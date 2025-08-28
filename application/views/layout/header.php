@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+	<title><?php echo $tab_title; ?></title>
+	<link href="<?php echo base_url('assets/image/favicon.png'); ?>" rel="icon">
+    <link href="<?php echo base_url('assets/image/favicon.png'); ?>" rel="apple-touch-icon">
+	<link href="https://fonts.googleapis.com/css?family=Poppins:300,400,500,600,700" rel="stylesheet">
+	<link href="<?php echo base_url('assets/css/datatables-bundle.css?param=qiqithay'); ?>" type="text/css" rel="stylesheet">
+	<link href="<?php echo base_url('assets/css/plugins-bundle.css'); ?>" type="text/css" rel="stylesheet">
+	<link href="<?php echo base_url('assets/css/prismjs-bundle.css'); ?>" type="text/css" rel="stylesheet">
+	<link href="<?php echo base_url('assets/css/style-bundle.css?param=kiriel'); ?>" type="text/css" rel="stylesheet">
+	<link href="<?php echo base_url('assets/css/dark.css'); ?>" type="text/css" rel="stylesheet">
+	<link href="<?php echo base_url('assets/css/skin.min.css'); ?>" type="text/css" rel="stylesheet">
+	<script src="<?php echo base_url('assets/js/plugins-bundle.js?param=qiqi'); ?>"></script>
+	<script src="<?php echo base_url('assets/js/jquery-dirty.js'); ?>"></script>
+</head>
+
+<style type="text/css">
+	input::-webkit-outer-spin-button,
+	input::-webkit-inner-spin-button {
+		-webkit-appearance: none;
+		margin: 0;
+	}
+
+	input[type=number] {
+		-moz-appearance: textfield;
+	}
+</style>
+
+<body class="header-fixed header-mobile-fixed subheader-enabled subheader-fixed aside-enabled aside-fixed aside-minimize-hoverable page-loading">
+	<div class="header-mobile align-items-center header-mobile-fixed" style="background-color:black;">
+		<a href="<?php echo base_url('Dashboard'); ?>">
+			<img src="">
+		</a>
+		<div class="d-flex align-items-center">
+			<button id="kt_aside_mobile_toggle" class="btn p-0 burger-icon burger-icon-left">
+				<span></span>
+			</button>
+			<button id="kt_header_mobile_topbar_toggle" class="btn btn-hover-text-primary p-0 ml-2">
+				<span class="svg-icon svg-icon-xl">
+					<svg>
+						<g>
+							<path d="M12, 11 C9.790861, 11 8, 9.209139 8, 7 C8, 4.790861 9.790861, 3 12, 3 C14.209139, 3 16, 4.790861 16, 7 C16, 9.209139 14.209139, 11 12, 11 Z" fill="#000000" opacity="0.3"></path>
+							<path d="M3.00065168, 20.1992055 C3.38825852, 15.4265159 7.26191235, 13 11.9833413, 13 C16.7712164, 13 20.7048837, 15.2931929 20.9979143, 20.2 C21.0095879, 20.3954741 20.9979143, 21 20.2466999, 21 C16.541124, 21 11.0347247, 21 3.72750223, 21 C3.47671215, 21 2.97953825, 20.45918 3.00065168, 20.1992055 Z" fill="#000000"></path>
+						</g>
+					</svg>
+				</span>
+			</button>
+		</div>
+	</div>
+	<div class="d-flex flex-column flex-root">
+		<div class="d-flex flex-row flex-column-fluid page">
+			<div id="kt_aside" class="aside aside-left aside-fixed d-flex flex-column flex-row-auto">
+				<div class="brand flex-column-auto">
+					<a href="<?php echo base_url('Dashboard'); ?>" class="brand-logo">
+						<img src="<?php echo base_url('assets/image/logo.png'); ?>" class="w-100">
+					</a>
+					<button id="kt_aside_toggle" class="brand-toggle btn btn-sm px-0">
+						<span class="svg-icon svg-icon-xl">
+							<svg>
+								<g>
+									<path d="M5.29288961, 6.70710318 C4.90236532, 6.31657888 4.90236532, 5.68341391 5.29288961, 5.29288961 C5.68341391, 4.90236532 6.31657888, 4.90236532 6.70710318, 5.29288961 L12.7071032, 11.2928896 C13.0856821, 11.6714686 13.0989277, 12.281055 12.7371505, 12.675721 L7.23715054, 18.675721 C6.86395813, 19.08284 6.23139076, 19.1103429 5.82427177, 18.7371505 C5.41715278, 18.3639581 5.38964985, 17.7313908 5.76284226, 17.3242718 L10.6158586, 12.0300721 L5.29288961, 6.70710318 Z" fill="#000000" transform="translate(8.999997, 11.999999) scale(-1, 1) translate(-8.999997, -11.999999)"></path>
+									<path d="M10.7071009, 15.7071068 C10.3165766, 16.0976311 9.68341162, 16.0976311 9.29288733, 15.7071068 C8.90236304, 15.3165825 8.90236304, 14.6834175 9.29288733, 14.2928932 L15.2928873, 8.29289322 C15.6714663, 7.91431428 16.2810527, 7.90106866 16.6757187, 8.26284586 L22.6757187, 13.7628459 C23.0828377, 14.1360383 23.1103407, 14.7686056 22.7371482, 15.1757246 C22.3639558, 15.5828436 21.7313885, 15.6103465 21.3242695, 15.2371541 L16.0300699, 10.3841378 L10.7071009, 15.7071068 Z" fill="#000000" opacity="0.3" transform="translate(15.999997, 11.999999) scale(-1, 1) rotate(-270.000000) translate(-15.999997, -11.999999)"></path>
+								</g>
+							</svg>
+						</span>
+					</button>
+				</div>
+				<div class="aside-menu-wrapper flex-column-fluid">
+					<div id="kt_aside_menu" class="aside-menu my-4 scroll ps ps--active-y">
+						<ul class="menu-nav">
+							<li class="menu-item <?php if($this->router->class == 'Dashboard') { echo 'menu-item-active'; } ?>">
+								<a href="<?php echo base_url('Dashboard'); ?>" class="menu-link">
+									<span class="svg-icon menu-icon">
+										<svg>
+											<g>
+												<path d="M12.9336061, 16.072447 L19.36, 10.9564761 L19.5181585, 10.8312381 C20.1676248, 10.3169571 20.2772143, 9.3735535 19.7629333, 8.72408713 C19.6917232, 8.63415859 19.6104327, 8.55269514 19.5206557, 8.48129411 L12.9336854, 3.24257445 C12.3871201, 2.80788259 11.6128799, 2.80788259 11.0663146, 3.24257445 L4.47482784, 8.48488609 C3.82645598, 9.00054628 3.71887192, 9.94418071 4.23453211, 10.5925526 C4.30500305, 10.6811601 4.38527899, 10.7615046 4.47382636, 10.8320511 L4.63, 10.9564761 L11.0659024, 16.0730648 C11.6126744, 16.5077525 12.3871218, 16.5074963 12.9336061, 16.072447 Z" fill="#000000"></path>
+												<path d="M11.0563554, 18.6706981 L5.33593024, 14.122919 C4.94553994, 13.8125559 4.37746707, 13.8774308 4.06710397, 14.2678211 C4.06471678, 14.2708238 4.06234874, 14.2738418 4.06, 14.2768747 L4.06, 14.2768747 C3.75257288, 14.6738539 3.82516916, 15.244888 4.22214834, 15.5523151 C4.22358765, 15.5534297 4.2250303, 15.55454 4.22647627, 15.555646 L11.0872776, 20.8031356 C11.6250734, 21.2144692 12.371757, 21.2145375 12.909628, 20.8033023 L19.7677785, 15.559828 C20.1693192, 15.2528257 20.2459576, 14.6784381 19.9389553, 14.2768974 C19.9376429, 14.2751809 19.9363245, 14.2734691 19.935, 14.2717619 L19.935, 14.2717619 C19.6266937, 13.8743807 19.0546209, 13.8021712 18.6572397, 14.1104775 C18.654352, 14.112718 18.6514778, 14.1149757 18.6486172, 14.1172508 L12.9235044, 18.6705218 C12.377022, 19.1051477 11.6029199, 19.1052208 11.0563554, 18.6706981 Z" fill="#000000" opacity="0.3"></path>
+											</g>
+										</svg>
+									</span>
+									<span class="menu-text">Dashboard</span>
+								</a>
+							</li>
+							<?php if($this->session->level != 20) { ?>
+								<li class="menu-item <?php if($this->router->class == 'Admin') { echo 'menu-item-active'; } ?>">
+									<a href="<?php echo base_url('Admin'); ?>" class="menu-link">
+										<span class="svg-icon menu-icon">
+											<svg>
+												<g>
+													<path d="M12.9336061, 16.072447 L19.36, 10.9564761 L19.5181585, 10.8312381 C20.1676248, 10.3169571 20.2772143, 9.3735535 19.7629333, 8.72408713 C19.6917232, 8.63415859 19.6104327, 8.55269514 19.5206557, 8.48129411 L12.9336854, 3.24257445 C12.3871201, 2.80788259 11.6128799, 2.80788259 11.0663146, 3.24257445 L4.47482784, 8.48488609 C3.82645598, 9.00054628 3.71887192, 9.94418071 4.23453211, 10.5925526 C4.30500305, 10.6811601 4.38527899, 10.7615046 4.47382636, 10.8320511 L4.63, 10.9564761 L11.0659024, 16.0730648 C11.6126744, 16.5077525 12.3871218, 16.5074963 12.9336061, 16.072447 Z" fill="#000000"></path>
+													<path d="M11.0563554, 18.6706981 L5.33593024, 14.122919 C4.94553994, 13.8125559 4.37746707, 13.8774308 4.06710397, 14.2678211 C4.06471678, 14.2708238 4.06234874, 14.2738418 4.06, 14.2768747 L4.06, 14.2768747 C3.75257288, 14.6738539 3.82516916, 15.244888 4.22214834, 15.5523151 C4.22358765, 15.5534297 4.2250303, 15.55454 4.22647627, 15.555646 L11.0872776, 20.8031356 C11.6250734, 21.2144692 12.371757, 21.2145375 12.909628, 20.8033023 L19.7677785, 15.559828 C20.1693192, 15.2528257 20.2459576, 14.6784381 19.9389553, 14.2768974 C19.9376429, 14.2751809 19.9363245, 14.2734691 19.935, 14.2717619 L19.935, 14.2717619 C19.6266937, 13.8743807 19.0546209, 13.8021712 18.6572397, 14.1104775 C18.654352, 14.112718 18.6514778, 14.1149757 18.6486172, 14.1172508 L12.9235044, 18.6705218 C12.377022, 19.1051477 11.6029199, 19.1052208 11.0563554, 18.6706981 Z" fill="#000000" opacity="0.3"></path>
+												</g>
+											</svg>
+										</span>
+										<span class="menu-text">Admin</span>
+									</a>
+								</li>
+							<?php } ?>
+							<?php if(in_array('VB', $this->session->access_control)) { ?>
+								<li class="menu-item <?php if($this->router->class == 'Booking') { echo 'menu-item-active'; } ?>">
+									<a href="<?php echo base_url('Booking'); ?>" class="menu-link">
+										<span class="svg-icon menu-icon">
+											<svg>
+												<g>
+													<path d="M12.9336061, 16.072447 L19.36, 10.9564761 L19.5181585, 10.8312381 C20.1676248, 10.3169571 20.2772143, 9.3735535 19.7629333, 8.72408713 C19.6917232, 8.63415859 19.6104327, 8.55269514 19.5206557, 8.48129411 L12.9336854, 3.24257445 C12.3871201, 2.80788259 11.6128799, 2.80788259 11.0663146, 3.24257445 L4.47482784, 8.48488609 C3.82645598, 9.00054628 3.71887192, 9.94418071 4.23453211, 10.5925526 C4.30500305, 10.6811601 4.38527899, 10.7615046 4.47382636, 10.8320511 L4.63, 10.9564761 L11.0659024, 16.0730648 C11.6126744, 16.5077525 12.3871218, 16.5074963 12.9336061, 16.072447 Z" fill="#000000"></path>
+													<path d="M11.0563554, 18.6706981 L5.33593024, 14.122919 C4.94553994, 13.8125559 4.37746707, 13.8774308 4.06710397, 14.2678211 C4.06471678, 14.2708238 4.06234874, 14.2738418 4.06, 14.2768747 L4.06, 14.2768747 C3.75257288, 14.6738539 3.82516916, 15.244888 4.22214834, 15.5523151 C4.22358765, 15.5534297 4.2250303, 15.55454 4.22647627, 15.555646 L11.0872776, 20.8031356 C11.6250734, 21.2144692 12.371757, 21.2145375 12.909628, 20.8033023 L19.7677785, 15.559828 C20.1693192, 15.2528257 20.2459576, 14.6784381 19.9389553, 14.2768974 C19.9376429, 14.2751809 19.9363245, 14.2734691 19.935, 14.2717619 L19.935, 14.2717619 C19.6266937, 13.8743807 19.0546209, 13.8021712 18.6572397, 14.1104775 C18.654352, 14.112718 18.6514778, 14.1149757 18.6486172, 14.1172508 L12.9235044, 18.6705218 C12.377022, 19.1051477 11.6029199, 19.1052208 11.0563554, 18.6706981 Z" fill="#000000" opacity="0.3"></path>
+												</g>
+											</svg>
+										</span>
+										<span class="menu-text">Booking</span>
+									</a>
+								</li>
+							<?php } ?>
+							<?php if(in_array('VP', $this->session->access_control)) { ?>
+								<li class="menu-item <?php if($this->router->class == 'Payment') { echo 'menu-item-active'; } ?>">
+									<a href="<?php echo base_url('Payment'); ?>" class="menu-link">
+										<span class="svg-icon menu-icon">
+											<svg>
+												<g>
+													<path d="M12.9336061, 16.072447 L19.36, 10.9564761 L19.5181585, 10.8312381 C20.1676248, 10.3169571 20.2772143, 9.3735535 19.7629333, 8.72408713 C19.6917232, 8.63415859 19.6104327, 8.55269514 19.5206557, 8.48129411 L12.9336854, 3.24257445 C12.3871201, 2.80788259 11.6128799, 2.80788259 11.0663146, 3.24257445 L4.47482784, 8.48488609 C3.82645598, 9.00054628 3.71887192, 9.94418071 4.23453211, 10.5925526 C4.30500305, 10.6811601 4.38527899, 10.7615046 4.47382636, 10.8320511 L4.63, 10.9564761 L11.0659024, 16.0730648 C11.6126744, 16.5077525 12.3871218, 16.5074963 12.9336061, 16.072447 Z" fill="#000000"></path>
+													<path d="M11.0563554, 18.6706981 L5.33593024, 14.122919 C4.94553994, 13.8125559 4.37746707, 13.8774308 4.06710397, 14.2678211 C4.06471678, 14.2708238 4.06234874, 14.2738418 4.06, 14.2768747 L4.06, 14.2768747 C3.75257288, 14.6738539 3.82516916, 15.244888 4.22214834, 15.5523151 C4.22358765, 15.5534297 4.2250303, 15.55454 4.22647627, 15.555646 L11.0872776, 20.8031356 C11.6250734, 21.2144692 12.371757, 21.2145375 12.909628, 20.8033023 L19.7677785, 15.559828 C20.1693192, 15.2528257 20.2459576, 14.6784381 19.9389553, 14.2768974 C19.9376429, 14.2751809 19.9363245, 14.2734691 19.935, 14.2717619 L19.935, 14.2717619 C19.6266937, 13.8743807 19.0546209, 13.8021712 18.6572397, 14.1104775 C18.654352, 14.112718 18.6514778, 14.1149757 18.6486172, 14.1172508 L12.9235044, 18.6705218 C12.377022, 19.1051477 11.6029199, 19.1052208 11.0563554, 18.6706981 Z" fill="#000000" opacity="0.3"></path>
+												</g>
+											</svg>
+										</span>
+										<span class="menu-text">Payment</span>
+									</a>
+								</li>
+							<?php } ?>
+							<?php if($this->session->level != 20) { ?>
+								<?php if(in_array('VR', $this->session->access_control)) { ?>
+									<li class="menu-item menu-item-submenu <?php if($this->router->class == 'Report') { echo 'menu-item-active menu-item-open'; } ?>">
+										<a href="javascript:;" class="menu-link menu-toggle">
+											<span class="svg-icon menu-icon">
+												<svg>
+													<g>
+														<path d="M12.9336061, 16.072447 L19.36, 10.9564761 L19.5181585, 10.8312381 C20.1676248, 10.3169571 20.2772143, 9.3735535 19.7629333, 8.72408713 C19.6917232, 8.63415859 19.6104327, 8.55269514 19.5206557, 8.48129411 L12.9336854, 3.24257445 C12.3871201, 2.80788259 11.6128799, 2.80788259 11.0663146, 3.24257445 L4.47482784, 8.48488609 C3.82645598, 9.00054628 3.71887192, 9.94418071 4.23453211, 10.5925526 C4.30500305, 10.6811601 4.38527899, 10.7615046 4.47382636, 10.8320511 L4.63, 10.9564761 L11.0659024, 16.0730648 C11.6126744, 16.5077525 12.3871218, 16.5074963 12.9336061, 16.072447 Z" fill="#000000"></path>
+														<path d="M11.0563554, 18.6706981 L5.33593024, 14.122919 C4.94553994, 13.8125559 4.37746707, 13.8774308 4.06710397, 14.2678211 C4.06471678, 14.2708238 4.06234874, 14.2738418 4.06, 14.2768747 L4.06, 14.2768747 C3.75257288, 14.6738539 3.82516916, 15.244888 4.22214834, 15.5523151 C4.22358765, 15.5534297 4.2250303, 15.55454 4.22647627, 15.555646 L11.0872776, 20.8031356 C11.6250734, 21.2144692 12.371757, 21.2145375 12.909628, 20.8033023 L19.7677785, 15.559828 C20.1693192, 15.2528257 20.2459576, 14.6784381 19.9389553, 14.2768974 C19.9376429, 14.2751809 19.9363245, 14.2734691 19.935, 14.2717619 L19.935, 14.2717619 C19.6266937, 13.8743807 19.0546209, 13.8021712 18.6572397, 14.1104775 C18.654352, 14.112718 18.6514778, 14.1149757 18.6486172, 14.1172508 L12.9235044, 18.6705218 C12.377022, 19.1051477 11.6029199, 19.1052208 11.0563554, 18.6706981 Z" fill="#000000" opacity="0.3"></path>
+													</g>
+												</svg>
+											</span>
+											<span class="menu-text">Report</span>
+											<i class="menu-arrow"></i>
+										</a>
+										<div class="menu-submenu">
+											<i class="menu-arrow"></i>
+											<ul class="menu-subnav">
+												<li class="menu-item <?php if($this->router->method == 'Destination_Sales') { echo 'menu-item-active'; } ?>">
+													<a href="<?php echo base_url('Report/Destination_Sales'); ?>" class="menu-link">
+														<i class="menu-bullet menu-bullet-dot">
+															<span></span>
+														</i>
+														<span class="menu-text">Destination Sales</span>
+													</a>
+												</li>
+												<li class="menu-item <?php if($this->router->method == 'City_Sales') { echo 'menu-item-active'; } ?>">
+													<a href="<?php echo base_url('Report/City_Sales'); ?>" class="menu-link">
+														<i class="menu-bullet menu-bullet-dot">
+															<span></span>
+														</i>
+														<span class="menu-text">City Sales</span>
+													</a>
+												</li>
+												<li class="menu-item <?php if($this->router->method == 'State_Sales') { echo 'menu-item-active'; } ?>">
+													<a href="<?php echo base_url('Report/State_Sales'); ?>" class="menu-link">
+														<i class="menu-bullet menu-bullet-dot">
+															<span></span>
+														</i>
+														<span class="menu-text">State Sales</span>
+													</a>
+												</li>
+												<li class="menu-item <?php if($this->router->method == 'Country_Sales') { echo 'menu-item-active'; } ?>">
+													<a href="<?php echo base_url('Report/Country_Sales'); ?>" class="menu-link">
+														<i class="menu-bullet menu-bullet-dot">
+															<span></span>
+														</i>
+														<span class="menu-text">Country Sales</span>
+													</a>
+												</li>
+												<li class="menu-item <?php if($this->router->method == 'Product_Sales') { echo 'menu-item-active'; } ?>">
+													<a href="<?php echo base_url('Report/Product_Sales'); ?>" class="menu-link">
+														<i class="menu-bullet menu-bullet-dot">
+															<span></span>
+														</i>
+														<span class="menu-text">Product Sales</span>
+													</a>
+												</li>
+												<li class="menu-item <?php if($this->router->method == 'BC_By_Source') { echo 'menu-item-active'; } ?>">
+													<a href="<?php echo base_url('Report/BC_By_Source'); ?>" class="menu-link">
+														<i class="menu-bullet menu-bullet-dot">
+															<span></span>
+														</i>
+														<span class="menu-text">BC By Source</span>
+													</a>
+												</li>
+												<li class="menu-item <?php if($this->router->method == 'Guest_By_Country') { echo 'menu-item-active'; } ?>">
+													<a href="<?php echo base_url('Report/Guest_By_Country'); ?>" class="menu-link">
+														<i class="menu-bullet menu-bullet-dot">
+															<span></span>
+														</i>
+														<span class="menu-text">Guest By Country</span>
+													</a>
+												</li>
+											</ul>
+										</div>
+									</li>
+								<?php } ?>
+								<li class="menu-item menu-item-submenu <?php if($this->router->class == 'Category_Code' || $this->router->class == 'Category' || $this->router->class == 'Supplier' || $this->router->class == 'Product' || $this->router->class == 'Footer' || $this->router->class == 'Country_Code' || $this->router->class == 'Tag' || $this->router->class == 'Source') { echo 'menu-item-active menu-item-open'; } ?>">
+									<a href="javascript:;" class="menu-link menu-toggle">
+										<span class="svg-icon menu-icon">
+											<svg>
+												<g>
+													<path d="M12.9336061, 16.072447 L19.36, 10.9564761 L19.5181585, 10.8312381 C20.1676248, 10.3169571 20.2772143, 9.3735535 19.7629333, 8.72408713 C19.6917232, 8.63415859 19.6104327, 8.55269514 19.5206557, 8.48129411 L12.9336854, 3.24257445 C12.3871201, 2.80788259 11.6128799, 2.80788259 11.0663146, 3.24257445 L4.47482784, 8.48488609 C3.82645598, 9.00054628 3.71887192, 9.94418071 4.23453211, 10.5925526 C4.30500305, 10.6811601 4.38527899, 10.7615046 4.47382636, 10.8320511 L4.63, 10.9564761 L11.0659024, 16.0730648 C11.6126744, 16.5077525 12.3871218, 16.5074963 12.9336061, 16.072447 Z" fill="#000000"></path>
+													<path d="M11.0563554, 18.6706981 L5.33593024, 14.122919 C4.94553994, 13.8125559 4.37746707, 13.8774308 4.06710397, 14.2678211 C4.06471678, 14.2708238 4.06234874, 14.2738418 4.06, 14.2768747 L4.06, 14.2768747 C3.75257288, 14.6738539 3.82516916, 15.244888 4.22214834, 15.5523151 C4.22358765, 15.5534297 4.2250303, 15.55454 4.22647627, 15.555646 L11.0872776, 20.8031356 C11.6250734, 21.2144692 12.371757, 21.2145375 12.909628, 20.8033023 L19.7677785, 15.559828 C20.1693192, 15.2528257 20.2459576, 14.6784381 19.9389553, 14.2768974 C19.9376429, 14.2751809 19.9363245, 14.2734691 19.935, 14.2717619 L19.935, 14.2717619 C19.6266937, 13.8743807 19.0546209, 13.8021712 18.6572397, 14.1104775 C18.654352, 14.112718 18.6514778, 14.1149757 18.6486172, 14.1172508 L12.9235044, 18.6705218 C12.377022, 19.1051477 11.6029199, 19.1052208 11.0563554, 18.6706981 Z" fill="#000000" opacity="0.3"></path>
+												</g>
+											</svg>
+										</span>
+										<span class="menu-text">Setting</span>
+										<i class="menu-arrow"></i>
+									</a>
+									<div class="menu-submenu">
+										<i class="menu-arrow"></i>
+										<ul class="menu-subnav">
+											<li class="menu-item <?php if($this->router->class == 'Category_Code') { echo 'menu-item-active'; } ?>">
+												<a href="<?php echo base_url('Category_Code'); ?>" class="menu-link">
+													<i class="menu-bullet menu-bullet-dot">
+														<span></span>
+													</i>
+													<span class="menu-text">Category Code</span>
+												</a>
+											</li>
+											<li class="menu-item <?php if($this->router->class == 'Category') { echo 'menu-item-active'; } ?>">
+												<a href="<?php echo base_url('Category'); ?>" class="menu-link">
+													<i class="menu-bullet menu-bullet-dot">
+														<span></span>
+													</i>
+													<span class="menu-text">Category</span>
+												</a>
+											</li>
+											<li class="menu-item <?php if($this->router->class == 'Supplier') { echo 'menu-item-active'; } ?>">
+												<a href="<?php echo base_url('Supplier'); ?>" class="menu-link">
+													<i class="menu-bullet menu-bullet-dot">
+														<span></span>
+													</i>
+													<span class="menu-text">Supplier</span>
+												</a>
+											</li>
+											<li class="menu-item <?php if($this->router->class == 'Product') { echo 'menu-item-active'; } ?>">
+												<a href="<?php echo base_url('Product'); ?>" class="menu-link">
+													<i class="menu-bullet menu-bullet-dot">
+														<span></span>
+													</i>
+													<span class="menu-text">Product</span>
+												</a>
+											</li>
+											<li class="menu-item <?php if($this->router->class == 'Footer') { echo 'menu-item-active'; } ?>">
+												<a href="<?php echo base_url('Footer'); ?>" class="menu-link">
+													<i class="menu-bullet menu-bullet-dot">
+														<span></span>
+													</i>
+													<span class="menu-text">Footer</span>
+												</a>
+											</li>
+											<li class="menu-item <?php if($this->router->class == 'Country_Code') { echo 'menu-item-active'; } ?>">
+												<a href="<?php echo base_url('Country_Code'); ?>" class="menu-link">
+													<i class="menu-bullet menu-bullet-dot">
+														<span></span>
+													</i>
+													<span class="menu-text">Country Code</span>
+												</a>
+											</li>
+											<li class="menu-item <?php if($this->router->class == 'Tag') { echo 'menu-item-active'; } ?>">
+												<a href="<?php echo base_url('Tag'); ?>" class="menu-link">
+													<i class="menu-bullet menu-bullet-dot">
+														<span></span>
+													</i>
+													<span class="menu-text">Tag</span>
+												</a>
+											</li>
+											<li class="menu-item <?php if($this->router->class == 'Source') { echo 'menu-item-active'; } ?>">
+												<a href="<?php echo base_url('Source'); ?>" class="menu-link">
+													<i class="menu-bullet menu-bullet-dot">
+														<span></span>
+													</i>
+													<span class="menu-text">Source</span>
+												</a>
+											</li>
+										</ul>
+									</div>
+								</li>
+							<?php } ?>
+						</ul>
+					</div>
+				</div>
+			</div>
+		</div>
+		<div class="d-flex flex-column flex-row-fluid wrapper">
+			<div class="header header-fixed" style="background-color:#EEF0F8;">
+				<div class="container-fluid d-flex align-items-stretch justify-content-between">
+					<div class="header-menu-wrapper header-menu-wrapper-left">
+						<div class="header-menu header-menu-mobile header-menu-layout-default"></div>
+					</div>
+					<div class="topbar">
+						<div class="topbar-item">
+							<div id="kt_quick_user_toggle" class="btn btn-icon btn-icon-mobile w-auto btn-clean d-flex align-items-center btn-lg px-2">
+								<span class="text-muted font-weight-bold font-size-base d-md-inline mr-1">Welcome,</span>
+								<span class="text-dark-50 font-weight-bolder font-size-base d-none d-md-inline mr-3"><?php echo $this->session->name; ?></span>
+								<span class="symbol symbol-lg-35 symbol-25 symbol-light-success">
+									<span class="symbol-label font-size-h5 font-weight-bold">
+										<img src="<?php echo $this->session->profile_picture; ?>" class="w-100">
+									</span>
+								</span>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+			<div class="content d-flex flex-column flex-column-fluid">
+				<div class="subheader py-2 py-lg-4 subheader-solid">
+					<div class="container-fluid d-flex align-items-center justify-content-between flex-wrap flex-sm-nowrap">
+						<div class="d-flex align-items-center flex-wrap mr-2">
+							<h5 class="text-dark font-weight-bold mt-2 mb-2 mr-5"><?php echo $breadcrumb_title; ?></h5>
+						</div>
+					</div>
+				</div>
+				<div id="kt_quick_user" class="offcanvas offcanvas-right p-10">
+					<div class="offcanvas-header d-flex align-items-center justify-content-between pb-5">
+						<h3 class="font-weight-bold m-0">Admin
+							<a id="kt_quick_user_close" class="btn btn-xs btn-icon btn-light btn-hover-primary">
+								<i class="ki ki-close icon-xs text-muted"></i>
+							</a>
+						</h3>
+					</div>
+					<div class="offcanvas-content pr-5 mr-n5 scroll ps ps--active-y">
+						<div class="d-flex align-items-center mt-5">
+							<div class="symbol symbol-100 mr-5">
+								<div class="symbol-label" style="background-image:url(<?php echo $this->session->profile_picture; ?>)"></div>
+								<i class="symbol-badge bg-success"></i>
+							</div>
+							<div class="d-flex flex-column">
+								<a href="<?php echo base_url('Profile'); ?>" class="font-weight-bold font-size-h5 text-dark-75 text-hover-primary"><?php echo $this->session->name; ?></a>
+								<div class="text-muted mt-1"><?php echo $this->session->priviledge; ?></div>
+								<div class="navi mt-2">
+									<a href="<?php echo base_url('Login/Logout'); ?>" class="btn btn-sm btn-light-primary font-weight-bold py-2 px-5" style="width:80px;">Logout</a>
+								</div>
+							</div>
+						</div>
+						<div class="separator separator-dashed mt-8 mb-5"></div>
+						<div class="navi navi-spacer-x-0 p-0">
+							<a href="<?php echo base_url('Profile'); ?>" class="navi-item">
+								<div class="navi-link">
+									<div class="symbol symbol-40 bg-light mr-3">
+										<div class="symbol-label">
+											<span class="svg-icon svg-icon-md svg-icon-success">
+												<svg>
+													<g>
+														<path d="M13.2070325, 4 C13.0721672, 4.47683179 13, 4.97998812 13, 5.5 C13, 8.53756612 15.4624339, 11 18.5, 11 C19.0200119, 11 19.5231682, 10.9278328 20, 10.7929675 L20, 17 C20, 18.6568542 18.6568542, 20 17, 20 L7, 20 C5.34314575, 20 4, 18.6568542 4, 17 L4, 7 C4, 5.34314575 5.34314575, 4 7, 4 L13.2070325, 4 Z" fill="#000000"></path>
+														<circle fill="#000000" opacity="0.3" cx="18.5" cy="5.5" r="2.5"></circle>
+													</g>
+												</svg>
+											</span>
+										</div>
+									</div>
+									<div class="navi-text">
+										<div class="font-weight-bold">My Profile</div>
+										<div class="text-muted">Information & Account Setting</div>
+									</div>
+								</div>
+							</a>
+						</div>
+						<?php if($this->session->level != 20) { ?>
+							<div class="navi navi-spacer-x-0 p-0">
+								<a href="<?php echo base_url('Company'); ?>" class="navi-item">
+									<div class="navi-link">
+										<div class="symbol symbol-40 bg-light mr-3">
+											<div class="symbol-label">
+												<span class="svg-icon svg-icon-md svg-icon-success">
+													<svg>
+														<g>
+															<path d="M13.2070325, 4 C13.0721672, 4.47683179 13, 4.97998812 13, 5.5 C13, 8.53756612 15.4624339, 11 18.5, 11 C19.0200119, 11 19.5231682, 10.9278328 20, 10.7929675 L20, 17 C20, 18.6568542 18.6568542, 20 17, 20 L7, 20 C5.34314575, 20 4, 18.6568542 4, 17 L4, 7 C4, 5.34314575 5.34314575, 4 7, 4 L13.2070325, 4 Z" fill="#000000"></path>
+															<circle fill="#000000" opacity="0.3" cx="18.5" cy="5.5" r="2.5"></circle>
+														</g>
+													</svg>
+												</span>
+											</div>
+										</div>
+										<div class="navi-text">
+											<div class="font-weight-bold">Company Profile</div>
+											<div class="text-muted">Information</div>
+										</div>
+									</div>
+								</a>
+							</div>
+						<?php } ?>
+					</div>
+				</div>

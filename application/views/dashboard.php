@@ -1,0 +1,1615 @@
+<div class="d-flex flex-column-fluid">
+	<div class="container-fluid">
+		<div class="card card-custom mb-5">
+            <div class="card-header flex-wrap py-3" style="background-color:#D7E2F2;">
+                <div class="card-title">
+                    <h3 class="card-label" style="color:#6082B6;">
+                        <strong>Dashboard</strong>
+                    </h3>
+                </div>
+                <?php if($this->session->level != 20) { ?>
+                    <div class="card-toolbar" style="width:350px;">
+                        <label>Sales Agent</label>
+                        <select title="--Select Sales Agent--" id="sales_agent" data-live-search="true" class="form-control selectpicker">
+                            <option selected data-icon="la la-user-alt font-size-lg bs-icon" value="">ALL</option>
+                            <?php foreach($sales_agents as $sales_agent) { ?>
+                                <option data-icon="la la-user-alt font-size-lg bs-icon" value="<?php echo $sales_agent->AdminID; ?>"><?php echo $sales_agent->Name; ?></option>
+                            <?php } ?>
+                        </select>
+                    </div>
+                <?php } ?>
+            </div>
+            <div class="card-body">
+                <div class="row pt-7 pl-3 pr-3 mb-5" style="background-color:#CCCCFF30;">
+                    <?php if($this->session->level == 20) { ?>
+                        <div class="col-md-12">
+                            <div class="card card-custom card-stretch gutter-b">
+                                <div class="card-header border-0" style="background-color:#F0FFFF;">
+                                    <h3 class="card-title font-weight-bold text-dark" style="font-size:14px;">Travel Reminder</h3>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card card-custom card-stretch gutter-b">
+                                <div class="card-header border-0" style="background-color:#A7C7E730;">
+                                    <h3 class="card-title font-weight-bold text-dark" style="font-size:14px;">Travels Tomorrow</h3>
+                                </div>
+                                <div class="card-body">
+                                    <div class="accordion accordion-solid accordion-toggle-plus">
+                                        <div class="card">
+                                            <div class="card-header">
+                                                <div data-toggle="collapse" data-target="#sales_agent_upcoming_travels" class="card-title collapsed" style="font-size:13px;"><?php echo '<strong>' . count($sales_agent_upcoming_travels) . '</strong>&nbsp;BC(s)'; ?></div>
+                                            </div>
+                                            <div id="sales_agent_upcoming_travels" class="collapse">
+                                                <div class="card-body">
+                                                    <?php if(!empty($sales_agent_upcoming_travels)) {
+                                                        foreach($sales_agent_upcoming_travels as $sales_agent_upcoming_travel) { ?>
+                                                            <div class="d-flex align-items-center">
+                                                                <span class="bullet bullet-bar bg-primary align-self-stretch"></span>
+                                                                <label class="checkbox checkbox-lg checkbox-light-primary checkbox-inline flex-shrink-0 m-0 mx-4">
+                                                                    <input disabled type="checkbox">
+                                                                    <span></span>
+                                                                </label>
+                                                                <div class="d-flex flex-column flex-grow-1">
+                                                                    <a href="<?php echo base_url('Booking?booking_number=') . $sales_agent_upcoming_travel->BookingNumber; ?>" target="_blank" class="text-dark-75 text-hover-primary font-weight-bold font-size-xs"><?php echo $sales_agent_upcoming_travel->BookingNumber; ?></a>
+                                                                    <span class="text-muted font-weight-bold" style="font-size:10px;"><?php echo $sales_agent_upcoming_travel->Name; ?></span>
+                                                                    <span class="text-muted font-weight-bold" style="font-size:10px;"><?php echo $sales_agent_upcoming_travel->Customer; ?></span>
+                                                                </div>
+                                                            </div>
+                                                            <br>
+                                                        <?php }
+                                                    } ?>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card card-custom card-stretch gutter-b">
+                                <div class="card-header border-0" style="background-color:#FFFAA030;">
+                                    <h3 class="card-title font-weight-bold text-dark" style="font-size:14px;">Upcoming Travel In 7 Days - Pending Travel Voucher</h3>
+                                </div>
+                                <div class="card-body">
+                                    <div class="accordion accordion-solid accordion-toggle-plus">
+                                        <div class="card">
+                                            <div class="card-header">
+                                                <div data-toggle="collapse" data-target="#sales_agent_pending_travel_vouchers" class="card-title collapsed" style="font-size:13px;"><?php echo '<strong>' . count($sales_agent_pending_travel_vouchers) . '</strong>&nbsp;BC(s)'; ?></div>
+                                            </div>
+                                            <div id="sales_agent_pending_travel_vouchers" class="collapse">
+                                                <div class="card-body">
+                                                    <?php if(!empty($sales_agent_pending_travel_vouchers)) {
+                                                        foreach($sales_agent_pending_travel_vouchers as $sales_agent_pending_travel_voucher) { ?>
+                                                            <div class="d-flex align-items-center">
+                                                                <span class="bullet bullet-bar bg-warning align-self-stretch"></span>
+                                                                <label class="checkbox checkbox-lg checkbox-light-warning checkbox-inline flex-shrink-0 m-0 mx-4">
+                                                                    <input disabled type="checkbox">
+                                                                    <span></span>
+                                                                </label>
+                                                                <div class="d-flex flex-column flex-grow-1">
+                                                                    <a href="<?php echo base_url('Booking?booking_number=') . $sales_agent_pending_travel_voucher->BookingNumber; ?>" target="_blank" class="text-dark-75 text-hover-primary font-weight-bold font-size-xs"><?php echo $sales_agent_pending_travel_voucher->BookingNumber; ?></a>
+                                                                    <span class="text-muted font-weight-bold" style="color:#FAC898 !important; font-size:10px;"><?php echo strtoupper(date('j M', strtotime($sales_agent_pending_travel_voucher->StartDate)) . ' - ' . date('j M Y', strtotime($sales_agent_pending_travel_voucher->EndDate))); ?></span>
+                                                                    <span class="text-muted font-weight-bold" style="font-size:10px;"><?php echo $sales_agent_pending_travel_voucher->Name; ?></span>
+                                                                    <span class="text-muted font-weight-bold" style="font-size:10px;"><?php echo $sales_agent_pending_travel_voucher->Customer; ?></span>
+                                                                </div>
+                                                            </div>
+                                                            <br>
+                                                        <?php }
+                                                    } ?>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card card-custom card-stretch gutter-b">
+                                <div class="card-header border-0" style="background-color:#FFFAA030;">
+                                    <h3 class="card-title font-weight-bold text-dark" style="font-size:14px;">Travel Completed - Pending Review</h3>
+                                </div>
+                                <div class="card-body">
+                                    <div class="accordion accordion-solid accordion-toggle-plus">
+                                        <div class="card">
+                                            <div class="card-header">
+                                                <div data-toggle="collapse" data-target="#sales_agent_pending_reviews" class="card-title collapsed" style="font-size:13px;"><?php echo '<strong>' . count($sales_agent_pending_reviews) . '</strong>&nbsp;BC(s)'; ?></div>
+                                            </div>
+                                            <div id="sales_agent_pending_reviews" class="collapse">
+                                                <div class="card-body">
+                                                    <?php if(!empty($sales_agent_pending_reviews)) {
+                                                        foreach($sales_agent_pending_reviews as $sales_agent_pending_review) { ?>
+                                                            <div class="d-flex align-items-center">
+                                                                <span class="bullet bullet-bar bg-warning align-self-stretch"></span>
+                                                                <label class="checkbox checkbox-lg checkbox-light-warning checkbox-inline flex-shrink-0 m-0 mx-4">
+                                                                    <input disabled type="checkbox">
+                                                                    <span></span>
+                                                                </label>
+                                                                <div class="d-flex flex-column flex-grow-1">
+                                                                    <a href="<?php echo base_url('Booking?booking_number=') . $sales_agent_pending_review->BookingNumber; ?>" target="_blank" class="text-dark-75 text-hover-primary font-weight-bold font-size-xs"><?php echo $sales_agent_pending_review->BookingNumber; ?></a>
+                                                                    <span class="text-muted font-weight-bold" style="font-size:10px;"><?php echo $sales_agent_pending_review->Name; ?></span>
+                                                                    <span class="text-muted font-weight-bold" style="font-size:10px;"><?php echo $sales_agent_pending_review->Customer; ?></span>
+                                                                </div>
+                                                            </div>
+                                                            <br>
+                                                        <?php }
+                                                    } ?>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-12">
+                            <div class="card card-custom card-stretch gutter-b">
+                                <div class="card-header border-0" style="background-color:#FFFFF0;">
+                                    <h3 class="card-title font-weight-bold text-dark" style="font-size:14px;">Payment Reminder</h3>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card card-custom card-stretch gutter-b">
+                                <div class="card-header border-0" style="background-color:#FAA0A030;">
+                                    <h3 class="card-title font-weight-bold text-dark" style="font-size:14px;">Payment Overdue</h3>
+                                </div>
+                                <div class="card-body">
+                                    <div class="accordion accordion-solid accordion-toggle-plus">
+                                        <div class="card">
+                                            <div class="card-header">
+                                                <div data-toggle="collapse" data-target="#sales_agent_overdue_payments" class="card-title collapsed" style="font-size:13px;"><?php echo '<strong>' . count($sales_agent_overdue_payments) . '</strong>&nbsp;BC(s)'; ?></div>
+                                            </div>
+                                            <div id="sales_agent_overdue_payments" class="collapse">
+                                                <div class="card-body">
+                                                    <?php if(!empty($sales_agent_overdue_payments)) {
+                                                        foreach($sales_agent_overdue_payments as $sales_agent_overdue_payment) { ?>
+                                                            <div class="d-flex align-items-center">
+                                                                <span class="bullet bullet-bar bg-danger align-self-stretch"></span>
+                                                                <label class="checkbox checkbox-lg checkbox-light-danger checkbox-inline flex-shrink-0 m-0 mx-4">
+                                                                    <input disabled type="checkbox">
+                                                                    <span></span>
+                                                                </label>
+                                                                <div class="d-flex flex-column flex-grow-1">
+                                                                    <a href="<?php echo base_url('Booking/Update?booking_id=') . $sales_agent_overdue_payment->BookingID; ?>" target="_blank" class="text-dark-75 text-hover-primary font-weight-bold font-size-xs"><?php echo $sales_agent_overdue_payment->BookingNumber; ?></a>
+                                                                    <a href="<?php echo base_url('Payment?booking_number=') . $sales_agent_overdue_payment->BookingNumber; ?>" target="_blank" class="text-muted font-weight-bold" style="font-size:10px;"><?php echo $sales_agent_overdue_payment->Name; ?></a>
+                                                                    <span class="text-muted font-weight-bold" style="font-size:10px;"><?php echo $sales_agent_overdue_payment->Customer; ?></span>
+                                                                </div>
+                                                            </div>
+                                                            <br>
+                                                        <?php }
+                                                    } ?>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card card-custom card-stretch gutter-b">
+                                <div class="card-header border-0" style="background-color:#FAA0A030;">
+                                    <h3 class="card-title font-weight-bold text-dark" style="font-size:14px;">Negative Profit Margin</h3>
+                                </div>
+                                <div class="card-body">
+                                    <div class="accordion accordion-solid accordion-toggle-plus">
+                                        <div class="card">
+                                            <div class="card-header">
+                                                <div data-toggle="collapse" data-target="#sales_agent_negative_profit_margins" class="card-title collapsed" style="font-size:13px;"><?php echo '<strong>' . count($sales_agent_negative_profit_margins) . '</strong>&nbsp;BC(s)'; ?></div>
+                                            </div>
+                                            <div id="sales_agent_negative_profit_margins" class="collapse">
+                                                <div class="card-body">
+                                                    <?php if(!empty($sales_agent_negative_profit_margins)) {
+                                                        foreach($sales_agent_negative_profit_margins as $sales_agent_negative_profit_margin) { ?>
+                                                            <div class="d-flex align-items-center">
+                                                                <span class="bullet bullet-bar bg-danger align-self-stretch"></span>
+                                                                <label class="checkbox checkbox-lg checkbox-light-danger checkbox-inline flex-shrink-0 m-0 mx-4">
+                                                                    <input disabled type="checkbox">
+                                                                    <span></span>
+                                                                </label>
+                                                                <div class="d-flex flex-column flex-grow-1">
+                                                                    <a href="<?php echo base_url('Payment?booking_number=') . $sales_agent_negative_profit_margin->BookingNumber; ?>" target="_blank" class="text-dark-75 text-hover-primary font-weight-bold font-size-xs"><?php echo $sales_agent_negative_profit_margin->BookingNumber; ?></a>
+                                                                    <span class="text-muted font-weight-bold" style="color:#F88379 !important; font-size:10px;"><?php echo 'RM ' . number_format($sales_agent_negative_profit_margin->NetProfit, 2, '.', ','); ?></span>
+                                                                    <span class="text-muted font-weight-bold" style="font-size:10px;"><?php echo $sales_agent_negative_profit_margin->Name; ?></span>
+                                                                    <span class="text-muted font-weight-bold" style="font-size:10px;"><?php echo $sales_agent_negative_profit_margin->Customer; ?></span>
+                                                                </div>
+                                                            </div>
+                                                            <br>
+                                                        <?php }
+                                                    } ?>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card card-custom card-stretch gutter-b">
+                                <div class="card-header border-0" style="background-color:#C1E1C130;">
+                                    <h3 class="card-title font-weight-bold text-dark" style="font-size:14px;">Profit Margin Less Than 10% - Last 30 Days</h3>
+                                </div>
+                                <div class="card-body">
+                                    <div class="accordion accordion-solid accordion-toggle-plus">
+                                        <div class="card">
+                                            <div class="card-header">
+                                                <div data-toggle="collapse" data-target="#sales_agent_profit_margins_less_than_10_percent" class="card-title collapsed" style="font-size:13px;"><?php echo '<strong>' . count($sales_agent_profit_margins_less_than_10_percent) . '</strong>&nbsp;BC(s)'; ?></div>
+                                            </div>
+                                            <div id="sales_agent_profit_margins_less_than_10_percent" class="collapse">
+                                                <div class="card-body">
+                                                    <?php if(!empty($sales_agent_profit_margins_less_than_10_percent)) {
+                                                        foreach($sales_agent_profit_margins_less_than_10_percent as $sales_agent_profit_margin_less_than_10_percent) { ?>
+                                                            <div class="d-flex align-items-center">
+                                                                <span class="bullet bullet-bar bg-success align-self-stretch"></span>
+                                                                <label class="checkbox checkbox-lg checkbox-light-success checkbox-inline flex-shrink-0 m-0 mx-4">
+                                                                    <input disabled type="checkbox">
+                                                                    <span></span>
+                                                                </label>
+                                                                <div class="d-flex flex-column flex-grow-1">
+                                                                    <a href="<?php echo base_url('Payment?booking_number=') . $sales_agent_profit_margin_less_than_10_percent->BookingNumber; ?>" target="_blank" class="text-dark-75 text-hover-primary font-weight-bold font-size-xs"><?php echo $sales_agent_profit_margin_less_than_10_percent->BookingNumber; ?></a>
+                                                                    <span class="text-muted font-weight-bold" style="color:#50C878 !important; font-size:10px;"><?php echo $sales_agent_profit_margin_less_than_10_percent->Percentage; ?></span>
+                                                                    <span class="text-muted font-weight-bold" style="font-size:10px;"><?php echo $sales_agent_profit_margin_less_than_10_percent->Name; ?></span>
+                                                                    <span class="text-muted font-weight-bold" style="font-size:10px;"><?php echo $sales_agent_profit_margin_less_than_10_percent->Customer; ?></span>
+                                                                </div>
+                                                            </div>
+                                                            <br>
+                                                        <?php }
+                                                    } ?>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-12">
+                            <div class="card card-custom card-stretch gutter-b">
+                                <div class="card-header border-0" style="background-color:#FFFFF0;">
+                                    <h3 class="card-title font-weight-bold text-dark" style="font-size:14px;">Payment Reminder</h3>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card card-custom card-stretch gutter-b">
+                                <div class="card-header border-0" style="background-color:#C1E1C130;">
+                                    <h3 class="card-title font-weight-bold text-dark" style="font-size:14px;">Pending Credit Payments</h3>
+                                </div>
+                                <div class="card-body">
+                                    <div class="accordion accordion-solid accordion-toggle-plus">
+                                        <div class="card">
+                                            <div class="card-header">
+                                                <div data-toggle="collapse" data-target="#sales_agent_pending_credit_payments" class="card-title collapsed" style="font-size:13px;"><?php echo '<strong>' . count($sales_agent_pending_credit_payments) . '</strong>&nbsp;Payment(s)'; ?></div>
+                                            </div>
+                                            <div id="sales_agent_pending_credit_payments" class="collapse">
+                                                <div class="card-body">
+                                                    <?php if(!empty($sales_agent_pending_credit_payments)) {
+                                                        foreach($sales_agent_pending_credit_payments as $sales_agent_pending_credit_payment) { ?>
+                                                            <div class="d-flex align-items-center">
+                                                                <span class="bullet bullet-bar bg-success align-self-stretch"></span>
+                                                                <label class="checkbox checkbox-lg checkbox-light-success checkbox-inline flex-shrink-0 m-0 mx-4">
+                                                                    <input disabled type="checkbox">
+                                                                    <span></span>
+                                                                </label>
+                                                                <div class="d-flex flex-column flex-grow-1">
+                                                                    <a href="<?php echo base_url('Payment/View?payment_id=') . $sales_agent_pending_credit_payment->PaymentID; ?>" target="_blank" class="text-dark-75 text-hover-primary font-weight-bold font-size-xs"><?php echo $sales_agent_pending_credit_payment->BookingNumber; ?></a>
+                                                                    <span class="text-muted font-weight-bold" style="color:#A7C7E7 !important; font-size:10px;"><?php echo $sales_agent_pending_credit_payment->Customer; ?></span>
+                                                                    <span class="text-muted font-weight-bold" style="font-size:10px;"><?php echo strtoupper(date('j M Y', strtotime($sales_agent_pending_credit_payment->Date))); ?></span>
+                                                                    <span class="text-muted font-weight-bold" style="font-size:10px;"><?php echo $sales_agent_pending_credit_payment->Type; ?></span>
+                                                                    <span class="text-muted font-weight-bold" style="color:#50C878 !important; font-size:10px;"><?php echo 'RM ' . number_format($sales_agent_pending_credit_payment->Credit, 2, '.', ','); ?></span>
+                                                                </div>
+                                                            </div>
+                                                            <br>
+                                                        <?php }
+                                                    } ?>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card card-custom card-stretch gutter-b">
+                                <div class="card-header border-0" style="background-color:#FAA0A030;">
+                                    <h3 class="card-title font-weight-bold text-dark" style="font-size:14px;">Pending Debit Payments</h3>
+                                </div>
+                                <div class="card-body">
+                                    <div class="accordion accordion-solid accordion-toggle-plus">
+                                        <div class="card">
+                                            <div class="card-header">
+                                                <div data-toggle="collapse" data-target="#sales_agent_pending_debit_payments" class="card-title collapsed" style="font-size:13px;"><?php echo '<strong>' . count($sales_agent_pending_debit_payments) . '</strong>&nbsp;Payment(s)'; ?></div>
+                                            </div>
+                                            <div id="sales_agent_pending_debit_payments" class="collapse">
+                                                <div class="card-body">
+                                                    <?php if(!empty($sales_agent_pending_debit_payments)) {
+                                                        foreach($sales_agent_pending_debit_payments as $sales_agent_pending_debit_payment) { ?>
+                                                            <div class="d-flex align-items-center">
+                                                                <span class="bullet bullet-bar bg-danger align-self-stretch"></span>
+                                                                <label class="checkbox checkbox-lg checkbox-light-danger checkbox-inline flex-shrink-0 m-0 mx-4">
+                                                                    <input disabled type="checkbox">
+                                                                    <span></span>
+                                                                </label>
+                                                                <div class="d-flex flex-column flex-grow-1">
+                                                                    <a href="<?php echo base_url('Payment/View?payment_id=') . $sales_agent_pending_debit_payment->PaymentID; ?>" target="_blank" class="text-dark-75 text-hover-primary font-weight-bold font-size-xs"><?php echo $sales_agent_pending_debit_payment->BookingNumber; ?></a>
+                                                                    <?php if($sales_agent_pending_debit_payment->Type == 'SUPPLIER PAYMENT') { ?>
+                                                                        <span class="text-muted font-weight-bold" style="color:#A7C7E7 !important; font-size:10px;"><?php echo $sales_agent_pending_debit_payment->Name; ?></span>
+                                                                    <?php } else { ?>
+                                                                        <span class="text-muted font-weight-bold" style="color:#A7C7E7 !important; font-size:10px;"><?php echo $sales_agent_pending_debit_payment->BankHolder; ?></span>
+                                                                    <?php } ?>
+                                                                    <span class="text-muted font-weight-bold" style="font-size:10px;"><?php echo strtoupper(date('j M Y', strtotime($sales_agent_pending_debit_payment->Deadline))); ?></span>
+                                                                    <span class="text-muted font-weight-bold" style="font-size:10px;"><?php echo $sales_agent_pending_debit_payment->Type; ?></span>
+                                                                    <span class="text-muted font-weight-bold" style="color:#F88379 !important; font-size:10px;"><?php echo 'RM ' . number_format($sales_agent_pending_debit_payment->Debit, 2, '.', ','); ?></span>
+                                                                </div>
+                                                            </div>
+                                                            <br>
+                                                        <?php }
+                                                    } ?>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    <?php } else { ?>
+                        <div class="col-md-12">
+                            <div class="card card-custom card-stretch gutter-b">
+                                <div class="card-header border-0" style="background-color:#F0FFFF;">
+                                    <h3 class="card-title font-weight-bold text-dark" style="font-size:14px;">Travel Reminder</h3>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card card-custom card-stretch gutter-b">
+                                <div class="card-header border-0" style="background-color:#A7C7E730;">
+                                    <h3 class="card-title font-weight-bold text-dark" style="font-size:14px;">Travels Tomorrow</h3>
+                                </div>
+                                <div class="card-body">
+                                    <div class="accordion accordion-solid accordion-toggle-plus">
+                                        <div class="card">
+                                            <div class="card-header">
+                                                <div id="upcoming_travels_header" data-toggle="collapse" data-target="#upcoming_travels" class="card-title collapsed" style="font-size:13px;"><?php echo '<strong>' . count($upcoming_travels) . '</strong>&nbsp;BC(s)'; ?></div>
+                                            </div>
+                                            <div id="upcoming_travels" class="collapse">
+                                                <div class="card-body">
+                                                    <?php if(!empty($upcoming_travels)) {
+                                                        foreach($upcoming_travels as $upcoming_travel) { ?>
+                                                            <div class="d-flex align-items-center <?php echo $upcoming_travel->AdminID; ?>">
+                                                                <span class="bullet bullet-bar bg-primary align-self-stretch"></span>
+                                                                <label class="checkbox checkbox-lg checkbox-light-primary checkbox-inline flex-shrink-0 m-0 mx-4">
+                                                                    <input disabled type="checkbox">
+                                                                    <span></span>
+                                                                </label>
+                                                                <div class="d-flex flex-column flex-grow-1">
+                                                                    <span class="font-weight-bold" style="color:#C3B1E1; font-size:11px;"><?php echo $upcoming_travel->SalesAgent; ?></span>
+                                                                    <a href="<?php echo base_url('Booking?booking_number=') . $upcoming_travel->BookingNumber; ?>" target="_blank" class="text-dark-75 text-hover-primary font-weight-bold font-size-xs"><?php echo $upcoming_travel->BookingNumber; ?></a>
+                                                                    <span class="text-muted font-weight-bold" style="font-size:10px;"><?php echo $upcoming_travel->Destination; ?></span>
+                                                                    <span class="text-muted font-weight-bold" style="font-size:10px;"><?php echo $upcoming_travel->Customer; ?></span>
+                                                                </div>
+                                                            </div>
+                                                            <br class="<?php echo $upcoming_travel->AdminID; ?>">
+                                                        <?php }
+                                                    } ?>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card card-custom card-stretch gutter-b">
+                                <div class="card-header border-0" style="background-color:#FFFAA030;">
+                                    <h3 class="card-title font-weight-bold text-dark" style="font-size:14px;">Upcoming Travel In 7 Days - Pending Travel Voucher</h3>
+                                </div>
+                                <div class="card-body">
+                                    <div class="accordion accordion-solid accordion-toggle-plus">
+                                        <div class="card">
+                                            <div class="card-header">
+                                                <div id="pending_travel_vouchers_header" data-toggle="collapse" data-target="#pending_travel_vouchers" class="card-title collapsed" style="font-size:13px;"><?php echo '<strong>' . count($pending_travel_vouchers) . '</strong>&nbsp;BC(s)'; ?></div>
+                                            </div>
+                                            <div id="pending_travel_vouchers" class="collapse">
+                                                <div class="card-body">
+                                                    <?php if(!empty($pending_travel_vouchers)) {
+                                                        foreach($pending_travel_vouchers as $pending_travel_voucher) { ?>
+                                                            <div class="d-flex align-items-center <?php echo $pending_travel_voucher->AdminID; ?>">
+                                                                <span class="bullet bullet-bar bg-warning align-self-stretch"></span>
+                                                                <label class="checkbox checkbox-lg checkbox-light-warning checkbox-inline flex-shrink-0 m-0 mx-4">
+                                                                    <input disabled type="checkbox">
+                                                                    <span></span>
+                                                                </label>
+                                                                <div class="d-flex flex-column flex-grow-1">
+                                                                    <span class="font-weight-bold" style="color:#C3B1E1; font-size:11px;"><?php echo $pending_travel_voucher->SalesAgent; ?></span>
+                                                                    <a href="<?php echo base_url('Booking?booking_number=') . $pending_travel_voucher->BookingNumber; ?>" target="_blank" class="text-dark-75 text-hover-primary font-weight-bold font-size-xs"><?php echo $pending_travel_voucher->BookingNumber; ?></a>
+                                                                    <span class="text-muted font-weight-bold" style="color:#FAC898 !important; font-size:10px;"><?php echo strtoupper(date('j M', strtotime($pending_travel_voucher->StartDate)) . ' - ' . date('j M Y', strtotime($pending_travel_voucher->EndDate))); ?></span>
+                                                                    <span class="text-muted font-weight-bold" style="font-size:10px;"><?php echo $pending_travel_voucher->Destination; ?></span>
+                                                                    <span class="text-muted font-weight-bold" style="font-size:10px;"><?php echo $pending_travel_voucher->Customer; ?></span>
+                                                                </div>
+                                                            </div>
+                                                            <br class="<?php echo $pending_travel_voucher->AdminID; ?>">
+                                                        <?php }
+                                                    } ?>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card card-custom card-stretch gutter-b">
+                                <div class="card-header border-0" style="background-color:#FFFAA030;">
+                                    <h3 class="card-title font-weight-bold text-dark" style="font-size:14px;">Travel Completed - Pending Review</h3>
+                                </div>
+                                <div class="card-body">
+                                    <div class="accordion accordion-solid accordion-toggle-plus">
+                                        <div class="card">
+                                            <div class="card-header">
+                                                <div id="pending_reviews_header" data-toggle="collapse" data-target="#pending_reviews" class="card-title collapsed" style="font-size:13px;"><?php echo '<strong>' . count($pending_reviews) . '</strong>&nbsp;BC(s)'; ?></div>
+                                            </div>
+                                            <div id="pending_reviews" class="collapse">
+                                                <div class="card-body">
+                                                    <?php if(!empty($pending_reviews)) {
+                                                        foreach($pending_reviews as $pending_review) { ?>
+                                                            <div class="d-flex align-items-center <?php echo $pending_review->AdminID; ?>">
+                                                                <span class="bullet bullet-bar bg-warning align-self-stretch"></span>
+                                                                <label class="checkbox checkbox-lg checkbox-light-warning checkbox-inline flex-shrink-0 m-0 mx-4">
+                                                                    <input disabled type="checkbox">
+                                                                    <span></span>
+                                                                </label>
+                                                                <div class="d-flex flex-column flex-grow-1">
+                                                                    <span class="font-weight-bold" style="color:#C3B1E1; font-size:11px;"><?php echo $pending_review->SalesAgent; ?></span>
+                                                                    <a href="<?php echo base_url('Booking?booking_number=') . $pending_review->BookingNumber; ?>" target="_blank" class="text-dark-75 text-hover-primary font-weight-bold font-size-xs"><?php echo $pending_review->BookingNumber; ?></a>
+                                                                    <span class="text-muted font-weight-bold" style="font-size:10px;"><?php echo $pending_review->Destination; ?></span>
+                                                                    <span class="text-muted font-weight-bold" style="font-size:10px;"><?php echo $pending_review->Customer; ?></span>
+                                                                </div>
+                                                            </div>
+                                                            <br class="<?php echo $pending_review->AdminID; ?>">
+                                                        <?php }
+                                                    } ?>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-12">
+                            <div class="card card-custom card-stretch gutter-b">
+                                <div class="card-header border-0" style="background-color:#FFFFF0;">
+                                    <h3 class="card-title font-weight-bold text-dark" style="font-size:14px;">Payment Reminder</h3>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card card-custom card-stretch gutter-b">
+                                <div class="card-header border-0" style="background-color:#FAA0A030;">
+                                    <h3 class="card-title font-weight-bold text-dark" style="font-size:14px;">Payment Overdue</h3>
+                                </div>
+                                <div class="card-body">
+                                    <div class="accordion accordion-solid accordion-toggle-plus">
+                                        <div class="card">
+                                            <div class="card-header">
+                                                <div id="overdue_payments_header" data-toggle="collapse" data-target="#overdue_payments" class="card-title collapsed" style="font-size:13px;"><?php echo '<strong>' . count($overdue_payments) . '</strong>&nbsp;BC(s)'; ?></div>
+                                            </div>
+                                            <div id="overdue_payments" class="collapse">
+                                                <div class="card-body">
+                                                    <?php if(!empty($overdue_payments)) {
+                                                        foreach($overdue_payments as $overdue_payment) { ?>
+                                                            <div class="d-flex align-items-center <?php echo $overdue_payment->AdminID; ?>">
+                                                                <span class="bullet bullet-bar bg-danger align-self-stretch"></span>
+                                                                <label class="checkbox checkbox-lg checkbox-light-danger checkbox-inline flex-shrink-0 m-0 mx-4">
+                                                                    <input disabled type="checkbox">
+                                                                    <span></span>
+                                                                </label>
+                                                                <div class="d-flex flex-column flex-grow-1">
+                                                                    <span class="font-weight-bold" style="color:#C3B1E1; font-size:11px;"><?php echo $overdue_payment->SalesAgent; ?></span>
+                                                                    <a href="<?php echo base_url('Booking/Update?booking_id=') . $overdue_payment->BookingID; ?>" target="_blank" class="text-dark-75 text-hover-primary font-weight-bold font-size-xs"><?php echo $overdue_payment->BookingNumber; ?></a>
+                                                                    <a href="<?php echo base_url('Payment?booking_number=') . $overdue_payment->BookingNumber; ?>" target="_blank" class="text-muted font-weight-bold" style="font-size:10px;"><?php echo $overdue_payment->Destination; ?></a>
+                                                                    <span class="text-muted font-weight-bold" style="font-size:10px;"><?php echo $overdue_payment->Customer; ?></span>
+                                                                </div>
+                                                            </div>
+                                                            <br class="<?php echo $overdue_payment->AdminID; ?>">
+                                                        <?php }
+                                                    } ?>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card card-custom card-stretch gutter-b">
+                                <div class="card-header border-0" style="background-color:#FAA0A030;">
+                                    <h3 class="card-title font-weight-bold text-dark" style="font-size:14px;">Negative Profit Margin</h3>
+                                </div>
+                                <div class="card-body">
+                                    <div class="accordion accordion-solid accordion-toggle-plus">
+                                        <div class="card">
+                                            <div class="card-header">
+                                                <div id="negative_profit_margins_header" data-toggle="collapse" data-target="#negative_profit_margins" class="card-title collapsed" style="font-size:13px;"><?php echo '<strong>' . count($negative_profit_margins) . '</strong>&nbsp;BC(s)'; ?></div>
+                                            </div>
+                                            <div id="negative_profit_margins" class="collapse">
+                                                <div class="card-body">
+                                                    <?php if(!empty($negative_profit_margins)) {
+                                                        foreach($negative_profit_margins as $negative_profit_margin) { ?>
+                                                            <div class="d-flex align-items-center <?php echo $negative_profit_margin->AdminID; ?>">
+                                                                <span class="bullet bullet-bar bg-danger align-self-stretch"></span>
+                                                                <label class="checkbox checkbox-lg checkbox-light-danger checkbox-inline flex-shrink-0 m-0 mx-4">
+                                                                    <input disabled type="checkbox">
+                                                                    <span></span>
+                                                                </label>
+                                                                <div class="d-flex flex-column flex-grow-1">
+                                                                    <span class="font-weight-bold" style="color:#C3B1E1; font-size:11px;"><?php echo $negative_profit_margin->SalesAgent; ?></span>
+                                                                    <a href="<?php echo base_url('Payment?booking_number=') . $negative_profit_margin->BookingNumber; ?>" target="_blank" class="text-dark-75 text-hover-primary font-weight-bold font-size-xs"><?php echo $negative_profit_margin->BookingNumber; ?></a>
+                                                                    <span class="text-muted font-weight-bold" style="color:#F88379 !important; font-size:10px;"><?php echo 'RM ' . number_format($negative_profit_margin->NetProfit, 2, '.', ','); ?></span>
+                                                                    <span class="text-muted font-weight-bold" style="font-size:10px;"><?php echo $negative_profit_margin->Destination; ?></span>
+                                                                    <span class="text-muted font-weight-bold" style="font-size:10px;"><?php echo $negative_profit_margin->Customer; ?></span>
+                                                                </div>
+                                                            </div>
+                                                            <br class="<?php echo $negative_profit_margin->AdminID; ?>">
+                                                        <?php }
+                                                    } ?>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card card-custom card-stretch gutter-b">
+                                <div class="card-header border-0" style="background-color:#C1E1C130;">
+                                    <h3 class="card-title font-weight-bold text-dark" style="font-size:14px;">Profit Margin Less Than 10% - Last 30 Days</h3>
+                                </div>
+                                <div class="card-body">
+                                    <div class="accordion accordion-solid accordion-toggle-plus">
+                                        <div class="card">
+                                            <div class="card-header">
+                                                <div id="profit_margins_less_than_10_percent_header" data-toggle="collapse" data-target="#profit_margins_less_than_10_percent" class="card-title collapsed" style="font-size:13px;"><?php echo '<strong>' . count($profit_margins_less_than_10_percent) . '</strong>&nbsp;BC(s)'; ?></div>
+                                            </div>
+                                            <div id="profit_margins_less_than_10_percent" class="collapse">
+                                                <div class="card-body">
+                                                    <?php if(!empty($profit_margins_less_than_10_percent)) {
+                                                        foreach($profit_margins_less_than_10_percent as $profit_margin_less_than_10_percent) { ?>
+                                                            <div class="d-flex align-items-center <?php echo $profit_margin_less_than_10_percent->AdminID; ?>">
+                                                                <span class="bullet bullet-bar bg-success align-self-stretch"></span>
+                                                                <label class="checkbox checkbox-lg checkbox-light-success checkbox-inline flex-shrink-0 m-0 mx-4">
+                                                                    <input disabled type="checkbox">
+                                                                    <span></span>
+                                                                </label>
+                                                                <div class="d-flex flex-column flex-grow-1">
+                                                                    <span class="font-weight-bold" style="color:#C3B1E1; font-size:11px;"><?php echo $profit_margin_less_than_10_percent->SalesAgent; ?></span>
+                                                                    <a href="<?php echo base_url('Payment?booking_number=') . $profit_margin_less_than_10_percent->BookingNumber; ?>" target="_blank" class="text-dark-75 text-hover-primary font-weight-bold font-size-xs"><?php echo $profit_margin_less_than_10_percent->BookingNumber; ?></a>
+                                                                    <span class="text-muted font-weight-bold" style="color:#50C878 !important; font-size:10px;"><?php echo $profit_margin_less_than_10_percent->Percentage; ?></span>
+                                                                    <span class="text-muted font-weight-bold" style="font-size:10px;"><?php echo $profit_margin_less_than_10_percent->Destination; ?></span>
+                                                                    <span class="text-muted font-weight-bold" style="font-size:10px;"><?php echo $profit_margin_less_than_10_percent->Customer; ?></span>
+                                                                </div>
+                                                            </div>
+                                                            <br class="<?php echo $profit_margin_less_than_10_percent->AdminID; ?>">
+                                                        <?php }
+                                                    } ?>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-12">
+                            <div class="card card-custom card-stretch gutter-b">
+                                <div class="card-header border-0" style="background-color:#FFFFF0;">
+                                    <h3 class="card-title font-weight-bold text-dark" style="font-size:14px;">Payment Reminder</h3>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card card-custom card-stretch gutter-b">
+                                <div class="card-header border-0" style="background-color:#C1E1C130;">
+                                    <h3 class="card-title font-weight-bold text-dark" style="font-size:14px;">Pending Credit Payments</h3>
+                                </div>
+                                <div class="card-body">
+                                    <div class="accordion accordion-solid accordion-toggle-plus">
+                                        <div class="card">
+                                            <div class="card-header">
+                                                <div id="pending_credit_payments_header" data-toggle="collapse" data-target="#pending_credit_payments" class="card-title collapsed" style="font-size:13px;"><?php echo '<strong>' . count($pending_credit_payments) . '</strong>&nbsp;Payment(s)'; ?></div>
+                                            </div>
+                                            <div id="pending_credit_payments" class="collapse">
+                                                <div class="card-body">
+                                                    <?php if(!empty($pending_credit_payments)) {
+                                                        foreach($pending_credit_payments as $pending_credit_payment) { ?>
+                                                            <div class="d-flex align-items-center <?php echo $pending_credit_payment->AdminID; ?>">
+                                                                <span class="bullet bullet-bar bg-success align-self-stretch"></span>
+                                                                <label class="checkbox checkbox-lg checkbox-light-success checkbox-inline flex-shrink-0 m-0 mx-4">
+                                                                    <input disabled type="checkbox">
+                                                                    <span></span>
+                                                                </label>
+                                                                <div class="d-flex flex-column flex-grow-1">
+                                                                    <span class="font-weight-bold" style="color:#C3B1E1; font-size:11px;"><?php echo $pending_credit_payment->Name; ?></span>
+                                                                    <a href="<?php echo base_url('Payment/Update?payment_id=') . $pending_credit_payment->PaymentID; ?>" target="_blank" class="text-dark-75 text-hover-primary font-weight-bold font-size-xs"><?php echo $pending_credit_payment->BookingNumber; ?></a>
+                                                                    <span class="text-muted font-weight-bold" style="color:#A7C7E7 !important; font-size:10px;"><?php echo $pending_credit_payment->Customer; ?></span>
+                                                                    <span class="text-muted font-weight-bold" style="font-size:10px;"><?php echo strtoupper(date('j M Y', strtotime($pending_credit_payment->Date))); ?></span>
+                                                                    <span class="text-muted font-weight-bold" style="font-size:10px;"><?php echo $pending_credit_payment->Type; ?></span>
+                                                                    <span class="text-muted font-weight-bold" style="color:#50C878 !important; font-size:10px;"><?php echo 'RM ' . number_format($pending_credit_payment->Credit, 2, '.', ','); ?></span>
+                                                                </div>
+                                                            </div>
+                                                            <br class="<?php echo $pending_credit_payment->AdminID; ?>">
+                                                        <?php }
+                                                    } ?>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card card-custom card-stretch gutter-b">
+                                <div class="card-header border-0" style="background-color:#FAA0A030;">
+                                    <h3 class="card-title font-weight-bold text-dark" style="font-size:14px;">Pending Debit Payments</h3>
+                                </div>
+                                <div class="card-body">
+                                    <div class="accordion accordion-solid accordion-toggle-plus">
+                                        <div class="card">
+                                            <div class="card-header">
+                                                <div id="pending_debit_payments_header" data-toggle="collapse" data-target="#pending_debit_payments" class="card-title collapsed" style="font-size:13px;"><?php echo '<strong>' . count($pending_debit_payments) . '</strong>&nbsp;Payment(s)'; ?></div>
+                                            </div>
+                                            <div id="pending_debit_payments" class="collapse">
+                                                <div class="card-body">
+                                                    <?php if(!empty($pending_debit_payments)) {
+                                                        foreach($pending_debit_payments as $pending_debit_payment) { ?>
+                                                            <div class="d-flex align-items-center <?php echo $pending_debit_payment->AdminID; ?>">
+                                                                <span class="bullet bullet-bar bg-danger align-self-stretch"></span>
+                                                                <label class="checkbox checkbox-lg checkbox-light-danger checkbox-inline flex-shrink-0 m-0 mx-4">
+                                                                    <input disabled type="checkbox">
+                                                                    <span></span>
+                                                                </label>
+                                                                <div class="d-flex flex-column flex-grow-1">
+                                                                    <span class="font-weight-bold" style="color:#C3B1E1; font-size:11px;"><?php echo $pending_debit_payment->SalesAgent; ?></span>
+                                                                    <a href="<?php echo base_url('Payment/Update?payment_id=') . $pending_debit_payment->PaymentID; ?>" target="_blank" class="text-dark-75 text-hover-primary font-weight-bold font-size-xs"><?php echo $pending_debit_payment->BookingNumber; ?></a>
+                                                                    <?php if($pending_debit_payment->Type == 'SUPPLIER PAYMENT') { ?>
+                                                                        <span class="text-muted font-weight-bold" style="color:#A7C7E7 !important; font-size:10px;"><?php echo $pending_debit_payment->Supplier; ?></span>
+                                                                    <?php } else { ?>
+                                                                        <span class="text-muted font-weight-bold" style="color:#A7C7E7 !important; font-size:10px;"><?php echo $pending_debit_payment->BankHolder; ?></span>
+                                                                    <?php } ?>
+                                                                    <span class="text-muted font-weight-bold" style="font-size:10px;"><?php echo strtoupper(date('j M Y', strtotime($pending_debit_payment->Deadline))); ?></span>
+                                                                    <span class="text-muted font-weight-bold" style="font-size:10px;"><?php echo $pending_debit_payment->Type; ?></span>
+                                                                    <span class="text-muted font-weight-bold" style="color:#F88379 !important; font-size:10px;"><?php echo 'RM ' . number_format($pending_debit_payment->Debit, 2, '.', ','); ?></span>
+                                                                </div>
+                                                            </div>
+                                                            <br class="<?php echo $pending_debit_payment->AdminID; ?>">
+                                                        <?php }
+                                                    } ?>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    <?php } ?>
+                </div>
+                <?php if($this->session->level == 20) { ?>
+                    <div class="row pt-7 pl-3 pr-3 mb-5" style="background-color:#B6D0E230;">
+                        <div class="col-md-12">
+                            <div class="card card-custom gutter-b">
+                                <div class="card-header" style="background-color:#FFFAA030;">
+                                    <div class="card-title">
+                                        <h3 class="card-label" style="font-size:14px;"><?php echo 'Year ' . date('Y') . ' Daily Sales'; ?></h3>
+                                    </div>
+                                </div>
+                                <div class="card-body" style="overflow-x:auto; position:relative;">
+                                    <div id="sales_agent_daily_sales" style="min-width:900px;"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-12">
+                            <div class="card card-custom gutter-b">
+                                <div class="card-header" style="background-color:#FFFAA030;">
+                                    <div class="card-title">
+                                        <h3 class="card-label" style="font-size:14px;"><?php echo 'Year ' . date('Y') . ' Monthly Sales'; ?></h3>
+                                    </div>
+                                </div>
+                                <div class="card-body" style="overflow-x:auto; position:relative;">
+                                    <div id="sales_agent_monthly_sales" style="min-width:900px;"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-12">
+                            <div class="card card-custom gutter-b">
+                                <div class="card-header" style="background-color:#FAA0A030;">
+                                    <div class="card-title">
+                                        <h3 class="card-label" style="font-size:14px;"><?php echo 'Year ' . date('Y') . ' Monthly Cancellation Rates'; ?></h3>
+                                    </div>
+                                </div>
+                                <div class="card-body" style="overflow-x:auto; position:relative;">
+                                    <div id="sales_agent_cancellation_rates" style="min-width:900px;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                <?php } else { ?>
+                    <div class="row pt-7 pl-3 pr-3 mb-5" style="background-color:#98FB9830;">
+                        <div class="col-md-4">
+                            <div class="card card-custom card-stretch gutter-b">
+                                <div class="card-header border-0" style="background-color:#7FFFD430;">
+                                    <h3 class="card-title font-weight-bold text-dark" style="font-size:14px;"><?php echo date('j F', strtotime('This Week Monday')) . ' To ' . date('j F', strtotime('This Week Sunday')) . ' Leading SA'; ?></h3>
+                                </div>
+                                <br>
+                                <div class="card-body pt-2">
+                                    <?php foreach($weekly_top_sa as $sa) { ?>
+                                        <div class="d-flex align-items-center mb-10">
+                                            <div class="symbol symbol-40 symbol-light-success mr-5">
+                                                <span class="symbol-label">
+                                                    <img src="<?php echo $sa->ProfilePicture; ?>" class="h-75 align-self-end">
+                                                </span>
+                                            </div>
+                                            <div class="d-flex flex-column flex-grow-1 font-weight-bold">
+                                                <a class="text-dark text-hover-primary mb-1 font-size-xs"><?php echo $sa->Name; ?></a>
+                                                <span class="text-muted" style="font-size:11px;"><?php echo $sa->Sales; ?></span>
+                                            </div>
+                                        </div>
+                                    <?php } ?>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card card-custom card-stretch gutter-b">
+                                <div class="card-header border-0" style="background-color:#7FFFD430;">
+                                    <h3 class="card-title font-weight-bold text-dark" style="font-size:14px;"><?php echo date('F') . ' Leading SA'; ?></h3>
+                                </div>
+                                <br>
+                                <div class="card-body pt-2">
+                                    <?php foreach($monthly_top_sa as $sa) { ?>
+                                        <div class="d-flex align-items-center mb-10">
+                                            <div class="symbol symbol-40 symbol-light-success mr-5">
+                                                <span class="symbol-label">
+                                                    <img src="<?php echo $sa->ProfilePicture; ?>" class="h-75 align-self-end">
+                                                </span>
+                                            </div>
+                                            <div class="d-flex flex-column flex-grow-1 font-weight-bold">
+                                                <a class="text-dark text-hover-primary mb-1 font-size-xs"><?php echo $sa->Name; ?></a>
+                                                <span class="text-muted" style="font-size:11px;"><?php echo $sa->Sales; ?></span>
+                                            </div>
+                                        </div>
+                                    <?php } ?>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card card-custom card-stretch gutter-b">
+                                <div class="card-header border-0" style="background-color:#7FFFD430;">
+                                    <h3 class="card-title font-weight-bold text-dark" style="font-size:14px;"><?php echo 'Year ' . date('Y') . ' Leading SA'; ?></h3>
+                                </div>
+                                <br>
+                                <div class="card-body pt-2">
+                                    <?php foreach($annual_top_sa as $sa) { ?>
+                                        <div class="d-flex align-items-center mb-10">
+                                            <div class="symbol symbol-40 symbol-light-success mr-5">
+                                                <span class="symbol-label">
+                                                    <img src="<?php echo $sa->ProfilePicture; ?>" class="h-75 align-self-end">
+                                                </span>
+                                            </div>
+                                            <div class="d-flex flex-column flex-grow-1 font-weight-bold">
+                                                <a class="text-dark text-hover-primary mb-1 font-size-xs"><?php echo $sa->Name; ?></a>
+                                                <span class="text-muted" style="font-size:11px;"><?php echo $sa->Sales; ?></span>
+                                            </div>
+                                        </div>
+                                    <?php } ?>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row pt-7 pl-3 pr-3 mb-5" style="background-color:#B6D0E230;">
+                        <div class="col-md-12">
+                            <div class="card card-custom gutter-b">
+                                <div class="card-header" style="background-color:#FFFAA030;">
+                                    <div class="card-title">
+                                        <h3 class="card-label" style="font-size:14px;"><?php echo 'Year ' . date('Y') . ' SA Daily Sales'; ?></h3>
+                                    </div>
+                                </div>
+                                <div class="card-body" style="overflow-x:auto; position:relative;">
+                                    <div id="sales_agents_daily_sales" style="min-width:900px;"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-12">
+                            <div class="card card-custom gutter-b">
+                                <div class="card-header" style="background-color:#FFFAA030;">
+                                    <div class="card-title">
+                                        <h3 class="card-label" style="font-size:14px;"><?php echo 'Year ' . date('Y') . ' Daily Total Sales'; ?></h3>
+                                    </div>
+                                </div>
+                                <div class="card-body" style="overflow-x:auto; position:relative;">
+                                    <div id="daily_sales" style="min-width:900px;"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-12">
+                            <div class="card card-custom gutter-b">
+                                <div class="card-header" style="background-color:#FFFAA030;">
+                                    <div class="card-title">
+                                        <h3 class="card-label" style="font-size:14px;"><?php echo 'Year ' . date('Y') . ' SA Monthly Sales'; ?></h3>
+                                    </div>
+                                </div>
+                                <div class="card-body" style="overflow-x:auto; position:relative;">
+                                    <div id="sales_agents_monthly_sales" style="min-width:900px;"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-12">
+                            <div class="card card-custom gutter-b">
+                                <div class="card-header" style="background-color:#FFFAA030;">
+                                    <div class="card-title">
+                                        <h3 class="card-label" style="font-size:14px;"><?php echo 'Year ' . date('Y') . ' Monthly Total Sales'; ?></h3>
+                                    </div>
+                                </div>
+                                <div class="card-body" style="overflow-x:auto; position:relative;">
+                                    <div id="monthly_sales" style="min-width:900px;"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-12">
+                            <div class="card card-custom gutter-b">
+                                <div class="card-header" style="background-color:#FAA0A030;">
+                                    <div class="card-title">
+                                        <h3 class="card-label" style="font-size:14px;"><?php echo 'Year ' . date('Y') . ' Monthly Total Cancellation Rates'; ?></h3>
+                                    </div>
+                                </div>
+                                <div class="card-body" style="overflow-x:auto; position:relative;">
+                                    <div id="cancellation_rates" style="min-width:900px;"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-12">
+                            <div class="card card-custom gutter-b">
+                                <div class="card-header" style="background-color:#FAC89830;">
+                                    <div class="card-title">
+                                        <h3 class="card-label" style="font-size:14px;"><?php echo 'Year ' . date('Y') . ' Monthly Total Approved Credit And Debit Payments'; ?></h3>
+                                    </div>
+                                </div>
+                                <div class="card-body" style="overflow-x:auto; position:relative;">
+                                    <div id="approved_payments" style="min-width:900px;"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-12">
+                            <div class="card card-custom gutter-b">
+                                <div class="card-header" style="background-color:#FAC89830;">
+                                    <div class="card-title">
+                                        <h3 class="card-label" style="font-size:14px;"><?php echo 'Monthly Total Pending Credit And Debit Payments - All Generated Years'; ?></h3>
+                                    </div>
+                                </div>
+                                <div class="card-body" style="overflow-x:auto; position:relative;">
+                                    <div id="pending_payments" style="min-width:900px;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                <?php } ?>
+            </div>
+        </div>
+	</div>
+</div>
+<script src="<?php echo base_url('assets/js/pages/widgets.js'); ?>"></script>
+<script src="<?php echo base_url('assets/js/pages/features/charts/apexcharts.js'); ?>"></script>
+<script type="text/javascript">
+    $(document).ready(function() {
+        //SA
+        $.ajax({
+            url: '<?php echo base_url('Dashboard/Sales_Agent_Daily_Sales'); ?>',
+            type: 'post',
+            dataType: 'json',
+            success: function(array) {
+                var options = {
+                    series: [{
+                        name: 'Sales',
+                        data: array.daily_sales
+                    }],
+                    chart: {
+                        type: 'bar',
+                        height: 350,
+                        toolbar: {
+                            show: false
+		                }
+                    },
+                    plotOptions: {
+                        bar: {
+                            horizontal: false,
+                            columnWidth: '15%'
+                        },
+                    },
+                    dataLabels: {
+                        enabled: false,
+                    },
+                    stroke: {
+                        show: true,
+                        width: 2,
+                        colors: ['transparent']
+                    },
+                    xaxis: {
+                        categories: array.current_week,
+                    },
+                    yaxis: {
+                        title: {
+                            text: 'Sales (RM)'
+                        },
+                        labels: {
+                            formatter: (value) => { return value.toLocaleString('en-US', {minimumFractionDigits: 2}) },
+                        }
+                    },
+                    fill: {
+                        opacity: 1
+                    },
+                    tooltip: {
+                        y: {
+                            formatter: function(sales) {
+                                return "RM " + sales.toLocaleString('en-US', {minimumFractionDigits: 2})
+                            }
+                        }
+                    },
+                    colors: ['#FFDB58']
+                };
+                var chart = new ApexCharts(document.querySelector("#sales_agent_daily_sales"), options);
+                chart.render();
+            }
+        });
+
+        $.ajax({
+            url: '<?php echo base_url('Dashboard/Sales_Agent_Monthly_Sales'); ?>',
+            type: 'post',
+            dataType: 'json',
+            success: function(array) {
+                var options = {
+                    series: [{
+                        name: 'Sales',
+                        data: array
+                    }],
+                    chart: {
+                        type: 'bar',
+                        height: 350,
+                        toolbar: {
+                            show: false
+		                }
+                    },
+                    plotOptions: {
+                        bar: {
+                            horizontal: false,
+                            columnWidth: '15%'
+                        },
+                    },
+                    dataLabels: {
+                        enabled: false,
+                    },
+                    stroke: {
+                        show: true,
+                        width: 2,
+                        colors: ['transparent']
+                    },
+                    xaxis: {
+                        categories: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Total'],
+                        labels: {
+                            style: {
+                                colors: ['#36454F', '#36454F', '#36454F', '#36454F', '#36454F', '#36454F', '#36454F', '#36454F', '#36454F', '#36454F', '#36454F', '#36454F', '#FFC000']
+                            }
+                        }
+                    },
+                    yaxis: {
+                        title: {
+                            text: 'Sales (RM)'
+                        },
+                        labels: {
+                            formatter: (value) => { return value.toLocaleString('en-US', {minimumFractionDigits: 2}) },
+                        }
+                    },
+                    fill: {
+                        opacity: 1
+                    },
+                    tooltip: {
+                        y: {
+                            formatter: function(sales) {
+                                return "RM " + sales.toLocaleString('en-US', {minimumFractionDigits: 2})
+                            }
+                        }
+                    },
+                    colors: ['#FFDB58']
+                };
+                var chart = new ApexCharts(document.querySelector("#sales_agent_monthly_sales"), options);
+                chart.render();
+            }
+        });
+
+        $.ajax({
+            url: '<?php echo base_url('Dashboard/Sales_Agent_Cancellation_Rates'); ?>',
+            type: 'post',
+            dataType: 'json',
+            success: function(array) {
+                var options = {
+                    series: [{
+                        name: 'Rate',
+                        data: array
+                    }],
+                    chart: {
+                        type: 'bar',
+                        height: 350,
+                        toolbar: {
+                            show: false
+		                }
+                    },
+                    plotOptions: {
+                        bar: {
+                            horizontal: false,
+                            columnWidth: '15%'
+                        },
+                    },
+                    dataLabels: {
+                        enabled: false,
+                    },
+                    stroke: {
+                        show: true,
+                        width: 2,
+                        colors: ['transparent']
+                    },
+                    xaxis: {
+                        categories: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+                    },
+                    yaxis: {
+                        title: {
+                            text: 'Rate (%)'
+                        },
+                        labels: {
+                            formatter: (value) => { return value + '%' },
+                        }
+                    },
+                    fill: {
+                        opacity: 1
+                    },
+                    tooltip: {
+                        y: {
+                            formatter: function(rate) {
+                                return rate + "%"
+                            }
+                        }
+                    },
+                    colors: ['#FAA0A0']
+                };
+                var chart = new ApexCharts(document.querySelector("#sales_agent_cancellation_rates"), options);
+                chart.render();
+            }
+        });
+
+        //Owner / Finance
+        var sales_agents = <?php echo json_encode($sales_agents) ?>;
+        var upcoming_travels = <?php echo json_encode($upcoming_travels) ?>;
+        var profit_margins_less_than_10_percent = <?php echo json_encode($profit_margins_less_than_10_percent) ?>;
+        var overdue_payments = <?php echo json_encode($overdue_payments) ?>;
+        var negative_profit_margins = <?php echo json_encode($negative_profit_margins) ?>;
+        var pending_travel_vouchers = <?php echo json_encode($pending_travel_vouchers) ?>;
+        var pending_reviews = <?php echo json_encode($pending_reviews) ?>;
+        var pending_credit_payments = <?php echo json_encode($pending_credit_payments) ?>;
+        var pending_debit_payments = <?php echo json_encode($pending_debit_payments) ?>;
+
+        $('#sales_agent').change(function() {
+            var agent = $('#sales_agent').val();
+            var count = 0;
+            for(var i = 0; i < sales_agents.length; i++) {
+                if(agent != '') {
+                    if(sales_agents[i].AdminID == agent) {
+                        $('.' + sales_agents[i].AdminID).removeAttr('style');
+                    } else {
+                        $('.' + sales_agents[i].AdminID).attr('style', 'display: none !important');
+                    }
+                } else {
+                    $('.' + sales_agents[i].AdminID).removeAttr('style');
+                }
+            }
+
+            if(agent != '') {
+                for(var i = 0; i < upcoming_travels.length; i++) {
+                    if(upcoming_travels[i].AdminID == agent) {
+                        count++;
+                    }
+                }
+                $('#upcoming_travels_header').html('<strong>' + count + '</strong>&nbsp;BC(s)');
+                count = 0;
+                for(var i = 0; i < profit_margins_less_than_10_percent.length; i++) {
+                    if(profit_margins_less_than_10_percent[i].AdminID == agent) {
+                        count++;
+                    }
+                }
+                $('#profit_margins_less_than_10_percent_header').html('<strong>' + count + '</strong>&nbsp;BC(s)');
+                count = 0;
+                for(var i = 0; i < overdue_payments.length; i++) {
+                    if(overdue_payments[i].AdminID == agent) {
+                        count++;
+                    }
+                }
+                $('#overdue_payments_header').html('<strong>' + count + '</strong>&nbsp;BC(s)');
+                count = 0;
+                for(var i = 0; i < negative_profit_margins.length; i++) {
+                    if(negative_profit_margins[i].AdminID == agent) {
+                        count++;
+                    }
+                }
+                $('#negative_profit_margins_header').html('<strong>' + count + '</strong>&nbsp;BC(s)');
+                count = 0;
+                for(var i = 0; i < pending_travel_vouchers.length; i++) {
+                    if(pending_travel_vouchers[i].AdminID == agent) {
+                        count++;
+                    }
+                }
+                $('#pending_travel_vouchers_header').html('<strong>' + count + '</strong>&nbsp;BC(s)');
+                count = 0;
+                for(var i = 0; i < pending_reviews.length; i++) {
+                    if(pending_reviews[i].AdminID == agent) {
+                        count++;
+                    }
+                }
+                $('#pending_reviews_header').html('<strong>' + count + '</strong>&nbsp;BC(s)');
+                count = 0;
+                for(var i = 0; i < pending_credit_payments.length; i++) {
+                    if(pending_credit_payments[i].AdminID == agent) {
+                        count++;
+                    }
+                }
+                $('#pending_credit_payments_header').html('<strong>' + count + '</strong>&nbsp;Payment(s)');
+                count = 0;
+                for(var i = 0; i < pending_debit_payments.length; i++) {
+                    if(pending_debit_payments[i].AdminID == agent) {
+                        count++;
+                    }
+                }
+                $('#pending_debit_payments_header').html('<strong>' + count + '</strong>&nbsp;Payment(s)');
+            } else {
+                $('#upcoming_travels_header').html('<?php echo '<strong>' . count($upcoming_travels) . '</strong>&nbsp;BC(s)'; ?>');
+                $('#profit_margins_less_than_10_percent_header').html('<?php echo '<strong>' . count($profit_margins_less_than_10_percent) . '</strong>&nbsp;BC(s)'; ?>');
+                $('#overdue_payments_header').html('<?php echo '<strong>' . count($overdue_payments) . '</strong>&nbsp;BC(s)'; ?>');
+                $('#negative_profit_margins_header').html('<?php echo '<strong>' . count($negative_profit_margins) . '</strong>&nbsp;BC(s)'; ?>');
+                $('#pending_travel_vouchers_header').html('<?php echo '<strong>' . count($pending_travel_vouchers) . '</strong>&nbsp;BC(s)'; ?>');
+                $('#pending_reviews_header').html('<?php echo '<strong>' . count($pending_reviews) . '</strong>&nbsp;BC(s)'; ?>');
+                $('#pending_credit_payments_header').html('<?php echo '<strong>' . count($pending_credit_payments) . '</strong>&nbsp;Payment(s)'; ?>');
+                $('#pending_debit_payments_header').html('<?php echo '<strong>' . count($pending_debit_payments) . '</strong>&nbsp;Payment(s)'; ?>');
+            }
+        });
+
+        $.ajax({
+            url: '<?php echo base_url('Dashboard/Sales_Agents_Daily_Sales'); ?>',
+            type: 'post',
+            dataType: 'json',
+            success: function(array) {
+                var series = [];
+                for(var i = 0; i < (array.sales_agents).length; i++) {
+                    series.push({name: array.sales_agents[i], data: array.daily_sales[array.sales_agents[i]]});
+                }
+                var options = {
+                    series: series,
+                    chart: {
+                        type: 'bar',
+                        height: 350,
+                        toolbar: {
+                            show: false
+		                }
+                    },
+                    plotOptions: {
+                        bar: {
+                            horizontal: false,
+                            columnWidth: '65%'
+                        },
+                    },
+                    dataLabels: {
+                        enabled: false,
+                    },
+                    stroke: {
+                        show: true,
+                        width: 2,
+                        colors: ['transparent']
+                    },
+                    xaxis: {
+                        categories: array.current_week,
+                    },
+                    yaxis: {
+                        title: {
+                            text: 'Sales (RM)'
+                        },
+                        labels: {
+                            formatter: (value) => { return value.toLocaleString('en-US', {minimumFractionDigits: 2}) },
+                        }
+                    },
+                    fill: {
+                        opacity: 1
+                    },
+                    tooltip: {
+                        y: {
+                            formatter: function(sales) {
+                                return "RM " + sales.toLocaleString('en-US', {minimumFractionDigits: 2})
+                            }
+                        }
+                    },
+                    colors: ['#F8C8DC', '#C3B1E1', '#A7C7E7', '#FAA0A0', '#FAC898', '#C1E1C1']
+                };
+                var chart = new ApexCharts(document.querySelector("#sales_agents_daily_sales"), options);
+                chart.render();
+            }
+        });
+
+        $.ajax({
+            url: '<?php echo base_url('Dashboard/Sales_Agents_Monthly_Sales'); ?>',
+            type: 'post',
+            dataType: 'json',
+            success: function(array) {
+                var series = [];
+                for(var i = 0; i < (array.sales_agents).length; i++) {
+                    series.push({name: array.sales_agents[i], data: array.monthly_sales[array.sales_agents[i]]});
+                }
+                var options = {
+                    series: series,
+                    chart: {
+                        type: 'bar',
+                        height: 350,
+                        toolbar: {
+                            show: false
+		                }
+                    },
+                    plotOptions: {
+                        bar: {
+                            horizontal: false,
+                            columnWidth: '65%'
+                        },
+                    },
+                    dataLabels: {
+                        enabled: false,
+                    },
+                    stroke: {
+                        show: true,
+                        width: 2,
+                        colors: ['transparent']
+                    },
+                    xaxis: {
+                        categories: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+                    },
+                    yaxis: {
+                        title: {
+                            text: 'Sales (RM)'
+                        },
+                        labels: {
+                            formatter: (value) => { return value.toLocaleString('en-US', {minimumFractionDigits: 2}) },
+                        }
+                    },
+                    fill: {
+                        opacity: 1
+                    },
+                    tooltip: {
+                        y: {
+                            formatter: function(sales) {
+                                return "RM " + sales.toLocaleString('en-US', {minimumFractionDigits: 2})
+                            }
+                        }
+                    },
+                    colors: ['#F8C8DC', '#C3B1E1', '#A7C7E7', '#FAA0A0', '#FAC898', '#C1E1C1']
+                };
+                var chart = new ApexCharts(document.querySelector("#sales_agents_monthly_sales"), options);
+                chart.render();
+            }
+        });
+
+        $.ajax({
+            url: '<?php echo base_url('Dashboard/Daily_Sales'); ?>',
+            type: 'post',
+            dataType: 'json',
+            success: function(array) {
+                var options = {
+                    series: [{
+                        name: 'Sales',
+                        data: array.daily_sales
+                    }],
+                    chart: {
+                        type: 'bar',
+                        height: 350,
+                        toolbar: {
+                            show: false
+		                }
+                    },
+                    plotOptions: {
+                        bar: {
+                            horizontal: false,
+                            columnWidth: '15%'
+                        },
+                    },
+                    dataLabels: {
+                        enabled: false,
+                    },
+                    stroke: {
+                        show: true,
+                        width: 2,
+                        colors: ['transparent']
+                    },
+                    xaxis: {
+                        categories: array.current_week,
+                    },
+                    yaxis: {
+                        title: {
+                            text: 'Sales (RM)'
+                        },
+                        labels: {
+                            formatter: (value) => { return value.toLocaleString('en-US', {minimumFractionDigits: 2}) },
+                        }
+                    },
+                    fill: {
+                        opacity: 1
+                    },
+                    tooltip: {
+                        y: {
+                            formatter: function(sales) {
+                                return "RM " + sales.toLocaleString('en-US', {minimumFractionDigits: 2})
+                            }
+                        }
+                    },
+                    colors: ['#FFDB58']
+                };
+                var chart = new ApexCharts(document.querySelector("#daily_sales"), options);
+                chart.render();
+            }
+        });
+
+        $.ajax({
+            url: '<?php echo base_url('Dashboard/Monthly_Sales'); ?>',
+            type: 'post',
+            dataType: 'json',
+            success: function(array) {
+                var options = {
+                    series: [{
+                        name: 'Sales',
+                        data: array
+                    }],
+                    chart: {
+                        type: 'bar',
+                        height: 350,
+                        toolbar: {
+                            show: false
+		                }
+                    },
+                    plotOptions: {
+                        bar: {
+                            horizontal: false,
+                            columnWidth: '15%'
+                        },
+                    },
+                    dataLabels: {
+                        enabled: false,
+                    },
+                    stroke: {
+                        show: true,
+                        width: 2,
+                        colors: ['transparent']
+                    },
+                    xaxis: {
+                        categories: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Total'],
+                        labels: {
+                            style: {
+                                colors: ['#36454F', '#36454F', '#36454F', '#36454F', '#36454F', '#36454F', '#36454F', '#36454F', '#36454F', '#36454F', '#36454F', '#36454F', '#FFC000']
+                            }
+                        }
+                    },
+                    yaxis: {
+                        title: {
+                            text: 'Sales (RM)'
+                        },
+                        labels: {
+                            formatter: (value) => { return value.toLocaleString('en-US', {minimumFractionDigits: 2}) },
+                        }
+                    },
+                    fill: {
+                        opacity: 1
+                    },
+                    tooltip: {
+                        y: {
+                            formatter: function(sales) {
+                                return "RM " + sales.toLocaleString('en-US', {minimumFractionDigits: 2})
+                            }
+                        }
+                    },
+                    colors: ['#FFDB58']
+                };
+                var chart = new ApexCharts(document.querySelector("#monthly_sales"), options);
+                chart.render();
+            }
+        });
+
+        $.ajax({
+            url: '<?php echo base_url('Dashboard/Approved_Payments'); ?>',
+            type: 'post',
+            dataType: 'json',
+            success: function(array) {
+                var series = [];
+                for(var i = 1; i <= 2; i++) {
+                    if(i == 1) {
+                        series.push({name: 'Credit', data: array.credits});
+                    } else {
+                        series.push({name: 'Debit', data: array.debits});
+                    }
+                }
+                var options = {
+                    series: series,
+                    chart: {
+                        type: 'bar',
+                        height: 350,
+                        toolbar: {
+                            show: false
+		                }
+                    },
+                    plotOptions: {
+                        bar: {
+                            horizontal: false,
+                            columnWidth: '25%'
+                        },
+                    },
+                    dataLabels: {
+                        enabled: false,
+                    },
+                    stroke: {
+                        show: true,
+                        width: 2,
+                        colors: ['transparent']
+                    },
+                    xaxis: {
+                        categories: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Total'],
+                        labels: {
+                            style: {
+                                colors: ['#36454F', '#36454F', '#36454F', '#36454F', '#36454F', '#36454F', '#36454F', '#36454F', '#36454F', '#36454F', '#36454F', '#36454F', '#FFC000']
+                            }
+                        }
+                    },
+                    yaxis: {
+                        title: {
+                            text: 'Payment (RM)'
+                        },
+                        labels: {
+                            formatter: (value) => { return value.toLocaleString('en-US', {minimumFractionDigits: 2}) },
+                        }
+                    },
+                    fill: {
+                        opacity: 1
+                    },
+                    tooltip: {
+                        y: {
+                            formatter: function(payment) {
+                                return "RM " + payment.toLocaleString('en-US', {minimumFractionDigits: 2})
+                            }
+                        }
+                    },
+                    colors: ['#C1E1C1', '#FAA0A0']
+                };
+                var chart = new ApexCharts(document.querySelector("#approved_payments"), options);
+                chart.render();
+            }
+        });
+
+        $.ajax({
+            url: '<?php echo base_url('Dashboard/Pending_Payments'); ?>',
+            type: 'post',
+            dataType: 'json',
+            success: function(array) {
+                var series = [];
+                for(var i = 1; i <= 2; i++) {
+                    if(i == 1) {
+                        series.push({name: 'Credit', data: array.credits});
+                    } else {
+                        series.push({name: 'Debit', data: array.debits});
+                    }
+                }
+                var options = {
+                    series: series,
+                    chart: {
+                        type: 'bar',
+                        height: 350,
+                        toolbar: {
+                            show: false
+		                }
+                    },
+                    plotOptions: {
+                        bar: {
+                            horizontal: false,
+                            columnWidth: '25%'
+                        },
+                    },
+                    dataLabels: {
+                        enabled: false,
+                    },
+                    stroke: {
+                        show: true,
+                        width: 2,
+                        colors: ['transparent']
+                    },
+                    xaxis: {
+                        categories: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Total'],
+                        labels: {
+                            style: {
+                                colors: ['#36454F', '#36454F', '#36454F', '#36454F', '#36454F', '#36454F', '#36454F', '#36454F', '#36454F', '#36454F', '#36454F', '#36454F', '#FFC000']
+                            }
+                        }
+                    },
+                    yaxis: {
+                        title: {
+                            text: 'Payment (RM)'
+                        },
+                        labels: {
+                            formatter: (value) => { return value.toLocaleString('en-US', {minimumFractionDigits: 2}) },
+                        }
+                    },
+                    fill: {
+                        opacity: 1
+                    },
+                    tooltip: {
+                        y: {
+                            formatter: function(payment) {
+                                return "RM " + payment.toLocaleString('en-US', {minimumFractionDigits: 2})
+                            }
+                        }
+                    },
+                    colors: ['#C1E1C1', '#FAA0A0']
+                };
+                var chart = new ApexCharts(document.querySelector("#pending_payments"), options);
+                chart.render();
+            }
+        });
+        
+        $.ajax({
+            url: '<?php echo base_url('Dashboard/Cancellation_Rates'); ?>',
+            type: 'post',
+            dataType: 'json',
+            success: function(array) {
+                var options = {
+                    series: [{
+                        name: 'Rate',
+                        data: array
+                    }],
+                    chart: {
+                        type: 'bar',
+                        height: 350,
+                        toolbar: {
+                            show: false
+		                }
+                    },
+                    plotOptions: {
+                        bar: {
+                            horizontal: false,
+                            columnWidth: '15%'
+                        },
+                    },
+                    dataLabels: {
+                        enabled: false,
+                    },
+                    stroke: {
+                        show: true,
+                        width: 2,
+                        colors: ['transparent']
+                    },
+                    xaxis: {
+                        categories: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+                    },
+                    yaxis: {
+                        title: {
+                            text: 'Rate (%)'
+                        },
+                        labels: {
+                            formatter: (value) => { return value + '%' },
+                        }
+                    },
+                    fill: {
+                        opacity: 1
+                    },
+                    tooltip: {
+                        y: {
+                            formatter: function(rate) {
+                                return rate + "%"
+                            }
+                        }
+                    },
+                    colors: ['#FAA0A0']
+                };
+                var chart = new ApexCharts(document.querySelector("#cancellation_rates"), options);
+                chart.render();
+            }
+        });
+    });
+</script>
