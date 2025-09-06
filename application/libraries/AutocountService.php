@@ -12,7 +12,6 @@ class AutoCountService {
         $this->CI->config->load('autocount', TRUE);
         $this->config = $this->CI->config->item('autocount');
 
-        // Optionally fetch token immediately
         $this->token = $this->getToken();
     }
 
@@ -20,7 +19,7 @@ class AutoCountService {
      * Get OAuth2 token
      */
     private function getToken() {
-        $url = $this->config['base_url'] . '/auth/token';
+        $url = rtrim($this->config['base_url'], '/') . '/auth/token';
         $payload = [
             'client_id'     => $this->config['client_id'],
             'client_secret' => $this->config['client_secret'],
@@ -42,8 +41,17 @@ class AutoCountService {
     /**
      * Send request to AutoCount API
      */
-    public function request($method, $endpoint, $payload = []) {
-        $url = $this->config['base_url'] . $endpoint;
+    public function request($method, $endpoint, $payload = [], $queryParams = []) {
+        $accountBookId = $this->config['accountBookId'];
+
+        // Build URL with accountBookId prefix
+        $url = rtrim($this->config['base_url'], '/') . '/' . $accountBookId . '/' . ltrim($endpoint, '/');
+
+        // Append query parameters
+        if (!empty($queryParams)) {
+            $url .= '?' . http_build_query($queryParams);
+        }
+
         $headers = [
             "Authorization: Bearer {$this->token}",
             "Content-Type: application/json"
@@ -85,7 +93,6 @@ class AutoCountService {
             curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
         }
 
-        // 🔹 Control HTTPS SSL verification with flag
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, $verifySSL);
         curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, $verifySSL ? 2 : 0);
 
@@ -98,5 +105,4 @@ class AutoCountService {
         curl_close($ch);
         return json_decode($result, true);
     }
-
 }
