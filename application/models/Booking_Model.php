@@ -770,4 +770,81 @@ class Booking_Model extends CI_Model
 			return false;
 		}
 	}
+
+	function getAllBookingsWithGuests($booking_id = null)
+	{
+		// Get all columns from booking table
+		$bookingCols = $this->db->list_fields('booking');
+		$bookingCols = array_map(function($col) {
+			return "booking.`$col`";
+		}, $bookingCols);
+
+		// Get all columns from guest_list table, but alias with guest_ prefix
+		$guestCols = $this->db->list_fields('guest_list');
+		$guestCols = array_map(function($col) {
+			return "guest_list.`$col` AS guest_$col";
+		}, $guestCols);
+
+		// Merge both columns into one select string
+		$allCols = array_merge($bookingCols, $guestCols);
+		$this->db->select(implode(', ', $allCols), false);
+
+		// Main query
+		$this->db->from('booking');
+		$this->db->join('guest_list', 'guest_list.BookingID = booking.BookingID', 'left');
+
+		// Optional filter by BookingID
+		if (!is_null($booking_id) && $booking_id !== '') {
+			$this->db->where('booking.BookingID', $booking_id);
+		}
+
+		$this->db->order_by('booking.BookingID', 'ASC');
+
+		$query = $this->db->get();
+		return $query->result();
+	}
+
+	function getAllBookingsWithProducts($booking_id = null)
+	{
+		// Get all columns from booking table
+		$bookingCols = $this->db->list_fields('booking');
+		$bookingCols = array_map(function($col) {
+			return "booking.`$col`";
+		}, $bookingCols);
+
+		// Get all columns from booking_product table, alias with product_ prefix
+		$productCols = $this->db->list_fields('booking_product');
+		$productCols = array_map(function($col) {
+			return "booking_product.`$col` AS product_$col";
+		}, $productCols);
+
+		// Merge both columns into one select string
+		$allCols = array_merge($bookingCols, $productCols);
+		$this->db->select(implode(', ', $allCols), false);
+
+		// Main query
+		$this->db->from('booking');
+		$this->db->join('booking_product', 'booking_product.BookingID = booking.BookingID', 'left');
+
+		// Optional filter by BookingID
+		if (!is_null($booking_id) && $booking_id !== '') {
+			$this->db->where('booking.BookingID', $booking_id);
+		}
+
+		$this->db->order_by('booking.BookingID', 'ASC');
+
+		$query = $this->db->get();
+		return $query->result();
+	}
+
+	function getBookingById($booking_id)
+	{
+		$this->db->select('*');
+		$this->db->from('booking');
+		$this->db->where('BookingID', $booking_id);
+		$query = $this->db->get();
+
+		return $query->num_rows() > 0 ? $query->row() : null;
+	}
+
 }

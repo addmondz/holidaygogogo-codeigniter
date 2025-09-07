@@ -5,6 +5,8 @@ $config['autocount'] = [
     // Base settings
     'base_url'       => 'https://accounting-api.autocountcloud.com',
     'accountBookId'  => 1, // your accountBookId here
+	'apiKey' 		 => '',
+	'keyId'			 => '',
     'client_id'      => 'YOUR_CLIENT_ID',
     'client_secret'  => 'YOUR_CLIENT_SECRET',
     'username'       => 'YOUR_API_USERNAME',

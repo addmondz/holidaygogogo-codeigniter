@@ -53,3 +53,40 @@ if (!function_exists('autocount_request')) {
         return $CI->autocountservice->request($method, $endpoint, $payload, $queryParams);
     }
 }
+if (!function_exists('autocount_log')) {
+    /**
+     * Log AutoCount API request/response
+     *
+     * @param string $endpoint API endpoint (e.g., quotation.create)
+     * @param array  $request  Request data (headers, body, query)
+     * @param mixed  $response API response
+     * @param string $status   Y = success, N = fail
+     * @param int|null $user_id Optional user ID
+     */
+    function autocount_log($endpoint, $request, $response, $status, $user_id = null) {
+        $CI =& get_instance();
+
+        try {
+            $actionData = [
+                'endpoint' => $endpoint,
+                'request'  => $request,
+                'response' => $response
+            ];
+
+            $data = [
+                'UserID'     => $user_id,
+                'Action'     => json_encode($actionData, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+                'IP'         => $_SERVER['REMOTE_ADDR'] ?? null,
+                'Url'        => is_string($endpoint) ? $endpoint : '',
+                'Status'     => strtoupper($status) === 'Y' ? 'Y' : 'N',
+                'InsertBy'   => 'SYSTEM',
+                'InsertDate' => date('Y-m-d H:i:s')
+            ];
+
+            $CI->db->insert('activity_log', $data);
+
+        } catch (Throwable $e) {
+            log_message('error', 'AutoCount log failed: ' . $e->getMessage());
+        }
+    }
+}

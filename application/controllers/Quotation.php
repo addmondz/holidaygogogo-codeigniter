@@ -11,30 +11,30 @@ class Quotation extends MY_Controller {
                 'DocDate'       => $data['InsertDate'],
                 'DebtorCode'    => '',
                 'DebtorName'    => $data['Customer'],
-                'Email'         => $data['customer_email'],
+                'Email'         => $data['guest_email'],
                 'EmailCC'       => null,
                 'EmailBCC'      => null,
-                'Address'       => $data['customer_address'],
+                'Address'       => $data['guest_address'],
                 'Attention'     => '',
-                'Phone1'        => $data['customer_phone'],
+                'Phone1'        => $data['guest_phone'],
                 'Fax1'          => '',
-                'DeliverAddress'=> $data['customer_address'],
-                'DeliverContact'=> '',
-                'DeliverPhone1' => '',
+                'DeliverAddress'=> $data['guest_address'],
+                'DeliverContact'=> $data['Customer'],
+                'DeliverPhone1' => $data['guest_phone'],
                 'DeliverFax1'   => '',
                 'Ref'           => null,
                 'Description'   => null,
                 'Note'          => null,
                 'SalesAgent'    => '',
-                'CreditTerm'    => $data['credit_term'],
-                'SalesLocation' => $data['sales_location'],
-                'Remark1'       => null,
+                'CreditTerm'    => $data['credit_term'] ?? 'C.O.D.',
+                'SalesLocation' => $data['sales_location'] ?? 'HQ',
+                'Remark1'       => $data['BokingRemark'],
                 'Remark2'       => null,
                 'Remark3'       => null,
                 'Remark4'       => null,
                 'CurrencyRate'  => $data['currency_rate'],
-                'InclusiveTax'  => false,
-                'IsRoundAdj'    => false,
+                'InclusiveTax'  => $data['inclusive_tax'] ?? false,
+                'IsRoundAdj'    => $data['is_round_adj'] ?? false,
                 'YourRef'       => null,
                 'Validity'      => null,
                 'CC'            => null,
@@ -43,7 +43,7 @@ class Quotation extends MY_Controller {
             ],
             'details' => [],
             'autoFillOption' => [
-                'TaxCode' => true
+                'TaxCode' => $data['tax_code'] ?? true
             ],
             'saveApprove' => null
         ];
@@ -51,15 +51,15 @@ class Quotation extends MY_Controller {
         if (!empty($data['booking_product'])) {
             foreach($data['booking_product'] as $product) {
                 $param['details'][] = [
-                    'ProductCode'        => $product['ProductCode'],
+                    'ProductCode'        => $product['product_ProductCode'],
                     'ProductVariant'     => null,
-                    'Description'        => $product['Description'],
+                    'Description'        => $product['product_Description'],
                     'FurtherDescription' => '',
-                    'Qty'                => $product['Quantity'],
-                    'Unit'               => $product['unit'],
-                    'UnitPrice'          => $product['Price'],
+                    'Qty'                => $product['product_Quantity'],
+                    'Unit'               => (isset($product['unit'])) ? $product['unit'] : 'unit',
+                    'UnitPrice'          => $product['product_Price'],
                     'Discount'           => null,
-                    'TaxCode'            => $product['tax_code'],
+                    'TaxCode'            => (isset($product['tax_code'])) ? $product['tax_code'] : 'S-5',
                     'TaxAdjustment'      => 0,
                     'LocalTaxAdjustment' => 0,
                     'DeptNo'             => null
@@ -70,105 +70,50 @@ class Quotation extends MY_Controller {
         return autocount_request('POST', 'quotation.create', $param);
     }
 
-   public function update($data = []) {
-        // docNo comes from BookingNumber (falls back to DocNo if provided)
-        $docNo = $data['BookingNumber'] ?? '';
-        // if ($docNo === '') {
-        //     return ['error' => 'Missing required parameter: BookingNumber (or DocNo).'];
-        // }
+    public function update($data = [])
+    {
+        $docNo = $data['BookingNumber'] ?? $data['DocNo'] ?? '';
+        if ($docNo === '') {
+            return ['error' => 'Missing required parameter: BookingNumber (or DocNo).'];
+        }
 
-        // Choose body
-        $scenario = $data['scenario'] ?? '';
+        // Build master section — only include if not empty
+        $body = [];
+        if (!empty($data['master'])) {
+            $body['master'] = $data['master'];
+        }
 
-        if (isset($data['body']) && is_array($data['body']) && !empty($data['body'])) {
-            // Use provided body directly
-            $body = $data['body'];
-        } else {
-            // Build from scenario presets (based on your original variants)
-            switch ($scenario) {
-                case 'desc_only':
-                    $body = [
-                        'master'  => [],
-                        'details' => [
-                            ['description' => 'Short Pants'],
-                            ['description' => 'Short Pants'],
-                        ],
-                    ];
-                    break;
-
-                case 'long_pants_and_full_line':
-                    $body = [
-                        'master'  => [],
-                        'details' => [
-                            [
-                                'productCode' => 'P-00002',
-                                'description' => 'Long Pants',
-                                'qty'         => 2,
-                            ],
-                            [
-                                'productCode'        => 'P-00002',
-                                'productVariant'     => null,
-                                'accNo'              => '510-0000',
-                                'description'        => 'Pants',
-                                'furtherDescription' => '',
-                                'qty'                => 1,
-                                'unit'               => '20000',
-                                'unitPrice'          => 450,
-                                'discount'           => null,
-                                'taxCode'            => 'S-5',
-                                'tariffCode'         => '40159000',
-                                'taxExportCountry'   => null,
-                                'taxPermitNo'        => null,
-                                'taxAdjustment'      => 0,
-                                'localTaxAdjustment' => 0,
-                                'unitCost'           => 300,
-                                'goodsReturn'        => true,
-                                'yourPONo'           => null,
-                                'yourPODate'         => null,
-                                'deptNo'             => null,
-                            ],
-                        ],
-                        'autoFillOption' => [
-                            'taxCode' => true,
-                        ],
-                        'saveApprove' => null,
-                    ];
-                    break;
-
-                case 'coat_and_pants':
-                    $body = [
-                        'master'  => [],
-                        'details' => [
-                            [
-                                'productCode' => 'P-00003',
-                                'description' => 'Coat',
-                                'qty'         => 1,
-                                'unit'        => '3000',
-                                'unitPrice'   => 300,
-                            ],
-                            [
-                                'productCode' => 'P-00002',
-                                'accNo'       => '500-0000',
-                                'description' => 'Pants',
-                                'qty'         => 1,
-                                'unit'        => '20000',
-                                'unitPrice'   => 450,
-                                'tariffCode'  => '40159000',
-                            ],
-                        ],
-                        'autoFillOption' => [
-                            'taxCode' => true,
-                        ],
-                        'saveApprove' => null,
-                    ];
-                    break;
-
-                default:
-                    // No body and unknown scenario -> return error (don’t send empty payloads)
-                    return [
-                        'error' => 'No update body provided. Pass $data["body"] or a valid $data["scenario"]: desc_only, long_pants_and_full_line, coat_and_pants.'
-                    ];
+        // Build details section — always replace with full details from DB
+        if (!empty($data['booking_product']) && is_array($data['booking_product'])) {
+            $body['details'] = [];
+            foreach ($data['booking_product'] as $product) {
+                $body['details'][] = [
+                    'ProductCode'        => $product['product_ProductCode'],
+                    'ProductVariant'     => null,
+                    'Description'        => $product['product_Description'],
+                    'FurtherDescription' => '',
+                    'Qty'                => $product['product_Quantity'],
+                    'Unit'               => (isset($product['unit'])) ? $product['unit'] : 'unit',
+                    'UnitPrice'          => $product['product_Price'],
+                    'Discount'           => null,
+                    'TaxCode'            => (isset($product['tax_code'])) ? $product['tax_code'] : 'S-5',
+                    'TaxAdjustment'      => 0,
+                    'LocalTaxAdjustment' => 0,
+                    'DeptNo'             => null
+                ];
             }
+        }
+
+        // Auto-fill options — optional
+        if (!empty($data['tax_code'])) {
+            $body['autoFillOption'] = [
+                'TaxCode' => $data['tax_code']
+            ];
+        }
+
+        // Save & Approve — optional
+        if (isset($data['saveApprove'])) {
+            $body['saveApprove'] = $data['saveApprove'];
         }
 
         return autocount_request(
@@ -182,7 +127,8 @@ class Quotation extends MY_Controller {
     public function update_status($data = []) {
         $docNo = $data['BookingNumber'] ?? '';
         $body = [
-            'documentStatus' => $data['Status'] ?? ''
+            'documentStatus' => $data['Status'] ?? '',
+            'lostReason' => $data['reason'] ?? ''
         ];
 
         return autocount_request(

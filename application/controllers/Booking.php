@@ -173,10 +173,45 @@ class Booking extends MY_Controller
 	function Create()
 	{
 		if(in_array('GB', $this->session->access_control)) {
-			if($this->input->is_ajax_request()) {
-				$booking_id = $this->Booking_Model->Create();
-				$this->Booking_Product_Model->Create($this->input->post('booking_products'), $booking_id);
-			} else {
+			 if ($this->input->is_ajax_request()) {
+
+            $booking_id = $this->Booking_Model->Create();
+
+            $this->Booking_Product_Model->Create($this->input->post('booking_products'), $booking_id);
+
+            $bookingData = $this->Booking_Model->getAllBookingsWithGuests($booking_id);
+            if (!empty($bookingData)) {
+                $bookingData = (array) $bookingData[0]; 
+            }
+
+            $bookingProducts = $this->Booking_Model->getAllBookingsWithProducts($booking_id);
+            $bookingProducts = array_map('get_object_vars', $bookingProducts); // convert to array
+
+            $quotationData = [
+                'BookingNumber'   => $bookingData['BookingNumber'] ?? '',
+                'InsertDate'      => $bookingData['InsertDate'] ?? date('Y-m-d'),
+                'Customer'        => $bookingData['Customer'] ?? '',
+                'guest_email'     => $bookingData['guest_email'] ?? '',
+                'guest_address'   => $bookingData['guest_address'] ?? '',
+                'guest_phone'     => $bookingData['guest_phone'] ?? '',
+                'BokingRemark'    => $bookingData['BokingRemark'] ?? '',
+                
+                // Fields not in DB → set default or null
+                'credit_term'     => null,
+                'sales_location'  => '',
+                'currency_rate'   => 1,
+                'inclusive_tax'   => false,
+                'is_round_adj'    => false,
+                'tax_code'        => '',
+
+                // Details
+                'booking_product' => $bookingProducts
+            ];
+			
+			$this->load->model('Quotation_Model');
+            $this->Quotation_Model->create($quotationData);
+
+        } else {
 				$titles = array('tab_title' => 'HolidayGoGoGo | Booking', 'breadcrumb_title' => 'Booking >> Create');
 				$array = array('BookingID' => 'NA', 'BookingConfirmationFooterID' => 'NA', 'TravelVoucherFooterID' => 'NA', 'BookingNumber' => 'NA', 'Tag' => array(), 'Discount' => 'NA', 'NetTotal' => 'NA', 'ProductSequence' => array(), 'BookingProductID' => ($this->Booking_Product_Model->Read_Last_Booking_Product_ID()) + 1);
 				$array['admins'] = $this->Booking_Model->Read_Admins();
@@ -246,6 +281,38 @@ class Booking extends MY_Controller
 						$this->Booking_Model->Update_Product_Sequence(implode(',', $booking['ProductSequence']));
 					}
 				}
+
+				/*** Fetch Fresh Booking + Products from DB ***/
+				$booking_id = $this->input->post('booking_id');
+				$bookingData = $this->Booking_Model->getAllBookingsWithGuests($booking_id);
+				$bookingProducts = $this->Booking_Product_Model->getAllBookingsWithProducts($booking_id);
+
+				// Convert objects to arrays
+				$bookingProducts = array_map('get_object_vars', $bookingProducts);
+
+				/*** Call Quotation Update in AutoCount ***/
+				$quotationData = [
+					'BookingNumber'   => $bookingData['BookingNumber'],
+					'DocNo'           => $bookingData['BookingNumber'], // Fallback
+					'master'          => [
+						'DocDate'        => $bookingData['InsertDate'],
+						'DebtorName'     => $bookingData['Customer'],
+						'Email'          => $bookingData['guest_email'],
+						'Address'        => $bookingData['guest_address'],
+						'Phone1'         => $bookingData['guest_phone'],
+						'DeliverAddress' => $bookingData['guest_address'],
+						'DeliverContact' => $bookingData['Customer'],
+						'DeliverPhone1'  => $bookingData['guest_phone'],
+						'Remark1'        => $bookingData['BokingRemark'],
+					],
+					'booking_product' => $bookingProducts,
+					'tax_code'        => 'S-5', // Default tax code if missing
+					'saveApprove'     => null
+				];
+
+				$this->load->model('Quotation_Model');
+				$this->Quotation_Model->update($quotationData);
+
 			} else {
 				$valid_booking_id = $this->Universal_Model->Validate_Id('BookingID', $this->input->get('booking_id'), 'booking');
 
@@ -364,6 +431,28 @@ class Booking extends MY_Controller
 		if(in_array('AB', $this->session->access_control)) {
 			$this->Booking_Model->Update_Status($this->input->get('new_status'), $this->input->get('booking_id'));
 			$this->Booking_Model->Create_Booking_Log();
+			
+			$this->load->config('status_mapping');
+			$statusMap = $this->config->item('booking_to_autocount_status');
+			$newStatus = $this->input->get('new_status');
+			$autoCountStatus = $statusMap[$newStatus] ?? 0; // default Pending
+
+			$bookingData = $this->Booking_Model->getBookingById(
+				$this->input->get('booking_id')
+			);
+
+			if (!empty($bookingData->BookingNumber)) {
+				$quotationData = [
+					'DocNo'  => $bookingData->BookingNumber,
+					'master' => [
+						'Status' => $autoCountStatus
+					]
+				];
+
+				$this->load->model('Quotation_Model');
+				$this->Quotation_Model->update($quotationData);
+			}
+
 			if(strpos($this->input->get('param'), '?') == true) {
 				redirect('Booking?' . explode('?', $this->input->get('param'))[1]);
 			} else {
@@ -382,6 +471,13 @@ class Booking extends MY_Controller
 			$this->Universal_Model->Delete('BookingID', $this->input->get('booking_id'), 'booking_product');
 			$this->Universal_Model->Delete('BookingID', $this->input->get('booking_id'), 'guest_list');
 			$this->Universal_Model->Delete('BookingID', $this->input->get('booking_id'), 'payment');
+			// Delete from AutoCount (Quotation)
+			if (!empty($bookingData->BookingNumber)) {
+				$this->load->model('Quotation_Model');
+				$this->Quotation_Model->delete([
+					'BookingNumber' => $bookingData->BookingNumber
+				]);
+			}
 		} else {
 			redirect('Dashboard');
 		}

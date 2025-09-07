@@ -52,12 +52,35 @@ class AutoCountService {
             $url .= '?' . http_build_query($queryParams);
         }
 
+        // Headers required by AutoCount Cloud API
         $headers = [
-            "Authorization: Bearer {$this->token}",
+            "API-Key: {$this->config['apiKey']}",
+            "Key-ID: {$this->config['keyId']}",
             "Content-Type: application/json"
         ];
 
-        return $this->curlRequest($method, $url, $payload, $headers);
+        // If your API still needs Bearer token for some endpoints
+        if (!empty($this->token)) {
+            $headers[] = "Authorization: Bearer {$this->token}";
+        }
+
+        $response = $this->curlRequest($method, $url, $payload, $headers);
+
+        $this->CI->load->helper('autocount');
+        $status = (is_array($response) && empty($response['error'])) ? 'Y' : 'N';
+        autocount_log(
+            $endpoint,
+            [
+                'headers' => $headers,
+                'body'    => $payload,
+                'query'   => $queryParams
+            ],
+            $response,
+            $status,
+            null
+        );
+
+        return $response;
     }
 
     /**
