@@ -208,8 +208,7 @@ class Booking extends MY_Controller
                 'booking_product' => $bookingProducts
             ];
 			
-			$this->load->model('Quotation_Model');
-            $this->Quotation_Model->create($quotationData);
+            $this->autocount_create($quotationData);
 
         } else {
 				$titles = array('tab_title' => 'HolidayGoGoGo | Booking', 'breadcrumb_title' => 'Booking >> Create');
@@ -310,8 +309,7 @@ class Booking extends MY_Controller
 					'saveApprove'     => null
 				];
 
-				$this->load->model('Quotation_Model');
-				$this->Quotation_Model->update($quotationData);
+				$this->autocount_update($quotationData);
 
 			} else {
 				$valid_booking_id = $this->Universal_Model->Validate_Id('BookingID', $this->input->get('booking_id'), 'booking');
@@ -449,8 +447,7 @@ class Booking extends MY_Controller
 					]
 				];
 
-				$this->load->model('Quotation_Model');
-				$this->Quotation_Model->update($quotationData);
+				$this->autocount_update($quotationData);
 			}
 
 			if(strpos($this->input->get('param'), '?') == true) {
@@ -472,10 +469,13 @@ class Booking extends MY_Controller
 			$this->Universal_Model->Delete('BookingID', $this->input->get('booking_id'), 'guest_list');
 			$this->Universal_Model->Delete('BookingID', $this->input->get('booking_id'), 'payment');
 			// Delete from AutoCount (Quotation)
-			if (!empty($bookingData->BookingNumber)) {
-				$this->load->model('Quotation_Model');
-				$this->Quotation_Model->delete([
-					'BookingNumber' => $bookingData->BookingNumber
+
+			$bookingData = $this->Booking_Model->getBookingById($this->input->get('booking_id'));
+        	$bookingNumber = (!empty($bookingData) && !empty($bookingData->BookingNumber)) ? $bookingData->BookingNumber : '';
+
+			if (!empty($bookingNumber)) {
+				$this->autocount_delete([
+					'BookingNumber' => $bookingNumber
 				]);
 			}
 		} else {
@@ -834,4 +834,167 @@ class Booking extends MY_Controller
 			echo json_encode(false);
 		}
 	}
+
+	public function autocount_create($data = [])
+    {
+        $param = [
+            'master' => [
+                'DocNo'           => $data['BookingNumber'],
+                'DocNoFormatName' => null,
+                'DocDate'         => $data['InsertDate'],
+                'DebtorCode'      => '',
+                'DebtorName'      => $data['Customer'],
+                'Email'           => $data['guest_email'],
+                'EmailCC'         => null,
+                'EmailBCC'        => null,
+                'Address'         => $data['guest_address'],
+                'Attention'       => '',
+                'Phone1'          => $data['guest_phone'],
+                'Fax1'            => '',
+                'DeliverAddress'  => $data['guest_address'],
+                'DeliverContact'  => $data['Customer'],
+                'DeliverPhone1'   => $data['guest_phone'],
+                'DeliverFax1'     => '',
+                'Ref'             => null,
+                'Description'     => null,
+                'Note'            => null,
+                'SalesAgent'      => '',
+                'CreditTerm'      => $data['credit_term'] ?? 'C.O.D.',
+                'SalesLocation'   => $data['sales_location'] ?? 'HQ',
+                'Remark1'         => $data['BokingRemark'],
+                'Remark2'         => null,
+                'Remark3'         => null,
+                'Remark4'         => null,
+                'CurrencyRate'    => $data['currency_rate'],
+                'InclusiveTax'    => $data['inclusive_tax'] ?? false,
+                'IsRoundAdj'      => $data['is_round_adj'] ?? false,
+                'YourRef'         => null,
+                'Validity'        => null,
+                'CC'              => null,
+                'DeliveryTerm'    => null,
+                'PaymentTerm'     => null
+            ],
+            'details' => [],
+            'autoFillOption' => [
+                'TaxCode' => $data['tax_code'] ?? true
+            ],
+            'saveApprove' => null
+        ];
+
+        if (!empty($data['booking_product'])) {
+            foreach ($data['booking_product'] as $product) {
+                $param['details'][] = [
+                    'ProductCode'        => $product['product_ProductCode'],
+                    'ProductVariant'     => null,
+                    'Description'        => $product['product_Description'],
+                    'FurtherDescription' => '',
+                    'Qty'                => $product['product_Quantity'],
+                    'Unit'               => isset($product['unit']) ? $product['unit'] : 'unit',
+                    'UnitPrice'          => $product['product_Price'],
+                    'Discount'           => null,
+                    'TaxCode'            => isset($product['tax_code']) ? $product['tax_code'] : 'S-5',
+                    'TaxAdjustment'      => 0,
+                    'LocalTaxAdjustment' => 0,
+                    'DeptNo'             => null
+                ];
+            }
+        }
+
+        return autocount_request('POST', 'quotation.create', $param);
+    }
+
+    public function autocount_update($data = [])
+    {
+        $docNo = $data['BookingNumber'] ?? $data['DocNo'] ?? '';
+        if ($docNo === '') {
+            return ['error' => 'Missing required parameter: BookingNumber (or DocNo).'];
+        }
+
+        $body = [];
+
+        if (!empty($data['master'])) {
+            $body['master'] = $data['master'];
+        }
+
+        if (!empty($data['booking_product']) && is_array($data['booking_product'])) {
+            $body['details'] = [];
+            foreach ($data['booking_product'] as $product) {
+                $body['details'][] = [
+                    'ProductCode'        => $product['product_ProductCode'],
+                    'ProductVariant'     => null,
+                    'Description'        => $product['product_Description'],
+                    'FurtherDescription' => '',
+                    'Qty'                => $product['product_Quantity'],
+                    'Unit'               => isset($product['unit']) ? $product['unit'] : 'unit',
+                    'UnitPrice'          => $product['product_Price'],
+                    'Discount'           => null,
+                    'TaxCode'            => isset($product['tax_code']) ? $product['tax_code'] : 'S-5',
+                    'TaxAdjustment'      => 0,
+                    'LocalTaxAdjustment' => 0,
+                    'DeptNo'             => null
+                ];
+            }
+        }
+
+        if (!empty($data['tax_code'])) {
+            $body['autoFillOption'] = [
+                'TaxCode' => $data['tax_code']
+            ];
+        }
+
+        if (isset($data['saveApprove'])) {
+            $body['saveApprove'] = $data['saveApprove'];
+        }
+
+        return autocount_request(
+            'PUT',
+            'quotation.update',
+            $body,
+            ['docNo' => $docNo]
+        );
+    }
+
+    public function autocount_update_status($data = [])
+    {
+        $docNo = $data['BookingNumber'] ?? '';
+        $body = [
+            'documentStatus' => $data['Status'] ?? '',
+            'lostReason'     => $data['reason'] ?? ''
+        ];
+
+        return autocount_request(
+            'PUT',
+            'quotation.update_status',
+            $body,
+            ['docNo' => $docNo]
+        );
+    }
+
+    public function autocount_delete($data = [])
+    {
+        $docNo = $data['BookingNumber'] ?? '';
+
+        return autocount_request(
+            'DELETE',
+            'quotation.delete',
+            [],
+            ['docNo' => $docNo]
+        );
+    }
+
+    public function autocount_void($data = [])
+    {
+        $docNo = $data['DocNo'] ?? '';
+        $body = [
+            'voidReason' => $data['reason'] ?? ''
+        ];
+
+        return autocount_request(
+            'POST',
+            'quotation.void',
+            $body,
+            ['docNo' => $docNo]
+        );
+        
+    }    
 }

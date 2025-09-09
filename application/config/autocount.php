@@ -15,18 +15,18 @@ $config['autocount'] = [
     // Endpoints
     'endpoints' => [
         'quotation' => [
-            'create'        => '/quotation/create',
-            'update'        => '/quotation/update',
+            'create'        => '/quotation',
+            'update'        => '/quotation',
             'update_status' => '/quotation/updatestatus',
-            'delete'        => '/quotation/delete',
+            'delete'        => '/quotation',
             'void'          => '/quotation/void',
         ],
         'payment' => [
-            'create'        => '/cashbook/create',
-            'update'        => '/cashbook/update',
-            'update_status' => '/cashbook/updatestatus',
-            'delete'        => '/cashbook/delete',
-            'void'          => '/cashbook/void',
+            'create'        => '/payment',
+            'update'        => '/payment',
+            'update_status' => '/payment/updatestatus',
+            'delete'        => '/pyament',
+            'void'          => '/payment/void',
         ]
     ]
 ];
