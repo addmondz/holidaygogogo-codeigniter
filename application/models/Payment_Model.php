@@ -11,6 +11,7 @@ class Payment_Model extends CI_Model
 	
 	function Read_Payments1()
 	{
+
 		$this->db->select('PaymentID, payment.BookingID, payment.SupplierID, Date, Type, Credit, ReferenceNumber, Debit, Deadline, payment.BankHolder, payment.Status, BookingNumber, ReservationNumber, Customer, StartDate, EndDate, NetTotal, Token, admin.Name As SalesAgent, supplier.Name As Supplier');
 		$this->db->join('payment', 'payment.BookingID = booking.BookingID', 'left');
 		$this->db->join('admin', 'admin.AdminID = booking.SalesAgent', 'left');
@@ -74,7 +75,7 @@ class Payment_Model extends CI_Model
 			$this->db->where('BookingNumber', $this->input->get('booking_number'));
 		}
 		if(!empty($this->input->get('customer'))) {
-			$this->db->where('Customer', $this->input->get('customer'));
+			$this->db->like('Customer', $this->input->get('customer'));
 		}
 		if(!empty($this->input->get('travel_date'))) {
 			$travel_date = explode(' - ', $this->input->get('travel_date'));
