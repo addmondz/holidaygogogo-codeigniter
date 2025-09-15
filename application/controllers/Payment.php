@@ -496,6 +496,16 @@ class Payment extends MY_Controller
 		if(in_array('RP', $this->session->access_control)) {
 			$this->Universal_Model->Delete('PaymentID', $this->input->get('payment_id'), 'payment');
 			$this->Payment_Model->Create_Payment_Log2();
+
+			
+			$paymentData = $this->Payment_Model->getBookingById($this->input->get('payment_id'));
+        	$bookingNumber = (!empty($paymentData) && !empty($paymentData->QuotationNumber)) ? $paymentData->QuotationNumber : '';
+
+			if (!empty($bookingNumber)) {
+				$this->autocount_delete([
+					'BookingNumber' => $bookingNumber
+				]);
+			}
 		} else {
 			redirect('Dashboard');
 		}
