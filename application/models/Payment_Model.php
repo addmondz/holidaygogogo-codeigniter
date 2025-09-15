@@ -430,4 +430,63 @@ class Payment_Model extends CI_Model
 			return false;
 		}
 	}
+
+	function getAllBookingsWithPayment($payment_id = null)
+	{
+		// Get all booking columns
+		$bookingCols = $this->db->list_fields('booking');
+		$bookingCols = array_map(function($col) {
+			return "booking.`$col`";
+		}, $bookingCols);
+
+		// Get all payment columns, alias with payment_ prefix
+		$paymentCols = $this->db->list_fields('payment');
+		$paymentCols = array_map(function($col) {
+			return "payment.`$col` AS payment_$col";
+		}, $paymentCols);
+
+		// Merge both sets of columns
+		$allCols = array_merge($bookingCols, $paymentCols);
+		$this->db->select(implode(', ', $allCols), false);
+
+		// Main query
+		$this->db->from('booking');
+		$this->db->join('payment', 'payment.PaymentID = booking.PaymentID', 'left');
+
+		// Optional filter by PaymentID
+		if (!is_null($payment_id) && $payment_id !== '') {
+			$this->db->where('payment.PaymentID', $payment_id);
+		}
+
+		$this->db->order_by('booking.BookingID', 'ASC');
+
+		$query = $this->db->get();
+		return $query->result();
+	}
+
+	function getPaymentById($payment_id)
+	{
+		$this->db->select('*');
+		$this->db->from('payment');
+		$this->db->where('PaymentID', $payment_id);
+		$query = $this->db->get();
+
+		return $query->num_rows() > 0 ? $query->row() : null;
+	}
+
+	function getSupplierByPaymentId($payment_id)
+	{
+		$supplierCols = $this->db->list_fields('supplier');
+		$supplierCols = array_map(fn($col) => "supplier.`$col` AS supplier_$col", $supplierCols);
+
+		$this->db->select(implode(', ', $supplierCols), false);
+		$this->db->from('payment');
+		$this->db->join('supplier', 'supplier.SupplierID = payment.SupplierID', 'left');
+		$this->db->where('payment.PaymentID', $payment_id);
+
+		$query = $this->db->get();
+		return $query->num_rows() > 0 ? $query->row() : null;
+	}
+
+
 }

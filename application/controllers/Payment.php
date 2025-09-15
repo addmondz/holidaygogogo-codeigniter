@@ -676,8 +676,9 @@ class Payment extends MY_Controller
 	}
 
 	public function autocount_create($data = [])
-    {
-        $param = [
+	{
+		// Master (single row only)
+		$param = [
 			'master' => [
 				'docNo'           => $data['ReferenceNumber'],
 				'docNo2'          => '',
@@ -692,73 +693,64 @@ class Payment extends MY_Controller
 				'description'     => $data['PaymentRemark'] ?? '',
 				'note'            => ''
 			],
-			'details' => [
-				[
-					'accNo'              => $data['account_no'], // required
-					'toAccountRate'      => 1,
-					'description'        => '',
-					'furtherDescription' => '',
-					'amount'             => $data['debit'], // required
-					'taxCode'            => '',
-					'taxAdjustment'      => 0,
-					'localTaxAdjustment' => 0,
-					'tariffCode'         => '',
-					'taxExportCountry'   => '',
-					'taxPermitNo'        => '',
-					'taxBRNo'            => '',
-					'taxBName'           => '',
-					'taxRefNo'           => '',
-					'taxRegisterNo'      => '',
-					'taxBillDate'        => null,
-					'salesAgent'         => '',
-					'inclusiveTax'       => true,
-					'deptNo'             => ''
-				]
-			],
-			'paymentDetails' => [
-				[
-					'paymentMethod'        => $data['payment_method'],
-					'paymentBy'            => '',
-					'chequeNo'             => '',
-					'floatDay'             => 0,
-					'bankCharge'           => 0,
-					'toBankRate'           => 1,
-					'paymentAmt'           => '',
-					'bankChargeTaxCode'    => '',
-					'bankChargeTaxRate'    => 0,
-					'bankChargeTax'        => 0,
-					'bankChargeTaxRefNo'   => ''
-				]
-			],
+			'details'        => [],
+			'paymentDetails' => [],
 			'autoFillOption' => [
-				'taxCode'  => $data['tax_code'],
-				'tariffCode' => $data['tariff_code'] 
+				'taxCode'    => $data['tax_code'],
+				'tariffCode' => $data['tariff_code']
 			],
 			'saveApprove' => null
 		];
 
+		// Details (loop through $data['details'])
+		if (!empty($data['details']) && is_array($data['details'])) {
+			foreach ($data['details'] as $detail) {
+				$param['details'][] = [
+					'accNo'              => $detail['account_no'], // required
+					'toAccountRate'      => $detail['toAccountRate'] ?? 1,
+					'description'        => $detail['description'] ?? '',
+					'furtherDescription' => $detail['furtherDescription'] ?? '',
+					'amount'             => $detail['amount'], // required
+					'taxCode'            => $detail['taxCode'] ?? '',
+					'taxAdjustment'      => $detail['taxAdjustment'] ?? 0,
+					'localTaxAdjustment' => $detail['localTaxAdjustment'] ?? 0,
+					'tariffCode'         => $detail['tariffCode'] ?? '',
+					'taxExportCountry'   => $detail['taxExportCountry'] ?? '',
+					'taxPermitNo'        => $detail['taxPermitNo'] ?? '',
+					'taxBRNo'            => $detail['taxBRNo'] ?? '',
+					'taxBName'           => $detail['taxBName'] ?? '',
+					'taxRefNo'           => $detail['taxRefNo'] ?? '',
+					'taxRegisterNo'      => $detail['taxRegisterNo'] ?? '',
+					'taxBillDate'        => $detail['taxBillDate'] ?? null,
+					'salesAgent'         => $detail['salesAgent'] ?? '',
+					'inclusiveTax'       => $detail['inclusiveTax'] ?? true,
+					'deptNo'             => $detail['deptNo'] ?? ''
+				];
+			}
+		}
 
-        // if (!empty($data['booking_product'])) {
-        //     foreach ($data['booking_product'] as $product) {
-        //         $param['details'][] = [
-        //             'ProductCode'        => $product['product_ProductCode'],
-        //             'ProductVariant'     => null,
-        //             'Description'        => $product['product_Description'],
-        //             'FurtherDescription' => '',
-        //             'Qty'                => $product['product_Quantity'],
-        //             'Unit'               => isset($product['unit']) ? $product['unit'] : 'unit',
-        //             'UnitPrice'          => $product['product_Price'],
-        //             'Discount'           => null,
-        //             'TaxCode'            => isset($product['tax_code']) ? $product['tax_code'] : 'S-5',
-        //             'TaxAdjustment'      => 0,
-        //             'LocalTaxAdjustment' => 0,
-        //             'DeptNo'             => null
-        //         ];
-        //     }
-        // }
+		// Payment details (loop through $data['paymentDetails'])
+		if (!empty($data['paymentDetails']) && is_array($data['paymentDetails'])) {
+			foreach ($data['paymentDetails'] as $payment) {
+				$param['paymentDetails'][] = [
+					'paymentMethod'      => $payment['paymentMethod'],
+					'paymentBy'          => $payment['paymentBy'] ?? '',
+					'chequeNo'           => $payment['chequeNo'] ?? '',
+					'floatDay'           => $payment['floatDay'] ?? 0,
+					'bankCharge'         => $payment['bankCharge'] ?? 0,
+					'toBankRate'         => $payment['toBankRate'] ?? 1,
+					'paymentAmt'         => $payment['paymentAmt'],
+					'bankChargeTaxCode'  => $payment['bankChargeTaxCode'] ?? '',
+					'bankChargeTaxRate'  => $payment['bankChargeTaxRate'] ?? 0,
+					'bankChargeTax'      => $payment['bankChargeTax'] ?? 0,
+					'bankChargeTaxRefNo' => $payment['bankChargeTaxRefNo'] ?? ''
+				];
+			}
+		}
 
-        return autocount_request('POST', 'payment.create', $param);
-    }
+		return autocount_request('POST', 'payment.create', $param);
+	}
+
 
     public function autocount_update($data = [])
     {
@@ -773,25 +765,51 @@ class Payment extends MY_Controller
             $body['master'] = $data['master'];
         }
 
-        if (!empty($data['booking_product']) && is_array($data['booking_product'])) {
-            $body['details'] = [];
-            foreach ($data['booking_product'] as $product) {
-                $body['details'][] = [
-                    'ProductCode'        => $product['product_ProductCode'],
-                    'ProductVariant'     => null,
-                    'Description'        => $product['product_Description'],
-                    'FurtherDescription' => '',
-                    'Qty'                => $product['product_Quantity'],
-                    'Unit'               => isset($product['unit']) ? $product['unit'] : 'unit',
-                    'UnitPrice'          => $product['product_Price'],
-                    'Discount'           => null,
-                    'TaxCode'            => isset($product['tax_code']) ? $product['tax_code'] : 'S-5',
-                    'TaxAdjustment'      => 0,
-                    'LocalTaxAdjustment' => 0,
-                    'DeptNo'             => null
-                ];
-            }
-        }
+       // Details (loop through $data['details'])
+		if (!empty($data['details']) && is_array($data['details'])) {
+			foreach ($data['details'] as $detail) {
+				$param['details'][] = [
+					'accNo'              => $detail['account_no'], // required
+					'toAccountRate'      => $detail['toAccountRate'] ?? 1,
+					'description'        => $detail['description'] ?? '',
+					'furtherDescription' => $detail['furtherDescription'] ?? '',
+					'amount'             => $detail['amount'], // required
+					'taxCode'            => $detail['taxCode'] ?? '',
+					'taxAdjustment'      => $detail['taxAdjustment'] ?? 0,
+					'localTaxAdjustment' => $detail['localTaxAdjustment'] ?? 0,
+					'tariffCode'         => $detail['tariffCode'] ?? '',
+					'taxExportCountry'   => $detail['taxExportCountry'] ?? '',
+					'taxPermitNo'        => $detail['taxPermitNo'] ?? '',
+					'taxBRNo'            => $detail['taxBRNo'] ?? '',
+					'taxBName'           => $detail['taxBName'] ?? '',
+					'taxRefNo'           => $detail['taxRefNo'] ?? '',
+					'taxRegisterNo'      => $detail['taxRegisterNo'] ?? '',
+					'taxBillDate'        => $detail['taxBillDate'] ?? null,
+					'salesAgent'         => $detail['salesAgent'] ?? '',
+					'inclusiveTax'       => $detail['inclusiveTax'] ?? true,
+					'deptNo'             => $detail['deptNo'] ?? ''
+				];
+			}
+		}
+
+		// Payment details (loop through $data['paymentDetails'])
+		if (!empty($data['paymentDetails']) && is_array($data['paymentDetails'])) {
+			foreach ($data['paymentDetails'] as $payment) {
+				$param['paymentDetails'][] = [
+					'paymentMethod'      => $payment['paymentMethod'],
+					'paymentBy'          => $payment['paymentBy'] ?? '',
+					'chequeNo'           => $payment['chequeNo'] ?? '',
+					'floatDay'           => $payment['floatDay'] ?? 0,
+					'bankCharge'         => $payment['bankCharge'] ?? 0,
+					'toBankRate'         => $payment['toBankRate'] ?? 1,
+					'paymentAmt'         => $payment['paymentAmt'],
+					'bankChargeTaxCode'  => $payment['bankChargeTaxCode'] ?? '',
+					'bankChargeTaxRate'  => $payment['bankChargeTaxRate'] ?? 0,
+					'bankChargeTax'      => $payment['bankChargeTax'] ?? 0,
+					'bankChargeTaxRefNo' => $payment['bankChargeTaxRefNo'] ?? ''
+				];
+			}
+		}
 
         if (!empty($data['tax_code'])) {
             $body['autoFillOption'] = [
