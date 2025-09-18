@@ -694,20 +694,20 @@ class Payment extends MY_Controller
 				'docNo2'          => '',
 				'docNoFormatName' => null,
 				'docType'         => 'PV', // required
-				'docDate'         => $data['InsertDate'], // required
-				'taxDate'         => $data['tax_date'],
-				'currencyCode'    => $data['currency_code'], // required
-				'currencyRate'    => $data['currency_rate'], // required
+				'docDate'         => $data['InsertDate'] ?? '', // required
+				'taxDate'         => $data['tax_date'] ?? '',
+				'currencyCode'    => $data['currency_code'] ?? 'MYR', // required
+				'currencyRate'    => $data['currency_rate'] ?? '1', // required
 				'journalType'     => 'GENERAL', // required
-				'dealWith'        => $data['supplier_name'], // required
+				'dealWith'        => $data['supplier_name'] ?? '', // required
 				'description'     => $data['PaymentRemark'] ?? '',
 				'note'            => ''
 			],
 			'details'        => [],
 			'paymentDetails' => [],
 			'autoFillOption' => [
-				'taxCode'    => $data['tax_code'],
-				'tariffCode' => $data['tariff_code']
+				'taxCode'    => $data['tax_code'] ?? '',
+				'tariffCode' => $data['tariff_code'] ?? ''
 			],
 			'saveApprove' => null
 		];
