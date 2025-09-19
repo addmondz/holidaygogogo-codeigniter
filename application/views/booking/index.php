@@ -225,6 +225,9 @@
                     <table id="kt_datatable" class="table table-bordered table-head-custom table-checkable dataTable no-footer dtr-inline">
                         <thead>
                             <tr>
+                                <th class="booking_checkbox" style="text-align:center;">
+                                    <input class="booking_checkbox" type="checkbox" id="check_all">
+                                </th>
                                 <th style="text-align:center;">No.</th>
                                 <?php if($this->session->userdata('level') != 20) { ?>
                                     <th style="text-align:center;">SA</th>
@@ -243,6 +246,7 @@
                                 <th style="text-align:center;">Net Profit Margin (%)</th>
                                 <th style="text-align:center;">BC Status</th>
                                 <th class="gl_status" style="text-align:center;">GL Status</th>
+                                <th class="autocount_sync_status" style="text-align:center;">Autocount Status</th>
                                 <th class="action" style="text-align:center;">Action</th>
                             </tr>
                         </thead>
@@ -253,6 +257,9 @@
                                 <?php $count = 1; ?>
                                 <?php foreach($bookings as $booking) { ?>
                                     <tr>
+                                        <td style="text-align:center;">
+                                            <input type="checkbox" class="check_item" value="<?php echo $booking->BookingID; ?>">
+                                        </td>
                                         <td style="text-align:center; padding-top:15px; padding-bottom:15px;"><?php echo $count; ?></td>
                                         <?php if($this->session->userdata('level') != 20) { ?>
                                             <td style="text-align:center;"><?php echo $booking->SalesAgentName; ?></td>
@@ -279,6 +286,12 @@
                                             <span class="font-weight-bold" style="color:<?php if($booking->CancelStatus == 'Y') { echo '#FF69B4'; } else if($booking->Status == 'Y') { echo '#50C878'; } else if($booking->Status == 'PR') { echo '#C3B1E1'; } else if($booking->Status == 'P') { echo '#FFBF00'; } else if($booking->Status == 'PP') { echo '#A7C7E7'; } else if($booking->Status == 'PTV') { echo '#F89880'; } else if($booking->Status == 'PGL') { echo '#FAC898'; } else if($booking->Status == 'PT') { echo '#F8C8DC'; } else if($booking->Status == 'OG') { echo '#CCCCFF'; } else { echo '#DA70D6'; } ?>"><?php if($booking->CancelStatus == 'Y') { echo 'CANCELLED'; } else if($booking->Status == 'Y') { echo 'COMPLETED'; } else if($booking->Status == 'PR') { echo 'PENDING REVIEW'; } else if($booking->Status == 'P') { echo 'PENDING PAYMENT'; } else if($booking->Status == 'PP') { echo 'PARTIAL PAYMENT'; } else if($booking->Status == 'PTV') { echo 'PENDING TRAVEL VOUCHER'; } else if($booking->Status == 'PGL') { echo 'PENDING GUEST LIST'; } else if($booking->Status == 'PT') { echo 'PENDING TRAVEL'; } else if($booking->Status == 'OG') { echo 'ON-GOING'; } else { echo 'PAYMENT OVERDUE'; } ?></span>
                                         </td>
                                         <td style="text-align:center;"><?php if($booking->LockStatus == 'Y') { echo '<i class="la la-lock text-danger"></i>'; } else { echo '<i class="la la-unlock text-success"></i>'; } ?></td>
+                                        <td style="text-align:center;">
+                                            <span class="font-weight-bold" style="color:<?php if($booking->AutocountSyncStatus == 'N') { echo '#808080'; } else if($booking->AutocountSyncStatus == 'C') { echo '#50C878'; } else if($booking->AutocountSyncStatus == 'U') { echo '#FFBF00'; } else if($booking->AutocountSyncStatus == 'D') { echo '#FF4500'; } else if($booking->AutocountSyncStatus == 'V') { echo '#8A2BE2'; } else { echo '#000000'; } ?>">
+    <?php if($booking->AutocountSyncStatus == 'N') { echo 'NONE'; } else if($booking->AutocountSyncStatus == 'C') { echo 'CREATED'; } else if($booking->AutocountSyncStatus == 'U') { echo 'UPDATED'; } else if($booking->AutocountSyncStatus == 'D') { echo 'DELETED'; } else if($booking->AutocountSyncStatus == 'V') { echo 'VOID'; } else { echo 'UNKNOWN'; } ?>
+</span>
+
+                                        </td>
                                         <td style="text-align:center;">
                                             <div class="btn-group">
                                                 <button type="button" data-toggle="dropdown" class="btn btn-light-primary btn-sm dropdown-toggle" style="padding-left:3px;"></button>
@@ -447,4 +460,10 @@
         }
         navigator.clipboard.writeText(url).then(() => { alert("Successfully Copied"); }) .catch(() => { alert("Something Went Wrong"); });
     }
+</script>
+<script>
+document.getElementById('check_all').addEventListener('change', function() {
+    let checked = this.checked;
+    document.querySelectorAll('.check_item').forEach(cb => cb.checked = checked);
+});
 </script>

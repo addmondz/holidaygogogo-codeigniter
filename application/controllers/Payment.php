@@ -130,6 +130,8 @@ class Payment extends MY_Controller
 				$this->load->library('upload');
 				$config['upload_path'] = 'assets/upload/payment';
 				$config['allowed_types'] = 'jpg|jpeg|png|pdf';
+
+				$payment_ids = array();
 				for($i = 1; $i <= $count; $i++) {
 					if(!empty($this->input->post('transaction_date-' . $i)) || !empty($this->input->post('payment_deadline-' . $i))) {
 						$payment_id = $this->Payment_Model->Create($i);
@@ -154,6 +156,22 @@ class Payment extends MY_Controller
 							$invoice = $this->upload->data();
 							$this->Payment_Model->Update_File('Invoice', $invoice, $payment_id);
 						}
+						$payment_ids[] = $payment_id;
+					}
+				}
+
+				if (!empty($payment_ids))
+				{
+					foreach($payment_ids as $payment_id) {
+						$payment = Payment::find($payment_id);
+						if ($payment != null) {
+							$quotationData = [];
+							$respond = $this->autocount_create($quotationData);
+
+							$payment->AutocountSyncStatus = 'C';
+							$payment->AutocountSyncMessage = $respond;
+							$payment->update();
+						}	
 					}
 				}
 				$this->session->set_flashdata('message_success', 'New Payment Record Successfully Created');
@@ -392,6 +410,18 @@ class Payment extends MY_Controller
 				if(count($array['payment'][0]) > 3 || !empty($_FILES['bank_slip']['name']) || !empty($_FILES['quotation']['name']) || !empty($_FILES['invoice']['name'])) {
 					if(count($array['payment'][0]) > 3) {
 						$this->Payment_Model->Update($array['payment']);
+
+						if ($payment != null) {	
+							$payment2 = Payment::find($payment->PaymentID);
+							if ($payment2 != null) {
+								$quotationData = [];
+								$respond = $this->autocount_update($quotationData);
+
+								$payment2->AutocountSyncStatus = 'U';
+								$payment2->AutocountSyncMessage = $respond;
+								$payment2->update();
+							}	
+						}
 					}
 					$this->session->set_flashdata('message_success', $payment['Credit'] != 0.00 ? 'Payment Record : Credit RM ' . number_format($payment['Credit'], 2, '.', ',') . ' Successfully Updated' : 'Payment Record : Debit RM ' . number_format($payment['Debit'], 2, '.', ',') . ' Successfully Updated');
 				} else {
@@ -479,6 +509,7 @@ class Payment extends MY_Controller
 					$this->Payment_Model->Update_Status($status, $payments[$i]);
 					$this->Payment_Model->Create_Payment_Log('Status', $this->Payment_Model->Read_Status($payments[$i]), $status, $payments[$i]);
 				}
+				
 			}
 			$this->session->set_flashdata('message_success', 'Payment Records Successfully Updated');
 			if(strpos($this->input->get('url'), '?') == true) {
@@ -498,14 +529,21 @@ class Payment extends MY_Controller
 			$this->Payment_Model->Create_Payment_Log2();
 
 			
-			$paymentData = $this->Payment_Model->getBookingById($this->input->get('payment_id'));
-        	$bookingNumber = (!empty($paymentData) && !empty($paymentData->QuotationNumber)) ? $paymentData->QuotationNumber : '';
+			$paymentData = $this->Payment_Model->getPaymentById($this->input->get('payment_id'));
+        	$paymentNumber = (!empty($paymentData) && !empty($paymentData->ReferenceNumber)) ? $paymentData->ReferenceNumber : '';
 
-			if (!empty($bookingNumber)) {
-				$this->autocount_delete([
-					'BookingNumber' => $bookingNumber
-				]);
+			if (!empty($paymentNumber)) {
+				$payment = Payment::find($this->input->get('payment_id'));
+				if ($payment != null) {
+					$quotationData = [];
+					$respond = $this->autocount_delete($quotationData);
+
+					$payment->AutocountSyncStatus = 'D';
+					$payment->AutocountSyncMessage = $respond;
+					$payment->update();
+				}	
 			}
+			
 		} else {
 			redirect('Dashboard');
 		}
@@ -684,6 +722,131 @@ class Payment extends MY_Controller
 			echo json_encode(false);
 		}
 	}
+
+	public function bulkSyncToAutocount()
+    {
+        $payment_ids = $this->input->post('payment_id'); 
+
+        if (empty($payment_ids)) {
+            return response()->json(['message' => 'No payment selected'], 400);
+        }
+
+        $results = [];
+
+        foreach ($payment_ids as $payment_id) {
+            try {
+                $payment = Payment::find($payment_id);
+                if (!$payment) {
+                    $results[$payment_id] = 'Not Found';
+                    continue;
+                }
+
+				$paymentData = $this->Payment_Model->getAllBookingsWithGuests($payment_id);
+				if (!empty($paymentData)) {
+					$paymentData = (array) $paymentData[0]; 
+				}
+
+			
+                switch ($paymentData['AutocountSyncStatus']) {
+                    case 'N': // new → create
+						$quotationData = [
+							'BookingNumber'   => $bookingData['BookingNumber'] ?? '',
+							'InsertDate'      => $bookingData['InsertDate'] ?? date('Y-m-d'),
+							'Customer'        => $bookingData['Customer'] ?? '',
+							'guest_email'     => $bookingData['guest_email'] ?? '',
+							'guest_address'   => $bookingData['guest_address'] ?? '',
+							'guest_phone'     => $bookingData['guest_phone'] ?? '',
+							'BokingRemark'    => $bookingData['BokingRemark'] ?? '',
+							
+							// Fields not in DB → set default or null
+							'credit_term'     => null,
+							'sales_location'  => '',
+							'currency_rate'   => 1,
+							'inclusive_tax'   => false,
+							'is_round_adj'    => false,
+							'tax_code'        => '',
+
+							// Details
+							'booking_product' => $bookingProducts
+						];
+
+                        $respond = $this->autocount_create($quotationData);
+                        $payment->AutocountSyncStatus = 'C';
+						$payment->AutocountSyncMessage = $respond;
+
+                        $results[$payment->id] = 'Created';
+                        break;
+
+                    case 'U': // update
+                    case 'C': // created → still allow update
+						$quotationData = [
+							'BookingNumber'   => $bookingData['BookingNumber'],
+							'DocNo'           => $bookingData['BookingNumber'], // Fallback
+							'master'          => [
+								'DocDate'        => $bookingData['InsertDate'],
+								'DebtorName'     => $bookingData['Customer'],
+								'Email'          => $bookingData['guest_email'],
+								'Address'        => $bookingData['guest_address'],
+								'Phone1'         => $bookingData['guest_phone'],
+								'DeliverAddress' => $bookingData['guest_address'],
+								'DeliverContact' => $bookingData['Customer'],
+								'DeliverPhone1'  => $bookingData['guest_phone'],
+								'Remark1'        => $bookingData['BokingRemark'],
+							],
+							'booking_product' => $bookingProducts,
+							'tax_code'        => 'S-5', // Default tax code if missing
+							'saveApprove'     => null
+						];
+                        $respond = $this->autocount_update($payment);
+                        $payment->AutocountSyncStatus = 'C'; // keep as created
+						$payment->AutocountSyncMessage = $respond;
+
+                        $results[$payment->id] = 'Updated';
+                        break;
+
+                    case 'D': // delete
+						$paymentNumber = (!empty($payment) && !empty($payment->ReferenceNumber)) ? $payment->ReferenceNumber : '';
+
+						if (!empty($paymentNumber)) {
+							$respond = $this->autocount_delete([
+								'PaymentNumber' => $paymentNumber
+							]);
+
+							$payment->AutocountSyncStatus = 'D';
+							$payment->AutocountSyncMessage = $respond;
+							$results[$payment->id] = 'Deleted';
+							break;
+						}
+                    case 'V': // void
+						$paymentNumber = (!empty($payment) && !empty($payment->ReferenceNumber)) ? $payment->ReferenceNumber : '';
+
+						if (!empty($paymentNumber)) {
+							$respond = $this->autocount_void([
+								'PaymentNumber' => $paymentNumber
+							]);
+
+							$payment->AutocountSyncStatus = 'V';
+							$payment->AutocountSyncMessage = $respond;
+							$results[$payment->id] = 'Void';
+							break;
+						}
+
+                    default:
+                        $results[$payment->id] = 'Skipped';
+                        break;
+                }
+
+                $payment->save();
+            } catch (\Exception $e) {
+                $results[$paymentData['id']] = 'Error: ' . $e->getMessage();
+            }
+        }
+
+        return response()->json([
+            'message' => 'Sync process completed',
+            'results' => $results,
+        ]);
+    }
 
 	public function autocount_create($data = [])
 	{

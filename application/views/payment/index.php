@@ -373,6 +373,7 @@
                                 <th class="deadline" style="text-align:center;">Deadline</th>
                                 <th style="text-align:center;">Reference</th>
                                 <th class="status" style="text-align:center;">Status</th>
+                                <th class="autocount_sync_status" style="text-align:center;">Autocount Status</th>
                                 <th class="action" style="text-align:center;">Action</th>
                             </tr>
                         </thead>
@@ -419,6 +420,12 @@
                                         <td id="<?php echo 'deadline-' . $payment->PaymentID; ?>" style="text-align:center;"><?php echo $payment->Deadline; ?></td>
                                         <td id="<?php echo 'reference_number-' . $payment->PaymentID; ?>" style="text-align:center;"><?php echo $payment->ReferenceNumber; ?></td>
                                         <td style="text-align:center;"><?php if($payment->Status == 'Y') { echo '<i class="la la-check-circle text-success"></i>'; } else if($payment->Status == 'P') { echo '<i class="la la-exclamation-circle text-warning"></i>'; } else { echo '<i class="la la-times-circle text-danger"></i>'; } ?></td>
+                                        <td style="text-align:center;">
+                                            <span class="font-weight-bold" style="color:<?php if($payment->AutocountSyncStatus == 'N') { echo '#808080'; } else if($payment->AutocountSyncStatus == 'C') { echo '#50C878'; } else if($payment->AutocountSyncStatus == 'U') { echo '#FFBF00'; } else if($payment->AutocountSyncStatus == 'D') { echo '#FF4500'; } else if($payment->AutocountSyncStatus == 'V') { echo '#8A2BE2'; } else { echo '#000000'; } ?>">
+    <?php if($payment->AutocountSyncStatus == 'N') { echo 'NONE'; } else if($payment->AutocountSyncStatus == 'C') { echo 'CREATED'; } else if($payment->AutocountSyncStatus == 'U') { echo 'UPDATED'; } else if($payment->AutocountSyncStatus == 'D') { echo 'DELETED'; } else if($payment->AutocountSyncStatus == 'V') { echo 'VOID'; } else { echo 'UNKNOWN'; } ?>
+</span>
+
+                                        </td>
                                         <td style="text-align:center;">
                                             <div class="btn-group">
                                                 <button type="button" data-toggle="dropdown" class="btn btn-light-primary btn-sm dropdown-toggle" style="padding-left:3px;"></button>

@@ -90,3 +90,24 @@ if (!function_exists('autocount_log')) {
         }
     }
 }
+
+if (!function_exists('mapAutocountSyncStatus')) {
+    /**
+     * Map AutocountSyncStatus code to human readable text
+     *
+     * @param string|null $status
+     * @return string
+     */
+    function mapAutocountSyncStatus(?string $status): string
+    {
+        $map = [
+            'N' => 'None',
+            'C' => 'Created',
+            'U' => 'Updated',
+            'D' => 'Deleted',
+            'V' => 'Void',
+        ];
+
+        return $map[$status] ?? 'Unknown';
+    }
+}

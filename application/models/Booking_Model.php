@@ -3,7 +3,7 @@ class Booking_Model extends CI_Model
 {
 	function Read_Booking()
 	{
-		$this->db->select('booking.BookingID, BookingConfirmationFooterID, TravelVoucherFooterID, booking.CountryCodeID As CustomerCountryCode, BookingNumber, ReservationNumber, DepositDeadline, FullPaymentDeadline, AdditionalPaymentDeadline, Customer, booking.Mobile As CustomerMobile, StartDate, EndDate, Adult, Children, Infant, Destination, SalesAgent, Tag, BookingRemark, Subtotal, Discount, NetTotal, ChatLanguage, Source, Token, booking.BookingConfirmationTitle, BookingConfirmationFooter, TravelVoucherFooter, ProductSequence, admin.Name As SalesAgentName');
+		$this->db->select('booking.BookingID, BookingConfirmationFooterID, TravelVoucherFooterID, booking.CountryCodeID As CustomerCountryCode, BookingNumber, ReservationNumber, DepositDeadline, FullPaymentDeadline, AdditionalPaymentDeadline, Customer, booking.Mobile As CustomerMobile, StartDate, EndDate, Adult, Children, Infant, Destination, SalesAgent, Tag, BookingRemark, Subtotal, Discount, NetTotal, ChatLanguage, Source, Token, booking.BookingConfirmationTitle, BookingConfirmationFooter, TravelVoucherFooter, ProductSequence, admin.Name As SalesAgentName, booking.AutocountSyncStatus, booking.AutocountSyncMessage');
 		$this->db->join('admin', 'admin.AdminID = booking.SalesAgent', 'left');
 		$this->db->where('booking.BookingID', $this->input->get('booking_id'));
 		return $this->db->get('booking')->row_array();
@@ -28,7 +28,7 @@ class Booking_Model extends CI_Model
 	
 	function Read_Bookings()
 	{
-		$this->db->select('booking.BookingID, BookingNumber, DepositDeadline, FullPaymentDeadline, Customer, booking.Mobile As CustomerMobile, StartDate, EndDate, NetTotal, ChatLanguage, Token, booking.BookingConfirmationTitle, CancelStatus, LockStatus, AfterSalesService, booking.Status, booking.InsertDate, admin.Name As SalesAgentName, category.Name As DestinationName, CountryCode');
+		$this->db->select('booking.BookingID, BookingNumber, DepositDeadline, FullPaymentDeadline, Customer, booking.Mobile As CustomerMobile, StartDate, EndDate, NetTotal, ChatLanguage, Token, booking.BookingConfirmationTitle, CancelStatus, LockStatus, AfterSalesService, booking.Status, booking.InsertDate, admin.Name As SalesAgentName, category.Name As DestinationName, CountryCode, booking.AutocountSyncStatus, booking.AutocountSyncMessage');
 		$this->db->join('admin', 'admin.AdminID = booking.SalesAgent', 'left');
 		$this->db->join('category', 'category.CategoryID = booking.Destination', 'left');
 		$this->db->join('country_code', 'country_code.CountryCodeID = booking.CountryCodeID', 'left');
@@ -435,6 +435,11 @@ class Booking_Model extends CI_Model
 		$this->db->set('Token', sha1($booking_number));
 		$this->db->where('BookingID', $booking_id);
 		$this->db->where('Token', null);
+		$this->db->update('booking');
+
+		$this->db->set('AutocountSyncStatus', 'C');
+		$this->db->where('BookingID', $booking_id);
+		$this->db->where('AutocountSyncStatus', 'N');
 		$this->db->update('booking');
 
 		$this->db->select('Adult, Children, Infant');
@@ -845,6 +850,12 @@ class Booking_Model extends CI_Model
 		$query = $this->db->get();
 
 		return $query->num_rows() > 0 ? $query->row() : null;
+	}
+
+
+	function getAutocountSyncStatus()
+	{
+		
 	}
 
 }
