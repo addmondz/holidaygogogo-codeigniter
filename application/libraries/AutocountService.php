@@ -12,7 +12,7 @@ class AutoCountService {
         $this->CI->config->load('autocount', TRUE);
         $this->config = $this->CI->config->item('autocount');
 
-        $this->token = $this->getToken();
+        //$this->token = $this->getToken();
     }
 
     /**

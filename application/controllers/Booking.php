@@ -911,7 +911,7 @@ class Booking extends MY_Controller
 						];
 
                         $respond = $this->autocount_create($quotationData);
-                        $booking->AutocountSyncStatus = 'C_S';
+                        $booking->AutocountSyncStatus = 'C';
 						$booking->AutocountSyncMessage = $respond;
 
                         $results[$booking->id] = 'Created';
@@ -938,7 +938,7 @@ class Booking extends MY_Controller
 							'saveApprove'     => null
 						];
                         $respond = $this->autocount_update($booking);
-                        $booking->AutocountSyncStatus = 'U_S'; // keep as created
+                        $booking->AutocountSyncStatus = 'U'; // keep as created
 						$booking->AutocountSyncMessage = $respond;
 
                         $results[$booking->id] = 'Updated';
@@ -952,7 +952,7 @@ class Booking extends MY_Controller
 								'BookingNumber' => $bookingNumber
 							]);
 
-							$booking->AutocountSyncStatus = 'D_S';
+							$booking->AutocountSyncStatus = 'D';
 							$booking->AutocountSyncMessage = $respond;
 							$results[$booking->id] = 'Deleted';
 							break;
@@ -966,7 +966,7 @@ class Booking extends MY_Controller
 							]);
 						}
                         $respond = $this->autocount_void($booking);
-                        $booking->AutocountSyncStatus = 'V_S';
+                        $booking->AutocountSyncStatus = 'V';
 						$booking->AutocountSyncMessage = $respond;
                         $results[$booking->id] = 'Voided';
                         break;
@@ -1018,7 +1018,7 @@ class Booking extends MY_Controller
                 'Remark2'         => null,
                 'Remark3'         => null,
                 'Remark4'         => null,
-                'CurrencyRate'    => $data['currency_rate'],
+                'CurrencyRate'    => $data['currency_rate'] ?? '',
                 'InclusiveTax'    => $data['inclusive_tax'] ?? false,
                 'IsRoundAdj'      => $data['is_round_adj'] ?? false,
                 'YourRef'         => null,
