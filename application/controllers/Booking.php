@@ -211,7 +211,7 @@ class Booking extends MY_Controller
             $respond = $this->autocount_create($quotationData);
 
 			$booking = Booking::find($booking_id);
-			if ($booking != null) {
+			if ($booking != null && $respond != null) {
 				$booking->AutocountSyncStatus = 'C';
 				$booking->AutocountSyncMessage = $respond;
 				$booking->update();
@@ -300,7 +300,7 @@ class Booking extends MY_Controller
 					'BookingNumber'   => $bookingData['BookingNumber'],
 					'DocNo'           => $bookingData['BookingNumber'], // Fallback
 					'master'          => [
-						'DocDate'        => $bookingData['InsertDate'],
+						'DocDate'        => date('Y-m-d', strtotime($bookingData['InsertDate'])),
 						'DebtorName'     => $bookingData['Customer'],
 						'Email'          => $bookingData['guest_email'],
 						'Address'        => $bookingData['guest_address'],
@@ -311,13 +311,13 @@ class Booking extends MY_Controller
 						'Remark1'        => $bookingData['BokingRemark'],
 					],
 					'booking_product' => $bookingProducts,
-					'tax_code'        => 'S-5', // Default tax code if missing
+					'tax_code'        => '', // Default tax code if missing
 					'saveApprove'     => null
 				];
 
 				$respond = $this->autocount_update($quotationData);
 				$booking = Booking::find($booking_id);
-				if ($booking != null) {
+				if ($booking != null && $respond != null) {
 					$booking->AutocountSyncStatus = 'U';
 					$booking->AutocountSyncMessage = $respond;
 					$booking->update();
@@ -461,7 +461,7 @@ class Booking extends MY_Controller
 
 				$respond = $this->autocount_update($quotationData);
 				$booking = Booking::find($this->input->get('booking_id'));
-				if ($booking != null) {
+				if ($booking != null && $respond != null) {
 					$booking->AutocountSyncStatus = 'U';
 					$booking->AutocountSyncMessage = $respond;
 					$booking->update();
@@ -497,7 +497,7 @@ class Booking extends MY_Controller
 				]);
 
 				$booking = Booking::find($this->input->get('booking_id'));
-				if ($booking != null) {
+				if ($booking != null && $respond != null) {
 					$booking->AutocountSyncStatus = 'D';
 					$booking->AutocountSyncMessage = $respond;
 					$booking->update();
@@ -891,7 +891,7 @@ class Booking extends MY_Controller
                     case 'N': // new → create
 						$quotationData = [
 							'BookingNumber'   => $bookingData['BookingNumber'] ?? '',
-							'InsertDate'      => $bookingData['InsertDate'] ?? date('Y-m-d'),
+							'DocDate'        => date('Y-m-d', strtotime($bookingData['InsertDate'])) ?? date('Y-m-d'),
 							'Customer'        => $bookingData['Customer'] ?? '',
 							'guest_email'     => $bookingData['guest_email'] ?? '',
 							'guest_address'   => $bookingData['guest_address'] ?? '',
@@ -911,9 +911,10 @@ class Booking extends MY_Controller
 						];
 
                         $respond = $this->autocount_create($quotationData);
-                        $booking->AutocountSyncStatus = 'C';
-						$booking->AutocountSyncMessage = $respond;
-
+						if ($respond != null) {
+							$booking->AutocountSyncStatus = 'C';
+							$booking->AutocountSyncMessage = $respond;
+						}
                         $results[$booking->id] = 'Created';
                         break;
 
@@ -923,7 +924,7 @@ class Booking extends MY_Controller
 							'BookingNumber'   => $bookingData['BookingNumber'],
 							'DocNo'           => $bookingData['BookingNumber'], // Fallback
 							'master'          => [
-								'DocDate'        => $bookingData['InsertDate'],
+								'DocDate'        => date('Y-m-d', strtotime($bookingData['InsertDate'])),
 								'DebtorName'     => $bookingData['Customer'],
 								'Email'          => $bookingData['guest_email'],
 								'Address'        => $bookingData['guest_address'],
@@ -934,13 +935,14 @@ class Booking extends MY_Controller
 								'Remark1'        => $bookingData['BokingRemark'],
 							],
 							'booking_product' => $bookingProducts,
-							'tax_code'        => 'S-5', // Default tax code if missing
+							'tax_code'        => '', // Default tax code if missing
 							'saveApprove'     => null
 						];
                         $respond = $this->autocount_update($booking);
-                        $booking->AutocountSyncStatus = 'U'; // keep as created
-						$booking->AutocountSyncMessage = $respond;
-
+						if ($respond != null) {
+							$booking->AutocountSyncStatus = 'U'; // keep as created
+							$booking->AutocountSyncMessage = $respond;
+						}
                         $results[$booking->id] = 'Updated';
                         break;
 
@@ -951,9 +953,10 @@ class Booking extends MY_Controller
 							$respond = $this->autocount_delete([
 								'BookingNumber' => $bookingNumber
 							]);
-
-							$booking->AutocountSyncStatus = 'D';
-							$booking->AutocountSyncMessage = $respond;
+							if ($respond != null) {
+								$booking->AutocountSyncStatus = 'D';
+								$booking->AutocountSyncMessage = $respond;
+							}
 							$results[$booking->id] = 'Deleted';
 							break;
 						}
@@ -966,8 +969,10 @@ class Booking extends MY_Controller
 							]);
 						}
                         $respond = $this->autocount_void($booking);
-                        $booking->AutocountSyncStatus = 'V';
-						$booking->AutocountSyncMessage = $respond;
+						if ($respond != null) {
+							$booking->AutocountSyncStatus = 'V';
+							$booking->AutocountSyncMessage = $respond;
+						}
                         $results[$booking->id] = 'Voided';
                         break;
 
@@ -994,7 +999,7 @@ class Booking extends MY_Controller
             'master' => [
                 'DocNo'           => $data['BookingNumber'],
                 'DocNoFormatName' => null,
-                'DocDate'         => $data['InsertDate'],
+                'DocDate'         => date('Y-m-d', strtotime($data['InsertDate'])),
                 'DebtorCode'      => '',
                 'DebtorName'      => $data['Customer'],
                 'Email'           => $data['guest_email'],
@@ -1041,11 +1046,11 @@ class Booking extends MY_Controller
                     'ProductVariant'     => null,
                     'Description'        => $product['product_Description'],
                     'FurtherDescription' => '',
-                    'Qty'                => $product['product_Quantity'],
+                    'Qty'                => (float)$product['product_Quantity'],
                     'Unit'               => isset($product['unit']) ? $product['unit'] : 'unit',
-                    'UnitPrice'          => $product['product_Price'],
+                    'UnitPrice'          => (float)$product['product_Price'],
                     'Discount'           => null,
-                    'TaxCode'            => isset($product['tax_code']) ? $product['tax_code'] : 'S-5',
+                    'TaxCode'            => isset($product['tax_code']) ? $product['tax_code'] : '',
                     'TaxAdjustment'      => 0,
                     'LocalTaxAdjustment' => 0,
                     'DeptNo'             => null
@@ -1077,11 +1082,11 @@ class Booking extends MY_Controller
                     'ProductVariant'     => null,
                     'Description'        => $product['product_Description'],
                     'FurtherDescription' => '',
-                    'Qty'                => $product['product_Quantity'],
+                    'Qty'                => (float)$product['product_Quantity'],
                     'Unit'               => isset($product['unit']) ? $product['unit'] : 'unit',
-                    'UnitPrice'          => $product['product_Price'],
+                    'UnitPrice'          => (float)$product['product_Price'],
                     'Discount'           => null,
-                    'TaxCode'            => isset($product['tax_code']) ? $product['tax_code'] : 'S-5',
+                    'TaxCode'            => isset($product['tax_code']) ? $product['tax_code'] : '',
                     'TaxAdjustment'      => 0,
                     'LocalTaxAdjustment' => 0,
                     'DeptNo'             => null

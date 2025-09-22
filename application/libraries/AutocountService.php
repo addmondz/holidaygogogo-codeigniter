@@ -41,11 +41,12 @@ class AutoCountService {
     /**
      * Send request to AutoCount API
      */
-    public function request($method, $endpoint, $payload = [], $queryParams = []) {
-        $accountBookId = $this->config['accountBookId'];
-
+    public function request($config, $method, $endpoint, $payload = [], $queryParams = []) {
+        $apiKey = get_env('AUTOCOUNT_apiKey');
+        $keyId = get_env('AUTOCOUNT_keyId');
+        $accountBookId = get_env('AUTOCOUNT_accountBookId');
         // Build URL with accountBookId prefix
-        $url = rtrim($this->config['base_url'], '/') . '/' . $accountBookId . '/' . ltrim($endpoint, '/');
+        $url = rtrim($config['base_url'], '/') . '/' . $accountBookId . '/' . ltrim($endpoint, '/');
 
         // Append query parameters
         if (!empty($queryParams)) {
@@ -54,8 +55,8 @@ class AutoCountService {
 
         // Headers required by AutoCount Cloud API
         $headers = [
-            "API-Key: {$this->config['apiKey']}",
-            "Key-ID: {$this->config['keyId']}",
+            "API-Key: {$apiKey}",
+            "Key-ID: {$keyId}",
             "Content-Type: application/json"
         ];
 

@@ -11,17 +11,6 @@ defined('BASEPATH') OR exit('No direct script access allowed');
  * @property CI_Config $config
  * @property AutoCountService $autocountservice
  */
-if (!function_exists('dd')) {
-    function dd(...$vars) {
-        echo '<pre>';
-        foreach ($vars as $var) {
-            var_dump($var);
-        }
-        echo '</pre>';
-        exit;
-    }
-}
-
 if (!function_exists('autocount_request')) {
     /**
      * @param string $method       HTTP method (GET, POST, PUT, DELETE)
@@ -48,9 +37,11 @@ if (!function_exists('autocount_request')) {
 
         if (!$endpoint) {
             return ['error' => "Endpoint '{$endpoint_key}' not found"];
+        } else {
+            $endpoint .= $config['base_url'] . $endpoint;
         }
 
-        return $CI->autocountservice->request($method, $endpoint, $payload, $queryParams);
+        return $CI->autocountservice->request($config, $method, $endpoint, $payload, $queryParams);
     }
 }
 if (!function_exists('autocount_log')) {

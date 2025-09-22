@@ -750,13 +750,13 @@ class Payment extends MY_Controller
                 switch ($paymentData['AutocountSyncStatus']) {
                     case 'N': // new → create
 						$quotationData = [
-							'BookingNumber'   => $bookingData['BookingNumber'] ?? '',
-							'InsertDate'      => $bookingData['InsertDate'] ?? date('Y-m-d'),
-							'Customer'        => $bookingData['Customer'] ?? '',
-							'guest_email'     => $bookingData['guest_email'] ?? '',
-							'guest_address'   => $bookingData['guest_address'] ?? '',
-							'guest_phone'     => $bookingData['guest_phone'] ?? '',
-							'BokingRemark'    => $bookingData['BokingRemark'] ?? '',
+							'BookingNumber'   => $paymentData['BookingNumber'] ?? '',
+							'InsertDate'      => $paymentData['InsertDate'] ?? date('Y-m-d'),
+							'Customer'        => $paymentData['Customer'] ?? '',
+							'guest_email'     => $paymentData['guest_email'] ?? '',
+							'guest_address'   => $paymentData['guest_address'] ?? '',
+							'guest_phone'     => $paymentData['guest_phone'] ?? '',
+							'BokingRemark'    => $paymentData['BokingRemark'] ?? '',
 							
 							// Fields not in DB → set default or null
 							'credit_term'     => null,
@@ -780,18 +780,18 @@ class Payment extends MY_Controller
                     case 'U': // update
                     case 'C': // created → still allow update
 						$quotationData = [
-							'BookingNumber'   => $bookingData['BookingNumber'],
-							'DocNo'           => $bookingData['BookingNumber'], // Fallback
+							'BookingNumber'   => $paymentData['BookingNumber'],
+							'DocNo'           => $paymentData['BookingNumber'], // Fallback
 							'master'          => [
-								'DocDate'        => $bookingData['InsertDate'],
-								'DebtorName'     => $bookingData['Customer'],
-								'Email'          => $bookingData['guest_email'],
-								'Address'        => $bookingData['guest_address'],
-								'Phone1'         => $bookingData['guest_phone'],
-								'DeliverAddress' => $bookingData['guest_address'],
-								'DeliverContact' => $bookingData['Customer'],
-								'DeliverPhone1'  => $bookingData['guest_phone'],
-								'Remark1'        => $bookingData['BokingRemark'],
+								'DocDate'        => $paymentData['InsertDate'],
+								'DebtorName'     => $paymentData['Customer'],
+								'Email'          => $paymentData['guest_email'],
+								'Address'        => $paymentData['guest_address'],
+								'Phone1'         => $paymentData['guest_phone'],
+								'DeliverAddress' => $paymentData['guest_address'],
+								'DeliverContact' => $paymentData['Customer'],
+								'DeliverPhone1'  => $paymentData['guest_phone'],
+								'Remark1'        => $paymentData['BokingRemark'],
 							],
 							'booking_product' => $bookingProducts,
 							'tax_code'        => 'S-5', // Default tax code if missing
@@ -857,7 +857,7 @@ class Payment extends MY_Controller
 				'docNo2'          => '',
 				'docNoFormatName' => null,
 				'docType'         => 'PV', // required
-				'docDate'         => $data['InsertDate'] ?? '', // required
+				'docDate'         => date('Y-m-d', strtotime($data['InsertDate'])) ?? date('Y-m-d'), // required
 				'taxDate'         => $data['tax_date'] ?? '',
 				'currencyCode'    => $data['currency_code'] ?? 'MYR', // required
 				'currencyRate'    => $data['currency_rate'] ?? '1', // required
@@ -883,7 +883,7 @@ class Payment extends MY_Controller
 					'toAccountRate'      => $detail['toAccountRate'] ?? 1,
 					'description'        => $detail['description'] ?? '',
 					'furtherDescription' => $detail['furtherDescription'] ?? '',
-					'amount'             => $detail['amount'], // required
+					'amount'             => (float)$detail['amount'], // required
 					'taxCode'            => $detail['taxCode'] ?? '',
 					'taxAdjustment'      => $detail['taxAdjustment'] ?? 0,
 					'localTaxAdjustment' => $detail['localTaxAdjustment'] ?? 0,
@@ -910,9 +910,9 @@ class Payment extends MY_Controller
 					'paymentBy'          => $payment['paymentBy'] ?? '',
 					'chequeNo'           => $payment['chequeNo'] ?? '',
 					'floatDay'           => $payment['floatDay'] ?? 0,
-					'bankCharge'         => $payment['bankCharge'] ?? 0,
+					'bankCharge'         => (float)$payment['bankCharge'] ?? 0,
 					'toBankRate'         => $payment['toBankRate'] ?? 1,
-					'paymentAmt'         => $payment['paymentAmt'],
+					'paymentAmt'         => (float)$payment['paymentAmt'],
 					'bankChargeTaxCode'  => $payment['bankChargeTaxCode'] ?? '',
 					'bankChargeTaxRate'  => $payment['bankChargeTaxRate'] ?? 0,
 					'bankChargeTax'      => $payment['bankChargeTax'] ?? 0,
@@ -946,7 +946,7 @@ class Payment extends MY_Controller
 					'toAccountRate'      => $detail['toAccountRate'] ?? 1,
 					'description'        => $detail['description'] ?? '',
 					'furtherDescription' => $detail['furtherDescription'] ?? '',
-					'amount'             => $detail['amount'], // required
+					'amount'             => (float)$detail['amount'], // required
 					'taxCode'            => $detail['taxCode'] ?? '',
 					'taxAdjustment'      => $detail['taxAdjustment'] ?? 0,
 					'localTaxAdjustment' => $detail['localTaxAdjustment'] ?? 0,
@@ -973,9 +973,9 @@ class Payment extends MY_Controller
 					'paymentBy'          => $payment['paymentBy'] ?? '',
 					'chequeNo'           => $payment['chequeNo'] ?? '',
 					'floatDay'           => $payment['floatDay'] ?? 0,
-					'bankCharge'         => $payment['bankCharge'] ?? 0,
+					'bankCharge'         => (float)$payment['bankCharge'] ?? 0,
 					'toBankRate'         => $payment['toBankRate'] ?? 1,
-					'paymentAmt'         => $payment['paymentAmt'],
+					'paymentAmt'         => (float)$payment['paymentAmt'],
 					'bankChargeTaxCode'  => $payment['bankChargeTaxCode'] ?? '',
 					'bankChargeTaxRate'  => $payment['bankChargeTaxRate'] ?? 0,
 					'bankChargeTax'      => $payment['bankChargeTax'] ?? 0,
