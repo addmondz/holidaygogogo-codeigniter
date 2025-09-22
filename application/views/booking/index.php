@@ -221,6 +221,12 @@
                     </div>
                 </div>
                 <br><br>
+<button type="button" 
+        class="btn btn-primary font-weight-bold mb-2" 
+        id="sync-autocount-booking" 
+        style="width:180px; display:none;">
+    Sync Autocount
+</button>
                 <div class="dataTables_wrapper dt-bootstrap4 no-footer" <?php if(empty($bookings)) { echo 'style="overflow-x:auto;"'; } ?>>
                     <table id="kt_datatable" class="table table-bordered table-head-custom table-checkable dataTable no-footer dtr-inline">
                         <thead>
@@ -258,7 +264,7 @@
                                 <?php foreach($bookings as $booking) { ?>
                                     <tr>
                                         <td style="text-align:center;">
-                                            <input type="checkbox" class="check_item" value="<?php echo $booking->BookingID; ?>">
+                                            <input type="checkbox" id="check_item" class="check_item" value="<?php echo $booking->BookingID; ?>">
                                         </td>
                                         <td style="text-align:center; padding-top:15px; padding-bottom:15px;"><?php echo $count; ?></td>
                                         <?php if($this->session->userdata('level') != 20) { ?>
@@ -288,9 +294,8 @@
                                         <td style="text-align:center;"><?php if($booking->LockStatus == 'Y') { echo '<i class="la la-lock text-danger"></i>'; } else { echo '<i class="la la-unlock text-success"></i>'; } ?></td>
                                         <td style="text-align:center;">
                                             <span class="font-weight-bold" style="color:<?php if($booking->AutocountSyncStatus == 'N') { echo '#808080'; } else if($booking->AutocountSyncStatus == 'C') { echo '#50C878'; } else if($booking->AutocountSyncStatus == 'U') { echo '#FFBF00'; } else if($booking->AutocountSyncStatus == 'D') { echo '#FF4500'; } else if($booking->AutocountSyncStatus == 'V') { echo '#8A2BE2'; } else { echo '#000000'; } ?>">
-    <?php if($booking->AutocountSyncStatus == 'N') { echo 'NONE'; } else if($booking->AutocountSyncStatus == 'C') { echo 'CREATED'; } else if($booking->AutocountSyncStatus == 'U') { echo 'UPDATED'; } else if($booking->AutocountSyncStatus == 'D') { echo 'DELETED'; } else if($booking->AutocountSyncStatus == 'V') { echo 'VOID'; } else { echo 'UNKNOWN'; } ?>
-</span>
-
+                                            <?php if($booking->AutocountSyncStatus == 'N') { echo 'NONE'; } else if($booking->AutocountSyncStatus == 'C') { echo 'CREATED'; } else if($booking->AutocountSyncStatus == 'U') { echo 'UPDATED'; } else if($booking->AutocountSyncStatus == 'D') { echo 'DELETED'; } else if($booking->AutocountSyncStatus == 'V') { echo 'VOID'; } else { echo 'UNKNOWN'; } ?>
+                                        </span>
                                         </td>
                                         <td style="text-align:center;">
                                             <div class="btn-group">
@@ -462,8 +467,60 @@
     }
 </script>
 <script>
+function toggleButton() {
+    let anyChecked = document.querySelectorAll('.check_item:checked').length > 0;
+    document.getElementById('sync-autocount-booking').style.display = anyChecked ? 'inline-block' : 'none';
+}
+
+// Check All toggle
 document.getElementById('check_all').addEventListener('change', function() {
     let checked = this.checked;
     document.querySelectorAll('.check_item').forEach(cb => cb.checked = checked);
+    toggleButton();
+});
+
+// Individual checkbox toggle
+document.querySelectorAll('.check_item').forEach(cb => {
+    cb.addEventListener('change', function() {
+        // If one unchecked → uncheck "check_all"
+        if (!this.checked) {
+            document.getElementById('check_all').checked = false;
+        }
+        // If all checked → check "check_all"
+        else if (document.querySelectorAll('.check_item:checked').length === document.querySelectorAll('.check_item').length) {
+            document.getElementById('check_all').checked = true;
+        }
+        toggleButton();
+    });
+});
+</script>
+<script>
+document.getElementById('sync-autocount-booking').addEventListener('click', function() {
+    let selected = Array.from(document.querySelectorAll('.check_item:checked'))
+                        .map(cb => cb.value);
+
+    if (selected.length === 0) {
+        alert("Please select at least one booking.");
+        return;
+    }
+
+    fetch("<?php echo base_url('Booking/sync_autocount'); ?>", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ booking_ids: selected })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            alert("Sync successful!");
+            // Optionally refresh table or update row status
+        } else {
+            alert("Sync failed: " + data.message);
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        alert("Error occurred during sync.");
+    });
 });
 </script>
