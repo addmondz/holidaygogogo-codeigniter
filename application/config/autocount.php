@@ -3,7 +3,7 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 
 $config['autocount'] = [
     // Base settings
-    'base_url'       => 'https://accounting-api.autocountcloud.com/',
+    'base_url'       => 'https://accounting-api.autocountcloud.com',
     
     'client_id'      => 'YOUR_CLIENT_ID',
     'client_secret'  => 'YOUR_CLIENT_SECRET',

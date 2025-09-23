@@ -173,49 +173,56 @@ class Booking extends MY_Controller
 	function Create()
 	{
 		if(in_array('GB', $this->session->access_control)) {
-			 if ($this->input->is_ajax_request()) {
+			if ($this->input->is_ajax_request()) {
 
-            $booking_id = $this->Booking_Model->Create();
+				$booking_id = $this->Booking_Model->Create();
 
-            $this->Booking_Product_Model->Create($this->input->post('booking_products'), $booking_id);
+				$this->Booking_Product_Model->Create($this->input->post('booking_products'), $booking_id);
 
-            $bookingData = $this->Booking_Model->getAllBookingsWithGuests($booking_id);
-            if (!empty($bookingData)) {
-                $bookingData = (array) $bookingData[0]; 
-            }
+				$bookingData = $this->Booking_Model->getAllBookingsWithGuests($booking_id);
+				if (!empty($bookingData)) {
+					$bookingData = (array) $bookingData[0]; 
+				}
 
-            $bookingProducts = $this->Booking_Model->getAllBookingsWithProducts($booking_id);
-            $bookingProducts = array_map('get_object_vars', $bookingProducts); // convert to array
+				$bookingProducts = $this->Booking_Model->getAllBookingsWithProducts($booking_id);
+				$bookingProducts = array_map('get_object_vars', $bookingProducts); // convert to array
 
-            $quotationData = [
-                'BookingNumber'   => $bookingData['BookingNumber'] ?? '',
-                'InsertDate'      => $bookingData['InsertDate'] ?? date('Y-m-d'),
-                'Customer'        => $bookingData['Customer'] ?? '',
-                'guest_email'     => $bookingData['guest_email'] ?? '',
-                'guest_address'   => $bookingData['guest_address'] ?? '',
-                'guest_phone'     => $bookingData['guest_phone'] ?? '',
-                'BokingRemark'    => $bookingData['BokingRemark'] ?? '',
-                
-                // Fields not in DB → set default or null
-                'credit_term'     => null,
-                'sales_location'  => '',
-                'currency_rate'   => 1,
-                'inclusive_tax'   => false,
-                'is_round_adj'    => false,
-                'tax_code'        => '',
+				$quotationData = [
+					'BookingNumber'   => $bookingData['BookingNumber'] ?? '',
+					'InsertDate'      => $bookingData['InsertDate'] ?? date('Y-m-d'),
+					'Customer'        => $bookingData['Customer'] ?? '',
+					'guest_email'     => $bookingData['guest_email'] ?? '',
+					'guest_address'   => $bookingData['guest_address'] ?? '',
+					'guest_phone'     => $bookingData['guest_phone'] ?? '',
+					'BokingRemark'    => $bookingData['BokingRemark'] ?? '',
+					
+					// Fields not in DB → set default or null
+					'credit_term'     => null,
+					'sales_location'  => '',
+					'currency_rate'   => 1,
+					'inclusive_tax'   => false,
+					'is_round_adj'    => false,
+					'tax_code'        => '',
 
-                // Details
-                'booking_product' => $bookingProducts
-            ];
-			
-            $respond = $this->autocount_create($quotationData);
+					// Details
+					'booking_product' => $bookingProducts
+				];
+				
+				$respond = $this->autocount_create($quotationData);
 
-			$booking = Booking::find($booking_id);
-			if ($booking != null && $respond != null) {
-				$booking->AutocountSyncStatus = 'C';
-				$booking->AutocountSyncMessage = $respond;
-				$booking->update();
-			}	
+				$booking = $this->Booking_Model->find($booking_id);
+				if ($booking != null && $respond != null) {
+					if ($respond['error']) {
+						$this->Booking_Model->update_by_id($booking_id, [
+							'AutocountSyncMessage' => json_encode($respond),
+						]);
+					} elseif ($respond['status'] === 201 || $respond['status'] === 204) {
+						$this->Booking_Model->update_by_id($booking_id, [
+							'AutocountSyncMessage' => json_encode($respond),
+							'AutocountSyncStatus' => 'C'
+						]);
+					} 
+				}	
         } else {
 				$titles = array('tab_title' => 'HolidayGoGoGo | Booking', 'breadcrumb_title' => 'Booking >> Create');
 				$array = array('BookingID' => 'NA', 'BookingConfirmationFooterID' => 'NA', 'TravelVoucherFooterID' => 'NA', 'BookingNumber' => 'NA', 'Tag' => array(), 'Discount' => 'NA', 'NetTotal' => 'NA', 'ProductSequence' => array(), 'BookingProductID' => ($this->Booking_Product_Model->Read_Last_Booking_Product_ID()) + 1);
@@ -316,13 +323,20 @@ class Booking extends MY_Controller
 				];
 
 				$respond = $this->autocount_update($quotationData);
-				$booking = Booking::find($booking_id);
-				if ($booking != null && $respond != null) {
-					$booking->AutocountSyncStatus = 'U';
-					$booking->AutocountSyncMessage = $respond;
-					$booking->update();
-				}	
 
+				$booking = $this->Booking_Model->find($booking_id);
+				if ($booking != null && $respond != null) {
+					if ($respond['error']) {
+						$this->Booking_Model->update_by_id($booking_id, [
+							'AutocountSyncMessage' => json_encode($respond),
+						]);
+					} elseif ($respond['status'] === 201 || $respond['status'] === 204) {
+						$this->Booking_Model->update_by_id($booking_id, [
+							'AutocountSyncMessage' => json_encode($respond),
+							'AutocountSyncStatus' => 'U'
+						]);
+					} 
+				}
 			} else {
 				$valid_booking_id = $this->Universal_Model->Validate_Id('BookingID', $this->input->get('booking_id'), 'booking');
 
@@ -460,11 +474,18 @@ class Booking extends MY_Controller
 				];
 
 				$respond = $this->autocount_update($quotationData);
-				$booking = Booking::find($this->input->get('booking_id'));
+				$booking = $this->Booking_Model->find($this->input->get('booking_id'));
 				if ($booking != null && $respond != null) {
-					$booking->AutocountSyncStatus = 'U';
-					$booking->AutocountSyncMessage = $respond;
-					$booking->update();
+					if ($respond['error']) {
+						$this->Booking_Model->update_by_id($this->input->get('booking_id'), [
+							'AutocountSyncMessage' => json_encode($respond),
+						]);
+					} elseif ($respond['status'] === 201 || $respond['status'] === 204) {
+						$this->Booking_Model->update_by_id($this->input->get('booking_id'), [
+							'AutocountSyncMessage' => json_encode($respond),
+							'AutocountSyncStatus' => 'U'
+						]);
+					} 
 				}	
 			}
 
@@ -486,6 +507,7 @@ class Booking extends MY_Controller
 			$this->Universal_Model->Delete('BookingID', $this->input->get('booking_id'), 'booking_product');
 			$this->Universal_Model->Delete('BookingID', $this->input->get('booking_id'), 'guest_list');
 			$this->Universal_Model->Delete('BookingID', $this->input->get('booking_id'), 'payment');
+			$this->Booking_Model->update_by_id($this->input->get('booking_id'), ['AutocountSyncStatus' => 'D']);
 			// Delete from AutoCount (Quotation)
 
 			$bookingData = $this->Booking_Model->getBookingById($this->input->get('booking_id'));
@@ -496,12 +518,19 @@ class Booking extends MY_Controller
 					'BookingNumber' => $bookingNumber
 				]);
 
-				$booking = Booking::find($this->input->get('booking_id'));
+				$booking = $this->Booking_Model->find($this->input->get('booking_id'));
 				if ($booking != null && $respond != null) {
-					$booking->AutocountSyncStatus = 'D';
-					$booking->AutocountSyncMessage = $respond;
-					$booking->update();
-				}	
+					if ($respond['error']) {
+						$this->Booking_Model->update_by_id($this->input->get('booking_id'), [
+							'AutocountSyncMessage' => json_encode($respond),
+						]);
+					} elseif ($respond['status'] === 201 || $respond['status'] === 204) {
+						$this->Booking_Model->update_by_id($this->input->get('booking_id'), [
+							'AutocountSyncMessage' => json_encode($respond),
+							'AutocountSyncStatus' => 'D'
+						]);
+					} 
+				}		
 			}
 			
 		} else {
@@ -863,17 +892,25 @@ class Booking extends MY_Controller
 
 	public function bulkSyncToAutocount()
     {
-        $booking_ids = $this->input->post('booking_id'); 
+        // Read raw JSON body
+		$input = json_decode($this->input->raw_input_stream, true);
+		$booking_ids = $input['booking_ids'] ?? [];
 
-        if (empty($booking_ids)) {
-            return response()->json(['message' => 'No bookings selected'], 400);
-        }
+		if (empty($booking_ids)) {
+			$this->output
+				->set_content_type('application/json')
+				->set_output(json_encode([
+					'success' => false,
+					'message' => 'No bookings selected'
+				]));
+			return;
+		}
 
         $results = [];
 
         foreach ($booking_ids as $booking_id) {
             try {
-                $booking = Booking::find($booking_id);
+				$booking = $this->Booking_Model->find($booking_id);
                 if (!$booking) {
                     $results[$booking_id] = 'Not Found';
                     continue;
@@ -891,7 +928,7 @@ class Booking extends MY_Controller
                     case 'N': // new → create
 						$quotationData = [
 							'BookingNumber'   => $bookingData['BookingNumber'] ?? '',
-							'DocDate'        => date('Y-m-d', strtotime($bookingData['InsertDate'])) ?? date('Y-m-d'),
+							'InsertDate'      => $bookingData['InsertDate'] ?? date('Y-m-d'),
 							'Customer'        => $bookingData['Customer'] ?? '',
 							'guest_email'     => $bookingData['guest_email'] ?? '',
 							'guest_address'   => $bookingData['guest_address'] ?? '',
@@ -911,11 +948,20 @@ class Booking extends MY_Controller
 						];
 
                         $respond = $this->autocount_create($quotationData);
-						if ($respond != null) {
-							$booking->AutocountSyncStatus = 'C';
-							$booking->AutocountSyncMessage = $respond;
-						}
-                        $results[$booking->id] = 'Created';
+						if ($booking != null && $respond != null) {
+							if ($respond['error']) {
+								$this->Booking_Model->update_by_id($booking_id, [
+									'AutocountSyncMessage' => json_encode($respond),
+								]);
+								$results[$booking->BookingID] = $respond['error'];
+							} elseif ($respond['status'] === 201 || $respond['status'] === 204) {
+								$this->Booking_Model->update_by_id($booking_id, [
+									'AutocountSyncMessage' => json_encode($respond),
+									'AutocountSyncStatus' => 'C'
+								]);
+							} 
+						}	
+                        $results[$booking->BookingID] = 'Created';
                         break;
 
                     case 'U': // update
@@ -939,26 +985,46 @@ class Booking extends MY_Controller
 							'saveApprove'     => null
 						];
                         $respond = $this->autocount_update($booking);
-						if ($respond != null) {
-							$booking->AutocountSyncStatus = 'U'; // keep as created
-							$booking->AutocountSyncMessage = $respond;
-						}
-                        $results[$booking->id] = 'Updated';
+						if ($booking != null && $respond != null) {
+							if ($respond['error']) {
+								$this->Booking_Model->update_by_id($booking_id, [
+									'AutocountSyncMessage' => json_encode($respond),
+								]);
+								$results[$booking->BookingID] = $respond['error'];
+							} elseif ($respond['status'] === 201 || $respond['status'] === 204) {
+								$this->Booking_Model->update_by_id($booking_id, [
+									'AutocountSyncMessage' => json_encode($respond),
+									'AutocountSyncStatus' => 'U'
+								]);
+							} 
+						}	
+                        $results[$booking->BookingID] = 'Updated';
                         break;
 
                     case 'D': // delete
 						$bookingNumber = (!empty($booking) && !empty($booking->BookingNumber)) ? $booking->BookingNumber : '';
 
-						if (!empty($bookingNumber)) {
-							$respond = $this->autocount_delete([
-								'BookingNumber' => $bookingNumber
-							]);
-							if ($respond != null) {
-								$booking->AutocountSyncStatus = 'D';
-								$booking->AutocountSyncMessage = $respond;
+						if (!empty($booking) && $booking->status == 'N') {
+							if (!empty($bookingNumber)) {
+								$respond = $this->autocount_delete([
+									'BookingNumber' => $bookingNumber
+								]);
+								if ($booking != null && $respond != null) {
+									if ($respond['error']) {
+										$this->Booking_Model->update_by_id($booking_id, [
+											'AutocountSyncMessage' => json_encode($respond),
+										]);
+										$results[$booking->BookingID] = $respond['error'];
+									} elseif ($respond['status'] === 201 || $respond['status'] === 204) {
+										$this->Booking_Model->update_by_id($booking_id, [
+											'AutocountSyncMessage' => json_encode($respond),
+											'AutocountSyncStatus' => 'D'
+										]);
+									} 
+								}	
+								$results[$booking->BookingID] = 'Deleted';
+								break;
 							}
-							$results[$booking->id] = 'Deleted';
-							break;
 						}
                     case 'V': // void
 						$bookingNumber = (!empty($booking) && !empty($booking->BookingNumber)) ? $booking->BookingNumber : '';
@@ -969,28 +1035,38 @@ class Booking extends MY_Controller
 							]);
 						}
                         $respond = $this->autocount_void($booking);
-						if ($respond != null) {
-							$booking->AutocountSyncStatus = 'V';
-							$booking->AutocountSyncMessage = $respond;
+						if ($booking != null && $respond != null) {
+							if ($respond['error']) {
+								$this->Booking_Model->update_by_id($booking_id, [
+									'AutocountSyncMessage' => json_encode($respond),
+								]);
+								$results[$booking->BookingID] = $respond['error'];
+							} elseif ($respond['status'] === 201 || $respond['status'] === 204) {
+								$this->Booking_Model->update_by_id($booking_id, [
+									'AutocountSyncMessage' => json_encode($respond),
+									'AutocountSyncStatus' => 'V'
+								]);
+							} 
 						}
-                        $results[$booking->id] = 'Voided';
+                        $results[$booking->BookingID] = 'Voided';
                         break;
 
                     default:
-                        $results[$booking->id] = 'Skipped';
+                        $results[$booking->BookingID] = 'Skipped';
                         break;
                 }
 
-                $booking->save();
             } catch (\Exception $e) {
-                $results[$bookingData['id']] = 'Error: ' . $e->getMessage();
+                $results[$bookingData['BookingID']] = 'Error: ' . $e->getMessage();
             }
         }
 
-        return response()->json([
-            'message' => 'Sync process completed',
-            'results' => $results,
-        ]);
+		$this->output
+        ->set_content_type('application/json')
+        ->set_output(json_encode([
+            'success' => true,
+            'message' => implode("\n", $results) // return as plain text
+        ]));
     }
 
 	public function autocount_create($data = [])
@@ -1017,15 +1093,15 @@ class Booking extends MY_Controller
                 'Description'     => null,
                 'Note'            => null,
                 'SalesAgent'      => '',
-                'CreditTerm'      => $data['credit_term'] ?? 'C.O.D.',
-                'SalesLocation'   => $data['sales_location'] ?? 'HQ',
+                'CreditTerm'      => (isset($data['credit_term'])) ? $data['credit_term'] :  'C.O.D.',
+                'SalesLocation'   => 'HQ',
                 'Remark1'         => $data['BokingRemark'],
                 'Remark2'         => null,
                 'Remark3'         => null,
                 'Remark4'         => null,
-                'CurrencyRate'    => $data['currency_rate'] ?? '',
-                'InclusiveTax'    => $data['inclusive_tax'] ?? false,
-                'IsRoundAdj'      => $data['is_round_adj'] ?? false,
+                'CurrencyRate'    => (isset($data['currency_rate'])) ? $data['currency_rate'] : '',
+                'InclusiveTax'    => (isset($data['inclusive_tax'])) ? $data['inclusive_tax'] : false,
+                'IsRoundAdj'      => (isset($data['is_round_adj'])) ? $data['is_round_adj'] : false,
                 'YourRef'         => null,
                 'Validity'        => null,
                 'CC'              => null,
@@ -1034,7 +1110,7 @@ class Booking extends MY_Controller
             ],
             'details' => [],
             'autoFillOption' => [
-                'TaxCode' => $data['tax_code'] ?? true
+                'TaxCode' => (isset($data['tax_code'])) ? (bool)$data['tax_code'] : true,
             ],
             'saveApprove' => null
         ];
@@ -1096,7 +1172,7 @@ class Booking extends MY_Controller
 
         if (!empty($data['tax_code'])) {
             $body['autoFillOption'] = [
-                'TaxCode' => $data['tax_code']
+                'TaxCode' => (isset($data['tax_code'])) ? (bool)$data['tax_code'] : true,
             ];
         }
 

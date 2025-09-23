@@ -60,17 +60,12 @@ class AutoCountService {
             "Content-Type: application/json"
         ];
 
-        // If your API still needs Bearer token for some endpoints
-        if (!empty($this->token)) {
-            $headers[] = "Authorization: Bearer {$this->token}";
-        }
-
         $response = $this->curlRequest($method, $url, $payload, $headers);
 
         $this->CI->load->helper('autocount');
         $status = (is_array($response) && empty($response['error'])) ? 'Y' : 'N';
         autocount_log(
-            $endpoint,
+            $url,
             [
                 'headers' => $headers,
                 'body'    => $payload,
@@ -121,12 +116,46 @@ class AutoCountService {
         curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, $verifySSL ? 2 : 0);
 
         $result = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 
         if (curl_errno($ch)) {
-            return ['error' => curl_error($ch)];
+            $errorMsg = curl_error($ch);
+            curl_close($ch);
+            return [
+                'status' => $httpCode,
+                'body'   => null,
+                'error'  => $errorMsg
+            ];
         }
 
         curl_close($ch);
-        return json_decode($result, true);
+
+        // Handle empty body (example: 201 Created with no response body)
+        if ($result === '' || $result === null) {
+            return [
+                'status' => $httpCode,
+                'body'   => null,
+                'error'  => ($httpCode >= 400 ? "HTTP Error $httpCode" : null)
+            ];
+        }
+
+        // Decode JSON body
+        $decoded = json_decode($result, true);
+
+        // If body is JSON and has "statusCode" field → treat as error
+        if (is_array($decoded) && isset($decoded['statusCode']) && $decoded['statusCode'] >= 400) {
+            return [
+                'status' => $httpCode,
+                'body'   => $decoded,
+                'error'  => $decoded['message'] ?? "HTTP Error {$decoded['statusCode']}"
+            ];
+        }
+
+        // Normal success response
+        return [
+            'status' => $httpCode,
+            'body'   => $decoded,
+            'error'  => null
+        ];
     }
 }

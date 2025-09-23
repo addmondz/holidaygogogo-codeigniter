@@ -37,8 +37,6 @@ if (!function_exists('autocount_request')) {
 
         if (!$endpoint) {
             return ['error' => "Endpoint '{$endpoint_key}' not found"];
-        } else {
-            $endpoint .= $config['base_url'] . $endpoint;
         }
 
         return $CI->autocountservice->request($config, $method, $endpoint, $payload, $queryParams);

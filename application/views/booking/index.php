@@ -504,7 +504,7 @@ document.getElementById('sync-autocount-booking').addEventListener('click', func
         return;
     }
 
-    fetch("<?php echo base_url('Booking/sync_autocount'); ?>", {
+   fetch("<?php echo base_url('Booking/bulkSyncToAutocount'); ?>", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ booking_ids: selected })
@@ -512,10 +512,9 @@ document.getElementById('sync-autocount-booking').addEventListener('click', func
     .then(res => res.json())
     .then(data => {
         if (data.success) {
-            alert("Sync successful!");
-            // Optionally refresh table or update row status
+            alert(data.message); // ✅ all messages from PHP
         } else {
-            alert("Sync failed: " + data.message);
+            alert("❌ " + data.message);
         }
     })
     .catch(err => {

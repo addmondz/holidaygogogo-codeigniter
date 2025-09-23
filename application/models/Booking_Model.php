@@ -853,9 +853,18 @@ class Booking_Model extends CI_Model
 	}
 
 
-	function getAutocountSyncStatus()
-	{
-		
-	}
+	public function find($booking_id)
+    {
+        return $this->db->get_where('booking', ['BookingID' => $booking_id])->row();
+    }
+	
+    public function update_by_id($booking_id, $data = [])
+    {
+        if (empty($data)) return false;
+
+        return $this->db
+            ->where('BookingID', $booking_id)
+            ->update('booking', $data);
+    }
 
 }
