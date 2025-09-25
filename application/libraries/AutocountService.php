@@ -42,9 +42,9 @@ class AutoCountService {
      * Send request to AutoCount API
      */
     public function request($config, $method, $endpoint, $payload = [], $queryParams = []) {
-        $apiKey = get_env('AUTOCOUNT_apiKey');
-        $keyId = get_env('AUTOCOUNT_keyId');
-        $accountBookId = get_env('AUTOCOUNT_accountBookId');
+        $apiKey = $config['AUTOCOUNT_apiKey'];
+        $keyId = $config['AUTOCOUNT_keyId'];
+        $accountBookId = $config['AUTOCOUNT_accountBookId'];
         // Build URL with accountBookId prefix
         $url = rtrim($config['base_url'], '/') . '/' . $accountBookId . '/' . ltrim($endpoint, '/');
 

@@ -13,6 +13,7 @@ class Booking extends MY_Controller
 		$this->load->model('Booking_Product_Model');
 		$this->load->model('Payment_Model');
 		$this->load->model('Universal_Model');
+		$this->config->load('autocount'); // load config/autocount.php
 	}
 
 	function index()
@@ -184,45 +185,49 @@ class Booking extends MY_Controller
 					$bookingData = (array) $bookingData[0]; 
 				}
 
-				$bookingProducts = $this->Booking_Model->getAllBookingsWithProducts($booking_id);
-				$bookingProducts = array_map('get_object_vars', $bookingProducts); // convert to array
+				$statuses = !empty($this->config->item('booking_sync_status')) ? $this->config->item('booking_sync_status') : ['BOOKING CONFIRMATION'];
 
-				$quotationData = [
-					'BookingNumber'   => $bookingData['BookingNumber'] ?? '',
-					'InsertDate'      => $bookingData['InsertDate'] ?? date('Y-m-d'),
-					'Customer'        => $bookingData['Customer'] ?? '',
-					'guest_email'     => $bookingData['guest_email'] ?? '',
-					'guest_address'   => $bookingData['guest_address'] ?? '',
-					'guest_phone'     => $bookingData['guest_phone'] ?? '',
-					'BokingRemark'    => $bookingData['BokingRemark'] ?? '',
+				if (in_array($bookingData['BookingConfirmationTitle'], $statuses)) {
+					$bookingProducts = $this->Booking_Model->getAllBookingsWithProducts($booking_id);
+					$bookingProducts = array_map('get_object_vars', $bookingProducts); // convert to array
+
+					$quotationData = [
+						'BookingNumber'   => $bookingData['BookingNumber'] ?? '',
+						'InsertDate'      => $bookingData['InsertDate'] ?? date('Y-m-d'),
+						'Customer'        => $bookingData['Customer'] ?? '',
+						'guest_email'     => $bookingData['guest_email'] ?? '',
+						'guest_address'   => $bookingData['guest_address'] ?? '',
+						'guest_phone'     => $bookingData['guest_phone'] ?? '',
+						'BokingRemark'    => $bookingData['BokingRemark'] ?? '',
+						
+						// Fields not in DB → set default or null
+						'credit_term'     => null,
+						'sales_location'  => '',
+						'currency_rate'   => 1,
+						'inclusive_tax'   => false,
+						'is_round_adj'    => false,
+						'tax_code'        => '',
+
+						// Details
+						'booking_product' => $bookingProducts
+					];
 					
-					// Fields not in DB → set default or null
-					'credit_term'     => null,
-					'sales_location'  => '',
-					'currency_rate'   => 1,
-					'inclusive_tax'   => false,
-					'is_round_adj'    => false,
-					'tax_code'        => '',
+					$respond = $this->autocount_create($quotationData);
 
-					// Details
-					'booking_product' => $bookingProducts
-				];
-				
-				$respond = $this->autocount_create($quotationData);
-
-				$booking = $this->Booking_Model->find($booking_id);
-				if ($booking != null && $respond != null) {
-					if ($respond['error']) {
-						$this->Booking_Model->update_by_id($booking_id, [
-							'AutocountSyncMessage' => json_encode($respond),
-						]);
-					} elseif ($respond['status'] === 201 || $respond['status'] === 204) {
-						$this->Booking_Model->update_by_id($booking_id, [
-							'AutocountSyncMessage' => json_encode($respond),
-							'AutocountSyncStatus' => 'C'
-						]);
-					} 
-				}	
+					$booking = $this->Booking_Model->find($booking_id);
+					if ($booking != null && $respond != null) {
+						if (!empty($respond['error'])) {
+							$this->Booking_Model->update_by_id($booking_id, [
+								'AutocountSyncMessage' => json_encode($respond),
+							]);
+						} elseif ($respond['status'] === 201 || $respond['status'] === 204) {
+							$this->Booking_Model->update_by_id($booking_id, [
+								'AutocountSyncMessage' => json_encode($respond),
+								'AutocountSyncStatus'  => 'C'
+							]);
+						}
+					}
+				}
         } else {
 				$titles = array('tab_title' => 'HolidayGoGoGo | Booking', 'breadcrumb_title' => 'Booking >> Create');
 				$array = array('BookingID' => 'NA', 'BookingConfirmationFooterID' => 'NA', 'TravelVoucherFooterID' => 'NA', 'BookingNumber' => 'NA', 'Tag' => array(), 'Discount' => 'NA', 'NetTotal' => 'NA', 'ProductSequence' => array(), 'BookingProductID' => ($this->Booking_Product_Model->Read_Last_Booking_Product_ID()) + 1);
@@ -302,40 +307,44 @@ class Booking extends MY_Controller
 				// Convert objects to arrays
 				$bookingProducts = array_map('get_object_vars', $bookingProducts);
 
-				/*** Call Quotation Update in AutoCount ***/
-				$quotationData = [
-					'BookingNumber'   => $bookingData['BookingNumber'],
-					'DocNo'           => $bookingData['BookingNumber'], // Fallback
-					'master'          => [
-						'DocDate'        => date('Y-m-d', strtotime($bookingData['InsertDate'])),
-						'DebtorName'     => $bookingData['Customer'],
-						'Email'          => $bookingData['guest_email'],
-						'Address'        => $bookingData['guest_address'],
-						'Phone1'         => $bookingData['guest_phone'],
-						'DeliverAddress' => $bookingData['guest_address'],
-						'DeliverContact' => $bookingData['Customer'],
-						'DeliverPhone1'  => $bookingData['guest_phone'],
-						'Remark1'        => $bookingData['BokingRemark'],
-					],
-					'booking_product' => $bookingProducts,
-					'tax_code'        => '', // Default tax code if missing
-					'saveApprove'     => null
-				];
+				$statuses = !empty($this->config->item('booking_sync_status')) ? $this->config->item('booking_sync_status') : ['BOOKING CONFIRMATION'];
 
-				$respond = $this->autocount_update($quotationData);
+				if (in_array($bookingData['BookingConfirmationTitle'], $statuses)) {
+					/*** Call Quotation Update in AutoCount ***/
+					$quotationData = [
+						'BookingNumber'   => $bookingData['BookingNumber'],
+						'DocNo'           => $bookingData['BookingNumber'], // Fallback
+						'master'          => [
+							'DocDate'        => date('Y-m-d', strtotime($bookingData['InsertDate'])),
+							'DebtorName'     => $bookingData['Customer'],
+							'Email'          => $bookingData['guest_email'],
+							'Address'        => $bookingData['guest_address'],
+							'Phone1'         => $bookingData['guest_phone'],
+							'DeliverAddress' => $bookingData['guest_address'],
+							'DeliverContact' => $bookingData['Customer'],
+							'DeliverPhone1'  => $bookingData['guest_phone'],
+							'Remark1'        => $bookingData['BokingRemark'],
+						],
+						'booking_product' => $bookingProducts,
+						'tax_code'        => '', // Default tax code if missing
+						'saveApprove'     => null
+					];
 
-				$booking = $this->Booking_Model->find($booking_id);
-				if ($booking != null && $respond != null) {
-					if ($respond['error']) {
-						$this->Booking_Model->update_by_id($booking_id, [
-							'AutocountSyncMessage' => json_encode($respond),
-						]);
-					} elseif ($respond['status'] === 201 || $respond['status'] === 204) {
-						$this->Booking_Model->update_by_id($booking_id, [
-							'AutocountSyncMessage' => json_encode($respond),
-							'AutocountSyncStatus' => 'U'
-						]);
-					} 
+					$respond = $this->autocount_update($quotationData);
+
+					$booking = $this->Booking_Model->find($booking_id);
+					if ($booking != null && $respond != null) {
+						if ($respond['error']) {
+							$this->Booking_Model->update_by_id($booking_id, [
+								'AutocountSyncMessage' => json_encode($respond),
+							]);
+						} elseif ($respond['status'] === 201 || $respond['status'] === 204) {
+							$this->Booking_Model->update_by_id($booking_id, [
+								'AutocountSyncMessage' => json_encode($respond),
+								'AutocountSyncStatus' => 'U'
+							]);
+						} 
+					}
 				}
 			} else {
 				$valid_booking_id = $this->Universal_Model->Validate_Id('BookingID', $this->input->get('booking_id'), 'booking');
@@ -465,28 +474,32 @@ class Booking extends MY_Controller
 				$this->input->get('booking_id')
 			);
 
-			if (!empty($bookingData->BookingNumber)) {
-				$quotationData = [
-					'DocNo'  => $bookingData->BookingNumber,
-					'master' => [
-						'Status' => $autoCountStatus
-					]
-				];
+			$statuses = !empty($this->config->item('booking_sync_status')) ? $this->config->item('booking_sync_status') : ['BOOKING CONFIRMATION'];
 
-				$respond = $this->autocount_update($quotationData);
-				$booking = $this->Booking_Model->find($this->input->get('booking_id'));
-				if ($booking != null && $respond != null) {
-					if ($respond['error']) {
-						$this->Booking_Model->update_by_id($this->input->get('booking_id'), [
-							'AutocountSyncMessage' => json_encode($respond),
-						]);
-					} elseif ($respond['status'] === 201 || $respond['status'] === 204) {
-						$this->Booking_Model->update_by_id($this->input->get('booking_id'), [
-							'AutocountSyncMessage' => json_encode($respond),
-							'AutocountSyncStatus' => 'U'
-						]);
-					} 
-				}	
+			if (in_array($bookingData['BookingConfirmationTitle'], $statuses)) {
+				if (!empty($bookingData->BookingNumber)) {
+					$quotationData = [
+						'DocNo'  => $bookingData->BookingNumber,
+						'master' => [
+							'Status' => $autoCountStatus
+						]
+					];
+
+					$respond = $this->autocount_update($quotationData);
+					$booking = $this->Booking_Model->find($this->input->get('booking_id'));
+					if ($booking != null && $respond != null) {
+						if ($respond['error']) {
+							$this->Booking_Model->update_by_id($this->input->get('booking_id'), [
+								'AutocountSyncMessage' => json_encode($respond),
+							]);
+						} elseif ($respond['status'] === 201 || $respond['status'] === 204) {
+							$this->Booking_Model->update_by_id($this->input->get('booking_id'), [
+								'AutocountSyncMessage' => json_encode($respond),
+								'AutocountSyncStatus' => 'U'
+							]);
+						} 
+					}	
+				}
 			}
 
 			if(strpos($this->input->get('param'), '?') == true) {
@@ -513,24 +526,28 @@ class Booking extends MY_Controller
 			$bookingData = $this->Booking_Model->getBookingById($this->input->get('booking_id'));
         	$bookingNumber = (!empty($bookingData) && !empty($bookingData->BookingNumber)) ? $bookingData->BookingNumber : '';
 
-			if (!empty($bookingNumber)) {
-				$respond = $this->autocount_delete([
-					'BookingNumber' => $bookingNumber
-				]);
+			$statuses = !empty($this->config->item('booking_sync_status')) ? $this->config->item('booking_sync_status') : ['BOOKING CONFIRMATION'];
 
-				$booking = $this->Booking_Model->find($this->input->get('booking_id'));
-				if ($booking != null && $respond != null) {
-					if ($respond['error']) {
-						$this->Booking_Model->update_by_id($this->input->get('booking_id'), [
-							'AutocountSyncMessage' => json_encode($respond),
-						]);
-					} elseif ($respond['status'] === 201 || $respond['status'] === 204) {
-						$this->Booking_Model->update_by_id($this->input->get('booking_id'), [
-							'AutocountSyncMessage' => json_encode($respond),
-							'AutocountSyncStatus' => 'D'
-						]);
-					} 
-				}		
+			if (in_array($bookingData['BookingConfirmationTitle'], $statuses)) {
+				if (!empty($bookingNumber)) {
+					$respond = $this->autocount_delete([
+						'BookingNumber' => $bookingNumber
+					]);
+
+					$booking = $this->Booking_Model->find($this->input->get('booking_id'));
+					if ($booking != null && $respond != null) {
+						if ($respond['error']) {
+							$this->Booking_Model->update_by_id($this->input->get('booking_id'), [
+								'AutocountSyncMessage' => json_encode($respond),
+							]);
+						} elseif ($respond['status'] === 201 || $respond['status'] === 204) {
+							$this->Booking_Model->update_by_id($this->input->get('booking_id'), [
+								'AutocountSyncMessage' => json_encode($respond),
+								'AutocountSyncStatus' => 'D'
+							]);
+						} 
+					}						
+				}
 			}
 			
 		} else {
@@ -894,7 +911,7 @@ class Booking extends MY_Controller
     {
         // Read raw JSON body
 		$input = json_decode($this->input->raw_input_stream, true);
-		$booking_ids = $input['booking_ids'] ?? [];
+		$booking_ids = $input['booking_ids'] ? $input['booking_ids'] : [];
 
 		if (empty($booking_ids)) {
 			$this->output
@@ -924,137 +941,141 @@ class Booking extends MY_Controller
 				$bookingProducts = $this->Booking_Model->getAllBookingsWithProducts($booking_id);
 				$bookingProducts = array_map('get_object_vars', $bookingProducts); // convert to array
 
-                switch ($bookingData['AutocountSyncStatus']) {
-                    case 'N': // new → create
-						$quotationData = [
-							'BookingNumber'   => $bookingData['BookingNumber'] ?? '',
-							'InsertDate'      => $bookingData['InsertDate'] ?? date('Y-m-d'),
-							'Customer'        => $bookingData['Customer'] ?? '',
-							'guest_email'     => $bookingData['guest_email'] ?? '',
-							'guest_address'   => $bookingData['guest_address'] ?? '',
-							'guest_phone'     => $bookingData['guest_phone'] ?? '',
-							'BokingRemark'    => $bookingData['BokingRemark'] ?? '',
-							
-							// Fields not in DB → set default or null
-							'credit_term'     => null,
-							'sales_location'  => '',
-							'currency_rate'   => 1,
-							'inclusive_tax'   => false,
-							'is_round_adj'    => false,
-							'tax_code'        => '',
+				$statuses = !empty($this->config->item('booking_sync_status')) ? $this->config->item('booking_sync_status') : ['BOOKING CONFIRMATION'];
 
-							// Details
-							'booking_product' => $bookingProducts
-						];
+				if (in_array($bookingData['BookingConfirmationTitle'], $statuses)) {
+					switch ($bookingData['AutocountSyncStatus']) {
+						case 'N': // new → create
+							$quotationData = [
+								'BookingNumber'   => $bookingData['BookingNumber'] ?? '',
+								'InsertDate'      => $bookingData['InsertDate'] ?? date('Y-m-d'),
+								'Customer'        => $bookingData['Customer'] ?? '',
+								'guest_email'     => $bookingData['guest_email'] ?? '',
+								'guest_address'   => $bookingData['guest_address'] ?? '',
+								'guest_phone'     => $bookingData['guest_phone'] ?? '',
+								'BokingRemark'    => $bookingData['BokingRemark'] ?? '',
+								
+								// Fields not in DB → set default or null
+								'credit_term'     => null,
+								'sales_location'  => '',
+								'currency_rate'   => 1,
+								'inclusive_tax'   => false,
+								'is_round_adj'    => false,
+								'tax_code'        => '',
 
-                        $respond = $this->autocount_create($quotationData);
-						if ($booking != null && $respond != null) {
-							if ($respond['error']) {
-								$this->Booking_Model->update_by_id($booking_id, [
-									'AutocountSyncMessage' => json_encode($respond),
-								]);
-								$results[$booking->BookingID] = $respond['error'];
-							} elseif ($respond['status'] === 201 || $respond['status'] === 204) {
-								$this->Booking_Model->update_by_id($booking_id, [
-									'AutocountSyncMessage' => json_encode($respond),
-									'AutocountSyncStatus' => 'C'
-								]);
-							} 
-						}	
-                        $results[$booking->BookingID] = 'Created';
-                        break;
+								// Details
+								'booking_product' => $bookingProducts
+							];
 
-                    case 'U': // update
-                    case 'C': // created → still allow update
-						$quotationData = [
-							'BookingNumber'   => $bookingData['BookingNumber'],
-							'DocNo'           => $bookingData['BookingNumber'], // Fallback
-							'master'          => [
-								'DocDate'        => date('Y-m-d', strtotime($bookingData['InsertDate'])),
-								'DebtorName'     => $bookingData['Customer'],
-								'Email'          => $bookingData['guest_email'],
-								'Address'        => $bookingData['guest_address'],
-								'Phone1'         => $bookingData['guest_phone'],
-								'DeliverAddress' => $bookingData['guest_address'],
-								'DeliverContact' => $bookingData['Customer'],
-								'DeliverPhone1'  => $bookingData['guest_phone'],
-								'Remark1'        => $bookingData['BokingRemark'],
-							],
-							'booking_product' => $bookingProducts,
-							'tax_code'        => '', // Default tax code if missing
-							'saveApprove'     => null
-						];
-                        $respond = $this->autocount_update($booking);
-						if ($booking != null && $respond != null) {
-							if ($respond['error']) {
-								$this->Booking_Model->update_by_id($booking_id, [
-									'AutocountSyncMessage' => json_encode($respond),
-								]);
-								$results[$booking->BookingID] = $respond['error'];
-							} elseif ($respond['status'] === 201 || $respond['status'] === 204) {
-								$this->Booking_Model->update_by_id($booking_id, [
-									'AutocountSyncMessage' => json_encode($respond),
-									'AutocountSyncStatus' => 'U'
-								]);
-							} 
-						}	
-                        $results[$booking->BookingID] = 'Updated';
-                        break;
+							$respond = $this->autocount_create($quotationData);
+							if ($booking != null && $respond != null) {
+								if ($respond['error']) {
+									$this->Booking_Model->update_by_id($booking_id, [
+										'AutocountSyncMessage' => json_encode($respond),
+									]);
+									$results[$booking->BookingID] = $respond['error'];
+								} elseif ($respond['status'] === 201 || $respond['status'] === 204) {
+									$this->Booking_Model->update_by_id($booking_id, [
+										'AutocountSyncMessage' => json_encode($respond),
+										'AutocountSyncStatus' => 'C'
+									]);
+								} 
+							}	
+							$results[$booking->BookingID] = 'Created';
+							break;
 
-                    case 'D': // delete
-						$bookingNumber = (!empty($booking) && !empty($booking->BookingNumber)) ? $booking->BookingNumber : '';
+						case 'U': // update
+						case 'C': // created → still allow update
+							$quotationData = [
+								'BookingNumber'   => $bookingData['BookingNumber'],
+								'DocNo'           => $bookingData['BookingNumber'], // Fallback
+								'master'          => [
+									'DocDate'        => date('Y-m-d', strtotime($bookingData['InsertDate'])),
+									'DebtorName'     => $bookingData['Customer'],
+									'Email'          => $bookingData['guest_email'],
+									'Address'        => $bookingData['guest_address'],
+									'Phone1'         => $bookingData['guest_phone'],
+									'DeliverAddress' => $bookingData['guest_address'],
+									'DeliverContact' => $bookingData['Customer'],
+									'DeliverPhone1'  => $bookingData['guest_phone'],
+									'Remark1'        => $bookingData['BokingRemark'],
+								],
+								'booking_product' => $bookingProducts,
+								'tax_code'        => '', // Default tax code if missing
+								'saveApprove'     => null
+							];
+							$respond = $this->autocount_update($booking);
+							if ($booking != null && $respond != null) {
+								if ($respond['error']) {
+									$this->Booking_Model->update_by_id($booking_id, [
+										'AutocountSyncMessage' => json_encode($respond),
+									]);
+									$results[$booking->BookingID] = $respond['error'];
+								} elseif ($respond['status'] === 201 || $respond['status'] === 204) {
+									$this->Booking_Model->update_by_id($booking_id, [
+										'AutocountSyncMessage' => json_encode($respond),
+										'AutocountSyncStatus' => 'U'
+									]);
+								} 
+							}	
+							$results[$booking->BookingID] = 'Updated';
+							break;
 
-						if (!empty($booking) && $booking->status == 'N') {
+						case 'D': // delete
+							$bookingNumber = (!empty($booking) && !empty($booking->BookingNumber)) ? $booking->BookingNumber : '';
+
+							if (!empty($booking) && $booking->status == 'N') {
+								if (!empty($bookingNumber)) {
+									$respond = $this->autocount_delete([
+										'BookingNumber' => $bookingNumber
+									]);
+									if ($booking != null && $respond != null) {
+										if ($respond['error']) {
+											$this->Booking_Model->update_by_id($booking_id, [
+												'AutocountSyncMessage' => json_encode($respond),
+											]);
+											$results[$booking->BookingID] = $respond['error'];
+										} elseif ($respond['status'] === 201 || $respond['status'] === 204) {
+											$this->Booking_Model->update_by_id($booking_id, [
+												'AutocountSyncMessage' => json_encode($respond),
+												'AutocountSyncStatus' => 'D'
+											]);
+										} 
+									}	
+									$results[$booking->BookingID] = 'Deleted';
+									break;
+								}
+							}
+						case 'V': // void
+							$bookingNumber = (!empty($booking) && !empty($booking->BookingNumber)) ? $booking->BookingNumber : '';
+
 							if (!empty($bookingNumber)) {
-								$respond = $this->autocount_delete([
+								$this->autocount_void([
 									'BookingNumber' => $bookingNumber
 								]);
-								if ($booking != null && $respond != null) {
-									if ($respond['error']) {
-										$this->Booking_Model->update_by_id($booking_id, [
-											'AutocountSyncMessage' => json_encode($respond),
-										]);
-										$results[$booking->BookingID] = $respond['error'];
-									} elseif ($respond['status'] === 201 || $respond['status'] === 204) {
-										$this->Booking_Model->update_by_id($booking_id, [
-											'AutocountSyncMessage' => json_encode($respond),
-											'AutocountSyncStatus' => 'D'
-										]);
-									} 
-								}	
-								$results[$booking->BookingID] = 'Deleted';
-								break;
 							}
-						}
-                    case 'V': // void
-						$bookingNumber = (!empty($booking) && !empty($booking->BookingNumber)) ? $booking->BookingNumber : '';
+							$respond = $this->autocount_void($booking);
+							if ($booking != null && $respond != null) {
+								if ($respond['error']) {
+									$this->Booking_Model->update_by_id($booking_id, [
+										'AutocountSyncMessage' => json_encode($respond),
+									]);
+									$results[$booking->BookingID] = $respond['error'];
+								} elseif ($respond['status'] === 201 || $respond['status'] === 204) {
+									$this->Booking_Model->update_by_id($booking_id, [
+										'AutocountSyncMessage' => json_encode($respond),
+										'AutocountSyncStatus' => 'V'
+									]);
+								} 
+							}
+							$results[$booking->BookingID] = 'Voided';
+							break;
 
-						if (!empty($bookingNumber)) {
-							$this->autocount_void([
-								'BookingNumber' => $bookingNumber
-							]);
-						}
-                        $respond = $this->autocount_void($booking);
-						if ($booking != null && $respond != null) {
-							if ($respond['error']) {
-								$this->Booking_Model->update_by_id($booking_id, [
-									'AutocountSyncMessage' => json_encode($respond),
-								]);
-								$results[$booking->BookingID] = $respond['error'];
-							} elseif ($respond['status'] === 201 || $respond['status'] === 204) {
-								$this->Booking_Model->update_by_id($booking_id, [
-									'AutocountSyncMessage' => json_encode($respond),
-									'AutocountSyncStatus' => 'V'
-								]);
-							} 
-						}
-                        $results[$booking->BookingID] = 'Voided';
-                        break;
-
-                    default:
-                        $results[$booking->BookingID] = 'Skipped';
-                        break;
-                }
+						default:
+							$results[$booking->BookingID] = 'Skipped';
+							break;
+					}
+				}
 
             } catch (\Exception $e) {
                 $results[$bookingData['BookingID']] = 'Error: ' . $e->getMessage();
@@ -1069,166 +1090,219 @@ class Booking extends MY_Controller
         ]));
     }
 
-	public function autocount_create($data = [])
-    {
-        $param = [
-            'master' => [
-                'DocNo'           => $data['BookingNumber'],
-                'DocNoFormatName' => null,
-                'DocDate'         => date('Y-m-d', strtotime($data['InsertDate'])),
-                'DebtorCode'      => '',
-                'DebtorName'      => $data['Customer'],
-                'Email'           => $data['guest_email'],
-                'EmailCC'         => null,
-                'EmailBCC'        => null,
-                'Address'         => $data['guest_address'],
-                'Attention'       => '',
-                'Phone1'          => $data['guest_phone'],
-                'Fax1'            => '',
-                'DeliverAddress'  => $data['guest_address'],
-                'DeliverContact'  => $data['Customer'],
-                'DeliverPhone1'   => $data['guest_phone'],
-                'DeliverFax1'     => '',
-                'Ref'             => null,
-                'Description'     => null,
-                'Note'            => null,
-                'SalesAgent'      => '',
-                'CreditTerm'      => (isset($data['credit_term'])) ? $data['credit_term'] :  'C.O.D.',
-                'SalesLocation'   => 'HQ',
-                'Remark1'         => $data['BokingRemark'],
-                'Remark2'         => null,
-                'Remark3'         => null,
-                'Remark4'         => null,
-                'CurrencyRate'    => (isset($data['currency_rate'])) ? $data['currency_rate'] : '',
-                'InclusiveTax'    => (isset($data['inclusive_tax'])) ? $data['inclusive_tax'] : false,
-                'IsRoundAdj'      => (isset($data['is_round_adj'])) ? $data['is_round_adj'] : false,
-                'YourRef'         => null,
-                'Validity'        => null,
-                'CC'              => null,
-                'DeliveryTerm'    => null,
-                'PaymentTerm'     => null
-            ],
-            'details' => [],
-            'autoFillOption' => [
-                'TaxCode' => (isset($data['tax_code'])) ? (bool)$data['tax_code'] : true,
-            ],
-            'saveApprove' => null
-        ];
+	public function autocount_create($data)
+	{
+		try {
+			$docNo = arr_get($data, 'doc_no');
 
-        if (!empty($data['booking_product'])) {
-            foreach ($data['booking_product'] as $product) {
-                $param['details'][] = [
-                    'ProductCode'        => $product['product_ProductCode'],
-                    'ProductVariant'     => null,
-                    'Description'        => $product['product_Description'],
-                    'FurtherDescription' => '',
-                    'Qty'                => (float)$product['product_Quantity'],
-                    'Unit'               => isset($product['unit']) ? $product['unit'] : 'unit',
-                    'UnitPrice'          => (float)$product['product_Price'],
-                    'Discount'           => null,
-                    'TaxCode'            => isset($product['tax_code']) ? $product['tax_code'] : '',
-                    'TaxAdjustment'      => 0,
-                    'LocalTaxAdjustment' => 0,
-                    'DeptNo'             => null
-                ];
-            }
-        }
+			$body = [
+				'DocNo'        => $docNo,
+				'DocDate'      => arr_get($data, 'doc_date'),
+				'DebtorCode'   => arr_get($data, 'debtor_code'),
+				'DebtorName'   => arr_get($data, 'debtor_name'),
+				'Address1'     => arr_get($data, 'address1'),
+				'Address2'     => arr_get($data, 'address2'),
+				'Address3'     => arr_get($data, 'address3'),
+				'Address4'     => arr_get($data, 'address4'),
+				'Attention'    => arr_get($data, 'attention'),
+				'Phone1'       => arr_get($data, 'phone1'),
+				'Phone2'       => arr_get($data, 'phone2'),
+				'Fax1'         => arr_get($data, 'fax1'),
+				'Fax2'         => arr_get($data, 'fax2'),
+				'Email'        => arr_get($data, 'email'),
+				'CreditTerm'   => arr_get($data, 'credit_term', 'C.O.D.'),
+				'CurrencyCode' => arr_get($data, 'currency_code', 'MYR'),
+				'CurrencyRate' => arr_get($data, 'currency_rate'),
+				'InclusiveTax' => arr_get($data, 'inclusive_tax', false),
+				'IsRoundAdj'   => arr_get($data, 'is_round_adj', false),
+				'Description'  => arr_get($data, 'description'),
+				'Reference'    => arr_get($data, 'reference'),
+				'Project'      => arr_get($data, 'project'),
+				'Department'   => arr_get($data, 'department'),
+			];
 
-        return autocount_request('POST', 'quotation.create', $param);
-    }
+			// handle details
+			$body['details'] = [];
+			if (!empty($data['details']) && is_array($data['details'])) {
+				foreach ($data['details'] as $detail) {
+					$body['details'][] = [
+						'accNo'              => arr_get($detail, 'account_no'),
+						'toAccountRate'      => arr_get($detail, 'toAccountRate', 1),
+						'description'        => arr_get($detail, 'description'),
+						'furtherDescription' => arr_get($detail, 'furtherDescription'),
+						'qty'                => arr_get($detail, 'qty', 1),
+						'uom'                => arr_get($detail, 'uom'),
+						'taxType'            => arr_get($detail, 'taxType'),
+						'taxRate'            => arr_get($detail, 'taxRate', 0),
+						'unitPrice'          => arr_get($detail, 'unitPrice', 0),
+						'discount'           => arr_get($detail, 'discount', 0),
+						'amount'             => arr_get($detail, 'amount', 0),
+					];
+				}
+			}
 
-    public function autocount_update($data = [])
-    {
-        $docNo = $data['BookingNumber'] ?? $data['DocNo'] ?? '';
-        if ($docNo === '') {
-            return ['error' => 'Missing required parameter: BookingNumber (or DocNo).'];
-        }
+			return autocount_request(
+				'POST',
+				'quotation.create',
+				$body,
+				['docNo' => $docNo]
+			);
 
-        $body = [];
+		} catch (Exception $e) {
+			log_message('error', 'Autocount create error: ' . $e->getMessage());
 
-        if (!empty($data['master'])) {
-            $body['master'] = $data['master'];
-        }
+			return [
+				'status' => 500,
+				'error'  => $e->getMessage(),
+				'data'   => [],
+			];
+		}
+	}
 
-        if (!empty($data['booking_product']) && is_array($data['booking_product'])) {
-            $body['details'] = [];
-            foreach ($data['booking_product'] as $product) {
-                $body['details'][] = [
-                    'ProductCode'        => $product['product_ProductCode'],
-                    'ProductVariant'     => null,
-                    'Description'        => $product['product_Description'],
-                    'FurtherDescription' => '',
-                    'Qty'                => (float)$product['product_Quantity'],
-                    'Unit'               => isset($product['unit']) ? $product['unit'] : 'unit',
-                    'UnitPrice'          => (float)$product['product_Price'],
-                    'Discount'           => null,
-                    'TaxCode'            => isset($product['tax_code']) ? $product['tax_code'] : '',
-                    'TaxAdjustment'      => 0,
-                    'LocalTaxAdjustment' => 0,
-                    'DeptNo'             => null
-                ];
-            }
-        }
+   	public function autocount_update($data)
+	{
+		try {
+			$docNo = arr_get($data, 'doc_no');
 
-        if (!empty($data['tax_code'])) {
-            $body['autoFillOption'] = [
-                'TaxCode' => (isset($data['tax_code'])) ? (bool)$data['tax_code'] : true,
-            ];
-        }
+			$body = [
+				'DocNo'        => $docNo,
+				'DocDate'      => arr_get($data, 'doc_date'),
+				'DebtorCode'   => arr_get($data, 'debtor_code'),
+				'DebtorName'   => arr_get($data, 'debtor_name'),
+				'Address1'     => arr_get($data, 'address1'),
+				'Address2'     => arr_get($data, 'address2'),
+				'Address3'     => arr_get($data, 'address3'),
+				'Address4'     => arr_get($data, 'address4'),
+				'Attention'    => arr_get($data, 'attention'),
+				'Phone1'       => arr_get($data, 'phone1'),
+				'Phone2'       => arr_get($data, 'phone2'),
+				'Fax1'         => arr_get($data, 'fax1'),
+				'Fax2'         => arr_get($data, 'fax2'),
+				'Email'        => arr_get($data, 'email'),
+				'CreditTerm'   => arr_get($data, 'credit_term', 'C.O.D.'),
+				'CurrencyCode' => arr_get($data, 'currency_code', 'MYR'),
+				'CurrencyRate' => arr_get($data, 'currency_rate'),
+				'InclusiveTax' => arr_get($data, 'inclusive_tax', false),
+				'IsRoundAdj'   => arr_get($data, 'is_round_adj', false),
+				'Description'  => arr_get($data, 'description'),
+				'Reference'    => arr_get($data, 'reference'),
+				'Project'      => arr_get($data, 'project'),
+				'Department'   => arr_get($data, 'department'),
+			];
 
-        if (isset($data['saveApprove'])) {
-            $body['saveApprove'] = $data['saveApprove'];
-        }
+			// handle details
+			$body['details'] = [];
+			if (!empty($data['details']) && is_array($data['details'])) {
+				foreach ($data['details'] as $detail) {
+					$body['details'][] = [
+						'accNo'              => arr_get($detail, 'account_no'),
+						'toAccountRate'      => arr_get($detail, 'toAccountRate', 1),
+						'description'        => arr_get($detail, 'description'),
+						'furtherDescription' => arr_get($detail, 'furtherDescription'),
+						'qty'                => arr_get($detail, 'qty', 1),
+						'uom'                => arr_get($detail, 'uom'),
+						'taxType'            => arr_get($detail, 'taxType'),
+						'taxRate'            => arr_get($detail, 'taxRate', 0),
+						'unitPrice'          => arr_get($detail, 'unitPrice', 0),
+						'discount'           => arr_get($detail, 'discount', 0),
+						'amount'             => arr_get($detail, 'amount', 0),
+					];
+				}
+			}
 
-        return autocount_request(
-            'PUT',
-            'quotation.update',
-            $body,
-            ['docNo' => $docNo]
-        );
-    }
+			return autocount_request(
+				'PUT',
+				'quotation.update',
+				$body,
+				['docNo' => $docNo]
+			);
 
-    public function autocount_update_status($data = [])
-    {
-        $docNo = $data['BookingNumber'] ?? '';
-        $body = [
-            'documentStatus' => $data['Status'] ?? '',
-            'lostReason'     => $data['reason'] ?? ''
-        ];
+		} catch (Exception $e) {
+			log_message('error', 'Autocount update error: ' . $e->getMessage());
 
-        return autocount_request(
-            'PUT',
-            'quotation.update_status',
-            $body,
-            ['docNo' => $docNo]
-        );
-    }
+			return [
+				'status' => 500,
+				'error'  => $e->getMessage(),
+				'data'   => [],
+			];
+		}
+	}
 
-    public function autocount_delete($data = [])
-    {
-        $docNo = $data['BookingNumber'] ?? '';
+	public function autocount_update_status($data)
+	{
+		try {
+			$docNo = arr_get($data, 'doc_no');
 
-        return autocount_request(
-            'DELETE',
-            'quotation.delete',
-            [],
-            ['docNo' => $docNo]
-        );
-    }
+			$body = [
+				'documentStatus' => arr_get($data, 'status'),
+				'lostReason'     => arr_get($data, 'reason'),
+			];
 
-    public function autocount_void($data = [])
-    {
-        $docNo = $data['DocNo'] ?? '';
-        $body = [
-            'voidReason' => $data['reason'] ?? ''
-        ];
+			return autocount_request(
+				'PUT',
+				'quotation.update_status',
+				$body,
+				['docNo' => $docNo]
+			);
 
-        return autocount_request(
-            'POST',
-            'quotation.void',
-            $body,
-            ['docNo' => $docNo]
-        );
-        
-    }    
+		} catch (Exception $e) {
+			log_message('error', 'Autocount update_status error: ' . $e->getMessage());
+
+			return [
+				'status' => 500,
+				'error'  => $e->getMessage(),
+				'data'   => [],
+			];
+		}
+	}
+
+	public function autocount_delete($data)
+	{
+		try {
+			$docNo = arr_get($data, 'doc_no');
+
+			return autocount_request(
+				'DELETE',
+				'quotation.delete',
+				[],
+				['docNo' => $docNo]
+			);
+
+		} catch (Exception $e) {
+			log_message('error', 'Autocount delete error: ' . $e->getMessage());
+
+			return [
+				'status' => 500,
+				'error'  => $e->getMessage(),
+				'data'   => [],
+			];
+		}
+	}
+
+	public function autocount_void($data)
+	{
+		try {
+			$docNo = arr_get($data, 'doc_no');
+
+			$body = [
+				'voidReason' => arr_get($data, 'reason'),
+			];
+
+			return autocount_request(
+				'POST',
+				'quotation.void',
+				$body,
+				['docNo' => $docNo]
+			);
+
+		} catch (Exception $e) {
+			log_message('error', 'Autocount void error: ' . $e->getMessage());
+
+			return [
+				'status' => 500,
+				'error'  => $e->getMessage(),
+				'data'   => [],
+			];
+		}
+	}
 }

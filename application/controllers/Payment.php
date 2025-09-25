@@ -12,6 +12,7 @@ class Payment extends MY_Controller
 		$this->load->model('Payment_Model');
 		$this->load->model('Booking_Model');
 		$this->load->model('Universal_Model');
+		$this->config->load('autocount'); // load config/autocount.php
 	}
 
 	function index()
@@ -160,20 +161,27 @@ class Payment extends MY_Controller
 					}
 				}
 
-				if (!empty($payment_ids))
-				{
-					foreach($payment_ids as $payment_id) {
-						$payment = Payment::find($payment_id);
-						if ($payment != null) {
-							$quotationData = [];
-							$respond = $this->autocount_create($quotationData);
+				// if (!empty($payment_ids))
+				// {
+				// 	foreach($payment_ids as $payment_id) {
+				// 		$payment = $this->Payment_Model->find($payment_id);
+				// 		if ($payment != null) {
+				// 			$quotationData = [];
+				// 			$respond = $this->autocount_create($quotationData);
 
-							$payment->AutocountSyncStatus = 'C';
-							$payment->AutocountSyncMessage = $respond;
-							$payment->update();
-						}	
-					}
-				}
+				// 			if ($respond['error']) {
+				// 				$this->Payment_Model->update_by_id($payment_id, [
+				// 					'AutocountSyncMessage' => json_encode($respond),
+				// 				]);
+				// 			} elseif ($respond['status'] === 201 || $respond['status'] === 204) {
+				// 				$this->Payment_Model->update_by_id($payment_id, [
+				// 					'AutocountSyncMessage' => json_encode($respond),
+				// 					'AutocountSyncStatus' => 'C'
+				// 				]);
+				// 			} 
+				// 		}	
+				// 	}
+				// }
 				$this->session->set_flashdata('message_success', 'New Payment Record Successfully Created');
 				redirect($this->input->post('url'));
 			} else {
@@ -411,17 +419,22 @@ class Payment extends MY_Controller
 					if(count($array['payment'][0]) > 3) {
 						$this->Payment_Model->Update($array['payment']);
 
-						if ($payment != null) {	
-							$payment2 = Payment::find($payment->PaymentID);
-							if ($payment2 != null) {
-								$quotationData = [];
-								$respond = $this->autocount_update($quotationData);
+						$payment = $this->Payment_Model->find($payment->PaymentID);
+						if ($payment != null) {
+							$quotationData = [];
+							$respond = $this->autocount_create($quotationData);
 
-								$payment2->AutocountSyncStatus = 'U';
-								$payment2->AutocountSyncMessage = $respond;
-								$payment2->update();
-							}	
-						}
+							if ($respond['error']) {
+								$this->Payment_Model->update_by_id($payment->PaymentID, [
+									'AutocountSyncMessage' => json_encode($respond),
+								]);
+							} elseif ($respond['status'] === 201 || $respond['status'] === 204) {
+								$this->Payment_Model->update_by_id($payment->PaymentID, [
+									'AutocountSyncMessage' => json_encode($respond),
+									'AutocountSyncStatus' => 'U'
+								]);
+							} 
+						}	
 					}
 					$this->session->set_flashdata('message_success', $payment['Credit'] != 0.00 ? 'Payment Record : Credit RM ' . number_format($payment['Credit'], 2, '.', ',') . ' Successfully Updated' : 'Payment Record : Debit RM ' . number_format($payment['Debit'], 2, '.', ',') . ' Successfully Updated');
 				} else {
@@ -533,15 +546,24 @@ class Payment extends MY_Controller
         	$paymentNumber = (!empty($paymentData) && !empty($paymentData->ReferenceNumber)) ? $paymentData->ReferenceNumber : '';
 
 			if (!empty($paymentNumber)) {
-				$payment = Payment::find($this->input->get('payment_id'));
+				$payment = $this->Payment_Model->find($this->input->get('payment_id'));
+
 				if ($payment != null) {
 					$quotationData = [];
-					$respond = $this->autocount_delete($quotationData);
+					$respond = $this->autocount_create($quotationData);
 
-					$payment->AutocountSyncStatus = 'D';
-					$payment->AutocountSyncMessage = $respond;
-					$payment->update();
+					if ($respond['error']) {
+						$this->Payment_Model->update_by_id($payment->PaymentID, [
+							'AutocountSyncMessage' => json_encode($respond),
+						]);
+					} elseif ($respond['status'] === 201 || $respond['status'] === 204) {
+						$this->Payment_Model->update_by_id($payment->PaymentID, [
+							'AutocountSyncMessage' => json_encode($respond),
+							'AutocountSyncStatus' => 'D'
+						]);
+					} 
 				}	
+				
 			}
 			
 		} else {
@@ -725,17 +747,25 @@ class Payment extends MY_Controller
 
 	public function bulkSyncToAutocount()
     {
-        $payment_ids = $this->input->post('payment_id'); 
+		$input = json_decode($this->input->raw_input_stream, true);
+        $payment_ids = $input['payment_ids'] ? $input['payment_ids'] : []; 
+		$statuses = !empty($this->config->item('payment_sync_status')) ? $this->config->item('payment_sync_status') : ['Y'];
 
         if (empty($payment_ids)) {
-            return response()->json(['message' => 'No payment selected'], 400);
-        }
+			$this->output
+				->set_content_type('application/json')
+				->set_output(json_encode([
+					'success' => false,
+					'message' => 'No payments selected'
+				]));
+			return;
+		}
 
         $results = [];
 
         foreach ($payment_ids as $payment_id) {
             try {
-                $payment = Payment::find($payment_id);
+				$payment = $this->Payment_Model->find($payment_id);
                 if (!$payment) {
                     $results[$payment_id] = 'Not Found';
                     continue;
@@ -746,106 +776,107 @@ class Payment extends MY_Controller
 					$paymentData = (array) $paymentData[0]; 
 				}
 
-			
-                switch ($paymentData['AutocountSyncStatus']) {
-                    case 'N': // new → create
-						$quotationData = [
-							'BookingNumber'   => $paymentData['BookingNumber'] ?? '',
-							'InsertDate'      => $paymentData['InsertDate'] ?? date('Y-m-d'),
-							'Customer'        => $paymentData['Customer'] ?? '',
-							'guest_email'     => $paymentData['guest_email'] ?? '',
-							'guest_address'   => $paymentData['guest_address'] ?? '',
-							'guest_phone'     => $paymentData['guest_phone'] ?? '',
-							'BokingRemark'    => $paymentData['BokingRemark'] ?? '',
-							
-							// Fields not in DB → set default or null
-							'credit_term'     => null,
-							'sales_location'  => '',
-							'currency_rate'   => 1,
-							'inclusive_tax'   => false,
-							'is_round_adj'    => false,
-							'tax_code'        => '',
+				if (in_array($payment->status, $statuses)) {
+					switch ($paymentData['AutocountSyncStatus']) {
+						case 'N': // new → create
+							$quotationData = [
+								'BookingNumber'   => $paymentData['BookingNumber'] ?? '',
+								'InsertDate'      => $paymentData['InsertDate'] ?? date('Y-m-d'),
+								'Customer'        => $paymentData['Customer'] ?? '',
+								'guest_email'     => $paymentData['guest_email'] ?? '',
+								'guest_address'   => $paymentData['guest_address'] ?? '',
+								'guest_phone'     => $paymentData['guest_phone'] ?? '',
+								'BokingRemark'    => $paymentData['BokingRemark'] ?? '',
+								
+								// Fields not in DB → set default or null
+								'credit_term'     => null,
+								'sales_location'  => '',
+								'currency_rate'   => 1,
+								'inclusive_tax'   => false,
+								'is_round_adj'    => false,
+								'tax_code'        => '',
 
-							// Details
-							'booking_product' => $bookingProducts
-						];
+								// Details
+								'details' => $bookingProducts
+							];
 
-                        $respond = $this->autocount_create($quotationData);
-                        $payment->AutocountSyncStatus = 'C';
-						$payment->AutocountSyncMessage = $respond;
-
-                        $results[$payment->id] = 'Created';
-                        break;
-
-                    case 'U': // update
-                    case 'C': // created → still allow update
-						$quotationData = [
-							'BookingNumber'   => $paymentData['BookingNumber'],
-							'DocNo'           => $paymentData['BookingNumber'], // Fallback
-							'master'          => [
-								'DocDate'        => $paymentData['InsertDate'],
-								'DebtorName'     => $paymentData['Customer'],
-								'Email'          => $paymentData['guest_email'],
-								'Address'        => $paymentData['guest_address'],
-								'Phone1'         => $paymentData['guest_phone'],
-								'DeliverAddress' => $paymentData['guest_address'],
-								'DeliverContact' => $paymentData['Customer'],
-								'DeliverPhone1'  => $paymentData['guest_phone'],
-								'Remark1'        => $paymentData['BokingRemark'],
-							],
-							'booking_product' => $bookingProducts,
-							'tax_code'        => 'S-5', // Default tax code if missing
-							'saveApprove'     => null
-						];
-                        $respond = $this->autocount_update($payment);
-                        $payment->AutocountSyncStatus = 'C'; // keep as created
-						$payment->AutocountSyncMessage = $respond;
-
-                        $results[$payment->id] = 'Updated';
-                        break;
-
-                    case 'D': // delete
-						$paymentNumber = (!empty($payment) && !empty($payment->ReferenceNumber)) ? $payment->ReferenceNumber : '';
-
-						if (!empty($paymentNumber)) {
-							$respond = $this->autocount_delete([
-								'PaymentNumber' => $paymentNumber
-							]);
-
-							$payment->AutocountSyncStatus = 'D';
+							$respond = $this->autocount_create($quotationData);
+							$payment->AutocountSyncStatus = 'C';
 							$payment->AutocountSyncMessage = $respond;
-							$results[$payment->id] = 'Deleted';
+
+							$results[$payment->id] = 'Created';
 							break;
-						}
-                    case 'V': // void
-						$paymentNumber = (!empty($payment) && !empty($payment->ReferenceNumber)) ? $payment->ReferenceNumber : '';
 
-						if (!empty($paymentNumber)) {
-							$respond = $this->autocount_void([
-								'PaymentNumber' => $paymentNumber
-							]);
-
-							$payment->AutocountSyncStatus = 'V';
+						case 'U': // update
+						case 'C': // created → still allow update
+							$quotationData = [
+								'BookingNumber'   => $paymentData['BookingNumber'],
+								'DocNo'           => $paymentData['BookingNumber'], // Fallback
+								'master'          => [
+									'DocDate'        => $paymentData['InsertDate'],
+									'DebtorName'     => $paymentData['Customer'],
+									'Email'          => $paymentData['guest_email'],
+									'Address'        => $paymentData['guest_address'],
+									'Phone1'         => $paymentData['guest_phone'],
+									'DeliverAddress' => $paymentData['guest_address'],
+									'DeliverContact' => $paymentData['Customer'],
+									'DeliverPhone1'  => $paymentData['guest_phone'],
+									'Remark1'        => $paymentData['BokingRemark'],
+								],
+								'details' => $bookingProducts,
+								'tax_code'        => 'S-5', // Default tax code if missing
+								'saveApprove'     => null
+							];
+							$respond = $this->autocount_update($payment);
+							$payment->AutocountSyncStatus = 'C'; // keep as created
 							$payment->AutocountSyncMessage = $respond;
-							$results[$payment->id] = 'Void';
+
+							$results[$payment->id] = 'Updated';
 							break;
-						}
 
-                    default:
-                        $results[$payment->id] = 'Skipped';
-                        break;
-                }
+						case 'D': // delete
+							$paymentNumber = (!empty($payment) && !empty($payment->ReferenceNumber)) ? $payment->ReferenceNumber : '';
 
-                $payment->save();
+							if (!empty($paymentNumber)) {
+								$respond = $this->autocount_delete([
+									'PaymentNumber' => $paymentNumber
+								]);
+
+								$payment->AutocountSyncStatus = 'D';
+								$payment->AutocountSyncMessage = $respond;
+								$results[$payment->id] = 'Deleted';
+								break;
+							}
+						case 'V': // void
+							$paymentNumber = (!empty($payment) && !empty($payment->ReferenceNumber)) ? $payment->ReferenceNumber : '';
+
+							if (!empty($paymentNumber)) {
+								$respond = $this->autocount_void([
+									'PaymentNumber' => $paymentNumber
+								]);
+
+								$payment->AutocountSyncStatus = 'V';
+								$payment->AutocountSyncMessage = $respond;
+								$results[$payment->id] = 'Void';
+								break;
+							}
+
+						default:
+							$results[$payment->id] = 'Skipped';
+							break;
+					}
+				}
             } catch (\Exception $e) {
                 $results[$paymentData['id']] = 'Error: ' . $e->getMessage();
             }
         }
 
-        return response()->json([
-            'message' => 'Sync process completed',
-            'results' => $results,
-        ]);
+       $this->output
+        ->set_content_type('application/json')
+        ->set_output(json_encode([
+            'success' => true,
+            'message' => implode("\n", $results) // return as plain text
+        ]));
     }
 
 	public function autocount_create($data = [])
@@ -853,51 +884,52 @@ class Payment extends MY_Controller
 		// Master (single row only)
 		$param = [
 			'master' => [
-				'docNo'           => $data['ReferenceNumber'],
+				'docNo'           => isset($data['ReferenceNumber']) ? $data['ReferenceNumber'] : '',
 				'docNo2'          => '',
 				'docNoFormatName' => null,
 				'docType'         => 'PV', // required
-				'docDate'         => date('Y-m-d', strtotime($data['InsertDate'])) ?? date('Y-m-d'), // required
-				'taxDate'         => $data['tax_date'] ?? '',
-				'currencyCode'    => $data['currency_code'] ?? 'MYR', // required
-				'currencyRate'    => $data['currency_rate'] ?? '1', // required
+				'docDate'         => isset($data['InsertDate']) ? date('Y-m-d', strtotime($data['InsertDate'])) : date('Y-m-d'), // required
+				'taxDate'         => isset($data['tax_date']) ? $data['tax_date'] : '',
+				'currencyCode'    => isset($data['currency_code']) ? $data['currency_code'] : 'MYR', // required
+				'currencyRate'    => isset($data['currency_rate']) ? $data['currency_rate'] : '1', // required
 				'journalType'     => 'GENERAL', // required
-				'dealWith'        => $data['supplier_name'] ?? '', // required
-				'description'     => $data['PaymentRemark'] ?? '',
+				'dealWith'        => isset($data['supplier_name']) ? $data['supplier_name'] : '', // required
+				'description'     => isset($data['PaymentRemark']) ? $data['PaymentRemark'] : '',
 				'note'            => ''
 			],
 			'details'        => [],
 			'paymentDetails' => [],
 			'autoFillOption' => [
-				'taxCode'    => $data['tax_code'] ?? '',
-				'tariffCode' => $data['tariff_code'] ?? ''
+				'taxCode'    => isset($data['tax_code']) ? $data['tax_code'] : '',
+				'tariffCode' => isset($data['tariff_code']) ? $data['tariff_code'] : ''
 			],
 			'saveApprove' => null
 		];
 
-		// Details (loop through $data['details'])
+
+		// Details
 		if (!empty($data['details']) && is_array($data['details'])) {
 			foreach ($data['details'] as $detail) {
 				$param['details'][] = [
 					'accNo'              => $detail['account_no'], // required
-					'toAccountRate'      => $detail['toAccountRate'] ?? 1,
-					'description'        => $detail['description'] ?? '',
-					'furtherDescription' => $detail['furtherDescription'] ?? '',
+					'toAccountRate'      => isset($detail['toAccountRate']) ? $detail['toAccountRate'] : 1,
+					'description'        => isset($detail['description']) ? $detail['description'] : '',
+					'furtherDescription' => isset($detail['furtherDescription']) ? $detail['furtherDescription'] : '',
 					'amount'             => (float)$detail['amount'], // required
-					'taxCode'            => $detail['taxCode'] ?? '',
-					'taxAdjustment'      => $detail['taxAdjustment'] ?? 0,
-					'localTaxAdjustment' => $detail['localTaxAdjustment'] ?? 0,
-					'tariffCode'         => $detail['tariffCode'] ?? '',
-					'taxExportCountry'   => $detail['taxExportCountry'] ?? '',
-					'taxPermitNo'        => $detail['taxPermitNo'] ?? '',
-					'taxBRNo'            => $detail['taxBRNo'] ?? '',
-					'taxBName'           => $detail['taxBName'] ?? '',
-					'taxRefNo'           => $detail['taxRefNo'] ?? '',
-					'taxRegisterNo'      => $detail['taxRegisterNo'] ?? '',
-					'taxBillDate'        => $detail['taxBillDate'] ?? null,
-					'salesAgent'         => $detail['salesAgent'] ?? '',
-					'inclusiveTax'       => $detail['inclusiveTax'] ?? true,
-					'deptNo'             => $detail['deptNo'] ?? ''
+					'taxCode'            => isset($detail['taxCode']) ? $detail['taxCode'] : '',
+					'taxAdjustment'      => isset($detail['taxAdjustment']) ? $detail['taxAdjustment'] : 0,
+					'localTaxAdjustment' => isset($detail['localTaxAdjustment']) ? $detail['localTaxAdjustment'] : 0,
+					'tariffCode'         => isset($detail['tariffCode']) ? $detail['tariffCode'] : '',
+					'taxExportCountry'   => isset($detail['taxExportCountry']) ? $detail['taxExportCountry'] : '',
+					'taxPermitNo'        => isset($detail['taxPermitNo']) ? $detail['taxPermitNo'] : '',
+					'taxBRNo'            => isset($detail['taxBRNo']) ? $detail['taxBRNo'] : '',
+					'taxBName'           => isset($detail['taxBName']) ? $detail['taxBName'] : '',
+					'taxRefNo'           => isset($detail['taxRefNo']) ? $detail['taxRefNo'] : '',
+					'taxRegisterNo'      => isset($detail['taxRegisterNo']) ? $detail['taxRegisterNo'] : '',
+					'taxBillDate'        => isset($detail['taxBillDate']) ? $detail['taxBillDate'] : null,
+					'salesAgent'         => isset($detail['salesAgent']) ? $detail['salesAgent'] : '',
+					'inclusiveTax'       => isset($detail['inclusiveTax']) ? $detail['inclusiveTax'] : true,
+					'deptNo'             => isset($detail['deptNo']) ? $detail['deptNo'] : ''
 				];
 			}
 		}
@@ -907,16 +939,16 @@ class Payment extends MY_Controller
 			foreach ($data['paymentDetails'] as $payment) {
 				$param['paymentDetails'][] = [
 					'paymentMethod'      => $payment['paymentMethod'],
-					'paymentBy'          => $payment['paymentBy'] ?? '',
-					'chequeNo'           => $payment['chequeNo'] ?? '',
-					'floatDay'           => $payment['floatDay'] ?? 0,
-					'bankCharge'         => (float)$payment['bankCharge'] ?? 0,
-					'toBankRate'         => $payment['toBankRate'] ?? 1,
+					'paymentBy'          => isset($payment['paymentBy']) ? $payment['paymentBy'] : '',
+					'chequeNo'           => isset($payment['chequeNo']) ? $payment['chequeNo'] : '',
+					'floatDay'           => isset($payment['floatDay']) ? $payment['floatDay'] : 0,
+					'bankCharge'         => isset($payment['bankCharge']) ? (float)$payment['bankCharge'] : 0,
+					'toBankRate'         => isset($payment['toBankRate']) ? $payment['toBankRate'] : 1,
 					'paymentAmt'         => (float)$payment['paymentAmt'],
-					'bankChargeTaxCode'  => $payment['bankChargeTaxCode'] ?? '',
-					'bankChargeTaxRate'  => $payment['bankChargeTaxRate'] ?? 0,
-					'bankChargeTax'      => $payment['bankChargeTax'] ?? 0,
-					'bankChargeTaxRefNo' => $payment['bankChargeTaxRefNo'] ?? ''
+					'bankChargeTaxCode'  => isset($payment['bankChargeTaxCode']) ? $payment['bankChargeTaxCode'] : '',
+					'bankChargeTaxRate'  => isset($payment['bankChargeTaxRate']) ? $payment['bankChargeTaxRate'] : 0,
+					'bankChargeTax'      => isset($payment['bankChargeTax']) ? $payment['bankChargeTax'] : 0,
+					'bankChargeTaxRefNo' => isset($payment['bankChargeTaxRefNo']) ? $payment['bankChargeTaxRefNo'] : ''
 				];
 			}
 		}
@@ -1002,25 +1034,9 @@ class Payment extends MY_Controller
         );
     }
 
-    // public function autocount_update_status($data = [])
-    // {
-    //     $docNo = $data['BookingNumber'] ?? '';
-    //     $body = [
-    //         'documentStatus' => $data['Status'] ?? '',
-    //         'lostReason'     => $data['reason'] ?? ''
-    //     ];
-
-    //     return autocount_request(
-    //         'PUT',
-    //         'payment.update_status',
-    //         $body,
-    //         ['docNo' => $docNo]
-    //     );
-    // }
-
     public function autocount_delete($data = [])
     {
-        $docNo = $data['BookingNumber'] ?? '';
+        $docNo = isset($data['BookingNumber']) ? $data['BookingNumber'] : '';
 
         return autocount_request(
             'DELETE',
@@ -1032,9 +1048,9 @@ class Payment extends MY_Controller
 
     public function autocount_void($data = [])
     {
-        $docNo = $data['DocNo'] ?? '';
+        $docNo = isset($data['DocNo']) ? $data['DocNo'] : '';
         $body = [
-            'voidReason' => $data['reason'] ?? ''
+            'voidReason' => isset($data['reason']) ? $data['reason'] : ''
         ];
 
         return autocount_request(

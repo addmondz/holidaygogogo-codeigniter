@@ -293,9 +293,43 @@
                                         </td>
                                         <td style="text-align:center;"><?php if($booking->LockStatus == 'Y') { echo '<i class="la la-lock text-danger"></i>'; } else { echo '<i class="la la-unlock text-success"></i>'; } ?></td>
                                         <td style="text-align:center;">
-                                            <span class="font-weight-bold" style="color:<?php if($booking->AutocountSyncStatus == 'N') { echo '#808080'; } else if($booking->AutocountSyncStatus == 'C') { echo '#50C878'; } else if($booking->AutocountSyncStatus == 'U') { echo '#FFBF00'; } else if($booking->AutocountSyncStatus == 'D') { echo '#FF4500'; } else if($booking->AutocountSyncStatus == 'V') { echo '#8A2BE2'; } else { echo '#000000'; } ?>">
-                                            <?php if($booking->AutocountSyncStatus == 'N') { echo 'NONE'; } else if($booking->AutocountSyncStatus == 'C') { echo 'CREATED'; } else if($booking->AutocountSyncStatus == 'U') { echo 'UPDATED'; } else if($booking->AutocountSyncStatus == 'D') { echo 'DELETED'; } else if($booking->AutocountSyncStatus == 'V') { echo 'VOID'; } else { echo 'UNKNOWN'; } ?>
-                                        </span>
+                                            <?php 
+                                                // status color & label
+                                                $statusColor = '#000000';
+                                                $statusText  = 'UNKNOWN';
+                                                switch ($booking->AutocountSyncStatus) {
+                                                    case 'N': $statusColor = '#808080'; $statusText = 'NONE'; break;
+                                                    case 'C': $statusColor = '#50C878'; $statusText = 'CREATED'; break;
+                                                    case 'U': $statusColor = '#FFBF00'; $statusText = 'UPDATED'; break;
+                                                    case 'D': $statusColor = '#FF4500'; $statusText = 'DELETED'; break;
+                                                    case 'V': $statusColor = '#8A2BE2'; $statusText = 'VOID'; break;
+                                                }
+
+                                                // tooltip logic
+                                                $tooltipAttr = ''; 
+                                                if (!empty($booking->AutocountSyncMessage)) {
+                                                    $decoded = json_decode($booking->AutocountSyncMessage, true);
+
+                                                    if (json_last_error() === JSON_ERROR_NONE) {
+                                                        if (isset($decoded['error']) && $decoded['error'] == null) {
+                                                            $tooltipText = "SUCCESS";
+                                                        } elseif (isset($decoded['error']) && $decoded['error'] !== null) {
+                                                            $tooltipText = "ERROR: " . (is_string($decoded['error']) ? $decoded['error'] : json_encode($decoded['error']));
+                                                        } else {
+                                                            $tooltipText = $booking->AutocountSyncMessage;
+                                                        }
+                                                    } else {
+                                                        $tooltipText = $booking->AutocountSyncMessage;
+                                                    }
+
+                                                    $tooltipAttr = ' data-toggle="tooltip" data-placement="top" title="' . htmlspecialchars($tooltipText) . '"';
+                                                }
+                                            ?>
+                                            <span class="font-weight-bold" 
+                                                style="color:<?= $statusColor ?>;" 
+                                                <?= $tooltipAttr ?>>
+                                                <?= $statusText ?>
+                                            </span>
                                         </td>
                                         <td style="text-align:center;">
                                             <div class="btn-group">

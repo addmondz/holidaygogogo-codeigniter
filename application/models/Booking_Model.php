@@ -437,11 +437,6 @@ class Booking_Model extends CI_Model
 		$this->db->where('Token', null);
 		$this->db->update('booking');
 
-		$this->db->set('AutocountSyncStatus', 'C');
-		$this->db->where('BookingID', $booking_id);
-		$this->db->where('AutocountSyncStatus', 'N');
-		$this->db->update('booking');
-
 		$this->db->select('Adult, Children, Infant');
 		$this->db->where('BookingID', $booking_id);
 		$booking = $this->db->get('booking')->row_array();

@@ -488,5 +488,18 @@ class Payment_Model extends CI_Model
 		return $query->num_rows() > 0 ? $query->row() : null;
 	}
 
+	public function find($payment_id)
+    {
+        return $this->db->get_where('payment', ['PaymentID' => $payment_id])->row();
+    }
+	
+    public function update_by_id($payment_id, $data = [])
+    {
+        if (empty($data)) return false;
+
+        return $this->db
+            ->where('PaymentID', $payment_id)
+            ->update('payment', $data);
+    }
 
 }

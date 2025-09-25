@@ -45,3 +45,9 @@ if (!function_exists('get_env')) {
         return isset($env[$key]) ? $env[$key] : null;
     }
 }
+if (!function_exists('arr_get')) {
+    function arr_get($array, $key, $default = '')
+    {
+        return isset($array[$key]) ? $array[$key] : $default;
+    }
+}

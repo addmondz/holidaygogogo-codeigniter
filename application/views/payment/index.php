@@ -341,6 +341,12 @@
                     </div>
                 <?php } ?>
                 <br><br>
+                <button type="button" 
+        class="btn btn-primary font-weight-bold mb-2" 
+        id="sync-autocount-payment" 
+        style="width:180px; display:none;">
+    Sync Autocount
+</button>
                 <div class="dataTables_wrapper dt-bootstrap4 no-footer" <?php if(empty($payments)) { echo 'style="overflow-x:auto;"'; } ?>>
                     <table id="kt_datatable" class="table table-bordered table-head-custom table-checkable dataTable no-footer dtr-inline">
                         <thead>
@@ -388,7 +394,7 @@
                                         <?php if($this->session->userdata('level') != 20 && in_array('AP', $this->session->access_control)) { ?>
                                             <td style="text-align:center;">
                                                 <label class="checkbox checkbox-outline checkbox-success">
-                                                    <input type="checkbox" id="<?php echo $payment->PaymentID; ?>" onclick="Select_Payment(<?php echo $payment->PaymentID; ?>)">
+                                                    <input type="checkbox" class="check_item" id="<?php echo $payment->PaymentID; ?>" onclick="Select_Payment(<?php echo $payment->PaymentID; ?>)">
                                                     <span></span>
                                                 </label>
                                             </td>
@@ -421,11 +427,43 @@
                                         <td id="<?php echo 'reference_number-' . $payment->PaymentID; ?>" style="text-align:center;"><?php echo $payment->ReferenceNumber; ?></td>
                                         <td style="text-align:center;"><?php if($payment->Status == 'Y') { echo '<i class="la la-check-circle text-success"></i>'; } else if($payment->Status == 'P') { echo '<i class="la la-exclamation-circle text-warning"></i>'; } else { echo '<i class="la la-times-circle text-danger"></i>'; } ?></td>
                                         <td style="text-align:center;">
-                                            <span class="font-weight-bold" style="color:<?php if($payment->AutocountSyncStatus == 'N') { echo '#808080'; } else if($payment->AutocountSyncStatus == 'C') { echo '#50C878'; } else if($payment->AutocountSyncStatus == 'U') { echo '#FFBF00'; } else if($payment->AutocountSyncStatus == 'D') { echo '#FF4500'; } else if($payment->AutocountSyncStatus == 'V') { echo '#8A2BE2'; } else { echo '#000000'; } ?>">
-    <?php if($payment->AutocountSyncStatus == 'N') { echo 'NONE'; } else if($payment->AutocountSyncStatus == 'C') { echo 'CREATED'; } else if($payment->AutocountSyncStatus == 'U') { echo 'UPDATED'; } else if($payment->AutocountSyncStatus == 'D') { echo 'DELETED'; } else if($payment->AutocountSyncStatus == 'V') { echo 'VOID'; } else { echo 'UNKNOWN'; } ?>
-</span>
+                                            <?php 
+                                                $statusColor = '#000000';
+                                                $statusText  = 'UNKNOWN';
+                                                switch ($payment->AutocountSyncStatus) {
+                                                    case 'N': $statusColor = '#808080'; $statusText = 'NONE'; break;
+                                                    case 'C': $statusColor = '#50C878'; $statusText = 'CREATED'; break;
+                                                    case 'U': $statusColor = '#FFBF00'; $statusText = 'UPDATED'; break;
+                                                    case 'D': $statusColor = '#FF4500'; $statusText = 'DELETED'; break;
+                                                    case 'V': $statusColor = '#8A2BE2'; $statusText = 'VOID'; break;
+                                                }
 
+                                                $tooltipAttr = '';
+                                                if (!empty($payment->AutocountSyncMessage)) {
+                                                    $decoded = json_decode($payment->AutocountSyncMessage, true);
+
+                                                    if (json_last_error() === JSON_ERROR_NONE) {
+                                                        if (isset($decoded['error']) && $decoded['error'] === null) {
+                                                            $tooltipText = "SUCCESS";
+                                                        } elseif (isset($decoded['error']) && $decoded['error'] !== null) {
+                                                            $tooltipText = "ERROR: " . (is_string($decoded['error']) ? $decoded['error'] : json_encode($decoded['error']));
+                                                        } else {
+                                                            $tooltipText = $payment->AutocountSyncMessage; // raw JSON
+                                                        }
+                                                    } else {
+                                                        $tooltipText = $payment->AutocountSyncMessage;
+                                                    }
+
+                                                    $tooltipAttr = ' data-toggle="tooltip" data-placement="top" title="' . htmlspecialchars($tooltipText) . '"';
+                                                }
+                                            ?>
+                                            <span class="font-weight-bold" 
+                                                style="color:<?= $statusColor ?>;" 
+                                                <?= $tooltipAttr ?>>
+                                                <?= $statusText ?>
+                                            </span>
                                         </td>
+
                                         <td style="text-align:center;">
                                             <div class="btn-group">
                                                 <button type="button" data-toggle="dropdown" class="btn btn-light-primary btn-sm dropdown-toggle" style="padding-left:3px;"></button>
@@ -638,6 +676,8 @@
     $('#all').click(function() {
         payment_ids = [];
         var payments = <?php echo json_encode($payments) ?>;
+        var isChecked = $('#all').is(':checked'); // Check the "Select All" checkbox state
+
         for(var i = 0; i < payments.length; i++) {
             if($('#all').is(':checked')) {
                 $(`#${payments[i].PaymentID}`).prop('checked', true);
@@ -646,22 +686,40 @@
                 $(`#${payments[i].PaymentID}`).prop('checked', false);
             }
         }
+        if (isChecked) {
+            $('#sync-autocount-payment').show();
+        } else {
+            $('#sync-autocount-payment').hide();
+        }
     });
 
     function Select_Payment(payment_id) {
-        if($(`#${payment_id}`).is(':checked')) {
-            var total_payments = <?php echo count($payments) ?>;
-            if(payment_ids.length + 1 == total_payments) {
-                $('#all').prop('checked', true);
-            }
-            payment_ids.push(payment_id);
-        } else {
-            $('#all').prop('checked', false);
-            payment_ids = payment_ids.filter(function(value) {
-                return value != payment_id;
-            });
-        }
+    if ($(`#${payment_id}`).is(':checked')) {
+        // Add payment_id to the selected list
+        payment_ids.push(payment_id);
+    } else {
+        // Remove payment_id from the selected list
+        payment_ids = payment_ids.filter(function(value) {
+            return value != payment_id;
+        });
     }
+
+    // If at least one payment is selected, show the "Sync Autocount" button
+    if (payment_ids.length > 0) {
+        $('#sync-autocount-payment').show();
+    } else {
+        $('#sync-autocount-payment').hide();
+    }
+
+    // Update the "Select All" checkbox if all checkboxes are selected
+    var total_payments = <?php echo count($payments) ?>;
+    if (payment_ids.length == total_payments) {
+        $('#all').prop('checked', true); // Check "Select All" if all are selected
+    } else {
+        $('#all').prop('checked', false); // Uncheck "Select All" if not all are selected
+    }
+}
+
     
     $('input[type="submit"]').click(function(event) {
         event.preventDefault();
@@ -811,4 +869,33 @@
             }
         }
     });
+</script>
+<script>
+document.getElementById('sync-autocount-payment').addEventListener('click', function() {
+    let selected = Array.from(document.querySelectorAll('.check_item:checked'))
+                        .map(cb => cb.value);
+
+    if (selected.length === 0) {
+        alert("Please select at least one payment.");
+        return;
+    }
+
+   fetch("<?php echo base_url('Payment/bulkSyncToAutocount'); ?>", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ payment_ids: selected })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message); // ✅ all messages from PHP
+        } else {
+            alert("❌ " + data.message);
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        alert("Error occurred during sync.");
+    });
+});
 </script>
