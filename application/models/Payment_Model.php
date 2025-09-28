@@ -502,4 +502,98 @@ class Payment_Model extends CI_Model
             ->update('payment', $data);
     }
 
+	function getAllPaymentsWithBookingAndSupplier($payment_id = null)
+	{
+		// Get all columns from payment table
+		$this->db->select('payment.*', false);  // Select all columns from payment table
+
+		// Join with booking table (only the necessary columns)
+		$this->db->join('booking', 'booking.BookingID = payment.BookingID', 'left');  // LEFT JOIN
+		$this->db->select([
+			'booking.BookingID',
+			'booking.Customer',
+			'booking.BookingNumber',
+			'booking.InsertDate',  // Example of columns you might want from the booking table
+		], false);
+
+		// Join with supplier table (only the necessary columns)
+		$this->db->join('supplier', 'supplier.SupplierID = payment.SupplierID', 'left');  // LEFT JOIN
+		$this->db->select([
+			'supplier.SupplierID',
+			'supplier.SupplierName',
+			'supplier.SupplierEmail', // Example of columns you might want from the supplier table
+		], false);
+
+		// Optional filter by PaymentID
+		if (!is_null($payment_id) && $payment_id !== '') {
+			$this->db->where('payment.PaymentID', $payment_id);
+		}
+
+		// Optional filters for syncing payment status (from config settings)
+		$statuses = !empty($this->config->item('payment_sync_autocount_status')) ? $this->config->item('payment_sync_autocount_status') : ['P', 'F'];
+		$titles   = !empty($this->config->item('payment_sync_status')) ? $this->config->item('payment_sync_status') : ['Y'];
+
+		$this->db->where_in('payment.AutocountSyncStatus', $statuses);
+		$this->db->where_in('payment.Status', $titles);
+
+		// Limit the number of payments to retrieve
+		$payment_qty_cront = !empty($this->config->item('payment_qty_cront')) ? $this->config->item('payment_qty_cront') : 25;
+		$this->db->limit($payment_qty_cront);
+
+		// Order by PaymentID
+		$this->db->order_by('payment.PaymentID', 'ASC');
+
+		// Execute query
+		$query = $this->db->get();
+		return $query->result();
+	}
+
+
+	function getAllPaymentsWithBookingAndSupplier1($payment_id = null)
+	{
+		// Get all columns from payment table
+		$this->db->select('payment.*', false);  // Select all columns from payment table
+
+		// Join with booking table (only the necessary columns)
+		$this->db->join('booking', 'booking.BookingID = payment.BookingID', 'left');  // LEFT JOIN
+		$this->db->select([
+			'booking.BookingID',
+			'booking.Customer',
+			'booking.BookingNumber',
+			'booking.InsertDate',  // Example of columns you might want from the booking table
+		], false);
+
+		// Join with supplier table (only the necessary columns)
+		$this->db->join('supplier', 'supplier.SupplierID = payment.SupplierID', 'left');  // LEFT JOIN
+		$this->db->select([
+			'supplier.SupplierID',
+			'supplier.SupplierName',
+			'supplier.SupplierEmail', // Example of columns you might want from the supplier table
+		], false);
+
+		// Optional filter by PaymentID
+		if (!is_null($payment_id) && $payment_id !== '') {
+			$this->db->where('payment.PaymentID', $payment_id);
+		}
+
+		// Optional filters for syncing payment status (from config settings)
+		$statuses = !empty($this->config->item('payment_sync_autocount_status')) ? $this->config->item('payment_sync_autocount_status') : ['P', 'F'];
+		$titles   = !empty($this->config->item('payment_sync_status')) ? $this->config->item('payment_sync_status') : ['Y'];
+
+		$this->db->where_in('payment.AutocountSyncStatus', $statuses);
+		$this->db->where_in('payment.Status', $titles);
+
+		// Limit the number of payments to retrieve
+		$payment_qty_cront = !empty($this->config->item('payment_qty_cront')) ? $this->config->item('payment_qty_cront') : 25;
+		$this->db->limit($payment_qty_cront);
+
+		// Order by PaymentID
+		$this->db->order_by('payment.PaymentID', 'ASC');
+
+		// Execute query
+		$query = $this->db->get();
+		return $query->result();
+	}
+
+
 }

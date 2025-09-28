@@ -32,9 +32,15 @@ $config['autocount'] = [
     ]
 ];
 
-$config['booking_sync_status'] = [
-    'BookingConfirmationTitle'
-];
-$config['payment_sync_status'] = [
-    'Y'
-];
+$config['bulkBookingSyncToAutocount'] = false;
+$config['bulkPaymentSyncToAutocount'] = false;
+
+$config['booking_sync_autocount_status'] = ['P', 'F']; // allowed AutocountSyncStatus
+$config['booking_sync_status'] = ['BOOKING CONFIRMATION']; // allowed BookingConfirmationTitle
+
+$config['payment_sync_autocount_status'] = ['P', 'F'];
+$config['payment_sync_status'] = ['Y'];
+
+$config['booking_qty_cront'] = 25;
+$config['payment_qty_cront'] = 25;
+

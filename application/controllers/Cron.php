@@ -3,6 +3,8 @@
 require FCPATH.'vendor/autoload.php';
 use PhpOffice\PhpSpreadsheet\Spreadsheet;  
 use PhpOffice\PhpSpreadsheet\Writer\Xlxs;
+require_once(APPPATH.'controllers/Booking.php');
+require_once(APPPATH.'controllers/Payment.php');
 
 class Cron extends CI_Controller
 {
@@ -13,6 +15,7 @@ class Cron extends CI_Controller
 		$this->load->model('Booking_Product_Model');
 		$this->load->model('Payment_Model');
 		$this->load->model('Universal_Model');
+		$this->load->library('AutocountService'); // <-- where you put Guzzle API
 	}
 
 	function index()
@@ -244,4 +247,125 @@ class Cron extends CI_Controller
 			redirect('Dashboard');
 		}
 	}
+
+	/**
+     * Master function: run all sync jobs
+     */
+    public function syncAll()
+    {
+        $this->syncBookings();
+        $this->syncPayments();
+    }
+
+    /**
+     * Sync Bookings
+     */
+	public function syncBookings()
+    {
+		$booking_qty_cront = !empty($this->config->item('booking_qty_cront')) ? $this->config->item('booking_qty_cront') : 25;
+        $bookings = $this->Booking_Model->getPendingBookingsWithDetails([], $booking_qty_cront);
+
+        // instantiate Booking controller
+        $bookingCtrl = new Booking();
+
+        foreach ($bookings as $booking) {
+            echo "Booking ID {$booking->BookingID} [{$booking->AutocountSyncAction}]... ";
+
+            try {
+                switch ($booking->AutocountSyncAction) {
+                    case 'C':
+                        $result = $bookingCtrl->autocount_create($booking);
+                        break;
+                    case 'U':
+                        $result = $bookingCtrl->autocount_update($booking);
+                        break;
+                    case 'S':
+                        $result = $bookingCtrl->autocount_update_status($booking);
+                        break;
+                    case 'D':
+                        $result = $bookingCtrl->autocount_delete($booking);
+                        break;
+                    default:
+                        $result = ['error' => 'Unknown action'];
+                }
+
+                // update status
+                if (!empty($result['success'])) {
+					$this->Booking_Model->update_by_id($booking->BookingID, [
+						'AutocountSyncStatus' => 'S',
+						'AutocountSyncMessage' => json_encode($result)
+					]);
+				} else {
+					$this->Booking_Model->update_by_id($booking->BookingID, [
+						'AutocountSyncStatus' => 'F',
+						'AutocountSyncMessage' => json_encode($result)
+					]);
+				}
+            } catch (\Exception $e) {
+                $this->Booking_Model->update_by_id($booking->BookingID, [
+                    'AutocountSyncStatus' => 'F',
+                    'AutocountSyncMessage' => $e->getMessage()
+                ]);
+                echo "ERROR: {$e->getMessage()}\n";
+            }
+        }
+    }
+
+    /**
+     * Sync Payments
+     */
+    public function syncPayments()
+	{
+		echo "=== Sync Payments Start ===\n";
+		$payments = $this->Payment_Model->getAllPaymentsWithBookingAndSupplier1();
+
+		// instantiate Payment controller
+		$paymentCtrl = new Payment();
+
+		foreach ($payments as $payment) {
+			echo "Payment ID {$payment->PaymentID} [{$payment->AutocountSyncAction}]... ";
+
+			try {
+				// choose action
+				switch ($payment->AutocountSyncAction) {
+					case 'C':
+						$result = $paymentCtrl->autocount_create($payment);
+						break;
+					case 'U':
+						$result = $paymentCtrl->autocount_update($payment);
+						break;
+					case 'D':
+						$result = $paymentCtrl->autocount_delete($payment);
+						break;
+					default:
+						$result = ['error' => 'Unknown action'];
+				}
+
+				// update DB status
+				if (isset($result['error']) && $result['error'] === null) {
+					$this->Payment_Model->update_by_id($payment->PaymentID, [
+						'AutocountSyncStatus' => 'S',
+						'AutocountSyncMessage' => json_encode($result)
+					]);
+					echo "SUCCESS\n";
+				} else {
+					$this->Payment_Model->update_by_id($payment->PaymentID, [
+						'AutocountSyncStatus' => 'F',
+						'AutocountSyncMessage' => json_encode($result)
+					]);
+					echo "FAILED: {$result['error']}\n";
+				}
+
+			} catch (\Exception $e) {
+				$this->Payment_Model->update_by_id($payment->PaymentID, [
+					'AutocountSyncStatus' => 'F',
+					'AutocountSyncMessage' => $e->getMessage()
+				]);
+				echo "ERROR: {$e->getMessage()}\n";
+			}
+		}
+
+		echo "=== Sync Payments End ===\n\n";
+	}
+
 }

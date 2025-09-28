@@ -341,12 +341,14 @@
                     </div>
                 <?php } ?>
                 <br><br>
-                <button type="button" 
-        class="btn btn-primary font-weight-bold mb-2" 
-        id="sync-autocount-payment" 
-        style="width:180px; display:none;">
-    Sync Autocount
-</button>
+                <?php if ($bulkPaymentSyncToAutocount) { ?>
+                    <button type="button" 
+                            class="btn btn-primary font-weight-bold mb-2" 
+                            id="sync-autocount-payment" 
+                            style="width:180px; display:none;">
+                        Sync Autocount
+                    </button>
+                <?php } ?>
                 <div class="dataTables_wrapper dt-bootstrap4 no-footer" <?php if(empty($payments)) { echo 'style="overflow-x:auto;"'; } ?>>
                     <table id="kt_datatable" class="table table-bordered table-head-custom table-checkable dataTable no-footer dtr-inline">
                         <thead>
@@ -428,16 +430,18 @@
                                         <td style="text-align:center;"><?php if($payment->Status == 'Y') { echo '<i class="la la-check-circle text-success"></i>'; } else if($payment->Status == 'P') { echo '<i class="la la-exclamation-circle text-warning"></i>'; } else { echo '<i class="la la-times-circle text-danger"></i>'; } ?></td>
                                         <td style="text-align:center;">
                                             <?php 
+                                                // default
                                                 $statusColor = '#000000';
                                                 $statusText  = 'UNKNOWN';
+
+                                                // only handle P, S, F
                                                 switch ($payment->AutocountSyncStatus) {
-                                                    case 'N': $statusColor = '#808080'; $statusText = 'NONE'; break;
-                                                    case 'C': $statusColor = '#50C878'; $statusText = 'CREATED'; break;
-                                                    case 'U': $statusColor = '#FFBF00'; $statusText = 'UPDATED'; break;
-                                                    case 'D': $statusColor = '#FF4500'; $statusText = 'DELETED'; break;
-                                                    case 'V': $statusColor = '#8A2BE2'; $statusText = 'VOID'; break;
+                                                    case 'P': $statusColor = '#808080'; $statusText = 'Pending'; break;
+                                                    case 'S': $statusColor = '#50C878'; $statusText = 'Synced'; break;
+                                                    case 'F': $statusColor = '#FF4500'; $statusText = 'Failed'; break;
                                                 }
 
+                                                // tooltip
                                                 $tooltipAttr = '';
                                                 if (!empty($payment->AutocountSyncMessage)) {
                                                     $decoded = json_decode($payment->AutocountSyncMessage, true);
@@ -457,12 +461,11 @@
                                                     $tooltipAttr = ' data-toggle="tooltip" data-placement="top" title="' . htmlspecialchars($tooltipText) . '"';
                                                 }
                                             ?>
-                                            <span class="font-weight-bold" 
-                                                style="color:<?= $statusColor ?>;" 
-                                                <?= $tooltipAttr ?>>
+                                            <span class="font-weight-bold" style="color:<?= $statusColor ?>;" <?= $tooltipAttr ?>>
                                                 <?= $statusText ?>
                                             </span>
                                         </td>
+
 
                                         <td style="text-align:center;">
                                             <div class="btn-group">
@@ -686,10 +689,13 @@
                 $(`#${payments[i].PaymentID}`).prop('checked', false);
             }
         }
-        if (isChecked) {
-            $('#sync-autocount-payment').show();
-        } else {
-            $('#sync-autocount-payment').hide();
+        var bulkPaymentSyncToAutocount = "<?php echo $bulkPaymentSyncToAutocount; ?>";
+        if (bulkPaymentSyncToAutocount) {
+            if (isChecked) {
+                $('#sync-autocount-payment').show();
+            } else {
+                $('#sync-autocount-payment').hide();
+            }
         }
     });
 
@@ -705,10 +711,13 @@
     }
 
     // If at least one payment is selected, show the "Sync Autocount" button
-    if (payment_ids.length > 0) {
-        $('#sync-autocount-payment').show();
-    } else {
-        $('#sync-autocount-payment').hide();
+    var bulkPaymentSyncToAutocount = "<?php echo $bulkPaymentSyncToAutocount; ?>";
+    if (bulkPaymentSyncToAutocount) {
+        if (payment_ids.length > 0) {
+            $('#sync-autocount-payment').show();
+        } else {
+            $('#sync-autocount-payment').hide();
+        }
     }
 
     // Update the "Select All" checkbox if all checkboxes are selected

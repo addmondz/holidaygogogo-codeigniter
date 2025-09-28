@@ -82,21 +82,36 @@ if (!function_exists('autocount_log')) {
 
 if (!function_exists('mapAutocountSyncStatus')) {
     /**
-     * Map AutocountSyncStatus code to human readable text
+     * Map AutocountSyncStatus (P, S, F only)
      *
      * @param string|null $status
-     * @return string
+     * @return array ['text' => string, 'color' => string]
      */
-    function mapAutocountSyncStatus(?string $status): string
+    function mapAutocountSyncStatus(?string $status): array
     {
         $map = [
-            'N' => 'None',
-            'C' => 'Created',
-            'U' => 'Updated',
-            'D' => 'Deleted',
-            'V' => 'Void',
+            'P' => ['text' => 'Pending', 'color' => '#808080'], // gray
+            'S' => ['text' => 'Synced',  'color' => '#50C878'], // green
+            'F' => ['text' => 'Failed',  'color' => '#FF4500'], // red
         ];
 
-        return $map[$status] ?? 'Unknown';
+        return $map[$status] ?? ['text' => 'Unknown', 'color' => '#000000'];
     }
+}
+
+
+if (!function_exists('mapAutoCountStatus')){
+    function mapAutoCountStatus($status) {
+    $statusMapping = [
+        'Pending' => 0,   // AutoCount code for "Pending"
+        'Success' => 1,   // AutoCount code for "Success"
+        'Lost'    => 2,   // AutoCount code for "Lost"
+        'Closed'  => 3,   // AutoCount code for "Closed"
+        'Void'    => 4,   // AutoCount code for "Void" (you might need to adjust this if it's not used)
+    ];
+
+    // Return the corresponding AutoCount code, or null if not found
+    return isset($statusMapping[$status]) ? $statusMapping[$status] : null;
+}
+
 }

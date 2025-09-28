@@ -221,12 +221,15 @@
                     </div>
                 </div>
                 <br><br>
-<button type="button" 
-        class="btn btn-primary font-weight-bold mb-2" 
-        id="sync-autocount-booking" 
-        style="width:180px; display:none;">
-    Sync Autocount
-</button>
+                <?php if ($bulkBookingSyncToAutocount) { ?>
+                    <button type="button" 
+                            class="btn btn-primary font-weight-bold mb-2" 
+                            id="sync-autocount-booking" 
+                            style="width:180px; display:none;">
+                        Sync Autocount
+                    </button>
+                <?php } ?>
+
                 <div class="dataTables_wrapper dt-bootstrap4 no-footer" <?php if(empty($bookings)) { echo 'style="overflow-x:auto;"'; } ?>>
                     <table id="kt_datatable" class="table table-bordered table-head-custom table-checkable dataTable no-footer dtr-inline">
                         <thead>
@@ -294,16 +297,10 @@
                                         <td style="text-align:center;"><?php if($booking->LockStatus == 'Y') { echo '<i class="la la-lock text-danger"></i>'; } else { echo '<i class="la la-unlock text-success"></i>'; } ?></td>
                                         <td style="text-align:center;">
                                             <?php 
-                                                // status color & label
-                                                $statusColor = '#000000';
-                                                $statusText  = 'UNKNOWN';
-                                                switch ($booking->AutocountSyncStatus) {
-                                                    case 'N': $statusColor = '#808080'; $statusText = 'NONE'; break;
-                                                    case 'C': $statusColor = '#50C878'; $statusText = 'CREATED'; break;
-                                                    case 'U': $statusColor = '#FFBF00'; $statusText = 'UPDATED'; break;
-                                                    case 'D': $statusColor = '#FF4500'; $statusText = 'DELETED'; break;
-                                                    case 'V': $statusColor = '#8A2BE2'; $statusText = 'VOID'; break;
-                                                }
+                                                // status info (P, S, F only)
+                                                $statusInfo  = mapAutocountSyncStatus(isset($booking->AutocountSyncStatus) ? $booking->AutocountSyncStatus : null);
+                                                $statusText  = $statusInfo['text'];
+                                                $statusColor = $statusInfo['color'];
 
                                                 // tooltip logic
                                                 $tooltipAttr = ''; 
@@ -325,12 +322,11 @@
                                                     $tooltipAttr = ' data-toggle="tooltip" data-placement="top" title="' . htmlspecialchars($tooltipText) . '"';
                                                 }
                                             ?>
-                                            <span class="font-weight-bold" 
-                                                style="color:<?= $statusColor ?>;" 
-                                                <?= $tooltipAttr ?>>
+                                            <span class="font-weight-bold" style="color:<?= $statusColor ?>;" <?= $tooltipAttr ?>>
                                                 <?= $statusText ?>
                                             </span>
                                         </td>
+
                                         <td style="text-align:center;">
                                             <div class="btn-group">
                                                 <button type="button" data-toggle="dropdown" class="btn btn-light-primary btn-sm dropdown-toggle" style="padding-left:3px;"></button>
@@ -510,7 +506,10 @@ function toggleButton() {
 document.getElementById('check_all').addEventListener('change', function() {
     let checked = this.checked;
     document.querySelectorAll('.check_item').forEach(cb => cb.checked = checked);
-    toggleButton();
+    var bulkBookingSyncToAutocount = "<?php echo $bulkBookingSyncToAutocount; ?>";
+    if (bulkBookingSyncToAutocount == true) {
+        toggleButton();
+    }
 });
 
 // Individual checkbox toggle
@@ -524,7 +523,10 @@ document.querySelectorAll('.check_item').forEach(cb => {
         else if (document.querySelectorAll('.check_item:checked').length === document.querySelectorAll('.check_item').length) {
             document.getElementById('check_all').checked = true;
         }
-        toggleButton();
+        var bulkBookingSyncToAutocount = "<?php echo $bulkBookingSyncToAutocount; ?>";
+        if (bulkBookingSyncToAutocount) {
+            toggleButton();
+        }
     });
 });
 </script>

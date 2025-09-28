@@ -34,6 +34,8 @@ class Payment extends MY_Controller
 			$total_net_profit = 0;
 			$booking_ids = [];
 			$total_sales = 0;
+			$array['bulkPaymentSyncToAutocount'] = !empty($this->config->item('bulkPaymentSyncToAutocount')) ? $this->config->item('bulkPaymentSyncToAutocount') : false;
+
 			if(!empty($array['payments'])) {
 				foreach($array['payments'] as $payment) {
 					if(!empty($payment->Date)) {
@@ -157,7 +159,9 @@ class Payment extends MY_Controller
 							$invoice = $this->upload->data();
 							$this->Payment_Model->Update_File('Invoice', $invoice, $payment_id);
 						}
-						$payment_ids[] = $payment_id;
+						$this->Payment_Model->update_by_id($payment_id, [
+							'AutocountSyncAction' => 'C'
+						]);
 					}
 				}
 
@@ -419,22 +423,25 @@ class Payment extends MY_Controller
 					if(count($array['payment'][0]) > 3) {
 						$this->Payment_Model->Update($array['payment']);
 
-						$payment = $this->Payment_Model->find($payment->PaymentID);
-						if ($payment != null) {
-							$quotationData = [];
-							$respond = $this->autocount_create($quotationData);
+						$this->Payment_Model->update_by_id($payment->PaymentID, [
+							'AutocountSyncAction' => 'U',
+							'AutocountSyncStatus' => 'P'
+						]);
+						// if ($payment != null) {
+						// 	$quotationData = [];
+						// 	$respond = $this->autocount_create($quotationData);
 
-							if ($respond['error']) {
-								$this->Payment_Model->update_by_id($payment->PaymentID, [
-									'AutocountSyncMessage' => json_encode($respond),
-								]);
-							} elseif ($respond['status'] === 201 || $respond['status'] === 204) {
-								$this->Payment_Model->update_by_id($payment->PaymentID, [
-									'AutocountSyncMessage' => json_encode($respond),
-									'AutocountSyncStatus' => 'U'
-								]);
-							} 
-						}	
+						// 	if ($respond['error']) {
+						// 		$this->Payment_Model->update_by_id($payment->PaymentID, [
+						// 			'AutocountSyncMessage' => json_encode($respond),
+						// 		]);
+						// 	} elseif ($respond['status'] === 201 || $respond['status'] === 204) {
+						// 		$this->Payment_Model->update_by_id($payment->PaymentID, [
+						// 			'AutocountSyncMessage' => json_encode($respond),
+						// 			'AutocountSyncStatus' => 'U'
+						// 		]);
+						// 	} 
+						// }	
 					}
 					$this->session->set_flashdata('message_success', $payment['Credit'] != 0.00 ? 'Payment Record : Credit RM ' . number_format($payment['Credit'], 2, '.', ',') . ' Successfully Updated' : 'Payment Record : Debit RM ' . number_format($payment['Debit'], 2, '.', ',') . ' Successfully Updated');
 				} else {
@@ -542,29 +549,33 @@ class Payment extends MY_Controller
 			$this->Payment_Model->Create_Payment_Log2();
 
 			
-			$paymentData = $this->Payment_Model->getPaymentById($this->input->get('payment_id'));
-        	$paymentNumber = (!empty($paymentData) && !empty($paymentData->ReferenceNumber)) ? $paymentData->ReferenceNumber : '';
+			// $paymentData = $this->Payment_Model->getPaymentById($this->input->get('payment_id'));
+        	// $paymentNumber = (!empty($paymentData) && !empty($paymentData->ReferenceNumber)) ? $paymentData->ReferenceNumber : '';
 
-			if (!empty($paymentNumber)) {
-				$payment = $this->Payment_Model->find($this->input->get('payment_id'));
+			// if (!empty($paymentNumber)) {
+			// 	$payment = $this->Payment_Model->find($this->input->get('payment_id'));
 
-				if ($payment != null) {
-					$quotationData = [];
-					$respond = $this->autocount_create($quotationData);
+			// 	if ($payment != null) {
+			// 		$quotationData = [];
+			// 		$respond = $this->autocount_create($quotationData);
 
-					if ($respond['error']) {
-						$this->Payment_Model->update_by_id($payment->PaymentID, [
-							'AutocountSyncMessage' => json_encode($respond),
-						]);
-					} elseif ($respond['status'] === 201 || $respond['status'] === 204) {
-						$this->Payment_Model->update_by_id($payment->PaymentID, [
-							'AutocountSyncMessage' => json_encode($respond),
-							'AutocountSyncStatus' => 'D'
-						]);
-					} 
-				}	
+			// 		if ($respond['error']) {
+			// 			$this->Payment_Model->update_by_id($payment->PaymentID, [
+			// 				'AutocountSyncMessage' => json_encode($respond),
+			// 			]);
+			// 		} elseif ($respond['status'] === 201 || $respond['status'] === 204) {
+			// 			$this->Payment_Model->update_by_id($payment->PaymentID, [
+			// 				'AutocountSyncMessage' => json_encode($respond),
+			// 				'AutocountSyncStatus' => 'D'
+			// 			]);
+			// 		} 
+			// 	}	
 				
-			}
+			// }
+			$this->Payment_Model->update_by_id($this->input->get('payment_id'), [
+				'AutocountSyncAction' => 'D',
+				'AutocountSyncStatus' => 'P'
+			]);
 			
 		} else {
 			redirect('Dashboard');
@@ -881,162 +892,200 @@ class Payment extends MY_Controller
 
 	public function autocount_create($data = [])
 	{
-		// Master (single row only)
-		$param = [
-			'master' => [
-				'docNo'           => isset($data['ReferenceNumber']) ? $data['ReferenceNumber'] : '',
-				'docNo2'          => '',
-				'docNoFormatName' => null,
-				'docType'         => 'PV', // required
-				'docDate'         => isset($data['InsertDate']) ? date('Y-m-d', strtotime($data['InsertDate'])) : date('Y-m-d'), // required
-				'taxDate'         => isset($data['tax_date']) ? $data['tax_date'] : '',
-				'currencyCode'    => isset($data['currency_code']) ? $data['currency_code'] : 'MYR', // required
-				'currencyRate'    => isset($data['currency_rate']) ? $data['currency_rate'] : '1', // required
-				'journalType'     => 'GENERAL', // required
-				'dealWith'        => isset($data['supplier_name']) ? $data['supplier_name'] : '', // required
-				'description'     => isset($data['PaymentRemark']) ? $data['PaymentRemark'] : '',
-				'note'            => ''
-			],
-			'details'        => [],
-			'paymentDetails' => [],
-			'autoFillOption' => [
-				'taxCode'    => isset($data['tax_code']) ? $data['tax_code'] : '',
-				'tariffCode' => isset($data['tariff_code']) ? $data['tariff_code'] : ''
-			],
-			'saveApprove' => null
-		];
+		try {
+			// Master (single row only)
+			$param = [
+				'master' => [
+					'docNo'           => arr_get($data, 'ReferenceNumber', ''),
+					'docNo2'          => arr_get($data, 'docNo2', ''),
+					'docNoFormatName' => arr_get($data, 'docNoFormatName', null),
+					'docType'         => 'PV', // required
+					'docDate'         => arr_get($data, 'InsertDate', date('Y-m-d')),
+					'taxDate'         => arr_get($data, 'tax_date', date('Y-m-d')),
+					'currencyCode'    => arr_get($data, 'currency_code', 'MYR'),
+					'currencyRate'    => arr_get($data, 'currency_rate', 1),
+					'journalType'     => 'GENERAL',
+					'dealWith'        => arr_get($data, 'supplier_name', ''),
+					'description'     => arr_get($data, 'PaymentRemark', ''),
+					'note'            => arr_get($data, 'note', ''),
+				],
+				'details'        => [],
+				'paymentDetails' => [],
+				'autoFillOption' => [
+					'taxCode'    => arr_get($data, 'tax_code', false),
+					'tariffCode' => arr_get($data, 'tariff_code', false),
+				],
+				'saveApprove' => arr_get($data, 'saveApprove', null),
+			];
 
-
-		// Details
-		if (!empty($data['details']) && is_array($data['details'])) {
-			foreach ($data['details'] as $detail) {
-				$param['details'][] = [
-					'accNo'              => $detail['account_no'], // required
-					'toAccountRate'      => isset($detail['toAccountRate']) ? $detail['toAccountRate'] : 1,
-					'description'        => isset($detail['description']) ? $detail['description'] : '',
-					'furtherDescription' => isset($detail['furtherDescription']) ? $detail['furtherDescription'] : '',
-					'amount'             => (float)$detail['amount'], // required
-					'taxCode'            => isset($detail['taxCode']) ? $detail['taxCode'] : '',
-					'taxAdjustment'      => isset($detail['taxAdjustment']) ? $detail['taxAdjustment'] : 0,
-					'localTaxAdjustment' => isset($detail['localTaxAdjustment']) ? $detail['localTaxAdjustment'] : 0,
-					'tariffCode'         => isset($detail['tariffCode']) ? $detail['tariffCode'] : '',
-					'taxExportCountry'   => isset($detail['taxExportCountry']) ? $detail['taxExportCountry'] : '',
-					'taxPermitNo'        => isset($detail['taxPermitNo']) ? $detail['taxPermitNo'] : '',
-					'taxBRNo'            => isset($detail['taxBRNo']) ? $detail['taxBRNo'] : '',
-					'taxBName'           => isset($detail['taxBName']) ? $detail['taxBName'] : '',
-					'taxRefNo'           => isset($detail['taxRefNo']) ? $detail['taxRefNo'] : '',
-					'taxRegisterNo'      => isset($detail['taxRegisterNo']) ? $detail['taxRegisterNo'] : '',
-					'taxBillDate'        => isset($detail['taxBillDate']) ? $detail['taxBillDate'] : null,
-					'salesAgent'         => isset($detail['salesAgent']) ? $detail['salesAgent'] : '',
-					'inclusiveTax'       => isset($detail['inclusiveTax']) ? $detail['inclusiveTax'] : true,
-					'deptNo'             => isset($detail['deptNo']) ? $detail['deptNo'] : ''
-				];
+			// Details (loop through $data['details'])
+			if (!empty($data['details']) && is_array($data['details'])) {
+				foreach ($data['details'] as $detail) {
+					$param['details'][] = [
+						'accNo'              => arr_get($detail, 'account_no'),
+						'toAccountRate'      => arr_get($detail, 'toAccountRate', 1),
+						'description'        => arr_get($detail, 'description', ''),
+						'furtherDescription' => arr_get($detail, 'furtherDescription', ''),
+						'amount'             => (float)arr_get($detail, 'amount', 0),
+						'taxCode'            => arr_get($detail, 'taxCode', ''),
+						'taxAdjustment'      => arr_get($detail, 'taxAdjustment', 0),
+						'localTaxAdjustment' => arr_get($detail, 'localTaxAdjustment', 0),
+						'tariffCode'         => arr_get($detail, 'tariffCode', ''),
+						'taxExportCountry'   => arr_get($detail, 'taxExportCountry', ''),
+						'taxPermitNo'        => arr_get($detail, 'taxPermitNo', ''),
+						'taxBRNo'            => arr_get($detail, 'taxBRNo', ''),
+						'taxBName'           => arr_get($detail, 'taxBName', ''),
+						'taxRefNo'           => arr_get($detail, 'taxRefNo', ''),
+						'taxRegisterNo'      => arr_get($detail, 'taxRegisterNo', ''),
+						'taxBillDate'        => arr_get($detail, 'taxBillDate', null),
+						'salesAgent'         => arr_get($detail, 'salesAgent', ''),
+						'inclusiveTax'       => arr_get($detail, 'inclusiveTax', true),
+						'deptNo'             => arr_get($detail, 'deptNo', ''),
+					];
+				}
 			}
-		}
 
-		// Payment details (loop through $data['paymentDetails'])
-		if (!empty($data['paymentDetails']) && is_array($data['paymentDetails'])) {
-			foreach ($data['paymentDetails'] as $payment) {
-				$param['paymentDetails'][] = [
-					'paymentMethod'      => $payment['paymentMethod'],
-					'paymentBy'          => isset($payment['paymentBy']) ? $payment['paymentBy'] : '',
-					'chequeNo'           => isset($payment['chequeNo']) ? $payment['chequeNo'] : '',
-					'floatDay'           => isset($payment['floatDay']) ? $payment['floatDay'] : 0,
-					'bankCharge'         => isset($payment['bankCharge']) ? (float)$payment['bankCharge'] : 0,
-					'toBankRate'         => isset($payment['toBankRate']) ? $payment['toBankRate'] : 1,
-					'paymentAmt'         => (float)$payment['paymentAmt'],
-					'bankChargeTaxCode'  => isset($payment['bankChargeTaxCode']) ? $payment['bankChargeTaxCode'] : '',
-					'bankChargeTaxRate'  => isset($payment['bankChargeTaxRate']) ? $payment['bankChargeTaxRate'] : 0,
-					'bankChargeTax'      => isset($payment['bankChargeTax']) ? $payment['bankChargeTax'] : 0,
-					'bankChargeTaxRefNo' => isset($payment['bankChargeTaxRefNo']) ? $payment['bankChargeTaxRefNo'] : ''
-				];
+			// Payment details (loop through $data['paymentDetails'])
+			if (!empty($data['paymentDetails']) && is_array($data['paymentDetails'])) {
+				foreach ($data['paymentDetails'] as $payment) {
+					$param['paymentDetails'][] = [
+						'paymentMethod'      => arr_get($payment, 'paymentMethod','CASH'),
+						'paymentBy'          => arr_get($payment, 'paymentBy', ''),
+						'chequeNo'           => arr_get($payment, 'chequeNo', ''),
+						'floatDay'           => arr_get($payment, 'floatDay', 0),
+						'bankCharge'         => (float)arr_get($payment, 'bankCharge', 0),
+						'toBankRate'         => arr_get($payment, 'toBankRate', 1),
+						'paymentAmt'         => (float)arr_get($payment, 'paymentAmt'),
+						'bankChargeTaxCode'  => arr_get($payment, 'bankChargeTaxCode', ''),
+						'bankChargeTaxRate'  => arr_get($payment, 'bankChargeTaxRate', 0),
+						'bankChargeTax'      => arr_get($payment, 'bankChargeTax', 0),
+						'bankChargeTaxRefNo' => arr_get($payment, 'bankChargeTaxRefNo', ''),
+					];
+				}
 			}
-		}
 
-		return autocount_request('POST', 'payment.create', $param);
+			// Send request to AutoCount
+			return autocount_request('POST', 'payment.create', $param);
+
+		} catch (Exception $e) {
+			log_message('error', 'Autocount payment creation error: ' . $e->getMessage());
+
+			return [
+				'status' => 500,
+				'error'  => $e->getMessage(),
+				'data'   => [],
+			];
+		}
 	}
 
-
     public function autocount_update($data = [])
-    {
-        $docNo = $data['BookingNumber'] ?? $data['DocNo'] ?? '';
-        if ($docNo === '') {
-            return ['error' => 'Missing required parameter: BookingNumber (or DocNo).'];
-        }
+	{
+		try {
+			// Ensure the docNo is passed (either BookingNumber or DocNo)
+			$docNo = $data['ReferenceNumber'] ?? $data['ReferenceNumber'] ?? '';
+			if ($docNo === '') {
+				return ['error' => 'Missing required parameter: ReferenceNumber (or DocNo).'];
+			}
 
-        $body = [];
+			$body = [];
 
-        if (!empty($data['master'])) {
-            $body['master'] = $data['master'];
-        }
-
-       // Details (loop through $data['details'])
-		if (!empty($data['details']) && is_array($data['details'])) {
-			foreach ($data['details'] as $detail) {
-				$param['details'][] = [
-					'accNo'              => $detail['account_no'], // required
-					'toAccountRate'      => $detail['toAccountRate'] ?? 1,
-					'description'        => $detail['description'] ?? '',
-					'furtherDescription' => $detail['furtherDescription'] ?? '',
-					'amount'             => (float)$detail['amount'], // required
-					'taxCode'            => $detail['taxCode'] ?? '',
-					'taxAdjustment'      => $detail['taxAdjustment'] ?? 0,
-					'localTaxAdjustment' => $detail['localTaxAdjustment'] ?? 0,
-					'tariffCode'         => $detail['tariffCode'] ?? '',
-					'taxExportCountry'   => $detail['taxExportCountry'] ?? '',
-					'taxPermitNo'        => $detail['taxPermitNo'] ?? '',
-					'taxBRNo'            => $detail['taxBRNo'] ?? '',
-					'taxBName'           => $detail['taxBName'] ?? '',
-					'taxRefNo'           => $detail['taxRefNo'] ?? '',
-					'taxRegisterNo'      => $detail['taxRegisterNo'] ?? '',
-					'taxBillDate'        => $detail['taxBillDate'] ?? null,
-					'salesAgent'         => $detail['salesAgent'] ?? '',
-					'inclusiveTax'       => $detail['inclusiveTax'] ?? true,
-					'deptNo'             => $detail['deptNo'] ?? ''
+			// Master data (single row only)
+			if (!empty($data['master'])) {
+				$body['master'] = [
+					'docNo'           => $docNo,                                // Reference Number -> docNo
+					'docNo2'          => arr_get($data, 'docNo2', ''),
+					'docNoFormatName' => arr_get($data, 'docNoFormatName', null),
+					'docType'         => arr_get($data, 'docType', 'PV'),        // Document Type (Payment Voucher)
+					'docDate'         => arr_get($data, 'Date', date('Y-m-d')),  // Date -> docDate
+					'taxDate'         => arr_get($data, 'tax_date', date('Y-m-d')),
+					'currencyCode'    => arr_get($data, 'Currency', 'MYR'),      // Currency -> currencyCode
+					'currencyRate'    => arr_get($data, 'ForeignCurrency', '1'),   // Foreign Currency -> currencyRate
+					'journalType'     => 'GENERAL',                               // Journal Type
+					'dealWith'        => arr_get($data, 'SupplierID', ''),       // Supplier -> dealWith
+					'description'     => arr_get($data, 'PaymentRemark', ''),    // Payment Remark -> description
+					'note'            => arr_get($data, 'Remark', ''),           // Remark -> note
 				];
 			}
-		}
 
-		// Payment details (loop through $data['paymentDetails'])
-		if (!empty($data['paymentDetails']) && is_array($data['paymentDetails'])) {
-			foreach ($data['paymentDetails'] as $payment) {
-				$param['paymentDetails'][] = [
-					'paymentMethod'      => $payment['paymentMethod'],
-					'paymentBy'          => $payment['paymentBy'] ?? '',
-					'chequeNo'           => $payment['chequeNo'] ?? '',
-					'floatDay'           => $payment['floatDay'] ?? 0,
-					'bankCharge'         => (float)$payment['bankCharge'] ?? 0,
-					'toBankRate'         => $payment['toBankRate'] ?? 1,
-					'paymentAmt'         => (float)$payment['paymentAmt'],
-					'bankChargeTaxCode'  => $payment['bankChargeTaxCode'] ?? '',
-					'bankChargeTaxRate'  => $payment['bankChargeTaxRate'] ?? 0,
-					'bankChargeTax'      => $payment['bankChargeTax'] ?? 0,
-					'bankChargeTaxRefNo' => $payment['bankChargeTaxRefNo'] ?? ''
+			// Details (loop through $data['details'])
+			if (!empty($data['details']) && is_array($data['details'])) {
+				foreach ($data['details'] as $detail) {
+					$body['details'][] = [
+						'accNo'              => arr_get($detail, 'account_no', ''),        // account_no -> accNo
+						'toAccountRate'      => arr_get($detail, 'toAccountRate', 1),       // Default to 1
+						'description'        => arr_get($detail, 'description', ''),
+						'furtherDescription' => arr_get($detail, 'furtherDescription', ''),
+						'amount'             => (float)arr_get($detail, 'Debit', 0),        // Debit -> amount
+						'taxCode'            => arr_get($detail, 'taxCode', ''),
+						'taxAdjustment'      => arr_get($detail, 'taxAdjustment', 0),
+						'localTaxAdjustment' => arr_get($detail, 'localTaxAdjustment', 0),
+						'tariffCode'         => arr_get($detail, 'tariffCode', ''),
+						'taxExportCountry'   => arr_get($detail, 'taxExportCountry', ''),
+						'taxPermitNo'        => arr_get($detail, 'taxPermitNo', ''),
+						'taxBRNo'            => arr_get($detail, 'taxBRNo', ''),
+						'taxBName'           => arr_get($detail, 'taxBName', ''),
+						'taxRefNo'           => arr_get($detail, 'taxRefNo', ''),
+						'taxRegisterNo'      => arr_get($detail, 'taxRegisterNo', ''),
+						'taxBillDate'        => arr_get($detail, 'taxBillDate', null),
+						'salesAgent'         => arr_get($detail, 'salesAgent', ''),
+						'inclusiveTax'       => arr_get($detail, 'inclusiveTax', true),
+						'deptNo'             => arr_get($detail, 'deptNo', ''),
+					];
+				}
+			}
+
+			// Payment details (loop through $data['paymentDetails'])
+			if (!empty($data['paymentDetails']) && is_array($data['paymentDetails'])) {
+				foreach ($data['paymentDetails'] as $payment) {
+					$body['paymentDetails'][] = [
+						'paymentMethod'      => arr_get($payment, 'paymentMethod', 'CASH'),
+						'paymentBy'          => arr_get($payment, 'paymentBy', ''),
+						'chequeNo'           => arr_get($payment, 'chequeNo', ''),
+						'floatDay'           => arr_get($payment, 'floatDay', 0),
+						'bankCharge'         => (float)arr_get($payment, 'bankCharge', 0),
+						'toBankRate'         => arr_get($payment, 'toBankRate', 1),
+						'paymentAmt'         => (float)arr_get($payment, 'paymentAmt', 0),  // Debit -> paymentAmt
+						'bankChargeTaxCode'  => arr_get($payment, 'bankChargeTaxCode', ''),
+						'bankChargeTaxRate'  => arr_get($payment, 'bankChargeTaxRate', 0),
+						'bankChargeTax'      => arr_get($payment, 'bankChargeTax', 0),
+						'bankChargeTaxRefNo' => arr_get($payment, 'bankChargeTaxRefNo', ''),
+					];
+				}
+			}
+
+			// AutoFill Options (tax code, etc.)
+			if (!empty($data['tax_code'])) {
+				$body['autoFillOption'] = [
+					'TaxCode' => arr_get($payment, 'TaxCode', false),
 				];
 			}
+
+			// Save Approval (if present)
+			if (isset($data['saveApprove'])) {
+				$body['saveApprove'] = arr_get($payment, 'saveApprove', false);
+			}
+
+			// Send request to AutoCount for updating the payment
+			return autocount_request(
+				'PUT',
+				'payment.update',
+				$body,
+				['docNo' => $docNo]
+			);
+		} catch (Exception $e) {
+			log_message('error', 'Autocount payment update error: ' . $e->getMessage());
+
+			return [
+				'status' => 500,
+				'error'  => $e->getMessage(),
+				'data'   => [],
+			];
 		}
-
-        if (!empty($data['tax_code'])) {
-            $body['autoFillOption'] = [
-                'TaxCode' => $data['tax_code']
-            ];
-        }
-
-        if (isset($data['saveApprove'])) {
-            $body['saveApprove'] = $data['saveApprove'];
-        }
-
-        return autocount_request(
-            'PUT',
-            'payment.update',
-            $body,
-            ['docNo' => $docNo]
-        );
-    }
+	}
 
     public function autocount_delete($data = [])
     {
-        $docNo = isset($data['BookingNumber']) ? $data['BookingNumber'] : '';
+        $docNo = isset($data['ReferenceNumber']) ? $data['ReferenceNumber'] : '';
 
         return autocount_request(
             'DELETE',
@@ -1048,7 +1097,7 @@ class Payment extends MY_Controller
 
     public function autocount_void($data = [])
     {
-        $docNo = isset($data['DocNo']) ? $data['DocNo'] : '';
+        $docNo = isset($data['ReferenceNumber']) ? $data['ReferenceNumber'] : '';
         $body = [
             'voidReason' => isset($data['reason']) ? $data['reason'] : ''
         ];

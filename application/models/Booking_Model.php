@@ -862,4 +862,90 @@ class Booking_Model extends CI_Model
             ->update('booking', $data);
     }
 
+	function getPendingBookingsWithDetails($booking_ids = [], $limit = 10)
+	{
+		// --- 1. Get all booking columns (no prefix) ---
+		$bookingCols = $this->db->list_fields('booking');
+		$bookingCols = array_map(function($col) {
+			return "booking.`$col`";
+		}, $bookingCols);
+		$this->db->select(implode(', ', $bookingCols), false);
+
+		$statuses = !empty($this->config->item('booking_sync_autocount_status')) 
+			? $this->config->item('booking_sync_autocount_status') 
+			: ['P'];
+
+		$titles   = !empty($this->config->item('booking_sync_status')) 
+			? $this->config->item('booking_sync_status') 
+			: ['BOOKING CONFIRMATION'];
+
+		// base query
+		$this->db->from('booking')
+			->where_in('booking.AutocountSyncStatus', $statuses)
+			->where_in('booking.BookingConfirmationTitle', $titles)
+			->order_by('booking.BookingID', 'ASC')
+			->limit($limit);
+
+		// extra filter if booking_id is provided
+		if (!empty($booking_ids)) {
+			$this->db->where_in('booking.BookingID', $booking_ids);
+		}
+
+		$bookings = $this->db->get()->result_array();
+
+		if (empty($bookings)) {
+			return [];
+		}
+
+		$bookingIds = array_column($bookings, 'BookingID');
+
+		// --- 2. Guest list with guest_ prefix (flattened, 1st guest only) ---
+		$guestCols = $this->db->list_fields('guest_list');
+		$guestCols = array_map(function($col) {
+			return "guest_list.`$col` AS guest_$col";
+		}, $guestCols);
+		$this->db->select(implode(', ', $guestCols), false);
+		$guests = $this->db
+			->where_in('guest_list.BookingID', $bookingIds)
+			->get('guest_list')
+			->result_array();
+
+		$guestByBooking = [];
+		foreach ($guests as $g) {
+			$bookingId = $g['guest_BookingID'];
+			if (!isset($guestByBooking[$bookingId])) {
+				$guestByBooking[$bookingId] = $g; // keep first guest only
+			}
+		}
+
+		// --- 3. Products with product_ prefix (array under "details") ---
+		$productCols = $this->db->list_fields('booking_product');
+		$productCols = array_map(function($col) {
+			return "booking_product.`$col` AS product_$col";
+		}, $productCols);
+		$this->db->select(implode(', ', $productCols), false);
+		$products = $this->db
+			->where_in('booking_product.BookingID', $bookingIds)
+			->get('booking_product')
+			->result_array();
+
+		$productsByBooking = [];
+		foreach ($products as $p) {
+			$productsByBooking[$p['product_BookingID']][] = $p;
+		}
+
+		// --- 4. Attach guest (flat fields) & products (array as details) ---
+		foreach ($bookings as &$b) {
+			if (isset($guestByBooking[$b['BookingID']])) {
+				$b = array_merge($b, $guestByBooking[$b['BookingID']]);
+			}
+			$b['booking_product'] = $productsByBooking[$b['BookingID']] ?? [];
+		}
+
+		return $bookings;
+	}
+
+
+
+
 }
