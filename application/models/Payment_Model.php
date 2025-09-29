@@ -537,7 +537,7 @@ class Payment_Model extends CI_Model
 		$this->db->where_in('payment.Status', $titles);
 
 		// Limit the number of payments to retrieve
-		$payment_qty_cront = !empty($this->config->item('payment_qty_cront')) ? $this->config->item('payment_qty_cront') : 25;
+		$payment_qty_cront = !empty($this->config->item('payment_qty_cront')) ? $this->config->item('payment_qty_cront') : 1;
 		$this->db->limit($payment_qty_cront);
 
 		// Order by PaymentID

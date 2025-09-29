@@ -862,8 +862,15 @@ class Booking_Model extends CI_Model
             ->update('booking', $data);
     }
 
-	function getPendingBookingsWithDetails($booking_ids = [], $limit = 10)
+	function getPendingBookingsWithDetails($booking_ids = array())
 	{
+		$this->load->helper('autocount');
+		$config = get_autocount_config();
+
+		$booking_qty_cront = !empty($config['booking_qty_cront'])
+			? $config['booking_qty_cront']
+			: 1;
+		
 		// --- 1. Get all booking columns (no prefix) ---
 		$bookingCols = $this->db->list_fields('booking');
 		$bookingCols = array_map(function($col) {
@@ -871,12 +878,12 @@ class Booking_Model extends CI_Model
 		}, $bookingCols);
 		$this->db->select(implode(', ', $bookingCols), false);
 
-		$statuses = !empty($this->config->item('booking_sync_autocount_status')) 
-			? $this->config->item('booking_sync_autocount_status') 
-			: ['P'];
+		$statuses = !empty($config['booking_sync_autocount_status']) 
+			? $config['booking_sync_autocount_status'] 
+			: ['P','F'];
 
-		$titles   = !empty($this->config->item('booking_sync_status')) 
-			? $this->config->item('booking_sync_status') 
+		$titles   = !empty($config['booking_sync_status']) 
+			? $config['booking_sync_status'] 
 			: ['BOOKING CONFIRMATION'];
 
 		// base query
@@ -884,7 +891,7 @@ class Booking_Model extends CI_Model
 			->where_in('booking.AutocountSyncStatus', $statuses)
 			->where_in('booking.BookingConfirmationTitle', $titles)
 			->order_by('booking.BookingID', 'ASC')
-			->limit($limit);
+			->limit($booking_qty_cront);
 
 		// extra filter if booking_id is provided
 		if (!empty($booking_ids)) {

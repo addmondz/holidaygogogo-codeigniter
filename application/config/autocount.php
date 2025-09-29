@@ -41,6 +41,6 @@ $config['booking_sync_status'] = ['BOOKING CONFIRMATION']; // allowed BookingCon
 $config['payment_sync_autocount_status'] = ['P', 'F'];
 $config['payment_sync_status'] = ['Y'];
 
-$config['booking_qty_cront'] = 25;
-$config['payment_qty_cront'] = 25;
+$config['booking_qty_cront'] = '5';
+$config['payment_qty_cront'] = '25';
 

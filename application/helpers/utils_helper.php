@@ -22,6 +22,18 @@ if (!function_exists('dd')) {
     }
 }
 
+if (!function_exists('ddSql')) {
+    function ddSql($query)
+    {  
+        $sql = $query->toSql();
+        $bindings = $query->getBindings();
+
+        dd(preg_replace_callback('/\?/', function ($match) use ($sql, &$bindings) {
+            return json_encode(array_shift($bindings));
+        }, $sql));
+    }
+}
+
 // Utility function to get environment variables from .env file
 if (!function_exists('get_env')) {
     function get_env($key)
