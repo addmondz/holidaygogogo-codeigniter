@@ -313,51 +313,48 @@ class Cron extends CI_Controller
     /**
      * Sync Payments
      */
-    public function syncPayments()
+  public function syncPayments()
 	{
 		echo "=== Sync Payments Start ===\n";
 		$payments = $this->Payment_Model->getAllPaymentsWithBookingAndSupplier1();
 
-		// instantiate Payment controller
-		$paymentCtrl = new Payment();
+		$this->load->library('PaymentSync'); // 👈 better than instantiating controller
 
 		foreach ($payments as $payment) {
 			echo "Payment ID {$payment->PaymentID} [{$payment->AutocountSyncAction}]... ";
 
 			try {
-				// choose action
 				switch ($payment->AutocountSyncAction) {
 					case 'C':
-						$result = $paymentCtrl->autocount_create($payment);
+						$result = $this->paymentsync->autocount_create($payment);
 						break;
 					case 'U':
-						$result = $paymentCtrl->autocount_update($payment);
+						$result = $this->paymentsync->autocount_update($payment);
 						break;
 					case 'D':
-						$result = $paymentCtrl->autocount_delete($payment);
+						$result = $this->paymentsync->autocount_delete($payment);
 						break;
 					default:
 						$result = ['error' => 'Unknown action'];
 				}
 
-				// update DB status
-				if (isset($result['error']) && $result['error'] === null && $result['status'] == '204' || $result['status'] == '201') {
+				if (($result['status'] == 201 || $result['status'] == 204) && $result['error'] === null) {
 					$this->Payment_Model->update_by_id($payment->PaymentID, [
-						'AutocountSyncStatus' => 'S',
+						'AutocountSyncStatus'  => 'S',
 						'AutocountSyncMessage' => json_encode($result)
 					]);
 					echo "SUCCESS\n";
 				} else {
 					$this->Payment_Model->update_by_id($payment->PaymentID, [
-						'AutocountSyncStatus' => 'F',
+						'AutocountSyncStatus'  => 'F',
 						'AutocountSyncMessage' => json_encode($result)
 					]);
-					echo "FAILED: {$result['error']}\n";
+					echo "FAILED: " . ($result['error'] ?? 'Unknown error') . "\n";
 				}
 
 			} catch (\Exception $e) {
 				$this->Payment_Model->update_by_id($payment->PaymentID, [
-					'AutocountSyncStatus' => 'F',
+					'AutocountSyncStatus'  => 'F',
 					'AutocountSyncMessage' => $e->getMessage()
 				]);
 				echo "ERROR: {$e->getMessage()}\n";
@@ -366,5 +363,6 @@ class Cron extends CI_Controller
 
 		echo "=== Sync Payments End ===\n\n";
 	}
+
 
 }
