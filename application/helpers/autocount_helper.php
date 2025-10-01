@@ -124,11 +124,12 @@ if ( ! function_exists('get_autocount_config'))
     function get_autocount_config()
     {
         $CI =& get_instance();
-        $CI->config->load('autocount');
+        $CI->load->library('AutoCountService');
+        $CI->config->load('autocount', TRUE);
 
-        // This gives you ALL items loaded from all configs
-        // but we filter only keys defined inside autocount.php
-        return $CI->config->config;
+        $config = $CI->config->item('autocount', 'autocount');
+
+        return $config;
     }
 }
 

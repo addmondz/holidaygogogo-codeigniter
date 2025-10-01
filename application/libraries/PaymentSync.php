@@ -47,7 +47,7 @@ class PaymentSync {
 						'toAccountRate'      => arr_get($detail, 'toAccountRate', 1),
 						'description'        => arr_get($detail, 'description', ''),
 						'furtherDescription' => arr_get($detail, 'furtherDescription', ''),
-						'amount'             => (float)arr_get($detail, 'amount', 0),
+						'amount'             => (float)arr_get($detail, 'credit', 0),
 						'taxCode'            => arr_get($detail, 'taxCode', ''),
 						'taxAdjustment'      => arr_get($detail, 'taxAdjustment', 0),
 						'localTaxAdjustment' => arr_get($detail, 'localTaxAdjustment', 0),

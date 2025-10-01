@@ -30,7 +30,10 @@ class Booking extends MY_Controller
 			$total_sales = 0;
 			$total_net_profit = 0;
 
-			$array['bulkBookingSyncToAutocount'] = !empty($this->config->item('bulkBookingSyncToAutocount')) ? $this->config->item('bulkBookingSyncToAutocount') : false;
+			$this->load->helper('autocount');
+			$config = get_autocount_config();
+
+			$array['bulkBookingSyncToAutocount'] = !empty($config['bulkBookingSyncToAutocount']) ? $config['bulkBookingSyncToAutocount'] : false;
 				foreach($bookings as $booking) {
 					if((date('Y-m-d') >= $booking->StartDate && date('Y-m-d') <= $booking->EndDate) && ($booking->Status == 'PT' || $booking->Status == 'Y')) {
 						$this->Booking_Model->Update_After_Sales_Service2($booking->BookingID);
@@ -474,7 +477,9 @@ class Booking extends MY_Controller
 			$this->Booking_Model->Create_Booking_Log();
 			
 			$this->load->config('status_mapping');
-			$statusMap = $this->config->item('booking_to_autocount_status');
+			$this->load->helper('autocount');
+			$config = get_autocount_config();
+			$statusMap = $config['booking_to_autocount_status'];
 			$newStatus = $this->input->get('new_status');
 			$autoCountStatus = $statusMap[$newStatus] ?? 0; // default Pending
 
@@ -957,7 +962,9 @@ class Booking extends MY_Controller
 				$bookingProducts = $this->Booking_Model->getAllBookingsWithProducts($booking_id);
 				$bookingProducts = array_map('get_object_vars', $bookingProducts); // convert to array
 
-				$statuses = !empty($this->config->item('booking_sync_status')) ? $this->config->item('booking_sync_status') : ['BOOKING CONFIRMATION'];
+				$this->load->helper('autocount');
+				$config = get_autocount_config();
+				$statuses = !empty($config['booking_sync_status']) ? $config['booking_sync_status'] : ['BOOKING CONFIRMATION'];
 
 				if (in_array($bookingData['BookingConfirmationTitle'], $statuses)) {
 					switch ($bookingData['AutocountSyncStatus']) {

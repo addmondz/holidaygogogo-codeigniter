@@ -529,15 +529,27 @@ class Payment_Model extends CI_Model
 			$this->db->where('payment.PaymentID', $payment_id);
 		}
 
+		$this->load->helper('autocount');
+		$config = get_autocount_config();
 		// Optional filters for syncing payment status (from config settings)
-		$statuses = !empty($this->config->item('payment_sync_autocount_status')) ? $this->config->item('payment_sync_autocount_status') : ['P', 'F'];
-		$titles   = !empty($this->config->item('payment_sync_status')) ? $this->config->item('payment_sync_status') : ['Y'];
+		// Load the whole autocount config
+		// Use values from inside the autocount array
+		$statuses = !empty($config['payment_sync_autocount_status'])
+			? $config['payment_sync_autocount_status']
+			: ['P', 'F'];
+
+		$titles = !empty($config['payment_sync_status'])
+			? $config['payment_sync_status']
+			: ['Y'];
 
 		$this->db->where_in('payment.AutocountSyncStatus', $statuses);
 		$this->db->where_in('payment.Status', $titles);
 
 		// Limit the number of payments to retrieve
-		$payment_qty_cront = !empty($this->config->item('payment_qty_cront')) ? $this->config->item('payment_qty_cront') : 1;
+		$payment_qty_cront = !empty($config['payment_qty_cront'])
+			? $config['payment_qty_cront']
+			: 1;
+
 		$this->db->limit($payment_qty_cront);
 
 		// Order by PaymentID
@@ -576,15 +588,26 @@ class Payment_Model extends CI_Model
 			$this->db->where('payment.PaymentID', $payment_id);
 		}
 
+		$this->load->helper('autocount');
 		// Optional filters for syncing payment status (from config settings)
-		$statuses = !empty($this->config->item('payment_sync_autocount_status')) ? $this->config->item('payment_sync_autocount_status') : ['P', 'F'];
-		$titles   = !empty($this->config->item('payment_sync_status')) ? $this->config->item('payment_sync_status') : ['Y'];
+		$config = get_autocount_config(); // get whole autocount config array
+
+		$statuses = !empty($config['payment_sync_autocount_status'])
+			? $config['payment_sync_autocount_status']
+			: ['P', 'F'];
+
+		$titles = !empty($config['payment_sync_status'])
+			? $config['payment_sync_status']
+			: ['Y'];
 
 		$this->db->where_in('payment.AutocountSyncStatus', $statuses);
 		$this->db->where_in('payment.Status', $titles);
 
 		// Limit the number of payments to retrieve
-		$payment_qty_cront = !empty($this->config->item('payment_qty_cront')) ? $this->config->item('payment_qty_cront') : 25;
+		$payment_qty_cront = !empty($config['payment_qty_cront'])
+			? $config['payment_qty_cront']
+			: 25;
+
 		$this->db->limit($payment_qty_cront);
 
 		// Order by PaymentID

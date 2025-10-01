@@ -34,7 +34,10 @@ class Payment extends MY_Controller
 			$total_net_profit = 0;
 			$booking_ids = [];
 			$total_sales = 0;
-			$array['bulkPaymentSyncToAutocount'] = !empty($this->config->item('bulkPaymentSyncToAutocount')) ? $this->config->item('bulkPaymentSyncToAutocount') : false;
+
+			$this->load->helper('autocount');
+			$config = get_autocount_config();
+			$array['bulkPaymentSyncToAutocount'] = !empty($config['bulkPaymentSyncToAutocount']) ? $config['bulkPaymentSyncToAutocount'] : false;
 
 			if(!empty($array['payments'])) {
 				foreach($array['payments'] as $payment) {
@@ -758,9 +761,12 @@ class Payment extends MY_Controller
 
 	public function bulkSyncToAutocount()
     {
+		$this->load->helper('autocount');
+		$config = get_autocount_config();
+
 		$input = json_decode($this->input->raw_input_stream, true);
         $payment_ids = $input['payment_ids'] ? $input['payment_ids'] : []; 
-		$statuses = !empty($this->config->item('payment_sync_status')) ? $this->config->item('payment_sync_status') : ['Y'];
+		$statuses = !empty($config['payment_sync_status']) ? $config['payment_sync_status'] : ['Y'];
 
         if (empty($payment_ids)) {
 			$this->output

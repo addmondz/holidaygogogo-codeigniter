@@ -29,18 +29,21 @@ $config['autocount'] = [
             'delete'        => '/pyament',
             'void'          => '/payment/void',
         ]
-    ]
+    ],
+
+    // Sync settings
+    'bulkBookingSyncToAutocount' => false,
+    'bulkPaymentSyncToAutocount' => false,
+
+    'booking_sync_autocount_status' => ['P', 'F'], // allowed AutocountSyncStatus
+    'booking_sync_status'           => ['BOOKING CONFIRMATION'], // allowed BookingConfirmationTitle
+
+    'payment_sync_autocount_status' => ['P', 'F'],
+    'payment_sync_status'           => ['Y'],
+
+    // Crontab sync qty
+    'booking_qty_cront' => 5,
+    'payment_qty_cront' => 25,
 ];
 
-$config['bulkBookingSyncToAutocount'] = false;
-$config['bulkPaymentSyncToAutocount'] = false;
-
-$config['booking_sync_autocount_status'] = ['P', 'F']; // allowed AutocountSyncStatus
-$config['booking_sync_status'] = ['BOOKING CONFIRMATION']; // allowed BookingConfirmationTitle
-
-$config['payment_sync_autocount_status'] = ['P', 'F'];
-$config['payment_sync_status'] = ['Y'];
-
-$config['booking_qty_cront'] = '5';
-$config['payment_qty_cront'] = '25';
 
