@@ -44,6 +44,9 @@ $config['autocount'] = [
     // Crontab sync qty
     'booking_qty_cront' => 5,
     'payment_qty_cront' => 25,
+
+    'payment_acc_no_1' => '300-d277',
+    'payment_acc_no_2' => '400-d019'
 ];
 
 

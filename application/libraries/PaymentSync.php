@@ -13,6 +13,8 @@ class PaymentSync {
 
     public function autocount_create($data = [])
 	{
+		$this->load->helper('autocount');
+		$config = get_autocount_config();
 		try {
 			// Master (single row only)
 			$param = [
@@ -42,12 +44,22 @@ class PaymentSync {
 			// Details (loop through $data['details'])
 			if (!empty($data['details']) && is_array($data['details'])) {
 				foreach ($data['details'] as $detail) {
+					$acc_no = '';
+					$amount = 0.00;
+					if ($data['credit'] !== 0.00){
+						$acc_no = $config['acc_no_payment_1'];
+						$amount = $data['credit'];
+					} else if ($data['debit'] !== 0.00){
+						$acc_no = $config['acc_no_payment_2'];
+						$amount = $data['debit'];
+					}
+
 					$param['details'][] = [
-						'accNo'              => arr_get($detail, 'account_no'),
+						'accNo'              => $acc_no,
 						'toAccountRate'      => arr_get($detail, 'toAccountRate', 1),
 						'description'        => arr_get($detail, 'description', ''),
 						'furtherDescription' => arr_get($detail, 'furtherDescription', ''),
-						'amount'             => (float)arr_get($detail, 'credit', 0),
+						'amount'             => (float)$amount,
 						'taxCode'            => arr_get($detail, 'taxCode', ''),
 						'taxAdjustment'      => arr_get($detail, 'taxAdjustment', 0),
 						'localTaxAdjustment' => arr_get($detail, 'localTaxAdjustment', 0),
@@ -101,6 +113,8 @@ class PaymentSync {
 
     public function autocount_update($data = [])
 	{
+		$this->load->helper('autocount');
+		$config = get_autocount_config();
 		try {
 			// Ensure the docNo is passed (either BookingNumber or DocNo)
 			$docNo = $data['ReferenceNumber'] ?? $data['ReferenceNumber'] ?? '';
@@ -131,12 +145,21 @@ class PaymentSync {
 			// Details (loop through $data['details'])
 			if (!empty($data['details']) && is_array($data['details'])) {
 				foreach ($data['details'] as $detail) {
+					$acc_no = '';
+					$amount = 0.00;
+					if ($data['credit'] !== 0.00){
+						$acc_no = $config['acc_no_payment_1'];
+						$amount = $data['credit'];
+					} else if ($data['debit'] !== 0.00){
+						$acc_no = $config['acc_no_payment_2'];
+						$amount = $data['debit'];
+					}
 					$body['details'][] = [
-						'accNo'              => arr_get($detail, 'account_no', ''),        // account_no -> accNo
+						'accNo'              => $acc_no,        // account_no -> accNo
 						'toAccountRate'      => arr_get($detail, 'toAccountRate', 1),       // Default to 1
 						'description'        => arr_get($detail, 'description', ''),
 						'furtherDescription' => arr_get($detail, 'furtherDescription', ''),
-						'amount'             => (float)arr_get($detail, 'Debit', 0),        // Debit -> amount
+						'amount'             => (float)$amount,        // Debit -> amount
 						'taxCode'            => arr_get($detail, 'taxCode', ''),
 						'taxAdjustment'      => arr_get($detail, 'taxAdjustment', 0),
 						'localTaxAdjustment' => arr_get($detail, 'localTaxAdjustment', 0),

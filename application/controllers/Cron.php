@@ -286,7 +286,7 @@ class Cron extends CI_Controller
 					default:
 						$result = ['error' => 'Unknown action'];
 				}
-				if (($result['status'] == 201 || $result['status'] == 204) && $result['error'] === null) {
+				if (isset($result['status']) && ($result['status'] == 201 || $result['status'] == 204) && $result['error'] === null) {
 					$this->Booking_Model->update_by_id($booking['BookingID'], [
 						'AutocountSyncStatus'  => 'S',
 						'AutocountSyncMessage' => json_encode($result)
@@ -338,7 +338,7 @@ class Cron extends CI_Controller
 						$result = ['error' => 'Unknown action'];
 				}
 
-				if (($result['status'] == 201 || $result['status'] == 204) && $result['error'] === null) {
+				if (isset($result['status']) && ($result['status'] == 201 || $result['status'] == 204) && $result['error'] === null) {
 					$this->Payment_Model->update_by_id($payment->PaymentID, [
 						'AutocountSyncStatus'  => 'S',
 						'AutocountSyncMessage' => json_encode($result)
