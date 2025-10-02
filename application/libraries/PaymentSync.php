@@ -11,10 +11,8 @@ class PaymentSync {
         $this->CI =& get_instance();
     }
 
-    public function autocount_create($data = [])
+    public function autocount_create($data = [], $config = [])
 	{
-		$this->load->helper('autocount');
-		$config = get_autocount_config();
 		try {
 			// Master (single row only)
 			$param = [
@@ -23,8 +21,8 @@ class PaymentSync {
 					'docNo2'          => arr_get($data, 'docNo2', ''),
 					'docNoFormatName' => arr_get($data, 'docNoFormatName', null),
 					'docType'         => 'PV', // required
-					'docDate'         => arr_get($data, 'InsertDate', date('Y-m-d')),
-					'taxDate'         => arr_get($data, 'tax_date', date('Y-m-d')),
+					'docDate'         => date('Y-m-d', strtotime(arr_get($data, 'InsertDate'))),  // Date -> docDate
+					'taxDate'         => null,  // Date -> taxDate
 					'currencyCode'    => arr_get($data, 'currency_code', 'MYR'),
 					'currencyRate'    => arr_get($data, 'currency_rate', 1),
 					'journalType'     => 'GENERAL',
@@ -46,12 +44,12 @@ class PaymentSync {
 				foreach ($data['details'] as $detail) {
 					$acc_no = '';
 					$amount = 0.00;
-					if ($data['credit'] !== 0.00){
-						$acc_no = $config['acc_no_payment_1'];
-						$amount = $data['credit'];
-					} else if ($data['debit'] !== 0.00){
-						$acc_no = $config['acc_no_payment_2'];
-						$amount = $data['debit'];
+					if ($data['Credit'] != 0.00){
+						$acc_no = $config['payment_acc_no_1'];
+						$amount = $data['Credit'];
+					} else if ($data['Debit'] != 0.00){
+						$acc_no = $config['payment_acc_no_2'];
+						$amount = $data['Debit'];
 					}
 
 					$param['details'][] = [
@@ -76,6 +74,25 @@ class PaymentSync {
 						'deptNo'             => arr_get($detail, 'deptNo', ''),
 					];
 				}
+			} else {
+				// Fallback: minimal details
+				$acc_no = '';
+				$amount = 0.00;
+				if ($data['Credit'] != 0.00) {
+					$acc_no = $config['payment_acc_no_1'];
+					$amount = $data['Credit'];
+				} else if ($data['Debit'] != 0.00) {
+					$acc_no = $config['payment_acc_no_2'];
+					$amount = $data['Debit'];
+				}
+
+				$param['details'][] = [
+					'accNo'  => $acc_no,
+					'amount' => (float)$amount,
+										'toAccountRate'      => arr_get($data, 'toAccountRate', 1),       // Default to 1
+
+				];
+
 			}
 
 			// Payment details (loop through $data['paymentDetails'])
@@ -95,6 +112,20 @@ class PaymentSync {
 						'bankChargeTaxRefNo' => arr_get($payment, 'bankChargeTaxRefNo', ''),
 					];
 				}
+			} else {
+				// Fallback: minimal paymentDetails
+				if ($data['Credit'] != 0.00) {
+					$acc_no = $config['payment_acc_no_1'];
+					$amount = $data['Credit'];
+				} else if ($data['Debit'] != 0.00) {
+					$acc_no = $config['payment_acc_no_2'];
+					$amount = $data['Debit'];
+				}
+
+				$param['paymentDetails'][] = [
+					'paymentMethod' => 'CASH',
+					'paymentAmt'    => (float)$amount,
+				];
 			}
 
 			// Send request to AutoCount
@@ -111,10 +142,8 @@ class PaymentSync {
 		}
 	}
 
-    public function autocount_update($data = [])
+    public function autocount_update($data = [], $config = [])
 	{
-		$this->load->helper('autocount');
-		$config = get_autocount_config();
 		try {
 			// Ensure the docNo is passed (either BookingNumber or DocNo)
 			$docNo = $data['ReferenceNumber'] ?? $data['ReferenceNumber'] ?? '';
@@ -125,34 +154,33 @@ class PaymentSync {
 			$body = [];
 
 			// Master data (single row only)
-			if (!empty($data['master'])) {
-				$body['master'] = [
-					'docNo'           => $docNo,                                // Reference Number -> docNo
-					'docNo2'          => arr_get($data, 'docNo2', ''),
-					'docNoFormatName' => arr_get($data, 'docNoFormatName', null),
-					'docType'         => arr_get($data, 'docType', 'PV'),        // Document Type (Payment Voucher)
-					'docDate'         => arr_get($data, 'Date', date('Y-m-d')),  // Date -> docDate
-					'taxDate'         => arr_get($data, 'tax_date', date('Y-m-d')),
-					'currencyCode'    => arr_get($data, 'Currency', 'MYR'),      // Currency -> currencyCode
-					'currencyRate'    => arr_get($data, 'ForeignCurrency', '1'),   // Foreign Currency -> currencyRate
-					'journalType'     => 'GENERAL',                               // Journal Type
-					'dealWith'        => arr_get($data, 'SupplierID', ''),       // Supplier -> dealWith
-					'description'     => arr_get($data, 'PaymentRemark', ''),    // Payment Remark -> description
-					'note'            => arr_get($data, 'Remark', ''),           // Remark -> note
-				];
-			}
+			$body['master'] = [
+				'docNo'           => $docNo,                                // Reference Number -> docNo
+				'docNo2'          => arr_get($data, 'docNo2', ''),
+				'docNoFormatName' => arr_get($data, 'docNoFormatName', null),
+				'docType'         => arr_get($data, 'docType', 'PV'),        // Document Type (Payment Voucher)
+				'docDate'         => date('Y-m-d', strtotime(arr_get($data, 'InsertDate'))),  // Date -> docDate
+				'taxDate'         => null,//date('Y-m-d', strtotime(arr_get($data, 'tax_date'))),  // Date -> taxDate
+				'currencyCode'    => arr_get($data, 'Currency', 'MYR'),      // Currency -> currencyCode
+				'currencyRate'    => (float)arr_get($data, 'ForeignCurrency', 1),   // Foreign Currency -> currencyRate
+				'journalType'     => 'GENERAL',                               // Journal Type
+				'dealWith'        => arr_get($data, 'SupplierID', ''),       // Supplier -> dealWith
+				'description'     => arr_get($data, 'PaymentRemark', ''),    // Payment Remark -> description
+				'note'            => arr_get($data, 'Remark', ''),           // Remark -> note
+			];
+			
 
 			// Details (loop through $data['details'])
 			if (!empty($data['details']) && is_array($data['details'])) {
 				foreach ($data['details'] as $detail) {
 					$acc_no = '';
 					$amount = 0.00;
-					if ($data['credit'] !== 0.00){
-						$acc_no = $config['acc_no_payment_1'];
-						$amount = $data['credit'];
-					} else if ($data['debit'] !== 0.00){
-						$acc_no = $config['acc_no_payment_2'];
-						$amount = $data['debit'];
+					if ($data['Credit'] != 0.00){
+						$acc_no = $config['payment_acc_no_1'];
+						$amount = $data['Credit'];
+					} else if ($data['Debit'] != 0.00){
+						$acc_no = $config['payment_acc_no_2'];
+						$amount = $data['Debit'];
 					}
 					$body['details'][] = [
 						'accNo'              => $acc_no,        // account_no -> accNo
@@ -176,6 +204,23 @@ class PaymentSync {
 						'deptNo'             => arr_get($detail, 'deptNo', ''),
 					];
 				}
+			} else {
+				// Fallback: minimal details
+				$acc_no = '';
+				$amount = 0.00;
+				if ($data['Credit'] != 0.00) {
+					$acc_no = $config['payment_acc_no_1'];
+					$amount = $data['Credit'];
+				} else if ($data['Debit'] != 0.00) {
+					$acc_no = $config['payment_acc_no_2'];
+					$amount = $data['Debit'];
+				}
+
+				$body['details'][] = [
+					'accNo'  => $acc_no,
+					'amount' => (float)$amount,
+					'toAccountRate'      => arr_get($data, 'toAccountRate', 1),       // Default to 1
+				];
 			}
 
 			// Payment details (loop through $data['paymentDetails'])
@@ -195,19 +240,29 @@ class PaymentSync {
 						'bankChargeTaxRefNo' => arr_get($payment, 'bankChargeTaxRefNo', ''),
 					];
 				}
-			}
+			} else {
+				// Fallback: minimal paymentDetails
+				$acc_no = '';
+				$amount = 0.00;
+				if ($data['Credit'] != 0.00) {
+					$acc_no = $config['payment_acc_no_1'];
+					$amount = $data['Credit'];
+				} else if ($data['Debit'] != 0.00) {
+					$acc_no = $config['payment_acc_no_2'];
+					$amount = $data['Debit'];
+				}
 
-			// AutoFill Options (tax code, etc.)
-			if (!empty($data['tax_code'])) {
-				$body['autoFillOption'] = [
-					'TaxCode' => arr_get($payment, 'TaxCode', false),
+				$body['paymentDetails'][] = [
+					'paymentMethod' => 'CASH',
+					'paymentAmt'    => (float)$amount,
 				];
 			}
 
-			// Save Approval (if present)
-			if (isset($data['saveApprove'])) {
-				$body['saveApprove'] = arr_get($payment, 'saveApprove', false);
-			}
+			// AutoFill Options (tax code, etc.)
+			$body['autoFillOption'] = [
+				'TaxCode' => arr_get($data, 'TaxCode', false),
+			];
+			
 
 			// Send request to AutoCount for updating the payment
 			return autocount_request(
@@ -227,7 +282,7 @@ class PaymentSync {
 		}
 	}
 
-    public function autocount_delete($data = [])
+    public function autocount_delete($data = [], $config = [])
     {
         $docNo = isset($data['ReferenceNumber']) ? $data['ReferenceNumber'] : '';
 

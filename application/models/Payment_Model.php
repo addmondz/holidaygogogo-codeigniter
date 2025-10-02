@@ -504,36 +504,34 @@ class Payment_Model extends CI_Model
 
 	function getAllPaymentsWithBookingAndSupplier($payment_id = null)
 	{
-		// Get all columns from payment table
-		$this->db->select('payment.*', false);  // Select all columns from payment table
+		$this->db->select('payment.*', false);
 
-		// Join with booking table (only the necessary columns)
-		$this->db->join('booking', 'booking.BookingID = payment.BookingID', 'left');  // LEFT JOIN
+		$this->db->from('payment'); // ✅ Base table
+
+		// Join with booking
+		$this->db->join('booking', 'booking.BookingID = payment.BookingID', 'left');
 		$this->db->select([
 			'booking.BookingID',
 			'booking.Customer',
 			'booking.BookingNumber',
-			'booking.InsertDate',  // Example of columns you might want from the booking table
+			'booking.InsertDate',
 		], false);
 
-		// Join with supplier table (only the necessary columns)
-		$this->db->join('supplier', 'supplier.SupplierID = payment.SupplierID', 'left');  // LEFT JOIN
+		// Join with supplier
+		$this->db->join('supplier', 'supplier.SupplierID = payment.SupplierID', 'left');
 		$this->db->select([
 			'supplier.SupplierID',
-			'supplier.SupplierName',
-			'supplier.SupplierEmail', // Example of columns you might want from the supplier table
+			'supplier.Name',
+			'supplier.PrimaryEmail',
 		], false);
 
-		// Optional filter by PaymentID
 		if (!is_null($payment_id) && $payment_id !== '') {
 			$this->db->where('payment.PaymentID', $payment_id);
 		}
 
 		$this->load->helper('autocount');
 		$config = get_autocount_config();
-		// Optional filters for syncing payment status (from config settings)
-		// Load the whole autocount config
-		// Use values from inside the autocount array
+
 		$statuses = !empty($config['payment_sync_autocount_status'])
 			? $config['payment_sync_autocount_status']
 			: ['P', 'F'];
@@ -545,20 +543,17 @@ class Payment_Model extends CI_Model
 		$this->db->where_in('payment.AutocountSyncStatus', $statuses);
 		$this->db->where_in('payment.Status', $titles);
 
-		// Limit the number of payments to retrieve
 		$payment_qty_cront = !empty($config['payment_qty_cront'])
 			? $config['payment_qty_cront']
 			: 1;
 
 		$this->db->limit($payment_qty_cront);
-
-		// Order by PaymentID
 		$this->db->order_by('payment.PaymentID', 'ASC');
 
-		// Execute query
-		$query = $this->db->get();
-		return $query->result();
+		$query = $this->db->get(); // ✅ no need to pass 'payment' here anymore
+		return $query->result_array();
 	}
+
 
 
 	function getAllPaymentsWithBookingAndSupplier1($payment_id = null)
@@ -615,7 +610,7 @@ class Payment_Model extends CI_Model
 
 		// Execute query
 		$query = $this->db->get();
-		return $query->result();
+return $query->result_array(); // instead of result()
 	}
 
 

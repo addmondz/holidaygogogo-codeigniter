@@ -3,8 +3,6 @@
 require FCPATH.'vendor/autoload.php';
 use PhpOffice\PhpSpreadsheet\Spreadsheet;  
 use PhpOffice\PhpSpreadsheet\Writer\Xlxs;
-require_once(APPPATH.'controllers/Booking.php');
-require_once(APPPATH.'controllers/Payment.php');
 
 class Cron extends CI_Controller
 {
@@ -253,8 +251,8 @@ class Cron extends CI_Controller
      */
     public function syncAll()
     {
-		$this->syncBookings();
-        // $this->syncPayments();
+		//$this->syncBookings();
+         $this->syncPayments();
     }
 
     /**
@@ -265,7 +263,9 @@ class Cron extends CI_Controller
 		$bookings = $this->Booking_Model->getPendingBookingsWithDetails();
 
 		$this->load->library('BookingSync');
-
+		$this->load->helper('autocount');
+		$config = get_autocount_config();
+		
 		foreach ($bookings as $booking) {
 			echo "Booking ID {$booking['BookingID']} [{$booking['AutocountSyncAction']}]... ";
 
@@ -313,39 +313,41 @@ class Cron extends CI_Controller
     /**
      * Sync Payments
      */
-  public function syncPayments()
+  	public function syncPayments()
 	{
 		echo "=== Sync Payments Start ===\n";
-		$payments = $this->Payment_Model->getAllPaymentsWithBookingAndSupplier1();
+		$payments = $this->Payment_Model->getAllPaymentsWithBookingAndSupplier();
 
-		$this->load->library('PaymentSync'); // 👈 better than instantiating controller
-
+		$this->load->library('PaymentSync');
+		$this->load->helper('autocount');
+		$config = get_autocount_config();
+		
 		foreach ($payments as $payment) {
-			echo "Payment ID {$payment->PaymentID} [{$payment->AutocountSyncAction}]... ";
+			echo "Payment ID {$payment['PaymentID']} [{$payment['AutocountSyncAction']}]... ";
 
 			try {
-				switch ($payment->AutocountSyncAction) {
+				switch ($payment['AutocountSyncAction']) {
 					case 'C':
-						$result = $this->paymentsync->autocount_create($payment);
+						$result = $this->paymentsync->autocount_create($payment, $config);
 						break;
 					case 'U':
-						$result = $this->paymentsync->autocount_update($payment);
+						$result = $this->paymentsync->autocount_update($payment, $config);
 						break;
 					case 'D':
-						$result = $this->paymentsync->autocount_delete($payment);
+						$result = $this->paymentsync->autocount_delete($payment, $config);
 						break;
 					default:
 						$result = ['error' => 'Unknown action'];
 				}
 
 				if (isset($result['status']) && ($result['status'] == 201 || $result['status'] == 204) && $result['error'] === null) {
-					$this->Payment_Model->update_by_id($payment->PaymentID, [
+					$this->Payment_Model->update_by_id($payment['PaymentID'], [
 						'AutocountSyncStatus'  => 'S',
 						'AutocountSyncMessage' => json_encode($result)
 					]);
 					echo "SUCCESS\n";
 				} else {
-					$this->Payment_Model->update_by_id($payment->PaymentID, [
+					$this->Payment_Model->update_by_id($payment['PaymentID'], [
 						'AutocountSyncStatus'  => 'F',
 						'AutocountSyncMessage' => json_encode($result)
 					]);
@@ -353,7 +355,7 @@ class Cron extends CI_Controller
 				}
 
 			} catch (\Exception $e) {
-				$this->Payment_Model->update_by_id($payment->PaymentID, [
+				$this->Payment_Model->update_by_id($payment['PaymentID'], [
 					'AutocountSyncStatus'  => 'F',
 					'AutocountSyncMessage' => $e->getMessage()
 				]);
