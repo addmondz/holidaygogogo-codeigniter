@@ -1,3 +1,6 @@
+<?php
+    $is_sales_agent = $this->session->userdata('level') == 20;
+?>
 <div class="d-flex flex-column-fluid">
     <div class="container-fluid">
         <div class="card card-custom mb-5">
@@ -251,8 +254,10 @@
                                 <th class="end_date" style="text-align:center;">End</th>
                                 <th style="text-align:center;">Destination</th>
                                 <th class="subtotal" style="text-align:center;">Net Sales (RM)</th>
-                                <th class="profit" style="text-align:center;">Net Profit (RM)</th>
-                                <th style="text-align:center;">Net Profit Margin (%)</th>
+                                <?php if(!$is_sales_agent) { ?>
+                                    <th class="profit" style="text-align:center;">Net Profit (RM)</th>
+                                    <th style="text-align:center;">Net Profit Margin (%)</th>
+                                <?php } ?>
                                 <th style="text-align:center;">BC Status</th>
                                 <th class="gl_status" style="text-align:center;">GL Status</th>
                                 <th class="autocount_sync_status" style="text-align:center;">Autocount Status</th>
@@ -289,8 +294,10 @@
                                         <td style="text-align:center;"><?php echo $booking->EndDate; ?></td>
                                         <td style="text-align:center;"><?php echo $booking->DestinationName; ?></td>
                                         <td style="text-align:center;"><?php echo $booking->NetTotal; ?></td>
-                                        <td style="color:<?php if(isset($booking->Profit) && $booking->Profit < 0) { echo '#FF2400;'; } else if(isset($booking->Profit) && $booking->Profit == 0) { echo '#F4BB44;'; } else { echo '#00A36C;'; } ?> text-align:center;"><?php echo isset($booking->Profit) ? $booking->Profit : '-'; ?></td>
-                                        <td style="color:<?php if(isset($booking->ProfitMargin) && $booking->ProfitMargin < 0) { echo '#FF2400;'; } else if(isset($booking->ProfitMargin) && $booking->ProfitMargin == 0) { echo '#F4BB44;'; } else { echo '#00A36C;'; } ?> text-align:center;"><?php echo isset($booking->ProfitMargin) ? $booking->ProfitMargin : '-'; ?></td>
+                                        <?php if(!$is_sales_agent) { ?>
+                                            <td style="color:<?php if(isset($booking->Profit) && $booking->Profit < 0) { echo '#FF2400;'; } else if(isset($booking->Profit) && $booking->Profit == 0) { echo '#F4BB44;'; } else { echo '#00A36C;'; } ?> text-align:center;"><?php echo isset($booking->Profit) ? $booking->Profit : '-'; ?></td>
+                                            <td style="color:<?php if(isset($booking->ProfitMargin) && $booking->ProfitMargin < 0) { echo '#FF2400;'; } else if(isset($booking->ProfitMargin) && $booking->ProfitMargin == 0) { echo '#F4BB44;'; } else { echo '#00A36C;'; } ?> text-align:center;"><?php echo isset($booking->ProfitMargin) ? $booking->ProfitMargin : '-'; ?></td>
+                                        <?php } ?>
                                         <td style="text-align:center;">
                                             <span class="font-weight-bold" style="color:<?php if($booking->CancelStatus == 'Y') { echo '#FF69B4'; } else if($booking->Status == 'Y') { echo '#50C878'; } else if($booking->Status == 'PR') { echo '#C3B1E1'; } else if($booking->Status == 'P') { echo '#FFBF00'; } else if($booking->Status == 'PP') { echo '#A7C7E7'; } else if($booking->Status == 'PTV') { echo '#F89880'; } else if($booking->Status == 'PGL') { echo '#FAC898'; } else if($booking->Status == 'PT') { echo '#F8C8DC'; } else if($booking->Status == 'OG') { echo '#CCCCFF'; } else { echo '#DA70D6'; } ?>"><?php if($booking->CancelStatus == 'Y') { echo 'CANCELLED'; } else if($booking->Status == 'Y') { echo 'COMPLETED'; } else if($booking->Status == 'PR') { echo 'PENDING REVIEW'; } else if($booking->Status == 'P') { echo 'PENDING PAYMENT'; } else if($booking->Status == 'PP') { echo 'PARTIAL PAYMENT'; } else if($booking->Status == 'PTV') { echo 'PENDING TRAVEL VOUCHER'; } else if($booking->Status == 'PGL') { echo 'PENDING GUEST LIST'; } else if($booking->Status == 'PT') { echo 'PENDING TRAVEL'; } else if($booking->Status == 'OG') { echo 'ON-GOING'; } else { echo 'PAYMENT OVERDUE'; } ?></span>
                                         </td>
