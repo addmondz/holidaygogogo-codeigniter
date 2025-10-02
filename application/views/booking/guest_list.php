@@ -90,8 +90,25 @@
 						<br><br>
 						<?php if($guest_lists[0]->LockStatus == 'N') { ?>
 							<div id="timer"></div>
-							<div class="p-5" style="background-color:#F8C8DC;">
-								<p style="color:white; font-size:13px; text-align:justify;"><strong>We Kindly Request That You Complete The Action Within The Specified Timeframe Provided. We Understand That Unforseen Circumstances May Arise, Leading To The Need For Additional Time. By The Last Minute Of The Allocated Timeframe, A Pop-Up Will Appear Allowing You To Request An Extension.</strong></p>
+							<div class="p-5" style="background-color:#F8C8DC; border-radius:6px;">
+								<!-- <p style="color:white; font-size:13px; text-align:justify;"><strong>We Kindly Request That You Complete The Action Within The Specified Timeframe Provided. We Understand That Unforseen Circumstances May Arise, Leading To The Need For Additional Time. By The Last Minute Of The Allocated Timeframe, A Pop-Up Will Appear Allowing You To Request An Extension.</strong></p> -->
+								<div style="padding:15px; border-radius:6px;">
+									<p style="color:#333; font-size:14px; text-align:justify; margin:0 0 10px 0;">
+										<strong>
+										We kindly request that you complete the action within the specified timeframe provided. 
+										We understand that unforeseen circumstances may arise, leading to the need for additional time. 
+										By the last minute of the allocated timeframe, a pop-up will appear allowing you to request an extension.
+										</strong>
+									</p>
+
+									<p style="color:#333; font-size:13px; text-align:justify; margin:0;">
+										By proceeding, you acknowledge that you have read and agreed to our 
+										<a href="https://www.holidaygogogo.com/terms-condition/" target="_blank" style="color:#0066cc; font-weight:bold; text-decoration:underline;">Terms & Conditions</a>, 
+										<a href="https://www.holidaygogogo.com/privacy-policy/" target="_blank" style="color:#0066cc; font-weight:bold; text-decoration:underline;">Privacy Policy</a>, 
+										and 
+										<a href="https://www.holidaygogogo.com/pdpa-notice/" target="_blank" style="color:#0066cc; font-weight:bold; text-decoration:underline;">PDPA Notice</a>.
+									</p>
+								</div>
 							</div>
 						<?php } ?>
 					</div>
