@@ -326,7 +326,8 @@
                                             '<div class="col-md-6 mb-7 mb-md-0">' +
                                                 '<label>Amount (RM) <span style="color:red;">*</span></label>' +
                                                 '<div class="input-icon">' +
-                                                    '<input type="text" name="credit-'+ payment_id +'" autocomplete="off" onchange="Validate_Amount('+ '/Credit/' + ',' + payment_id +')" class="form-control" style="text-align:right;">' +
+                                                    // '<input type="text" name="credit-'+ payment_id +'" autocomplete="off" onchange="Validate_Amount('+ '/Credit/' + ',' + payment_id +')" class="form-control" style="text-align:right;">' +
+                                                    '<input type="text" name="credit-'+ payment_id +'" autocomplete="off" onchange="Validate_Amount(`credit`, ' + payment_id + ')" class="form-control" style="text-align:right;">' +
                                                     '<span>' +
                                                         '<i class="la la-dollar"></i>' +
                                                     '</span>' +
@@ -356,7 +357,8 @@
                                             '<div class="col-md-6">' +
                                                 '<label>Bank Slip</label>' +
                                                 '<div class="custom-file">' +
-                                                    '<input type="file" name="bank_slip-'+ payment_id +'" onchange="Update_File_Label('+ '/BankSlip/' + ',' + payment_id +')" class="custom-file-input">' +
+                                                    // '<input type="file" name="bank_slip-'+ payment_id +'" onchange="Update_File_Label('+ '/BankSlip/' + ',' + payment_id +')" class="custom-file-input">' +
+                                                    '<input type="file" name="bank_slip-'+ payment_id +'" onchange="Update_File_Label(`bank_slip`, ' + payment_id + ')" class="custom-file-input">' +
                                                     '<label id="bank_slip-'+ payment_id +'" class="custom-file-label" style="font-size:13px;"></label>' +
                                                 '</div>' +
                                             '</div>' +
@@ -386,7 +388,8 @@
                                             '<div class="col-md-6">' +
                                                 '<label>Amount (RM)</label>' +
                                                 '<div class="input-icon">' +
-                                                    '<input type="text" name="debit-'+ payment_id +'" autocomplete="off" onchange="Validate_Amount('+ '/Debit/' + ',' + payment_id +')" class="form-control" style="text-align:right;">' +
+                                                    // '<input type="text" name="debit-'+ payment_id +'" autocomplete="off" onchange="Validate_Amount('+ '/Debit/' + ',' + payment_id +')" class="form-control" style="text-align:right;">' +
+                                                    '<input type="text" name="debit-'+ payment_id +'" autocomplete="off" onchange="Validate_Amount(`debit`, ' + payment_id + ')" class="form-control" style="text-align:right;">' +
                                                     '<span>' +
                                                         '<i class="la la-dollar"></i>' +
                                                     '</span>' +
@@ -486,7 +489,8 @@
                                             '<div class="col-md-6">' +
                                                 '<label>Quotation</label>' +
                                                 '<div class="custom-file">' +
-                                                    '<input type="file" name="quotation-'+ payment_id +'" onchange="Update_File_Label('+ '/Quotation/' + ',' + payment_id +')" class="custom-file-input">' +
+                                                    // '<input type="file" name="quotation-'+ payment_id +'" onchange="Update_File_Label('+ '/Quotation/' + ',' + payment_id +')" class="custom-file-input">' +
+                                                    '<input type="file" name="quotation-'+ payment_id +'" onchange="Update_File_Label(`Quotation`, ' + payment_id + ')" class="custom-file-input">' +
                                                     '<label id="quotation-'+ payment_id +'" class="custom-file-label" style="font-size:13px;"></label>' +
                                                 '</div>' +
                                             '</div>' +
@@ -505,7 +509,8 @@
                                             '<div class="col-md-6">' +
                                                 '<label>Invoice</label>' +
                                                 '<div class="custom-file">' +
-                                                    '<input type="file" name="invoice-'+ payment_id +'" onchange="Update_File_Label('+ '/Invoice/' + ',' + payment_id +')" class="custom-file-input">' +
+                                                    // '<input type="file" name="invoice-'+ payment_id +'" onchange="Update_File_Label('+ '/Invoice/' + ',' + payment_id +')" class="custom-file-input">' +
+                                                    '<input type="file" name="invoice-'+ payment_id +'" onchange="Update_File_Label(`Invoice`, ' + payment_id + ')" class="custom-file-input">' +
                                                     '<label id="invoice-'+ payment_id +'" class="custom-file-label" style="font-size:13px;"></label>' +
                                                 '</div>' +
                                             '</div>' +
@@ -1156,22 +1161,19 @@
 </div>
 
 <script>
-    function Validate_Amount(value, payment_id)
-    {
-        var amount = value == '/Credit/' ? ($(`input[name="credit-${payment_id}"]`).val()).replace(/,/g, '') : ($(`input[name="debit-${payment_id}"]`).val()).replace(/,/g, '');
-        if(amount.match(/^[1-9][\d]{0,9}([\.][\d]{0,2})?$/)) {
-            if(value == '/Credit/') {
-                $(`input[name="credit-${payment_id}"]`).val(parseFloat(amount).toLocaleString('en-US', {minimumFractionDigits: 2}));
-            } else {
-                $(`input[name="debit-${payment_id}"]`).val(parseFloat(amount).toLocaleString('en-US', {minimumFractionDigits: 2}));
-            }
+    function Validate_Amount(kind, payment_id, el) {
+        const isCredit = kind === 'credit';
+        const $input = el ? $(el) : $(`input[name="${isCredit ? `credit-${payment_id}` : `debit-${payment_id}` }"]`);
+        const raw = String($input.val() || '').replace(/,/g, '').trim();
+        const re = /^(?:0|[1-9]\d{0,9})(?:\.\d{1,2})?$/;
+
+        if (re.test(raw)) {
+            const num = parseFloat(raw);
+            $input.val(num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
         } else {
-            if(value == '/Credit/') {
-                $(`input[name="credit-${payment_id}"]`).val('');
-            } else {
-                $(`input[name="debit-${payment_id}"]`).val('');
-            }
+            $input.val('');
         }
+
         <?php if(current_url() == base_url('Payment/Create')) { ?>
             Calculate_Subtotal();
         <?php } ?>
