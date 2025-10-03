@@ -11,6 +11,31 @@ defined('BASEPATH') OR exit('No direct script access allowed');
  * @property CI_Config $config
  * @property AutoCountService $autocountservice
  */
+if (!function_exists('generate_secure_hash')) {
+    /**
+     * Generate a secure hash based on array of arguments
+     *
+     * @param array  $args   Key/value pairs to include in hash
+     * @param string $secret Secret key from config/env
+     * @param string $algo   Hash algorithm (default sha256)
+     * @return string
+     */
+    function generate_secure_hash(array $args, string $secret, string $algo = 'sha256')
+    {
+        // Sort args to keep consistent order
+        ksort($args);
+
+        // Build query-like string: key1=value1&key2=value2
+        $data = http_build_query($args);
+
+        // Append secret to prevent replay
+        $data .= '|' . $secret;
+
+        // Generate hash
+        return hash($algo, $data);
+    }
+}
+
 if (!function_exists('dd')) {
     function dd(...$vars) {
         echo '<pre>';

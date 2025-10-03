@@ -89,7 +89,7 @@ class PaymentSync {
 				$param['details'][] = [
 					'accNo'  => $acc_no,
 					'amount' => (float)$amount,
-										'toAccountRate'      => arr_get($data, 'toAccountRate', 1),       // Default to 1
+					'toAccountRate'      => arr_get($data, 'toAccountRate', 1),       // Default to 1
 
 				];
 

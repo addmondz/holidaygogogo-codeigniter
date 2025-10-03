@@ -13,6 +13,7 @@ $config['autocount'] = [
     'username'       => 'YOUR_API_USERNAME',
     'password'       => 'YOUR_API_PASSWORD',
 
+    'manual_sync_autocount_key' => '4579545c3a528c4c5a64b8cc0c1be092d',
     // Endpoints
     'endpoints' => [
         'quotation' => [

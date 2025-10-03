@@ -542,6 +542,7 @@ class Payment_Model extends CI_Model
 
 		$this->db->where_in('payment.AutocountSyncStatus', $statuses);
 		$this->db->where_in('payment.Status', $titles);
+		$this->db->where('payment.AutocountSyncAction IS NOT NULL');
 
 		$payment_qty_cront = !empty($config['payment_qty_cront'])
 			? $config['payment_qty_cront']
@@ -597,6 +598,7 @@ class Payment_Model extends CI_Model
 
 		$this->db->where_in('payment.AutocountSyncStatus', $statuses);
 		$this->db->where_in('payment.Status', $titles);
+		$this->db->where('payment.AutocountSyncAction IS NOT NULL');
 
 		// Limit the number of payments to retrieve
 		$payment_qty_cront = !empty($config['payment_qty_cront'])

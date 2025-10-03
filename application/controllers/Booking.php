@@ -514,10 +514,10 @@ class Booking extends MY_Controller
 			// 		}	
 			// 	}
 			// }
-			$this->Booking_Model->update_by_id($this->input->get('booking_id'), [
-				'AutocountSyncAction'  => 'S',
-				'AutocountSyncStatus'  => 'P'
-			]);
+			// $this->Booking_Model->update_by_id($this->input->get('booking_id'), [
+			// 	'AutocountSyncAction'  => 'S',
+			// 	'AutocountSyncStatus'  => 'P'
+			// ]);
 
 			if(strpos($this->input->get('param'), '?') == true) {
 				redirect('Booking?' . explode('?', $this->input->get('param'))[1]);

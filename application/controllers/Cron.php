@@ -251,15 +251,37 @@ class Cron extends CI_Controller
      */
     public function syncAll()
     {
-		//$this->syncBookings();
-         $this->syncPayments();
+		// check if request is from CLI (cron job)
+		if (is_cli()) {
+			$this->runSync();
+			return;
+		}
+		$this->load->helper('autocount');
+		$config = get_autocount_config();
+		
+		$apiKey = $this->input->get('key');
+    	$expectedKey = $config['manual_sync_autocount_key']; // store in config or .env
+
+		if ($apiKey !== $expectedKey) {
+			show_error('Unauthorized access', 401);
+			return;
+		}
+		$this->runSync();
     }
+	
+	private function runSync()
+	{
+		$this->syncBookings();
+		$this->syncPayments();
+	}
 
     /**
      * Sync Bookings
      */
-	public function syncBookings()
+	private function syncBookings()
 	{
+		echo "=== Sync Booking Start ===\n";
+
 		$bookings = $this->Booking_Model->getPendingBookingsWithDetails();
 
 		$this->load->library('BookingSync');
@@ -284,7 +306,7 @@ class Cron extends CI_Controller
 						$result = $this->bookingsync->autocount_delete($booking);
 						break;
 					default:
-						$result = ['error' => 'Unknown action'];
+						$result = ['error' => 'ERROR Autocount Sync Action'];
 				}
 				if (isset($result['status']) && ($result['status'] == 201 || $result['status'] == 204) && $result['error'] === null) {
 					$this->Booking_Model->update_by_id($booking['BookingID'], [
@@ -307,13 +329,14 @@ class Cron extends CI_Controller
 				echo "ERROR: {$e->getMessage()}\n";
 			}
 		}
+		echo "=== Sync Bookings End ===\n\n";
 	}
 
 
     /**
      * Sync Payments
      */
-  	public function syncPayments()
+  	private function syncPayments()
 	{
 		echo "=== Sync Payments Start ===\n";
 		$payments = $this->Payment_Model->getAllPaymentsWithBookingAndSupplier();
@@ -337,7 +360,7 @@ class Cron extends CI_Controller
 						$result = $this->paymentsync->autocount_delete($payment, $config);
 						break;
 					default:
-						$result = ['error' => 'Unknown action'];
+						$result = ['error' => 'ERROR Autocount Sync Action'];
 				}
 
 				if (isset($result['status']) && ($result['status'] == 201 || $result['status'] == 204) && $result['error'] === null) {

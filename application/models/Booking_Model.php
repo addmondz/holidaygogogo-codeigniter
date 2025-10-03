@@ -890,6 +890,7 @@ class Booking_Model extends CI_Model
 		$this->db->from('booking')
 			->where_in('booking.AutocountSyncStatus', $statuses)
 			->where_in('booking.BookingConfirmationTitle', $titles)
+			->where('booking.AutocountSyncAction IS NOT NULL')
 			->order_by('booking.BookingID', 'ASC')
 			->limit($booking_qty_cront);
 
