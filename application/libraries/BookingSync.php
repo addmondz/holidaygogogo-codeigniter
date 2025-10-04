@@ -55,7 +55,7 @@ class BookingSync {
 			if (!empty($data['booking_product']) && is_array($data['booking_product'])) {
 				foreach ($data['booking_product'] as $product) {
 					$body['details'][] = [
-						'productCode'        => 'AIRTIC-1490',//arr_get($product, 'product_ProductCode'),
+						'productCode'        => arr_get($product, 'product_ProductCode'),
 						'productVariant'     => arr_get($product, 'productVariant', null),
 						'description'        => arr_get($product, 'product_Description'),
 						'furtherDescription' => arr_get($product, 'furtherDescription', ''),
@@ -142,7 +142,7 @@ class BookingSync {
 			if (!empty($data['booking_product']) && is_array($data['booking_product'])) {
 				foreach ($data['booking_product'] as $product) {
 					$body['details'][] = [
-						'productCode'        => 'AIRTIC-1490',//arr_get($product, 'product_ProductCode'),
+						'productCode'        => arr_get($product, 'product_ProductCode'),
 						'productVariant'     => arr_get($product, 'productVariant', null),
 						'description'        => arr_get($product, 'product_Description'),
 						'furtherDescription' => arr_get($product, 'furtherDescription', ''),
