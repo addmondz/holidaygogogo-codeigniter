@@ -13,7 +13,7 @@ class Cron extends CI_Controller
 		$this->load->model('Booking_Product_Model');
 		$this->load->model('Payment_Model');
 		$this->load->model('Universal_Model');
-		$this->load->library('AutocountService'); // <-- where you put Guzzle API
+		$this->load->library('AutoCountService'); // <-- where you put Guzzle API
 	}
 
 	function index()
