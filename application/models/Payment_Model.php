@@ -543,6 +543,10 @@ class Payment_Model extends CI_Model
 		$this->db->where_in('payment.AutocountSyncStatus', $statuses);
 		$this->db->where_in('payment.Status', $titles);
 		$this->db->where('payment.AutocountSyncAction IS NOT NULL');
+		if (!empty($config['payment_cutoff_date'])) {
+			$date = date('Y-m-d', strtotime($config['payment_cutoff_date']));
+			$this->db->where('payment.InsertDate > '. $date);
+		}
 
 		$payment_qty_cront = !empty($config['payment_qty_cront'])
 			? $config['payment_qty_cront']

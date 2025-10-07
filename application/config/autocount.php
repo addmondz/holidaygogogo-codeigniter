@@ -32,6 +32,9 @@ $config['autocount'] = [
         ]
     ],
 
+    'booking_cutoff_date' => '2025-10-01',
+    'payment_cutoff_date' => '2025-10-01',
+
     // Sync settings
     'bulkBookingSyncToAutocount' => false,
     'bulkPaymentSyncToAutocount' => false,

@@ -894,6 +894,11 @@ class Booking_Model extends CI_Model
 			->order_by('booking.BookingID', 'ASC')
 			->limit($booking_qty_cront);
 
+		if (!empty($config['booking_cutoff_date'])) {
+			$date = date('Y-m-d', strtotime($config['booking_cutoff_date']));
+			$this->db->where('booking.InsertDate >', $date);
+		}
+
 		// extra filter if booking_id is provided
 		if (!empty($booking_ids)) {
 			$this->db->where_in('booking.BookingID', $booking_ids);
