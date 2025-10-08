@@ -348,7 +348,7 @@ class Cron extends CI_Controller
 		//validity
 		if (!empty($booking['StartDate']) && !empty($booking['EndDate'])) {
 			$booking['validity'] = $booking['StartDate'] . '-' . $booking['EndDate'];
-			$booking['BookingRemark'] = $booking['StartDate'] . '-' . $booking['EndDate'];
+			$booking['BokingRemark'] = $booking['StartDate'] . '-' . $booking['EndDate'];
 		}
 
 		// yourRef
@@ -373,7 +373,7 @@ class Cron extends CI_Controller
 		}
 
 		// deliveryTerm  
-		if (!empty($booking['deliveryTerm'])) {
+		if (!empty($booking['Destination'])) {
 			$booking['deliveryTerm'] = $booking['Destination'];
 			$booking['remark4'] = $booking['Destination'];
 		}
