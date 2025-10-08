@@ -18,16 +18,16 @@ class PaymentSync {
 			$param = [
 				'master' => [
 					'docNo'           => arr_get($data, 'ReferenceNumber', ''),
-					'docNo2'          => arr_get($data, 'docNo2', ''),
+					'docNo2'          => arr_get($data, 'BookingNumber', ''),
 					'docNoFormatName' => arr_get($data, 'docNoFormatName', null),
-					'docType'         => 'PV', // required
+					'docType'         => 'OR', // required
 					'docDate'         => date('Y-m-d', strtotime(arr_get($data, 'InsertDate'))),  // Date -> docDate
 					'taxDate'         => null,  // Date -> taxDate
 					'currencyCode'    => arr_get($data, 'currency_code', 'MYR'),
 					'currencyRate'    => arr_get($data, 'currency_rate', 1),
 					'journalType'     => 'GENERAL',
 					'dealWith'        => arr_get($data, 'supplier_name', ''),
-					'description'     => arr_get($data, 'PaymentRemark', ''),
+					'description'     => arr_get($data, 'ReservationNumber', ''),
 					'note'            => arr_get($data, 'note', ''),
 				],
 				'details'        => [],
@@ -56,7 +56,7 @@ class PaymentSync {
 						'accNo'              => $acc_no,
 						'toAccountRate'      => arr_get($detail, 'toAccountRate', 1),
 						'description'        => arr_get($detail, 'description', ''),
-						'furtherDescription' => arr_get($detail, 'furtherDescription', ''),
+						'furtherDescription' => arr_get($detail, 'ReservationNumber', ''),
 						'amount'             => (float)$amount,
 						'taxCode'            => arr_get($detail, 'taxCode', ''),
 						'taxAdjustment'      => arr_get($detail, 'taxAdjustment', 0),
@@ -90,7 +90,8 @@ class PaymentSync {
 					'accNo'  => $acc_no,
 					'amount' => (float)$amount,
 					'toAccountRate'      => arr_get($data, 'toAccountRate', 1),       // Default to 1
-
+					'salesAgent' => arr_get($data, 'salesAgent', ''),
+					'furtherDescription' => arr_get($data, 'ReservationNumber', ''),
 				];
 
 			}
@@ -156,16 +157,16 @@ class PaymentSync {
 			// Master data (single row only)
 			$body['master'] = [
 				'docNo'           => $docNo,                                // Reference Number -> docNo
-				'docNo2'          => arr_get($data, 'docNo2', ''),
+				'docNo2'          => arr_get($data, 'BookingNumber', ''),
 				'docNoFormatName' => arr_get($data, 'docNoFormatName', null),
-				'docType'         => arr_get($data, 'docType', 'PV'),        // Document Type (Payment Voucher)
+				'docType'         => arr_get($data, 'docType', 'OR'),        // Document Type (Payment Voucher)
 				'docDate'         => date('Y-m-d', strtotime(arr_get($data, 'InsertDate'))),  // Date -> docDate
 				'taxDate'         => null,//date('Y-m-d', strtotime(arr_get($data, 'tax_date'))),  // Date -> taxDate
 				'currencyCode'    => arr_get($data, 'Currency', 'MYR'),      // Currency -> currencyCode
 				'currencyRate'    => (float)arr_get($data, 'ForeignCurrency', 1),   // Foreign Currency -> currencyRate
 				'journalType'     => 'GENERAL',                               // Journal Type
 				'dealWith'        => arr_get($data, 'SupplierID', ''),       // Supplier -> dealWith
-				'description'     => arr_get($data, 'PaymentRemark', ''),    // Payment Remark -> description
+				'description'     => arr_get($data, 'ReservationNumber', ''),    // Payment Remark -> description
 				'note'            => arr_get($data, 'Remark', ''),           // Remark -> note
 			];
 			
@@ -186,7 +187,7 @@ class PaymentSync {
 						'accNo'              => $acc_no,        // account_no -> accNo
 						'toAccountRate'      => arr_get($detail, 'toAccountRate', 1),       // Default to 1
 						'description'        => arr_get($detail, 'description', ''),
-						'furtherDescription' => arr_get($detail, 'furtherDescription', ''),
+						'furtherDescription' => arr_get($detail, 'ReservationNumber', ''),
 						'amount'             => (float)$amount,        // Debit -> amount
 						'taxCode'            => arr_get($detail, 'taxCode', ''),
 						'taxAdjustment'      => arr_get($detail, 'taxAdjustment', 0),
@@ -220,6 +221,8 @@ class PaymentSync {
 					'accNo'  => $acc_no,
 					'amount' => (float)$amount,
 					'toAccountRate'      => arr_get($data, 'toAccountRate', 1),       // Default to 1
+					'salesAgent' => arr_get($data, 'salesAgent', ''),
+					'furtherDescription' => arr_get($data, 'ReservationNumber', ''),
 				];
 			}
 

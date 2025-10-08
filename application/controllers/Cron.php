@@ -291,6 +291,8 @@ class Cron extends CI_Controller
 		foreach ($bookings as $booking) {
 			echo "Booking ID {$booking['BookingID']} [{$booking['AutocountSyncAction']}]... ";
 
+			$booking = $this->enrichBooking($booking);
+
 			try {
 				switch ($booking['AutocountSyncAction']) {
 					case 'C':
@@ -333,6 +335,52 @@ class Cron extends CI_Controller
 	}
 
 
+	private function enrichBooking($booking)
+	{
+		// Sales agent
+		if (!empty($booking['salesAgent'])) {
+			$sale_agent = $this->Admin_Model->find($booking['salesAgent']);
+			if ($sale_agent) {
+				$booking['salesAgent'] = $sale_agent['Name'];
+			}
+		}
+
+		//validity
+		if (!empty($booking['StartDate']) && !empty($booking['EndDate'])) {
+			$booking['validity'] = $booking['StartDate'] . '-' . $booking['EndDate'];
+			$booking['BookingRemark'] = $booking['StartDate'] . '-' . $booking['EndDate'];
+		}
+
+		// yourRef
+		if (!empty($booking['ReservationNumber'])) {
+			$booking['yourRef'] = $booking['ReservationNumber'];
+			$booking['remark2'] = $booking['ReservationNumber'];
+		}
+
+		// cc 
+		if (!empty($booking['Adult'])) {
+			$booking['cc'] = $booking['Adult'] . ',';
+		}
+		if (!empty($booking['Children'])) {
+			$booking['cc'] .= $booking['Children'] . ',';
+		}
+		if (!empty($booking['InFant'])) {
+			$booking['cc'] .= $booking['InFant'];
+		}
+		if (!empty($booking['cc'])) {
+			$booking['cc'] = rtrim($booking['cc'],',');
+			$booking['remark3'] = $booking['cc'];
+		}
+
+		// deliveryTerm  
+		if (!empty($booking['deliveryTerm'])) {
+			$booking['deliveryTerm'] = $booking['Destination'];
+			$booking['remark4'] = $booking['Destination'];
+		}
+
+		return $booking;
+	}
+
     /**
      * Sync Payments
      */
@@ -347,6 +395,8 @@ class Cron extends CI_Controller
 		
 		foreach ($payments as $payment) {
 			echo "Payment ID {$payment['PaymentID']} [{$payment['AutocountSyncAction']}]... ";
+
+			$payment = $this->enrichPayment($payment);
 
 			try {
 				switch ($payment['AutocountSyncAction']) {
@@ -389,5 +439,34 @@ class Cron extends CI_Controller
 		echo "=== Sync Payments End ===\n\n";
 	}
 
+	private function enrichPayment($payment)
+	{
+		// Sales agent
+		if (!empty($payment['salesAgent'])) {
+			$sale_agent = $this->Admin_Model->find($payment['salesAgent']);
+			if ($sale_agent) {
+				$payment['salesAgent'] = $sale_agent['Name'];
+			}
+		}
+
+		// Payment details description
+		if (!empty($payment['Customer'])) {
+			$payment['detail_description'] = $payment['Customer'];
+		}
+
+		if (!empty($payment['StartDate']) && !empty($payment['EndDate'])) {
+			$payment['travelDate'] = $payment['StartDate'] . '-' . $payment['EndDate'];
+
+			if (!empty($payment['detail_description'])) {
+				$payment['detail_description'] .= ' (' . $payment['travelDate'] . ')';
+			} else {
+				$payment['detail_description'] = $payment['travelDate'];
+			}
+		}
+
+				
+
+		return $payment;
+	}
 
 }

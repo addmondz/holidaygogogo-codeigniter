@@ -57,8 +57,8 @@ class BookingSync {
 					$body['details'][] = [
 						'productCode'        => arr_get($product, 'product_ProductCode'),
 						'productVariant'     => arr_get($product, 'productVariant', null),
-						'description'        => arr_get($product, 'product_Description'),
-						'furtherDescription' => arr_get($product, 'furtherDescription', ''),
+						'description'        => arr_get($product, 'product_Name'),
+						'furtherDescription' => arr_get($product, 'product_Description', ''),
 						'qty'                => (float)arr_get($product, 'product_Quantity', 1),
 						'unit'               => arr_get($product, 'unit', 'unit'),
 						'unitPrice'          => (float)arr_get($product, 'product_Price', 0),
@@ -77,7 +77,6 @@ class BookingSync {
 
 			$body['saveApprove'] = arr_get($data, 'save_approve', null);
 
- //dd(json_encode($body));			return '1';
 			return autocount_request(
 				'POST',
 				'quotation.create',
@@ -144,8 +143,8 @@ class BookingSync {
 					$body['details'][] = [
 						'productCode'        => arr_get($product, 'product_ProductCode'),
 						'productVariant'     => arr_get($product, 'productVariant', null),
-						'description'        => arr_get($product, 'product_Description'),
-						'furtherDescription' => arr_get($product, 'furtherDescription', ''),
+						'description'        => arr_get($product, 'product_Name'),
+						'furtherDescription' => arr_get($product, 'product_Description', ''),
 						'qty'                => (float)arr_get($product, 'product_Quantity', 1),
 						'unit'               => arr_get($product, 'unit', 'unit'),
 						'unitPrice'          => (float)arr_get($product, 'product_Price', 0),

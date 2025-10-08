@@ -515,6 +515,10 @@ class Payment_Model extends CI_Model
 			'booking.Customer',
 			'booking.BookingNumber',
 			'booking.InsertDate',
+			'booking.SalesAgent',
+			'booking.ReservationNumber',
+			'booking.StartDate',
+			'booking.EndDate'
 		], false);
 
 		// Join with supplier

@@ -181,4 +181,10 @@ class Admin_Model extends CI_Model
 			default:
 		}
 	}
+
+	public function find($admin_id)
+    {
+        return $this->db->get_where('admin', ['AdminID' => $admin_id])->row();
+    }
+	
 }
