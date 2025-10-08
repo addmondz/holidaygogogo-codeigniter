@@ -525,7 +525,7 @@ class Payment_Model extends CI_Model
 		$this->db->join('supplier', 'supplier.SupplierID = payment.SupplierID', 'left');
 		$this->db->select([
 			'supplier.SupplierID',
-			'supplier.Name',
+			'supplier.Name as supplier_name',
 			'supplier.PrimaryEmail',
 		], false);
 
