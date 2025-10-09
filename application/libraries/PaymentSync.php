@@ -20,7 +20,7 @@ class PaymentSync {
 					'docNo'           => arr_get($data, 'ReferenceNumber', ''),
 					'docNo2'          => arr_get($data, 'BookingNumber', ''),
 					'docNoFormatName' => arr_get($data, 'docNoFormatName', null),
-					'docType'         => 'OR', // required
+					'docType'         => ($data['Credit'] != 0.00) ? 'OR' : 'PV', // required
 					'docDate'         => date('Y-m-d', strtotime(arr_get($data, 'InsertDate'))),  // Date -> docDate
 					'taxDate'         => null,  // Date -> taxDate
 					'currencyCode'    => arr_get($data, 'currency_code', 'MYR'),
@@ -160,7 +160,7 @@ class PaymentSync {
 				'docNo'           => $docNo,                                // Reference Number -> docNo
 				'docNo2'          => arr_get($data, 'BookingNumber', ''),
 				'docNoFormatName' => arr_get($data, 'docNoFormatName', null),
-				'docType'         => arr_get($data, 'docType', 'OR'),        // Document Type (Payment Voucher)
+				'docType'         => ($data['Credit'] != 0.00) ? 'OR' : 'PV', // required
 				'docDate'         => date('Y-m-d', strtotime(arr_get($data, 'InsertDate'))),  // Date -> docDate
 				'taxDate'         => null,//date('Y-m-d', strtotime(arr_get($data, 'tax_date'))),  // Date -> taxDate
 				'currencyCode'    => arr_get($data, 'Currency', 'MYR'),      // Currency -> currencyCode
