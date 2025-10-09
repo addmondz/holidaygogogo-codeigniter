@@ -343,7 +343,7 @@ class Cron extends CI_Controller
 		if (!empty($booking['SalesAgent'])) {
 			$sale_agent = $this->Admin_Model->find($booking['SalesAgent']);
 			if ($sale_agent) {
-				$booking['salesAgent'] = $sale_agent['Name'];
+				$booking['salesAgent'] = $sale_agent->Name;
 			}
 		}
 
@@ -378,7 +378,7 @@ class Cron extends CI_Controller
 		if (!empty($booking['Destination'])) {
 			$Destination = $this->Category_Model->find($booking['Destination']);
 			if ($Destination) {
-				$booking['Destination'] = $Destination['Name'];
+				$booking['Destination'] = $Destination->Name;
 				$booking['deliveryTerm'] = $booking['Destination'];
 				$booking['remark4'] = $booking['Destination'];
 			}
@@ -451,7 +451,7 @@ class Cron extends CI_Controller
 		if (!empty($payment['SalesAgent'])) {
 			$sale_agent = $this->Admin_Model->find($payment['SalesAgent']);
 			if ($sale_agent) {
-				$payment['salesAgent'] = $sale_agent['Name'];
+				$payment['salesAgent'] = $sale_agent->Name;
 			}
 		}
 

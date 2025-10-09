@@ -426,7 +426,7 @@ class Payment extends MY_Controller
 					if(count($array['payment'][0]) > 3) {
 						$this->Payment_Model->Update($array['payment']);
 
-						$this->Payment_Model->update_by_id($payment->PaymentID, [
+						$this->Payment_Model->update_by_id($payment['PaymentID'], [
 							'AutocountSyncAction' => 'U',
 							'AutocountSyncStatus' => 'P'
 						]);
