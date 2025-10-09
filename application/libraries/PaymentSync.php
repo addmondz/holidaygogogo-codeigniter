@@ -91,6 +91,7 @@ class PaymentSync {
 					'amount' => (float)$amount,
 					'toAccountRate'      => arr_get($data, 'toAccountRate', 1),       // Default to 1
 					'salesAgent' => arr_get($data, 'salesAgent', ''),
+					'description'        => arr_get($data, 'description', ''),
 					'furtherDescription' => arr_get($data, 'ReservationNumber', ''),
 				];
 
@@ -222,6 +223,7 @@ class PaymentSync {
 					'amount' => (float)$amount,
 					'toAccountRate'      => arr_get($data, 'toAccountRate', 1),       // Default to 1
 					'salesAgent' => arr_get($data, 'salesAgent', ''),
+					'description'        => arr_get($data, 'description', ''),
 					'furtherDescription' => arr_get($data, 'ReservationNumber', ''),
 				];
 			}

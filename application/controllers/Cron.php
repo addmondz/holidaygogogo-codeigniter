@@ -12,6 +12,8 @@ class Cron extends CI_Controller
 		$this->load->model('Booking_Model');
 		$this->load->model('Booking_Product_Model');
 		$this->load->model('Payment_Model');
+		$this->load->model('Admin_Model');
+		$this->load->model('Category_Model');
 		$this->load->model('Universal_Model');
 		$this->load->library('AutoCountService'); // <-- where you put Guzzle API
 	}
@@ -338,8 +340,8 @@ class Cron extends CI_Controller
 	private function enrichBooking($booking)
 	{
 		// Sales agent
-		if (!empty($booking['salesAgent'])) {
-			$sale_agent = $this->Admin_Model->find($booking['salesAgent']);
+		if (!empty($booking['SalesAgent'])) {
+			$sale_agent = $this->Admin_Model->find($booking['SalesAgent']);
 			if ($sale_agent) {
 				$booking['salesAgent'] = $sale_agent['Name'];
 			}
@@ -347,8 +349,8 @@ class Cron extends CI_Controller
 
 		//validity
 		if (!empty($booking['StartDate']) && !empty($booking['EndDate'])) {
-			$booking['validity'] = $booking['StartDate'] . '-' . $booking['EndDate'];
-			$booking['BokingRemark'] = $booking['StartDate'] . '-' . $booking['EndDate'];
+			$booking['validity'] = $booking['StartDate'] . ' - ' . $booking['EndDate'];
+			$booking['BokingRemark'] = $booking['StartDate'] . ' - ' . $booking['EndDate'];
 		}
 
 		// yourRef
@@ -364,8 +366,8 @@ class Cron extends CI_Controller
 		if (!empty($booking['Children'])) {
 			$booking['cc'] .= $booking['Children'] . ',';
 		}
-		if (!empty($booking['InFant'])) {
-			$booking['cc'] .= $booking['InFant'];
+		if (!empty($booking['Infant'])) {
+			$booking['cc'] .= $booking['Infant'];
 		}
 		if (!empty($booking['cc'])) {
 			$booking['cc'] = rtrim($booking['cc'],',');
@@ -374,8 +376,12 @@ class Cron extends CI_Controller
 
 		// deliveryTerm  
 		if (!empty($booking['Destination'])) {
-			$booking['deliveryTerm'] = $booking['Destination'];
-			$booking['remark4'] = $booking['Destination'];
+			$Destination = $this->Category_Model->find($booking['Destination']);
+			if ($Destination) {
+				$booking['Destination'] = $Destination['Name'];
+				$booking['deliveryTerm'] = $booking['Destination'];
+				$booking['remark4'] = $booking['Destination'];
+			}
 		}
 
 		return $booking;
@@ -442,8 +448,8 @@ class Cron extends CI_Controller
 	private function enrichPayment($payment)
 	{
 		// Sales agent
-		if (!empty($payment['salesAgent'])) {
-			$sale_agent = $this->Admin_Model->find($payment['salesAgent']);
+		if (!empty($payment['SalesAgent'])) {
+			$sale_agent = $this->Admin_Model->find($payment['SalesAgent']);
 			if ($sale_agent) {
 				$payment['salesAgent'] = $sale_agent['Name'];
 			}
@@ -455,7 +461,7 @@ class Cron extends CI_Controller
 		}
 
 		if (!empty($payment['StartDate']) && !empty($payment['EndDate'])) {
-			$payment['travelDate'] = $payment['StartDate'] . '-' . $payment['EndDate'];
+			$payment['travelDate'] = $payment['StartDate'] . ' - ' . $payment['EndDate'];
 
 			if (!empty($payment['detail_description'])) {
 				$payment['detail_description'] .= ' (' . $payment['travelDate'] . ')';

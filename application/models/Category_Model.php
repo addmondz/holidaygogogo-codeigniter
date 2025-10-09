@@ -69,4 +69,8 @@ class Category_Model extends CI_Model
 			return false;
 		}
 	}
+	function find($category_id)
+    {
+        return $this->db->get_where('category', ['CategoryID' => $category_id])->row();
+    }
 }
