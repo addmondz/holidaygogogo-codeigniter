@@ -360,17 +360,17 @@ class Cron extends CI_Controller
 		}
 
 		// cc 
-		if (!empty($booking['Adult'])) {
-			$booking['cc'] = $booking['Adult'] . ',';
-		}
-		if (!empty($booking['Children'])) {
-			$booking['cc'] .= $booking['Children'] . ',';
-		}
-		if (!empty($booking['Infant'])) {
-			$booking['cc'] .= $booking['Infant'];
-		}
+		// Check for Adult, Children, and Infant; if empty, set to 0
+		$booking['cc'] = '';
+
+		$booking['cc'] .= (!empty($booking['Adult']) ? $booking['Adult'] : 0) . ' Adult, ';
+		$booking['cc'] .= (!empty($booking['Children']) ? $booking['Children'] : 0) . ' Children, ';
+		$booking['cc'] .= (!empty($booking['Infant']) ? $booking['Infant'] : 0) . ' Infant';
+
+		// Remove trailing comma and space
+		$booking['cc'] = rtrim($booking['cc'], ', ');
+
 		if (!empty($booking['cc'])) {
-			$booking['cc'] = rtrim($booking['cc'],',');
 			$booking['remark3'] = $booking['cc'];
 		}
 
