@@ -8,6 +8,7 @@ class Travel_Voucher extends CI_Controller
         $this->load->model('Universal_Model');
 		$this->load->model('Booking_Product_Model');
 		$this->load->model('Company_Model');
+		$this->load->model('Guest_List_Model');
 	}
     
 	function index()
@@ -87,6 +88,15 @@ class Travel_Voucher extends CI_Controller
                 $array['CompanyLicenseNumber'] = $company['LicenseNumber'];
                 $array['CompanyAddress'] = $company['Address'];
                 $array['CompanyWebsite'] = $company['Website'];
+
+                // Get guest list data
+                $bookingNumber = $array['BookingNumber'];
+                $this->db->select('guest_list.Name As GuestFirstName, guest_list.LastName As GuestLastName, guest_list.Gender, DateOfBirth, guest_list.IdentificationNumber, guest_list.PassportNumber, Type');
+                $this->db->where('guest_list.BookingID', $bookingNumber);
+                $this->db->where('guest_list.Status', 'Y');
+                $this->db->order_by('Type', 'ASC');
+                $array['guest_lists'] = $this->db->get('guest_list')->result();
+                
                 $this->load->library('pdf');
                 $this->dompdf->loadHtml($this->load->view('booking/travel_voucher', $array, true));
                 $this->dompdf->set_option('isRemoteEnabled', true);

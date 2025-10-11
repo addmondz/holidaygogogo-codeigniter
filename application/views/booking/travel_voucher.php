@@ -153,6 +153,85 @@
 			<td><?php echo $TravelVoucherFooter; ?></td>
 		</tr>
 	</table>
+	
+	<!-- Guest List Details -->
+	<?php if(!empty($guest_lists)) { ?>
+	<br>
+	<div style="page-break-inside: avoid;">
+		<table style="width:100%; margin-bottom: 8px; border-collapse: collapse;">
+			<tr>
+				<td style="padding: 0; margin: 0;">
+					<h3 style="font-size: 15px; margin: 0; padding: 0; font-weight: 700; text-transform: uppercase;">Guest List</h3>
+				</td>
+			</tr>
+		</table>
+		<hr style="border: none; border-top: 2px solid #000; margin: 0 0 0 0;">
+		
+		<table style="width:100%; font-size:11px; border-collapse: collapse; margin-top: 0;">
+			<thead>
+				<tr style="background-color: #f8f8f8;">
+					<th style="padding: 10px 6px; text-align: center; font-weight: 700; width: 4%; border-bottom: 2px solid #000;">#</th>
+					<th style="padding: 10px 6px; text-align: left; font-weight: 700; width: 9%; border-bottom: 2px solid #000;">Type</th>
+					<th style="padding: 10px 6px; text-align: left; font-weight: 700; width: 30%; border-bottom: 2px solid #000;">Full Name</th>
+					<th style="padding: 10px 6px; text-align: center; font-weight: 700; width: 9%; border-bottom: 2px solid #000;">Gender</th>
+					<th style="padding: 10px 6px; text-align: center; font-weight: 700; width: 14%; border-bottom: 2px solid #000;">Date of Birth</th>
+					<th style="padding: 10px 6px; text-align: left; font-weight: 700; width: 17%; border-bottom: 2px solid #000;">IC Number</th>
+					<th style="padding: 10px 6px; text-align: left; font-weight: 700; width: 17%; border-bottom: 2px solid #000;">Passport Number</th>
+				</tr>
+			</thead>
+			<tbody>
+				<?php 
+				$guest_count = 1;
+				foreach($guest_lists as $guest) { 
+					$full_name = trim($guest->GuestFirstName . ' ' . $guest->GuestLastName);
+					if(empty($full_name)) $full_name = '-';
+					$dob = !empty($guest->DateOfBirth) ? strtoupper(date('d M Y', strtotime($guest->DateOfBirth))) : '-';
+					$ic = !empty($guest->IdentificationNumber) ? strtoupper($guest->IdentificationNumber) : '-';
+					$passport = !empty($guest->PassportNumber) ? strtoupper($guest->PassportNumber) : '-';
+					$gender = !empty($guest->Gender) ? strtoupper($guest->Gender) : '-';
+					
+					// Subtle alternating rows
+					$row_bg = ($guest_count % 2 == 0) ? '#fafafa' : '#ffffff';
+				?>
+				<tr style="background-color: <?php echo $row_bg; ?>;">
+					<td style="padding: 12px 6px; text-align: center; color: #888; font-weight: 600; border-bottom: 1px solid #e8e8e8;"><?php echo $guest_count; ?></td>
+					<td style="padding: 12px 6px; font-weight: 600; border-bottom: 1px solid #e8e8e8;"><?php echo $guest->Type; ?></td>
+					<td style="padding: 12px 6px; font-weight: 600; border-bottom: 1px solid #e8e8e8;"><?php echo strtoupper($full_name); ?></td>
+					<td style="padding: 12px 6px; text-align: center; border-bottom: 1px solid #e8e8e8;"><?php echo $gender; ?></td>
+					<td style="padding: 12px 6px; text-align: center; font-family: 'Courier New', monospace; border-bottom: 1px solid #e8e8e8;"><?php echo $dob; ?></td>
+					<td style="padding: 12px 6px; font-family: 'Courier New', monospace; font-size: 10px; border-bottom: 1px solid #e8e8e8;"><?php echo $ic; ?></td>
+					<td style="padding: 12px 6px; font-family: 'Courier New', monospace; font-size: 10px; border-bottom: 1px solid #e8e8e8;"><?php echo $passport; ?></td>
+				</tr>
+				<?php 
+				$guest_count++;
+				} 
+				?>
+			</tbody>
+			<tfoot>
+				<tr style="background-color: #f8f8f8;">
+					<td colspan="7" style="padding: 12px 6px; text-align: right; border-top: 2px solid #000;">
+						<?php 
+						$adults = 0; $children = 0; $infants = 0;
+						foreach($guest_lists as $g) {
+							if($g->Type == 'ADULT') $adults++;
+							elseif($g->Type == 'CHILD') $children++;
+							elseif($g->Type == 'INFANT') $infants++;
+						}
+						?>
+						<strong style="font-size: 11px; font-weight: 700;">
+							Total: <?php echo count($guest_lists); ?> Passenger<?php echo count($guest_lists) > 1 ? 's' : ''; ?>
+						</strong>
+						<span style="color: #777; font-size: 10px; margin-left: 12px;">
+							(<?php echo $adults; ?> Adult<?php echo $adults != 1 ? 's' : ''; ?>, 
+							<?php echo $children; ?> Child<?php echo $children != 1 ? 'ren' : ''; ?>, 
+							<?php echo $infants; ?> Infant<?php echo $infants != 1 ? 's' : ''; ?>)
+						</span>
+					</td>
+				</tr>
+			</tfoot>
+		</table>
+	</div>
+	<?php } ?>
 </body>
 
 </html>
