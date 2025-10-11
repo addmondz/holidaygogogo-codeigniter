@@ -1,0 +1,170 @@
+<?php
+
+require FCPATH.'vendor/autoload.php';  
+use Clegginabox\PDFMerger\PDFMerger;
+
+class Receipt extends CI_Controller
+{
+    public $Booking_Model;
+    public $Universal_Model;
+    public $Booking_Product_Model;
+    public $Company_Model;
+    public $Payment_Model;
+    public $session;
+    public $input;
+    public $db;
+    public $dompdf;
+    
+    function __construct()
+    {
+        parent::__construct();
+        $this->load->model('Booking_Model');
+        $this->load->model('Universal_Model');
+        $this->load->model('Booking_Product_Model');
+        $this->load->model('Company_Model');
+        $this->load->model('Payment_Model');
+    }
+
+    function index()
+    {  
+        $token = $this->input->get('token');
+        
+        if(empty($token)) {
+            $this->load->view('errors/access_denied');
+            return;
+        }
+        
+        // Get booking data by token
+        $this->db->where('Token', $token);
+        $booking = $this->db->get('booking')->row();
+        
+        if(empty($booking)) {
+            $this->load->view('errors/access_denied');
+            return;
+        }
+        
+        // Generate receipt on demand
+        $this->generate_receipt($booking);
+    }
+    
+    private function generate_receipt($booking)
+    {
+        // Get booking data
+        $array = $this->Booking_Model->Booking_Document();
+        
+        if(empty($array)) {
+            $this->load->view('errors/access_denied');
+            return;
+        }
+        
+        // Set receipt title and data
+        $array['BookingConfirmationTitle'] = 'PAYMENT RECEIPT';
+        $array['Title'] = 'Receipt_' . $array['BookingNumber'];
+        $array['InsertDate'] = strtoupper(date('j M Y'));
+        
+        // Get approved payments for this booking
+        $this->db->select('Date, Type, Credit, ReferenceNumber, Status');
+        $this->db->where('BookingID', $array['BookingID']);
+        $this->db->where('Status', 'Y');
+        $this->db->where('Credit >', 0);
+        $this->db->order_by('Date', 'ASC');
+        $approved_payments = $this->db->get('payment')->result();
+        
+        $total_received = 0;
+        foreach($approved_payments as $payment) {
+            $total_received += $payment->Credit;
+        }
+        
+        $array['approved_payments'] = $approved_payments;
+        $array['total_received'] = $total_received;
+        $array['balance_due'] = $array['NetTotal'] - $total_received;
+        
+        // Get booking products
+        $_GET['booking_id'] = $array['BookingID'];
+        $array['booking_products'] = $this->Booking_Product_Model->Read();
+        
+        // Format dates
+        $array['DepositDeadline'] = empty($array['DepositDeadline']) ? '-' : strtoupper(date('j M Y', strtotime($array['DepositDeadline'])));
+        $array['FullPaymentDeadline'] = strtoupper(date('j M Y', strtotime($array['FullPaymentDeadline'])));
+        $array['CustomerMobile'] = $array['CountryCode'] . $array['CustomerMobile'];
+        
+        if(!empty($array['StartDate']) && !empty($array['EndDate'])) {
+            $array['TravelDate'] = strtoupper(date('j M', strtotime($array['StartDate'])) . ' - ' . date('j M Y', strtotime($array['EndDate'])));
+        } else {
+            $array['TravelDate'] = '-';
+        }
+        
+        // Format guest numbers
+        if(!empty($array['Adult'])) {
+            $array['Adult'] = $array['Adult'] == 1 ? $array['Adult'] . ' ADULT ' : $array['Adult'] . ' ADULTS ';
+        }
+        if(!empty($array['Children'])) {
+            $array['Children'] = $array['Children'] == 1 ? $array['Children'] . ' CHILD ' : $array['Children'] . ' CHILDREN ';
+        }
+        if(!empty($array['Infant'])) {
+            $array['Infant'] = $array['Infant'] == 1 ? $array['Infant'] . ' INFANT ' : $array['Infant'] . ' INFANTS ';
+        }
+        
+        // Combine guest numbers
+        if(!empty($array['Adult']) && !empty($array['Children']) && !empty($array['Infant'])) {
+            $array['PaxNumber'] = $array['Adult'] . '& ' . $array['Children'] . '& ' . $array['Infant'];
+        } else {
+            if(!empty($array['Adult']) && empty($array['Children']) && !empty($array['Infant'])) {
+                $array['PaxNumber'] = $array['Adult'] . '& ' . $array['Infant'];
+            } else {
+                if(!empty($array['Adult']) && !empty($array['Children']) && empty($array['Infant'])) {
+                    $array['PaxNumber'] = $array['Adult'] . '& ' . $array['Children'];
+                } else {
+                    if(!empty($array['Adult']) && empty($array['Children']) && empty($array['Infant'])) {
+                        $array['PaxNumber'] = $array['Adult'];
+                    } else {
+                        if(empty($array['Adult']) && !empty($array['Children']) && !empty($array['Infant'])) {
+                            $array['PaxNumber'] = $array['Children'] . '& ' . $array['Infant'];
+                        } else {
+                            if(empty($array['Adult']) && empty($array['Children']) && !empty($array['Infant'])) {
+                                $array['PaxNumber'] = $array['Infant'];
+                            } else {
+                                $array['PaxNumber'] = $array['Children'];
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Keep numeric values - view will format them
+        // No formatting needed here as the view template handles it
+        
+        // Format product names
+        foreach($array['booking_products'] as $booking_product) {
+            $booking_product->Name = (explode(' (' . $booking_product->ProductCode . ')', $booking_product->Name))[0];
+        }
+        
+        // Get company information
+        $company = $this->Company_Model->Read();
+        $array['CompanyName'] = $company['Name'];
+        $array['CompanyRegistrationNumber'] = $company['RegistrationNumber'];
+        $array['CompanyLicenseNumber'] = $company['LicenseNumber'];
+        $array['CompanyAddress'] = $company['Address'];
+        $array['CompanyWebsite'] = $company['Website'];
+        
+        // Set Text variable for footer
+        $array['Text'] = !empty($array['BookingConfirmationFooter']) ? $array['BookingConfirmationFooter'] : 'Thank you for your payment. Please keep this receipt for your records.';
+        
+        // Generate PDF
+        $this->load->library('pdf');
+        
+        // Generate single-page receipt
+        $this->dompdf->loadHtml($this->load->view('receipt/receipt_simple', $array, true));
+        $this->dompdf->set_option('isRemoteEnabled', true);
+        $this->dompdf->setPaper('A4', 'portrait');
+        $this->dompdf->render();
+        
+        $pdf_output = $this->dompdf->output();
+        
+        // Output the PDF directly to the browser
+        header('Content-Type: application/pdf');
+        header('Content-Disposition: inline; filename="' . $array['BookingNumber'] . '_receipt.pdf"');
+        echo $pdf_output;
+    }
+}

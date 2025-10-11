@@ -147,9 +147,9 @@
                                             <div class="form-group">
                                                 <label>Status</label>
                                                 <select name="status" class="form-control selectpicker">
-                                                    <option selected data-icon="la la-dollar font-size-lg bs-icon" value="">--SELECT STATUS--</option>
+                                                    <option data-icon="la la-dollar font-size-lg bs-icon" value="">--SELECT STATUS--</option>
                                                     <?php foreach(unserialize(PAYMENT_STATUS) as $key => $value) { ?>
-                                                        <option data-icon="<?php if($key == 'Y') { echo 'la la-check-circle'; } else if($key == 'P') { echo 'la la-exclamation-circle'; } else { echo 'la la-times-circle'; } ?> font-size-lg bs-icon" value="<?php echo $key; ?>" <?php if(!empty($this->input->get('status')) && $this->input->get('status') == $key) { echo 'selected'; } ?>><?php echo $value; ?></option>
+                                                        <option data-icon="<?php if($key == 'Y') { echo 'la la-check-circle'; } else if($key == 'P') { echo 'la la-exclamation-circle'; } else { echo 'la la-times-circle'; } ?> font-size-lg bs-icon" value="<?php echo $key; ?>" <?php if((!empty($this->input->get('status')) && $this->input->get('status') == $key) || (empty($this->input->get('status')) && $key == 'P' && strpos($_SERVER['REQUEST_URI'], '?') == false)) { echo 'selected'; } ?>><?php echo $value; ?></option>
                                                     <?php } ?>
                                                 </select>
                                             </div>
@@ -475,6 +475,10 @@
                                                         <button onclick="Delete_Record('<?php echo base_url('assets/image/sweetalert.jpg'); ?>', '<?php if(!empty($payment->Credit)) { echo 'Payment Record : Credit ' . $payment->Credit; } else { echo 'Payment Record : Debit ' . $payment->Debit; } ?>', '<?php echo base_url('Payment/Delete'); ?>', 'payment_id', <?php echo $payment->PaymentID; ?>, '<?php echo $payment->Status; ?>', '<?php if(strpos($current_url, '?') == true) { echo base_url('Payment?') . (explode('?', $current_url))[1]; } else { echo base_url('Payment'); } ?>')" class="dropdown-item" style="color:#E37383; font-size:11px;">Delete Payment</button>
                                                     <?php } ?>
                                                     <a href="<?php echo base_url('Payment/View?payment_id=') . $payment->PaymentID; ?>" class="dropdown-item" style="font-size:11px;">Read Payment</a>
+                                                    <?php //if($payment->Status == 'Y' && $payment->Credit > 0) { ?>
+                                                    <?php if($payment->Status == 'Y') { ?>
+                                                        <a href="<?php echo base_url('Receipt?token=') . $payment->Token; ?>" target="_blank" class="dropdown-item" style="font-size:11px; color:#28a745;">Generate Receipt</a>
+                                                    <?php } ?>
                                                     <?php if(in_array('AP', $this->session->access_control)) { ?>
                                                         <a href="<?php if(strpos($current_url, '?') == true) { echo base_url('Payment/Update?payment_id=') . $payment->PaymentID . '&' . (explode('?', $current_url))[1]; } else { echo base_url('Payment/Update?payment_id=') . $payment->PaymentID; } ?>" class="dropdown-item" style="font-size:11px;">Update Payment</a>
                                                     <?php } ?>

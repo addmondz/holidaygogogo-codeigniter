@@ -9,7 +9,7 @@ class Payment_Model extends CI_Model
 		return $this->db->get('payment')->row_array();
 	}
 	
-	function Read_Payments1()
+	function Read_Payments1($limit = null)
 	{
 		$this->db->select('PaymentID, payment.BookingID, payment.SupplierID, Date, Type, Credit, ReferenceNumber, Debit, Deadline, payment.BankHolder, payment.Status, BookingNumber, ReservationNumber, Customer, StartDate, EndDate, NetTotal, Token, admin.Name As SalesAgent, supplier.Name As Supplier,  payment.AutocountSyncStatus, payment.AutocountSyncMessage');
 		$this->db->join('payment', 'payment.BookingID = booking.BookingID', 'left');
@@ -84,6 +84,12 @@ class Payment_Model extends CI_Model
 		}
 		if(!empty($this->input->get('sales_agent'))) {
 			$this->db->where('SalesAgent', $this->input->get('sales_agent'));
+		}
+		if(!empty($limit)) {
+			$this->db->limit($limit);
+		}
+		else if($this->input->get('status') == 'Y') {
+			$this->db->limit(100);
 		}
 		$this->db->where('payment.Status !=', 'N');
 		$this->db->order_by('Date DESC');
@@ -234,6 +240,15 @@ class Payment_Model extends CI_Model
 		$this->db->where('BookingID', $booking_id);
 		$this->db->where_in('Type', array('ADDITIONAL PAYMENT', 'DEPOSIT', 'FULL', 'CUSTOMER REFUND'));
 		$this->db->where('Status', 'Y');
+		return $this->db->get('payment')->result();
+	}
+	
+	function Read_Approved_Payments($booking_id) {
+		$this->db->select('Date, Type, Credit, ReferenceNumber, Status');
+		$this->db->where('BookingID', $booking_id);
+		$this->db->where('Status', 'Y');
+		$this->db->where('Credit >', 0);
+		$this->db->order_by('Date', 'ASC');
 		return $this->db->get('payment')->result();
 	}
 	
