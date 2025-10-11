@@ -50,7 +50,7 @@ class Receipt extends CI_Controller
     private function generate_receipt($booking)
     {
         // Get booking data
-        $array = $this->Booking_Model->Booking_Document();
+        $array = $this->Booking_Model->Booking_Document_for_receipt();
         
         if(empty($array)) {
             $this->load->view('errors/access_denied');
