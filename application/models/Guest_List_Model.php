@@ -3,7 +3,7 @@ class Guest_List_Model extends CI_Model
 {
 	function Read_Guest_Lists1()
 	{
-		$this->db->select('GuestListID, guest_list.BookingID, guest_list.CountryCodeID As GuestCountryCode, Type, guest_list.Name As Guest, guest_list.Gender, DateOfBirth, Nationality, guest_list.IdentificationNumber, guest_list.PassportNumber, guest_list.Mobile As GuestMobile, guest_list.Email, MaritalStatus, Employment, Address, Postcode, guest_list.City, guest_list.State, guest_list.Country, Nominee, NomineeIdentificationNumber, Relationship, booking.BookingID, BookingNumber, ReservationNumber, Customer, booking.Mobile As CustomerMobile, StartDate, EndDate, Adult, Children, Infant, ChatLanguage, LockStatus, TravelInsuranceStatus, AfterSalesService, GLSessionLock, GLSessionExpiration, booking.Status, admin.CountryCodeID As SalesAgentCountryCode, admin.Name As SalesAgent, admin.Mobile As SalesAgentMobile, category.Name As Destination, CountryCode');
+		$this->db->select('GuestListID, guest_list.BookingID, guest_list.CountryCodeID As GuestCountryCode, Type, guest_list.Name As Guest, guest_list.LastName As GuestLastName, guest_list.Gender, DateOfBirth, Nationality, guest_list.IdentificationNumber, guest_list.PassportNumber, guest_list.Mobile As GuestMobile, guest_list.Email, MaritalStatus, Employment, Address, Postcode, guest_list.City, guest_list.State, guest_list.Country, Nominee, NomineeIdentificationNumber, Relationship, booking.BookingID, BookingNumber, ReservationNumber, Customer, booking.Mobile As CustomerMobile, StartDate, EndDate, Adult, Children, Infant, ChatLanguage, LockStatus, TravelInsuranceStatus, AfterSalesService, GLSessionLock, GLSessionExpiration, booking.Status, admin.CountryCodeID As SalesAgentCountryCode, admin.Name As SalesAgent, admin.Mobile As SalesAgentMobile, category.Name As Destination, CountryCode');
 		$this->db->join('guest_list', 'guest_list.BookingID = booking.BookingID', 'left');
 		$this->db->join('admin', 'admin.AdminID = booking.SalesAgent', 'left');
 		$this->db->join('category', 'category.CategoryID = booking.Destination', 'left');
@@ -20,7 +20,7 @@ class Guest_List_Model extends CI_Model
 
     function Read_Guest_Lists2()
 	{
-		$this->db->select('GuestListID, guest_list.CountryCodeID As GuestCountryCode, guest_list.Name As Guest, guest_list.Gender, DateOfBirth, Nationality, guest_list.IdentificationNumber, guest_list.PassportNumber, guest_list.Mobile As GuestMobile, guest_list.Email, MaritalStatus, Employment, Address, Postcode, guest_list.City, guest_list.State, guest_list.Country, Nominee, NomineeIdentificationNumber, Relationship, Adult, Children, Infant, LockStatus, TravelInsuranceStatus');
+		$this->db->select('GuestListID, guest_list.CountryCodeID As GuestCountryCode, guest_list.Name As Guest, guest_list.LastName As GuestLastName, guest_list.Gender, DateOfBirth, Nationality, guest_list.IdentificationNumber, guest_list.PassportNumber, guest_list.Mobile As GuestMobile, guest_list.Email, MaritalStatus, Employment, Address, Postcode, guest_list.City, guest_list.State, guest_list.Country, Nominee, NomineeIdentificationNumber, Relationship, Adult, Children, Infant, LockStatus, TravelInsuranceStatus');
 		$this->db->join('guest_list', 'guest_list.BookingID = booking.BookingID', 'left');
         $this->db->where('booking.BookingID', $this->input->post('booking_id'));
 		$this->db->where('guest_list.Status', 'Y');
@@ -67,6 +67,7 @@ class Guest_List_Model extends CI_Model
 				'CountryCodeID' => empty($this->input->post('new_country_codes')[$i]) ? null : $this->input->post('new_country_codes')[$i],
 				'Type' => $this->input->post('new_types')[$i],
 				'Name' => empty($this->input->post('new_names')[$i]) ? null : strtoupper($this->input->post('new_names')[$i]),
+				'LastName' => empty($this->input->post('new_last_names')[$i]) ? null : strtoupper($this->input->post('new_last_names')[$i]),
 				'Gender' => empty($this->input->post('new_genders')[$i]) ? null : $this->input->post('new_genders')[$i],
 				'DateOfBirth' => empty($this->input->post('new_date_of_births')[$i]) ? null : date('Y-m-d', strtotime(str_replace('/', '-', $this->input->post('new_date_of_births')[$i]))),
 				'Nationality' => empty($this->input->post('new_nationalities')[$i]) ? null : $this->input->post('new_nationalities')[$i],
@@ -110,6 +111,7 @@ class Guest_List_Model extends CI_Model
 				$array = array(
 					'CountryCodeID' => empty($this->input->post('country_codes')[$i]) ? null : $this->input->post('country_codes')[$i],
 					'Name' => empty($this->input->post('names')[$i]) ? null : strtoupper($this->input->post('names')[$i]),
+					'LastName' => empty($this->input->post('last_names')[$i]) ? null : strtoupper($this->input->post('last_names')[$i]),
 					'Gender' => empty($this->input->post('genders')[$i]) ? null : $this->input->post('genders')[$i],
 					'DateOfBirth' => empty($this->input->post('date_of_births')[$i]) ? null : date('Y-m-d', strtotime(str_replace('/', '-', $this->input->post('date_of_births')[$i]))),
 					'Nationality' => empty($this->input->post('nationalities')[$i]) ? null : $this->input->post('nationalities')[$i],

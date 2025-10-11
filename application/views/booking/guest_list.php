@@ -157,12 +157,16 @@
 										<div class="form-group">
 											<div class="row">
 												<div class="col-md-6 mb-7 mb-md-0">
-													<label id="<?php echo 'name_label-' . $guest->GuestListID; ?>">Name (As per IC/Passport) <?php if(!empty($guest->Guest)) { echo '<span style="color:red;">*</span>'; } ?></label>
-													<input <?php if(!empty($guest->Guest)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="names[]" id="<?php echo 'name-' . $guest->GuestListID; ?>" value="<?php echo $guest->Guest; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="form-control">
+													<label id="<?php echo 'name_label-' . $guest->GuestListID; ?>">First Name (As per IC/Passport) <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>
+													<input <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="names[]" id="<?php echo 'name-' . $guest->GuestListID; ?>" value="<?php echo $guest->Guest; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="form-control">
+												</div>
+												<div class="col-md-6 mb-7 mb-md-0">
+													<label id="<?php echo 'last_name_label-' . $guest->GuestListID; ?>">Last Name (As per IC/Passport) <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>
+													<input <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="last_names[]" id="<?php echo 'last-name-' . $guest->GuestListID; ?>" value="<?php echo $guest->GuestLastName; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="form-control">
 												</div>
 												<div class="col-md-6">
-													<label id="<?php echo 'gender_label-' . $guest->GuestListID; ?>">Gender <?php if(!empty($guest->Guest)) { echo '<span style="color:red;">*</span>'; } ?></label>
-													<select <?php if(!empty($guest->Guest)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> name="genders[]" id="<?php echo 'gender-' . $guest->GuestListID; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" class="form-control">
+													<label id="<?php echo 'gender_label-' . $guest->GuestListID; ?>">Gender <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>
+													<select <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> name="genders[]" id="<?php echo 'gender-' . $guest->GuestListID; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" class="form-control">
 														<option selected disabled value="">--SELECT GENDER--</option>
 														<option value="F" <?php if($guest->Gender == 'F') { echo 'selected'; } ?>>FEMALE</option>
 														<option value="M" <?php if($guest->Gender == 'M') { echo 'selected'; } ?>>MALE</option>
@@ -172,12 +176,12 @@
 											<br>
 											<div class="row">
 												<div class="col-md-6 mb-7 mb-md-0">
-													<label id="<?php echo 'date_of_birth_label-' . $guest->GuestListID; ?>">Date Of Birth <?php if(!empty($guest->Guest)) { echo '<span style="color:red;">*</span>'; } ?></label>
-													<input <?php if(!empty($guest->Guest)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="date_of_births[]" id="<?php echo 'date_of_birth-' . $guest->GuestListID; ?>" value="<?php echo $guest->DateOfBirth; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="form-control kt_datepicker_4_3">
+													<label id="<?php echo 'date_of_birth_label-' . $guest->GuestListID; ?>">Date Of Birth <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>
+													<input <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="date_of_births[]" id="<?php echo 'date_of_birth-' . $guest->GuestListID; ?>" value="<?php echo $guest->DateOfBirth; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="form-control kt_datepicker_4_3">
 												</div>
 												<div class="col-md-6">
-													<label id="<?php echo 'nationality_label-' . $guest->GuestListID; ?>">Nationality <?php if(!empty($guest->Guest)) { echo '<span style="color:red;">*</span>'; } ?></label>
-													<select <?php if(!empty($guest->Guest)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> name="nationalities[]" id="<?php echo 'nationality-' . $guest->GuestListID; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" class="form-control">
+													<label id="<?php echo 'nationality_label-' . $guest->GuestListID; ?>">Nationality <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>
+													<select <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> name="nationalities[]" id="<?php echo 'nationality-' . $guest->GuestListID; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" class="form-control">
 														<option selected disabled value="">--SELECT NATIONALITY--</option>
 														<?php foreach($country_codes as $nationality) { ?>
 															<option <?php if(!empty($guest->Nationality) && $nationality->CountryCodeID == $guest->Nationality) { echo 'selected'; } ?> value="<?php echo $nationality->CountryCodeID; ?>"><?php echo $nationality->Country; ?></option>
@@ -188,19 +192,19 @@
 											<br>
 											<div class="row">
 												<div class="col-md-6 mb-7 mb-md-0">
-													<label id="<?php echo 'identification_number_label-' . $guest->GuestListID; ?>">Identification Number <?php if(!empty($guest->Guest) && $guest->NationalityName == 'MALAYSIA') { echo '<span style="color:red;">*</span>'; } ?></label>
-													<input <?php if(!empty($guest->Guest && $guest->NationalityName == 'MALAYSIA')) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="identification_numbers[]" id="<?php echo 'identification_number-' . $guest->GuestListID; ?>" value="<?php echo $guest->IdentificationNumber; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="form-control">
+													<label id="<?php echo 'identification_number_label-' . $guest->GuestListID; ?>">Identification Number <?php if((!empty($guest->Guest) || !empty($guest->GuestLastName)) && $guest->NationalityName == 'MALAYSIA') { echo '<span style="color:red;">*</span>'; } ?></label>
+													<input <?php if((!empty($guest->Guest) || !empty($guest->GuestLastName)) && $guest->NationalityName == 'MALAYSIA') { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="identification_numbers[]" id="<?php echo 'identification_number-' . $guest->GuestListID; ?>" value="<?php echo $guest->IdentificationNumber; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="form-control">
 												</div>
 												<div class="col-md-6">
-													<label id="<?php echo 'passport_number_label-' . $guest->GuestListID; ?>">Passport Number <?php if(!empty($guest->Guest) && !empty($guest->NationalityName) && $guest->NationalityName != 'MALAYSIA') { echo '<span style="color:red;">*</span>'; } ?></label>
-													<input <?php if(!empty($guest->Guest && !empty($guest->NationalityName) && $guest->NationalityName != 'MALAYSIA')) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="passport_numbers[]" id="<?php echo 'passport_number-' . $guest->GuestListID; ?>" value="<?php echo $guest->PassportNumber; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="form-control">
+													<label id="<?php echo 'passport_number_label-' . $guest->GuestListID; ?>">Passport Number <?php if((!empty($guest->Guest) || !empty($guest->GuestLastName)) && !empty($guest->NationalityName) && $guest->NationalityName != 'MALAYSIA') { echo '<span style="color:red;">*</span>'; } ?></label>
+													<input <?php if((!empty($guest->Guest) || !empty($guest->GuestLastName)) && !empty($guest->NationalityName) && $guest->NationalityName != 'MALAYSIA') { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="passport_numbers[]" id="<?php echo 'passport_number-' . $guest->GuestListID; ?>" value="<?php echo $guest->PassportNumber; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="form-control">
 												</div>
 											</div>
 											<br>
 											<div class="row">
 												<div class="col-md-6 mb-7 mb-md-0">
-													<label id="<?php echo 'country_code_label-' . $guest->GuestListID; ?>">Country Code <?php if(!empty($guest->Guest)) { echo '<span style="color:red;">*</span>'; } ?></label>
-													<select <?php if(!empty($guest->Guest)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> name="country_codes[]" id="<?php echo 'country_code-' . $guest->GuestListID; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" class="form-control">
+													<label id="<?php echo 'country_code_label-' . $guest->GuestListID; ?>">Country Code <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>
+													<select <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> name="country_codes[]" id="<?php echo 'country_code-' . $guest->GuestListID; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" class="form-control">
 														<option selected disabled value="">--SELECT COUNTRY CODE--</option>
 														<?php foreach($country_codes as $country_code) { ?>
 															<option <?php if(!empty($guest->GuestCountryCode) && $country_code->CountryCodeID == $guest->GuestCountryCode) { echo 'selected'; } ?> value="<?php echo $country_code->CountryCodeID; ?>"><?php echo $country_code->Country . ' ' . $country_code->CountryCode; ?></option>
@@ -208,15 +212,15 @@
 													</select>
 												</div>
 												<div class="col-md-6">
-													<label id="<?php echo 'mobile_label-' . $guest->GuestListID; ?>">Mobile <?php if(!empty($guest->Guest)) { echo '<span style="color:red;">*</span>'; } ?></label>
-													<input <?php if(!empty($guest->Guest)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="mobiles[]" id="<?php echo 'mobile-' . $guest->GuestListID; ?>" value="<?php echo $guest->GuestMobile; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="form-control">
+													<label id="<?php echo 'mobile_label-' . $guest->GuestListID; ?>">Mobile <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>
+													<input <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="mobiles[]" id="<?php echo 'mobile-' . $guest->GuestListID; ?>" value="<?php echo $guest->GuestMobile; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="form-control">
 												</div>
 											</div>
 											<br>
 											<div class="row">
 												<div class="col-md-6">
-													<label id="<?php echo 'email_label-' . $guest->GuestListID; ?>">Email <?php if(!empty($guest->Guest)) { echo '<span style="color:red;">*</span>'; } ?></label>
-													<input <?php if(!empty($guest->Guest)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="emails[]" id="<?php echo 'email-' . $guest->GuestListID; ?>" value="<?php echo $guest->Email; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="form-control">
+													<label id="<?php echo 'email_label-' . $guest->GuestListID; ?>">Email <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>
+													<input <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="emails[]" id="<?php echo 'email-' . $guest->GuestListID; ?>" value="<?php echo $guest->Email; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="form-control">
 												</div>
 											</div>
 										</div>
@@ -233,8 +237,8 @@
 															<div class="form-group">
 																<div class="row">
 																	<div class="col-md-6 mb-7 mb-md-0">
-																		<label id="<?php echo 'marital_status_label-' . $guest->GuestListID; ?>">Marital Status <?php if(!empty($guest->Guest)) { echo '<span style="color:red;">*</span>'; } ?></label>
-																		<select <?php if(!empty($guest->Guest)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> name="marital_statuses[]" id="<?php echo 'marital_status-' . $guest->GuestListID; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" class="form-control">
+																		<label id="<?php echo 'marital_status_label-' . $guest->GuestListID; ?>">Marital Status <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>
+																		<select <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> name="marital_statuses[]" id="<?php echo 'marital_status-' . $guest->GuestListID; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" class="form-control">
 																			<option selected disabled value="">--SELECT MARITAL STATUS--</option>
 																			<option value="DIVORCED" <?php if($guest->MaritalStatus == 'DIVORCED') { echo 'selected'; } ?>>DIVORCED</option>
 																			<option value="MARRIED" <?php if($guest->MaritalStatus == 'MARRIED') { echo 'selected'; } ?>>MARRIED</option>
@@ -243,37 +247,37 @@
 																		</select>
 																	</div>
 																	<div class="col-md-6">
-																		<label id="<?php echo 'employment_label-' . $guest->GuestListID; ?>">Employment <?php if(!empty($guest->Guest)) { echo '<span style="color:red;">*</span>'; } ?></label>
-																		<input <?php if(!empty($guest->Guest)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="employments[]" id="<?php echo 'employment-' . $guest->GuestListID; ?>" value="<?php echo $guest->Employment; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="form-control">
+																		<label id="<?php echo 'employment_label-' . $guest->GuestListID; ?>">Employment <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>
+																		<input <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="employments[]" id="<?php echo 'employment-' . $guest->GuestListID; ?>" value="<?php echo $guest->Employment; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="form-control">
 																	</div>
 																</div>
 																<br>
 																<div class="row">
 																	<div class="col-md-6 mb-7 mb-md-0">
-																		<label id="<?php echo 'address_label-' . $guest->GuestListID; ?>">Address <?php if(!empty($guest->Guest)) { echo '<span style="color:red;">*</span>'; } ?></label>
-																		<input <?php if(!empty($guest->Guest)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="addresses[]" id="<?php echo 'address-' . $guest->GuestListID; ?>" value="<?php echo $guest->Address; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="form-control">
+																		<label id="<?php echo 'address_label-' . $guest->GuestListID; ?>">Address <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>
+																		<input <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="addresses[]" id="<?php echo 'address-' . $guest->GuestListID; ?>" value="<?php echo $guest->Address; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="form-control">
 																	</div>
 																	<div class="col-md-6">
-																		<label id="<?php echo 'postcode_label-' . $guest->GuestListID; ?>">Postcode <?php if(!empty($guest->Guest)) { echo '<span style="color:red;">*</span>'; } ?></label>
-																		<input <?php if(!empty($guest->Guest)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="postcodes[]" id="<?php echo 'postcode-' . $guest->GuestListID; ?>" value="<?php echo $guest->Postcode; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="form-control">
+																		<label id="<?php echo 'postcode_label-' . $guest->GuestListID; ?>">Postcode <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>
+																		<input <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="postcodes[]" id="<?php echo 'postcode-' . $guest->GuestListID; ?>" value="<?php echo $guest->Postcode; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="form-control">
 																	</div>
 																</div>
 																<br>
 																<div class="row">
 																	<div class="col-md-6 mb-7 mb-md-0">
-																		<label id="<?php echo 'city_label-' . $guest->GuestListID; ?>">City <?php if(!empty($guest->Guest)) { echo '<span style="color:red;">*</span>'; } ?></label>
-																		<input <?php if(!empty($guest->Guest)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="cities[]" id="<?php echo 'city-' . $guest->GuestListID; ?>" value="<?php echo $guest->City; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="form-control">
+																		<label id="<?php echo 'city_label-' . $guest->GuestListID; ?>">City <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>
+																		<input <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="cities[]" id="<?php echo 'city-' . $guest->GuestListID; ?>" value="<?php echo $guest->City; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="form-control">
 																	</div>
 																	<div class="col-md-6">
-																		<label id="<?php echo 'state_label-' . $guest->GuestListID; ?>">State <?php if(!empty($guest->Guest)) { echo '<span style="color:red;">*</span>'; } ?></label>
-																		<input <?php if(!empty($guest->Guest)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="states[]" id="<?php echo 'state-' . $guest->GuestListID; ?>" value="<?php echo $guest->State; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="form-control">
+																		<label id="<?php echo 'state_label-' . $guest->GuestListID; ?>">State <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>
+																		<input <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="states[]" id="<?php echo 'state-' . $guest->GuestListID; ?>" value="<?php echo $guest->State; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="form-control">
 																	</div>
 																</div>
 																<br>
 																<div class="row">
 																	<div class="col-md-6 mb-7 mb-md-0">
-																		<label id="<?php echo 'country_label-' . $guest->GuestListID; ?>">Country <?php if(!empty($guest->Guest)) { echo '<span style="color:red;">*</span>'; } ?></label>
-																		<select <?php if(!empty($guest->Guest)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> name="countries[]" id="<?php echo 'country-' . $guest->GuestListID; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" class="form-control">
+																		<label id="<?php echo 'country_label-' . $guest->GuestListID; ?>">Country <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>
+																		<select <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> name="countries[]" id="<?php echo 'country-' . $guest->GuestListID; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" class="form-control">
 																			<option selected disabled value="">--SELECT COUNTRY--</option>
 																			<?php foreach($country_codes as $country) { ?>
 																				<option <?php if(!empty($guest->Country) && $country->CountryCodeID == $guest->Country) { echo 'selected'; } ?> value="<?php echo $country->CountryCodeID; ?>"><?php echo $country->Country; ?></option>
@@ -281,19 +285,19 @@
 																		</select>
 																	</div>
 																	<div class="col-md-6">
-																		<label id="<?php echo 'nominee_name_label-' . $guest->GuestListID; ?>">Nominee Name <?php if(!empty($guest->Guest)) { echo '<span style="color:red;">*</span>'; } ?></label>
-																		<input <?php if(!empty($guest->Guest)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="nominee_names[]" id="<?php echo 'nominee_name-' . $guest->GuestListID; ?>" value="<?php echo $guest->Nominee; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="form-control">
+																		<label id="<?php echo 'nominee_name_label-' . $guest->GuestListID; ?>">Nominee Name <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>
+																		<input <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="nominee_names[]" id="<?php echo 'nominee_name-' . $guest->GuestListID; ?>" value="<?php echo $guest->Nominee; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="form-control">
 																	</div>
 																</div>
 																<br>
 																<div class="row">
 																	<div class="col-md-6 mb-7 mb-md-0">
-																		<label id="<?php echo 'nominee_identification_number_label-' . $guest->GuestListID; ?>">Nominee Identification Number <?php if(!empty($guest->Guest)) { echo '<span style="color:red;">*</span>'; } ?></label>
-																		<input <?php if(!empty($guest->Guest)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="nominee_identification_numbers[]" id="<?php echo 'nominee_identification_number-' . $guest->GuestListID; ?>" value="<?php echo $guest->NomineeIdentificationNumber; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="form-control">
+																		<label id="<?php echo 'nominee_identification_number_label-' . $guest->GuestListID; ?>">Nominee Identification Number <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>
+																		<input <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="nominee_identification_numbers[]" id="<?php echo 'nominee_identification_number-' . $guest->GuestListID; ?>" value="<?php echo $guest->NomineeIdentificationNumber; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="form-control">
 																	</div>
 																	<div class="col-md-6">
-																		<label id="<?php echo 'relationship_label-' . $guest->GuestListID; ?>">Relationship <?php if(!empty($guest->Guest)) { echo '<span style="color:red;">*</span>'; } ?></label>
-																		<input <?php if(!empty($guest->Guest)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="relationships[]" id="<?php echo 'relationship-' . $guest->GuestListID; ?>" value="<?php echo $guest->Relationship; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="form-control">
+																		<label id="<?php echo 'relationship_label-' . $guest->GuestListID; ?>">Relationship <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>
+																		<input <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="relationships[]" id="<?php echo 'relationship-' . $guest->GuestListID; ?>" value="<?php echo $guest->Relationship; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="form-control">
 																		<p style="color:#FAA0A0; font-size:10px; margin-top:5px;">(must be relative and not in the trip, eg cousin, uncle, sister, brother, father, mother & etc)</p>
 																	</div>
 																</div>
@@ -348,6 +352,7 @@
 		{
 			//Basic Details
 			var name = $(`#name-${guest_list_id}`).val();
+			var last_name = $(`#last-name-${guest_list_id}`).val();
 			var gender = $(`#gender-${guest_list_id}`).val();
 			var date_of_birth = $(`#date_of_birth-${guest_list_id}`).val();
 			var nationality = $(`#nationality-${guest_list_id}`).val();
@@ -369,9 +374,11 @@
 			var nominee_identification_number = $(`#nominee_identification_number-${guest_list_id}`).val();
 			var relationship = $(`#relationship-${guest_list_id}`).val();
 
-			if(name != '' || gender != null || date_of_birth != '' || nationality != null || identification_number != '' || passport_number != '' || country_code != null || mobile != '' || email != '' || marital_status != null || employment != '' || address != '' || postcode != '' || city != '' || state != '' || country != null || nominee_name != '' || nominee_identification_number != '' || relationship != '') {
-				$(`#name_label-${guest_list_id}`).html('Name <span style="color:red;">*</span>');
+			if(name != '' || last_name != '' || gender != null || date_of_birth != '' || nationality != null || identification_number != '' || passport_number != '' || country_code != null || mobile != '' || email != '' || marital_status != null || employment != '' || address != '' || postcode != '' || city != '' || state != '' || country != null || nominee_name != '' || nominee_identification_number != '' || relationship != '') {
+				$(`#name_label-${guest_list_id}`).html('First Name <span style="color:red;">*</span>');
 				$(`#name-${guest_list_id}`).prop('required', 'true');
+				$(`#last_name_label-${guest_list_id}`).html('Last Name <span style="color:red;">*</span>');
+				$(`#last-name-${guest_list_id}`).prop('required', 'true');
 				$(`#gender_label-${guest_list_id}`).html('Gender <span style="color:red;">*</span>');
 				$(`#gender-${guest_list_id}`).prop('required', 'true');
 				$(`#date_of_birth_label-${guest_list_id}`).html('Date Of Birth <span style="color:red;">*</span>');
@@ -424,8 +431,10 @@
 					$(`#relationship-${guest_list_id}`).prop('required', 'true');
 				<?php } ?>
 			} else {
-				$(`#name_label-${guest_list_id}`).html('Name');
+				$(`#name_label-${guest_list_id}`).html('First Name');
 				$(`#name-${guest_list_id}`).removeAttr('required');
+				$(`#last_name_label-${guest_list_id}`).html('Last Name');
+				$(`#last-name-${guest_list_id}`).removeAttr('required');
 				$(`#gender_label-${guest_list_id}`).html('Gender');
 				$(`#gender-${guest_list_id}`).removeAttr('required');
 				$(`#date_of_birth_label-${guest_list_id}`).html('Date Of Birth');
@@ -488,8 +497,12 @@
 						'<div class="form-group">' +
 							'<div class="row">' +
 								'<div class="col-md-6 mb-7 mb-md-0">' +
-									'<label id="name_label-'+ guest_list_id +'">Name (As per IC/Passport) </label>' +
+									'<label id="name_label-'+ guest_list_id +'">First Name (As per IC/Passport) </label>' +
 									'<input type="text" name="new_names[]" id="name-'+ guest_list_id +'" onchange="Set_Required_Field('+ guest_list_id +')" autocomplete="off" class="form-control">' +
+								'</div>' +
+								'<div class="col-md-6 mb-7 mb-md-0">' +
+									'<label id="last_name_label-'+ guest_list_id +'">Last Name (As per IC/Passport) </label>' +
+									'<input type="text" name="new_last_names[]" id="last-name-'+ guest_list_id +'" onchange="Set_Required_Field('+ guest_list_id +')" autocomplete="off" class="form-control">' +
 								'</div>' +
 								'<div class="col-md-6">' +
 									'<label id="gender_label-'+ guest_list_id +'">Gender</label>' +
@@ -767,6 +780,9 @@
 						$.each(array, function(key, value) {
 							if(value.Guest != null && $(`#name-${value.GuestListID}`).val() == '') {
 								$(`#name-${value.GuestListID}`).val(value.Guest);
+							}
+							if(value.GuestLastName != null && $(`#last-name-${value.GuestListID}`).val() == '') {
+								$(`#last-name-${value.GuestListID}`).val(value.GuestLastName);
 							}
 							if(value.Gender != null && $(`#gender-${value.GuestListID}`).val() == null) {
 								$(`#gender-${value.GuestListID}`).val(value.Gender).change();
