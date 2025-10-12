@@ -119,12 +119,9 @@
 		<table>
 			<tr>
 				<?php
-					$logoPath = FCPATH . 'assets/image/pdflogo.png';      // CI3: FCPATH points to webroot
-					$imgSrc   = 'file://' . realpath($logoPath);          // works for Dompdf/mPDF via <img>
-
-					if (!file_exists($logoPath)) {
-						log_message('error', 'PDF logo not found at: ' . $logoPath);
-					}
+					$logoPath = FCPATH.'assets/image/pdflogo.png';
+					$imgData  = base64_encode(file_get_contents($logoPath));
+					$imgSrc   = 'data:image/png;base64,'.$imgData;
 				?>
 				<td style="width:15%">
 					<img src="<?= $imgSrc ?>" style="width:160px;">
