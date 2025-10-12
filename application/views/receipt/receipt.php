@@ -118,7 +118,17 @@
 	<header>
 		<table>
 			<tr>
-				<td style="width:15%"><img src="<?php echo base_url('assets/image/pdflogo.png'); ?>" style="width:160px;"></td>
+				<?php
+					$logoPath = FCPATH . 'assets/image/pdflogo.png';      // CI3: FCPATH points to webroot
+					$imgSrc   = 'file://' . realpath($logoPath);          // works for Dompdf/mPDF via <img>
+
+					if (!file_exists($logoPath)) {
+						log_message('error', 'PDF logo not found at: ' . $logoPath);
+					}
+				?>
+				<td style="width:15%">
+					<img src="<?= $imgSrc ?>" style="width:160px;">
+				</td>
 				<td style="width:85%; text-align: center;">
 					<h1><?php echo $CompanyName; ?></h1>
 					<small>(Co. Reg. No. - <?php echo $CompanyRegistrationNumber; ?> | Travel Agent License No. - <?php echo $CompanyLicenseNumber; ?>)</small>
