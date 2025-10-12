@@ -84,7 +84,14 @@
 	<header>
 		<table>
 			<tr>
-				<td style="width:15%"><img src="<?php echo base_url('assets/image/pdflogo.png'); ?>" style="width:160px;"></td>
+				<?php
+					$logoPath = FCPATH.'assets/image/pdflogo.png';
+					$imgData  = base64_encode(file_get_contents($logoPath));
+					$imgSrc   = 'data:image/png;base64,'.$imgData;
+				?>
+				<td style="width:15%">
+					<img src="<?= $imgSrc ?>" style="width:160px;">
+				</td>
 				<td style="width:85%; text-align: center;">
 					<h1><?php echo $CompanyName; ?></h1>
 					<small>(Co. Reg. No. - <?php echo $CompanyRegistrationNumber; ?> | Travel Agent License No. - <?php echo $CompanyLicenseNumber; ?>)</small>
