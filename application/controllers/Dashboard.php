@@ -33,13 +33,17 @@ class Dashboard extends MY_Controller
 
 		$titles = array('tab_title' => 'HolidayGoGoGo | Dashboard', 'breadcrumb_title' => 'Dashboard');
 
+		// Get date filters from query string
+		$start_date = $this->input->get('start_date');
+		$end_date = $this->input->get('end_date');
+
 		//SA
 
-		$array['sales_agent_upcoming_travels'] = $this->Dashboard_Model->Sales_Agent_Upcoming_Travels();
+		$array['sales_agent_upcoming_travels'] = $this->Dashboard_Model->Sales_Agent_Upcoming_Travels($start_date, $end_date);
 
 		$array['sales_agent_overdue_payments'] = $this->Dashboard_Model->Sales_Agent_Overdue_Payments();
 
-		$array['sales_agent_pending_travel_vouchers'] = $this->Dashboard_Model->Sales_Agent_Pending_Travel_Vouchers();
+		$array['sales_agent_pending_travel_vouchers'] = $this->Dashboard_Model->Sales_Agent_Pending_Travel_Vouchers($start_date, $end_date);
 
 		$array['sales_agent_pending_reviews'] = $this->Dashboard_Model->Sales_Agent_Pending_Reviews();
 
@@ -77,11 +81,11 @@ class Dashboard extends MY_Controller
 
 		$array['sales_agents'] = $this->Dashboard_Model->Sales_Agents();
 
-		$array['upcoming_travels'] = $this->Dashboard_Model->Upcoming_Travels();
+		$array['upcoming_travels'] = $this->Dashboard_Model->Upcoming_Travels($start_date, $end_date);
 
 		$array['overdue_payments'] = $this->Dashboard_Model->Overdue_Payments();
 
-		$array['pending_travel_vouchers'] = $this->Dashboard_Model->Pending_Travel_Vouchers();
+		$array['pending_travel_vouchers'] = $this->Dashboard_Model->Pending_Travel_Vouchers($start_date, $end_date);
 
 		$array['pending_reviews'] = $this->Dashboard_Model->Pending_Reviews();
 

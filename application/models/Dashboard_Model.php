@@ -5,7 +5,6 @@ class Dashboard_Model extends CI_Model
 {
 
 	//SA
-	
 
 	function Sales_Agent_Daily_Sales()
 
@@ -119,15 +118,25 @@ class Dashboard_Model extends CI_Model
 
 
 
-	function Sales_Agent_Upcoming_Travels()
+	function Sales_Agent_Upcoming_Travels($start_date = null, $end_date = null)
 
 	{
 
-		$this->db->select('BookingNumber, Customer, Name');
+		$this->db->select('BookingNumber, Customer, Name, StartDate');
 
 		$this->db->join('category', 'category.CategoryID = booking.Destination', 'left');
 
-		$this->db->where('StartDate', date('Y-m-d', strtotime('+ 1 day')));
+		// Use custom date range if provided, otherwise default to tomorrow
+		if ($start_date && $end_date) {
+			$this->db->where('StartDate >=', $start_date);
+			$this->db->where('StartDate <=', $end_date);
+		} elseif ($start_date) {
+			$this->db->where('StartDate >=', $start_date);
+		} elseif ($end_date) {
+			$this->db->where('StartDate <=', $end_date);
+		} else {
+			$this->db->where('StartDate', date('Y-m-d', strtotime('+ 1 day')));
+		}
 
 		$this->db->where('SalesAgent', $this->session->admin_id);
 
@@ -136,6 +145,8 @@ class Dashboard_Model extends CI_Model
 		$this->db->where('CancelStatus', 'N');
 
 		$this->db->where('booking.Status', 'PT');
+
+		$this->db->order_by('StartDate', 'ASC');
 
 		$this->db->order_by('BookingNumber', 'ASC');
 
@@ -173,7 +184,7 @@ class Dashboard_Model extends CI_Model
 
 
 
-	function Sales_Agent_Pending_Travel_Vouchers()
+	function Sales_Agent_Pending_Travel_Vouchers($start_date = null, $end_date = null)
 
 	{
 
@@ -181,9 +192,18 @@ class Dashboard_Model extends CI_Model
 
 		$this->db->join('category', 'category.CategoryID = booking.Destination', 'left');
 
-		$this->db->where('StartDate >=', date('Y-m-d', strtotime('+ 1 day')));
-
-		$this->db->where('StartDate <=', date('Y-m-d', strtotime('+ 7 days')));
+		// Use custom date range if provided, otherwise default to next 7 days
+		if ($start_date && $end_date) {
+			$this->db->where('StartDate >=', $start_date);
+			$this->db->where('StartDate <=', $end_date);
+		} elseif ($start_date) {
+			$this->db->where('StartDate >=', $start_date);
+		} elseif ($end_date) {
+			$this->db->where('StartDate <=', $end_date);
+		} else {
+			$this->db->where('StartDate >=', date('Y-m-d', strtotime('+ 1 day')));
+			$this->db->where('StartDate <=', date('Y-m-d', strtotime('+ 7 days')));
+		}
 
 		$this->db->where('SalesAgent', $this->session->admin_id);
 
@@ -192,6 +212,8 @@ class Dashboard_Model extends CI_Model
 		$this->db->where('CancelStatus', 'N');
 
 		$this->db->where('booking.Status', 'PTV');
+
+		$this->db->order_by('StartDate', 'ASC');
 
 		$this->db->order_by('BookingNumber', 'ASC');
 
@@ -645,17 +667,27 @@ class Dashboard_Model extends CI_Model
 
 
 
-	function Upcoming_Travels()
+	function Upcoming_Travels($start_date = null, $end_date = null)
 
 	{
 
-		$this->db->select('BookingNumber, Customer, AdminID, admin.Name As SalesAgent, category.Name As Destination');
+		$this->db->select('BookingNumber, Customer, AdminID, admin.Name As SalesAgent, category.Name As Destination, StartDate');
 
 		$this->db->join('admin', 'admin.AdminID = booking.SalesAgent', 'left');
 
 		$this->db->join('category', 'category.CategoryID = booking.Destination', 'left');
 
-		$this->db->where('StartDate', date('Y-m-d', strtotime('+ 1 day')));
+		// Use custom date range if provided, otherwise default to tomorrow
+		if ($start_date && $end_date) {
+			$this->db->where('StartDate >=', $start_date);
+			$this->db->where('StartDate <=', $end_date);
+		} elseif ($start_date) {
+			$this->db->where('StartDate >=', $start_date);
+		} elseif ($end_date) {
+			$this->db->where('StartDate <=', $end_date);
+		} else {
+			$this->db->where('StartDate', date('Y-m-d', strtotime('+ 1 day')));
+		}
 
 		$this->db->where('BookingConfirmationTitle', 'BOOKING CONFIRMATION');
 
@@ -664,6 +696,8 @@ class Dashboard_Model extends CI_Model
 		$this->db->where('booking.Status', 'PT');
 
 		$this->db->order_by('SalesAgent', 'ASC');
+
+		$this->db->order_by('StartDate', 'ASC');
 
 		$this->db->order_by('BookingNumber', 'ASC');
 
@@ -713,7 +747,7 @@ class Dashboard_Model extends CI_Model
 
 
 
-	function Pending_Travel_Vouchers()
+	function Pending_Travel_Vouchers($start_date = null, $end_date = null)
 
 	{
 
@@ -723,9 +757,18 @@ class Dashboard_Model extends CI_Model
 
 		$this->db->join('category', 'category.CategoryID = booking.Destination', 'left');
 
-		$this->db->where('StartDate >=', date('Y-m-d', strtotime('+ 1 day')));
-
-		$this->db->where('StartDate <=', date('Y-m-d', strtotime('+ 7 days')));
+		// Use custom date range if provided, otherwise default to next 7 days
+		if ($start_date && $end_date) {
+			$this->db->where('StartDate >=', $start_date);
+			$this->db->where('StartDate <=', $end_date);
+		} elseif ($start_date) {
+			$this->db->where('StartDate >=', $start_date);
+		} elseif ($end_date) {
+			$this->db->where('StartDate <=', $end_date);
+		} else {
+			$this->db->where('StartDate >=', date('Y-m-d', strtotime('+ 1 day')));
+			$this->db->where('StartDate <=', date('Y-m-d', strtotime('+ 7 days')));
+		}
 
 		$this->db->where('BookingConfirmationTitle', 'BOOKING CONFIRMATION');
 
@@ -734,6 +777,8 @@ class Dashboard_Model extends CI_Model
 		$this->db->where('booking.Status', 'PTV');
 
 		$this->db->order_by('SalesAgent', 'ASC');
+
+		$this->db->order_by('StartDate', 'ASC');
 
 		$this->db->order_by('BookingNumber', 'ASC');
 

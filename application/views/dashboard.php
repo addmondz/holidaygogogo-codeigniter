@@ -26,13 +26,35 @@
                             <div class="card card-custom card-stretch gutter-b">
                                 <div class="card-header border-0" style="background-color:#F0FFFF;">
                                     <h3 class="card-title font-weight-bold text-dark" style="font-size:14px;">Travel Reminder</h3>
+                                    <!-- <div class="card-toolbar">
+                                        <div id="kt_daterangepicker_4" class="input-icon sa_picker">
+                                            <input readonly type="text" id="travel_reminder_date" autocomplete="off" class="form-control">
+                                            <span>
+                                                <i class="la la-calendar"></i>
+                                            </span>
+                                        </div>
+                                    </div> -->
                                 </div>
                             </div>
                         </div>
                         <div class="col-md-4">
                             <div class="card card-custom card-stretch gutter-b">
                                 <div class="card-header border-0" style="background-color:#A7C7E730;">
-                                    <h3 class="card-title font-weight-bold text-dark" style="font-size:14px;">Travels Tomorrow</h3>
+                                    <!-- <h3 class="card-title font-weight-bold text-dark" style="font-size:14px;"> -->
+                                        <?php 
+                                            // $start_date = $this->input->get('start_date');
+                                            // $end_date = $this->input->get('end_date');
+                                            // if ($start_date && $end_date) {
+                                            //     echo 'Travels: ' . date('j M', strtotime($start_date)) . ' - ' . date('j M Y', strtotime($end_date));
+                                            // } elseif ($start_date) {
+                                            //     echo 'Travels From: ' . date('j M Y', strtotime($start_date));
+                                            // } elseif ($end_date) {
+                                            //     echo 'Travels Until: ' . date('j M Y', strtotime($end_date));
+                                            // } else {
+                                            //     echo 'Travels Tomorrow';
+                                            // }
+                                        ?>
+                                    <!-- </h3> -->
                                 </div>
                                 <div class="card-body">
                                     <div class="accordion accordion-solid accordion-toggle-plus">
@@ -52,6 +74,7 @@
                                                                 </label>
                                                                 <div class="d-flex flex-column flex-grow-1">
                                                                     <a href="<?php echo base_url('Booking?booking_number=') . $sales_agent_upcoming_travel->BookingNumber; ?>" target="_blank" class="text-dark-75 text-hover-primary font-weight-bold font-size-xs"><?php echo $sales_agent_upcoming_travel->BookingNumber; ?></a>
+                                                                    <span class="text-muted font-weight-bold" style="color:#A7C7E7 !important; font-size:10px;"><?php echo strtoupper(date('j M Y', strtotime($sales_agent_upcoming_travel->StartDate))); ?></span>
                                                                     <span class="text-muted font-weight-bold" style="font-size:10px;"><?php echo $sales_agent_upcoming_travel->Name; ?></span>
                                                                     <span class="text-muted font-weight-bold" style="font-size:10px;"><?php echo $sales_agent_upcoming_travel->Customer; ?></span>
                                                                 </div>
@@ -69,7 +92,21 @@
                         <div class="col-md-4">
                             <div class="card card-custom card-stretch gutter-b">
                                 <div class="card-header border-0" style="background-color:#FFFAA030;">
-                                    <h3 class="card-title font-weight-bold text-dark" style="font-size:14px;">Upcoming Travel In 7 Days - Pending Travel Voucher</h3>
+                                    <h3 class="card-title font-weight-bold text-dark" style="font-size:14px;">
+                                        <?php 
+                                            $start_date = $this->input->get('start_date');
+                                            $end_date = $this->input->get('end_date');
+                                            if ($start_date && $end_date) {
+                                                echo 'Pending Travel Voucher: ' . date('j M', strtotime($start_date)) . ' - ' . date('j M Y', strtotime($end_date));
+                                            } elseif ($start_date) {
+                                                echo 'Pending Travel Voucher From: ' . date('j M Y', strtotime($start_date));
+                                            } elseif ($end_date) {
+                                                echo 'Pending Travel Voucher Until: ' . date('j M Y', strtotime($end_date));
+                                            } else {
+                                                echo 'Upcoming Travel In 7 Days - Pending Travel Voucher';
+                                            }
+                                        ?>
+                                    </h3>
                                 </div>
                                 <div class="card-body">
                                     <div class="accordion accordion-solid accordion-toggle-plus">
@@ -355,13 +392,42 @@
                             <div class="card card-custom card-stretch gutter-b">
                                 <div class="card-header border-0" style="background-color:#F0FFFF;">
                                     <h3 class="card-title font-weight-bold text-dark" style="font-size:14px;">Travel Reminder</h3>
+                                    <div class="card-toolbar">
+                                        <div id="kt_daterangepicker_4" class="input-icon travel_reminder_picker">
+                                            <?php
+                                                $start_date_travel_reminder =isset( $_GET['start_date']) ? date('d/m/Y', strtotime($_GET['start_date'])) : '';
+                                                $end_date_travel_reminder =isset( $_GET['end_date']) ? date('d/m/Y', strtotime($_GET['end_date'])) : '';
+                                            ?>
+                                            <input readonly type="text" id="travel_reminder_date" autocomplete="off" class="form-control" value="<?php echo $start_date_travel_reminder . ' - ' . $end_date_travel_reminder; ?>">
+                                            <span>
+                                                <i class="la la-calendar"></i>
+                                            </span>
+                                        </div>
+                                        <span id="reset_travel_reminder_date" class="btn btn-icon btn-warning btn-sm ml-1">
+                                            <i class="la la-refresh"></i>
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                         <div class="col-md-4">
                             <div class="card card-custom card-stretch gutter-b">
                                 <div class="card-header border-0" style="background-color:#A7C7E730;">
-                                    <h3 class="card-title font-weight-bold text-dark" style="font-size:14px;">Travels Tomorrow</h3>
+                                    <h3 class="card-title font-weight-bold text-dark" style="font-size:14px;">
+                                        <?php 
+                                            $start_date = $this->input->get('start_date');
+                                            $end_date = $this->input->get('end_date');
+                                            if ($start_date && $end_date) {
+                                                echo 'Travels: ' . date('j M', strtotime($start_date)) . ' - ' . date('j M Y', strtotime($end_date));
+                                            } elseif ($start_date) {
+                                                echo 'Travels From: ' . date('j M Y', strtotime($start_date));
+                                            } elseif ($end_date) {
+                                                echo 'Travels Until: ' . date('j M Y', strtotime($end_date));
+                                            } else {
+                                                echo 'Travels Tomorrow';
+                                            }
+                                        ?>
+                                    </h3>
                                 </div>
                                 <div class="card-body">
                                     <div class="accordion accordion-solid accordion-toggle-plus">
@@ -382,6 +448,7 @@
                                                                 <div class="d-flex flex-column flex-grow-1">
                                                                     <span class="font-weight-bold" style="color:#C3B1E1; font-size:11px;"><?php echo $upcoming_travel->SalesAgent; ?></span>
                                                                     <a href="<?php echo base_url('Booking?booking_number=') . $upcoming_travel->BookingNumber; ?>" target="_blank" class="text-dark-75 text-hover-primary font-weight-bold font-size-xs"><?php echo $upcoming_travel->BookingNumber; ?></a>
+                                                                    <span class="text-muted font-weight-bold" style="color:#A7C7E7 !important; font-size:10px;"><?php echo strtoupper(date('j M Y', strtotime($upcoming_travel->StartDate))); ?></span>
                                                                     <span class="text-muted font-weight-bold" style="font-size:10px;"><?php echo $upcoming_travel->Destination; ?></span>
                                                                     <span class="text-muted font-weight-bold" style="font-size:10px;"><?php echo $upcoming_travel->Customer; ?></span>
                                                                 </div>
@@ -399,7 +466,21 @@
                         <div class="col-md-4">
                             <div class="card card-custom card-stretch gutter-b">
                                 <div class="card-header border-0" style="background-color:#FFFAA030;">
-                                    <h3 class="card-title font-weight-bold text-dark" style="font-size:14px;">Upcoming Travel In 7 Days - Pending Travel Voucher</h3>
+                                    <h3 class="card-title font-weight-bold text-dark" style="font-size:14px;">
+                                        <?php 
+                                            $start_date = $this->input->get('start_date');
+                                            $end_date = $this->input->get('end_date');
+                                            if ($start_date && $end_date) {
+                                                echo 'Pending Travel Voucher: ' . date('j M', strtotime($start_date)) . ' - ' . date('j M Y', strtotime($end_date));
+                                            } elseif ($start_date) {
+                                                echo 'Pending Travel Voucher From: ' . date('j M Y', strtotime($start_date));
+                                            } elseif ($end_date) {
+                                                echo 'Pending Travel Voucher Until: ' . date('j M Y', strtotime($end_date));
+                                            } else {
+                                                echo 'Upcoming Travel In 7 Days - Pending Travel Voucher';
+                                            }
+                                        ?>
+                                    </h3>
                                 </div>
                                 <div class="card-body">
                                     <div class="accordion accordion-solid accordion-toggle-plus">
@@ -1611,5 +1692,74 @@
                 chart.render();
             }
         });
+
+        // travel reminder picker
+        var start_date_travel_reminder = '';
+        var end_date_travel_reminder = '';
+        var current_url = window.location.href;
+
+        // get start and end date from current url
+        if (current_url.includes('start_date=') && current_url.includes('end_date=')) {
+            start_date_travel_reminder = current_url.split('start_date=')[1].split('&')[0];
+            end_date_travel_reminder = current_url.split('end_date=')[1].split('&')[0];
+        }
+
+        $('#kt_daterangepicker_4.travel_reminder_picker').on('apply.daterangepicker', function(ev, picker) {
+            console.log('travel reminder picker change', picker.startDate.format('YYYY-MM-DD'), picker.endDate.format('YYYY-MM-DD'));
+            start_date_travel_reminder = picker.startDate.format('YYYY-MM-DD');
+            end_date_travel_reminder = picker.endDate.format('YYYY-MM-DD');
+            filterTravelReminders();
+        });
+
+        // sa picker
+        var start_date_sa = '';
+        var end_date_sa = '';
+        // $('#kt_daterangepicker_4.sa_picker').on('apply.daterangepicker', function(ev, picker) {
+        //     console.log('sa change', picker.startDate.format('YYYY-MM-DD'), picker.endDate.format('YYYY-MM-DD'));
+        //     start_date_sa = picker.startDate.format('YYYY-MM-DD');
+        //     end_date_sa = picker.endDate.format('YYYY-MM-DD');
+        // });
+
+        
+        $('#reset_travel_reminder_date').click(function() {
+            window.location.href = '<?php echo base_url('Dashboard'); ?>';
+        });
+
+        // Function to filter travel reminders based on date range
+        function filterTravelReminders() {
+            var params = '';
+
+            // sa
+            var start_date_sa = start_date_sa;
+            var end_date_sa = end_date_sa;
+            // if (start_date_sa && $('#sa_travel_start_date').length) {
+            //     params += '?start_date=' + moment(start_date_sa, 'DD MMM YYYY').format('YYYY-MM-DD');
+            // }
+            // if (end_date_sa && $('#sa_travel_end_date').length) {
+            //     params += (params ? '&' : '?') + 'end_date=' + moment(end_date_sa, 'DD MMM YYYY').format('YYYY-MM-DD');
+            // }
+
+            // travel reminder
+            var start_date = start_date_travel_reminder;
+            var end_date = end_date_travel_reminder;
+            if (start_date != '') {
+                params += (params ? '&' : '?') + 'start_date=' + start_date;
+            }
+            if (end_date != '') {
+                params += (params ? '&' : '?') + 'end_date=' + end_date;
+            }
+
+            console.log('params', params);
+            
+            // Reload page with date parameters
+            if (params) {
+                window.location.href = '<?php echo base_url('Dashboard'); ?>' + params;
+            } else {
+                // If both dates are cleared, reload without parameters
+                if (!start_date_sa && !end_date_sa && !start_date && !end_date) {
+                    window.location.href = '<?php echo base_url('Dashboard'); ?>';
+                }
+            }
+        }
     });
 </script>
