@@ -306,10 +306,26 @@ class Booking extends MY_Controller
 					}
 				}
 
-				$this->Booking_Model->update_by_id($this->input->post('booking_id'), [
-					'AutocountSyncAction'  => 'U',
-					'AutocountSyncStatus'  => 'P'
-				]);
+				$bookingInfo = $this->Booking_Model->find($this->input->post('booking_id'));
+
+				if (!empty($bookingInfo)) {
+					if ($bookingInfo['AutocountSyncAction'] == 'C' && $bookingInfo['AutocountSyncStatus'] == 'S') {
+						$this->Booking_Model->update_by_id($this->input->post('booking_id'), [
+							'AutocountSyncAction'  => 'U',
+							'AutocountSyncStatus'  => 'P'
+						]);
+					} else if ($bookingInfo['AutocountSyncAction'] == 'U' && $bookingInfo['AutocountSyncStatus'] == 'S') {
+						$this->Booking_Model->update_by_id($this->input->post('booking_id'), [
+							'AutocountSyncAction'  => 'U',
+							'AutocountSyncStatus'  => 'P'
+						]);
+					} else {
+						$this->Booking_Model->update_by_id($this->input->post('booking_id'), [
+							'AutocountSyncStatus'  => 'P'
+						]);
+					}
+				}
+				
 				/*** Fetch Fresh Booking + Products from DB ***/
 				// $booking_id = $this->input->post('booking_id');
 				// $bookingData = $this->Booking_Model->getAllBookingsWithGuests($booking_id);
@@ -566,10 +582,24 @@ class Booking extends MY_Controller
 			// 		}						
 			// 	}
 			// }
-			$this->Booking_Model->update_by_id($this->input->get('booking_id'), [
-				'AutocountSyncAction'  => 'D',
-				'AutocountSyncStatus'  => 'P'
-			]);
+
+			$bookingInfo = $this->Booking_Model->find($this->input->get('booking_id'));
+			if (!empty($bookingInfo)) {
+				if (($bookingInfo['AutocountSyncAction'] == 'C' || $bookingInfo['AutocountSyncAction'] == 'U') && $bookingInfo['AutocountSyncStatus'] == 'S') {
+						$this->Booking_Model->update_by_id($this->input->get('booking_id'), [
+						'AutocountSyncAction' => 'D',
+						'AutocountSyncStatus' => 'P'
+					]);				
+				} else {
+					$this->Booking_Model->update_by_id($this->input->get('booking_id'), [
+						'AutocountSyncStatus' => 'P'
+					]);
+				}
+			}
+			// $this->Booking_Model->update_by_id($this->input->get('booking_id'), [
+			// 	'AutocountSyncAction'  => 'D',
+			// 	'AutocountSyncStatus'  => 'P'
+			// ]);
 			
 		} else {
 			redirect('Dashboard');

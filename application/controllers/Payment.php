@@ -426,10 +426,24 @@ class Payment extends MY_Controller
 					if(count($array['payment'][0]) > 3) {
 						$this->Payment_Model->Update($array['payment']);
 
-						$this->Payment_Model->update_by_id($payment['PaymentID'], [
-							'AutocountSyncAction' => 'U',
-							'AutocountSyncStatus' => 'P'
-						]);
+						if ($payment['AutocountSyncAction'] == 'C' && $payment['AutocountSyncStatus'] == 'S') {
+							// Update action to 'U' and status to 'P' if action is 'C' and status is 'S'
+							$this->Payment_Model->update_by_id($payment['PaymentID'], [
+								'AutocountSyncAction' => 'U',
+								'AutocountSyncStatus' => 'P'
+							]);
+						} elseif ($payment['AutocountSyncAction'] == 'U' && $payment['AutocountSyncStatus'] == 'S') {
+							// Update status to 'P' if action is 'U' and status is 'S'
+							$this->Payment_Model->update_by_id($payment['PaymentID'], [
+								'AutocountSyncStatus' => 'P'
+							]);
+						} else {
+							// Just update status to 'P' in all other cases
+							$this->Payment_Model->update_by_id($payment['PaymentID'], [
+								'AutocountSyncStatus' => 'P'
+							]);
+						}
+						
 						// if ($payment != null) {
 						// 	$quotationData = [];
 						// 	$respond = $this->autocount_create($quotationData);
@@ -575,10 +589,20 @@ class Payment extends MY_Controller
 			// 	}	
 				
 			// }
-			$this->Payment_Model->update_by_id($this->input->get('payment_id'), [
-				'AutocountSyncAction' => 'D',
-				'AutocountSyncStatus' => 'P'
-			]);
+
+			$payment = $this->Payment_Model->find($this->input->get('payment_id'));
+			if (!empty($payment)) {
+				if (($payment['AutocountSyncAction'] == 'C' || $payment['AutocountSyncAction'] == 'U') && $payment['AutocountSyncStatus'] == 'S') {
+						$this->Payment_Model->update_by_id($this->input->get('payment_id'), [
+						'AutocountSyncAction' => 'D',
+						'AutocountSyncStatus' => 'P'
+					]);				
+				} else {
+					$this->Payment_Model->update_by_id($this->input->get('payment_id'), [
+						'AutocountSyncStatus' => 'P'
+					]);
+				}
+			}
 			
 		} else {
 			redirect('Dashboard');
