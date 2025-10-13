@@ -363,9 +363,9 @@ class Cron extends CI_Controller
 		// Check for Adult, Children, and Infant; if empty, set to 0
 		$booking['cc'] = '';
 
-		$booking['cc'] .= (!empty($booking['Adult']) ? $booking['Adult'] : 0) . ' Adult, ';
-		$booking['cc'] .= (!empty($booking['Children']) ? $booking['Children'] : 0) . ' Children, ';
-		$booking['cc'] .= (!empty($booking['Infant']) ? $booking['Infant'] : 0) . ' Infant';
+		$booking['cc'] .= (!empty($booking['Adult']) ? $booking['Adult'] : 0) . ' A, ';
+		$booking['cc'] .= (!empty($booking['Children']) ? $booking['Children'] : 0) . ' C, ';
+		$booking['cc'] .= (!empty($booking['Infant']) ? $booking['Infant'] : 0) . ' IN';
 
 		// Remove trailing comma and space
 		$booking['cc'] = rtrim($booking['cc'], ', ');
