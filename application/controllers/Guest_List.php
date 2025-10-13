@@ -33,7 +33,7 @@ class Guest_List extends CI_Controller
 						$this->Guest_List_Model->Delete($deleted_guests[$i]);
 					}
 				}
-				$bookingInfo = $this->Booking_Model->find($booking_id);
+				$bookingInfo = get_object_vars($this->Booking_Model->find($booking_id));
 				if (!empty($bookingInfo)) {
 					if (($bookingInfo['AutocountSyncAction'] == 'C' || $bookingInfo['AutocountSyncAction'] == 'U') && $bookingInfo['AutocountSyncStatus'] == 'S') {
 							$this->Booking_Model->update_by_id($booking_id, [
