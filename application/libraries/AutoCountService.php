@@ -67,6 +67,7 @@ class AutoCountService {
         autocount_log(
             $url,
             [
+                'method'  => (isset($method)) ? $method : '',
                 'headers' => $headers,
                 'body'    => $payload,
                 'query'   => $queryParams
