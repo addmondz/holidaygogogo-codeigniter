@@ -39,15 +39,15 @@ $config['autocount'] = [
     'bulkBookingSyncToAutocount' => false,
     'bulkPaymentSyncToAutocount' => false,
 
-    'booking_sync_autocount_status' => ['P', 'F'], // allowed AutocountSyncStatus
+    'booking_sync_autocount_status' => ['P'], // allowed AutocountSyncStatus
     'booking_sync_status'           => ['BOOKING CONFIRMATION'], // allowed BookingConfirmationTitle
 
-    'payment_sync_autocount_status' => ['P', 'F'],
+    'payment_sync_autocount_status' => ['P'],
     'payment_sync_status'           => ['Y'],
 
     // Crontab sync qty
-    'booking_qty_cront' => 5,
-    'payment_qty_cront' => 1,
+    'booking_qty_cront' => 10,
+    'payment_qty_cront' => 10,
 
     'payment_acc_no_1' => '300-d277',
     'payment_acc_no_2' => '400-d019',

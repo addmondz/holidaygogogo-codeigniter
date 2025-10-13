@@ -553,7 +553,7 @@ class Payment_Model extends CI_Model
 
 		$statuses = !empty($config['payment_sync_autocount_status'])
 			? $config['payment_sync_autocount_status']
-			: ['P', 'F'];
+			: ['P'];
 
 		$titles = !empty($config['payment_sync_status'])
 			? $config['payment_sync_status']
@@ -569,7 +569,7 @@ class Payment_Model extends CI_Model
 
 		$payment_qty_cront = !empty($config['payment_qty_cront'])
 			? $config['payment_qty_cront']
-			: 1;
+			: 10;
 
 		$this->db->limit($payment_qty_cront);
 		$this->db->order_by('payment.PaymentID', 'ASC');

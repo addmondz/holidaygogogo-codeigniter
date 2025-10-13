@@ -880,7 +880,7 @@ class Booking_Model extends CI_Model
 
 		$booking_qty_cront = !empty($config['booking_qty_cront'])
 			? $config['booking_qty_cront']
-			: 1;
+			: 10;
 		
 		// --- 1. Get all booking columns (no prefix) ---
 		$bookingCols = $this->db->list_fields('booking');
@@ -891,7 +891,7 @@ class Booking_Model extends CI_Model
 
 		$statuses = !empty($config['booking_sync_autocount_status']) 
 			? $config['booking_sync_autocount_status'] 
-			: ['P','F'];
+			: ['P'];
 
 		$titles   = !empty($config['booking_sync_status']) 
 			? $config['booking_sync_status'] 
