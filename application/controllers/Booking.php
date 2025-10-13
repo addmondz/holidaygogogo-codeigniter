@@ -306,7 +306,7 @@ class Booking extends MY_Controller
 					}
 				}
 
-				$bookingInfo = $this->Booking_Model->find($this->input->post('booking_id'));
+				$bookingInfo = get_object_vars($this->Booking_Model->find($this->input->post('booking_id')));
 
 				if (!empty($bookingInfo)) {
 					if ($bookingInfo['AutocountSyncAction'] == 'C' && $bookingInfo['AutocountSyncStatus'] == 'S') {
