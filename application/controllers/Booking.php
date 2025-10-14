@@ -309,20 +309,45 @@ class Booking extends MY_Controller
 				$bookingInfo = get_object_vars($this->Booking_Model->find($this->input->post('booking_id')));
 
 				if (!empty($bookingInfo)) {
+					$payments = $this->Payment_Model->get_payments_by_booking_id($this->input->post('booking_id'));
+
 					if ($bookingInfo['AutocountSyncAction'] == 'C' && $bookingInfo['AutocountSyncStatus'] == 'S') {
 						$this->Booking_Model->update_by_id($this->input->post('booking_id'), [
 							'AutocountSyncAction' => 'U',
 							'AutocountSyncStatus' => 'P'
 						]);
+						if (!empty($payments)) {
+							foreach($payments as $payment) {
+								$this->Payment_Model->update_by_id($payment['PaymentID'], [
+									'AutocountSyncAction' => 'U',
+									'AutocountSyncStatus' => 'P'
+								]);	
+							}
+						}
 					} else if ($bookingInfo['AutocountSyncAction'] == 'U' && $bookingInfo['AutocountSyncStatus'] == 'S') {
 						$this->Booking_Model->update_by_id($this->input->post('booking_id'), [
 							'AutocountSyncAction' => 'U',
 							'AutocountSyncStatus' => 'P'
 						]);
+						if (!empty($payments)) {
+							foreach($payments as $payment) {
+								$this->Payment_Model->update_by_id($payment['PaymentID'], [
+									'AutocountSyncAction' => 'U',
+									'AutocountSyncStatus' => 'P'
+								]);	
+							}
+						}
 					} else {
 						$this->Booking_Model->update_by_id($this->input->post('booking_id'), [
 							'AutocountSyncStatus'  => 'P'
 						]);
+						if (!empty($payments)) {
+							foreach($payments as $payment) {
+								$this->Payment_Model->update_by_id($payment['PaymentID'], [
+									'AutocountSyncStatus' => 'P'
+								]);	
+							}
+						}
 					}
 				}
 				
@@ -585,20 +610,45 @@ class Booking extends MY_Controller
 
 			$bookingInfo = get_object_vars($this->Booking_Model->find($this->input->get('booking_id')));
 			if (!empty($bookingInfo)) {
+				$payments = $this->Payment_Model->get_payments_by_booking_id($this->input->get('booking_id'));
+
 				if ($bookingInfo['AutocountSyncAction'] == 'C' && $bookingInfo['AutocountSyncStatus'] == 'S') {
 					$this->Booking_Model->update_by_id($this->input->get('booking_id'), [
 						'AutocountSyncAction' => 'D',
 						'AutocountSyncStatus' => 'P'
 					]);				
+					if (!empty($payments)) {
+						foreach($payments as $payment) {
+							$this->Payment_Model->update_by_id($payment['PaymentID'], [
+								'AutocountSyncAction' => 'D',
+								'AutocountSyncStatus' => 'P'
+							]);	
+						}
+					}
 				} else if ($bookingInfo['AutocountSyncAction'] == 'U') {
 					$this->Booking_Model->update_by_id($this->input->get('booking_id'), [
 						'AutocountSyncAction' => 'D',
 						'AutocountSyncStatus' => 'P'
 					]);
+					if (!empty($payments)) {
+						foreach($payments as $payment) {
+							$this->Payment_Model->update_by_id($payment['PaymentID'], [
+								'AutocountSyncAction' => 'D',
+								'AutocountSyncStatus' => 'P'
+							]);	
+						}
+					}
 				} else {
 					$this->Booking_Model->update_by_id($this->input->get('booking_id'), [
 						'AutocountSyncStatus' => 'P'
 					]);
+					if (!empty($payments)) {
+						foreach($payments as $payment) {
+							$this->Payment_Model->update_by_id($payment['PaymentID'], [
+								'AutocountSyncStatus' => 'P'
+							]);	
+						}
+					}
 				}
 			}
 			// $this->Booking_Model->update_by_id($this->input->get('booking_id'), [

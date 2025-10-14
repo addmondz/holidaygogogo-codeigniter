@@ -26,7 +26,7 @@ class PaymentSync {
 					'currencyCode'    => arr_get($data, 'currency_code', 'MYR'),
 					'currencyRate'    => arr_get($data, 'currency_rate', 1),
 					'journalType'     => 'GENERAL',
-					'dealWith'        => arr_get($data, 'supplier_name', ''),
+					'dealWith'        => ($data['Credit'] != 0.00) ? arr_get($data, 'Customer', '') : arr_get($data, 'supplier_name', ''),
 					'description'     => arr_get($data, 'ReservationNumber', ''),
 					'note'            => arr_get($data, 'note', ''),
 				],
@@ -101,7 +101,7 @@ class PaymentSync {
 			if (!empty($data['paymentDetails']) && is_array($data['paymentDetails'])) {
 				foreach ($data['paymentDetails'] as $payment) {
 					$param['paymentDetails'][] = [
-						'paymentMethod'      => arr_get($payment, 'paymentMethod','CASH'),
+						'paymentMethod'      => arr_get($payment, 'paymentMethod','BANK'),
 						'paymentBy'          => arr_get($payment, 'paymentBy', ''),
 						'chequeNo'           => arr_get($payment, 'chequeNo', ''),
 						'floatDay'           => arr_get($payment, 'floatDay', 0),
@@ -125,7 +125,7 @@ class PaymentSync {
 				}
 
 				$param['paymentDetails'][] = [
-					'paymentMethod' => 'CASH',
+					'paymentMethod' => 'BANK',
 					'paymentAmt'    => (float)$amount,
 				];
 			}
@@ -166,7 +166,7 @@ class PaymentSync {
 				'currencyCode'    => arr_get($data, 'Currency', 'MYR'),      // Currency -> currencyCode
 				'currencyRate'    => (float)arr_get($data, 'ForeignCurrency', 1),   // Foreign Currency -> currencyRate
 				'journalType'     => 'GENERAL',                               // Journal Type
-				'dealWith'        => arr_get($data, 'SupplierID', ''),       // Supplier -> dealWith
+				'dealWith'        => ($data['Credit'] != 0.00) ? arr_get($data, 'Customer', '') : arr_get($data, 'supplier_name', ''),       // Supplier -> dealWith
 				'description'     => arr_get($data, 'ReservationNumber', ''),    // Payment Remark -> description
 				'note'            => arr_get($data, 'Remark', ''),           // Remark -> note
 			];
@@ -232,7 +232,7 @@ class PaymentSync {
 			if (!empty($data['paymentDetails']) && is_array($data['paymentDetails'])) {
 				foreach ($data['paymentDetails'] as $payment) {
 					$body['paymentDetails'][] = [
-						'paymentMethod'      => arr_get($payment, 'paymentMethod', 'CASH'),
+						'paymentMethod'      => arr_get($payment, 'paymentMethod', 'BANK'),
 						'paymentBy'          => arr_get($payment, 'paymentBy', ''),
 						'chequeNo'           => arr_get($payment, 'chequeNo', ''),
 						'floatDay'           => arr_get($payment, 'floatDay', 0),
@@ -258,7 +258,7 @@ class PaymentSync {
 				}
 
 				$body['paymentDetails'][] = [
-					'paymentMethod' => 'CASH',
+					'paymentMethod' => 'BANK',
 					'paymentAmt'    => (float)$amount,
 				];
 			}

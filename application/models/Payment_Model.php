@@ -517,7 +517,7 @@ class Payment_Model extends CI_Model
             ->update('payment', $data);
     }
 
-	function getAllPaymentsWithBookingAndSupplier($payment_id = null)
+	function getAllPaymentsWithBookingAndSupplier($payment_id = null, $deleted_payment = false)
 	{
 		$this->db->select('payment.*', false);
 
@@ -560,8 +560,12 @@ class Payment_Model extends CI_Model
 			: ['Y'];
 
 		$this->db->where_in('payment.AutocountSyncStatus', $statuses);
-		$this->db->where_in('payment.Status', $titles);
-		$this->db->where('payment.AutocountSyncAction IS NOT NULL');
+		if ($deleted_payment == false) {
+			$this->db->where_in('payment.Status', $titles);
+			$this->db->where('payment.AutocountSyncAction IS NOT NULL');
+		} else {
+			$this->db->where('payment.AutocountSyncAction', 'D');			
+		}
 		if (!empty($config['payment_cutoff_date'])) {
 			$date = date('Y-m-d', strtotime($config['payment_cutoff_date']));
 			$this->db->where('payment.InsertDate >', $date);
@@ -636,6 +640,18 @@ class Payment_Model extends CI_Model
 		// Execute query
 		$query = $this->db->get();
 return $query->result_array(); // instead of result()
+	}
+
+	public function get_payments_by_booking_id($booking_id)
+	{
+		$this->db->select('p.*');
+		$this->db->from('payment AS p');
+		$this->db->join('booking AS b', 'b.BookingID = p.BookingID', 'left');
+		$this->db->join('supplier AS s', 's.SupplierID = p.SupplierID', 'left');
+		$this->db->where('p.BookingID', $booking_id);
+
+		$query = $this->db->get();
+		return $query->result_array(); // return as array
 	}
 
 

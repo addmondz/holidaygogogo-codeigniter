@@ -275,6 +275,7 @@ class Cron extends CI_Controller
 	{
 		$this->syncBookings();
 		$this->syncPayments();
+		$this->syncDeletedPayments();
 	}
 
     /**
@@ -393,7 +394,7 @@ class Cron extends CI_Controller
   	private function syncPayments()
 	{
 		echo "=== Sync Payments Start ===\n";
-		$payments = $this->Payment_Model->getAllPaymentsWithBookingAndSupplier();
+		$payments = $this->Payment_Model->getAllPaymentsWithBookingAndSupplier(null, false);
 
 		$this->load->library('PaymentSync');
 		$this->load->helper('autocount');
@@ -443,6 +444,55 @@ class Cron extends CI_Controller
 		}
 
 		echo "=== Sync Payments End ===\n\n";
+	}
+
+	private function syncDeletedPayments()
+	{
+		echo "=== Sync Deleted Payments Start ===\n";
+		$payments = $this->Payment_Model->getAllPaymentsWithBookingAndSupplier(null, true);
+
+		$this->load->library('PaymentSync');
+		$this->load->helper('autocount');
+		$config = get_autocount_config();
+		
+		foreach ($payments as $payment) {
+			echo "Payment ID {$payment['PaymentID']} [{$payment['AutocountSyncAction']}]... ";
+
+			$payment = $this->enrichPayment($payment);
+
+			try {
+				switch ($payment['AutocountSyncAction']) {
+					case 'D':
+						$result = $this->paymentsync->autocount_delete($payment, $config);
+						break;
+					default:
+						$result = ['error' => 'ERROR Autocount Sync Action'];
+				}
+
+				if (isset($result['status']) && ($result['status'] == 201 || $result['status'] == 204) && $result['error'] === null) {
+					$this->Payment_Model->update_by_id($payment['PaymentID'], [
+						'AutocountSyncStatus'  => 'S',
+						'AutocountSyncMessage' => json_encode($result)
+					]);
+					echo "SUCCESS\n";
+				} else {
+					$this->Payment_Model->update_by_id($payment['PaymentID'], [
+						'AutocountSyncStatus'  => 'F',
+						'AutocountSyncMessage' => json_encode($result)
+					]);
+					echo "FAILED: " . ($result['error'] ?? 'Unknown error') . "\n";
+				}
+
+			} catch (\Exception $e) {
+				$this->Payment_Model->update_by_id($payment['PaymentID'], [
+					'AutocountSyncStatus'  => 'F',
+					'AutocountSyncMessage' => $e->getMessage()
+				]);
+				echo "ERROR: {$e->getMessage()}\n";
+			}
+		}
+
+		echo "=== Sync Deleted Payments End ===\n\n";
 	}
 
 	private function enrichPayment($payment)
