@@ -27,7 +27,7 @@ $config['autocount'] = [
             'create'        => '/payment',
             'update'        => '/payment',
             'update_status' => '/payment/updatestatus',
-            'delete'        => '/pyament',
+            'delete'        => '/payment',
             'void'          => '/payment/void',
         ]
     ],
