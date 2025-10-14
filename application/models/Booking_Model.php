@@ -951,6 +951,7 @@ class Booking_Model extends CI_Model
 		$this->db->select(implode(', ', $productCols), false);
 		$products = $this->db
 			->where_in('booking_product.BookingID', $bookingIds)
+			->where('booking_product.Status', 'Y')
 			->get('booking_product')
 			->result_array();
 
