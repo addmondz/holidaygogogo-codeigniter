@@ -592,11 +592,16 @@ class Payment extends MY_Controller
 
 			$payment = get_object_vars($this->Payment_Model->find($this->input->get('payment_id')));
 			if (!empty($payment)) {
-				if (($payment['AutocountSyncAction'] == 'C' || $payment['AutocountSyncAction'] == 'U') && $payment['AutocountSyncStatus'] == 'S') {
-						$this->Payment_Model->update_by_id($this->input->get('payment_id'), [
+				if ($payment['AutocountSyncAction'] == 'C' && $payment['AutocountSyncStatus'] == 'S') {
+					$this->Payment_Model->update_by_id($this->input->get('payment_id'), [
 						'AutocountSyncAction' => 'D',
 						'AutocountSyncStatus' => 'P'
 					]);				
+				} else if ($payment['AutocountSyncAction'] == 'U') {
+					$this->Payment_Model->update_by_id($this->input->get('payment_id'), [
+						'AutocountSyncAction' => 'D',
+						'AutocountSyncStatus' => 'P'
+					]);	
 				} else {
 					$this->Payment_Model->update_by_id($this->input->get('payment_id'), [
 						'AutocountSyncStatus' => 'P'

@@ -311,13 +311,13 @@ class Booking extends MY_Controller
 				if (!empty($bookingInfo)) {
 					if ($bookingInfo['AutocountSyncAction'] == 'C' && $bookingInfo['AutocountSyncStatus'] == 'S') {
 						$this->Booking_Model->update_by_id($this->input->post('booking_id'), [
-							'AutocountSyncAction'  => 'U',
-							'AutocountSyncStatus'  => 'P'
+							'AutocountSyncAction' => 'U',
+							'AutocountSyncStatus' => 'P'
 						]);
 					} else if ($bookingInfo['AutocountSyncAction'] == 'U' && $bookingInfo['AutocountSyncStatus'] == 'S') {
 						$this->Booking_Model->update_by_id($this->input->post('booking_id'), [
-							'AutocountSyncAction'  => 'U',
-							'AutocountSyncStatus'  => 'P'
+							'AutocountSyncAction' => 'U',
+							'AutocountSyncStatus' => 'P'
 						]);
 					} else {
 						$this->Booking_Model->update_by_id($this->input->post('booking_id'), [
@@ -585,11 +585,16 @@ class Booking extends MY_Controller
 
 			$bookingInfo = get_object_vars($this->Booking_Model->find($this->input->get('booking_id')));
 			if (!empty($bookingInfo)) {
-				if (($bookingInfo['AutocountSyncAction'] == 'C' || $bookingInfo['AutocountSyncAction'] == 'U') && $bookingInfo['AutocountSyncStatus'] == 'S') {
-						$this->Booking_Model->update_by_id($this->input->get('booking_id'), [
+				if ($bookingInfo['AutocountSyncAction'] == 'C' && $bookingInfo['AutocountSyncStatus'] == 'S') {
+					$this->Booking_Model->update_by_id($this->input->get('booking_id'), [
 						'AutocountSyncAction' => 'D',
 						'AutocountSyncStatus' => 'P'
 					]);				
+				} else if ($bookingInfo['AutocountSyncAction'] == 'U') {
+					$this->Booking_Model->update_by_id($this->input->get('booking_id'), [
+						'AutocountSyncAction' => 'D',
+						'AutocountSyncStatus' => 'P'
+					]);
 				} else {
 					$this->Booking_Model->update_by_id($this->input->get('booking_id'), [
 						'AutocountSyncStatus' => 'P'
