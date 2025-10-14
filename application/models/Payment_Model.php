@@ -3,7 +3,7 @@ class Payment_Model extends CI_Model
 {
 	function Read_Payment()
 	{
-		$this->db->select('PaymentID, payment.BookingID, payment.SupplierID, Date, Type, Currency, ForeignCurrency, Credit, ReferenceNumber, BankSlip, Debit, Deadline, QuotationNumber, Quotation, InvoiceNumber, Invoice, payment.Bank, payment.BankAccount, payment.BankHolder, DebitRemark, PaymentRemark, payment.Status, Remark, BookingNumber, ReservationNumber, Customer');
+		$this->db->select('PaymentID, payment.BookingID, payment.SupplierID, Date, Type, Currency, ForeignCurrency, Credit, ReferenceNumber, BankSlip, Debit, Deadline, QuotationNumber, Quotation, InvoiceNumber, Invoice, payment.Bank, payment.BankAccount, payment.BankHolder, DebitRemark, PaymentRemark, payment.Status, Remark, BookingNumber, ReservationNumber, Customer, payment.AutocountSyncStatus, payment.AutocountSyncMessage');
 		$this->db->join('booking', 'booking.BookingID = payment.BookingID', 'left');
 		$this->db->where('PaymentID', $this->input->get('payment_id'));
 		return $this->db->get('payment')->row_array();
