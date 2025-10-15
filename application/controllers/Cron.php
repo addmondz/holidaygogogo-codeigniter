@@ -505,9 +505,14 @@ class Cron extends CI_Controller
 			}
 		}
 
-		// Payment details description
-		if (!empty($payment['Customer'])) {
-			$payment['description'] = $payment['Customer'];
+		if ($payment['Credit'] != 0.00) {
+			if (!empty($payment['Customer'])) {
+				$payment['description'] = $payment['Customer'];
+			}
+		} else {
+			if (!empty($payment['supplier_name'])) {
+				$payment['description'] = $payment['supplier_name'];
+			}
 		}
 
 		if (!empty($payment['StartDate']) && !empty($payment['EndDate'])) {
