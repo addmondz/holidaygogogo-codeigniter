@@ -159,8 +159,8 @@ class PaymentSync {
 				'docType'         => ($data['Credit'] != 0.00) ? 'OR' : 'PV', // required
 				'docDate'         => date('Y-m-d', strtotime(arr_get($data, 'InsertDate'))),  // Date -> docDate
 				'taxDate'         => null,//date('Y-m-d', strtotime(arr_get($data, 'tax_date'))),  // Date -> taxDate
-				'currencyCode'    => arr_get($data, 'Currency', 'MYR'),      // Currency -> currencyCode
-				'currencyRate'    => (float)arr_get($data, 'ForeignCurrency', 1),   // Foreign Currency -> currencyRate
+				'currencyCode'    => arr_get($data, 'currency_code', 'MYR'),      // Currency -> currencyCode
+				'currencyRate'    => (float)arr_get($data, 'currency_rate', 1),   // Foreign Currency -> currencyRate
 				'journalType'     => 'GENERAL',                               // Journal Type
 				'dealWith'        => ($data['Credit'] != 0.00) ? arr_get($data, 'Customer', '') : arr_get($data, 'supplier_name', ''),       // Supplier -> dealWith
 				'description'     => arr_get($data, 'ReservationNumber', ''),    // Payment Remark -> description
