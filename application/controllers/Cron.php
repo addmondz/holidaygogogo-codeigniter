@@ -505,12 +505,12 @@ class Cron extends CI_Controller
 			}
 		}
 
-		if ($payment['Credit'] != 0.00) {
+		if ($payment['Credit'] != 0.00) { // or
 			if (!empty($payment['Customer'])) {
 				$payment['description'] = $payment['Customer'];
 			}
 		} else {
-			if (!empty($payment['supplier_name'])) {
+			if (!empty($payment['supplier_name'])) { // pv
 				$payment['description'] = $payment['supplier_name'];
 			}
 		}
