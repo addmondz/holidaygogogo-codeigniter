@@ -103,7 +103,7 @@ class PaymentSync {
 					$param['paymentDetails'][] = [
 						'paymentMethod'      => arr_get($payment, 'paymentMethod','BANK'),
 						'paymentBy'          => arr_get($payment, 'paymentBy', ''),
-						'chequeNo'           => arr_get($payment, 'chequeNo', ''),
+						'chequeNo'           => arr_get($payment, 'ReferenceNumber', ''),
 						'floatDay'           => arr_get($payment, 'floatDay', 0),
 						'bankCharge'         => (float)arr_get($payment, 'bankCharge', 0),
 						'toBankRate'         => arr_get($payment, 'toBankRate', 1),
@@ -126,6 +126,7 @@ class PaymentSync {
 
 				$param['paymentDetails'][] = [
 					'paymentMethod' => 'BANK',
+					'chequeNo'      => arr_get($data, 'ReferenceNumber', ''),
 					'paymentAmt'    => (float)$amount,
 				];
 			}
@@ -147,17 +148,12 @@ class PaymentSync {
     public function autocount_update($data = [], $config = [])
 	{
 		try {
-			// Ensure the docNo is passed (either BookingNumber or DocNo)
-			$docNo = $data['ReferenceNumber'] ?? $data['ReferenceNumber'] ?? '';
-			if ($docNo === '') {
-				return ['error' => 'Missing required parameter: ReferenceNumber (or DocNo).'];
-			}
 
 			$body = [];
 
 			// Master data (single row only)
 			$body['master'] = [
-				'docNo'           => $docNo,                                // Reference Number -> docNo
+				'docNo'           => arr_get($data, 'ReferenceNumber', ''),                                // Reference Number -> docNo
 				'docNo2'          => arr_get($data, 'BookingNumber', ''),
 				'docNoFormatName' => arr_get($data, 'docNoFormatName', null),
 				'docType'         => ($data['Credit'] != 0.00) ? 'OR' : 'PV', // required
@@ -234,7 +230,7 @@ class PaymentSync {
 					$body['paymentDetails'][] = [
 						'paymentMethod'      => arr_get($payment, 'paymentMethod', 'BANK'),
 						'paymentBy'          => arr_get($payment, 'paymentBy', ''),
-						'chequeNo'           => arr_get($payment, 'chequeNo', ''),
+						'chequeNo'           => arr_get($payment, 'ReferenceNumber', ''),
 						'floatDay'           => arr_get($payment, 'floatDay', 0),
 						'bankCharge'         => (float)arr_get($payment, 'bankCharge', 0),
 						'toBankRate'         => arr_get($payment, 'toBankRate', 1),
@@ -259,6 +255,7 @@ class PaymentSync {
 
 				$body['paymentDetails'][] = [
 					'paymentMethod' => 'BANK',
+					'chequeNo'      => arr_get($data, 'ReferenceNumber', ''),
 					'paymentAmt'    => (float)$amount,
 				];
 			}
@@ -274,7 +271,7 @@ class PaymentSync {
 				'PUT',
 				'payment.update',
 				$body,
-				['docNo' => $docNo]
+				['docNo' => arr_get($data, 'ReferenceNumber', '')]
 			);
 		} catch (Exception $e) {
 			log_message('error', 'Autocount payment update error: ' . $e->getMessage());
