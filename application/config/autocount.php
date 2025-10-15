@@ -8,12 +8,13 @@ $config['autocount'] = [
     'AUTOCOUNT_accountBookId' => '45795',
     'AUTOCOUNT_apiKey' => '45c3a528-c4c5-4306-b036-d05f2a1d84a8',
     
+    // no use yet
     'client_id'      => 'YOUR_CLIENT_ID',
     'client_secret'  => 'YOUR_CLIENT_SECRET',
     'username'       => 'YOUR_API_USERNAME',
     'password'       => 'YOUR_API_PASSWORD',
 
-    'manual_sync_autocount_key' => '4579545c3a528c4c5a64b8cc0c1be092d',
+    'manual_sync_autocount_key' => '4579545c3a528c4c5a64b8cc0c1be092d', // manual sync cron by url (?key=)
     // Endpoints
     'endpoints' => [
         'quotation' => [
@@ -32,25 +33,25 @@ $config['autocount'] = [
         ]
     ],
 
-    'booking_cutoff_date' => '2025-10-01',
-    'payment_cutoff_date' => '2025-10-01',
+    'booking_cutoff_date' => '2025-10-01', // after the date only sync
+    'payment_cutoff_date' => '2025-10-01', // after the date only sync
 
-    // Sync settings
-    'bulkBookingSyncToAutocount' => false,
-    'bulkPaymentSyncToAutocount' => false,
+    // manually Sync settings
+    'bulkBookingSyncToAutocount' => false, // no open for manual trigger
+    'bulkPaymentSyncToAutocount' => false, // no open for manual trigger
 
     'booking_sync_autocount_status' => ['P'], // allowed AutocountSyncStatus
     'booking_sync_status'           => ['BOOKING CONFIRMATION'], // allowed BookingConfirmationTitle
 
-    'payment_sync_autocount_status' => ['P'],
-    'payment_sync_status'           => ['Y'],
+    'payment_sync_autocount_status' => ['P'], // allowed AutocountSyncStatus
+    'payment_sync_status'           => ['Y'], // allowed Payemnt approve status 
 
     // Crontab sync qty
-    'booking_qty_cront' => 10,
-    'payment_qty_cront' => 10,
+    'booking_qty_cront' => 10, // each time sync 
+    'payment_qty_cront' => 10, // each time sync 
 
-    'payment_acc_no_1' => '300-d277',
-    'payment_acc_no_2' => '400-d019',
+    'payment_acc_no_1' => '300-d277', // payment in OR
+    'payment_acc_no_2' => '400-d019', // payment out PV
 ];
 
 
