@@ -397,8 +397,13 @@
                                             <?php
                                                 $start_date_travel_reminder =isset( $_GET['start_date']) ? date('d/m/Y', strtotime($_GET['start_date'])) : '';
                                                 $end_date_travel_reminder =isset( $_GET['end_date']) ? date('d/m/Y', strtotime($_GET['end_date'])) : '';
+
+                                                $display_travel_reminder_date = '';
+                                                if ($start_date_travel_reminder && $end_date_travel_reminder) {
+                                                    $display_travel_reminder_date = $start_date_travel_reminder . ' - ' . $end_date_travel_reminder;
+                                                }
                                             ?>
-                                            <input readonly type="text" id="travel_reminder_date" autocomplete="off" class="form-control" value="<?php echo $start_date_travel_reminder . ' - ' . $end_date_travel_reminder; ?>">
+                                            <input readonly type="text" id="travel_reminder_date" autocomplete="off" class="form-control" value="<?php echo $display_travel_reminder_date; ?>">
                                             <span>
                                                 <i class="la la-calendar"></i>
                                             </span>
@@ -888,6 +893,26 @@
                                     <div class="card-title">
                                         <h3 class="card-label" style="font-size:14px;"><?php echo 'Year ' . date('Y') . ' SA Daily Sales'; ?></h3>
                                     </div>
+                                    <div class="card-toolbar">
+                                        <div id="kt_daterangepicker_sa_daily" class="input-icon sa_daily_picker">
+                                            <?php
+                                                $start_date_sa_daily = isset($_GET['start_date_sa_daily']) ? date('d/m/Y', strtotime($_GET['start_date_sa_daily'])) : '';
+                                                $end_date_sa_daily = isset($_GET['end_date_sa_daily']) ? date('d/m/Y', strtotime($_GET['end_date_sa_daily'])) : '';
+
+                                                $display_sa_daily_date = '';
+                                                if ($start_date_sa_daily && $end_date_sa_daily) {
+                                                    $display_sa_daily_date = $start_date_sa_daily . ' - ' . $end_date_sa_daily;
+                                                }
+                                            ?>
+                                            <input readonly type="text" id="sa_daily_date" autocomplete="off" class="form-control" value="<?php echo $display_sa_daily_date; ?>">
+                                            <span>
+                                                <i class="la la-calendar"></i>
+                                            </span>
+                                        </div>
+                                        <span id="reset_sa_daily_date" class="btn btn-icon btn-warning btn-sm ml-1">
+                                            <i class="la la-refresh"></i>
+                                        </span>
+                                    </div>
                                 </div>
                                 <div class="card-body" style="overflow-x:auto; position:relative;">
                                     <div id="sales_agents_daily_sales" style="min-width:900px;"></div>
@@ -899,6 +924,26 @@
                                 <div class="card-header" style="background-color:#FFFAA030;">
                                     <div class="card-title">
                                         <h3 class="card-label" style="font-size:14px;"><?php echo 'Year ' . date('Y') . ' Daily Total Sales'; ?></h3>
+                                    </div>
+                                    <div class="card-toolbar">
+                                        <div id="kt_daterangepicker_daily_total" class="input-icon daily_total_picker">
+                                            <?php
+                                                $start_date_daily_total = isset($_GET['start_date_daily_total']) ? date('d/m/Y', strtotime($_GET['start_date_daily_total'])) : '';
+                                                $end_date_daily_total = isset($_GET['end_date_daily_total']) ? date('d/m/Y', strtotime($_GET['end_date_daily_total'])) : '';
+
+                                                $display_daily_total_date = '';
+                                                if ($start_date_daily_total && $end_date_daily_total) {
+                                                    $display_daily_total_date = $start_date_daily_total . ' - ' . $end_date_daily_total;
+                                                }
+                                            ?>
+                                            <input readonly type="text" id="daily_total_date" autocomplete="off" class="form-control" value="<?php echo $display_daily_total_date; ?>">
+                                            <span>
+                                                <i class="la la-calendar"></i>
+                                            </span>
+                                        </div>
+                                        <span id="reset_daily_total_date" class="btn btn-icon btn-warning btn-sm ml-1">
+                                            <i class="la la-refresh"></i>
+                                        </span>
                                     </div>
                                 </div>
                                 <div class="card-body" style="overflow-x:auto; position:relative;">
@@ -1253,11 +1298,24 @@
             }
         });
 
-        $.ajax({
-            url: '<?php echo base_url('Dashboard/Sales_Agents_Daily_Sales'); ?>',
-            type: 'post',
-            dataType: 'json',
-            success: function(array) {
+        function loadSADailySales() {
+            var sa_daily_params = {};
+            var start_date_sa_daily = '<?php echo isset($_GET['start_date_sa_daily']) ? $_GET['start_date_sa_daily'] : ''; ?>';
+            var end_date_sa_daily = '<?php echo isset($_GET['end_date_sa_daily']) ? $_GET['end_date_sa_daily'] : ''; ?>';
+            
+            if (start_date_sa_daily) {
+                sa_daily_params.start_date = start_date_sa_daily;
+            }
+            if (end_date_sa_daily) {
+                sa_daily_params.end_date = end_date_sa_daily;
+            }
+
+            $.ajax({
+                url: '<?php echo base_url('Dashboard/Sales_Agents_Daily_Sales'); ?>',
+                type: 'post',
+                dataType: 'json',
+                data: sa_daily_params,
+                success: function(array) {
                 var series = [];
                 for(var i = 0; i < (array.sales_agents).length; i++) {
                     series.push({name: array.sales_agents[i], data: array.daily_sales[array.sales_agents[i]]});
@@ -1312,6 +1370,9 @@
                 chart.render();
             }
         });
+        }
+
+        loadSADailySales();
 
         $.ajax({
             url: '<?php echo base_url('Dashboard/Sales_Agents_Monthly_Sales'); ?>',
@@ -1373,11 +1434,24 @@
             }
         });
 
-        $.ajax({
-            url: '<?php echo base_url('Dashboard/Daily_Sales'); ?>',
-            type: 'post',
-            dataType: 'json',
-            success: function(array) {
+        function loadDailyTotalSales() {
+            var daily_total_params = {};
+            var start_date_daily_total = '<?php echo isset($_GET['start_date_daily_total']) ? $_GET['start_date_daily_total'] : ''; ?>';
+            var end_date_daily_total = '<?php echo isset($_GET['end_date_daily_total']) ? $_GET['end_date_daily_total'] : ''; ?>';
+            
+            if (start_date_daily_total) {
+                daily_total_params.start_date = start_date_daily_total;
+            }
+            if (end_date_daily_total) {
+                daily_total_params.end_date = end_date_daily_total;
+            }
+
+            $.ajax({
+                url: '<?php echo base_url('Dashboard/Daily_Sales'); ?>',
+                type: 'post',
+                dataType: 'json',
+                data: daily_total_params,
+                success: function(array) {
                 var options = {
                     series: [{
                         name: 'Sales',
@@ -1431,6 +1505,9 @@
                 chart.render();
             }
         });
+        }
+
+        loadDailyTotalSales();
 
         $.ajax({
             url: '<?php echo base_url('Dashboard/Monthly_Sales'); ?>',
@@ -1724,6 +1801,94 @@
         $('#reset_travel_reminder_date').click(function() {
             window.location.href = '<?php echo base_url('Dashboard'); ?>';
         });
+
+        // SA Daily Sales picker
+        var start_date_sa_daily = '';
+        var end_date_sa_daily = '';
+
+        $('#kt_daterangepicker_sa_daily.sa_daily_picker').on('apply.daterangepicker', function(ev, picker) {
+            console.log('sa daily picker change', picker.startDate.format('YYYY-MM-DD'), picker.endDate.format('YYYY-MM-DD'));
+            start_date_sa_daily = picker.startDate.format('YYYY-MM-DD');
+            end_date_sa_daily = picker.endDate.format('YYYY-MM-DD');
+            filterSADailySales();
+        });
+
+        $('#reset_sa_daily_date').click(function() {
+            var current_url = window.location.href;
+            var new_url = current_url.split('?')[0];
+            var params = new URLSearchParams(window.location.search);
+            params.delete('start_date_sa_daily');
+            params.delete('end_date_sa_daily');
+            
+            var remaining_params = params.toString();
+            if (remaining_params) {
+                new_url += '?' + remaining_params;
+            }
+            window.location.href = new_url;
+        });
+
+        // Daily Total Sales picker
+        var start_date_daily_total = '';
+        var end_date_daily_total = '';
+
+        $('#kt_daterangepicker_daily_total.daily_total_picker').on('apply.daterangepicker', function(ev, picker) {
+            console.log('daily total picker change', picker.startDate.format('YYYY-MM-DD'), picker.endDate.format('YYYY-MM-DD'));
+            start_date_daily_total = picker.startDate.format('YYYY-MM-DD');
+            end_date_daily_total = picker.endDate.format('YYYY-MM-DD');
+            filterDailyTotalSales();
+        });
+
+        $('#reset_daily_total_date').click(function() {
+            var current_url = window.location.href;
+            var new_url = current_url.split('?')[0];
+            var params = new URLSearchParams(window.location.search);
+            params.delete('start_date_daily_total');
+            params.delete('end_date_daily_total');
+            
+            var remaining_params = params.toString();
+            if (remaining_params) {
+                new_url += '?' + remaining_params;
+            }
+            window.location.href = new_url;
+        });
+
+        // Function to filter SA Daily Sales based on date range
+        function filterSADailySales() {
+            var current_url = window.location.href;
+            var base_url = current_url.split('?')[0];
+            var params = new URLSearchParams(window.location.search);
+
+            if (start_date_sa_daily) {
+                params.set('start_date_sa_daily', start_date_sa_daily);
+            }
+            if (end_date_sa_daily) {
+                params.set('end_date_sa_daily', end_date_sa_daily);
+            }
+
+            console.log('SA Daily params', params.toString());
+            
+            // Reload page with date parameters
+            window.location.href = base_url + '?' + params.toString();
+        }
+
+        // Function to filter Daily Total Sales based on date range
+        function filterDailyTotalSales() {
+            var current_url = window.location.href;
+            var base_url = current_url.split('?')[0];
+            var params = new URLSearchParams(window.location.search);
+
+            if (start_date_daily_total) {
+                params.set('start_date_daily_total', start_date_daily_total);
+            }
+            if (end_date_daily_total) {
+                params.set('end_date_daily_total', end_date_daily_total);
+            }
+
+            console.log('Daily Total params', params.toString());
+            
+            // Reload page with date parameters
+            window.location.href = base_url + '?' + params.toString();
+        }
 
         // Function to filter travel reminders based on date range
         function filterTravelReminders() {

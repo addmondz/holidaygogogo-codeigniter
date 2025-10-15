@@ -72,6 +72,26 @@ var KTBootstrapDaterangepicker = function () {
             $('#kt_daterangepicker_5 .form-control').val( start.format('DD/MM/YYYY') + ' - ' + end.format('DD/MM/YYYY'));
         });
 
+        // SA Daily Sales daterangepicker
+        $('#kt_daterangepicker_sa_daily').daterangepicker({
+            buttonClasses: ' btn',
+            applyClass: 'btn-primary',
+            cancelClass: 'btn-secondary',
+            autoApply: true
+        }, function(start, end, label) {
+            $('#kt_daterangepicker_sa_daily .form-control').val( start.format('DD/MM/YYYY') + ' - ' + end.format('DD/MM/YYYY'));
+        });
+
+        // Daily Total Sales daterangepicker
+        $('#kt_daterangepicker_daily_total').daterangepicker({
+            buttonClasses: ' btn',
+            applyClass: 'btn-primary',
+            cancelClass: 'btn-secondary',
+            autoApply: true
+        }, function(start, end, label) {
+            $('#kt_daterangepicker_daily_total .form-control').val( start.format('DD/MM/YYYY') + ' - ' + end.format('DD/MM/YYYY'));
+        });
+
         // predefined ranges
         var start = moment().subtract(29, 'days');
         var end = moment();

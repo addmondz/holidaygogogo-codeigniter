@@ -375,7 +375,7 @@ class Dashboard_Model extends CI_Model
 
 
 
-	function Sales_Agents_Daily_Sales()
+	function Sales_Agents_Daily_Sales($start_date = null, $end_date = null)
 
 	{
 
@@ -389,9 +389,14 @@ class Dashboard_Model extends CI_Model
 
 		$this->db->where('booking.Status !=', 'N');
 
-		$this->db->where('CAST(booking.InsertDate AS DATE) >=', date('Y-m-d', strtotime('This Week Monday')));
-
-		$this->db->where('CAST(booking.InsertDate AS DATE) <=', date('Y-m-d', strtotime('This Week Sunday')));
+		// Use custom date range if provided, otherwise default to current week
+		if ($start_date && $end_date) {
+			$this->db->where('CAST(booking.InsertDate AS DATE) >=', $start_date);
+			$this->db->where('CAST(booking.InsertDate AS DATE) <=', $end_date);
+		} else {
+			$this->db->where('CAST(booking.InsertDate AS DATE) >=', date('Y-m-d', strtotime('This Week Monday')));
+			$this->db->where('CAST(booking.InsertDate AS DATE) <=', date('Y-m-d', strtotime('This Week Sunday')));
+		}
 
 		$this->db->where('Level !=', 30);
 
@@ -441,7 +446,7 @@ class Dashboard_Model extends CI_Model
 
 
 
-	function Daily_Sales()
+	function Daily_Sales($start_date = null, $end_date = null)
 
 	{
 
@@ -453,9 +458,14 @@ class Dashboard_Model extends CI_Model
 
 		$this->db->where('Status !=', 'N');
 
-		$this->db->where('CAST(InsertDate AS DATE) >=', date('Y-m-d', strtotime('This Week Monday')));
-
-		$this->db->where('CAST(InsertDate AS DATE) <=', date('Y-m-d', strtotime('This Week Sunday')));
+		// Use custom date range if provided, otherwise default to current week
+		if ($start_date && $end_date) {
+			$this->db->where('CAST(InsertDate AS DATE) >=', $start_date);
+			$this->db->where('CAST(InsertDate AS DATE) <=', $end_date);
+		} else {
+			$this->db->where('CAST(InsertDate AS DATE) >=', date('Y-m-d', strtotime('This Week Monday')));
+			$this->db->where('CAST(InsertDate AS DATE) <=', date('Y-m-d', strtotime('This Week Sunday')));
+		}
 
 		$this->db->group_by('Date');
 

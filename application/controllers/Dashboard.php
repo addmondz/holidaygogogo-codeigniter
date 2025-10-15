@@ -331,63 +331,82 @@ class Dashboard extends MY_Controller
 
 	{
 
-		$array['current_week'] = [];
+		// Get date filters from POST data
+		$start_date = $this->input->post('start_date');
+		$end_date = $this->input->post('end_date');
 
-		for($i = 1; $i <= 7; $i++) {
+		// If dates are provided, use them. Otherwise default to current week
+		if ($start_date && $end_date) {
+			// Generate date range array
+			$start = new DateTime($start_date);
+			$end = new DateTime($end_date);
+			$interval = new DateInterval('P1D');
+			$date_range = new DatePeriod($start, $interval, $end->modify('+1 day'));
 
-			switch($i) {
+			$array['current_week'] = [];
+			foreach ($date_range as $date) {
+				array_push($array['current_week'], $date->format('j M'));
+			}
+		} else {
+			// Default to current week
+			$array['current_week'] = [];
 
-				case 1:
+			for($i = 1; $i <= 7; $i++) {
 
-					array_push($array['current_week'], date('j M', strtotime('This Week Monday')));
+				switch($i) {
 
-					break;
+					case 1:
 
-				case 2:
+						array_push($array['current_week'], date('j M', strtotime('This Week Monday')));
 
-					array_push($array['current_week'], date('j M', strtotime('This Week Tuesday')));
+						break;
 
-					break;
+					case 2:
 
-				case 3:
+						array_push($array['current_week'], date('j M', strtotime('This Week Tuesday')));
 
-					array_push($array['current_week'], date('j M', strtotime('This Week Wednesday')));
+						break;
 
-					break;
+					case 3:
 
-				case 4:
+						array_push($array['current_week'], date('j M', strtotime('This Week Wednesday')));
 
-					array_push($array['current_week'], date('j M', strtotime('This Week Thursday')));
+						break;
 
-					break;
+					case 4:
 
-				case 5:
+						array_push($array['current_week'], date('j M', strtotime('This Week Thursday')));
 
-					array_push($array['current_week'], date('j M', strtotime('This Week Friday')));
+						break;
 
-					break;
+					case 5:
 
-				case 6:
+						array_push($array['current_week'], date('j M', strtotime('This Week Friday')));
 
-					array_push($array['current_week'], date('j M', strtotime('This Week Saturday')));
+						break;
 
-					break;
+					case 6:
 
-				case 7:
+						array_push($array['current_week'], date('j M', strtotime('This Week Saturday')));
 
-					array_push($array['current_week'], date('j M', strtotime('This Week Sunday')));
+						break;
 
-					break;
+					case 7:
 
-				default:
+						array_push($array['current_week'], date('j M', strtotime('This Week Sunday')));
+
+						break;
+
+					default:
+
+				}
 
 			}
-
 		}
 
 		$sales_agents = $this->Dashboard_Model->Sales_Agents();
 
-		$daily_sales = $this->Dashboard_Model->Sales_Agents_Daily_Sales();
+		$daily_sales = $this->Dashboard_Model->Sales_Agents_Daily_Sales($start_date, $end_date);
 
 		$array['sales_agents'] = [];
 
@@ -395,13 +414,16 @@ class Dashboard extends MY_Controller
 
 			array_push($array['sales_agents'], $sales_agent->Name);
 
-			$array['daily_sales'][$sales_agent->Name] = [0, 0, 0, 0, 0, 0, 0];
+			$array['daily_sales'][$sales_agent->Name] = array_fill(0, count($array['current_week']), 0);
 
 			foreach($daily_sales as $daily_sale) {
 
 				if($daily_sale->SalesAgent == $sales_agent->AdminID) {
 
-					$array['daily_sales'][$daily_sale->Name][array_search(date('j M', strtotime($daily_sale->Date)), $array['current_week'])] = $daily_sale->Sales;
+					$date_index = array_search(date('j M', strtotime($daily_sale->Date)), $array['current_week']);
+					if ($date_index !== false) {
+						$array['daily_sales'][$daily_sale->Name][$date_index] = $daily_sale->Sales;
+					}
 
 				}
 
@@ -565,67 +587,92 @@ class Dashboard extends MY_Controller
 
 	{
 
-		$array['current_week'] = [];
+		// Get date filters from POST data
+		$start_date = $this->input->post('start_date');
+		$end_date = $this->input->post('end_date');
 
-		$array['daily_sales'] = [0, 0, 0, 0, 0, 0, 0];
+		$array['daily_sales'] = [];
 
-		for($i = 1; $i <= 7; $i++) {
+		// If dates are provided, use them. Otherwise default to current week
+		if ($start_date && $end_date) {
+			// Generate date range array
+			$start = new DateTime($start_date);
+			$end = new DateTime($end_date);
+			$interval = new DateInterval('P1D');
+			$date_range = new DatePeriod($start, $interval, $end->modify('+1 day'));
 
-			switch($i) {
+			$array['current_week'] = [];
+			foreach ($date_range as $date) {
+				array_push($array['current_week'], $date->format('j M'));
+			}
+			$array['daily_sales'] = array_fill(0, count($array['current_week']), 0);
+		} else {
+			// Default to current week
+			$array['current_week'] = [];
 
-				case 1:
+			$array['daily_sales'] = [0, 0, 0, 0, 0, 0, 0];
 
-					array_push($array['current_week'], date('j M', strtotime('This Week Monday')));
+			for($i = 1; $i <= 7; $i++) {
 
-					break;
+				switch($i) {
 
-				case 2:
+					case 1:
 
-					array_push($array['current_week'], date('j M', strtotime('This Week Tuesday')));
+						array_push($array['current_week'], date('j M', strtotime('This Week Monday')));
 
-					break;
+						break;
 
-				case 3:
+					case 2:
 
-					array_push($array['current_week'], date('j M', strtotime('This Week Wednesday')));
+						array_push($array['current_week'], date('j M', strtotime('This Week Tuesday')));
 
-					break;
+						break;
 
-				case 4:
+					case 3:
 
-					array_push($array['current_week'], date('j M', strtotime('This Week Thursday')));
+						array_push($array['current_week'], date('j M', strtotime('This Week Wednesday')));
 
-					break;
+						break;
 
-				case 5:
+					case 4:
 
-					array_push($array['current_week'], date('j M', strtotime('This Week Friday')));
+						array_push($array['current_week'], date('j M', strtotime('This Week Thursday')));
 
-					break;
+						break;
 
-				case 6:
+					case 5:
 
-					array_push($array['current_week'], date('j M', strtotime('This Week Saturday')));
+						array_push($array['current_week'], date('j M', strtotime('This Week Friday')));
 
-					break;
+						break;
 
-				case 7:
+					case 6:
 
-					array_push($array['current_week'], date('j M', strtotime('This Week Sunday')));
+						array_push($array['current_week'], date('j M', strtotime('This Week Saturday')));
 
-					break;
+						break;
 
-				default:
+					case 7:
+
+						array_push($array['current_week'], date('j M', strtotime('This Week Sunday')));
+
+						break;
+
+					default:
+
+				}
 
 			}
-
 		}
 
-		$daily_sales = $this->Dashboard_Model->Daily_Sales();
+		$daily_sales = $this->Dashboard_Model->Daily_Sales($start_date, $end_date);
 
 		foreach($daily_sales as $daily_sale) {
 
-			$array['daily_sales'][array_search(date('j M', strtotime($daily_sale->Date)), $array['current_week'])] = $daily_sale->Sales;
+			$date_index = array_search(date('j M', strtotime($daily_sale->Date)), $array['current_week']);
+			if ($date_index !== false) {
+				$array['daily_sales'][$date_index] = $daily_sale->Sales;
+			}
 
 		}
 
