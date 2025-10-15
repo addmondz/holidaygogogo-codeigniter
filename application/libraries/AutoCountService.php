@@ -108,6 +108,7 @@ class AutoCountService {
 
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_HEADER, true);
 
         if ($headers) {
             curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
@@ -117,6 +118,7 @@ class AutoCountService {
         curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, $verifySSL ? 2 : 0);
 
         $result = curl_exec($ch);
+        $headerSize = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 
         if (curl_errno($ch)) {
@@ -124,6 +126,7 @@ class AutoCountService {
             curl_close($ch);
             return [
                 'status' => $httpCode,
+                'headers' => [], 
                 'body'   => null,
                 'error'  => $errorMsg
             ];
@@ -131,13 +134,46 @@ class AutoCountService {
 
         curl_close($ch);
 
+        $headerText = substr($result, 0, $headerSize);
+        $bodyText = substr($result, $headerSize);
+
+        $headerLines = explode("\r\n", trim($headerText));
+        $headersAssoc = []; // whole header 
+        $docNo = null; // ✅ added
+
+        foreach ($headerLines as $line) {
+            if (strpos($line, ':') !== false) {
+                [$key, $value] = explode(':', $line, 2);
+                $key = strtolower(trim($key));
+                $value = trim($value);
+
+                $headersAssoc[$key] = $value;
+
+                // ✅ auto-detect and extract docNo if "location" header exists
+                if ($key === 'location' && stripos($value, 'docNo=') !== false) {
+                    $parts = parse_url($value);
+                    parse_str($parts['query'] ?? '', $query);
+                    $docNo = $query['docNo'] ?? null;
+                }
+            }
+        }
+
+
         // Handle empty body (example: 201 Created with no response body)
-        if ($result === '' || $result === null) {
-            return [
+        if ($bodyText === '' || $bodyText === null) {
+            $response = [
                 'status' => $httpCode,
+                //'headers' => $headersAssoc,
                 'body'   => null,
                 'error'  => ($httpCode >= 400 ? "HTTP Error $httpCode" : null)
             ];
+
+            // ✅ only add docNo if it exists
+            if (!empty($docNo)) {
+                $response['docNo'] = $docNo;
+            }
+
+            return $response;
         }
 
         // Decode JSON body
@@ -145,18 +181,31 @@ class AutoCountService {
 
         // If body is JSON and has "statusCode" field → treat as error
         if (is_array($decoded) && isset($decoded['statusCode']) && $decoded['statusCode'] >= 400) {
-            return [
+            $response = [
                 'status' => $httpCode,
+                //'headers' => $headersAssoc,
                 'body'   => $decoded,
                 'error'  => $decoded['message'] ?? "HTTP Error {$decoded['statusCode']}"
             ];
+
+            if (!empty($docNo)) {
+                $response['docNo'] = $docNo;
+            }
+
+            return $response;
         }
 
         // Normal success response
-        return [
+        $response = [
             'status' => $httpCode,
+            //'headers' => $headersAssoc,
             'body'   => $decoded,
             'error'  => null
         ];
+        if (!empty($docNo)) {
+            $response['docNo'] = $docNo;
+        }
+
+        return $response;
     }
 }

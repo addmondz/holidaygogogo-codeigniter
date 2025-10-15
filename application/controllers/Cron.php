@@ -421,10 +421,16 @@ class Cron extends CI_Controller
 				}
 
 				if (isset($result['status']) && ($result['status'] == 201 || $result['status'] == 204) && $result['error'] === null) {
-					$this->Payment_Model->update_by_id($payment['PaymentID'], [
+					$updateData = [
 						'AutocountSyncStatus'  => 'S',
 						'AutocountSyncMessage' => json_encode($result)
-					]);
+					];
+
+					if (isset($result['docNo']) && !empty($result['docNo'])) {
+						$updateData['ReferenceNumber'] = $result['docNo'];
+					}
+
+					$this->Payment_Model->update_by_id($payment['PaymentID'], $updateData);
 					echo "SUCCESS\n";
 				} else {
 					$this->Payment_Model->update_by_id($payment['PaymentID'], [
