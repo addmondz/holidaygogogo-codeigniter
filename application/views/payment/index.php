@@ -380,6 +380,7 @@
                                 <th style="text-align:center;">Supplier</th>
                                 <th class="deadline" style="text-align:center;">Deadline</th>
                                 <th style="text-align:center;">Reference</th>
+                                <th style="text-align:center;">Autocount Reference</th>
                                 <th class="status" style="text-align:center;">Status</th>
                                 <th class="autocount_sync_status" style="text-align:center;">Autocount Status</th>
                                 <th class="action" style="text-align:center;">Action</th>
@@ -427,6 +428,7 @@
                                         </td>
                                         <td id="<?php echo 'deadline-' . $payment->PaymentID; ?>" style="text-align:center;"><?php echo $payment->Deadline; ?></td>
                                         <td id="<?php echo 'reference_number-' . $payment->PaymentID; ?>" style="text-align:center;"><?php echo $payment->ReferenceNumber; ?></td>
+                                        <td id="<?php echo 'autocount_reference_number-' . $payment->PaymentID; ?>" style="text-align:center;"><?php echo $payment->AutocountReferenceNumber; ?></td>
                                         <td style="text-align:center;"><?php if($payment->Status == 'Y') { echo '<i class="la la-check-circle text-success"></i>'; } else if($payment->Status == 'P') { echo '<i class="la la-exclamation-circle text-warning"></i>'; } else { echo '<i class="la la-times-circle text-danger"></i>'; } ?></td>
                                         <td style="text-align:center;">
                                             <?php 

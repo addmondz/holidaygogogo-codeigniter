@@ -3,7 +3,7 @@ class Payment_Model extends CI_Model
 {
 	function Read_Payment()
 	{
-		$this->db->select('PaymentID, payment.BookingID, payment.SupplierID, Date, Type, Currency, ForeignCurrency, Credit, ReferenceNumber, BankSlip, Debit, Deadline, QuotationNumber, Quotation, InvoiceNumber, Invoice, payment.Bank, payment.BankAccount, payment.BankHolder, DebitRemark, PaymentRemark, payment.Status, Remark, BookingNumber, ReservationNumber, Customer, payment.AutocountSyncAction, payment.AutocountSyncStatus, payment.AutocountSyncMessage');
+		$this->db->select('PaymentID, payment.BookingID, payment.SupplierID, Date, Type, Currency, ForeignCurrency, Credit, ReferenceNumber, BankSlip, Debit, Deadline, QuotationNumber, Quotation, InvoiceNumber, Invoice, payment.Bank, payment.BankAccount, payment.BankHolder, DebitRemark, PaymentRemark, payment.Status, Remark, BookingNumber, ReservationNumber, Customer, payment.AutocountSyncAction, payment.AutocountSyncStatus, payment.AutocountSyncMessage, payment.AutocountReferenceNumber');
 		$this->db->join('booking', 'booking.BookingID = payment.BookingID', 'left');
 		$this->db->where('PaymentID', $this->input->get('payment_id'));
 		return $this->db->get('payment')->row_array();
@@ -11,7 +11,7 @@ class Payment_Model extends CI_Model
 	
 	function Read_Payments1($limit = null)
 	{
-		$this->db->select('PaymentID, payment.BookingID, payment.SupplierID, Date, Type, Credit, ReferenceNumber, Debit, Deadline, payment.BankHolder, payment.Status, BookingNumber, ReservationNumber, Customer, StartDate, EndDate, NetTotal, Token, admin.Name As SalesAgent, supplier.Name As Supplier,  payment.AutocountSyncStatus, payment.AutocountSyncMessage, payment.AutocountSyncAction');
+		$this->db->select('PaymentID, payment.BookingID, payment.SupplierID, Date, Type, Credit, ReferenceNumber, Debit, Deadline, payment.BankHolder, payment.Status, BookingNumber, ReservationNumber, Customer, StartDate, EndDate, NetTotal, Token, admin.Name As SalesAgent, supplier.Name As Supplier,  payment.AutocountSyncStatus, payment.AutocountSyncMessage, payment.AutocountSyncAction,payment.AutocountReferenceNumber');
 		$this->db->join('payment', 'payment.BookingID = booking.BookingID', 'left');
 		$this->db->join('admin', 'admin.AdminID = booking.SalesAgent', 'left');
 		$this->db->join('supplier', 'supplier.SupplierID = payment.SupplierID', 'left');

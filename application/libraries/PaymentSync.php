@@ -17,7 +17,7 @@ class PaymentSync {
 			// Master (single row only)
 			$param = [
 				'master' => [
-					'docNo'           => arr_get($data, 'ReferenceNumber', ''),
+					'docNo'           => '',
 					'docNo2'          => arr_get($data, 'BookingNumber', ''),
 					'docNoFormatName' => arr_get($data, 'docNoFormatName', null),
 					'docType'         => ($data['Credit'] != 0.00) ? 'OR' : 'PV', // required
@@ -153,7 +153,7 @@ class PaymentSync {
 
 			// Master data (single row only)
 			$body['master'] = [
-				'docNo'           => arr_get($data, 'ReferenceNumber', ''),                                // Reference Number -> docNo
+				'docNo'           => arr_get($data, 'AutocountReferenceNumber', ''),                                // Reference Number -> docNo
 				'docNo2'          => arr_get($data, 'BookingNumber', ''),
 				'docNoFormatName' => arr_get($data, 'docNoFormatName', null),
 				'docType'         => ($data['Credit'] != 0.00) ? 'OR' : 'PV', // required
@@ -271,7 +271,7 @@ class PaymentSync {
 				'PUT',
 				'payment.update',
 				$body,
-				['docNo' => arr_get($data, 'ReferenceNumber', '')]
+				['docNo' => arr_get($data, 'AutocountReferenceNumber', '')]
 			);
 		} catch (Exception $e) {
 			log_message('error', 'Autocount payment update error: ' . $e->getMessage());
@@ -286,7 +286,7 @@ class PaymentSync {
 
     public function autocount_delete($data = [], $config = [])
     {
-        $docNo = isset($data['ReferenceNumber']) ? $data['ReferenceNumber'] : '';
+        $docNo = isset($data['AutocountReferenceNumber']) ? $data['AutocountReferenceNumber'] : '';
 
         return autocount_request(
             'DELETE',
@@ -298,7 +298,7 @@ class PaymentSync {
 
     public function autocount_void($data = [])
     {
-        $docNo = isset($data['ReferenceNumber']) ? $data['ReferenceNumber'] : '';
+        $docNo = isset($data['AutocountReferenceNumber']) ? $data['AutocountReferenceNumber'] : '';
         $body = [
             'voidReason' => isset($data['reason']) ? $data['reason'] : ''
         ];

@@ -427,7 +427,7 @@ class Cron extends CI_Controller
 					];
 
 					if (isset($result['docNo']) && !empty($result['docNo'])) {
-						$updateData['ReferenceNumber'] = $result['docNo'];
+						$updateData['AutocountReferenceNumber'] = $result['docNo'];
 					}
 
 					$this->Payment_Model->update_by_id($payment['PaymentID'], $updateData);
