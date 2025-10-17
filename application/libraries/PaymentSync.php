@@ -21,7 +21,7 @@ class PaymentSync {
 					'docNo2'          => arr_get($data, 'BookingNumber', ''),
 					'docNoFormatName' => arr_get($data, 'docNoFormatName', null),
 					'docType'         => ($data['Credit'] != 0.00) ? 'OR' : 'PV', // required
-					'docDate'         => date('Y-m-d', strtotime(arr_get($data, 'InsertDate'))),  // Date -> docDate
+					'docDate'         => date('Y-m-d', strtotime(arr_get($data, 'Date'))),  // Date -> docDate
 					'taxDate'         => null,  // Date -> taxDate
 					'currencyCode'    => arr_get($data, 'currency_code', 'MYR'),
 					'currencyRate'    => arr_get($data, 'currency_rate', 1),
@@ -157,7 +157,7 @@ class PaymentSync {
 				'docNo2'          => arr_get($data, 'BookingNumber', ''),
 				'docNoFormatName' => arr_get($data, 'docNoFormatName', null),
 				'docType'         => ($data['Credit'] != 0.00) ? 'OR' : 'PV', // required
-				'docDate'         => date('Y-m-d', strtotime(arr_get($data, 'InsertDate'))),  // Date -> docDate
+				'docDate'         => date('Y-m-d', strtotime(arr_get($data, 'Date'))),  // Date -> docDate
 				'taxDate'         => null,//date('Y-m-d', strtotime(arr_get($data, 'tax_date'))),  // Date -> taxDate
 				'currencyCode'    => arr_get($data, 'currency_code', 'MYR'),      // Currency -> currencyCode
 				'currencyRate'    => (float)arr_get($data, 'currency_rate', 1),   // Foreign Currency -> currencyRate
