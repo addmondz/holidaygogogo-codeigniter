@@ -10,8 +10,7 @@
                 <?php if($this->session->level != 20) { ?>
                     <div class="card-toolbar" style="width:350px;">
                         <label>Sales Agent</label>
-                        <select title="--Select Sales Agent--" id="sales_agent" data-live-search="true" class="form-control selectpicker">
-                            <option selected data-icon="la la-user-alt font-size-lg bs-icon" value="">ALL</option>
+                        <select title="--Select Sales Agent--" id="sales_agent" data-live-search="true" class="form-control selectpicker" multiple="multiple">
                             <?php foreach($sales_agents as $sales_agent) { ?>
                                 <option data-icon="la la-user-alt font-size-lg bs-icon" value="<?php echo $sales_agent->AdminID; ?>"><?php echo $sales_agent->Name; ?></option>
                             <?php } ?>
@@ -894,7 +893,21 @@
                                         <h3 class="card-label" style="font-size:14px;"><?php echo 'Year ' . date('Y') . ' SA Daily Sales'; ?></h3>
                                     </div>
                                     <div class="card-toolbar">
-                                        <div id="kt_daterangepicker_sa_daily" class="input-icon sa_daily_picker">
+                                        <select class="form-control form-control-sm" id="sa_daily_filter" multiple="multiple" style="width: 200px;">
+                                            <?php foreach($sales_agents as $agent) { ?>
+                                                <option value="<?php echo $agent->AdminID; ?>" 
+                                                    <?php 
+                                                        if(isset($_GET['sa_daily_agents'])) {
+                                                            $selected_agents = explode(',', $_GET['sa_daily_agents']);
+                                                            if(in_array($agent->AdminID, $selected_agents)) {
+                                                                echo 'selected';
+                                                            }
+                                                        }
+                                                    ?>
+                                                ><?php echo $agent->Name; ?></option>
+                                            <?php } ?>
+                                        </select>
+                                        <div id="kt_daterangepicker_sa_daily" class="input-icon sa_daily_picker ml-2">
                                             <?php
                                                 $start_date_sa_daily = isset($_GET['start_date_sa_daily']) ? date('d/m/Y', strtotime($_GET['start_date_sa_daily'])) : '';
                                                 $end_date_sa_daily = isset($_GET['end_date_sa_daily']) ? date('d/m/Y', strtotime($_GET['end_date_sa_daily'])) : '';
@@ -909,7 +922,7 @@
                                                 <i class="la la-calendar"></i>
                                             </span>
                                         </div>
-                                        <span id="reset_sa_daily_date" class="btn btn-icon btn-warning btn-sm ml-1">
+                                        <span id="reset_sa_daily_filter" class="btn btn-icon btn-warning btn-sm ml-1">
                                             <i class="la la-refresh"></i>
                                         </span>
                                     </div>
@@ -1216,72 +1229,77 @@
         var pending_debit_payments = <?php echo json_encode($pending_debit_payments) ?>;
 
         $('#sales_agent').change(function() {
-            var agent = $('#sales_agent').val();
+            var selectedAgents = $('#sales_agent').val(); // Returns array when multiple is enabled
             var count = 0;
+            
+            // Show/hide elements based on selected agents
             for(var i = 0; i < sales_agents.length; i++) {
-                if(agent != '') {
-                    if(sales_agents[i].AdminID == agent) {
+                if(selectedAgents && selectedAgents.length > 0) {
+                    // Check if this agent is in the selected agents array
+                    if(selectedAgents.includes(sales_agents[i].AdminID)) {
                         $('.' + sales_agents[i].AdminID).removeAttr('style');
                     } else {
                         $('.' + sales_agents[i].AdminID).attr('style', 'display: none !important');
                     }
                 } else {
+                    // No selection, show all
                     $('.' + sales_agents[i].AdminID).removeAttr('style');
                 }
             }
 
-            if(agent != '') {
+            // Update counts based on selected agents
+            if(selectedAgents && selectedAgents.length > 0) {
                 for(var i = 0; i < upcoming_travels.length; i++) {
-                    if(upcoming_travels[i].AdminID == agent) {
+                    if(selectedAgents.includes(upcoming_travels[i].AdminID)) {
                         count++;
                     }
                 }
                 $('#upcoming_travels_header').html('<strong>' + count + '</strong>&nbsp;BC(s)');
                 count = 0;
                 for(var i = 0; i < profit_margins_less_than_10_percent.length; i++) {
-                    if(profit_margins_less_than_10_percent[i].AdminID == agent) {
+                    if(selectedAgents.includes(profit_margins_less_than_10_percent[i].AdminID)) {
                         count++;
                     }
                 }
                 $('#profit_margins_less_than_10_percent_header').html('<strong>' + count + '</strong>&nbsp;BC(s)');
                 count = 0;
                 for(var i = 0; i < overdue_payments.length; i++) {
-                    if(overdue_payments[i].AdminID == agent) {
+                    if(selectedAgents.includes(overdue_payments[i].AdminID)) {
                         count++;
                     }
                 }
                 $('#overdue_payments_header').html('<strong>' + count + '</strong>&nbsp;BC(s)');
                 count = 0;
                 for(var i = 0; i < negative_profit_margins.length; i++) {
-                    if(negative_profit_margins[i].AdminID == agent) {
+                    if(selectedAgents.includes(negative_profit_margins[i].AdminID)) {
                         count++;
                     }
                 }
                 $('#negative_profit_margins_header').html('<strong>' + count + '</strong>&nbsp;BC(s)');
                 count = 0;
                 for(var i = 0; i < pending_travel_vouchers.length; i++) {
-                    if(pending_travel_vouchers[i].AdminID == agent) {
+                    if(selectedAgents.includes(pending_travel_vouchers[i].AdminID)) {
                         count++;
                     }
                 }
                 $('#pending_travel_vouchers_header').html('<strong>' + count + '</strong>&nbsp;BC(s)');
                 count = 0;
                 for(var i = 0; i < pending_reviews.length; i++) {
-                    if(pending_reviews[i].AdminID == agent) {
+                    if(selectedAgents.includes(pending_reviews[i].AdminID)) {
                         count++;
                     }
                 }
                 $('#pending_reviews_header').html('<strong>' + count + '</strong>&nbsp;BC(s)');
                 count = 0;
                 for(var i = 0; i < pending_credit_payments.length; i++) {
-                    if(pending_credit_payments[i].AdminID == agent) {
+                    if(selectedAgents.includes(pending_credit_payments[i].AdminID)) {
                         count++;
                     }
                 }
                 $('#pending_credit_payments_header').html('<strong>' + count + '</strong>&nbsp;Payment(s)');
                 count = 0;
                 for(var i = 0; i < pending_debit_payments.length; i++) {
-                    if(pending_debit_payments[i].AdminID == agent) {
+                    if(selectedAgents.includes(pending_debit_payments[i].AdminID)) {
                         count++;
                     }
                 }
@@ -1302,12 +1320,16 @@
             var sa_daily_params = {};
             var start_date_sa_daily = '<?php echo isset($_GET['start_date_sa_daily']) ? $_GET['start_date_sa_daily'] : ''; ?>';
             var end_date_sa_daily = '<?php echo isset($_GET['end_date_sa_daily']) ? $_GET['end_date_sa_daily'] : ''; ?>';
+            var sa_daily_agents = '<?php echo isset($_GET['sa_daily_agents']) ? $_GET['sa_daily_agents'] : ''; ?>';
             
             if (start_date_sa_daily) {
                 sa_daily_params.start_date = start_date_sa_daily;
             }
             if (end_date_sa_daily) {
                 sa_daily_params.end_date = end_date_sa_daily;
+            }
+            if (sa_daily_agents) {
+                sa_daily_params.sales_agents = sa_daily_agents;
             }
 
             $.ajax({
@@ -1802,9 +1824,22 @@
             window.location.href = '<?php echo base_url('Dashboard'); ?>';
         });
 
-        // SA Daily Sales picker
+        // SA Daily Sales picker and filter
         var start_date_sa_daily = '';
         var end_date_sa_daily = '';
+        var selected_sa_daily_agents = [];
+
+        // Initialize Select2 for sales agent filter
+        $('#sa_daily_filter').select2({
+            placeholder: "Select Sales Agents",
+            allowClear: true
+        });
+
+        // Handle sales agent selection change
+        $('#sa_daily_filter').on('change', function() {
+            selected_sa_daily_agents = $(this).val() || [];
+            filterSADailySales();
+        });
 
         $('#kt_daterangepicker_sa_daily.sa_daily_picker').on('apply.daterangepicker', function(ev, picker) {
             console.log('sa daily picker change', picker.startDate.format('YYYY-MM-DD'), picker.endDate.format('YYYY-MM-DD'));
@@ -1813,12 +1848,13 @@
             filterSADailySales();
         });
 
-        $('#reset_sa_daily_date').click(function() {
+        $('#reset_sa_daily_filter').click(function() {
             var current_url = window.location.href;
             var new_url = current_url.split('?')[0];
             var params = new URLSearchParams(window.location.search);
             params.delete('start_date_sa_daily');
             params.delete('end_date_sa_daily');
+            params.delete('sa_daily_agents');
             
             var remaining_params = params.toString();
             if (remaining_params) {
@@ -1852,7 +1888,7 @@
             window.location.href = new_url;
         });
 
-        // Function to filter SA Daily Sales based on date range
+        // Function to filter SA Daily Sales based on date range and selected agents
         function filterSADailySales() {
             var current_url = window.location.href;
             var base_url = current_url.split('?')[0];
@@ -1860,15 +1896,30 @@
 
             if (start_date_sa_daily) {
                 params.set('start_date_sa_daily', start_date_sa_daily);
+            } else {
+                params.delete('start_date_sa_daily');
             }
             if (end_date_sa_daily) {
                 params.set('end_date_sa_daily', end_date_sa_daily);
+            } else {
+                params.delete('end_date_sa_daily');
+            }
+
+            // Get current selected agents if not already set
+            if (selected_sa_daily_agents.length === 0) {
+                selected_sa_daily_agents = $('#sa_daily_filter').val() || [];
+            }
+
+            if (selected_sa_daily_agents.length > 0) {
+                params.set('sa_daily_agents', selected_sa_daily_agents.join(','));
+            } else {
+                params.delete('sa_daily_agents');
             }
 
             console.log('SA Daily params', params.toString());
             
-            // Reload page with date parameters
-            window.location.href = base_url + '?' + params.toString();
+            // Reload page with parameters
+            window.location.href = base_url + (params.toString() ? '?' + params.toString() : '');
         }
 
         // Function to filter Daily Total Sales based on date range

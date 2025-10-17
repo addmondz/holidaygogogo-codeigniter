@@ -334,6 +334,13 @@ class Dashboard extends MY_Controller
 		// Get date filters from POST data
 		$start_date = $this->input->post('start_date');
 		$end_date = $this->input->post('end_date');
+		$sales_agents_filter = $this->input->post('sales_agents');
+
+		// Convert comma-separated sales agents to array
+		$selected_agents = [];
+		if ($sales_agents_filter) {
+			$selected_agents = explode(',', $sales_agents_filter);
+		}
 
 		// If dates are provided, use them. Otherwise default to current week
 		if ($start_date && $end_date) {
@@ -406,11 +413,16 @@ class Dashboard extends MY_Controller
 
 		$sales_agents = $this->Dashboard_Model->Sales_Agents();
 
-		$daily_sales = $this->Dashboard_Model->Sales_Agents_Daily_Sales($start_date, $end_date);
+		$daily_sales = $this->Dashboard_Model->Sales_Agents_Daily_Sales($start_date, $end_date, $selected_agents);
 
 		$array['sales_agents'] = [];
 
 		foreach($sales_agents as $sales_agent) {
+
+			// If filter is applied, only include selected agents
+			if (!empty($selected_agents) && !in_array($sales_agent->AdminID, $selected_agents)) {
+				continue;
+			}
 
 			array_push($array['sales_agents'], $sales_agent->Name);
 
