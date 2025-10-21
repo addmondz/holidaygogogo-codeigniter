@@ -516,20 +516,19 @@ class Cron extends CI_Controller
 		if ($payment['Credit'] != 0.00) { // OR
 			$desc = !empty($payment['Customer']) ? $payment['Customer'] : '';
 		} else { // PV
-			if (!empty($payment['Type']) && $payment['Type'] == 'SUPPLIER PAYMENT') {
-				$desc = !empty($payment['supplier_name']) ? $payment['supplier_name'] : '';
-			} else {
-				$desc = !empty($payment['Customer']) ? $payment['Customer'] : (!empty($payment['supplier_name']) ? $payment['supplier_name'] : '');
-			}
-			if (!empty($payment['Type'])) {
-				$desc .= ' ' . $payment['Type'];
-			}
+			$desc = !empty($payment['supplier_name']) ? $payment['supplier_name'] : (!empty($payment['Customer']) ? $payment['Customer'] : '');
 		}
+
 		if (!empty($payment['StartDate']) && !empty($payment['EndDate'])) {
 			$travelDate = $payment['StartDate'] . ' - ' . $payment['EndDate'];
 			$desc = !empty($desc) ? $desc . ' (' . $travelDate . ')' : $travelDate;
 			$payment['travelDate'] = $travelDate;
 		}
+
+		if (!empty($payment['Type'])) {
+			$desc .= ' ' . $payment['Type'];  // Always append Type last
+		}
+
 		$payment['description'] = trim($desc);
 
 		// deal with 
