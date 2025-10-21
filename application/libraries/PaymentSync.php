@@ -26,7 +26,7 @@ class PaymentSync {
 					'currencyCode'    => arr_get($data, 'currency_code', 'MYR'),
 					'currencyRate'    => arr_get($data, 'currency_rate', 1),
 					'journalType'     => 'GENERAL',
-					'dealWith'        => ($data['Credit'] != 0.00) ? arr_get($data, 'Customer', '') : arr_get($data, 'supplier_name', ''),
+					'dealWith'        => arr_get($data, 'dealWith', null),
 					'description'     => arr_get($data, 'description', ''),
 					'note'            => arr_get($data, 'note', ''),
 				],
@@ -162,7 +162,7 @@ class PaymentSync {
 				'currencyCode'    => arr_get($data, 'currency_code', 'MYR'),      // Currency -> currencyCode
 				'currencyRate'    => (float)arr_get($data, 'currency_rate', 1),   // Foreign Currency -> currencyRate
 				'journalType'     => 'GENERAL',                               // Journal Type
-				'dealWith'        => ($data['Credit'] != 0.00) ? arr_get($data, 'Customer', '') : arr_get($data, 'supplier_name', ''),       // Supplier -> dealWith
+				'dealWith'        => arr_get($data, 'dealWith', null),      // Supplier -> dealWith
 				'description'     => arr_get($data, 'description', ''),    // Payment Remark -> description
 				'note'            => arr_get($data, 'Remark', ''),           // Remark -> note
 			];

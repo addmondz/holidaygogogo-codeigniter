@@ -511,27 +511,38 @@ class Cron extends CI_Controller
 			}
 		}
 
-		if ($payment['Credit'] != 0.00) { // or
-			if (!empty($payment['Customer'])) {
-				$payment['description'] = $payment['Customer'];
-			}
-		} else {
-			if (!empty($payment['supplier_name'])) { // pv
-				$payment['description'] = $payment['supplier_name'];
-			}
-		}
-
-		if (!empty($payment['StartDate']) && !empty($payment['EndDate'])) {
-			$payment['travelDate'] = $payment['StartDate'] . ' - ' . $payment['EndDate'];
-
-			if (!empty($payment['description'])) {
-				$payment['description'] .= ' (' . $payment['travelDate'] . ')';
+		// description
+		$desc = '';
+		if ($payment['Credit'] != 0.00) { // OR
+			$desc = !empty($payment['Customer']) ? $payment['Customer'] : '';
+		} else { // PV
+			if (!empty($payment['Type']) && $payment['Type'] == 'SUPPLIER PAYMENT') {
+				$desc = !empty($payment['supplier_name']) ? $payment['supplier_name'] : '';
 			} else {
-				$payment['description'] = $payment['travelDate'];
+				$desc = !empty($payment['Customer']) ? $payment['Customer'] : (!empty($payment['supplier_name']) ? $payment['supplier_name'] : '');
+			}
+			if (!empty($payment['Type'])) {
+				$desc .= ' ' . $payment['Type'];
 			}
 		}
+		if (!empty($payment['StartDate']) && !empty($payment['EndDate'])) {
+			$travelDate = $payment['StartDate'] . ' - ' . $payment['EndDate'];
+			$desc = !empty($desc) ? $desc . ' (' . $travelDate . ')' : $travelDate;
+			$payment['travelDate'] = $travelDate;
+		}
+		$payment['description'] = trim($desc);
 
-				
+		// deal with 
+		if ($payment['Credit'] != 0.00) { // OR
+			$payment['dealWith'] = !empty($payment['Customer']) ? $payment['Customer'] : '';
+		} else { // PV
+			$payment['dealWith'] = !empty($payment['supplier_name']) ? $payment['supplier_name'] : '';
+		}
+		if (!empty($payment['Type'])) {
+			if ($payment['Type'] == 'AGENT COMMISSION' || $payment['Type'] == 'CUSTOMER REFUND') {
+				$payment['dealWith'] = $payment['BankHolder'];
+			}
+		}
 
 		return $payment;
 	}
