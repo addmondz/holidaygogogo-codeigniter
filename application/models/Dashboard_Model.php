@@ -375,7 +375,7 @@ class Dashboard_Model extends CI_Model
 
 
 
-	function Sales_Agents_Daily_Sales($start_date = null, $end_date = null)
+	function Sales_Agents_Daily_Sales($start_date = null, $end_date = null, $selected_agents = null)
 
 	{
 
@@ -396,6 +396,11 @@ class Dashboard_Model extends CI_Model
 		} else {
 			$this->db->where('CAST(booking.InsertDate AS DATE) >=', date('Y-m-d', strtotime('This Week Monday')));
 			$this->db->where('CAST(booking.InsertDate AS DATE) <=', date('Y-m-d', strtotime('This Week Sunday')));
+		}
+
+		// Filter by selected sales agents if provided
+		if (!empty($selected_agents)) {
+			$this->db->where_in('SalesAgent', $selected_agents);
 		}
 
 		$this->db->where('Level !=', 30);

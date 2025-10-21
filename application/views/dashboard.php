@@ -1230,13 +1230,17 @@
 
         $('#sales_agent').change(function() {
             var selectedAgents = $('#sales_agent').val(); // Returns array when multiple is enabled
+            // Convert to strings to ensure type consistency between environments
+            if(selectedAgents && selectedAgents.length > 0) {
+                selectedAgents = selectedAgents.map(String);
+            }
             var count = 0;
             
             // Show/hide elements based on selected agents
             for(var i = 0; i < sales_agents.length; i++) {
                 if(selectedAgents && selectedAgents.length > 0) {
                     // Check if this agent is in the selected agents array
-                    if(selectedAgents.includes(sales_agents[i].AdminID)) {
+                    if(selectedAgents.includes(String(sales_agents[i].AdminID))) {
                         $('.' + sales_agents[i].AdminID).removeAttr('style');
                     } else {
                         $('.' + sales_agents[i].AdminID).attr('style', 'display: none !important');
@@ -1250,56 +1254,56 @@
             // Update counts based on selected agents
             if(selectedAgents && selectedAgents.length > 0) {
                 for(var i = 0; i < upcoming_travels.length; i++) {
-                    if(selectedAgents.includes(upcoming_travels[i].AdminID)) {
+                    if(selectedAgents.includes(String(upcoming_travels[i].AdminID))) {
                         count++;
                     }
                 }
                 $('#upcoming_travels_header').html('<strong>' + count + '</strong>&nbsp;BC(s)');
                 count = 0;
                 for(var i = 0; i < profit_margins_less_than_10_percent.length; i++) {
-                    if(selectedAgents.includes(profit_margins_less_than_10_percent[i].AdminID)) {
+                    if(selectedAgents.includes(String(profit_margins_less_than_10_percent[i].AdminID))) {
                         count++;
                     }
                 }
                 $('#profit_margins_less_than_10_percent_header').html('<strong>' + count + '</strong>&nbsp;BC(s)');
                 count = 0;
                 for(var i = 0; i < overdue_payments.length; i++) {
-                    if(selectedAgents.includes(overdue_payments[i].AdminID)) {
+                    if(selectedAgents.includes(String(overdue_payments[i].AdminID))) {
                         count++;
                     }
                 }
                 $('#overdue_payments_header').html('<strong>' + count + '</strong>&nbsp;BC(s)');
                 count = 0;
                 for(var i = 0; i < negative_profit_margins.length; i++) {
-                    if(selectedAgents.includes(negative_profit_margins[i].AdminID)) {
+                    if(selectedAgents.includes(String(negative_profit_margins[i].AdminID))) {
                         count++;
                     }
                 }
                 $('#negative_profit_margins_header').html('<strong>' + count + '</strong>&nbsp;BC(s)');
                 count = 0;
                 for(var i = 0; i < pending_travel_vouchers.length; i++) {
-                    if(selectedAgents.includes(pending_travel_vouchers[i].AdminID)) {
+                    if(selectedAgents.includes(String(pending_travel_vouchers[i].AdminID))) {
                         count++;
                     }
                 }
                 $('#pending_travel_vouchers_header').html('<strong>' + count + '</strong>&nbsp;BC(s)');
                 count = 0;
                 for(var i = 0; i < pending_reviews.length; i++) {
-                    if(selectedAgents.includes(pending_reviews[i].AdminID)) {
+                    if(selectedAgents.includes(String(pending_reviews[i].AdminID))) {
                         count++;
                     }
                 }
                 $('#pending_reviews_header').html('<strong>' + count + '</strong>&nbsp;BC(s)');
                 count = 0;
                 for(var i = 0; i < pending_credit_payments.length; i++) {
-                    if(selectedAgents.includes(pending_credit_payments[i].AdminID)) {
+                    if(selectedAgents.includes(String(pending_credit_payments[i].AdminID))) {
                         count++;
                     }
                 }
                 $('#pending_credit_payments_header').html('<strong>' + count + '</strong>&nbsp;Payment(s)');
                 count = 0;
                 for(var i = 0; i < pending_debit_payments.length; i++) {
-                    if(selectedAgents.includes(pending_debit_payments[i].AdminID)) {
+                    if(selectedAgents.includes(String(pending_debit_payments[i].AdminID))) {
                         count++;
                     }
                 }
