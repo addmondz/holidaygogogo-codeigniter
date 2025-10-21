@@ -164,7 +164,7 @@ class AutoCountService {
             $response = [
                 'status' => $httpCode,
                 //'headers' => $headersAssoc,
-                'body'   => (!empty($result)) ? $result : null,
+                'body'   => null,
                 'error'  => ($httpCode >= 400 ? "HTTP Error $httpCode" : null)
             ];
 
