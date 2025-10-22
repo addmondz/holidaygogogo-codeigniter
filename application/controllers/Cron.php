@@ -538,7 +538,14 @@ class Cron extends CI_Controller
 			$payment['dealWith'] = !empty($payment['supplier_name']) ? $payment['supplier_name'] : '';
 		}
 		if (!empty($payment['Type'])) {
-			if ($payment['Type'] == 'AGENT COMMISSION' || $payment['Type'] == 'CUSTOMER REFUND') {
+			$type = [
+				'AGENT COMMISSION',
+				'CUSTOMER REFUND',
+				'BANK CHARGES',
+				'CREDIT CARD CHARGES',
+				'ONE-TIME PAYMENT'
+			];		
+			if (in_array($payment['Type'], $type)) {
 				$payment['dealWith'] = $payment['BankHolder'];
 			}
 		}
