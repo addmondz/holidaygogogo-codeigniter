@@ -90,9 +90,9 @@ class Travel_Voucher extends CI_Controller
                 $array['CompanyWebsite'] = $company['Website'];
 
                 // Get guest list data
-                $bookingNumber = $array['BookingNumber'];
+                $bookingID = $array['BookingID'];
                 $this->db->select('guest_list.Name As GuestFirstName, guest_list.LastName As GuestLastName, guest_list.Gender, DateOfBirth, guest_list.IdentificationNumber, guest_list.PassportNumber, Type');
-                $this->db->where('guest_list.BookingID', $bookingNumber);
+                $this->db->where('guest_list.BookingID', $bookingID);
                 $this->db->where('guest_list.Status', 'Y');
                 $this->db->order_by('Type', 'ASC');
                 $array['guest_lists'] = $this->db->get('guest_list')->result();
