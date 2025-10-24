@@ -52,6 +52,8 @@ $config['autocount'] = [
 
     'payment_acc_no_1' => '300-d277', // payment in OR
     'payment_acc_no_2' => '400-d019', // payment out PV
+
+    'creditTerm' => 'C.O.D.', // supplier need creditTerm
 ];
 
 

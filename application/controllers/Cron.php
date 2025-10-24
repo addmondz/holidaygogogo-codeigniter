@@ -14,7 +14,8 @@ class Cron extends CI_Controller
 		$this->load->model('Payment_Model');
 		$this->load->model('Admin_Model');
 		$this->load->model('Category_Model');
-		$this->load->model('Universal_Model');
+		$this->load->model('Supplier_Model');
+		$this->load->model('Booking_Model');
 		$this->load->library('AutoCountService'); // <-- where you put Guzzle API
 	}
 
@@ -551,6 +552,70 @@ class Cron extends CI_Controller
 		}
 
 		return $payment;
+	}
+
+	/**
+     * Sync Supplier
+     */
+	private function syncSupplier() // creditor
+	{
+		echo "=== Sync Supplier Start ===\n";
+
+		$suppliers = $this->Supplier_Model->get_pending_sycn_suppliers();
+
+		$this->load->library('SupplierSync');
+		$this->load->helper('autocount');
+		$config = get_autocount_config();
+		
+		foreach ($suppliers as $supplier) {
+			echo "Supplier ID {$supplier['SupplierID']} [{$supplier['AutocountSyncAction']}]... ";
+
+			$supplier = $this->enrichSupplier($supplier);
+
+			try {
+				switch ($supplier['AutocountSyncAction']) {
+					case 'C':
+						$result = $this->suppliersync->autocount_create($supplier);
+						break;
+					case 'U':
+						$result = $this->suppliersync->autocount_update($supplier);
+						break;
+					case 'S':
+						$result = $this->suppliersync->autocount_update_status($supplier);
+						break;
+					case 'D':
+						$result = $this->suppliersync->autocount_delete($supplier);
+						break;
+					default:
+						$result = ['error' => 'ERROR Autocount Sync Action'];
+				}
+				if (isset($result['status']) && ($result['status'] == 201 || $result['status'] == 204) && $result['error'] === null) {
+					$this->Supplier_Model->update_by_id($supplier['SupplierID'], [
+						'AutocountSyncStatus'  => 'S',
+						'AutocountSyncMessage' => json_encode($result)
+					]);
+					echo "SUCCESS\n";
+				} else {
+					$this->Supplier_Model->update_by_id($supplier['SupplierID'], [
+						'AutocountSyncStatus'  => 'F',
+						'AutocountSyncMessage' => json_encode($result)
+					]);
+					echo "FAILED\n";
+				}
+			} catch (\Exception $e) {
+				$this->Supplier_Model->update_by_id($booking['SupplierID'], [
+					'AutocountSyncStatus'  => 'F',
+					'AutocountSyncMessage' => $e->getMessage()
+				]);
+				echo "ERROR: {$e->getMessage()}\n";
+			}
+		}
+		echo "=== Sync Suppliers End ===\n\n";
+	}
+
+	private function enrichSupplier($supplier)
+	{
+		return $supplier;
 	}
 
 }

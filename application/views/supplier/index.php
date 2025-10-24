@@ -157,6 +157,8 @@
                                 <th style="text-align:center;">No.</th>
                                 <th style="text-align:center;">Name</th>
                                 <th style="text-align:center;">Phone</th>
+                                <th style="text-align:center;">Supplier Code</th>
+                                <th style="text-align:center;">Autocount Status</th>
                                 <th class="action" style="text-align:center;">Action</th>
                             </tr>
                         </thead>
@@ -170,6 +172,44 @@
                                         <td style="text-align:center; padding-top:15px; padding-bottom:15px;"><?php echo $count; ?></td>
                                         <td style="text-align:center;"><?php echo $supplier->Name; ?></td>
                                         <td style="text-align:center;"><?php echo $supplier->Phone; ?></td>
+                                        <td style="text-align:center;"><?php echo $supplier->SupplierCode; ?></td>
+                                        <td style="text-align:center;">
+                                            <?php 
+                                                // default
+                                                $statusColor = '#000000';
+                                                $statusText  = 'UNKNOWN';
+
+                                                // only handle P, S, F
+                                                switch ($supplier->AutocountSyncStatus) {
+                                                    case 'P': $statusColor = '#808080'; $statusText = 'Pending'; break;
+                                                    case 'S': $statusColor = '#50C878'; $statusText = 'Synced'; break;
+                                                    case 'F': $statusColor = '#FF4500'; $statusText = 'Failed'; break;
+                                                }
+
+                                                // tooltip
+                                                $tooltipAttr = '';
+                                                if (!empty($supplier->AutocountSyncMessage)) {
+                                                    $decoded = json_decode($supplier->AutocountSyncMessage, true);
+
+                                                    if (json_last_error() === JSON_ERROR_NONE) {
+                                                        if (isset($decoded['error']) && $decoded['error'] === null) {
+                                                            $tooltipText = "SUCCESS";
+                                                        } elseif (isset($decoded['error']) && $decoded['error'] !== null) {
+                                                            $tooltipText = "ERROR: " . (is_string($decoded['error']) ? $decoded['error'] : json_encode($decoded['error']));
+                                                        } else {
+                                                            $tooltipText = $supplier->AutocountSyncMessage; // raw JSON
+                                                        }
+                                                    } else {
+                                                        $tooltipText = $supplier->AutocountSyncMessage;
+                                                    }
+
+                                                    $tooltipAttr = ' data-toggle="tooltip" data-placement="top" title="' . htmlspecialchars($tooltipText) . '"';
+                                                }
+                                            ?>
+                                            <span class="font-weight-bold" style="color:<?= $statusColor ?>;" <?= $tooltipAttr ?>>
+                                                <?= $statusText ?>
+                                            </span>
+                                        </td>
                                         <td style="text-align:center;">
                                             <div class="btn-group">
                                                 <button type="button" data-toggle="dropdown" class="btn btn-light-primary btn-sm dropdown-toggle" style="padding-left:3px;"></button>

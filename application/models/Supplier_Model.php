@@ -3,14 +3,14 @@ class Supplier_Model extends CI_Model
 {
 	function Read_Supplier()
 	{
-		$this->db->select('SupplierID, Name, Phone, PrimaryEmail, SecondaryEmail, Address, CurrencyCode, Bank, BankAccount, BankHolder, SwiftCode');
+		$this->db->select('SupplierID, Name, Phone, PrimaryEmail, SecondaryEmail, Address, CurrencyCode, Bank, BankAccount, BankHolder, SwiftCode, SupplierCode,AutocountSyncAction, AutocountSyncStatus, AutocountSyncMessage');
 		$this->db->where('SupplierID', $this->input->get('supplier_id'));
 		return $this->db->get('supplier')->row_array();
 	}
 
 	function Read_Suppliers1()
 	{
-		$this->db->select('SupplierID, Name, Phone, Status');
+		$this->db->select('SupplierID, Name, Phone, Status, SupplierCode,AutocountSyncAction, AutocountSyncStatus, AutocountSyncMessage');;
 		if(!empty($this->input->get('name'))) {
 			$this->db->where('Name', $this->input->get('name'));
 		}
@@ -48,7 +48,7 @@ class Supplier_Model extends CI_Model
 
 	function Read_Suppliers2()
 	{
-		$this->db->select('Name, Phone, PrimaryEmail, SecondaryEmail, Address, CurrencyCode, Bank, BankAccount, BankHolder, SwiftCode');
+		$this->db->select('Name, Phone, PrimaryEmail, SecondaryEmail, Address, CurrencyCode, Bank, BankAccount, BankHolder, SwiftCode, SupplierCode, AutocountSyncAction, AutocountSyncStatus, AutocountSyncMessage');
 		if(!empty($this->input->get('name'))) {
 			$this->db->where('Name', $this->input->get('name'));
 		}
@@ -143,4 +143,25 @@ class Supplier_Model extends CI_Model
 			return false;
 		}
 	}
+
+	public function find($supplier_id)
+    {
+        return $this->db->get_where('supplier', ['SupplierID' => $supplier_id])->row();
+    }
+	
+    public function update_by_id($supplier_id, $data = [])
+    {
+        if (empty($data)) return false;
+
+        return $this->db
+            ->where('SupplierID', $supplier_id)
+            ->update('supplier', $data);
+    }
+	public function get_pending_sycn_suppliers()
+    {
+        $this->db->from('supplier');
+        $this->db->where('AutocountSyncStatus', 'P');
+        $this->db->where('SupplierCode IS NOT NULL', null, false);
+        return $this->db->get()->result_array();
+    }
 }

@@ -40,6 +40,27 @@ class Supplier extends MY_Controller
 		if($this->input->is_ajax_request()) {
 			if(count($this->input->post('supplier')[0]) > 3) {
 				$this->Supplier_Model->Update();
+
+				$supplier = get_object_vars($this->Supplier_Model->find($this->input->post('supplier_id')));
+				if (!empty($supplier)) {
+					if ($supplier['AutocountSyncAction'] == 'C' && $supplier['AutocountSyncStatus'] == 'S') {
+						// Update action to 'U' and status to 'P' if action is 'C' and status is 'S'
+						$this->Supplier_Model->update_by_id($supplier['SupplierID'], [
+							'AutocountSyncAction' => 'U',
+							'AutocountSyncStatus' => 'P'
+						]);
+					} elseif ($supplier['AutocountSyncAction'] == 'U' && $supplier['AutocountSyncStatus'] == 'S') {
+						// Update status to 'P' if action is 'U' and status is 'S'
+						$this->Supplier_Model->update_by_id($supplier['SupplierID'], [
+							'AutocountSyncStatus' => 'P'
+						]);
+					} else {
+						// Just update status to 'P' in all other cases
+						$this->Supplier_Model->update_by_id($supplier['SupplierID'], [
+							'AutocountSyncStatus' => 'P'
+						]);
+					}
+				}
 			}
 		} else {
 			$valid_supplier_id = $this->Universal_Model->Validate_Id('SupplierID', $this->input->get('supplier_id'), 'supplier');
@@ -58,6 +79,28 @@ class Supplier extends MY_Controller
 	function Delete() 
 	{
 		$this->Universal_Model->Delete('SupplierID', $this->input->get('supplier_id'), 'supplier');
+
+		$supplier = get_object_vars($this->Supplier_Model->find($this->input->get('supplier_id')));
+		if (!empty($supplier)) {
+			if ($supplier['AutocountSyncAction'] == 'C' && $supplier['AutocountSyncStatus'] == 'S') {
+				// Update action to 'U' and status to 'P' if action is 'C' and status is 'S'
+				$this->Supplier_Model->update_by_id($supplier['SupplierID'], [
+					'AutocountSyncAction' => 'D',
+					'AutocountSyncStatus' => 'P'
+				]);
+			} elseif ($supplier['AutocountSyncAction'] == 'U') {
+				// Update status to 'P' if action is 'U' and status is 'S'
+				$this->Supplier_Model->update_by_id($supplier['SupplierID'], [
+					'AutocountSyncAction' => 'D',
+					'AutocountSyncStatus' => 'P'
+				]);
+			} else {
+				// Just update status to 'P' in all other cases
+				$this->Supplier_Model->update_by_id($supplier['SupplierID'], [
+					'AutocountSyncStatus' => 'P'
+				]);
+			}
+		}
 	}
 	
 	function Download() {
