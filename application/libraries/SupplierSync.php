@@ -34,14 +34,14 @@ class SupplierSync {
 				"attention"        => arr_get($data, 'attention', ''),
 				"natureOfBusiness" => arr_get($data, 'natureOfBusiness', ''),
 				"currencyCode"     => arr_get($data, 'CurrencyCode', 'MYR'),
-				"creditTerm"       => $config['creditTerm'],
+				"creditTerm"       => $config['supplier_creditTerm'],
 				"taxCode"          => arr_get($data, 'taxCode', ''),
 				"taxRegisterNo"    => arr_get($data, 'taxRegisterNo', ''),
 				"note"             => arr_get($data, 'note', ''),
 			];
 
 			// Send request to AutoCount (Creditor)
-			return autocount_request('POST', 'supplier.create', $param);
+			return autocount_request('POST', 'creditor.create', $param);
 
 		} catch (Exception $e) {
 			log_message('error', 'Autocount supplier creation error: ' . $e->getMessage());
@@ -77,7 +77,7 @@ class SupplierSync {
 				"attention"        => arr_get($data, 'attention', ''),
 				"natureOfBusiness" => arr_get($data, 'natureOfBusiness', ''),
 				"currencyCode"     => arr_get($data, 'CurrencyCode', 'MYR'),
-				"creditTerm"       => $config['creditTerm'],
+				"creditTerm"       => $config['supplier_creditTerm'],
 				"taxCode"          => arr_get($data, 'taxCode', ''),
 				"taxRegisterNo"    => arr_get($data, 'taxRegisterNo', ''),
 				"note"             => arr_get($data, 'note', ''),
@@ -86,9 +86,9 @@ class SupplierSync {
 			// Send request to AutoCount Supplier Update API
 			return autocount_request(
 				'PUT',
-				'supplier.update',
+				'creditor.update',
 				$param,
-				['accNo' => arr_get($data, 'accNo', null)]
+				['code' => arr_get($data, 'accNo', null)]
 			);
 
 		} catch (Exception $e) {
@@ -108,7 +108,7 @@ class SupplierSync {
 
         return autocount_request(
             'DELETE',
-            'payment.delete',
+            'creditor.delete',
             [],
             ['code' => $docNo]
         );

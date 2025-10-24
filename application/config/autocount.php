@@ -30,7 +30,17 @@ $config['autocount'] = [
             'update_status' => '/payment/updatestatus',
             'delete'        => '/payment',
             'void'          => '/payment/void',
-        ]
+        ],
+        'debtor' =>[
+            'create'        => '/debtor',
+            'update'        => '/debtor',
+            'delete'        => '/debtor',
+        ],
+        'creditor' =>[
+            'create'        => '/creditor',
+            'update'        => '/creditor',
+            'delete'        => '/creditor',
+        ],
     ],
 
     'booking_cutoff_date' => '2025-10-01', // after the date only sync
@@ -53,7 +63,8 @@ $config['autocount'] = [
     'payment_acc_no_1' => '300-d277', // payment in OR
     'payment_acc_no_2' => '400-d019', // payment out PV
 
-    'creditTerm' => 'C.O.D.', // supplier need creditTerm
+    'supplier_creditTerm' => 'C.O.D.', // supplier need creditTerm
+    'customer_creditTerm' => 'C.O.D.', // customer need creditTerm
 ];
 
 

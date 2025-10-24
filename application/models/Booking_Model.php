@@ -971,6 +971,14 @@ class Booking_Model extends CI_Model
 		return $bookings;
 	}
 
+	public function get_pending_sycn_booking_customer()
+    {
+        $this->db->from('booking');
+        $this->db->where('CustomerAutocountSyncStatus', 'P');
+        $this->db->where('CustomerCode IS NOT NULL', null, false);
+        return $this->db->get()->result_array();
+    }
+
 
 
 
