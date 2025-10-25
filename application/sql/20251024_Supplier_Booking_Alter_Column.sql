@@ -10,21 +10,10 @@ CREATE INDEX IX_supplier_SupplierCode ON supplier (SupplierCode);
 
 
 ALTER TABLE booking
-  ADD COLUMN CustomerAutocountSyncAction CHAR(1) NOT NULL DEFAULT 'C'
-  COMMENT 'C: Create, U: Update, D: Delete, V: Void, S: Update_Status'
-  AFTER `Status`;
-
-ALTER TABLE booking
-  ADD COLUMN CustomerAutocountSyncStatus CHAR(1) NOT NULL DEFAULT 'P'
-  COMMENT 'P: Pending, S: Synced, F: Failed'
-  AFTER CustomerAutocountSyncAction;
-
-ALTER TABLE booking
-  ADD COLUMN CustomerAutocountSyncMessage TEXT AFTER CustomerAutocountSyncStatus;
-
-ALTER TABLE booking
-  ADD COLUMN CustomerCode VARCHAR(255) NULL
-  AFTER Customer;
+  ADD COLUMN CustomerAutocountSyncAction CHAR(1) NOT NULL DEFAULT 'C' COMMENT 'C: Create, U: Update, D: Delete, V: Void, S: Update_Status' AFTER Status,
+  ADD COLUMN CustomerAutocountSyncStatus CHAR(1) NOT NULL DEFAULT 'P' COMMENT 'P: Pending, S: Synced, F: Failed' AFTER CustomerAutocountSyncAction,
+  ADD COLUMN CustomerAutocountSyncMessage TEXT AFTER CustomerAutocountSyncStatus,
+  ADD COLUMN CustomerCode VARCHAR(255) NULL AFTER Customer;
 
 CREATE INDEX IX_booking_customer_AutocountSyncAction ON booking (CustomerAutocountSyncAction);
 CREATE INDEX IX_booking_customer_AutocountSyncStatus ON booking (CustomerAutocountSyncStatus);
