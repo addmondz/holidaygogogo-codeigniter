@@ -157,7 +157,7 @@
                                 <th style="text-align:center;">No.</th>
                                 <th style="text-align:center;">Name</th>
                                 <th style="text-align:center;">Phone</th>
-                                <th style="text-align:center;">Supplier Code</th>
+                                <th style="text-align:center;">Supplier Code (Autocount Creditor Code)</th>
                                 <th style="text-align:center;">Autocount Status</th>
                                 <th class="action" style="text-align:center;">Action</th>
                             </tr>
