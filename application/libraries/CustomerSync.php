@@ -107,7 +107,7 @@ class CustomerSync {
 
     public function autocount_delete($data = [], $config = [])
     {
-        $docNo = isset($data['customer_code']) ? $data['customer_code'] : '';
+        $docNo = isset($data['CustomerCode']) ? $data['CustomerCode'] : '';
 
         return autocount_request(
             'DELETE',

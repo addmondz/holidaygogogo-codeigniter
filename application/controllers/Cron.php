@@ -274,11 +274,11 @@ class Cron extends CI_Controller
 	
 	private function runSync()
 	{
-		$this->syncCustomer();
+		//$this->syncCustomer();
 		$this->syncSupplier();
-		$this->syncBookings();
-		$this->syncPayments();
-		$this->syncDeletedPayments();
+		// $this->syncBookings();
+		// $this->syncPayments();
+		// $this->syncDeletedPayments();
 	}
 
 	/**
@@ -302,17 +302,17 @@ class Cron extends CI_Controller
 			try {
 				switch ($customer['AutocountSyncAction']) {
 					case 'C':
-						$result = $this->customersync->autocount_create($customer);
+						$result = $this->customersync->autocount_create($customer, $config);
 						break;
 					case 'U':
-						$result = $this->customersync->autocount_update($customer);
+						$result = $this->customersync->autocount_update($customer, $config);
 						break;
 					case 'S':
-						$result = $this->customersync->autocount_update_status($customer);
+						$result = $this->customersync->autocount_update_status($customer, $config);
 						break;
-					case 'D':
-						$result = $this->customersync->autocount_delete($customer);
-						break;
+					// case 'D':
+					// 	$result = $this->customersync->autocount_delete($customer, $config);
+					// 	break;
 					default:
 						$result = ['error' => 'ERROR Autocount Sync Action'];
 				}
@@ -321,6 +321,13 @@ class Cron extends CI_Controller
 						'CustomerAutocountSyncStatus'  => 'S',
 						'CustomerAutocountSyncMessage' => json_encode($result)
 					]);
+
+					if (isset($result['docNo']) && !empty($result['docNo'])) {
+						$updateData['CustomerCode'] = $result['docNo'];
+					}
+					if (!empty($updateData)) {
+						$this->Booking_Model->update_by_id($customer['BookingID'], $updateData);
+					}
 					echo "SUCCESS\n";
 				} else {
 					$this->Booking_Model->update_by_id($customer['BookingID'], [
@@ -366,16 +373,16 @@ class Cron extends CI_Controller
 			try {
 				switch ($supplier['AutocountSyncAction']) {
 					case 'C':
-						$result = $this->suppliersync->autocount_create($supplier);
+						$result = $this->suppliersync->autocount_create($supplier,$config);
 						break;
 					case 'U':
-						$result = $this->suppliersync->autocount_update($supplier);
+						$result = $this->suppliersync->autocount_update($supplier, $config);
 						break;
 					case 'S':
-						$result = $this->suppliersync->autocount_update_status($supplier);
+						$result = $this->suppliersync->autocount_update_status($supplier, $config);
 						break;
 					case 'D':
-						$result = $this->suppliersync->autocount_delete($supplier);
+						$result = $this->suppliersync->autocount_delete($supplier, $config);
 						break;
 					default:
 						$result = ['error' => 'ERROR Autocount Sync Action'];
@@ -385,6 +392,13 @@ class Cron extends CI_Controller
 						'AutocountSyncStatus'  => 'S',
 						'AutocountSyncMessage' => json_encode($result)
 					]);
+
+					if (isset($result['docNo']) && !empty($result['docNo'])) {
+						$updateData['SupplierCode'] = $result['docNo'];
+					}
+					if (!empty($updateData)){
+						$this->Supplier_Model->update_by_id($supplier['SupplierID'], $updateData);
+					}
 					echo "SUCCESS\n";
 				} else {
 					$this->Supplier_Model->update_by_id($supplier['SupplierID'], [
@@ -560,8 +574,9 @@ class Cron extends CI_Controller
 					if (isset($result['docNo']) && !empty($result['docNo'])) {
 						$updateData['AutocountReferenceNumber'] = $result['docNo'];
 					}
-
-					$this->Payment_Model->update_by_id($payment['PaymentID'], $updateData);
+					if (!empty($updateData)){
+						$this->Payment_Model->update_by_id($payment['PaymentID'], $updateData);
+					}
 					echo "SUCCESS\n";
 				} else {
 					$this->Payment_Model->update_by_id($payment['PaymentID'], [

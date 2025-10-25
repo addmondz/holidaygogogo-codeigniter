@@ -154,10 +154,13 @@ class AutoCountService {
                     $parts = parse_url($value);
                     parse_str($parts['query'] ?? '', $query);
                     $docNo = $query['docNo'] ?? null;
+                } else if ($key === 'location' && stripos($value, 'code=') !== false) {
+                    $parts = parse_url($value);
+                    parse_str($parts['query'] ?? '', $query);
+                    $docNo = $query['code'] ?? null;
                 }
             }
         }
-
 
         // Handle empty body (example: 201 Created with no response body)
         if ($bodyText === '' || $bodyText === null) {
@@ -176,8 +179,18 @@ class AutoCountService {
             return $response;
         }
 
-        // Decode JSON body
-        $decoded = json_decode($result, true);
+        // ✅ added — ensure we decode only the JSON body (not headers)
+        $decoded = json_decode($bodyText, true);
+
+        // ✅ added — optional: capture message if available
+        if (is_array($decoded) && isset($decoded['message'])) {
+            $apiMessage = $decoded['message'];
+        }
+
+        // ✅ added — fallback if JSON decode failed
+        if (!is_array($decoded)) {
+            $decoded = null;
+        }
 
         // If body is JSON and has "statusCode" field → treat as error
         if (is_array($decoded) && isset($decoded['statusCode']) && $decoded['statusCode'] >= 400) {

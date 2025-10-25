@@ -88,7 +88,7 @@ class SupplierSync {
 				'PUT',
 				'creditor.update',
 				$param,
-				['code' => arr_get($data, 'accNo', null)]
+				['code' => arr_get($data, 'SupplierCode', null)]
 			);
 
 		} catch (Exception $e) {
@@ -104,7 +104,7 @@ class SupplierSync {
 
     public function autocount_delete($data = [], $config = [])
     {
-        $docNo = isset($data['supplier_code']) ? $data['supplier_code'] : '';
+        $docNo = isset($data['SupplierCode']) ? $data['SupplierCode'] : '';
 
         return autocount_request(
             'DELETE',
