@@ -260,7 +260,8 @@
                                 <?php } ?>
                                 <th style="text-align:center;">BC Status</th>
                                 <th class="gl_status" style="text-align:center;">GL Status</th>
-                                <th class="autocount_sync_status" style="text-align:center;">Autocount Status</th>
+                                <th class="autocount_sync_status" style="text-align:center;">Booking Autocount Status</th>
+                                <th class="autocount_sync_status" style="text-align:center;">Customer Autocount Status</th>
                                 <th class="action" style="text-align:center;">Action</th>
                             </tr>
                         </thead>
@@ -324,6 +325,37 @@
                                                         }
                                                     } else {
                                                         $tooltipText = $booking->AutocountSyncMessage;
+                                                    }
+
+                                                    $tooltipAttr = ' data-toggle="tooltip" data-placement="top" title="' . htmlspecialchars($tooltipText) . '"';
+                                                }
+                                            ?>
+                                            <span class="font-weight-bold" style="color:<?= $statusColor ?>;" <?= $tooltipAttr ?>>
+                                                <?= $statusText ?>
+                                            </span>
+                                        </td>
+                                        <td style="text-align:center;">
+                                            <?php 
+                                                // status info (P, S, F only)
+                                                $statusInfo  = mapAutocountSyncStatus(isset($booking->CustomerAutocountSyncStatus) ? $booking->CustomerAutocountSyncStatus : null);
+                                                $statusText  = $statusInfo['text'];
+                                                $statusColor = $statusInfo['color'];
+
+                                                // tooltip logic
+                                                $tooltipAttr = ''; 
+                                                if (!empty($booking->CustomerAutocountSyncMessage)) {
+                                                    $decoded = json_decode($booking->CustomerAutocountSyncMessage, true);
+
+                                                    if (json_last_error() === JSON_ERROR_NONE) {
+                                                        if (isset($decoded['error']) && $decoded['error'] == null) {
+                                                            $tooltipText = "SUCCESS";
+                                                        } elseif (isset($decoded['error']) && $decoded['error'] !== null) {
+                                                            $tooltipText = "ERROR: " . (is_string($decoded['error']) ? $decoded['error'] : json_encode($decoded['error']));
+                                                        } else {
+                                                            $tooltipText = $booking->CustomerAutocountSyncMessage;
+                                                        }
+                                                    } else {
+                                                        $tooltipText = $booking->CustomerAutocountSyncMessage;
                                                     }
 
                                                     $tooltipAttr = ' data-toggle="tooltip" data-placement="top" title="' . htmlspecialchars($tooltipText) . '"';

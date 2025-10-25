@@ -288,7 +288,7 @@ class Cron extends CI_Controller
 	{
 		echo "=== Sync Booking Customer Start ===\n";
 
-		$booking_customers = $this->Booking_Model->getPendingBookingsWithDetails();
+		$booking_customers = $this->Booking_Model->get_pending_sycn_booking_customer();
 
 		$this->load->library('CustomerSync');
 		$this->load->helper('autocount');
@@ -394,7 +394,7 @@ class Cron extends CI_Controller
 					echo "FAILED\n";
 				}
 			} catch (\Exception $e) {
-				$this->Supplier_Model->update_by_id($booking['SupplierID'], [
+				$this->Supplier_Model->update_by_id($supplier['SupplierID'], [
 					'AutocountSyncStatus'  => 'F',
 					'AutocountSyncMessage' => $e->getMessage()
 				]);

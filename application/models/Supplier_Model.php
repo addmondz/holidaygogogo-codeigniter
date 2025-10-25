@@ -161,7 +161,6 @@ class Supplier_Model extends CI_Model
     {
         $this->db->from('supplier');
         $this->db->where('AutocountSyncStatus', 'P');
-        $this->db->where('SupplierCode IS NOT NULL', null, false);
         return $this->db->get()->result_array();
     }
 }

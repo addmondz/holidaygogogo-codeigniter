@@ -361,7 +361,7 @@ class Booking extends MY_Controller
 						}
 					} else {
 						$this->Booking_Model->update_by_id($this->input->post('booking_id'), [
-							'AutocountSyncStatus'  => 'P'
+							'AutocountSyncStatus'  => 'P',
 						]);
 						if (!empty($payments)) {
 							foreach($payments as $payment) {
@@ -382,6 +382,22 @@ class Booking extends MY_Controller
 								}
 							}
 						}
+					}
+
+					if ($bookingInfo['CustomerAutocountSyncAction'] == 'C' && $bookingInfo['CustomerAutocountSyncStatus'] == 'S') {
+						$this->Booking_Model->update_by_id($this->input->post('booking_id'), [
+							'CustomerAutocountSyncAction' => 'U',
+							'CustomerAutocountSyncStatus' => 'P'
+						]);
+					} else if ($bookingInfo['CustomerAutocountSyncAction'] == 'U' && $bookingInfo['CustomerAutocountSyncStatus'] == 'S') {
+						$this->Booking_Model->update_by_id($this->input->post('booking_id'), [
+							'CustomerAutocountSyncAction' => 'U',
+							'CustomerAutocountSyncStatus' => 'P'
+						]);
+					} else {
+						$this->Booking_Model->update_by_id($this->input->post('booking_id'), [
+							'CustomerAutocountSyncStatus'  => 'P',
+						]);
 					}
 				}
 				
@@ -612,7 +628,7 @@ class Booking extends MY_Controller
 			$this->Universal_Model->Delete('BookingID', $this->input->get('booking_id'), 'booking_product');
 			$this->Universal_Model->Delete('BookingID', $this->input->get('booking_id'), 'guest_list');
 			$this->Universal_Model->Delete('BookingID', $this->input->get('booking_id'), 'payment');
-			$this->Booking_Model->update_by_id($this->input->get('booking_id'), ['AutocountSyncStatus' => 'D']);
+			//$this->Booking_Model->update_by_id($this->input->get('booking_id'), ['AutocountSyncStatus' => 'D']);
 			// Delete from AutoCount (Quotation)
 
 			// $bookingData = $this->Booking_Model->getBookingById($this->input->get('booking_id'));
