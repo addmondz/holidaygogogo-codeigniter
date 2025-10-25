@@ -60,7 +60,7 @@ class SupplierSync {
 			// Prepare supplier (creditor) update body
 			$param = [
 				"accNo"            => arr_get($data, 'SupplierCode', ''),
-				"parentAccNo"      => arr_get($data, 'parentAccNo', ''),
+				//"parentAccNo"      => arr_get($data, 'parentAccNo', ''),
 				"companyName"      => arr_get($data, 'Name', ''),
 				"desc2"            => arr_get($data, 'desc2', ''),
 				"registerNo"       => arr_get($data, 'registerNo', ''),

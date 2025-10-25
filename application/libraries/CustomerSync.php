@@ -63,7 +63,7 @@ class CustomerSync {
 			// Prepare customer (debtor) update body
 			$param = [
 				"accNo"            => arr_get($data, 'CustomerCode', ''),
-				"parentAccNo"      => arr_get($data, 'parentAccNo', ''),
+				//"parentAccNo"      => arr_get($data, 'parentAccNo', ''),
 				"companyName"      => arr_get($data, 'Customer', ''),
 				"desc2"            => arr_get($data, 'desc2', ''),
 				"registerNo"       => arr_get($data, 'registerNo', ''),
