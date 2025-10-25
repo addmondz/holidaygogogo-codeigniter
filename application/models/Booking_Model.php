@@ -972,10 +972,31 @@ class Booking_Model extends CI_Model
 	}
 
 	public function get_pending_sycn_booking_customer()
-    {
-        $this->db->from('booking');
-        $this->db->where('CustomerAutocountSyncStatus', 'P');
-        return $this->db->get()->result_array();
-    }
+	{
+		$this->load->helper('autocount');
+		$config = get_autocount_config();
+
+		$customer_qty_cront = !empty($config['customer_qty_cront'])
+			? (int)$config['customer_qty_cront']
+			: 10;
+
+		$statuses = !empty($config['customer_sync_autocount_status'])
+			? (array)$config['customer_sync_autocount_status']
+			: ['P'];
+
+		$this->db->from('booking');
+		$this->db->where_in('CustomerAutocountSyncStatus', $statuses);
+		$this->db->where('CustomerAutocountSyncAction IS NOT NULL', null, false);
+
+		if (!empty($config['customer_cutoff_date'])) {
+			$date = date('Y-m-d', strtotime($config['customer_cutoff_date']));
+			$this->db->where('booking.InsertDate >', $date);
+		}
+
+		$this->db->limit($customer_qty_cront);
+
+		return $this->db->get()->result_array();
+	}
+
 
 }

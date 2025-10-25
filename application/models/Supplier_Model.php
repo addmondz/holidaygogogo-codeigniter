@@ -158,9 +158,31 @@ class Supplier_Model extends CI_Model
             ->update('supplier', $data);
     }
 	public function get_pending_sycn_suppliers()
-    {
-        $this->db->from('supplier');
-        $this->db->where('AutocountSyncStatus', 'P');
-        return $this->db->get()->result_array();
-    }
+	{
+		$this->load->helper('autocount');
+		$config = get_autocount_config();
+
+		$supplier_qty_cront = !empty($config['supplier_qty_cront'])
+			? (int)$config['supplier_qty_cront']
+			: 10;
+		
+		$statuses = !empty($config['supplier_sync_autocount_status']) 
+			? (array)$config['supplier_sync_autocount_status'] 
+			: ['P'];
+
+		$this->db->from('supplier');
+		$this->db->where_in('AutocountSyncStatus', $statuses);
+		$this->db->where('AutocountSyncAction IS NOT NULL', null, false);
+
+		if (!empty($config['supplier_cutoff_date'])) {
+			$date = date('Y-m-d', strtotime($config['supplier_cutoff_date']));
+			$this->db->where('supplier.InsertDate >', $date);
+		}
+
+		$this->db->limit($supplier_qty_cront);
+
+		return $this->db->get()->result_array();
+	}
+
+
 }
