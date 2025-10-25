@@ -43,8 +43,8 @@ $config['autocount'] = [
         ],
     ],
 
-    'booking_cutoff_date' => '2025-10-01', // after the date only sync
-    'payment_cutoff_date' => '2025-10-01', // after the date only sync
+    'booking_cutoff_date'  => '2025-10-01', // after the date only sync
+    'payment_cutoff_date'  => '2025-10-01', // after the date only sync
     'customer_cutoff_date' => '2025-10-25', // after the date only sync
     'supplier_cutoff_date' => '2025-10-25', // after the date only sync
 
@@ -62,10 +62,10 @@ $config['autocount'] = [
     'supplier_sync_autocount_status' => ['P'], // allowed AutocountSyncStatus
 
     // Crontab sync qty
-    'booking_qty_cront' => 10, // each time sync 
-    'payment_qty_cront' => 10, // each time sync 
-    'customer_qty_cront' => 1, // each time sync 
-    'supplier_qty_cront' => 1, // each time sync 
+    'booking_qty_cront'  => 10, // each time sync 
+    'payment_qty_cront'  => 10, // each time sync 
+    'customer_qty_cront' => 10, // each time sync 
+    'supplier_qty_cront' => 10, // each time sync 
 
     'payment_acc_no_1' => '300-d277', // payment in OR
     'payment_acc_no_2' => '400-d019', // payment out PV

@@ -35,7 +35,7 @@ class CustomerSync {
 				"webURL"            => arr_get($data, 'webURL', ''),
 				"attention"         => arr_get($data, 'attention', ''),
 				"natureOfBusiness"  => arr_get($data, 'natureOfBusiness', ''),
-				"salesAgent"        => arr_get($data, 'SalesAgent', ''),
+				"salesAgent"        => arr_get($data, 'salesAgent', ''),
 				"currencyCode"      => arr_get($data, 'CurrencyCode', 'MYR'),
 				"creditTerm"        => $config['customer_creditTerm'],
 				"taxCode"           => arr_get($data, 'taxCode', ''),
@@ -79,6 +79,7 @@ class CustomerSync {
 				"webURL"           => arr_get($data, 'webURL', ''),
 				"attention"        => arr_get($data, 'attention', ''),
 				"natureOfBusiness" => arr_get($data, 'natureOfBusiness', ''),
+				"salesAgent"        => arr_get($data, 'salesAgent', ''),
 				"currencyCode"     => arr_get($data, 'CurrencyCode', 'MYR'),
 				"creditTerm"       => $config['customer_creditTerm'],
 				"taxCode"          => arr_get($data, 'taxCode', ''),
@@ -91,7 +92,7 @@ class CustomerSync {
 				'PUT',
 				'debtor.update',
 				$param,
-				['code' => arr_get($data, 'accNo', null)]
+				['code' => arr_get($data, 'CustomerCode', null)]
 			);
 
 		} catch (Exception $e) {

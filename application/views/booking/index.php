@@ -248,6 +248,7 @@
                                 <th style="text-align:center;">BC Number</th>
                                 <th style="text-align:center;">BC</th>
                                 <th style="text-align:center;">Customer</th>
+                                <th style="text-align:center;">Customer Code (Autocount Debtor Code)</th>
                                 <th style="text-align:center;">Chat</th>
                                 <th class="test" style="text-align:center;">Mobile</th>
                                 <th class="start_date" style="text-align:center;">Start</th>
@@ -285,6 +286,7 @@
                                         </td>
                                         <td style="text-align:center;"><?php echo $booking->BookingConfirmationTitle; ?></td>
                                         <td style="text-align:center;"><?php echo $booking->Customer; ?></td>
+                                        <td style="text-align:center;"><?php echo $booking->CustomerCode; ?></td>
                                         <td style="text-align:center;"><?php echo $booking->ChatLanguage; ?></td>
                                         <td style="text-align:center;">
                                             <a href="<?php echo 'https://wa.me/' . $booking->CustomerMobile; ?>" target="_blank" class="btn btn-light-success d-inline-flex align-items-center btn-sm">

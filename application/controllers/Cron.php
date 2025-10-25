@@ -274,11 +274,11 @@ class Cron extends CI_Controller
 	
 	private function runSync()
 	{
-		//$this->syncCustomer();
+		$this->syncCustomer();
 		$this->syncSupplier();
-		// $this->syncBookings();
-		// $this->syncPayments();
-		// $this->syncDeletedPayments();
+		$this->syncBookings();
+		$this->syncPayments();
+		$this->syncDeletedPayments();
 	}
 
 	/**
@@ -295,12 +295,12 @@ class Cron extends CI_Controller
 		$config = get_autocount_config();
 		
 		foreach ($booking_customers as $customer) {
-			echo "Customer {$customer['Customer']} [{$customer['AutocountSyncAction']}]... ";
+			echo "Customer {$customer['Customer']} [{$customer['CustomerAutocountSyncAction']}]... ";
 
 			$customer = $this->enrichCustomer($customer);
 
 			try {
-				switch ($customer['AutocountSyncAction']) {
+				switch ($customer['CustomerAutocountSyncAction']) {
 					case 'C':
 						$result = $this->customersync->autocount_create($customer, $config);
 						break;
@@ -349,6 +349,12 @@ class Cron extends CI_Controller
 
 	private function enrichCustomer($customer)
 	{
+		if (!empty($customer['SalesAgent'])) {
+			$sale_agent = $this->Admin_Model->find($customer['SalesAgent']);
+			if ($sale_agent) {
+				$customer['salesAgent'] = $sale_agent->Name;
+			}
+		}
 		return $customer;
 	}
 
