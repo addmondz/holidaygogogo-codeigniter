@@ -3,140 +3,196 @@ class Customer_Model extends CI_Model
 {
 	function Read_Customer()
 	{
-		$this->db->select('CustomerID, Name, Phone, PrimaryEmail, SecondaryEmail, Address, CurrencyCode, Bank, BankAccount, BankHolder, SwiftCode, CustomerCode,AutocountSyncAction, AutocountSyncStatus, AutocountSyncMessage');
+		$this->db->select('*');
 		$this->db->where('CustomerID', $this->input->get('customer_id'));
 		return $this->db->get('customer')->row_array();
 	}
 
 	function Read_Customers1()
 	{
-		$this->db->select('CustomerID, Name, Phone, Status, CustomerCode,AutocountSyncAction, AutocountSyncStatus, AutocountSyncMessage');;
+		$this->db->select('*');
 		if(!empty($this->input->get('name'))) {
-			$this->db->where('Name', $this->input->get('name'));
+			$this->db->where('name', $this->input->get('name'));
 		}
-		if(!empty($this->input->get('phone'))) {
-			$this->db->where('Phone', $this->input->get('phone'));
+		if(!empty($this->input->get('phone_number'))) {
+			$this->db->where('phone_number', $this->input->get('phone_number'));
 		}
-		if(!empty($this->input->get('primary_email'))) {
-			$this->db->where('PrimaryEmail', $this->input->get('primary_email'));
+	
+		if (!empty($this->input->get('customer_code'))) {
+			$this->db->where('customer_code', $this->input->get('customer_code'));
 		}
-		if(!empty($this->input->get('secondary_email'))) {
-			$this->db->where('SecondaryEmail', $this->input->get('secondary_email'));
+
+		if (!empty($this->input->get('ChatLanguage'))) {
+			$this->db->where('ChatLanguage', $this->input->get('ChatLanguage'));
 		}
-		if(!empty($this->input->get('address'))) {
-			$this->db->where('Address', $this->input->get('address'));
+
+		if (!empty($this->input->get('AutocountSyncAction'))) {
+			$this->db->where('AutocountSyncAction', $this->input->get('AutocountSyncAction'));
 		}
-		if(!empty($this->input->get('currency_code'))) {
-			$this->db->where('CurrencyCode', $this->input->get('currency_code'));
+
+		if (!empty($this->input->get('AutocountSyncStatus'))) {
+			$this->db->where('AutocountSyncStatus', $this->input->get('AutocountSyncStatus'));
 		}
-		if(!empty($this->input->get('bank'))) {
-			$this->db->where('Bank', $this->input->get('bank'));
+
+		if (!empty($this->input->get('AutocountSyncMessage'))) {
+			$this->db->like('AutocountSyncMessage', $this->input->get('AutocountSyncMessage'));
 		}
-		if(!empty($this->input->get('bank_account'))) {
-			$this->db->where('BankAccount', $this->input->get('bank_account'));
+
+		if (!empty($this->input->get('created_at'))) {
+			$this->db->where('DATE(created_at)', $this->input->get('created_at'));
 		}
-		if(!empty($this->input->get('bank_holder'))) {
-			$this->db->where('BankHolder', $this->input->get('bank_holder'));
+
+		if (!empty($this->input->get('updated_at'))) {
+			$this->db->where('DATE(updated_at)', $this->input->get('updated_at'));
 		}
-		if(!empty($this->input->get('swift_code'))) {
-			$this->db->where('SwiftCode', $this->input->get('swift_code'));
-		}
-		$this->db->where('Status', 'Y');
-		$this->db->order_by('Name', 'ASC');
+		
+		$this->db->order_by('name', 'ASC');
 		return $this->db->get('customer')->result();
 	}
 
 	function Read_Customers2()
 	{
-		$this->db->select('Name, Phone, PrimaryEmail, SecondaryEmail, Address, CurrencyCode, Bank, BankAccount, BankHolder, SwiftCode, CustomerCode, AutocountSyncAction, AutocountSyncStatus, AutocountSyncMessage');
+		$this->db->select('*');
 		if(!empty($this->input->get('name'))) {
-			$this->db->where('Name', $this->input->get('name'));
+			$this->db->where('name', $this->input->get('name'));
 		}
-		if(!empty($this->input->get('phone'))) {
-			$this->db->where('Phone', $this->input->get('phone'));
+		if(!empty($this->input->get('phone_number'))) {
+			$this->db->where('phone_number', $this->input->get('phone_number'));
 		}
-		if(!empty($this->input->get('primary_email'))) {
-			$this->db->where('PrimaryEmail', $this->input->get('primary_email'));
+	
+		if (!empty($this->input->get('customer_code'))) {
+			$this->db->where('customer_code', $this->input->get('customer_code'));
 		}
-		if(!empty($this->input->get('secondary_email'))) {
-			$this->db->where('SecondaryEmail', $this->input->get('secondary_email'));
+
+		if (!empty($this->input->get('ChatLanguage'))) {
+			$this->db->where('ChatLanguage', $this->input->get('ChatLanguage'));
 		}
-		if(!empty($this->input->get('address'))) {
-			$this->db->where('Address', $this->input->get('address'));
+
+		if (!empty($this->input->get('AutocountSyncAction'))) {
+			$this->db->where('AutocountSyncAction', $this->input->get('AutocountSyncAction'));
 		}
-		if(!empty($this->input->get('currency_code'))) {
-			$this->db->where('CurrencyCode', $this->input->get('currency_code'));
+
+		if (!empty($this->input->get('AutocountSyncStatus'))) {
+			$this->db->where('AutocountSyncStatus', $this->input->get('AutocountSyncStatus'));
 		}
-		if(!empty($this->input->get('bank'))) {
-			$this->db->where('Bank', $this->input->get('bank'));
+
+		if (!empty($this->input->get('AutocountSyncMessage'))) {
+			$this->db->like('AutocountSyncMessage', $this->input->get('AutocountSyncMessage'));
 		}
-		if(!empty($this->input->get('bank_account'))) {
-			$this->db->where('BankAccount', $this->input->get('bank_account'));
+
+		if (!empty($this->input->get('created_at'))) {
+			$this->db->where('DATE(created_at)', $this->input->get('created_at'));
 		}
-		if(!empty($this->input->get('bank_holder'))) {
-			$this->db->where('BankHolder', $this->input->get('bank_holder'));
+
+		if (!empty($this->input->get('updated_at'))) {
+			$this->db->where('DATE(updated_at)', $this->input->get('updated_at'));
 		}
-		if(!empty($this->input->get('swift_code'))) {
-			$this->db->where('SwiftCode', $this->input->get('swift_code'));
-		}
-		$this->db->where('Status', 'Y');
-		$this->db->order_by('Name', 'ASC');
+		$this->db->order_by('name', 'ASC');
 		return $this->db->get('customer')->result();
 	}
 	
-	function Create()
+	public function Create($by_booking = false)
 	{
-		$this->db->insert_batch('customer', json_decode(json_encode($this->input->post('customer'))));
+		if ($by_booking) {
+			$name          = $this->input->post('Customer');
+			$phone_number  = $this->input->post('Mobile');
+			$chat_language = $this->input->post('ChatLanguage');
+
+			// Prepare data for insert
+			$data = [
+				'name'         => $name,
+				'phone_number' => $phone_number,
+				'ChatLanguage' => $chat_language,
+				'created_at'   => date('Y-m-d H:i:s'),
+				'updated_at'   => date('Y-m-d H:i:s'),
+			];
+
+			// Insert into table
+			$insert = $this->db->insert('customer', $data);
+
+			// Check insert success
+			if ($insert && $this->db->affected_rows() > 0) {
+				return [
+					'success' => true,
+					'CustomerID' => $this->db->insert_id(),
+					'message' => 'Customer inserted successfully.'
+				];
+			} else {
+				return [
+					'success' => false,
+					'message' => 'Failed to insert customer.'
+				];
+			}
+
+		} else {
+			// Batch insert
+			$data = json_decode(json_encode($this->input->post('customer')), true);
+
+			if (empty($data)) {
+				return [
+					'success' => false,
+					'message' => 'No customer data provided.'
+				];
+			}
+
+			$this->db->insert_batch('customer', $data);
+
+			$affected = $this->db->affected_rows();
+
+			if ($affected > 0) {
+				return [
+					'success' => true,
+					'affected_rows' => $affected,
+					'message' => "$affected customer(s) inserted successfully."
+				];
+			} else {
+				return [
+					'success' => false,
+					'message' => 'Failed to insert customers.'
+				];
+			}
+		}
 	}
 
 	function Update()
 	{
 		$this->db->update_batch('customer', json_decode(json_encode($this->input->post('customer'))), 'CustomerID');
 
-		$this->db->set('Phone', null);
+		$this->db->set('phone_number', null);
 		$this->db->where('CustomerID', $this->input->post('customer_id'));
-		$this->db->where('Phone', '');
+		$this->db->where('phone_number', '');
 		$this->db->update('customer');
 
-		$this->db->set('PrimaryEmail', null);
+		$this->db->set('ChatLanguage', null);
 		$this->db->where('CustomerID', $this->input->post('customer_id'));
-		$this->db->where('PrimaryEmail', '');
+		$this->db->where('ChatLanguage', '');
 		$this->db->update('customer');
 
-		$this->db->set('SecondaryEmail', null);
+		$this->db->set('customer_code', null);
 		$this->db->where('CustomerID', $this->input->post('customer_id'));
-		$this->db->where('SecondaryEmail', '');
+		$this->db->where('customer_code', '');
 		$this->db->update('customer');
 
-		$this->db->set('Address', null);
+		$this->db->set('AutocountSyncAction', null);
 		$this->db->where('CustomerID', $this->input->post('customer_id'));
-		$this->db->where('Address', '');
+		$this->db->where('AutocountSyncAction', '');
 		$this->db->update('customer');
 
-		$this->db->set('Bank', null);
+		$this->db->set('AutocountSyncStatus', null);
 		$this->db->where('CustomerID', $this->input->post('customer_id'));
-		$this->db->where('Bank', '');
+		$this->db->where('AutocountSyncStatus', '');
 		$this->db->update('customer');
 
-		$this->db->set('BankAccount', null);
+		$this->db->set('AutocountSyncMessage', null);
 		$this->db->where('CustomerID', $this->input->post('customer_id'));
-		$this->db->where('BankAccount', '');
-		$this->db->update('customer');
-
-		$this->db->set('BankHolder', null);
-		$this->db->where('CustomerID', $this->input->post('customer_id'));
-		$this->db->where('BankHolder', '');
-		$this->db->update('customer');
-		
-		$this->db->set('SwiftCode', null);
-		$this->db->where('CustomerID', $this->input->post('customer_id'));
-		$this->db->where('SwiftCode', '');
+		$this->db->where('AutocountSyncMessage', '');
 		$this->db->update('customer');
 	}
 
+
 	function Detect()
 	{
-		$this->db->where('Name', $this->input->post('name'));
+		$this->db->where('name', $this->input->post('name'));
 		if($this->db->get('customer')->row()) {
 			return true;
 		} else {
@@ -176,7 +232,7 @@ class Customer_Model extends CI_Model
 
 		if (!empty($config['customer_cutoff_date'])) {
 			$date = date('Y-m-d', strtotime($config['customer_cutoff_date']));
-			$this->db->where('customer.InsertDate >', $date);
+			$this->db->where('customer.create_at >', $date);
 		}
 
 		$this->db->limit($customer_qty_cront);

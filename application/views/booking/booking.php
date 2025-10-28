@@ -2330,6 +2330,7 @@ jQuery(document).ready(function() {
 
 $(document).ready(function() {
     const MAX_DISPLAY = 5; // visible items in dropdown
+    const MAX_CUSTOMER = 'INFINITE';
     const container = $('#customerResults');
 
     // Function to render results
@@ -2342,7 +2343,7 @@ $(document).ready(function() {
 
         const fragment = $(document.createDocumentFragment());
         customers.forEach(c => {
-            fragment.append(`<button type="button" class="list-group-item list-group-item-action">${c.name} (${c.customer_code})</button>`);
+            fragment.append(`<button type="button" class="list-group-item list-group-item-action">${c.name} (${c.phone_number})</button>`);
         });
         container.append(fragment);
         container.show();
@@ -2358,7 +2359,7 @@ $(document).ready(function() {
         $.ajax({
             url: "<?= base_url('customer/search'); ?>",
             type: "GET",
-            data: { q: query, limit: 50 },
+            data: { q: query, limit: MAX_CUSTOMER },
             dataType: "json",
             success: function(data) {
                 showResults(data);
