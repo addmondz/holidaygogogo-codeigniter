@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS `customer` (
   `ChatLanguage` VARCHAR(50) DEFAULT NULL,
   `AutocountSyncAction` CHAR(1) NOT NULL DEFAULT 'C' COMMENT 'C: Create, U: Update, D: Delete, V: Void, S: Update_Status',
   `AutocountSyncStatus` CHAR(1) NOT NULL DEFAULT 'P' COMMENT 'P: Pending, S: Synced, F: Failed',
+  `Status` ENUM('Y','N','P','PP','PT','OG','PTV') NOT NULL DEFAULT 'Y' COLLATE 'utf8mb3_general_ci',
   `AutocountSyncMessage` TEXT DEFAULT NULL,
   `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
   `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -13,6 +14,7 @@ CREATE TABLE IF NOT EXISTS `customer` (
   INDEX `idx_customercode` (`CustomerCode`),
   INDEX `idx_name` (`name`),
   INDEX `idx_phone_number` (`phone_number`),
-  INDEX `idx_autocountsyncaction` (`autocountsyncaction`),
-  INDEX `idx_autocountsyncstatus` (`autocountsyncstatus`)
+  INDEX `idx_autocountsyncaction` (`AutocountSyncAction`),
+  INDEX `idx_autocountsyncstatus` (`AutocountSyncStatus`),
+  INDEX `idx_status` (`Status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

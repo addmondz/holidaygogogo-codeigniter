@@ -150,7 +150,7 @@
 </div>
 
 <script>
-    <?php if(!empty($this->input->get('name')) || !empty($this->input->get('phone_number')) || !empty($this->input->get('customer_code')) || !empty($this->input->get('ChatLanguage'))) { ?>
+    <?php if(!empty($this->input->get('name')) || !empty($this->input->get('phone_number')) || !empty($this->input->get('CustomerCode')) || !empty($this->input->get('ChatLanguage'))) { ?>
         $('#customer_header').click();
     <?php } ?>
 

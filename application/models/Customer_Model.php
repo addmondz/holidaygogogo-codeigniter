@@ -18,8 +18,8 @@ class Customer_Model extends CI_Model
 			$this->db->where('phone_number', $this->input->get('phone_number'));
 		}
 	
-		if (!empty($this->input->get('customer_code'))) {
-			$this->db->where('customer_code', $this->input->get('customer_code'));
+		if (!empty($this->input->get('CustomerCode'))) {
+			$this->db->where('CustomerCode', $this->input->get('CustomerCode'));
 		}
 
 		if (!empty($this->input->get('ChatLanguage'))) {
@@ -60,8 +60,8 @@ class Customer_Model extends CI_Model
 			$this->db->where('phone_number', $this->input->get('phone_number'));
 		}
 	
-		if (!empty($this->input->get('customer_code'))) {
-			$this->db->where('customer_code', $this->input->get('customer_code'));
+		if (!empty($this->input->get('CustomerCode'))) {
+			$this->db->where('CustomerCode', $this->input->get('CustomerCode'));
 		}
 
 		if (!empty($this->input->get('ChatLanguage'))) {
@@ -91,68 +91,52 @@ class Customer_Model extends CI_Model
 		return $this->db->get('customer')->result();
 	}
 	
-	public function Create($by_booking = false)
-	{
-		if ($by_booking) {
-			$name          = $this->input->post('Customer');
-			$phone_number  = $this->input->post('Mobile');
-			$chat_language = $this->input->post('ChatLanguage');
+	public function Create()
+{
+	$customer = $this->input->post('customer'); // this is an array
 
-			// Prepare data for insert
-			$data = [
-				'name'         => $name,
-				'phone_number' => $phone_number,
-				'ChatLanguage' => $chat_language,
-				'created_at'   => date('Y-m-d H:i:s'),
-				'updated_at'   => date('Y-m-d H:i:s'),
-			];
-
-			// Insert into table
-			$insert = $this->db->insert('customer', $data);
-
-			// Check insert success
-			if ($insert && $this->db->affected_rows() > 0) {
-				return [
-					'success' => true,
-					'CustomerID' => $this->db->insert_id(),
-					'message' => 'Customer inserted successfully.'
-				];
-			} else {
-				return [
-					'success' => false,
-					'message' => 'Failed to insert customer.'
-				];
-			}
-
-		} else {
-			// Batch insert
-			$data = json_decode(json_encode($this->input->post('customer')), true);
-
-			if (empty($data)) {
-				return [
-					'success' => false,
-					'message' => 'No customer data provided.'
-				];
-			}
-
-			$this->db->insert_batch('customer', $data);
-
-			$affected = $this->db->affected_rows();
-
-			if ($affected > 0) {
-				return [
-					'success' => true,
-					'affected_rows' => $affected,
-					'message' => "$affected customer(s) inserted successfully."
-				];
-			} else {
-				return [
-					'success' => false,
-					'message' => 'Failed to insert customers.'
-				];
-			}
-		}
+	// If it’s a JSON string (in some cases), decode it:
+	if (is_string($customer)) {
+		$customer = json_decode($customer, true);
 	}
+
+	if (empty($customer)) {
+		return $this->output
+			->set_content_type('application/json')
+			->set_output(json_encode([
+				'success' => false,
+				'message' => 'No customer data received.'
+			]));
+	}
+
+	$data = [
+		'CustomerCode'  => $customer['CustomerCode'] ?? null,
+		'name'          => $customer['name'] ?? null,
+		'phone_number'  => $customer['phone_number'] ?? null,
+		'ChatLanguage'  => $customer['ChatLanguage'] ?? null,
+		'created_at'    => date('Y-m-d H:i:s'),
+		'updated_at'    => date('Y-m-d H:i:s'),
+	];
+
+	$insert = $this->db->insert('customer', $data);
+
+	if ($insert && $this->db->affected_rows() > 0) {
+		return $this->output
+			->set_content_type('application/json')
+			->set_output(json_encode([
+				'success' => true,
+				'CustomerID' => $this->db->insert_id(),
+				'message' => 'Customer inserted successfully.'
+			]));
+	} else {
+		return $this->output
+			->set_content_type('application/json')
+			->set_output(json_encode([
+				'success' => false,
+				'message' => 'Failed to insert customer.'
+			]));
+	}
+}
 
 	function Update()
 	{
@@ -168,9 +152,9 @@ class Customer_Model extends CI_Model
 		$this->db->where('ChatLanguage', '');
 		$this->db->update('customer');
 
-		$this->db->set('customer_code', null);
+		$this->db->set('CustomerCode', null);
 		$this->db->where('CustomerID', $this->input->post('customer_id'));
-		$this->db->where('customer_code', '');
+		$this->db->where('CustomerCode', '');
 		$this->db->update('customer');
 
 		$this->db->set('AutocountSyncAction', null);
@@ -213,6 +197,7 @@ class Customer_Model extends CI_Model
             ->where('CustomerID', $customer_id)
             ->update('customer', $data);
     }
+
 	public function get_pending_sycn_customers()
 	{
 		$this->load->helper('autocount');

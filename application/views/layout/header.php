@@ -248,6 +248,14 @@
 													<span class="menu-text">Supplier</span>
 												</a>
 											</li>
+											<li class="menu-item <?php if($this->router->class == 'Customer') { echo 'menu-item-active'; } ?>">
+												<a href="<?php echo base_url('Customer'); ?>" class="menu-link">
+													<i class="menu-bullet menu-bullet-dot">
+														<span></span>
+													</i>
+													<span class="menu-text">Customer</span>
+												</a>
+											</li>
 											<li class="menu-item <?php if($this->router->class == 'Product') { echo 'menu-item-active'; } ?>">
 												<a href="<?php echo base_url('Product'); ?>" class="menu-link">
 													<i class="menu-bullet menu-bullet-dot">

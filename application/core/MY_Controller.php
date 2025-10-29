@@ -12,6 +12,7 @@ class MY_Controller extends CI_Controller
 					case 'Category_Code':
 					case 'Category':
 					case 'Supplier':
+					case 'Customer':
 					case 'Product':
 					case 'Country_Code':
 					case 'Tag':

@@ -24,8 +24,10 @@ class Customer extends MY_Controller
 
 	function Create()
 	{
+
+								
 		if($this->input->is_ajax_request()) {
-			$this->Customer_Model->Create();
+			$this->Customer_Model->Create(false);
 		} else {
 			$titles = array('tab_title' => 'HolidayGoGoGo | Customer', 'breadcrumb_title' => 'Customer >> Create');
 			$array = array('CustomerID' => 'NA', 'Name' => 'NA');
@@ -117,13 +119,13 @@ class Customer extends MY_Controller
 		$spreadsheet->getActiveSheet()->setCellValue('H1', 'CREATED AT');
 		$spreadsheet->getActiveSheet()->setCellValue('I1', 'UPDATED AT');
 		$row = 2;
-		$customers = $this->Customer_Model->Read_Customer2();
+		$customers = $this->Customer_Model->Read_Customers2();
 		$spreadsheet->getActiveSheet()->getStyle('A1:I1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_BLACK);
 		$spreadsheet->getActiveSheet()->getStyle('A1:I1')->getFont()->getColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_WHITE);
 		$spreadsheet->getActiveSheet()->getStyle('A1:I1')->getFont()->setBold(true);
 		if(!empty($customers)) {
 			foreach($customers as $customer) {
-				$spreadsheet->getActiveSheet()->setCellValueExplicit('A' . $row, $customer->customer_code, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+				$spreadsheet->getActiveSheet()->setCellValueExplicit('A' . $row, $customer->CustomerCode, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 				$spreadsheet->getActiveSheet()->setCellValueExplicit('B' . $row, $customer->name, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 				$spreadsheet->getActiveSheet()->setCellValueExplicit('C' . $row, $customer->phone_number, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 				$spreadsheet->getActiveSheet()->setCellValueExplicit('D' . $row, $customer->ChatLanguage, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
@@ -172,7 +174,7 @@ class Customer extends MY_Controller
         $q = $this->input->get('q');
 		
         $this->db->like('name', $q);
-        $this->db->or_like('customer_code', $q);
+        $this->db->or_like('CustomerCode', $q);
 		if ($this->input->get('limit') != 'INFINITE') {
 			$limit = !empty($this->input->get('limit')) ? $this->input->get('limit') : 30;
         	$this->db->limit($limit);

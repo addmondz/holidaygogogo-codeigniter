@@ -5,7 +5,7 @@
                 <div class="card-title">
                     <h3 class="card-label" style="color:#6082B6;">
                         <strong>
-                            <?php if(current_url() == base_url('Customer/Create')) { echo 'New Customer Record'; } else { echo 'Customer Record : ' . $Name; } ?>
+                            <?php if(current_url() == base_url('Customer/Create')) { echo 'New Customer Record'; } else { echo 'Customer Record : ' . $name; } ?>
                         </strong>
                     </h3>
                 </div>
@@ -19,7 +19,7 @@
                             <div class="form-group">
                                 <label>Name <span style="color:red;">*</span></label>
                                 <div class="input-icon">
-                                    <input type="text" id="name" <?php if(current_url() == base_url('Customer/Update')) { ?> value="<?php echo $Name; ?>" <?php } ?> autocomplete="off" class="form-control">
+                                    <input type="text" id="name" <?php if(current_url() == base_url('Customer/Update')) { ?> value="<?php echo $name; ?>" <?php } ?> autocomplete="off" class="form-control">
                                     <span><i class="la la-user-alt"></i></span>
                                 </div>
                             </div>
@@ -28,7 +28,7 @@
                             <div class="form-group">
                                 <label>Phone</label>
                                 <div class="input-icon">
-                                    <input type="text" id="phone_number" <?php if(current_url() == base_url('Customer/Update')) { ?> value="<?php echo $Phone; ?>" <?php } ?> autocomplete="off" class="form-control">
+                                    <input type="text" id="phone_number" <?php if(current_url() == base_url('Customer/Update')) { ?> value="<?php echo $phone_number; ?>" <?php } ?> autocomplete="off" class="form-control">
                                     <span><i class="la la-phone"></i></span>
                                 </div>
                             </div>
@@ -101,7 +101,7 @@
                 var name = ($('#name').val()).toUpperCase();
                 var phone_number = $('#phone_number').val();
                 var chat_language = $('#ChatLanguage').val();
-                var customer_code = $('#CustomerCode').val();
+                var CustomerCode = $('#CustomerCode').val();
 
                 if(name == '') {
                     Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', 'Please Insert All Required Customer Information', null);
@@ -111,7 +111,7 @@
                             name: name,
                             phone_number: phone_number,
                             ChatLanguage: chat_language,
-                            customer_code: customer_code,
+                            CustomerCode: CustomerCode,
                             InsertBy: <?php echo $this->session->userdata('admin_id') ?>,
                             InsertDate: '<?php echo date('Y-m-d H:i:s') ?>'
                         }];

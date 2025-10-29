@@ -180,6 +180,7 @@ class Booking extends MY_Controller
 		if(in_array('GB', $this->session->access_control)) {
 			if ($this->input->is_ajax_request()) {
 
+				dd($this->input->post());
 				$booking_id = $this->Booking_Model->Create();
 
 				$this->Booking_Product_Model->Create($this->input->post('booking_products'), $booking_id);
