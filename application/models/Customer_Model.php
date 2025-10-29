@@ -45,7 +45,8 @@ class Customer_Model extends CI_Model
 		if (!empty($this->input->get('updated_at'))) {
 			$this->db->where('DATE(updated_at)', $this->input->get('updated_at'));
 		}
-		
+
+		$this->db->where('Status', 'Y');
 		$this->db->order_by('name', 'ASC');
 		return $this->db->get('customer')->result();
 	}
@@ -87,56 +88,58 @@ class Customer_Model extends CI_Model
 		if (!empty($this->input->get('updated_at'))) {
 			$this->db->where('DATE(updated_at)', $this->input->get('updated_at'));
 		}
+		
+		$this->db->where('Status', 'Y');
 		$this->db->order_by('name', 'ASC');
 		return $this->db->get('customer')->result();
 	}
 	
 	public function Create()
-{
-	$customer = $this->input->post('customer'); // this is an array
+	{
+		$customer = $this->input->post('customer')[0]; // this is an array
 
-	// If it’s a JSON string (in some cases), decode it:
-	if (is_string($customer)) {
-		$customer = json_decode($customer, true);
+		// If it’s a JSON string (in some cases), decode it:
+		if (is_string($customer)) {
+			$customer = json_decode($customer, true);
+		}
+
+		if (empty($customer)) {
+			return $this->output
+				->set_content_type('application/json')
+				->set_output(json_encode([
+					'success' => false,
+					'message' => 'No customer data received.'
+				]));
+		}
+
+		$data = [
+			'CustomerCode'  => $customer['CustomerCode'] ? $customer['CustomerCode'] : null,
+			'name'          => $customer['name'] ? $customer['name'] : null,
+			'phone_number'  => $customer['phone_number'] ? $customer['phone_number'] : null,
+			'ChatLanguage'  => $customer['ChatLanguage'] ? $customer['ChatLanguage'] : null,
+			'created_at'    => date('Y-m-d H:i:s'),
+			'updated_at'    => date('Y-m-d H:i:s'),
+		];
+
+		$insert = $this->db->insert('customer', $data);
+
+		if ($insert && $this->db->affected_rows() > 0) {
+			return $this->output
+				->set_content_type('application/json')
+				->set_output(json_encode([
+					'success' => true,
+					'CustomerID' => $this->db->insert_id(),
+					'message' => 'Customer inserted successfully.'
+				]));
+		} else {
+			return $this->output
+				->set_content_type('application/json')
+				->set_output(json_encode([
+					'success' => false,
+					'message' => 'Failed to insert customer.'
+				]));
+		}
 	}
-
-	if (empty($customer)) {
-		return $this->output
-			->set_content_type('application/json')
-			->set_output(json_encode([
-				'success' => false,
-				'message' => 'No customer data received.'
-			]));
-	}
-
-	$data = [
-		'CustomerCode'  => $customer['CustomerCode'] ?? null,
-		'name'          => $customer['name'] ?? null,
-		'phone_number'  => $customer['phone_number'] ?? null,
-		'ChatLanguage'  => $customer['ChatLanguage'] ?? null,
-		'created_at'    => date('Y-m-d H:i:s'),
-		'updated_at'    => date('Y-m-d H:i:s'),
-	];
-
-	$insert = $this->db->insert('customer', $data);
-
-	if ($insert && $this->db->affected_rows() > 0) {
-		return $this->output
-			->set_content_type('application/json')
-			->set_output(json_encode([
-				'success' => true,
-				'CustomerID' => $this->db->insert_id(),
-				'message' => 'Customer inserted successfully.'
-			]));
-	} else {
-		return $this->output
-			->set_content_type('application/json')
-			->set_output(json_encode([
-				'success' => false,
-				'message' => 'Failed to insert customer.'
-			]));
-	}
-}
 
 	function Update()
 	{

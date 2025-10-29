@@ -412,6 +412,16 @@ class Booking_Model extends CI_Model
 		$this->db->insert_batch('booking', json_decode(json_encode($this->input->post('booking'))));
 		$booking_id = $this->db->insert_id();
 
+		$data = [
+			'name'          => $this->input->post('booking')[0]['customer'] ? $this->input->post('booking')[0]['customer'] : null,
+			'phone_number'  => $this->input->post('booking')[0]['mobile'] ? $this->input->post('booking')[0]['mobile'] : null,
+			'ChatLanguage'  => $this->input->post('booking')[0]['chat_language'] ? $this->input->post('booking')[0]['chat_language'] : null,
+			'created_at'    => date('Y-m-d H:i:s'),
+			'updated_at'    => date('Y-m-d H:i:s'),
+		];
+
+		$customer_id = $this->db->insert('customer', $data);
+
 		if($this->input->post('booking_number') != '' || $this->input->post('booking_number') != null) {
 			$booking_number = $this->input->post('booking_number');
 		} else {
@@ -435,6 +445,11 @@ class Booking_Model extends CI_Model
 		$this->db->set('Token', sha1($booking_number));
 		$this->db->where('BookingID', $booking_id);
 		$this->db->where('Token', null);
+		$this->db->update('booking');
+
+		$this->db->set('CustomerID', $customer_id);
+		$this->db->where('BookingID', $booking_id);
+		$this->db->where('CustomerID', null);
 		$this->db->update('booking');
 
 		$this->db->select('Adult, Children, Infant');

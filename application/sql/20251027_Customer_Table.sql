@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS `customer` (
   `CustomerCode` VARCHAR(50) DEFAULT NULL COMMENT 'Debtor code',
   `name` VARCHAR(255) NOT NULL,
   `phone_number` VARCHAR(255) DEFAULT NULL,
-  `ChatLanguage` VARCHAR(50) DEFAULT NULL,
+  `ChatLanguage` ENUM('CN','EN','ML') DEFAULT NULL COLLATE 'utf8mb3_general_ci',
   `AutocountSyncAction` CHAR(1) NOT NULL DEFAULT 'C' COMMENT 'C: Create, U: Update, D: Delete, V: Void, S: Update_Status',
   `AutocountSyncStatus` CHAR(1) NOT NULL DEFAULT 'P' COMMENT 'P: Pending, S: Synced, F: Failed',
   `Status` ENUM('Y','N','P','PP','PT','OG','PTV') NOT NULL DEFAULT 'Y' COLLATE 'utf8mb3_general_ci',
@@ -18,3 +18,7 @@ CREATE TABLE IF NOT EXISTS `customer` (
   INDEX `idx_autocountsyncstatus` (`AutocountSyncStatus`),
   INDEX `idx_status` (`Status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+ALTER TABLE `booking`
+	ADD COLUMN `CustomerID` INT(15) NULL DEFAULT NULL AFTER `CustomerCode`,
+	ADD INDEX `CustomerID` (`CustomerID`);

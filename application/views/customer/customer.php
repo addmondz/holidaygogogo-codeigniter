@@ -34,13 +34,13 @@
                             </div>
                         </div>
                         <div class="col-md-6">
-                            <div class="form-group">
-                                <label>Chat Language</label>
-                                <div class="input-icon">
-                                    <input type="text" id="ChatLanguage" <?php if(current_url() == base_url('Customer/Update')) { ?> value="<?php echo $ChatLanguage; ?>" <?php } ?> autocomplete="off" class="form-control">
-                                    <span><i class="la la-language"></i></span>
-                                </div>
-                            </div>
+                            <label>Chat Language</label>
+                            <select id="ChatLanguage" class="form-control selectpicker">
+                                <option selected disabled data-icon="la la-language font-size-lg bs-icon" value="">--SELECT CHAT LANGUAGE--</option>
+                                <?php foreach(unserialize(CHAT_LANGUAGE) as $key => $value) { ?>
+                                    <option <?php if((current_url() == base_url('Customer/Update') || current_url() == base_url('Customer/Duplicate')) && $key == $ChatLanguage) { echo 'selected'; } ?> data-icon="la la-language font-size-lg bs-icon" value="<?php echo $key; ?>"><?php echo $value; ?></option>
+                                <?php } ?>
+                            </select>                        
                         </div>
                         <div class="col-md-6">
                             <div class="form-group">
@@ -92,7 +92,7 @@
             width: 550,
             background: 'url(<?php echo base_url('assets/image/sweetalert.jpg') ?>)',
             icon: 'warning',
-            title: <?php if(current_url() == base_url('Customer/Create')) { ?> 'Create New Customer Record ?' <?php } else { ?> '<?php echo 'Update Customer Record : ' . str_replace('\'', '', $Name) . ' ?'; ?>' <?php } ?>,
+            title: <?php if(current_url() == base_url('Customer/Create')) { ?> 'Create New Customer Record ?' <?php } else { ?> '<?php echo 'Update Customer Record : ' . str_replace('\'', '', $name) . ' ?'; ?>' <?php } ?>,
             confirmButtonText: 'Confirm',
             cancelButtonText: 'Cancel',
             showCancelButton: true
@@ -100,7 +100,7 @@
             if(action.isConfirmed) {
                 var name = ($('#name').val()).toUpperCase();
                 var phone_number = $('#phone_number').val();
-                var chat_language = $('#ChatLanguage').val();
+                var chat_language = $('#chat_language').val();
                 var CustomerCode = $('#CustomerCode').val();
 
                 if(name == '') {
@@ -111,16 +111,14 @@
                             name: name,
                             phone_number: phone_number,
                             ChatLanguage: chat_language,
-                            CustomerCode: CustomerCode,
-                            InsertBy: <?php echo $this->session->userdata('admin_id') ?>,
-                            InsertDate: '<?php echo date('Y-m-d H:i:s') ?>'
+                            CustomerCode: CustomerCode
+                            // InsertBy: <?php echo $this->session->userdata('admin_id') ?>,
+                            // InsertDate: '<?php echo date('Y-m-d H:i:s') ?>'
                         }];
                         Submit_Customer('<?php echo base_url('Customer/Create') ?>', null, customer);
                     } else {
                         var customer = [{
-                            CustomerID: <?php echo $CustomerID ?>,
-                            UpdateBy: <?php echo $this->session->userdata('admin_id') ?>,
-                            UpdateDate: '<?php echo date('Y-m-d H:i:s') ?>'
+                            CustomerID: <?php echo $CustomerID ?>
                         }];
                         var dirty_fields = $('#form').dirty('showDirtyFields');
                         if(dirty_fields.length > 0){
@@ -132,7 +130,7 @@
                         }
                         count = Object.keys(customer[0]).length;
                         if(count == 3) {
-                            Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', '<?php echo 'No Changes Detected In Customer Record : ' . str_replace('\'', '', $Name); ?>', '<?php echo base_url('Customer') ?>');
+                            Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', '<?php echo 'No Changes Detected In Customer Record : ' . str_replace('\'', '', $name); ?>', '<?php echo base_url('Customer') ?>');
                         } else {
                             Submit_Customer('<?php echo base_url('Customer/Update') ?>', customer[0].CustomerID, customer);
                         }
@@ -151,10 +149,10 @@
                 customer: customer
             },
             success: function() {
-                Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', '<?php if(current_url() == base_url('Customer/Create')) { echo 'New'; } ?> Customer Record <?php if(current_url() == base_url('Customer/Update')) { echo ': ' . str_replace('\'', '', $Name); } ?> Successfully <?php if(current_url() == base_url('Customer/Create')) { echo 'Created'; } else { echo 'Updated'; } ?>', '<?php echo base_url('Customer') ?>');
+                Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', '<?php if(current_url() == base_url('Customer/Create')) { echo 'New'; } ?> Customer Record <?php if(current_url() == base_url('Customer/Update')) { echo ': ' . str_replace('\'', '', $name); } ?> Successfully <?php if(current_url() == base_url('Customer/Create')) { echo 'Created'; } else { echo 'Updated'; } ?>', '<?php echo base_url('Customer') ?>');
             },
             error: function() {
-                Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', '<?php if(current_url() == base_url('Customer/Create')) { echo 'New'; } ?> Customer Record <?php if(current_url() == base_url('Customer/Update')) { echo ': ' . str_replace('\'', '', $Name); } ?> Could Not Be <?php if(current_url() == base_url('Customer/Create')) { echo 'Created'; } else { echo 'Updated'; } ?>', null);
+                Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', '<?php if(current_url() == base_url('Customer/Create')) { echo 'New'; } ?> Customer Record <?php if(current_url() == base_url('Customer/Update')) { echo ': ' . str_replace('\'', '', $name); } ?> Could Not Be <?php if(current_url() == base_url('Customer/Create')) { echo 'Created'; } else { echo 'Updated'; } ?>', null);
             }
         });
     }

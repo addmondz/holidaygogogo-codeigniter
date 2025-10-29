@@ -13,6 +13,7 @@ class Booking extends MY_Controller
 		$this->load->model('Booking_Product_Model');
 		$this->load->model('Payment_Model');
 		$this->load->model('Universal_Model');
+		$this->load->model('Customer_Model');
 		$this->config->load('autocount'); // load config/autocount.php
 	}
 
@@ -180,7 +181,6 @@ class Booking extends MY_Controller
 		if(in_array('GB', $this->session->access_control)) {
 			if ($this->input->is_ajax_request()) {
 
-				dd($this->input->post());
 				$booking_id = $this->Booking_Model->Create();
 
 				$this->Booking_Product_Model->Create($this->input->post('booking_products'), $booking_id);
@@ -385,20 +385,23 @@ class Booking extends MY_Controller
 						}
 					}
 
-					if ($bookingInfo['CustomerAutocountSyncAction'] == 'C' && $bookingInfo['CustomerAutocountSyncStatus'] == 'S') {
-						$this->Booking_Model->update_by_id($this->input->post('booking_id'), [
-							'CustomerAutocountSyncAction' => 'U',
-							'CustomerAutocountSyncStatus' => 'P'
-						]);
-					} else if ($bookingInfo['CustomerAutocountSyncAction'] == 'U' && $bookingInfo['CustomerAutocountSyncStatus'] == 'S') {
-						$this->Booking_Model->update_by_id($this->input->post('booking_id'), [
-							'CustomerAutocountSyncAction' => 'U',
-							'CustomerAutocountSyncStatus' => 'P'
-						]);
-					} else {
-						$this->Booking_Model->update_by_id($this->input->post('booking_id'), [
-							'CustomerAutocountSyncStatus'  => 'P',
-						]);
+					$customerInfo = get_object_vars($this->Customer_Model->find($bookingInfo['CustomerID']));
+					if (!empty($customerInfo)) {
+						if ($customerInfo['AutocountSyncAction'] == 'C' && $customerInfo['AutocountSyncStatus'] == 'S') {
+							$this->Customer_Model->update_by_id($customerInfo['CustomerID'], [
+								'AutocountSyncAction' => 'U',
+								'AutocountSyncStatus' => 'P'
+							]);
+						} else if ($customerInfo['AutocountSyncAction'] == 'U' && $customerInfo['AutocountSyncStatus'] == 'S') {
+							$this->Customer_Model->update_by_id($customerInfo['CustomerID'], [
+								'AutocountSyncAction' => 'U',
+								'AutocountSyncStatus' => 'P'
+							]);
+						} else {
+							$this->Customer_Model->update_by_id($customerInfo['CustomerID'], [
+								'AutocountSyncStatus'  => 'P',
+							]);
+						}
 					}
 				}
 				
@@ -661,7 +664,6 @@ class Booking extends MY_Controller
 
 			$bookingInfo = get_object_vars($this->Booking_Model->find($this->input->get('booking_id')));
 			if (!empty($bookingInfo)) {
-
 				if ($bookingInfo['AutocountSyncAction'] == 'C' && $bookingInfo['AutocountSyncStatus'] == 'S') {
 					$this->Booking_Model->update_by_id($this->input->get('booking_id'), [
 						'AutocountSyncAction' => 'D',

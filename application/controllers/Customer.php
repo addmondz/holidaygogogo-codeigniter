@@ -23,11 +23,9 @@ class Customer extends MY_Controller
 	}
 
 	function Create()
-	{
-
-								
+	{							
 		if($this->input->is_ajax_request()) {
-			$this->Customer_Model->Create(false);
+			$this->Customer_Model->Create();
 		} else {
 			$titles = array('tab_title' => 'HolidayGoGoGo | Customer', 'breadcrumb_title' => 'Customer >> Create');
 			$array = array('CustomerID' => 'NA', 'Name' => 'NA');
@@ -80,7 +78,11 @@ class Customer extends MY_Controller
 	
 	function Delete() 
 	{
-		$this->Universal_Model->Delete('CustomerID', $this->input->get('customer_id'), 'customer');
+		//$this->Universal_Model->Delete('CustomerID', $this->input->get('customer_id'), 'customer');
+		$this->Customer_Model->update_by_id($this->input->get('customer_id'), [
+			'Status'  => 'N',
+			'updated_at' => date('Y-m-d H:i:s')
+		]);
 
 		$customer = get_object_vars($this->Customer_Model->find($this->input->get('customer_id')));
 		if (!empty($customer)) {
