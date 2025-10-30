@@ -418,12 +418,13 @@ class Booking_Model extends CI_Model
 		$booking_id = $this->db->insert_id();
 
 		$data = [
-			'name'          => $this->input->post('booking')[0]['customer'] ? $this->input->post('booking')[0]['customer'] : null,
-			'phone_number'  => $this->input->post('booking')[0]['mobile'] ? $this->input->post('booking')[0]['mobile'] : null,
-			'ChatLanguage'  => $this->input->post('booking')[0]['chat_language'] ? $this->input->post('booking')[0]['chat_language'] : null,
+			'name'          => $this->input->post('booking')[0]['Customer'] ? $this->input->post('booking')[0]['Customer'] : null,
+			'phone_number'  => $this->input->post('booking')[0]['Mobile'] ? $this->input->post('booking')[0]['Mobile'] : null,
+			'ChatLanguage'  => $this->input->post('booking')[0]['ChatLanguage'] ? $this->input->post('booking')[0]['ChatLanguage'] : null,
 			'updated_at'    => date('Y-m-d H:i:s'),
 		];
 		if ((!empty($this->input->post('CustomerID')) && $this->input->post('CustomerID') != 'undefiend')) {
+			$customer_id = $this->input->post('CustomerID');
 			$this->load->model('Customer_Model');
 			$this->Customer_Model->update_by_id($this->input->post('CustomerID'), $data);
 			$customerInfo = get_object_vars($this->Customer_Model->find($this->input->post('CustomerID')));
@@ -446,7 +447,8 @@ class Booking_Model extends CI_Model
 			}
 		} else {
 			$data['created_at'] = date('Y-m-d H:i:s');
-			$customer_id = $this->db->insert('customer', $data);
+			$this->db->insert('customer', $data);
+			$customer_id = $this->db->insert_id();
 		}
 
 		if($this->input->post('booking_number') != '' || $this->input->post('booking_number') != null) {
@@ -643,13 +645,14 @@ class Booking_Model extends CI_Model
 		$this->db->update_batch('booking', json_decode(json_encode($this->input->post('booking'))), 'BookingID');
 		
 		$data = [
-			'name'          => $this->input->post('booking')[0]['customer'] ? $this->input->post('booking')[0]['customer'] : null,
-			'phone_number'  => $this->input->post('booking')[0]['mobile'] ? $this->input->post('booking')[0]['mobile'] : null,
-			'ChatLanguage'  => $this->input->post('booking')[0]['chat_language'] ? $this->input->post('booking')[0]['chat_language'] : null,
+			'name'          => $this->input->post('booking')[0]['Customer'] ? $this->input->post('booking')[0]['Customer'] : null,
+			'phone_number'  => $this->input->post('booking')[0]['Mobile'] ? $this->input->post('booking')[0]['Mobile'] : null,
+			'ChatLanguage'  => $this->input->post('booking')[0]['ChatLanguage'] ? $this->input->post('booking')[0]['ChatLanguage'] : null,
 			'updated_at'    => date('Y-m-d H:i:s'),
 		];
 		if ((!empty($this->input->post('CustomerID')) && $this->input->post('CustomerID') != 'undefiend')) {
 			$this->load->model('Customer_Model');
+			$customer_id = $this->input->post('CustomerID');
 
 			$this->Customer_Model->update_by_id($this->input->post('CustomerID'), $data);
 			$customerInfo = get_object_vars($this->Customer_Model->find($this->input->post('CustomerID')));
@@ -672,16 +675,18 @@ class Booking_Model extends CI_Model
 			}
 		} else {
 			$data['created_at'] = date('Y-m-d H:i:s');
-			$customer_id = $this->db->insert('customer', $data);
-			$this->db->set('CustomerID', $customer_id);
-			$this->db->where('BookingID', $this->input->post('booking_id'));
-			$this->db->where('CustomerID', null);
-			$this->db->update('booking');
+			$this->db->insert('customer', $data);
+			$customer_id = $this->db->insert_id();
 		}
 
 		$this->db->set('BookingConfirmationFooterID', null);
 		$this->db->where('BookingID', $this->input->post('booking_id'));
 		$this->db->where('BookingConfirmationFooterID', '');
+		$this->db->update('booking');
+
+		$this->db->set('CustomerID', $customer_id);
+		$this->db->where('BookingID', $this->input->post('booking_id'));
+		$this->db->where('CustomerID', null);
 		$this->db->update('booking');
 
 		$this->db->set('TravelVoucherFooterID', null);
