@@ -28,7 +28,7 @@ class Customer extends MY_Controller
 			$this->Customer_Model->Create();
 		} else {
 			$titles = array('tab_title' => 'HolidayGoGoGo | Customer', 'breadcrumb_title' => 'Customer >> Create');
-			$array = array('CustomerID' => 'NA', 'Name' => 'NA');
+			$array = array('CustomerID' => 'NA', 'name' => 'NA');
 			$this->load->view('layout/header', $titles);
 			$this->load->view('customer/customer', $array);
 			$this->load->view('layout/footer');

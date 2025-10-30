@@ -100,7 +100,7 @@
             if(action.isConfirmed) {
                 var name = ($('#name').val()).toUpperCase();
                 var phone_number = $('#phone_number').val();
-                var chat_language = $('#chat_language').val();
+                var ChatLanguage = $('#ChatLanguage').val();
                 var CustomerCode = $('#CustomerCode').val();
 
                 if(name == '') {
@@ -110,7 +110,7 @@
                         var customer = [{
                             name: name,
                             phone_number: phone_number,
-                            ChatLanguage: chat_language,
+                            ChatLanguage: ChatLanguage,
                             CustomerCode: CustomerCode
                             // InsertBy: <?php echo $this->session->userdata('admin_id') ?>,
                             // InsertDate: '<?php echo date('Y-m-d H:i:s') ?>'
@@ -132,6 +132,7 @@
                         if(count == 3) {
                             Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', '<?php echo 'No Changes Detected In Customer Record : ' . str_replace('\'', '', $name); ?>', '<?php echo base_url('Customer') ?>');
                         } else {
+                            console.log('123');
                             Submit_Customer('<?php echo base_url('Customer/Update') ?>', customer[0].CustomerID, customer);
                         }
                     }

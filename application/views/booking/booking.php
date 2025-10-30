@@ -126,26 +126,29 @@
                                 <label>Customer <span style="color:red;">*</span></label>
 
                                 <div class="input-icon position-relative">
-                                <input type="text" 
-                                    id="Customer" 
-                                    name="Customer"
-                                    <?php if (current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) { ?> 
-                                        value="<?php echo $Customer; ?>" 
-                                    <?php } ?> 
-                                    autocomplete="off" 
-                                    class="form-control" 
-                                    placeholder="Search or select customer">
+                                    <input type="text" 
+                                        id="Customer" 
+                                        name="Customer"
+                                        <?php if (current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) { ?> 
+                                            value="<?php echo $Customer; ?>" 
+                                        <?php } ?> 
+                                        autocomplete="off" 
+                                        class="form-control" 
+                                        placeholder="Search or select customer">
 
-                                <span><i class="la la-user"></i></span>
+                                    <!-- Hidden field to detect existing customer -->
+                                    <input type="hidden" id="CustomerID" name="CustomerID" value="">
 
-                                <!-- Search results container -->
-                                <div id="customerResults" 
-                                    class="list-group position-absolute w-100 shadow-sm" 
-                                    style="z-index:1000; display:none; top:100%; left:0; max-height:200px; overflow-y:auto;"></div>
-                            </div>
+                                    <span><i class="la la-user"></i></span>
 
+                                    <div id="customerResults" 
+                                        class="list-group position-absolute w-100 shadow-sm" 
+                                        style="z-index:1000; display:none; top:100%; left:0; max-height:200px; overflow-y:auto;">
+                                    </div>
+                                </div>
                             </div>
                         </div>
+
 
 
                         <div class="col-md-6">
@@ -1416,6 +1419,8 @@
 
                 var customer = ($('#Customer').val()).toUpperCase();
 
+                var CustomerID = $('input[name="CustomerID"]').val();
+
                 var mobile = $('#Mobile').val();
 
                 var travel_date = $('#TravelDate').val();
@@ -1510,6 +1515,8 @@
 
                                     }
 
+                                    var CustomerID = $('input[name="CustomerID"]').val();
+
                                     var deposit_deadline = $('input[name="DepositDeadline"]').val();
 
                                     if(deposit_deadline != '') {
@@ -1594,7 +1601,7 @@
 
 
 
-                                    Submit_Booking('<?php echo base_url('Booking/Create') ?>', null, booking_number, booking, null, booking_products);
+                                    Submit_Booking('<?php echo base_url('Booking/Create') ?>', null, booking_number, booking, null, booking_products, CustomerID);
 
                                 } else {
 
@@ -1823,6 +1830,7 @@
                                     }
 
 
+                                    var CustomerID = $('input[name="CustomerID"]').val();
 
                                     // Booking
 
@@ -2016,7 +2024,7 @@
 
                                     } else {
 
-                                        Submit_Booking('<?php echo base_url('Booking/Update') ?>', booking[0].BookingID, null, booking, booking_log, booking_products);
+                                        Submit_Booking('<?php echo base_url('Booking/Update') ?>', booking[0].BookingID, null, booking, booking_log, booking_products, CustomerID);
 
                                     }
 
@@ -2038,7 +2046,7 @@
 
 
 
-    function Submit_Booking(url, booking_id, booking_number, booking, booking_log, booking_products)
+    function Submit_Booking(url, booking_id, booking_number, booking, booking_log, booking_products, CustomerID)
 
     {
 
@@ -2058,7 +2066,9 @@
 
                 booking_log: booking_log,
 
-                booking_products: booking_products
+                booking_products: booking_products,
+            
+                CustomerID: CustomerID,
 
             },
 
@@ -2332,6 +2342,7 @@ $(document).ready(function() {
     const MAX_DISPLAY = 5; // visible items in dropdown
     const MAX_CUSTOMER = 'INFINITE';
     const container = $('#customerResults');
+    const hiddenCustomerId = $('#CustomerID'); // hidden field
 
     // Function to render results
     function showResults(customers) {
@@ -2343,15 +2354,25 @@ $(document).ready(function() {
 
         const fragment = $(document.createDocumentFragment());
         customers.forEach(c => {
-            fragment.append(`<button type="button" class="list-group-item list-group-item-action">${c.name} (${c.phone_number})</button>`);
+            fragment.append(`
+                <button type="button" 
+                    class="list-group-item list-group-item-action"
+                    data-id="${c.CustomerID}"
+                    data-name="${c.name}"
+                    data-phone="${c.phone_number}">
+                    ${c.name} (${c.phone_number})
+                </button>
+            `);
         });
         container.append(fragment);
         container.show();
 
         // Fix height for MAX_DISPLAY
         const itemHeight = container.find('button').first().outerHeight() || 40;
-        container.css('max-height', itemHeight * MAX_DISPLAY + 'px');
-        container.css('overflow-y', 'auto');
+        container.css({
+            'max-height': itemHeight * MAX_DISPLAY + 'px',
+            'overflow-y': 'auto'
+        });
     }
 
     // Fetch from backend
@@ -2369,18 +2390,23 @@ $(document).ready(function() {
 
     // Show top items on focus/click
     $('#Customer').on('focus click', function() {
-        fetchCustomers(''); // empty query to get top 50
+        fetchCustomers(''); // empty query to get top customers
     });
 
     // Filter while typing
     $('#Customer').on('input', function() {
         const query = $(this).val();
+        hiddenCustomerId.val(''); // clear selection if typing
         fetchCustomers(query);
     });
 
-    // Click to select
+    // Click to select existing customer
     $(document).on('click', '#customerResults button', function() {
-        $('#Customer').val($(this).text());
+        const name = $(this).data('name');
+        const id = $(this).data('id');
+
+        $('#Customer').val(name);
+        hiddenCustomerId.val(id); // store selected ID
         container.hide();
     });
 
@@ -2391,5 +2417,6 @@ $(document).ready(function() {
         }
     });
 });
+
 
 </script>
