@@ -220,7 +220,7 @@ class Customer_Model extends CI_Model
 
 		if (!empty($config['customer_cutoff_date'])) {
 			$date = date('Y-m-d', strtotime($config['customer_cutoff_date']));
-			$this->db->where('customer.create_at >', $date);
+			$this->db->where('customer.created_at >', $date);
 		}
 
 		$this->db->limit($customer_qty_cront);
