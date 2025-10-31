@@ -132,7 +132,7 @@
                                             <div class="btn-group">
                                                 <button type="button" data-toggle="dropdown" class="btn btn-light-primary btn-sm dropdown-toggle" style="padding-left:3px;"></button>
                                                 <div class="dropdown-menu">
-                                                    <button onclick="Delete_Record('<?php echo base_url('assets/image/sweetalert.jpg'); ?>', '<?php echo 'Customer Record : ' . str_replace('\'', '', $customer->name); ?>', '<?php echo base_url('Customer/Delete'); ?>', 'customer_id', <?php echo $customer->CustomerID; ?>, '', '<?php if(strpos($current_url, '?') == true) { echo base_url('Customer?') . (explode('?', $current_url))[1]; } else { echo base_url('Customer'); } ?>')" class="dropdown-item" style="color:#E37383; font-size:11px;">Delete Customer</button>
+                                                    <!-- delete disable -- if needed refer supplier change text and route enough, controller, model, autocount all done QA -->
                                                     <a href="<?php echo base_url('Customer/Update?customer_id=') . $customer->CustomerID; ?>" class="dropdown-item" style="font-size:11px;">Update Customer</a>
                                                 </div>
                                             </div>
