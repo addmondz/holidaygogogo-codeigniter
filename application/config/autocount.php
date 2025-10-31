@@ -45,7 +45,7 @@ $config['autocount'] = [
 
     'booking_cutoff_date'  => '2025-10-01', // after the date only sync
     'payment_cutoff_date'  => '2025-10-01', // after the date only sync
-    'customer_cutoff_date' => '2025-11-01', // after the date only sync
+    'customer_cutoff_date' => '2025-10-31', // after the date only sync
     'supplier_cutoff_date' => '2025-10-25', // after the date only sync
 
     // manually Sync settings
