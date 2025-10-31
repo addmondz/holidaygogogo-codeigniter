@@ -318,7 +318,7 @@ class Cron extends CI_Controller
 						$result = ['error' => 'ERROR Autocount Sync Action'];
 				}
 				if (isset($result['status']) && ($result['status'] == 201 || $result['status'] == 204) && $result['error'] === null) {
-					$this->Booking_Model->update_by_id($customer['CustomerID'], [
+					$this->Customer_Model->update_by_id($customer['CustomerID'], [
 						'AutocountSyncStatus'  => 'S',
 						'AutocountSyncMessage' => json_encode($result)
 					]);
