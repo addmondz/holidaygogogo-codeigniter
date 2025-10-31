@@ -135,9 +135,15 @@
                                         autocomplete="off" 
                                         class="form-control" 
                                         placeholder="Search or select customer">
+                                    <small id="customerInfo" class="form-text text-muted">&laquo; New Customer &raquo;</small>
 
                                     <!-- Hidden field to detect existing customer -->
-                                    <input type="hidden" id="CustomerID" name="CustomerID" value="">
+                                    <?php 
+                                    $is_edit_page = in_array(current_url(), [base_url('Booking/Update'), base_url('Booking/Duplicate')]);
+                                    $customer_id_value = ($is_edit_page && !empty($CustomerID)) ? $CustomerID : '';
+                                    ?>
+                                    <input type="hidden" id="CustomerID" name="CustomerID" value="<?= htmlspecialchars($customer_id_value, ENT_QUOTES) ?>">
+
 
                                     <span><i class="la la-user"></i></span>
 
@@ -2342,7 +2348,8 @@ $(document).ready(function() {
     const MAX_DISPLAY = 5; // visible items in dropdown
     const MAX_CUSTOMER = 'INFINITE';
     const container = $('#customerResults');
-    const hiddenCustomerId = $('#CustomerID'); // hidden field
+    const hiddenCustomerId = $('#CustomerID');
+    const infoSpan = $('#customerInfo'); // new info span
 
     // Function to render results
     function showResults(customers) {
@@ -2359,7 +2366,8 @@ $(document).ready(function() {
                     class="list-group-item list-group-item-action"
                     data-id="${c.CustomerID}"
                     data-name="${c.name}"
-                    data-phone="${c.phone_number}">
+                    data-phone="${c.phone_number}"
+                    data-code="${c.CustomerCode ?? ''}">
                     ${c.name} (${c.phone_number})
                 </button>
             `);
@@ -2390,7 +2398,7 @@ $(document).ready(function() {
 
     // Show top items on focus/click
     $('#Customer').on('focus click', function() {
-        fetchCustomers(''); // empty query to get top customers
+        fetchCustomers('');
     });
 
     // Filter while typing
@@ -2398,16 +2406,21 @@ $(document).ready(function() {
         const query = $(this).val();
         hiddenCustomerId.val(''); // clear selection if typing
         fetchCustomers(query);
+        updateInfo(false); // reset to new customer message
     });
 
     // Click to select existing customer
     $(document).on('click', '#customerResults button', function() {
         const name = $(this).data('name');
         const id = $(this).data('id');
+        const code = $(this).data('code');
+        const phone = $(this).data('phone');
 
         $('#Customer').val(name);
-        hiddenCustomerId.val(id); // store selected ID
+        hiddenCustomerId.val(id);
         container.hide();
+
+        updateInfo(true, { code, phone });
     });
 
     // Hide dropdown when clicking outside
@@ -2416,7 +2429,33 @@ $(document).ready(function() {
             container.hide();
         }
     });
+
+    // Update info span
+    function updateInfo(isExisting, data = {}) {
+        if (isExisting) {
+            infoSpan
+                .removeClass('text-muted text-primary')
+                .addClass('text-success')
+                .html(`<i class="la la-check-circle"></i> Existing Customer — <strong>${data.code || 'Empty Customer Code '}</strong> (${data.phone || 'No phone number'})`);
+        } else {
+            infoSpan
+                .removeClass('text-success')
+                .addClass('text-muted')
+                .html('&laquo; New Customer &raquo;');
+        }
+    }
+
+    // Initial setup (for update page)
+    if (hiddenCustomerId.val()) {
+        updateInfo(true, {
+            code: "<?= isset($CustomerCode) ? $CustomerCode : 'N/A'; ?>",
+            phone: "<?= isset($CustomerMobile) ? $CustomerMobile : 'N/A'; ?>"
+        });
+    } else {
+        updateInfo(false);
+    }
 });
+
 
 
 </script>

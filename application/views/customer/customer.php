@@ -34,21 +34,37 @@
                             </div>
                         </div>
                         <div class="col-md-6">
-                            <label>Chat Language</label>
-                            <select id="ChatLanguage" class="form-control selectpicker">
-                                <option selected disabled data-icon="la la-language font-size-lg bs-icon" value="">--SELECT CHAT LANGUAGE--</option>
-                                <?php foreach(unserialize(CHAT_LANGUAGE) as $key => $value) { ?>
-                                    <option <?php if((current_url() == base_url('Customer/Update') || current_url() == base_url('Customer/Duplicate')) && $key == $ChatLanguage) { echo 'selected'; } ?> data-icon="la la-language font-size-lg bs-icon" value="<?php echo $key; ?>"><?php echo $value; ?></option>
-                                <?php } ?>
-                            </select>                        
+                            <div class="form-group">
+                                <label>Chat Language</label>
+                                <select id="ChatLanguage" class="form-control selectpicker">
+                                    <option selected disabled data-icon="la la-language font-size-lg bs-icon" value="">--SELECT CHAT LANGUAGE--</option>
+                                    <?php foreach(unserialize(CHAT_LANGUAGE) as $key => $value) { ?>
+                                        <option <?php if((current_url() == base_url('Customer/Update') || current_url() == base_url('Customer/Duplicate')) && $key == $ChatLanguage) { echo 'selected'; } ?> data-icon="la la-language font-size-lg bs-icon" value="<?php echo $key; ?>"><?php echo $value; ?></option>
+                                    <?php } ?>
+                                </select>  
+                            </div>                   
                         </div>
                         <div class="col-md-6">
                             <div class="form-group">
                                 <label>Customer Code</label>
-                                <div class="input-icon">
-                                    <input type="text" id="CustomerCode" <?php if(current_url() == base_url('Customer/Update')) { ?> value="<?php echo $CustomerCode; ?>" <?php } ?> autocomplete="off" class="form-control">
-                                    <span><i class="la la-clipboard-list"></i></span>
-                                </div>
+                                <?php if (current_url() == base_url('Customer/Update') && !empty($CustomerCode)) { ?> 
+                                    <div class="input-icon">
+                                        <div class="form-control bg-light" style="cursor:not-allowed;">
+                                            <?php echo !empty($CustomerCode) ? htmlspecialchars($CustomerCode, ENT_QUOTES) : ''; ?>
+                                        </div>
+                                        <span><i class="la la-clipboard-list"></i></span>
+                                    </div>
+                                <?php } else { ?> 
+                                    <div class="input-icon">
+                                        <input type="text" 
+                                            id="CustomerCode" 
+                                            name="CustomerCode"
+                                            class="form-control"
+                                            autocomplete="off"
+                                            placeholder="Enter customer code">
+                                        <span><i class="la la-clipboard-list"></i></span>
+                                    </div>
+                                <?php } ?>
                             </div>
                         </div>
                     </div>
@@ -117,9 +133,7 @@
                         }];
                         Submit_Customer('<?php echo base_url('Customer/Create') ?>', null, customer);
                     } else {
-                        var customer = [{
-                            CustomerID: <?php echo $CustomerID ?>
-                        }];
+                        var customer = [{CustomerID: <?php echo $CustomerID ?>}];
                         var dirty_fields = $('#form').dirty('showDirtyFields');
                         if(dirty_fields.length > 0){
                             for(var i = 0; i < dirty_fields.length; i++){
@@ -128,8 +142,11 @@
                                 customer[0][key] = value;
                             }
                         }
-                        count = Object.keys(customer[0]).length;
-                        if(count == 3) {
+                        count = 0;
+                        $.each(customer[0], function() {
+                            count++;
+                        });     
+                        if(count == 1) {
                             Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', '<?php echo 'No Changes Detected In Customer Record : ' . str_replace('\'', '', $name); ?>', '<?php echo base_url('Customer') ?>');
                         } else {
                             console.log('123');

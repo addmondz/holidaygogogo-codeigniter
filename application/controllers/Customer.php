@@ -38,7 +38,7 @@ class Customer extends MY_Controller
 	function Update()
 	{
 		if($this->input->is_ajax_request()) {
-			if(count($this->input->post('customer')[0]) > 3) {
+			if(count($this->input->post('customer')[0]) > 1) {
 				$this->Customer_Model->Update();
 
 				$customer = get_object_vars($this->Customer_Model->find($this->input->post('customer_id')));
