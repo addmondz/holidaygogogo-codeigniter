@@ -177,6 +177,7 @@ class Customer extends MY_Controller
 		
         $this->db->like('name', $q);
         $this->db->or_like('CustomerCode', $q);
+        $this->db->or_like('phone_number', $q);
 		if ($this->input->get('limit') != 'INFINITE') {
 			$limit = !empty($this->input->get('limit')) ? $this->input->get('limit') : 30;
         	$this->db->limit($limit);
