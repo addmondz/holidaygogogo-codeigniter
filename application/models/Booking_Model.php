@@ -686,7 +686,7 @@ class Booking_Model extends CI_Model
 
 		$this->db->set('CustomerID', $customer_id);
 		$this->db->where('BookingID', $this->input->post('booking_id'));
-		$this->db->where('CustomerID', null);
+		$this->db->where("(CustomerID IS NULL OR CustomerID <> " . $this->db->escape($customer_id) . ")", null, false);
 		$this->db->update('booking');
 
 		$this->db->set('TravelVoucherFooterID', null);
