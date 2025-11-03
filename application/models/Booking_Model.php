@@ -644,17 +644,23 @@ class Booking_Model extends CI_Model
 	{
 		$this->db->update_batch('booking', json_decode(json_encode($this->input->post('booking'))), 'BookingID');
 		
-		$data = [
-			'name'          => $this->input->post('booking')[0]['Customer'] ? $this->input->post('booking')[0]['Customer'] : null,
-			'phone_number'  => $this->input->post('booking')[0]['Mobile'] ? $this->input->post('booking')[0]['Mobile'] : null,
-			'ChatLanguage'  => $this->input->post('booking')[0]['ChatLanguage'] ? $this->input->post('booking')[0]['ChatLanguage'] : null,
-			'updated_at'    => date('Y-m-d H:i:s'),
-		];
+		$data = [];
+		$booking = $this->input->post('booking');
+		if (!empty($booking) && isset($booking[0])) {
+			$booking = $booking[0];
+			if (!empty($booking['Customer'])) { $data['name'] = $booking['Customer']; }
+			if (!empty($booking['Mobile'])) { $data['phone_number'] = $booking['Mobile']; }
+			if (!empty($booking['ChatLanguage'])) { $data['ChatLanguage'] = $booking['ChatLanguage'];}
+			if ($data) { $data['updated_at'] = date('Y-m-d H:i:s'); }
+		}
+
 		if ((!empty($this->input->post('CustomerID')) && $this->input->post('CustomerID') != 'undefiend')) {
 			$this->load->model('Customer_Model');
 			$customer_id = $this->input->post('CustomerID');
 
-			$this->Customer_Model->update_by_id($this->input->post('CustomerID'), $data);
+			if (!empty($data)) {
+				$this->Customer_Model->update_by_id($this->input->post('CustomerID'), $data);
+			}
 			$customerInfo = get_object_vars($this->Customer_Model->find($this->input->post('CustomerID')));
 			if (!empty($customerInfo)) {
 				if ($customerInfo['AutocountSyncAction'] == 'C' && $customerInfo['AutocountSyncStatus'] == 'S') {
