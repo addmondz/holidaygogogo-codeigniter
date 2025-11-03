@@ -531,14 +531,14 @@ class Cron extends CI_Controller
 			}
 		}
 
-		// if (!empty($booking['CustomerID'])) {
-		// 	$customer = $this->Customer_Model->find($booking['CustomerID']);
-		// 	if (!empty($customer)) {
-		// 		if (!empty($customer['CustomerCode'])) {
-		// 			$booking['CustomerCode'] = $customer['CustomerCode'];
-		// 		}
-		// 	}
-		// }
+		if (!empty($booking['CustomerID'])) {
+			$customer = $this->Customer_Model->find($booking['CustomerID']);
+			if (!empty($customer)) {
+				if (!empty($customer->CustomerCode) && $customer->CustomerCode != null) {
+					$booking['CustomerCode'] = $customer->CustomerCode;
+				}
+			}
+		}
 
 		return $booking;
 	}
