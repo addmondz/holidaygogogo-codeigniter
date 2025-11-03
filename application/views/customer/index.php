@@ -82,6 +82,7 @@
                                 <th style="text-align:center;">Phone Number</th>
                                 <th style="text-align:center;">Customer Code</th>
                                 <th style="text-align:center;">Chat Language</th>
+                                <th style="text-align:center;">Created Date</th>
                                 <th style="text-align:center;">Autocount Sync Status</th>
                                 <th class="action" style="text-align:center;">Action</th>
                             </tr>
@@ -98,6 +99,7 @@
                                         <td style="text-align:center;"><?php echo $customer->phone_number; ?></td>
                                         <td style="text-align:center;"><?php echo $customer->CustomerCode; ?></td>
                                         <td style="text-align:center;"><?php echo $customer->ChatLanguage; ?></td>
+                                        <td style="text-align:center;"><?php echo date('Y-m-d', strtotime($customer->created_at)); ?></td>
                                         <td style="text-align:center;">
                                             <?php 
                                                 $statusColor = '#000000';
