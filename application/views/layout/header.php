@@ -240,22 +240,24 @@
 													<span class="menu-text">Category</span>
 												</a>
 											</li>
-											<li class="menu-item <?php if($this->router->class == 'Supplier') { echo 'menu-item-active'; } ?>">
-												<a href="<?php echo base_url('Supplier'); ?>" class="menu-link">
-													<i class="menu-bullet menu-bullet-dot">
-														<span></span>
-													</i>
-													<span class="menu-text">Supplier</span>
-												</a>
-											</li>
-											<li class="menu-item <?php if($this->router->class == 'Customer') { echo 'menu-item-active'; } ?>">
-												<a href="<?php echo base_url('Customer'); ?>" class="menu-link">
-													<i class="menu-bullet menu-bullet-dot">
-														<span></span>
-													</i>
-													<span class="menu-text">Customer</span>
-												</a>
-											</li>
+											<?php if ($this->session->level == '10' || $this->session->level == '30') { ?>
+												<li class="menu-item <?php if($this->router->class == 'Supplier') { echo 'menu-item-active'; } ?>">
+													<a href="<?php echo base_url('Supplier'); ?>" class="menu-link">
+														<i class="menu-bullet menu-bullet-dot">
+															<span></span>
+														</i>
+														<span class="menu-text">Supplier</span>
+													</a>
+												</li>
+												<li class="menu-item <?php if($this->router->class == 'Customer') { echo 'menu-item-active'; } ?>">
+													<a href="<?php echo base_url('Customer'); ?>" class="menu-link">
+														<i class="menu-bullet menu-bullet-dot">
+															<span></span>
+														</i>
+														<span class="menu-text">Customer</span>
+													</a>
+												</li>
+											<?php } ?>
 											<li class="menu-item <?php if($this->router->class == 'Product') { echo 'menu-item-active'; } ?>">
 												<a href="<?php echo base_url('Product'); ?>" class="menu-link">
 													<i class="menu-bullet menu-bullet-dot">

@@ -45,10 +45,10 @@ class PaymentSync {
 					$acc_no = '';
 					$amount = 0.00;
 					if ($data['Credit'] != 0.00){
-						$acc_no = $config['payment_acc_no_1'];
+						$acc_no = arr_get($data, 'CustomerCode', '');//$config['payment_acc_no_1'];
 						$amount = $data['Credit'];
 					} else if ($data['Debit'] != 0.00){
-						$acc_no = $config['payment_acc_no_2'];
+						$acc_no = arr_get($data, 'SupplierCode', '');//$config['payment_acc_no_2'];
 						$amount = $data['Debit'];
 					}
 
@@ -78,11 +78,11 @@ class PaymentSync {
 				// Fallback: minimal details
 				$acc_no = '';
 				$amount = 0.00;
-				if ($data['Credit'] != 0.00) {
-					$acc_no = $config['payment_acc_no_1'];
+				if ($data['Credit'] != 0.00) { // OR
+					$acc_no = arr_get($data, 'CustomerCode', '');//$config['payment_acc_no_1'];
 					$amount = $data['Credit'];
-				} else if ($data['Debit'] != 0.00) {
-					$acc_no = $config['payment_acc_no_2'];
+				} else if ($data['Debit'] != 0.00) { // PV
+					$acc_no = arr_get($data, 'SupplierCode', '');//$config['payment_acc_no_2'];
 					$amount = $data['Debit'];
 				}
 
@@ -117,10 +117,10 @@ class PaymentSync {
 			} else {
 				// Fallback: minimal paymentDetails
 				if ($data['Credit'] != 0.00) {
-					$acc_no = $config['payment_acc_no_1'];
+					$acc_no = arr_get($data, 'CustomerCode', '');//$config['payment_acc_no_1'];
 					$amount = $data['Credit'];
 				} else if ($data['Debit'] != 0.00) {
-					$acc_no = $config['payment_acc_no_2'];
+					$acc_no = arr_get($data, 'SupplierCode', '');//$config['payment_acc_no_2'];
 					$amount = $data['Debit'];
 				}
 
@@ -174,10 +174,10 @@ class PaymentSync {
 					$acc_no = '';
 					$amount = 0.00;
 					if ($data['Credit'] != 0.00){
-						$acc_no = $config['payment_acc_no_1'];
+						$acc_no = arr_get($data, 'CustomerCode', '');//$config['payment_acc_no_1'];
 						$amount = $data['Credit'];
 					} else if ($data['Debit'] != 0.00){
-						$acc_no = $config['payment_acc_no_2'];
+						$acc_no = arr_get($data, 'SupplierCode', '');//$config['payment_acc_no_2'];
 						$amount = $data['Debit'];
 					}
 					$body['details'][] = [
@@ -207,10 +207,10 @@ class PaymentSync {
 				$acc_no = '';
 				$amount = 0.00;
 				if ($data['Credit'] != 0.00) {
-					$acc_no = $config['payment_acc_no_1'];
+					$acc_no = arr_get($data, 'CustomerCode', '');//$config['payment_acc_no_1'];
 					$amount = $data['Credit'];
 				} else if ($data['Debit'] != 0.00) {
-					$acc_no = $config['payment_acc_no_2'];
+					$acc_no = arr_get($data, 'SupplierCode', '');//$config['payment_acc_no_2'];
 					$amount = $data['Debit'];
 				}
 
@@ -246,10 +246,10 @@ class PaymentSync {
 				$acc_no = '';
 				$amount = 0.00;
 				if ($data['Credit'] != 0.00) {
-					$acc_no = $config['payment_acc_no_1'];
+					$acc_no = arr_get($data, 'CustomerCode', '');//$config['payment_acc_no_1'];
 					$amount = $data['Credit'];
 				} else if ($data['Debit'] != 0.00) {
-					$acc_no = $config['payment_acc_no_2'];
+					$acc_no = arr_get($data, 'SupplierCode', '');//$config['payment_acc_no_2'];
 					$amount = $data['Debit'];
 				}
 

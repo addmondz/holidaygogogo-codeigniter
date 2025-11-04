@@ -528,6 +528,7 @@ class Payment_Model extends CI_Model
 		$this->db->select([
 			'booking.BookingID',
 			'booking.Customer',
+			'booking.CustomerID',
 			'booking.BookingNumber',
 			'booking.InsertDate',
 			'booking.SalesAgent',

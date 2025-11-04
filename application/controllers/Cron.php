@@ -706,6 +706,23 @@ class Cron extends CI_Controller
 			}
 		}
 
+		if (!empty($payment['CustomerID'])) {
+			$customer = $this->Customer_Model->find($payment['CustomerID']);
+			if (!empty($customer)) {
+				if (!empty($customer->CustomerCode) && $customer->CustomerCode != null) {
+					$payment['CustomerCode'] = $customer->CustomerCode;
+				}
+			}
+		}
+		if (!empty($payment['SupplierID'])) {
+			$supplier = $this->Supplier_Model->find($payment['SupplierID']);
+			if (!empty($supplier)) {
+				if (!empty($supplier->SupplierCode) && $supplier->SupplierCode != null) {
+					$payment['SupplierCode'] = $supplier->SupplierCode;
+				}
+			}
+		}
+
 		return $payment;
 	}
 
