@@ -134,7 +134,7 @@
                                             <div class="btn-group">
                                                 <button type="button" data-toggle="dropdown" class="btn btn-light-primary btn-sm dropdown-toggle" style="padding-left:3px;"></button>
                                                 <div class="dropdown-menu">
-                                                    <!-- delete disable -- if needed refer supplier change text and route enough, controller, model, autocount all done QA -->
+                                                    <!-- delete disable -- controller, model, autocount all done QA, if need just add button -->
                                                     <a href="<?php echo base_url('Customer/Update?customer_id=') . $customer->CustomerID; ?>" class="dropdown-item" style="font-size:11px;">Update Customer</a>
                                                 </div>
                                             </div>
