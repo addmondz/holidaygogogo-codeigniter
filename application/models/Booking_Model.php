@@ -990,7 +990,7 @@ class Booking_Model extends CI_Model
 		// base query
 		$this->db->from('booking')
 			->join('customer', 'booking.CustomerID = customer.CustomerID', 'left') // Join customer table
-			->where('customer.CustomerCode IS NOT NULL') // Filter for non-NULL CustomerCode
+			->where("(customer.CustomerCode IS NOT NULL AND customer.CustomerCode <> '')")
 			->where_in('booking.AutocountSyncStatus', $statuses)
 			->where_in('booking.BookingConfirmationTitle', $titles)
 			->where('booking.AutocountSyncAction IS NOT NULL')
