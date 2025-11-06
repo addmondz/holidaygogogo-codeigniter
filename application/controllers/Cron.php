@@ -558,7 +558,7 @@ class Cron extends CI_Controller
 		foreach ($payments as $payment) {
 			echo "Payment ID {$payment['PaymentID']} [{$payment['AutocountSyncAction']}]... ";
 
-			$payment = $this->enrichPayment($payment);
+			$payment = $this->enrichPayment($payment, $config);
 
 			try {
 				switch ($payment['AutocountSyncAction']) {
@@ -620,7 +620,7 @@ class Cron extends CI_Controller
 		foreach ($payments as $payment) {
 			echo "Payment ID {$payment['PaymentID']} [{$payment['AutocountSyncAction']}]... ";
 
-			$payment = $this->enrichPayment($payment);
+			$payment = $this->enrichPayment($payment, $config);
 
 			try {
 				switch ($payment['AutocountSyncAction']) {
@@ -657,7 +657,7 @@ class Cron extends CI_Controller
 		echo "=== Sync Deleted Payments End ===\n\n";
 	}
 
-	private function enrichPayment($payment)
+	private function enrichPayment($payment, $config)
 	{
 		// Sales agent
 		if (!empty($payment['SalesAgent'])) {
@@ -706,6 +706,7 @@ class Cron extends CI_Controller
 			}
 		}
 
+		$payment['CustomerCode'] = $config['payment_acc_no_1'];
 		if (!empty($payment['CustomerID'])) {
 			$customer = $this->Customer_Model->find($payment['CustomerID']);
 			if (!empty($customer)) {
@@ -714,6 +715,8 @@ class Cron extends CI_Controller
 				}
 			}
 		}
+
+		$payment['SupplierCode'] = $config['payment_acc_no_2'];
 		if (!empty($payment['SupplierID'])) {
 			$supplier = $this->Supplier_Model->find($payment['SupplierID']);
 			if (!empty($supplier)) {
