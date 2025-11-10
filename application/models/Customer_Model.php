@@ -218,6 +218,25 @@ class Customer_Model extends CI_Model
 		$this->db->where_in('AutocountSyncStatus', $statuses);
 		$this->db->where('AutocountSyncAction IS NOT NULL', null, false);
 
+		// --- NEW, CLEARER QUERY START ---
+		// This query uses a nested EXISTS, which is easier to read
+		// and just as performant.
+		$subquery = "EXISTS (
+			SELECT 1 
+			FROM booking b
+			WHERE b.CustomerID = customer.CustomerID 
+			AND EXISTS (
+				SELECT 1 
+				FROM payment p
+				WHERE p.PaymentID = b.PaymentID
+			)
+		)";
+		
+		// Pass the whole string to where()
+		$this->db->where($subquery, null, false); 
+
+		// --- NEW, CLEARER QUERY END ---
+
 		if (!empty($config['customer_cutoff_date'])) {
 			$date = date('Y-m-d', strtotime($config['customer_cutoff_date']));
 			$this->db->where('customer.created_at >', $date);
