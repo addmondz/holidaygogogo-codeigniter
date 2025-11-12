@@ -5,8 +5,8 @@ $config['autocount'] = [
     // Base settings
     'base_url'       => 'https://accounting-api.autocountcloud.com',
     'AUTOCOUNT_keyId'=> 'bb560506-69fd-406d-a64b-8cc0c1be092d',
-    'AUTOCOUNT_accountBookId' => '45795',
-    'AUTOCOUNT_apiKey' => '45c3a528-c4c5-4306-b036-d05f2a1d84a8',
+    'AUTOCOUNT_accountBookId' => '26516',//'45795',
+    'AUTOCOUNT_apiKey' => 'f66b6d44-9433-42b1-8399-2bb5135783f3',//'45c3a528-c4c5-4306-b036-d05f2a1d84a8',
     
     // no use yet
     'client_id'      => 'YOUR_CLIENT_ID',
@@ -43,10 +43,10 @@ $config['autocount'] = [
         ],
     ],
 
-    'booking_cutoff_date'  => '2025-10-01', // after the date only sync
-    'payment_cutoff_date'  => '2025-10-01', // after the date only sync
-    'customer_cutoff_date' => '2025-10-30', // after the date only sync
-    'supplier_cutoff_date' => '2025-10-25', // after the date only sync
+    'booking_cutoff_date'  => '2025-11-16', // after the date only sync
+    'payment_cutoff_date'  => '2025-11-16', // after the date only sync
+    'customer_cutoff_date' => '2025-11-16', // after the date only sync
+    'supplier_cutoff_date' => '2025-11-16', // after the date only sync
 
     // manually Sync settings
     'bulkBookingSyncToAutocount' => false, // no open for manual trigger
