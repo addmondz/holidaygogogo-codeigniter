@@ -1,5 +1,5 @@
 -- 1. Drop the old column (only if it exists - remove manually if error)
-ALTER TABLE booking DROP COLUMN AutocountSyncStatus;
+-- ALTER TABLE booking DROP COLUMN AutocountSyncStatus;
 
 -- 2. Add new column AutocountSyncAction
 ALTER TABLE booking
@@ -13,6 +13,10 @@ ALTER TABLE booking
   COMMENT 'P: Pending, S: Synced, F: Failed'
   AFTER AutocountSyncAction;
 
--- 4. Create indexes
+-- 4. Add new column AutocountSyncMessage
+ALTER TABLE booking
+  ADD COLUMN AutocountSyncMessage TEXT AFTER AutocountSyncStatus;
+
+-- 5. Create indexes
 CREATE INDEX IX_booking_AutocountSyncAction ON booking (AutocountSyncAction);
 CREATE INDEX IX_booking_AutocountSyncStatus ON booking (AutocountSyncStatus);

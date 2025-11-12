@@ -3,7 +3,7 @@
 -- =============================================
 
 -- 1. Drop old column AutocountSyncStatus (run only if it exists)
-ALTER TABLE payment DROP COLUMN AutocountSyncStatus;
+-- ALTER TABLE payment DROP COLUMN AutocountSyncStatus;
 
 -- 2. Add AutocountSyncAction column
 ALTER TABLE payment
