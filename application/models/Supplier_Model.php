@@ -184,5 +184,27 @@ class Supplier_Model extends CI_Model
 		return $this->db->get()->result_array();
 	}
 
+	public function get_supplier_by_name($name)
+	{
+		$this->db->select('SupplierID, Name, SupplierCode');
+		$this->db->where('Name', $name);
+		$this->db->where('Status', 'Y');
+		return $this->db->get('supplier')->row();
+	}
+
+	public function get_all_suppliers_for_mapping()
+	{
+		$this->db->select('Name, SupplierCode');
+		$this->db->where('Status', 'Y');
+		$this->db->order_by('Name', 'ASC');
+		$result = $this->db->get('supplier')->result();
+		
+		$mapping = array();
+		foreach ($result as $supplier) {
+			$mapping[trim(strtolower($supplier->Name))] = $supplier->SupplierCode;
+		}
+		
+		return $mapping;
+	}
 
 }

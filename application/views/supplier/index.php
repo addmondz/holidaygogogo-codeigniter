@@ -8,12 +8,15 @@
                     </h3>
                 </div>
                 <div class="card-toolbar">
-                    <a href="<?php echo base_url('Supplier/Create'); ?>" class="btn btn-primary font-weight-bold mr-1 mb-2" style="width:180px;">
+                    <a href="<?php echo base_url('Supplier/Create'); ?>" class="btn btn-primary font-weight-bold mr-2 mb-2">
                         <i class="la la-user-alt"></i>Create Supplier
                     </a>
                     <?php $current_url = base_url($_SERVER['REQUEST_URI']); ?>
-                    <a href="<?php if(strpos($current_url, '?') == true) { echo base_url('Supplier/Download?') . (explode('?', $current_url))[1]; } else { echo base_url('Supplier/Download'); } ?>" class="btn btn-light-warning font-weight-bold mb-2" style="width:180px;">
+                    <a href="<?php if(strpos($current_url, '?') == true) { echo base_url('Supplier/Download?') . (explode('?', $current_url))[1]; } else { echo base_url('Supplier/Download'); } ?>" class="btn btn-light-warning font-weight-bold mr-1 mb-2" style="width:180px;">
                         <i class="las la-arrow-circle-down"></i>Supplier Records
+                    </a>
+                    <a href="<?php echo base_url('Supplier/MapSupplierCodes'); ?>" class="btn btn-light-info font-weight-bold mb-2" style="width:200px;">
+                        <i class="la la-file-upload"></i>import supplier code
                     </a>
                 </div>
             </div>
