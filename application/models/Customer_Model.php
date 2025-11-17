@@ -228,7 +228,7 @@ class Customer_Model extends CI_Model
 			AND EXISTS (
 				SELECT 1 
 				FROM payment p
-				WHERE p.PaymentID = b.PaymentID
+				WHERE p.BookingID = b.BookingID
 			)
 		)";
 		
