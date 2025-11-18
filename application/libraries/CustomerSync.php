@@ -16,7 +16,7 @@ class CustomerSync {
 		try {
 			// Prepare customer (creditor) payload
 			$param = [
-				"accNo"             => arr_get($data, 'accNo', ''),
+				"accNo"             => arr_get($data, 'CustomerCode', ''),
 				"parentAccNo"       => arr_get($data, 'parentAccNo', ''),
 				"companyName"       => arr_get($data, 'name', ''),
 				"desc2"             => arr_get($data, 'desc2', ''),
