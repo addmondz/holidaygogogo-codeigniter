@@ -7,7 +7,7 @@ $config['autocount'] = [
     'base_url'       => 'https://accounting-api.autocountcloud.com',
     'AUTOCOUNT_keyId'=> 'f66b6d44-9433-42b1-8399-2bb5135783f3',//'bb560506-69fd-406d-a64b-8cc0c1be092d',
     'AUTOCOUNT_accountBookId' => '26516',//'45795',
-    'AUTOCOUNT_apiKey' => 'f66b6d44-9433-42b1-8399-2bb5135783f3',//'45c3a528-c4c5-4306-b036-d05f2a1d84a8',
+    'AUTOCOUNT_apiKey' => '75be787f-d7fb-4f40-ab8d-32848af7a169',//'45c3a528-c4c5-4306-b036-d05f2a1d84a8',
     
     // no use yet
     'client_id'      => 'YOUR_CLIENT_ID',
