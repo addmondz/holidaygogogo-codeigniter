@@ -16,7 +16,6 @@ class CustomerSync {
 		try {
 			// Prepare customer (creditor) payload
 			$param = [
-				"accNo"             => arr_get($data, 'CustomerCode', ''),
 				"parentAccNo"       => arr_get($data, 'parentAccNo', ''),
 				"companyName"       => arr_get($data, 'name', ''),
 				"desc2"             => arr_get($data, 'desc2', ''),
@@ -42,6 +41,11 @@ class CustomerSync {
 				"taxRegisterNo"     => arr_get($data, 'taxRegisterNo', ''),
 				"note"              => arr_get($data, 'note', ''),
 			];
+
+			$CustomerCode = arr_get($data, 'CustomerCode', '');
+			if (!empty($CustomerCode)) {
+				$param['accNo'] = $CustomerCode;
+			}
 
 			// Send request to AutoCount (Debtor)
 			return autocount_request('POST', 'debtor.create', $param);
