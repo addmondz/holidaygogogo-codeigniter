@@ -137,7 +137,7 @@ class Booking extends MY_Controller
 						}
 					}
 					$net_profit = $total_credit - $total_debit;
-					if($net_profit != 0) {
+					if($net_profit != 0 && $booking1->NetTotal != 0) {
 						$profit_margin = round(($net_profit / $booking1->NetTotal) * 100);
 					}
 				}

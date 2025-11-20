@@ -1,5 +1,6 @@
 <?php
     $is_sales_agent = $this->session->userdata('level') == 20;
+    ini_set("memory_limit","512M");
 ?>
 <div class="d-flex flex-column-fluid">
     <div class="container-fluid">
