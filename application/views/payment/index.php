@@ -1,3 +1,7 @@
+<?php
+    ini_set("memory_limit","512M");
+?>
+
 <div class="d-flex flex-column-fluid">
     <div class="container-fluid">
         <?php if($this->session->flashdata('message_success')) { ?>

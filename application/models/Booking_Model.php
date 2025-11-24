@@ -96,7 +96,7 @@ class Booking_Model extends CI_Model
 				$level2Ignore = 1;
 			}
 			if(!empty($this->input->get('chat_language'))) {
-				$this->db->where('ChatLanguage', $this->input->get('chat_language'));
+				$this->db->where('booking.ChatLanguage', $this->input->get('chat_language'));
 				$level2Ignore = 1;
 			}
 			if(!empty($this->input->get('source'))) {
