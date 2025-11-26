@@ -1099,6 +1099,19 @@ class Booking_Model extends CI_Model
 			$this->db->where('SalesAgent', $this->session->userdata('admin_id'));
 		}
 
+		// DataTables search parameter
+		$search_value = $this->input->get('search[value]');
+		if(!empty($search_value)) {
+			$this->db->group_start();
+			$this->db->like('BookingNumber', $search_value);
+			$this->db->or_like('Customer', $search_value);
+			$this->db->or_like('customer.CustomerCode', $search_value);
+			$this->db->or_like('category.Name', $search_value);
+			$this->db->or_like('admin.Name', $search_value);
+			$this->db->or_like('booking.Mobile', $search_value);
+			$this->db->group_end();
+		}
+
 		// These filters can ignore others
 		$ignore = 0;
 

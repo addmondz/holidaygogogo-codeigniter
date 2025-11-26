@@ -460,6 +460,7 @@ $(document).ready(function() {
             order: [[1, 'desc']], // Order by row number (BookingID) descending
             pageLength: 100,
             lengthMenu: [[50, 100, 200, 500], [50, 100, 200, 500]],
+            searchDelay: 300, // 300ms debounce on search
             language: {
                 processing: '<div class="spinner spinner-primary spinner-lg mr-15"></div> Loading...',
                 emptyTable: 'Booking Records Not Found',
