@@ -2,6 +2,12 @@
     $is_sales_agent = $this->session->userdata('level') == 20;
     ini_set("memory_limit","512M");
 ?>
+<style>
+#kt_datatable tbody tr td:first-child::before,
+#kt_datatable tbody tr td:first-child::after {
+    display: none !important;
+}
+</style>
 <div class="d-flex flex-column-fluid">
     <div class="container-fluid">
         <div class="card card-custom mb-5">
