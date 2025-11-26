@@ -234,8 +234,8 @@
                     </button>
                 <?php } ?>
 
-                <div class="dataTables_wrapper dt-bootstrap4 no-footer" <?php if(empty($bookings)) { echo 'style="overflow-x:auto;"'; } ?>>
-                    <table id="kt_datatable" class="table table-bordered table-head-custom table-checkable dataTable no-footer dtr-inline">
+                <div class="dataTables_wrapper dt-bootstrap4 no-footer" style="overflow-x:auto;">
+                    <table id="kt_datatable" class="table table-bordered table-head-custom table-checkable dataTable no-footer dtr-inline" style="width:100%;">
                         <thead>
                             <tr>
                                 <th class="booking_checkbox" style="text-align:center;">
@@ -267,161 +267,36 @@
                             </tr>
                         </thead>
                         <tbody>
-                            <?php if(empty($bookings)) { ?>
-                                <td colspan="<?php if($this->session->userdata('level') != 20) { echo 17; } else { echo 16; } ?>" style="text-align:center; padding-top:10px; padding-bottom:10px;">Booking Records Not Found</td>
-                            <?php } else { ?>
-                                <?php $count = 1; ?>
-                                <?php foreach($bookings as $booking) { ?>
-                                    <tr>
-                                        <td style="text-align:center;">
-                                            <input type="checkbox" id="check_item" class="check_item" value="<?php echo $booking->BookingID; ?>">
-                                        </td>
-                                        <td style="text-align:center; padding-top:15px; padding-bottom:15px;"><?php echo $count; ?></td>
-                                        <?php if($this->session->userdata('level') != 20) { ?>
-                                            <td style="text-align:center;"><?php echo $booking->SalesAgentName; ?></td>
-                                        <?php } ?>
-                                        <td style="text-align:center;"><?php echo $booking->InsertDate; ?></td>
-                                        <td style="text-align:center;">
-                                            <a href="<?php echo base_url('Payment?booking_number=') . $booking->BookingNumber . '&customer=' . str_replace('&', '%26', $booking->Customer); ?>" target="_blank"><?php echo $booking->BookingNumber; ?></a>
-                                        </td>
-                                        <td style="text-align:center;"><?php echo $booking->BookingConfirmationTitle; ?></td>
-                                        <td style="text-align:center;"><?php echo $booking->Customer; ?></td>
-                                        <td style="text-align:center;"><?php echo $booking->CustomerCode; ?></td>
-                                        <td style="text-align:center;"><?php echo $booking->ChatLanguage; ?></td>
-                                        <td style="text-align:center;">
-                                            <a href="<?php echo 'https://wa.me/' . $booking->CustomerMobile; ?>" target="_blank" class="btn btn-light-success d-inline-flex align-items-center btn-sm">
-                                                <i class="la la-whatsapp"></i>
-                                            </a>
-                                        </td>
-                                        <td style="text-align:center;"><?php echo $booking->StartDate; ?></td>
-                                        <td style="text-align:center;"><?php echo $booking->EndDate; ?></td>
-                                        <td style="text-align:center;"><?php echo $booking->DestinationName; ?></td>
-                                        <td style="text-align:center;"><?php echo $booking->NetTotal; ?></td>
-                                        <?php if(!$is_sales_agent) { ?>
-                                            <td style="color:<?php if(isset($booking->Profit) && $booking->Profit < 0) { echo '#FF2400;'; } else if(isset($booking->Profit) && $booking->Profit == 0) { echo '#F4BB44;'; } else { echo '#00A36C;'; } ?> text-align:center;"><?php echo isset($booking->Profit) ? $booking->Profit : '-'; ?></td>
-                                            <td style="color:<?php if(isset($booking->ProfitMargin) && $booking->ProfitMargin < 0) { echo '#FF2400;'; } else if(isset($booking->ProfitMargin) && $booking->ProfitMargin == 0) { echo '#F4BB44;'; } else { echo '#00A36C;'; } ?> text-align:center;"><?php echo isset($booking->ProfitMargin) ? $booking->ProfitMargin : '-'; ?></td>
-                                        <?php } ?>
-                                        <td style="text-align:center;">
-                                            <span class="font-weight-bold" style="color:<?php if($booking->CancelStatus == 'Y') { echo '#FF69B4'; } else if($booking->Status == 'Y') { echo '#50C878'; } else if($booking->Status == 'PR') { echo '#C3B1E1'; } else if($booking->Status == 'P') { echo '#FFBF00'; } else if($booking->Status == 'PP') { echo '#A7C7E7'; } else if($booking->Status == 'PTV') { echo '#F89880'; } else if($booking->Status == 'PGL') { echo '#FAC898'; } else if($booking->Status == 'PT') { echo '#F8C8DC'; } else if($booking->Status == 'OG') { echo '#CCCCFF'; } else { echo '#DA70D6'; } ?>"><?php if($booking->CancelStatus == 'Y') { echo 'CANCELLED'; } else if($booking->Status == 'Y') { echo 'COMPLETED'; } else if($booking->Status == 'PR') { echo 'PENDING REVIEW'; } else if($booking->Status == 'P') { echo 'PENDING PAYMENT'; } else if($booking->Status == 'PP') { echo 'PARTIAL PAYMENT'; } else if($booking->Status == 'PTV') { echo 'PENDING TRAVEL VOUCHER'; } else if($booking->Status == 'PGL') { echo 'PENDING GUEST LIST'; } else if($booking->Status == 'PT') { echo 'PENDING TRAVEL'; } else if($booking->Status == 'OG') { echo 'ON-GOING'; } else { echo 'PAYMENT OVERDUE'; } ?></span>
-                                        </td>
-                                        <td style="text-align:center;"><?php if($booking->LockStatus == 'Y') { echo '<i class="la la-lock text-danger"></i>'; } else { echo '<i class="la la-unlock text-success"></i>'; } ?></td>
-                                        <td style="text-align:center;">
-                                            <?php 
-                                                // status info (P, S, F only)
-                                                $statusInfo  = mapAutocountSyncStatus(isset($booking->AutocountSyncStatus) ? $booking->AutocountSyncStatus : null);
-                                                $statusText  = $statusInfo['text'];
-                                                $statusColor = $statusInfo['color'];
-
-                                                // tooltip logic
-                                                $tooltipAttr = ''; 
-                                                if (!empty($booking->AutocountSyncMessage)) {
-                                                    $decoded = json_decode($booking->AutocountSyncMessage, true);
-
-                                                    if (json_last_error() === JSON_ERROR_NONE) {
-                                                        if (isset($decoded['error']) && $decoded['error'] == null) {
-                                                            $tooltipText = "SUCCESS";
-                                                        } elseif (isset($decoded['error']) && $decoded['error'] !== null) {
-                                                            $tooltipText = "ERROR: " . (is_string($decoded['error']) ? $decoded['error'] : json_encode($decoded['error']));
-                                                        } else {
-                                                            $tooltipText = $booking->AutocountSyncMessage;
-                                                        }
-                                                    } else {
-                                                        $tooltipText = $booking->AutocountSyncMessage;
-                                                    }
-
-                                                    $tooltipAttr = ' data-toggle="tooltip" data-placement="top" title="' . htmlspecialchars($tooltipText) . '"';
-                                                }
-                                            ?>
-                                            <span class="font-weight-bold" style="color:<?= $statusColor ?>;" <?= $tooltipAttr ?>>
-                                                <?= $statusText ?>
-                                            </span>
-                                        </td>
-                                        <td style="text-align:center;">
-                                            <div class="btn-group">
-                                                <button type="button" data-toggle="dropdown" class="btn btn-light-primary btn-sm dropdown-toggle" style="padding-left:3px;"></button>
-                                                <div class="dropdown-menu">
-                                                    <?php if($booking->Status != 'Y' || ($this->session->level != 20 && $booking->Status == 'Y')) { ?>
-                                                        <?php if(in_array('RB', $this->session->access_control)) { ?>
-                                                            <button onclick="Delete_Record('<?php echo base_url('assets/image/sweetalert.jpg'); ?>', '<?php echo 'Booking Record : ' . $booking->BookingNumber; ?>', '<?php echo base_url('Booking/Delete'); ?>', 'booking_id', <?php echo $booking->BookingID; ?>, '<?php echo $booking->Status; ?>', '<?php if(strpos($current_url, '?') == true) { echo base_url('Booking?') . (explode('?', $current_url))[1]; } else { echo base_url('Booking'); } ?>')" class="dropdown-item" style="color:#E37383; font-size:11px;">Delete Booking</button>
-                                                        <?php } ?>
-                                                        <?php if(in_array('AB', $this->session->access_control)) { ?>
-                                                            <?php if($booking->CancelStatus == 'Y') { ?>
-                                                                <a href="<?php echo base_url('Booking/Update_Cancel_Status?booking_id=') . $booking->BookingID . '&current_cancel_status=' . $booking->CancelStatus . '&new_cancel_status=N' . '&param=' . urlencode($current_url); ?>" class="dropdown-item" style="color:#93C572; font-size:11px;">Activate Booking</a>
-                                                            <?php } else { ?>
-                                                                <a href="<?php echo base_url('Booking/Update_Cancel_Status?booking_id=') . $booking->BookingID . '&current_cancel_status=' . $booking->CancelStatus . '&new_cancel_status=Y' . '&param=' . urlencode($current_url); ?>" class="dropdown-item" style="color:#E0115F; font-size:11px;">Cancel Booking</a>
-                                                            <?php } ?>
-                                                            <?php if($booking->Status == 'Y' || $booking->Status == 'PR') { ?>
-                                                                <?php if($booking->AfterSalesService == 'PENDING') { ?>
-                                                                    <a href="<?php echo base_url('Booking/Update_After_Sales_Service?booking_id=') . $booking->BookingID . '&current_after_sales_service=' . $booking->AfterSalesService . '&new_after_sales_service=COMPLETE' . '&param=' . urlencode($current_url); ?>" class="dropdown-item" style="color:#50C878; font-size:11px;">Complete Booking</a>
-                                                                <?php } else { ?>
-                                                                    <a href="<?php echo base_url('Booking/Update_After_Sales_Service?booking_id=') . $booking->BookingID . '&current_after_sales_service=' . $booking->AfterSalesService . '&new_after_sales_service=PENDING' . '&param=' . urlencode($current_url); ?>" class="dropdown-item" style="color:#702963; font-size:11px;">Revert Pending Review</a>
-                                                                <?php } ?>
-                                                            <?php } ?>
-                                                            <?php if($booking->Status == 'PTV' || $booking->Status == 'PT') { ?>
-                                                                <?php if($booking->Status == 'PTV') { ?>
-                                                                    <a href="<?php echo base_url('Booking/Update_Status?booking_id=') . $booking->BookingID . '&current_status=' . $booking->Status . '&new_status=PT' . '&param=' . urlencode($current_url); ?>" class="dropdown-item" style="color:#6082B6; font-size:11px;">Sent Travel Voucher ?</a>
-                                                                <?php } else { ?>
-                                                                    <a href="<?php echo base_url('Booking/Update_Status?booking_id=') . $booking->BookingID . '&current_status=' . $booking->Status . '&new_status=PTV' . '&param=' . urlencode($current_url); ?>" class="dropdown-item" style="color:#F4BB44; font-size:11px;">Revert Pending Travel Voucher</a>
-                                                                <?php } ?>
-                                                            <?php } ?>
-                                                            <a href="<?php if(strpos($current_url, '?') == true) { echo base_url('Booking/Update?booking_id=') . $booking->BookingID . '&' . (explode('?', $current_url))[1]; } else { echo base_url('Booking/Update?booking_id=') . $booking->BookingID; } ?>" class="dropdown-item" style="font-size:11px;">Update Booking</a>
-                                                        <?php } ?>
-                                                    <?php } ?>
-                                                    <?php if(in_array('GB', $this->session->access_control)) { ?>
-                                                        <a href="<?php if(strpos($current_url, '?') == true) { echo base_url('Booking/Duplicate?booking_id=') . $booking->BookingID . '&' . (explode('?', $current_url))[1]; } else { echo base_url('Booking/Duplicate?booking_id=') . $booking->BookingID; } ?>" class="dropdown-item" style="font-size:11px;">Duplicate Booking</a>
-                                                    <?php } ?>
-                                                    <div class="dropdown-divider"></div>
-                                                    <a href="<?php echo base_url('Booking_Confirmation?token=') . $booking->Token; ?>" target="_blank" class="dropdown-item" style="font-size:11px;">Booking Confirmation</a>
-                                                    <button id="<?php echo 'bc_url-' . $booking->BookingID; ?>" value="<?php echo base_url('Booking_Confirmation?token=') . $booking->Token; ?>" onclick="Copy_URL('BC URL', <?php echo $booking->BookingID; ?>)" class="dropdown-item" style="font-size:11px;">Copy BC Link</button>
-                                                    <div class="dropdown-divider"></div>
-                                                    <?php if($booking->Status != 'Y' || ($this->session->level != 20 && $booking->Status == 'Y')) { ?>
-                                                        <a href="<?php echo base_url('Guest_List?gl=') . $booking->Token; ?>"  target="_blank" class="dropdown-item" style="font-size:11px;">Guest List</a>
-                                                    <?php } ?>
-                                                    <a href="<?php echo base_url('Guest_List/Download?booking_id=') . $booking->BookingID; ?>" class="dropdown-item" style="font-size:11px;">Download Guest List</a>
-                                                    <button id="<?php echo 'gl_url-' . $booking->BookingID; ?>" value="<?php echo 'https://gl.holidaygogogo.com?gl=' . $booking->Token; ?>" onclick="Copy_URL('GL URL', <?php echo $booking->BookingID; ?>)" class="dropdown-item" style="font-size:11px;">Copy GL Link</button>
-                                                    <div class="dropdown-divider"></div>
-                                                    <a href="<?php echo base_url('Travel_Voucher?token=') . $booking->Token; ?>" target="_blank" class="dropdown-item" style="font-size:11px;">Travel Voucher</a>
-                                                    <button id="<?php echo 'tv_url-' . $booking->BookingID; ?>" value="<?php echo base_url('Travel_Voucher?token=') . $booking->Token; ?>" onclick="Copy_URL('TV URL', <?php echo $booking->BookingID; ?>)" class="dropdown-item" style="font-size:11px;">Copy TV Link</button>
-                                                    <div class="dropdown-divider"></div>
-                                                    <button id="<?php echo 'customer_name-' . $booking->BookingID; ?>" value="<?php echo $booking->Customer; ?>" onclick="Copy_URL('CUSTOMER NAME', <?php echo $booking->BookingID; ?>)" class="dropdown-item" style="font-size:11px;">Copy Customer Name</button>
-                                                    <button id="<?php echo 'customer_mobile-' . $booking->BookingID; ?>" value="<?php echo $booking->CustomerMobile; ?>" onclick="Copy_URL('CUSTOMER MOBILE', <?php echo $booking->BookingID; ?>)" class="dropdown-item" style="font-size:11px;">Copy Customer Mobile</button>
-                                                </div>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                    <?php $count++; ?>
-                                <?php } ?>
-                            <?php } ?>
                         </tbody>
                     </table>
                 </div>
-                <?php if(!empty($this->input->get('booking_number')) || !empty($this->input->get('reservation_number')) || !empty($this->input->get('deadline')) || !empty($this->input->get('customer')) || !empty($this->input->get('mobile')) || !empty($this->input->get('travel_date')) || !empty($this->input->get('destination')) || !empty($this->input->get('sales_agent')) || !empty($this->input->get('source')) || !empty($this->input->get('status')) || !empty($this->input->get('booking_date')) || !empty($this->input->get('chat_language')) || !empty($this->input->get('booking_confirmation_title')) || !empty($this->input->get('tag'))) { ?>
-                    <br>
-                    <div class="row">
-                        <div class="col-md-12 pt-3 pb-3" style="background-color:white; border:3px solid #D7E2F2; border-radius:8px;">
-                            <div class="row">
-                                <div class="col-md-6 mb-7 mb-md-0">
-                                    <label style="color:#C4B454;">Total Net Sales (RM)</label>
-                                    <div class="input-icon">
-                                        <input disabled type="text" value="<?php echo $total_sales; ?>" class="form-control" style="text-align:right;">
-                                        <span>
-                                            <i class="la la-dollar"></i>
-                                        </span>
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <label style="color:#FFC000;">Total Net Profit (RM)</label>
-                                    <div class="input-icon">
-                                        <input disabled type="text" value="<?php echo $total_net_profit; ?>" class="form-control" style="text-align:right;">
-                                        <span>
-                                            <i class="la la-dollar"></i>
-                                        </span>
-                                    </div>
+                <br>
+                <div class="row" id="summary_section">
+                    <div class="col-md-12 pt-3 pb-3" style="background-color:white; border:3px solid #D7E2F2; border-radius:8px;">
+                        <div class="row">
+                            <div class="col-md-6 mb-7 mb-md-0">
+                                <label style="color:#C4B454;">Total Net Sales (RM)</label>
+                                <div class="input-icon">
+                                    <input disabled type="text" id="total_sales_display" value="Loading..." class="form-control" style="text-align:right;">
+                                    <span>
+                                        <i class="la la-dollar"></i>
+                                    </span>
                                 </div>
                             </div>
+                            <?php if(!$is_sales_agent) { ?>
+                            <div class="col-md-6">
+                                <label style="color:#FFC000;">Total Net Profit (RM)</label>
+                                <div class="input-icon">
+                                    <input disabled type="text" id="total_net_profit_display" value="Loading..." class="form-control" style="text-align:right;">
+                                    <span>
+                                        <i class="la la-dollar"></i>
+                                    </span>
+                                </div>
+                            </div>
+                            <?php } ?>
                         </div>
                     </div>
-                <?php } ?>
+                </div>
             </div>
         </div>
     </div>
@@ -505,66 +380,203 @@
         navigator.clipboard.writeText(url).then(() => { alert("Successfully Copied"); }) .catch(() => { alert("Something Went Wrong"); });
     }
 </script>
-<script>
-function toggleButton() {
-    let anyChecked = document.querySelectorAll('.check_item:checked').length > 0;
-    document.getElementById('sync-autocount-booking').style.display = anyChecked ? 'inline-block' : 'none';
-}
 
-// Check All toggle
-document.getElementById('check_all').addEventListener('change', function() {
-    let checked = this.checked;
-    document.querySelectorAll('.check_item').forEach(cb => cb.checked = checked);
-    var bulkBookingSyncToAutocount = "<?php echo $bulkBookingSyncToAutocount; ?>";
-    if (bulkBookingSyncToAutocount == true) {
-        toggleButton();
-    }
+<script>
+// DataTables Server-Side Initialization
+var is_sales_agent = <?php echo $is_sales_agent ? 'true' : 'false'; ?>;
+var bookingTable;
+
+$(document).ready(function() {
+    // Use setTimeout to run AFTER column-rendering.js initialization
+    setTimeout(function() {
+        // Destroy existing DataTable if it exists (from column-rendering.js)
+        if ($.fn.DataTable.isDataTable('#kt_datatable')) {
+            $('#kt_datatable').DataTable().destroy();
+        }
+
+        // Build columns array based on user role
+        var columns = [
+            { data: 'checkbox', orderable: false, searchable: false, className: 'text-center' },
+            { data: 'row_number', orderable: false, searchable: false, className: 'text-center' }
+        ];
+
+        if (!is_sales_agent) {
+            columns.push({ data: 'sales_agent', className: 'text-center' });
+        }
+
+        columns = columns.concat([
+            { data: 'insert_date', className: 'text-center' },
+            { data: 'booking_number', className: 'text-center' },
+            { data: 'bc_title', className: 'text-center' },
+            { data: 'customer', className: 'text-center' },
+            { data: 'customer_code', className: 'text-center' },
+            { data: 'chat_language', className: 'text-center' },
+            { data: 'mobile', orderable: false, searchable: false, className: 'text-center' },
+            { data: 'start_date', className: 'text-center' },
+            { data: 'end_date', className: 'text-center' },
+            { data: 'destination', className: 'text-center' },
+            { data: 'net_total', className: 'text-center' }
+        ]);
+
+        if (!is_sales_agent) {
+            columns.push({ data: 'profit', className: 'text-center' });
+            columns.push({ data: 'profit_margin', className: 'text-center' });
+        }
+
+        columns = columns.concat([
+            { data: 'status', className: 'text-center' },
+            { data: 'gl_status', className: 'text-center' },
+            { data: 'autocount_status', className: 'text-center' },
+            { data: 'action', orderable: false, searchable: false, className: 'text-center' }
+        ]);
+
+        // Get current filter params from URL
+        var urlParams = new URLSearchParams(window.location.search);
+        var filterParams = {};
+        ['customer', 'booking_number', 'reservation_number', 'mobile', 'destination', 'travel_date',
+         'deadline', 'source', 'chat_language', 'booking_date', 'status', 'booking_confirmation_title',
+         'tag', 'sales_agent'].forEach(function(param) {
+            if (urlParams.has(param)) {
+                filterParams[param] = urlParams.get(param);
+            }
+        });
+
+        // Initialize DataTable with server-side processing
+        bookingTable = $('#kt_datatable').DataTable({
+            processing: true,
+            serverSide: true,
+            ajax: {
+                url: '<?php echo base_url("Booking/ajax_list"); ?>',
+                type: 'GET',
+                data: function(d) {
+                    // Add filter params to request
+                    for (var key in filterParams) {
+                        d[key] = filterParams[key];
+                    }
+                    return d;
+                }
+            },
+            columns: columns,
+            order: [[1, 'desc']], // Order by row number (BookingID) descending
+            pageLength: 100,
+            lengthMenu: [[50, 100, 200, 500], [50, 100, 200, 500]],
+            language: {
+                processing: '<div class="spinner spinner-primary spinner-lg mr-15"></div> Loading...',
+                emptyTable: 'Booking Records Not Found',
+                zeroRecords: 'No matching records found'
+            },
+            drawCallback: function(settings) {
+                // Re-initialize tooltips after each draw
+                $('[data-toggle="tooltip"]').tooltip();
+                // Re-attach checkbox event listeners
+                attachCheckboxListeners();
+            }
+        });
+
+        // Load summary totals
+        loadSummaryTotals();
+    }, 100); // Small delay to ensure column-rendering.js runs first
 });
 
-// Individual checkbox toggle
-document.querySelectorAll('.check_item').forEach(cb => {
-    cb.addEventListener('change', function() {
-        // If one unchecked → uncheck "check_all"
-        if (!this.checked) {
-            document.getElementById('check_all').checked = false;
+// Function to load summary totals via AJAX
+function loadSummaryTotals() {
+    var urlParams = new URLSearchParams(window.location.search);
+    var params = [];
+    ['customer', 'booking_number', 'reservation_number', 'mobile', 'destination', 'travel_date',
+     'deadline', 'source', 'chat_language', 'booking_date', 'status', 'booking_confirmation_title',
+     'tag', 'sales_agent'].forEach(function(param) {
+        if (urlParams.has(param)) {
+            params.push(param + '=' + encodeURIComponent(urlParams.get(param)));
         }
-        // If all checked → check "check_all"
-        else if (document.querySelectorAll('.check_item:checked').length === document.querySelectorAll('.check_item').length) {
-            document.getElementById('check_all').checked = true;
+    });
+
+    var queryString = params.length > 0 ? '?' + params.join('&') : '';
+
+    $.ajax({
+        url: '<?php echo base_url("Booking/ajax_summary"); ?>' + queryString,
+        type: 'GET',
+        dataType: 'json',
+        success: function(data) {
+            $('#total_sales_display').val(data.total_sales);
+            if (!data.is_sales_agent) {
+                $('#total_net_profit_display').val(data.total_net_profit);
+            }
+        },
+        error: function() {
+            $('#total_sales_display').val('Error loading');
+            $('#total_net_profit_display').val('Error loading');
         }
-        var bulkBookingSyncToAutocount = "<?php echo $bulkBookingSyncToAutocount; ?>";
+    });
+}
+
+// Function to attach checkbox listeners (called after each DataTable draw)
+function attachCheckboxListeners() {
+    var bulkBookingSyncToAutocount = <?php echo $bulkBookingSyncToAutocount ? 'true' : 'false'; ?>;
+
+    // Check All toggle
+    $('#check_all').off('change').on('change', function() {
+        var checked = this.checked;
+        $('.check_item').prop('checked', checked);
         if (bulkBookingSyncToAutocount) {
             toggleButton();
         }
     });
-});
+
+    // Individual checkbox toggle
+    $('.check_item').off('change').on('change', function() {
+        // If one unchecked → uncheck "check_all"
+        if (!this.checked) {
+            $('#check_all').prop('checked', false);
+        }
+        // If all checked → check "check_all"
+        else if ($('.check_item:checked').length === $('.check_item').length) {
+            $('#check_all').prop('checked', true);
+        }
+        if (bulkBookingSyncToAutocount) {
+            toggleButton();
+        }
+    });
+}
+</script>
+
+<script>
+function toggleButton() {
+    let anyChecked = document.querySelectorAll('.check_item:checked').length > 0;
+    var syncBtn = document.getElementById('sync-autocount-booking');
+    if (syncBtn) {
+        syncBtn.style.display = anyChecked ? 'inline-block' : 'none';
+    }
+}
 </script>
 <script>
-document.getElementById('sync-autocount-booking').addEventListener('click', function() {
-    let selected = Array.from(document.querySelectorAll('.check_item:checked'))
-                        .map(cb => cb.value);
+var syncAutocountBtn = document.getElementById('sync-autocount-booking');
+if (syncAutocountBtn) {
+    syncAutocountBtn.addEventListener('click', function() {
+        let selected = Array.from(document.querySelectorAll('.check_item:checked'))
+                            .map(cb => cb.value);
 
-    if (selected.length === 0) {
-        alert("Please select at least one booking.");
-        return;
-    }
-
-   fetch("<?php echo base_url('Booking/bulkSyncToAutocount'); ?>", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ booking_ids: selected })
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (data.success) {
-            alert(data.message); // ✅ all messages from PHP
-        } else {
-            alert("❌ " + data.message);
+        if (selected.length === 0) {
+            alert("Please select at least one booking.");
+            return;
         }
-    })
-    .catch(err => {
-        console.error(err);
-        alert("Error occurred during sync.");
+
+       fetch("<?php echo base_url('Booking/bulkSyncToAutocount'); ?>", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ booking_ids: selected })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                alert(data.message);
+            } else {
+                alert("Error: " + data.message);
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            alert("Error occurred during sync.");
+        });
     });
-});
+}
 </script>

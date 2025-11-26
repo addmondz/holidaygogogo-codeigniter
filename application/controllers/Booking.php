@@ -22,70 +22,66 @@ class Booking extends MY_Controller
 		$startTime = date("Y-m-d H:i:s.u");
 		if(in_array('VB', $this->session->access_control)) {
 			$titles = array('tab_title' => 'HolidayGoGoGo | Booking', 'breadcrumb_title' => 'Booking');
-			$array = array('total_sales' => 0, 'total_net_profit' => 0);
-			$bookings = $this->Booking_Model->Read_All_Bookings();
+			$array = array();
+
+			// Load filter dropdowns data
 			$array['admins'] = $this->Booking_Model->Read_Admins();
 			$array['categories'] = $this->Booking_Model->Read_Categories();
 			$array['tags'] = $this->Booking_Model->Read_Tags();
 			$array['sources'] = $this->Booking_Model->Read_Sources();
-			$total_sales = 0;
-			$total_net_profit = 0;
 
 			$this->load->helper('autocount');
 			$config = get_autocount_config();
 
 			$array['bulkBookingSyncToAutocount'] = !empty($config['bulkBookingSyncToAutocount']) ? $config['bulkBookingSyncToAutocount'] : false;
-				foreach($bookings as $booking) {
-					if((date('Y-m-d') >= $booking->StartDate && date('Y-m-d') <= $booking->EndDate) && ($booking->Status == 'PT' || $booking->Status == 'Y')) {
+
+			// Update status for all bookings (this runs before the AJAX calls)
+			$bookings = $this->Booking_Model->Read_All_Bookings();
+			foreach($bookings as $booking) {
+				if((date('Y-m-d') >= $booking->StartDate && date('Y-m-d') <= $booking->EndDate) && ($booking->Status == 'PT' || $booking->Status == 'Y')) {
+					$this->Booking_Model->Update_After_Sales_Service2($booking->BookingID);
+					$this->Booking_Model->Update_Status('OG', $booking->BookingID);
+					$this->Booking_Model->Create_Booking_Log2($booking->Status, 'OG', $booking->BookingID);
+				} else {
+					if((date('Y-m-d') < $booking->StartDate && ($booking->Status == 'OG' || $booking->Status == 'Y'))) {
 						$this->Booking_Model->Update_After_Sales_Service2($booking->BookingID);
-						$this->Booking_Model->Update_Status('OG', $booking->BookingID);
-						$this->Booking_Model->Create_Booking_Log2($booking->Status, 'OG', $booking->BookingID);
+						$this->Booking_Model->Update_Status('PT', $booking->BookingID);
+						$this->Booking_Model->Create_Booking_Log2($booking->Status, 'PT', $booking->BookingID);
 					} else {
-						if((date('Y-m-d') < $booking->StartDate && ($booking->Status == 'OG' || $booking->Status == 'Y'))) {
+						if((date('Y-m-d') > $booking->EndDate && ($booking->Status == 'PT' || $booking->Status == 'OG'))) {
 							$this->Booking_Model->Update_After_Sales_Service2($booking->BookingID);
-							$this->Booking_Model->Update_Status('PT', $booking->BookingID);
-							$this->Booking_Model->Create_Booking_Log2($booking->Status, 'PT', $booking->BookingID);
-						} else {
-							if((date('Y-m-d') > $booking->EndDate && ($booking->Status == 'PT' || $booking->Status == 'OG'))) {
-								$this->Booking_Model->Update_After_Sales_Service2($booking->BookingID);
-								$this->Booking_Model->Update_Status('Y', $booking->BookingID);
-								$this->Booking_Model->Create_Booking_Log2($booking->Status, 'Y', $booking->BookingID);
-							}
+							$this->Booking_Model->Update_Status('Y', $booking->BookingID);
+							$this->Booking_Model->Create_Booking_Log2($booking->Status, 'Y', $booking->BookingID);
 						}
 					}
-					
-					$payments = $this->Booking_Model->Read_Payments($booking->BookingID);
-					$total_approved_credit = 0;
-					if(!empty($payments)) {
-						foreach($payments as $payment) {
-							if($payment->Type != 'SUPPLIER REFUND' && $payment->Credit != 0.00 && $payment->Status == 'Y') {
-								$total_approved_credit += $payment->Credit;
-							}
+				}
+
+				$payments = $this->Booking_Model->Read_Payments($booking->BookingID);
+				$total_approved_credit = 0;
+				if(!empty($payments)) {
+					foreach($payments as $payment) {
+						if($payment->Type != 'SUPPLIER REFUND' && $payment->Credit != 0.00 && $payment->Status == 'Y') {
+							$total_approved_credit += $payment->Credit;
 						}
-						if($total_approved_credit != 0) {
-							if(strval($total_approved_credit) >= $booking->NetTotal) {
-								$full_payment_existed = $this->Payment_Model->Read_Type($booking->BookingID);
-								if($full_payment_existed) {
-									if($booking->Status == 'P' || $booking->Status == 'PP') {
-										$this->Booking_Model->Update_Status('PTV', $booking->BookingID);
-										$this->Booking_Model->Create_Booking_Log2($booking->Status, 'PTV', $booking->BookingID);
-									}
-								} else {
-									if($booking->Status == 'P') {
-										$this->Booking_Model->Update_Status('PP', $booking->BookingID);
-										$this->Booking_Model->Create_Booking_Log2($booking->Status, 'PP', $booking->BookingID);
-									}
+					}
+					if($total_approved_credit != 0) {
+						if(strval($total_approved_credit) >= $booking->NetTotal) {
+							$full_payment_existed = $this->Payment_Model->Read_Type($booking->BookingID);
+							if($full_payment_existed) {
+								if($booking->Status == 'P' || $booking->Status == 'PP') {
+									$this->Booking_Model->Update_Status('PTV', $booking->BookingID);
+									$this->Booking_Model->Create_Booking_Log2($booking->Status, 'PTV', $booking->BookingID);
 								}
 							} else {
-								if($booking->Status != 'PP') {
+								if($booking->Status == 'P') {
 									$this->Booking_Model->Update_Status('PP', $booking->BookingID);
 									$this->Booking_Model->Create_Booking_Log2($booking->Status, 'PP', $booking->BookingID);
 								}
 							}
 						} else {
-							if($booking->Status != 'P') {
-								$this->Booking_Model->Update_Status('P', $booking->BookingID);
-								$this->Booking_Model->Create_Booking_Log2($booking->Status, 'P', $booking->BookingID);
+							if($booking->Status != 'PP') {
+								$this->Booking_Model->Update_Status('PP', $booking->BookingID);
+								$this->Booking_Model->Create_Booking_Log2($booking->Status, 'PP', $booking->BookingID);
 							}
 						}
 					} else {
@@ -94,88 +90,363 @@ class Booking extends MY_Controller
 							$this->Booking_Model->Create_Booking_Log2($booking->Status, 'P', $booking->BookingID);
 						}
 					}
-				}
-			
-
-			$array['bookings'] = $this->Booking_Model->Read_Bookings();
-
-			foreach($array['bookings'] as $booking1) {
-				$booking1->CustomerMobile = $booking1->CountryCode . str_replace([' ', '-'], '', $booking1->CustomerMobile);
-				if(!empty($booking1->StartDate)) {
-					$booking1->StartDate = strtoupper(date('j M Y', strtotime($booking1->StartDate)));
 				} else {
-					$booking1->StartDate = null;
-				}
-				if(!empty($booking1->EndDate)) {
-					$booking1->EndDate = strtoupper(date('j M Y', strtotime($booking1->EndDate)));
-				} else {
-					$booking1->EndDate = null;
-				}
-				if($booking1->BookingConfirmationTitle == 'BOOKING CONFIRMATION') {
-					$booking1->BookingConfirmationTitle = 'BC';
-				} else {
-					if($booking1->BookingConfirmationTitle == 'QUOTATION') {
-						$booking1->BookingConfirmationTitle = 'QU';
-					} else {
-						$booking1->BookingConfirmationTitle = 'PI';
+					if($booking->Status != 'P') {
+						$this->Booking_Model->Update_Status('P', $booking->BookingID);
+						$this->Booking_Model->Create_Booking_Log2($booking->Status, 'P', $booking->BookingID);
 					}
 				}
-
-				$payments = $this->Booking_Model->Read_Payments($booking1->BookingID);
-				$total_credit = 0;
-				$total_debit = 0;
-				$net_profit = 0;
-				$profit_margin = 0;
-				if(!empty($payments)) {
-					foreach($payments as $payment) {
-						if($payment->Status == 'Y' || $payment->Status == 'P') {
-							if($payment->Credit != 0.00) {
-								$total_credit += $payment->Credit;
-							} else {
-								$total_debit += $payment->Debit;
-							}
-						}
-					}
-					$net_profit = $total_credit - $total_debit;
-					if($net_profit != 0 && $booking1->NetTotal != 0) {
-						$profit_margin = round(($net_profit / $booking1->NetTotal) * 100);
-					}
-				}
-				$booking1->Profit = number_format($net_profit, 2, '.', ',');
-				$booking1->ProfitMargin = $net_profit != 0 ? $profit_margin : 0;
-				if($booking1->LockStatus == 'N' && $booking1->Status == 'PTV') {
-					$booking1->Status = 'PGL';
-				}
-				if($booking1->AfterSalesService == 'PENDING' && $booking1->Status == 'Y') {
-					$booking1->Status = 'PR';
-				}
-				if(empty($booking1->DepositDeadline)) {
-					if(date('Y-m-d') > $booking1->FullPaymentDeadline && ($booking1->Status == 'P' || $booking1->Status == 'PP')) {
-						$booking1->Status = 'PO';
-					}
-				} else {
-					if((date('Y-m-d') > $booking1->DepositDeadline && $booking1->Status == 'P') || (date('Y-m-d') > $booking1->FullPaymentDeadline && ($booking1->Status == 'P' || $booking1->Status == 'PP'))) {
-						$booking1->Status = 'PO';
-					}
-				}
-				$total_sales += $booking1->NetTotal;
-				$total_net_profit += $net_profit;
-				$booking1->NetTotal = number_format($booking1->NetTotal, 2, '.', ',');
-				$booking1->InsertDate = strtoupper(date('j M Y', strtotime($booking1->InsertDate)));
-
 			}
-			
-			$array['total_sales'] = number_format($total_sales, 2, '.', ',');
-			$array['total_net_profit'] = $total_net_profit != 0 && $total_sales != 0 ? number_format($total_net_profit, 2, '.', ',') . ' (' . round(($total_net_profit / $total_sales) * 100) . '%)' : number_format($total_net_profit, 2, '.', ',') . ' (0%)';
+
+			// Bookings data is now loaded via AJAX (ajax_list method)
+			// Summary totals are loaded via AJAX (ajax_summary method)
+
 			$this->load->view('layout/header', $titles);
 			$this->load->view('booking/index', $array);
 			$this->load->view('layout/footer');
-			
+
 		} else {
 			redirect('Dashboard');
 		}
 	}
-	
+
+	/**
+	 * AJAX endpoint for DataTables server-side processing
+	 * Returns paginated booking data as JSON
+	 */
+	function ajax_list()
+	{
+		if(!in_array('VB', $this->session->access_control)) {
+			echo json_encode(array('error' => 'Access denied'));
+			return;
+		}
+
+		$is_sales_agent = $this->session->userdata('level') == 20;
+
+		// DataTables parameters
+		$draw = intval($this->input->get('draw'));
+		$start = intval($this->input->get('start'));
+		$length = intval($this->input->get('length'));
+
+		// Order parameters
+		$order_column_index = $this->input->get('order[0][column]');
+		$order_dir = $this->input->get('order[0][dir]') == 'asc' ? 'ASC' : 'DESC';
+
+		// Map column index to database column
+		$columns = array(
+			0 => 'booking.BookingID',      // checkbox
+			1 => 'booking.BookingID',      // row number
+			2 => 'admin.Name',             // sales agent (or skip for sales agents)
+			3 => 'booking.InsertDate',     // creation date
+			4 => 'BookingNumber',          // BC number
+			5 => 'booking.BookingConfirmationTitle', // BC
+			6 => 'Customer',               // customer
+			7 => 'customer.CustomerCode',  // customer code
+			8 => 'booking.ChatLanguage',   // chat
+			9 => 'booking.Mobile',         // mobile
+			10 => 'StartDate',             // start
+			11 => 'EndDate',               // end
+			12 => 'category.Name',         // destination
+			13 => 'NetTotal',              // net sales
+			14 => 'NetTotal',              // profit (calculated, use NetTotal as proxy)
+			15 => 'NetTotal',              // profit margin (calculated)
+			16 => 'booking.Status',        // status
+			17 => 'LockStatus',            // GL status
+			18 => 'booking.AutocountSyncStatus', // autocount status
+			19 => 'booking.BookingID'      // action
+		);
+
+		// Adjust column index for sales agents (they don't see SA column)
+		if($is_sales_agent && $order_column_index > 1) {
+			$order_column_index++;
+		}
+
+		$order_column = isset($columns[$order_column_index]) ? $columns[$order_column_index] : 'booking.BookingID';
+
+		// Get counts
+		$records_total = $this->Booking_Model->Count_Bookings_Total();
+		$records_filtered = $this->Booking_Model->Count_Bookings_Filtered();
+
+		// Get paginated data
+		$bookings = $this->Booking_Model->Read_Bookings_Paginated($start, $length, $order_column, $order_dir);
+
+		// Process bookings for display
+		$data = array();
+		$count = $start + 1;
+		$current_url = base_url($_SERVER['REQUEST_URI']);
+
+		foreach($bookings as $booking) {
+			// Format mobile
+			$booking->CustomerMobile = $booking->CountryCode . str_replace([' ', '-'], '', $booking->CustomerMobile);
+
+			// Format dates
+			$start_date_formatted = !empty($booking->StartDate) ? strtoupper(date('j M Y', strtotime($booking->StartDate))) : null;
+			$end_date_formatted = !empty($booking->EndDate) ? strtoupper(date('j M Y', strtotime($booking->EndDate))) : null;
+			$insert_date_formatted = strtoupper(date('j M Y', strtotime($booking->InsertDate)));
+
+			// Format BC title
+			if($booking->BookingConfirmationTitle == 'BOOKING CONFIRMATION') {
+				$bc_title = 'BC';
+			} else if($booking->BookingConfirmationTitle == 'QUOTATION') {
+				$bc_title = 'QU';
+			} else {
+				$bc_title = 'PI';
+			}
+
+			// Calculate profit
+			$payments = $this->Booking_Model->Read_Payments($booking->BookingID);
+			$total_credit = 0;
+			$total_debit = 0;
+			$net_profit = 0;
+			$profit_margin = 0;
+			if(!empty($payments)) {
+				foreach($payments as $payment) {
+					if($payment->Status == 'Y' || $payment->Status == 'P') {
+						if($payment->Credit != 0.00) {
+							$total_credit += $payment->Credit;
+						} else {
+							$total_debit += $payment->Debit;
+						}
+					}
+				}
+				$net_profit = $total_credit - $total_debit;
+				if($net_profit != 0 && $booking->NetTotal != 0) {
+					$profit_margin = round(($net_profit / $booking->NetTotal) * 100);
+				}
+			}
+
+			// Determine display status
+			$display_status = $booking->Status;
+			if($booking->LockStatus == 'N' && $booking->Status == 'PTV') {
+				$display_status = 'PGL';
+			}
+			if($booking->AfterSalesService == 'PENDING' && $booking->Status == 'Y') {
+				$display_status = 'PR';
+			}
+			if(empty($booking->DepositDeadline)) {
+				if(date('Y-m-d') > $booking->FullPaymentDeadline && ($booking->Status == 'P' || $booking->Status == 'PP')) {
+					$display_status = 'PO';
+				}
+			} else {
+				if((date('Y-m-d') > $booking->DepositDeadline && $booking->Status == 'P') || (date('Y-m-d') > $booking->FullPaymentDeadline && ($booking->Status == 'P' || $booking->Status == 'PP'))) {
+					$display_status = 'PO';
+				}
+			}
+
+			// Status color and text
+			$status_colors = array(
+				'Y' => '#50C878', 'PR' => '#C3B1E1', 'P' => '#FFBF00', 'PP' => '#A7C7E7',
+				'PTV' => '#F89880', 'PGL' => '#FAC898', 'PT' => '#F8C8DC', 'OG' => '#CCCCFF', 'PO' => '#DA70D6'
+			);
+			$status_texts = array(
+				'Y' => 'COMPLETED', 'PR' => 'PENDING REVIEW', 'P' => 'PENDING PAYMENT', 'PP' => 'PARTIAL PAYMENT',
+				'PTV' => 'PENDING TRAVEL VOUCHER', 'PGL' => 'PENDING GUEST LIST', 'PT' => 'PENDING TRAVEL', 'OG' => 'ON-GOING', 'PO' => 'PAYMENT OVERDUE'
+			);
+			$status_color = $booking->CancelStatus == 'Y' ? '#FF69B4' : (isset($status_colors[$display_status]) ? $status_colors[$display_status] : '#DA70D6');
+			$status_text = $booking->CancelStatus == 'Y' ? 'CANCELLED' : (isset($status_texts[$display_status]) ? $status_texts[$display_status] : 'UNKNOWN');
+
+			// Profit color
+			$profit_color = $net_profit < 0 ? '#FF2400' : ($net_profit == 0 ? '#F4BB44' : '#00A36C');
+
+			// Autocount status
+			$autocount_status_map = array('P' => array('text' => 'P', 'color' => '#FFBF00'), 'S' => array('text' => 'S', 'color' => '#50C878'), 'F' => array('text' => 'F', 'color' => '#FF2400'));
+			$autocount_info = isset($autocount_status_map[$booking->AutocountSyncStatus]) ? $autocount_status_map[$booking->AutocountSyncStatus] : array('text' => '-', 'color' => '#000');
+
+			// Build tooltip for autocount
+			$tooltip_attr = '';
+			if(!empty($booking->AutocountSyncMessage)) {
+				$decoded = json_decode($booking->AutocountSyncMessage, true);
+				if(json_last_error() === JSON_ERROR_NONE) {
+					if(isset($decoded['error']) && $decoded['error'] == null) {
+						$tooltip_text = 'SUCCESS';
+					} elseif(isset($decoded['error']) && $decoded['error'] !== null) {
+						$tooltip_text = 'ERROR: ' . (is_string($decoded['error']) ? $decoded['error'] : json_encode($decoded['error']));
+					} else {
+						$tooltip_text = $booking->AutocountSyncMessage;
+					}
+				} else {
+					$tooltip_text = $booking->AutocountSyncMessage;
+				}
+				$tooltip_attr = ' data-toggle="tooltip" data-placement="top" title="' . htmlspecialchars($tooltip_text) . '"';
+			}
+
+			// Build row data
+			$row = array();
+
+			// Checkbox
+			$row['checkbox'] = '<input type="checkbox" class="check_item" value="' . $booking->BookingID . '">';
+
+			// Row number
+			$row['row_number'] = $count;
+
+			// Sales agent (only for non-sales agents)
+			if(!$is_sales_agent) {
+				$row['sales_agent'] = $booking->SalesAgentName;
+			}
+
+			// Insert date
+			$row['insert_date'] = $insert_date_formatted;
+
+			// BC Number with link
+			$row['booking_number'] = '<a href="' . base_url('Payment?booking_number=') . $booking->BookingNumber . '&customer=' . str_replace('&', '%26', $booking->Customer) . '" target="_blank">' . $booking->BookingNumber . '</a>';
+
+			// BC Title
+			$row['bc_title'] = $bc_title;
+
+			// Customer
+			$row['customer'] = $booking->Customer;
+
+			// Customer Code
+			$row['customer_code'] = $booking->CustomerCode;
+
+			// Chat Language
+			$row['chat_language'] = $booking->ChatLanguage;
+
+			// Mobile (WhatsApp link)
+			$row['mobile'] = '<a href="https://wa.me/' . $booking->CustomerMobile . '" target="_blank" class="btn btn-light-success d-inline-flex align-items-center btn-sm"><i class="la la-whatsapp"></i></a>';
+
+			// Start Date
+			$row['start_date'] = $start_date_formatted;
+
+			// End Date
+			$row['end_date'] = $end_date_formatted;
+
+			// Destination
+			$row['destination'] = $booking->DestinationName;
+
+			// Net Total
+			$row['net_total'] = number_format($booking->NetTotal, 2, '.', ',');
+
+			// Profit (only for non-sales agents)
+			if(!$is_sales_agent) {
+				$row['profit'] = '<span style="color:' . $profit_color . '">' . number_format($net_profit, 2, '.', ',') . '</span>';
+				$row['profit_margin'] = '<span style="color:' . $profit_color . '">' . $profit_margin . '</span>';
+			}
+
+			// Status
+			$row['status'] = '<span class="font-weight-bold" style="color:' . $status_color . '">' . $status_text . '</span>';
+
+			// GL Status
+			$row['gl_status'] = $booking->LockStatus == 'Y' ? '<i class="la la-lock text-danger"></i>' : '<i class="la la-unlock text-success"></i>';
+
+			// Autocount Status
+			$row['autocount_status'] = '<span class="font-weight-bold" style="color:' . $autocount_info['color'] . '"' . $tooltip_attr . '>' . $autocount_info['text'] . '</span>';
+
+			// Action dropdown - simplified for AJAX response
+			$row['action'] = $this->build_action_dropdown($booking, $current_url, $is_sales_agent);
+
+			$data[] = $row;
+			$count++;
+		}
+
+		$output = array(
+			'draw' => $draw,
+			'recordsTotal' => $records_total,
+			'recordsFiltered' => $records_filtered,
+			'data' => $data
+		);
+
+		header('Content-Type: application/json');
+		echo json_encode($output);
+	}
+
+	/**
+	 * Build action dropdown HTML for a booking row
+	 */
+	private function build_action_dropdown($booking, $current_url, $is_sales_agent)
+	{
+		$html = '<div class="btn-group">';
+		$html .= '<button type="button" data-toggle="dropdown" class="btn btn-light-primary btn-sm dropdown-toggle" style="padding-left:3px;"></button>';
+		$html .= '<div class="dropdown-menu">';
+
+		if($booking->Status != 'Y' || (!$is_sales_agent && $booking->Status == 'Y')) {
+			if(in_array('RB', $this->session->access_control)) {
+				$html .= '<button onclick="Delete_Record(\'' . base_url('assets/image/sweetalert.jpg') . '\', \'Booking Record : ' . $booking->BookingNumber . '\', \'' . base_url('Booking/Delete') . '\', \'booking_id\', ' . $booking->BookingID . ', \'' . $booking->Status . '\', \'' . (strpos($current_url, '?') ? base_url('Booking?') . explode('?', $current_url)[1] : base_url('Booking')) . '\')" class="dropdown-item" style="color:#E37383; font-size:11px;">Delete Booking</button>';
+			}
+			if(in_array('AB', $this->session->access_control)) {
+				if($booking->CancelStatus == 'Y') {
+					$html .= '<a href="' . base_url('Booking/Update_Cancel_Status?booking_id=') . $booking->BookingID . '&current_cancel_status=' . $booking->CancelStatus . '&new_cancel_status=N&param=' . urlencode($current_url) . '" class="dropdown-item" style="color:#93C572; font-size:11px;">Activate Booking</a>';
+				} else {
+					$html .= '<a href="' . base_url('Booking/Update_Cancel_Status?booking_id=') . $booking->BookingID . '&current_cancel_status=' . $booking->CancelStatus . '&new_cancel_status=Y&param=' . urlencode($current_url) . '" class="dropdown-item" style="color:#E0115F; font-size:11px;">Cancel Booking</a>';
+				}
+				if($booking->Status == 'Y' || $booking->Status == 'PR') {
+					if($booking->AfterSalesService == 'PENDING') {
+						$html .= '<a href="' . base_url('Booking/Update_After_Sales_Service?booking_id=') . $booking->BookingID . '&current_after_sales_service=' . $booking->AfterSalesService . '&new_after_sales_service=COMPLETE&param=' . urlencode($current_url) . '" class="dropdown-item" style="color:#50C878; font-size:11px;">Complete Booking</a>';
+					} else {
+						$html .= '<a href="' . base_url('Booking/Update_After_Sales_Service?booking_id=') . $booking->BookingID . '&current_after_sales_service=' . $booking->AfterSalesService . '&new_after_sales_service=PENDING&param=' . urlencode($current_url) . '" class="dropdown-item" style="color:#702963; font-size:11px;">Revert Pending Review</a>';
+					}
+				}
+				if($booking->Status == 'PTV' || $booking->Status == 'PT') {
+					if($booking->Status == 'PTV') {
+						$html .= '<a href="' . base_url('Booking/Update_Status?booking_id=') . $booking->BookingID . '&current_status=' . $booking->Status . '&new_status=PT&param=' . urlencode($current_url) . '" class="dropdown-item" style="color:#6082B6; font-size:11px;">Sent Travel Voucher ?</a>';
+					} else {
+						$html .= '<a href="' . base_url('Booking/Update_Status?booking_id=') . $booking->BookingID . '&current_status=' . $booking->Status . '&new_status=PTV&param=' . urlencode($current_url) . '" class="dropdown-item" style="color:#F4BB44; font-size:11px;">Revert Pending Travel Voucher</a>';
+					}
+				}
+				$html .= '<a href="' . (strpos($current_url, '?') ? base_url('Booking/Update?booking_id=') . $booking->BookingID . '&' . explode('?', $current_url)[1] : base_url('Booking/Update?booking_id=') . $booking->BookingID) . '" class="dropdown-item" style="font-size:11px;">Update Booking</a>';
+			}
+		}
+		if(in_array('GB', $this->session->access_control)) {
+			$html .= '<a href="' . (strpos($current_url, '?') ? base_url('Booking/Duplicate?booking_id=') . $booking->BookingID . '&' . explode('?', $current_url)[1] : base_url('Booking/Duplicate?booking_id=') . $booking->BookingID) . '" class="dropdown-item" style="font-size:11px;">Duplicate Booking</a>';
+		}
+		$html .= '<div class="dropdown-divider"></div>';
+		$html .= '<a href="' . base_url('Booking_Confirmation?token=') . $booking->Token . '" target="_blank" class="dropdown-item" style="font-size:11px;">Booking Confirmation</a>';
+		$html .= '<button id="bc_url-' . $booking->BookingID . '" value="' . base_url('Booking_Confirmation?token=') . $booking->Token . '" onclick="Copy_URL(\'BC URL\', ' . $booking->BookingID . ')" class="dropdown-item" style="font-size:11px;">Copy BC Link</button>';
+		$html .= '<div class="dropdown-divider"></div>';
+		if($booking->Status != 'Y' || (!$is_sales_agent && $booking->Status == 'Y')) {
+			$html .= '<a href="' . base_url('Guest_List?gl=') . $booking->Token . '" target="_blank" class="dropdown-item" style="font-size:11px;">Guest List</a>';
+		}
+		$html .= '<a href="' . base_url('Guest_List/Download?booking_id=') . $booking->BookingID . '" class="dropdown-item" style="font-size:11px;">Download Guest List</a>';
+		$html .= '<button id="gl_url-' . $booking->BookingID . '" value="https://gl.holidaygogogo.com?gl=' . $booking->Token . '" onclick="Copy_URL(\'GL URL\', ' . $booking->BookingID . ')" class="dropdown-item" style="font-size:11px;">Copy GL Link</button>';
+		$html .= '<div class="dropdown-divider"></div>';
+		$html .= '<a href="' . base_url('Travel_Voucher?token=') . $booking->Token . '" target="_blank" class="dropdown-item" style="font-size:11px;">Travel Voucher</a>';
+		$html .= '<button id="tv_url-' . $booking->BookingID . '" value="' . base_url('Travel_Voucher?token=') . $booking->Token . '" onclick="Copy_URL(\'TV URL\', ' . $booking->BookingID . ')" class="dropdown-item" style="font-size:11px;">Copy TV Link</button>';
+		$html .= '<div class="dropdown-divider"></div>';
+		$html .= '<button id="customer_name-' . $booking->BookingID . '" value="' . $booking->Customer . '" onclick="Copy_URL(\'CUSTOMER NAME\', ' . $booking->BookingID . ')" class="dropdown-item" style="font-size:11px;">Copy Customer Name</button>';
+		$html .= '<button id="customer_mobile-' . $booking->BookingID . '" value="' . $booking->CustomerMobile . '" onclick="Copy_URL(\'CUSTOMER MOBILE\', ' . $booking->BookingID . ')" class="dropdown-item" style="font-size:11px;">Copy Customer Mobile</button>';
+		$html .= '</div></div>';
+
+		return $html;
+	}
+
+	/**
+	 * AJAX endpoint for summary totals
+	 * Returns total sales and net profit for all filtered bookings
+	 */
+	function ajax_summary()
+	{
+		if(!in_array('VB', $this->session->access_control)) {
+			echo json_encode(array('error' => 'Access denied'));
+			return;
+		}
+
+		$is_sales_agent = $this->session->userdata('level') == 20;
+
+		$summary = $this->Booking_Model->Calculate_Summary();
+
+		$total_sales = $summary['total_sales'];
+		$total_net_profit = $summary['total_net_profit'];
+
+		// Format output
+		$total_sales_formatted = number_format($total_sales, 2, '.', ',');
+
+		if($total_net_profit != 0 && $total_sales != 0) {
+			$profit_percentage = round(($total_net_profit / $total_sales) * 100);
+			$total_net_profit_formatted = number_format($total_net_profit, 2, '.', ',') . ' (' . $profit_percentage . '%)';
+		} else {
+			$total_net_profit_formatted = number_format($total_net_profit, 2, '.', ',') . ' (0%)';
+		}
+
+		$output = array(
+			'total_sales' => $total_sales_formatted,
+			'total_net_profit' => $total_net_profit_formatted,
+			'is_sales_agent' => $is_sales_agent
+		);
+
+		header('Content-Type: application/json');
+		echo json_encode($output);
+	}
+
 	function Create()
 	{
 		if(in_array('GB', $this->session->access_control)) {

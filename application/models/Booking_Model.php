@@ -1090,5 +1090,253 @@ class Booking_Model extends CI_Model
 		return $this->db->get()->result_array();
 	}
 
+	/**
+	 * Apply filters to the query builder (shared logic for pagination methods)
+	 */
+	private function apply_booking_filters()
+	{
+		if($this->session->userdata('level') == 20) {
+			$this->db->where('SalesAgent', $this->session->userdata('admin_id'));
+		}
+
+		// These filters can ignore others
+		$ignore = 0;
+
+		if(!empty($this->input->get('customer'))) {
+			$this->db->like('Customer', $this->input->get('customer'));
+			$ignore = 1;
+		}
+
+		if(!empty($this->input->get('booking_number'))) {
+			$this->db->where('BookingNumber', $this->input->get('booking_number'));
+			$ignore = 1;
+		}
+
+		if(!empty($this->input->get('reservation_number'))) {
+			$this->db->where('ReservationNumber', $this->input->get('reservation_number'));
+			$ignore = 1;
+		}
+
+		if($ignore == 0) {
+			// Second level ignore
+			$level2Ignore = 0;
+
+			if(!empty($this->input->get('deadline'))) {
+				$deadline = explode(' - ', $this->input->get('deadline'));
+				$start_date = date('Y-m-d', strtotime(str_replace('/', '-', $deadline[0])));
+				$end_date = date('Y-m-d', strtotime(str_replace('/', '-', $deadline[1])));
+				$this->db->where("((`DepositDeadline` >= '".$start_date."' AND `DepositDeadline` <= '".$end_date."') OR (`FullPaymentDeadline` >= '".$start_date."' AND `FullPaymentDeadline` <= '".$end_date."') OR (`AdditionalPaymentDeadline` >= '".$start_date."' AND `AdditionalPaymentDeadline` <= '".$end_date."')) AND `booking`.`Status` IN ('P','PP')");
+				$level2Ignore = 1;
+			}
+			if(!empty($this->input->get('mobile'))) {
+				$this->db->where('booking.Mobile', $this->input->get('mobile'));
+				$level2Ignore = 1;
+			}
+			if(!empty($this->input->get('travel_date'))) {
+				$travel_date = explode(' - ', $this->input->get('travel_date'));
+				$start_date = date('Y-m-d', strtotime(str_replace('/', '-', $travel_date[0])));
+				$end_date = date('Y-m-d', strtotime(str_replace('/', '-', $travel_date[1])));
+				$this->db->where("((`StartDate` <= '".$start_date."' AND `EndDate` >= '".$end_date."') OR (`StartDate` >= '".$start_date."' AND `StartDate` <= '".$end_date."') OR (`EndDate` >= '".$start_date."' AND `EndDate` <= '".$end_date."'))");
+				$level2Ignore = 1;
+			}
+			if(!empty($this->input->get('destination'))) {
+				$this->db->where('Destination', $this->input->get('destination'));
+				$level2Ignore = 1;
+			}
+			if(!empty($this->input->get('sales_agent'))) {
+				$this->db->where('SalesAgent', $this->input->get('sales_agent'));
+				$level2Ignore = 1;
+			}
+			if(!empty($this->input->get('tag'))) {
+				$this->db->where("FIND_IN_SET('".$this->input->get('tag')."', Tag)");
+				$level2Ignore = 1;
+			}
+			if(!empty($this->input->get('chat_language'))) {
+				$this->db->where('booking.ChatLanguage', $this->input->get('chat_language'));
+				$level2Ignore = 1;
+			}
+			if(!empty($this->input->get('source'))) {
+				$this->db->where('Source', $this->input->get('source'));
+				$level2Ignore = 1;
+			}
+			if(!empty($this->input->get('booking_confirmation_title'))) {
+				$this->db->where('booking.BookingConfirmationTitle', $this->input->get('booking_confirmation_title'));
+				$level2Ignore = 1;
+			}
+			if(!empty($this->input->get('status'))) {
+				if($this->input->get('status') == 'A') {
+					$this->db->where('CancelStatus', 'N');
+					$this->db->where('booking.Status !=', 'N');
+				}
+				if($this->input->get('status') == 'C') {
+					$this->db->where('CancelStatus', 'Y');
+					$this->db->where('booking.Status !=', 'N');
+				}
+				if($this->input->get('status') == 'Y') {
+					$this->db->where('CancelStatus', 'N');
+					$this->db->where('AfterSalesService', 'COMPLETE');
+					$this->db->where('booking.Status', 'Y');
+				}
+				if($this->input->get('status') == 'OG') {
+					$this->db->where('CancelStatus', 'N');
+					$this->db->where('booking.Status', 'OG');
+				}
+				if($this->input->get('status') == 'PP') {
+					$this->db->where('CancelStatus', 'N');
+					$this->db->where('FullPaymentDeadline >=', date('Y-m-d'));
+					$this->db->where('booking.Status', 'PP');
+				}
+				if($this->input->get('status') == 'PO') {
+					$this->db->where('CancelStatus', 'N');
+					$this->db->where("((`FullPaymentDeadline` < '".date('Y-m-d')."' AND `booking`.`Status` IN ('P','PP')) OR ((`DepositDeadline` < '".date('Y-m-d')."' AND `booking`.`Status` = 'P') OR (`FullPaymentDeadline` < '".date('Y-m-d')."' AND `booking`.`Status` IN ('P','PP'))))");
+				}
+				if($this->input->get('status') == 'PGL') {
+					$this->db->where('CancelStatus', 'N');
+					$this->db->where('LockStatus', 'N');
+					$this->db->where('booking.Status', 'PTV');
+				}
+				if($this->input->get('status') == 'P') {
+					$this->db->where('CancelStatus', 'N');
+					$this->db->where("(`DepositDeadline` >= '".date('Y-m-d')."' OR (`DepositDeadline` IS NULL AND `FullPaymentDeadline` >= '".date('Y-m-d')."'))");
+					$this->db->where('booking.Status', 'P');
+				}
+				if($this->input->get('status') == 'PR') {
+					$this->db->where('CancelStatus', 'N');
+					$this->db->where('AfterSalesService', 'PENDING');
+					$this->db->where('booking.Status', 'Y');
+				}
+				if($this->input->get('status') == 'PT') {
+					$this->db->where('CancelStatus', 'N');
+					$this->db->where('booking.Status', 'PT');
+				}
+				if($this->input->get('status') == 'PTV') {
+					$this->db->where('CancelStatus', 'N');
+					$this->db->where('LockStatus', 'Y');
+					$this->db->where('booking.Status', 'PTV');
+				}
+
+				$level2Ignore = 1;
+			} else {
+				$this->db->where('CancelStatus', 'N');
+				$this->db->where('AfterSalesService', 'PENDING');
+			}
+		}
+
+		if(!empty($this->input->get('booking_date'))) {
+			$booking_date = explode(' - ', $this->input->get('booking_date'));
+			$start_date = date('Y-m-d', strtotime(str_replace('/', '-', $booking_date[0])));
+			$end_date = date('Y-m-d', strtotime(str_replace('/', '-', $booking_date[1])));
+			$this->db->where('CAST(booking.InsertDate AS DATE) >=', $start_date);
+			$this->db->where('CAST(booking.InsertDate AS DATE) <=', $end_date);
+		} else {
+			if($ignore == 0 && isset($level2Ignore) && $level2Ignore == 0) {
+				$this->db->where('CAST(booking.InsertDate AS DATE) >=', date('Y-m-d', strtotime('-7 days')));
+				$this->db->where('CAST(booking.InsertDate AS DATE) <=', date('Y-m-d'));
+			}
+		}
+
+		$this->db->where('booking.Status !=', 'N');
+	}
+
+	/**
+	 * Read bookings with pagination for DataTables server-side processing
+	 */
+	function Read_Bookings_Paginated($start, $length, $order_column, $order_dir)
+	{
+		$this->db->select('booking.BookingID, BookingNumber, DepositDeadline, FullPaymentDeadline, Customer, booking.Mobile As CustomerMobile, StartDate, EndDate, NetTotal, booking.ChatLanguage, Token, booking.BookingConfirmationTitle, CancelStatus, LockStatus, AfterSalesService, booking.Status, booking.InsertDate, admin.Name As SalesAgentName, category.Name As DestinationName, CountryCode, booking.AutocountSyncStatus, booking.AutocountSyncMessage, booking.AutocountSyncAction, booking.CustomerAutocountSyncStatus, booking.CustomerAutocountSyncMessage, booking.CustomerAutocountSyncAction, customer.CustomerCode, booking.CustomerID');
+		$this->db->join('admin', 'admin.AdminID = booking.SalesAgent', 'left');
+		$this->db->join('category', 'category.CategoryID = booking.Destination', 'left');
+		$this->db->join('country_code', 'country_code.CountryCodeID = booking.CountryCodeID', 'left');
+		$this->db->join('customer', 'customer.CustomerID = booking.CustomerID', 'left');
+
+		$this->apply_booking_filters();
+
+		// Order by
+		$this->db->order_by($order_column, $order_dir);
+
+		// Pagination
+		$this->db->limit($length, $start);
+
+		return $this->db->get('booking')->result();
+	}
+
+	/**
+	 * Count total bookings without filters (for DataTables recordsTotal)
+	 */
+	function Count_Bookings_Total()
+	{
+		$this->db->from('booking');
+		if($this->session->userdata('level') == 20) {
+			$this->db->where('SalesAgent', $this->session->userdata('admin_id'));
+		}
+		$this->db->where('booking.Status !=', 'N');
+		return $this->db->count_all_results();
+	}
+
+	/**
+	 * Count bookings with filters applied (for DataTables recordsFiltered)
+	 */
+	function Count_Bookings_Filtered()
+	{
+		$this->db->from('booking');
+		$this->db->join('admin', 'admin.AdminID = booking.SalesAgent', 'left');
+		$this->db->join('category', 'category.CategoryID = booking.Destination', 'left');
+		$this->db->join('country_code', 'country_code.CountryCodeID = booking.CountryCodeID', 'left');
+		$this->db->join('customer', 'customer.CustomerID = booking.CustomerID', 'left');
+
+		$this->apply_booking_filters();
+
+		return $this->db->count_all_results();
+	}
+
+	/**
+	 * Calculate summary totals for all filtered bookings
+	 * Returns total sales and calculates net profit from payments
+	 */
+	function Calculate_Summary()
+	{
+		// First get all filtered booking IDs and their NetTotal
+		$this->db->select('booking.BookingID, booking.NetTotal');
+		$this->db->from('booking');
+		$this->db->join('admin', 'admin.AdminID = booking.SalesAgent', 'left');
+		$this->db->join('category', 'category.CategoryID = booking.Destination', 'left');
+		$this->db->join('country_code', 'country_code.CountryCodeID = booking.CountryCodeID', 'left');
+		$this->db->join('customer', 'customer.CustomerID = booking.CustomerID', 'left');
+
+		$this->apply_booking_filters();
+
+		$bookings = $this->db->get()->result();
+
+		$total_sales = 0;
+		$total_net_profit = 0;
+
+		foreach($bookings as $booking) {
+			$total_sales += $booking->NetTotal;
+
+			// Get payments for this booking
+			$payments = $this->Read_Payments($booking->BookingID);
+			$total_credit = 0;
+			$total_debit = 0;
+
+			if(!empty($payments)) {
+				foreach($payments as $payment) {
+					if($payment->Status == 'Y' || $payment->Status == 'P') {
+						if($payment->Credit != 0.00) {
+							$total_credit += $payment->Credit;
+						} else {
+							$total_debit += $payment->Debit;
+						}
+					}
+				}
+			}
+			$total_net_profit += ($total_credit - $total_debit);
+		}
+
+		return array(
+			'total_sales' => $total_sales,
+			'total_net_profit' => $total_net_profit
+		);
+	}
+
 
 }
