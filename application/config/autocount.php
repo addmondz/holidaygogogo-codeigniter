@@ -44,10 +44,10 @@ $config['autocount'] = [
         ],
     ],
 
-    'booking_cutoff_date'  => '2025-11-16', // after the date only sync
-    'payment_cutoff_date'  => '2025-11-16', // after the date only sync
-    'customer_cutoff_date' => '2025-11-16', // after the date only sync
-    'supplier_cutoff_date' => '2025-11-16', // after the date only sync
+    'booking_cutoff_date'  => '2025-12-02', // after the date only sync
+    'payment_cutoff_date'  => '2025-12-02', // after the date only sync
+    'customer_cutoff_date' => '2025-12-02', // after the date only sync
+    'supplier_cutoff_date' => '2025-12-02', // after the date only sync
 
     // manually Sync settings
     'bulkBookingSyncToAutocount' => false, // no open for manual trigger
