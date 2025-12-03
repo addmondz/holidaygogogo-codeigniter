@@ -255,7 +255,6 @@
                                 <th style="text-align:center;">BC Number</th>
                                 <th style="text-align:center;">BC</th>
                                 <th style="text-align:center;">Customer</th>
-                                <th style="text-align:center;">Customer Code (Autocount Debtor Code)</th>
                                 <th style="text-align:center;">Chat</th>
                                 <th class="test" style="text-align:center;">Mobile</th>
                                 <th class="start_date" style="text-align:center;">Start</th>
@@ -415,7 +414,6 @@ $(document).ready(function() {
             { data: 'booking_number', className: 'text-center' },
             { data: 'bc_title', className: 'text-center' },
             { data: 'customer', className: 'text-center' },
-            { data: 'customer_code', className: 'text-center' },
             { data: 'chat_language', className: 'text-center' },
             { data: 'mobile', orderable: false, searchable: false, className: 'text-center' },
             { data: 'start_date', className: 'text-center' },
