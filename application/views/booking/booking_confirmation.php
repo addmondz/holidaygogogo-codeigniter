@@ -195,7 +195,6 @@
 	<?php if($count%13 == 0){ echo '<br>'; } $count++; } ?> <!-- another to make sure item split-->
 	</div>
 	<div style="position: absolute; top: auto; bottom: 0; ">
-		<?php echo $BookingConfirmationFooter; ?>
 		<footer style="">
 			<hr style="margin-bottom:5px;">
 			<table style="width:100%; margin-bottom:10px;">

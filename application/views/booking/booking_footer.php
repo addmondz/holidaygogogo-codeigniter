@@ -186,5 +186,6 @@
 		</table>
 		<hr style="margin-top:0px;">
 	</header>
+	<?php echo $BookingConfirmationFooter; ?>
 </body>
 </html>
