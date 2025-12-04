@@ -485,24 +485,75 @@
     
     function Copy_URL(value, booking_id)
     {
+        var elementId = '';
         if(value == 'BC URL') {
-            var url = $(`#bc_url-${booking_id}`).val();
-        } else {
-            if(value == 'GL URL') {
-                var url = $(`#gl_url-${booking_id}`).val();
+            elementId = 'bc_url-' + booking_id;
+        } else if(value == 'GL URL') {
+            elementId = 'gl_url-' + booking_id;
+        } else if(value == 'TV URL') {
+            elementId = 'tv_url-' + booking_id;
+        } else if(value == 'CUSTOMER NAME') {
+            elementId = 'customer_name-' + booking_id;
+        } else if(value == 'CUSTOMER MOBILE') {
+            elementId = 'customer_mobile-' + booking_id;
+        }
+        
+        // Try to get element using jQuery first, fallback to vanilla JS
+        var element = null;
+        if (typeof $ !== 'undefined' && $) {
+            element = $('#' + elementId);
+            if (element.length > 0) {
+                var url = element.val();
             } else {
-                if(value == 'TV URL') {
-                    var url = $(`#tv_url-${booking_id}`).val();
-                } else {
-                    if(value == 'CUSTOMER NAME') {
-                        var url = $(`#customer_name-${booking_id}`).val();
-                    } else {
-                        var url = $(`#customer_mobile-${booking_id}`).val();
-                    }
-                }
+                alert("Element not found");
+                return;
+            }
+        } else {
+            element = document.getElementById(elementId);
+            if (element) {
+                var url = element.value;
+            } else {
+                alert("Element not found");
+                return;
             }
         }
-        navigator.clipboard.writeText(url).then(() => { alert("Successfully Copied"); }) .catch(() => { alert("Something Went Wrong"); });
+        
+        // Try modern clipboard API first, fallback to older method
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(url).then(function() {
+                // alert("Successfully Copied");
+            }).catch(function(err) {
+                // Fallback to older method if clipboard API fails
+                fallbackCopyToClipboard(url);
+            });
+        } else {
+            // Use fallback method for older browsers
+            fallbackCopyToClipboard(url);
+        }
+    }
+    
+    function fallbackCopyToClipboard(text) {
+        var textArea = document.createElement("textarea");
+        textArea.value = text;
+        textArea.style.position = "fixed";
+        textArea.style.left = "-999999px";
+        textArea.style.top = "-999999px";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        
+        try {
+            var successful = document.execCommand('copy');
+            if (successful) {
+                // alert("Successfully Copied");
+            } else {
+                alert("Failed to copy. Please copy manually.");
+            }
+        } catch (err) {
+            alert("Failed to copy. Please copy manually.");
+        }
+        
+        document.body.removeChild(textArea);
     }
 </script>
 <script>
