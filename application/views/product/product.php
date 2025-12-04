@@ -19,7 +19,7 @@
                                     <span style="color:red;">*</span>
                                 </label>
                                 <div class="input-icon">
-                                    <input type="text" id="Name" <?php if(current_url() == base_url('Product/Update')) { ?> value="<?php echo $Product; ?>" <?php } ?> autocomplete="off" class="form-control">
+                                    <input type="text" id="Name" <?php if(current_url() == base_url('Product/Update')) { ?> value="<?php echo $Product; ?>" <?php } ?> autocomplete="off" maxlength="99" class="form-control">
                                     <span>
                                         <i class="la la-product-hunt"></i>
                                     </span>
@@ -152,6 +152,8 @@
                 var name = ($('#Name').val()).toUpperCase();
                 if(window.location.href == '<?php echo base_url('Product/Create'); ?>' && category == null || supplier == null || name == '') {
                     Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', 'Please Insert All Required Product Information', null);
+                } else if(name.length > 95) {
+                    Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', 'Product Name Must Not Exceed 95 Characters', null);
                 } else {
                     if(window.location.href == '<?php echo base_url('Product/Create'); ?>') {
                         var product = [];
