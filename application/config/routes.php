@@ -64,7 +64,7 @@ $baseUrl = $env['BASE_URL'];
 $domain = parse_url($baseUrl, PHP_URL_HOST);
 
 if(isset($_SERVER['SERVER_NAME'])){
-	if($_SERVER['SERVER_NAME'] == $domain) {
+    if ( $_SERVER['SERVER_NAME'] === $domain && isset($_GET['gl']) ) {
 		$route['default_controller'] = 'Guest_List';
 	} else {
 		$route['default_controller'] = 'Dashboard';
