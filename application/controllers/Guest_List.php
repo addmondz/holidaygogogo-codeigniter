@@ -8,9 +8,21 @@ class Guest_List extends CI_Controller
 {
 	function __construct()
 	{
+		$env = [];
+		if (file_exists(FCPATH . '.env')) {
+			$lines = file(FCPATH . '.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+			foreach ($lines as $line) {
+				if (strpos(trim($line), '#') === 0) continue;
+				list($key, $value) = explode('=', $line, 2);
+				$env[trim($key)] = trim($value);
+			}
+		}
+		$baseUrl = $env['BASE_URL'];
+		$domain = parse_url($baseUrl, PHP_URL_HOST);
+
 		parent::__construct();
-		if(empty($this->session->userdata('admin_id')) && $_SERVER['SERVER_NAME'] != 'gl.holidaygogogo.com') {
-			redirect('https://gl.holidaygogogo.com?gl=' . $this->input->get('gl'));
+		if(empty($this->session->userdata('admin_id')) && $_SERVER['SERVER_NAME'] != $domain) {
+			redirect($baseUrl . '?gl=' . $this->input->get('gl'));
 		}
 		$this->load->model('Guest_List_Model');
 		$this->load->model('Booking_Model');

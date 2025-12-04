@@ -50,8 +50,21 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 |		my-controller/my-method	-> my_controller/my_method
 */
 
+$env = [];
+if (file_exists(FCPATH . '.env')) {
+    $lines = file(FCPATH . '.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    foreach ($lines as $line) {
+        if (strpos(trim($line), '#') === 0) continue;
+        list($key, $value) = explode('=', $line, 2);
+        $env[trim($key)] = trim($value);
+    }
+}
+
+$baseUrl = $env['BASE_URL'];
+$domain = parse_url($baseUrl, PHP_URL_HOST);
+
 if(isset($_SERVER['SERVER_NAME'])){
-	if($_SERVER['SERVER_NAME'] == 'gl.holidaygogogo.com') {
+	if($_SERVER['SERVER_NAME'] == $domain) {
 		$route['default_controller'] = 'Guest_List';
 	} else {
 		$route['default_controller'] = 'Dashboard';
