@@ -682,7 +682,11 @@ class Cron extends CI_Controller
 		}
 
 		if (!empty($payment['Type'])) {
-			$desc .= ' ' . $payment['Type'];  // Always append Type last
+			if(!empty($payment['ReservationNumber'])) {
+				$payment['ReservationNumber'] .= ' ' . $payment['Type'];
+			} else {
+				$payment['ReservationNumber'] = $payment['Type'];
+			}
 		}
 
 		$payment['description'] = trim($desc);
