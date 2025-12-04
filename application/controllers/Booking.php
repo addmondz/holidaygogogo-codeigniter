@@ -141,19 +141,18 @@ class Booking extends MY_Controller
 			4 => 'BookingNumber',          // BC number
 			5 => 'booking.BookingConfirmationTitle', // BC
 			6 => 'Customer',               // customer
-			7 => 'customer.CustomerCode',  // customer code
-			8 => 'booking.ChatLanguage',   // chat
-			9 => 'booking.Mobile',         // mobile
-			10 => 'StartDate',             // start
-			11 => 'EndDate',               // end
-			12 => 'category.Name',         // destination
-			13 => 'NetTotal',              // net sales
-			14 => 'NetTotal',              // profit (calculated, use NetTotal as proxy)
-			15 => 'NetTotal',              // profit margin (calculated)
-			16 => 'booking.Status',        // status
-			17 => 'LockStatus',            // GL status
-			18 => 'booking.AutocountSyncStatus', // autocount status
-			19 => 'booking.BookingID'      // action
+			7 => 'booking.ChatLanguage',   // chat
+			8 => 'booking.Mobile',         // mobile
+			9 => 'StartDate',              // start
+			10 => 'EndDate',               // end
+			11 => 'category.Name',         // destination
+			12 => 'NetTotal',              // net sales
+			13 => 'NetTotal',              // profit (calculated, use NetTotal as proxy)
+			14 => 'NetTotal',              // profit margin (calculated)
+			15 => 'booking.Status',        // BC status
+			16 => 'LockStatus',            // GL status
+			17 => 'booking.AutocountSyncStatus', // autocount status
+			18 => 'booking.BookingID'      // action
 		);
 
 		// Adjust column index for sales agents (they don't see SA column)
