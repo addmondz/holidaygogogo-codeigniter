@@ -1001,6 +1001,17 @@ class Cron extends CI_Controller
 
 	public function mapSupplierCustomerFromAutoCount()
 	{
+		$this->load->helper('autocount');
+		$config = get_autocount_config();
+		
+		$apiKey = $this->input->get('key');
+    	$expectedKey = $config['manual_sync_autocount_key'];
+
+		if ($apiKey !== $expectedKey) {
+			show_error('Unauthorized access', 401);
+			return;
+		}
+
 		$dryRun = true; // SET TO FALSE after testing
 
 		$apiKey = "75be787f-d7fb-4f40-ab8d-32848af7a169";

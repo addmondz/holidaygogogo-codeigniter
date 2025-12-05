@@ -14,7 +14,7 @@ $config['autocount'] = [
     'client_secret'  => 'YOUR_CLIENT_SECRET',
     'username'       => 'YOUR_API_USERNAME',
     'password'       => 'YOUR_API_PASSWORD',
-
+    // manual sync key          => '4579545c3a528c4c5a64b8cc0c1be092d'
     'manual_sync_autocount_key' => '4579545c3a528c4c5a64b8cc0c1be092d', // manual sync cron by url (?key=)
     // Endpoints
     'endpoints' => [
