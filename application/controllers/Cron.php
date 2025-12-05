@@ -733,4 +733,393 @@ class Cron extends CI_Controller
 		return $payment;
 	}
 
+	// public function generateSupplierCustomerSQL() // generatequery 
+	// {
+	// 	$apiKey = "75be787f-d7fb-4f40-ab8d-32848af7a169";
+	// 	$keyId = "f66b6d44-9433-42b1-8399-2bb5135783f3";
+
+	// 	$supplierUrl = "https://accounting-api.autocountcloud.com/26516/creditor/listing?activeOnly=true&field=accNo&field=parentAccNo&field=desc2&field=registerNo&field=isActive&field=address&field=postCode&field=phone1&field=phone2&field=fax1&field=fax2&field=areaCode&field=emailAddress&field=webURL&field=attention&field=natureOfBusiness&field=taxCode&field=taxRegisterNo&field=note";
+	// 	$customerUrl = "https://accounting-api.autocountcloud.com/26516/debtor/listing?activeOnly=true&field=accNo&field=parentAccNo&field=desc2&field=registerNo&field=isActive&field=address&field=postCode&field=phone1&field=phone2&field=fax1&field=fax2&field=deliverAddress&field=deliverPostCode&field=areaCode&field=emailAddress&field=webURL&field=attention&field=natureOfBusiness&field=salesAgent&field=taxCode&field=taxRegisterNo&field=taxExemptionNo&field=taxExemptionExpiryDate&field=note";
+
+	// 	// Fetch data
+	// 	//$responseSuppliers = $this->fetchAllAutoCount($supplierUrl, $apiKey, $keyId);
+	// 	$responseCustomers = $this->fetchAllAutoCount($customerUrl, $apiKey, $keyId);
+
+
+	// 	$allSuppliers = []; //$responseSuppliers ?? [];
+	// 	$allCustomers = $responseCustomers ?? [];
+
+	// 	$now = date('Y-m-d H:i:s');
+	// 	$userId = 1;
+
+	// 	$queries = [
+	// 		'supplier' => [],
+	// 		'customer' => []
+	// 	];
+
+	// 	// Supplier queries
+	// 	// foreach ($allSuppliers as $supplier) {
+	// 	// 	$supplierCode = $supplier['AccNo'] ?? null;
+	// 	// 	if (!$supplierCode) continue;
+
+	// 	// 	$exists = \DB::table('supplier')->where('SupplierCode', $supplierCode)->exists();
+
+	// 	// 	$name = addslashes($supplier['CompanyName'] ?? '');
+	// 	// 	$phone = addslashes($supplier['Phone1'] ?? '');
+	// 	// 	$email = addslashes($supplier['EmailAddress'] ?? '');
+	// 	// 	$currency = addslashes($supplier['CurrencyCode'] ?? '');
+	// 	// 	$address = addslashes($supplier['Address'] ?? '');
+
+	// 	// 	if ($exists) {
+	// 	// 		$query = "UPDATE supplier SET
+	// 	// 			Name = '{$name}',
+	// 	// 			Phone = '{$phone}',
+	// 	// 			PrimaryEmail = '{$email}',
+	// 	// 			CurrencyCode = '{$currency}',
+	// 	// 			Addressa = '{$address}',
+	// 	// 			UpdateDate = '{$now}',
+	// 	// 			UpdateBy = {$userId}
+	// 	// 			WHERE SupplierCode = '{$supplierCode}';";
+	// 	// 	} else {
+	// 	// 		$query = "INSERT INTO supplier
+	// 	// 			(Name, SupplierCode, Phone, PrimaryEmail, CurrencyCode, Addressa, InsertDate, InsertBy, UpdateDate, UpdateBy)
+	// 	// 			VALUES
+	// 	// 			('{$name}', '{$supplierCode}', '{$phone}', '{$email}', '{$currency}', '{$address}', '{$now}', {$userId}, '{$now}', {$userId});";
+	// 	// 	}
+
+	// 	// 	$queries['supplier'][] = $query;
+	// 	// }
+
+	// 	// foreach ($allSuppliers as $supplier) {
+	// 	// 	$supplierCode = $supplier['AccNo'] ?? null;
+	// 	// 	if (!$supplierCode) continue;
+
+	// 	// 	$name = addslashes($supplier['CompanyName'] ?? '');
+	// 	// 	$phone = addslashes($supplier['Phone1'] ?? '');
+	// 	// 	$email = addslashes($supplier['EmailAddress'] ?? '');
+	// 	// 	$currency = addslashes($supplier['CurrencyCode'] ?? '');
+	// 	// 	$address = addslashes($supplier['Address'] ?? '');
+
+	// 	// 	$query = "INSERT INTO supplier
+	// 	// 			(Name, SupplierCode, Phone, PrimaryEmail, CurrencyCode, Address, InsertDate, InsertBy, UpdateDate, UpdateBy)
+	// 	// 			VALUES
+	// 	// 			('{$name}', '{$supplierCode}', '{$phone}', '{$email}', '{$currency}', '{$address}', '{$now}', '{$userId}', '{$now}', '{$userId}')";
+
+	// 	// 	$queries['supplier'][] = $query;
+	// 	// }
+
+	// 	// Customer queries
+	// 	// foreach ($allCustomers as $customer) {
+	// 	// 	$customerCode = $customer['AccNo'] ?? null;
+	// 	// 	if (!$customerCode) continue;
+
+	// 	// 	$exists = \DB::table('customer')->where('CustomerCode', $customerCode)->exists();
+
+	// 	// 	$name = addslashes($customer['CompanyName'] ?? '');
+	// 	// 	$phone = addslashes($customer['Phone1'] ?? '');
+
+	// 	// 	if ($exists) {
+	// 	// 		$query = "UPDATE customer SET
+	// 	// 			name = '{$name}',
+	// 	// 			phone_number = '{$phone}',
+	// 	// 			updated_at = '{$now}'
+	// 	// 			WHERE CustomerCode = '{$customerCode}';";
+	// 	// 	} else {
+	// 	// 		$query = "INSERT INTO customer
+	// 	// 			(name, CustomerCode, phone_number, created_at, updated_at)
+	// 	// 			VALUES
+	// 	// 			('{$name}', '{$customerCode}', '{$phone}', '{$now}', '{$now}');";
+	// 	// 	}
+
+	// 	// 	$queries['customer'][] = $query;
+	// 	// }
+
+	// 	foreach ($allCustomers as $customer) {
+	// 			$customerCode = $customer['AccNo'] ?? null;
+	// 		if (!$customerCode) continue;
+	// 			$name = addslashes($customer['CompanyName'] ?? '');
+	// 		$phone = addslashes($customer['Phone1'] ?? '');
+
+	// 		$query = "INSERT INTO customer
+	// 				(name, CustomerCode, phone_number, created_at, updated_at)
+	// 				VALUES
+	// 				('{$name}', '{$customerCode}', '{$phone}', '{$now}', '{$now}');";
+
+	// 		$queries['customer'][] = $query;
+	// 	}
+
+	// 	// Optionally echo
+	// 	// foreach ($queries['supplier'] as $index => $sql) {
+	// 	// 	echo   $sql . PHP_EOL . PHP_EOL . '<br>';
+	// 	// }
+	// 	foreach ($queries['customer'] as $index => $sql) {
+	// 		echo $sql . PHP_EOL . PHP_EOL . '<br>';
+	// 	}
+
+	// 	return $queries;
+	// }
+
+	// public function syncSuppliersAndCustomers() // straight execute
+	// {
+	// 	$apiKey = "75be787f-d7fb-4f40-ab8d-32848af7a169";
+	// 	$keyId = "f66b6d44-9433-42b1-8399-2bb5135783f3";
+
+	// 	$supplierUrl = "https://accounting-api.autocountcloud.com/26516/creditor/listing?activeOnly=true&field=accNo&field=parentAccNo&field=desc2&field=registerNo&field=isActive&field=address&field=postCode&field=phone1&field=phone2&field=fax1&field=fax2&field=areaCode&field=emailAddress&field=webURL&field=attention&field=natureOfBusiness&field=taxCode&field=taxRegisterNo&field=note";
+	// 	$customerUrl = "https://accounting-api.autocountcloud.com/26516/debtor/listing?activeOnly=true&field=accNo&field=parentAccNo&field=desc2&field=registerNo&field=isActive&field=address&field=postCode&field=phone1&field=phone2&field=fax1&field=fax2&field=deliverAddress&field=deliverPostCode&field=areaCode&field=emailAddress&field=webURL&field=attention&field=natureOfBusiness&field=salesAgent&field=taxCode&field=taxRegisterNo&field=taxExemptionNo&field=taxExemptionExpiryDate&field=note";
+
+	// 	// Fetch data
+	// 	$responseSuppliers = $this->fetchAllAutoCount($supplierUrl, $apiKey, $keyId);
+	// 	$responseCustomers = $this->fetchAllAutoCount($customerUrl, $apiKey, $keyId);
+
+	// 	$allSuppliers = $responseSuppliers['data'] ?? [];
+	// 	$allCustomers = $responseCustomers['data'] ?? [];
+
+	// 	echo "Total suppliers: " . count($allSuppliers) . PHP_EOL;
+	// 	echo "Total customers: " . count($allCustomers) . PHP_EOL;
+
+	// 	$now = date('Y-m-d H:i:s');
+	// 	$userId = 1; // fixed InsertBy / UpdateBy user ID as you requested
+
+	// 	// Process suppliers
+	// 	foreach ($allSuppliers as $supplier) {
+	// 		$supplierCode = $supplier['AccNo'] ?? null;
+	// 		if (!$supplierCode) {
+	// 			continue; // skip if no AccNo
+	// 		}
+
+	// 		// Check if supplier exists in DB by SupplierCode
+	// 		$exists = \DB::table('supplier')->where('SupplierCode', $supplierCode)->exists();
+
+	// 		$data = [
+	// 			'Name'          => $supplier['CompanyName'] ?? '',
+	// 			'SupplierCode'  => $supplierCode,
+	// 			'Phone'         => $supplier['Phone1'] ?? '',
+	// 			'PrimaryEmail'  => $supplier['EmailAddress'] ?? '',
+	// 			'CurrencyCode'  => $supplier['CurrencyCode'] ?? '',
+	// 			'Addressa'      => $supplier['Address'] ?? '',
+	// 		];
+
+	// 		if ($exists) {
+	// 			// Update existing
+	// 			\DB::table('supplier')
+	// 				->where('SupplierCode', $supplierCode)
+	// 				->update(array_merge($data, [
+	// 					'UpdateDate' => $now,
+	// 					'UpdateBy'   => $userId,
+	// 				]));
+	// 			echo "Updated supplier: $supplierCode" . PHP_EOL;
+	// 		} else {
+	// 			// Insert new
+	// 			\DB::table('supplier')->insert(array_merge($data, [
+	// 				'InsertDate' => $now,
+	// 				'InsertBy'   => $userId,
+	// 				'UpdateDate' => $now,
+	// 				'UpdateBy'   => $userId,
+	// 			]));
+	// 			echo "Inserted supplier: $supplierCode" . PHP_EOL;
+	// 		}
+	// 	}
+
+	// 	// Process customers
+	// 	foreach ($allCustomers as $customer) {
+	// 		$customerCode = $customer['AccNo'] ?? null;
+	// 		if (!$customerCode) {
+	// 			continue; // skip if no AccNo
+	// 		}
+
+	// 		// Check if customer exists in DB by CustomerCode
+	// 		$exists = \DB::table('customer')->where('CustomerCode', $customerCode)->exists();
+
+	// 		$data = [
+	// 			'name'          => $customer['CompanyName'] ?? '',
+	// 			'CustomerCode'  => $customerCode,
+	// 			'phone_number'  => $customer['Phone1'] ?? '',
+	// 			// add other fields here if needed
+	// 		];
+
+	// 		if ($exists) {
+	// 			// Update existing
+	// 			\DB::table('customer')
+	// 				->where('CustomerCode', $customerCode)
+	// 				->update(array_merge($data, [
+	// 					'updated_at' => $now,
+	// 				]));
+	// 			echo "Updated customer: $customerCode" . PHP_EOL;
+	// 		} else {
+	// 			// Insert new
+	// 			\DB::table('customer')->insert(array_merge($data, [
+	// 				'created_at' => $now,
+	// 				'updated_at' => $now,
+	// 			]));
+	// 			echo "Inserted customer: $customerCode" . PHP_EOL;
+	// 		}
+	// 	}
+	// }
+
+
+	public function fetchAllAutoCount($url, $apiKey, $keyId)
+	{
+		$allData = [];
+		$page = 1;
+		$totalCount = null;
+
+		do {
+			$fullUrl = $url . "&page=" . $page;
+
+			$ch = curl_init();
+			curl_setopt($ch, CURLOPT_URL, $fullUrl);
+			curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+			curl_setopt($ch, CURLOPT_HTTPHEADER, [
+				"API-Key: $apiKey",
+				"Key-ID: $keyId",
+				"Content-Type: application/json"
+			]);
+
+			$response = curl_exec($ch);
+			curl_close($ch);
+
+			$json = json_decode($response, true);
+
+			if (!$json || !isset($json['data'])) {
+				break; // invalid response
+			}
+
+			// Set totalCount once
+			if ($totalCount === null && isset($json['totalCount'])) {
+				$totalCount = (int) $json['totalCount'];
+			}
+
+			// Merge results
+			$allData = array_merge($allData, $json['data']);
+
+			$page++;
+		
+		} while (count($allData) < $totalCount);
+
+		return $allData;
+	}
+
+	public function mapSupplierCustomerFromAutoCount()
+	{
+		$dryRun = true; // SET TO FALSE after testing
+
+		$apiKey = "75be787f-d7fb-4f40-ab8d-32848af7a169";
+		$keyId = "f66b6d44-9433-42b1-8399-2bb5135783f3";
+
+		$supplierUrl = "https://accounting-api.autocountcloud.com/26516/creditor/listing?activeOnly=true&field=accNo&field=companyName";
+		$customerUrl = "https://accounting-api.autocountcloud.com/26516/debtor/listing?activeOnly=true&field=accNo&field=companyName";
+
+		// Fetch from API
+		$apiSuppliers = $this->fetchAllAutoCount($supplierUrl, $apiKey, $keyId) ?? [];
+		$apiCustomers = $this->fetchAllAutoCount($customerUrl, $apiKey, $keyId) ?? [];
+
+		// INDEX API DATA BY NAME
+		$supplierIndex = [];
+		foreach ($apiSuppliers as $item) {
+			$key = trim(strtoupper($item['CompanyName'] ?? ''));
+			if ($key) $supplierIndex[$key] = $item;
+		}
+
+		$customerIndex = [];
+		foreach ($apiCustomers as $item) {
+			$key = trim(strtoupper($item['CompanyName'] ?? ''));
+			if ($key) $customerIndex[$key] = $item;
+		}
+
+		// SYSTEM SUPPLIERS
+		$systemSuppliers = $this->db
+			->where('SupplierCode IS NULL', null, false)
+			->where('AutocountSyncStatus', 'P')
+			->where('AutocountSyncAction', 'C')
+			->where('Name IS NOT NULL', null, false)
+			->where('Name !=', '')
+			->get('supplier')
+			->result();
+
+		// SYSTEM CUSTOMERS
+		$systemCustomers = $this->db
+			->where('CustomerCode IS NULL', null, false)
+			->where('AutocountSyncStatus', 'P')
+			->where('AutocountSyncAction', 'C')
+			->where('Status', 'Y')
+			->where('name IS NOT NULL', null, false)
+			->where('name !=', '')
+			->get('customer')
+			->result();
+
+		$now = date('Y-m-d H:i:s');
+		$supplierUpdates = 0;
+		$customerUpdates = 0;
+
+		echo "===== SUPPLIER MATCHES =====\n";
+
+		foreach ($systemSuppliers as $row) {
+
+			$nameKey = strtoupper(trim($row->Name));
+
+			if (isset($supplierIndex[$nameKey])) {
+
+				$apiItem = $supplierIndex[$nameKey];
+
+				echo "Match Supplier: {$row->Name} → {$apiItem['AccNo']}\n";
+
+				if (!$dryRun) {
+
+					$this->db->where('id', $row->id)
+						->update('supplier', [
+							'SupplierCode'         => $apiItem['AccNo'],
+							'AutocountSyncStatus'  => 'S',
+							'AutocountSyncMessage' => json_encode($apiItem),
+							'UpdateDate'           => $now,
+							'UpdateBy'             => 1,
+						]);
+				}
+
+				$supplierUpdates++;
+			}
+		}
+
+		echo "\n===== CUSTOMER MATCHES =====\n";
+
+		foreach ($systemCustomers as $row) {
+
+			$nameKey = strtoupper(trim($row->name));
+
+			if (isset($customerIndex[$nameKey])) {
+
+				$apiItem = $customerIndex[$nameKey];
+
+				echo "Match Customer: {$row->name} → {$apiItem['AccNo']}\n";
+
+				if (!$dryRun) {
+
+					$this->db->where('id', $row->id)
+						->update('customer', [
+							'CustomerCode'         => $apiItem['AccNo'],
+							'AutocountSyncStatus'  => 'S',
+							'AutocountSyncMessage' => json_encode($apiItem),
+							'UpdateDate'           => $now,
+							'UpdateBy'             => 1
+						]);
+				}
+
+				$customerUpdates++;
+			}
+		}
+
+		echo "\n===== SUMMARY =====\n";
+		print_r(json_encode([
+			'dry_run_mode'            => $dryRun,
+			'total_api_suppliers'     => count($apiSuppliers),
+			'total_api_customers'     => count($apiCustomers),
+			'system_suppliers_to_map' => count($systemSuppliers),
+			'system_customers_to_map' => count($systemCustomers),
+			'supplier_matched'        => $supplierUpdates,
+			'customer_matched'        => $customerUpdates,
+		]));
+	}
+
+
+
+
 }
