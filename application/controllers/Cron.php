@@ -1012,7 +1012,7 @@ class Cron extends CI_Controller
 			return;
 		}
 
-		$dryRun = false; // SET TO FALSE after testing
+		$dryRun = true; // SET TO FALSE after testing
 
 		$apiKey = "75be787f-d7fb-4f40-ab8d-32848af7a169";
 		$keyId = "f66b6d44-9433-42b1-8399-2bb5135783f3";
