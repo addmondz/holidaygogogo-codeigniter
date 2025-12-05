@@ -1076,7 +1076,7 @@ class Cron extends CI_Controller
 
 				if (!$dryRun) {
 
-					$this->db->where('id', $row->id)
+					$this->db->where('SupplierID', $row->SupplierID)
 						->update('supplier', [
 							'SupplierCode'         => $apiItem['AccNo'],
 							'AutocountSyncStatus'  => 'S',
@@ -1104,7 +1104,7 @@ class Cron extends CI_Controller
 
 				if (!$dryRun) {
 
-					$this->db->where('id', $row->id)
+					$this->db->where('CustomerID', $row->CustomerID)
 						->update('customer', [
 							'CustomerCode'         => $apiItem['AccNo'],
 							'AutocountSyncStatus'  => 'S',
