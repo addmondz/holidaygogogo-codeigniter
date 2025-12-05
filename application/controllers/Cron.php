@@ -668,12 +668,12 @@ class Cron extends CI_Controller
 		}
 
 		// description
-		$desc = '';
-		if ($payment['Credit'] != 0.00) { // OR
-			$desc = !empty($payment['Customer']) ? $payment['Customer'] : '';
-		} else { // PV
-			$desc = !empty($payment['supplier_name']) ? $payment['supplier_name'] : (!empty($payment['Customer']) ? $payment['Customer'] : '');
-		}
+		$desc = !empty($payment['Customer']) ? $payment['Customer'] : '';
+		// if ($payment['Credit'] != 0.00) { // OR
+		// 	$desc = !empty($payment['Customer']) ? $payment['Customer'] : '';
+		// } else { // PV
+		// 	$desc = !empty($payment['supplier_name']) ? $payment['supplier_name'] : (!empty($payment['Customer']) ? $payment['Customer'] : '');
+		// }
 
 		if (!empty($payment['StartDate']) && !empty($payment['EndDate'])) {
 			$travelDate = $payment['StartDate'] . ' - ' . $payment['EndDate'];
