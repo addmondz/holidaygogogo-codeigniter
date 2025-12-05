@@ -1109,8 +1109,7 @@ class Cron extends CI_Controller
 							'CustomerCode'         => $apiItem['AccNo'],
 							'AutocountSyncStatus'  => 'S',
 							'AutocountSyncMessage' => json_encode($apiItem),
-							'UpdateDate'           => $now,
-							'UpdateBy'             => 1
+							'updated_at'           => $now,
 						]);
 				}
 
