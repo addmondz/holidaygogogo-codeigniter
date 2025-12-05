@@ -150,10 +150,11 @@
                 var category = $('#CategoryID').val();
                 var supplier = $('#SupplierID').val();
                 var name = ($('#Name').val()).toUpperCase();
+                var maxNameLength = '<?php echo $maxNameLength ?? 95 ?>'
                 if(window.location.href == '<?php echo base_url('Product/Create'); ?>' && category == null || supplier == null || name == '') {
                     Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', 'Please Insert All Required Product Information', null);
-                } else if(name.length > 95) {
-                    Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', 'Product Name Must Not Exceed 95 Characters', null);
+                } else if(name.length > maxNameLength) {
+                    Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', 'Product Name Must Not Exceed '+maxNameLength+' Characters', null);
                 } else {
                     if(window.location.href == '<?php echo base_url('Product/Create'); ?>') {
                         var product = [];
