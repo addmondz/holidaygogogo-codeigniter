@@ -150,46 +150,60 @@
                 var category = $('#CategoryID').val();
                 var supplier = $('#SupplierID').val();
                 var name = ($('#Name').val()).toUpperCase();
-                var maxNameLength = '<?php echo $maxNameLength ?? 95 ?>'
                 if(window.location.href == '<?php echo base_url('Product/Create'); ?>' && category == null || supplier == null || name == '') {
                     Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', 'Please Insert All Required Product Information', null);
-                } else if(name.length > maxNameLength) {
-                    Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', 'Product Name Must Not Exceed '+maxNameLength+' Characters', null);
                 } else {
                     if(window.location.href == '<?php echo base_url('Product/Create'); ?>') {
-                        var product = [];
-                        product.push({CategoryID:category, SupplierID:supplier, Name:name, InsertBy:<?php echo $this->session->userdata('admin_id') ?>, InsertDate:'<?php echo date('Y-m-d H:i:s') ?>'});
-                        var retail_price = $('#RetailPrice').val();
-                        if(retail_price != '') {
-                            product[0]['RetailPrice'] = retail_price.replace(/,/g, '');;
-                        }
-                        var supplier_price = $('#SupplierPrice').val();
-                        if(supplier_price != '') {
-                            product[0]['SupplierPrice'] = supplier_price.replace(/,/g, '');;
-                        }
+                        $.ajax({
+                            url: '<?php echo base_url('Product/GetMaxNameLength') ?>',
+                            type: 'post',
+                            data: { category_id: category },
+                            dataType: 'json',
+                            success: function(maxNameLength) {
+                                if(name.length > maxNameLength) {
+                                    Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', 'Product Name Must Not Exceed '+maxNameLength+' Characters', null);
+                                } else {
+                                    var product = [];
+                                    product.push({CategoryID:category, SupplierID:supplier, Name:name, InsertBy:<?php echo $this->session->userdata('admin_id') ?>, InsertDate:'<?php echo date('Y-m-d H:i:s') ?>'});
+                                    var retail_price = $('#RetailPrice').val();
+                                    if(retail_price != '') {
+                                        product[0]['RetailPrice'] = retail_price.replace(/,/g, '');;
+                                    }
+                                    var supplier_price = $('#SupplierPrice').val();
+                                    if(supplier_price != '') {
+                                        product[0]['SupplierPrice'] = supplier_price.replace(/,/g, '');;
+                                    }
 
-                        Submit_Product('<?php echo base_url('Product/Create') ?>', category, product);
-                    } else {
-                        var product = [{ProductID:<?php echo $ProductID ?>, UpdateBy:<?php echo $this->session->userdata('admin_id') ?>, UpdateDate:'<?php echo date('Y-m-d H:i:s') ?>'}];
-                        var dirty_fields = $('#form').dirty('showDirtyFields');
-                        if(dirty_fields.length > 0) {
-                            for(var i = 0; i < dirty_fields.length; i++) {
-                                var key = dirty_fields[i].id;
-                                var value = (dirty_fields[i].value).toUpperCase();
-                                if(key == 'RetailPrice' || key == 'SupplierPrice') {
-                                    value = value.replace(/,/g, '');
+                                    Submit_Product('<?php echo base_url('Product/Create') ?>', category, product);
                                 }
-                                product[0][key] = value;
                             }
-                        }
-                        count = 0;
-                        $.each(product[0], function() {
-                            count++;
                         });
-                        if(count == 3) {
-                            Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', '<?php echo 'No Changes Detected In Product Record : ' . str_replace('\'', '', $ProductCode); ?>', '<?php echo base_url('Product') ?>');
+                    } else {
+                        var maxNameLength = '<?php echo $maxNameLength ?? 99 ?>';
+                        if(name.length > maxNameLength) {
+                            Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', 'Product Name Must Not Exceed '+maxNameLength+' Characters', null);
                         } else {
-                            Submit_Product('<?php echo base_url('Product/Update') ?>', null, product);
+                            var product = [{ProductID:<?php echo $ProductID ?>, UpdateBy:<?php echo $this->session->userdata('admin_id') ?>, UpdateDate:'<?php echo date('Y-m-d H:i:s') ?>'}];
+                            var dirty_fields = $('#form').dirty('showDirtyFields');
+                            if(dirty_fields.length > 0) {
+                                for(var i = 0; i < dirty_fields.length; i++) {
+                                    var key = dirty_fields[i].id;
+                                    var value = (dirty_fields[i].value).toUpperCase();
+                                    if(key == 'RetailPrice' || key == 'SupplierPrice') {
+                                        value = value.replace(/,/g, '');
+                                    }
+                                    product[0][key] = value;
+                                }
+                            }
+                            count = 0;
+                            $.each(product[0], function() {
+                                count++;
+                            });
+                            if(count == 3) {
+                                Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', '<?php echo 'No Changes Detected In Product Record : ' . str_replace('\'', '', $ProductCode); ?>', '<?php echo base_url('Product') ?>');
+                            } else {
+                                Submit_Product('<?php echo base_url('Product/Update') ?>', null, product);
+                            }
                         }
                     }
                 }

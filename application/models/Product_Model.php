@@ -98,4 +98,16 @@ class Product_Model extends CI_Model
 			return false;
 		}
 	}
+
+	function Get_Max_Name_Length($category_id)
+	{
+		$this->db->select('category_code.Name');
+		$this->db->join('category_code', 'category_code.CategoryCodeID = category.CategoryCodeID', 'left');
+		$this->db->where('CategoryID', $category_id);
+		$category_code = $this->db->get('category')->row()->Name;
+
+		$next_id = $this->db->query("SELECT AUTO_INCREMENT FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'product'")->row()->AUTO_INCREMENT;
+
+		return 99 - strlen($category_code) - 1 - strlen($next_id);
+	}
 }

@@ -58,7 +58,7 @@ class Product extends MY_Controller
             	$array['SupplierPrice'] = $array['SupplierPrice'] == 0.00 ? null : number_format($array['SupplierPrice'], 2, '.', ',');
 				$array['categories'] = $this->Product_Model->Read_Categories();
 				$array['suppliers'] = $this->Product_Model->Read_Suppliers();
-            	$array['maxNameLength'] = 99 - strlen($array['ProductCode']) + 3;
+            	$array['maxNameLength'] = 99 - strlen($array['ProductCode']) - 3;
 				$this->load->view('layout/header', $titles);
 				$this->load->view('product/product', $array);
 				$this->load->view('layout/footer');
@@ -132,5 +132,11 @@ class Product extends MY_Controller
 		} else {
 			echo json_encode(false);
 		}
+	}
+
+	function GetMaxNameLength() {
+		$category_id = $this->input->post('category_id');
+		$max_name_length = $this->Product_Model->Get_Max_Name_Length($category_id);
+		echo json_encode($max_name_length);
 	}
 }
