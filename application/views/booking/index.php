@@ -7,6 +7,10 @@
 #kt_datatable tbody tr td:first-child::after {
     display: none !important;
 }
+#kt_datatable thead th:first-child,
+#kt_datatable tbody td:first-child {
+    display: none !important;
+}
 </style>
 <div class="d-flex flex-column-fluid">
     <div class="container-fluid">
