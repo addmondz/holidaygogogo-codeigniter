@@ -150,21 +150,112 @@ class Receipt extends CI_Controller
         
         // Set Text variable for footer
         $array['Text'] = !empty($array['BookingConfirmationFooter']) ? $array['BookingConfirmationFooter'] : 'Thank you for your payment. Please keep this receipt for your records.';
-        
+
+        // Variables for receipt_simple2 view
+        $array['ReceivedFrom'] = $array['Customer'];
+        $array['VoucherNo'] = 'OR-' . date('ym') . '-' . str_pad($array['BookingID'], 4, '0', STR_PAD_LEFT);
+        $array['ReceiptDate'] = strtoupper(date('j M Y'));
+        $array['RefNo'] = $array['BookingNumber'];
+
+        // Generate Amount In Words
+        $amount_parts = explode('.', $total_received);
+        $ringgit = $this->Convert_Subtotal($amount_parts[0]);
+        if(isset($amount_parts[1]) && $amount_parts[1] != 0) {
+            $sen = 'AND CENTS ' . $this->Convert_Subtotal($amount_parts[1]);
+        } else {
+            $sen = '';
+        }
+        $array['ReceiveSumOf'] = 'RINGGIT MALAYSIA ' . strtoupper($ringgit) . ' ' . $sen . ' ONLY.';
+
+        // Format payments for view
+        $payments = [];
+        foreach($approved_payments as $payment) {
+            $pay = new stdClass();
+            $pay->PaymentBy = $payment->Type;
+            $pay->ChequeNo = $payment->ReferenceNumber;
+            $pay->Amount = $payment->Credit;
+            $payments[] = $pay;
+        }
+        $array['payments'] = $payments;
+
+        // Format paid items for view
+        $paid_items = [];
+        $item = new stdClass();
+        $item->AccNo = $array['BookingNumber'];
+        $item->Description = $array['Customer'] . '     ' . $array['TravelDate'];
+        $item->TaxAmount = $total_received;
+        $item->Amount = $total_received;
+        $paid_items[] = $item;
+        $array['paid_items'] = $paid_items;
+
+        // Total
+        $array['Total'] = $total_received;
+
         // Generate PDF
         $this->load->library('pdf');
-        
+
         // Generate single-page receipt
-        $this->dompdf->loadHtml($this->load->view('receipt/receipt_simple', $array, true));
+        $this->dompdf->loadHtml($this->load->view('receipt/receipt_simple2', $array, true));
         $this->dompdf->set_option('isRemoteEnabled', true);
         $this->dompdf->setPaper('A4', 'portrait');
         $this->dompdf->render();
         
         $pdf_output = $this->dompdf->output();
-        
+
         // Output the PDF directly to the browser
         header('Content-Type: application/pdf');
         header('Content-Disposition: inline; filename="' . $array['BookingNumber'] . '_receipt.pdf"');
         echo $pdf_output;
+    }
+
+    function Convert_Subtotal($subtotal)
+    {
+        if($subtotal < 0) {
+            $negative = true;
+            $subtotal = abs($subtotal);
+        } else {
+            $negative = false;
+        }
+
+        if(($subtotal < 0) || ($subtotal > 999999999)) {
+            throw new Exception('Subtotal Is Out Of Range');
+        }
+        $giga = floor($subtotal / 1000000);
+        $subtotal -= $giga * 1000000;
+        $kilo = floor($subtotal / 1000);
+        $subtotal -= $kilo * 1000;
+        $hecto = floor($subtotal / 100);
+        $subtotal -= $hecto * 100;
+        $deca = floor($subtotal / 10);
+        $number = $subtotal % 10;
+        $value = '';
+        if($giga) {
+            $value .= $this->Convert_Subtotal($giga) . ' Million';
+        }
+        if($kilo) {
+            $value .= (empty($value) ? '' : ' ') . $this->Convert_Subtotal($kilo) . ' Thousand';
+        }
+        if($hecto) {
+            $value .= (empty($value) ? '' : ' ') . $this->Convert_Subtotal($hecto) . ' Hundred';
+        }
+        $ones = array('', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eightteen', 'Nineteen');
+        $tens = array('', '', 'Twenty', 'Thirty', 'Fourty', 'Fifty', 'Sixty', 'Seventy', 'Eigthy', 'Ninety');
+        if($deca || $number) {
+            if(!empty($value)) {
+                $value .= ' And ';
+            }
+            if($deca < 2) {
+                $value .= $ones[$deca * 10 + $number];
+            } else {
+                $value .= $tens[$deca];
+                if($number) {
+                    $value .= '-' . $ones[$number];
+                }
+            }
+        }
+        if(empty($value)) {
+            $value = 'Zero';
+        }
+        return $value;
     }
 }

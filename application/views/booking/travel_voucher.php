@@ -155,7 +155,15 @@
 	</table>
 	
 	<!-- Guest List Details -->
-	<?php if(!empty($guest_lists)) { ?>
+	<?php
+	$has_filled_guests = false;
+	foreach($guest_lists as $g) {
+		if(!empty(trim($g->GuestFirstName . ' ' . $g->GuestLastName))) {
+			$has_filled_guests = true;
+			break;
+		}
+	}
+	if($has_filled_guests) { ?>
 	<br>
 	<div style="page-break-inside: avoid;">
 		<table style="width:100%; margin-bottom: 8px; border-collapse: collapse;">
