@@ -63,7 +63,7 @@ class Receipt extends CI_Controller
         $array['InsertDate'] = strtoupper(date('j M Y'));
         
         // Get approved payments for this booking
-        $this->db->select('Date, Type, Credit, ReferenceNumber, Status');
+        $this->db->select('Date, Type, Credit, ReferenceNumber, AutocountReferenceNumber, Status');
         $this->db->where('BookingID', $array['BookingID']);
         $this->db->where('Status', 'Y');
         $this->db->where('Credit >', 0);
@@ -153,7 +153,10 @@ class Receipt extends CI_Controller
 
         // Variables for receipt_simple2 view
         $array['ReceivedFrom'] = $array['Customer'];
-        $array['VoucherNo'] = 'OR-' . date('ym') . '-' . str_pad($array['BookingID'], 4, '0', STR_PAD_LEFT);
+        // Use AutoCount reference number from first payment if available
+        $array['VoucherNo'] = !empty($approved_payments) && !empty($approved_payments[0]->AutocountReferenceNumber)
+            ? $approved_payments[0]->AutocountReferenceNumber
+            : 'OR-' . date('ym') . '-' . str_pad($array['BookingID'], 4, '0', STR_PAD_LEFT);
         $array['ReceiptDate'] = date('d/m/Y');
         $array['RefNo'] = $array['BookingNumber'];
 
