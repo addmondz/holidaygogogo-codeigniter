@@ -204,9 +204,6 @@ class Guest_List extends CI_Controller
 		$spreadsheet->getActiveSheet()->getStyle('A1:AB1')->getFont()->getColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_WHITE);
 		$spreadsheet->getActiveSheet()->getStyle('A1:AB1')->getFont()->setBold(true);
 		foreach($guest_lists as $guest) {
-			$customerParts = explode(' ', $guest->Customer, 2);
-			$guest->CustomerFirstName = $customerParts[0] ?? '';
-			$guest->CustomerLastName = $customerParts[1] ?? '';
 			$guest->CustomerMobile = $guest->CountryCode . $guest->CustomerMobile;
 			if(!empty($guest->StartDate) && !empty($guest->EndDate)) {
 				$guest->TravelDate = strtoupper(date('j M', strtotime($guest->StartDate)) . ' - ' . date('j M Y', strtotime($guest->EndDate)));
@@ -230,8 +227,8 @@ class Guest_List extends CI_Controller
 			}
 			$spreadsheet->getActiveSheet()->setCellValueExplicit('A' . $row, $guest->BookingNumber, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 			$spreadsheet->getActiveSheet()->setCellValueExplicit('B' . $row, $guest->ReservationNumber, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-			$spreadsheet->getActiveSheet()->setCellValueExplicit('C' . $row, $guest->CustomerFirstName, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-			$spreadsheet->getActiveSheet()->setCellValueExplicit('D' . $row, $guest->CustomerLastName, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('C' . $row, $guest->Guest, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('D' . $row, $guest->GuestLastName, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 			$spreadsheet->getActiveSheet()->setCellValueExplicit('E' . $row, $guest->CustomerMobile, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 			$spreadsheet->getActiveSheet()->setCellValueExplicit('F' . $row, $guest->ChatLanguage, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 			$spreadsheet->getActiveSheet()->setCellValueExplicit('G' . $row, $guest->TravelDate, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
