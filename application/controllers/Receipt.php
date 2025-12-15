@@ -171,7 +171,7 @@ class Receipt extends CI_Controller
         $payments = [];
         foreach($approved_payments as $payment) {
             $pay = new stdClass();
-            $pay->PaymentBy = ($payment->Type == 'full') ? 'M2U' : $payment->Type;
+            $pay->PaymentBy = ($payment->Type == 'FULL') ? 'M2U' : $payment->Type;
             $pay->ChequeNo = $payment->ReferenceNumber;
             $pay->Amount = $payment->Credit;
             $payments[] = $pay;
