@@ -154,7 +154,7 @@ class Receipt extends CI_Controller
         // Variables for receipt_simple2 view
         $array['ReceivedFrom'] = $array['Customer'];
         $array['VoucherNo'] = 'OR-' . date('ym') . '-' . str_pad($array['BookingID'], 4, '0', STR_PAD_LEFT);
-        $array['ReceiptDate'] = strtoupper(date('j M Y'));
+        $array['ReceiptDate'] = date('d/m/Y');
         $array['RefNo'] = $array['BookingNumber'];
 
         // Generate Amount In Words
@@ -172,7 +172,7 @@ class Receipt extends CI_Controller
         foreach($approved_payments as $payment) {
             $pay = new stdClass();
             $pay->PaymentBy = $payment->Type;
-            $pay->ChequeNo = $payment->ReferenceNumber;
+            $pay->ChequeNo = empty($payment->ReferenceNumber) ? 'M2U' : $payment->ReferenceNumber;
             $pay->Amount = $payment->Credit;
             $payments[] = $pay;
         }
@@ -181,7 +181,7 @@ class Receipt extends CI_Controller
         // Format paid items for view
         $paid_items = [];
         $item = new stdClass();
-        $item->AccNo = $array['BookingNumber'];
+        $item->AccNo = $array['CustomerCode'];
         $item->Description = $array['Customer'] . '     ' . $array['TravelDate'];
         $item->TaxAmount = $total_received;
         $item->Amount = $total_received;
@@ -197,7 +197,7 @@ class Receipt extends CI_Controller
         // Generate single-page receipt
         $this->dompdf->loadHtml($this->load->view('receipt/receipt_simple2', $array, true));
         $this->dompdf->set_option('isRemoteEnabled', true);
-        $this->dompdf->setPaper('A4', 'portrait');
+        $this->dompdf->setPaper(array(0, 0, 850, 550));
         $this->dompdf->render();
         
         $pdf_output = $this->dompdf->output();
