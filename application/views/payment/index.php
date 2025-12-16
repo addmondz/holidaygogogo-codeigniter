@@ -578,8 +578,7 @@
                             </div>
                         </div>
                     <?php } ?>
-                    <?php if(!empty($this->input->get('supplier')) || !empty($this->input->get('transaction_date')) || !empty($this->input->get('payment_type')) || !empty($this->input->get('transaction_type')) || !empty($this->input->get('reference_number')) || !empty($this->input->get('payment_deadline')) || !empty($this->input->get('quotation_number')) || !empty($this->input->get('invoice_number')) || !empty($this->input->get('bank')) || !empty($this->input->get('bank_account')) || !empty($this->input->get('bank_holder')) || !empty($this->input->get('status')) || !empty($this->input->get('booking_number')) || !empty($this->input->get('customer')) || !empty($this->input->get('travel_date')) || !empty($this->input->get('sales_agent'))) { ?>
-                        <div class="row" style="display:none;">
+                        <div class="row">
                             <br>
                             <div class="col-md-12 pt-3 pb-3" style="background-color:white; border:3px solid #D7E2F2; border-radius:8px;">
                                 <div class="row">
@@ -613,7 +612,6 @@
                                 </div>
                             </div>
                         </div>
-                    <?php } ?>
                     <br>
                     <?php if(in_array('GP', $this->session->access_control)) { ?>
                         <a href="<?php if(strpos($current_url, '?') == true) { echo base_url('Payment/Create?') . (explode('?', $current_url))[1]; } else { echo base_url('Payment/Create'); } ?>" class="btn btn-primary font-weight-bold" style="width:180px; float:right;">
