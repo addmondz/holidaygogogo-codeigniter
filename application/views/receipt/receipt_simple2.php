@@ -232,7 +232,7 @@
 
 	<!-- Signature -->
 	<div class="signature-line">
-		For <?php echo $CompanyName; ?>.
+		For <?php echo $CompanyName; ?>
 	</div>
 
 </body></html>
