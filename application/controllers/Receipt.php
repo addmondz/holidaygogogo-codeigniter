@@ -157,7 +157,9 @@ class Receipt extends CI_Controller
         $array['VoucherNo'] = !empty($approved_payments) && !empty($approved_payments[0]->AutocountReferenceNumber)
             ? $approved_payments[0]->AutocountReferenceNumber
             : 'OR-' . date('ym') . '-' . str_pad($array['BookingID'], 4, '0', STR_PAD_LEFT);
-        $array['ReceiptDate'] = date('d/m/Y');
+        $array['ReceiptDate'] = !empty($approved_payments)
+            ? date('d/m/Y', strtotime($approved_payments[0]->Date))
+            : date('d/m/Y');
         $array['RefNo'] = $array['BookingNumber'];
 
         // Generate Amount In Words
