@@ -85,9 +85,9 @@
 		<table>
 			<tr>
 				<?php
-					$logoPath = FCPATH.'assets/image/pdflogo.png';
+					$logoPath = FCPATH.'assets/image/pdflogo-new.jpeg';
 					$imgData  = base64_encode(file_get_contents($logoPath));
-					$imgSrc   = 'data:image/png;base64,'.$imgData;
+					$imgSrc   = 'data:image/jpeg;base64,'.$imgData;
 				?>
 				<td style="width:15%">
 					<img src="<?= $imgSrc ?>" style="width:160px;">

@@ -58,7 +58,7 @@
 <body>
 	<table>
 		<tr>
-			<td style="width: 15%"><img src="<?php echo base_url('assets/image/logo.png'); ?>" style="width:160px;"></td>
+			<td style="width: 15%"><img src="<?php echo base_url('assets/image/pdflogo-new.jpeg'); ?>" style="width:160px;"></td>
 			<td style="width: 85%">
 				<h1><?php echo $CompanyName; ?></h1>
 				<p class="text-center small-font">
