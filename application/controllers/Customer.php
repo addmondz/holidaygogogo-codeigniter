@@ -172,21 +172,30 @@ class Customer extends MY_Controller
 	}
 
 	public function search()
-    {
-        $q = $this->input->get('q');
-		
-        $this->db->like('name', $q);
-        $this->db->or_like('CustomerCode', $q);
-        $this->db->or_like('phone_number', $q);
-		if ($this->input->get('limit') != 'INFINITE') {
-			$limit = !empty($this->input->get('limit')) ? $this->input->get('limit') : 30;
-        	$this->db->limit($limit);
-		}
-        $query = $this->db->get('customer');
-        $results = $query->result();
+	{
+		$q = $this->input->get('q');
 
-        // Return JSON
-        echo json_encode($results);
-    }
+		$this->db->group_start(); // Open bracket (
+		$this->db->like('name', $q);
+		$this->db->or_like('CustomerCode', $q);
+		$this->db->or_like('phone_number', $q);
+		$this->db->group_end();   // Close bracket )
+
+		// Check not null and not empty
+		$this->db->where('name IS NOT NULL');
+		$this->db->where('ChatLanguage IS NOT NULL');
+		$this->db->where('phone_number IS NOT NULL');
+
+		if ($this->input->get('limit') != 'INFINITE') {
+			$limit = !empty($this->input->get('limit')) ? (int)$this->input->get('limit') : 30;
+			$this->db->limit($limit);
+		}
+		
+		$query = $this->db->get('customer');
+		$results = $query->result();
+
+		// Return JSON
+		echo json_encode($results);
+	}
 
 }
