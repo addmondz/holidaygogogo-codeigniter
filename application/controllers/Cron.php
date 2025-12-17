@@ -1128,8 +1128,100 @@ class Cron extends CI_Controller
 			'customer_matched'        => $customerUpdates,
 		]));
 	}
+	
+	public function AddCustomerFromAutoCount()
+	{
+		$this->load->helper('autocount');
+		$config = get_autocount_config();
 
+		// 🔐 Simple API key protection
+		$apiKey = $this->input->get('key');
+		$expectedKey = $config['manual_sync_autocount_key'];
 
+		if ($apiKey !== $expectedKey) {
+			show_error('Unauthorized access', 401);
+			return;
+		}
 
+		// 🔁 Dry run mode (SET FALSE AFTER TESTING)
+		$dryRun = true;
+
+		// 🔑 AutoCount API credentials
+		$apiKey = "75be787f-d7fb-4f40-ab8d-32848af7a169";
+		$keyId  = "f66b6d44-9433-42b1-8399-2bb5135783f3";
+
+		// 🌐 AutoCount customer listing API
+		$customerUrl = "https://accounting-api.autocountcloud.com/26516/debtor/listing"
+			. "?activeOnly=true"
+			. "&field=accNo"
+			. "&field=companyName"
+			. "&field=phone1";
+
+		// 📡 Fetch customers from AutoCount
+		$apiCustomers = $this->fetchAllAutoCount($customerUrl, $apiKey, $keyId) ?? [];
+
+		// 📦 Existing CustomerCode index (FAST lookup)
+		$existingCodes = $this->db
+			->select('CustomerCode')
+			->where('CustomerCode IS NOT NULL', null, false)
+			->get('customer')
+			->result_array();
+
+		$existingIndex = array_flip(
+			array_map('strtoupper', array_column($existingCodes, 'CustomerCode'))
+		);
+
+		$now       = date('Y-m-d H:i:s');
+		$inserted  = 0;
+		$ignored   = 0;
+
+		echo "\n===== AUTOCOUNT CUSTOMER SYNC =====\n";
+
+		foreach ($apiCustomers as $item) {
+
+			$accNo = strtoupper(trim($item['AccNo'] ?? ''));
+
+			// Skip invalid records
+			if (!$accNo) {
+				continue;
+			}
+
+			// 🚫 Ignore if already exists
+			if (isset($existingIndex[$accNo])) {
+				echo "Ignored (exists): {$accNo}\n";
+				$ignored++;
+				continue;
+			}
+
+			echo "Insert New Customer: {$accNo} - {$item['CompanyName']}\n";
+
+			if (!$dryRun) {
+				// $this->db->insert('customer', [
+				// 	'CustomerCode'         => $item['AccNo'],
+				// 	'name'                 => $item['CompanyName'] ?? '',
+				// 	'phone_number'         => $item['Phone1'] ?? '',
+				// 	'ChatLanguage'         => 'CN',
+				// 	'Status'               => 'Y',
+				// 	'AutocountSyncStatus'  => 'S',
+				// 	'AutocountSyncAction'  => 'C',
+				// 	'AutocountSyncMessage' => json_encode($item),
+				// 	'created_at'           => $now,
+				// 	'updated_at'           => $now,
+				// ]);
+			}
+
+			// Add to index to prevent double insert in same run
+			$existingIndex[$accNo] = true;
+			$inserted++;
+		}
+
+		echo "\n===== SUMMARY =====\n";
+		echo json_encode([
+			'dry_run_mode'        => $dryRun,
+			'total_api_customers' => count($apiCustomers),
+			'inserted'            => $inserted,
+			'ignored_existing'    => $ignored,
+		], JSON_PRETTY_PRINT);
+	}
 
 }
