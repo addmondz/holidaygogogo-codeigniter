@@ -183,7 +183,6 @@ class Customer extends MY_Controller
 
 		// Check not null and not empty
 		$this->db->where('name IS NOT NULL');
-		$this->db->where('ChatLanguage IS NOT NULL');
 		$this->db->where('phone_number IS NOT NULL');
 
 		if ($this->input->get('limit') != 'INFINITE') {

@@ -48,7 +48,6 @@ class Customer_Model extends CI_Model
 
 		$this->db->where('Status', 'Y');
 		$this->db->where('name IS NOT NULL');
-		$this->db->where('ChatLanguage IS NOT NULL');
 		$this->db->where('phone_number IS NOT NULL');
 		$this->db->order_by('name', 'ASC');
 		return $this->db->get('customer')->result();
