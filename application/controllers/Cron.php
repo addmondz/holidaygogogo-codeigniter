@@ -1144,7 +1144,7 @@ class Cron extends CI_Controller
 		}
 
 		// 🔁 Dry run mode (SET FALSE AFTER TESTING)
-		$dryRun = true;
+		$dryRun = false;
 
 		// 🔑 AutoCount API credentials
 		$apiKey = "75be787f-d7fb-4f40-ab8d-32848af7a169";
@@ -1196,18 +1196,17 @@ class Cron extends CI_Controller
 			echo "Insert New Customer: {$accNo} - {$item['CompanyName']}\n";
 
 			if (!$dryRun) {
-				// $this->db->insert('customer', [
-				// 	'CustomerCode'         => $item['AccNo'],
-				// 	'name'                 => $item['CompanyName'] ?? '',
-				// 	'phone_number'         => $item['Phone1'] ?? '',
-				// 	'ChatLanguage'         => 'CN',
-				// 	'Status'               => 'Y',
-				// 	'AutocountSyncStatus'  => 'S',
-				// 	'AutocountSyncAction'  => 'C',
-				// 	'AutocountSyncMessage' => json_encode($item),
-				// 	'created_at'           => $now,
-				// 	'updated_at'           => $now,
-				// ]);
+				$this->db->insert('customer', [
+					'CustomerCode'         => $item['AccNo'],
+					'name'                 => $item['CompanyName'] ?? '',
+					'phone_number'         => $item['Phone1'] ?? '',
+					'Status'               => 'Y',
+					'AutocountSyncStatus'  => 'S',
+					'AutocountSyncAction'  => 'C',
+					'AutocountSyncMessage' => json_encode($item),
+					'created_at'           => $now,
+					'updated_at'           => $now,
+				]);
 			}
 
 			// Add to index to prevent double insert in same run
