@@ -49,6 +49,11 @@ class Customer_Model extends CI_Model
 		$this->db->where('Status', 'Y');
 		$this->db->where('name IS NOT NULL');
 		$this->db->where('phone_number IS NOT NULL');
+		$this->db->where(
+			"created_at NOT BETWEEN '2025-12-17 22:58:00' AND '2025-12-17 22:59:59'",
+			null,
+			false
+		);
 		$this->db->order_by('name', 'ASC');
 		return $this->db->get('customer')->result();
 	}
@@ -219,6 +224,7 @@ class Customer_Model extends CI_Model
 		$this->db->from('customer');
 		$this->db->where_in('AutocountSyncStatus', $statuses);
 		$this->db->where('AutocountSyncAction IS NOT NULL', null, false);
+		$this->db->where('name IS NOT NULL', null, false);
 
 		// --- NEW, CLEARER QUERY START ---
 		// This query uses a nested EXISTS, which is easier to read
