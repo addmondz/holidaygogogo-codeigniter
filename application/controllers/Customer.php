@@ -171,7 +171,7 @@ class Customer extends MY_Controller
 		}
 	}
 
-	public function search()
+	public function search1()
 	{
 		$q = $this->input->get('q');
 
@@ -199,5 +199,34 @@ class Customer extends MY_Controller
 		$query = $this->db->get('customer');
 		echo json_encode($query->result());
 	}
+
+	public function search()
+	{
+		$q = trim($this->input->get('q'));
+
+		if ($q === '') {
+			echo json_encode([]);
+			return;
+		}
+
+		// 🚀 Decide which column to search
+		if (is_numeric($q)) {
+			// Phone number
+			$this->db->like('phone_number', $q, 'after'); // NO leading %
+		} elseif (preg_match('/^[A-Za-z0-9\-]+$/', $q)) {
+			// Customer code
+			$this->db->like('CustomerCode', $q, 'after');
+		} else {
+			// Name
+			$this->db->like('name', $q);
+		}
+
+		$this->db->where('Status', 'Y');
+		$this->db->where('name IS NOT NULL', null, false);
+		$this->db->limit(30);
+
+		echo json_encode($this->db->get('customer')->result());
+	}
+
 
 }
