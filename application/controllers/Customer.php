@@ -176,25 +176,28 @@ class Customer extends MY_Controller
 		$q = $this->input->get('q');
 
 		$this->db->group_start(); 
-		$this->db->like('name', $q);
-		$this->db->or_like('CustomerCode', $q);
-		$this->db->or_like('phone_number', $q);
+			$this->db->like('name', $q);
+			$this->db->or_like('CustomerCode', $q);
+			$this->db->or_like('phone_number', $q);
 		$this->db->group_end();
 
-		// Check not null and not empty
-		$this->db->where('name IS NOT NULL');
-		$this->db->where('phone_number IS NOT NULL');
+		$this->db->where('name IS NOT NULL', null, false);
+		$this->db->where('phone_number IS NOT NULL', null, false);
+
+		// 🚫 EXCLUDE heavy batch (8k rows)
+		$this->db->where(
+			"created_at NOT BETWEEN '2025-12-17 22:58:00' AND '2025-12-17 22:59:59'",
+			null,
+			false
+		);
 
 		if ($this->input->get('limit') != 'INFINITE') {
 			$limit = !empty($this->input->get('limit')) ? (int)$this->input->get('limit') : 30;
 			$this->db->limit($limit);
 		}
-		
-		$query = $this->db->get('customer');
-		$results = $query->result();
 
-		// Return JSON
-		echo json_encode($results);
+		$query = $this->db->get('customer');
+		echo json_encode($query->result());
 	}
 
 }
