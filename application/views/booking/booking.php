@@ -72,6 +72,7 @@
                                     </span>
 
                                 </div>
+                                <small id="ReservationNumberError" class="text-danger"></small>
 
                             </div>
 
@@ -204,6 +205,8 @@
                                     </span>
 
                                 </div>
+                                <small id="MobileError" class="text-danger"></small>
+
 
                             </div>
 
@@ -1447,6 +1450,10 @@
 
                 var bc_title = $('#BookingConfirmationTitle').val();
 
+                 // Apply validation
+                validateLength('ReservationNumber', 'ReservationNumberError', 20);
+                validateLength('Mobile', 'MobileError', 25, true);
+
                 if(country_code == null || reservation_number == '' || full_payment_deadline == '' || customer == '' || mobile == '' || travel_date == '' || destination == null || sales_agent == null || chat_language == null || source == null || bc_title == null) {
 
                     Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', 'Please Insert All Required Booking Information', null);
@@ -2056,6 +2063,7 @@
 
     {
 
+
         $.ajax({
 
             url: url,
@@ -2257,6 +2265,38 @@ jQuery(document).ready(function() {
 </script>
 
 <script>
+    function validateLength(inputId, errorId, maxLength, onlyNumber = false) {
+        const input = document.getElementById(inputId);
+        const error = document.getElementById(errorId);
+
+        if (!input) return; // safety check
+
+        input.addEventListener('input', function () {
+            let value = this.value;
+
+            // Numbers only
+            if (onlyNumber) {
+                value = value.replace(/\D/g, '');
+            }
+
+            // Length validation
+            if (value.length > maxLength) {
+                error.textContent = `Length can't be more than ${maxLength} characters`;
+                value = value.substring(0, maxLength);
+            } else {
+                error.textContent = '';
+            }
+
+            this.value = value;
+        });
+    }
+
+    // Run when page is fully loaded
+    document.addEventListener('DOMContentLoaded', function () {
+        validateLength('ReservationNumber', 'ReservationNumberError', 20);
+        validateLength('Mobile', 'MobileError', 25, true);
+    });
+
 // $(document).ready(function() {
 //     // Hardcoded customer list (simulate DB)
 //     const customers = [
