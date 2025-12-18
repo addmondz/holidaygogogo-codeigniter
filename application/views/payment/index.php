@@ -482,7 +482,7 @@
                                                     <?php } ?>
                                                     <a href="<?php echo base_url('Payment/View?payment_id=') . $payment->PaymentID; ?>" class="dropdown-item" style="font-size:11px;">Read Payment</a>
                                                     <?php //if($payment->Status == 'Y' && $payment->Credit > 0) { ?>
-                                                    <?php if($payment->Status == 'Y') { ?>
+                                                    <?php if($payment->Status == 'Y' && substr($payment->AutocountReferenceNumber, 0, 2) !== 'PV') { ?>
                                                         <a href="<?php echo base_url('Receipt?token=') . $payment->Token; ?>" target="_blank" class="dropdown-item" style="font-size:11px; color:#28a745;">Generate Receipt</a>
                                                     <?php } ?>
                                                     <?php if(in_array('AP', $this->session->access_control)) { ?>
