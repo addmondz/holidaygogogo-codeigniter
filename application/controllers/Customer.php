@@ -15,10 +15,22 @@ class Customer extends MY_Controller
 
 	function index()
 	{
-		$titles = array('tab_title' => 'HolidayGoGoGo | Customer', 'breadcrumb_title' => 'Customer');
-		$array['customers'] = $this->Customer_Model->Read_Customers1();
+		$page   = max(1, (int) $this->input->get('page'));
+		$limit  = 30; // rows per page
+		$offset = ($page - 1) * $limit;
+
+		$data['customers'] = $this->Customer_Model->Read_Customers1($limit, $offset);
+		$data['total']     = $this->Customer_Model->Count_Customers();
+		$data['page']      = $page;
+		$data['limit']     = $limit;
+
+		$titles = [
+			'tab_title' => 'HolidayGoGoGo | Customer',
+			'breadcrumb_title' => 'Customer'
+		];
+
 		$this->load->view('layout/header', $titles);
-		$this->load->view('customer/index', $array);
+		$this->load->view('customer/index', $data);
 		$this->load->view('layout/footer');
 	}
 

@@ -1,39 +1,49 @@
-<style>
-/* Hide pagination buttons container */
-.kt-datatable__pager {
-    display: none !important;
-}
+<?php
+function renderPagination($totalPages, $currentPage, $query, $maxPagesToShow = 7) {
+    if ($totalPages <= 1) return;
 
-/* Hide "show entries" dropdown (page size selector) */
-.kt-datatable__pager .kt-datatable__pager-size {
-    display: none !important;
-}
+    $half = floor($maxPagesToShow / 2);
+    $start = max(1, $currentPage - $half);
+    $end = min($totalPages, $currentPage + $half);
 
-/* Hide info text (optional if you want to build your own info display) */
-.kt-datatable__info {
-    display: none !important;
-}
-.kt-datatable__pager-size {
-    display: none !important;
-}
-/* Hide pagination controls */
-.kt-datatable__pager,
-.kt-datatable__pager-info,
-.kt-datatable__pager-size,
-.kt-datatable__pager-nav,
-.kt-datatable__info,
-.dataTables_paginate,
-.dataTables_length,
-.dataTables_info {
-    display: none !important;
-}
-div.kt-datatable__pager-container {
-    display: none !important;
-}
+    if ($currentPage <= $half) {
+        $end = min($totalPages, $maxPagesToShow);
+    }
+    if ($currentPage + $half > $totalPages) {
+        $start = max(1, $totalPages - $maxPagesToShow + 1);
+    }
 
+    $query['page'] = 1;
+    echo '<a href="?' . http_build_query($query) . '" class="btn btn-sm ' . ($currentPage == 1 ? 'btn-primary disabled' : 'btn-light') . '">&laquo; First</a> ';
 
-</style>
+    $prevPage = max(1, $currentPage - 1);
+    $query['page'] = $prevPage;
+    echo '<a href="?' . http_build_query($query) . '" class="btn btn-sm ' . ($currentPage == 1 ? 'btn-primary disabled' : 'btn-light') . '">&lsaquo; Prev</a> ';
 
+    if ($start > 1) {
+        echo '<span class="btn btn-sm btn-light disabled">...</span> ';
+    }
+
+    for ($i = $start; $i <= $end; $i++) {
+        $query['page'] = $i;
+        $activeClass = ($currentPage == $i) ? 'btn-primary' : 'btn-light';
+        echo '<a href="?' . http_build_query($query) . '" class="btn btn-sm ' . $activeClass . '">' . $i . '</a> ';
+    }
+
+    if ($end < $totalPages) {
+        echo '<span class="btn btn-sm btn-light disabled">...</span> ';
+    }
+
+    $nextPage = min($totalPages, $currentPage + 1);
+    $query['page'] = $nextPage;
+    echo '<a href="?' . http_build_query($query) . '" class="btn btn-sm ' . ($currentPage == $totalPages ? 'btn-primary disabled' : 'btn-light') . '">Next &rsaquo;</a> ';
+
+    $query['page'] = $totalPages;
+    echo '<a href="?' . http_build_query($query) . '" class="btn btn-sm ' . ($currentPage == $totalPages ? 'btn-primary disabled' : 'btn-light') . '">Last &raquo;</a>';
+}
+?>
+<link href="path_to/kt_datatable.bundle.css" rel="stylesheet" type="text/css" />
+<script src="path_to/kt_datatable.bundle.js"></script>
 <div class="d-flex flex-column-fluid">
     <div class="container-fluid">
         <div class="card card-custom mb-5">
@@ -125,12 +135,14 @@ div.kt-datatable__pager-container {
                         </thead>
                         <tbody>
                             <?php if(empty($customers)) { ?>
-                                <td colspan="7" style="text-align:center; padding-top:10px; padding-bottom:10px;">Customer Records Not Found</td>
+                                <td colspan="8" style="text-align:center; padding-top:10px; padding-bottom:10px;">Customer Records Not Found</td>
                             <?php } else { ?>
-                                <?php $count = 1; ?>
-                                <?php foreach($customers as $customer) { ?>
+                                <?php 
+                                    $count = ($page - 1) * $limit + 1; 
+                                    foreach($customers as $customer) { 
+                                ?>
                                     <tr>
-                                        <td style="text-align:center; padding-top:15px; padding-bottom:15px;"><?php echo $count; ?></td>
+                                        <td style="text-align:center; padding-top:15px; padding-bottom:15px;"><?php echo $count++; ?></td>
                                         <td style="text-align:center;"><?php echo $customer->name; ?></td>
                                         <td style="text-align:center;"><?php echo $customer->phone_number; ?></td>
                                         <td style="text-align:center;"><?php echo $customer->CustomerCode; ?></td>
@@ -176,94 +188,110 @@ div.kt-datatable__pager-container {
                                             </div>
                                         </td>
                                     </tr>
-                                    <?php $count++; ?>
                                 <?php } ?>
                             <?php } ?>
                         </tbody>
                     </table>
-                    <div class="d-flex justify-content-between align-items-center mt-3">
-                        <?php if (!empty($customers)) {
-                            $start = ($page - 1) * $limit + 1;
-                            $end = min($page * $limit, $total);
-                        ?>
-                            <div class="text-left font-weight-bold" style="padding-left:15px;">
-                                Showing <?= $start ?> to <?= $end ?> of <?= $total ?> entries
-                            </div>
-                        <?php } ?>
 
-                        <div class="text-center">
-                            <?php
-                            $totalPages = ceil($total / $limit);
-                            $query = $_GET;
-                            unset($query['page']);
+                   <div class="d-flex justify-content-between align-items-center mt-3">
+    <?php if (!empty($customers)) {
+        $start = ($page - 1) * $limit + 1;
+        $end = min($page * $limit, $total);
+    ?>
+        <div class="text-left font-weight-bold" style="padding-left:15px;">
+            Showing <?= $start ?> to <?= $end ?> of <?= $total ?> entries
+        </div>
+    <?php } ?>
 
-                            // Only show pagination if more than 1 page
-                            if ($totalPages > 1):
-                                $maxPagesToShow = 7; // max page buttons to show
-                                $half = floor($maxPagesToShow / 2);
-                                $startPage = max(1, $page - $half);
-                                $endPage = min($totalPages, $page + $half);
+    <div class="text-center">
+        <?php
+        $totalPages = ceil($total / $limit);
+        $query = $_GET;
+        unset($query['page']);
 
-                                // Adjust start or end if near beginning or end
-                                if ($page <= $half) {
-                                    $endPage = min($totalPages, $maxPagesToShow);
-                                }
-                                if ($page + $half > $totalPages) {
-                                    $startPage = max(1, $totalPages - $maxPagesToShow + 1);
-                                }
-                            ?>
+        // Only show pagination if more than 1 page
+        if ($totalPages > 1):
+            $maxPagesToShow = 7; // max page buttons to show
+            $half = floor($maxPagesToShow / 2);
+            $startPage = max(1, $page - $half);
+            $endPage = min($totalPages, $page + $half);
 
-                            <!-- First Page -->
-                            <?php
-                                $query['page'] = 1;
-                            ?>
-                            <a href="?<?= http_build_query($query) ?>" class="btn btn-sm <?= ($page == 1 ? 'btn-primary disabled' : 'btn-light') ?>">« First</a>
+            // Adjust start or end if near beginning or end
+            if ($page <= $half) {
+                $endPage = min($totalPages, $maxPagesToShow);
+            }
+            if ($page + $half > $totalPages) {
+                $startPage = max(1, $totalPages - $maxPagesToShow + 1);
+            }
+        ?>
 
-                            <!-- Previous Page -->
-                            <?php
-                                $prevPage = max(1, $page - 1);
-                                $query['page'] = $prevPage;
-                            ?>
-                            <a href="?<?= http_build_query($query) ?>" class="btn btn-sm <?= ($page == 1 ? 'btn-primary disabled' : 'btn-light') ?>">‹ Prev</a>
+        <!-- First Page -->
+        <?php
+            $query['page'] = 1;
+        ?>
+        <a href="?<?= http_build_query($query) ?>" class="btn btn-sm <?= ($page == 1 ? 'btn-primary disabled' : 'btn-light') ?>">« First</a>
 
-                            <!-- Ellipsis before -->
-                            <?php if ($startPage > 1): ?>
-                                <span class="btn btn-sm btn-light disabled">...</span>
-                            <?php endif; ?>
+        <!-- Previous Page -->
+        <?php
+            $prevPage = max(1, $page - 1);
+            $query['page'] = $prevPage;
+        ?>
+        <a href="?<?= http_build_query($query) ?>" class="btn btn-sm <?= ($page == 1 ? 'btn-primary disabled' : 'btn-light') ?>">‹ Prev</a>
 
-                            <!-- Page Numbers -->
-                            <?php for ($i = $startPage; $i <= $endPage; $i++):
-                                $query['page'] = $i;
-                            ?>
-                                <a href="?<?= http_build_query($query) ?>" class="btn btn-sm <?= ($page == $i ? 'btn-primary' : 'btn-light') ?>"><?= $i ?></a>
-                            <?php endfor; ?>
+        <!-- Ellipsis before -->
+        <?php if ($startPage > 1): ?>
+            <span class="btn btn-sm btn-light disabled">...</span>
+        <?php endif; ?>
 
-                            <!-- Ellipsis after -->
-                            <?php if ($endPage < $totalPages): ?>
-                                <span class="btn btn-sm btn-light disabled">...</span>
-                            <?php endif; ?>
+        <!-- Page Numbers -->
+        <?php for ($i = $startPage; $i <= $endPage; $i++):
+            $query['page'] = $i;
+        ?>
+            <a href="?<?= http_build_query($query) ?>" class="btn btn-sm <?= ($page == $i ? 'btn-primary' : 'btn-light') ?>"><?= $i ?></a>
+        <?php endfor; ?>
 
-                            <!-- Next Page -->
-                            <?php
-                                $nextPage = min($totalPages, $page + 1);
-                                $query['page'] = $nextPage;
-                            ?>
-                            <a href="?<?= http_build_query($query) ?>" class="btn btn-sm <?= ($page == $totalPages ? 'btn-primary disabled' : 'btn-light') ?>">Next ›</a>
+        <!-- Ellipsis after -->
+        <?php if ($endPage < $totalPages): ?>
+            <span class="btn btn-sm btn-light disabled">...</span>
+        <?php endif; ?>
 
-                            <!-- Last Page -->
-                            <?php
-                                $query['page'] = $totalPages;
-                            ?>
-                            <a href="?<?= http_build_query($query) ?>" class="btn btn-sm <?= ($page == $totalPages ? 'btn-primary disabled' : 'btn-light') ?>">Last »</a>
+        <!-- Next Page -->
+        <?php
+            $nextPage = min($totalPages, $page + 1);
+            $query['page'] = $nextPage;
+        ?>
+        <a href="?<?= http_build_query($query) ?>" class="btn btn-sm <?= ($page == $totalPages ? 'btn-primary disabled' : 'btn-light') ?>">Next ›</a>
 
-                            <?php endif; ?>
-                        </div>
-                    </div>
+        <!-- Last Page -->
+        <?php
+            $query['page'] = $totalPages;
+        ?>
+        <a href="?<?= http_build_query($query) ?>" class="btn btn-sm <?= ($page == $totalPages ? 'btn-primary disabled' : 'btn-light') ?>">Last »</a>
+
+        <?php endif; ?>
+    </div>
+</div>
+
+
                 </div>
             </div>
         </div>
     </div>
 </div>
+<script>
+$(document).ready(function() {
+    $('#kt_datatable').KTDatatable({
+        sortable: true,        // enable sorting
+        pagination: true,      // enable pagination
+        search: {
+            input: $('#search_input'), // optional search input if you want custom filtering
+            key: 'generalSearch'
+        },
+        // Other options you might want to configure:
+        // data source, page size, etc.
+    });
+});
+</script>
 
 <script>
     <?php if(!empty($this->input->get('name')) || !empty($this->input->get('phone_number')) || !empty($this->input->get('CustomerCode')) || !empty($this->input->get('ChatLanguage'))) { ?>

@@ -8,7 +8,7 @@ class Customer_Model extends CI_Model
 		return $this->db->get('customer')->row_array();
 	}
 
-	function Read_Customers1()
+	function Read_Customers1_back()
 	{
 		$this->db->select('*');
 		if(!empty($this->input->get('name'))) {
@@ -56,6 +56,52 @@ class Customer_Model extends CI_Model
 		);
 		$this->db->order_by('name', 'ASC');
 		return $this->db->get('customer')->result();
+	}
+
+	function Read_Customers1($limit, $offset)
+	{
+		$this->db->select('*');
+
+		if ($this->input->get('name')) {
+			$this->db->like('name', $this->input->get('name'), 'after'); // index-safe
+		}
+
+		if ($this->input->get('phone_number')) {
+			$this->db->like('phone_number', $this->input->get('phone_number'), 'after');
+		}
+
+		if ($this->input->get('CustomerCode')) {
+			$this->db->like('CustomerCode', $this->input->get('CustomerCode'), 'after');
+		}
+
+		if ($this->input->get('ChatLanguage')) {
+			$this->db->where('ChatLanguage', $this->input->get('ChatLanguage'));
+		}
+
+		$this->db->where('Status', 'Y');
+		$this->db->where('name IS NOT NULL', null, false);
+		$this->db->where('phone_number IS NOT NULL', null, false);
+
+		// 🚫 Exclude bad batch (still OK for now)
+		// $this->db->where(
+		// 	"created_at NOT BETWEEN '2025-12-17 22:58:00' AND '2025-12-17 22:59:59'",
+		// 	null,
+		// 	false
+		// );
+
+		$this->db->order_by('name', 'ASC');
+		$this->db->limit($limit, $offset);
+
+		return $this->db->get('customer')->result();
+	}
+	function Count_Customers()
+	{
+		$this->db->from('customer');
+		$this->db->where('Status', 'Y');
+		$this->db->where('name IS NOT NULL', null, false);
+		$this->db->where('phone_number IS NOT NULL', null, false);
+
+		return $this->db->count_all_results();
 	}
 
 	function Read_Customers2()
