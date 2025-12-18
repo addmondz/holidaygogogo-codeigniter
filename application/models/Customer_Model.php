@@ -96,6 +96,22 @@ class Customer_Model extends CI_Model
 	}
 	function Count_Customers()
 	{
+		if ($this->input->get('name')) {
+			$this->db->like('name', $this->input->get('name'), 'after'); // index-safe
+		}
+
+		if ($this->input->get('phone_number')) {
+			$this->db->like('phone_number', $this->input->get('phone_number'), 'after');
+		}
+
+		if ($this->input->get('CustomerCode')) {
+			$this->db->like('CustomerCode', $this->input->get('CustomerCode'), 'after');
+		}
+
+		if ($this->input->get('ChatLanguage')) {
+			$this->db->where('ChatLanguage', $this->input->get('ChatLanguage'));
+		}
+		
 		$this->db->from('customer');
 		$this->db->where('Status', 'Y');
 		$this->db->where('name IS NOT NULL', null, false);
