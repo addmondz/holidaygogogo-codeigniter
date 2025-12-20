@@ -88,3 +88,149 @@ if (!function_exists('arr_get')) {
         return isset($array[$key]) ? $array[$key] : $default;
     }
 }
+
+/**
+ * Convert a hex string to base36 (0-9, a-z)
+ * Uses chunk-based conversion for large numbers
+ * 
+ * @param string $hex_string Hex string to convert
+ * @return string Base36 encoded string (lowercase letters and numbers only)
+ */
+if (!function_exists('hex_to_base36')) {
+    function hex_to_base36($hex_string)
+    {
+        $base = 36;
+        $chars = '0123456789abcdefghijklmnopqrstuvwxyz';
+        $base36 = '';
+        
+        if (function_exists('gmp_init')) {
+            // Use GMP for large number handling
+            $num = gmp_init($hex_string, 16);
+            $zero = gmp_init(0, 10);
+            $base_gmp = gmp_init($base, 10);
+            
+            while (gmp_cmp($num, $zero) > 0) {
+                $remainder = gmp_intval(gmp_mod($num, $base_gmp));
+                $base36 = $chars[$remainder] . $base36;
+                $num = gmp_div($num, $base_gmp);
+            }
+        } else {
+            // Fallback: process in chunks for very large numbers
+            // Convert hex to binary, then process chunks
+            $binary = '';
+            for ($i = 0; $i < strlen($hex_string); $i += 2) {
+                $binary .= chr(hexdec(substr($hex_string, $i, 2)));
+            }
+            
+            // Process binary string in chunks
+            $chunk_size = 13; // base_convert can handle up to 36^13
+            $hex_chunks = str_split($hex_string, $chunk_size * 2);
+            $result = '0';
+            
+            foreach ($hex_chunks as $chunk) {
+                $chunk_decimal = base_convert($chunk, 16, 10);
+                // Multiply previous result by 16^(chunk_size*2) and add new chunk
+                $result = bcmul($result, bcpow('16', strlen($chunk)), 0);
+                $result = bcadd($result, $chunk_decimal, 0);
+            }
+            
+            // Convert result to base36
+            $num = $result;
+            while (bccomp($num, '0') > 0) {
+                $remainder = intval(bcmod($num, (string)$base));
+                $base36 = $chars[$remainder] . $base36;
+                $num = bcdiv($num, (string)$base, 0);
+            }
+        }
+        
+        return $base36;
+    }
+}
+
+/**
+ * Generate HMAC hash for customer portal URL
+ * 
+ * @param string $customer_code The customer code to sign
+ * @param string $secret Secret key for HMAC (defaults to config value)
+ * @param int $length Optional length to truncate (default: full length, recommended: 16-24)
+ * @return string Base36 encoded HMAC hash (lowercase letters and numbers only)
+ */
+if (!function_exists('generate_customer_portal_hash')) {
+    function generate_customer_portal_hash($customer_code, $secret = null, $length = 20)
+    {
+        if (empty($customer_code)) {
+            return false;
+        }
+        
+        if ($secret === null) {
+            $CI =& get_instance();
+            $secret = $CI->config->item('customer_portal_hmac_secret');
+            if (empty($secret)) {
+                // Fallback to .env if config not set
+                if (function_exists('get_env')) {
+                    $secret = get_env('CUSTOMER_PORTAL_HMAC_SECRET');
+                }
+                if (empty($secret)) {
+                    show_error('Customer portal HMAC secret not configured');
+                }
+            }
+        }
+        
+        // Generate HMAC using SHA-256
+        $hash = hash_hmac('sha256', $customer_code, $secret);
+        
+        // Convert hex to base36 (only lowercase letters and numbers)
+        $base36_hash = hex_to_base36($hash);
+        
+        // Truncate to desired length (default 20 characters for shorter URLs)
+        // Still secure as long as length >= 16
+        if ($length > 0 && strlen($base36_hash) > $length) {
+            $base36_hash = substr($base36_hash, 0, $length);
+        }
+        
+        return $base36_hash;
+    }
+}
+
+/**
+ * Verify HMAC hash for customer portal URL
+ * 
+ * @param string $hash The hash from the URL
+ * @param string $customer_code The customer code to verify against
+ * @param string $secret Secret key for HMAC (defaults to config value)
+ * @param int $length Expected length of hash (if 0, uses actual hash length)
+ * @return bool True if hash is valid, false otherwise
+ */
+if (!function_exists('verify_customer_portal_hash')) {
+    function verify_customer_portal_hash($hash, $customer_code, $secret = null, $length = 0)
+    {
+        if (empty($hash) || empty($customer_code)) {
+            return false;
+        }
+        
+        // Use actual hash length if not specified
+        if ($length === 0) {
+            $length = strlen($hash);
+        }
+        
+        if ($secret === null) {
+            $CI =& get_instance();
+            $secret = $CI->config->item('customer_portal_hmac_secret');
+            if (empty($secret)) {
+                // Fallback to .env if config not set
+                if (function_exists('get_env')) {
+                    $secret = get_env('CUSTOMER_PORTAL_HMAC_SECRET');
+                }
+                if (empty($secret)) {
+                    return false;
+                }
+            }
+        }
+        
+        // Generate expected hash with same length as provided hash
+        $expected_hash = generate_customer_portal_hash($customer_code, $secret, $length);
+        
+        // Use timing-safe comparison to prevent timing attacks
+        return hash_equals($expected_hash, $hash);
+    }
+}

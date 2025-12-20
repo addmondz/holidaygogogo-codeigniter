@@ -234,5 +234,52 @@ class Customer extends MY_Controller
 		echo json_encode($this->db->get('customer')->result());
 	}
 
+	/**
+	 * Generate customer portal URL
+	 * 
+	 * Usage: /Customer/GeneratePortalUrl?customer_id=123
+	 * Returns JSON with portal_url
+	 */
+	public function GeneratePortalUrl()
+	{
+		$this->load->helper('utils');
+		
+		$customer_id = $this->input->get('customer_id');
+		
+		if (empty($customer_id)) {
+			$this->output
+				->set_content_type('application/json')
+				->set_output(json_encode([
+					'success' => false,
+					'message' => 'Customer ID is required'
+				]));
+			return;
+		}
+
+		$customer = $this->Customer_Model->find($customer_id);
+		
+		if (!$customer || empty($customer->CustomerCode)) {
+			$this->output
+				->set_content_type('application/json')
+				->set_output(json_encode([
+					'success' => false,
+					'message' => 'Customer not found or has no CustomerCode'
+				]));
+			return;
+		}
+
+		$hash = generate_customer_portal_hash($customer->CustomerCode);
+		$portal_url = base_url('customer-portal/' . $hash);
+
+		$this->output
+			->set_content_type('application/json')
+			->set_output(json_encode([
+				'success' => true,
+				'portal_url' => $portal_url,
+				'hash' => $hash,
+				'customer_code' => $customer->CustomerCode
+			]));
+	}
+
 
 }

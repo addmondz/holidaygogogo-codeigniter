@@ -75,3 +75,12 @@ if(isset($_SERVER['SERVER_NAME'])){
 $route['404_override'] = '';
 $route['translate_uri_dashes'] = FALSE;
 $route['customer/search'] = 'customer/search';
+
+
+/*
+|--------------------------------------------------------------------------
+| Customer Portal
+|--------------------------------------------------------------------------
+|
+*/
+$route['customer/(:any)'] = 'Customer_Portal/dashboard/$1';
