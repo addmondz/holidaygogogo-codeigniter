@@ -3,13 +3,15 @@
     ini_set("memory_limit","512M");
 ?>
 <style>
-#kt_datatable tbody tr td:first-child::before,
-#kt_datatable tbody tr td:first-child::after {
+/* Hide pseudo-elements on first child, but allow responsive control icons */
+#kt_datatable tbody tr td:first-child:not(.dtr-control)::before,
+#kt_datatable tbody tr td:first-child:not(.dtr-control)::after {
     display: none !important;
 }
-#kt_datatable thead th:first-child,
-#kt_datatable tbody td:first-child {
-    display: none !important;
+/* Ensure DataTable wrapper uses full width without extra padding */
+.dataTables_wrapper {
+
+    overflow-x: hidden;
 }
 </style>
 <div class="d-flex flex-column-fluid">
@@ -248,10 +250,10 @@
                     <table id="kt_datatable" class="table table-bordered table-head-custom table-checkable dataTable no-footer dtr-inline" style="width:100%;">
                         <thead>
                             <tr>
+                                <th style="text-align:center;">No.</th>
                                 <th class="booking_checkbox" style="text-align:center;">
                                     <input class="booking_checkbox" type="checkbox" id="check_all">
                                 </th>
-                                <th style="text-align:center;">No.</th>
                                 <?php if($this->session->userdata('level') != 20) { ?>
                                     <th style="text-align:center;">SA</th>
                                 <?php } ?>
@@ -455,38 +457,40 @@ $(document).ready(function() {
         }
 
         // Build columns array based on user role
+        // responsivePriority: LOWER number = HIGHER priority (stays visible longer)
+        // HIGHER number = LOWER priority (hidden first on smaller screens)
         var columns = [
-            { data: 'checkbox', orderable: false, searchable: false, className: 'text-center' },
-            { data: 'row_number', orderable: false, searchable: false, className: 'text-center' }
+            { data: 'row_number', orderable: false, searchable: false, className: 'text-center', responsivePriority: 1 },
+            { data: 'checkbox', orderable: false, searchable: false, className: 'text-center', responsivePriority: 2 },
         ];
 
         if (!is_sales_agent) {
-            columns.push({ data: 'sales_agent', className: 'text-center' });
+            columns.push({ data: 'sales_agent', className: 'text-center', responsivePriority: 10000 });
         }
 
         columns = columns.concat([
-            { data: 'insert_date', className: 'text-center' },
-            { data: 'booking_number', className: 'text-center' },
-            { data: 'bc_title', className: 'text-center' },
-            { data: 'customer', className: 'text-center' },
-            { data: 'chat_language', className: 'text-center' },
-            { data: 'mobile', orderable: false, searchable: false, className: 'text-center' },
-            { data: 'start_date', className: 'text-center' },
-            { data: 'end_date', className: 'text-center' },
-            { data: 'destination', className: 'text-center' },
-            { data: 'net_total', className: 'text-center' }
+            { data: 'insert_date', className: 'text-center', responsivePriority: 10001 },
+            { data: 'booking_number', className: 'text-center', responsivePriority: 3 },
+            { data: 'bc_title', className: 'text-center', responsivePriority: 10002 },
+            { data: 'customer', className: 'text-center', responsivePriority: 4 },
+            { data: 'chat_language', className: 'text-center', responsivePriority: 10003 },
+            { data: 'mobile', orderable: false, searchable: false, className: 'text-center', responsivePriority: 5 },
+            { data: 'start_date', className: 'text-center', responsivePriority: 10004 },
+            { data: 'end_date', className: 'text-center', responsivePriority: 10005 },
+            { data: 'destination', className: 'text-center', responsivePriority: 10006 },
+            { data: 'net_total', className: 'text-center', responsivePriority: 6 }
         ]);
 
         if (!is_sales_agent) {
-            columns.push({ data: 'profit', className: 'text-center' });
-            columns.push({ data: 'profit_margin', className: 'text-center' });
+            columns.push({ data: 'profit', className: 'text-center', responsivePriority: 10007 });
+            columns.push({ data: 'profit_margin', className: 'text-center', responsivePriority: 10008 });
         }
 
         columns = columns.concat([
-            { data: 'status', className: 'text-center' },
-            { data: 'gl_status', className: 'text-center' },
-            { data: 'autocount_status', className: 'text-center' },
-            { data: 'action', orderable: false, searchable: false, className: 'text-center' }
+            { data: 'status', className: 'text-center', responsivePriority: 7 },
+            { data: 'gl_status', className: 'text-center', responsivePriority: 10009 },
+            { data: 'autocount_status', className: 'text-center', responsivePriority: 10010 },
+            { data: 'action', orderable: false, searchable: false, className: 'text-center', responsivePriority: 1 }
         ]);
 
         // Get current filter params from URL
@@ -504,6 +508,9 @@ $(document).ready(function() {
         bookingTable = $('#kt_datatable').DataTable({
             processing: true,
             serverSide: true,
+            responsive: {
+                details: true // Enable responsive with default control column
+            },
             ajax: {
                 url: '<?php echo base_url("Booking/ajax_list"); ?>',
                 type: 'GET',
