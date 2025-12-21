@@ -269,7 +269,7 @@ class Customer extends MY_Controller
 		}
 
 		$hash = generate_customer_portal_hash($customer->CustomerCode);
-		$portal_url = base_url('customer-portal/' . $hash);
+		$portal_url = base_url('customer/' . $hash);
 
 		$this->output
 			->set_content_type('application/json')

@@ -437,10 +437,10 @@
                 </div>
                 <div class="filter-actions">
                     <button type="submit" class="btn-filter btn-primary">
-                        <i class="la la-search"></i> Apply Filters
+                        Apply Filters
                     </button>
                     <a href="<?php echo base_url('customer/' . urlencode($hash)); ?>" class="btn-filter btn-secondary" style="text-decoration: none; display: inline-block;">
-                        <i class="la la-times"></i> Clear Filters
+                        Clear Filters
                     </a>
                 </div>
             </form>
