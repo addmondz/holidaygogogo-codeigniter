@@ -180,10 +180,13 @@ div.kt-datatable__pager-container {
                                                         // Generate portal hash for direct link
                                                         $this->load->helper('utils');
                                                         $portal_hash = generate_customer_portal_hash($customer->CustomerCode);
+                                                        // Only show link if hash was generated successfully
+                                                        if (!empty($portal_hash) && $portal_hash !== false):
                                                     ?>
                                                     <a href="<?php echo base_url('customer/' . urlencode($portal_hash)); ?>" target="_blank" class="dropdown-item" style="font-size:11px;">
                                                         Customer Portal
                                                     </a>
+                                                    <?php endif; ?>
                                                     <?php else: ?>
                                                         <a class="dropdown-item disabled" style="font-size:11px; cursor:not-allowed; opacity:0.6;" tabindex="-1" aria-disabled="true">
                                                             Customer Code Not Found

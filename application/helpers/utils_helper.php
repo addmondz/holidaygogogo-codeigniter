@@ -136,34 +136,52 @@ if (!function_exists('hex_to_base36')) {
                 $num = bcdiv($num, (string)$base, 0);
             }
         } else {
-            // Final fallback: Use simple method with MD5 hash for consistency
-            // This creates a shorter, consistent hash when neither GMP nor BCMath is available
-            // We'll use the first 32 chars of hex, convert to decimal, then to base36
-            $hex_short = substr($hex_string, 0, 32); // Use first 32 hex chars (128 bits)
+            // Final fallback: Use simple method when neither GMP nor BCMath is available
+            // Process in smaller chunks that base_convert can safely handle
+            $hex_short = substr($hex_string, 0, 16); // Use first 16 hex chars (64 bits, safe for PHP int)
             
-            // Convert in smaller chunks that base_convert can handle
-            $chunks = str_split($hex_short, 8); // 8 hex chars = 32 bits, safe for base_convert
-            $decimal_parts = [];
+            // Convert hex to decimal using base_convert (safe for up to 16 hex chars)
+            $decimal = base_convert($hex_short, 16, 10);
             
-            foreach ($chunks as $chunk) {
-                $decimal_parts[] = base_convert($chunk, 16, 10);
+            // Convert decimal to base36
+            $num = intval($decimal);
+            if ($num == 0) {
+                $base36 = '0';
+            } else {
+                while ($num > 0) {
+                    $remainder = $num % $base;
+                    $base36 = $chars[$remainder] . $base36;
+                    $num = intval($num / $base);
+                }
             }
             
-            // Combine chunks manually (simple addition for small numbers)
-            $total = 0;
-            $multiplier = 1;
-            for ($i = count($decimal_parts) - 1; $i >= 0; $i--) {
-                $total += $decimal_parts[$i] * $multiplier;
-                $multiplier *= pow(16, 8); // 16^8 for each chunk
+            // If we need more entropy, append hash of remaining hex string
+            if (strlen($hex_string) > 16) {
+                $remaining = substr($hex_string, 16);
+                // Use MD5 to create a consistent hash from remaining part
+                $hash_suffix = md5($remaining);
+                $suffix_hex = substr($hash_suffix, 0, 8); // Use first 8 chars of MD5
+                $suffix_decimal = base_convert($suffix_hex, 16, 10);
+                $num_suffix = intval($suffix_decimal);
+                $suffix_base36 = '';
+                if ($num_suffix == 0) {
+                    $suffix_base36 = '0';
+                } else {
+                    while ($num_suffix > 0) {
+                        $remainder = $num_suffix % $base;
+                        $suffix_base36 = $chars[$remainder] . $suffix_base36;
+                        $num_suffix = intval($num_suffix / $base);
+                    }
+                }
+                $base36 = $base36 . $suffix_base36;
             }
-            
-            // Convert to base36
-            $num = $total;
-            while ($num > 0) {
-                $remainder = $num % $base;
-                $base36 = $chars[$remainder] . $base36;
-                $num = intval($num / $base);
-            }
+        }
+        
+        // Ensure we always return a non-empty string
+        if (empty($base36)) {
+            // Ultimate fallback: use MD5 of the hex string
+            $md5_hash = md5($hex_string);
+            $base36 = base_convert(substr($md5_hash, 0, 16), 16, 36);
         }
         
         return $base36;
@@ -205,10 +223,36 @@ if (!function_exists('generate_customer_portal_hash')) {
         // Convert hex to base36 (only lowercase letters and numbers)
         $base36_hash = hex_to_base36($hash);
         
+        // Ensure we have a valid hash - if empty, use simpler fallback
+        if (empty($base36_hash) || $base36_hash === '0') {
+            // Fallback: use base_convert directly on first 16 hex chars (safe for all PHP versions)
+            $hex_short = substr($hash, 0, 16);
+            try {
+                $base36_hash = base_convert($hex_short, 16, 36);
+                // If still empty, use MD5 as ultimate fallback
+                if (empty($base36_hash)) {
+                    $base36_hash = base_convert(substr(md5($customer_code . $secret), 0, 16), 16, 36);
+                }
+            } catch (Exception $e) {
+                // Ultimate fallback: use MD5 hash
+                $base36_hash = base_convert(substr(md5($customer_code . $secret), 0, 16), 16, 36);
+            }
+        }
+        
         // Truncate to desired length (default 20 characters for shorter URLs)
         // Still secure as long as length >= 16
         if ($length > 0 && strlen($base36_hash) > $length) {
             $base36_hash = substr($base36_hash, 0, $length);
+        }
+        
+        // Final safety check - ensure we never return empty or "0"
+        if (empty($base36_hash) || $base36_hash === '0') {
+            // Last resort: create hash from customer code and secret
+            $fallback_hash = md5($customer_code . $secret . 'portal');
+            $base36_hash = base_convert(substr($fallback_hash, 0, 16), 16, 36);
+            if ($length > 0 && strlen($base36_hash) > $length) {
+                $base36_hash = substr($base36_hash, 0, $length);
+            }
         }
         
         return $base36_hash;
