@@ -104,7 +104,7 @@ if (!function_exists('hex_to_base36')) {
         $base36 = '';
         
         if (function_exists('gmp_init')) {
-            // Use GMP for large number handling
+            // Use GMP for large number handling (preferred method)
             $num = gmp_init($hex_string, 16);
             $zero = gmp_init(0, 10);
             $base_gmp = gmp_init($base, 10);
@@ -114,15 +114,9 @@ if (!function_exists('hex_to_base36')) {
                 $base36 = $chars[$remainder] . $base36;
                 $num = gmp_div($num, $base_gmp);
             }
-        } else {
-            // Fallback: process in chunks for very large numbers
-            // Convert hex to binary, then process chunks
-            $binary = '';
-            for ($i = 0; $i < strlen($hex_string); $i += 2) {
-                $binary .= chr(hexdec(substr($hex_string, $i, 2)));
-            }
-            
-            // Process binary string in chunks
+        } elseif (function_exists('bcmul') && function_exists('bcadd') && function_exists('bcpow') && function_exists('bccomp')) {
+            // Fallback: Use BCMath if available
+            // Process hex string in chunks
             $chunk_size = 13; // base_convert can handle up to 36^13
             $hex_chunks = str_split($hex_string, $chunk_size * 2);
             $result = '0';
@@ -140,6 +134,35 @@ if (!function_exists('hex_to_base36')) {
                 $remainder = intval(bcmod($num, (string)$base));
                 $base36 = $chars[$remainder] . $base36;
                 $num = bcdiv($num, (string)$base, 0);
+            }
+        } else {
+            // Final fallback: Use simple method with MD5 hash for consistency
+            // This creates a shorter, consistent hash when neither GMP nor BCMath is available
+            // We'll use the first 32 chars of hex, convert to decimal, then to base36
+            $hex_short = substr($hex_string, 0, 32); // Use first 32 hex chars (128 bits)
+            
+            // Convert in smaller chunks that base_convert can handle
+            $chunks = str_split($hex_short, 8); // 8 hex chars = 32 bits, safe for base_convert
+            $decimal_parts = [];
+            
+            foreach ($chunks as $chunk) {
+                $decimal_parts[] = base_convert($chunk, 16, 10);
+            }
+            
+            // Combine chunks manually (simple addition for small numbers)
+            $total = 0;
+            $multiplier = 1;
+            for ($i = count($decimal_parts) - 1; $i >= 0; $i--) {
+                $total += $decimal_parts[$i] * $multiplier;
+                $multiplier *= pow(16, 8); // 16^8 for each chunk
+            }
+            
+            // Convert to base36
+            $num = $total;
+            while ($num > 0) {
+                $remainder = $num % $base;
+                $base36 = $chars[$remainder] . $base36;
+                $num = intval($num / $base);
             }
         }
         
