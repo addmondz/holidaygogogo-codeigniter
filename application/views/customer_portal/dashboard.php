@@ -22,54 +22,6 @@
             line-height: 1.6;
         }
 
-        /* Header */
-        .dashboard-header {
-            background: #162447;
-            color: white;
-            padding: 10px 0;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-            position: sticky;
-            top: 0;
-            z-index: 100;
-        }
-
-        .header-content {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 0 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 15px;
-        }
-
-        .header-title h1 {
-            font-size: 24px;
-            font-weight: 600;
-            margin: 0;
-        }
-
-        .header-title p {
-            font-size: 14px;
-            opacity: 0.9;
-            margin: 5px 0 0 0;
-        }
-
-        .customer-info {
-            text-align: right;
-        }
-
-        .customer-info strong {
-            display: block;
-            font-size: 16px;
-            margin-bottom: 5px;
-        }
-
-        .customer-info span {
-            font-size: 13px;
-            opacity: 0.9;
-        }
 
         /* Main Container */
         .dashboard-container {
@@ -77,6 +29,40 @@
             max-width: 1400px;
             margin: 0 auto;
             padding: 30px 20px;
+        }
+
+        /* Customer Details Section */
+        .customer-details-section {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+
+        .customer-details-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 15px;
+        }
+
+        .customer-detail-item {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .customer-detail-label {
+            font-size: 13px;
+            color: #666;
+            font-weight: 500;
+        }
+
+        .customer-detail-value {
+            font-size: 15px;
+            color: #333;
+            font-weight: 500;
         }
 
         /* Filters Section */
@@ -325,31 +311,23 @@
                 padding: 8px 0;
             }
 
-            .header-content {
-                padding: 0 15px;
-                flex-direction: column;
-                text-align: center;
-                gap: 10px;
+
+            .customer-details-section {
+                padding: 20px 15px;
+                margin-bottom: 20px;
             }
 
-            .header-title h1 {
-                font-size: 20px;
+            .customer-details-grid {
+                grid-template-columns: 1fr;
+                gap: 15px;
             }
 
-            .header-title p {
+            .customer-detail-label {
                 font-size: 12px;
             }
 
-            .customer-info {
-                text-align: center;
-            }
-
-            .customer-info strong {
+            .customer-detail-value {
                 font-size: 14px;
-            }
-
-            .customer-info span {
-                font-size: 12px;
             }
 
             .filters-section {
@@ -553,27 +531,53 @@
     </style>
 </head>
 <body>
-    <!-- Header -->
-    <div class="dashboard-header">
-        <div class="header-content">
-            <div class="header-title">
-                    <a>
-                        <img src="<?php echo base_url('assets/image/logo.png'); ?>" class="max-h-75px">
-                    </a>
-            </div>
-            <div class="customer-info">
-                <strong><?php echo htmlspecialchars($customer['name']); ?></strong>
-                <?php if (!empty($customer['CustomerCode'])): ?>
-                <span>Code: <?php echo htmlspecialchars($customer['CustomerCode']); ?></span>
-                <?php endif; ?>
-            </div>
-        </div>
-    </div>
+    <?php $this->load->view('customer_portal/header'); ?>
 
     <!-- Main Container -->
     <div class="dashboard-container">
         <h1>My Bookings</h1>
         <p>View and manage your travel bookings</p>
+        
+        <!-- Customer Details Section -->
+        <div class="customer-details-section">
+            <div class="card-title">
+                Customer Details
+            </div>
+            <div class="customer-details-grid">
+                <div class="customer-detail-item">
+                    <span class="customer-detail-label">Name</span>
+                    <span class="customer-detail-value"><?php echo htmlspecialchars($customer['name']); ?></span>
+                </div>
+                <?php if (!empty($customer['CustomerCode'])): ?>
+                <div class="customer-detail-item">
+                    <span class="customer-detail-label">Customer Code</span>
+                    <span class="customer-detail-value"><?php echo htmlspecialchars($customer['CustomerCode']); ?></span>
+                </div>
+                <?php endif; ?>
+                <?php if (!empty($customer['email'])): ?>
+                <div class="customer-detail-item">
+                    <span class="customer-detail-label">Email</span>
+                    <span class="customer-detail-value">
+                        <a href="mailto:<?php echo htmlspecialchars($customer['email']); ?>" style="color: #667eea; text-decoration: none;">
+                            <?php echo htmlspecialchars($customer['email']); ?>
+                        </a>
+                    </span>
+                </div>
+                <?php endif; ?>
+                <?php if (!empty($customer['phone_number'])): ?>
+                <div class="customer-detail-item">
+                    <span class="customer-detail-label">WhatsApp</span>
+                    <span class="customer-detail-value">
+                        <a href="https://wa.me/<?php echo preg_replace('/[^0-9]/', '', $customer['phone_number']); ?>" target="_blank" style="color: #25D366; text-decoration: none; display: inline-flex; align-items: center; gap: 5px;">
+                            <i class="la la-whatsapp" style="font-size: 18px;"></i>
+                            <?php echo htmlspecialchars($customer['phone_number']); ?>
+                        </a>
+                    </span>
+                </div>
+                <?php endif; ?>
+            </div>
+        </div>
+
         <!-- Filters Section -->
         <div class="filters-section">
             <div class="filters-title">

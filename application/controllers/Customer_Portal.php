@@ -106,6 +106,19 @@ class Customer_Portal extends CI_Controller
         // Try each customer code until we find a match
         foreach ($customers as $customer) {
             if (verify_customer_portal_hash($hash, $customer['CustomerCode'])) {
+                // Get customer email from guest_list (get first email from their bookings)
+                $this->db->select('guest_list.Email');
+                $this->db->from('guest_list');
+                $this->db->join('booking', 'booking.BookingID = guest_list.BookingID', 'left');
+                $this->db->where('booking.CustomerID', $customer['CustomerID']);
+                $this->db->where('guest_list.Email IS NOT NULL', null, false);
+                $this->db->where('guest_list.Email !=', '');
+                $this->db->where('guest_list.Status', 'Y');
+                $this->db->order_by('guest_list.GuestListID', 'ASC');
+                $this->db->limit(1);
+                $email_result = $this->db->get()->row_array();
+                
+                $customer['email'] = !empty($email_result['Email']) ? $email_result['Email'] : null;
                 return $customer;
             }
         }

@@ -22,54 +22,7 @@
             line-height: 1.6;
         }
 
-        /* Header */
-        .dashboard-header {
-            background: #162447;
-            color: white;
-            padding: 10px 0;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-            position: sticky;
-            top: 0;
-            z-index: 100;
-        }
 
-        .header-content {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 0 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 15px;
-        }
-
-        .header-title h1 {
-            font-size: 24px;
-            font-weight: 600;
-            margin: 0;
-        }
-
-        .header-title p {
-            font-size: 14px;
-            opacity: 0.9;
-            margin: 5px 0 0 0;
-        }
-
-        .customer-info {
-            text-align: right;
-        }
-
-        .customer-info strong {
-            display: block;
-            font-size: 16px;
-            margin-bottom: 5px;
-        }
-
-        .customer-info span {
-            font-size: 13px;
-            opacity: 0.9;
-        }
 
         .container {
             max-width: 1400px;
@@ -486,24 +439,6 @@
                 padding: 8px 0;
             }
 
-            .header-content {
-                padding: 0 15px;
-                flex-direction: column;
-                text-align: center;
-                gap: 10px;
-            }
-
-            .customer-info {
-                text-align: center;
-            }
-
-            .customer-info strong {
-                font-size: 14px;
-            }
-
-            .customer-info span {
-                font-size: 12px;
-            }
 
             .back-button {
                 padding: 8px 16px;
@@ -724,24 +659,7 @@
     </style>
 </head>
 <body>
-    <!-- Header -->
-    <div class="dashboard-header">
-        <div class="header-content">
-            <div class="header-title">
-                <a>
-                    <img src="<?php echo base_url('assets/image/logo.png'); ?>" class="max-h-75px">
-                </a>
-            </div>
-            <?php if (!empty($customer)): ?>
-            <div class="customer-info">
-                <strong><?php echo htmlspecialchars($customer['name']); ?></strong>
-                <?php if (!empty($customer['CustomerCode'])): ?>
-                <span>Code: <?php echo htmlspecialchars($customer['CustomerCode']); ?></span>
-                <?php endif; ?>
-            </div>
-            <?php endif; ?>
-        </div>
-    </div>
+    <?php $this->load->view('customer_portal/header'); ?>
 
     <div class="container">
         <!-- Back Button -->
