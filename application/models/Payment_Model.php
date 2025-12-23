@@ -655,5 +655,209 @@ return $query->result_array(); // instead of result()
 		return $query->result_array(); // return as array
 	}
 
+	// ============================================
+	// Server-Side DataTables Methods
+	// ============================================
+
+	private function apply_payment_filters()
+	{
+		// Sales agent restriction for level 20 users
+		if($this->session->userdata('level') == 20) {
+			$this->db->where('SalesAgent', $this->session->userdata('admin_id'));
+		}
+
+		// Supplier filter
+		if(!empty($this->input->get('supplier'))) {
+			$this->db->where('payment.SupplierID', $this->input->get('supplier'));
+		}
+
+		// Transaction date range filter
+		if(!empty($this->input->get('transaction_date'))) {
+			$transaction_date = explode(' - ', $this->input->get('transaction_date'));
+			$start_date = date('Y-m-d', strtotime(str_replace('/', '-', $transaction_date[0])));
+			$end_date = date('Y-m-d', strtotime(str_replace('/', '-', $transaction_date[1])));
+			$this->db->where('Date >=', $start_date);
+			$this->db->where('Date <=', $end_date);
+		}
+
+		// Payment type filter
+		if(!empty($this->input->get('payment_type'))) {
+			$this->db->where('Type', $this->input->get('payment_type'));
+		}
+
+		// Transaction type filter (PAYMENT IN vs OUT)
+		if(!empty($this->input->get('transaction_type'))) {
+			if($this->input->get('transaction_type') == 'PAYMENT IN') {
+				$this->db->where('Credit !=', 0.00);
+			} else {
+				$this->db->where('Credit', 0.00);
+			}
+		}
+
+		// Reference number filter
+		if(!empty($this->input->get('reference_number'))) {
+			$this->db->where('ReferenceNumber', $this->input->get('reference_number'));
+		}
+
+		// Payment deadline range filter
+		if(!empty($this->input->get('payment_deadline'))) {
+			$payment_deadline = explode(' - ', $this->input->get('payment_deadline'));
+			$start_date = date('Y-m-d', strtotime(str_replace('/', '-', $payment_deadline[0])));
+			$end_date = date('Y-m-d', strtotime(str_replace('/', '-', $payment_deadline[1])));
+			$this->db->where('Deadline >=', $start_date);
+			$this->db->where('Deadline <=', $end_date);
+		}
+
+		// Quotation number filter
+		if(!empty($this->input->get('quotation_number'))) {
+			$this->db->where('QuotationNumber', $this->input->get('quotation_number'));
+		}
+
+		// Invoice number filter
+		if(!empty($this->input->get('invoice_number'))) {
+			$this->db->where('InvoiceNumber', $this->input->get('invoice_number'));
+		}
+
+		// Bank filters
+		if(!empty($this->input->get('bank'))) {
+			$this->db->where('payment.Bank', $this->input->get('bank'));
+		}
+		if(!empty($this->input->get('bank_account'))) {
+			$this->db->where('payment.BankAccount', $this->input->get('bank_account'));
+		}
+		if(!empty($this->input->get('bank_holder'))) {
+			$this->db->where('payment.BankHolder', $this->input->get('bank_holder'));
+		}
+
+		// Status filter (default to 'P' if no query params)
+		if(!empty($this->input->get('status'))) {
+			$this->db->where('payment.Status', $this->input->get('status'));
+		} else {
+			if(strpos($_SERVER['REQUEST_URI'], '?') == false) {
+				$this->db->where('payment.Status', 'P');
+			}
+		}
+
+		// Booking number filter
+		if(!empty($this->input->get('booking_number'))) {
+			$this->db->where('BookingNumber', $this->input->get('booking_number'));
+		}
+
+		// Customer filter
+		if(!empty($this->input->get('customer'))) {
+			$this->db->where('Customer', $this->input->get('customer'));
+		}
+
+		// Travel date range filter (overlap logic)
+		if(!empty($this->input->get('travel_date'))) {
+			$travel_date = explode(' - ', $this->input->get('travel_date'));
+			$start_date = date('Y-m-d', strtotime(str_replace('/', '-', $travel_date[0])));
+			$end_date = date('Y-m-d', strtotime(str_replace('/', '-', $travel_date[1])));
+			$this->db->where("((`StartDate` <= '".$start_date."' AND `EndDate` >= '".$end_date."') OR (`StartDate` >= '".$start_date."' AND `StartDate` <= '".$end_date."') OR (`EndDate` >= '".$start_date."' AND `EndDate` <= '".$end_date."'))");
+		}
+
+		// Sales agent filter
+		if(!empty($this->input->get('sales_agent'))) {
+			$this->db->where('SalesAgent', $this->input->get('sales_agent'));
+		}
+
+		// Autocount reference filter
+		if(!empty($this->input->get('autocount_reference'))) {
+			$this->db->like('payment.AutocountReferenceNumber', $this->input->get('autocount_reference'));
+		}
+
+		// Exclude deleted payments
+		$this->db->where('payment.Status !=', 'N');
+
+		// DataTables global search
+		$search_value = $this->input->get('search[value]');
+		if(!empty($search_value)) {
+			$this->db->group_start();
+			$this->db->like('BookingNumber', $search_value);
+			$this->db->or_like('Customer', $search_value);
+			$this->db->or_like('ReferenceNumber', $search_value);
+			$this->db->or_like('supplier.Name', $search_value);
+			$this->db->or_like('ReservationNumber', $search_value);
+			$this->db->group_end();
+		}
+	}
+
+	function Read_Payments_Paginated($start, $length, $order_column, $order_dir)
+	{
+		$this->db->select('PaymentID, payment.BookingID, payment.SupplierID, Date, Type, Credit, ReferenceNumber, Debit, Deadline, payment.BankHolder, payment.Status, BookingNumber, ReservationNumber, Customer, StartDate, EndDate, NetTotal, Token, admin.Name As SalesAgent, supplier.Name As Supplier, payment.AutocountSyncStatus, payment.AutocountSyncMessage, payment.AutocountSyncAction, payment.AutocountReferenceNumber');
+		$this->db->from('booking');
+		$this->db->join('payment', 'payment.BookingID = booking.BookingID', 'left');
+		$this->db->join('admin', 'admin.AdminID = booking.SalesAgent', 'left');
+		$this->db->join('supplier', 'supplier.SupplierID = payment.SupplierID', 'left');
+
+		$this->apply_payment_filters();
+
+		$this->db->order_by($order_column, $order_dir);
+		$this->db->limit($length, $start);
+
+		return $this->db->get()->result();
+	}
+
+	function Count_Payments_Total()
+	{
+		$this->db->from('payment');
+		$this->db->join('booking', 'booking.BookingID = payment.BookingID', 'left');
+
+		// Only apply base restrictions
+		if($this->session->userdata('level') == 20) {
+			$this->db->where('SalesAgent', $this->session->userdata('admin_id'));
+		}
+		$this->db->where('payment.Status !=', 'N');
+
+		return $this->db->count_all_results();
+	}
+
+	function Count_Payments_Filtered()
+	{
+		$this->db->from('booking');
+		$this->db->join('payment', 'payment.BookingID = booking.BookingID', 'left');
+		$this->db->join('admin', 'admin.AdminID = booking.SalesAgent', 'left');
+		$this->db->join('supplier', 'supplier.SupplierID = payment.SupplierID', 'left');
+
+		$this->apply_payment_filters();
+
+		return $this->db->count_all_results();
+	}
+
+	function Calculate_Payment_Summary()
+	{
+		$this->db->select('SUM(Credit) as total_credit, SUM(Debit) as total_debit');
+		$this->db->from('booking');
+		$this->db->join('payment', 'payment.BookingID = booking.BookingID', 'left');
+		$this->db->join('admin', 'admin.AdminID = booking.SalesAgent', 'left');
+		$this->db->join('supplier', 'supplier.SupplierID = payment.SupplierID', 'left');
+
+		$this->apply_payment_filters();
+
+		$result = $this->db->get()->row();
+
+		$total_credit = $result->total_credit ?? 0;
+		$total_debit = $result->total_debit ?? 0;
+		$total_net_profit = $total_credit - $total_debit;
+
+		// Calculate total sales from unique bookings
+		$this->db->select('SUM(DISTINCT booking.NetTotal) as total_sales');
+		$this->db->from('booking');
+		$this->db->join('payment', 'payment.BookingID = booking.BookingID', 'left');
+		$this->db->join('admin', 'admin.AdminID = booking.SalesAgent', 'left');
+		$this->db->join('supplier', 'supplier.SupplierID = payment.SupplierID', 'left');
+
+		$this->apply_payment_filters();
+
+		$sales_result = $this->db->get()->row();
+		$total_sales = $sales_result->total_sales ?? 0;
+
+		return array(
+			'total_credit' => $total_credit,
+			'total_debit' => $total_debit,
+			'total_net_profit' => $total_net_profit,
+			'total_sales' => $total_sales
+		);
+	}
 
 }
