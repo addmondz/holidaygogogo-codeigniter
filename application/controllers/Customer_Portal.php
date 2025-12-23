@@ -48,11 +48,16 @@ class Customer_Portal extends CI_Controller
 
         // Get customer bookings with filters
         $bookings = $this->get_customer_bookings_filtered(
-            $customer['CustomerID'], 
-            $status_filter, 
-            $travel_date_from, 
+            $customer['CustomerID'],
+            $status_filter,
+            $travel_date_from,
             $travel_date_to
         );
+
+        // Format pax information for each booking
+        foreach ($bookings as &$booking) {
+            $booking['PaxInfo'] = $this->format_pax_info($booking['Adult'] ?? 0, $booking['Children'] ?? 0, $booking['Infant'] ?? 0);
+        }
 
         // Get booking status options
         $status_options = $this->get_booking_status_options();
@@ -146,6 +151,7 @@ class Customer_Portal extends CI_Controller
                           Customer, booking.Mobile As CustomerMobile, StartDate, EndDate, NetTotal, 
                           booking.ChatLanguage, Token, booking.BookingConfirmationTitle, CancelStatus, 
                           LockStatus, AfterSalesService, booking.Status, booking.InsertDate,
+                          booking.Adult, booking.Children, booking.Infant,
                           category.Name As DestinationName, CountryCode');
         $this->db->from('booking');
         $this->db->join('category', 'category.CategoryID = booking.Destination', 'left');
@@ -228,6 +234,37 @@ class Customer_Portal extends CI_Controller
     }
 
     /**
+     * Format passenger information (Adult, Children, Infant)
+     * 
+     * @param int $adult
+     * @param int $children
+     * @param int $infant
+     * @return string Formatted pax information
+     */
+    private function format_pax_info($adult = 0, $children = 0, $infant = 0)
+    {
+        $parts = [];
+        
+        if (!empty($adult) && $adult > 0) {
+            $parts[] = $adult . ($adult == 1 ? ' Adult' : ' Adults');
+        }
+        
+        if (!empty($children) && $children > 0) {
+            $parts[] = $children . ($children == 1 ? ' Child' : ' Children');
+        }
+        
+        if (!empty($infant) && $infant > 0) {
+            $parts[] = $infant . ($infant == 1 ? ' Infant' : ' Infants');
+        }
+        
+        if (empty($parts)) {
+            return 'No pax info';
+        }
+        
+        return implode(', ', $parts);
+    }
+
+    /**
      * Get all payments for a customer (via bookings)
      * 
      * @param int $customer_id
@@ -248,6 +285,194 @@ class Customer_Portal extends CI_Controller
         $this->db->order_by('payment.PaymentID', 'DESC');
         
         return $this->db->get()->result_array();
+    }
+
+    /**
+     * Booking Details Page - Shows booking details and documents
+     * 
+     * @param string $hashed_bc Booking token (hashed booking confirmation)
+     */
+    public function booking_details($hashed_bc = null)
+    {
+        if (empty($hashed_bc)) {
+            show_404();
+            return;
+        }
+
+        // Get booking by token
+        $this->db->select('booking.BookingID, BookingNumber, ReservationNumber, DepositDeadline, 
+                          FullPaymentDeadline, AdditionalPaymentDeadline, Customer, booking.Mobile As CustomerMobile, 
+                          StartDate, EndDate, Adult, Children, Infant, BookingRemark, Subtotal, Discount, NetTotal, 
+                          booking.ChatLanguage, Token, booking.BookingConfirmationTitle, CancelStatus, LockStatus, 
+                          AfterSalesService, booking.Status, booking.InsertDate, booking.CustomerID,
+                          category.Name As DestinationName, CountryCode, admin.Name As SalesAgentName');
+        $this->db->from('booking');
+        $this->db->join('category', 'category.CategoryID = booking.Destination', 'left');
+        $this->db->join('country_code', 'country_code.CountryCodeID = booking.CountryCodeID', 'left');
+        $this->db->join('admin', 'admin.AdminID = booking.SalesAgent', 'left');
+        $this->db->where('booking.Token', $hashed_bc);
+        $this->db->where('booking.Status !=', 'N');
+        $booking = $this->db->get()->row_array();
+
+        if (empty($booking)) {
+            show_404();
+            return;
+        }
+
+        // Get customer info
+        $customer = null;
+        if (!empty($booking['CustomerID'])) {
+            $this->db->select('CustomerID, CustomerCode, name, phone_number, ChatLanguage');
+            $this->db->where('CustomerID', $booking['CustomerID']);
+            $customer = $this->db->get('customer')->row_array();
+        }
+
+        // Format booking data
+        $booking['DepositDeadline'] = !empty($booking['DepositDeadline']) ? date('d M Y', strtotime($booking['DepositDeadline'])) : null;
+        $booking['FullPaymentDeadline'] = !empty($booking['FullPaymentDeadline']) ? date('d M Y', strtotime($booking['FullPaymentDeadline'])) : null;
+        $booking['AdditionalPaymentDeadline'] = !empty($booking['AdditionalPaymentDeadline']) ? date('d M Y', strtotime($booking['AdditionalPaymentDeadline'])) : null;
+        $booking['StartDate'] = !empty($booking['StartDate']) ? date('d M Y', strtotime($booking['StartDate'])) : null;
+        $booking['EndDate'] = !empty($booking['EndDate']) ? date('d M Y', strtotime($booking['EndDate'])) : null;
+        $booking['InsertDate'] = !empty($booking['InsertDate']) ? date('d M Y', strtotime($booking['InsertDate'])) : null;
+        $booking['CustomerMobile'] = $booking['CountryCode'] . $booking['CustomerMobile'];
+        $booking['PaxInfo'] = $this->format_pax_info($booking['Adult'] ?? 0, $booking['Children'] ?? 0, $booking['Infant'] ?? 0);
+
+        // Get booking products
+        $this->db->select('*');
+        $this->db->where('BookingID', $booking['BookingID']);
+        $this->db->where('Status', 'Y');
+        $this->db->order_by('BookingProductID', 'ASC');
+        $booking['products'] = $this->db->get('booking_product')->result_array();
+
+        // Get payment history (exclude SUPPLIER PAYMENT)
+        $this->db->select('Date, Type, Credit, ReferenceNumber, Debit, Deadline, payment.Status, PaymentRemark, DebitRemark, payment.Bank, payment.BankAccount, payment.BankHolder, supplier.Name As SupplierName');
+        $this->db->from('payment');
+        $this->db->join('supplier', 'supplier.SupplierID = payment.SupplierID', 'left');
+        $this->db->where('payment.BookingID', $booking['BookingID']);
+        $this->db->where('payment.Status !=', 'N');
+        $this->db->where('payment.Type !=', 'SUPPLIER PAYMENT');
+        $this->db->order_by('Date', 'ASC');
+        $this->db->order_by('PaymentID', 'ASC');
+        $payments = $this->db->get()->result_array();
+
+        // Format payments and calculate totals
+        $total_credit = 0;
+        $total_debit = 0;
+        foreach ($payments as &$payment) {
+            if (!empty($payment['Date'])) {
+                $payment['Date'] = date('d M Y', strtotime($payment['Date']));
+            }
+            if (!empty($payment['Deadline'])) {
+                $payment['Deadline'] = date('d M Y', strtotime($payment['Deadline']));
+            }
+            if ($payment['Status'] == 'Y' || $payment['Status'] == 'P') {
+                if (!empty($payment['Credit']) && $payment['Credit'] > 0) {
+                    $total_credit += $payment['Credit'];
+                }
+                if (!empty($payment['Debit']) && $payment['Debit'] > 0) {
+                    $total_debit += $payment['Debit'];
+                }
+            }
+        }
+        $booking['payments'] = $payments;
+        $booking['total_paid'] = $total_credit;
+        $booking['total_debit'] = $total_debit;
+        $booking['balance_due'] = $booking['NetTotal'] - $total_credit;
+
+        // Prepare document URLs
+        $base_url = base_url();
+        $booking['documents'] = [
+            'bc' => [
+                'name' => 'Booking Confirmation',
+                'url' => $base_url . 'Booking_Confirmation?token=' . $hashed_bc,
+                'icon' => 'file-text',
+                'available' => true
+            ],
+            'tv' => [
+                'name' => 'Travel Voucher',
+                'url' => $base_url . 'Travel_Voucher?token=' . $hashed_bc,
+                'icon' => 'plane',
+                'available' => true
+            ],
+            'or' => [
+                'name' => 'Official Receipt',
+                'url' => $base_url . 'Receipt?token=' . $hashed_bc,
+                'icon' => 'receipt',
+                'available' => true
+            ],
+            'gl' => [
+                'name' => 'Guest List',
+                'url' => $base_url . 'Guest_List?gl=' . $hashed_bc,
+                'icon' => 'users',
+                'available' => true
+            ]
+        ];
+
+        // Get status display info
+        $booking['status_display'] = $this->get_booking_status_display($booking);
+
+        // Generate customer hash for back button
+        $customer_hash = '';
+        if (!empty($customer) && !empty($customer['CustomerCode'])) {
+            $customer_hash = generate_customer_portal_hash($customer['CustomerCode']);
+        }
+
+        // Prepare data for view
+        $data = [
+            'booking' => $booking,
+            'customer' => $customer,
+            'customer_hash' => $customer_hash
+        ];
+
+        // Load booking details view
+        $this->load->view('customer_portal/booking_details', $data);
+    }
+
+    /**
+     * Get booking status display information
+     * 
+     * @param array $booking
+     * @return array
+     */
+    private function get_booking_status_display($booking)
+    {
+        $status = $booking['Status'];
+        $cancel_status = $booking['CancelStatus'];
+        $after_sales = $booking['AfterSalesService'];
+        $lock_status = $booking['LockStatus'];
+
+        if ($cancel_status == 'Y') {
+            return [
+                'text' => 'Cancelled',
+                'class' => 'status-cancelled',
+                'color' => '#E0115F'
+            ];
+        }
+
+        // Determine display status
+        $display_status = $status;
+        if ($lock_status == 'N' && $status == 'PTV') {
+            $display_status = 'PGL';
+        }
+        if ($after_sales == 'PENDING' && $status == 'Y') {
+            $display_status = 'PR';
+        }
+
+        $status_map = [
+            'Y' => ['text' => 'Completed', 'class' => 'status-completed', 'color' => '#50C878'],
+            'PR' => ['text' => 'Pending Review', 'class' => 'status-pending-review', 'color' => '#C3B1E1'],
+            'P' => ['text' => 'Pending Payment', 'class' => 'status-pending-payment', 'color' => '#FFBF00'],
+            'PP' => ['text' => 'Partial Payment', 'class' => 'status-partial-payment', 'color' => '#A7C7E7'],
+            'PTV' => ['text' => 'Pending Travel Voucher', 'class' => 'status-pending-tv', 'color' => '#F89880'],
+            'PGL' => ['text' => 'Pending Guest List', 'class' => 'status-pending-gl', 'color' => '#FAC898'],
+            'PT' => ['text' => 'Pending Travel', 'class' => 'status-pending-travel', 'color' => '#F8C8DC'],
+            'OG' => ['text' => 'On-Going', 'class' => 'status-ongoing', 'color' => '#CCCCFF'],
+            'PO' => ['text' => 'Payment Overdue', 'class' => 'status-overdue', 'color' => '#DA70D6']
+        ];
+
+        return isset($status_map[$display_status]) 
+            ? $status_map[$display_status] 
+            : ['text' => 'Unknown', 'class' => 'status-unknown', 'color' => '#999'];
     }
 }
 

@@ -24,10 +24,10 @@
 
         /* Header */
         .dashboard-header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #162447;
             color: white;
-            padding: 20px 0;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 10px 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
             position: sticky;
             top: 0;
             z-index: 100;
@@ -216,11 +216,16 @@
             padding: 20px;
             transition: all 0.3s;
             background: white;
+            text-decoration: none;
+            color: inherit;
+            display: block;
+            cursor: pointer;
         }
 
         .booking-card:hover {
             box-shadow: 0 4px 12px rgba(0,0,0,0.1);
             transform: translateY(-2px);
+            border-color: #667eea;
         }
 
         .booking-header {
@@ -308,33 +313,193 @@
 
         /* Responsive Design */
         @media (max-width: 768px) {
+            body {
+                padding: 0;
+            }
+
             .dashboard-container {
-                padding: 20px 15px;
+                padding: 15px 10px;
+            }
+
+            .dashboard-header {
+                padding: 8px 0;
             }
 
             .header-content {
+                padding: 0 15px;
                 flex-direction: column;
                 text-align: center;
+                gap: 10px;
+            }
+
+            .header-title h1 {
+                font-size: 20px;
+            }
+
+            .header-title p {
+                font-size: 12px;
             }
 
             .customer-info {
                 text-align: center;
             }
 
-            .filters-grid {
-                grid-template-columns: 1fr;
+            .customer-info strong {
+                font-size: 14px;
             }
 
-            .bookings-grid {
+            .customer-info span {
+                font-size: 12px;
+            }
+
+            .filters-section {
+                padding: 20px 15px;
+                margin-bottom: 20px;
+            }
+
+            .filters-title {
+                font-size: 16px;
+                margin-bottom: 15px;
+            }
+
+            .filters-grid {
                 grid-template-columns: 1fr;
+                gap: 15px;
+                margin-bottom: 15px;
+            }
+
+            .filter-group label {
+                font-size: 12px;
+            }
+
+            .filter-group select,
+            .filter-group input {
+                padding: 8px 10px;
+                font-size: 13px;
             }
 
             .filter-actions {
                 width: 100%;
+                flex-direction: column;
             }
 
             .btn-filter {
                 flex: 1;
+                width: 100%;
+            }
+
+            .bookings-section {
+                padding: 20px 15px;
+            }
+
+            .section-header {
+                margin-bottom: 20px;
+            }
+
+            .section-title {
+                font-size: 18px;
+            }
+
+            .bookings-count {
+                font-size: 12px;
+                padding: 4px 10px;
+            }
+
+            .bookings-grid {
+                grid-template-columns: 1fr;
+                gap: 15px;
+            }
+
+            .booking-card {
+                padding: 15px;
+            }
+
+            .booking-header {
+                margin-bottom: 12px;
+                padding-bottom: 12px;
+            }
+
+            .booking-number {
+                font-size: 14px;
+            }
+
+            .booking-status {
+                font-size: 10px;
+                padding: 4px 10px;
+            }
+
+            .booking-details {
+                gap: 10px;
+            }
+
+            .detail-row {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 4px;
+            }
+
+            .detail-label {
+                font-size: 12px;
+            }
+
+            .detail-value {
+                font-size: 13px;
+                text-align: left;
+            }
+
+            .detail-value.amount {
+                font-size: 15px;
+            }
+
+            .empty-state {
+                padding: 40px 20px;
+            }
+
+            .empty-state i {
+                font-size: 48px;
+            }
+
+            .empty-state h3 {
+                font-size: 16px;
+            }
+
+            .empty-state p {
+                font-size: 13px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .dashboard-container {
+                padding: 10px 5px;
+            }
+
+            .header-content {
+                padding: 0 10px;
+            }
+
+            .header-title h1 {
+                font-size: 18px;
+            }
+
+            .filters-section,
+            .bookings-section {
+                padding: 15px 10px;
+            }
+
+            .filters-title {
+                font-size: 15px;
+            }
+
+            .section-title {
+                font-size: 16px;
+            }
+
+            .booking-card {
+                padding: 12px;
+            }
+
+            .booking-number {
+                font-size: 13px;
             }
         }
 
@@ -350,7 +515,7 @@
             }
 
             .bookings-grid {
-                grid-template-columns: repeat(3, 1fr);
+                grid-template-columns: repeat(2, 1fr);
             }
         }
 
@@ -360,7 +525,7 @@
             }
 
             .bookings-grid {
-                grid-template-columns: repeat(4, 1fr);
+                grid-template-columns: repeat(3, 1fr);
             }
         }
 
@@ -392,8 +557,9 @@
     <div class="dashboard-header">
         <div class="header-content">
             <div class="header-title">
-                <h1>My Bookings</h1>
-                <p>View and manage your travel bookings</p>
+                    <a>
+                        <img src="<?php echo base_url('assets/image/logo.png'); ?>" class="max-h-75px">
+                    </a>
             </div>
             <div class="customer-info">
                 <strong><?php echo htmlspecialchars($customer['name']); ?></strong>
@@ -406,6 +572,8 @@
 
     <!-- Main Container -->
     <div class="dashboard-container">
+        <h1>My Bookings</h1>
+        <p>View and manage your travel bookings</p>
         <!-- Filters Section -->
         <div class="filters-section">
             <div class="filters-title">
@@ -498,7 +666,7 @@
                             }
                         }
                         ?>
-                        <div class="booking-card">
+                        <a href="<?php echo base_url('customer/booking/' . urlencode($booking['Token'] ?? '')); ?>" class="booking-card" data-booking-id="<?php echo htmlspecialchars($booking['BookingID'] ?? 'N/A'); ?>">
                             <div class="booking-header">
                                 <div class="booking-number">
                                     <?php echo htmlspecialchars($booking['BookingNumber'] ?? 'N/A'); ?>
@@ -520,6 +688,14 @@
                                         <?php if (!empty($booking['EndDate'])): ?>
                                             - <?php echo date('M d, Y', strtotime($booking['EndDate'])); ?>
                                         <?php endif; ?>
+                                    </span>
+                                </div>
+                                <?php endif; ?>
+                                <?php if (!empty($booking['PaxInfo'])): ?>
+                                <div class="detail-row">
+                                    <span class="detail-label">Travel Pax</span>
+                                    <span class="detail-value">
+                                        <?php echo htmlspecialchars($booking['PaxInfo']); ?>
                                     </span>
                                 </div>
                                 <?php endif; ?>
@@ -548,7 +724,7 @@
                                 </div>
                                 <?php endif; ?>
                             </div>
-                        </div>
+                        </a>
                     <?php endforeach; ?>
                 </div>
             <?php endif; ?>

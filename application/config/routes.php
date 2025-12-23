@@ -83,4 +83,5 @@ $route['customer/search'] = 'customer/search';
 |--------------------------------------------------------------------------
 |
 */
+$route['customer/booking/(:any)'] = 'Customer_Portal/booking_details/$1';
 $route['customer/(:any)'] = 'Customer_Portal/dashboard/$1';
