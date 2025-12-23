@@ -749,6 +749,12 @@
                     <span class="detail-value"><?php echo nl2br(htmlspecialchars($booking['BookingRemark'])); ?></span>
                 </div>
                 <?php endif; ?>
+                <?php if (!empty($booking['ChatLanguage'])): ?>
+                <div class="detail-item">
+                    <span class="detail-label">Booking Chat Language</span>
+                    <span class="detail-value"><?php echo htmlspecialchars($booking['ChatLanguage']); ?></span>
+                </div>
+                <?php endif; ?>
             </div>
 
             <!-- Documents -->

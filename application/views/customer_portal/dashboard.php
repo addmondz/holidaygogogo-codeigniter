@@ -581,6 +581,14 @@
                     </span>
                 </div>
                 <?php endif; ?>
+                <?php if (!empty($customer['ChatLanguage'])): ?>
+                <div class="customer-detail-item">
+                    <span class="customer-detail-label">Chat Language</span>
+                    <span class="customer-detail-value">
+                        <?php echo htmlspecialchars($customer['ChatLanguage']); ?>
+                    </span>
+                </div>
+                <?php endif; ?>
             </div>
         </div>
 
