@@ -307,8 +307,8 @@
                 padding: 15px 10px;
             }
 
-            .dashboard-header {
-                padding: 8px 0;
+            .dashboard-container-header {
+                padding: 0px 10px;
             }
 
 
@@ -444,6 +444,10 @@
             .empty-state p {
                 font-size: 13px;
             }
+
+            .dashboard-header {
+                padding: 0px 10px;
+            }
         }
 
         @media (max-width: 480px) {
@@ -535,8 +539,10 @@
 
     <!-- Main Container -->
     <div class="dashboard-container">
-        <h1>My Bookings</h1>
-        <p>View and manage your travel bookings</p>
+        <div class="dashboard-container-header">
+            <h1>My Bookings</h1>
+            <p>View and manage your travel bookings</p>
+        </div>
         
         <!-- Customer Details Section -->
         <div class="customer-details-section">

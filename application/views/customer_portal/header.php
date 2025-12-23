@@ -56,6 +56,11 @@
         .header-title h1 {
             font-size: 18px;
         }
+
+        .header-title img {
+            max-height: 50px;
+        }
+
     }
 </style>
 
