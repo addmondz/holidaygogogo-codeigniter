@@ -172,25 +172,19 @@ div.kt-datatable__pager-container {
                                                 <div class="dropdown-menu">
                                                     <!-- delete disable -- controller, model, autocount all done QA, if need just add button -->
                                                     <a href="<?php echo base_url('Customer/Update?customer_id=') . $customer->CustomerID; ?>" class="dropdown-item" style="font-size:11px;">Update Customer</a>
-                                                    <?php if (!empty($customer->CustomerCode)): ?>
                                                     <a href="#" class="dropdown-item copy-customer-link" data-customer-id="<?php echo $customer->CustomerID; ?>" style="font-size:11px;">
                                                         Copy Customer Link
                                                     </a>
                                                     <?php 
                                                         // Generate portal hash for direct link
                                                         $this->load->helper('utils');
-                                                        $portal_hash = generate_customer_portal_hash($customer->CustomerCode);
+                                                        $portal_hash = generate_customer_portal_hash($customer->CustomerID);
                                                         // Only show link if hash was generated successfully
                                                         if (!empty($portal_hash) && $portal_hash !== false):
                                                     ?>
                                                     <a href="<?php echo base_url('customer/' . urlencode($portal_hash)); ?>" target="_blank" class="dropdown-item" style="font-size:11px;">
                                                         Customer Portal
                                                     </a>
-                                                    <?php endif; ?>
-                                                    <?php else: ?>
-                                                        <a class="dropdown-item disabled" style="font-size:11px; cursor:not-allowed; opacity:0.6;" tabindex="-1" aria-disabled="true">
-                                                            Customer Code Not Found
-                                                        </a>
                                                     <?php endif; ?>
                                                 </div>
                                             </div>

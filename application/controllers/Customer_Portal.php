@@ -89,23 +89,21 @@ class Customer_Portal extends CI_Controller
     }
 
     /**
-     * Find customer by verifying HMAC hash against all customer codes
+     * Find customer by verifying HMAC hash against all customer IDs
      * 
      * @param string $hash The HMAC hash from URL
      * @return array|null Customer data if found, null otherwise
      */
     private function find_customer_by_hash($hash)
     {
-        // Get all active customers with CustomerCode
+        // Get all active customers
         $this->db->select('CustomerID, CustomerCode, name, phone_number, ChatLanguage, Status');
         $this->db->where('Status', 'Y');
-        $this->db->where('CustomerCode IS NOT NULL', null, false);
-        $this->db->where('CustomerCode !=', '');
         $customers = $this->db->get('customer')->result_array();
 
-        // Try each customer code until we find a match
+        // Try each customer ID until we find a match
         foreach ($customers as $customer) {
-            if (verify_customer_portal_hash($hash, $customer['CustomerCode'])) {
+            if (verify_customer_portal_hash($hash, $customer['CustomerID'])) {
                 // Get customer email from guest_list (get first email from their bookings)
                 $this->db->select('guest_list.Email');
                 $this->db->from('guest_list');
@@ -401,8 +399,8 @@ class Customer_Portal extends CI_Controller
 
         // Generate customer hash for back button
         $customer_hash = '';
-        if (!empty($customer) && !empty($customer['CustomerCode'])) {
-            $customer_hash = generate_customer_portal_hash($customer['CustomerCode']);
+        if (!empty($customer) && !empty($customer['CustomerID'])) {
+            $customer_hash = generate_customer_portal_hash($customer['CustomerID']);
         }
 
         // Prepare data for view

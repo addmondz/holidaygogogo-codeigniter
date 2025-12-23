@@ -191,17 +191,20 @@ if (!function_exists('hex_to_base36')) {
 /**
  * Generate HMAC hash for customer portal URL
  * 
- * @param string $customer_code The customer code to sign
+ * @param int|string $customer_id The customer ID to sign
  * @param string $secret Secret key for HMAC (defaults to config value)
  * @param int $length Optional length to truncate (default: full length, recommended: 16-24)
  * @return string Base36 encoded HMAC hash (lowercase letters and numbers only)
  */
 if (!function_exists('generate_customer_portal_hash')) {
-    function generate_customer_portal_hash($customer_code, $secret = null, $length = 20)
+    function generate_customer_portal_hash($customer_id, $secret = null, $length = 20)
     {
-        if (empty($customer_code)) {
+        if (empty($customer_id)) {
             return false;
         }
+        
+        // Convert customer ID to string for hashing
+        $customer_id_str = (string)$customer_id;
         
         if ($secret === null) {
             $CI =& get_instance();
@@ -218,7 +221,7 @@ if (!function_exists('generate_customer_portal_hash')) {
         }
         
         // Generate HMAC using SHA-256
-        $hash = hash_hmac('sha256', $customer_code, $secret);
+        $hash = hash_hmac('sha256', $customer_id_str, $secret);
         
         // Convert hex to base36 (only lowercase letters and numbers)
         $base36_hash = hex_to_base36($hash);
@@ -231,11 +234,11 @@ if (!function_exists('generate_customer_portal_hash')) {
                 $base36_hash = base_convert($hex_short, 16, 36);
                 // If still empty, use MD5 as ultimate fallback
                 if (empty($base36_hash)) {
-                    $base36_hash = base_convert(substr(md5($customer_code . $secret), 0, 16), 16, 36);
+                    $base36_hash = base_convert(substr(md5($customer_id_str . $secret), 0, 16), 16, 36);
                 }
             } catch (Exception $e) {
                 // Ultimate fallback: use MD5 hash
-                $base36_hash = base_convert(substr(md5($customer_code . $secret), 0, 16), 16, 36);
+                $base36_hash = base_convert(substr(md5($customer_id_str . $secret), 0, 16), 16, 36);
             }
         }
         
@@ -247,8 +250,8 @@ if (!function_exists('generate_customer_portal_hash')) {
         
         // Final safety check - ensure we never return empty or "0"
         if (empty($base36_hash) || $base36_hash === '0') {
-            // Last resort: create hash from customer code and secret
-            $fallback_hash = md5($customer_code . $secret . 'portal');
+            // Last resort: create hash from customer ID and secret
+            $fallback_hash = md5($customer_id_str . $secret . 'portal');
             $base36_hash = base_convert(substr($fallback_hash, 0, 16), 16, 36);
             if ($length > 0 && strlen($base36_hash) > $length) {
                 $base36_hash = substr($base36_hash, 0, $length);
@@ -263,15 +266,15 @@ if (!function_exists('generate_customer_portal_hash')) {
  * Verify HMAC hash for customer portal URL
  * 
  * @param string $hash The hash from the URL
- * @param string $customer_code The customer code to verify against
+ * @param int|string $customer_id The customer ID to verify against
  * @param string $secret Secret key for HMAC (defaults to config value)
  * @param int $length Expected length of hash (if 0, uses actual hash length)
  * @return bool True if hash is valid, false otherwise
  */
 if (!function_exists('verify_customer_portal_hash')) {
-    function verify_customer_portal_hash($hash, $customer_code, $secret = null, $length = 0)
+    function verify_customer_portal_hash($hash, $customer_id, $secret = null, $length = 0)
     {
-        if (empty($hash) || empty($customer_code)) {
+        if (empty($hash) || empty($customer_id)) {
             return false;
         }
         
@@ -295,7 +298,7 @@ if (!function_exists('verify_customer_portal_hash')) {
         }
         
         // Generate expected hash with same length as provided hash
-        $expected_hash = generate_customer_portal_hash($customer_code, $secret, $length);
+        $expected_hash = generate_customer_portal_hash($customer_id, $secret, $length);
         
         // Use timing-safe comparison to prevent timing attacks
         return hash_equals($expected_hash, $hash);

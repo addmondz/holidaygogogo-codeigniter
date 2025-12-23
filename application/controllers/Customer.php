@@ -258,17 +258,17 @@ class Customer extends MY_Controller
 
 		$customer = $this->Customer_Model->find($customer_id);
 		
-		if (!$customer || empty($customer->CustomerCode)) {
+		if (!$customer || empty($customer->CustomerID)) {
 			$this->output
 				->set_content_type('application/json')
 				->set_output(json_encode([
 					'success' => false,
-					'message' => 'Customer not found or has no CustomerCode'
+					'message' => 'Customer not found or has no CustomerID'
 				]));
 			return;
 		}
 
-		$hash = generate_customer_portal_hash($customer->CustomerCode);
+		$hash = generate_customer_portal_hash($customer->CustomerID);
 		$portal_url = base_url('customer/' . $hash);
 
 		$this->output
