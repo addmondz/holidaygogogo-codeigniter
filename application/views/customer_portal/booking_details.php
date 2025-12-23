@@ -306,13 +306,130 @@
             border-color: #162447;
         }
 
+        /* Timeline and Payment History Layout */
+        .timeline-payment-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        /* Timeline Section */
+        .timeline-section {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+
+        .timeline {
+            position: relative;
+            padding-left: 27px;
+        }
+
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 8px;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: #e0e0e0;
+        }
+
+        .timeline-item {
+            position: relative;
+            margin-bottom: 30px;
+        }
+
+        .timeline-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -26px;
+            top: 5px;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: white;
+            border: 3px solid #162447;
+            z-index: 1;
+        }
+
+        .timeline-item.completed::before {
+            background: #50C878;
+            border-color: #50C878;
+        }
+
+        .timeline-item.pending::before {
+            background: #FFBF00;
+            border-color: #FFBF00;
+        }
+
+        .timeline-item.available::before {
+            background: #162447;
+            border-color: #162447;
+        }
+
+        .timeline-content {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            border-left: 3px solid #162447;
+        }
+
+        .timeline-item.completed .timeline-content {
+            border-left-color: #50C878;
+        }
+
+        .timeline-item.pending .timeline-content {
+            border-left-color: #FFBF00;
+        }
+
+        .timeline-date {
+            font-size: 12px;
+            color: #666;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .timeline-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .timeline-action {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .timeline-action a {
+            color: #162447;
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .timeline-action a:hover {
+            text-decoration: underline;
+        }
+
+        .timeline-icon {
+            display: inline-block;
+            margin-right: 8px;
+            font-size: 14px;
+        }
+
         /* Payment History Section */
         .payments-section {
             background: white;
             border-radius: 12px;
             padding: 25px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-            margin-bottom: 30px;
         }
 
         .payments-table {
@@ -476,11 +593,17 @@
                 margin-bottom: 20px;
             }
 
+            .timeline-payment-grid {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+
             .details-card,
             .documents-card,
             .products-section,
             .payments-section,
-            .summary-card {
+            .summary-card,
+            .timeline-section {
                 padding: 20px 15px;
                 margin-bottom: 20px;
             }
@@ -757,30 +880,141 @@
                 <?php endif; ?>
             </div>
 
-            <!-- Documents -->
-            <div class="documents-card">
+            <!-- Timeline -->
+            <div class="timeline-section">
                 <div class="card-title">
-                    Documents
+                    Timeline
                 </div>
-                <div class="documents-grid">
-                    <?php foreach ($booking['documents'] as $doc_key => $doc): ?>
-                    <a href="<?php echo $doc['url']; ?>" target="_blank" class="document-item <?php echo $doc['available'] ? '' : 'disabled'; ?>">
-                        <div class="document-icon">
-                            <?php if ($doc_key == 'bc'): ?>
-                                <i class="la la-file-contract"></i>
-                            <?php elseif ($doc_key == 'tv'): ?>
-                                <i class="la la-plane"></i>
-                            <?php elseif ($doc_key == 'or'): ?>
-                                <i class="la la-receipt"></i>
-                            <?php elseif ($doc_key == 'gl'): ?>
-                                <i class="la la-users"></i>
-                            <?php else: ?>
-                                <i class="la la-file"></i>
-                            <?php endif; ?>
+                <div class="timeline">
+                    <?php
+                    $today = date('Y-m-d');
+                    $timeline_events = [];
+                    
+                    // Event 1: View Booking Confirmation (always available)
+                    $timeline_events[] = [
+                        'date' => !empty($booking['InsertDateRaw']) ? date('d/m/y', strtotime($booking['InsertDateRaw'])) : 'N/A',
+                        'title' => 'View Booking Confirmation',
+                        'action' => '<a href="' . $booking['documents']['bc']['url'] . '" target="_blank">View BC</a>',
+                        'status' => 'available',
+                        'icon' => 'la la-file-contract'
+                    ];
+                    
+                    // Event 2: Upload payment proof (deposit) - if DepositDeadline exists
+                    if (!empty($booking['DepositDeadlineRaw'])) {
+                        $deposit_deadline_passed = strtotime($booking['DepositDeadlineRaw']) < strtotime($today);
+                        $has_deposit_payment = false;
+                        if (!empty($booking['payments'])) {
+                            foreach ($booking['payments'] as $payment) {
+                                // Check if payment has credit and is approved
+                                if (!empty($payment['Credit']) && $payment['Credit'] > 0 && 
+                                    ($payment['Status'] == 'Y' || $payment['Status'] == 'P')) {
+                                    // Use raw date for comparison
+                                    $payment_date = !empty($payment['DateRaw']) ? $payment['DateRaw'] : null;
+                                    if ($payment_date && strtotime($payment_date) <= strtotime($booking['DepositDeadlineRaw'])) {
+                                        $has_deposit_payment = true;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        $timeline_events[] = [
+                            'date' => date('d/m/y', strtotime($booking['DepositDeadlineRaw'])),
+                            'title' => 'Upload payment proof (deposit)',
+                            'action' => $has_deposit_payment ? 'Completed' : ($deposit_deadline_passed ? 'Overdue' : 'Pending'),
+                            'status' => $has_deposit_payment ? 'completed' : ($deposit_deadline_passed ? 'pending' : 'pending'),
+                            'icon' => 'la la-upload'
+                        ];
+                    }
+                    
+                    // Event 3: Submit namelist - if guest list is available
+                    if (!empty($booking['has_guest_list'])) {
+                        $timeline_events[] = [
+                            'date' => !empty($booking['InsertDateRaw']) ? date('d/m/y', strtotime($booking['InsertDateRaw'])) : 'N/A',
+                            'title' => 'Submit namelist',
+                            'action' => '<a href="' . $booking['documents']['gl']['url'] . '" target="_blank">View Guest List</a>',
+                            'status' => 'completed',
+                            'icon' => 'la la-users'
+                        ];
+                    }
+                    
+                    // Event 4: Download payment receipt - if payments exist
+                    if (!empty($booking['payments'])) {
+                        $has_approved_payment = false;
+                        $first_payment_date = null;
+                        foreach ($booking['payments'] as $payment) {
+                            if ($payment['Status'] == 'Y' && !empty($payment['Credit']) && $payment['Credit'] > 0) {
+                                $has_approved_payment = true;
+                                if (empty($first_payment_date) && !empty($payment['DateRaw'])) {
+                                    $first_payment_date = $payment['DateRaw'];
+                                }
+                            }
+                        }
+                        if ($has_approved_payment) {
+                            $receipt_date = 'N/A';
+                            if ($first_payment_date) {
+                                $receipt_date = date('d/m/y', strtotime($first_payment_date));
+                            }
+                            $timeline_events[] = [
+                                'date' => $receipt_date,
+                                'title' => 'Download payment receipt',
+                                'action' => '<a href="' . $booking['documents']['or']['url'] . '" target="_blank">View Receipt</a>',
+                                'status' => 'available',
+                                'icon' => 'la la-download'
+                            ];
+                        }
+                    }
+                    
+                    // Event 5: Upload payment proof (balance) - if FullPaymentDeadline exists
+                    if (!empty($booking['FullPaymentDeadlineRaw'])) {
+                        $balance_deadline_passed = strtotime($booking['FullPaymentDeadlineRaw']) < strtotime($today);
+                        $balance_paid = $booking['balance_due'] <= 0;
+                        $timeline_events[] = [
+                            'date' => date('d/m/y', strtotime($booking['FullPaymentDeadlineRaw'])),
+                            'title' => 'Upload payment proof (balance)',
+                            'action' => $balance_paid ? 'Completed' : ($balance_deadline_passed ? 'Overdue' : 'Pending'),
+                            'status' => $balance_paid ? 'completed' : ($balance_deadline_passed ? 'pending' : 'pending'),
+                            'icon' => 'la la-upload'
+                        ];
+                    }
+                    
+                    // Event 6: Download Travel Voucher - if TV is available (usually after full payment)
+                    if ($booking['balance_due'] <= 0 || !empty($booking['documents']['tv']['available'])) {
+                        $timeline_events[] = [
+                            'date' => !empty($booking['FullPaymentDeadlineRaw']) ? date('d/m/y', strtotime($booking['FullPaymentDeadlineRaw'])) : 'N/A',
+                            'title' => 'Download Travel Voucher',
+                            'action' => '<a href="' . $booking['documents']['tv']['url'] . '" target="_blank">View TV</a>',
+                            'status' => ($booking['balance_due'] <= 0) ? 'available' : 'pending',
+                            'icon' => 'la la-plane'
+                        ];
+                    }
+                    
+                    // Event 7: Submit Review - only after travel date and if not blocked
+                    if (!empty($booking['EndDateRaw'])) {
+                        $travel_ended = strtotime($booking['EndDateRaw']) < strtotime($today);
+                        if ($travel_ended) {
+                            $timeline_events[] = [
+                                'date' => date('d/m/y', strtotime($booking['EndDateRaw'])),
+                                'title' => 'Submit Review',
+                                'action' => 'Available after travel',
+                                'status' => 'pending',
+                                'icon' => 'la la-star'
+                            ];
+                        }
+                    }
+                    
+                    // Display timeline events
+                    foreach ($timeline_events as $event):
+                    ?>
+                    <div class="timeline-item <?php echo $event['status']; ?>">
+                        <div class="timeline-content">
+                            <div class="timeline-date">
+                                <i class="<?php echo $event['icon']; ?> timeline-icon"></i>
+                                <?php echo $event['date']; ?>
+                            </div>
+                            <div class="timeline-title"><?php echo htmlspecialchars($event['title']); ?></div>
+                            <div class="timeline-action"><?php echo $event['action']; ?></div>
                         </div>
-                        <div class="document-name"><?php echo htmlspecialchars($doc['name']); ?></div>
-                        <div class="document-action">Click to View</div>
-                    </a>
+                    </div>
                     <?php endforeach; ?>
                 </div>
             </div>
@@ -788,7 +1022,7 @@
 
         <!-- Products Section -->
         <?php if (!empty($booking['products'])): ?>
-        <div class="products-section">
+        <div class="products-section" style="display: none !important;">
             <div class="card-title">
                 Products & Services
             </div>
@@ -826,80 +1060,112 @@
         </div>
         <?php endif; ?>
 
-        <!-- Payment History Section -->
-        <div class="payments-section">
-            <div class="card-title">
-                Payment History
+        <!-- Timeline and Payment History -->
+        <div class="timeline-payment-grid">
+
+            <!-- Payment History Section -->
+            <div class="payments-section">
+                <div class="card-title">
+                    Payment History
+                </div>
+                <?php if (empty($booking['payments'])): ?>
+                    <div class="empty-state">
+                        <i class="la la-wallet"></i>
+                        <p>No payment records found</p>
+                    </div>
+                <?php else: ?>
+                    <table class="payments-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Type</th>
+                                <th>Payment In</th>
+                                <th>Payment Out</th>
+                                <th>Reference</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($booking['payments'] as $payment): ?>
+                            <tr>
+                                <td data-label="Date"><?php echo !empty($payment['Date']) ? htmlspecialchars($payment['Date']) : '-'; ?></td>
+                                <td data-label="Type"><?php echo htmlspecialchars($payment['Type'] ?? '-'); ?></td>
+                                <td data-label="Payment In" class="payment-credit">
+                                    <?php if (!empty($payment['Credit']) && $payment['Credit'] > 0): ?>
+                                        RM <?php echo number_format($payment['Credit'], 2); ?>
+                                    <?php else: ?>
+                                        -
+                                    <?php endif; ?>
+                                </td>
+                                <td data-label="Payment Out" class="payment-debit">
+                                    <?php if (!empty($payment['Debit']) && $payment['Debit'] > 0): ?>
+                                        RM <?php echo number_format($payment['Debit'], 2); ?>
+                                    <?php else: ?>
+                                        -
+                                    <?php endif; ?>
+                                </td>
+                                <td data-label="Reference"><?php echo !empty($payment['ReferenceNumber']) ? htmlspecialchars($payment['ReferenceNumber']) : '-'; ?></td>
+                                <td data-label="Status">
+                                    <span class="payment-status <?php echo $payment['Status'] == 'Y' ? 'status-approved' : 'status-pending'; ?>">
+                                        <?php echo $payment['Status'] == 'Y' ? 'Approved' : 'Pending'; ?>
+                                    </span>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                    <div class="payment-summary">
+                        <div class="payment-summary-row">
+                            <span class="payment-summary-label">Total Paid:</span>
+                            <span class="payment-summary-value positive">RM <?php echo number_format($booking['total_paid'], 2); ?></span>
+                        </div>
+                        <?php if ($booking['total_debit'] > 0): ?>
+                        <div class="payment-summary-row">
+                            <span class="payment-summary-label">Total Refunds:</span>
+                            <span class="payment-summary-value negative">RM <?php echo number_format($booking['total_debit'], 2); ?></span>
+                        </div>
+                        <?php endif; ?>
+                        <div class="payment-summary-row">
+                            <span class="payment-summary-label">Booking Total:</span>
+                            <span class="payment-summary-value">RM <?php echo number_format($booking['NetTotal'], 2); ?></span>
+                        </div>
+                        <div class="payment-summary-row total">
+                            <span class="payment-summary-label">Balance Due:</span>
+                            <span class="payment-summary-value <?php echo $booking['balance_due'] > 0 ? 'negative' : ($booking['balance_due'] < 0 ? 'positive' : ''); ?>">
+                                RM <?php echo number_format($booking['balance_due'], 2); ?>
+                            </span>
+                        </div>
+                    </div>
+                <?php endif; ?>
             </div>
-            <?php if (empty($booking['payments'])): ?>
-                <div class="empty-state">
-                    <i class="la la-wallet"></i>
-                    <p>No payment records found</p>
+
+             <!-- Documents -->
+            <div class="documents-card">
+                <div class="card-title">
+                    Documents
                 </div>
-            <?php else: ?>
-                <table class="payments-table">
-                    <thead>
-                        <tr>
-                            <th>Date</th>
-                            <th>Type</th>
-                            <th>Payment In</th>
-                            <th>Payment Out</th>
-                            <th>Reference</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($booking['payments'] as $payment): ?>
-                        <tr>
-                            <td data-label="Date"><?php echo !empty($payment['Date']) ? htmlspecialchars($payment['Date']) : '-'; ?></td>
-                            <td data-label="Type"><?php echo htmlspecialchars($payment['Type'] ?? '-'); ?></td>
-                            <td data-label="Payment In" class="payment-credit">
-                                <?php if (!empty($payment['Credit']) && $payment['Credit'] > 0): ?>
-                                    RM <?php echo number_format($payment['Credit'], 2); ?>
-                                <?php else: ?>
-                                    -
-                                <?php endif; ?>
-                            </td>
-                            <td data-label="Payment Out" class="payment-debit">
-                                <?php if (!empty($payment['Debit']) && $payment['Debit'] > 0): ?>
-                                    RM <?php echo number_format($payment['Debit'], 2); ?>
-                                <?php else: ?>
-                                    -
-                                <?php endif; ?>
-                            </td>
-                            <td data-label="Reference"><?php echo !empty($payment['ReferenceNumber']) ? htmlspecialchars($payment['ReferenceNumber']) : '-'; ?></td>
-                            <td data-label="Status">
-                                <span class="payment-status <?php echo $payment['Status'] == 'Y' ? 'status-approved' : 'status-pending'; ?>">
-                                    <?php echo $payment['Status'] == 'Y' ? 'Approved' : 'Pending'; ?>
-                                </span>
-                            </td>
-                        </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
-                <div class="payment-summary">
-                    <div class="payment-summary-row">
-                        <span class="payment-summary-label">Total Paid:</span>
-                        <span class="payment-summary-value positive">RM <?php echo number_format($booking['total_paid'], 2); ?></span>
-                    </div>
-                    <?php if ($booking['total_debit'] > 0): ?>
-                    <div class="payment-summary-row">
-                        <span class="payment-summary-label">Total Refunds:</span>
-                        <span class="payment-summary-value negative">RM <?php echo number_format($booking['total_debit'], 2); ?></span>
-                    </div>
-                    <?php endif; ?>
-                    <div class="payment-summary-row">
-                        <span class="payment-summary-label">Booking Total:</span>
-                        <span class="payment-summary-value">RM <?php echo number_format($booking['NetTotal'], 2); ?></span>
-                    </div>
-                    <div class="payment-summary-row total">
-                        <span class="payment-summary-label">Balance Due:</span>
-                        <span class="payment-summary-value <?php echo $booking['balance_due'] > 0 ? 'negative' : ($booking['balance_due'] < 0 ? 'positive' : ''); ?>">
-                            RM <?php echo number_format($booking['balance_due'], 2); ?>
-                        </span>
-                    </div>
+                <div class="documents-grid">
+                    <?php foreach ($booking['documents'] as $doc_key => $doc): ?>
+                    <a href="<?php echo $doc['url']; ?>" target="_blank" class="document-item <?php echo $doc['available'] ? '' : 'disabled'; ?>">
+                        <div class="document-icon">
+                            <?php if ($doc_key == 'bc'): ?>
+                                <i class="la la-file-contract"></i>
+                            <?php elseif ($doc_key == 'tv'): ?>
+                                <i class="la la-plane"></i>
+                            <?php elseif ($doc_key == 'or'): ?>
+                                <i class="la la-receipt"></i>
+                            <?php elseif ($doc_key == 'gl'): ?>
+                                <i class="la la-users"></i>
+                            <?php else: ?>
+                                <i class="la la-file"></i>
+                            <?php endif; ?>
+                        </div>
+                        <div class="document-name"><?php echo htmlspecialchars($doc['name']); ?></div>
+                        <div class="document-action">Click to View</div>
+                    </a>
+                    <?php endforeach; ?>
                 </div>
-            <?php endif; ?>
+            </div>
         </div>
     </div>
 </body>

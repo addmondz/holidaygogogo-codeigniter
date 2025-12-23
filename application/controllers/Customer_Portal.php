@@ -313,6 +313,13 @@ class Customer_Portal extends CI_Controller
             $customer = $this->db->get('customer')->row_array();
         }
 
+        // Store raw dates before formatting (for timeline calculations)
+        $booking['StartDateRaw'] = !empty($booking['StartDate']) ? $booking['StartDate'] : null;
+        $booking['EndDateRaw'] = !empty($booking['EndDate']) ? $booking['EndDate'] : null;
+        $booking['DepositDeadlineRaw'] = !empty($booking['DepositDeadline']) ? $booking['DepositDeadline'] : null;
+        $booking['FullPaymentDeadlineRaw'] = !empty($booking['FullPaymentDeadline']) ? $booking['FullPaymentDeadline'] : null;
+        $booking['InsertDateRaw'] = !empty($booking['InsertDate']) ? $booking['InsertDate'] : null;
+
         // Format booking data
         $booking['DepositDeadline'] = !empty($booking['DepositDeadline']) ? date('d M Y', strtotime($booking['DepositDeadline'])) : null;
         $booking['FullPaymentDeadline'] = !empty($booking['FullPaymentDeadline']) ? date('d M Y', strtotime($booking['FullPaymentDeadline'])) : null;
@@ -345,6 +352,9 @@ class Customer_Portal extends CI_Controller
         $total_credit = 0;
         $total_debit = 0;
         foreach ($payments as &$payment) {
+            // Store raw date before formatting
+            $payment['DateRaw'] = !empty($payment['Date']) ? $payment['Date'] : null;
+            
             if (!empty($payment['Date'])) {
                 $payment['Date'] = date('d M Y', strtotime($payment['Date']));
             }
@@ -393,6 +403,13 @@ class Customer_Portal extends CI_Controller
                 'available' => true
             ]
         ];
+
+        // Check if guest list exists
+        $this->db->select('COUNT(*) as count');
+        $this->db->where('BookingID', $booking['BookingID']);
+        $this->db->where('Status', 'Y');
+        $guest_list_result = $this->db->get('guest_list')->row_array();
+        $booking['has_guest_list'] = !empty($guest_list_result['count']) && $guest_list_result['count'] > 0;
 
         // Get status display info
         $booking['status_display'] = $this->get_booking_status_display($booking);
