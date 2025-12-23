@@ -171,45 +171,25 @@ class Customer_Portal extends CI_Controller
         $this->db->join('country_code', 'country_code.CountryCodeID = booking.CountryCodeID', 'left');
         $this->db->where('booking.CustomerID', $customer_id);
         $this->db->where('booking.Status !=', 'N');
+        $this->db->where('CancelStatus', 'N'); // Always exclude cancelled
 
-        // Apply status filter
+        // Apply status filter based on BC stage visibility rules
         if (!empty($status_filter)) {
-            if ($status_filter == 'C') {
-                // Cancelled
-                $this->db->where('CancelStatus', 'Y');
-            } elseif ($status_filter == 'Y') {
-                // Completed
-                $this->db->where('CancelStatus', 'N');
-                $this->db->where('AfterSalesService', 'COMPLETE');
-                $this->db->where('booking.Status', 'Y');
-            } elseif ($status_filter == 'OG') {
-                // On-going
-                $this->db->where('CancelStatus', 'N');
-                $this->db->where('booking.Status', 'OG');
-            } elseif ($status_filter == 'PP') {
-                // Partial Payment
-                $this->db->where('CancelStatus', 'N');
-                $this->db->where('booking.Status', 'PP');
-            } elseif ($status_filter == 'P') {
-                // Pending Payment
-                $this->db->where('CancelStatus', 'N');
+            if ($status_filter == 'pending') {
+                // Pending: Status = 'P' (Pending Payment - before booking confirmation)
                 $this->db->where('booking.Status', 'P');
-            } elseif ($status_filter == 'PT') {
-                // Pending Travel
-                $this->db->where('CancelStatus', 'N');
-                $this->db->where('booking.Status', 'PT');
-            } elseif ($status_filter == 'PTV') {
-                // Pending Travel Voucher
-                $this->db->where('CancelStatus', 'N');
-                $this->db->where('booking.Status', 'PTV');
-            } elseif ($status_filter == 'PO') {
-                // Payment Overdue
-                $this->db->where('CancelStatus', 'N');
-                $this->db->where("((FullPaymentDeadline < '" . date('Y-m-d') . "' AND booking.Status IN ('P','PP')) OR (DepositDeadline < '" . date('Y-m-d') . "' AND booking.Status = 'P'))");
+            } elseif ($status_filter == 'confirmed') {
+                // Confirmed: Status IN ('PP', 'PTV', 'PT', 'OG') - after booking confirmation
+                $this->db->where_in('booking.Status', ['PP', 'PTV', 'PT', 'OG']);
+            } elseif ($status_filter == 'completed') {
+                // Completed: Status = 'Y' AND AfterSalesService = 'COMPLETE'
+                $this->db->where('booking.Status', 'Y');
+                $this->db->where('AfterSalesService', 'COMPLETE');
             }
         } else {
-            // Default: exclude cancelled
-            $this->db->where('CancelStatus', 'N');
+            // Default: Show only Confirmed and Completed (hide Pending)
+            // Pending (Status = 'P') is hidden from customers
+            $this->db->where("(booking.Status IN ('PP', 'PTV', 'PT', 'OG') OR (booking.Status = 'Y' AND AfterSalesService = 'COMPLETE'))", null, false);
         }
 
         // Apply travel date filter
@@ -234,15 +214,10 @@ class Customer_Portal extends CI_Controller
     private function get_booking_status_options()
     {
         return [
-            '' => 'All Statuses',
-            'P' => 'Pending Payment',
-            'PP' => 'Partial Payment',
-            'PT' => 'Pending Travel',
-            'PTV' => 'Pending Travel Voucher',
-            'OG' => 'On-Going',
-            'Y' => 'Completed',
-            'PO' => 'Payment Overdue',
-            'C' => 'Cancelled'
+            '' => 'All Bookings',
+            'pending' => 'Pending',
+            'confirmed' => 'Confirmed',
+            'completed' => 'Completed'
         ];
     }
 
@@ -442,7 +417,7 @@ class Customer_Portal extends CI_Controller
     }
 
     /**
-     * Get booking status display information
+     * Get booking status display information based on BC stage visibility rules
      * 
      * @param array $booking
      * @return array
@@ -452,7 +427,6 @@ class Customer_Portal extends CI_Controller
         $status = $booking['Status'];
         $cancel_status = $booking['CancelStatus'];
         $after_sales = $booking['AfterSalesService'];
-        $lock_status = $booking['LockStatus'];
 
         if ($cancel_status == 'Y') {
             return [
@@ -462,30 +436,40 @@ class Customer_Portal extends CI_Controller
             ];
         }
 
-        // Determine display status
-        $display_status = $status;
-        if ($lock_status == 'N' && $status == 'PTV') {
-            $display_status = 'PGL';
-        }
-        if ($after_sales == 'PENDING' && $status == 'Y') {
-            $display_status = 'PR';
+        // Determine display status based on BC stage visibility rules
+        // Pending: Status = 'P' (Pending Payment - before booking confirmation)
+        // Confirmed: Status IN ('PP', 'PTV', 'PT', 'OG') - after booking confirmation
+        // Completed: Status = 'Y' AND AfterSalesService = 'COMPLETE'
+        
+        if ($status == 'Y' && $after_sales == 'COMPLETE') {
+            // Completed
+            return [
+                'text' => 'Completed',
+                'class' => 'status-completed',
+                'color' => '#50C878'
+            ];
+        } elseif (in_array($status, ['PP', 'PTV', 'PT', 'OG'])) {
+            // Confirmed - after booking confirmation
+            return [
+                'text' => 'Confirmed',
+                'class' => 'status-partial-payment',
+                'color' => '#A7C7E7'
+            ];
+        } elseif ($status == 'P') {
+            // Pending - before booking confirmation
+            return [
+                'text' => 'Pending',
+                'class' => 'status-pending-payment',
+                'color' => '#FFBF00'
+            ];
         }
 
-        $status_map = [
-            'Y' => ['text' => 'Completed', 'class' => 'status-completed', 'color' => '#50C878'],
-            'PR' => ['text' => 'Pending Review', 'class' => 'status-pending-review', 'color' => '#C3B1E1'],
-            'P' => ['text' => 'Pending Payment', 'class' => 'status-pending-payment', 'color' => '#FFBF00'],
-            'PP' => ['text' => 'Partial Payment', 'class' => 'status-partial-payment', 'color' => '#A7C7E7'],
-            'PTV' => ['text' => 'Pending Travel Voucher', 'class' => 'status-pending-tv', 'color' => '#F89880'],
-            'PGL' => ['text' => 'Pending Guest List', 'class' => 'status-pending-gl', 'color' => '#FAC898'],
-            'PT' => ['text' => 'Pending Travel', 'class' => 'status-pending-travel', 'color' => '#F8C8DC'],
-            'OG' => ['text' => 'On-Going', 'class' => 'status-ongoing', 'color' => '#CCCCFF'],
-            'PO' => ['text' => 'Payment Overdue', 'class' => 'status-overdue', 'color' => '#DA70D6']
+        // Fallback for any other status
+        return [
+            'text' => 'Unknown',
+            'class' => 'status-unknown',
+            'color' => '#999'
         ];
-
-        return isset($status_map[$display_status]) 
-            ? $status_map[$display_status] 
-            : ['text' => 'Unknown', 'class' => 'status-unknown', 'color' => '#999'];
     }
 }
 

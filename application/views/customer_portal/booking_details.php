@@ -895,29 +895,6 @@
                 </div>
             <?php endif; ?>
         </div>
-
-        <!-- Summary Card -->
-        <div class="summary-card">
-            <div class="card-title">
-                Payment Summary
-            </div>
-            <?php if (!empty($booking['Subtotal'])): ?>
-            <div class="summary-item">
-                <span class="summary-label">Subtotal</span>
-                <span class="summary-value">RM <?php echo number_format($booking['Subtotal'], 2); ?></span>
-            </div>
-            <?php endif; ?>
-            <?php if (!empty($booking['Discount']) && $booking['Discount'] > 0): ?>
-            <div class="summary-item">
-                <span class="summary-label">Discount</span>
-                <span class="summary-value">- RM <?php echo number_format($booking['Discount'], 2); ?></span>
-            </div>
-            <?php endif; ?>
-            <div class="summary-item">
-                <span class="summary-label">Net Total</span>
-                <span class="summary-value">RM <?php echo number_format($booking['NetTotal'], 2); ?></span>
-            </div>
-        </div>
     </div>
 </body>
 </html>

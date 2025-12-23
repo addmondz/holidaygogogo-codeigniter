@@ -641,7 +641,7 @@
                 <div class="bookings-grid">
                     <?php foreach ($bookings as $booking): ?>
                         <?php
-                        // Determine booking status
+                        // Determine booking status based on BC stage visibility rules
                         $display_status = $booking['Status'];
                         $status_class = 'status-pending';
                         $status_text = 'Pending';
@@ -649,30 +649,35 @@
                         if ($booking['CancelStatus'] == 'Y') {
                             $status_class = 'status-cancelled';
                             $status_text = 'Cancelled';
-                        } elseif ($booking['Status'] == 'Y') {
+                        } elseif ($booking['Status'] == 'Y' && $booking['AfterSalesService'] == 'COMPLETE') {
+                            // Completed: Status = 'Y' AND AfterSalesService = 'COMPLETE'
                             $status_class = 'status-completed';
                             $status_text = 'Completed';
-                        } elseif ($booking['Status'] == 'OG') {
-                            $status_class = 'status-ongoing';
-                            $status_text = 'On-Going';
-                        } elseif ($booking['Status'] == 'PP') {
-                            $status_class = 'status-partial';
-                            $status_text = 'Partial Payment';
-                        } elseif ($booking['Status'] == 'PT') {
-                            $status_class = 'status-pending-travel';
-                            $status_text = 'Pending Travel';
-                        } elseif ($booking['Status'] == 'PTV') {
-                            $status_class = 'status-pending-travel';
-                            $status_text = 'Pending Travel Voucher';
+                        } elseif (in_array($booking['Status'], ['PP', 'PTV', 'PT', 'OG'])) {
+                            // Confirmed: Status IN ('PP', 'PTV', 'PT', 'OG') - after booking confirmation
+                            if ($booking['Status'] == 'OG') {
+                                $status_class = 'status-ongoing';
+                                $status_text = 'Confirmed';
+                            } elseif ($booking['Status'] == 'PP') {
+                                $status_class = 'status-partial';
+                                $status_text = 'Confirmed';
+                            } elseif ($booking['Status'] == 'PT') {
+                                $status_class = 'status-pending-travel';
+                                $status_text = 'Confirmed';
+                            } elseif ($booking['Status'] == 'PTV') {
+                                $status_class = 'status-pending-travel';
+                                $status_text = 'Confirmed';
+                            }
                         } elseif ($booking['Status'] == 'P') {
+                            // Pending: Status = 'P' (Pending Payment - before booking confirmation)
                             // Check if overdue
                             $deadline = !empty($booking['DepositDeadline']) ? $booking['DepositDeadline'] : $booking['FullPaymentDeadline'];
                             if (!empty($deadline) && strtotime($deadline) < strtotime('today')) {
                                 $status_class = 'status-overdue';
-                                $status_text = 'Payment Overdue';
+                                $status_text = 'Pending';
                             } else {
                                 $status_class = 'status-pending';
-                                $status_text = 'Pending Payment';
+                                $status_text = 'Pending';
                             }
                         }
                         ?>
