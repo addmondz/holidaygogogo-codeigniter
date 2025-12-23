@@ -189,12 +189,12 @@ if (!function_exists('hex_to_base36')) {
 }
 
 /**
- * Generate HMAC hash for customer portal URL
+ * Generate simple hash for customer portal URL
  * 
  * @param int|string $customer_id The customer ID to sign
- * @param string $secret Secret key for HMAC (defaults to config value)
- * @param int $length Optional length to truncate (default: full length, recommended: 16-24)
- * @return string Base36 encoded HMAC hash (lowercase letters and numbers only)
+ * @param string $secret Secret key (defaults to config value)
+ * @param int $length Optional length to truncate (default: 20)
+ * @return string Base36 encoded hash (lowercase letters and numbers only)
  */
 if (!function_exists('generate_customer_portal_hash')) {
     function generate_customer_portal_hash($customer_id, $secret = null, $length = 20)
@@ -203,14 +203,14 @@ if (!function_exists('generate_customer_portal_hash')) {
             return false;
         }
         
-        // Convert customer ID to string for hashing
+        // Convert customer ID to string
         $customer_id_str = (string)$customer_id;
         
+        // Get secret from config or .env
         if ($secret === null) {
             $CI =& get_instance();
             $secret = $CI->config->item('customer_portal_hmac_secret');
             if (empty($secret)) {
-                // Fallback to .env if config not set
                 if (function_exists('get_env')) {
                     $secret = get_env('CUSTOMER_PORTAL_HMAC_SECRET');
                 }
@@ -220,42 +220,16 @@ if (!function_exists('generate_customer_portal_hash')) {
             }
         }
         
-        // Generate HMAC using SHA-256
-        $hash = hash_hmac('sha256', $customer_id_str, $secret);
+        // Simple method: MD5 hash of customer_id + secret, then convert to base36
+        $md5_hash = md5($customer_id_str . $secret);
         
-        // Convert hex to base36 (only lowercase letters and numbers)
-        $base36_hash = hex_to_base36($hash);
+        // Convert first 16 hex characters to base36 (simple, works everywhere)
+        $hex_short = substr($md5_hash, 0, 16);
+        $base36_hash = base_convert($hex_short, 16, 36);
         
-        // Ensure we have a valid hash - if empty, use simpler fallback
-        if (empty($base36_hash) || $base36_hash === '0') {
-            // Fallback: use base_convert directly on first 16 hex chars (safe for all PHP versions)
-            $hex_short = substr($hash, 0, 16);
-            try {
-                $base36_hash = base_convert($hex_short, 16, 36);
-                // If still empty, use MD5 as ultimate fallback
-                if (empty($base36_hash)) {
-                    $base36_hash = base_convert(substr(md5($customer_id_str . $secret), 0, 16), 16, 36);
-                }
-            } catch (Exception $e) {
-                // Ultimate fallback: use MD5 hash
-                $base36_hash = base_convert(substr(md5($customer_id_str . $secret), 0, 16), 16, 36);
-            }
-        }
-        
-        // Truncate to desired length (default 20 characters for shorter URLs)
-        // Still secure as long as length >= 16
+        // Truncate to desired length
         if ($length > 0 && strlen($base36_hash) > $length) {
             $base36_hash = substr($base36_hash, 0, $length);
-        }
-        
-        // Final safety check - ensure we never return empty or "0"
-        if (empty($base36_hash) || $base36_hash === '0') {
-            // Last resort: create hash from customer ID and secret
-            $fallback_hash = md5($customer_id_str . $secret . 'portal');
-            $base36_hash = base_convert(substr($fallback_hash, 0, 16), 16, 36);
-            if ($length > 0 && strlen($base36_hash) > $length) {
-                $base36_hash = substr($base36_hash, 0, $length);
-            }
         }
         
         return $base36_hash;
