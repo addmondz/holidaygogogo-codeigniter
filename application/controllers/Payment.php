@@ -71,8 +71,12 @@ class Payment extends MY_Controller
 			if(!empty($this->input->get('booking_number'))) {
 				$array['booking_id'] = !empty($this->Booking_Model->Read_Booking_ID()) ? ($this->Booking_Model->Read_Booking_ID())['BookingID'] : 'NA';
 				$array['token'] = !empty($this->Booking_Model->Read_Token()) ? ($this->Booking_Model->Read_Token())['Token'] : 'NA';
-				$array['booking_subtotal'] = !empty($this->Booking_Model->Read_Net_Total()) ? number_format(($this->Booking_Model->Read_Net_Total())['NetTotal'], 2, '.', ',') : number_format(0, 2, '.', ',');
-				$array['outstanding_balance_by_customer'] = !empty($this->Booking_Model->Read_Net_Total()) ? number_format(($this->Booking_Model->Read_Net_Total())['NetTotal'], 2, '.', ',') : number_format(0, 2, '.', ',');
+				$net_total = !empty($this->Booking_Model->Read_Net_Total()) ? ($this->Booking_Model->Read_Net_Total())['NetTotal'] : 0;
+				$array['booking_subtotal'] = number_format($net_total, 2, '.', ',');
+				// Calculate outstanding balance: NetTotal - Total Payments Received
+				$total_credit = ($array['booking_id'] != 'NA') ? $this->Calculate_Total_Credit($array['booking_id']) : 0;
+				$outstanding = $net_total - $total_credit;
+				$array['outstanding_balance_by_customer'] = number_format($outstanding, 2, '.', ',');
 			}
 
 			if(isset($_GET['nick'])) {
