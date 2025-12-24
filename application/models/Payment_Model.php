@@ -860,4 +860,40 @@ return $query->result_array(); // instead of result()
 		);
 	}
 
+	function Read_Supplier_Payments_Breakdown()
+	{
+		$this->db->select('supplier.SupplierID, supplier.Name, SUM(Debit) as TotalDebit');
+		$this->db->from('booking');
+		$this->db->join('payment', 'payment.BookingID = booking.BookingID', 'left');
+		$this->db->join('admin', 'admin.AdminID = booking.SalesAgent', 'left');
+		$this->db->join('supplier', 'supplier.SupplierID = payment.SupplierID', 'left');
+
+		$this->apply_payment_filters();
+
+		$this->db->where('Type', 'SUPPLIER PAYMENT');
+		$this->db->where('supplier.SupplierID IS NOT NULL');
+		$this->db->group_by('supplier.SupplierID');
+		$this->db->order_by('supplier.Name', 'ASC');
+
+		return $this->db->get()->result();
+	}
+
+	function Read_Customer_Refunds_Breakdown()
+	{
+		$this->db->select('payment.BankHolder, SUM(Debit) as TotalDebit');
+		$this->db->from('booking');
+		$this->db->join('payment', 'payment.BookingID = booking.BookingID', 'left');
+		$this->db->join('admin', 'admin.AdminID = booking.SalesAgent', 'left');
+		$this->db->join('supplier', 'supplier.SupplierID = payment.SupplierID', 'left');
+
+		$this->apply_payment_filters();
+
+		$this->db->where('Type', 'CUSTOMER REFUND');
+		$this->db->where('payment.BankHolder IS NOT NULL');
+		$this->db->group_by('payment.BankHolder');
+		$this->db->order_by('payment.BankHolder', 'ASC');
+
+		return $this->db->get()->result();
+	}
+
 }

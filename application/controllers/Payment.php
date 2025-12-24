@@ -36,8 +36,31 @@ class Payment extends MY_Controller
 			// Load dropdown data
 			$array['admins'] = $this->Payment_Model->Read_Admins();
 			$array['suppliers'] = $this->Payment_Model->Read_Suppliers();
-			$array['supplier_payments'] = [];
-			$array['customer_refunds'] = [];
+
+			// Get supplier payments breakdown
+			$supplier_breakdown = $this->Payment_Model->Read_Supplier_Payments_Breakdown();
+			$supplier_payments = [];
+			$supplier_ids = [];
+			$total_supplier = 0;
+			foreach($supplier_breakdown as $item) {
+				$supplier_payments[$item->Name] = $item->TotalDebit;
+				$supplier_ids[] = $item->SupplierID;
+				$total_supplier += $item->TotalDebit;
+			}
+			$array['supplier_payments'] = $supplier_payments;
+			$array['supplier_ids'] = $supplier_ids;
+			$array['total_supplier_payment'] = 'RM ' . number_format($total_supplier, 2, '.', ',');
+
+			// Get customer refunds breakdown
+			$refunds_breakdown = $this->Payment_Model->Read_Customer_Refunds_Breakdown();
+			$customer_refunds = [];
+			$total_refunds = 0;
+			foreach($refunds_breakdown as $item) {
+				$customer_refunds[$item->BankHolder] = $item->TotalDebit;
+				$total_refunds += $item->TotalDebit;
+			}
+			$array['customer_refunds'] = $customer_refunds;
+			$array['total_customer_refund'] = 'RM ' . number_format($total_refunds, 2, '.', ',');
 
 			// Load autocount config
 			$this->load->helper('autocount');
