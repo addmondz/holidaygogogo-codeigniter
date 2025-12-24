@@ -393,6 +393,8 @@
             elementId = 'customer_name-' + booking_id;
         } else if(value == 'CUSTOMER MOBILE') {
             elementId = 'customer_mobile-' + booking_id;
+        } else if(value == 'CUSTOMER PORTAL LINK') {
+            elementId = 'portal_url-' + booking_id;
         }
         
         // Try to get element using jQuery first, fallback to vanilla JS

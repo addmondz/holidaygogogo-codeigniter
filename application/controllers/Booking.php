@@ -407,6 +407,20 @@ class Booking extends MY_Controller
 		$html .= '<div class="dropdown-divider"></div>';
 		$html .= '<button id="customer_name-' . $booking->BookingID . '" value="' . $booking->Customer . '" onclick="Copy_URL(\'CUSTOMER NAME\', ' . $booking->BookingID . ')" class="dropdown-item" style="font-size:11px;">Copy Customer Name</button>';
 		$html .= '<button id="customer_mobile-' . $booking->BookingID . '" value="' . $booking->CustomerMobile . '" onclick="Copy_URL(\'CUSTOMER MOBILE\', ' . $booking->BookingID . ')" class="dropdown-item" style="font-size:11px;">Copy Customer Mobile</button>';
+		$html .= '<div class="dropdown-divider"></div>';
+		if($booking->CustomerID != null) {
+			// Load helper for generating portal hash
+			$this->load->helper('utils');
+			$customer_hash = generate_customer_portal_hash($booking->CustomerID);
+			if (!empty($customer_hash)) {
+				$portal_url = base_url('customer/' . urlencode($customer_hash));
+				$html .= '<a href="' . $portal_url . '" target="_blank" class="dropdown-item" style="font-size:11px;">Go to Customer Portal</a>';
+				$html .= '<button id="portal_url-' . $booking->BookingID . '" value="' . $portal_url . '" onclick="Copy_URL(\'CUSTOMER PORTAL LINK\', ' . $booking->BookingID . ')" class="dropdown-item" style="font-size:11px;">Copy Customer Portal Link</button>';
+			}
+		}
+		else {
+			$html .= '<a href="#" class="dropdown-item" style="font-size:11px; cursor:not-allowed; color:#6c757d;" disabled>Customer ID not found</a>';
+		}
 		$html .= '</div></div>';
 
 		return $html;
