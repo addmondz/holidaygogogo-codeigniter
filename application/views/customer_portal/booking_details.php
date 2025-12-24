@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
@@ -36,7 +37,7 @@
             border-radius: 12px;
             padding: 25px;
             margin-bottom: 30px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
         }
 
         .header-top {
@@ -70,17 +71,152 @@
             text-transform: uppercase;
         }
 
-        .status-completed { background: #d4edda; color: #155724; }
-        .status-pending-review { background: #e2d9f3; color: #6f42c1; }
-        .status-pending-payment { background: #fff3cd; color: #856404; }
-        .status-partial-payment { background: #d1ecf1; color: #0c5460; }
-        .status-pending-tv { background: #f8d7da; color: #721c24; }
-        .status-pending-gl { background: #ffeaa7; color: #856404; }
-        .status-pending-travel { background: #e2e3e5; color: #383d41; }
-        .status-ongoing { background: #cce5ff; color: #004085; }
-        .status-overdue { background: #f8d7da; color: #721c24; }
-        .status-cancelled { background: #f5c6cb; color: #721c24; }
-        .status-unknown { background: #e9ecef; color: #495057; }
+        .status-completed {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-pending-review {
+            background: #e2d9f3;
+            color: #6f42c1;
+        }
+
+        .status-pending-payment {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .status-partial-payment {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .status-pending-tv {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .status-pending-gl {
+            background: #ffeaa7;
+            color: #856404;
+        }
+
+        .status-pending-travel {
+            background: #e2e3e5;
+            color: #383d41;
+        }
+
+        .status-ongoing {
+            background: #cce5ff;
+            color: #004085;
+        }
+
+        .status-overdue {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .status-cancelled {
+            background: #f5c6cb;
+            color: #721c24;
+        }
+
+        .status-unknown {
+            background: #e9ecef;
+            color: #495057;
+        }
+
+        /* Review CTA Banner */
+        .review-cta-banner {
+            margin-top: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+            animation: pulseGlow 2s ease-in-out infinite;
+        }
+
+        @keyframes pulseGlow {
+
+            0%,
+            100% {
+                box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+            }
+
+            50% {
+                box-shadow: 0 4px 25px rgba(102, 126, 234, 0.6);
+            }
+        }
+
+        .review-cta-content {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .review-cta-icon {
+            font-size: 48px;
+            color: #ffd700;
+            animation: starPulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes starPulse {
+
+            0%,
+            100% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.1);
+            }
+        }
+
+        .review-cta-text {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .review-cta-text h3 {
+            color: white;
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .review-cta-text p {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 14px;
+            margin: 0;
+        }
+
+        .review-cta-button {
+            background: white;
+            color: #667eea;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        .review-cta-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            background: #f8f9fa;
+        }
+
+        .review-cta-button i {
+            font-size: 18px;
+            color: #667eea;
+        }
 
         /* Main Content */
         .content-grid {
@@ -95,7 +231,7 @@
             background: white;
             border-radius: 12px;
             padding: 25px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
         }
 
         .card-title {
@@ -137,7 +273,7 @@
             background: white;
             border-radius: 12px;
             padding: 25px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
         }
 
         .documents-grid {
@@ -168,7 +304,7 @@
         .document-item:hover {
             background: #e9ecef;
             border-color: #162447;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         }
 
         .document-item.disabled {
@@ -189,7 +325,7 @@
             margin-bottom: 10px;
             color: #162447;
         }
-        
+
         .document-icon i {
             font-size: 64px;
         }
@@ -210,7 +346,7 @@
             background: white;
             border-radius: 12px;
             padding: 25px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
             margin-bottom: 30px;
         }
 
@@ -255,7 +391,7 @@
             background: white;
             border-radius: 12px;
             padding: 25px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
         }
 
         .summary-item {
@@ -298,7 +434,7 @@
             font-weight: 500;
             transition: all 0.3s ease;
             margin-bottom: 20px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
         }
 
         .back-button:hover {
@@ -319,7 +455,7 @@
             background: white;
             border-radius: 12px;
             padding: 25px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
         }
 
         .timeline {
@@ -418,6 +554,76 @@
             text-decoration: underline;
         }
 
+        /* Highlighted timeline item for review */
+        .timeline-item-highlight {
+            animation: highlightPulse 2s ease-in-out infinite;
+        }
+
+        .timeline-item-highlight .timeline-content {
+            background: linear-gradient(135deg, #fff5e6 0%, #ffe6cc 100%);
+            border-left: 4px solid #ff9800;
+            box-shadow: 0 2px 8px rgba(255, 152, 0, 0.2);
+        }
+
+        .timeline-item-highlight::before {
+            background: #ff9800;
+            border-color: #ff9800;
+            box-shadow: 0 0 10px rgba(255, 152, 0, 0.5);
+        }
+
+        @keyframes highlightPulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.9;
+            }
+        }
+
+        .timeline-review-cta {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: #ff9800;
+            color: white !important;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-weight: 600;
+            text-decoration: none !important;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(255, 152, 0, 0.3);
+            cursor: pointer;
+        }
+
+        .timeline-review-cta:hover {
+            background: #f57c00;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(255, 152, 0, 0.4);
+        }
+
+        .timeline-review-cta i {
+            font-size: 16px;
+        }
+
+        /* Clickable timeline item */
+        .timeline-item-clickable .timeline-content {
+            transition: all 0.3s ease;
+        }
+
+        .timeline-item-clickable:hover .timeline-content {
+            transform: translateX(5px);
+            box-shadow: 0 4px 12px rgba(255, 152, 0, 0.3);
+        }
+
+        .timeline-item-clickable:hover .timeline-review-cta {
+            background: #f57c00;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(255, 152, 0, 0.4);
+        }
+
         .timeline-icon {
             display: inline-block;
             margin-right: 8px;
@@ -429,7 +635,7 @@
             background: white;
             border-radius: 12px;
             padding: 25px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
         }
 
         .payments-table {
@@ -585,6 +791,33 @@
             .status-badge {
                 font-size: 10px;
                 padding: 4px 10px;
+            }
+
+            .review-cta-banner {
+                padding: 20px;
+                margin-top: 15px;
+            }
+
+            .review-cta-content {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .review-cta-icon {
+                font-size: 40px;
+            }
+
+            .review-cta-text {
+                margin: 10px 0;
+            }
+
+            .review-cta-text h3 {
+                font-size: 18px;
+            }
+
+            .review-cta-button {
+                width: 100%;
+                justify-content: center;
             }
 
             .content-grid {
@@ -781,15 +1014,16 @@
         }
     </style>
 </head>
+
 <body>
     <?php $this->load->view('customer_portal/header'); ?>
 
     <div class="container">
         <!-- Back Button -->
         <?php if (!empty($customer_hash)): ?>
-        <a href="<?php echo base_url('customer/' . urlencode($customer_hash)); ?>" class="back-button">
-            <i class="la la-arrow-left"></i> Back to Bookings
-        </a>
+            <a href="<?php echo base_url('customer/' . urlencode($customer_hash)); ?>" class="back-button">
+                <i class="la la-arrow-left"></i> Back to Bookings
+            </a>
         <?php endif; ?>
 
         <!-- Page Header -->
@@ -807,6 +1041,32 @@
             </div>
         </div>
 
+        <?php
+        // Show review CTA if travel has ended, review is allowed, and no review exists
+        $today = date('Y-m-d');
+        $travel_ended = !empty($booking['EndDateRaw']) && strtotime($booking['EndDateRaw']) < strtotime($today);
+        $allow_review = !empty($booking['AllowReview']) && $booking['AllowReview'] == 1;
+        $has_review = !empty($booking['CustomerReview']);
+        $booking_token = !empty($booking['Token']) ? $booking['Token'] : '';
+
+        if ($travel_ended && $allow_review && !$has_review):
+        ?>
+            <div class="review-cta-banner" style="margin-bottom: 20px;">
+                <div class="review-cta-content">
+                    <div class="review-cta-icon">
+                        <i class="la la-star" style="color: white; font-size: 45px;"></i>
+                    </div>
+                    <div class="review-cta-text">
+                        <h3>Share Your Experience!</h3>
+                        <p>Your travel has ended. We'd love to hear about your experience!</p>
+                    </div>
+                    <button class="review-cta-button submit-review-link" data-booking-token="<?php echo htmlspecialchars($booking_token); ?>">
+                        <i class="la la-star"></i> Submit Review
+                    </button>
+                </div>
+            </div>
+        <?php endif; ?>
+
         <!-- Main Content Grid -->
         <div class="content-grid">
             <!-- Booking Details -->
@@ -819,20 +1079,20 @@
                     <span class="detail-value"><?php echo htmlspecialchars($booking['Customer']); ?></span>
                 </div>
                 <?php if (!empty($booking['ReservationNumber'])): ?>
-                <div class="detail-item">
-                    <span class="detail-label">Reservation Number</span>
-                    <span class="detail-value"><?php echo htmlspecialchars($booking['ReservationNumber']); ?></span>
-                </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Reservation Number</span>
+                        <span class="detail-value"><?php echo htmlspecialchars($booking['ReservationNumber']); ?></span>
+                    </div>
                 <?php endif; ?>
                 <div class="detail-item">
                     <span class="detail-label">Destination</span>
                     <span class="detail-value"><?php echo htmlspecialchars($booking['DestinationName'] ?? 'N/A'); ?></span>
                 </div>
                 <?php if (!empty($booking['StartDate']) && !empty($booking['EndDate'])): ?>
-                <div class="detail-item">
-                    <span class="detail-label">Travel Date</span>
-                    <span class="detail-value"><?php echo $booking['StartDate']; ?> - <?php echo $booking['EndDate']; ?></span>
-                </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Travel Date</span>
+                        <span class="detail-value"><?php echo $booking['StartDate']; ?> - <?php echo $booking['EndDate']; ?></span>
+                    </div>
                 <?php endif; ?>
                 <div class="detail-item">
                     <span class="detail-label">Passengers</span>
@@ -843,40 +1103,40 @@
                     <span class="detail-value"><?php echo htmlspecialchars($booking['CustomerMobile']); ?></span>
                 </div>
                 <?php if (!empty($booking['SalesAgentName'])): ?>
-                <div class="detail-item">
-                    <span class="detail-label">Sales Agent</span>
-                    <span class="detail-value"><?php echo htmlspecialchars($booking['SalesAgentName']); ?></span>
-                </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Sales Agent</span>
+                        <span class="detail-value"><?php echo htmlspecialchars($booking['SalesAgentName']); ?></span>
+                    </div>
                 <?php endif; ?>
                 <?php if (!empty($booking['DepositDeadline'])): ?>
-                <div class="detail-item">
-                    <span class="detail-label">Deposit Deadline</span>
-                    <span class="detail-value"><?php echo $booking['DepositDeadline']; ?></span>
-                </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Deposit Deadline</span>
+                        <span class="detail-value"><?php echo $booking['DepositDeadline']; ?></span>
+                    </div>
                 <?php endif; ?>
                 <?php if (!empty($booking['FullPaymentDeadline'])): ?>
-                <div class="detail-item">
-                    <span class="detail-label">Full Payment Deadline</span>
-                    <span class="detail-value"><?php echo $booking['FullPaymentDeadline']; ?></span>
-                </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Full Payment Deadline</span>
+                        <span class="detail-value"><?php echo $booking['FullPaymentDeadline']; ?></span>
+                    </div>
                 <?php endif; ?>
                 <?php if (!empty($booking['InsertDate'])): ?>
-                <div class="detail-item">
-                    <span class="detail-label">Booking Date</span>
-                    <span class="detail-value"><?php echo $booking['InsertDate']; ?></span>
-                </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Booking Date</span>
+                        <span class="detail-value"><?php echo $booking['InsertDate']; ?></span>
+                    </div>
                 <?php endif; ?>
                 <?php if (!empty($booking['BookingRemark'])): ?>
-                <div class="detail-item">
-                    <span class="detail-label">Remarks</span>
-                    <span class="detail-value"><?php echo nl2br(htmlspecialchars($booking['BookingRemark'])); ?></span>
-                </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Remarks</span>
+                        <span class="detail-value"><?php echo nl2br(htmlspecialchars($booking['BookingRemark'])); ?></span>
+                    </div>
                 <?php endif; ?>
                 <?php if (!empty($booking['ChatLanguage'])): ?>
-                <div class="detail-item">
-                    <span class="detail-label">Booking Chat Language</span>
-                    <span class="detail-value"><?php echo htmlspecialchars($booking['ChatLanguage']); ?></span>
-                </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Booking Chat Language</span>
+                        <span class="detail-value"><?php echo htmlspecialchars($booking['ChatLanguage']); ?></span>
+                    </div>
                 <?php endif; ?>
             </div>
 
@@ -889,7 +1149,7 @@
                     <?php
                     $today = date('Y-m-d');
                     $timeline_events = [];
-                    
+
                     // Event 1: View Booking Confirmation (always available)
                     $timeline_events[] = [
                         'date' => !empty($booking['InsertDateRaw']) ? date('d/m/y', strtotime($booking['InsertDateRaw'])) : 'N/A',
@@ -898,7 +1158,7 @@
                         'status' => 'available',
                         'icon' => 'la la-file-contract'
                     ];
-                    
+
                     // Event 2: Upload payment proof (deposit) - if DepositDeadline exists
                     if (!empty($booking['DepositDeadlineRaw'])) {
                         $deposit_deadline_passed = strtotime($booking['DepositDeadlineRaw']) < strtotime($today);
@@ -906,8 +1166,10 @@
                         if (!empty($booking['payments'])) {
                             foreach ($booking['payments'] as $payment) {
                                 // Check if payment has credit and is approved
-                                if (!empty($payment['Credit']) && $payment['Credit'] > 0 && 
-                                    ($payment['Status'] == 'Y' || $payment['Status'] == 'P')) {
+                                if (
+                                    !empty($payment['Credit']) && $payment['Credit'] > 0 &&
+                                    ($payment['Status'] == 'Y' || $payment['Status'] == 'P')
+                                ) {
                                     // Use raw date for comparison
                                     $payment_date = !empty($payment['DateRaw']) ? $payment['DateRaw'] : null;
                                     if ($payment_date && strtotime($payment_date) <= strtotime($booking['DepositDeadlineRaw'])) {
@@ -925,7 +1187,7 @@
                             'icon' => 'la la-upload'
                         ];
                     }
-                    
+
                     // Event 3: Submit namelist - if guest list is available
                     if (!empty($booking['has_guest_list'])) {
                         $timeline_events[] = [
@@ -936,7 +1198,7 @@
                             'icon' => 'la la-users'
                         ];
                     }
-                    
+
                     // Event 4: Download payment receipt - if payments exist
                     if (!empty($booking['payments'])) {
                         $has_approved_payment = false;
@@ -963,7 +1225,7 @@
                             ];
                         }
                     }
-                    
+
                     // Event 5: Upload payment proof (balance) - if FullPaymentDeadline exists
                     if (!empty($booking['FullPaymentDeadlineRaw'])) {
                         $balance_deadline_passed = strtotime($booking['FullPaymentDeadlineRaw']) < strtotime($today);
@@ -976,7 +1238,7 @@
                             'icon' => 'la la-upload'
                         ];
                     }
-                    
+
                     // Event 6: Download Travel Voucher - if TV is available (usually after full payment)
                     if ($booking['balance_due'] <= 0 || !empty($booking['documents']['tv']['available'])) {
                         $timeline_events[] = [
@@ -987,34 +1249,62 @@
                             'icon' => 'la la-plane'
                         ];
                     }
-                    
-                    // Event 7: Submit Review - only after travel date and if not blocked
+
+                    // Event 7: Submit/View Review - only after travel date and if allowed
                     if (!empty($booking['EndDateRaw'])) {
                         $travel_ended = strtotime($booking['EndDateRaw']) < strtotime($today);
-                        if ($travel_ended) {
-                            $timeline_events[] = [
-                                'date' => date('d/m/y', strtotime($booking['EndDateRaw'])),
-                                'title' => 'Submit Review',
-                                'action' => 'Available after travel',
-                                'status' => 'pending',
-                                'icon' => 'la la-star'
-                            ];
+                        $allow_review = !empty($booking['AllowReview']) && $booking['AllowReview'] == 1;
+                        $has_review = !empty($booking['CustomerReview']);
+                        $booking_token = !empty($booking['Token']) ? $booking['Token'] : '';
+
+                        if ($travel_ended && $allow_review) {
+                            if ($has_review) {
+                                // Review already submitted - show view option
+                                $review_date = !empty($booking['CustomerReviewTimestamp'])
+                                    ? date('d/m/y', strtotime($booking['CustomerReviewTimestamp']))
+                                    : date('d/m/y', strtotime($booking['EndDateRaw']));
+                                $timeline_events[] = [
+                                    'date' => $review_date,
+                                    'title' => 'View Review',
+                                    'action' => '<a href="#" class="view-review-link" data-booking-token="' . htmlspecialchars($booking_token) . '">View Your Review</a>',
+                                    'status' => 'completed',
+                                    'icon' => 'la la-star'
+                                ];
+                            } else {
+                                // No review yet - show submit option with prominent styling
+                                $timeline_events[] = [
+                                    'date' => date('d/m/y', strtotime($booking['EndDateRaw'])),
+                                    'title' => 'Submit Review',
+                                    'action' => '<span class="timeline-review-cta"><i class="la la-star" style="color: white;"></i> Submit Your Review</span>',
+                                    'status' => 'pending',
+                                    'icon' => 'la la-star',
+                                    'highlight' => true,
+                                    'clickable' => true,
+                                    'booking_token' => $booking_token
+                                ];
+                            }
                         }
                     }
-                    
+
                     // Display timeline events
                     foreach ($timeline_events as $event):
+                        $highlight_class = !empty($event['highlight']) ? 'timeline-item-highlight' : '';
+                        $clickable_class = !empty($event['clickable']) ? 'timeline-item-clickable' : '';
+                        $data_attrs = '';
+                        if (!empty($event['booking_token'])) {
+                            $data_attrs = 'data-booking-token="' . htmlspecialchars($event['booking_token']) . '"';
+                        }
                     ?>
-                    <div class="timeline-item <?php echo $event['status']; ?>">
-                        <div class="timeline-content">
-                            <div class="timeline-date">
-                                <i class="<?php echo $event['icon']; ?> timeline-icon"></i>
-                                <?php echo $event['date']; ?>
+                        <div class="timeline-item <?php echo $event['status']; ?> <?php echo $highlight_class; ?> <?php echo $clickable_class; ?>" <?php echo $data_attrs; ?>>
+                            <div class="timeline-content">
+                                <div class="timeline-date">
+                                    <i class="<?php echo $event['icon']; ?> timeline-icon"></i>
+                                    <?php echo $event['date']; ?>
+                                </div>
+                                <div class="timeline-title"><?php echo htmlspecialchars($event['title']); ?></div>
+                                <div class="timeline-action"><?php echo $event['action']; ?></div>
                             </div>
-                            <div class="timeline-title"><?php echo htmlspecialchars($event['title']); ?></div>
-                            <div class="timeline-action"><?php echo $event['action']; ?></div>
                         </div>
-                    </div>
                     <?php endforeach; ?>
                 </div>
             </div>
@@ -1022,42 +1312,42 @@
 
         <!-- Products Section -->
         <?php if (!empty($booking['products'])): ?>
-        <div class="products-section" style="display: none !important;">
-            <div class="card-title">
-                Products & Services
-            </div>
-            <?php foreach ($booking['products'] as $product): ?>
-            <div class="product-item">
-                <div class="product-name"><?php echo htmlspecialchars($product['Name'] ?? $product['Description'] ?? 'N/A'); ?></div>
-                <div class="product-details">
-                    <?php if (!empty($product['ProductCode'])): ?>
-                    <div class="product-detail">
-                        <span class="detail-label">Code:</span>
-                        <span><?php echo htmlspecialchars($product['ProductCode']); ?></span>
-                    </div>
-                    <?php endif; ?>
-                    <?php if (!empty($product['Quantity'])): ?>
-                    <div class="product-detail">
-                        <span class="detail-label">Quantity:</span>
-                        <span><?php echo htmlspecialchars($product['Quantity']); ?></span>
-                    </div>
-                    <?php endif; ?>
-                    <?php if (!empty($product['Price'])): ?>
-                    <div class="product-detail">
-                        <span class="detail-label">Price:</span>
-                        <span>RM <?php echo number_format($product['Price'], 2); ?></span>
-                    </div>
-                    <?php endif; ?>
-                    <?php if (!empty($product['Total'])): ?>
-                    <div class="product-detail">
-                        <span class="detail-label">Total:</span>
-                        <span>RM <?php echo number_format($product['Total'], 2); ?></span>
-                    </div>
-                    <?php endif; ?>
+            <div class="products-section" style="display: none !important;">
+                <div class="card-title">
+                    Products & Services
                 </div>
+                <?php foreach ($booking['products'] as $product): ?>
+                    <div class="product-item">
+                        <div class="product-name"><?php echo htmlspecialchars($product['Name'] ?? $product['Description'] ?? 'N/A'); ?></div>
+                        <div class="product-details">
+                            <?php if (!empty($product['ProductCode'])): ?>
+                                <div class="product-detail">
+                                    <span class="detail-label">Code:</span>
+                                    <span><?php echo htmlspecialchars($product['ProductCode']); ?></span>
+                                </div>
+                            <?php endif; ?>
+                            <?php if (!empty($product['Quantity'])): ?>
+                                <div class="product-detail">
+                                    <span class="detail-label">Quantity:</span>
+                                    <span><?php echo htmlspecialchars($product['Quantity']); ?></span>
+                                </div>
+                            <?php endif; ?>
+                            <?php if (!empty($product['Price'])): ?>
+                                <div class="product-detail">
+                                    <span class="detail-label">Price:</span>
+                                    <span>RM <?php echo number_format($product['Price'], 2); ?></span>
+                                </div>
+                            <?php endif; ?>
+                            <?php if (!empty($product['Total'])): ?>
+                                <div class="product-detail">
+                                    <span class="detail-label">Total:</span>
+                                    <span>RM <?php echo number_format($product['Total'], 2); ?></span>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
             </div>
-            <?php endforeach; ?>
-        </div>
         <?php endif; ?>
 
         <!-- Timeline and Payment History -->
@@ -1079,38 +1369,30 @@
                             <tr>
                                 <th>Date</th>
                                 <th>Type</th>
-                                <th>Payment In</th>
-                                <th>Payment Out</th>
+                                <th>Amount</th>
                                 <th>Reference</th>
                                 <th>Status</th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php foreach ($booking['payments'] as $payment): ?>
-                            <tr>
-                                <td data-label="Date"><?php echo !empty($payment['Date']) ? htmlspecialchars($payment['Date']) : '-'; ?></td>
-                                <td data-label="Type"><?php echo htmlspecialchars($payment['Type'] ?? '-'); ?></td>
-                                <td data-label="Payment In" class="payment-credit">
-                                    <?php if (!empty($payment['Credit']) && $payment['Credit'] > 0): ?>
-                                        RM <?php echo number_format($payment['Credit'], 2); ?>
-                                    <?php else: ?>
-                                        -
-                                    <?php endif; ?>
-                                </td>
-                                <td data-label="Payment Out" class="payment-debit">
-                                    <?php if (!empty($payment['Debit']) && $payment['Debit'] > 0): ?>
-                                        RM <?php echo number_format($payment['Debit'], 2); ?>
-                                    <?php else: ?>
-                                        -
-                                    <?php endif; ?>
-                                </td>
-                                <td data-label="Reference"><?php echo !empty($payment['ReferenceNumber']) ? htmlspecialchars($payment['ReferenceNumber']) : '-'; ?></td>
-                                <td data-label="Status">
-                                    <span class="payment-status <?php echo $payment['Status'] == 'Y' ? 'status-approved' : 'status-pending'; ?>">
-                                        <?php echo $payment['Status'] == 'Y' ? 'Approved' : 'Pending'; ?>
-                                    </span>
-                                </td>
-                            </tr>
+                                <tr>
+                                    <td data-label="Date"><?php echo !empty($payment['Date']) ? htmlspecialchars($payment['Date']) : '-'; ?></td>
+                                    <td data-label="Type"><?php echo htmlspecialchars($payment['Type'] ?? '-'); ?></td>
+                                    <td data-label="Amount" class="payment-credit">
+                                        <?php if (!empty($payment['Credit']) && $payment['Credit'] > 0): ?>
+                                            RM <?php echo number_format($payment['Credit'], 2); ?>
+                                        <?php else: ?>
+                                            -
+                                        <?php endif; ?>
+                                    </td>
+                                    <td data-label="Reference"><?php echo !empty($payment['ReferenceNumber']) ? htmlspecialchars($payment['ReferenceNumber']) : '-'; ?></td>
+                                    <td data-label="Status">
+                                        <span class="payment-status <?php echo $payment['Status'] == 'Y' ? 'status-approved' : 'status-pending'; ?>">
+                                            <?php echo $payment['Status'] == 'Y' ? 'Approved' : 'Pending'; ?>
+                                        </span>
+                                    </td>
+                                </tr>
                             <?php endforeach; ?>
                         </tbody>
                     </table>
@@ -1120,10 +1402,10 @@
                             <span class="payment-summary-value positive">RM <?php echo number_format($booking['total_paid'], 2); ?></span>
                         </div>
                         <?php if ($booking['total_debit'] > 0): ?>
-                        <div class="payment-summary-row">
-                            <span class="payment-summary-label">Total Refunds:</span>
-                            <span class="payment-summary-value negative">RM <?php echo number_format($booking['total_debit'], 2); ?></span>
-                        </div>
+                            <div class="payment-summary-row">
+                                <span class="payment-summary-label">Total Refunds:</span>
+                                <span class="payment-summary-value negative">RM <?php echo number_format($booking['total_debit'], 2); ?></span>
+                            </div>
                         <?php endif; ?>
                         <div class="payment-summary-row">
                             <span class="payment-summary-label">Booking Total:</span>
@@ -1139,35 +1421,448 @@
                 <?php endif; ?>
             </div>
 
-             <!-- Documents -->
+            <!-- Documents -->
             <div class="documents-card">
                 <div class="card-title">
                     Documents
                 </div>
                 <div class="documents-grid">
                     <?php foreach ($booking['documents'] as $doc_key => $doc): ?>
-                    <a href="<?php echo $doc['url']; ?>" target="_blank" class="document-item <?php echo $doc['available'] ? '' : 'disabled'; ?>">
-                        <div class="document-icon">
-                            <?php if ($doc_key == 'bc'): ?>
-                                <i class="la la-file-contract"></i>
-                            <?php elseif ($doc_key == 'tv'): ?>
-                                <i class="la la-plane"></i>
-                            <?php elseif ($doc_key == 'or'): ?>
-                                <i class="la la-receipt"></i>
-                            <?php elseif ($doc_key == 'gl'): ?>
-                                <i class="la la-users"></i>
-                            <?php else: ?>
-                                <i class="la la-file"></i>
-                            <?php endif; ?>
-                        </div>
-                        <div class="document-name"><?php echo htmlspecialchars($doc['name']); ?></div>
-                        <div class="document-action">Click to View</div>
-                    </a>
+                        <a href="<?php echo $doc['url']; ?>" target="_blank" class="document-item <?php echo $doc['available'] ? '' : 'disabled'; ?>">
+                            <div class="document-icon">
+                                <?php if ($doc_key == 'bc'): ?>
+                                    <i class="la la-file-contract"></i>
+                                <?php elseif ($doc_key == 'tv'): ?>
+                                    <i class="la la-plane"></i>
+                                <?php elseif ($doc_key == 'or'): ?>
+                                    <i class="la la-receipt"></i>
+                                <?php elseif ($doc_key == 'gl'): ?>
+                                    <i class="la la-users"></i>
+                                <?php else: ?>
+                                    <i class="la la-file"></i>
+                                <?php endif; ?>
+                            </div>
+                            <div class="document-name"><?php echo htmlspecialchars($doc['name']); ?></div>
+                            <div class="document-action">Click to View</div>
+                        </a>
                     <?php endforeach; ?>
                 </div>
             </div>
         </div>
     </div>
-</body>
-</html>
 
+    <!-- Review Modal -->
+    <div id="reviewModal" class="review-modal">
+        <div class="review-modal-overlay"></div>
+        <div class="review-modal-content">
+            <div class="review-modal-header">
+                <h2 id="reviewModalTitle">Submit Your Review</h2>
+                <button class="review-modal-close" id="reviewModalClose">&times;</button>
+            </div>
+            <div class="review-modal-body">
+                <div id="reviewModalMessage" class="review-modal-message" style="display: none;"></div>
+                <form id="reviewForm">
+                    <input type="hidden" id="reviewBookingToken" name="booking_token" value="<?php echo htmlspecialchars($booking['Token']); ?>">
+                    <div class="form-group">
+                        <label for="reviewText">Please share your experience with us</label>
+                        <textarea
+                            id="reviewText"
+                            name="review_text"
+                            class="form-control review-textarea"
+                            placeholder="Tell us about your travel experience..."
+                            required
+                            rows="6"><?php echo !empty($booking['CustomerReview']) ? htmlspecialchars($booking['CustomerReview']) : ''; ?></textarea>
+                    </div>
+                    <?php if (!empty($booking['CustomerReviewTimestamp'])): ?>
+                        <div class="review-date-info">
+                            <small>Review submitted on <?php echo date('d/m/Y h:i:s A', strtotime($booking['CustomerReviewTimestamp'])); ?></small>
+                        </div>
+                    <?php endif; ?>
+                    <div class="review-modal-actions">
+                        <button type="button" class="btn btn-secondary" id="reviewModalCancel">Cancel</button>
+                        <button type="button" class="btn btn-info" id="reviewEditBtn" style="display: none;">Edit Review</button>
+                        <button type="submit" class="btn btn-primary" id="reviewSubmitBtn">
+                            <span id="reviewSubmitText"><?php echo !empty($booking['CustomerReview']) ? 'Update Review' : 'Submit Review'; ?></span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            var hasReview = <?php echo !empty($booking['CustomerReview']) ? 'true' : 'false'; ?>;
+            var bookingToken = '<?php echo htmlspecialchars($booking['Token']); ?>';
+            var reviewText = <?php echo !empty($booking['CustomerReview']) ? json_encode($booking['CustomerReview']) : 'null'; ?>;
+
+            // Function to open submit review modal
+            function openSubmitReviewModal() {
+                $('#reviewModalTitle').text('Submit Your Review');
+                $('#reviewText').val('').prop('disabled', false);
+                $('#reviewSubmitText').text('Submit Review');
+                $('#reviewSubmitBtn').show();
+                $('#reviewEditBtn').hide();
+                $('#reviewModalMessage').hide();
+                $('.review-date-info').hide();
+                $('#reviewModal').addClass('active');
+            }
+
+            // Function to open view review modal
+            function openViewReviewModal() {
+                $('#reviewModalTitle').text('View Your Review');
+                $('#reviewText').val(reviewText).prop('disabled', true);
+                $('#reviewSubmitText').text('Update Review');
+                $('#reviewSubmitBtn').hide();
+                $('#reviewEditBtn').show();
+                $('#reviewModalMessage').hide();
+                $('.review-date-info').show();
+                $('#reviewModal').addClass('active');
+            }
+
+            // Handle banner button click
+            $(document).on('click', '.submit-review-link', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                openSubmitReviewModal();
+            });
+
+            $(document).on('click', '.timeline-review-cta', function(e) {
+                console.log('clicked');
+                e.preventDefault();
+                e.stopPropagation();
+                openSubmitReviewModal();
+            });
+
+            // Handle view review link click (fallback if clicked directly)
+            $(document).on('click', '.view-review-link', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                openViewReviewModal();
+            });
+
+            // Edit review button
+            $('#reviewEditBtn').on('click', function() {
+                $('#reviewText').prop('disabled', false);
+                $('#reviewModalTitle').text('Update Your Review');
+                $('#reviewEditBtn').hide();
+                $('#reviewSubmitBtn').show();
+            });
+
+            // Close modal
+            function closeModal() {
+                $('#reviewModal').removeClass('active');
+            }
+
+            $('#reviewModalClose, #reviewModalCancel, .review-modal-overlay').on('click', function(e) {
+                e.preventDefault();
+                closeModal();
+            });
+
+            // Handle form submission
+            $('#reviewForm').on('submit', function(e) {
+                e.preventDefault();
+
+                var reviewText = $('#reviewText').val().trim();
+
+                if (reviewText.length === 0) {
+                    showMessage('Please enter your review.', 'error');
+                    return;
+                }
+
+                // Disable submit button
+                var $submitBtn = $('#reviewSubmitBtn');
+                var originalText = $submitBtn.html();
+                $submitBtn.prop('disabled', true).html('<i class="la la-spinner la-spin"></i> Submitting...');
+
+                // Submit via AJAX
+                $.ajax({
+                    url: '<?php echo base_url('customer/booking/' . $booking['Token'] . '/review'); ?>',
+                    type: 'POST',
+                    data: {
+                        review_text: reviewText
+                    },
+                    success: function(response) {
+                        showMessage('Review submitted successfully!', 'success');
+                        setTimeout(function() {
+                            location.reload();
+                        }, 1500);
+                    },
+                    error: function(xhr) {
+                        var errorMsg = 'Failed to submit review. Please try again.';
+                        if (xhr.responseJSON && xhr.responseJSON.message) {
+                            errorMsg = xhr.responseJSON.message;
+                        }
+                        showMessage(errorMsg, 'error');
+                        $submitBtn.prop('disabled', false).html(originalText);
+                    }
+                });
+            });
+
+            // Show message in modal
+            function showMessage(message, type) {
+                var $message = $('#reviewModalMessage');
+                $message.removeClass('success error')
+                    .addClass(type)
+                    .text(message)
+                    .show();
+
+                // Scroll to message
+                $message[0].scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'nearest'
+                });
+            }
+
+            // Close modal on Escape key
+            $(document).on('keydown', function(e) {
+                if (e.key === 'Escape' && $('#reviewModal').hasClass('active')) {
+                    closeModal();
+                }
+            });
+        });
+    </script>
+
+    <style>
+        /* Review Modal Styles */
+        .review-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10000;
+        }
+
+        .review-modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .review-modal-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(2px);
+        }
+
+        .review-modal-content {
+            position: relative;
+            background: white;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            z-index: 10001;
+            animation: modalSlideIn 0.3s ease-out;
+        }
+
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .review-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 25px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .review-modal-header h2 {
+            font-size: 20px;
+            font-weight: 600;
+            color: #333;
+            margin: 0;
+        }
+
+        .review-modal-close {
+            background: none;
+            border: none;
+            font-size: 28px;
+            color: #999;
+            cursor: pointer;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+            transition: color 0.3s;
+        }
+
+        .review-modal-close:hover {
+            color: #333;
+        }
+
+        .review-modal-body {
+            padding: 25px;
+        }
+
+        .review-modal-message {
+            padding: 12px 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .review-modal-message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .review-modal-message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .review-textarea {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 15px;
+            font-family: 'Poppins', sans-serif;
+            resize: vertical;
+            min-height: 150px;
+        }
+
+        .review-textarea:focus {
+            outline: none;
+            border-color: #162447;
+            box-shadow: 0 0 0 3px rgba(22, 36, 71, 0.1);
+        }
+
+        .review-textarea:disabled {
+            background-color: #f8f9fa;
+            cursor: not-allowed;
+        }
+
+        .form-help {
+            display: block;
+            color: #666;
+            font-size: 13px;
+            margin-top: 5px;
+        }
+
+        .review-date-info {
+            margin-bottom: 20px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 6px;
+        }
+
+        .review-date-info small {
+            font-size: 13px;
+            color: #666;
+            font-style: italic;
+        }
+
+        .review-modal-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 25px;
+            padding-top: 20px;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: #162447;
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: #0f1a33;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .btn-info {
+            background: #17a2b8;
+            color: white;
+        }
+
+        .btn-info:hover {
+            background: #138496;
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        @media (max-width: 768px) {
+            .review-modal-content {
+                width: 95%;
+                max-height: 95vh;
+            }
+
+            .review-modal-header {
+                padding: 15px 20px;
+            }
+
+            .review-modal-body {
+                padding: 20px;
+            }
+
+            .review-modal-actions {
+                flex-direction: column;
+            }
+
+            .btn {
+                width: 100%;
+            }
+        }
+    </style>
+</body>
+
+</html>

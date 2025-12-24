@@ -291,6 +291,7 @@ class Customer_Portal extends CI_Controller
                           StartDate, EndDate, Adult, Children, Infant, BookingRemark, Subtotal, Discount, NetTotal, 
                           booking.ChatLanguage, Token, booking.BookingConfirmationTitle, CancelStatus, LockStatus, 
                           AfterSalesService, booking.Status, booking.InsertDate, booking.CustomerID,
+                          booking.AllowReview, booking.CustomerReview, booking.CustomerReviewTimestamp,
                           category.Name As DestinationName, CountryCode, admin.Name As SalesAgentName');
         $this->db->from('booking');
         $this->db->join('category', 'category.CategoryID = booking.Destination', 'left');

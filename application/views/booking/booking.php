@@ -548,6 +548,12 @@
 
                         </div>
 
+                        <?php if(current_url() == base_url('Booking/Create')) { ?>
+                            <div class="col-lg-6 col-md-12">
+                                <?php print_allow_review($AllowReview); ?>
+                            </div>
+                        <?php } ?>
+
                     </div>
 
                     <div class="d-flex justify-content-between border-top pt-5"></div>
@@ -756,9 +762,43 @@
 
         </div>
 
-    </div>
+        <?php if(current_url() == base_url('Booking/Update')) { ?>
+            <div class="card card-custom">
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="form-group">
+                                <label>Customer Review</label>
+                                <textarea id="CustomerReview" class="form-control auto-resize-textarea" disabled style="overflow: scroll;"><?php echo $CustomerReview; ?></textarea>
+                                <small class="font-italic" style="display: <?php echo isset($CustomerReviewTimestamp) && !empty($CustomerReviewTimestamp) ? 'block' : 'none'; ?>;"> Review provided on <?php echo date('d/m/Y h:i:s A', strtotime($CustomerReviewTimestamp)); ?></small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <?php print_allow_review($AllowReview); ?>
+                        </div>
+                    </div>
 
+                    <button type="button" id="update_allow_review_btn" class="btn btn-primary font-weight-bold">
+                        <i class="la la-save"></i> Update
+                    </button>
+                </div>
+            </div>
+        <?php } ?>
+
+    </div>
 </div>
+
+<?php function print_allow_review($AllowReview) { ?>
+    <div class="form-group">
+        <label>Allow Customer Review</label>
+        <select id="AllowReview" class="form-control selectpicker">
+            <option value="1" <?php if((isset($AllowReview) && $AllowReview == 1) || !isset($AllowReview)) { echo 'selected'; } ?>>Yes</option>
+            <option value="0" <?php if(isset($AllowReview) && $AllowReview == 0) { echo 'selected'; } ?>>No</option>
+        </select>
+    </div>
+<?php }?>
 
 <script>
 
@@ -2494,8 +2534,95 @@ $(document).ready(function() {
     } else {
         updateInfo(false);
     }
+
+    // Quick Update Allow Review Button
+    <?php if(current_url() == base_url('Booking/Update')) { ?>
+    $('#update_allow_review_btn').on('click', function() {
+        var allowReview = $('#AllowReview').val();
+        var bookingId = <?php echo $BookingID; ?>;
+        var currentAllowReview = '<?php echo isset($AllowReview) && $AllowReview !== null ? $AllowReview : 1; ?>';
+
+        console.log('allowReview: ', allowReview);
+        console.log('currentAllowReview: ', currentAllowReview);
+        
+        // Check if value changed
+        if(allowReview == currentAllowReview) {
+            Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', 'No changes detected for Allow Review', null);
+            return;
+        }
+
+        // Disable button during update
+        var $btn = $(this);
+        var originalText = $btn.html();
+        $btn.prop('disabled', true).html('<i class="la la-spinner la-spin"></i> Updating...');
+
+        // Prepare booking data with only AllowReview
+        var booking = [{
+            BookingID: bookingId,
+            AllowReview: parseInt(allowReview),
+            UpdateBy: <?php echo $this->session->userdata('admin_id'); ?>,
+            UpdateDate: '<?php echo date('Y-m-d H:i:s'); ?>'
+        }];
+
+        // Prepare booking log
+        var booking_log = [{
+            BookingID: bookingId,
+            Column: 'AllowReview',
+            CurrentData: currentAllowReview,
+            NewData: allowReview,
+            InsertBy: <?php echo $this->session->userdata('admin_id'); ?>,
+            InsertDate: '<?php echo date('Y-m-d H:i:s'); ?>'
+        }];
+
+        $.ajax({
+            url: '<?php echo base_url('Booking/UpdateAllowReview'); ?>',
+            type: 'post',
+            data: {
+                booking_id: bookingId,
+                booking: booking,
+                booking_log: booking_log,
+                allow_review: allowReview,
+                CustomerID: $('input[name="CustomerID"]').val() || ''
+            },
+            success: function() {
+                $btn.prop('disabled', false).html(originalText);
+                // Get current URL to reload after success
+                var currentUrl = window.location.href;
+                Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', 'Allow Review Successfully Updated', currentUrl);
+            },
+            error: function(xhr, status, error) {
+                $btn.prop('disabled', false).html(originalText);
+                console.error('Update Error:', error);
+                Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', 'Allow Review Could Not Be Updated', null);
+            }
+        });
+    });
+    <?php } ?>
+
+    // Auto-resize Customer Review textarea
+    function autoResizeTextarea() {
+        var textarea = $('#CustomerReview');
+        if (textarea.length) {
+            // Reset height to auto to get the correct scrollHeight
+            textarea.css('height', 'auto');
+            // Set height to scrollHeight to fit all content
+            textarea.css('height', textarea[0].scrollHeight + 'px');
+        }
+    }
+
+    // Run on page load
+    autoResizeTextarea();
+
+    // Also run after a short delay to ensure content is fully loaded
+    setTimeout(autoResizeTextarea, 100);
 });
 
-
-
 </script>
+
+<style>
+    .auto-resize-textarea {
+        resize: none;
+        overflow: hidden;
+        min-height: 60px;
+    }
+</style>

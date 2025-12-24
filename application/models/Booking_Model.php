@@ -3,7 +3,7 @@ class Booking_Model extends CI_Model
 {
 	function Read_Booking()
 	{
-		$this->db->select('booking.BookingID, BookingConfirmationFooterID, TravelVoucherFooterID, booking.CountryCodeID AS CustomerCountryCode, BookingNumber, ReservationNumber, DepositDeadline, FullPaymentDeadline, AdditionalPaymentDeadline, Customer, booking.Mobile AS CustomerMobile, StartDate, EndDate, Adult, Children, Infant, Destination, SalesAgent, Tag, BookingRemark, Subtotal, Discount, NetTotal, booking.ChatLanguage, Source, Token, booking.BookingConfirmationTitle, BookingConfirmationFooter, TravelVoucherFooter, ProductSequence, admin.Name AS SalesAgentName, booking.AutocountSyncStatus, booking.AutocountSyncMessage, booking.AutocountSyncAction, booking.CustomerAutocountSyncStatus, booking.CustomerAutocountSyncMessage, booking.CustomerAutocountSyncAction, customer.CustomerCode AS CustomerCode, booking.CustomerID');
+		$this->db->select('booking.BookingID, booking.AllowReview, booking.CustomerReview, booking.CustomerReviewTimestamp, BookingConfirmationFooterID, TravelVoucherFooterID, booking.CountryCodeID AS CustomerCountryCode, BookingNumber, ReservationNumber, DepositDeadline, FullPaymentDeadline, AdditionalPaymentDeadline, Customer, booking.Mobile AS CustomerMobile, StartDate, EndDate, Adult, Children, Infant, Destination, SalesAgent, Tag, BookingRemark, Subtotal, Discount, NetTotal, booking.ChatLanguage, Source, Token, booking.BookingConfirmationTitle, BookingConfirmationFooter, TravelVoucherFooter, ProductSequence, admin.Name AS SalesAgentName, booking.AutocountSyncStatus, booking.AutocountSyncMessage, booking.AutocountSyncAction, booking.CustomerAutocountSyncStatus, booking.CustomerAutocountSyncMessage, booking.CustomerAutocountSyncAction, customer.CustomerCode AS CustomerCode, booking.CustomerID');
 		$this->db->join('admin', 'admin.AdminID = booking.SalesAgent', 'left');
 		$this->db->join('customer', 'customer.CustomerID = booking.CustomerID', 'left');
 		$this->db->where('booking.BookingID', $this->input->get('booking_id'));
@@ -418,7 +418,25 @@ class Booking_Model extends CI_Model
 
 	function Create()
 	{
-		$this->db->insert_batch('booking', json_decode(json_encode($this->input->post('booking'))));
+		// Get booking data and ensure AllowReview is properly formatted as integer (0 or 1)
+		$booking_data = $this->input->post('booking');
+		if (!empty($booking_data) && is_array($booking_data)) {
+			foreach ($booking_data as $key => $booking_item) {
+				if (isset($booking_item['AllowReview'])) {
+					// Convert AllowReview to integer (0 or 1) for BOOLEAN field
+					$booking_data[$key]['AllowReview'] = (int)$booking_item['AllowReview'];
+					// Ensure it's either 0 or 1 (validate)
+					if ($booking_data[$key]['AllowReview'] != 0 && $booking_data[$key]['AllowReview'] != 1) {
+						$booking_data[$key]['AllowReview'] = 1; // Default to 1 if invalid
+					}
+				} else {
+					// If AllowReview is not set, default to 1 (TRUE)
+					$booking_data[$key]['AllowReview'] = 1;
+				}
+			}
+		}
+		
+		$this->db->insert_batch('booking', json_decode(json_encode($booking_data)));
 		$booking_id = $this->db->insert_id();
 
 		$data = [
@@ -646,7 +664,22 @@ class Booking_Model extends CI_Model
 
 	function Update()
 	{
-		$this->db->update_batch('booking', json_decode(json_encode($this->input->post('booking'))), 'BookingID');
+		// Get booking data and ensure AllowReview is properly formatted as integer (0 or 1)
+		$booking_data = $this->input->post('booking');
+		if (!empty($booking_data) && is_array($booking_data)) {
+			foreach ($booking_data as $key => $booking_item) {
+				if (isset($booking_item['AllowReview'])) {
+					// Convert AllowReview to integer (0 or 1) for BOOLEAN field
+					$booking_data[$key]['AllowReview'] = (int)$booking_item['AllowReview'];
+					// Ensure it's either 0 or 1 (validate)
+					if ($booking_data[$key]['AllowReview'] != 0 && $booking_data[$key]['AllowReview'] != 1) {
+						$booking_data[$key]['AllowReview'] = 1; // Default to 1 if invalid
+					}
+				}
+			}
+		}
+		
+		$this->db->update_batch('booking', json_decode(json_encode($booking_data)), 'BookingID');
 		
 		$data = [];
 		$booking = $this->input->post('booking');

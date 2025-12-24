@@ -512,7 +512,7 @@ class Booking extends MY_Controller
 				// }
         } else {
 				$titles = array('tab_title' => 'HolidayGoGoGo | Booking', 'breadcrumb_title' => 'Booking >> Create');
-				$array = array('BookingID' => 'NA', 'BookingConfirmationFooterID' => 'NA', 'TravelVoucherFooterID' => 'NA', 'BookingNumber' => 'NA', 'Tag' => array(), 'Discount' => 'NA', 'NetTotal' => 'NA', 'ProductSequence' => array(), 'BookingProductID' => ($this->Booking_Product_Model->Read_Last_Booking_Product_ID()) + 1);
+				$array = array('BookingID' => 'NA', 'BookingConfirmationFooterID' => 'NA', 'TravelVoucherFooterID' => 'NA', 'BookingNumber' => 'NA', 'Tag' => array(), 'Discount' => 'NA', 'NetTotal' => 'NA', 'ProductSequence' => array(), 'BookingProductID' => ($this->Booking_Product_Model->Read_Last_Booking_Product_ID()) + 1, 'AllowReview' => 1);
 				$array['admins'] = $this->Booking_Model->Read_Admins();
 				$array['booking_products'][0] = (object) array('BookingProductID' => 'NA');
 				$array['categories'] = $this->Booking_Model->Read_Categories();
@@ -748,6 +748,13 @@ class Booking extends MY_Controller
 						$array['TravelDate'] = date('d/m/Y', strtotime($array['StartDate'])) . ' - ' . date('d/m/Y', strtotime($array['EndDate']));
 					} else {
 						$array['TravelDate'] = null;
+					}
+					// Ensure AllowReview is set (default to 1 if not set or null)
+					if (!isset($array['AllowReview']) || $array['AllowReview'] === null) {
+						$array['AllowReview'] = 1;
+					} else {
+						// Convert to integer to ensure it's 0 or 1
+						$array['AllowReview'] = (int)$array['AllowReview'];
 					}
 					$array['BookingProductID'] = ($this->Booking_Product_Model->Read_Last_Booking_Product_ID()) + 1;
 					$array['Tag'] = explode(',', $array['Tag']);
@@ -1762,6 +1769,119 @@ class Booking extends MY_Controller
 				'error'  => $e->getMessage(),
 				'data'   => [],
 			];
+		}
+	}
+
+	public function UpdateAllowReview()
+	{
+		// Check access control
+		if (!in_array('AB', $this->session->access_control)) {
+			$this->output
+				->set_content_type('application/json')
+				->set_output(json_encode([
+					'success' => false,
+					'message' => 'Access denied'
+				]));
+			return;
+		}
+
+		// Check if AJAX request
+		if (!$this->input->is_ajax_request()) {
+			$this->output
+				->set_content_type('application/json')
+				->set_output(json_encode([
+					'success' => false,
+					'message' => 'Invalid request'
+				]));
+			return;
+		}
+
+		try {
+			$data = $this->input->post();
+			$bookingId = arr_get($data, 'booking_id');
+			$booking = $this->input->post('booking');
+			$bookingLog = $this->input->post('booking_log');
+
+			// Validate booking ID
+			if (empty($bookingId)) {
+				$this->output
+					->set_content_type('application/json')
+					->set_output(json_encode([
+						'success' => false,
+						'message' => 'Booking ID is required'
+					]));
+				return;
+			}
+
+			// Validate booking data
+			if (empty($booking) || !is_array($booking) || !isset($booking[0])) {
+				$this->output
+					->set_content_type('application/json')
+					->set_output(json_encode([
+						'success' => false,
+						'message' => 'Invalid booking data'
+					]));
+				return;
+			}
+
+			// Get AllowReview value and validate
+			$allowReview = isset($booking[0]['AllowReview']) ? (int)$booking[0]['AllowReview'] : null;
+			if ($allowReview === null || ($allowReview != 0 && $allowReview != 1)) {
+				$this->output
+					->set_content_type('application/json')
+					->set_output(json_encode([
+						'success' => false,
+						'message' => 'Invalid AllowReview value'
+					]));
+				return;
+			}
+
+			// Verify booking exists
+			$existingBooking = $this->Booking_Model->find($bookingId);
+			if (empty($existingBooking)) {
+				$this->output
+					->set_content_type('application/json')
+					->set_output(json_encode([
+						'success' => false,
+						'message' => 'Booking not found'
+					]));
+				return;
+			}
+
+			// Update AllowReview using update_batch
+			$bookingData = [
+				[
+					'BookingID' => $bookingId,
+					'AllowReview' => $allowReview,
+					'UpdateBy' => $this->session->userdata('admin_id'),
+					'UpdateDate' => date('Y-m-d H:i:s')
+				]
+			];
+
+			// Update the booking
+			$this->db->update_batch('booking', $bookingData, 'BookingID');
+
+			// Create booking log if provided
+			if (!empty($bookingLog) && is_array($bookingLog) && !empty($bookingLog[0])) {
+				$this->db->insert_batch('booking_log', $bookingLog);
+			}
+
+			// Return success response
+			$this->output
+				->set_content_type('application/json')
+				->set_output(json_encode([
+					'success' => true,
+					'message' => 'Allow Review updated successfully'
+				]));
+
+		} catch (Exception $e) {
+			log_message('error', 'Update allow review error: ' . $e->getMessage());
+			$this->output
+				->set_content_type('application/json')
+				->set_output(json_encode([
+					'success' => false,
+					'message' => 'An error occurred while updating Allow Review'
+				]));
 		}
 	}
 }
