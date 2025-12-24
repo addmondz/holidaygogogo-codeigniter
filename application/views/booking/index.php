@@ -228,6 +228,17 @@
                                                 </div>
                                             </div>
                                         <?php } ?>
+                                        <div class="col-md-3">
+                                            <div class="form-group">
+                                                <label>Autocount Status</label>
+                                                <select name="autocount_status" class="form-control selectpicker">
+                                                    <option selected data-icon="la la-sync font-size-lg bs-icon" value="">--SELECT AUTOCOUNT STATUS--</option>
+                                                    <option data-icon="la la-clock font-size-lg bs-icon" value="P" <?php if($this->input->get('autocount_status') == 'P') echo 'selected'; ?>>Pending</option>
+                                                    <option data-icon="la la-check-circle font-size-lg bs-icon" value="S" <?php if($this->input->get('autocount_status') == 'S') echo 'selected'; ?>>Synced</option>
+                                                    <option data-icon="la la-times-circle font-size-lg bs-icon" value="F" <?php if($this->input->get('autocount_status') == 'F') echo 'selected'; ?>>Failed</option>
+                                                </select>
+                                            </div>
+                                        </div>
                                     </div>
                                     <input type="submit" value="Filter" class="btn btn-light-success font-weight-bold" style="width:80px;">
                                     <input type="button" id="reset" value="Reset" class="btn btn-light-primary font-weight-bold" style="width:80px;">
@@ -352,7 +363,7 @@
         $('input[name="booking_date"]').val('');
     }
 
-    <?php if(!empty($this->input->get('booking_number')) || !empty($this->input->get('reservation_number')) || !empty($this->input->get('deadline')) || !empty($this->input->get('customer')) || !empty($this->input->get('mobile')) || !empty($this->input->get('travel_date')) || !empty($this->input->get('destination')) || !empty($this->input->get('sales_agent')) || !empty($this->input->get('tag')) || !empty($this->input->get('chat_language')) || !empty($this->input->get('source')) || !empty($this->input->get('booking_confirmation_title')) || !empty($this->input->get('status')) || !empty($this->input->get('booking_date'))) { ?>
+    <?php if(!empty($this->input->get('booking_number')) || !empty($this->input->get('reservation_number')) || !empty($this->input->get('deadline')) || !empty($this->input->get('customer')) || !empty($this->input->get('mobile')) || !empty($this->input->get('travel_date')) || !empty($this->input->get('destination')) || !empty($this->input->get('sales_agent')) || !empty($this->input->get('tag')) || !empty($this->input->get('chat_language')) || !empty($this->input->get('source')) || !empty($this->input->get('booking_confirmation_title')) || !empty($this->input->get('status')) || !empty($this->input->get('booking_date')) || !empty($this->input->get('autocount_status'))) { ?>
         $('#booking_header').click();
     <?php } ?>
     
@@ -498,7 +509,7 @@ $(document).ready(function() {
         var filterParams = {};
         ['customer', 'booking_number', 'reservation_number', 'mobile', 'destination', 'travel_date',
          'deadline', 'source', 'chat_language', 'booking_date', 'status', 'booking_confirmation_title',
-         'tag', 'sales_agent'].forEach(function(param) {
+         'tag', 'sales_agent', 'autocount_status'].forEach(function(param) {
             if (urlParams.has(param)) {
                 filterParams[param] = urlParams.get(param);
             }
@@ -551,7 +562,7 @@ function loadSummaryTotals() {
     var params = [];
     ['customer', 'booking_number', 'reservation_number', 'mobile', 'destination', 'travel_date',
      'deadline', 'source', 'chat_language', 'booking_date', 'status', 'booking_confirmation_title',
-     'tag', 'sales_agent'].forEach(function(param) {
+     'tag', 'sales_agent', 'autocount_status'].forEach(function(param) {
         if (urlParams.has(param)) {
             params.push(param + '=' + encodeURIComponent(urlParams.get(param)));
         }

@@ -107,6 +107,10 @@ class Booking_Model extends CI_Model
 				$this->db->where('booking.BookingConfirmationTitle', $this->input->get('booking_confirmation_title'));
 				$level2Ignore = 1;
 			}
+			if(!empty($this->input->get('autocount_status'))) {
+				$this->db->where('booking.AutocountSyncStatus', $this->input->get('autocount_status'));
+				$level2Ignore = 1;
+			}
 			if(!empty($this->input->get('status'))) {
 				if($this->input->get('status') == 'A') {
 					$this->db->where('CancelStatus', 'N');
@@ -1175,6 +1179,10 @@ class Booking_Model extends CI_Model
 			}
 			if(!empty($this->input->get('booking_confirmation_title'))) {
 				$this->db->where('booking.BookingConfirmationTitle', $this->input->get('booking_confirmation_title'));
+				$level2Ignore = 1;
+			}
+			if(!empty($this->input->get('autocount_status'))) {
+				$this->db->where('booking.AutocountSyncStatus', $this->input->get('autocount_status'));
 				$level2Ignore = 1;
 			}
 			if(!empty($this->input->get('status'))) {
