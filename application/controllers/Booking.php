@@ -14,6 +14,7 @@ class Booking extends MY_Controller
 		$this->load->model('Payment_Model');
 		$this->load->model('Universal_Model');
 		$this->load->model('Customer_Model');
+		$this->load->model('Remark_Model');
 		$this->config->load('autocount'); // load config/autocount.php
 	}
 
@@ -1896,6 +1897,236 @@ class Booking extends MY_Controller
 					'success' => false,
 					'message' => 'An error occurred while updating Allow Review'
 				]));
+		}
+	}
+
+	/**
+	 * AJAX endpoint to get remarks for a booking
+	 */
+	function Get_Remarks()
+	{
+		if (!in_array('AB', $this->session->access_control)) {
+			$this->output
+				->set_content_type('application/json')
+				->set_output(json_encode([
+					'success' => false,
+					'message' => 'Access denied'
+				]));
+			return;
+		}
+
+		$booking_id = $this->input->get('booking_id');
+		if (empty($booking_id)) {
+			$this->output
+				->set_content_type('application/json')
+				->set_output(json_encode([
+					'success' => false,
+					'message' => 'Booking ID is required'
+				]));
+			return;
+		}
+
+		$remarks = $this->Remark_Model->Read_Remarks('booking', $booking_id);
+		
+		// Format remarks for JSON response
+		$formatted_remarks = array();
+		foreach ($remarks as $remark) {
+			// Get initials for avatar
+			$initials = '';
+			if (!empty($remark->CommenterName)) {
+				$name_parts = explode(' ', $remark->CommenterName);
+				if (count($name_parts) >= 2) {
+					$initials = strtoupper(substr($name_parts[0], 0, 1) . substr($name_parts[count($name_parts) - 1], 0, 1));
+				} else {
+					$initials = strtoupper(substr($remark->CommenterName, 0, 2));
+				}
+			}
+			
+			$formatted_remarks[] = array(
+				'RemarkID' => $remark->RemarkID,
+				'content' => $remark->content,
+				'commenter_name' => $remark->CommenterName,
+				'commenter_initials' => $initials,
+				'created_at' => date('d/m/Y H:i:s', strtotime($remark->created_at)),
+				'created_at_relative' => $this->time_ago($remark->created_at),
+				'created_at_raw' => $remark->created_at
+			);
+		}
+
+		$this->output
+			->set_content_type('application/json')
+			->set_output(json_encode([
+				'success' => true,
+				'remarks' => $formatted_remarks
+			]));
+	}
+
+	/**
+	 * AJAX endpoint to add a new remark
+	 */
+	function Add_Remark()
+	{
+		if (!in_array('AB', $this->session->access_control)) {
+			$this->output
+				->set_content_type('application/json')
+				->set_output(json_encode([
+					'success' => false,
+					'message' => 'Access denied'
+				]));
+			return;
+		}
+
+		$booking_id = $this->input->post('booking_id');
+		$content = trim($this->input->post('content'));
+
+		if (empty($booking_id)) {
+			$this->output
+				->set_content_type('application/json')
+				->set_output(json_encode([
+					'success' => false,
+					'message' => 'Booking ID is required'
+				]));
+			return;
+		}
+
+		if (empty($content)) {
+			$this->output
+				->set_content_type('application/json')
+				->set_output(json_encode([
+					'success' => false,
+					'message' => 'Comment content is required'
+				]));
+			return;
+		}
+
+		// Verify booking exists
+		$booking = $this->Booking_Model->find($booking_id);
+		if (empty($booking)) {
+			$this->output
+				->set_content_type('application/json')
+				->set_output(json_encode([
+					'success' => false,
+					'message' => 'Booking not found'
+				]));
+			return;
+		}
+
+		$remark_data = array(
+			'owner_type' => 'booking',
+			'owner_id' => $booking_id,
+			'commenter_id' => $this->session->userdata('admin_id'),
+			'content' => $content
+		);
+
+		$remark_id = $this->Remark_Model->Create($remark_data);
+
+		if ($remark_id) {
+			// Get the newly created remark with commenter name
+			$remark = $this->Remark_Model->Read_Remark($remark_id);
+			
+			$this->output
+				->set_content_type('application/json')
+				->set_output(json_encode([
+					'success' => true,
+					'message' => 'Comment added successfully',
+					'remark' => array(
+						'RemarkID' => $remark->RemarkID,
+						'content' => $remark->content,
+						'commenter_name' => $remark->CommenterName,
+						'created_at' => date('d/m/Y H:i:s', strtotime($remark->created_at)),
+						'created_at_raw' => $remark->created_at
+					)
+				]));
+		} else {
+			$this->output
+				->set_content_type('application/json')
+				->set_output(json_encode([
+					'success' => false,
+					'message' => 'Failed to add comment'
+				]));
+		}
+	}
+
+	/**
+	 * AJAX endpoint to delete a remark
+	 */
+	function Delete_Remark()
+	{
+		if (!in_array('AB', $this->session->access_control)) {
+			$this->output
+				->set_content_type('application/json')
+				->set_output(json_encode([
+					'success' => false,
+					'message' => 'Access denied'
+				]));
+			return;
+		}
+
+		$remark_id = $this->input->post('remark_id');
+
+		if (empty($remark_id)) {
+			$this->output
+				->set_content_type('application/json')
+				->set_output(json_encode([
+					'success' => false,
+					'message' => 'Remark ID is required'
+				]));
+			return;
+		}
+
+		// Verify remark exists
+		$remark = $this->Remark_Model->Read_Remark($remark_id);
+		if (empty($remark)) {
+			$this->output
+				->set_content_type('application/json')
+				->set_output(json_encode([
+					'success' => false,
+					'message' => 'Remark not found'
+				]));
+			return;
+		}
+
+		// Delete the remark
+		$deleted = $this->Remark_Model->Delete($remark_id);
+
+		if ($deleted) {
+			$this->output
+				->set_content_type('application/json')
+				->set_output(json_encode([
+					'success' => true,
+					'message' => 'Comment deleted Successfully'
+				]));
+		} else {
+			$this->output
+				->set_content_type('application/json')
+				->set_output(json_encode([
+					'success' => false,
+					'message' => 'Failed to delete comment'
+				]));
+		}
+	}
+
+	/**
+	 * Helper function to get relative time (e.g., "2 hours ago")
+	 */
+	private function time_ago($datetime)
+	{
+		$timestamp = strtotime($datetime);
+		$diff = time() - $timestamp;
+		
+		if ($diff < 60) {
+			return 'Just now';
+		} elseif ($diff < 3600) {
+			$mins = floor($diff / 60);
+			return $mins . ' min' . ($mins > 1 ? 's' : '') . ' ago';
+		} elseif ($diff < 86400) {
+			$hours = floor($diff / 3600);
+			return $hours . ' hour' . ($hours > 1 ? 's' : '') . ' ago';
+		} elseif ($diff < 604800) {
+			$days = floor($diff / 86400);
+			return $days . ' day' . ($days > 1 ? 's' : '') . ' ago';
+		} else {
+			return date('M j, Y', $timestamp);
 		}
 	}
 }

@@ -763,26 +763,67 @@
         </div>
 
         <?php if(current_url() == base_url('Booking/Update')) { ?>
-            <div class="card card-custom">
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-12">
-                            <div class="form-group">
-                                <label>Customer Review</label>
-                                <textarea id="CustomerReview" class="form-control auto-resize-textarea" disabled style="overflow: scroll;"><?php echo $CustomerReview; ?></textarea>
-                                <small class="font-italic" style="display: <?php echo isset($CustomerReviewTimestamp) && !empty($CustomerReviewTimestamp) ? 'block' : 'none'; ?>;"> Review provided on <?php echo date('d/m/Y h:i:s A', strtotime($CustomerReviewTimestamp)); ?></small>
+            <div class="row">
+                <!-- Internal Comments Section -->
+                <div class="col-lg-6 col-md-12">
+                    <div class=" card card-custom">
+                        <div class="card-header flex-wrap py-2" style="background-color:#D7E2F2;">
+                            <div class="card-title">
+                                <h4 class="card-label mb-0" style="color:#6082B6; font-size: 1.1rem;">
+                                    <strong>Internal Comments</strong>
+                                </h4>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <!-- Comments List -->
+                            <div id="internal-comments-list" class="mb-3">
+                                <div class="text-center text-muted py-3">
+                                    <i class="la la-spinner la-spin"></i> Loading comments...
+                                </div>
+                            </div>
+
+                            <!-- Add New Comment Form -->
+                            <div class="border-top pt-3">
+                                <div class="form-group mb-2">
+                                    <textarea id="new-comment-content" class="form-control" rows="2" placeholder="Enter your comment here..." style="font-size: 0.9rem;"></textarea>
+                                </div>
+                                <button type="button" id="add-comment-btn" class="btn btn-primary btn-sm font-weight-bold mt-3 mb-3">
+                                    <i class="la la-comment"></i> Add Comment
+                                </button>
                             </div>
                         </div>
                     </div>
-                    <div class="row">
-                        <div class="col-md-6">
-                            <?php print_allow_review($AllowReview); ?>
+                </div>
+                <div class="col-lg-6 col-md-12  mt-md-6 mt-lg-0">
+                    <div class=" card card-custom">
+                        <div class="card-header flex-wrap py-2" style="background-color:#D7E2F2;">
+                            <div class="card-title">
+                                <h4 class="card-label mb-0" style="color:#6082B6; font-size: 1.1rem;">
+                                    <strong>Customer Review</strong>
+                                </h4>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-12">
+                                    <div class="form-group">
+                                        <label>Customer Review</label>
+                                        <textarea id="CustomerReview" class="form-control auto-resize-textarea" disabled style="overflow: scroll;"><?php echo $CustomerReview; ?></textarea>
+                                        <small class="font-italic" style="display: <?php echo isset($CustomerReviewTimestamp) && !empty($CustomerReviewTimestamp) ? 'block' : 'none'; ?>;"> Review provided on <?php echo date('d/m/Y h:i:s A', strtotime($CustomerReviewTimestamp)); ?></small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col">
+                                    <?php print_allow_review($AllowReview); ?>
+                                </div>
+                            </div>
+
+                            <button type="button" id="update_allow_review_btn" class="btn btn-primary font-weight-bold">
+                                <i class="la la-save"></i> Update
+                            </button>
                         </div>
                     </div>
-
-                    <button type="button" id="update_allow_review_btn" class="btn btn-primary font-weight-bold">
-                        <i class="la la-save"></i> Update
-                    </button>
                 </div>
             </div>
         <?php } ?>
@@ -2615,9 +2656,260 @@ $(document).ready(function() {
 
     // Also run after a short delay to ensure content is fully loaded
     setTimeout(autoResizeTextarea, 100);
+
+    // Internal Comments functionality
+    <?php if(current_url() == base_url('Booking/Update')) { ?>
+    var bookingId = <?php echo $BookingID; ?>;
+
+    // Load comments on page load
+    function loadComments() {
+        $.ajax({
+            url: '<?php echo base_url('Booking/Get_Remarks'); ?>',
+            type: 'get',
+            data: { booking_id: bookingId },
+            dataType: 'json',
+            success: function(response) {
+                var commentsList = $('#internal-comments-list');
+                commentsList.empty();
+
+                if (response.success && response.remarks && response.remarks.length > 0) {
+                    response.remarks.forEach(function(remark) {
+                        // Get first letter for avatar color
+                        var avatarColor = ['primary', 'success', 'info', 'warning', 'danger'][remark.commenter_name.charCodeAt(0) % 5];
+                        
+                        var commentHtml = '<div class="comment-item d-flex mb-3 mx-3 pb-3 pl-1" style="border-bottom: 1px solid #e4e6eb; position: relative;">' +
+                            // Avatar
+                            '<div class="flex-shrink-0 mr-3">' +
+                            '<div class="symbol symbol-40 symbol-circle symbol-light-' + avatarColor + '">' +
+                            '<span class="symbol-label font-weight-bold" style="font-size: 0.9rem;">' + (remark.commenter_initials || remark.commenter_name.substring(0, 2).toUpperCase()) + '</span>' +
+                            '</div>' +
+                            '</div>' +
+                            // Comment content
+                            '<div class="flex-grow-1" style="min-width: 0;">' +
+                            '<div class="d-flex align-items-baseline mb-1">' +
+                            '<strong class="mr-2" style="font-size: 0.9rem; color: #050505; cursor: pointer;">' + escapeHtml(remark.commenter_name) + '</strong>' +
+                            '<span class="text-muted" style="font-size: 0.8rem; color: #65676b;">' + (remark.created_at_relative || remark.created_at) + '</span>' +
+                            '</div>' +
+                            '<div class="comment-text" style="font-size: 0.9rem; color: #050505; line-height: 1.4; white-space: pre-wrap; word-wrap: break-word;">' + escapeHtml(remark.content) + '</div>' +
+                            '</div>' +
+                            // Delete button (visible by default)
+                            '<button type="button" class="btn btn-sm btn-link text-muted delete-comment-btn comment-delete-btn" data-remark-id="' + remark.RemarkID + '" style="position: absolute; top: 0; right: 0; opacity: 1; padding: 4px 8px; font-size: 0.85rem; background: transparent !important;" title="Delete comment">' +
+                            '<i class="la la-trash" style="color: #65676b;"></i>' +
+                            '</button>' +
+                            '</div>';
+                        commentsList.append(commentHtml);
+                    });
+                } else {
+                    commentsList.html('<div class="text-center text-muted py-4" style="font-size: 0.9rem; color: #65676b;">No comments yet. Be the first to add a comment!</div>');
+                }
+            },
+            error: function() {
+                $('#internal-comments-list').html('<div class="text-center text-danger py-4">Error loading comments. Please refresh the page.</div>');
+            }
+        });
+    }
+
+    // Add new comment
+    $('#add-comment-btn').on('click', function() {
+        var content = $('#new-comment-content').val().trim();
+        
+        if (!content) {
+            Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', 'Please enter a comment', null);
+            return;
+        }
+
+        var $btn = $(this);
+        var originalText = $btn.html();
+        $btn.prop('disabled', true).html('<i class="la la-spinner la-spin"></i> Adding...');
+
+        $.ajax({
+            url: '<?php echo base_url('Booking/Add_Remark'); ?>',
+            type: 'post',
+            data: {
+                booking_id: bookingId,
+                content: content
+            },
+            dataType: 'json',
+            success: function(response) {
+                $btn.prop('disabled', false).html(originalText);
+                
+                if (response.success) {
+                    $('#new-comment-content').val('');
+                    loadComments(); // Reload comments to show the new one
+                    // Don't redirect, just show success message
+                    Swal.fire({
+                        width: 550,
+                        background: 'url(<?php echo base_url('assets/image/sweetalert.jpg') ?>)',
+                        icon: 'success',
+                        title: 'Comment added Successfully',
+                        showConfirmButton: false,
+                        timer: 2200
+                    });
+                } else {
+                    Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', response.message || 'Failed to add comment', null);
+                }
+            },
+            error: function() {
+                $btn.prop('disabled', false).html(originalText);
+                Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', 'Error adding comment. Please try again.', null);
+            }
+        });
+    });
+
+    // Allow Enter key to submit (Ctrl+Enter or Shift+Enter)
+    $('#new-comment-content').on('keydown', function(e) {
+        if ((e.ctrlKey || e.shiftKey) && e.keyCode === 13) {
+            e.preventDefault();
+            $('#add-comment-btn').click();
+        }
+    });
+
+    // Delete comment handler (using event delegation for dynamically added buttons)
+    $(document).on('click', '.delete-comment-btn', function() {
+        var remarkId = $(this).data('remark-id');
+        var $commentDiv = $(this).closest('.comment-item');
+        
+        if (!remarkId) {
+            return;
+        }
+
+        // Confirm deletion
+        Swal.fire({
+            width: 550,
+            background: 'url(<?php echo base_url('assets/image/sweetalert.jpg') ?>)',
+            icon: 'warning',
+            title: 'Delete Comment?',
+            text: 'Are you sure you want to delete this comment?',
+            showCancelButton: true,
+            confirmButtonText: 'Delete',
+            cancelButtonText: 'Cancel',
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                // Show loading state
+                $commentDiv.css('opacity', '0.5');
+                
+                $.ajax({
+                    url: '<?php echo base_url('Booking/Delete_Remark'); ?>',
+                    type: 'post',
+                    data: {
+                        remark_id: remarkId
+                    },
+                    dataType: 'json',
+                    success: function(response) {
+                        if (response.success) {
+                            // Remove the comment from DOM
+                            $commentDiv.fadeOut(300, function() {
+                                $(this).remove();
+                                // Reload comments to ensure sync
+                                loadComments();
+                            });
+                            
+                            Swal.fire({
+                                width: 550,
+                                background: 'url(<?php echo base_url('assets/image/sweetalert.jpg') ?>)',
+                                icon: 'success',
+                                title: 'Comment deleted Successfully',
+                                showConfirmButton: false,
+                                timer: 1500
+                            });
+                        } else {
+                            $commentDiv.css('opacity', '1');
+                            Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', response.message || 'Failed to delete comment', null);
+                        }
+                    },
+                    error: function() {
+                        $commentDiv.css('opacity', '1');
+                        Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', 'Error deleting comment. Please try again.', null);
+                    }
+                });
+            }
+        });
+    });
+
+    // Helper function to escape HTML
+    function escapeHtml(text) {
+        var map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+    }
+
+    // Load comments when page is ready
+    loadComments();
+    <?php } ?>
 });
 
 </script>
+
+<style>
+/* Facebook-style comment styling */
+.comment-item {
+    transition: background-color 0.2s;
+    padding: 8px 0;
+    border-radius: 4px;
+}
+
+.comment-item:hover {
+    background-color: #f2f3f5;
+    transition: background-color 0.2s;
+}
+
+.comment-item:last-child {
+    border-bottom: none !important;
+    margin-bottom: 0 !important;
+    padding-bottom: 0 !important;
+}
+
+.comment-text {
+    margin-top: 2px;
+}
+
+.comment-delete-btn {
+    color: #65676b !important;
+    transition: all 0.2s ease;
+}
+
+.comment-delete-btn:hover {
+    color: #e41e3f !important;
+    transform: scale(1.15);
+}
+
+.comment-delete-btn:hover i {
+    color: #e41e3f !important;
+}
+
+.symbol-circle {
+    border-radius: 50% !important;
+}
+
+#internal-comments-list {
+    padding: 4px 0;
+}
+
+#internal-comments-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+#internal-comments-list::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 10px;
+}
+
+#internal-comments-list::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 10px;
+}
+
+#internal-comments-list::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+</style>
 
 <style>
     .auto-resize-textarea {
