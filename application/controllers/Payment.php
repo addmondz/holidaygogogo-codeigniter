@@ -19,94 +19,71 @@ class Payment extends MY_Controller
 	{
 		if(in_array('VP', $this->session->access_control)) {
 			$titles = array('tab_title' => 'HolidayGoGoGo | Payment', 'breadcrumb_title' => 'Payment');
-			$array = array('total_supplier_payment' => 0, 'total_customer_refund' => 0, 'total_credit' => 0, 'total_debit' => 0, 'total_net_profit' => 0, 'booking_subtotal' => 0, 'outstanding_balance_by_customer' => 0, 'booking_id' => 'NA', 'token' => 'NA');
-			$array['payments'] = $this->Payment_Model->Read_Payments1();
+
+			// Initialize array with default values - totals will be loaded via AJAX
+			$array = array(
+				'total_supplier_payment' => 'RM 0.00',
+				'total_customer_refund' => 'RM 0.00',
+				'total_credit' => '0.00',
+				'total_debit' => '0.00',
+				'total_net_profit' => '0.00 (0%)',
+				'booking_subtotal' => 0,
+				'outstanding_balance_by_customer' => 0,
+				'booking_id' => 'NA',
+				'token' => 'NA'
+			);
+
+			// Load dropdown data
 			$array['admins'] = $this->Payment_Model->Read_Admins();
 			$array['suppliers'] = $this->Payment_Model->Read_Suppliers();
-			$array['supplier_payments'] = [];
-			$array['customer_refunds'] = [];
-			$array['supplier_ids'] = [];
-			$customer_refund_ids = [];
-			$total_supplier_payment = 0;
-			$total_customer_refund = 0;
-			$total_credit = 0;
-			$total_debit = 0;
-			$total_net_profit = 0;
-			$booking_ids = [];
-			$total_sales = 0;
 
+			// Get supplier payments breakdown
+			$supplier_breakdown = $this->Payment_Model->Read_Supplier_Payments_Breakdown();
+			$supplier_payments = [];
+			$supplier_ids = [];
+			$total_supplier = 0;
+			foreach($supplier_breakdown as $item) {
+				$supplier_payments[$item->Name] = $item->TotalDebit;
+				$supplier_ids[] = $item->SupplierID;
+				$total_supplier += $item->TotalDebit;
+			}
+			$array['supplier_payments'] = $supplier_payments;
+			$array['supplier_ids'] = $supplier_ids;
+			$array['total_supplier_payment'] = 'RM ' . number_format($total_supplier, 2, '.', ',');
+
+			// Get customer refunds breakdown
+			$refunds_breakdown = $this->Payment_Model->Read_Customer_Refunds_Breakdown();
+			$customer_refunds = [];
+			$total_refunds = 0;
+			foreach($refunds_breakdown as $item) {
+				$customer_refunds[$item->BankHolder] = $item->TotalDebit;
+				$total_refunds += $item->TotalDebit;
+			}
+			$array['customer_refunds'] = $customer_refunds;
+			$array['total_customer_refund'] = 'RM ' . number_format($total_refunds, 2, '.', ',');
+
+			// Load autocount config
 			$this->load->helper('autocount');
 			$config = get_autocount_config();
 			$array['bulkPaymentSyncToAutocount'] = !empty($config['bulkPaymentSyncToAutocount']) ? $config['bulkPaymentSyncToAutocount'] : false;
 
-			if(!empty($array['payments'])) {
-				foreach($array['payments'] as $payment) {
-					if(!empty($payment->Date)) {
-						$payment->Date = strtoupper(date('j M Y', strtotime($payment->Date)));
-					}
-					if(!empty($payment->Deadline)) {
-						$payment->Deadline = strtoupper(date('j M Y', strtotime($payment->Deadline)));
-					}
-					if(!empty($payment->StartDate)) {
-						$payment->StartDate = strtoupper(date('j M Y', strtotime($payment->StartDate)));
-					} else {
-						$payment->StartDate = null;
-					}
-					if(!empty($payment->EndDate)) {
-						$payment->EndDate = strtoupper(date('j M Y', strtotime($payment->EndDate)));
-					} else {
-						$payment->EndDate = null;
-					}
-					$payment->TotalCredit = number_format($this->Calculate_Total_Credit($payment->BookingID), 2, '.', ',');
-					if($payment->Type == 'SUPPLIER PAYMENT') {
-						$total_supplier_payment += $payment->Debit;
-						if(!in_array($payment->SupplierID, $array['supplier_ids'])) {
-							array_push($array['supplier_ids'], $payment->SupplierID);
-							$array['supplier_payments'][$payment->Supplier] = $payment->Debit;
-						} else {
-							$array['supplier_payments'][$payment->Supplier] += $payment->Debit;
-						}
-					}
-					if($payment->Type == 'CUSTOMER REFUND') {
-						$total_customer_refund += $payment->Debit;
-						if(!in_array($payment->PaymentID, $customer_refund_ids)) {
-							array_push($customer_refund_ids, $payment->PaymentID);
-							$array['customer_refunds'][$payment->BankHolder] = $payment->Debit;
-						} else {
-							$array['customer_refunds'][$payment->BankHolder] += $payment->Debit;
-						}
-					}
-					if($array['booking_subtotal'] == 0 && $array['outstanding_balance_by_customer'] == 0) {
-						$array['booking_subtotal'] = number_format($payment->NetTotal, 2, '.', ',');
-						$array['outstanding_balance_by_customer'] = number_format(($payment->NetTotal - str_replace(',', '', $payment->TotalCredit)), 2, '.', ',');
-					}
-					$total_credit += $payment->Credit;
-					$total_debit += $payment->Debit;
-					$total_net_profit += $payment->Credit - $payment->Debit;
-					if(!in_array($payment->BookingID, $booking_ids)) {
-						array_push($booking_ids, $payment->BookingID);
-						$total_sales += $payment->NetTotal;
-					}
-					$payment->Credit = $payment->Credit == 0.00 ? '' : number_format($payment->Credit, 2, '.', ',');
-					$payment->Debit = $payment->Credit == 0.00 ? number_format($payment->Debit, 2, '.', ',') : '';
-				}
-			} else {
-				if(!empty($this->input->get('booking_number'))) {
-					$array['booking_id'] = !empty($this->Booking_Model->Read_Booking_ID()) ? ($this->Booking_Model->Read_Booking_ID())['BookingID'] : 'NA';
-					$array['token'] = !empty($this->Booking_Model->Read_Token()) ? ($this->Booking_Model->Read_Token())['Token'] : 'NA';
-					$array['booking_subtotal'] = !empty($this->Booking_Model->Read_Net_Total()) ? number_format(($this->Booking_Model->Read_Net_Total())['NetTotal'], 2, '.', ',') : number_format(0, 2, '.', ',');
-					$array['outstanding_balance_by_customer'] = !empty($this->Booking_Model->Read_Net_Total()) ? number_format(($this->Booking_Model->Read_Net_Total())['NetTotal'], 2, '.', ',') : number_format(0, 2, '.', ',');
-				}
+			// Handle booking_number filter for BC/GL links
+			if(!empty($this->input->get('booking_number'))) {
+				$array['booking_id'] = !empty($this->Booking_Model->Read_Booking_ID()) ? ($this->Booking_Model->Read_Booking_ID())['BookingID'] : 'NA';
+				$array['token'] = !empty($this->Booking_Model->Read_Token()) ? ($this->Booking_Model->Read_Token())['Token'] : 'NA';
+				$net_total = !empty($this->Booking_Model->Read_Net_Total()) ? ($this->Booking_Model->Read_Net_Total())['NetTotal'] : 0;
+				$array['booking_subtotal'] = number_format($net_total, 2, '.', ',');
+				// Calculate outstanding balance: NetTotal - Total Payments Received
+				$total_credit = ($array['booking_id'] != 'NA') ? $this->Calculate_Total_Credit($array['booking_id']) : 0;
+				$outstanding = $net_total - $total_credit;
+				$array['outstanding_balance_by_customer'] = number_format($outstanding, 2, '.', ',');
 			}
-			$array['total_supplier_payment'] = 'RM ' . number_format($total_supplier_payment, 2, '.', ',');
-			$array['total_customer_refund'] = 'RM ' . number_format($total_customer_refund, 2, '.', ',');
-			$array['total_credit'] = number_format($total_credit, 2, '.', ',');
-			$array['total_debit'] = number_format($total_debit, 2, '.', ',');
-			$array['total_net_profit'] = $total_net_profit != 0 && $total_sales != 0 ? number_format($total_net_profit, 2, '.', ',') . ' (' . round(($total_net_profit / $total_sales) * 100) . '%)' : number_format($total_net_profit, 2, '.', ',') . ' (0%)';
+
 			if(isset($_GET['nick'])) {
 				echo "<pre>";
 				print_r($array);exit;
 			}
+
 			$this->load->view('layout/header', $titles);
 			$this->load->view('payment/index', $array);
 			$this->load->view('layout/footer');
@@ -120,14 +97,280 @@ class Payment extends MY_Controller
 		$total_credit = 0;
 		foreach($payments as $payment) {
 			if($payment->Type != 'CUSTOMER REFUND') {
-				$total_credit += $payment->Credit; 
+				$total_credit += $payment->Credit;
 			} else {
 				$total_credit -= $payment->Debit;
 			}
 		}
 		return $total_credit;
 	}
-	
+
+	// ============================================
+	// Server-Side DataTables AJAX Methods
+	// ============================================
+
+	function ajax_list()
+	{
+		if(!in_array('VP', $this->session->access_control)) {
+			header('Content-Type: application/json');
+			echo json_encode(array('error' => 'Access denied'));
+			return;
+		}
+
+		$is_sales_agent = $this->session->userdata('level') == 20;
+		$has_ap_permission = in_array('AP', $this->session->access_control);
+		$has_payment_deadline_filter = !empty($this->input->get('payment_deadline'));
+
+		// DataTables parameters
+		$draw = intval($this->input->get('draw'));
+		$start = intval($this->input->get('start'));
+		$length = intval($this->input->get('length'));
+
+		// Order parameters
+		$order_column_index = intval($this->input->get('order[0][column]'));
+		$order_dir = $this->input->get('order[0][dir]') == 'asc' ? 'ASC' : 'DESC';
+
+		// Column mapping (adjusts based on user role and filters)
+		$columns = array(
+			0 => 'payment.PaymentID',        // row number
+			1 => 'payment.PaymentID',        // checkbox
+			2 => 'payment.Date',             // transaction date
+		);
+
+		$col_index = 3;
+		if(!$is_sales_agent) {
+			$columns[$col_index] = 'admin.Name';  // sales agent
+			$col_index++;
+		}
+
+		$columns[$col_index++] = 'BookingNumber';
+		$columns[$col_index++] = 'Customer';
+		$columns[$col_index++] = 'ReservationNumber';
+		$columns[$col_index++] = 'StartDate';
+		$columns[$col_index++] = 'EndDate';
+		$columns[$col_index++] = 'payment.PaymentID';  // received (calculated)
+		$columns[$col_index++] = 'Type';
+
+		if(!$has_payment_deadline_filter) {
+			$columns[$col_index++] = 'Credit';  // in
+		}
+
+		$columns[$col_index++] = 'Debit';           // out
+		$columns[$col_index++] = 'supplier.Name';   // supplier
+		$columns[$col_index++] = 'Deadline';
+		$columns[$col_index++] = 'ReferenceNumber';
+		$columns[$col_index++] = 'payment.AutocountReferenceNumber';
+		$columns[$col_index++] = 'payment.Status';
+		$columns[$col_index++] = 'payment.AutocountSyncStatus';
+		$columns[$col_index++] = 'payment.PaymentID';  // action
+
+		$order_column = isset($columns[$order_column_index]) ? $columns[$order_column_index] : 'payment.Date';
+
+		// Get counts
+		$records_total = $this->Payment_Model->Count_Payments_Total();
+		$records_filtered = $this->Payment_Model->Count_Payments_Filtered();
+
+		// Get paginated data
+		$payments = $this->Payment_Model->Read_Payments_Paginated($start, $length, $order_column, $order_dir);
+
+		// Build current URL for action links
+		$current_url = base_url($_SERVER['REQUEST_URI']);
+
+		// Process payments for display
+		$data = array();
+		$count = $start + 1;
+
+		foreach($payments as $payment) {
+			// Calculate TotalCredit for this booking
+			$total_credit = $this->Calculate_Total_Credit($payment->BookingID);
+
+			// Format dates
+			$date_formatted = !empty($payment->Date) ? strtoupper(date('j M Y', strtotime($payment->Date))) : '';
+			$deadline_formatted = !empty($payment->Deadline) ? strtoupper(date('j M Y', strtotime($payment->Deadline))) : '';
+			$start_date_formatted = !empty($payment->StartDate) ? strtoupper(date('j M Y', strtotime($payment->StartDate))) : '';
+			$end_date_formatted = !empty($payment->EndDate) ? strtoupper(date('j M Y', strtotime($payment->EndDate))) : '';
+
+			// Format credit/debit for display
+			$credit_raw = $payment->Credit;
+			$debit_raw = $payment->Debit;
+			$credit_display = $credit_raw == 0.00 ? '' : number_format($credit_raw, 2, '.', ',');
+			$debit_display = $credit_raw == 0.00 ? number_format($debit_raw, 2, '.', ',') : '';
+
+			// Build row data
+			$row = array();
+			$row['row_number'] = $count;
+
+			// Checkbox column
+			if(!$is_sales_agent && $has_ap_permission) {
+				$row['checkbox'] = '<label class="checkbox checkbox-outline checkbox-success"><input type="checkbox" class="check_item" id="' . $payment->PaymentID . '" onclick="Select_Payment(' . $payment->PaymentID . ')"><span></span></label>';
+			} else {
+				$row['checkbox'] = '';
+			}
+
+			$row['transaction_date'] = '<span id="date-' . $payment->PaymentID . '">' . $date_formatted . '</span>';
+
+			if(!$is_sales_agent) {
+				$row['sales_agent'] = $payment->SalesAgent;
+			}
+
+			// Booking number link
+			if(!empty($this->input->get('booking_number'))) {
+				$row['booking_number'] = $payment->BookingNumber;
+			} else {
+				$row['booking_number'] = '<a href="' . base_url('Payment?booking_number=' . $payment->BookingNumber . '&customer=' . str_replace('&', '%26', $payment->Customer)) . '" target="_blank">' . $payment->BookingNumber . '</a>';
+			}
+
+			$row['customer'] = $payment->Customer;
+			$row['reservation'] = $payment->ReservationNumber;
+			$row['start_date'] = $start_date_formatted;
+			$row['end_date'] = $end_date_formatted;
+			$row['total_credit'] = '<span style="color:#2AAA8A">' . number_format($total_credit, 2, '.', ',') . '</span>';
+			$row['type'] = $payment->Type;
+
+			if(!$has_payment_deadline_filter) {
+				$row['credit'] = '<span id="credit-' . $payment->PaymentID . '" style="color:#2AAA8A">' . $credit_display . '</span>';
+			}
+
+			$row['debit'] = '<span style="color:#F88379">' . $debit_display . '</span>';
+
+			// Supplier link
+			$row['supplier'] = '<a href="' . base_url('Supplier/Update?supplier_id=' . $payment->SupplierID) . '" target="_blank">' . $payment->Supplier . '</a>';
+
+			$row['deadline'] = '<span id="deadline-' . $payment->PaymentID . '">' . $deadline_formatted . '</span>';
+			$row['reference'] = '<span id="reference_number-' . $payment->PaymentID . '">' . $payment->ReferenceNumber . '</span>';
+			$row['autocount_ref'] = '<span id="autocount_reference_number-' . $payment->PaymentID . '">' . $payment->AutocountReferenceNumber . '</span>';
+
+			// Status icon
+			if($payment->Status == 'Y') {
+				$row['status'] = '<i class="la la-check-circle text-success"></i>';
+			} else if($payment->Status == 'P') {
+				$row['status'] = '<i class="la la-exclamation-circle text-warning"></i>';
+			} else {
+				$row['status'] = '<i class="la la-times-circle text-danger"></i>';
+			}
+
+			// Autocount sync status
+			$row['autocount_status'] = $this->build_autocount_status($payment);
+
+			// Action dropdown
+			$row['action'] = $this->build_payment_action_dropdown($payment, $current_url);
+
+			$data[] = $row;
+			$count++;
+		}
+
+		$output = array(
+			'draw' => $draw,
+			'recordsTotal' => $records_total,
+			'recordsFiltered' => $records_filtered,
+			'data' => $data
+		);
+
+		header('Content-Type: application/json');
+		echo json_encode($output);
+	}
+
+	function ajax_summary()
+	{
+		if(!in_array('VP', $this->session->access_control)) {
+			header('Content-Type: application/json');
+			echo json_encode(array('error' => 'Access denied'));
+			return;
+		}
+
+		$summary = $this->Payment_Model->Calculate_Payment_Summary();
+
+		$total_credit = $summary['total_credit'];
+		$total_debit = $summary['total_debit'];
+		$total_net_profit = $summary['total_net_profit'];
+		$total_sales = $summary['total_sales'];
+
+		// Format output
+		$profit_percentage = ($total_net_profit != 0 && $total_sales != 0)
+			? round(($total_net_profit / $total_sales) * 100)
+			: 0;
+
+		$output = array(
+			'total_credit' => number_format($total_credit, 2, '.', ','),
+			'total_debit' => number_format($total_debit, 2, '.', ','),
+			'total_net_profit' => number_format($total_net_profit, 2, '.', ',') . ' (' . $profit_percentage . '%)'
+		);
+
+		header('Content-Type: application/json');
+		echo json_encode($output);
+	}
+
+	private function build_autocount_status($payment)
+	{
+		$statusColor = '#000000';
+		$statusText = 'UNKNOWN';
+
+		switch ($payment->AutocountSyncStatus) {
+			case 'P': $statusColor = '#808080'; $statusText = 'Pending'; break;
+			case 'S': $statusColor = '#50C878'; $statusText = 'Synced'; break;
+			case 'F': $statusColor = '#FF4500'; $statusText = 'Failed'; break;
+		}
+
+		$tooltipAttr = '';
+		if (!empty($payment->AutocountSyncMessage)) {
+			$decoded = json_decode($payment->AutocountSyncMessage, true);
+
+			if (json_last_error() === JSON_ERROR_NONE) {
+				if (isset($decoded['error']) && $decoded['error'] === null) {
+					$tooltipText = "SUCCESS";
+				} elseif (isset($decoded['error']) && $decoded['error'] !== null) {
+					$tooltipText = "ERROR: " . (is_string($decoded['error']) ? $decoded['error'] : json_encode($decoded['error']));
+				} else {
+					$tooltipText = $payment->AutocountSyncMessage;
+				}
+			} else {
+				$tooltipText = $payment->AutocountSyncMessage;
+			}
+
+			$tooltipAttr = ' data-toggle="tooltip" data-placement="top" title="' . htmlspecialchars($tooltipText) . '"';
+		}
+
+		return '<span class="font-weight-bold" style="color:' . $statusColor . ';"' . $tooltipAttr . '>' . $statusText . '</span>';
+	}
+
+	private function build_payment_action_dropdown($payment, $current_url)
+	{
+		$credit_formatted = !empty($payment->Credit) && $payment->Credit != 0.00 ? number_format($payment->Credit, 2, '.', ',') : '';
+		$debit_formatted = $payment->Credit == 0.00 ? number_format($payment->Debit, 2, '.', ',') : '';
+
+		$delete_text = !empty($credit_formatted) ? 'Payment Record : Credit ' . $credit_formatted : 'Payment Record : Debit ' . $debit_formatted;
+
+		$html = '<div class="btn-group">';
+		$html .= '<button type="button" data-toggle="dropdown" class="btn btn-light-primary btn-sm dropdown-toggle" style="padding-left:3px;"></button>';
+		$html .= '<div class="dropdown-menu">';
+
+		// Delete option
+		if(in_array('RP', $this->session->access_control)) {
+			$redirect_url = strpos($current_url, '?') !== false ? base_url('Payment?') . explode('?', $current_url)[1] : base_url('Payment');
+			$html .= '<button onclick="Delete_Record(\'' . base_url('assets/image/sweetalert.jpg') . '\', \'' . $delete_text . '\', \'' . base_url('Payment/Delete') . '\', \'payment_id\', ' . $payment->PaymentID . ', \'' . $payment->Status . '\', \'' . $redirect_url . '\')" class="dropdown-item" style="color:#E37383; font-size:11px;">Delete Payment</button>';
+		}
+
+		// Read option
+		$html .= '<a href="' . base_url('Payment/View?payment_id=' . $payment->PaymentID) . '" class="dropdown-item" style="font-size:11px;">Read Payment</a>';
+
+		// Generate Receipt option
+		if($payment->Status == 'Y' && substr($payment->AutocountReferenceNumber, 0, 2) !== 'PV') {
+			$html .= '<a href="' . base_url('Receipt?token=' . $payment->Token) . '" target="_blank" class="dropdown-item" style="font-size:11px; color:#28a745;">Generate Receipt</a>';
+		}
+
+		// Update option
+		if(in_array('AP', $this->session->access_control)) {
+			$update_url = strpos($current_url, '?') !== false
+				? base_url('Payment/Update?payment_id=' . $payment->PaymentID . '&' . explode('?', $current_url)[1])
+				: base_url('Payment/Update?payment_id=' . $payment->PaymentID);
+			$html .= '<a href="' . $update_url . '" class="dropdown-item" style="font-size:11px;">Update Payment</a>';
+		}
+
+		$html .= '</div></div>';
+
+		return $html;
+	}
+
 	function Create()
 	{
 		if(in_array('GP', $this->session->access_control)) {

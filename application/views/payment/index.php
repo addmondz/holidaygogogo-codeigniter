@@ -261,6 +261,17 @@
                                                 </div>
                                             </div>
                                         </div>
+                                        <div class="col-md-3">
+                                            <div class="form-group">
+                                                <label>Autocount Reference</label>
+                                                <div class="input-icon">
+                                                    <input type="text" name="autocount_reference" value="<?php if(!empty($this->input->get('autocount_reference'))) { echo strtoupper($this->input->get('autocount_reference')); } ?>" autocomplete="off" class="form-control">
+                                                    <span>
+                                                        <i class="la la-hashtag"></i>
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                     <input type="button" id="filter" value="Filter" class="btn btn-light-success font-weight-bold" style="width:80px;">
                                     <input type="button" id="reset" value="Reset" class="btn btn-light-primary font-weight-bold" style="width:80px;">
@@ -391,110 +402,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            <?php if(empty($payments)) { ?>
-                                <td colspan="<?php if($this->session->userdata('level') != 20 && in_array('AP', $this->session->access_control)) { echo 18; } else if($this->session->userdata('level') != 20 && !in_array('AP', $this->session->access_control)) { echo 17; } else { echo 16; } ?>" style="text-align:center; padding-top:10px; padding-bottom:10px;">Payment Records Not Found</td>
-                            <?php } else { ?>
-                                <?php $count = 1; ?>
-                                <?php foreach($payments as $payment) { ?>
-                                    <tr>
-                                        <td id="<?php echo 'count-' . $payment->PaymentID; ?>" style="text-align:center; padding-top:15px; padding-bottom:15px;"><?php echo $count; ?></td>
-                                        <?php if($this->session->userdata('level') != 20 && in_array('AP', $this->session->access_control)) { ?>
-                                            <td style="text-align:center;">
-                                                <label class="checkbox checkbox-outline checkbox-success">
-                                                    <input type="checkbox" class="check_item" id="<?php echo $payment->PaymentID; ?>" onclick="Select_Payment(<?php echo $payment->PaymentID; ?>)">
-                                                    <span></span>
-                                                </label>
-                                            </td>
-                                        <?php } ?>
-                                        <td id="<?php echo 'date-' . $payment->PaymentID; ?>" style="text-align:center;"><?php echo $payment->Date; ?></td>
-                                        <?php if($this->session->userdata('level') != 20) { ?>
-                                            <td style="text-align:center;"><?php echo $payment->SalesAgent; ?></td>
-                                        <?php } ?>
-                                        <td style="text-align:center;">
-                                            <?php if(!empty($this->input->get('booking_number'))) { ?>
-                                                <?php echo $payment->BookingNumber; ?>
-                                            <?php } else { ?>
-                                                <a href="<?php echo base_url('Payment?booking_number=') . $payment->BookingNumber . '&customer=' . str_replace('&', '%26', $payment->Customer); ?>" target="_blank"><?php echo $payment->BookingNumber; ?></a>
-                                            <?php } ?>
-                                        </td>
-                                        <td style="text-align:center;"><?php echo $payment->Customer; ?></td>
-                                        <td style="text-align:center;"><?php echo $payment->ReservationNumber; ?></td>
-                                        <td style="text-align:center;"><?php echo $payment->StartDate; ?></td>
-                                        <td style="text-align:center;"><?php echo $payment->EndDate; ?></td>
-                                        <td style="color:#2AAA8A; text-align:center;"><?php echo $payment->TotalCredit; ?></td>
-                                        <td style="text-align:center;"><?php echo $payment->Type; ?></td>
-                                        <?php if(empty($this->input->get('payment_deadline'))) { ?>
-                                            <td id="<?php echo 'credit-' . $payment->PaymentID; ?>" style="color:#2AAA8A; text-align:center;"><?php echo $payment->Credit; ?></td>
-                                        <?php } ?>
-                                        <td style="color:#F88379; text-align:center;"><?php echo $payment->Debit; ?></td>
-                                        <td style="text-align:center;">
-                                            <a href="<?php echo base_url('Supplier/Update?supplier_id=') . $payment->SupplierID; ?>" target="_blank"><?php echo $payment->Supplier; ?></a>
-                                        </td>
-                                        <td id="<?php echo 'deadline-' . $payment->PaymentID; ?>" style="text-align:center;"><?php echo $payment->Deadline; ?></td>
-                                        <td id="<?php echo 'reference_number-' . $payment->PaymentID; ?>" style="text-align:center;"><?php echo $payment->ReferenceNumber; ?></td>
-                                        <td id="<?php echo 'autocount_reference_number-' . $payment->PaymentID; ?>" style="text-align:center;"><?php echo $payment->AutocountReferenceNumber; ?></td>
-                                        <td style="text-align:center;"><?php if($payment->Status == 'Y') { echo '<i class="la la-check-circle text-success"></i>'; } else if($payment->Status == 'P') { echo '<i class="la la-exclamation-circle text-warning"></i>'; } else { echo '<i class="la la-times-circle text-danger"></i>'; } ?></td>
-                                        <td style="text-align:center;">
-                                            <?php 
-                                                // default
-                                                $statusColor = '#000000';
-                                                $statusText  = 'UNKNOWN';
-
-                                                // only handle P, S, F
-                                                switch ($payment->AutocountSyncStatus) {
-                                                    case 'P': $statusColor = '#808080'; $statusText = 'Pending'; break;
-                                                    case 'S': $statusColor = '#50C878'; $statusText = 'Synced'; break;
-                                                    case 'F': $statusColor = '#FF4500'; $statusText = 'Failed'; break;
-                                                }
-
-                                                // tooltip
-                                                $tooltipAttr = '';
-                                                if (!empty($payment->AutocountSyncMessage)) {
-                                                    $decoded = json_decode($payment->AutocountSyncMessage, true);
-
-                                                    if (json_last_error() === JSON_ERROR_NONE) {
-                                                        if (isset($decoded['error']) && $decoded['error'] === null) {
-                                                            $tooltipText = "SUCCESS";
-                                                        } elseif (isset($decoded['error']) && $decoded['error'] !== null) {
-                                                            $tooltipText = "ERROR: " . (is_string($decoded['error']) ? $decoded['error'] : json_encode($decoded['error']));
-                                                        } else {
-                                                            $tooltipText = $payment->AutocountSyncMessage; // raw JSON
-                                                        }
-                                                    } else {
-                                                        $tooltipText = $payment->AutocountSyncMessage;
-                                                    }
-
-                                                    $tooltipAttr = ' data-toggle="tooltip" data-placement="top" title="' . htmlspecialchars($tooltipText) . '"';
-                                                }
-                                            ?>
-                                            <span class="font-weight-bold" style="color:<?= $statusColor ?>;" <?= $tooltipAttr ?>>
-                                                <?= $statusText ?>
-                                            </span>
-                                        </td>
-
-
-                                        <td style="text-align:center;">
-                                            <div class="btn-group">
-                                                <button type="button" data-toggle="dropdown" class="btn btn-light-primary btn-sm dropdown-toggle" style="padding-left:3px;"></button>
-                                                <div class="dropdown-menu">
-                                                    <?php if(in_array('RP', $this->session->access_control)) { ?>
-                                                        <button onclick="Delete_Record('<?php echo base_url('assets/image/sweetalert.jpg'); ?>', '<?php if(!empty($payment->Credit)) { echo 'Payment Record : Credit ' . $payment->Credit; } else { echo 'Payment Record : Debit ' . $payment->Debit; } ?>', '<?php echo base_url('Payment/Delete'); ?>', 'payment_id', <?php echo $payment->PaymentID; ?>, '<?php echo $payment->Status; ?>', '<?php if(strpos($current_url, '?') == true) { echo base_url('Payment?') . (explode('?', $current_url))[1]; } else { echo base_url('Payment'); } ?>')" class="dropdown-item" style="color:#E37383; font-size:11px;">Delete Payment</button>
-                                                    <?php } ?>
-                                                    <a href="<?php echo base_url('Payment/View?payment_id=') . $payment->PaymentID; ?>" class="dropdown-item" style="font-size:11px;">Read Payment</a>
-                                                    <?php //if($payment->Status == 'Y' && $payment->Credit > 0) { ?>
-                                                    <?php if($payment->Status == 'Y' && substr($payment->AutocountReferenceNumber, 0, 2) !== 'PV') { ?>
-                                                        <a href="<?php echo base_url('Receipt?token=') . $payment->Token; ?>" target="_blank" class="dropdown-item" style="font-size:11px; color:#28a745;">Generate Receipt</a>
-                                                    <?php } ?>
-                                                    <?php if(in_array('AP', $this->session->access_control)) { ?>
-                                                        <a href="<?php if(strpos($current_url, '?') == true) { echo base_url('Payment/Update?payment_id=') . $payment->PaymentID . '&' . (explode('?', $current_url))[1]; } else { echo base_url('Payment/Update?payment_id=') . $payment->PaymentID; } ?>" class="dropdown-item" style="font-size:11px;">Update Payment</a>
-                                                    <?php } ?>
-                                                </div>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                    <?php $count++; ?>
-                                <?php } ?>
-                            <?php } ?>
+                            <!-- Data loaded via AJAX server-side processing -->
                         </tbody>
                     </table>
                     <?php if(!empty($this->input->get('payment_deadline'))) { ?>
@@ -585,7 +493,7 @@
                                     <div class="col-md-4 mb-7 mb-md-0">
                                         <label style="color:#2AAA8A;">Total Payment In (RM)</label>
                                         <div class="input-icon">
-                                            <input disabled type="text" value="<?php echo $total_credit; ?>" class="form-control" style="text-align:right;">
+                                            <input disabled type="text" id="total_credit_display" value="Loading..." class="form-control" style="text-align:right;">
                                             <span>
                                                 <i class="la la-dollar"></i>
                                             </span>
@@ -594,7 +502,7 @@
                                     <div class="col-md-4 mb-7 mb-md-0">
                                         <label style="color:#F88379;">- Total Payment Out (RM)</label>
                                         <div class="input-icon">
-                                            <input disabled type="text" value="<?php echo $total_debit; ?>" class="form-control" style="text-align:right;">
+                                            <input disabled type="text" id="total_debit_display" value="Loading..." class="form-control" style="text-align:right;">
                                             <span>
                                                 <i class="la la-dollar"></i>
                                             </span>
@@ -603,7 +511,7 @@
                                     <div class="col-md-4">
                                         <label style="color:#FFC000;">= Total Net Profit (RM)</label>
                                         <div class="input-icon">
-                                            <input disabled type="text" value="<?php echo $total_net_profit; ?>" class="form-control" style="text-align:right;">
+                                            <input disabled type="text" id="total_net_profit_display" value="Loading..." class="form-control" style="text-align:right;">
                                             <span>
                                                 <i class="la la-dollar"></i>
                                             </span>
@@ -672,7 +580,7 @@
         $('input[name="deadline"]').val('');
     }
     
-    <?php if(!empty($this->input->get('supplier')) || !empty($this->input->get('transaction_date')) || !empty($this->input->get('payment_type')) || !empty($this->input->get('transaction_type')) || !empty($this->input->get('reference_number')) || !empty($this->input->get('payment_deadline')) || !empty($this->input->get('quotation_number')) || !empty($this->input->get('invoice_number')) || !empty($this->input->get('bank')) || !empty($this->input->get('bank_account')) || !empty($this->input->get('bank_holder')) || !empty($this->input->get('status')) || !empty($this->input->get('booking_number')) || !empty($this->input->get('customer')) || !empty($this->input->get('travel_date')) || !empty($this->input->get('sales_agent'))) { ?>
+    <?php if(!empty($this->input->get('supplier')) || !empty($this->input->get('transaction_date')) || !empty($this->input->get('payment_type')) || !empty($this->input->get('transaction_type')) || !empty($this->input->get('reference_number')) || !empty($this->input->get('payment_deadline')) || !empty($this->input->get('quotation_number')) || !empty($this->input->get('invoice_number')) || !empty($this->input->get('bank')) || !empty($this->input->get('bank_account')) || !empty($this->input->get('bank_holder')) || !empty($this->input->get('status')) || !empty($this->input->get('booking_number')) || !empty($this->input->get('customer')) || !empty($this->input->get('travel_date')) || !empty($this->input->get('sales_agent')) || !empty($this->input->get('autocount_reference'))) { ?>
         $('#payment_header').click();
     <?php } ?>
 
@@ -686,17 +594,19 @@
     
     $('#all').click(function() {
         payment_ids = [];
-        var payments = <?php echo json_encode($payments) ?>;
-        var isChecked = $('#all').is(':checked'); // Check the "Select All" checkbox state
+        var isChecked = $('#all').is(':checked');
 
-        for(var i = 0; i < payments.length; i++) {
-            if($('#all').is(':checked')) {
-                $(`#${payments[i].PaymentID}`).prop('checked', true);
-                payment_ids.push(payments[i].PaymentID);
+        // Get all visible checkboxes from the DataTable
+        $('.check_item').each(function() {
+            var paymentId = $(this).attr('id');
+            if(isChecked) {
+                $(this).prop('checked', true);
+                payment_ids.push(parseInt(paymentId));
             } else {
-                $(`#${payments[i].PaymentID}`).prop('checked', false);
+                $(this).prop('checked', false);
             }
-        }
+        });
+
         var bulkPaymentSyncToAutocount = "<?php echo $bulkPaymentSyncToAutocount; ?>";
         if (bulkPaymentSyncToAutocount) {
             if (isChecked) {
@@ -708,34 +618,35 @@
     });
 
     function Select_Payment(payment_id) {
-    if ($(`#${payment_id}`).is(':checked')) {
-        // Add payment_id to the selected list
-        payment_ids.push(payment_id);
-    } else {
-        // Remove payment_id from the selected list
-        payment_ids = payment_ids.filter(function(value) {
-            return value != payment_id;
-        });
-    }
-
-    // If at least one payment is selected, show the "Sync Autocount" button
-    var bulkPaymentSyncToAutocount = "<?php echo $bulkPaymentSyncToAutocount; ?>";
-    if (bulkPaymentSyncToAutocount) {
-        if (payment_ids.length > 0) {
-            $('#sync-autocount-payment').show();
+        if ($(`#${payment_id}`).is(':checked')) {
+            // Add payment_id to the selected list
+            payment_ids.push(payment_id);
         } else {
-            $('#sync-autocount-payment').hide();
+            // Remove payment_id from the selected list
+            payment_ids = payment_ids.filter(function(value) {
+                return value != payment_id;
+            });
+        }
+
+        // If at least one payment is selected, show the "Sync Autocount" button
+        var bulkPaymentSyncToAutocount = "<?php echo $bulkPaymentSyncToAutocount; ?>";
+        if (bulkPaymentSyncToAutocount) {
+            if (payment_ids.length > 0) {
+                $('#sync-autocount-payment').show();
+            } else {
+                $('#sync-autocount-payment').hide();
+            }
+        }
+
+        // Update the "Select All" checkbox based on visible checkboxes
+        var totalVisible = $('.check_item').length;
+        var totalChecked = $('.check_item:checked').length;
+        if (totalChecked == totalVisible && totalVisible > 0) {
+            $('#all').prop('checked', true);
+        } else {
+            $('#all').prop('checked', false);
         }
     }
-
-    // Update the "Select All" checkbox if all checkboxes are selected
-    var total_payments = <?php echo count($payments) ?>;
-    if (payment_ids.length == total_payments) {
-        $('#all').prop('checked', true); // Check "Select All" if all are selected
-    } else {
-        $('#all').prop('checked', false); // Uncheck "Select All" if not all are selected
-    }
-}
 
     
     $('input[type="submit"]').click(function(event) {
@@ -905,7 +816,7 @@ document.getElementById('sync-autocount-payment').addEventListener('click', func
     .then(res => res.json())
     .then(data => {
         if (data.success) {
-            alert(data.message); // ✅ all messages from PHP
+            alert(data.message);
         } else {
             alert("❌ " + data.message);
         }
@@ -915,4 +826,148 @@ document.getElementById('sync-autocount-payment').addEventListener('click', func
         alert("Error occurred during sync.");
     });
 });
+</script>
+
+<!-- Server-Side DataTables Initialization -->
+<script>
+var paymentTable;
+var is_sales_agent = <?php echo $this->session->userdata('level') == 20 ? 'true' : 'false'; ?>;
+var has_ap_permission = <?php echo in_array('AP', $this->session->access_control) ? 'true' : 'false'; ?>;
+var has_payment_deadline_filter = <?php echo !empty($this->input->get('payment_deadline')) ? 'true' : 'false'; ?>;
+
+$(document).ready(function() {
+    setTimeout(function() {
+        // Destroy existing DataTable if it exists
+        if ($.fn.DataTable.isDataTable('#kt_datatable')) {
+            $('#kt_datatable').DataTable().destroy();
+        }
+
+        // Build columns array based on user role and filters
+        var columns = [
+            { data: 'row_number', orderable: false, searchable: false, className: 'text-center' },
+        ];
+
+        // Checkbox column (only for non-SA users with AP permission)
+        if (!is_sales_agent && has_ap_permission) {
+            columns.push({ data: 'checkbox', orderable: false, searchable: false, className: 'text-center' });
+        }
+
+        columns.push({ data: 'transaction_date', className: 'text-center' });
+
+        // Sales agent column (hidden for SA users)
+        if (!is_sales_agent) {
+            columns.push({ data: 'sales_agent', className: 'text-center' });
+        }
+
+        columns = columns.concat([
+            { data: 'booking_number', className: 'text-center' },
+            { data: 'customer', className: 'text-center' },
+            { data: 'reservation', className: 'text-center' },
+            { data: 'start_date', className: 'text-center' },
+            { data: 'end_date', className: 'text-center' },
+            { data: 'total_credit', className: 'text-center' },
+            { data: 'type', className: 'text-center' },
+        ]);
+
+        // Credit/In column (hidden when payment_deadline filter is set)
+        if (!has_payment_deadline_filter) {
+            columns.push({ data: 'credit', className: 'text-center' });
+        }
+
+        columns = columns.concat([
+            { data: 'debit', className: 'text-center' },
+            { data: 'supplier', className: 'text-center' },
+            { data: 'deadline', className: 'text-center' },
+            { data: 'reference', className: 'text-center' },
+            { data: 'autocount_ref', className: 'text-center' },
+            { data: 'status', orderable: false, className: 'text-center' },
+            { data: 'autocount_status', orderable: false, className: 'text-center' },
+            { data: 'action', orderable: false, searchable: false, className: 'text-center' }
+        ]);
+
+        // Get current filter params from URL
+        var urlParams = new URLSearchParams(window.location.search);
+        var filterParams = {};
+        var filterKeys = ['booking_number', 'customer', 'travel_date', 'transaction_date', 'payment_deadline',
+            'status', 'payment_type', 'transaction_type', 'reference_number', 'supplier',
+            'quotation_number', 'invoice_number', 'bank', 'bank_account', 'bank_holder', 'sales_agent', 'autocount_reference'];
+
+        filterKeys.forEach(function(param) {
+            if (urlParams.has(param)) {
+                filterParams[param] = urlParams.get(param);
+            }
+        });
+
+        // Initialize DataTable with server-side processing
+        paymentTable = $('#kt_datatable').DataTable({
+            processing: true,
+            serverSide: true,
+            responsive: true,
+            ajax: {
+                url: '<?php echo base_url("Payment/ajax_list"); ?>',
+                type: 'GET',
+                data: function(d) {
+                    for (var key in filterParams) {
+                        d[key] = filterParams[key];
+                    }
+                    return d;
+                }
+            },
+            columns: columns,
+            order: [[is_sales_agent && has_ap_permission ? 1 : (is_sales_agent ? 1 : 2), 'desc']],
+            pageLength: 100,
+            lengthMenu: [[50, 100, 200, 500], [50, 100, 200, 500]],
+            searchDelay: 300,
+            language: {
+                processing: '<div class="spinner spinner-primary spinner-lg mr-15"></div> Loading...',
+                emptyTable: 'Payment Records Not Found',
+                zeroRecords: 'No matching records found'
+            },
+            drawCallback: function(settings) {
+                // Re-init tooltips and checkbox listeners after each draw
+                $('[data-toggle="tooltip"]').tooltip();
+                // Reset selection state
+                payment_ids = [];
+                $('#all').prop('checked', false);
+                $('#sync-autocount-payment').hide();
+            }
+        });
+
+        // Load summary totals
+        loadPaymentSummary();
+    }, 100);
+});
+
+function loadPaymentSummary() {
+    var urlParams = new URLSearchParams(window.location.search);
+    var params = [];
+    var filterKeys = ['booking_number', 'customer', 'travel_date', 'transaction_date', 'payment_deadline',
+        'status', 'payment_type', 'transaction_type', 'reference_number', 'supplier',
+        'quotation_number', 'invoice_number', 'bank', 'bank_account', 'bank_holder', 'sales_agent', 'autocount_reference'];
+
+    filterKeys.forEach(function(param) {
+        if (urlParams.has(param)) {
+            params.push(param + '=' + encodeURIComponent(urlParams.get(param)));
+        }
+    });
+
+    var queryString = params.length > 0 ? '?' + params.join('&') : '';
+
+    $.ajax({
+        url: '<?php echo base_url("Payment/ajax_summary"); ?>' + queryString,
+        type: 'GET',
+        dataType: 'json',
+        success: function(data) {
+            $('#total_credit_display').val(data.total_credit);
+            $('#total_debit_display').val(data.total_debit);
+            $('#total_net_profit_display').val(data.total_net_profit);
+        },
+        error: function() {
+            console.error('Failed to load payment summary');
+            $('#total_credit_display').val('Error');
+            $('#total_debit_display').val('Error');
+            $('#total_net_profit_display').val('Error');
+        }
+    });
+}
 </script>
