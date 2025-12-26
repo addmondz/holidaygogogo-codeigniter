@@ -86,18 +86,18 @@ defined('EXIT__AUTO_MAX')      OR define('EXIT__AUTO_MAX', 125); // highest auto
 
 //Admin
 defined('GENDER')              OR define('GENDER', serialize(array('F' => 'FEMALE', 'M' => 'MALE')));
-defined('LEVEL')               OR define('LEVEL', serialize(array(30 => 'FINANCE', 10 => 'OWNER', 20 => 'SALES AGENT')));
+defined('LEVEL')               OR define('LEVEL', serialize(array(10 => 'OWNER', 20 => 'SALES AGENT', 30 => 'FINANCE', 40 => 'OP', 50 => 'TC')));
 defined('ADMIN_STATUS')        OR define('ADMIN_STATUS', serialize(array('Y' => 'ACTIVE', 'D' => 'DEACTIVATED')));
 defined('ACCESS_CONTROL')      OR define('ACCESS_CONTROL', serialize(array('GB' => 'GENERATE BOOKING', 'VB' => 'VIEW BOOKING', 'AB' => 'AMEND BOOKING', 'RB' => 'REMOVE BOOKING', 'GP' => 'GENERATE PAYMENT', 'VP' => 'VIEW PAYMENT', 'AP' => 'AMEND PAYMENT', 'RP' => 'REMOVE PAYMENT', 'VR' => 'VIEW REPORT')));
 
 //Booking
-defined('BOOKING_STATUS')      OR define('BOOKING_STATUS', serialize(array('A' => 'ALL STATUSES', 'C' => 'CANCELLED', 'Y' => 'COMPLETED', 'OG' => 'ON-GOING', 'PP' => 'PARTIAL PAYMENT', 'PO' => 'PAYMENT OVERDUE', 'PGL' => 'PENDING GUEST LIST', 'P' => 'PENDING PAYMENT', 'PR' => 'PENDING REVIEW', 'PT' => 'PENDING TRAVEL', 'PTV' => 'PENDING TRAVEL VOUCHER')));
+defined('BOOKING_STATUS')      OR define('BOOKING_STATUS', serialize(array('A' => 'ALL STATUSES', 'C' => 'CANCELLED', 'Y' => 'COMPLETED', 'OG' => 'ON-GOING', 'PP' => 'PARTIAL PAYMENT', 'PO' => 'PAYMENT OVERDUE', 'PGL' => 'PENDING GUEST LIST', 'P' => 'PENDING PAYMENT', 'PR' => 'PENDING REVIEW', 'PT' => 'PENDING TRAVEL', 'PTV' => 'PENDING TRAVEL VOUCHER', 'PBO' => 'PENDING BOOKING OPERATION')));
 defined('BC_TITLE')            OR define('BC_TITLE', serialize(array('BOOKING CONFIRMATION' => 'BOOKING CONFIRMATION', 'QUOTATION' => 'QUOTATION', 'PROFORMA INVOICE' => 'PROFORMA INVOICE')));
 defined('CHAT_LANGUAGE')       OR define('CHAT_LANGUAGE', serialize(array('CN' => 'CN', 'EN' => 'EN', 'ML' => 'ML')));
 
 //Payment
 defined('PAYMENT_STATUS')      OR define('PAYMENT_STATUS', serialize(array('Y' => 'APPROVED', 'P' => 'PENDING', 'R' => 'REJECTED')));
-defined('PAYMENT_TYPE')        OR define('PAYMENT_TYPE', serialize(array('ADDITIONAL PAYMENT' => 'ADDITIONAL PAYMENT', 'AGENT COMMISSION' => 'AGENT COMMISSION', 'BANK CHARGES' => 'BANK CHARGES', 'CUSTOMER REFUND' => 'CUSTOMER REFUND', 'DEPOSIT' => 'DEPOSIT', 'FULL' => 'FULL', 'ONE-TIME PAYMENT' => 'ONE-TIME PAYMENT', 'SUPPLIER PAYMENT' => 'SUPPLIER PAYMENT', 'SUPPLIER REFUND' => 'SUPPLIER REFUND', 'CREDIT CARD CHARGES' => 'CREDIT CARD CHARGES')));
+defined('PAYMENT_TYPE')        OR define('PAYMENT_TYPE', serialize(array('ADDITIONAL PAYMENT' => 'ADDITIONAL PAYMENT', 'AGENT COMMISSION' => 'AGENT COMMISSION', 'AGENT COMMISSION FROM SUPPLIER' => 'AGENT COMMISSION FROM SUPPLIER', 'BANK CHARGES' => 'BANK CHARGES', 'CUSTOMER REFUND' => 'CUSTOMER REFUND', 'DEPOSIT' => 'DEPOSIT', 'FULL' => 'FULL', 'ONE-TIME PAYMENT' => 'ONE-TIME PAYMENT', 'SUPPLIER PAYMENT' => 'SUPPLIER PAYMENT', 'SUPPLIER REFUND' => 'SUPPLIER REFUND', 'CREDIT CARD CHARGES' => 'CREDIT CARD CHARGES')));
 defined('TRANSACTION_TYPE')    OR define('TRANSACTION_TYPE', serialize(array('PAYMENT IN' => 'PAYMENT IN', 'PAYMENT OUT' => 'PAYMENT OUT')));
 
 //Category
