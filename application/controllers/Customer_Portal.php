@@ -41,36 +41,23 @@ class Customer_Portal extends CI_Controller
             return;
         }
 
-        // Get filter parameters
-        $status_filter = $this->input->get('status');
-        $travel_date_from = $this->input->get('travel_date_from');
-        $travel_date_to = $this->input->get('travel_date_to');
-
-        // Get customer bookings with filters
-        $bookings = $this->get_customer_bookings_filtered(
-            $customer['CustomerID'],
-            $status_filter,
-            $travel_date_from,
-            $travel_date_to
-        );
+        // Get customer bookings separated into upcoming and completed
+        $bookings_data = $this->get_customer_bookings_by_category($customer['CustomerID']);
 
         // Format pax information for each booking
-        foreach ($bookings as &$booking) {
+        foreach ($bookings_data['upcoming'] as &$booking) {
             $booking['PaxInfo'] = $this->format_pax_info($booking['Adult'] ?? 0, $booking['Children'] ?? 0, $booking['Infant'] ?? 0);
         }
-
-        // Get booking status options
-        $status_options = $this->get_booking_status_options();
+        foreach ($bookings_data['completed'] as &$booking) {
+            $booking['PaxInfo'] = $this->format_pax_info($booking['Adult'] ?? 0, $booking['Children'] ?? 0, $booking['Infant'] ?? 0);
+        }
 
         // Prepare data for view
         $data = [
             'customer' => $customer,
-            'bookings' => $bookings,
-            'hash' => $hash,
-            'status_filter' => $status_filter,
-            'travel_date_from' => $travel_date_from,
-            'travel_date_to' => $travel_date_to,
-            'status_options' => $status_options
+            'upcoming_bookings' => $bookings_data['upcoming'],
+            'completed_bookings' => $bookings_data['completed'],
+            'hash' => $hash
         ];
 
         // Load dashboard view
@@ -148,15 +135,12 @@ class Customer_Portal extends CI_Controller
     }
 
     /**
-     * Get filtered bookings for a customer
+     * Get customer bookings separated into upcoming and completed
      * 
      * @param int $customer_id
-     * @param string|null $status_filter
-     * @param string|null $travel_date_from
-     * @param string|null $travel_date_to
-     * @return array
+     * @return array ['upcoming' => [], 'completed' => []]
      */
-    private function get_customer_bookings_filtered($customer_id, $status_filter = null, $travel_date_from = null, $travel_date_to = null)
+    private function get_customer_bookings_by_category($customer_id)
     {
         $this->db->select('booking.BookingID, BookingNumber, DepositDeadline, FullPaymentDeadline, 
                           Customer, booking.Mobile As CustomerMobile, StartDate, EndDate, NetTotal, 
@@ -170,52 +154,27 @@ class Customer_Portal extends CI_Controller
         $this->db->where('booking.CustomerID', $customer_id);
         $this->db->where('booking.Status !=', 'N');
         $this->db->where('CancelStatus', 'N'); // Always exclude cancelled
-
-        // Apply status filter based on BC stage visibility rules
-        if (!empty($status_filter)) {
-            if ($status_filter == 'pending') {
-                // Pending: Status = 'P' (Pending Payment - before booking confirmation)
-                $this->db->where('booking.Status', 'P');
-            } elseif ($status_filter == 'confirmed') {
-                // Confirmed: Status IN ('PP', 'PTV', 'PT', 'OG') - after booking confirmation
-                $this->db->where_in('booking.Status', ['PP', 'PTV', 'PT', 'OG']);
-            } elseif ($status_filter == 'completed') {
-                // Completed: Status = 'Y' AND AfterSalesService = 'COMPLETE'
-                $this->db->where('booking.Status', 'Y');
-                $this->db->where('AfterSalesService', 'COMPLETE');
-            }
-        } else {
-            // Default: Show only Confirmed and Completed (hide Pending)
-            // Pending (Status = 'P') is hidden from customers
-            $this->db->where("(booking.Status IN ('PP', 'PTV', 'PT', 'OG') OR (booking.Status = 'Y' AND AfterSalesService = 'COMPLETE'))", null, false);
-        }
-
-        // Apply travel date filter
-        if (!empty($travel_date_from)) {
-            $this->db->where('StartDate >=', date('Y-m-d', strtotime($travel_date_from)));
-        }
-        if (!empty($travel_date_to)) {
-            $this->db->where('StartDate <=', date('Y-m-d', strtotime($travel_date_to)));
-        }
-
         $this->db->order_by('booking.StartDate', 'DESC');
         $this->db->order_by('booking.BookingID', 'DESC');
         
-        return $this->db->get()->result_array();
-    }
-
-    /**
-     * Get booking status options for filter
-     * 
-     * @return array
-     */
-    private function get_booking_status_options()
-    {
+        $all_bookings = $this->db->get()->result_array();
+        
+        $upcoming = [];
+        $completed = [];
+        
+        foreach ($all_bookings as $booking) {
+            // Completed: Status = 'Y' AND AfterSalesService = 'COMPLETE'
+            if ($booking['Status'] == 'Y' && $booking['AfterSalesService'] == 'COMPLETE') {
+                $completed[] = $booking;
+            } else {
+                // Upcoming: All other bookings (P, PP, PTV, PT, OG, etc.)
+                $upcoming[] = $booking;
+            }
+        }
+        
         return [
-            '' => 'All Bookings',
-            'pending' => 'Pending',
-            'confirmed' => 'Confirmed',
-            'completed' => 'Completed'
+            'upcoming' => $upcoming,
+            'completed' => $completed
         ];
     }
 

@@ -65,8 +65,58 @@
             font-weight: 500;
         }
 
-        /* Filters Section */
-        .filters-section {
+
+        /* Tabs Section */
+        .tabs-container {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            margin-bottom: 30px;
+        }
+
+        .tabs-header {
+            display: flex;
+            gap: 10px;
+            border-bottom: 2px solid #e0e0e0;
+            margin-bottom: 25px;
+        }
+
+        .tab-button {
+            padding: 12px 24px;
+            background: transparent;
+            border: none;
+            border-bottom: 3px solid transparent;
+            font-size: 16px;
+            font-weight: 500;
+            color: #666;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-family: 'Poppins', sans-serif;
+            position: relative;
+            bottom: -2px;
+        }
+
+        .tab-button:hover {
+            color: #667eea;
+        }
+
+        .tab-button.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+            font-weight: 600;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Search Section */
+        .search-section {
             background: white;
             border-radius: 12px;
             padding: 25px;
@@ -74,88 +124,117 @@
             box-shadow: 0 2px 8px rgba(0,0,0,0.08);
         }
 
-        .filters-title {
+        .search-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .search-title {
             font-size: 18px;
             font-weight: 600;
-            margin-bottom: 20px;
             color: #333;
             display: flex;
             align-items: center;
             gap: 10px;
         }
 
-        .filters-title i {
+        .search-title i {
             color: #667eea;
         }
 
-        .filters-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-            margin-bottom: 20px;
-        }
-
-        .filter-group {
-            display: flex;
-            flex-direction: column;
-        }
-
-        .filter-group label {
+        .search-helper {
             font-size: 13px;
-            font-weight: 500;
-            color: #666;
-            margin-bottom: 8px;
+            color: #999;
+            margin-top: 8px;
         }
 
-        .filter-group select,
-        .filter-group input {
-            padding: 10px 12px;
+        .search-input-wrapper {
+            position: relative;
+            max-width: 100%;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 12px 40px 12px 15px;
             border: 1px solid #e0e0e0;
-            border-radius: 6px;
+            border-radius: 8px;
             font-size: 14px;
             font-family: 'Poppins', sans-serif;
             transition: border-color 0.3s;
         }
 
-        .filter-group select:focus,
-        .filter-group input:focus {
+        .search-input:focus {
             outline: none;
             border-color: #667eea;
         }
 
-        .filter-actions {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
+        .search-icon {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #999;
+            font-size: 18px;
         }
 
-        .btn-filter {
-            padding: 10px 20px;
-            border: none;
-            border-radius: 6px;
+        /* Pagination */
+        .pagination-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .pagination-info {
             font-size: 14px;
-            font-weight: 500;
+            color: #666;
+            margin: 0;
+        }
+
+        .pagination-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .pagination-button {
+            padding: 8px 16px;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            background: white;
+            color: #666;
+            font-size: 14px;
+            font-family: 'Poppins', sans-serif;
             cursor: pointer;
             transition: all 0.3s;
-            font-family: 'Poppins', sans-serif;
         }
 
-        .btn-primary {
+        .pagination-button:hover:not(:disabled) {
             background: #667eea;
             color: white;
+            border-color: #667eea;
         }
 
-        .btn-primary:hover {
-            background: #5568d3;
+        .pagination-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
 
-        .btn-secondary {
-            background: #f0f0f0;
-            color: #666;
+        .pagination-button.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
         }
 
-        .btn-secondary:hover {
-            background: #e0e0e0;
+        .pagination-pages {
+            display: flex;
+            gap: 5px;
+            align-items: center;
         }
 
         /* Bookings Section */
@@ -179,6 +258,12 @@
             font-size: 20px;
             font-weight: 600;
             color: #333;
+        }
+
+        .bookings-count {
+            margin-left: 8px; 
+            font-size: 14px; 
+            color: #999;
         }
 
         .bookings-count {
@@ -243,7 +328,8 @@
         .status-completed { background: #d4edda; color: #155724; }
         .status-overdue { background: #f8d7da; color: #721c24; }
         .status-cancelled { background: #f5c6cb; color: #721c24; }
-        .status-pending-travel { background: #e2e3e5; color: #383d41; }
+        .status-pending-travel {background: #e7f3ff;color: #0b5ed7;}
+
 
         .booking-details {
             display: grid;
@@ -330,57 +416,70 @@
                 font-size: 14px;
             }
 
-            .filters-section {
+
+            .tabs-container {
+                padding: 20px 15px;
+            }
+
+            .tabs-header {
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+
+            .tab-button {
+                padding: 10px 16px;
+                font-size: 14px;
+            }
+
+            .search-section {
                 padding: 20px 15px;
                 margin-bottom: 20px;
             }
 
-            .filters-title {
+            .search-title {
                 font-size: 16px;
-                margin-bottom: 15px;
             }
 
-            .filters-grid {
-                grid-template-columns: 1fr;
-                gap: 15px;
-                margin-bottom: 15px;
-            }
-
-            .filter-group label {
+            .search-helper {
                 font-size: 12px;
             }
 
-            .filter-group select,
-            .filter-group input {
-                padding: 8px 10px;
+            .search-input-wrapper {
+                max-width: 100%;
+            }
+
+            .search-input {
+                padding: 10px 35px 10px 12px;
                 font-size: 13px;
             }
 
-            .filter-actions {
-                width: 100%;
+            .pagination-container {
                 flex-direction: column;
+                align-items: center;
+                gap: 15px;
+                margin-top: 20px;
+                padding-top: 15px;
             }
 
-            .btn-filter {
-                flex: 1;
-                width: 100%;
+            .pagination-info {
+                font-size: 12px;
+                margin: 0;
+                text-align: center;
+            }
+
+            .pagination-controls {
+                flex-wrap: wrap;
+                gap: 5px;
+                justify-content: center;
+            }
+
+            .pagination-button {
+                padding: 6px 12px;
+                font-size: 12px;
             }
 
             .bookings-section {
                 padding: 20px 15px;
-            }
-
-            .section-header {
-                margin-bottom: 20px;
-            }
-
-            .section-title {
-                font-size: 18px;
-            }
-
-            .bookings-count {
-                font-size: 12px;
-                padding: 4px 10px;
             }
 
             .bookings-grid {
@@ -463,13 +562,21 @@
                 font-size: 18px;
             }
 
-            .filters-section,
-            .bookings-section {
+            .tabs-container {
                 padding: 15px 10px;
             }
 
-            .filters-title {
-                font-size: 15px;
+            .tab-button {
+                padding: 8px 12px;
+                font-size: 11px;
+            }
+
+            .bookings-count {
+                font-size: 11px;
+            }
+            
+            .bookings-section {
+                padding: 15px 10px;
             }
 
             .section-title {
@@ -592,62 +699,53 @@
             </div>
         </div>
 
-        <!-- Filters Section -->
-        <div class="filters-section">
-            <div class="filters-title">
-                <i class="la la-filter"></i>
-                Filter Bookings
+        <!-- Global Search Section -->
+        <div class="search-section">
+            <div class="search-header">
+                <div class="search-title">
+                    Search Bookings
+                </div>
             </div>
-            <form method="GET" action="<?php echo base_url('customer/' . urlencode($hash)); ?>" id="filterForm">
-                <div class="filters-grid">
-                    <div class="filter-group">
-                        <label for="status">Booking Status</label>
-                        <select name="status" id="status">
-                            <?php foreach ($status_options as $value => $label): ?>
-                                <option value="<?php echo $value; ?>" <?php echo ($status_filter == $value) ? 'selected' : ''; ?>>
-                                    <?php echo htmlspecialchars($label); ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="filter-group">
-                        <label for="travel_date_from">Travel Date From</label>
-                        <input type="date" name="travel_date_from" id="travel_date_from" 
-                               value="<?php echo htmlspecialchars($travel_date_from ?? ''); ?>">
-                    </div>
-                    <div class="filter-group">
-                        <label for="travel_date_to">Travel Date To</label>
-                        <input type="date" name="travel_date_to" id="travel_date_to" 
-                               value="<?php echo htmlspecialchars($travel_date_to ?? ''); ?>">
-                    </div>
-                </div>
-                <div class="filter-actions">
-                    <button type="submit" class="btn-filter btn-primary">
-                        Apply Filters
-                    </button>
-                    <a href="<?php echo base_url('customer/' . urlencode($hash)); ?>" class="btn-filter btn-secondary" style="text-decoration: none; display: inline-block;">
-                        Clear Filters
-                    </a>
-                </div>
-            </form>
+            <div class="search-input-wrapper">
+                <input type="text" 
+                       class="search-input" 
+                       id="global-search" 
+                       placeholder="Search by booking number or destination...">
+                <i class="la la-search search-icon"></i>
+            </div>
+            <div class="search-helper">
+                Search applies to all bookings across both tabs
+            </div>
         </div>
 
-        <!-- Bookings Section -->
-        <div class="bookings-section">
-            <div class="section-header">
-                <h2 class="section-title">Your Bookings</h2>
-                <span class="bookings-count"><?php echo count($bookings); ?> booking(s)</span>
+        <!-- Tabs Section -->
+        <div class="tabs-container">
+            <div class="tabs-header">
+                <button class="tab-button active" data-tab="upcoming">
+                    Upcoming Bookings
+                    <span class="bookings-count" id="count-upcoming">
+                        (<?php echo count($upcoming_bookings); ?>)
+                    </span>
+                </button>
+                <button class="tab-button" data-tab="completed">
+                    Completed Bookings
+                    <span class="bookings-count" id="count-completed">
+                        (<?php echo count($completed_bookings); ?>)
+                    </span>
+                </button>
             </div>
 
-            <?php if (empty($bookings)): ?>
-                <div class="empty-state">
-                    <i class="la la-suitcase"></i>
-                    <h3>No Bookings Found</h3>
-                    <p>Try adjusting your filters or check back later.</p>
-                </div>
-            <?php else: ?>
-                <div class="bookings-grid">
-                    <?php foreach ($bookings as $booking): ?>
+            <!-- Upcoming Bookings Tab -->
+            <div class="tab-content active" id="tab-upcoming">
+                <?php if (empty($upcoming_bookings)): ?>
+                    <div class="empty-state" id="empty-upcoming-default">
+                        <i class="la la-calendar"></i>
+                        <h3>No Upcoming Bookings</h3>
+                        <p>You don't have any upcoming bookings at the moment.</p>
+                    </div>
+                <?php else: ?>
+                    <div class="bookings-grid" id="bookings-upcoming" data-original-count="<?php echo count($upcoming_bookings); ?>">
+                        <?php foreach ($upcoming_bookings as $booking): ?>
                         <?php
                         // Determine booking status based on BC stage visibility rules
                         $display_status = $booking['Status'];
@@ -748,13 +846,384 @@
                                 <?php endif; ?>
                             </div>
                         </a>
-                    <?php endforeach; ?>
-                </div>
-            <?php endif; ?>
+                        <?php endforeach; ?>
+                    </div>
+
+                    <!-- Pagination -->
+                    <div class="pagination-container" id="pagination-upcoming"></div>
+                <?php endif; ?>
+            </div>
+
+            <!-- Completed Bookings Tab -->
+            <div class="tab-content" id="tab-completed">
+                <?php if (empty($completed_bookings)): ?>
+                    <div class="empty-state" id="empty-completed-default">
+                        <i class="la la-check-circle"></i>
+                        <h3>No Completed Bookings</h3>
+                        <p>Your completed bookings will appear here.</p>
+                    </div>
+                <?php else: ?>
+                    <div class="bookings-grid" id="bookings-completed" data-original-count="<?php echo count($completed_bookings); ?>">
+                        <?php foreach ($completed_bookings as $booking): ?>
+                            <?php
+                            // Completed bookings always show as completed
+                            $status_class = 'status-completed';
+                            $status_text = 'Completed';
+                            ?>
+                            <a href="<?php echo base_url('customer/booking/' . urlencode($booking['Token'] ?? '')); ?>" class="booking-card" data-booking-id="<?php echo htmlspecialchars($booking['BookingID'] ?? 'N/A'); ?>">
+                                <div class="booking-header">
+                                    <div class="booking-number">
+                                        <?php echo htmlspecialchars($booking['BookingNumber'] ?? 'N/A'); ?>
+                                    </div>
+                                    <span class="booking-status <?php echo $status_class; ?>">
+                                        <?php echo $status_text; ?>
+                                    </span>
+                                </div>
+                                <div class="booking-details">
+                                    <div class="detail-row">
+                                        <span class="detail-label">Destination</span>
+                                        <span class="detail-value"><?php echo htmlspecialchars($booking['DestinationName'] ?? 'N/A'); ?></span>
+                                    </div>
+                                    <?php if (!empty($booking['StartDate'])): ?>
+                                    <div class="detail-row">
+                                        <span class="detail-label">Travel Date</span>
+                                        <span class="detail-value">
+                                            <?php echo date('M d, Y', strtotime($booking['StartDate'])); ?>
+                                            <?php if (!empty($booking['EndDate'])): ?>
+                                                - <?php echo date('M d, Y', strtotime($booking['EndDate'])); ?>
+                                            <?php endif; ?>
+                                        </span>
+                                    </div>
+                                    <?php endif; ?>
+                                    <?php if (!empty($booking['PaxInfo'])): ?>
+                                    <div class="detail-row">
+                                        <span class="detail-label">Travel Pax</span>
+                                        <span class="detail-value">
+                                            <?php echo htmlspecialchars($booking['PaxInfo']); ?>
+                                        </span>
+                                    </div>
+                                    <?php endif; ?>
+                                    <?php if (!empty($booking['NetTotal'])): ?>
+                                    <div class="detail-row">
+                                        <span class="detail-label">Total Amount</span>
+                                        <span class="detail-value amount">
+                                            <?php echo number_format($booking['NetTotal'], 2); ?>
+                                        </span>
+                                    </div>
+                                    <?php endif; ?>
+                                </div>
+                            </a>
+                        <?php endforeach; ?>
+                    </div>
+
+                    <!-- Pagination -->
+                    <div class="pagination-container" id="pagination-completed"></div>
+                <?php endif; ?>
+            </div>
         </div>
     </div>
 
     <script src="<?php echo base_url('assets/js/plugins-bundle.js'); ?>"></script>
+    <script>
+        // Configuration
+        const ITEMS_PER_PAGE = 6; // Number of bookings per page
+
+        // Global search state
+        let globalSearchTerm = '';
+
+        // Tab switching functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const tabButtons = document.querySelectorAll('.tab-button');
+            const tabContents = document.querySelectorAll('.tab-content');
+
+            tabButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const targetTab = this.getAttribute('data-tab');
+
+                    // Remove active class from all buttons and contents
+                    tabButtons.forEach(btn => btn.classList.remove('active'));
+                    tabContents.forEach(content => content.classList.remove('active'));
+
+                    // Add active class to clicked button and corresponding content
+                    this.classList.add('active');
+                    document.getElementById('tab-' + targetTab).classList.add('active');
+                    
+                    // Apply current search to the newly active tab
+                    applyGlobalSearch();
+                });
+            });
+
+            // Initialize pagination and search for both tabs
+            initializeTab('upcoming');
+            initializeTab('completed');
+
+            // Setup global search
+            const globalSearchInput = document.getElementById('global-search');
+            if (globalSearchInput) {
+                globalSearchInput.addEventListener('input', function() {
+                    globalSearchTerm = this.value.toLowerCase().trim();
+                    applyGlobalSearch();
+                });
+            }
+        });
+
+        function initializeTab(tabName) {
+            const bookingsContainer = document.getElementById('bookings-' + tabName);
+            if (!bookingsContainer) return;
+
+            // Store original bookings HTML as data attribute (before any manipulation)
+            const originalHTML = bookingsContainer.innerHTML;
+            bookingsContainer.dataset.originalHTML = originalHTML;
+            
+            // Get original bookings count
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = originalHTML;
+            const originalBookings = Array.from(tempDiv.querySelectorAll('.booking-card'));
+            const originalCount = originalBookings.length;
+            bookingsContainer.dataset.originalCount = originalCount;
+
+            // Initialize pagination and render first page
+            renderPagination(tabName, originalCount, 1);
+            renderBookings(tabName, originalBookings, 1);
+        }
+
+        function applyGlobalSearch() {
+            // Get active tab
+            const activeTab = document.querySelector('.tab-button.active');
+            if (!activeTab) return;
+            
+            const activeTabName = activeTab.getAttribute('data-tab');
+            
+            // Apply search to both tabs but only show results for active tab
+            filterAndPaginate('upcoming', activeTabName === 'upcoming');
+            filterAndPaginate('completed', activeTabName === 'completed');
+            
+            // Update tab counts
+            updateTabCounts();
+        }
+
+        function filterAndPaginate(tabName, isActiveTab = true) {
+            const bookingsContainer = document.getElementById('bookings-' + tabName);
+            if (!bookingsContainer) return;
+
+            // Get original bookings from stored HTML
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = bookingsContainer.dataset.originalHTML || '';
+            const allBookings = Array.from(tempDiv.querySelectorAll('.booking-card'));
+            
+            // Filter bookings using global search term
+            let filteredBookings = allBookings;
+            if (globalSearchTerm) {
+                filteredBookings = allBookings.filter(booking => {
+                    const bookingNumber = booking.querySelector('.booking-number')?.textContent.toLowerCase() || '';
+                    const destination = booking.querySelector('.detail-value')?.textContent.toLowerCase() || '';
+                    return bookingNumber.includes(globalSearchTerm) || destination.includes(globalSearchTerm);
+                });
+            }
+
+            // Get current page (only reset if search changed)
+            let currentPage = parseInt(bookingsContainer.dataset.currentPage || '1');
+            if (bookingsContainer.dataset.lastSearchTerm !== globalSearchTerm) {
+                currentPage = 1;
+                bookingsContainer.dataset.currentPage = currentPage;
+                bookingsContainer.dataset.lastSearchTerm = globalSearchTerm;
+            }
+
+            // Show/hide empty state
+            const emptyStateDefault = document.getElementById('empty-' + tabName + '-default');
+            if (emptyStateDefault) {
+                if (filteredBookings.length === 0 && globalSearchTerm) {
+                    emptyStateDefault.style.display = 'none';
+                } else if (allBookings.length === 0) {
+                    emptyStateDefault.style.display = 'block';
+                } else {
+                    emptyStateDefault.style.display = 'none';
+                }
+            }
+
+            // Only render if this is the active tab
+            if (isActiveTab) {
+                renderBookings(tabName, filteredBookings, currentPage);
+                renderPagination(tabName, filteredBookings.length, currentPage);
+            } else {
+                // Store filtered count for tab badge update
+                bookingsContainer.dataset.filteredCount = filteredBookings.length;
+            }
+        }
+
+        function updateTabCounts() {
+            const upcomingContainer = document.getElementById('bookings-upcoming');
+            const completedContainer = document.getElementById('bookings-completed');
+            
+            if (upcomingContainer) {
+                const filteredCount = upcomingContainer.dataset.filteredCount || upcomingContainer.dataset.originalCount || 0;
+                const countElement = document.getElementById('count-upcoming');
+                if (countElement) {
+                    countElement.textContent = `(${filteredCount})`;
+                }
+            }
+            
+            if (completedContainer) {
+                const filteredCount = completedContainer.dataset.filteredCount || completedContainer.dataset.originalCount || 0;
+                const countElement = document.getElementById('count-completed');
+                if (countElement) {
+                    countElement.textContent = `(${filteredCount})`;
+                }
+            }
+        }
+
+        function renderBookings(tabName, bookings, page) {
+            const bookingsContainer = document.getElementById('bookings-' + tabName);
+            if (!bookingsContainer) return;
+
+            // Clear container
+            bookingsContainer.innerHTML = '';
+
+            // Calculate pagination
+            const startIndex = (page - 1) * ITEMS_PER_PAGE;
+            const endIndex = startIndex + ITEMS_PER_PAGE;
+            const paginatedBookings = bookings.slice(startIndex, endIndex);
+
+            // Render bookings
+            paginatedBookings.forEach(booking => {
+                bookingsContainer.appendChild(booking.cloneNode(true));
+            });
+
+            // Store current page
+            bookingsContainer.dataset.currentPage = page;
+
+            // Show empty state if no results
+            if (paginatedBookings.length === 0) {
+                const emptyState = document.createElement('div');
+                emptyState.className = 'empty-state';
+                emptyState.style.gridColumn = '1 / -1';
+                if (globalSearchTerm) {
+                    emptyState.innerHTML = `
+                        <i class="la la-search"></i>
+                        <h3>No Bookings Found</h3>
+                        <p>No bookings match your search "${globalSearchTerm}". Try adjusting your search terms.</p>
+                    `;
+                } else {
+                    emptyState.innerHTML = `
+                        <i class="la la-calendar"></i>
+                        <h3>No Bookings</h3>
+                        <p>No bookings to display.</p>
+                    `;
+                }
+                bookingsContainer.appendChild(emptyState);
+            }
+        }
+
+        function renderPagination(tabName, totalItems, currentPage) {
+            const paginationContainer = document.getElementById('pagination-' + tabName);
+            if (!paginationContainer) return;
+
+            const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
+
+            // Pagination info (left side) - always show
+            const startItem = totalItems === 0 ? 0 : (currentPage - 1) * ITEMS_PER_PAGE + 1;
+            const endItem = Math.min(currentPage * ITEMS_PER_PAGE, totalItems);
+            const infoHTML = `
+                <span class="pagination-info">
+                    Showing ${startItem} - ${endItem} of ${totalItems} Record(s)
+                </span>
+            `;
+
+            // Pagination controls (right side) - only show if more than 1 page
+            let controlsHTML = '';
+            if (totalPages > 1) {
+                controlsHTML = '<div class="pagination-controls">';
+
+            // Previous button
+            controlsHTML += `
+                <button class="pagination-button" 
+                        onclick="changePage('${tabName}', ${currentPage - 1})"
+                        ${currentPage === 1 ? 'disabled' : ''}>
+                    ‹ Prev
+                </button>
+            `;
+
+            // Page numbers
+            const maxPagesToShow = 5;
+            let startPage = Math.max(1, currentPage - Math.floor(maxPagesToShow / 2));
+            let endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
+
+            if (endPage - startPage < maxPagesToShow - 1) {
+                startPage = Math.max(1, endPage - maxPagesToShow + 1);
+            }
+
+            if (startPage > 1) {
+                controlsHTML += `
+                    <button class="pagination-button" onclick="changePage('${tabName}', 1)">1</button>
+                `;
+                if (startPage > 2) {
+                    controlsHTML += `<span style="color: #999; padding: 0 5px;">...</span>`;
+                }
+            }
+
+            for (let i = startPage; i <= endPage; i++) {
+                controlsHTML += `
+                    <button class="pagination-button ${i === currentPage ? 'active' : ''}" 
+                            onclick="changePage('${tabName}', ${i})">
+                        ${i}
+                    </button>
+                `;
+            }
+
+            if (endPage < totalPages) {
+                if (endPage < totalPages - 1) {
+                    controlsHTML += `<span style="color: #999; padding: 0 5px;">...</span>`;
+                }
+                controlsHTML += `
+                    <button class="pagination-button" onclick="changePage('${tabName}', ${totalPages})">
+                        ${totalPages}
+                    </button>
+                `;
+            }
+
+            // Next button
+            controlsHTML += `
+                <button class="pagination-button" 
+                        onclick="changePage('${tabName}', ${currentPage + 1})"
+                        ${currentPage === totalPages ? 'disabled' : ''}>
+                    Next ›
+                </button>
+            `;
+
+            controlsHTML += '</div>';
+            }
+
+            paginationContainer.innerHTML = infoHTML + controlsHTML;
+        }
+
+        function changePage(tabName, page) {
+            const bookingsContainer = document.getElementById('bookings-' + tabName);
+            if (!bookingsContainer) return;
+
+            // Get original bookings from stored HTML
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = bookingsContainer.dataset.originalHTML || '';
+            const allBookings = Array.from(tempDiv.querySelectorAll('.booking-card'));
+            
+            // Filter using global search term
+            let filteredBookings = allBookings;
+            if (globalSearchTerm) {
+                filteredBookings = allBookings.filter(booking => {
+                    const bookingNumber = booking.querySelector('.booking-number')?.textContent.toLowerCase() || '';
+                    const destination = booking.querySelector('.detail-value')?.textContent.toLowerCase() || '';
+                    return bookingNumber.includes(globalSearchTerm) || destination.includes(globalSearchTerm);
+                });
+            }
+
+            // Render with new page
+            renderBookings(tabName, filteredBookings, page);
+            renderPagination(tabName, filteredBookings.length, page);
+
+            // Scroll to top of bookings section
+            bookingsContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+    </script>
 </body>
 </html>
 
