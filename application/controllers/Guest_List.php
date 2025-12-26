@@ -27,6 +27,7 @@ class Guest_List extends CI_Controller
 		$this->load->model('Guest_List_Model');
 		$this->load->model('Booking_Model');
 		$this->load->model('Universal_Model');
+		$this->load->model('Guest_list_lock_model');
 	}
 
 	function index() 
@@ -63,6 +64,50 @@ class Guest_List extends CI_Controller
 			redirect('Message?url=' . base_url($_SERVER['REQUEST_URI']));
 		} else {
 			if(!empty($this->input->get('gl'))) {
+				$gl_hash = $this->input->get('gl');
+				
+				// Check lock status first (server-side check before showing form)
+				$lock = $this->Guest_list_lock_model->getByHash($gl_hash);
+				$userId = $this->session->userdata('admin_id') ? $this->session->userdata('admin_id') : null;
+				
+				$isLockedByOther = false;
+				if (!empty($lock)) {
+					$isExpired = $this->Guest_list_lock_model->isExpired($lock);
+					
+					// For logged-in users: check by user_id
+					if ($userId && $lock->lock_owner_type === 'user') {
+						$isSameOwner = ($lock->lock_owner_id == $userId);
+					} else {
+						// For guests: we can't check token here (it's in sessionStorage)
+						// So we'll let JS handle it, but if lock is active and user is logged in
+						// and lock is owned by guest, or vice versa, it's different owner
+						if ($userId && $lock->lock_owner_type === 'guest') {
+							$isSameOwner = false; // Logged-in user vs guest = different
+						} elseif (!$userId && $lock->lock_owner_type === 'user') {
+							$isSameOwner = false; // Guest vs logged-in user = different
+						} else {
+							// Both guests - can't determine without token, let JS handle
+							$isSameOwner = null; // Unknown, let JS check
+						}
+					}
+					
+					// Locked by another user if: lock exists, is active (not expired), and definitely not same owner
+					if (!$isExpired && $isSameOwner === false) {
+						$isLockedByOther = true;
+					}
+				}
+				
+				// If locked by another user, show minimal locked view (no form, no booking info)
+				if ($isLockedByOther) {
+					$lock_status = $this->Guest_list_lock_model->getStatus($gl_hash);
+					$array = array(
+						'locked' => true,
+						'expires_at' => isset($lock_status['lock_expires_at']) ? $lock_status['lock_expires_at'] : null
+					);
+					$this->load->view('booking/guest_list_locked', $array);
+					return;
+				}
+				
 	    		$array['guest_lists'] = $this->Guest_List_Model->Read_Guest_Lists1();
 	    		if(!empty($array['guest_lists'])) {
 					if(($this->session->has_userdata('admin_id') && $this->session->has_userdata('level')) || ($array['guest_lists'][0]->Status != 'Y' && $array['guest_lists'][0]->AfterSalesService != 'COMPLETE' || $array['guest_lists'][0]->Status == 'Y' && $array['guest_lists'][0]->AfterSalesService == 'PENDING')) {

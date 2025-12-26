@@ -862,6 +862,403 @@
 		});
 		
 		<?php if($guest_lists[0]->LockStatus == 'N') { ?>
+			// ============================================
+			// Guest List Locking System (Heartbeat-based)
+			// ============================================
+			var guestListHash = '<?php echo $this->input->get('gl'); ?>';
+			var lockToken = null;
+			var heartbeatInterval = null;
+			var heartbeatIntervalMs = <?php echo $this->config->item('guest_list_heartbeat_interval') * 1000; ?>;
+			var isLockGranted = false;
+			var heartbeatPaused = false;
+			var serverExpiresAt = null; // Server expiration time
+			var extensionUsed = false; // Track if extension was used
+			var timerInterval = null;
+			var timerInitialized = false; // Track if timer has been started
+
+			// Generate or retrieve lock token from sessionStorage
+			function getLockToken() {
+				var storageKey = 'guest_list_lock_token_' + guestListHash;
+				lockToken = sessionStorage.getItem(storageKey);
+				if (!lockToken) {
+					// Generate UUID v4
+					lockToken = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+						var r = Math.random() * 16 | 0;
+						var v = c == 'x' ? r : (r & 0x3 | 0x8);
+						return v.toString(16);
+					});
+					sessionStorage.setItem(storageKey, lockToken);
+				}
+				return lockToken;
+			}
+
+			// Acquire lock on page load
+			function acquireLock() {
+				var token = getLockToken();
+				$.ajax({
+					url: '<?php echo base_url('GuestListLock/acquire'); ?>',
+					type: 'POST',
+					data: {
+						guest_list_hash: guestListHash,
+						lock_token: token
+					},
+					dataType: 'json',
+					success: function(response) {
+						if (response.status === 'granted') {
+							isLockGranted = true;
+							serverExpiresAt = response.expires_at || null;
+							extensionUsed = response.extension_used || false;
+							console.log('Lock acquired:', {expires_at: serverExpiresAt, extension_used: extensionUsed});
+							enableForm();
+							startHeartbeat();
+							startTimer(); // Start countdown timer
+						} else if (response.status === 'locked') {
+							isLockGranted = false;
+							disableForm();
+							showLockMessage(response.expires_at);
+						}
+					},
+					error: function(xhr) {
+						if (xhr.status === 423) {
+							// Locked by another user
+							var response = JSON.parse(xhr.responseText);
+							isLockGranted = false;
+							disableForm();
+							showLockMessage(response.expires_at);
+						} else {
+							console.error('Failed to acquire lock:', xhr);
+							// On error, allow editing but warn user
+							isLockGranted = true;
+							// Set fallback expiration
+							var fallbackExpiration = new Date(Date.now() + 10 * 60 * 1000);
+							serverExpiresAt = fallbackExpiration.getFullYear() + '-' + 
+								String(fallbackExpiration.getMonth() + 1).padStart(2, '0') + '-' + 
+								String(fallbackExpiration.getDate()).padStart(2, '0') + ' ' + 
+								String(fallbackExpiration.getHours()).padStart(2, '0') + ':' + 
+								String(fallbackExpiration.getMinutes()).padStart(2, '0') + ':' + 
+								String(fallbackExpiration.getSeconds()).padStart(2, '0');
+							enableForm();
+							startHeartbeat();
+							startTimer(); // Start timer with fallback
+						}
+					}
+				});
+			}
+
+			// Start heartbeat timer
+			function startHeartbeat() {
+				if (heartbeatInterval) {
+					clearInterval(heartbeatInterval);
+				}
+
+				heartbeatInterval = setInterval(function() {
+					if (!heartbeatPaused && isLockGranted) {
+						sendHeartbeat();
+					}
+				}, heartbeatIntervalMs);
+
+				// Send initial heartbeat
+				sendHeartbeat();
+			}
+
+			// Send heartbeat to server
+			function sendHeartbeat() {
+				if (!isLockGranted || !lockToken) return;
+
+				$.ajax({
+					url: '<?php echo base_url('GuestListLock/heartbeat'); ?>',
+					type: 'POST',
+					data: {
+						guest_list_hash: guestListHash,
+						lock_token: lockToken
+					},
+					dataType: 'json',
+					success: function(response) {
+						if (response.status === 'ok') {
+							// Lock is alive - update expiration if server sent it
+							if (response.expires_at) {
+								serverExpiresAt = response.expires_at;
+							}
+						}
+					},
+					error: function(xhr) {
+						if (xhr.status === 403 || xhr.status === 404) {
+							// Lost ownership or lock deleted
+							console.warn('Lost lock ownership');
+							isLockGranted = false;
+							disableForm();
+							showLockMessage();
+						}
+					}
+				});
+			}
+
+			// Release lock
+			function releaseLock(callback) {
+				if (!lockToken) {
+					if (callback) callback();
+					return;
+				}
+
+				$.ajax({
+					url: '<?php echo base_url('GuestListLock/release'); ?>',
+					type: 'POST',
+					data: {
+						guest_list_hash: guestListHash,
+						lock_token: lockToken
+					},
+					async: false, // Synchronous for page unload
+					success: function(response) {
+						console.log('Lock released:', response);
+						if (callback) callback();
+					},
+					error: function(xhr) {
+						console.warn('Failed to release lock:', xhr);
+						if (callback) callback(); // Continue even if release fails
+					}
+				});
+			}
+
+			// Enable form editing
+			function enableForm() {
+				$('input, select, textarea').not('[type="hidden"]').prop('disabled', false);
+				$('#lock-message').hide();
+			}
+
+			// Disable form editing
+			function disableForm() {
+				$('input, select, textarea').not('[type="hidden"]').prop('disabled', true);
+			}
+
+			// Show lock message
+			function showLockMessage(expiresAt) {
+				var message = 'This guest list is currently being edited by another user. Please try again later.';
+				if (expiresAt) {
+					var expiresDate = new Date(expiresAt);
+					message += ' (Lock expires at ' + expiresDate.toLocaleTimeString() + ')';
+				}
+				
+				if ($('#lock-message').length === 0) {
+					$('#timer').after('<div id="lock-message" class="alert alert-warning" style="text-align:center; margin:20px 0;"><strong>' + message + '</strong></div>');
+				} else {
+					$('#lock-message').html('<strong>' + message + '</strong>').show();
+				}
+			}
+
+			// Pause heartbeat when page is hidden
+			document.addEventListener('visibilitychange', function() {
+				heartbeatPaused = document.hidden;
+				if (!heartbeatPaused && isLockGranted) {
+					// Resume - send immediate heartbeat
+					sendHeartbeat();
+				}
+			});
+
+			// Release lock on form submit
+			$('#form').on('submit', function() {
+				releaseLock();
+			});
+
+			// Release lock on page unload (keep for safety)
+			window.addEventListener('beforeunload', function() {
+				if (lockToken && guestListHash) {
+					// Synchronous release on page unload
+					var xhr = new XMLHttpRequest();
+					xhr.open('POST', '<?php echo base_url('GuestListLock/release'); ?>', false); // false = synchronous
+					xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+					xhr.send('guest_list_hash=' + encodeURIComponent(guestListHash) + '&lock_token=' + encodeURIComponent(lockToken));
+				}
+			});
+
+			// Initialize on page load
+			$(document).ready(function() {
+				acquireLock();
+			});
+
+			// ============================================
+			// Timer System (uses server expiration)
+			// ============================================
+			function twoDigits(n) {
+				return (n <= 9 ? "0" + n : n);
+			}
+
+			function startTimer() {
+				var element = document.getElementById("timer");
+				if (!element) {
+					console.error('Timer element not found');
+					return;
+				}
+
+				// Set initial display
+				element.innerHTML = '10:00';
+
+				function updateTimer() {
+					// If no expiration set yet, wait
+					if (!serverExpiresAt || String(serverExpiresAt).trim() === '' || serverExpiresAt === 'null' || serverExpiresAt === 'undefined') {
+						// Use fallback 10 minutes if we don't have server expiration
+						if (!timerInitialized) {
+							var fallbackExpiration = new Date(Date.now() + 10 * 60 * 1000);
+							serverExpiresAt = fallbackExpiration.getFullYear() + '-' + 
+								String(fallbackExpiration.getMonth() + 1).padStart(2, '0') + '-' + 
+								String(fallbackExpiration.getDate()).padStart(2, '0') + ' ' + 
+								String(fallbackExpiration.getHours()).padStart(2, '0') + ':' + 
+								String(fallbackExpiration.getMinutes()).padStart(2, '0') + ':' + 
+								String(fallbackExpiration.getSeconds()).padStart(2, '0');
+							console.log('Using fallback expiration:', serverExpiresAt);
+						} else {
+							// Timer already initialized but lost expiration - keep showing last time
+							return;
+						}
+					}
+
+					var now = new Date();
+					var expiration;
+					
+					try {
+						// Parse MySQL datetime format: "YYYY-MM-DD HH:MM:SS"
+						var dateStr = String(serverExpiresAt).trim();
+						
+						// Validate format
+						if (!dateStr.match(/^\d{4}-\d{2}-\d{2}[\sT]\d{2}:\d{2}:\d{2}$/)) {
+							console.warn('Invalid date format, using fallback:', dateStr);
+							expiration = new Date(Date.now() + 10 * 60 * 1000);
+						} else {
+							// Replace space with T for ISO format
+							dateStr = dateStr.replace(' ', 'T');
+							expiration = new Date(dateStr);
+							
+							// Validate date
+							if (isNaN(expiration.getTime())) {
+								console.error('Invalid expiration date after parsing:', serverExpiresAt);
+								// Use fallback
+								expiration = new Date(Date.now() + 10 * 60 * 1000);
+							}
+						}
+					} catch (e) {
+						console.error('Error parsing expiration date:', e, serverExpiresAt);
+						// Use fallback
+						expiration = new Date(Date.now() + 10 * 60 * 1000);
+					}
+					
+					var msLeft = expiration - now;
+
+					if (msLeft <= 0) {
+						clearInterval(timerInterval);
+						element.innerHTML = '00:00';
+						// Time expired - show message
+						swal.fire({
+							width: 550,
+							background: 'url(<?php echo base_url('assets/image/sweetalert.jpg') ?>)',
+							icon: 'warning',
+							title: 'Time Expired',
+							text: 'Your time has expired. The page will reload.',
+							confirmButtonText: 'OK',
+							allowOutsideClick: false
+						}).then(() => {
+							releaseLock();
+							window.location.reload();
+						});
+						return;
+					}
+
+					// Show extension prompt when less than 2 minutes remaining
+					if (msLeft < 120000 && msLeft > 0 && !extensionUsed) {
+						clearInterval(timerInterval);
+						swal.fire({
+							width: 550,
+							background: 'url(<?php echo base_url('assets/image/sweetalert.jpg') ?>)',
+							icon: 'question',
+							title: 'Time Over Soon, Need More Time ?',
+							text: 'You have one chance to extend the timer by 12 minutes. By clicking "No", all changes will not be saved automatically.',
+							confirmButtonText: 'Yes, Extend',
+							cancelButtonText: 'No',
+							showCancelButton: true,
+							timer: Math.min(120000, msLeft),
+							allowOutsideClick: false
+						}).then((action) => {
+							if (action.isConfirmed) {
+								// Extend lock
+								$.ajax({
+									url: '<?php echo base_url('GuestListLock/extend'); ?>',
+									type: 'POST',
+									data: {
+										guest_list_hash: guestListHash,
+										lock_token: lockToken
+									},
+									dataType: 'json',
+									success: function(response) {
+										if (response.status === 'extended') {
+											serverExpiresAt = response.expires_at;
+											extensionUsed = true;
+											timerInterval = setInterval(updateTimer, 1000);
+											updateTimer();
+										} else {
+											swal.fire({
+												width: 550,
+												background: 'url(<?php echo base_url('assets/image/sweetalert.jpg') ?>)',
+												icon: 'error',
+												title: 'Extension Failed',
+												text: response.message || 'Could not extend. Extension may have already been used.',
+												confirmButtonText: 'OK'
+											}).then(() => {
+												timerInterval = setInterval(updateTimer, 1000);
+												updateTimer();
+											});
+										}
+									},
+									error: function() {
+										swal.fire({
+											width: 550,
+											background: 'url(<?php echo base_url('assets/image/sweetalert.jpg') ?>)',
+											icon: 'error',
+											title: 'Extension Failed',
+											text: 'Could not extend. Extension may have already been used.',
+											confirmButtonText: 'OK'
+										}).then(() => {
+											timerInterval = setInterval(updateTimer, 1000);
+											updateTimer();
+										});
+									}
+								});
+							} else {
+								// User declined extension
+								releaseLock();
+								window.location.href = '<?php echo base_url('Message?url=' . base_url($_SERVER['REQUEST_URI'])) ?>';
+							}
+						});
+					} else {
+						// Calculate and display time
+						var totalSeconds = Math.floor(msLeft / 1000);
+						if (totalSeconds < 0) {
+							totalSeconds = 0;
+						}
+						var hours = Math.floor(totalSeconds / 3600);
+						var minutes = Math.floor((totalSeconds % 3600) / 60);
+						var seconds = totalSeconds % 60;
+						
+						// Ensure we have valid numbers
+						if (isNaN(hours) || isNaN(minutes) || isNaN(seconds)) {
+							console.error('Invalid time calculation:', {msLeft: msLeft, totalSeconds: totalSeconds, hours: hours, minutes: minutes, seconds: seconds});
+							element.innerHTML = '10:00';
+							return;
+						}
+						
+						element.innerHTML = (hours ? hours + ':' + twoDigits(minutes) : minutes) + ':' + twoDigits(seconds);
+					}
+				}
+
+				// Update timer every second
+				if (timerInterval) {
+					clearInterval(timerInterval);
+				}
+				timerInterval = setInterval(updateTimer, 1000);
+				timerInitialized = true;
+				updateTimer(); // Initial update
+			}
+
+			// ============================================
+			// Legacy Timer (keeping for compatibility)
+			// ============================================
 			function countdown(elementName, minutes, seconds)
 			{
 				var element, endTime, hours, mins, msLeft, time;
@@ -921,20 +1318,77 @@
 				endTime = (+ new Date) + 1000 * (60 * minutes + seconds) + 500;
 				updateTimer();
 			}
-			countdown("timer", 10, 0);
+			// Old timer function - kept for compatibility but not used
+			// New timer system uses startTimer() which is called after lock acquisition
 		<?php } ?>
 
 		function beforeUnloadHandler(value, url) {
-			$.ajax({
-				url: '<?php echo base_url('Guest_List/Unlock') ?>',
-				type: 'post',
-				data: { booking_id: <?php echo $guest_lists[0]->BookingID; ?> },
-				success: function(response) {
-					console.log("API Response:", response);
+			// Show the same message as timer expiration
+			swal.fire({
+				width: 550,
+				background: 'url(<?php echo base_url('assets/image/sweetalert.jpg') ?>)',
+				icon: 'warning',
+				title: 'Exiting Guest List',
+				text: 'You are exiting the guest list. The lock will be released and the page will redirect.',
+				confirmButtonText: 'OK',
+				allowOutsideClick: false
+			}).then(() => {
+				// Release the lock before navigating (same as timer expiration)
+				if (typeof releaseLock === 'function') {
+					releaseLock(function() {
+						// Navigate after lock is released
+						if(value == 'RTB' || value == 'EGL2') {
+							window.location.href = url;
+						} else {
+							// For EGL1, redirect to message page like timer expiration
+							window.location.href = '<?php echo base_url('Message?url=' . base_url($_SERVER['REQUEST_URI'])) ?>';
+						}
+					});
+				} else {
+					// Fallback: release lock and navigate
+					var lockReleased = false;
+					
+					// Try to release lock using new system
+					if (typeof guestListHash !== 'undefined' && typeof lockToken !== 'undefined' && lockToken) {
+						$.ajax({
+							url: '<?php echo base_url('GuestListLock/release'); ?>',
+							type: 'POST',
+							data: {
+								guest_list_hash: guestListHash,
+								lock_token: lockToken
+							},
+							async: false,
+							success: function(response) {
+								console.log('Lock released:', response);
+								lockReleased = true;
+							},
+							error: function(xhr) {
+								console.warn('Failed to release lock:', xhr);
+								lockReleased = true;
+							}
+						});
+					} else {
+						// Fallback to old unlock method
+						$.ajax({
+							url: '<?php echo base_url('Guest_List/Unlock') ?>',
+							type: 'post',
+							data: { booking_id: <?php echo $guest_lists[0]->BookingID; ?> },
+							async: false,
+							success: function(response) {
+								console.log("API Response:", response);
+								lockReleased = true;
+							},
+							error: function() {
+								lockReleased = true;
+							}
+						});
+					}
+					
+					// Navigate after lock is released
 					if(value == 'RTB' || value == 'EGL2') {
 						window.location.href = url;
 					} else {
-						window.close();
+						window.location.href = '<?php echo base_url('Message?url=' . base_url($_SERVER['REQUEST_URI'])) ?>';
 					}
 				}
 			});
