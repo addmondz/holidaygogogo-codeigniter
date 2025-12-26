@@ -84,7 +84,121 @@
                             </div>
                         </div>
                     </div>
+                    <?php if(isset($package_checklists)) {
+                        // Get required checklist IDs
+                        $required_ids = array();
+                        foreach($package_checklists as $checklist) {
+                            if(isset($checklist->is_required) && $checklist->is_required == 1) {
+                                $required_ids[] = $checklist->ID;
+                            }
+                        }
+                        
+                        // Get selected IDs from JSON (preserves order from database) - empty for Create
+                        $selected_ids = $selected_checklist_ids ?? array();
+                        
+                        // Ensure required ones are included (add at end if missing, to preserve existing order)
+                        foreach($required_ids as $req_id) {
+                            if(!in_array($req_id, $selected_ids)) {
+                                $selected_ids[] = $req_id; // Add at end if missing
+                            }
+                        }
+                        
+                        // Create a lookup map for faster access
+                        $checklist_map = array();
+                        foreach($package_checklists as $checklist) {
+                            $checklist_map[$checklist->ID] = $checklist;
+                        }
+                        
+                        // Build chosen checklists in exact order from selected_ids (preserves JSON order)
+                        $chosen_checklists = array();
+                        if(!empty($selected_ids)) {
+                            foreach($selected_ids as $checklist_id) {
+                                if(isset($checklist_map[$checklist_id])) {
+                                    $chosen_checklists[] = $checklist_map[$checklist_id];
+                                }
+                            }
+                        }
+                        
+                        // Build not chosen checklists (ordered by ID)
+                        $not_chosen_checklists = array();
+                        foreach($package_checklists as $checklist) {
+                            if(!in_array($checklist->ID, $selected_ids)) {
+                                $not_chosen_checklists[] = $checklist;
+                            }
+                        }
+                        usort($not_chosen_checklists, function($a, $b) {
+                            return $a->ID - $b->ID;
+                        });
+                    ?>
+                        <br>
+                        <strong>Package Checklists :</strong>
+                        <br><br>
+                        <div class="row">
+                            <!-- Left Column: Chosen Checklists (in order, draggable) -->
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label style="font-weight: 600; margin-bottom: 8px;">Chosen Checklists (Drag to reorder)</label>
+                                    <div class="input-icon" style="margin-bottom: 10px;">
+                                        <input type="text" id="search-chosen" placeholder="Search chosen checklists..." class="form-control form-control-sm" style="font-size: 12px;">
+                                        <span><i class="la la-search"></i></span>
+                                    </div>
+                                    <div id="chosen-checklist-list" class="draggable-zone" style="min-height: 300px; max-height: 400px; overflow-y: auto; border: 1px solid #e4e6ef; border-radius: 4px; padding: 10px; background: #f8f9fa;">
+                                        <?php if(empty($chosen_checklists)) { ?>
+                                            <p class="text-muted" style="font-size: 11px; margin: 0; text-align: center; padding: 20px;">No checklists selected</p>
+                                        <?php } else { ?>
+                                            <?php foreach($chosen_checklists as $checklist) {
+                                                $is_required = (isset($checklist->is_required) && $checklist->is_required == 1);
+                                            ?>
+                                                <div class="draggable checklist-item chosen-item" data-checklist-id="<?php echo $checklist->ID; ?>" data-is-required="<?php echo $is_required ? '1' : '0'; ?>" style="background: white; border: 1px solid #ddd; border-radius: 4px; padding: 8px; margin-bottom: 6px; cursor: move; display: flex; align-items: center; font-size: 11px;">
+                                                    <span class="draggable-handle" style="margin-right: 8px; color: #999; cursor: grab;">
+                                                        <i class="la la-bars"></i>
+                                                    </span>
+                                                    <?php if($is_required) { ?>
+                                                        <span class="label label-sm label-light-info" style="font-size: 9px; padding: 3px 6px; margin-right: 8px; min-width: 55px; text-align: center; border-radius: 4px;">Required</span>
+                                                    <?php } ?>
+                                                    <span class="checklist-name" style="flex: 1; color: #333;"><?php echo htmlspecialchars($checklist->name); ?></span>
+                                                    <?php if(!$is_required) { ?>
+                                                        <button type="button" class="btn btn-sm btn-light-danger remove-checklist-btn" data-checklist-id="<?php echo $checklist->ID; ?>" style="padding: 2px 8px; font-size: 10px; margin-left: 8px;">
+                                                            <i class="la la-times"></i>
+                                                        </button>
+                                                    <?php } ?>
+                                                </div>
+                                            <?php } ?>
+                                        <?php } ?>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Right Column: Not Chosen Checklists (ordered by ID) -->
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label style="font-weight: 600; margin-bottom: 8px;">Available Checklists</label>
+                                    <div class="input-icon" style="margin-bottom: 10px;">
+                                        <input type="text" id="search-available" placeholder="Search available checklists..." class="form-control form-control-sm" style="font-size: 12px;">
+                                        <span><i class="la la-search"></i></span>
+                                    </div>
+                                    <div id="available-checklist-list" style="min-height: 300px; max-height: 400px; overflow-y: auto; border: 1px solid #e4e6ef; border-radius: 4px; padding: 10px; background: #f8f9fa;">
+                                        <?php if(empty($not_chosen_checklists)) { ?>
+                                            <p class="text-muted" style="font-size: 11px; margin: 0; text-align: center; padding: 20px;">All checklists are selected</p>
+                                        <?php } else { ?>
+                                            <?php foreach($not_chosen_checklists as $checklist) {
+                                                $is_required = (isset($checklist->is_required) && $checklist->is_required == 1);
+                                            ?>
+                                                <div class="checklist-item available-item" data-checklist-id="<?php echo $checklist->ID; ?>" style="background: white; border: 1px solid #ddd; border-radius: 4px; padding: 8px; margin-bottom: 6px; display: flex; align-items: center; font-size: 11px;">
+                                                    <span class="checklist-name" style="flex: 1; color: #333;"><?php echo htmlspecialchars($checklist->name); ?></span>
+                                                    <button type="button" class="btn btn-sm btn-light-success add-checklist-btn" data-checklist-id="<?php echo $checklist->ID; ?>" data-checklist-name="<?php echo htmlspecialchars($checklist->name); ?>" data-is-required="<?php echo $is_required ? '1' : '0'; ?>" style="padding: 2px 8px; font-size: 10px; margin-left: 8px;">
+                                                        <i class="la la-plus"></i> Add
+                                                    </button>
+                                                </div>
+                                            <?php } ?>
+                                        <?php } ?>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    <?php } ?>
                     <div class="d-flex justify-content-between border-top pt-5">
+                        <a class="btn btn-light-primary font-weight-bold d-flex align-items-center justify-content-center px-9 py-4" href="<?php echo base_url('Product'); ?>"><i class="la la-arrow-left"></i> Back to List</a>
                         <input type="button" value="<?php if(current_url() == base_url('Product/Create')) { echo 'Create Product'; } else { echo 'Update Product'; } ?>" class="btn btn-success font-weight-bold px-9 py-4" style="width:180px; margin-left:auto;">
                     </div>
                 </form>
@@ -94,6 +208,175 @@
 </div>
 
 <script>
+    <?php if(isset($package_checklists)) { 
+        // Calculate final selected_ids (with required ones included) for JavaScript
+        $js_selected_ids = $selected_checklist_ids ?? array();
+        $js_required_ids = array();
+        foreach($package_checklists as $checklist) {
+            if(isset($checklist->is_required) && $checklist->is_required == 1) {
+                $js_required_ids[] = $checklist->ID;
+            }
+        }
+        foreach($js_required_ids as $req_id) {
+            if(!in_array($req_id, $js_selected_ids)) {
+                $js_selected_ids[] = $req_id;
+            }
+        }
+    ?>
+    // Initialize drag and drop for chosen checklists
+    var chosenChecklists = <?php echo json_encode($js_selected_ids); ?>;
+    var sortableInstance = null;
+    
+    // Initialize Sortable for chosen checklists
+    function initSortable() {
+        var chosenList = document.getElementById('chosen-checklist-list');
+        if(chosenList && typeof Sortable !== 'undefined') {
+            if(sortableInstance) {
+                sortableInstance.destroy();
+            }
+            sortableInstance = new Sortable.default(chosenList, {
+                draggable: '.draggable',
+                handle: '.draggable-handle',
+                mirror: {
+                    appendTo: 'body',
+                    constrainDimensions: true
+                },
+                onEnd: function(evt) {
+                    updateChosenChecklistsOrder();
+                    $('#form').dirty('setDirty');
+                }
+            });
+        }
+    }
+    
+    // Update chosen checklists order after drag
+    function updateChosenChecklistsOrder() {
+        chosenChecklists = [];
+        $('#chosen-checklist-list .chosen-item').each(function() {
+            var checklistId = parseInt($(this).data('checklist-id'));
+            if(checklistId) {
+                chosenChecklists.push(checklistId);
+            }
+        });
+    }
+    
+    // Initialize on document ready
+    $(document).ready(function() {
+        initSortable();
+    });
+    
+    // Add checklist from available to chosen
+    $(document).on('click', '.add-checklist-btn', function() {
+        var checklistId = parseInt($(this).data('checklist-id'));
+        var checklistName = $(this).data('checklist-name');
+        var isRequired = parseInt($(this).data('is-required')) === 1;
+        var $item = $(this).closest('.available-item');
+        
+        if(!chosenChecklists.includes(checklistId)) {
+            chosenChecklists.push(checklistId);
+            
+            // Create new item in chosen list
+            var newItem = '<div class="draggable checklist-item chosen-item" data-checklist-id="' + checklistId + '" data-is-required="' + (isRequired ? '1' : '0') + '" style="background: white; border: 1px solid #ddd; border-radius: 4px; padding: 8px; margin-bottom: 6px; cursor: move; display: flex; align-items: center; font-size: 11px;">';
+            newItem += '<span class="draggable-handle" style="margin-right: 8px; color: #999; cursor: grab;"><i class="la la-bars"></i></span>';
+            if(isRequired) {
+                newItem += '<span class="label label-sm label-light-info" style="font-size: 9px; padding: 3px 6px; margin-right: 8px; min-width: 55px; text-align: center; border-radius: 4px;">Required</span>';
+            }
+            newItem += '<span class="checklist-name" style="flex: 1; color: #333;">' + checklistName + '</span>';
+            if(!isRequired) {
+                newItem += '<button type="button" class="btn btn-sm btn-light-danger remove-checklist-btn" data-checklist-id="' + checklistId + '" style="padding: 2px 8px; font-size: 10px; margin-left: 8px;"><i class="la la-times"></i></button>';
+            }
+            newItem += '</div>';
+            
+            if($('#chosen-checklist-list .text-muted').length) {
+                $('#chosen-checklist-list .text-muted').remove();
+            }
+            $('#chosen-checklist-list').append(newItem);
+            
+            // Remove from available list
+            $item.fadeOut(200, function() {
+                $(this).remove();
+                if($('#available-checklist-list .available-item').length === 0) {
+                    $('#available-checklist-list').html('<p class="text-muted" style="font-size: 11px; margin: 0; text-align: center; padding: 20px;">All checklists are selected</p>');
+                }
+            });
+            
+            setTimeout(function() {
+                initSortable();
+            }, 100);
+            
+            $('#form').dirty('setDirty');
+        }
+    });
+    
+    // Remove checklist from chosen
+    $(document).on('click', '.remove-checklist-btn', function() {
+        var checklistId = parseInt($(this).data('checklist-id'));
+        var $item = $(this).closest('.chosen-item');
+        var checklistName = $item.find('.checklist-name').text();
+        var isRequired = parseInt($item.data('is-required')) === 1;
+        
+        if(isRequired) {
+            Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', 'Required checklist cannot be removed', null);
+            return;
+        }
+        
+        chosenChecklists = chosenChecklists.filter(function(id) {
+            return id !== checklistId;
+        });
+        
+        $item.fadeOut(200, function() {
+            $(this).remove();
+            if($('#chosen-checklist-list .chosen-item').length === 0) {
+                $('#chosen-checklist-list').html('<p class="text-muted" style="font-size: 11px; margin: 0; text-align: center; padding: 20px;">No checklists selected</p>');
+            }
+        });
+        
+        // Add back to available list
+        var availableItem = '<div class="checklist-item available-item" data-checklist-id="' + checklistId + '" style="background: white; border: 1px solid #ddd; border-radius: 4px; padding: 8px; margin-bottom: 6px; display: flex; align-items: center; font-size: 11px;">';
+        availableItem += '<span class="checklist-name" style="flex: 1; color: #333;">' + checklistName + '</span>';
+        availableItem += '<button type="button" class="btn btn-sm btn-light-success add-checklist-btn" data-checklist-id="' + checklistId + '" data-checklist-name="' + checklistName + '" data-is-required="0" style="padding: 2px 8px; font-size: 10px; margin-left: 8px;"><i class="la la-plus"></i> Add</button>';
+        availableItem += '</div>';
+        
+        if($('#available-checklist-list .text-muted').length) {
+            $('#available-checklist-list .text-muted').remove();
+        }
+        $('#available-checklist-list').append(availableItem);
+        
+        var items = $('#available-checklist-list .available-item').detach().sort(function(a, b) {
+            return parseInt($(a).data('checklist-id')) - parseInt($(b).data('checklist-id'));
+        });
+        $('#available-checklist-list').append(items);
+        
+        $('#form').dirty('setDirty');
+    });
+    
+    // Search functionality for chosen checklists
+    $('#search-chosen').on('keyup', function() {
+        var searchTerm = $(this).val().toLowerCase();
+        $('#chosen-checklist-list .chosen-item').each(function() {
+            var name = $(this).find('.checklist-name').text().toLowerCase();
+            if(name.indexOf(searchTerm) > -1) {
+                $(this).show();
+            } else {
+                $(this).hide();
+            }
+        });
+    });
+    
+    // Search functionality for available checklists
+    $('#search-available').on('keyup', function() {
+        var searchTerm = $(this).val().toLowerCase();
+        $('#available-checklist-list .available-item').each(function() {
+            var name = $(this).find('.checklist-name').text().toLowerCase();
+            if(name.indexOf(searchTerm) > -1) {
+                $(this).show();
+            } else {
+                $(this).hide();
+            }
+        });
+    });
+    <?php } ?>
+
     function Validate_Price(value) {
         var price = value == 'RetailPrice' ? ($('#RetailPrice').val()).replace(/,/g, '') : ($('#SupplierPrice').val()).replace(/,/g, '');
         if(price.match(/^[1-9][\d]{0,9}([\.][\d]{0,2})?$/)) {
@@ -150,7 +433,7 @@
                 var category = $('#CategoryID').val();
                 var supplier = $('#SupplierID').val();
                 var name = ($('#Name').val()).toUpperCase();
-                if(window.location.href == '<?php echo base_url('Product/Create'); ?>' && category == null || supplier == null || name == '') {
+                if(window.location.href == '<?php echo base_url('Product/Create'); ?>' && (category == null || category == '' || supplier == null || supplier == '' || name == '')) {
                     Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', 'Please Insert All Required Product Information', null);
                 } else {
                     if(window.location.href == '<?php echo base_url('Product/Create'); ?>') {
@@ -174,7 +457,21 @@
                                         product[0]['SupplierPrice'] = supplier_price.replace(/,/g, '');;
                                     }
 
-                                    Submit_Product('<?php echo base_url('Product/Create') ?>', category, product);
+                                    // Collect chosen checklists in order
+                                    var selected_checklists = [];
+                                    <?php if(isset($package_checklists)) { ?>
+                                        $('#chosen-checklist-list .chosen-item').each(function() {
+                                            var checklistId = parseInt($(this).data('checklist-id'));
+                                            if(checklistId && !isNaN(checklistId)) {
+                                                selected_checklists.push(checklistId);
+                                            }
+                                        });
+                                        if(selected_checklists.length === 0 && typeof chosenChecklists !== 'undefined' && Array.isArray(chosenChecklists)) {
+                                            selected_checklists = chosenChecklists.slice();
+                                        }
+                                    <?php } ?>
+
+                                    Submit_Product('<?php echo base_url('Product/Create') ?>', category, product, selected_checklists);
                                 }
                             }
                         });
@@ -195,14 +492,51 @@
                                     product[0][key] = value;
                                 }
                             }
+                            
+                            // Collect chosen checklists in order (from DOM to preserve drag-and-drop order)
+                            var selected_checklists = [];
+                            <?php if(isset($package_checklists)) { ?>
+                                // Always read from DOM to get current order (after any drag operations)
+                                $('#chosen-checklist-list .chosen-item').each(function() {
+                                    var checklistId = parseInt($(this).data('checklist-id'));
+                                    if(checklistId && !isNaN(checklistId)) {
+                                        selected_checklists.push(checklistId);
+                                    }
+                                });
+                                
+                                // Fallback to chosenChecklists array if DOM is empty
+                                if(selected_checklists.length === 0 && typeof chosenChecklists !== 'undefined' && Array.isArray(chosenChecklists)) {
+                                    selected_checklists = chosenChecklists.slice(); // Use slice() to create a copy
+                                }
+                                
+                                console.log('Collected checklists order:', selected_checklists);
+                            <?php } ?>
+                            
+                            // Ensure selected_checklists is an array
+                            if(!Array.isArray(selected_checklists)) {
+                                selected_checklists = [];
+                            }
+                            
                             count = 0;
                             $.each(product[0], function() {
                                 count++;
                             });
                             if(count == 3) {
-                                Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', '<?php echo 'No Changes Detected In Product Record : ' . str_replace('\'', '', $ProductCode); ?>', '<?php echo base_url('Product') ?>');
+                                // Only product metadata changed, check if checklists changed
+                                var original_checklists = <?php echo json_encode($js_selected_ids ?? $selected_checklist_ids ?? array()); ?>;
+                                // Compare order and content (don't sort - preserve order!)
+                                var checklists_changed = JSON.stringify(selected_checklists) !== JSON.stringify(original_checklists);
+                                
+                                if(!checklists_changed) {
+                                    Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', '<?php echo 'No Changes Detected In Product Record : ' . str_replace('\'', '', $ProductCode); ?>', '<?php echo base_url('Product') ?>');
+                                } else {
+                                    // Only update checklists (preserve order)
+                                    console.log('Updating checklists with order:', selected_checklists);
+                                    Update_Product_Checklists(<?php echo $ProductID ?>, selected_checklists);
+                                }
                             } else {
-                                Submit_Product('<?php echo base_url('Product/Update') ?>', null, product);
+                                // Product fields changed, update product first then checklists
+                                Submit_Product('<?php echo base_url('Product/Update') ?>', null, product, selected_checklists);
                             }
                         }
                     }
@@ -211,20 +545,75 @@
         });
     });
 
-    function Submit_Product(url, category_id, product)
+    function Submit_Product(url, category_id, product, checklists)
     {
+        var postData = {
+            category_id: category_id,
+            product: product
+        };
+        
+        // Add checklists to POST data if provided
+        if(checklists !== undefined && checklists !== null && Array.isArray(checklists)) {
+            postData.checklist_ids = checklists;
+        }
+        
         $.ajax({
             url: url,
             type: 'post',
+            data: postData,
+            success: function(response) {
+                <?php if(current_url() == base_url('Product/Update')) { ?>
+                    // Update checklists after product update
+                    if(checklists !== undefined && checklists !== null && checklists.length > 0) {
+                        Update_Product_Checklists(<?php echo $ProductID ?>, checklists);
+                    } else {
+                        Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', 'Product Record <?php echo ': ' . str_replace('\'', '', $ProductCode); ?> Successfully Updated', '<?php echo base_url('Product') ?>');
+                    }
+                <?php } else { ?>
+                    // For create, checklists are already saved in the backend
+                    Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', 'New Product Record Successfully Created', '<?php echo base_url('Product') ?>');
+                <?php } ?>
+            },
+            error: function(xhr, status, error) {
+                console.error('Submit_Product Error:', xhr.responseText, xhr.status, error);
+                Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', '<?php if(current_url() == base_url('Product/Create')) { echo 'New'; } ?> Product Record <?php if(current_url() == base_url('Product/Update')) { echo ': ' . str_replace('\'', '', $ProductCode); } ?> Could Not Be <?php if(current_url() == base_url('Product/Create')) { echo 'Created'; } else { echo 'Updated'; } ?>', null);
+            }
+        });
+    }
+
+    function Update_Product_Checklists(product_id, checklist_ids)
+    {
+        // Ensure checklist_ids is an array
+        if(!Array.isArray(checklist_ids)) {
+            checklist_ids = [];
+        }
+        
+        console.log('Sending to backend - product_id:', product_id, 'checklist_ids (order):', checklist_ids);
+        
+        $.ajax({
+            url: '<?php echo base_url('Product/UpdateChecklists') ?>',
+            type: 'post',
             data: {
-                category_id: category_id,
-                product: product
+                product_id: product_id,
+                checklist_ids: checklist_ids
             },
-            success: function() {
-                Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', '<?php if(current_url() == base_url('Product/Create')) { echo 'New'; } ?> Product Record <?php if(current_url() == base_url('Product/Update')) { echo ': ' . str_replace('\'', '', $ProductCode); } ?> Successfully <?php if(current_url() == base_url('Product/Create')) { echo 'Created'; } else { echo 'Updated'; } ?>', '<?php echo base_url('Product') ?>');
+            dataType: 'json',
+            success: function(response) {
+                console.log('Backend response:', response);
+                if(response && response.success) {
+                    Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', 'Product Record <?php echo ': ' . str_replace('\'', '', $ProductCode); ?> Successfully Updated', '<?php echo base_url('Product') ?>');
+                } else {
+                    var errorMsg = (response && response.message) ? response.message : 'Product Checklists Could Not Be Updated';
+                    Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', errorMsg, null);
+                }
             },
-            error: function() {
-                Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', '<?php if(current_url() == base_url('Product/Create')) { echo 'New'; } ?> Product Record <?php if(current_url() == base_url('Product/Update')) { echo ': ' . str_replace('\'', '', $ProductCode); } ?> Successfully <?php if(current_url() == base_url('Product/Create')) { echo 'Created'; } else { echo 'Updated'; } ?>', null);
+            error: function(xhr, status, error) {
+                console.error('UpdateChecklists Error:', xhr.responseText);
+                var errorMsg = 'Product Checklists Could Not Be Updated';
+                if(xhr.responseJSON && xhr.responseJSON.message) {
+                    errorMsg = xhr.responseJSON.message;
+                }
+                Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', errorMsg, null);
             }
         });
     }

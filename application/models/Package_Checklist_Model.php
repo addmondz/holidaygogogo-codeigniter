@@ -3,14 +3,14 @@ class Package_Checklist_Model extends CI_Model
 {
 	function Read_Package_Checklist()
 	{
-		$this->db->select('ID, name, can_be_disabled');
+		$this->db->select('ID, name, is_required');
 		$this->db->where('ID', $this->input->get('package_checklist_id'));
 		return $this->db->get('package_checklist')->row_array();
 	}
 
 	function Read_Package_Checklists()
 	{
-		$this->db->select('ID, name, can_be_disabled, created_at, updated_at');
+		$this->db->select('ID, name, is_required, created_at, updated_at');
 		if(!empty($this->input->get('name'))) {
 			$this->db->like('name', $this->input->get('name'));
 		}
@@ -55,6 +55,56 @@ class Package_Checklist_Model extends CI_Model
 	{
 		$this->db->where('ID', $id);
 		$this->db->delete('package_checklist');
+	}
+
+	function Read_Package_Checklist_By_Id($id)
+	{
+		$this->db->select('ID, name, is_required');
+		$this->db->where('ID', $id);
+		return $this->db->get('package_checklist')->row_array();
+	}
+
+	function Add_Required_Checklist_To_All_Products($checklist_id)
+	{
+		// Ensure checklist_id is an integer
+		$checklist_id = (int)$checklist_id;
+		
+		// Get all products from product_package_checklist table
+		$this->db->select('id, product_id, package_checklist_json');
+		$products = $this->db->get('product_package_checklist')->result();
+		
+		foreach($products as $product) {
+			// Decode JSON
+			$checklist_ids = array();
+			if(!empty($product->package_checklist_json)) {
+				$json = $product->package_checklist_json;
+				if(is_string($json)) {
+					$checklist_ids = json_decode($json, true);
+				} else {
+					$checklist_ids = $json;
+				}
+				if(!is_array($checklist_ids)) {
+					$checklist_ids = array();
+				}
+			}
+			
+			// Normalize all IDs to integers
+			$checklist_ids = array_map('intval', $checklist_ids);
+			$checklist_ids = array_values(array_filter($checklist_ids, function($id) { return $id > 0; }));
+			
+			// Check if checklist_id is already in the array
+			if(!in_array($checklist_id, $checklist_ids)) {
+				// Append to the array (as integer)
+				$checklist_ids[] = $checklist_id;
+				
+				// Update the JSON
+				$json_data = json_encode($checklist_ids);
+				$this->db->where('id', $product->id);
+				$this->db->update('product_package_checklist', array(
+					'package_checklist_json' => $json_data
+				));
+			}
+		}
 	}
 }
 

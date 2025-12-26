@@ -50,7 +50,7 @@
                             <tr>
                                 <th style="text-align:center;">No.</th>
                                 <th style="text-align:center;">Name</th>
-                                <th style="text-align:center;">Can Be Disabled</th>
+                                <th style="text-align:center;">Is Required</th>
                                 <th style="text-align:center;">Created At</th>
                                 <th style="text-align:center;">Updated At</th>
                                 <th class="action" style="text-align:center;">Action</th>
@@ -66,10 +66,10 @@
                                         <td style="text-align:center; padding-top:15px; padding-bottom:15px;"><?php echo $count; ?></td>
                                         <td style="text-align:center;"><?php echo htmlspecialchars($package_checklist->name); ?></td>
                                         <td style="text-align:center;">
-                                            <?php if($package_checklist->can_be_disabled == 1) { ?>
+                                            <?php if($package_checklist->is_required == 1) { ?>
                                                 <span class="label label-lg label-light-success label-inline">Yes</span>
                                             <?php } else { ?>
-                                                <span class="label label-lg label-light-danger label-inline">No</span>
+                                                <span class="label label-lg label-light-secondary label-inline" style="color:#6c757d;">No</span>
                                             <?php } ?>
                                         </td>
                                         <td style="text-align:center;"><?php echo !empty($package_checklist->created_at) ? date('d/m/Y H:i', strtotime($package_checklist->created_at)) : 'N/A'; ?></td>

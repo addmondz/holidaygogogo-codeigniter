@@ -36,12 +36,12 @@
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="form-group">
-                                    <label>Can Be Disabled
+                                    <label>Is Required
                                         <span style="color:red;">*</span>
                                     </label>
-                                    <select id="can_be_disabled" class="form-control">
-                                        <option value="1" <?php if(current_url() == base_url('Package_Checklist/Update') && isset($can_be_disabled) && $can_be_disabled == 1) { echo 'selected'; } elseif(current_url() == base_url('Package_Checklist/Create')) { echo 'selected'; } ?>>Yes</option>
-                                        <option value="0" <?php if(current_url() == base_url('Package_Checklist/Update') && isset($can_be_disabled) && $can_be_disabled == 0) { echo 'selected'; } ?>>No</option>
+                                    <select id="is_required" class="form-control">
+                                        <option value="0" <?php if(current_url() == base_url('Package_Checklist/Update') && isset($is_required) && $is_required == 0) { echo 'selected'; } elseif(current_url() == base_url('Package_Checklist/Create')) { echo 'selected'; } ?>>No</option>
+                                        <option value="1" <?php if(current_url() == base_url('Package_Checklist/Update') && isset($is_required) && $is_required == 1) { echo 'selected'; } ?>>Yes</option>
                                     </select>
                                 </div>
                             </div>
@@ -102,7 +102,7 @@
         }).then((action) => {
             if(action.isConfirmed) {
                 var name = ($('#name').val()).trim();
-                var can_be_disabled = $('#can_be_disabled').val();
+                var is_required = $('#is_required').val();
                 if(name == '') {
                     Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', 'Please Insert All Required Package Checklist Information', null);
                 } else {
@@ -110,7 +110,7 @@
                         var package_checklist = [];
                         package_checklist.push({
                             name: name,
-                            can_be_disabled: can_be_disabled,
+                            is_required: is_required,
                             InsertBy: <?php echo $this->session->userdata('admin_id') ?>,
                             InsertDate: '<?php echo date('Y-m-d H:i:s') ?>'
                         });

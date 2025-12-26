@@ -208,7 +208,7 @@
 										</div>
 									</li>
 								<?php } ?>
-								<li class="menu-item menu-item-submenu <?php if($this->router->class == 'Category_Code' || $this->router->class == 'Category' || $this->router->class == 'Supplier' || $this->router->class == 'Product' || $this->router->class == 'Footer' || $this->router->class == 'Country_Code' || $this->router->class == 'Tag' || $this->router->class == 'Source' || $this->router->class == 'Package_Checklist') { echo 'menu-item-active menu-item-open'; } ?>">
+								<li class="menu-item menu-item-submenu <?php if($this->router->class == 'Category_Code' || $this->router->class == 'Category' || $this->router->class == 'Supplier' || $this->router->class == 'Product' || $this->router->class == 'Footer' || $this->router->class == 'Country_Code' || $this->router->class == 'Tag' || $this->router->class == 'Source' || $this->router->class == 'Package_Checklist' || $this->router->class == 'Product_Package_Checklist') { echo 'menu-item-active menu-item-open'; } ?>">
 									<a href="javascript:;" class="menu-link menu-toggle">
 										<span class="svg-icon menu-icon">
 											<svg>
