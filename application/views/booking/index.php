@@ -17,12 +17,12 @@
 .tooltip-inner {
     max-width: 450px !important;
     text-align: left !important;
-    padding: 0 !important;
+    padding: 0 5px !important;
     background: #fff !important;
     color: #050505 !important;
     border: 1px solid #e4e6eb;
     border-radius: 8px;
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35), 0 2px 8px rgba(0, 0, 0, 0.2) !important;
 
     white-space: pre-line;
     word-break: break-word;

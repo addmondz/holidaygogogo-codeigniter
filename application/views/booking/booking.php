@@ -776,18 +776,18 @@
                         </div>
                         <div class="card-body">
                             <!-- Comments List -->
-                            <div id="internal-comments-list" class="mb-3">
-                                <div class="text-center text-muted py-3">
+                            <div id="internal-comments-list" class="mb-2">
+                                <div class="text-center text-muted py-2" style="font-size: 0.8125rem;">
                                     <i class="la la-spinner la-spin"></i> Loading comments...
                                 </div>
                             </div>
 
                             <!-- Add New Comment Form -->
-                            <div class="border-top pt-3">
+                            <div class="border-top pt-2">
                                 <div class="form-group mb-2">
-                                    <textarea id="new-comment-content" class="form-control" rows="2" placeholder="Enter your comment here..." style="font-size: 0.9rem;"></textarea>
+                                    <textarea id="new-comment-content" class="form-control" rows="2" placeholder="Enter your comment here..." style="font-size: 0.8125rem;"></textarea>
                                 </div>
-                                <button type="button" id="add-comment-btn" class="btn btn-primary btn-sm font-weight-bold mt-3 mb-3">
+                                <button type="button" id="add-comment-btn" class="btn btn-primary btn-sm font-weight-bold mt-2 mb-2">
                                     <i class="la la-comment"></i> Add Comment
                                 </button>
                             </div>
@@ -2767,34 +2767,34 @@ $(document).ready(function() {
                         // Get first letter for avatar color
                         var avatarColor = ['primary', 'success', 'info', 'warning', 'danger'][remark.commenter_name.charCodeAt(0) % 5];
                         
-                        var commentHtml = '<div class="comment-item d-flex mb-3 mx-3 pb-3 pl-1" style="border-bottom: 1px solid #e4e6eb; position: relative;">' +
+                        var commentHtml = '<div class="comment-item d-flex mb-2 mx-2 pb-2 pl-1" style="border-bottom: 1px solid #e4e6eb; position: relative;">' +
                             // Avatar
-                            '<div class="flex-shrink-0 mr-3">' +
-                            '<div class="symbol symbol-40 symbol-circle symbol-light-' + avatarColor + '">' +
-                            '<span class="symbol-label font-weight-bold" style="font-size: 0.9rem;">' + (remark.commenter_initials || remark.commenter_name.substring(0, 2).toUpperCase()) + '</span>' +
+                            '<div class="flex-shrink-0 mr-2">' +
+                            '<div class="symbol symbol-32 symbol-circle symbol-light-' + avatarColor + '">' +
+                            '<span class="symbol-label font-weight-bold" style="font-size: 0.75rem;">' + (remark.commenter_initials || remark.commenter_name.substring(0, 2).toUpperCase()) + '</span>' +
                             '</div>' +
                             '</div>' +
                             // Comment content
                             '<div class="flex-grow-1" style="min-width: 0;">' +
                             '<div class="d-flex align-items-baseline mb-1">' +
-                            '<strong class="mr-2" style="font-size: 0.9rem; color: #050505; cursor: pointer;">' + escapeHtml(remark.commenter_name) + '</strong>' +
-                            '<span class="text-muted" style="font-size: 0.8rem; color: #65676b;">' + (remark.created_at_relative || remark.created_at) + '</span>' +
+                            '<strong class="mr-2" style="font-size: 0.8125rem; color: #050505; cursor: pointer;">' + escapeHtml(remark.commenter_name) + '</strong>' +
+                            '<span class="text-muted" style="font-size: 0.75rem; color: #65676b;">' + (remark.created_at_relative || remark.created_at) + '</span>' +
                             '</div>' +
-                            '<div class="comment-text" style="font-size: 0.9rem; color: #050505; line-height: 1.4; white-space: pre-wrap; word-wrap: break-word;">' + escapeHtml(remark.content) + '</div>' +
+                            '<div class="comment-text" style="font-size: 0.8125rem; color: #050505; line-height: 1.3; white-space: pre-wrap; word-wrap: break-word;">' + escapeHtml(remark.content) + '</div>' +
                             '</div>' +
                             // Delete button (visible by default)
-                            '<button type="button" class="btn btn-sm btn-link text-muted delete-comment-btn comment-delete-btn" data-remark-id="' + remark.RemarkID + '" style="position: absolute; top: 0; right: 0; opacity: 1; padding: 4px 8px; font-size: 0.85rem; background: transparent !important;" title="Delete comment">' +
-                            '<i class="la la-trash" style="color: #65676b;"></i>' +
+                            '<button type="button" class="btn btn-sm btn-link text-muted delete-comment-btn comment-delete-btn" data-remark-id="' + remark.RemarkID + '" style="position: absolute; top: 0; right: 0; opacity: 1; padding: 2px 6px; font-size: 0.75rem; background: transparent !important;" title="Delete comment">' +
+                            '<i class="la la-trash" style="color: #65676b; font-size: 0.875rem;"></i>' +
                             '</button>' +
                             '</div>';
                         commentsList.append(commentHtml);
                     });
                 } else {
-                    commentsList.html('<div class="text-center text-muted py-4" style="font-size: 0.9rem; color: #65676b;">No comments yet. Be the first to add a comment!</div>');
+                    commentsList.html('<div class="text-center text-muted py-3" style="font-size: 0.8125rem; color: #65676b;">No comments yet. Be the first to add a comment!</div>');
                 }
             },
             error: function() {
-                $('#internal-comments-list').html('<div class="text-center text-danger py-4">Error loading comments. Please refresh the page.</div>');
+                $('#internal-comments-list').html('<div class="text-center text-danger py-3" style="font-size: 0.8125rem;">Error loading comments. Please refresh the page.</div>');
             }
         });
     }
@@ -3059,7 +3059,7 @@ $(document).ready(function() {
 <style>
 .comment-item {
     transition: background-color 0.2s;
-    padding: 8px 0;
+    padding: 6px 0;
     border-radius: 4px;
 }
 
@@ -3075,7 +3075,7 @@ $(document).ready(function() {
 }
 
 .comment-text {
-    margin-top: 2px;
+    margin-top: 1px;
 }
 
 .comment-delete-btn {
@@ -3097,7 +3097,7 @@ $(document).ready(function() {
 }
 
 #internal-comments-list {
-    padding: 4px 0;
+    padding: 2px 0;
 }
 
 #internal-comments-list::-webkit-scrollbar {
