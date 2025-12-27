@@ -795,33 +795,90 @@
                     </div>
                 </div>
                 <div class="col-lg-6 col-md-12  mt-md-6 mt-lg-0">
-                    <div class=" card card-custom">
-                        <div class="card-header flex-wrap py-2" style="background-color:#D7E2F2;">
-                            <div class="card-title">
-                                <h4 class="card-label mb-0" style="color:#6082B6; font-size: 1.1rem;">
-                                    <strong>Customer Review</strong>
-                                </h4>
-                            </div>
-                        </div>
-                        <div class="card-body">
-                            <div class="row">
-                                <div class="col-md-12">
-                                    <div class="form-group">
-                                        <label>Customer Review</label>
-                                        <textarea id="CustomerReview" class="form-control auto-resize-textarea" disabled style="overflow: scroll;"><?php echo $CustomerReview; ?></textarea>
-                                        <small class="font-italic" style="display: <?php echo isset($CustomerReviewTimestamp) && !empty($CustomerReviewTimestamp) ? 'block' : 'none'; ?>;"> Review provided on <?php echo date('d/m/Y h:i:s A', strtotime($CustomerReviewTimestamp)); ?></small>
+                    <div class="row">
+                        <div class="col">
+                            <div class="card card-custom">
+                                <div class="card-header flex-wrap py-2" style="background-color:#D7E2F2;">
+                                    <div class="card-title">
+                                        <h4 class="card-label mb-0" style="color:#6082B6; font-size: 1.1rem;">
+                                            <strong>Customer Review</strong>
+                                        </h4>
                                     </div>
                                 </div>
-                            </div>
-                            <div class="row">
-                                <div class="col">
-                                    <?php print_allow_review($AllowReview); ?>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-12">
+                                            <div class="form-group">
+                                                <label>Customer Review</label>
+                                                <textarea id="CustomerReview" class="form-control auto-resize-textarea" disabled style="overflow: scroll;"><?php echo $CustomerReview; ?></textarea>
+                                                <small class="font-italic" style="display: <?php echo isset($CustomerReviewTimestamp) && !empty($CustomerReviewTimestamp) ? 'block' : 'none'; ?>;"> Review provided on <?php echo date('d/m/Y h:i:s A', strtotime($CustomerReviewTimestamp)); ?></small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col">
+                                            <?php print_allow_review($AllowReview); ?>
+                                        </div>
+                                    </div>
+
+                                    <button type="button" id="update_allow_review_btn" class="btn btn-primary font-weight-bold">
+                                        <i class="la la-save"></i> Update
+                                    </button>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col">
+                            <!-- Booking Checklist Section -->
+                            <?php if(isset($booking_checklists) && !empty($booking_checklists)) { ?>
+                                <div class="row mt-5">
+                                    <div class="col-12">
+                                        <div class="card card-custom">
+                                            <div class="card-header flex-wrap py-2" style="background-color:#D7E2F2;">
+                                                <div class="card-title">
+                                                    <h4 class="card-label mb-0" style="color:#6082B6; font-size: 1.1rem;">
+                                                        <strong>Booking Checklist</strong>
+                                                    </h4>
+                                                </div>
+                                            </div>
+                                            <div class="card-body">
+                                                <?php 
+                                                $completion_map = isset($completion_map) ? $completion_map : array();
+                                                foreach($booking_checklists as $checklist) { 
+                                                    $is_checked = isset($completion_map[$checklist->ID]);
+                                                    $completion_info = $is_checked ? $completion_map[$checklist->ID] : null;
+                                                ?>
+                                                    <div class="form-check mb-3" style="padding-left: 2rem;">
+                                                        <div class="d-flex align-items-start">
+                                                            <input class="form-check-input checklist-checkbox mt-1" type="checkbox" 
+                                                                id="checklist_<?php echo $checklist->ID; ?>" 
+                                                                value="<?php echo $checklist->ID; ?>"
+                                                                <?php echo $is_checked ? 'checked' : ''; ?>>
+                                                            <div class="flex-grow-1 ml-2">
+                                                                <label class="form-check-label" for="checklist_<?php echo $checklist->ID; ?>" style="font-size: 0.95rem; cursor: pointer; margin-bottom: 0;">
+                                                                    <?php echo htmlspecialchars($checklist->name); ?>
+                                                                </label>
+                                                                <?php if($is_checked && $completion_info) { ?>
+                                                                    <div class="mt-1" style="font-size: 0.8rem; color: #6c757d;">
+                                                                        <i class="la la-check-circle text-success"></i> 
+                                                                        Checked by <strong><?php echo htmlspecialchars($completion_info['created_by_name']); ?></strong> 
+                                                                        on <?php echo date('d/m/Y H:i', strtotime($completion_info['created_at'])); ?>
+                                                                    </div>
+                                                                <?php } ?>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                <?php } ?>
 
-                            <button type="button" id="update_allow_review_btn" class="btn btn-primary font-weight-bold">
-                                <i class="la la-save"></i> Update
-                            </button>
+                                                <button type="button" id="update_checklist_btn" class="btn btn-primary font-weight-bold mt-3">
+                                                    <i class="la la-save"></i> Update
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            <?php } ?>
                         </div>
                     </div>
                 </div>
@@ -2842,6 +2899,97 @@ $(document).ready(function() {
 
     // Load comments when page is ready
     loadComments();
+    <?php } ?>
+    
+    // Booking Checklist functionality
+    <?php if(isset($booking_checklists) && !empty($booking_checklists) && current_url() == base_url('Booking/Update')) { ?>
+    var bookingId = <?php echo $BookingID; ?>;
+    var checklistCompletions = [];
+    
+    // Update checklist completions array when checkbox changes
+    $('.checklist-checkbox').on('change', function() {
+        updateChecklistCompletions();
+    });
+    
+    function updateChecklistCompletions() {
+        checklistCompletions = [];
+        $('.checklist-checkbox:checked').each(function() {
+            checklistCompletions.push(parseInt($(this).val()));
+        });
+    }
+    
+    // Update Checklist Button Click Handler
+    $('#update_checklist_btn').on('click', function() {
+        updateChecklistCompletions();
+        
+        // Disable button during update
+        var $btn = $(this);
+        var originalText = $btn.html();
+        $btn.prop('disabled', true).html('<i class="la la-spinner la-spin"></i> Updating...');
+        
+        // Prepare data - CodeIgniter expects checklist_completions[] format
+        var postData = 'booking_id=' + bookingId;
+        
+        // Add each checklist ID as checklist_completions[]
+        $.each(checklistCompletions, function(index, value) {
+            postData += '&checklist_completions[]=' + encodeURIComponent(value);
+        });
+        
+        console.log('Sending checklist completions:', checklistCompletions);
+        console.log('Post data string:', postData);
+        
+        $.ajax({
+            url: '<?php echo base_url('Booking/Update'); ?>',
+            type: 'POST',
+            data: postData,
+            contentType: 'application/x-www-form-urlencoded; charset=UTF-8',
+            success: function(response) {
+                $btn.prop('disabled', false).html(originalText);
+                console.log('Response received');
+                Swal.fire({
+                    width: 550,
+                    background: 'url(<?php echo base_url('assets/image/sweetalert.jpg') ?>)',
+                    icon: 'success',
+                    title: 'Booking Checklist Successfully Updated',
+                    showConfirmButton: false,
+                    timer: 1500
+                }).then(function() {
+                    // Reload page to show updated "checked by" information
+                    window.location.reload();
+                });
+            },
+            error: function(xhr, status, error) {
+                $btn.prop('disabled', false).html(originalText);
+                console.error('Update Error:', error);
+                Swal.fire({
+                    width: 550,
+                    background: 'url(<?php echo base_url('assets/image/sweetalert.jpg') ?>)',
+                    icon: 'error',
+                    title: 'Booking Checklist Could Not Be Updated',
+                    showConfirmButton: false,
+                    timer: 3000
+                });
+            }
+        });
+    });
+    
+    // Save checklist completions when form is submitted
+    $('form').on('submit', function(e) {
+        updateChecklistCompletions();
+        // Remove any existing hidden inputs
+        $('input[name="checklist_completions[]"]').remove();
+        // Add checklist completions to form data
+        $.each(checklistCompletions, function(index, value) {
+            $('<input>').attr({
+                type: 'hidden',
+                name: 'checklist_completions[]',
+                value: value
+            }).appendTo($('form'));
+        });
+    });
+    
+    // Initialize
+    updateChecklistCompletions();
     <?php } ?>
 });
 

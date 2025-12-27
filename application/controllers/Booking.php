@@ -15,6 +15,9 @@ class Booking extends MY_Controller
 		$this->load->model('Universal_Model');
 		$this->load->model('Customer_Model');
 		$this->load->model('Remark_Model');
+		$this->load->model('Booking_Checklist_Completion_Model');
+		$this->load->model('Product_Package_Checklist_Model');
+		$this->load->model('Package_Checklist_Model');
 		$this->config->load('autocount'); // load config/autocount.php
 	}
 
@@ -806,6 +809,42 @@ class Booking extends MY_Controller
 				// 		} 
 				// 	}
 				// }
+				
+				// Booking Checklist Completion
+				$booking_id = $this->input->post('booking_id');
+				$checklist_completions = $this->input->post('checklist_completions');
+				
+				// Always process checklist completions if booking_id and checklist_completions are provided
+				if(!empty($booking_id) && $checklist_completions !== null) {
+					// Ensure it's an array
+					if(!is_array($checklist_completions)) {
+						// If it's a single value, convert to array
+						if(!empty($checklist_completions)) {
+							$checklist_completions = array($checklist_completions);
+						} else {
+							$checklist_completions = array();
+						}
+					}
+					
+					$created_by = $this->session->userdata('admin_id');
+					
+					if(!empty($created_by)) {
+						// Get previous completions for logging (before updating)
+						$previous_completions = array();
+						if($this->db->table_exists('booking_checklist_completion')) {
+							// Get previous completions from map (extract keys)
+							$previous_map = $this->Booking_Checklist_Completion_Model->Read_Completion_Map($booking_id);
+							$previous_completions = array_keys($previous_map);
+							$this->Booking_Checklist_Completion_Model->Create($booking_id, $checklist_completions, $created_by);
+						} else {
+							// Table doesn't exist - log error
+							log_message('error', 'booking_checklist_completion table does not exist. Please run migration.');
+						}
+						
+						// Create activity logs for changes
+						$this->log_checklist_changes($booking_id, $previous_completions, $checklist_completions, $created_by);
+					}
+				}
 			} else {
 				$valid_booking_id = $this->Universal_Model->Validate_Id('BookingID', $this->input->get('booking_id'), 'booking');
 
@@ -868,6 +907,10 @@ class Booking extends MY_Controller
 						$booking_product->Price = number_format($booking_product->Price, 2, '.', ',');
 						$booking_product->Total = number_format($booking_product->Total, 2, '.', ',');
 					}
+
+					// Get booking checklists
+					$array['booking_checklists'] = $this->get_booking_checklists($array['booking_products']);
+					$array['completion_map'] = $this->Booking_Checklist_Completion_Model->Read_Completion_Map($array['BookingID']);
 
 					if(isset($_GET['nick'])) { echo "<pre>"; print_r($array); exit; }
 					$this->load->view('layout/header', $titles);
@@ -2192,6 +2235,111 @@ class Booking extends MY_Controller
 			return $days . ' day' . ($days > 1 ? 's' : '') . ' ago';
 		} else {
 			return date('M j, Y', $timestamp);
+		}
+	}
+
+	/**
+	 * Get all checklists for booking products
+	 * If product doesn't have checklists, create default (required) ones
+	 */
+	private function get_booking_checklists($booking_products)
+	{
+		$all_checklists = array();
+		$all_checklist_ids = array();
+		
+		// Get all package checklists
+		$package_checklists = $this->Package_Checklist_Model->Read_Package_Checklists();
+		$checklist_map = array();
+		foreach($package_checklists as $pc) {
+			$checklist_map[$pc->ID] = $pc;
+		}
+		
+		// Get required checklist IDs
+		$required_ids = array();
+		foreach($package_checklists as $pc) {
+			if(isset($pc->is_required) && $pc->is_required == 1) {
+				$required_ids[] = $pc->ID;
+			}
+		}
+		
+		// Process each booking product
+		foreach($booking_products as $booking_product) {
+			$product_id = $booking_product->ProductID;
+			
+			// Get checklists for this product
+			$product_checklist_ids = $this->Product_Package_Checklist_Model->Get_Checklists_For_Product($product_id);
+			
+			// If product doesn't have checklists, use required ones and create entry
+			if(empty($product_checklist_ids)) {
+				$product_checklist_ids = $required_ids;
+				// Create entry in product_package_checklist
+				$this->Product_Package_Checklist_Model->Bulk_Update_Product_Checklists($product_id, $required_ids);
+			}
+			
+			// Build checklist list in order
+			foreach($product_checklist_ids as $checklist_id) {
+				if(isset($checklist_map[$checklist_id]) && !in_array($checklist_id, $all_checklist_ids)) {
+					$all_checklists[] = $checklist_map[$checklist_id];
+					$all_checklist_ids[] = $checklist_id;
+				}
+			}
+		}
+		
+		return $all_checklists;
+	}
+
+	/**
+	 * Log checklist completion changes to booking_log
+	 */
+	private function log_checklist_changes($booking_id, $previous_completions, $new_completions, $created_by)
+	{
+		// Get checklist names for logging
+		$checklist_map = array();
+		$all_checklist_ids = array_unique(array_merge($previous_completions, $new_completions));
+		if(!empty($all_checklist_ids)) {
+			$this->db->select('ID, name');
+			$this->db->where_in('ID', $all_checklist_ids);
+			$checklists = $this->db->get('package_checklist')->result();
+			foreach($checklists as $checklist) {
+				$checklist_map[$checklist->ID] = $checklist->name;
+			}
+		}
+		
+		$booking_logs = array();
+		
+		// Find items that were added (ticked)
+		$added = array_diff($new_completions, $previous_completions);
+		foreach($added as $checklist_id) {
+			$checklist_name = isset($checklist_map[$checklist_id]) ? $checklist_map[$checklist_id] : 'Checklist ID: ' . $checklist_id;
+			$booking_logs[] = array(
+				'BookingID' => $booking_id,
+				'Column' => 'BookingChecklist',
+				'CurrentData' => 'Unchecked',
+				'NewData' => 'Checked: ' . $checklist_name,
+				'InsertBy' => $created_by,
+				'InsertDate' => date('Y-m-d H:i:s')
+			);
+		}
+		
+		// Find items that were removed (unticked)
+		$removed = array_diff($previous_completions, $new_completions);
+		foreach($removed as $checklist_id) {
+			$checklist_name = isset($checklist_map[$checklist_id]) ? $checklist_map[$checklist_id] : 'Checklist ID: ' . $checklist_id;
+			$booking_logs[] = array(
+				'BookingID' => $booking_id,
+				'Column' => 'BookingChecklist',
+				'CurrentData' => 'Checked: ' . $checklist_name,
+				'NewData' => 'Unchecked',
+				'InsertBy' => $created_by,
+				'InsertDate' => date('Y-m-d H:i:s')
+			);
+		}
+		
+		// Insert logs if there are any changes
+		if(!empty($booking_logs)) {
+			$result = $this->db->insert_batch('booking_log', $booking_logs);
+			// Log for debugging
+			log_message('debug', 'Booking Checklist Logs: ' . count($booking_logs) . ' entries inserted for BookingID: ' . $booking_id);
 		}
 	}
 }
