@@ -323,8 +323,73 @@ class Booking extends MY_Controller
 				$row['profit_margin'] = '<span style="color:' . $profit_color . '">' . $profit_margin . '</span>';
 			}
 
-			// Status
-			$row['status'] = '<span class="font-weight-bold" style="color:' . $status_color . '">' . $status_text . '</span>';
+			// Status with remarks tooltip
+			$remarks = $this->Remark_Model->Read_Remarks('booking', $booking->BookingID);
+			$remarks_count = count($remarks);
+			$remarks_html = '';
+
+			$bc_text = '<strong>BC: ' . $booking->BookingNumber . '</strong><br>';
+			
+			if (!empty($remarks)) {
+				$remarks_list = array();
+				foreach ($remarks as $remark) {
+					$commenter_name = !empty($remark->CommenterName) ? $remark->CommenterName : 'Unknown';
+					$commenter_initials = strtoupper(substr($commenter_name, 0, 2));
+					$created_at = !empty($remark->created_at) ? date('d/m/Y H:i', strtotime($remark->created_at)) : '';
+					
+					// Calculate relative time
+					$created_timestamp = strtotime($remark->created_at);
+					$current_timestamp = time();
+					$time_diff = $current_timestamp - $created_timestamp;
+					$created_at_relative = '';
+					if ($time_diff < 60) {
+						$created_at_relative = 'Just now';
+					} elseif ($time_diff < 3600) {
+						$created_at_relative = floor($time_diff / 60) . 'm ago';
+					} elseif ($time_diff < 86400) {
+						$created_at_relative = floor($time_diff / 3600) . 'h ago';
+					} elseif ($time_diff < 604800) {
+						$created_at_relative = floor($time_diff / 86400) . 'd ago';
+					} else {
+						$created_at_relative = $created_at;
+					}
+					
+					// Avatar color based on first letter
+					$avatar_colors = ['primary', 'success', 'info', 'warning', 'danger'];
+					$avatar_color = $avatar_colors[ord($commenter_name[0]) % 5];
+					
+					// Convert newlines to <br> tags and escape HTML
+					$content = htmlspecialchars($remark->content, ENT_QUOTES);
+					$content = nl2br($content);
+					
+					$remarks_list[] = '<div class="d-flex mb-2 pb-2" style="border-bottom: 1px solid #e4e6eb; padding-left: 4px;">' .
+						// Avatar
+						'<div class="flex-shrink-0 mr-2 pl-2">' .
+						'<div class="symbol symbol-30 symbol-circle symbol-light-' . $avatar_color . '">' .
+						'<span class="symbol-label font-weight-bold" style="font-size: 0.7rem;">' . $commenter_initials . '</span>' .
+						'</div>' .
+						'</div>' .
+						// Comment content
+						'<div class="flex-grow-1" style="min-width: 0;">' .
+						'<div class="d-flex align-items-baseline mb-1">' .
+						'<strong class="mr-2" style="font-size: 0.8rem; color: #050505;">' . htmlspecialchars($commenter_name, ENT_QUOTES) . '</strong>' .
+						'<span class="text-muted" style="font-size: 0.7rem; color: #65676b;">' . $created_at_relative . '</span>' .
+						'</div>' .
+						'<div style="font-size: 0.8rem; color: #050505; line-height: 1.3; word-wrap: break-word; white-space: pre-line;">' . $content . '</div>' .
+						'</div>' .
+						'</div>';
+				}
+				$remarks_html = '<div style="max-width: 450px; text-align: left; padding: 0; background: #fff;">' .
+					'<div class="p-2 pb-1" style="border-bottom: 1px solid #e4e6eb; background: #f8f9fa;">' . '<span style="font-size: 0.85rem; font-weight: 600; color: #333;">' . $bc_text . '</span></div>' .
+					'<div style="padding: 10px 12px;">' . implode('', $remarks_list) . '</div>' .
+					'</div>';
+			} else {
+				$remarks_html = '<div class="p-2" style="text-align: center; padding: 15px; color: #65676b; font-size: 0.8rem;">'.$bc_text.' No comments found.</div>';
+			}
+			
+			// Status with tooltip for remarks
+			$status_icon = $remarks_count > 0 ? ' <i class="la la-comment" style="font-size: 0.85em; opacity: 0.7;"></i>' : '';
+			$row['status'] = '<span class="font-weight-bold remarks-status" style="color:' . $status_color . '; cursor: help;" data-toggle="tooltip" data-html="true" data-placement="left" data-booking-id="' . $booking->BookingID . '" title="' . htmlspecialchars($remarks_html, ENT_QUOTES) . '">' . $status_text . $status_icon . '</span>';
 
 			// GL Status
 			$row['gl_status'] = $booking->LockStatus == 'Y' ? '<i class="la la-lock text-danger"></i>' : '<i class="la la-unlock text-success"></i>';

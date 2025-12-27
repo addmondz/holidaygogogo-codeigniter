@@ -154,6 +154,8 @@ class Customer_Portal extends CI_Controller
         $this->db->where('booking.CustomerID', $customer_id);
         $this->db->where('booking.Status !=', 'N');
         $this->db->where('CancelStatus', 'N'); // Always exclude cancelled
+        // Hide pending bookings (Status = 'P') from customers - only show confirmed bookings
+        $this->db->where('booking.Status !=', 'P'); // Exclude pending bookings
         $this->db->order_by('booking.StartDate', 'DESC');
         $this->db->order_by('booking.BookingID', 'DESC');
         
@@ -162,12 +164,27 @@ class Customer_Portal extends CI_Controller
         $upcoming = [];
         $completed = [];
         
+        $today = date('Y-m-d');
+        
         foreach ($all_bookings as $booking) {
-            // Completed: Status = 'Y' AND AfterSalesService = 'COMPLETE'
-            if ($booking['Status'] == 'Y' && $booking['AfterSalesService'] == 'COMPLETE') {
+            // Check if travel date has passed
+            // Use EndDate if available, otherwise use StartDate
+            $travel_date_passed = false;
+            $travel_end_date = !empty($booking['EndDate']) ? $booking['EndDate'] : $booking['StartDate'];
+            if (!empty($travel_end_date)) {
+                // Compare dates (ignore time)
+                $travel_date = date('Y-m-d', strtotime($travel_end_date));
+                $travel_date_passed = $travel_date < $today;
+            }
+            
+            // Completed: 
+            // 1. Status = 'Y' AND AfterSalesService = 'COMPLETE', OR
+            // 2. Travel date has passed (EndDate < today)
+            if (($booking['Status'] == 'Y' && $booking['AfterSalesService'] == 'COMPLETE') || $travel_date_passed) {
                 $completed[] = $booking;
             } else {
-                // Upcoming: All other bookings (P, PP, PTV, PT, OG, etc.)
+                // Upcoming: Confirmed bookings (PP, PTV, PT, OG, etc.) where travel date hasn't passed
+                // Note: Pending (P) bookings are already filtered out in the query above
                 $upcoming[] = $booking;
             }
         }
@@ -445,6 +462,80 @@ class Customer_Portal extends CI_Controller
             'class' => 'status-unknown',
             'color' => '#999'
         ];
+    }
+
+    /**
+     * Submit customer review for a booking
+     * 
+     * @param string $hashed_bc Booking token
+     */
+    public function submit_review($hashed_bc = null)
+    {
+        // Set JSON response header
+        $this->output->set_content_type('application/json');
+
+        if (empty($hashed_bc)) {
+            $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => 'Invalid booking token'
+            ]));
+            return;
+        }
+
+        // Verify booking exists
+        $this->db->select('BookingID, Token, AllowReview, Status');
+        $this->db->where('Token', $hashed_bc);
+        $this->db->where('Status !=', 'N');
+        $booking = $this->db->get('booking')->row_array();
+
+        if (empty($booking)) {
+            $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => 'Booking not found'
+            ]));
+            return;
+        }
+
+        // Check if review is allowed
+        if (empty($booking['AllowReview']) || $booking['AllowReview'] == 0) {
+            $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => 'Review submission is not allowed for this booking'
+            ]));
+            return;
+        }
+
+        // Get review text from POST
+        $review_text = $this->input->post('review_text');
+        
+        if (empty($review_text) || trim($review_text) === '') {
+            $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => 'Please enter your review'
+            ]));
+            return;
+        }
+
+        // Update booking with review
+        $update_data = [
+            'CustomerReview' => trim($review_text),
+            'CustomerReviewTimestamp' => date('Y-m-d H:i:s')
+        ];
+
+        $this->db->where('BookingID', $booking['BookingID']);
+        $result = $this->db->update('booking', $update_data);
+
+        if ($result) {
+            $this->output->set_output(json_encode([
+                'success' => true,
+                'message' => 'Review submitted successfully'
+            ]));
+        } else {
+            $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => 'Failed to submit review. Please try again.'
+            ]));
+        }
     }
 }
 

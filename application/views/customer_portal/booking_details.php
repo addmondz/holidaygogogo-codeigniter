@@ -1580,19 +1580,35 @@
                 $.ajax({
                     url: '<?php echo base_url('customer/booking/' . $booking['Token'] . '/review'); ?>',
                     type: 'POST',
+                    dataType: 'json',
                     data: {
                         review_text: reviewText
                     },
                     success: function(response) {
-                        showMessage('Review submitted successfully!', 'success');
-                        setTimeout(function() {
-                            location.reload();
-                        }, 1500);
+                        if (response && response.success) {
+                            showMessage(response.message || 'Review submitted successfully!', 'success');
+                            setTimeout(function() {
+                                location.reload();
+                            }, 1500);
+                        } else {
+                            showMessage(response.message || 'Failed to submit review. Please try again.', 'error');
+                            $submitBtn.prop('disabled', false).html(originalText);
+                        }
                     },
                     error: function(xhr) {
                         var errorMsg = 'Failed to submit review. Please try again.';
-                        if (xhr.responseJSON && xhr.responseJSON.message) {
-                            errorMsg = xhr.responseJSON.message;
+                        try {
+                            var response = JSON.parse(xhr.responseText);
+                            if (response && response.message) {
+                                errorMsg = response.message;
+                            }
+                        } catch(e) {
+                            // If response is not JSON, use default message
+                            if (xhr.status === 404) {
+                                errorMsg = 'Review submission endpoint not found. Please contact support.';
+                            } else if (xhr.status === 500) {
+                                errorMsg = 'Server error. Please try again later.';
+                            }
                         }
                         showMessage(errorMsg, 'error');
                         $submitBtn.prop('disabled', false).html(originalText);

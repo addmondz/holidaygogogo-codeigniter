@@ -150,9 +150,74 @@
             margin-top: 8px;
         }
 
+        .search-filters-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
         .search-input-wrapper {
             position: relative;
             max-width: 100%;
+        }
+
+        .date-filters-wrapper {
+            display: flex;
+            gap: 15px;
+            align-items: flex-end;
+            flex-wrap: wrap;
+        }
+
+        .date-filter-item {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            flex: 1;
+            min-width: 150px;
+        }
+
+        .date-filter-label {
+            font-size: 13px;
+            color: #666;
+            font-weight: 500;
+        }
+
+        .date-filter-input {
+            padding: 10px 12px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: 'Poppins', sans-serif;
+            color: #333;
+            transition: border-color 0.3s;
+        }
+
+        .date-filter-input:focus {
+            outline: none;
+            border-color: #6082B6;
+        }
+
+        .btn-clear-filters {
+            padding: 10px 20px;
+            background: #f5f7fa;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            color: #666;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-family: 'Poppins', sans-serif;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+        }
+
+        .btn-clear-filters:hover {
+            background: #e8e8e8;
+            border-color: #ccc;
+            color: #333;
         }
 
         .search-input {
@@ -444,6 +509,10 @@
                 font-size: 12px;
             }
 
+            .search-filters-wrapper {
+                gap: 12px;
+            }
+
             .search-input-wrapper {
                 max-width: 100%;
             }
@@ -451,6 +520,20 @@
             .search-input {
                 padding: 10px 35px 10px 12px;
                 font-size: 13px;
+            }
+
+            .date-filters-wrapper {
+                flex-direction: column;
+                gap: 12px;
+            }
+
+            .date-filter-item {
+                min-width: 100%;
+            }
+
+            .btn-clear-filters {
+                width: 100%;
+                justify-content: center;
             }
 
             .pagination-container {
@@ -703,18 +786,39 @@
         <div class="search-section">
             <div class="search-header">
                 <div class="search-title">
-                    Search Bookings
+                    Search & Filter Bookings
                 </div>
             </div>
-            <div class="search-input-wrapper">
-                <input type="text" 
-                       class="search-input" 
-                       id="global-search" 
-                       placeholder="Search by booking number or destination...">
-                <i class="la la-search search-icon"></i>
+            <div class="search-filters-wrapper">
+                <div class="search-input-wrapper">
+                    <input type="text" 
+                           class="search-input" 
+                           id="global-search" 
+                           placeholder="Search by booking number or destination...">
+                    <i class="la la-search search-icon"></i>
+                </div>
+                <div class="date-filters-wrapper">
+                    <div class="date-filter-item">
+                        <label for="date-from" class="date-filter-label">From Date</label>
+                        <input type="date" 
+                               class="date-filter-input" 
+                               id="date-from" 
+                               placeholder="From date">
+                    </div>
+                    <div class="date-filter-item">
+                        <label for="date-to" class="date-filter-label">To Date</label>
+                        <input type="date" 
+                               class="date-filter-input" 
+                               id="date-to" 
+                               placeholder="To date">
+                    </div>
+                    <button type="button" class="btn-clear-filters" id="clear-filters">
+                        <i class="la la-times"></i> Clear
+                    </button>
+                </div>
             </div>
             <div class="search-helper">
-                Search applies to all bookings across both tabs
+                Search and date filters apply to all bookings across both tabs
             </div>
         </div>
 
@@ -751,12 +855,26 @@
                         $display_status = $booking['Status'];
                         $status_class = 'status-pending';
                         $status_text = 'Pending';
+                        
+                        // Check if travel date has passed
+                        // Use EndDate if available, otherwise use StartDate
+                        $travel_date_passed = false;
+                        $travel_end_date = !empty($booking['EndDate']) ? $booking['EndDate'] : $booking['StartDate'];
+                        if (!empty($travel_end_date)) {
+                            // Compare dates (ignore time)
+                            $travel_date = date('Y-m-d', strtotime($travel_end_date));
+                            $travel_date_passed = $travel_date < date('Y-m-d');
+                        }
 
                         if ($booking['CancelStatus'] == 'Y') {
                             $status_class = 'status-cancelled';
                             $status_text = 'Cancelled';
                         } elseif ($booking['Status'] == 'Y' && $booking['AfterSalesService'] == 'COMPLETE') {
                             // Completed: Status = 'Y' AND AfterSalesService = 'COMPLETE'
+                            $status_class = 'status-completed';
+                            $status_text = 'Completed';
+                        } elseif ($travel_date_passed) {
+                            // Travel date has passed - show as Completed
                             $status_class = 'status-completed';
                             $status_text = 'Completed';
                         } elseif (in_array($booking['Status'], ['PP', 'PTV', 'PT', 'OG'])) {
@@ -930,6 +1048,8 @@
 
         // Global search state
         let globalSearchTerm = '';
+        let dateFrom = '';
+        let dateTo = '';
 
         // Tab switching functionality
         document.addEventListener('DOMContentLoaded', function() {
@@ -962,6 +1082,66 @@
             if (globalSearchInput) {
                 globalSearchInput.addEventListener('input', function() {
                     globalSearchTerm = this.value.toLowerCase().trim();
+                    applyGlobalSearch();
+                });
+            }
+
+            // Setup date filters
+            const dateFromInput = document.getElementById('date-from');
+            const dateToInput = document.getElementById('date-to');
+            const clearFiltersBtn = document.getElementById('clear-filters');
+
+            // Function to validate and fix date range
+            function validateDateRange() {
+                if (dateFrom && dateTo) {
+                    const fromDate = new Date(dateFrom);
+                    const toDate = new Date(dateTo);
+                    
+                    if (toDate < fromDate) {
+                        // Show error message
+                        Swal.fire({
+                            width: 550,
+                            background: 'url(<?php echo base_url('assets/image/sweetalert.jpg') ?>)',
+                            icon: 'error',
+                            title: 'Invalid Date Range',
+                            text: 'To Date cannot be before From Date. To Date has been adjusted to match From Date.',
+                            showConfirmButton: false,
+                            timer: 3000
+                        });
+                        
+                        // Set To Date to From Date
+                        dateTo = dateFrom;
+                        if (dateToInput) {
+                            dateToInput.value = dateFrom;
+                        }
+                    }
+                }
+            }
+
+            if (dateFromInput) {
+                dateFromInput.addEventListener('change', function() {
+                    dateFrom = this.value;
+                    validateDateRange();
+                    applyGlobalSearch();
+                });
+            }
+
+            if (dateToInput) {
+                dateToInput.addEventListener('change', function() {
+                    dateTo = this.value;
+                    validateDateRange();
+                    applyGlobalSearch();
+                });
+            }
+
+            if (clearFiltersBtn) {
+                clearFiltersBtn.addEventListener('click', function() {
+                    globalSearchTerm = '';
+                    dateFrom = '';
+                    dateTo = '';
+                    if (globalSearchInput) globalSearchInput.value = '';
+                    if (dateFromInput) dateFromInput.value = '';
+                    if (dateToInput) dateToInput.value = '';
                     applyGlobalSearch();
                 });
             }
@@ -1011,28 +1191,78 @@
             tempDiv.innerHTML = bookingsContainer.dataset.originalHTML || '';
             const allBookings = Array.from(tempDiv.querySelectorAll('.booking-card'));
             
-            // Filter bookings using global search term
+            // Filter bookings using global search term and date filters
             let filteredBookings = allBookings;
+            
+            // Apply text search filter
             if (globalSearchTerm) {
-                filteredBookings = allBookings.filter(booking => {
+                filteredBookings = filteredBookings.filter(booking => {
                     const bookingNumber = booking.querySelector('.booking-number')?.textContent.toLowerCase() || '';
                     const destination = booking.querySelector('.detail-value')?.textContent.toLowerCase() || '';
                     return bookingNumber.includes(globalSearchTerm) || destination.includes(globalSearchTerm);
                 });
             }
+            
+            // Apply date filters
+            if (dateFrom || dateTo) {
+                filteredBookings = filteredBookings.filter(booking => {
+                    // Find all detail rows to locate the travel date
+                    const detailRows = booking.querySelectorAll('.detail-row');
+                    let travelDateText = '';
+                    
+                    // Find the row that contains "Travel Date"
+                    for (let row of detailRows) {
+                        const label = row.querySelector('.detail-label');
+                        if (label && label.textContent.toLowerCase().includes('travel date')) {
+                            travelDateText = row.querySelector('.detail-value')?.textContent || '';
+                            break;
+                        }
+                    }
+                    
+                    if (!travelDateText) return true; // If no travel date, include it
+                    
+                    // Parse the date (format: "Jan 15, 2024" or "Jan 15, 2024 - Jan 20, 2024")
+                    // Extract the start date (first date in the range)
+                    const dateMatch = travelDateText.match(/(\w{3})\s+(\d{1,2}),\s+(\d{4})/);
+                    
+                    if (!dateMatch) return true;
+                    
+                    // Parse the date (format: "Jan 15, 2024")
+                    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                    const monthIndex = monthNames.indexOf(dateMatch[1]);
+                    if (monthIndex === -1) return true;
+                    
+                    const bookingDate = new Date(parseInt(dateMatch[3]), monthIndex, parseInt(dateMatch[2]));
+                    bookingDate.setHours(0, 0, 0, 0); // Reset time to midnight for accurate comparison
+                    
+                    const fromDate = dateFrom ? new Date(dateFrom) : null;
+                    if (fromDate) fromDate.setHours(0, 0, 0, 0);
+                    
+                    const toDate = dateTo ? new Date(dateTo) : null;
+                    if (toDate) toDate.setHours(23, 59, 59, 999); // End of day
+                    
+                    // Check if booking date is within range
+                    if (fromDate && bookingDate < fromDate) return false;
+                    if (toDate && bookingDate > toDate) return false;
+                    
+                    return true;
+                });
+            }
 
-            // Get current page (only reset if search changed)
+            // Get current page (only reset if search or date filters changed)
             let currentPage = parseInt(bookingsContainer.dataset.currentPage || '1');
-            if (bookingsContainer.dataset.lastSearchTerm !== globalSearchTerm) {
+            const currentFilterKey = globalSearchTerm + '|' + dateFrom + '|' + dateTo;
+            if (bookingsContainer.dataset.lastFilterKey !== currentFilterKey) {
                 currentPage = 1;
                 bookingsContainer.dataset.currentPage = currentPage;
-                bookingsContainer.dataset.lastSearchTerm = globalSearchTerm;
+                bookingsContainer.dataset.lastFilterKey = currentFilterKey;
             }
 
             // Show/hide empty state
             const emptyStateDefault = document.getElementById('empty-' + tabName + '-default');
             if (emptyStateDefault) {
-                if (filteredBookings.length === 0 && globalSearchTerm) {
+                const hasFilters = globalSearchTerm || dateFrom || dateTo;
+                if (filteredBookings.length === 0 && hasFilters) {
                     emptyStateDefault.style.display = 'none';
                 } else if (allBookings.length === 0) {
                     emptyStateDefault.style.display = 'block';
@@ -1041,13 +1271,13 @@
                 }
             }
 
+            // Store filtered count for tab badge update (always store it)
+            bookingsContainer.dataset.filteredCount = filteredBookings.length;
+            
             // Only render if this is the active tab
             if (isActiveTab) {
                 renderBookings(tabName, filteredBookings, currentPage);
                 renderPagination(tabName, filteredBookings.length, currentPage);
-            } else {
-                // Store filtered count for tab badge update
-                bookingsContainer.dataset.filteredCount = filteredBookings.length;
             }
         }
 

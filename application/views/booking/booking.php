@@ -2848,7 +2848,6 @@ $(document).ready(function() {
 </script>
 
 <style>
-/* Facebook-style comment styling */
 .comment-item {
     transition: background-color 0.2s;
     padding: 8px 0;

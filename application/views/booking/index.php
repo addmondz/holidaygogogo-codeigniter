@@ -10,9 +10,47 @@
 }
 /* Ensure DataTable wrapper uses full width without extra padding */
 .dataTables_wrapper {
-
     overflow-x: hidden;
 }
+
+/* remarks tooltip styling */
+.tooltip-inner {
+    max-width: 450px !important;
+    text-align: left !important;
+    padding: 0 !important;
+    background: #fff !important;
+    color: #050505 !important;
+    border: 1px solid #e4e6eb;
+    border-radius: 8px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+
+    white-space: pre-line;
+    word-break: break-word;
+    overflow-wrap: break-word;
+    font-size: 0.8rem;
+}
+
+.tooltip.bs-tooltip-left .arrow::before {
+    border-left-color: #e4e6eb !important;
+}
+
+.tooltip.bs-tooltip-left .arrow::after {
+    border-left-color: #fff !important;
+}
+
+.remarks-status[data-toggle="tooltip"]:hover {
+    text-decoration: underline;
+}
+
+/* Ensure tooltip can be interacted with */
+.tooltip {
+    pointer-events: auto !important;
+}
+
+.tooltip-inner {
+    pointer-events: auto !important;
+}
+
 </style>
 <div class="d-flex flex-column-fluid">
     <div class="container-fluid">
@@ -547,7 +585,26 @@ $(document).ready(function() {
             },
             drawCallback: function(settings) {
                 // Re-initialize tooltips after each draw
-                $('[data-toggle="tooltip"]').tooltip();
+                $('[data-toggle="tooltip"]').tooltip({
+                    html: true,
+                    container: 'body',
+                    boundary: 'viewport',
+                    trigger: 'hover',
+                    delay: { "show": 300, "hide": 100 }
+                });
+                
+                // Allow tooltip to stay open when hovering over it
+                $('[data-toggle="tooltip"]').on('shown.bs.tooltip', function() {
+                    var $tooltip = $(this);
+                    var $tip = $tooltip.next('.tooltip');
+                    $tip.on('mouseenter', function() {
+                        $tooltip.tooltip('show');
+                    });
+                    $tip.on('mouseleave', function() {
+                        $tooltip.tooltip('hide');
+                    });
+                });
+                
                 // Re-attach checkbox event listeners
                 attachCheckboxListeners();
             }
