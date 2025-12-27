@@ -843,37 +843,70 @@
                                                 </div>
                                             </div>
                                             <div class="card-body">
-                                                <?php 
-                                                $completion_map = isset($completion_map) ? $completion_map : array();
-                                                foreach($booking_checklists as $checklist) { 
-                                                    $is_checked = isset($completion_map[$checklist->ID]);
-                                                    $completion_info = $is_checked ? $completion_map[$checklist->ID] : null;
-                                                ?>
-                                                    <div class="form-check mb-3" style="padding-left: 2rem;">
-                                                        <div class="d-flex align-items-start">
-                                                            <input class="form-check-input checklist-checkbox mt-1" type="checkbox" 
-                                                                id="checklist_<?php echo $checklist->ID; ?>" 
-                                                                value="<?php echo $checklist->ID; ?>"
-                                                                <?php echo $is_checked ? 'checked' : ''; ?>>
-                                                            <div class="flex-grow-1 ml-2">
-                                                                <label class="form-check-label" for="checklist_<?php echo $checklist->ID; ?>" style="font-size: 0.95rem; cursor: pointer; margin-bottom: 0;">
-                                                                    <?php echo htmlspecialchars($checklist->name); ?>
-                                                                </label>
-                                                                <?php if($is_checked && $completion_info) { ?>
-                                                                    <div class="mt-1" style="font-size: 0.8rem; color: #6c757d;">
-                                                                        <i class="la la-check-circle text-success"></i> 
-                                                                        Checked by <strong><?php echo htmlspecialchars($completion_info['created_by_name']); ?></strong> 
-                                                                        on <?php echo date('d/m/Y H:i', strtotime($completion_info['created_at'])); ?>
+                                                <div class="checklist-container">
+                                                    <?php 
+                                                    $completion_map = isset($completion_map) ? $completion_map : array();
+                                                    $checked_count = 0;
+                                                    $total_count = count($booking_checklists);
+                                                    foreach($booking_checklists as $index => $checklist) { 
+                                                        $is_checked = isset($completion_map[$checklist->ID]);
+                                                        $completion_info = $is_checked ? $completion_map[$checklist->ID] : null;
+                                                        if($is_checked) $checked_count++;
+                                                    ?>
+                                                        <div class="checklist-item <?php echo $is_checked ? 'checked' : ''; ?>" data-checklist-id="<?php echo $checklist->ID; ?>">
+                                                            <div class="checklist-item-content">
+                                                                <div class="checklist-checkbox-wrapper">
+                                                                    <input class="form-check-input checklist-checkbox" type="checkbox" 
+                                                                        id="checklist_<?php echo $checklist->ID; ?>" 
+                                                                        value="<?php echo $checklist->ID; ?>"
+                                                                        <?php echo $is_checked ? 'checked' : ''; ?>>
+                                                                    <label class="checklist-checkbox-label" for="checklist_<?php echo $checklist->ID; ?>"></label>
+                                                                </div>
+                                                                <div class="checklist-details">
+                                                                    <div class="checklist-name-wrapper">
+                                                                        <label class="checklist-name" for="checklist_<?php echo $checklist->ID; ?>">
+                                                                            <?php echo htmlspecialchars($checklist->name); ?>
+                                                                        </label>
                                                                     </div>
-                                                                <?php } ?>
+                                                                    <?php if($is_checked && $completion_info) { ?>
+                                                                        <div class="checklist-completion-info">
+                                                                            <i class="la la-user-circle text-primary"></i>
+                                                                            <span class="completion-text">
+                                                                                Completed by <strong><?php echo htmlspecialchars($completion_info['created_by_name']); ?></strong>
+                                                                                <span class="completion-separator">•</span>
+                                                                                <span class="completion-date"><?php echo date('d M Y, H:i', strtotime($completion_info['created_at'])); ?></span>
+                                                                            </span>
+                                                                        </div>
+                                                                    <?php } ?>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    <?php } ?>
+                                                </div>
+                                                
+                                                <div class="checklist-footer">
+                                                    <div class="checklist-progress">
+                                                        <div class="progress-info">
+                                                            <span class="progress-text">
+                                                                <strong><?php echo $checked_count; ?></strong> of <strong><?php echo $total_count; ?></strong> items completed
+                                                            </span>
+                                                            <span class="progress-percentage"><?php echo $total_count > 0 ? round(($checked_count / $total_count) * 100) : 0; ?>%</span>
+                                                        </div>
+                                                        <div class="progress-bar-wrapper">
+                                                            <div class="progress" style="height: 8px; background-color: #e9ecef; border-radius: 4px;">
+                                                                <div class="progress-bar bg-success" role="progressbar" 
+                                                                     style="width: <?php echo $total_count > 0 ? ($checked_count / $total_count) * 100 : 0; ?>%;" 
+                                                                     aria-valuenow="<?php echo $checked_count; ?>" 
+                                                                     aria-valuemin="0" 
+                                                                     aria-valuemax="<?php echo $total_count; ?>">
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     </div>
-                                                <?php } ?>
-
-                                                <button type="button" id="update_checklist_btn" class="btn btn-primary font-weight-bold mt-3">
-                                                    <i class="la la-save"></i> Update
-                                                </button>
+                                                    <button type="button" id="update_checklist_btn" class="btn btn-primary btn-sm font-weight-bold">
+                                                        <i class="la la-save"></i> Save Changes
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -2905,10 +2938,25 @@ $(document).ready(function() {
     <?php if(isset($booking_checklists) && !empty($booking_checklists) && current_url() == base_url('Booking/Update')) { ?>
     var bookingId = <?php echo $BookingID; ?>;
     var checklistCompletions = [];
+    var totalChecklistItems = <?php echo count($booking_checklists); ?>;
     
-    // Update checklist completions array when checkbox changes
+    // Update checklist completions array and UI when checkbox changes
     $('.checklist-checkbox').on('change', function() {
+        var $checkbox = $(this);
+        var $item = $checkbox.closest('.checklist-item');
+        var checklistId = $checkbox.val();
+        
+        // Update item visual state
+        if($checkbox.is(':checked')) {
+            $item.addClass('checked');
+        } else {
+            $item.removeClass('checked');
+            // Remove completion info if exists
+            $item.find('.checklist-completion-info').remove();
+        }
+        
         updateChecklistCompletions();
+        updateProgressBar();
     });
     
     function updateChecklistCompletions() {
@@ -2916,6 +2964,18 @@ $(document).ready(function() {
         $('.checklist-checkbox:checked').each(function() {
             checklistCompletions.push(parseInt($(this).val()));
         });
+    }
+    
+    function updateProgressBar() {
+        var checkedCount = checklistCompletions.length;
+        var percentage = totalChecklistItems > 0 ? Math.round((checkedCount / totalChecklistItems) * 100) : 0;
+        
+        // Update progress text
+        $('.progress-text').html('<strong>' + checkedCount + '</strong> of <strong>' + totalChecklistItems + '</strong> items completed');
+        $('.progress-percentage').text(percentage + '%');
+        
+        // Update progress bar
+        $('.progress-bar').css('width', percentage + '%').attr('aria-valuenow', checkedCount);
     }
     
     // Update Checklist Button Click Handler
@@ -2990,6 +3050,7 @@ $(document).ready(function() {
     
     // Initialize
     updateChecklistCompletions();
+    updateProgressBar();
     <?php } ?>
 });
 
@@ -3063,5 +3124,176 @@ $(document).ready(function() {
         resize: none;
         overflow: hidden;
         min-height: 60px;
+    }
+
+    /* Booking Checklist Professional Styling */
+    .checklist-container {
+        padding: 0;
+    }
+
+    .checklist-item {
+        padding: 10px 12px;
+        margin-bottom: 8px;
+        background-color: #ffffff;
+        border: 1px solid #e4e6eb;
+        border-radius: 6px;
+        transition: all 0.2s ease;
+    }
+
+    .checklist-item:hover {
+        border-color: #c1c7d0;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
+
+    .checklist-item.checked {
+        background-color: #f8f9fa;
+        border-color: #d4edda;
+    }
+
+    .checklist-item.checked:hover {
+        border-color: #c3e6cb;
+    }
+
+    .checklist-item-content {
+        display: flex;
+        align-items: flex-start;
+        gap: 28px;
+    }
+
+    .checklist-checkbox-wrapper {
+        position: relative;
+        flex-shrink: 0;
+        margin-top: 2px;
+    }
+
+    .checklist-checkbox {
+        width: 18px;
+        height: 18px;
+        cursor: pointer;
+        margin: 0;
+        accent-color: #6082B6;
+    }
+
+    .checklist-checkbox-label {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 18px;
+        height: 18px;
+        cursor: pointer;
+        margin: 0;
+    }
+
+    .checklist-details {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .checklist-name-wrapper {
+        margin-bottom: 4px;
+    }
+
+    .checklist-name {
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: #212529;
+        cursor: pointer;
+        margin: 0;
+        line-height: 1.3;
+    }
+
+    .checklist-completion-info {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        margin-top: 6px;
+        padding-top: 6px;
+        border-top: 1px solid #e9ecef;
+        font-size: 0.75rem;
+        color: #6c757d;
+    }
+
+    .checklist-completion-info i {
+        font-size: 0.875rem;
+        color: #6082B6;
+    }
+
+    .completion-text {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+    }
+
+    .completion-separator {
+        color: #adb5bd;
+        margin: 0 4px;
+    }
+
+    .completion-date {
+        color: #868e96;
+    }
+
+    .checklist-footer {
+        margin-top: 16px;
+        padding-top: 14px;
+        border-top: 2px solid #e4e6eb;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        flex-wrap: wrap;
+    }
+
+    .checklist-progress {
+        flex: 1;
+        min-width: 200px;
+    }
+
+    .progress-info {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 6px;
+    }
+
+    .progress-text {
+        font-size: 0.8125rem;
+        color: #495057;
+    }
+
+    .progress-text strong {
+        color: #212529;
+    }
+
+    .progress-percentage {
+        font-size: 0.8125rem;
+        font-weight: 600;
+        color: #6082B6;
+    }
+
+    .progress-bar-wrapper {
+        width: 100%;
+    }
+
+    .progress-bar-wrapper .progress {
+        height: 6px;
+        border-radius: 3px;
+        overflow: hidden;
+    }
+
+    .progress-bar-wrapper .progress-bar {
+        transition: width 0.3s ease;
+    }
+
+    @media (max-width: 768px) {
+        .checklist-footer {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .checklist-footer .btn {
+            width: 100%;
+        }
     }
 </style>
