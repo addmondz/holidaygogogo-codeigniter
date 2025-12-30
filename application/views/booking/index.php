@@ -470,7 +470,16 @@ $(document).ready(function() {
         // responsivePriority: LOWER number = HIGHER priority (stays visible longer)
         // HIGHER number = LOWER priority (hidden first on smaller screens)
         var columns = [
-            { data: 'row_number', orderable: false, searchable: false, className: 'text-center', responsivePriority: 1 },
+            {
+                data: 'row_number',
+                orderable: false,
+                searchable: false,
+                className: 'text-center',
+                responsivePriority: 1,
+                createdCell: function(td) {
+                    $(td).css('text-align', 'center');
+                }
+            },
             { data: 'checkbox', orderable: false, searchable: false, className: 'text-center', responsivePriority: 2 },
         ];
 
