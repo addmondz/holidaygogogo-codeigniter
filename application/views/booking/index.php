@@ -10,8 +10,7 @@
 }
 /* Ensure DataTable wrapper uses full width without extra padding */
 .dataTables_wrapper {
-
-    overflow-x: hidden;
+    overflow-x: auto;
 }
 </style>
 <div class="d-flex flex-column-fluid">
