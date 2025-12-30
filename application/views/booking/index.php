@@ -12,6 +12,11 @@
 .dataTables_wrapper {
     overflow-x: auto;
 }
+/* Center the No. column by resetting DataTable's padding-left */
+#kt_datatable tbody tr td:first-child {
+    padding-left: 0.75rem !important;
+    text-align: center !important;
+}
 </style>
 <div class="d-flex flex-column-fluid">
     <div class="container-fluid">
