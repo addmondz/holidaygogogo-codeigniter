@@ -766,6 +766,11 @@ return $query->result_array(); // instead of result()
 			$this->db->like('payment.AutocountReferenceNumber', $this->input->get('autocount_reference'));
 		}
 
+		// Autocount status filter
+		if(!empty($this->input->get('autocount_status'))) {
+			$this->db->where('payment.AutocountSyncStatus', $this->input->get('autocount_status'));
+		}
+
 		// Exclude deleted payments
 		$this->db->where('payment.Status !=', 'N');
 

@@ -272,6 +272,17 @@
                                                 </div>
                                             </div>
                                         </div>
+                                        <div class="col-md-3">
+                                            <div class="form-group">
+                                                <label>Autocount Status</label>
+                                                <select name="autocount_status" class="form-control selectpicker">
+                                                    <option value="">--SELECT AUTOCOUNT STATUS--</option>
+                                                    <option data-icon="la la-clock font-size-lg bs-icon" value="P" <?php if($this->input->get('autocount_status') == 'P') echo 'selected'; ?>>Pending</option>
+                                                    <option data-icon="la la-check-circle font-size-lg bs-icon" value="S" <?php if($this->input->get('autocount_status') == 'S') echo 'selected'; ?>>Synced</option>
+                                                    <option data-icon="la la-times-circle font-size-lg bs-icon" value="F" <?php if($this->input->get('autocount_status') == 'F') echo 'selected'; ?>>Failed</option>
+                                                </select>
+                                            </div>
+                                        </div>
                                     </div>
                                     <input type="button" id="filter" value="Filter" class="btn btn-light-success font-weight-bold" style="width:80px;">
                                     <input type="button" id="reset" value="Reset" class="btn btn-light-primary font-weight-bold" style="width:80px;">
@@ -890,7 +901,7 @@ $(document).ready(function() {
         var filterParams = {};
         var filterKeys = ['booking_number', 'customer', 'travel_date', 'transaction_date', 'payment_deadline',
             'status', 'payment_type', 'transaction_type', 'reference_number', 'supplier',
-            'quotation_number', 'invoice_number', 'bank', 'bank_account', 'bank_holder', 'sales_agent', 'autocount_reference'];
+            'quotation_number', 'invoice_number', 'bank', 'bank_account', 'bank_holder', 'sales_agent', 'autocount_reference', 'autocount_status'];
 
         filterKeys.forEach(function(param) {
             if (urlParams.has(param)) {
