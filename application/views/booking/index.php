@@ -518,9 +518,8 @@ $(document).ready(function() {
         bookingTable = $('#kt_datatable').DataTable({
             processing: true,
             serverSide: true,
-            responsive: {
-                details: true // Enable responsive with default control column
-            },
+            scrollX: true,
+            responsive: false,
             ajax: {
                 url: '<?php echo base_url("Booking/ajax_list"); ?>',
                 type: 'GET',
