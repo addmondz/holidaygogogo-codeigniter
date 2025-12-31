@@ -28,6 +28,27 @@
 	input[type=number] {
 		-moz-appearance: textfield;
 	}
+
+	/* Fix left menu scrolling */
+	.aside-menu-wrapper {
+		height: calc(100vh - 60px);
+		overflow: hidden;
+		display: flex;
+		flex-direction: column;
+	}
+
+	#kt_aside_menu {
+		overflow-y: auto !important;
+		overflow-x: hidden !important;
+		flex: 1;
+		height: 100%;
+		scrollbar-width: none; /* Firefox */
+		-ms-overflow-style: none; /* IE and Edge */
+	}
+
+	#kt_aside_menu::-webkit-scrollbar {
+		display: none; /* Chrome, Safari, Opera */
+	}
 </style>
 
 <body class="header-fixed header-mobile-fixed subheader-enabled subheader-fixed aside-enabled aside-fixed aside-minimize-hoverable page-loading">
