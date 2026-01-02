@@ -734,6 +734,30 @@
 
                             </div>
 
+                            <div id="travel_voucher_key_contacts" class="show mb-2" style="overflow-x:auto; display:none; padding: 8px 12px; border: 1px solid #D7E2F2;">
+
+                                <div class="alert-text" style="margin: 0;">
+
+                                    <label style="color:#3F4254; font-size: 12px; margin-bottom: 4px;"><strong>Key Contacts:</strong></label>
+
+                                    <div id="travel_voucher_key_contacts_content" style="font-size: 11px; line-height: 1.4;"></div>
+
+                                </div>
+
+                            </div>
+
+                            <div id="travel_voucher_special_remarks" class="show mb-2" style="overflow-x:auto; display:none; padding: 8px 12px; border: 1px solid #D7E2F2;">
+
+                                <div class="alert-text" style="margin: 0;">
+
+                                    <label style="color:#3F4254; font-size: 12px; margin-bottom: 4px;"><strong>Special Remarks:</strong></label>
+
+                                    <div id="travel_voucher_special_remarks_content" style="font-size: 11px; line-height: 1.4;"></div>
+
+                                </div>
+
+                            </div>
+
                         </div>
 
                     </div>
@@ -945,6 +969,45 @@
 
         $('#travel_voucher_content').show();
 
+        // Load Key Contacts and Special Remarks for existing travel voucher footer
+        $.ajax({
+
+            url: '<?php echo base_url('Footer/Read') ?>',
+
+            type: 'get',
+
+            data: {
+
+                footer_id: '<?php echo $TravelVoucherFooterID; ?>'
+
+            },
+
+            dataType: 'json',
+
+            success: function(array) {
+
+                // Show Key Contacts if available
+                if(array.KeyContacts && array.KeyContacts.trim() != '') {
+
+                    $('#travel_voucher_key_contacts_content').html(array.KeyContacts);
+
+                    $('#travel_voucher_key_contacts').show();
+
+                }
+
+                // Show Special Remarks if available
+                if(array.SpecialRemarks && array.SpecialRemarks.trim() != '') {
+
+                    $('#travel_voucher_special_remarks_content').html(array.SpecialRemarks);
+
+                    $('#travel_voucher_special_remarks').show();
+
+                }
+
+            }
+
+        });
+
     <?php } ?>
 
     var products = <?php echo json_encode($products) ?>;
@@ -1077,6 +1140,10 @@
 
             $('#travel_voucher_content').hide();
 
+            $('#travel_voucher_key_contacts').hide();
+
+            $('#travel_voucher_special_remarks').hide();
+
             tinyMCE.editors[1].setContent('');
 
         } else {
@@ -1100,6 +1167,32 @@
                 success: function(array) {
 
                     tinyMCE.editors[1].setContent(array.TravelVoucherContent);
+
+                    // Show Key Contacts if available
+                    if(array.KeyContacts && array.KeyContacts.trim() != '') {
+
+                        $('#travel_voucher_key_contacts_content').html(array.KeyContacts);
+
+                        $('#travel_voucher_key_contacts').show();
+
+                    } else {
+
+                        $('#travel_voucher_key_contacts').hide();
+
+                    }
+
+                    // Show Special Remarks if available
+                    if(array.SpecialRemarks && array.SpecialRemarks.trim() != '') {
+
+                        $('#travel_voucher_special_remarks_content').html(array.SpecialRemarks);
+
+                        $('#travel_voucher_special_remarks').show();
+
+                    } else {
+
+                        $('#travel_voucher_special_remarks').hide();
+
+                    }
 
                 }
 

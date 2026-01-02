@@ -152,6 +152,20 @@
 		<tr>
 			<td><?php echo $TravelVoucherFooter; ?></td>
 		</tr>
+		<?php if(!empty($TravelVoucherKeyContacts)) { ?>
+		<tr>
+			<td style="padding-top: 8px; font-size: 11px;">
+				<strong>Key Contacts:</strong> <span style="font-size: 10px;"><?php echo $TravelVoucherKeyContacts; ?></span>
+			</td>
+		</tr>
+		<?php } ?>
+		<?php if(!empty($TravelVoucherSpecialRemarks)) { ?>
+		<tr>
+			<td style="padding-top: 8px; font-size: 11px;">
+				<strong>Special Remarks:</strong> <span style="font-size: 10px;"><?php echo $TravelVoucherSpecialRemarks; ?></span>
+			</td>
+		</tr>
+		<?php } ?>
 	</table>
 	
 	<!-- Guest List Details -->
