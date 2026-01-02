@@ -113,6 +113,55 @@
 						<?php } ?>
 					</div>
 				</div>
+				<?php if(!empty($this->session->userdata('admin_id')) && $guest_lists[0]->LockStatus == 'N') { ?>
+				<div class="row mb-5">
+					<div class="col-md-12">
+						<div class="card card-custom mb-5">
+							<div class="card-header flex-wrap py-3" style="background-color:#D7E2F2;">
+								<div class="card-title">
+									<h3 class="card-label" style="color:#6082B6;">
+										<strong>Room Management</strong>
+									</h3>
+								</div>
+								<div class="card-toolbar">
+									<button type="button" id="create_room_btn" class="btn btn-sm btn-light-success font-weight-bold">
+										<i class="la la-plus"></i> Add Room
+									</button>
+								</div>
+							</div>
+							<div class="card-body">
+								<div id="rooms_list" class="row">
+									<?php if(!empty($rooms)) { 
+										foreach($rooms as $room) { ?>
+										<div class="col-md-3 mb-3 room-item" data-room-id="<?php echo $room->id; ?>">
+											<div class="card" style="border: 1px solid #D7E2F2;">
+												<div class="card-body p-3">
+													<div class="d-flex justify-content-between align-items-center">
+														<span class="font-weight-bold room-name"><?php echo $room->room_name; ?></span>
+														<div>
+															<button type="button" class="btn btn-sm btn-icon btn-light-primary edit-room-btn" data-room-id="<?php echo $room->id; ?>" data-room-name="<?php echo htmlspecialchars($room->room_name); ?>">
+																<i class="la la-edit"></i>
+															</button>
+															<button type="button" class="btn btn-sm btn-icon btn-light-danger delete-room-btn" data-room-id="<?php echo $room->id; ?>">
+																<i class="la la-trash"></i>
+															</button>
+														</div>
+													</div>
+												</div>
+											</div>
+										</div>
+									<?php } 
+									} else { ?>
+										<div class="col-md-12">
+											<p class="text-muted">No rooms created yet. Click "Add Room" to create one.</p>
+										</div>
+									<?php } ?>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+				<?php } ?>
                 <form id="form" action="<?php if($_SERVER['SERVER_NAME'] != 'gl.holidaygogogo.com') { echo base_url('Guest_List?gl=') . $this->input->get('gl'); } else { echo 'https://gl.holidaygogogo.com/?gl=' . $this->input->get('gl'); } ?>" method="post">
 					<div id="benchmark" class="row">
 						<?php $counter = 1;
@@ -156,6 +205,19 @@
 										<br><br>
 										<div class="form-group">
 											<div class="row">
+												<?php if(!empty($this->session->userdata('admin_id'))) { ?>
+												<div class="col-md-12 mb-3">
+													<label>Room Assignment</label>
+													<select name="room_ids[]" id="<?php echo 'room-' . $guest->GuestListID; ?>" <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> class="form-control room-select">
+														<option value="">-- No Room --</option>
+														<?php if(!empty($rooms)) {
+															foreach($rooms as $room) { ?>
+																<option value="<?php echo $room->id; ?>" <?php if(isset($guest->guest_list_room_id) && $guest->guest_list_room_id == $room->id) { echo 'selected'; } ?>><?php echo $room->room_name; ?></option>
+															<?php }
+														} ?>
+													</select>
+												</div>
+												<?php } ?>
 												<div class="col-md-6 mb-7 mb-md-0">
 													<label id="<?php echo 'name_label-' . $guest->GuestListID; ?>">First Name (As per IC/Passport) <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>
 													<input <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="names[]" id="<?php echo 'name-' . $guest->GuestListID; ?>" value="<?php echo $guest->Guest; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="form-control">
@@ -496,6 +558,12 @@
 						'<br><br>' +
 						'<div class="form-group">' +
 							'<div class="row">' +
+								'<div class="col-md-12 mb-3">' +
+									'<label>Room Assignment</label>' +
+									'<select name="new_room_ids[]" id="room-'+ guest_list_id +'" class="form-control room-select">' +
+										'<option value="">-- No Room --</option>' + getRoomOptions() +
+									'</select>' +
+								'</div>' +
 								'<div class="col-md-6 mb-7 mb-md-0">' +
 									'<label id="name_label-'+ guest_list_id +'">First Name (As per IC/Passport) </label>' +
 									'<input type="text" name="new_names[]" id="name-'+ guest_list_id +'" onchange="Set_Required_Field('+ guest_list_id +')" autocomplete="off" class="form-control">' +
@@ -1393,6 +1461,188 @@
 				}
 			});
 		}
+
+		// Room Management Functions
+		var rooms = <?php echo json_encode(isset($rooms) ? $rooms : array()); ?>;
+		var booking_id = <?php echo $guest_lists[0]->BookingID; ?>;
+
+		function getRoomOptions() {
+			var options = '';
+			if(rooms && rooms.length > 0) {
+				rooms.forEach(function(room) {
+					options += '<option value="' + room.id + '">' + room.room_name + '</option>';
+				});
+			}
+			return options;
+		}
+
+		function refreshRoomDropdowns() {
+			var roomOptions = '<option value="">-- No Room --</option>' + getRoomOptions();
+			$('.room-select').each(function() {
+				var currentValue = $(this).val();
+				$(this).html(roomOptions);
+				$(this).val(currentValue);
+			});
+		}
+
+		function refreshRoomsList() {
+			$.ajax({
+				url: '<?php echo base_url('Guest_List_Room/Read'); ?>',
+				type: 'get',
+				data: { booking_id: booking_id },
+				dataType: 'json',
+				success: function(data) {
+					rooms = data;
+					var roomsHtml = '';
+					if(data && data.length > 0) {
+						data.forEach(function(room) {
+							roomsHtml += '<div class="col-md-3 mb-3 room-item" data-room-id="' + room.id + '">' +
+								'<div class="card" style="border: 1px solid #D7E2F2;">' +
+								'<div class="card-body p-3">' +
+								'<div class="d-flex justify-content-between align-items-center">' +
+								'<span class="font-weight-bold room-name">' + room.room_name + '</span>' +
+								'<div>' +
+								'<button type="button" class="btn btn-sm btn-icon btn-light-primary edit-room-btn" data-room-id="' + room.id + '" data-room-name="' + room.room_name.replace(/"/g, '&quot;') + '">' +
+								'<i class="la la-edit"></i>' +
+								'</button>' +
+								'<button type="button" class="btn btn-sm btn-icon btn-light-danger delete-room-btn" data-room-id="' + room.id + '">' +
+								'<i class="la la-trash"></i>' +
+								'</button>' +
+								'</div>' +
+								'</div>' +
+								'</div>' +
+								'</div>' +
+								'</div>';
+						});
+					} else {
+						roomsHtml = '<div class="col-md-12"><p class="text-muted">No rooms created yet. Click "Add Room" to create one.</p></div>';
+					}
+					$('#rooms_list').html(roomsHtml);
+					refreshRoomDropdowns();
+					attachRoomEventHandlers();
+				}
+			});
+		}
+
+		function attachRoomEventHandlers() {
+			$('.edit-room-btn').off('click').on('click', function() {
+				var roomId = $(this).data('room-id');
+				var roomName = $(this).data('room-name');
+				Swal.fire({
+					title: 'Edit Room',
+					input: 'text',
+					inputValue: roomName,
+					inputPlaceholder: 'Enter room name',
+					showCancelButton: true,
+					confirmButtonText: 'Update',
+					cancelButtonText: 'Cancel',
+					inputValidator: (value) => {
+						if (!value) {
+							return 'Room name is required!';
+						}
+					}
+				}).then((result) => {
+					if (result.isConfirmed) {
+						$.ajax({
+							url: '<?php echo base_url('Guest_List_Room/Update'); ?>',
+							type: 'post',
+							data: {
+								room_id: roomId,
+								room_name: result.value
+							},
+							dataType: 'json',
+							success: function(response) {
+								if(response.success) {
+									Swal.fire('Success!', response.message, 'success');
+									refreshRoomsList();
+								} else {
+									Swal.fire('Error!', response.message, 'error');
+								}
+							},
+							error: function() {
+								Swal.fire('Error!', 'Failed to update room', 'error');
+							}
+						});
+					}
+				});
+			});
+
+			$('.delete-room-btn').off('click').on('click', function() {
+				var roomId = $(this).data('room-id');
+				Swal.fire({
+					title: 'Are you sure?',
+					text: 'This will delete the room. Guests assigned to this room will be unassigned.',
+					icon: 'warning',
+					showCancelButton: true,
+					confirmButtonText: 'Yes, delete it!',
+					cancelButtonText: 'Cancel'
+				}).then((result) => {
+					if (result.isConfirmed) {
+						$.ajax({
+							url: '<?php echo base_url('Guest_List_Room/Delete'); ?>',
+							type: 'get',
+							data: { room_id: roomId },
+							dataType: 'json',
+							success: function(response) {
+								if(response.success) {
+									Swal.fire('Deleted!', response.message, 'success');
+									refreshRoomsList();
+								} else {
+									Swal.fire('Error!', response.message, 'error');
+								}
+							},
+							error: function() {
+								Swal.fire('Error!', 'Failed to delete room', 'error');
+							}
+						});
+					}
+				});
+			});
+		}
+
+		$('#create_room_btn').click(function() {
+			Swal.fire({
+				title: 'Create New Room',
+				input: 'text',
+				inputPlaceholder: 'Enter room name (e.g., Room 101)',
+				showCancelButton: true,
+				confirmButtonText: 'Create',
+				cancelButtonText: 'Cancel',
+				inputValidator: (value) => {
+					if (!value) {
+						return 'Room name is required!';
+					}
+				}
+			}).then((result) => {
+				if (result.isConfirmed) {
+					$.ajax({
+						url: '<?php echo base_url('Guest_List_Room/Create'); ?>',
+						type: 'post',
+						data: {
+							booking_id: booking_id,
+							room_name: result.value
+						},
+						dataType: 'json',
+						success: function(response) {
+							if(response.success) {
+								Swal.fire('Success!', response.message, 'success');
+								refreshRoomsList();
+							} else {
+								Swal.fire('Error!', response.message, 'error');
+							}
+						},
+						error: function() {
+							Swal.fire('Error!', 'Failed to create room', 'error');
+						}
+					});
+				}
+			});
+		});
+
+		// Attach event handlers on page load
+		$(document).ready(function() {
+			attachRoomEventHandlers();
+		});
 	</script>
 
 </body>
