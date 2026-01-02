@@ -52,6 +52,10 @@ class PaymentSync {
 						$amount = $data['Debit'];
 					}
 
+					if (!empty($data['bankaccNo'])) {
+						$acc_no = $data['bankaccNo'];
+					}
+
 					$param['details'][] = [
 						'accNo'              => $acc_no,
 						'toAccountRate'      => arr_get($detail, 'toAccountRate', 1),
@@ -84,6 +88,10 @@ class PaymentSync {
 				} else if ($data['Debit'] != 0.00) { // PV
 					$acc_no = arr_get($data, 'SupplierCode', '');//$config['payment_acc_no_2'];
 					$amount = $data['Debit'];
+				}
+
+				if (!empty($data['bankaccNo'])) {
+					$acc_no = $data['bankaccNo'];
 				}
 
 				$param['details'][] = [
@@ -122,6 +130,10 @@ class PaymentSync {
 				} else if ($data['Debit'] != 0.00) {
 					$acc_no = arr_get($data, 'SupplierCode', '');//$config['payment_acc_no_2'];
 					$amount = $data['Debit'];
+				}
+
+				if (!empty($data['bankaccNo'])) {
+					$acc_no = $data['bankaccNo'];
 				}
 
 				$param['paymentDetails'][] = [
@@ -180,6 +192,10 @@ class PaymentSync {
 						$acc_no = arr_get($data, 'SupplierCode', '');//$config['payment_acc_no_2'];
 						$amount = $data['Debit'];
 					}
+
+					if (!empty($data['bankaccNo'])) {
+						$acc_no = $data['bankaccNo'];
+					}
 					$body['details'][] = [
 						'accNo'              => $acc_no,        // account_no -> accNo
 						'toAccountRate'      => arr_get($detail, 'toAccountRate', 1),       // Default to 1
@@ -212,6 +228,10 @@ class PaymentSync {
 				} else if ($data['Debit'] != 0.00) {
 					$acc_no = arr_get($data, 'SupplierCode', '');//$config['payment_acc_no_2'];
 					$amount = $data['Debit'];
+				}
+
+				if (!empty($data['bankaccNo'])) {
+					$acc_no = $data['bankaccNo'];
 				}
 
 				$body['details'][] = [
@@ -253,6 +273,10 @@ class PaymentSync {
 					$amount = $data['Debit'];
 				}
 
+				if (!empty($data['bankaccNo'])) {
+					$acc_no = $data['bankaccNo'];
+				}
+				
 				$body['paymentDetails'][] = [
 					'paymentMethod' => 'BANK',
 					'chequeNo'      => arr_get($data, 'ReferenceNumber', ''),

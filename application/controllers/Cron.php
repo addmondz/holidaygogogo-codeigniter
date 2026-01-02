@@ -697,6 +697,9 @@ class Cron extends CI_Controller
 		} else { // PV
 			$payment['dealWith'] = !empty($payment['supplier_name']) ? $payment['supplier_name'] : '';
 		}
+		
+		$payment['bankaccNo'] = '';
+
 		if (!empty($payment['Type'])) {
 			$type = [
 				'AGENT COMMISSION',
@@ -707,6 +710,14 @@ class Cron extends CI_Controller
 			];		
 			if (in_array($payment['Type'], $type)) {
 				$payment['dealWith'] = $payment['BankHolder'];
+			}
+
+			$bank_acc_code_types = [
+				'BANK CHARGES',
+				'CREDIT CARD CHARGES'
+			];
+			if (in_array($payment['Type'], $bank_acc_code_types)) {
+				$payment['bankaccNo'] = $config['payment_acc_no_3'];
 			}
 		}
 
