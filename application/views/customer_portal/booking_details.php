@@ -475,7 +475,7 @@
 
         .timeline-item {
             position: relative;
-            margin-bottom: 30px;
+            margin-bottom: 20px;
         }
 
         .timeline-item:last-child {
@@ -498,61 +498,173 @@
         .timeline-item.completed::before {
             background: #50C878;
             border-color: #50C878;
+            box-shadow: 0 0 0 3px rgba(80, 200, 120, 0.2);
+        }
+
+        .timeline-item.completed::after {
+            content: '\f00c';
+            font-family: 'Line Awesome Free';
+            font-weight: 900;
+            position: absolute;
+            left: -26px;
+            top: 5px;
+            width: 16px;
+            height: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 10px;
+            z-index: 2;
         }
 
         .timeline-item.pending::before {
-            background: #FFBF00;
-            border-color: #FFBF00;
+            background: #FF9800;
+            border-color: #FF9800;
+            box-shadow: 0 0 0 3px rgba(255, 152, 0, 0.2);
+            animation: pendingPulse 2s ease-in-out infinite;
+        }
+
+        .timeline-item.pending::after {
+            content: '\f071';
+            font-family: 'Line Awesome Free';
+            font-weight: 900;
+            position: absolute;
+            left: -26px;
+            top: 5px;
+            width: 16px;
+            height: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 9px;
+            z-index: 2;
+        }
+
+        @keyframes pendingPulse {
+            0%, 100% {
+                box-shadow: 0 0 0 3px rgba(255, 152, 0, 0.2);
+            }
+            50% {
+                box-shadow: 0 0 0 5px rgba(255, 152, 0, 0.3);
+            }
         }
 
         .timeline-item.available::before {
-            background: #162447;
-            border-color: #162447;
+            background: #6c757d;
+            border-color: #6c757d;
         }
 
         .timeline-content {
-            background: #f8f9fa;
-            border-radius: 8px;
-            padding: 15px;
-            border-left: 3px solid #162447;
+            background: #ffffff;
+            border-radius: 6px;
+            padding: 12px;
+            border-left: 3px solid #e0e0e0;
+            transition: all 0.3s ease;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
         }
 
         .timeline-item.completed .timeline-content {
             border-left-color: #50C878;
+            border-left-width: 3px;
+            background: #f0fdf4;
         }
 
         .timeline-item.pending .timeline-content {
-            border-left-color: #FFBF00;
+            border-left-color: #FF9800;
+            border-left-width: 3px;
+            background: #fffbf0;
+        }
+
+        .timeline-item.available .timeline-content {
+            border-left-color: #6c757d;
+            border-left-width: 3px;
+            background: #f8f9fa;
+        }
+
+        /* Overdue styling - more prominent red */
+        .timeline-item.pending .timeline-action-text.overdue {
+            color: #d32f2f;
+            font-weight: 600;
         }
 
         .timeline-date {
-            font-size: 12px;
+            font-size: 11px;
             color: #666;
             font-weight: 600;
-            margin-bottom: 5px;
+            margin-bottom: 4px;
         }
 
         .timeline-title {
-            font-size: 14px;
+            font-size: 13px;
             font-weight: 600;
             color: #333;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
         }
 
         .timeline-action {
-            font-size: 12px;
-            color: #666;
-        }
-
-        .timeline-action a {
-            color: #162447;
-            text-decoration: none;
+            font-size: 11px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            width: auto;
+            border-radius: 8px;
+            padding: 4px 20px;
             font-weight: 500;
         }
 
-        .timeline-action a:hover {
-            text-decoration: underline;
+        /* Completed status - green badge */
+        .timeline-item.completed .timeline-action {
+            background-color: #d4edda;
+            color: #155724;
         }
+
+        /* Pending status - yellow badge (including overdue) */
+        .timeline-item.pending .timeline-action {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+
+        /* Overdue - also yellow (same as pending) */
+        .timeline-item.pending .timeline-action.overdue {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+
+        /* Available/Default status - gray badge */
+        .timeline-item.available .timeline-action {
+            background-color: #e9ecef;
+            color: #495057;
+        }
+
+        .timeline-action a {
+            color: inherit;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .timeline-action a:hover {
+            opacity: 0.8;
+        }
+
+        .timeline-action-text {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* Icons for different action types - inherit text color */
+        .timeline-action i,
+        .timeline-action-text i,
+        .timeline-action a i {
+            font-size: 12px;
+            color: inherit !important;
+        }
+
+        /* Remove status badges - visual indicators are enough */
 
         /* Highlighted timeline item for review */
         .timeline-item-highlight {
@@ -626,8 +738,8 @@
 
         .timeline-icon {
             display: inline-block;
-            margin-right: 8px;
-            font-size: 14px;
+            margin-right: 6px;
+            font-size: 12px;
         }
 
         /* Payment History Section */
@@ -1159,33 +1271,124 @@
                         'icon' => 'la la-file-contract'
                     ];
 
-                    // Event 2: Upload payment proof (deposit) - if DepositDeadline exists
-                    if (!empty($booking['DepositDeadlineRaw'])) {
-                        $deposit_deadline_passed = strtotime($booking['DepositDeadlineRaw']) < strtotime($today);
-                        $has_deposit_payment = false;
-                        if (!empty($booking['payments'])) {
-                            foreach ($booking['payments'] as $payment) {
-                                // Check if payment has credit and is approved
-                                if (
-                                    !empty($payment['Credit']) && $payment['Credit'] > 0 &&
-                                    ($payment['Status'] == 'Y' || $payment['Status'] == 'P')
-                                ) {
-                                    // Use raw date for comparison
-                                    $payment_date = !empty($payment['DateRaw']) ? $payment['DateRaw'] : null;
-                                    if ($payment_date && strtotime($payment_date) <= strtotime($booking['DepositDeadlineRaw'])) {
-                                        $has_deposit_payment = true;
-                                        break;
+                    // Analyze payment types to determine what payment upload events to show
+                    $has_deposit_payment = false;
+                    $has_full_payment = false;
+                    $has_balance_payment = false;
+                    $deposit_payment_date = null;
+                    $full_payment_date = null;
+                    $balance_payment_date = null;
+                    
+                    if (!empty($booking['payments'])) {
+                        foreach ($booking['payments'] as $payment) {
+                            if (!empty($payment['Credit']) && $payment['Credit'] > 0 && 
+                                ($payment['Status'] == 'Y' || $payment['Status'] == 'P')) {
+                                
+                                $payment_type = !empty($payment['Type']) ? strtoupper(trim($payment['Type'])) : '';
+                                $payment_date = !empty($payment['DateRaw']) ? $payment['DateRaw'] : null;
+                                
+                                if ($payment_type == 'DEPOSIT') {
+                                    $has_deposit_payment = true;
+                                    if (empty($deposit_payment_date) && $payment_date) {
+                                        $deposit_payment_date = $payment_date;
+                                    }
+                                    // If we already have a full payment, treat it as balance payment
+                                    if ($has_full_payment && !empty($full_payment_date)) {
+                                        $has_balance_payment = true;
+                                        if (empty($balance_payment_date)) {
+                                            $balance_payment_date = $full_payment_date;
+                                        }
+                                    }
+                                } elseif ($payment_type == 'FULL') {
+                                    $has_full_payment = true;
+                                    if (empty($full_payment_date) && $payment_date) {
+                                        $full_payment_date = $payment_date;
+                                    }
+                                    // If we already have a deposit, treat FULL as balance payment
+                                    if ($has_deposit_payment) {
+                                        $has_balance_payment = true;
+                                        if (empty($balance_payment_date) && $payment_date) {
+                                            $balance_payment_date = $payment_date;
+                                        }
+                                    }
+                                } else {
+                                    // Check if this is a balance payment (not deposit, not full, but has credit)
+                                    // Balance payments might be ADDITIONAL PAYMENT or other types
+                                    if ($payment_type != 'DEPOSIT' && $payment_type != 'FULL') {
+                                        $has_balance_payment = true;
+                                        if (empty($balance_payment_date) && $payment_date) {
+                                            $balance_payment_date = $payment_date;
+                                        }
                                     }
                                 }
                             }
                         }
-                        $timeline_events[] = [
-                            'date' => date('d/m/y', strtotime($booking['DepositDeadlineRaw'])),
-                            'title' => 'Upload payment proof (deposit)',
-                            'action' => $has_deposit_payment ? 'Completed' : ($deposit_deadline_passed ? 'Overdue' : 'Pending'),
-                            'status' => $has_deposit_payment ? 'completed' : ($deposit_deadline_passed ? 'pending' : 'pending'),
-                            'icon' => 'la la-upload'
-                        ];
+                    }
+                    
+                    // Determine payment structure: full payment only, or deposit + balance
+                    // Priority: Check actual payments first, then fall back to deadlines
+                    $payment_structure = 'none';
+                    
+                    if ($has_full_payment && !$has_deposit_payment) {
+                        // Only full payment exists in actual payments
+                        $payment_structure = 'full_only';
+                    } elseif ($has_deposit_payment) {
+                        // Has deposit payment, might have balance too
+                        $payment_structure = 'deposit_balance';
+                    } else {
+                        // No payments yet - determine structure from deadlines
+                        $has_deposit_deadline = !empty($booking['DepositDeadlineRaw']);
+                        $has_full_payment_deadline = !empty($booking['FullPaymentDeadlineRaw']);
+                        
+                        if ($has_deposit_deadline && $has_full_payment_deadline) {
+                            // Both deadlines exist - deposit + balance structure
+                            $payment_structure = 'deposit_balance';
+                        } elseif ($has_full_payment_deadline && !$has_deposit_deadline) {
+                            // Only full payment deadline exists - full payment only
+                            $payment_structure = 'full_only';
+                        } elseif ($has_deposit_deadline) {
+                            // Only deposit deadline exists - deposit + balance structure (balance deadline might come later)
+                            $payment_structure = 'deposit_balance';
+                        }
+                    }
+                    
+                    // Event 2: Upload payment proof based on payment structure
+                    if ($payment_structure == 'full_only') {
+                        // Show single full payment upload event
+                        // Use payment date if payment exists, otherwise use deadline
+                        $full_event_date = !empty($full_payment_date) ? $full_payment_date : 
+                                          (!empty($booking['FullPaymentDeadlineRaw']) ? $booking['FullPaymentDeadlineRaw'] : 
+                                          (!empty($booking['DepositDeadlineRaw']) ? $booking['DepositDeadlineRaw'] : null));
+                        
+                        if ($full_event_date) {
+                            $full_deadline = !empty($booking['FullPaymentDeadlineRaw']) ? $booking['FullPaymentDeadlineRaw'] : 
+                                            (!empty($booking['DepositDeadlineRaw']) ? $booking['DepositDeadlineRaw'] : null);
+                            $full_deadline_passed = $full_deadline ? (strtotime($full_deadline) < strtotime($today)) : false;
+                            $full_paid = $booking['balance_due'] <= 0 || $has_full_payment;
+                            
+                            $timeline_events[] = [
+                                'date' => date('d/m/y', strtotime($full_event_date)),
+                                'title' => 'Upload payment proof (Full Payment)',
+                                'action' => $full_paid ? 'Completed' : ($full_deadline_passed ? 'Overdue' : 'Pending'),
+                                'status' => $full_paid ? 'completed' : ($full_deadline_passed ? 'pending' : 'pending'),
+                                'icon' => 'la la-upload'
+                            ];
+                        }
+                    } elseif ($payment_structure == 'deposit_balance') {
+                        // Show deposit upload event if deposit deadline exists
+                        // Use payment date if payment exists, otherwise use deadline
+                        if (!empty($booking['DepositDeadlineRaw']) || !empty($deposit_payment_date)) {
+                            $deposit_event_date = !empty($deposit_payment_date) ? $deposit_payment_date : $booking['DepositDeadlineRaw'];
+                            $deposit_deadline_passed = !empty($booking['DepositDeadlineRaw']) ? (strtotime($booking['DepositDeadlineRaw']) < strtotime($today)) : false;
+                            
+                            $timeline_events[] = [
+                                'date' => date('d/m/y', strtotime($deposit_event_date)),
+                                'title' => 'Upload payment proof (Deposit)',
+                                'action' => $has_deposit_payment ? 'Completed' : ($deposit_deadline_passed ? 'Overdue' : 'Pending'),
+                                'status' => $has_deposit_payment ? 'completed' : ($deposit_deadline_passed ? 'pending' : 'pending'),
+                                'icon' => 'la la-upload'
+                            ];
+                        }
                     }
 
                     // Event 3: Submit namelist - if guest list is available
@@ -1226,17 +1429,32 @@
                         }
                     }
 
-                    // Event 5: Upload payment proof (balance) - if FullPaymentDeadline exists
-                    if (!empty($booking['FullPaymentDeadlineRaw'])) {
-                        $balance_deadline_passed = strtotime($booking['FullPaymentDeadlineRaw']) < strtotime($today);
-                        $balance_paid = $booking['balance_due'] <= 0;
-                        $timeline_events[] = [
-                            'date' => date('d/m/y', strtotime($booking['FullPaymentDeadlineRaw'])),
-                            'title' => 'Upload payment proof (balance)',
-                            'action' => $balance_paid ? 'Completed' : ($balance_deadline_passed ? 'Overdue' : 'Pending'),
-                            'status' => $balance_paid ? 'completed' : ($balance_deadline_passed ? 'pending' : 'pending'),
-                            'icon' => 'la la-upload'
-                        ];
+                    // Event 5: Upload payment proof (Balance) - only show if deposit+balance structure, not for full payment only
+                    if ($payment_structure == 'deposit_balance' && (!empty($booking['FullPaymentDeadlineRaw']) || !empty($balance_payment_date) || !empty($full_payment_date))) {
+                        // Use payment date if balance payment exists (could be FULL payment after deposit, or other balance payment type)
+                        // Priority: balance_payment_date > full_payment_date (when deposit exists) > deadline
+                        $balance_event_date = null;
+                        if (!empty($balance_payment_date)) {
+                            $balance_event_date = $balance_payment_date;
+                        } elseif (!empty($full_payment_date) && $has_deposit_payment) {
+                            // If we have deposit and full payment, use full payment date as balance
+                            $balance_event_date = $full_payment_date;
+                        } elseif (!empty($booking['FullPaymentDeadlineRaw'])) {
+                            $balance_event_date = $booking['FullPaymentDeadlineRaw'];
+                        }
+                        
+                        if ($balance_event_date) {
+                            $balance_deadline_passed = !empty($booking['FullPaymentDeadlineRaw']) ? (strtotime($booking['FullPaymentDeadlineRaw']) < strtotime($today)) : false;
+                            $balance_paid = $booking['balance_due'] <= 0 || $has_balance_payment || ($has_full_payment && $has_deposit_payment);
+                            
+                            $timeline_events[] = [
+                                'date' => date('d/m/y', strtotime($balance_event_date)),
+                                'title' => 'Upload payment proof (Balance)',
+                                'action' => $balance_paid ? 'Completed' : ($balance_deadline_passed ? 'Overdue' : 'Pending'),
+                                'status' => $balance_paid ? 'completed' : ($balance_deadline_passed ? 'pending' : 'pending'),
+                                'icon' => 'la la-upload'
+                            ];
+                        }
                     }
 
                     // Event 6: Download Travel Voucher - if TV is available (usually after full payment)
@@ -1294,6 +1512,24 @@
                         if (!empty($event['booking_token'])) {
                             $data_attrs = 'data-booking-token="' . htmlspecialchars($event['booking_token']) . '"';
                         }
+                        
+                        // Determine action type and prepare display
+                        $original_action = $event['action'];
+                        $has_link = stripos($original_action, '<a') !== false || stripos($original_action, '<span') !== false;
+                        $action_display = $original_action;
+                        
+                        // Only simplify if it's not a link
+                        if (!$has_link) {
+                            if ($event['status'] == 'completed' && stripos($original_action, 'Completed') !== false) {
+                                $action_display = '';
+                            } elseif ($event['status'] == 'pending') {
+                                if (stripos($original_action, 'Overdue') !== false) {
+                                    $action_display = 'Overdue';
+                                } elseif (stripos($original_action, 'Pending') !== false) {
+                                    $action_display = 'Pending';
+                                }
+                            }
+                        }
                     ?>
                         <div class="timeline-item <?php echo $event['status']; ?> <?php echo $highlight_class; ?> <?php echo $clickable_class; ?>" <?php echo $data_attrs; ?>>
                             <div class="timeline-content">
@@ -1301,8 +1537,32 @@
                                     <i class="<?php echo $event['icon']; ?> timeline-icon"></i>
                                     <?php echo $event['date']; ?>
                                 </div>
-                                <div class="timeline-title"><?php echo htmlspecialchars($event['title']); ?></div>
-                                <div class="timeline-action"><?php echo $event['action']; ?></div>
+                                <div class="timeline-title">
+                                    <?php echo htmlspecialchars($event['title']); ?>
+                                </div>
+                                <div class="timeline-action<?php echo ($event['status'] == 'pending' && stripos($action_display, 'Overdue') !== false) ? ' overdue' : ''; ?>">
+                                    <?php 
+                                    if ($has_link) {
+                                        // For links (View BC, View Receipt, etc.) - add view icon
+                                        // Add icon before the link text
+                                        $link_html = preg_replace('/(<a[^>]*>)(.*?)(<\/a>)/i', '$1<i class="la la-eye"></i> $2$3', $original_action);
+                                        echo $link_html;
+                                    } elseif ($event['status'] == 'completed') {
+                                        // For completed actions - add checkmark icon
+                                        $text = !empty($action_display) ? htmlspecialchars($action_display) : 'Completed';
+                                        echo '<span class="timeline-action-text"><i class="la la-check"></i> ' . $text . '</span>';
+                                    } elseif (stripos($action_display, 'Overdue') !== false) {
+                                        // For overdue actions - add warning icon
+                                        echo '<span class="timeline-action-text"><i class="la la-exclamation-triangle"></i> Overdue</span>';
+                                    } elseif (stripos($action_display, 'Pending') !== false || $event['status'] == 'pending') {
+                                        // For pending actions - add clock icon
+                                        echo '<span class="timeline-action-text"><i class="la la-clock"></i> Pending</span>';
+                                    } elseif (!empty($action_display)) {
+                                        // Fallback for any other text
+                                        echo '<span class="timeline-action-text">' . htmlspecialchars($action_display) . '</span>';
+                                    }
+                                    ?>
+                                </div>
                             </div>
                         </div>
                     <?php endforeach; ?>
