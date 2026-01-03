@@ -342,7 +342,13 @@ class Payment_Model extends CI_Model
 				$text = urlencode('New Payment Record Successfully Created' . "\n\n" . 'Booking Number : ' . "\n" . $payment['BookingNumber'] . "\n\n" . 'Travel Date : ' . "\n" . $payment['TravelDate'] . "\n\n" . 'Destination : ' . "\n" . $payment['Destination'] . "\n\n" . 'Sales Agent : ' . "\n" . $payment['SalesAgent'] . "\n\n" . 'Transaction Date : ' . "\n" . $payment['Date'] . "\n\n" . 'Payment Out : ' . "\n" . $payment['Debit'] . "\n\n" . 'Payment Type : ' . "\n" . $payment['Type'] . "\n\n" . 'Payment Deadline : ' . "\n" . $payment['Deadline'] . "\n\n" . 'Bank : ' . "\n" . $payment['Bank'] . "\n\n" . 'Bank Account : ' . "\n" . $payment['BankAccount'] . "\n\n" . 'Bank Holder : ' . "\n" . $payment['BankHolder'] . "\n\n" . 'Remark : ' . "\n" . $payment['DebitRemark']);
 			}
 		}
-		file_get_contents('https://api.telegram.org/bot7521016286:AAEMDyjd789UEHBH5LK4xfBzIzY9TZ80tCg/sendMessage?chat_id=-1002546036574&text=' . $text);
+
+		// Send Telegram notification only if APP_ENV is 'prod'
+		$this->load->helper('utils');
+		$app_env = get_app_env();
+		if ($app_env === 'prod') {
+			file_get_contents('https://api.telegram.org/bot7521016286:AAEMDyjd789UEHBH5LK4xfBzIzY9TZ80tCg/sendMessage?chat_id=-1002546036574&text=' . $text);
+		}
 
 		return $payment_id;
 	}

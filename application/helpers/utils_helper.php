@@ -82,6 +82,17 @@ if (!function_exists('get_env')) {
         return isset($env[$key]) ? $env[$key] : null;
     }
 }
+
+// Utility function to get APP_ENV from .env file
+// Returns 'prod' as default if APP_ENV is not defined
+if (!function_exists('get_app_env')) {
+    function get_app_env()
+    {
+        $app_env = get_env('APP_ENV');
+        return empty($app_env) ? 'prod' : $app_env;
+    }
+}
+
 if (!function_exists('arr_get')) {
     function arr_get($array, $key, $default = '')
     {

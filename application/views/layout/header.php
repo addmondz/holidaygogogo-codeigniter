@@ -1,3 +1,8 @@
+<?php 
+$this->load->helper('utils');
+$app_env = get_app_env();
+$is_dev_env = ($app_env !== 'prod');
+?>
 <!DOCTYPE html>
 <html lang="en">
 
@@ -49,9 +54,36 @@
 	#kt_aside_menu::-webkit-scrollbar {
 		display: none; /* Chrome, Safari, Opera */
 	}
+
+	<?php if ($is_dev_env) { ?>
+	/* Adjust header position when dev banner is visible */
+	#dev-env-banner {
+		height: auto;
+		min-height: 40px;
+	}
+	.header.header-fixed {
+		top: 40px !important;
+	}
+	.header-mobile.header-mobile-fixed {
+		top: 40px !important;
+	}
+	/* Adjust aside menu height to account for banner */
+	.aside-menu-wrapper {
+		height: calc(100vh - 100px) !important;
+	}
+	/* Adjust wrapper to account for banner */
+	.wrapper {
+		margin-top: 0 !important;
+	}
+	<?php } ?>
 </style>
 
 <body class="header-fixed header-mobile-fixed subheader-enabled subheader-fixed aside-enabled aside-fixed aside-minimize-hoverable page-loading">
+	<?php if ($is_dev_env) { ?>
+	<div id="dev-env-banner" style="background-color: #FFA500; color: #000; text-align: center; padding: 10px; font-size: 14px; position: fixed; top: 0; left: 0; right: 0; z-index: 9999; box-shadow: 0 2px 4px rgba(0,0,0,0.2); line-height: 1.4;">
+		This is a development environment. It is safe to make any changes here.
+	</div>
+	<?php } ?>
 	<div class="header-mobile align-items-center header-mobile-fixed" style="background-color:black;">
 		<a href="<?php echo base_url('Dashboard'); ?>">
 			<img src="">

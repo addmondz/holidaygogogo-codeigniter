@@ -579,7 +579,13 @@ class Booking_Model extends CI_Model
 		$country_code = $this->Universal_Model->Read_Country_Code($booking['CountryCodeID']);
 		$booking['SalesAgentMobile'] = $country_code . $booking['SalesAgentMobile'];
 		$text = urlencode('New Booking Record Successfully Created' . "\n\n" . 'Booking Number : ' . "\n" . $booking['BookingNumber'] . "\n\n" . 'Reservation Number : ' . "\n" . $booking['ReservationNumber'] . "\n\n" . 'Deposit Deadline : ' . "\n" . $booking['DepositDeadline'] . "\n\n" . 'Full Payment Deadline : ' . "\n" . $booking['FullPaymentDeadline'] . "\n\n" . 'Customer : ' . "\n" . $booking['Customer'] . ' (' . $booking['CustomerMobile'] . ')' . "\n\n" . 'Travel Date : ' . "\n" . $booking['TravelDate'] . "\n\n" . 'Pax Number : ' . "\n" . $booking['PaxNumber'] . "\n\n" . 'Destination : ' . "\n" . $booking['Destination'] . "\n\n" . 'Sales Agent : ' . "\n" . $booking['SalesAgent'] . ' (' . $booking['SalesAgentMobile'] . ')' . "\n\n" . 'Remark : ' . "\n" . $booking['BookingRemark'] . "\n\n" . 'Subtotal : ' . "\n" . $booking['NetTotal'] . "\n\n" . 'Chat Language : ' . "\n" . $booking['ChatLanguage'] . "\n\n" . 'Source : ' . "\n" . $booking['Source']);
-		file_get_contents('https://api.telegram.org/bot7521016286:AAEMDyjd789UEHBH5LK4xfBzIzY9TZ80tCg/sendMessage?chat_id=-1002546036574&text=' . $text);
+		
+		// Send Telegram notification only if APP_ENV is 'prod'
+		$this->load->helper('utils');
+		$app_env = get_app_env();
+		if ($app_env === 'prod') {
+			file_get_contents('https://api.telegram.org/bot7521016286:AAEMDyjd789UEHBH5LK4xfBzIzY9TZ80tCg/sendMessage?chat_id=-1002546036574&text=' . $text);
+		}
 
 		return $booking_id;
 	}
