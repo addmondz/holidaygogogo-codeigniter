@@ -18,6 +18,7 @@ class Booking extends MY_Controller
 		$this->load->model('Booking_Checklist_Completion_Model');
 		$this->load->model('Product_Package_Checklist_Model');
 		$this->load->model('Package_Checklist_Model');
+		$this->load->model('Guest_list_lock_model');
 		$this->config->load('autocount'); // load config/autocount.php
 	}
 
@@ -394,8 +395,41 @@ class Booking extends MY_Controller
 			$status_icon = $remarks_count > 0 ? ' <i class="la la-comment" style="font-size: 0.85em; opacity: 0.7;"></i>' : '';
 			$row['status'] = '<span class="font-weight-bold remarks-status" style="color:' . $status_color . '; cursor: help;" data-toggle="tooltip" data-html="true" data-placement="left" data-booking-id="' . $booking->BookingID . '" title="' . htmlspecialchars($remarks_html, ENT_QUOTES) . '">' . $status_text . $status_icon . '</span>';
 
-			// GL Status
-			$row['gl_status'] = $booking->LockStatus == 'Y' ? '<i class="la la-lock text-danger"></i>' : '<i class="la la-unlock text-success"></i>';
+			// GL Status - Basic rule:
+			// 1. If old LockStatus = 'Y' -> display locked (red lock)
+			// 2. If has active guest_list_lock (someone is filling) -> display loading (spinner)
+			// 3. Else -> display green open lock
+			$gl_status_icon = '';
+			
+			// First check: Old LockStatus field
+			if ($booking->LockStatus == 'Y') {
+				// Locked - display red lock icon
+				$gl_status_icon = '<i class="la la-lock text-danger"></i>';
+			} else {
+				// Second check: Active guest_list_lock (someone is filling)
+				if (!empty($booking->Token)) {
+					$lock = $this->Guest_list_lock_model->getByHash($booking->Token);
+					if (!empty($lock)) {
+						// Check if lock is expired (checks both lock_expires_at timestamp and missing heartbeat)
+						$is_expired = $this->Guest_list_lock_model->isExpired($lock);
+						
+						if (!$is_expired) {
+							// Active lock exists (someone is filling) - show loading spinner
+							$gl_status_icon = '<i class="la la-spinner la-spin text-primary" data-toggle="tooltip" data-placement="top" title="Guest list is being edited"></i>';
+						} else {
+							// Lock exists but expired - show green open lock
+							$gl_status_icon = '<i class="la la-unlock text-success"></i>';
+						}
+					} else {
+						// No lock exists - show green open lock
+						$gl_status_icon = '<i class="la la-unlock text-success"></i>';
+					}
+				} else {
+					// No token - show green open lock
+					$gl_status_icon = '<i class="la la-unlock text-success"></i>';
+				}
+			}
+			$row['gl_status'] = $gl_status_icon;
 
 			// Autocount Status
 			$row['autocount_status'] = '<span class="font-weight-bold" style="color:' . $autocount_info['color'] . '"' . $tooltip_attr . '>' . $autocount_info['text'] . '</span>';
