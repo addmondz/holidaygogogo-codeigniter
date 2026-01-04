@@ -2084,10 +2084,13 @@ class Booking extends MY_Controller
 				}
 			}
 			
+			$current_user_id = $this->session->userdata('admin_id');
 			$formatted_remarks[] = array(
 				'RemarkID' => $remark->RemarkID,
 				'content' => $remark->content,
 				'commenter_name' => $remark->CommenterName,
+				'commenter_id' => $remark->commenter_id,
+				'is_owner' => ($remark->commenter_id == $current_user_id),
 				'commenter_initials' => $initials,
 				'created_at' => date('d/m/Y H:i:s', strtotime($remark->created_at)),
 				'created_at_relative' => $this->time_ago($remark->created_at),
@@ -2224,6 +2227,18 @@ class Booking extends MY_Controller
 				->set_output(json_encode([
 					'success' => false,
 					'message' => 'Remark not found'
+				]));
+			return;
+		}
+
+		// Check if current user is the owner of the remark
+		$current_user_id = $this->session->userdata('admin_id');
+		if ($remark->commenter_id != $current_user_id) {
+			$this->output
+				->set_content_type('application/json')
+				->set_output(json_encode([
+					'success' => false,
+					'message' => 'You can only delete your own comments'
 				]));
 			return;
 		}

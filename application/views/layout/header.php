@@ -375,6 +375,25 @@ $is_dev_env = ($app_env !== 'prod');
 						<div class="header-menu header-menu-mobile header-menu-layout-default"></div>
 					</div>
 					<div class="topbar">
+						<!-- Notifications Dropdown -->
+						<div class="topbar-item position-relative">
+							<div class="btn btn-icon btn-clean btn-lg mr-1 position-relative" id="kt_notification_toggle" data-toggle="dropdown" data-offset="10px,10px">
+								<i class="la la-bell la-2x text-primary"></i>
+								<span class="label label-lg label-light-danger label-inline label-rounded position-absolute" id="notification-badge" style="top: -5px; right: -5px; display: none; min-width: 20px; padding: 2px 6px;">0</span>
+							</div>
+							<!-- Notification Dropdown -->
+							<div class="dropdown-menu dropdown-menu-right p-0 m-0 dropdown-menu-anim-up dropdown-menu-lg" id="notification-dropdown" style="width: 400px; max-height: 500px; overflow-y: auto;">
+								<div class="d-flex align-items-center justify-content-between p-5 border-bottom">
+									<h5 class="mb-0">Notifications</h5>
+								</div>
+								<div class="notification-list" id="notification-list">
+									<div class="text-center p-10">
+										<div class="spinner spinner-primary spinner-lg"></div>
+										<div class="mt-3">Loading notifications...</div>
+									</div>
+								</div>
+							</div>
+						</div>
 						<div class="topbar-item">
 							<div id="kt_quick_user_toggle" class="btn btn-icon btn-icon-mobile w-auto btn-clean d-flex align-items-center btn-lg px-2">
 								<span class="text-muted font-weight-bold font-size-base d-md-inline mr-1">Welcome,</span>

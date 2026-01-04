@@ -2875,10 +2875,10 @@ $(document).ready(function() {
                             '</div>' +
                             '<div class="comment-text" style="font-size: 0.8125rem; color: #050505; line-height: 1.3; white-space: pre-wrap; word-wrap: break-word;">' + escapeHtml(remark.content) + '</div>' +
                             '</div>' +
-                            // Delete button (visible by default)
-                            '<button type="button" class="btn btn-sm btn-link text-muted delete-comment-btn comment-delete-btn" data-remark-id="' + remark.RemarkID + '" style="position: absolute; top: 0; right: 0; opacity: 1; padding: 2px 6px; font-size: 0.75rem; background: transparent !important;" title="Delete comment">' +
+                            // Delete button (only show if user is the owner)
+                            (remark.is_owner ? '<button type="button" class="btn btn-sm btn-link text-muted delete-comment-btn comment-delete-btn" data-remark-id="' + remark.RemarkID + '" style="position: absolute; top: 0; right: 0; opacity: 1; padding: 2px 6px; font-size: 0.75rem; background: transparent !important;" title="Delete comment">' +
                             '<i class="la la-trash" style="color: #65676b; font-size: 0.875rem;"></i>' +
-                            '</button>' +
+                            '</button>' : '') +
                             '</div>';
                         commentsList.append(commentHtml);
                     });

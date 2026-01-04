@@ -13,7 +13,7 @@ class Remark_Model extends CI_Model
 		$this->db->join('admin', 'admin.AdminID = remark.commenter_id', 'left');
 		$this->db->where('remark.owner_type', $owner_type);
 		$this->db->where('remark.owner_id', $owner_id);
-		$this->db->order_by('remark.created_at', 'DESC');
+		$this->db->order_by('remark.created_at', 'ASC'); // Order by oldest first, latest at bottom
 		return $this->db->get('remark')->result();
 	}
 
@@ -31,7 +31,20 @@ class Remark_Model extends CI_Model
 			'content' => $data['content']
 		);
 		$this->db->insert('remark', $remark_data);
-		return $this->db->insert_id();
+		$remark_id = $this->db->insert_id();
+		
+		// Create notifications for relevant users
+		if ($remark_id && $data['owner_type'] == 'booking') {
+			$this->load->model('Notification_Model');
+			$this->Notification_Model->Create_Remark_Notifications(
+				$data['owner_id'],
+				$remark_id,
+				$data['commenter_id'],
+				$data['content']
+			);
+		}
+		
+		return $remark_id;
 	}
 
 	/**
