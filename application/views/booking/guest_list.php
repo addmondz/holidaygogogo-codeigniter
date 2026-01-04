@@ -205,8 +205,7 @@
 										<br><br>
 										<div class="form-group">
 											<div class="row">
-												<?php if(!empty($this->session->userdata('admin_id'))) { ?>
-												<div class="col-md-12 mb-3">
+												<div class="col-md-12 mb-6">
 													<label>Room Assignment</label>
 													<select name="room_ids[]" id="<?php echo 'room-' . $guest->GuestListID; ?>" <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> class="form-control room-select">
 														<option value="">-- No Room --</option>
@@ -217,12 +216,11 @@
 														} ?>
 													</select>
 												</div>
-												<?php } ?>
-												<div class="col-md-6 mb-7 mb-md-0">
+												<div class="col-md-6 mb-6">
 													<label id="<?php echo 'name_label-' . $guest->GuestListID; ?>">First Name (As per IC/Passport) <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>
 													<input <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="names[]" id="<?php echo 'name-' . $guest->GuestListID; ?>" value="<?php echo $guest->Guest; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="form-control">
 												</div>
-												<div class="col-md-6 mb-7 mb-md-0">
+												<div class="col-md-6 mb-6">
 													<label id="<?php echo 'last_name_label-' . $guest->GuestListID; ?>">Last Name (As per IC/Passport) <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>
 													<input <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="last_names[]" id="<?php echo 'last-name-' . $guest->GuestListID; ?>" value="<?php echo $guest->GuestLastName; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="form-control">
 												</div>
@@ -558,17 +556,17 @@
 						'<br><br>' +
 						'<div class="form-group">' +
 							'<div class="row">' +
-								'<div class="col-md-12 mb-3">' +
+								'<div class="col-md-12 mb-6">' +
 									'<label>Room Assignment</label>' +
 									'<select name="new_room_ids[]" id="room-'+ guest_list_id +'" class="form-control room-select">' +
 										'<option value="">-- No Room --</option>' + getRoomOptions() +
 									'</select>' +
 								'</div>' +
-								'<div class="col-md-6 mb-7 mb-md-0">' +
+								'<div class="col-md-6 mb-6">' +
 									'<label id="name_label-'+ guest_list_id +'">First Name (As per IC/Passport) </label>' +
 									'<input type="text" name="new_names[]" id="name-'+ guest_list_id +'" onchange="Set_Required_Field('+ guest_list_id +')" autocomplete="off" class="form-control">' +
 								'</div>' +
-								'<div class="col-md-6 mb-7 mb-md-0">' +
+								'<div class="col-md-6 mb-6">' +
 									'<label id="last_name_label-'+ guest_list_id +'">Last Name (As per IC/Passport) </label>' +
 									'<input type="text" name="new_last_names[]" id="last-name-'+ guest_list_id +'" onchange="Set_Required_Field('+ guest_list_id +')" autocomplete="off" class="form-control">' +
 								'</div>' +
