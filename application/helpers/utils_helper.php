@@ -73,8 +73,8 @@ if (!function_exists('get_env')) {
                     // Skip comments
                     if (strpos(trim($line), '#') === 0) continue;
                     // Split key-value pairs
-                    list($key, $value) = explode('=', $line, 2);
-                    $env[trim($key)] = trim($value);
+                    list($env_key, $value) = explode('=', $line, 2);
+                    $env[trim($env_key)] = trim($value);
                 }
             }
         }
