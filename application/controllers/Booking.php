@@ -946,6 +946,10 @@ class Booking extends MY_Controller
 					$array['booking_checklists'] = $this->get_booking_checklists($array['booking_products']);
 					$array['completion_map'] = $this->Booking_Checklist_Completion_Model->Read_Completion_Map($array['BookingID']);
 
+					// Get custom uploads
+					$this->load->model('Custom_Upload_Model');
+					$array['custom_uploads'] = $this->Custom_Upload_Model->Read($array['BookingID']);
+
 					if(isset($_GET['nick'])) { echo "<pre>"; print_r($array); exit; }
 					$this->load->view('layout/header', $titles);
 					$this->load->view('booking/booking', $array);
@@ -2040,6 +2044,178 @@ class Booking extends MY_Controller
 					'message' => 'An error occurred while updating Allow Review'
 				]));
 		}
+	}
+
+	/**
+	 * Upload custom file for booking
+	 */
+	function Upload_Custom_File()
+	{
+		if (!in_array('AB', $this->session->access_control)) {
+			$this->output
+				->set_content_type('application/json')
+				->set_output(json_encode([
+					'success' => false,
+					'message' => 'Access denied'
+				]));
+			return;
+		}
+
+		if (!$this->input->is_ajax_request()) {
+			$this->output
+				->set_content_type('application/json')
+				->set_output(json_encode([
+					'success' => false,
+					'message' => 'Invalid request'
+				]));
+			return;
+		}
+
+		$booking_id = $this->input->post('booking_id');
+		$upload_name = $this->input->post('upload_name');
+
+		if (empty($booking_id) || empty($upload_name)) {
+			$this->output
+				->set_content_type('application/json')
+				->set_output(json_encode([
+					'success' => false,
+					'message' => 'Booking ID and upload name are required'
+				]));
+			return;
+		}
+
+		// Validate booking exists
+		$booking = $this->Booking_Model->find($booking_id);
+		if (empty($booking)) {
+			$this->output
+				->set_content_type('application/json')
+				->set_output(json_encode([
+					'success' => false,
+					'message' => 'Booking not found'
+				]));
+			return;
+		}
+
+		// Configure upload
+		$config['upload_path'] = FCPATH . 'assets/upload/custom/';
+		$config['allowed_types'] = 'pdf|jpg|jpeg|png|gif|doc|docx|xls|xlsx|txt';
+		$config['max_size'] = 10240; // 10MB
+		$config['encrypt_name'] = true;
+
+		// Create upload directory if it doesn't exist
+		if (!is_dir($config['upload_path'])) {
+			mkdir($config['upload_path'], 0755, true);
+		}
+
+		$this->load->library('upload', $config);
+
+		if (!$this->upload->do_upload('upload_file')) {
+			$error = $this->upload->display_errors('', '');
+			$this->output
+				->set_content_type('application/json')
+				->set_output(json_encode([
+					'success' => false,
+					'message' => 'Upload failed: ' . $error
+				]));
+			return;
+		}
+
+		$upload_data = $this->upload->data();
+		$file_path = 'assets/upload/custom/' . $upload_data['file_name'];
+
+		// Save to database
+		$this->load->model('Custom_Upload_Model');
+		$upload_id = $this->Custom_Upload_Model->Create(
+			$booking_id,
+			$upload_name,
+			$file_path,
+			$this->session->userdata('admin_id')
+		);
+
+		// Get admin name
+		$this->db->select('Name');
+		$this->db->where('AdminID', $this->session->userdata('admin_id'));
+		$admin = $this->db->get('admin')->row_array();
+
+		$this->output
+			->set_content_type('application/json')
+			->set_output(json_encode([
+				'success' => true,
+				'message' => 'File uploaded successfully',
+				'upload' => [
+					'id' => $upload_id,
+					'upload_name' => $upload_name,
+					'upload_content' => base_url($file_path),
+					'created_by' => $admin['Name'],
+					'created_at' => date('d/m/Y H:i:s')
+				]
+			]));
+	}
+
+	/**
+	 * Delete custom upload
+	 */
+	function Delete_Custom_Upload()
+	{
+		if (!in_array('AB', $this->session->access_control)) {
+			$this->output
+				->set_content_type('application/json')
+				->set_output(json_encode([
+					'success' => false,
+					'message' => 'Access denied'
+				]));
+			return;
+		}
+
+		if (!$this->input->is_ajax_request()) {
+			$this->output
+				->set_content_type('application/json')
+				->set_output(json_encode([
+					'success' => false,
+					'message' => 'Invalid request'
+				]));
+			return;
+		}
+
+		$upload_id = $this->input->post('upload_id');
+		if (empty($upload_id)) {
+			$this->output
+				->set_content_type('application/json')
+				->set_output(json_encode([
+					'success' => false,
+					'message' => 'Upload ID is required'
+				]));
+			return;
+		}
+
+		$this->load->model('Custom_Upload_Model');
+		$upload = $this->Custom_Upload_Model->Get_By_Id($upload_id);
+
+		if (empty($upload)) {
+			$this->output
+				->set_content_type('application/json')
+				->set_output(json_encode([
+					'success' => false,
+					'message' => 'Upload not found'
+				]));
+			return;
+		}
+
+		// Delete file
+		$file_path = FCPATH . $upload['upload_content'];
+		if (file_exists($file_path) && is_file($file_path)) {
+			@unlink($file_path);
+		}
+
+		// Delete from database
+		$this->Custom_Upload_Model->Delete($upload_id);
+
+		$this->output
+			->set_content_type('application/json')
+			->set_output(json_encode([
+				'success' => true,
+				'message' => 'Upload deleted successfully'
+			]));
 	}
 
 	/**

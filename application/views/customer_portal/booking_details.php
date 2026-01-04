@@ -1698,6 +1698,8 @@
                                     <i class="la la-receipt"></i>
                                 <?php elseif ($doc_key == 'gl'): ?>
                                     <i class="la la-users"></i>
+                                <?php elseif (strpos($doc_key, 'cu_') === 0): ?>
+                                    <i class="la la-file-alt"></i>
                                 <?php else: ?>
                                     <i class="la la-file"></i>
                                 <?php endif; ?>

@@ -790,30 +790,122 @@
             <div class="row">
                 <!-- Internal Comments Section -->
                 <div class="col-lg-6 col-md-12">
-                    <div class=" card card-custom">
-                        <div class="card-header flex-wrap py-2" style="background-color:#D7E2F2;">
-                            <div class="card-title">
-                                <h4 class="card-label mb-0" style="color:#6082B6; font-size: 1.1rem;">
-                                    <strong>Internal Comments</strong>
-                                </h4>
+                    <div class="row">
+                        <div class="col">
+                            <div class="card card-custom">
+                                <div class="card-header flex-wrap py-2" style="background-color:#D7E2F2;">
+                                    <div class="card-title">
+                                        <h4 class="card-label mb-0" style="color:#6082B6; font-size: 1.1rem;">
+                                            <strong>Internal Comments</strong>
+                                        </h4>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <!-- Comments List -->
+                                    <div id="internal-comments-list" class="mb-2">
+                                        <div class="text-center text-muted py-2" style="font-size: 0.8125rem;">
+                                            <i class="la la-spinner la-spin"></i> Loading comments...
+                                        </div>
+                                    </div>
+
+                                    <!-- Add New Comment Form -->
+                                    <div class="border-top pt-2">
+                                        <div class="form-group mb-2">
+                                            <textarea id="new-comment-content" class="form-control" rows="2" placeholder="Enter your comment here..." style="font-size: 0.8125rem;"></textarea>
+                                        </div>
+                                        <button type="button" id="add-comment-btn" class="btn btn-primary btn-sm font-weight-bold mt-2 mb-2">
+                                            <i class="la la-comment"></i> Add Comment
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                        <div class="card-body">
-                            <!-- Comments List -->
-                            <div id="internal-comments-list" class="mb-2">
-                                <div class="text-center text-muted py-2" style="font-size: 0.8125rem;">
-                                    <i class="la la-spinner la-spin"></i> Loading comments...
+                    </div>
+                    <div class="row mt-5">
+                        <div class="col">
+                            <div class="card card-custom">
+                                <div class="card-header flex-wrap py-2" style="background-color:#D7E2F2;">
+                                    <div class="card-title">
+                                        <h4 class="card-label mb-0" style="color:#6082B6; font-size: 1.1rem;">
+                                            <strong>Custom Uploads</strong>
+                                        </h4>
+                                    </div>
                                 </div>
-                            </div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-12">
+                                            <form id="custom_upload_form" enctype="multipart/form-data" style="border-bottom:1px solid #D7E2F2; padding-bottom:15px;">
+                                                <input type="hidden" id="upload_booking_id" value="<?php echo $BookingID; ?>">
+                                                
+                                                <div class="row">
+                                                    <div class="col">
+                                                        <div class="form-group">
+                                                            <label>Document Name <span style="color:red;">*</span></label>
+                                                            <input type="text" id="upload_name" class="form-control" placeholder="Enter document name" required>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col">
+                                                        <div class="form-group">
+                                                            <label>Select File <span style="color:red;">*</span></label>
+                                                            <div class="custom-file">
+                                                                <input type="file" class="custom-file-input" id="upload_file" accept=".pdf,.jpg,.jpeg,.png,.gif,.doc,.docx,.xls,.xlsx,.txt" required>
+                                                                <label class="custom-file-label" for="upload_file">Choose file</label>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="row">
+                                                    <div class="col-auto">
+                                                        <button type="submit" class="btn btn-primary btn-block btn-sm" id="upload_btn">
+                                                            <i class="la la-upload"></i> Upload
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </form>
 
-                            <!-- Add New Comment Form -->
-                            <div class="border-top pt-2">
-                                <div class="form-group mb-2">
-                                    <textarea id="new-comment-content" class="form-control" rows="2" placeholder="Enter your comment here..." style="font-size: 0.8125rem;"></textarea>
+                                             <div id="custom_uploads_list" class="mt-4">
+                                                 <strong class="mb-3 d-block">Uploaded Documents</strong>
+                                                 <div id="uploads_container">
+                                                     <?php if (!empty($custom_uploads)): ?>
+                                                         <?php foreach ($custom_uploads as $upload): ?>
+                                                             <div class="upload-item mb-3 border rounded" data-upload-id="<?php echo $upload['id']; ?>" style="background: #fff; transition: all 0.2s;">
+                                                                 <div class="p-3 d-flex justify-content-between align-items-end">
+                                                                     <div class="flex-grow-1 min-w-0 mr-3">
+                                                                         <div class="mb-1">
+                                                                             <strong class="d-block text-truncate" style="font-size: 0.95rem; color: #212529;"><?php echo htmlspecialchars($upload['upload_name']); ?></strong>
+                                                                         </div>
+                                                                         <small class="text-muted d-block" style="font-size: 0.75rem; line-height: 1.4;">
+                                                                             <i class="la la-user-circle"></i> <?php echo htmlspecialchars($upload['CreatedByName']); ?><br>
+                                                                             <i class="la la-clock"></i> <?php echo date('d/m/Y H:i', strtotime($upload['created_at'])); ?>
+                                                                         </small>
+                                                                     </div>
+                                                                     <div class="d-flex align-items-center flex-shrink-0">
+                                                                         <a href="<?php echo base_url($upload['upload_content']); ?>" target="_blank" class="btn btn-sm btn-light-primary mr-2" title="View Document" style="min-width: 50px; display: flex; align-items: center; justify-content: center;">
+                                                                             <i class="la la-eye"></i>
+                                                                         </a>
+                                                                         <a href="<?php echo base_url($upload['upload_content']); ?>" download class="btn btn-sm btn-light-success mr-2" title="Download Document" style="min-width: 50px; display: flex; align-items: center; justify-content: center;">
+                                                                             <i class="la la-download"></i>
+                                                                         </a>
+                                                                         <?php if ($upload['created_by'] == $this->session->userdata('admin_id')) { ?>
+                                                                             <button type="button" class="btn btn-sm btn-light-danger delete-upload" data-upload-id="<?php echo $upload['id']; ?>" title="Delete Document" style="min-width: 50px; display: flex; align-items: center; justify-content: center;">
+                                                                                 <i class="la la-trash"></i>
+                                                                             </button>
+                                                                         <?php } ?>
+                                                                     </div>
+                                                                 </div>
+                                                             </div>
+                                                         <?php endforeach; ?>
+                                                     <?php else: ?>
+                                                         <div class="text-center text-muted py-5">
+                                                             <i class="la la-inbox" style="font-size: 3rem; opacity: 0.3;"></i>
+                                                             <p class="mt-3 mb-0" style="font-size: 0.9rem;">No documents uploaded yet</p>
+                                                         </div>
+                                                     <?php endif; ?>
+                                                 </div>
+                                             </div>
+                                        </div>
+                                    </div>
                                 </div>
-                                <button type="button" id="add-comment-btn" class="btn btn-primary btn-sm font-weight-bold mt-2 mb-2">
-                                    <i class="la la-comment"></i> Add Comment
-                                </button>
                             </div>
                         </div>
                     </div>
@@ -845,7 +937,7 @@
                                         </div>
                                     </div>
 
-                                    <button type="button" id="update_allow_review_btn" class="btn btn-primary font-weight-bold">
+                                    <button type="button" id="update_allow_review_btn" class="btn btn-primary font-weight-bold btn-sm">
                                         <i class="la la-save"></i> Update
                                     </button>
                                 </div>
@@ -3147,6 +3239,206 @@ $(document).ready(function() {
     <?php } ?>
 });
 
+// Custom Upload Functionality
+<?php if(current_url() == base_url('Booking/Update')) { ?>
+$(document).ready(function() {
+    // Update file input label when file is selected
+    $('#upload_file').on('change', function() {
+        var fileName = $(this).val().split('\\').pop();
+        $(this).next('.custom-file-label').html(fileName);
+    });
+
+    // Handle upload form submission
+    $('#custom_upload_form').on('submit', function(e) {
+        e.preventDefault();
+        
+        var bookingId = $('#upload_booking_id').val();
+        var uploadName = $('#upload_name').val();
+        var uploadFile = $('#upload_file')[0].files[0];
+
+        if (!uploadName || !uploadFile) {
+            Swal.fire({
+                width: 550,
+                background: 'url(<?php echo base_url('assets/image/sweetalert.jpg') ?>)',
+                icon: 'warning',
+                title: 'Please provide both document name and file',
+                showConfirmButton: true
+            });
+            return;
+        }
+
+        var formData = new FormData();
+        formData.append('booking_id', bookingId);
+        formData.append('upload_name', uploadName);
+        formData.append('upload_file', uploadFile);
+
+        $('#upload_btn').prop('disabled', true).html('<i class="la la-spinner la-spin"></i> Uploading...');
+
+        $.ajax({
+            url: '<?php echo base_url('Booking/Upload_Custom_File'); ?>',
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(response) {
+                var result = typeof response === 'string' ? JSON.parse(response) : response;
+                if (result.success) {
+                    // Add new upload to list
+                    var uploadHtml = '<div class="upload-item mb-3 border rounded" data-upload-id="' + result.upload.id + '" style="background: #fff; transition: all 0.2s;">' +
+                        '<div class="p-3">' +
+                        '<div class="d-flex align-items-start">' +
+                        '<div class="flex-shrink-0 mr-3">' +
+                        '<div class="d-flex align-items-center justify-content-center" style="width: 48px; height: 48px; background: #f0f4ff; border-radius: 8px;">' +
+                        '<i class="la la-file-alt text-primary" style="font-size: 1.5rem;"></i>' +
+                        '</div>' +
+                        '</div>' +
+                        '<div class="flex-grow-1 min-w-0">' +
+                        '<div class="mb-1">' +
+                        '<strong class="d-block text-truncate" style="font-size: 0.95rem; color: #212529;">' + escapeHtml(result.upload.upload_name) + '</strong>' +
+                        '</div>' +
+                        '<small class="text-muted d-block" style="font-size: 0.75rem; line-height: 1.4;">' +
+                        '<i class="la la-user-circle"></i> ' + escapeHtml(result.upload.created_by) + '<br>' +
+                        '<i class="la la-clock"></i> ' + result.upload.created_at.replace(/\s+\d{2}:\d{2}:\d{2}$/, '') +
+                        '</small>' +
+                        '</div>' +
+                        '</div>' +
+                        '<div class="mt-3 pt-3 border-top">' +
+                        '<div class="d-flex flex-wrap align-items-center">' +
+                        '<a href="' + result.upload.upload_content + '" target="_blank" class="btn btn-sm btn-light-primary mr-2 mb-2" title="View Document" style="flex: 1; min-width: 80px;">' +
+                        '<i class="la la-eye mr-1"></i> <span class="d-none d-md-inline">View</span></a>' +
+                        '<a href="' + result.upload.upload_content + '" download class="btn btn-sm btn-light-success mr-2 mb-2" title="Download Document" style="flex: 1; min-width: 80px;">' +
+                        '<i class="la la-download mr-1"></i> <span class="d-none d-md-inline">Download</span></a>' +
+                        '<button type="button" class="btn btn-sm btn-light-danger delete-upload mb-2" data-upload-id="' + result.upload.id + '" title="Delete Document" style="min-width: 50px;">' +
+                        '<i class="la la-trash"></i></button>' +
+                        '</div>' +
+                        '</div>' +
+                        '</div>' +
+                        '</div>';
+
+                    if ($('#uploads_container .text-center').length > 0) {
+                        $('#uploads_container').html(uploadHtml);
+                    } else {
+                        $('#uploads_container').prepend(uploadHtml);
+                    }
+
+                    // Reset form
+                    $('#custom_upload_form')[0].reset();
+                    $('#upload_file').next('.custom-file-label').html('Choose file');
+                    $('#upload_btn').prop('disabled', false).html('<i class="la la-upload"></i> Upload');
+
+                    // Show success message
+                    Swal.fire({
+                        width: 550,
+                        background: 'url(<?php echo base_url('assets/image/sweetalert.jpg') ?>)',
+                        icon: 'success',
+                        title: 'File uploaded successfully!',
+                        showConfirmButton: false,
+                        timer: 2000
+                    });
+                } else {
+                    Swal.fire({
+                        width: 550,
+                        background: 'url(<?php echo base_url('assets/image/sweetalert.jpg') ?>)',
+                        icon: 'error',
+                        title: 'Error: ' + result.message,
+                        showConfirmButton: true
+                    });
+                    $('#upload_btn').prop('disabled', false).html('<i class="la la-upload"></i> Upload');
+                }
+            },
+            error: function(xhr, status, error) {
+                Swal.fire({
+                    width: 550,
+                    background: 'url(<?php echo base_url('assets/image/sweetalert.jpg') ?>)',
+                    icon: 'error',
+                    title: 'Upload failed: ' + error,
+                    showConfirmButton: true
+                });
+                $('#upload_btn').prop('disabled', false).html('<i class="la la-upload"></i> Upload');
+            }
+        });
+    });
+
+    // Handle delete upload
+    $(document).on('click', '.delete-upload', function() {
+        var uploadId = $(this).data('upload-id');
+        var $uploadItem = $(this).closest('.upload-item');
+
+        Swal.fire({
+            width: 550,
+            background: 'url(<?php echo base_url('assets/image/sweetalert.jpg') ?>)',
+            icon: 'warning',
+            title: 'Are you sure you want to delete this upload?',
+            showCancelButton: true,
+            confirmButtonText: 'Yes, delete it!',
+            cancelButtonText: 'Cancel',
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                $.ajax({
+                    url: '<?php echo base_url('Booking/Delete_Custom_Upload'); ?>',
+                    type: 'POST',
+                    data: { upload_id: uploadId },
+                    dataType: 'json',
+                    success: function(response) {
+                        if (response.success) {
+                            $uploadItem.fadeOut(300, function() {
+                                $(this).remove();
+                                if ($('#uploads_container .upload-item').length === 0) {
+                                    $('#uploads_container').html(
+                                        '<div class="text-center text-muted py-4">' +
+                                        '<i class="la la-inbox" style="font-size: 3rem;"></i>' +
+                                        '<p class="mt-2">No documents uploaded yet</p>' +
+                                        '</div>'
+                                    );
+                                }
+                            });
+                            Swal.fire({
+                                width: 550,
+                                background: 'url(<?php echo base_url('assets/image/sweetalert.jpg') ?>)',
+                                icon: 'success',
+                                title: 'Upload deleted successfully!',
+                                showConfirmButton: false,
+                                timer: 2000
+                            });
+                        } else {
+                            Swal.fire({
+                                width: 550,
+                                background: 'url(<?php echo base_url('assets/image/sweetalert.jpg') ?>)',
+                                icon: 'error',
+                                title: 'Error: ' + response.message,
+                                showConfirmButton: true
+                            });
+                        }
+                    },
+                    error: function() {
+                        Swal.fire({
+                            width: 550,
+                            background: 'url(<?php echo base_url('assets/image/sweetalert.jpg') ?>)',
+                            icon: 'error',
+                            title: 'Failed to delete upload',
+                            showConfirmButton: true
+                        });
+                    }
+                });
+            }
+        });
+    });
+
+    function escapeHtml(text) {
+        var map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+    }
+});
+<?php } ?>
+
 </script>
 
 <style>
@@ -3387,6 +3679,32 @@ $(document).ready(function() {
 
         .checklist-footer .btn {
             width: 100%;
+        }
+    }
+
+    /* Mobile-friendly upload items */
+    .upload-item {
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .upload-item:hover {
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    }
+
+    @media (max-width: 576px) {
+        .upload-item .p-3 {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+        }
+
+        .upload-item .flex-shrink-0 {
+            width: 100%;
+            margin-top: 12px;
+            justify-content: flex-start;
+        }
+
+        .upload-item .flex-shrink-0 .btn {
+            flex: 1;
         }
     }
 </style>

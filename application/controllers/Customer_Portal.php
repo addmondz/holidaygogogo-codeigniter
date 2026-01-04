@@ -381,6 +381,23 @@ class Customer_Portal extends CI_Controller
             ]
         ];
 
+        // Get custom uploads
+        $this->db->select('custom_upload.*');
+        $this->db->from('custom_upload');
+        $this->db->where('custom_upload.booking_id', $booking['BookingID']);
+        $this->db->order_by('custom_upload.created_at', 'DESC');
+        $custom_uploads = $this->db->get()->result_array();
+        
+        // Add custom uploads to documents array
+        foreach ($custom_uploads as $upload) {
+            $booking['documents']['cu_' . $upload['id']] = [
+                'name' => $upload['upload_name'],
+                'url' => $base_url . $upload['upload_content'],
+                'icon' => 'download',
+                'available' => true
+            ];
+        }
+
         // Check if guest list exists
         $this->db->select('COUNT(*) as count');
         $this->db->where('BookingID', $booking['BookingID']);
