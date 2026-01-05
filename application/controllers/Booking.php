@@ -273,7 +273,7 @@ class Booking extends MY_Controller
 			$row = array();
 
 			// Checkbox
-			$row['checkbox'] = '<input type="checkbox" class="check_item" value="' . $booking->BookingID . '">';
+			// $row['checkbox'] = '<input type="checkbox" class="check_item" value="' . $booking->BookingID . '">';
 
 			// Row number
 			$row['row_number'] = $count;

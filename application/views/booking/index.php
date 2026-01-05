@@ -266,9 +266,11 @@
                         <thead>
                             <tr>
                                 <th style="text-align:center;">No.</th>
+                                <?php /* Checkbox column - commented out for now
                                 <th class="booking_checkbox" style="text-align:center;">
                                     <input class="booking_checkbox" type="checkbox" id="check_all">
                                 </th>
+                                */ ?>
                                 <?php if($this->session->userdata('level') != 20) { ?>
                                     <th style="text-align:center;">SA</th>
                                 <?php } ?>
@@ -485,7 +487,8 @@ $(document).ready(function() {
                     $(td).css('text-align', 'center');
                 }
             },
-            { data: 'checkbox', orderable: false, searchable: false, className: 'text-center', responsivePriority: 2 },
+            // Checkbox column - commented out for now
+            // { data: 'checkbox', orderable: false, searchable: false, className: 'text-center', responsivePriority: 2 },
         ];
 
         if (!is_sales_agent) {
