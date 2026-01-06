@@ -179,11 +179,11 @@ class Booking_Model extends CI_Model
 		} else {
 
 			if($ignore == 0 && isset($level2Ignore) && $level2Ignore == 0) {
-				$this->db->where('CAST(booking.InsertDate AS DATE) >=', date('Y-m-d', strtotime('-7 days')));
+				$this->db->where('CAST(booking.InsertDate AS DATE) >=', date('Y-m-d', strtotime('-14 days')));
 				$this->db->where('CAST(booking.InsertDate AS DATE) <=', date('Y-m-d'));
 			}
 		}
-		
+
 		$this->db->where('booking.Status !=', 'N');
 		$this->db->order_by('booking.BookingID', 'DESC');
 
@@ -1252,7 +1252,7 @@ class Booking_Model extends CI_Model
 			$this->db->where('CAST(booking.InsertDate AS DATE) <=', $end_date);
 		} else {
 			if($ignore == 0 && isset($level2Ignore) && $level2Ignore == 0) {
-				$this->db->where('CAST(booking.InsertDate AS DATE) >=', date('Y-m-d', strtotime('-7 days')));
+				$this->db->where('CAST(booking.InsertDate AS DATE) >=', date('Y-m-d', strtotime('-14 days')));
 				$this->db->where('CAST(booking.InsertDate AS DATE) <=', date('Y-m-d'));
 			}
 		}
