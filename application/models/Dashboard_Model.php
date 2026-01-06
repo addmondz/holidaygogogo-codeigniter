@@ -202,7 +202,7 @@ class Dashboard_Model extends CI_Model
 			$this->db->where('StartDate <=', $end_date);
 		} else {
 			$this->db->where('StartDate >=', date('Y-m-d', strtotime('+ 1 day')));
-			$this->db->where('StartDate <=', date('Y-m-d', strtotime('+ 7 days')));
+			$this->db->where('StartDate <=', date('Y-m-d', strtotime('+ 14 days')));
 		}
 
 		$this->db->where('SalesAgent', $this->session->admin_id);
@@ -782,7 +782,7 @@ class Dashboard_Model extends CI_Model
 			$this->db->where('StartDate <=', $end_date);
 		} else {
 			$this->db->where('StartDate >=', date('Y-m-d', strtotime('+ 1 day')));
-			$this->db->where('StartDate <=', date('Y-m-d', strtotime('+ 7 days')));
+			$this->db->where('StartDate <=', date('Y-m-d', strtotime('+ 14 days')));
 		}
 
 		$this->db->where('BookingConfirmationTitle', 'BOOKING CONFIRMATION');
