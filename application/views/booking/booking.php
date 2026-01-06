@@ -586,6 +586,8 @@
 
                     <br><br>
 
+                    <?php if($this->session->userdata('level') != 20) { ?>
+
                     <div class="row">
 
                         <div class="col-md-12 pt-3 pb-3" style="background-color:white; border:3px solid #D7E2F2; border-radius:8px;">
@@ -651,6 +653,8 @@
                         </div>
 
                     </div>
+
+                    <?php } ?>
 
                     <br>
 
