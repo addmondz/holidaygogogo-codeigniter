@@ -133,31 +133,41 @@ class Booking extends MY_Controller
 		$order_dir = $this->input->get('order[0][dir]') == 'asc' ? 'ASC' : 'DESC';
 
 		// Map column index to database column
+		// Note: Column indices must match the frontend DataTables columns array
+		// For non-sales agents: row_number(0), sales_agent(1), insert_date(2), booking_number(3), ...
+		// For sales agents: row_number(0), insert_date(1), booking_number(2), ...
 		$columns = array(
-			0 => 'booking.BookingID',      // checkbox
-			1 => 'booking.BookingID',      // row number
-			2 => 'admin.Name',             // sales agent (or skip for sales agents)
-			3 => 'booking.InsertDate',     // creation date
-			4 => 'BookingNumber',          // BC number
-			5 => 'booking.BookingConfirmationTitle', // BC
-			6 => 'Customer',               // customer
-			7 => 'booking.ChatLanguage',   // chat
-			8 => 'booking.Mobile',         // mobile
-			9 => 'StartDate',              // start
-			10 => 'EndDate',               // end
-			11 => 'category.Name',         // destination
-			12 => 'NetTotal',              // net sales
-			13 => 'NetTotal',              // profit (calculated, use NetTotal as proxy)
-			14 => 'NetTotal',              // profit margin (calculated)
-			15 => 'booking.Status',        // BC status
-			16 => 'LockStatus',            // GL status
-			17 => 'booking.AutocountSyncStatus', // autocount status
-			18 => 'booking.BookingID'      // action
+			0 => 'booking.BookingID',      // row number
+			1 => 'admin.Name',             // sales agent (for non-sales agents)
+			2 => 'booking.InsertDate',     // creation date
+			3 => 'BookingNumber',          // BC number
+			4 => 'booking.BookingConfirmationTitle', // BC
+			5 => 'Customer',               // customer
+			6 => 'booking.ChatLanguage',   // chat
+			7 => 'booking.Mobile',         // mobile
+			8 => 'StartDate',              // start
+			9 => 'EndDate',                // end
+			10 => 'category.Name',         // destination
+			11 => 'NetTotal',              // net sales
+			12 => 'NetTotal',              // profit (calculated, use NetTotal as proxy)
+			13 => 'NetTotal',              // profit margin (calculated)
+			14 => 'booking.Status',        // BC status
+			15 => 'LockStatus',            // GL status
+			16 => 'booking.AutocountSyncStatus', // autocount status
+			17 => 'booking.BookingID'      // action
 		);
 
-		// Adjust column index for sales agents (they don't see SA column)
-		if($is_sales_agent && $order_column_index > 1) {
-			$order_column_index++;
+		// Adjust column index for sales agents
+		// Sales agents don't see: sales_agent (index 1), profit (index 12), profit_margin (index 13)
+		// So their column indices need to be mapped back to the full column array
+		if($is_sales_agent) {
+			if($order_column_index >= 1 && $order_column_index <= 10) {
+				// Columns 1-10: add 1 for missing sales_agent column
+				$order_column_index++;
+			} else if($order_column_index >= 11) {
+				// Columns 11+: add 3 for missing sales_agent + profit + profit_margin
+				$order_column_index += 3;
+			}
 		}
 
 		$order_column = isset($columns[$order_column_index]) ? $columns[$order_column_index] : 'booking.BookingID';
