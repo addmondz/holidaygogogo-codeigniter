@@ -1100,7 +1100,7 @@
 
                 '<br>' +
 
-                '<div class="row" <?php if($this->session->userdata('level') == 20) { echo 'style="display:none;"'; } ?>>' +
+                '<div class="row">' +
 
                     '<div class="col-md-6">' +
 

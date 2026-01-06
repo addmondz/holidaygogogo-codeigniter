@@ -497,6 +497,7 @@
                             </div>
                         </div>
                     <?php } ?>
+                    <?php if($this->session->userdata('level') != 20) { ?>
                         <div class="row">
                             <br>
                             <div class="col-md-12 pt-3 pb-3" style="background-color:white; border:3px solid #D7E2F2; border-radius:8px;">
@@ -531,6 +532,7 @@
                                 </div>
                             </div>
                         </div>
+                    <?php } ?>
                     <br>
                     <?php if(in_array('GP', $this->session->access_control)) { ?>
                         <a href="<?php if(strpos($current_url, '?') == true) { echo base_url('Payment/Create?') . (explode('?', $current_url))[1]; } else { echo base_url('Payment/Create'); } ?>" class="btn btn-primary font-weight-bold" style="width:180px; float:right;">
