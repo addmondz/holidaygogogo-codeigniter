@@ -549,7 +549,7 @@ $(document).ready(function() {
                 }
             },
             columns: columns,
-            order: [[1, 'desc']], // Order by row number (BookingID) descending
+            order: [[is_sales_agent ? 1 : 2, 'desc']], // Order by Creation Date descending
             pageLength: 100,
             lengthMenu: [[50, 100, 200, 500], [50, 100, 200, 500]],
             searchDelay: 300, // 300ms debounce on search
