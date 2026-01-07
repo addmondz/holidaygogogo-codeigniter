@@ -475,7 +475,7 @@
                             </div>
                         </div>
                     <?php } ?>
-                    <?php if(!empty($this->input->get('booking_number')) && $this->session->userdata('level') != 20) { ?>
+                    <?php if(!empty($this->input->get('booking_number'))) { ?>
                         <br>
                         <div class="row">
                             <div class="col-md-6 pt-3 pb-3 ml-auto" style="background-color:white; border:3px solid #D7E2F2; border-radius:8px;">

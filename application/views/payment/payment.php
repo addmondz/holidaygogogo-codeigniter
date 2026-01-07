@@ -240,6 +240,8 @@
                                                 '<br><br>' +
                                             '</div>' +
                                         '</div>').insertAfter('#summary');
+                                        $('#total_credit').val(total_credit.toLocaleString('en-US', {minimumFractionDigits: 2}));
+                                        $('#total_debit').val(total_debit.toLocaleString('en-US', {minimumFractionDigits: 2}));
                                     }
                                 });
                                 for(var i = 0; i < payment_ids.length; i++) {
