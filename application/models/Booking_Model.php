@@ -427,7 +427,8 @@ class Booking_Model extends CI_Model
 			'ChatLanguage'  => $this->input->post('booking')[0]['ChatLanguage'] ? $this->input->post('booking')[0]['ChatLanguage'] : null,
 			'updated_at'    => date('Y-m-d H:i:s'),
 		];
-		if ((!empty($this->input->post('CustomerID')) && $this->input->post('CustomerID') != 'undefined')) {
+		$customerId = $this->input->post('CustomerID');
+		if (!empty($customerId) && $customerId != 'undefined' && $customerId != 'null' && is_numeric($customerId)) {
 			$customer_id = $this->input->post('CustomerID');
 			$this->load->model('Customer_Model');
 			$this->Customer_Model->update_by_id($this->input->post('CustomerID'), $data);
@@ -662,7 +663,8 @@ class Booking_Model extends CI_Model
 			if ($data) { $data['updated_at'] = date('Y-m-d H:i:s'); }
 		}
 
-		if ((!empty($this->input->post('CustomerID')) && $this->input->post('CustomerID') != 'undefined')) {
+		$customerId = $this->input->post('CustomerID');
+		if (!empty($customerId) && $customerId != 'undefined' && $customerId != 'null' && is_numeric($customerId)) {			
 			$this->load->model('Customer_Model');
 			$customer_id = $this->input->post('CustomerID');
 
