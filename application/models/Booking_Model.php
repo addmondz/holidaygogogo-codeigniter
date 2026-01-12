@@ -427,7 +427,7 @@ class Booking_Model extends CI_Model
 			'ChatLanguage'  => $this->input->post('booking')[0]['ChatLanguage'] ? $this->input->post('booking')[0]['ChatLanguage'] : null,
 			'updated_at'    => date('Y-m-d H:i:s'),
 		];
-		if ((!empty($this->input->post('CustomerID')) && $this->input->post('CustomerID') != 'undefiend')) {
+		if ((!empty($this->input->post('CustomerID')) && $this->input->post('CustomerID') != 'undefined')) {
 			$customer_id = $this->input->post('CustomerID');
 			$this->load->model('Customer_Model');
 			$this->Customer_Model->update_by_id($this->input->post('CustomerID'), $data);
@@ -450,9 +450,13 @@ class Booking_Model extends CI_Model
 				}
 			}
 		} else {
-			$data['created_at'] = date('Y-m-d H:i:s');
-			$this->db->insert('customer', $data);
-			$customer_id = $this->db->insert_id();
+			if (!empty($data['name']) || !empty($data['phone_number'])) {
+				$data['created_at'] = date('Y-m-d H:i:s');
+				$this->db->insert('customer', $data);
+				$customer_id = $this->db->insert_id();
+			} else {
+				$customer_id = null;
+			}
 		}
 
 		if($this->input->post('booking_number') != '' || $this->input->post('booking_number') != null) {
@@ -658,7 +662,7 @@ class Booking_Model extends CI_Model
 			if ($data) { $data['updated_at'] = date('Y-m-d H:i:s'); }
 		}
 
-		if ((!empty($this->input->post('CustomerID')) && $this->input->post('CustomerID') != 'undefiend')) {
+		if ((!empty($this->input->post('CustomerID')) && $this->input->post('CustomerID') != 'undefined')) {
 			$this->load->model('Customer_Model');
 			$customer_id = $this->input->post('CustomerID');
 
@@ -684,10 +688,15 @@ class Booking_Model extends CI_Model
 				}
 			}
 		} else {
-			$data['created_at'] = date('Y-m-d H:i:s');
-			$this->db->insert('customer', $data);
-			$customer_id = $this->db->insert_id();
+			if (!empty($data['name']) || !empty($data['phone_number'])) {
+				$data['created_at'] = date('Y-m-d H:i:s');
+				$this->db->insert('customer', $data);
+				$customer_id = $this->db->insert_id();
+			} else {
+				$customer_id = null;
+			}
 		}
+
 
 		$this->db->set('BookingConfirmationFooterID', null);
 		$this->db->where('BookingID', $this->input->post('booking_id'));
