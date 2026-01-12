@@ -100,6 +100,34 @@ div.kt-datatable__pager-container {
                                             </div>
                                         </div>
                                     </div>
+                                    <div class="row">
+                                        <div class="col-md-3">
+                                            <div class="form-group">
+                                                <label>Autocount Status</label>
+                                                <select name="autocount_status" class="form-control selectpicker">
+                                                    <option selected data-icon="la la-sync font-size-lg bs-icon" value="">--SELECT AUTOCOUNT STATUS--</option>
+                                                    <option data-icon="la la-clock font-size-lg bs-icon" value="P" <?php if($this->input->get('autocount_status') == 'P') echo 'selected'; ?>>Pending</option>
+                                                    <option data-icon="la la-check-circle font-size-lg bs-icon" value="S" <?php if($this->input->get('autocount_status') == 'S') echo 'selected'; ?>>Synced</option>
+                                                    <option data-icon="la la-times-circle font-size-lg bs-icon" value="F" <?php if($this->input->get('autocount_status') == 'F') echo 'selected'; ?>>Failed</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="form-group">
+                                                <label>Created Date
+                                                    <a onclick="Reset_Created_Date()" class="btn btn-icon btn-light-warning btn-xs">
+                                                        <i class="la la-undo"></i>
+                                                    </a>
+                                                </label>
+                                                <div id="kt_daterangepicker_customer" class="input-icon">
+                                                    <input readonly type="text" name="created_date" value="<?php if(!empty($this->input->get('created_date'))) { echo $this->input->get('created_date'); } ?>" autocomplete="off" class="form-control">
+                                                    <span>
+                                                        <i class="la la-calendar"></i>
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
                                     <input type="submit" value="Filter" class="btn btn-light-success font-weight-bold" style="width:80px;">
                                     <input type="button" id="reset" value="Reset" class="btn btn-light-primary font-weight-bold" style="width:80px;">
                                 </form>
@@ -266,11 +294,24 @@ div.kt-datatable__pager-container {
 </div>
 
 <script>
-    <?php if(!empty($this->input->get('name')) || !empty($this->input->get('phone_number')) || !empty($this->input->get('CustomerCode')) || !empty($this->input->get('ChatLanguage'))) { ?>
+    <?php if(!empty($this->input->get('name')) || !empty($this->input->get('phone_number')) || !empty($this->input->get('CustomerCode')) || !empty($this->input->get('ChatLanguage')) || !empty($this->input->get('autocount_status')) || !empty($this->input->get('created_date'))) { ?>
         $('#customer_header').click();
     <?php } ?>
 
     $('#reset').click(function() {
         Reset('<?php echo base_url('Customer'); ?>');
+    });
+
+    function Reset_Created_Date() {
+        $('#kt_daterangepicker_customer input').val('');
+    }
+
+    $('#kt_daterangepicker_customer').daterangepicker({
+        buttonClasses: ' btn',
+        applyClass: 'btn-primary',
+        cancelClass: 'btn-secondary',
+        autoApply: true
+    }, function(start, end, label) {
+        $('#kt_daterangepicker_customer .form-control').val(start.format('DD/MM/YYYY') + ' - ' + end.format('DD/MM/YYYY'));
     });
 </script>

@@ -78,6 +78,20 @@ class Customer_Model extends CI_Model
 			$this->db->where('ChatLanguage', $this->input->get('ChatLanguage'));
 		}
 
+		if ($this->input->get('autocount_status')) {
+			$this->db->where('AutocountSyncStatus', $this->input->get('autocount_status'));
+		}
+
+		if ($this->input->get('created_date')) {
+			$dates = explode(' - ', $this->input->get('created_date'));
+			if (count($dates) == 2) {
+				$start_date = date('Y-m-d', strtotime(str_replace('/', '-', $dates[0])));
+				$end_date = date('Y-m-d', strtotime(str_replace('/', '-', $dates[1])));
+				$this->db->where('DATE(created_at) >=', $start_date);
+				$this->db->where('DATE(created_at) <=', $end_date);
+			}
+		}
+
 		$this->db->where('Status', 'Y');
 		$this->db->where('name IS NOT NULL', null, false);
 		$this->db->where('phone_number IS NOT NULL', null, false);
@@ -111,7 +125,21 @@ class Customer_Model extends CI_Model
 		if ($this->input->get('ChatLanguage')) {
 			$this->db->where('ChatLanguage', $this->input->get('ChatLanguage'));
 		}
-		
+
+		if ($this->input->get('autocount_status')) {
+			$this->db->where('AutocountSyncStatus', $this->input->get('autocount_status'));
+		}
+
+		if ($this->input->get('created_date')) {
+			$dates = explode(' - ', $this->input->get('created_date'));
+			if (count($dates) == 2) {
+				$start_date = date('Y-m-d', strtotime(str_replace('/', '-', $dates[0])));
+				$end_date = date('Y-m-d', strtotime(str_replace('/', '-', $dates[1])));
+				$this->db->where('DATE(created_at) >=', $start_date);
+				$this->db->where('DATE(created_at) <=', $end_date);
+			}
+		}
+
 		$this->db->from('customer');
 		$this->db->where('Status', 'Y');
 		$this->db->where('name IS NOT NULL', null, false);
