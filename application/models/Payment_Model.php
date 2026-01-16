@@ -537,6 +537,14 @@ class Payment_Model extends CI_Model
 			'booking.EndDate'
 		], false);
 
+		$this->db->join('customer', 'customer.CustomerID = booking.CustomerID', 'left');
+		$this->db->select([
+			'customer.CustomerCode'
+		], false);
+
+		$this->db->where('customer.CustomerCode IS NOT NULL');
+		$this->db->where('customer.CustomerCode <>', '');
+
 		// Join with supplier
 		$this->db->join('supplier', 'supplier.SupplierID = payment.SupplierID', 'left');
 		$this->db->select([
