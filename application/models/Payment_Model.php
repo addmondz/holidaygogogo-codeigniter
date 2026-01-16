@@ -537,6 +537,7 @@ class Payment_Model extends CI_Model
 			'booking.EndDate'
 		], false);
 
+		// special to retrict only have customer code can sync -- 2025 Jan 16
 		$this->db->join('customer', 'customer.CustomerID = booking.CustomerID', 'left');
 		$this->db->select([
 			'customer.CustomerCode'
