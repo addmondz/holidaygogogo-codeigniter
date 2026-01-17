@@ -1705,7 +1705,16 @@
                     Documents
                 </div>
                 <div class="documents-grid">
-                    <?php foreach ($booking['documents'] as $doc_key => $doc): ?>
+                    <?php 
+                    // Check if travel voucher has been sent (status PT or later)
+                    $travel_voucher_sent = in_array($booking['Status'], array('PT', 'OG', 'Y', 'PR'));
+                    
+                    foreach ($booking['documents'] as $doc_key => $doc): 
+                        // Hide custom uploads (extra documents) until travel voucher is sent
+                        if (strpos($doc_key, 'cu_') === 0 && !$travel_voucher_sent) {
+                            continue;
+                        }
+                    ?>
                         <a href="<?php echo $doc['url']; ?>" target="_blank" class="document-item <?php echo $doc['available'] ? '' : 'disabled'; ?>">
                             <div class="document-icon">
                                 <?php if ($doc_key == 'bc'): ?>
