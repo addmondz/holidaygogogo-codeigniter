@@ -1189,10 +1189,10 @@
                     <span class="detail-label">Customer</span>
                     <span class="detail-value"><?php echo htmlspecialchars($booking['Customer']); ?></span>
                 </div>
-                <?php if (!empty($booking['ReservationNumber'])): ?>
+                <?php if (!empty($booking['BookingNumber'])): ?>
                     <div class="detail-item">
-                        <span class="detail-label">Reservation Number</span>
-                        <span class="detail-value"><?php echo htmlspecialchars($booking['ReservationNumber']); ?></span>
+                        <span class="detail-label">Booking Number</span>
+                        <span class="detail-value"><?php echo htmlspecialchars($booking['BookingNumber']); ?></span>
                     </div>
                 <?php endif; ?>
                 <div class="detail-item">
@@ -1206,11 +1206,11 @@
                     </div>
                 <?php endif; ?>
                 <div class="detail-item">
-                    <span class="detail-label">Passengers</span>
+                    <span class="detail-label">Guests</span>
                     <span class="detail-value"><?php echo htmlspecialchars($booking['PaxInfo']); ?></span>
                 </div>
                 <div class="detail-item">
-                    <span class="detail-label">Mobile</span>
+                    <span class="detail-label">Customer Mobile</span>
                     <span class="detail-value"><?php echo htmlspecialchars($booking['CustomerMobile']); ?></span>
                 </div>
                 <?php if (!empty($booking['SalesAgentName'])): ?>
@@ -1243,12 +1243,31 @@
                         <span class="detail-value"><?php echo nl2br(htmlspecialchars($booking['BookingRemark'])); ?></span>
                     </div>
                 <?php endif; ?>
-                <?php if (!empty($booking['ChatLanguage'])): ?>
-                    <div class="detail-item">
-                        <span class="detail-label">Booking Chat Language</span>
-                        <span class="detail-value"><?php echo htmlspecialchars($booking['ChatLanguage']); ?></span>
-                    </div>
-                <?php endif; ?>
+
+                <!-- Contact Actions -->
+                <div class="documents-grid" style="margin-top: 20px;">
+                    <?php if (!empty($booking['SalesAgentMobile'])): 
+                        $formatted_mobile = format_mobile_number($booking['SalesAgentMobile']);
+                        if ($formatted_mobile): ?>
+                            <a href="tel:<?php echo $formatted_mobile; ?>" class="document-item">
+                                <div class="document-icon">
+                                    <i class="la la-phone"></i>
+                                </div>
+                                <div class="document-name">Call Sales Agent</div>
+                                <div class="document-action">Click to Call</div>
+                            </a>
+                        <?php endif; ?>
+                    <?php endif; ?>
+                    <?php if (get_offical_whatsapp_link() != null): ?>
+                        <a href="<?php echo get_offical_whatsapp_link('Hi, I have a question about my booking. Booking no. ' . $booking['BookingNumber']); ?>" target="_blank" class="document-item">
+                            <div class="document-icon">
+                                <i class="la la-whatsapp"></i>
+                            </div>
+                            <div class="document-name">WhatsApp Us</div>
+                            <div class="document-action">Click to Chat</div>
+                        </a>
+                    <?php endif; ?>
+                </div>
             </div>
 
             <!-- Timeline -->

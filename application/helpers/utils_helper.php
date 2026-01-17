@@ -289,3 +289,38 @@ if (!function_exists('verify_customer_portal_hash')) {
         return hash_equals($expected_hash, $hash);
     }
 }
+
+function format_mobile_number($mobile_number)
+{
+    if (empty($mobile_number)) {
+        return null;
+    }
+
+    // Remove spaces, dashes, brackets, plus sign
+    $number = preg_replace('/[^0-9]/', '', $mobile_number);
+
+    // If starts with 60 (already international)
+    if (preg_match('/^60\d{8,10}$/', $number)) {
+        return $number;
+    }
+
+    // If starts with 0 (local format)
+    if (preg_match('/^0\d{8,10}$/', $number)) {
+        return '6' . $number;
+    }
+
+    // If starts with 1 (missing country code & leading zero)
+    if (preg_match('/^1\d{8,10}$/', $number)) {
+        return '60' . $number;
+    }
+
+    // Anything else → invalid or unsupported
+    return null;
+}
+
+function get_offical_whatsapp_link($text = null){
+    if (empty($text)) {
+        $text = 'Welcome to Holidaygogogo!';
+    }
+    return 'https://api.whatsapp.com/send?phone=60102956786&text=' . urlencode($text);
+}
