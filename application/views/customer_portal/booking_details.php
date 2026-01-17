@@ -1447,7 +1447,7 @@
                         }
                     }
 
-                    // Event 5: Upload payment proof (Balance) - only show if deposit+balance structure, not for full payment only
+                    // Event 5: Upload payment proof (Full) - only show if deposit+balance structure, not for full payment only
                     if ($payment_structure == 'deposit_balance' && (!empty($booking['FullPaymentDeadlineRaw']) || !empty($balance_payment_date) || !empty($full_payment_date))) {
                         // Use payment date if balance payment exists (could be FULL payment after deposit, or other balance payment type)
                         // Priority: balance_payment_date > full_payment_date (when deposit exists) > deadline
@@ -1467,7 +1467,7 @@
                             
                             $timeline_events[] = [
                                 'date' => date('d/m/y', strtotime($balance_event_date)),
-                                'title' => 'Upload payment proof (Balance)',
+                                'title' => 'Upload payment proof (Full)',
                                 'action' => $balance_paid ? 'Completed' : ($balance_deadline_passed ? 'Overdue' : 'Pending'),
                                 'status' => $balance_paid ? 'completed' : ($balance_deadline_passed ? 'pending' : 'pending'),
                                 'icon' => 'la la-upload'

@@ -1,6 +1,11 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 
+// Load REMARK_TYPE class
+if (!class_exists('REMARK_TYPE')) {
+    require_once(APPPATH . 'libraries/Remark_type.php');
+}
+
 /**
  * Dynamic function to call any AutoCount API endpoint
  * Usage example:

@@ -2261,6 +2261,11 @@ class Booking extends MY_Controller
 			}
 			
 			$current_user_id = $this->session->userdata('admin_id');
+			
+			// Get remark type label from REMARK_TYPE class
+			$remark_type = isset($remark->type) ? $remark->type : REMARK_TYPE::INTERNAL;
+			$remark_type_label = REMARK_TYPE::getLabel($remark_type) ?: 'INTERNAL';
+			
 			$formatted_remarks[] = array(
 				'RemarkID' => $remark->RemarkID,
 				'content' => $remark->content,
@@ -2268,6 +2273,8 @@ class Booking extends MY_Controller
 				'commenter_id' => $remark->commenter_id,
 				'is_owner' => ($remark->commenter_id == $current_user_id),
 				'commenter_initials' => $initials,
+				'type' => isset($remark->type) ? $remark->type : 1,
+				'type_label' => $remark_type_label,
 				'created_at' => date('d/m/Y H:i:s', strtotime($remark->created_at)),
 				'created_at_relative' => $this->time_ago($remark->created_at),
 				'created_at_raw' => $remark->created_at
@@ -2336,7 +2343,8 @@ class Booking extends MY_Controller
 			'owner_type' => 'booking',
 			'owner_id' => $booking_id,
 			'commenter_id' => $this->session->userdata('admin_id'),
-			'content' => $content
+			'content' => $content,
+			'type' => REMARK_TYPE::INTERNAL // INTERNAL remark type
 		);
 
 		$remark_id = $this->Remark_Model->Create($remark_data);
@@ -2344,6 +2352,10 @@ class Booking extends MY_Controller
 		if ($remark_id) {
 			// Get the newly created remark with commenter name
 			$remark = $this->Remark_Model->Read_Remark($remark_id);
+			
+			// Get remark type label from REMARK_TYPE class
+			$remark_type = isset($remark->type) ? $remark->type : REMARK_TYPE::INTERNAL;
+			$remark_type_label = REMARK_TYPE::getLabel($remark_type) ?: 'INTERNAL';
 			
 			$this->output
 				->set_content_type('application/json')
@@ -2354,6 +2366,8 @@ class Booking extends MY_Controller
 						'RemarkID' => $remark->RemarkID,
 						'content' => $remark->content,
 						'commenter_name' => $remark->CommenterName,
+						'type' => $remark_type,
+						'type_label' => $remark_type_label,
 						'created_at' => date('d/m/Y H:i:s', strtotime($remark->created_at)),
 						'created_at_raw' => $remark->created_at
 					)

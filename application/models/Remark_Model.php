@@ -7,12 +7,15 @@ class Remark_Model extends CI_Model
 	 * @param int $owner_id ID of the owner record
 	 * @return array Array of remark objects
 	 */
-	function Read_Remarks($owner_type, $owner_id)
+	function Read_Remarks($owner_type, $owner_id, $type = null)
 	{
-		$this->db->select('remark.RemarkID, remark.owner_type, remark.owner_id, remark.commenter_id, remark.content, remark.created_at, remark.updated_at, admin.Name AS CommenterName');
+		$this->db->select('remark.RemarkID, remark.owner_type, remark.owner_id, remark.commenter_id, remark.content, remark.type, remark.created_at, remark.updated_at, admin.Name AS CommenterName');
 		$this->db->join('admin', 'admin.AdminID = remark.commenter_id', 'left');
 		$this->db->where('remark.owner_type', $owner_type);
 		$this->db->where('remark.owner_id', $owner_id);
+		if ($type !== null) {
+			$this->db->where('remark.type', $type);
+		}
 		$this->db->order_by('remark.created_at', 'ASC'); // Order by oldest first, latest at bottom
 		return $this->db->get('remark')->result();
 	}
@@ -24,11 +27,15 @@ class Remark_Model extends CI_Model
 	 */
 	function Create($data)
 	{
+		// Default to INTERNAL type if not specified
+		$remark_type = isset($data['type']) ? $data['type'] : REMARK_TYPE::INTERNAL;
+		
 		$remark_data = array(
 			'owner_type' => $data['owner_type'],
 			'owner_id' => $data['owner_id'],
 			'commenter_id' => $data['commenter_id'],
-			'content' => $data['content']
+			'content' => $data['content'],
+			'type' => $remark_type
 		);
 		$this->db->insert('remark', $remark_data);
 		$remark_id = $this->db->insert_id();
@@ -77,7 +84,7 @@ class Remark_Model extends CI_Model
 	 */
 	function Read_Remark($remark_id)
 	{
-		$this->db->select('remark.RemarkID, remark.owner_type, remark.owner_id, remark.commenter_id, remark.content, remark.created_at, remark.updated_at, admin.Name AS CommenterName');
+		$this->db->select('remark.RemarkID, remark.owner_type, remark.owner_id, remark.commenter_id, remark.content, remark.type, remark.created_at, remark.updated_at, admin.Name AS CommenterName');
 		$this->db->join('admin', 'admin.AdminID = remark.commenter_id', 'left');
 		$this->db->where('remark.RemarkID', $remark_id);
 		return $this->db->get('remark')->row();
