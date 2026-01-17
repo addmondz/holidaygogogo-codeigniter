@@ -824,6 +824,37 @@
                     <div class="row mt-5">
                         <div class="col">
                             <div class="card card-custom">
+                                <div class="card-header flex-wrap py-2" style="background-color:#E8F5E9;">
+                                    <div class="card-title">
+                                        <h4 class="card-label mb-0" style="color:#4CAF50; font-size: 1.1rem;">
+                                            <strong>Customer Remarks</strong>
+                                        </h4>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <!-- Customer Remarks List -->
+                                    <div id="customer-remarks-list" class="mb-2">
+                                        <div class="text-center text-muted py-2" style="font-size: 0.8125rem;">
+                                            <i class="la la-spinner la-spin"></i> Loading customer remarks...
+                                        </div>
+                                    </div>
+
+                                    <!-- Add Admin Remark Form (for responding to customer) -->
+                                    <div class="border-top pt-2">
+                                        <div class="form-group mb-2">
+                                            <textarea id="new-admin-remark-content" class="form-control" rows="2" placeholder="Add your response or remark here..." style="font-size: 0.8125rem;"></textarea>
+                                        </div>
+                                        <button type="button" id="add-admin-remark-btn" class="btn btn-primary btn-sm font-weight-bold mt-2 mb-2">
+                                            <i class="la la-comment"></i> Add Remark
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row mt-5">
+                        <div class="col">
+                            <div class="card card-custom">
                                 <div class="card-header flex-wrap py-2" style="background-color:#D7E2F2;">
                                     <div class="card-title">
                                         <h4 class="card-label mb-0" style="color:#6082B6; font-size: 1.1rem;">
@@ -2936,6 +2967,50 @@ $(document).ready(function() {
     <?php if(current_url() == base_url('Booking/Update')) { ?>
     var bookingId = <?php echo $BookingID; ?>;
 
+    // Load customer remarks on page load
+    function loadCustomerRemarks() {
+        $.ajax({
+            url: '<?php echo base_url('Booking/Get_Customer_Remarks'); ?>',
+            type: 'get',
+            data: { booking_id: bookingId },
+            dataType: 'json',
+            success: function(response) {
+                var remarksList = $('#customer-remarks-list');
+                remarksList.empty();
+
+                if (response.success && response.remarks && response.remarks.length > 0) {
+                    response.remarks.forEach(function(remark) {
+                        // Get first letter for avatar color
+                        var avatarColor = ['primary', 'success', 'info', 'warning', 'danger'][remark.commenter_name.charCodeAt(0) % 5];
+                        
+                        var remarkHtml = '<div class="comment-item d-flex mb-2 mx-2 pb-2 pl-1" style="border-bottom: 1px solid #e4e6eb;">' +
+                            // Avatar
+                            '<div class="flex-shrink-0 mr-2">' +
+                            '<div class="symbol symbol-32 symbol-circle symbol-light-' + avatarColor + '">' +
+                            '<span class="symbol-label font-weight-bold" style="font-size: 0.75rem;">' + (remark.commenter_initials || remark.commenter_name.substring(0, 2).toUpperCase()) + '</span>' +
+                            '</div>' +
+                            '</div>' +
+                            // Comment content
+                            '<div class="flex-grow-1" style="min-width: 0;">' +
+                            '<div class="d-flex align-items-baseline mb-1">' +
+                            '<strong class="mr-2" style="font-size: 0.8125rem; color: #050505;">' + escapeHtml(remark.commenter_name) + '</strong>' +
+                            '<span class="text-muted" style="font-size: 0.75rem; color: #65676b;">' + (remark.created_at_relative || remark.created_at) + '</span>' +
+                            '</div>' +
+                            '<div class="comment-text" style="font-size: 0.8125rem; color: #050505; line-height: 1.3; white-space: pre-wrap; word-wrap: break-word;">' + escapeHtml(remark.content) + '</div>' +
+                            '</div>' +
+                            '</div>';
+                        remarksList.append(remarkHtml);
+                    });
+                } else {
+                    remarksList.html('<div class="text-center text-muted py-3" style="font-size: 0.8125rem; color: #65676b;">No customer remarks yet.</div>');
+                }
+            },
+            error: function() {
+                $('#customer-remarks-list').html('<div class="text-center text-danger py-3" style="font-size: 0.8125rem;">Error loading customer remarks. Please refresh the page.</div>');
+            }
+        });
+    }
+
     // Load comments on page load
     function loadComments() {
         $.ajax({
@@ -3115,8 +3190,66 @@ $(document).ready(function() {
         return text.replace(/[&<>"']/g, function(m) { return map[m]; });
     }
 
+    // Add admin remark (internal remark in response to customer)
+    $('#add-admin-remark-btn').on('click', function() {
+        var content = $('#new-admin-remark-content').val().trim();
+        
+        if (!content) {
+            Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', 'Please enter a remark', null);
+            return;
+        }
+
+        var $btn = $(this);
+        var originalText = $btn.html();
+        $btn.prop('disabled', true).html('<i class="la la-spinner la-spin"></i> Adding...');
+
+        $.ajax({
+            url: '<?php echo base_url('Booking/Add_Remark'); ?>',
+            type: 'post',
+            data: {
+                booking_id: bookingId,
+                content: content,
+                remark_type: '2', // CUSTOMER type when adding from Customer Remarks section
+                skip_notifications: '1' // Skip notifications when adding from Customer Remarks section
+            },
+            dataType: 'json',
+            success: function(response) {
+                $btn.prop('disabled', false).html(originalText);
+                
+                if (response.success) {
+                    $('#new-admin-remark-content').val('');
+                    loadCustomerRemarks(); // Reload customer remarks to show the new one
+                    // Don't redirect, just show success message
+                    Swal.fire({
+                        width: 550,
+                        background: 'url(<?php echo base_url('assets/image/sweetalert.jpg') ?>)',
+                        icon: 'success',
+                        title: 'Remark added Successfully',
+                        showConfirmButton: false,
+                        timer: 2200
+                    });
+                } else {
+                    Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', response.message || 'Failed to add remark', null);
+                }
+            },
+            error: function() {
+                $btn.prop('disabled', false).html(originalText);
+                Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', 'Error adding remark. Please try again.', null);
+            }
+        });
+    });
+
+    // Allow Enter key to submit (Ctrl+Enter or Shift+Enter) for admin remark
+    $('#new-admin-remark-content').on('keydown', function(e) {
+        if ((e.ctrlKey || e.shiftKey) && e.keyCode === 13) {
+            e.preventDefault();
+            $('#add-admin-remark-btn').click();
+        }
+    });
+
     // Load comments when page is ready
     loadComments();
+    loadCustomerRemarks();
     <?php } ?>
     
     // Booking Checklist functionality

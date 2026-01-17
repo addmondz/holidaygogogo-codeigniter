@@ -220,5 +220,51 @@ class Notification_Model extends CI_Model
 
 		return $notifications_created;
 	}
+
+	/**
+	 * Create notification for Sales Agent when customer adds a remark
+	 * 
+	 * @param int $booking_id Booking ID
+	 * @param int $remark_id Remark ID
+	 * @param int $sales_agent_id Sales Agent Admin ID
+	 * @param string $customer_name Customer name
+	 * @param string $remark_content Remark content
+	 * @return bool Success status
+	 */
+	function Create_Customer_Remark_Notification($booking_id, $remark_id, $sales_agent_id, $customer_name, $remark_content)
+	{
+		// Check if Sales Agent exists and is active
+		$this->db->select('AdminID');
+		$this->db->where('AdminID', $sales_agent_id);
+		$this->db->where('Status', 'Y');
+		$sales_agent = $this->db->get('admin')->row();
+		
+		if (empty($sales_agent)) {
+			return false;
+		}
+
+		// Check if notification already exists (prevent duplicates)
+		$this->db->where('user_id', $sales_agent_id);
+		$this->db->where('remark_id', $remark_id);
+		$existing = $this->db->get('notification')->row();
+		
+		if (!empty($existing)) {
+			return true; // Already notified
+		}
+
+		// Prepare notification message - use "Customer" instead of customer name
+		$message = 'Customer added a remark';
+
+		$notification_data = array(
+			'user_id' => $sales_agent_id,
+			'type' => 'remark',
+			'owner_type' => 'booking',
+			'owner_id' => $booking_id,
+			'remark_id' => $remark_id,
+			'message' => $message
+		);
+
+		return $this->Create($notification_data) !== false;
+	}
 }
 

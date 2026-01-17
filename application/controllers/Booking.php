@@ -2218,33 +2218,34 @@ class Booking extends MY_Controller
 			]));
 	}
 
-	/**
-	 * AJAX endpoint to get remarks for a booking
-	 */
-	function Get_Remarks()
-	{
-		if (!in_array('AB', $this->session->access_control)) {
-			$this->output
-				->set_content_type('application/json')
-				->set_output(json_encode([
-					'success' => false,
-					'message' => 'Access denied'
-				]));
-			return;
-		}
+    /**
+     * AJAX endpoint to get remarks for a booking
+     */
+    function Get_Remarks()
+    {
+        if (!in_array('AB', $this->session->access_control)) {
+            $this->output
+                ->set_content_type('application/json')
+                ->set_output(json_encode([
+                    'success' => false,
+                    'message' => 'Access denied'
+                ]));
+            return;
+        }
 
-		$booking_id = $this->input->get('booking_id');
-		if (empty($booking_id)) {
-			$this->output
-				->set_content_type('application/json')
-				->set_output(json_encode([
-					'success' => false,
-					'message' => 'Booking ID is required'
-				]));
-			return;
-		}
+        $booking_id = $this->input->get('booking_id');
+        if (empty($booking_id)) {
+            $this->output
+                ->set_content_type('application/json')
+                ->set_output(json_encode([
+                    'success' => false,
+                    'message' => 'Booking ID is required'
+                ]));
+            return;
+        }
 
-		$remarks = $this->Remark_Model->Read_Remarks('booking', $booking_id);
+        // Get internal remarks (type 1) only
+        $remarks = $this->Remark_Model->Read_Remarks('booking', $booking_id, REMARK_TYPE::INTERNAL);
 		
 		// Format remarks for JSON response
 		$formatted_remarks = array();
@@ -2289,10 +2290,87 @@ class Booking extends MY_Controller
 			]));
 	}
 
-	/**
-	 * AJAX endpoint to add a new remark
-	 */
-	function Add_Remark()
+    /**
+     * AJAX endpoint to get customer remarks for a booking
+     */
+    function Get_Customer_Remarks()
+    {
+        if (!in_array('AB', $this->session->access_control)) {
+            $this->output
+                ->set_content_type('application/json')
+                ->set_output(json_encode([
+                    'success' => false,
+                    'message' => 'Access denied'
+                ]));
+            return;
+        }
+
+        $booking_id = $this->input->get('booking_id');
+        if (empty($booking_id)) {
+            $this->output
+                ->set_content_type('application/json')
+                ->set_output(json_encode([
+                    'success' => false,
+                    'message' => 'Booking ID is required'
+                ]));
+            return;
+        }
+
+        // Get customer remarks (type 2) only
+        $remarks = $this->Remark_Model->Read_Remarks('booking', $booking_id, REMARK_TYPE::CUSTOMER);
+        
+        // Format remarks for JSON response
+        $formatted_remarks = array();
+        foreach ($remarks as $remark) {
+            // Determine commenter name - if CommenterName exists, it's an admin, otherwise it's the customer
+            $commenter_name = 'Customer';
+            $initials = '';
+            
+            if (!empty($remark->CommenterName)) {
+                // Admin created this remark - use admin name from join
+                $commenter_name = $remark->CommenterName;
+            } else {
+                // Customer created this remark - get customer name from booking
+                $this->db->select('Customer');
+                $this->db->where('BookingID', $booking_id);
+                $booking_info = $this->db->get('booking')->row();
+                $commenter_name = !empty($booking_info) ? $booking_info->Customer : 'Customer';
+            }
+            
+            // Get initials for avatar
+            if (!empty($commenter_name)) {
+                $name_parts = explode(' ', $commenter_name);
+                if (count($name_parts) >= 2) {
+                    $initials = strtoupper(substr($name_parts[0], 0, 1) . substr($name_parts[count($name_parts) - 1], 0, 1));
+                } else {
+                    $initials = strtoupper(substr($commenter_name, 0, 2));
+                }
+            }
+            
+            $formatted_remarks[] = array(
+                'RemarkID' => $remark->RemarkID,
+                'content' => $remark->content,
+                'commenter_name' => $commenter_name,
+                'commenter_id' => $remark->commenter_id,
+                'commenter_initials' => $initials,
+                'created_at' => date('d/m/Y H:i:s', strtotime($remark->created_at)),
+                'created_at_relative' => $this->time_ago($remark->created_at),
+                'created_at_raw' => $remark->created_at
+            );
+        }
+
+        $this->output
+            ->set_content_type('application/json')
+            ->set_output(json_encode([
+                'success' => true,
+                'remarks' => $formatted_remarks
+            ]));
+    }
+
+    /**
+     * AJAX endpoint to add a new remark
+     */
+    function Add_Remark()
 	{
 		if (!in_array('AB', $this->session->access_control)) {
 			$this->output
@@ -2339,12 +2417,19 @@ class Booking extends MY_Controller
 			return;
 		}
 
+		// Check if this is from Customer Remarks section (type 2) or Internal Comments (type 1)
+		$remark_type = $this->input->post('remark_type') == '2' ? REMARK_TYPE::CUSTOMER : REMARK_TYPE::INTERNAL;
+		
+		// Check if notifications should be skipped (when adding from Customer Remarks section)
+		$skip_notifications = $this->input->post('skip_notifications') == '1' ? true : false;
+		
 		$remark_data = array(
 			'owner_type' => 'booking',
 			'owner_id' => $booking_id,
 			'commenter_id' => $this->session->userdata('admin_id'),
 			'content' => $content,
-			'type' => REMARK_TYPE::INTERNAL // INTERNAL remark type
+			'type' => $remark_type,
+			'skip_notifications' => $skip_notifications
 		);
 
 		$remark_id = $this->Remark_Model->Create($remark_data);

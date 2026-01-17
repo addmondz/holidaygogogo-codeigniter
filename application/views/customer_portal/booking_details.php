@@ -1728,6 +1728,35 @@
                     <?php endforeach; ?>
                 </div>
             </div>
+
+            <!-- Customer Comments Section -->
+            <div class="details-card">
+                <div class="card-title">
+                    Your Comments
+                </div>
+                <div id="customer-comments-list" class="mb-3" style="min-height: 100px;">
+                    <div class="text-center text-muted py-3" style="font-size: 14px;">
+                        <i class="la la-spinner la-spin"></i> Loading comments...
+                    </div>
+                </div>
+
+                <?php 
+                // Hide comment form after travel voucher is sent (status PT or later)
+                // Status progression: P/PP -> PTV -> PT (travel voucher sent) -> OG -> Y
+                $hide_comment_form = in_array($booking['Status'], array('PT', 'OG', 'Y', 'PR'));
+                if (!$hide_comment_form): 
+                ?>
+                <!-- Add New Comment Form -->
+                <div class="pt-3">
+                    <div class="form-group mb-2">
+                        <textarea id="new-customer-comment-content" class="form-control" rows="3" placeholder="Enter your comment or question here..." style="font-size: 14px; resize: vertical;"></textarea>
+                    </div>
+                    <button type="button" id="add-customer-comment-btn" class="btn btn-primary btn-sm" style="font-weight: 600;">
+                        <i class="la la-comment"></i> Add Comment
+                    </button>
+                </div>
+                <?php endif; ?>
+            </div>
         </div>
     </div>
 
@@ -1771,6 +1800,7 @@
     </div>
 
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="<?php echo base_url('assets/js/plugins-bundle.js'); ?>"></script>
     <script>
         $(document).ready(function() {
             var hasReview = <?php echo !empty($booking['CustomerReview']) ? 'true' : 'false'; ?>;
@@ -1917,6 +1947,154 @@
                     closeModal();
                 }
             });
+
+            // Customer Comments functionality
+            var bookingToken = '<?php echo htmlspecialchars($booking['Token']); ?>';
+
+            // Helper function to escape HTML
+            function escapeHtml(text) {
+                var map = {
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#039;'
+                };
+                return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+            }
+
+            // Helper function to calculate time ago
+            function timeAgo(datetime) {
+                var timestamp = new Date(datetime).getTime();
+                var diff = Date.now() - timestamp;
+
+                if (diff < 60000) {
+                    return 'just now';
+                } else if (diff < 3600000) {
+                    var mins = Math.floor(diff / 60000);
+                    return mins + ' minute' + (mins > 1 ? 's' : '') + ' ago';
+                } else if (diff < 86400000) {
+                    var hours = Math.floor(diff / 3600000);
+                    return hours + ' hour' + (hours > 1 ? 's' : '') + ' ago';
+                } else if (diff < 604800000) {
+                    var days = Math.floor(diff / 86400000);
+                    return days + ' day' + (days > 1 ? 's' : '') + ' ago';
+                } else {
+                    return new Date(datetime).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                }
+            }
+
+            // Load customer comments on page load
+            function loadCustomerComments() {
+                $.ajax({
+                    url: '<?php echo base_url('customer/booking/' . $booking['Token'] . '/remarks'); ?>',
+                    type: 'get',
+                    dataType: 'json',
+                    success: function(response) {
+                        var commentsList = $('#customer-comments-list');
+                        commentsList.empty();
+
+                        if (response.success && response.remarks && response.remarks.length > 0) {
+                            response.remarks.forEach(function(remark) {
+                                // Get first letter for avatar color
+                                var avatarColor = ['primary', 'success', 'info', 'warning', 'danger'][remark.commenter_name.charCodeAt(0) % 5];
+                                
+                                var commentHtml = '<div class="comment-item d-flex mb-3 pb-3" style="border-bottom: 1px solid #e4e6eb;">' +
+                                    // Avatar
+                                    '<div class="flex-shrink-0 mr-3">' +
+                                    '<div class="symbol symbol-40 symbol-circle symbol-light-' + avatarColor + '">' +
+                                    '<span class="symbol-label font-weight-bold" style="font-size: 0.875rem;">' + (remark.commenter_initials || remark.commenter_name.substring(0, 2).toUpperCase()) + '</span>' +
+                                    '</div>' +
+                                    '</div>' +
+                                    // Comment content
+                                    '<div class="flex-grow-1" style="min-width: 0;">' +
+                                    '<div class="d-flex align-items-baseline mb-1">' +
+                                    '<strong class="mr-2" style="font-size: 0.875rem; color: #050505;">' + escapeHtml(remark.commenter_name) + '</strong>' +
+                                    '<span class="text-muted" style="font-size: 0.75rem; color: #65676b;">' + (remark.created_at_relative || remark.created_at) + '</span>' +
+                                    '</div>' +
+                                    '<div class="comment-text" style="font-size: 0.875rem; color: #050505; line-height: 1.4; white-space: pre-wrap; word-wrap: break-word;">' + escapeHtml(remark.content) + '</div>' +
+                                    '</div>' +
+                                    '</div>';
+                                commentsList.append(commentHtml);
+                            });
+                        } else {
+                            commentsList.html('<div class="text-center text-muted py-4" style="font-size: 0.875rem; color: #65676b;">No comments yet. Be the first to add a comment!</div>');
+                        }
+                    },
+                    error: function() {
+                        $('#customer-comments-list').html('<div class="text-center text-danger py-3" style="font-size: 0.875rem;">Error loading comments. Please refresh the page.</div>');
+                    }
+                });
+            }
+
+            // Add new customer comment
+            $('#add-customer-comment-btn').on('click', function() {
+                var content = $('#new-customer-comment-content').val().trim();
+                
+                if (!content) {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Please enter a comment',
+                        showConfirmButton: false,
+                        timer: 2000
+                    });
+                    return;
+                }
+
+                var $btn = $(this);
+                var originalText = $btn.html();
+                $btn.prop('disabled', true).html('<i class="la la-spinner la-spin"></i> Adding...');
+
+                $.ajax({
+                    url: '<?php echo base_url('customer/booking/' . $booking['Token'] . '/remark'); ?>',
+                    type: 'post',
+                    data: {
+                        content: content
+                    },
+                    dataType: 'json',
+                    success: function(response) {
+                        $btn.prop('disabled', false).html(originalText);
+                        
+                        if (response.success) {
+                            $('#new-customer-comment-content').val('');
+                            loadCustomerComments(); // Reload comments to show the new one
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Comment added successfully!',
+                                showConfirmButton: false,
+                                timer: 2000
+                            });
+                        } else {
+                            Swal.fire({
+                                icon: 'error',
+                                title: response.message || 'Failed to add comment. Please try again.',
+                                showConfirmButton: false,
+                                timer: 3000
+                            });
+                        }
+                    },
+                    error: function() {
+                        $btn.prop('disabled', false).html(originalText);
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error adding comment. Please try again.',
+                            showConfirmButton: false,
+                            timer: 3000
+                        });
+                    }
+                });
+            });
+
+            // Allow Enter key to submit (Ctrl+Enter or Shift+Enter)
+            $('#new-customer-comment-content').on('keydown', function(e) {
+                if ((e.ctrlKey || e.shiftKey) && e.key === 'Enter') {
+                    e.preventDefault();
+                    $('#add-customer-comment-btn').click();
+                }
+            });
+
+            // Load comments on page load
+            loadCustomerComments();
         });
     </script>
 

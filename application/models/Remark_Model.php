@@ -30,6 +30,9 @@ class Remark_Model extends CI_Model
 		// Default to INTERNAL type if not specified
 		$remark_type = isset($data['type']) ? $data['type'] : REMARK_TYPE::INTERNAL;
 		
+		// Check if notifications should be skipped
+		$skip_notifications = isset($data['skip_notifications']) ? $data['skip_notifications'] : false;
+		
 		$remark_data = array(
 			'owner_type' => $data['owner_type'],
 			'owner_id' => $data['owner_id'],
@@ -40,8 +43,10 @@ class Remark_Model extends CI_Model
 		$this->db->insert('remark', $remark_data);
 		$remark_id = $this->db->insert_id();
 		
-		// Create notifications for relevant users
-		if ($remark_id && $data['owner_type'] == 'booking') {
+		// Create notifications for relevant users (only for internal remarks, not customer remarks)
+		// Customer remarks have their own notification logic handled separately
+		// Skip notifications if flag is set
+		if ($remark_id && $data['owner_type'] == 'booking' && $remark_type == REMARK_TYPE::INTERNAL && !$skip_notifications) {
 			$this->load->model('Notification_Model');
 			$this->Notification_Model->Create_Remark_Notifications(
 				$data['owner_id'],

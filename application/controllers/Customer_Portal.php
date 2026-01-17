@@ -17,6 +17,8 @@ class Customer_Portal extends CI_Controller
         $this->load->model('Customer_Model');
         $this->load->model('Booking_Model');
         $this->load->model('Payment_Model');
+        $this->load->model('Remark_Model');
+        $this->load->model('Notification_Model');
         $this->load->helper('utils');
     }
 
@@ -552,6 +554,203 @@ class Customer_Portal extends CI_Controller
                 'success' => false,
                 'message' => 'Failed to submit review. Please try again.'
             ]));
+        }
+    }
+
+    /**
+     * Get customer remarks for a booking (AJAX)
+     * 
+     * @param string $hashed_bc Booking token
+     */
+    public function get_customer_remarks($hashed_bc = null)
+    {
+        $this->output->set_content_type('application/json');
+
+        if (empty($hashed_bc)) {
+            $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => 'Invalid booking token'
+            ]));
+            return;
+        }
+
+        // Verify booking exists
+        $this->db->select('BookingID');
+        $this->db->where('Token', $hashed_bc);
+        $this->db->where('Status !=', 'N');
+        $booking = $this->db->get('booking')->row_array();
+
+        if (empty($booking)) {
+            $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => 'Booking not found'
+            ]));
+            return;
+        }
+
+        // Get customer remarks (type 2)
+        $remarks = $this->Remark_Model->Read_Remarks('booking', $booking['BookingID'], REMARK_TYPE::CUSTOMER);
+        
+        // Format remarks for JSON response
+        $formatted_remarks = array();
+        foreach ($remarks as $remark) {
+            // Determine commenter name - if CommenterName exists, it's an admin, otherwise it's the customer
+            $commenter_name = 'Customer';
+            $initials = '';
+            
+            if (!empty($remark->CommenterName)) {
+                // Admin created this remark - use admin name from join
+                $commenter_name = $remark->CommenterName;
+            } else {
+                // Customer created this remark - get customer name from booking
+                $this->db->select('Customer');
+                $this->db->where('BookingID', $booking['BookingID']);
+                $booking_info = $this->db->get('booking')->row();
+                $commenter_name = !empty($booking_info) ? $booking_info->Customer : 'Customer';
+            }
+            
+            // Get initials for avatar
+            if (!empty($commenter_name)) {
+                $name_parts = explode(' ', $commenter_name);
+                if (count($name_parts) >= 2) {
+                    $initials = strtoupper(substr($name_parts[0], 0, 1) . substr($name_parts[count($name_parts) - 1], 0, 1));
+                } else {
+                    $initials = strtoupper(substr($commenter_name, 0, 2));
+                }
+            }
+            
+            $formatted_remarks[] = array(
+                'RemarkID' => $remark->RemarkID,
+                'content' => $remark->content,
+                'commenter_name' => $commenter_name,
+                'commenter_initials' => $initials,
+                'created_at' => date('d/m/Y H:i:s', strtotime($remark->created_at)),
+                'created_at_relative' => $this->time_ago($remark->created_at),
+                'created_at_raw' => $remark->created_at
+            );
+        }
+
+        $this->output->set_output(json_encode([
+            'success' => true,
+            'remarks' => $formatted_remarks
+        ]));
+    }
+
+    /**
+     * Add customer remark (AJAX)
+     * 
+     * @param string $hashed_bc Booking token
+     */
+    public function add_customer_remark($hashed_bc = null)
+    {
+        $this->output->set_content_type('application/json');
+
+        if (empty($hashed_bc)) {
+            $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => 'Invalid booking token'
+            ]));
+            return;
+        }
+
+        $content = trim($this->input->post('content'));
+
+        if (empty($content)) {
+            $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => 'Comment content is required'
+            ]));
+            return;
+        }
+
+        // Verify booking exists and get details
+        $this->db->select('BookingID, Customer, SalesAgent');
+        $this->db->where('Token', $hashed_bc);
+        $this->db->where('Status !=', 'N');
+        $booking = $this->db->get('booking')->row_array();
+
+        if (empty($booking)) {
+            $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => 'Booking not found'
+            ]));
+            return;
+        }
+
+        // Create remark with type 2 (CUSTOMER)
+        $remark_data = array(
+            'owner_type' => 'booking',
+            'owner_id' => $booking['BookingID'],
+            'commenter_id' => 0, // Customer comments don't have admin ID
+            'content' => $content,
+            'type' => REMARK_TYPE::CUSTOMER
+        );
+
+        $remark_id = $this->Remark_Model->Create($remark_data);
+
+        if ($remark_id) {
+            // Create notification for Sales Agent
+            if (!empty($booking['SalesAgent'])) {
+                $this->Notification_Model->Create_Customer_Remark_Notification(
+                    $booking['BookingID'],
+                    $remark_id,
+                    $booking['SalesAgent'],
+                    $booking['Customer'],
+                    $content
+                );
+            }
+
+            // Get the newly created remark
+            $remark = $this->Remark_Model->Read_Remark($remark_id);
+            
+            // Get customer name
+            $customer_name = $booking['Customer'];
+            $name_parts = explode(' ', $customer_name);
+            $initials = count($name_parts) >= 2 
+                ? strtoupper(substr($name_parts[0], 0, 1) . substr($name_parts[count($name_parts) - 1], 0, 1))
+                : strtoupper(substr($customer_name, 0, 2));
+            
+            $this->output->set_output(json_encode([
+                'success' => true,
+                'message' => 'Comment added successfully',
+                'remark' => array(
+                    'RemarkID' => $remark->RemarkID,
+                    'content' => $remark->content,
+                    'commenter_name' => $customer_name,
+                    'commenter_initials' => $initials,
+                    'created_at' => date('d/m/Y H:i:s', strtotime($remark->created_at)),
+                    'created_at_raw' => $remark->created_at
+                )
+            ]));
+        } else {
+            $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => 'Failed to add comment. Please try again.'
+            ]));
+        }
+    }
+
+    /**
+     * Helper function to calculate time ago
+     */
+    private function time_ago($datetime)
+    {
+        $timestamp = strtotime($datetime);
+        $diff = time() - $timestamp;
+
+        if ($diff < 60) {
+            return 'just now';
+        } elseif ($diff < 3600) {
+            $mins = floor($diff / 60);
+            return $mins . ' minute' . ($mins > 1 ? 's' : '') . ' ago';
+        } elseif ($diff < 86400) {
+            $hours = floor($diff / 3600);
+            return $hours . ' hour' . ($hours > 1 ? 's' : '') . ' ago';
+        } elseif ($diff < 604800) {
+            $days = floor($diff / 86400);
+            return $days . ' day' . ($days > 1 ? 's' : '') . ' ago';
+        } else {
+            return date('d/m/Y H:i', $timestamp);
         }
     }
 }
