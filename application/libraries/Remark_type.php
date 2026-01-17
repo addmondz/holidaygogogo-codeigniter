@@ -4,7 +4,6 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 /**
  * REMARK_TYPE Class
  * 
- * Laravel-style enum class for remark types
  * Usage: REMARK_TYPE::INTERNAL returns 1
  *        REMARK_TYPE::CUSTOMER returns 2
  */
