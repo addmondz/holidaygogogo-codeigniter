@@ -1059,6 +1059,50 @@
                                     </div>
                                 </div>
                             <?php } ?>
+                             <!-- Booking Status Log Timeline -->
+                            <?php if(!empty($status_logs)) { ?>
+                                <div class="row mt-5">
+                                    <div class="col-12">
+                                        <div class="card card-custom">
+                                            <div class="card-header flex-wrap py-2" style="background-color:#D7E2F2;">
+                                                <div class="card-title">
+                                                    <h4 class="card-label mb-0" style="color:#6082B6; font-size: 1.1rem;">
+                                                        <strong><i class="la la-history"></i> Status History</strong>
+                                                    </h4>
+                                                </div>
+                                            </div>
+                                            <div class="card-body">
+                                                <div class="timeline-container" style="max-height: 500px; overflow-y: auto;">
+                                                    <?php foreach($status_logs as $log): ?>
+                                                        <div class="timeline-item status-log-item <?php echo $log['status']; ?>" style="padding: 12px 0; border-left: 2px solid #e0e0e0; padding-left: 20px; margin-left: 15px; position: relative;">
+                                                            <div class="timeline-marker" style="position: absolute; left: -7px; top: 15px; width: 12px; height: 12px; border-radius: 50%; background-color: <?php echo $log['status'] == 'completed' ? '#50C878' : ($log['status'] == 'cancelled' ? '#FF69B4' : '#FFBF00'); ?>; border: 2px solid white; box-shadow: 0 0 0 2px <?php echo $log['status'] == 'completed' ? '#50C878' : ($log['status'] == 'cancelled' ? '#FF69B4' : '#FFBF00'); ?>;"></div>
+                                                            <div class="timeline-content">
+                                                                <div class="d-flex justify-content-between align-items-start mb-1">
+                                                                    <div class="timeline-title" style="font-weight: 600; color: #212529; font-size: 0.95rem;">
+                                                                        <i class="<?php echo $log['icon']; ?>" style="margin-right: 6px; color: #6082B6;"></i>
+                                                                        <?php echo htmlspecialchars($log['title']); ?>
+                                                                    </div>
+                                                                    <div class="timeline-date" style="font-size: 0.8125rem; color: #6c757d;">
+                                                                        <?php echo $log['date']; ?>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="timeline-description" style="font-size: 0.875rem; color: #495057; margin-top: 4px;">
+                                                                    <?php echo htmlspecialchars($log['description']); ?>
+                                                                </div>
+                                                                <?php if(!empty($log['created_by']) && $log['created_by'] != 'System'): ?>
+                                                                <div class="timeline-meta" style="font-size: 0.75rem; color: #868e96; margin-top: 6px;">
+                                                                    <i class="la la-user"></i> Changed by: <?php echo htmlspecialchars($log['created_by']); ?>
+                                                                </div>
+                                                                <?php endif; ?>
+                                                            </div>
+                                                        </div>
+                                                    <?php endforeach; ?>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            <?php } ?>
                         </div>
                     </div>
                 </div>
@@ -1082,13 +1126,13 @@
 
     $('.alert-light-info').hide();
 
-    <?php if((current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) && !empty($BookingConfirmationFooterID)) { ?>
+    <?php if((current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) && isset($BookingConfirmationFooterID) && !empty($BookingConfirmationFooterID)) { ?>
 
         $('#booking_confirmation_content').show();
 
     <?php } ?>
 
-    <?php if((current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) && !empty($TravelVoucherFooterID)) { ?>
+    <?php if((current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) && isset($TravelVoucherFooterID) && !empty($TravelVoucherFooterID)) { ?>
 
         $('#travel_voucher_content').show();
 
@@ -1101,7 +1145,7 @@
 
             data: {
 
-                footer_id: '<?php echo $TravelVoucherFooterID; ?>'
+                footer_id: '<?php echo isset($TravelVoucherFooterID) ? $TravelVoucherFooterID : ''; ?>'
 
             },
 
@@ -1841,10 +1885,31 @@
                 validateLength('ReservationNumber', 'ReservationNumberError', 20);
                 validateLength('Mobile', 'MobileError', 25, true);
 
-                if(country_code == null || reservation_number == '' || full_payment_deadline == '' || customer == '' || mobile == '' || travel_date == '' || destination == null || sales_agent == null || chat_language == null || source == null || bc_title == null) {
+                const fields = {
+                    'Country code': country_code,
+                    'Reservation number': reservation_number,
+                    'Full payment deadline': full_payment_deadline,
+                    'Customer': customer,
+                    'Mobile': mobile,
+                    'Travel date': travel_date,
+                    'Destination': destination,
+                    'Sales agent': sales_agent,
+                    'Chat language': chat_language,
+                    'Source': source,
+                    'BC title': bc_title,
+                };
 
-                    Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', 'Please Insert All Required Booking Information', null);
+                const missing = Object.keys(fields).filter(
+                    key => fields[key] === null || fields[key] === ''
+                );
 
+                if (missing.length) {
+                    Display_Message(
+                        '<?= base_url("assets/image/sweetalert.jpg") ?>',
+                        `Please insert: ${missing.join(', ')}`,
+                        null,
+                        true
+                    );
                 } else {
 
                     if(adult == '' && children == '' && infant == '') {
@@ -2302,11 +2367,11 @@
 
                                     var travel_voucher_footer_id = $('#travel_voucher_footer').val();
 
-                                    if(travel_voucher_footer_id != '<?php echo $TravelVoucherFooterID; ?>') {
+                                    if(travel_voucher_footer_id != '<?php echo isset($TravelVoucherFooterID) ? $TravelVoucherFooterID : ''; ?>') {
 
                                         booking[0]['TravelVoucherFooterID'] = travel_voucher_footer_id;
 
-                                        booking_log.push({BookingID:<?php echo $BookingID ?>, Column:'TravelVoucherFooterID', CurrentData:'<?php echo $TravelVoucherFooterID; ?>', NewData:travel_voucher_footer_id, InsertBy:<?php echo $this->session->userdata('admin_id') ?>, InsertDate:'<?php echo date('Y-m-d H:i:s') ?>'});
+                                        booking_log.push({BookingID:<?php echo $BookingID ?>, Column:'TravelVoucherFooterID', CurrentData:'<?php echo isset($TravelVoucherFooterID) ? $TravelVoucherFooterID : ''; ?>', NewData:travel_voucher_footer_id, InsertBy:<?php echo $this->session->userdata('admin_id') ?>, InsertDate:'<?php echo date('Y-m-d H:i:s') ?>'});
 
                                     }
 

@@ -36,15 +36,15 @@ function Delete_Record(background, title, url, key, value, status, href)
 	});
 }
 
-function Display_Message(background, title, url)
+function Display_Message(background, title, url, showConfirmButton = false)
 {
 	Swal.fire({
 		width: 550,
 		background: `url(${background})`,
 		icon: title.includes('Successfully') || title.includes('No Changes') ? 'success' : 'error',
 		title: title,
-		showConfirmButton: false,
-		timer: 2200
+		showConfirmButton: showConfirmButton,
+		...(confirm ? {} : { timer: 2200 })
 	}).then(() => {
 		if(title.includes('Successfully') || title.includes('No Changes') || title.includes('Page Will Refresh')) {
 			window.location.href = url;

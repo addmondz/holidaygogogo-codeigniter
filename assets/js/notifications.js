@@ -280,10 +280,10 @@
         $('.notification-item').on('click', function() {
             const bookingNumber = $(this).data('booking-number');
             const bookingID = $(this).data('booking-id');
-            
-            // Redirect to booking/payment page
+
+            // Redirect to booking dashboard with booking number search
             if (bookingNumber) {
-                window.location.href = HOST_URL + 'Booking/Update?booking_id=' + bookingID;
+                window.location.href = HOST_URL + 'Booking?booking_number=' + encodeURIComponent(bookingNumber);
             } else {
                 window.location.href = HOST_URL + 'Booking';
             }

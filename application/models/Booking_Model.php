@@ -143,6 +143,10 @@ class Booking_Model extends CI_Model
 					$this->db->where('LockStatus', 'N');
 					$this->db->where('booking.Status', 'PTV');
 				}
+				if($this->input->get('status') == 'PBC') {
+					$this->db->where('CancelStatus', 'N');
+					$this->db->where('booking.Status', 'PBC');
+				}
 				if($this->input->get('status') == 'P') {
 					$this->db->where('CancelStatus', 'N');
 					$this->db->where("(`DepositDeadline` >= '".date('Y-m-d')."' OR (`DepositDeadline` IS NULL AND `FullPaymentDeadline` >= '".date('Y-m-d')."'))");
@@ -275,6 +279,10 @@ class Booking_Model extends CI_Model
 				$this->db->where('CancelStatus', 'N');
 				$this->db->where('LockStatus', 'N');
 				$this->db->where('booking.Status', 'PTV');
+			}
+			if($this->input->get('status') == 'PBC') {
+				$this->db->where('CancelStatus', 'N');
+				$this->db->where('booking.Status', 'PBC');
 			}
 			if($this->input->get('status') == 'P') {
 				$this->db->where('CancelStatus', 'N');
@@ -418,6 +426,9 @@ class Booking_Model extends CI_Model
 
 	function Create()
 	{
+		// Load booking flow helper
+		$this->load->helper('booking_flow');
+		
 		// Get booking data and ensure AllowReview is properly formatted as integer (0 or 1)
 		$booking_data = $this->input->post('booking');
 		if (!empty($booking_data) && is_array($booking_data)) {
@@ -433,11 +444,30 @@ class Booking_Model extends CI_Model
 					// If AllowReview is not set, default to 1 (TRUE)
 					$booking_data[$key]['AllowReview'] = 1;
 				}
+				
+				// Set initial status to PBC if not provided
+				if (!isset($booking_item['Status']) || empty($booking_item['Status'])) {
+					$booking_data[$key]['Status'] = get_initial_booking_status(); // 'PBC'
+				}
 			}
 		}
 		
 		$this->db->insert_batch('booking', json_decode(json_encode($booking_data)));
 		$booking_id = $this->db->insert_id();
+		
+		// Log booking creation with initial status
+		if ($booking_id) {
+			$this->load->helper('booking_status_log');
+			$initial_status = !empty($booking_data[0]['Status']) ? $booking_data[0]['Status'] : 'PBC';
+			$creator_id = $this->session->userdata('admin_id');
+			log_booking_creation($booking_id, $initial_status, "Booking created", $creator_id);
+
+			// Notify Sales Agent when a booking is created under them by someone else
+			$sales_agent = isset($booking_data[0]['SalesAgent']) ? $booking_data[0]['SalesAgent'] : null;
+			$creator_name = $this->session->userdata('name') ?: 'Someone';
+			$this->load->model('Notification_Model');
+			$this->Notification_Model->Create_Booking_Created_Notification($booking_id, $creator_id, $creator_name, $sales_agent);
+		}
 
 		$data = [
 			'name'          => $this->input->post('booking')[0]['Customer'] ? $this->input->post('booking')[0]['Customer'] : null,
@@ -657,6 +687,7 @@ class Booking_Model extends CI_Model
 	
 	function Create_Booking_Log2($current_status, $new_status, $booking_id)
 	{
+		// Log to original booking_log table
 		$array = array(
 			'BookingID' => $booking_id,
 			'Column' => 'Status',
@@ -666,6 +697,11 @@ class Booking_Model extends CI_Model
 			'InsertDate' => date('Y-m-d H:i:s')
 		);
 		$this->db->insert('booking_log', $array);
+		
+		// Also log to booking_status_log table
+		$this->load->helper('booking_status_log');
+		$created_by = !empty($this->session->admin_id) ? $this->session->admin_id : 0;
+		log_booking_status_update($booking_id, $current_status, $new_status, $created_by, null, true);
 	}
 
 	function Update()
@@ -874,6 +910,13 @@ class Booking_Model extends CI_Model
 
 	function Update_Status($status, $booking_id)
 	{
+		// Get current status before update
+		$this->db->select('Status');
+		$this->db->where('BookingID', $booking_id);
+		$current_booking = $this->db->get('booking')->row();
+		$current_status = $current_booking ? $current_booking->Status : null;
+		
+		// Update status
 		$array = array(
 			'Status' => $status,
 			'UpdateBy' => $this->session->userdata('admin_id'),
@@ -881,6 +924,13 @@ class Booking_Model extends CI_Model
 		);
 		$this->db->where('BookingID', $booking_id);
 		$this->db->update('booking', $array);
+		
+		// Log status change if status actually changed
+		if ($current_status && $current_status != $status) {
+			$this->load->helper('booking_status_log');
+			$created_by = !empty($this->session->userdata('admin_id')) ? $this->session->userdata('admin_id') : 0;
+			log_booking_status_update($booking_id, $current_status, $status, $created_by, null, true);
+		}
 	}
 
 	function Booking_Document()
@@ -1256,6 +1306,10 @@ class Booking_Model extends CI_Model
 					$this->db->where('LockStatus', 'N');
 					$this->db->where('booking.Status', 'PTV');
 				}
+				if($this->input->get('status') == 'PBC') {
+					$this->db->where('CancelStatus', 'N');
+					$this->db->where('booking.Status', 'PBC');
+				}
 				if($this->input->get('status') == 'P') {
 					$this->db->where('CancelStatus', 'N');
 					$this->db->where("(`DepositDeadline` >= '".date('Y-m-d')."' OR (`DepositDeadline` IS NULL AND `FullPaymentDeadline` >= '".date('Y-m-d')."'))");
@@ -1304,7 +1358,7 @@ class Booking_Model extends CI_Model
 	 */
 	function Read_Bookings_Paginated($start, $length, $order_column, $order_dir)
 	{
-		$this->db->select('booking.BookingID, BookingNumber, DepositDeadline, FullPaymentDeadline, Customer, booking.Mobile As CustomerMobile, StartDate, EndDate, NetTotal, booking.ChatLanguage, Token, booking.BookingConfirmationTitle, CancelStatus, LockStatus, AfterSalesService, booking.Status, booking.InsertDate, admin.Name As SalesAgentName, category.Name As DestinationName, CountryCode, booking.AutocountSyncStatus, booking.AutocountSyncMessage, booking.AutocountSyncAction, booking.CustomerAutocountSyncStatus, booking.CustomerAutocountSyncMessage, booking.CustomerAutocountSyncAction, customer.CustomerCode, booking.CustomerID');
+		$this->db->select('booking.BookingID, BookingNumber, DepositDeadline, FullPaymentDeadline, Customer, booking.Mobile As CustomerMobile, StartDate, EndDate, NetTotal, booking.ChatLanguage, Token, booking.BookingConfirmationTitle, CancelStatus, LockStatus, AfterSalesService, booking.Status, booking.InsertDate, admin.Name As SalesAgentName, admin.AdminID AS SalesAgentID, category.Name As DestinationName, CountryCode, booking.AutocountSyncStatus, booking.AutocountSyncMessage, booking.AutocountSyncAction, booking.CustomerAutocountSyncStatus, booking.CustomerAutocountSyncMessage, booking.CustomerAutocountSyncAction, customer.CustomerCode, booking.CustomerID');
 		$this->db->join('admin', 'admin.AdminID = booking.SalesAgent', 'left');
 		$this->db->join('category', 'category.CategoryID = booking.Destination', 'left');
 		$this->db->join('country_code', 'country_code.CountryCodeID = booking.CountryCodeID', 'left');

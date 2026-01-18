@@ -40,6 +40,9 @@ class Booking extends MY_Controller
 
 			$array['bulkBookingSyncToAutocount'] = !empty($config['bulkBookingSyncToAutocount']) ? $config['bulkBookingSyncToAutocount'] : false;
 
+			// Load status log helper
+			$this->load->helper('booking_status_log');
+			
 			// Update status for all bookings (this runs before the AJAX calls)
 			$bookings = $this->Booking_Model->Read_All_Bookings();
 			foreach($bookings as $booking) {
@@ -47,58 +50,35 @@ class Booking extends MY_Controller
 					$this->Booking_Model->Update_After_Sales_Service2($booking->BookingID);
 					$this->Booking_Model->Update_Status('OG', $booking->BookingID);
 					$this->Booking_Model->Create_Booking_Log2($booking->Status, 'OG', $booking->BookingID);
+					log_booking_automatic_status_change($booking->BookingID, $booking->Status, 'OG', "Travel date reached - booking is now on-going", true);
 				} else {
 					if((date('Y-m-d') < $booking->StartDate && ($booking->Status == 'OG' || $booking->Status == 'Y'))) {
 						$this->Booking_Model->Update_After_Sales_Service2($booking->BookingID);
 						$this->Booking_Model->Update_Status('PT', $booking->BookingID);
 						$this->Booking_Model->Create_Booking_Log2($booking->Status, 'PT', $booking->BookingID);
+						log_booking_automatic_status_change($booking->BookingID, $booking->Status, 'PT', "Travel date not yet reached - status reverted to pending travel", true);
 					} else {
 						if((date('Y-m-d') > $booking->EndDate && ($booking->Status == 'PT' || $booking->Status == 'OG'))) {
 							$this->Booking_Model->Update_After_Sales_Service2($booking->BookingID);
 							$this->Booking_Model->Update_Status('Y', $booking->BookingID);
 							$this->Booking_Model->Create_Booking_Log2($booking->Status, 'Y', $booking->BookingID);
+							log_booking_automatic_status_change($booking->BookingID, $booking->Status, 'Y', "Travel completed - booking marked as completed", true);
 						}
 					}
 				}
 
+				// Payment-based status transitions (respecting new flow)
+				// Note: Payment approval status history is now handled in Payment controller
+				// when payment status is changed to 'Y' (approved)
 				$payments = $this->Booking_Model->Read_Payments($booking->BookingID);
-				$total_approved_credit = 0;
-				if(!empty($payments)) {
-					foreach($payments as $payment) {
-						if($payment->Type != 'SUPPLIER REFUND' && $payment->Credit != 0.00 && $payment->Status == 'Y') {
-							$total_approved_credit += $payment->Credit;
+				if(empty($payments)) {
+					// No payments at all, set to PBC if not already in flow
+					if($booking->Status != 'PBC' && $booking->Status != 'P') {
+						// Only reset if not already in payment-related status
+						if(!in_array($booking->Status, ['PBC', 'P', 'PBO', 'PTV', 'PT', 'Y', 'OG'])) {
+							$this->Booking_Model->Update_Status('PBC', $booking->BookingID);
+							$this->Booking_Model->Create_Booking_Log2($booking->Status, 'PBC', $booking->BookingID);
 						}
-					}
-					if($total_approved_credit != 0) {
-						if(strval($total_approved_credit) >= $booking->NetTotal) {
-							$full_payment_existed = $this->Payment_Model->Read_Type($booking->BookingID);
-							if($full_payment_existed) {
-								if($booking->Status == 'P' || $booking->Status == 'PP') {
-									$this->Booking_Model->Update_Status('PTV', $booking->BookingID);
-									$this->Booking_Model->Create_Booking_Log2($booking->Status, 'PTV', $booking->BookingID);
-								}
-							} else {
-								if($booking->Status == 'P') {
-									$this->Booking_Model->Update_Status('PP', $booking->BookingID);
-									$this->Booking_Model->Create_Booking_Log2($booking->Status, 'PP', $booking->BookingID);
-								}
-							}
-						} else {
-							if($booking->Status != 'PP') {
-								$this->Booking_Model->Update_Status('PP', $booking->BookingID);
-								$this->Booking_Model->Create_Booking_Log2($booking->Status, 'PP', $booking->BookingID);
-							}
-						}
-					} else {
-						if($booking->Status != 'P') {
-							$this->Booking_Model->Update_Status('P', $booking->BookingID);
-							$this->Booking_Model->Create_Booking_Log2($booking->Status, 'P', $booking->BookingID);
-						}
-					}
-				} else {
-					if($booking->Status != 'P') {
-						$this->Booking_Model->Update_Status('P', $booking->BookingID);
-						$this->Booking_Model->Create_Booking_Log2($booking->Status, 'P', $booking->BookingID);
 					}
 				}
 			}
@@ -121,12 +101,18 @@ class Booking extends MY_Controller
 	 */
 	function ajax_list()
 	{
-		if(!in_array('VB', $this->session->access_control)) {
-			echo json_encode(array('error' => 'Access denied'));
-			return;
-		}
+		// Set JSON header first to prevent any output issues
+		header('Content-Type: application/json');
+		
+		try {
+			// Ensure access_control is an array to prevent warnings
+			$access_control = $this->session->access_control ?? array();
+			if(!in_array('VB', $access_control)) {
+				echo json_encode(array('error' => 'Access denied'));
+				return;
+			}
 
-		$is_sales_agent = $this->session->userdata('level') == 20;
+			$is_sales_agent = $this->session->userdata('level') == 20;
 
 		// DataTables parameters
 		$draw = intval($this->input->get('draw'));
@@ -240,11 +226,13 @@ class Booking extends MY_Controller
 			// Status color and text
 			$status_colors = array(
 				'Y' => '#50C878', 'PR' => '#C3B1E1', 'P' => '#FFBF00', 'PP' => '#A7C7E7',
-				'PTV' => '#F89880', 'PGL' => '#FAC898', 'PT' => '#F8C8DC', 'OG' => '#CCCCFF', 'PO' => '#DA70D6'
+				'PTV' => '#F89880', 'PGL' => '#FAC898', 'PT' => '#F8C8DC', 'OG' => '#CCCCFF', 'PO' => '#DA70D6',
+				'PBC' => '#FFD700', 'PBO' => '#87CEEB'
 			);
 			$status_texts = array(
 				'Y' => 'COMPLETED', 'PR' => 'PENDING REVIEW', 'P' => 'PENDING PAYMENT', 'PP' => 'PARTIAL PAYMENT',
-				'PTV' => 'PENDING TRAVEL VOUCHER', 'PGL' => 'PENDING GUEST LIST', 'PT' => 'PENDING TRAVEL', 'OG' => 'ON-GOING', 'PO' => 'PAYMENT OVERDUE'
+				'PTV' => 'PENDING TRAVEL VOUCHER', 'PGL' => 'PENDING GUEST LIST', 'PT' => 'PENDING TRAVEL', 'OG' => 'ON-GOING', 'PO' => 'PAYMENT OVERDUE',
+				'PBC' => 'PENDING BC CONFIRMATION', 'PBO' => 'PENDING BOOKING OPERATION'
 			);
 			$status_color = $booking->CancelStatus == 'Y' ? '#FF69B4' : (isset($status_colors[$display_status]) ? $status_colors[$display_status] : '#DA70D6');
 			$status_text = $booking->CancelStatus == 'Y' ? 'CANCELLED' : (isset($status_texts[$display_status]) ? $status_texts[$display_status] : 'UNKNOWN');
@@ -441,15 +429,28 @@ class Booking extends MY_Controller
 			$count++;
 		}
 
-		$output = array(
-			'draw' => $draw,
-			'recordsTotal' => $records_total,
-			'recordsFiltered' => $records_filtered,
-			'data' => $data
-		);
+			$output = array(
+				'draw' => $draw,
+				'recordsTotal' => $records_total,
+				'recordsFiltered' => $records_filtered,
+				'data' => $data
+			);
 
-		header('Content-Type: application/json');
-		echo json_encode($output);
+			// Header already set at the beginning, just output JSON
+			echo json_encode($output);
+			exit; // Prevent any additional output
+		} catch (Exception $e) {
+			// Log error and return JSON error response
+			log_message('error', 'Booking ajax_list error: ' . $e->getMessage());
+			echo json_encode(array(
+				'error' => 'An error occurred while loading bookings',
+				'draw' => intval($this->input->get('draw') ?? 0),
+				'recordsTotal' => 0,
+				'recordsFiltered' => 0,
+				'data' => array()
+			));
+			exit;
+		}
 	}
 
 	/**
@@ -457,19 +458,27 @@ class Booking extends MY_Controller
 	 */
 	private function build_action_dropdown($booking, $current_url, $is_sales_agent)
 	{
+		$shown_approve_bc = false;
+		$shown_update_booking = false;
 		$html = '<div class="btn-group">';
 		$html .= '<button type="button" data-toggle="dropdown" class="btn btn-light-primary btn-sm dropdown-toggle" style="padding-left:3px;"></button>';
 		$html .= '<div class="dropdown-menu">';
 
 		if($booking->Status != 'Y' || (!$is_sales_agent && $booking->Status == 'Y')) {
-			if(in_array('RB', $this->session->access_control)) {
+			$access_control = $this->session->access_control ?? array();
+			if(in_array('RB', $access_control)) {
 				$html .= '<button onclick="Delete_Record(\'' . base_url('assets/image/sweetalert.jpg') . '\', \'Booking Record : ' . $booking->BookingNumber . '\', \'' . base_url('Booking/Delete') . '\', \'booking_id\', ' . $booking->BookingID . ', \'' . $booking->Status . '\', \'' . (strpos($current_url, '?') ? base_url('Booking?') . explode('?', $current_url)[1] : base_url('Booking')) . '\')" class="dropdown-item" style="color:#E37383; font-size:11px;">Delete Booking</button>';
 			}
-			if(in_array('AB', $this->session->access_control)) {
+			if(in_array('AB', $access_control)) {
 				if($booking->CancelStatus == 'Y') {
 					$html .= '<a href="' . base_url('Booking/Update_Cancel_Status?booking_id=') . $booking->BookingID . '&current_cancel_status=' . $booking->CancelStatus . '&new_cancel_status=N&param=' . urlencode($current_url) . '" class="dropdown-item" style="color:#93C572; font-size:11px;">Activate Booking</a>';
 				} else {
 					$html .= '<a href="' . base_url('Booking/Update_Cancel_Status?booking_id=') . $booking->BookingID . '&current_cancel_status=' . $booking->CancelStatus . '&new_cancel_status=Y&param=' . urlencode($current_url) . '" class="dropdown-item" style="color:#E0115F; font-size:11px;">Cancel Booking</a>';
+				}
+				// Approve BC - only show when status is PBC
+				if($booking->Status == 'PBC') {
+					$html .= '<a href="' . base_url('Booking/Approve_BC?booking_id=') . $booking->BookingID . '&param=' . urlencode($current_url) . '" class="dropdown-item" style="color:#50C878; font-size:11px;">Approve BC</a>';
+					$shown_approve_bc = true;
 				}
 				if($booking->Status == 'PTV' || $booking->Status == 'PT') {
 					if($booking->Status == 'PTV') {
@@ -479,10 +488,23 @@ class Booking extends MY_Controller
 					}
 				}
 				$html .= '<a href="' . (strpos($current_url, '?') ? base_url('Booking/Update?booking_id=') . $booking->BookingID . '&' . explode('?', $current_url)[1] : base_url('Booking/Update?booking_id=') . $booking->BookingID) . '" class="dropdown-item" style="font-size:11px;">Update Booking</a>';
+				$shown_update_booking = true;
 			}
 		}
+
+		// View Booking - Allow Sales Agents without AB access to view their own bookings
+		if($is_sales_agent && !$shown_update_booking && !empty($booking->SalesAgentID) && $booking->SalesAgentID == $this->session->userdata('admin_id')) {
+			if(!empty($booking->SalesAgentID) && $booking->SalesAgentID == $this->session->userdata('admin_id')) {
+				$html .= '<a href="' . (strpos($current_url, '?') ? base_url('Booking/View?booking_id=') . $booking->BookingID . '&' . explode('?', $current_url)[1] : base_url('Booking/View?booking_id=') . $booking->BookingID) . '" class="dropdown-item" style="font-size:11px;">View Booking</a>';
+			}
+		}
+		// Approve BC - Allow SA us . $is_sales_agentir own bookings
+		if($is_sales_agent && $booking->Status == 'PBC' && !empty($booking->SalesAgentID) && $booking->SalesAgentID == $this->session->userdata('admin_id') && !$shown_approve_bc) {
+			$html .= '<a href="' . base_url('Booking/Approve_BC?booking_id=') . $booking->BookingID . '&param=' . urlencode($current_url) . '" class="dropdown-item" style="color:#50C878; font-size:11px;">Approve BC</a>';
+		}
 		// Complete Booking / Revert Pending Review - Allow SA users to complete after-sales service
-		if(in_array('AB', $this->session->access_control)) {
+		$access_control = $this->session->access_control ?? array();
+		if(in_array('AB', $access_control)) {
 			if($booking->Status == 'Y' || $booking->Status == 'PR') {
 				if($booking->AfterSalesService == 'PENDING') {
 					$html .= '<a href="' . base_url('Booking/Update_After_Sales_Service?booking_id=') . $booking->BookingID . '&current_after_sales_service=' . $booking->AfterSalesService . '&new_after_sales_service=COMPLETE&param=' . urlencode($current_url) . '" class="dropdown-item" style="color:#50C878; font-size:11px;">Complete Booking</a>';
@@ -870,6 +892,13 @@ class Booking extends MY_Controller
 							$previous_map = $this->Booking_Checklist_Completion_Model->Read_Completion_Map($booking_id);
 							$previous_completions = array_keys($previous_map);
 							$this->Booking_Checklist_Completion_Model->Create($booking_id, $checklist_completions, $created_by);
+							
+							// Check if all checklists are completed and move to next status
+							$this->load->helper('booking_flow');
+							$booking = $this->Booking_Model->getBookingById($booking_id);
+							if($booking) {
+								check_and_advance_status_if_no_checklist_or_all_completed($booking_id, $booking, $created_by, $this);
+							}
 						} else {
 							// Table doesn't exist - log error
 							log_message('error', 'booking_checklist_completion table does not exist. Please run migration.');
@@ -950,6 +979,10 @@ class Booking extends MY_Controller
 					$this->load->model('Custom_Upload_Model');
 					$array['custom_uploads'] = $this->Custom_Upload_Model->Read($array['BookingID']);
 
+					// Get booking status log timeline
+					$this->load->model('Booking_Status_Log_Model');
+					$array['status_logs'] = $this->Booking_Status_Log_Model->get_timeline_data($array['BookingID'], false);
+
 					if(isset($_GET['nick'])) { echo "<pre>"; print_r($array); exit; }
 					$this->load->view('layout/header', $titles);
 					$this->load->view('booking/booking', $array);
@@ -957,6 +990,127 @@ class Booking extends MY_Controller
 				} else {
 					redirect('Booking');
 				}
+			}
+		} else {
+			redirect('Dashboard');
+		}
+	}
+
+	function View()
+	{
+		// Allow sales agents (level 20) to view their own bookings even without AB access
+		$is_sales_agent = $this->session->userdata('level') == 20;
+		$has_ab_access = in_array('AB', $this->session->access_control);
+		$has_vb_access = in_array('VB', $this->session->access_control);
+		
+		// Check if user has VB access OR is a sales agent
+		if($has_vb_access || $is_sales_agent) {
+			$valid_booking_id = $this->Universal_Model->Validate_Id('BookingID', $this->input->get('booking_id'), 'booking');
+			
+			if($valid_booking_id) {
+				$array = $this->Booking_Model->Read_Booking();
+				
+				// If sales agent without AB access, verify they own the booking
+				if($is_sales_agent && !$has_ab_access) {
+					if($array['SalesAgent'] != $this->session->userdata('admin_id')) {
+						$this->session->set_flashdata('error', 'You can only view bookings assigned to you.');
+						redirect('Booking');
+						return;
+					}
+				}
+				
+				$titles = array('tab_title' => 'HolidayGoGoGo | Booking', 'breadcrumb_title' => 'Booking >> View');
+				
+				if(!empty($array['DepositDeadline'])) {
+					$array['DepositDeadline'] = date('d/m/Y', strtotime($array['DepositDeadline']));
+				}
+				$array['FullPaymentDeadline'] = date('d/m/Y', strtotime($array['FullPaymentDeadline']));
+				if(!empty($array['AdditionalPaymentDeadline'])) {
+					$array['AdditionalPaymentDeadline'] = date('d/m/Y', strtotime($array['AdditionalPaymentDeadline']));
+				}
+				if(!empty($array['StartDate']) && !empty($array['EndDate'])) {
+					$array['TravelDate'] = date('d/m/Y', strtotime($array['StartDate'])) . ' - ' . date('d/m/Y', strtotime($array['EndDate']));
+				} else {
+					$array['TravelDate'] = null;
+				}
+				// Ensure AllowReview is set (default to 1 if not set or null)
+				if (!isset($array['AllowReview']) || $array['AllowReview'] === null) {
+					$array['AllowReview'] = 1;
+				} else {
+					// Convert to integer to ensure it's 0 or 1
+					$array['AllowReview'] = (int)$array['AllowReview'];
+				}
+				$array['BookingProductID'] = ($this->Booking_Product_Model->Read_Last_Booking_Product_ID()) + 1;
+				$array['Tag'] = explode(',', $array['Tag']);
+				$array['Subtotal'] = number_format($array['Subtotal'], 2, '.', ',');
+				$array['Discount'] = $array['Discount'] != 0.00 ? number_format($array['Discount'], 2, '.', ',') : '';
+				$array['NetTotal'] = number_format($array['NetTotal'], 2, '.', ',');
+				$array['admins'] = $this->Booking_Model->Read_Admins();
+
+				if(empty($array['ProductSequence'])) {
+					$array['ProductSequence'] = explode(',', $array['ProductSequence']);
+					$array['booking_products'] = $this->Booking_Product_Model->Read();
+				} else {
+					$array['ProductSequence'] = explode(',', $array['ProductSequence']);
+					$booking_products = $this->Booking_Product_Model->Read();
+					$array['booking_products'] = [];
+					for($i = 0; $i < count($array['ProductSequence']); $i++) {
+						foreach($booking_products as $booking_product) {
+							if($booking_product->BookingProductID == $array['ProductSequence'][$i]) {
+								array_push($array['booking_products'], $booking_product);
+							}
+						}
+					}
+				}
+				$array['categories'] = $this->Booking_Model->Read_Categories();
+				$array['products'] = $this->Booking_Model->Read_Products();
+				$array['footers'] = $this->Booking_Model->Read_Footers();
+				$array['country_codes'] = $this->Booking_Model->Read_Country_Codes();
+				$array['tags'] = $this->Booking_Model->Read_Tags();
+				$array['sources'] = $this->Booking_Model->Read_Sources();
+				
+				// Get Destination Name
+				foreach($array['categories'] as $category) {
+					if($category->CategoryID == $array['Destination']) {
+						$array['DestinationName'] = $category->Name;
+						break;
+					}
+				}
+				
+				// Get Source Name
+				foreach($array['sources'] as $source) {
+					if($source->SourceID == $array['Source']) {
+						$array['SourceName'] = $source->Name;
+						break;
+					}
+				}
+				
+				foreach($array['booking_products'] as $booking_product) {
+					$booking_product->Price = number_format($booking_product->Price, 2, '.', ',');
+					$booking_product->Total = number_format($booking_product->Total, 2, '.', ',');
+				}
+
+				// Get booking checklists
+				$array['booking_checklists'] = $this->get_booking_checklists($array['booking_products']);
+				$array['completion_map'] = $this->Booking_Checklist_Completion_Model->Read_Completion_Map($array['BookingID']);
+
+				// Get custom uploads
+				$this->load->model('Custom_Upload_Model');
+				$array['custom_uploads'] = $this->Custom_Upload_Model->Read($array['BookingID']);
+
+				// Get booking status log timeline
+				$this->load->model('Booking_Status_Log_Model');
+				$array['status_logs'] = $this->Booking_Status_Log_Model->get_timeline_data($array['BookingID'], false);
+				
+				// Mark as view mode (read-only)
+				$array['is_view_mode'] = true;
+
+				if(isset($_GET['nick'])) { echo "<pre>"; print_r($array); exit; }
+				$this->load->view('layout/header', $titles);
+				$this->load->view('booking/view', $array);
+				$this->load->view('layout/footer');
+			} else {
+				redirect('Booking');
 			}
 		} else {
 			redirect('Dashboard');
@@ -1010,8 +1164,69 @@ class Booking extends MY_Controller
 	function Update_Status() 
 	{
 		if(in_array('AB', $this->session->access_control)) {
-			$this->Booking_Model->Update_Status($this->input->get('new_status'), $this->input->get('booking_id'));
+			// Load booking flow helper
+			$this->load->helper('booking_flow');
+			
+			// Get current booking status
+			$booking = $this->Booking_Model->getBookingById($this->input->get('booking_id'));
+			if (!$booking) {
+				redirect('Dashboard');
+				return;
+			}
+			
+			$current_status = $booking->Status;
+			$new_status = $this->input->get('new_status');
+			
+			// Validate status transition
+			$validation = validate_booking_status_flow($current_status, $new_status, false);
+			
+			if (!$validation['valid']) {
+				// Set error message and redirect
+				$this->session->set_flashdata('error', $validation['message']);
+				if(strpos($this->input->get('param'), '?') == true) {
+					redirect('Booking?' . explode('?', $this->input->get('param'))[1]);
+				} else {
+					redirect('Booking');
+				}
+				return;
+			}
+			
+			$this->Booking_Model->Update_Status($new_status, $this->input->get('booking_id'));
 			$this->Booking_Model->Create_Booking_Log();
+			
+			// Add status history log
+			$this->load->helper('booking_status_log');
+			$admin_id = $this->session->userdata('admin_id');
+			
+			// Get status labels for description
+			$status_labels = array(
+				'PBC' => 'PENDING BC CONFIRMATION',
+				'P' => 'PENDING PAYMENT',
+				'PBO' => 'PENDING BOOKING OPERATION',
+				'PTV' => 'PENDING TRAVEL VOUCHER',
+				'PT' => 'PENDING TRAVEL',
+				'OG' => 'ON-GOING',
+				'Y' => 'COMPLETED',
+				'C' => 'CANCELLED'
+			);
+			
+			$from_label = isset($status_labels[$current_status]) ? $status_labels[$current_status] : $current_status;
+			$to_label = isset($status_labels[$new_status]) ? $status_labels[$new_status] : $new_status;
+			
+			// Create description based on status transition
+			$description = "Status changed from {$from_label} to {$to_label}";
+			if($current_status == 'PTV' && $new_status == 'PT') {
+				$description = "Travel voucher sent - status changed to PENDING TRAVEL";
+			}
+			
+			log_booking_status_change(
+				$this->input->get('booking_id'),
+				$new_status,
+				$current_status,
+				$admin_id,
+				$description,
+				true
+			);
 			
 			$this->load->config('status_mapping');
 			$this->load->helper('autocount');
@@ -1056,6 +1271,94 @@ class Booking extends MY_Controller
 			// 	'AutocountSyncStatus'  => 'P'
 			// ]);
 
+			if(strpos($this->input->get('param'), '?') == true) {
+				redirect('Booking?' . explode('?', $this->input->get('param'))[1]);
+			} else {
+				redirect('Booking');
+			}
+		} else {
+			redirect('Dashboard');
+		}
+	}
+
+	/**
+	 * Approve BC - Change status from PBC (PENDING BC CONFIRMATION) to P (PENDING PAYMENT)
+	 * This action should only be available when booking is in PBC status
+	 */
+	function Approve_BC()
+	{
+		// Allow AB access control OR Sales Agent (level 20) for their own bookings
+		$is_sales_agent = $this->session->userdata('level') == 20;
+		$has_ab_access = in_array('AB', $this->session->access_control);
+		
+		if($has_ab_access || $is_sales_agent) {
+			// Load helpers
+			$this->load->helper('booking_flow');
+			$this->load->helper('booking_status_log');
+			
+			// Get booking
+			$booking = $this->Booking_Model->getBookingById($this->input->get('booking_id'));
+			if (!$booking) {
+				$this->session->set_flashdata('error', 'Booking not found.');
+				redirect('Booking');
+				return;
+			}
+			
+			// Sales Agents can only approve their own bookings
+			if($is_sales_agent && !$has_ab_access) {
+				if($booking->SalesAgent != $this->session->userdata('admin_id')) {
+					$this->session->set_flashdata('error', 'You can only approve bookings assigned to you.');
+					if(strpos($this->input->get('param'), '?') == true) {
+						redirect('Booking?' . explode('?', $this->input->get('param'))[1]);
+					} else {
+						redirect('Booking');
+					}
+					return;
+				}
+			}
+			
+			// Validate that booking is in PBC status
+			if ($booking->Status != 'PBC') {
+				$this->session->set_flashdata('error', 'Only bookings with PENDING BC CONFIRMATION status can be approved.');
+				if(strpos($this->input->get('param'), '?') == true) {
+					redirect('Booking?' . explode('?', $this->input->get('param'))[1]);
+				} else {
+					redirect('Booking');
+				}
+				return;
+			}
+			
+			// Validate status transition
+			$validation = validate_booking_status_flow($booking->Status, 'P', false);
+			if (!$validation['valid']) {
+				$this->session->set_flashdata('error', $validation['message']);
+				if(strpos($this->input->get('param'), '?') == true) {
+					redirect('Booking?' . explode('?', $this->input->get('param'))[1]);
+				} else {
+					redirect('Booking');
+				}
+				return;
+			}
+			
+			// Update status from PBC to P
+			$this->Booking_Model->Update_Status('P', $this->input->get('booking_id'));
+			
+			// Log the status change with custom description
+			$admin_id = $this->session->userdata('admin_id');
+			// Use log_booking_status_change directly to avoid auto-generated description
+			log_booking_status_change(
+				$this->input->get('booking_id'),
+				'P',  // to_status
+				'PBC',  // from_status
+				$admin_id,  // created_by
+				'BC approved - status changed to PENDING PAYMENT',  // description
+				true  // show_to_customer
+			);
+			
+			// Set success message
+			$this->session->set_flashdata('success', 'Booking BC has been approved. Status changed to PENDING PAYMENT.');
+			
+			// Redirect back to booking list
 			if(strpos($this->input->get('param'), '?') == true) {
 				redirect('Booking?' . explode('?', $this->input->get('param'))[1]);
 			} else {
@@ -2295,7 +2598,11 @@ class Booking extends MY_Controller
      */
     function Get_Customer_Remarks()
     {
-        if (!in_array('AB', $this->session->access_control)) {
+        // Allow AB access control OR Sales Agent (level 20) for their own bookings
+        $is_sales_agent = $this->session->userdata('level') == 20;
+        $has_ab_access = in_array('AB', $this->session->access_control);
+        
+        if (!$has_ab_access && !$is_sales_agent) {
             $this->output
                 ->set_content_type('application/json')
                 ->set_output(json_encode([
@@ -2314,6 +2621,20 @@ class Booking extends MY_Controller
                     'message' => 'Booking ID is required'
                 ]));
             return;
+        }
+
+        // If sales agent without AB access, verify they own the booking
+        if($is_sales_agent && !$has_ab_access) {
+            $booking = $this->Booking_Model->getBookingById($booking_id);
+            if(!$booking || $booking->SalesAgent != $this->session->userdata('admin_id')) {
+                $this->output
+                    ->set_content_type('application/json')
+                    ->set_output(json_encode([
+                        'success' => false,
+                        'message' => 'You can only view remarks for bookings assigned to you.'
+                    ]));
+                return;
+            }
         }
 
         // Get customer remarks (type 2) only
@@ -2372,7 +2693,11 @@ class Booking extends MY_Controller
      */
     function Add_Remark()
 	{
-		if (!in_array('AB', $this->session->access_control)) {
+		// Allow AB access control OR Sales Agent (level 20) for their own bookings
+		$is_sales_agent = $this->session->userdata('level') == 20;
+		$has_ab_access = in_array('AB', $this->session->access_control);
+		
+		if (!$has_ab_access && !$is_sales_agent) {
 			$this->output
 				->set_content_type('application/json')
 				->set_output(json_encode([
@@ -2415,6 +2740,19 @@ class Booking extends MY_Controller
 					'message' => 'Booking not found'
 				]));
 			return;
+		}
+
+		// If sales agent without AB access, verify they own the booking
+		if($is_sales_agent && !$has_ab_access) {
+			if($booking->SalesAgent != $this->session->userdata('admin_id')) {
+				$this->output
+					->set_content_type('application/json')
+					->set_output(json_encode([
+						'success' => false,
+						'message' => 'You can only add remarks to bookings assigned to you.'
+					]));
+				return;
+			}
 		}
 
 		// Check if this is from Customer Remarks section (type 2) or Internal Comments (type 1)
@@ -2666,4 +3004,5 @@ class Booking extends MY_Controller
 			log_message('debug', 'Booking Checklist Logs: ' . count($booking_logs) . ' entries inserted for BookingID: ' . $booking_id);
 		}
 	}
+
 }

@@ -266,5 +266,42 @@ class Notification_Model extends CI_Model
 
 		return $this->Create($notification_data) !== false;
 	}
+
+	/**
+	 * Create notification for Sales Agent when a booking is created under them by someone else
+	 * Message format: "XXX has created an order"
+	 *
+	 * @param int $booking_id Booking ID
+	 * @param int $creator_id Admin ID who created the booking
+	 * @param string $creator_name Name of the user who created the booking
+	 * @param int|null $sales_agent_id Sales Agent (Admin ID) assigned to the booking
+	 * @return int 1 if notification created, 0 otherwise
+	 */
+	function Create_Booking_Created_Notification($booking_id, $creator_id, $creator_name, $sales_agent_id)
+	{
+		if (empty($sales_agent_id) || (int) $sales_agent_id === (int) $creator_id) {
+			return 0;
+		}
+
+		$this->db->select('AdminID');
+		$this->db->where('AdminID', $sales_agent_id);
+		$this->db->where('Status', 'Y');
+		$sa = $this->db->get('admin')->row();
+		if (empty($sa)) {
+			return 0;
+		}
+
+		$message = $creator_name . ' has created an order';
+		$data = array(
+			'user_id'     => $sales_agent_id,
+			'type'        => 'booking_created',
+			'owner_type'  => 'booking',
+			'owner_id'    => $booking_id,
+			'remark_id'   => null,
+			'message'     => $message
+		);
+
+		return $this->Create($data) ? 1 : 0;
+	}
 }
 

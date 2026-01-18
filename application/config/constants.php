@@ -1,5 +1,5 @@
 <?php
-defined('BASEPATH') OR exit('No direct script access allowed');
+defined('BASEPATH') or exit('No direct script access allowed');
 
 /*
 |--------------------------------------------------------------------------
@@ -11,7 +11,7 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 | of this setting
 |
 */
-defined('SHOW_DEBUG_BACKTRACE') OR define('SHOW_DEBUG_BACKTRACE', TRUE);
+defined('SHOW_DEBUG_BACKTRACE') or define('SHOW_DEBUG_BACKTRACE', TRUE);
 
 /*
 |--------------------------------------------------------------------------
@@ -26,10 +26,10 @@ defined('SHOW_DEBUG_BACKTRACE') OR define('SHOW_DEBUG_BACKTRACE', TRUE);
 | always be used to set the mode correctly.
 |
 */
-defined('FILE_READ_MODE')  OR define('FILE_READ_MODE', 0644);
-defined('FILE_WRITE_MODE') OR define('FILE_WRITE_MODE', 0666);
-defined('DIR_READ_MODE')   OR define('DIR_READ_MODE', 0755);
-defined('DIR_WRITE_MODE')  OR define('DIR_WRITE_MODE', 0755);
+defined('FILE_READ_MODE')  or define('FILE_READ_MODE', 0644);
+defined('FILE_WRITE_MODE') or define('FILE_WRITE_MODE', 0666);
+defined('DIR_READ_MODE')   or define('DIR_READ_MODE', 0755);
+defined('DIR_WRITE_MODE')  or define('DIR_WRITE_MODE', 0755);
 
 /*
 |--------------------------------------------------------------------------
@@ -39,14 +39,14 @@ defined('DIR_WRITE_MODE')  OR define('DIR_WRITE_MODE', 0755);
 | These modes are used when working with fopen()/popen()
 |
 */
-defined('FOPEN_READ')                           OR define('FOPEN_READ', 'rb');
-defined('FOPEN_READ_WRITE')                     OR define('FOPEN_READ_WRITE', 'r+b');
-defined('FOPEN_WRITE_CREATE_DESTRUCTIVE')       OR define('FOPEN_WRITE_CREATE_DESTRUCTIVE', 'wb'); // truncates existing file data, use with care
-defined('FOPEN_READ_WRITE_CREATE_DESTRUCTIVE')  OR define('FOPEN_READ_WRITE_CREATE_DESTRUCTIVE', 'w+b'); // truncates existing file data, use with care
-defined('FOPEN_WRITE_CREATE')                   OR define('FOPEN_WRITE_CREATE', 'ab');
-defined('FOPEN_READ_WRITE_CREATE')              OR define('FOPEN_READ_WRITE_CREATE', 'a+b');
-defined('FOPEN_WRITE_CREATE_STRICT')            OR define('FOPEN_WRITE_CREATE_STRICT', 'xb');
-defined('FOPEN_READ_WRITE_CREATE_STRICT')       OR define('FOPEN_READ_WRITE_CREATE_STRICT', 'x+b');
+defined('FOPEN_READ')                           or define('FOPEN_READ', 'rb');
+defined('FOPEN_READ_WRITE')                     or define('FOPEN_READ_WRITE', 'r+b');
+defined('FOPEN_WRITE_CREATE_DESTRUCTIVE')       or define('FOPEN_WRITE_CREATE_DESTRUCTIVE', 'wb'); // truncates existing file data, use with care
+defined('FOPEN_READ_WRITE_CREATE_DESTRUCTIVE')  or define('FOPEN_READ_WRITE_CREATE_DESTRUCTIVE', 'w+b'); // truncates existing file data, use with care
+defined('FOPEN_WRITE_CREATE')                   or define('FOPEN_WRITE_CREATE', 'ab');
+defined('FOPEN_READ_WRITE_CREATE')              or define('FOPEN_READ_WRITE_CREATE', 'a+b');
+defined('FOPEN_WRITE_CREATE_STRICT')            or define('FOPEN_WRITE_CREATE_STRICT', 'xb');
+defined('FOPEN_READ_WRITE_CREATE_STRICT')       or define('FOPEN_READ_WRITE_CREATE_STRICT', 'x+b');
 
 /*
 |--------------------------------------------------------------------------
@@ -73,33 +73,50 @@ defined('FOPEN_READ_WRITE_CREATE_STRICT')       OR define('FOPEN_READ_WRITE_CREA
 |       http://tldp.org/LDP/abs/html/exitcodes.html
 |
 */
-defined('EXIT_SUCCESS')        OR define('EXIT_SUCCESS', 0); // no errors
-defined('EXIT_ERROR')          OR define('EXIT_ERROR', 1); // generic error
-defined('EXIT_CONFIG')         OR define('EXIT_CONFIG', 3); // configuration error
-defined('EXIT_UNKNOWN_FILE')   OR define('EXIT_UNKNOWN_FILE', 4); // file not found
-defined('EXIT_UNKNOWN_CLASS')  OR define('EXIT_UNKNOWN_CLASS', 5); // unknown class
-defined('EXIT_UNKNOWN_METHOD') OR define('EXIT_UNKNOWN_METHOD', 6); // unknown class member
-defined('EXIT_USER_INPUT')     OR define('EXIT_USER_INPUT', 7); // invalid user input
-defined('EXIT_DATABASE')       OR define('EXIT_DATABASE', 8); // database error
-defined('EXIT__AUTO_MIN')      OR define('EXIT__AUTO_MIN', 9); // lowest automatically-assigned error code
-defined('EXIT__AUTO_MAX')      OR define('EXIT__AUTO_MAX', 125); // highest automatically-assigned error code
+defined('EXIT_SUCCESS')        or define('EXIT_SUCCESS', 0); // no errors
+defined('EXIT_ERROR')          or define('EXIT_ERROR', 1); // generic error
+defined('EXIT_CONFIG')         or define('EXIT_CONFIG', 3); // configuration error
+defined('EXIT_UNKNOWN_FILE')   or define('EXIT_UNKNOWN_FILE', 4); // file not found
+defined('EXIT_UNKNOWN_CLASS')  or define('EXIT_UNKNOWN_CLASS', 5); // unknown class
+defined('EXIT_UNKNOWN_METHOD') or define('EXIT_UNKNOWN_METHOD', 6); // unknown class member
+defined('EXIT_USER_INPUT')     or define('EXIT_USER_INPUT', 7); // invalid user input
+defined('EXIT_DATABASE')       or define('EXIT_DATABASE', 8); // database error
+defined('EXIT__AUTO_MIN')      or define('EXIT__AUTO_MIN', 9); // lowest automatically-assigned error code
+defined('EXIT__AUTO_MAX')      or define('EXIT__AUTO_MAX', 125); // highest automatically-assigned error code
 
 //Admin
-defined('GENDER')              OR define('GENDER', serialize(array('F' => 'FEMALE', 'M' => 'MALE')));
-defined('LEVEL')               OR define('LEVEL', serialize(array(10 => 'OWNER', 20 => 'SALES AGENT', 30 => 'FINANCE', 40 => 'OP', 50 => 'TC')));
-defined('ADMIN_STATUS')        OR define('ADMIN_STATUS', serialize(array('Y' => 'ACTIVE', 'D' => 'DEACTIVATED')));
-defined('ACCESS_CONTROL')      OR define('ACCESS_CONTROL', serialize(array('GB' => 'GENERATE BOOKING', 'VB' => 'VIEW BOOKING', 'AB' => 'AMEND BOOKING', 'RB' => 'REMOVE BOOKING', 'GP' => 'GENERATE PAYMENT', 'VP' => 'VIEW PAYMENT', 'AP' => 'AMEND PAYMENT', 'RP' => 'REMOVE PAYMENT', 'VR' => 'VIEW REPORT')));
+defined('GENDER')              or define('GENDER', serialize(array('F' => 'FEMALE', 'M' => 'MALE')));
+defined('LEVEL')               or define('LEVEL', serialize(array(10 => 'OWNER', 20 => 'SALES AGENT', 30 => 'FINANCE', 40 => 'OP', 50 => 'TC')));
+defined('ADMIN_STATUS')        or define('ADMIN_STATUS', serialize(array('Y' => 'ACTIVE', 'D' => 'DEACTIVATED')));
+defined('ACCESS_CONTROL')      or define('ACCESS_CONTROL', serialize(array('GB' => 'GENERATE BOOKING', 'VB' => 'VIEW BOOKING', 'AB' => 'AMEND BOOKING', 'RB' => 'REMOVE BOOKING', 'GP' => 'GENERATE PAYMENT', 'VP' => 'VIEW PAYMENT', 'AP' => 'AMEND PAYMENT', 'RP' => 'REMOVE PAYMENT', 'VR' => 'VIEW REPORT')));
 
 //Booking
-defined('BOOKING_STATUS')      OR define('BOOKING_STATUS', serialize(array('A' => 'ALL STATUSES', 'C' => 'CANCELLED', 'Y' => 'COMPLETED', 'OG' => 'ON-GOING', 'PP' => 'PARTIAL PAYMENT', 'PO' => 'PAYMENT OVERDUE', 'PGL' => 'PENDING GUEST LIST', 'P' => 'PENDING PAYMENT', 'PR' => 'PENDING REVIEW', 'PT' => 'PENDING TRAVEL', 'PTV' => 'PENDING TRAVEL VOUCHER', 'PBO' => 'PENDING BOOKING OPERATION')));
-defined('BC_TITLE')            OR define('BC_TITLE', serialize(array('BOOKING CONFIRMATION' => 'BOOKING CONFIRMATION', 'QUOTATION' => 'QUOTATION', 'PROFORMA INVOICE' => 'PROFORMA INVOICE')));
-defined('CHAT_LANGUAGE')       OR define('CHAT_LANGUAGE', serialize(array('CN' => 'CN', 'EN' => 'EN', 'ML' => 'ML')));
+defined('BOOKING_STATUS')      or define('BOOKING_STATUS', serialize(array(
+    'A'     => 'ALL STATUSES',
+    'OG'    => 'ON-GOING',
+    'PP'    => 'PARTIAL PAYMENT',
+    'PO'    => 'PAYMENT OVERDUE',
+    'PR'    => 'PENDING REVIEW',
+
+    // current booking flow
+    'PBC'   => 'PENDING BC CONFIRMATION',
+    'P'     => 'PENDING PAYMENT',
+    'PBO'   => 'PENDING BOOKING OPERATION',
+    'PGL'   => 'PENDING GUEST LIST',
+    'PTV'   => 'PENDING TRAVEL VOUCHER',
+    'PT'    => 'PENDING TRAVEL',
+    'Y'     => 'COMPLETED',
+    'C'     => 'CANCELLED',
+    // end current booking flow
+)));
+defined('BC_TITLE')            or define('BC_TITLE', serialize(array('BOOKING CONFIRMATION' => 'BOOKING CONFIRMATION', 'QUOTATION' => 'QUOTATION', 'PROFORMA INVOICE' => 'PROFORMA INVOICE')));
+defined('CHAT_LANGUAGE')       or define('CHAT_LANGUAGE', serialize(array('CN' => 'CN', 'EN' => 'EN', 'ML' => 'ML')));
 
 //Payment
-defined('PAYMENT_STATUS')      OR define('PAYMENT_STATUS', serialize(array('Y' => 'APPROVED', 'P' => 'PENDING', 'R' => 'REJECTED')));
-defined('PAYMENT_TYPE')        OR define('PAYMENT_TYPE', serialize(array('ADDITIONAL PAYMENT' => 'ADDITIONAL PAYMENT', 'AGENT COMMISSION' => 'AGENT COMMISSION', 'AGENT COMMISSION FROM SUPPLIER' => 'AGENT COMMISSION FROM SUPPLIER', 'BANK CHARGES' => 'BANK CHARGES', 'CUSTOMER REFUND' => 'CUSTOMER REFUND', 'DEPOSIT' => 'DEPOSIT', 'FULL' => 'FULL', 'ONE-TIME PAYMENT' => 'ONE-TIME PAYMENT', 'SUPPLIER PAYMENT' => 'SUPPLIER PAYMENT', 'SUPPLIER REFUND' => 'SUPPLIER REFUND', 'CREDIT CARD CHARGES' => 'CREDIT CARD CHARGES')));
-defined('TRANSACTION_TYPE')    OR define('TRANSACTION_TYPE', serialize(array('PAYMENT IN' => 'PAYMENT IN', 'PAYMENT OUT' => 'PAYMENT OUT')));
+defined('PAYMENT_STATUS')      or define('PAYMENT_STATUS', serialize(array('Y' => 'APPROVED', 'P' => 'PENDING', 'R' => 'REJECTED')));
+defined('PAYMENT_TYPE')        or define('PAYMENT_TYPE', serialize(array('ADDITIONAL PAYMENT' => 'ADDITIONAL PAYMENT', 'AGENT COMMISSION' => 'AGENT COMMISSION', 'AGENT COMMISSION FROM SUPPLIER' => 'AGENT COMMISSION FROM SUPPLIER', 'BANK CHARGES' => 'BANK CHARGES', 'CUSTOMER REFUND' => 'CUSTOMER REFUND', 'DEPOSIT' => 'DEPOSIT', 'FULL' => 'FULL', 'ONE-TIME PAYMENT' => 'ONE-TIME PAYMENT', 'SUPPLIER PAYMENT' => 'SUPPLIER PAYMENT', 'SUPPLIER REFUND' => 'SUPPLIER REFUND', 'CREDIT CARD CHARGES' => 'CREDIT CARD CHARGES')));
+defined('TRANSACTION_TYPE')    or define('TRANSACTION_TYPE', serialize(array('PAYMENT IN' => 'PAYMENT IN', 'PAYMENT OUT' => 'PAYMENT OUT')));
 
 //Category
-defined('IS_DESTINATION')      OR define('IS_DESTINATION', serialize(array('NO' => 'NO', 'YES' => 'YES')));
-defined('INCLUDE_FOUR_DIGITS') OR define('INCLUDE_FOUR_DIGITS', serialize(array('YES' => 'YES', 'NO' => 'NO')));
+defined('IS_DESTINATION')      or define('IS_DESTINATION', serialize(array('NO' => 'NO', 'YES' => 'YES')));
+defined('INCLUDE_FOUR_DIGITS') or define('INCLUDE_FOUR_DIGITS', serialize(array('YES' => 'YES', 'NO' => 'NO')));

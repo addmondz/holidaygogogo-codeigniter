@@ -67,13 +67,17 @@ class Recalculate {
                         }
                     }
                 } else {
-                    if($booking->Status != 'P') {
+                    // No payments in the payments array, but payments exist
+                    // Do NOT change PBC to P - PBC requires SA approval first
+                    if($booking->Status != 'P' && $booking->Status != 'PBC') {
                         $this->CI->Booking_Model->Update_Status('P', $booking->BookingID);
                         $this->CI->Booking_Model->Create_Booking_Log2($booking->Status, 'P', $booking->BookingID);
                     }
                 }
             } else {
-                if($booking->Status != 'P') {
+                // No payments at all
+                // Do NOT change PBC to P - PBC requires SA approval first
+                if($booking->Status != 'P' && $booking->Status != 'PBC') {
                     $this->CI->Booking_Model->Update_Status('P', $booking->BookingID);
                     $this->CI->Booking_Model->Create_Booking_Log2($booking->Status, 'P', $booking->BookingID);
                 }
