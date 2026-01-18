@@ -162,7 +162,7 @@
 					</div>
 				</div>
 				<?php } ?>
-                <form id="form" action="<?php if($_SERVER['SERVER_NAME'] != 'gl.holidaygogogo.com') { echo base_url('Guest_List?gl=') . $this->input->get('gl'); } else { echo 'https://gl.holidaygogogo.com/?gl=' . $this->input->get('gl'); } ?>" method="post">
+                <form id="form" action="<?php if($_SERVER['SERVER_NAME'] != 'gl.holidaygogogo.com') { echo base_url('Guest_List?gl=') . $this->input->get('gl'); } else { echo 'https://gl.holidaygogogo.com/?gl=' . $this->input->get('gl'); } ?>" method="post" enctype="multipart/form-data">
 					<div id="benchmark" class="row">
 						<?php $counter = 1;
 							$adult = 0;
@@ -232,14 +232,14 @@
 														<option value="M" <?php if($guest->Gender == 'M') { echo 'selected'; } ?>>MALE</option>
 													</select>
 												</div>
+												<div class="col-md-6">
+													<label id="<?php echo 'date_of_birth_label-' . $guest->GuestListID; ?>">Date Of Birth <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>
+													<input <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="date_of_births[]" id="<?php echo 'date_of_birth-' . $guest->GuestListID; ?>" value="<?php echo $guest->DateOfBirth; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="form-control kt_datepicker_4_3">
+												</div>
 											</div>
 											<br>
 											<div class="row">
 												<div class="col-md-6 mb-7 mb-md-0">
-													<label id="<?php echo 'date_of_birth_label-' . $guest->GuestListID; ?>">Date Of Birth <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>
-													<input <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="date_of_births[]" id="<?php echo 'date_of_birth-' . $guest->GuestListID; ?>" value="<?php echo $guest->DateOfBirth; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="form-control kt_datepicker_4_3">
-												</div>
-												<div class="col-md-6">
 													<label id="<?php echo 'nationality_label-' . $guest->GuestListID; ?>">Nationality <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>
 													<select <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> name="nationalities[]" id="<?php echo 'nationality-' . $guest->GuestListID; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" class="form-control">
 														<option selected disabled value="">--SELECT NATIONALITY--</option>
@@ -248,16 +248,51 @@
 														<?php } ?>
 													</select>
 												</div>
+												<div class="col-md-6">
+													<label id="<?php echo 'identification_number_label-' . $guest->GuestListID; ?>">Identification Number <?php if((!empty($guest->Guest) || !empty($guest->GuestLastName)) && $guest->NationalityName == 'MALAYSIA') { echo '<span style="color:red;">*</span>'; } ?></label>
+													<input <?php if((!empty($guest->Guest) || !empty($guest->GuestLastName)) && $guest->NationalityName == 'MALAYSIA') { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="identification_numbers[]" id="<?php echo 'identification_number-' . $guest->GuestListID; ?>" value="<?php echo $guest->IdentificationNumber; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="form-control">
+												</div>
 											</div>
 											<br>
 											<div class="row">
 												<div class="col-md-6 mb-7 mb-md-0">
-													<label id="<?php echo 'identification_number_label-' . $guest->GuestListID; ?>">Identification Number <?php if((!empty($guest->Guest) || !empty($guest->GuestLastName)) && $guest->NationalityName == 'MALAYSIA') { echo '<span style="color:red;">*</span>'; } ?></label>
-													<input <?php if((!empty($guest->Guest) || !empty($guest->GuestLastName)) && $guest->NationalityName == 'MALAYSIA') { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="identification_numbers[]" id="<?php echo 'identification_number-' . $guest->GuestListID; ?>" value="<?php echo $guest->IdentificationNumber; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="form-control">
-												</div>
-												<div class="col-md-6">
 													<label id="<?php echo 'passport_number_label-' . $guest->GuestListID; ?>">Passport Number <?php if((!empty($guest->Guest) || !empty($guest->GuestLastName)) && !empty($guest->NationalityName) && $guest->NationalityName != 'MALAYSIA') { echo '<span style="color:red;">*</span>'; } ?></label>
 													<input <?php if((!empty($guest->Guest) || !empty($guest->GuestLastName)) && !empty($guest->NationalityName) && $guest->NationalityName != 'MALAYSIA') { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="passport_numbers[]" id="<?php echo 'passport_number-' . $guest->GuestListID; ?>" value="<?php echo $guest->PassportNumber; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="form-control">
+												</div>
+												<div class="col-md-6">
+													<label>Passport Issue Date</label>
+													<input <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="passport_issue_dates[]" id="<?php echo 'passport_issue_date-' . $guest->GuestListID; ?>" value="<?php echo !empty($guest->PassportIssueDate) ? date('d/m/Y', strtotime($guest->PassportIssueDate)) : ''; ?>" autocomplete="off" class="form-control kt_datepicker_4_3">
+												</div>
+											</div>
+											<br>
+											<div class="row">
+												<div class="col-md-6 mb-7 mb-md-0">
+													<label>Passport Expiry Date</label>
+													<input <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="passport_expiry_dates[]" id="<?php echo 'passport_expiry_date-' . $guest->GuestListID; ?>" value="<?php echo !empty($guest->PassportExpiryDate) ? date('d/m/Y', strtotime($guest->PassportExpiryDate)) : ''; ?>" autocomplete="off" class="form-control kt_datepicker_4_3">
+												</div>
+												<div class="col-md-6">
+													<label>Passport Copy</label>
+													<div class="d-flex align-items-center">
+														<div class="custom-file flex-grow-1">
+															<input type="file" name="passport_copies[]" id="<?php echo 'passport_copy-' . $guest->GuestListID; ?>" <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> class="custom-file-input passport-copy-upload" accept=".pdf,.jpg,.jpeg,.png,.gif" data-guest-id="<?php echo $guest->GuestListID; ?>">
+															<label class="custom-file-label" for="<?php echo 'passport_copy-' . $guest->GuestListID; ?>">Choose file</label>
+														</div>
+														<?php if(!empty($guest->PassportCopy)) { ?>
+															<button type="button" class="btn btn-sm btn-light-primary ml-2" onclick="viewPassportCopy('<?php echo base_url($guest->PassportCopy); ?>', '<?php echo basename($guest->PassportCopy); ?>', '<?php echo $counter; ?>')" style="flex-shrink: 0;" title="View Uploaded Passport">
+																<i class="la la-eye" style="font-size: 1.2rem;"></i>
+															</button>
+															<input type="hidden" name="existing_passport_copies[]" value="<?php echo $guest->PassportCopy; ?>">
+														<?php } else { ?>
+															<input type="hidden" name="existing_passport_copies[]" value="">
+														<?php } ?>
+													</div>
+												</div>
+											</div>
+											<br>
+											<div class="row">
+												<div class="col-md-12">
+													<label>Dietary Requirement</label>
+													<textarea <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> name="dietary_requirements[]" id="<?php echo 'dietary_requirement-' . $guest->GuestListID; ?>" rows="2" class="form-control"><?php echo $guest->DietaryRequirement; ?></textarea>
 												</div>
 											</div>
 											<br>
@@ -578,29 +613,54 @@
 										'<option value="M">MALE</option>' +
 									'</select>' +
 								'</div>' +
+								'<div class="col-md-6">' +
+									'<label id="date_of_birth_label-'+ guest_list_id +'">Date Of Birth</label>' +
+									'<input type="text" name="new_date_of_births[]" id="date_of_birth-'+ guest_list_id +'" onchange="Set_Required_Field('+ guest_list_id +')" autocomplete="off" class="form-control kt_datepicker_4_3">' +
+								'</div>' +
 							'</div>' +
 							'<br>' +
 							'<div class="row">' +
 								'<div class="col-md-6 mb-7 mb-md-0">' +
-									'<label id="date_of_birth_label-'+ guest_list_id +'">Date Of Birth</label>' +
-									'<input type="text" name="new_date_of_births[]" id="date_of_birth-'+ guest_list_id +'" onchange="Set_Required_Field('+ guest_list_id +')" autocomplete="off" class="form-control kt_datepicker_4_3">' +
-								'</div>' +
-								'<div class="col-md-6">' +
 									'<label id="nationality_label-'+ guest_list_id +'">Nationality</label>' +
 									'<select name="new_nationalities[]" id="nationality-'+ guest_list_id +'" onchange="Set_Required_Field('+ guest_list_id +')" class="form-control">' +
 										'<option selected disabled value="">--SELECT NATIONALITY--</option>' + array1 +
 									'</select>' +
 								'</div>' +
+								'<div class="col-md-6">' +
+									'<label id="identification_number_label-'+ guest_list_id +'">Identification Number</label>' +
+									'<input type="text" name="new_identification_numbers[]" id="identification_number-'+ guest_list_id +'" onchange="Set_Required_Field('+ guest_list_id +')" autocomplete="off" class="form-control">' +
+								'</div>' +
 							'</div>' +
 							'<br>' +
 							'<div class="row">' +
 								'<div class="col-md-6 mb-7 mb-md-0">' +
-									'<label id="identification_number_label-'+ guest_list_id +'">Identification Number</label>' +
-									'<input type="text" name="new_identification_numbers[]" id="identification_number-'+ guest_list_id +'" onchange="Set_Required_Field('+ guest_list_id +')" autocomplete="off" class="form-control">' +
-								'</div>' +
-								'<div class="col-md-6">' +
 									'<label id="passport_number_label-'+ guest_list_id +'">Passport Number</label>' +
 									'<input type="text" name="new_passport_numbers[]" id="passport_number-'+ guest_list_id +'" onchange="Set_Required_Field('+ guest_list_id +')" autocomplete="off" class="form-control">' +
+								'</div>' +
+								'<div class="col-md-6">' +
+									'<label>Passport Issue Date</label>' +
+									'<input type="text" name="new_passport_issue_dates[]" id="passport_issue_date-'+ guest_list_id +'" autocomplete="off" class="form-control kt_datepicker_4_3">' +
+								'</div>' +
+							'</div>' +
+							'<br>' +
+							'<div class="row">' +
+								'<div class="col-md-6 mb-7 mb-md-0">' +
+									'<label>Passport Expiry Date</label>' +
+									'<input type="text" name="new_passport_expiry_dates[]" id="passport_expiry_date-'+ guest_list_id +'" autocomplete="off" class="form-control kt_datepicker_4_3">' +
+								'</div>' +
+								'<div class="col-md-6">' +
+									'<label>Passport Copy</label>' +
+									'<div class="custom-file">' +
+										'<input type="file" name="new_passport_copies[]" id="passport_copy-'+ guest_list_id +'" class="custom-file-input passport-copy-upload" accept=".pdf,.jpg,.jpeg,.png,.gif" data-guest-id="'+ guest_list_id +'">' +
+										'<label class="custom-file-label" for="passport_copy-'+ guest_list_id +'">Choose file</label>' +
+									'</div>' +
+								'</div>' +
+							'</div>' +
+							'<br>' +
+							'<div class="row">' +
+								'<div class="col-md-12">' +
+									'<label>Dietary Requirement</label>' +
+									'<textarea name="new_dietary_requirements[]" id="dietary_requirement-'+ guest_list_id +'" rows="2" class="form-control"></textarea>' +
 								'</div>' +
 							'</div>' +
 							'<br>' +
@@ -713,6 +773,23 @@
 				format: 'dd/mm/yyyy',
 				autoclose: true,
 				endDate: new Date()
+			});
+			$(`#passport_issue_date-${guest_list_id}`).datepicker({
+				orientation: 'bottom left',
+				todayHighlight: true,
+				format: 'dd/mm/yyyy',
+				autoclose: true
+			});
+			$(`#passport_expiry_date-${guest_list_id}`).datepicker({
+				orientation: 'bottom left',
+				todayHighlight: true,
+				format: 'dd/mm/yyyy',
+				autoclose: true
+			});
+			// Handle file input label - always show "Choose file"
+			$(`#passport_copy-${guest_list_id}`).on('change', function() {
+				// Keep label as "Choose file" - don't show filename
+				$(this).next('.custom-file-label').html('Choose file');
 			});
 			Update_Pax_Number(guest_list_id, 'C');
 			new_guests.push(guest_list_id);
@@ -1640,8 +1717,163 @@
 		// Attach event handlers on page load
 		$(document).ready(function() {
 			attachRoomEventHandlers();
+			
+			// Initialize date pickers for existing passport date fields
+			$('input[id^="passport_issue_date-"]').each(function() {
+				if ($(this).hasClass('kt_datepicker_4_3')) {
+					$(this).datepicker({
+						orientation: 'bottom left',
+						todayHighlight: true,
+						format: 'dd/mm/yyyy',
+						autoclose: true
+					});
+				}
+			});
+			
+			$('input[id^="passport_expiry_date-"]').each(function() {
+				if ($(this).hasClass('kt_datepicker_4_3')) {
+					$(this).datepicker({
+						orientation: 'bottom left',
+						todayHighlight: true,
+						format: 'dd/mm/yyyy',
+						autoclose: true
+					});
+				}
+			});
+			
+			// Handle file input labels for existing passport copy fields - always show "Choose file"
+			$('.passport-copy-upload').on('change', function() {
+				// Keep label as "Choose file" - don't show filename
+				$(this).next('.custom-file-label').html('Choose file');
+			});
 		});
+
+		// Function to view passport copy in modal
+		function viewPassportCopy(fileUrl, fileName, guestCounter) {
+			var fileExtension = fileName.split('.').pop().toLowerCase();
+			var modalContent = '';
+			var isMobile = window.innerWidth <= 768;
+			var maxHeight = isMobile ? 'calc(100vh - 150px)' : '80vh';
+			
+			if (fileExtension === 'pdf') {
+				modalContent = '<div style="width: 100%; height: ' + maxHeight + '; overflow: auto;">' +
+					'<iframe src="' + fileUrl + '" style="width: 100%; height: 100%; border: none;" frameborder="0"></iframe>' +
+					'</div>';
+			} else {
+				modalContent = '<div style="text-align: center; width: 100%;">' +
+					'<img src="' + fileUrl + '" alt="' + fileName + '" style="max-width: 100%; max-height: ' + maxHeight + '; height: auto; object-fit: contain;" class="img-fluid">' +
+					'</div>';
+			}
+			
+			$('#passportModalBody').html(modalContent);
+			$('#passportModalTitle').text('Passport Copy : Guest ' + guestCounter);
+			$('#passportModal').modal('show');
+		}
 	</script>
+
+	<!-- Passport Copy View Modal -->
+	<div class="modal fade" id="passportModal" tabindex="-1" role="dialog" aria-labelledby="passportModalLabel" aria-hidden="true">
+		<div class="modal-dialog modal-dialog-centered modal-lg" role="document" style="max-width: 95%; margin: 10px auto;">
+			<div class="modal-content" style="border-radius: 10px; max-width: 1200px; margin: auto;">
+				<div class="modal-header" style="background-color: #f8f9fa; border-bottom: 1px solid #dee2e6;">
+					<h5 class="modal-title" id="passportModalTitle" style="font-weight: 600; color: #333;">Passport Copy</h5>
+					<button type="button" class="close" data-dismiss="modal" aria-label="Close" style="font-size: 1.5rem; padding: 0.5rem;">
+						<span aria-hidden="true">&times;</span>
+					</button>
+				</div>
+				<div class="modal-body" id="passportModalBody" style="padding: 15px; background-color: #fff; overflow: auto; max-height: 85vh;">
+					<!-- Content will be loaded here -->
+				</div>
+				<div class="modal-footer" style="background-color: #f8f9fa; border-top: 1px solid #dee2e6; padding: 10px 15px;">
+					<button type="button" class="btn btn-secondary" data-dismiss="modal" style="width: 100%; padding: 10px; font-size: 16px;">Close</button>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<style>
+		/* Mobile-friendly styles for passport copy modal */
+		@media (max-width: 768px) {
+			#passportModal .modal-dialog {
+				margin: 5px;
+				max-width: 100%;
+				width: calc(100% - 10px);
+			}
+			#passportModal .modal-content {
+				border-radius: 5px;
+				margin: 0;
+			}
+			#passportModal .modal-header {
+				padding: 10px 15px;
+			}
+			#passportModal .modal-body {
+				padding: 10px;
+				max-height: calc(100vh - 120px);
+				overflow-y: auto;
+			}
+			#passportModal .modal-header h5 {
+				font-size: 16px;
+				word-break: break-word;
+			}
+			#passportModal .modal-footer {
+				padding: 10px 15px;
+			}
+			#passportModal iframe {
+				max-height: calc(100vh - 150px) !important;
+				height: calc(100vh - 150px) !important;
+			}
+			#passportModal img {
+				max-height: calc(100vh - 150px) !important;
+				width: 100% !important;
+				height: auto !important;
+			}
+			#passportModal .close {
+				font-size: 2rem;
+				padding: 0.25rem 0.5rem;
+			}
+		}
+		
+		/* Mobile-friendly styles for passport copy field */
+		@media (max-width: 768px) {
+			.passport-copy-upload {
+				font-size: 14px;
+			}
+			.custom-file-label {
+				font-size: 14px;
+				padding: 8px 12px;
+				white-space: nowrap;
+				overflow: hidden;
+				text-overflow: ellipsis;
+			}
+			.custom-file {
+				width: 100%;
+			}
+			.d-flex.align-items-center {
+				flex-wrap: nowrap;
+			}
+			.btn-sm.btn-light-primary {
+				padding: 8px 12px;
+				font-size: 14px;
+				min-width: 45px;
+				flex-shrink: 0;
+			}
+		}
+		
+		/* Desktop styles for passport copy field */
+		@media (min-width: 769px) {
+			.btn-sm.btn-light-primary {
+				min-width: 45px;
+				padding: 8px 12px;
+			}
+		}
+		
+		/* Desktop styles */
+		@media (min-width: 769px) {
+			#passportModal .modal-dialog {
+				max-width: 900px;
+			}
+		}
+	</style>
 
 </body>
 

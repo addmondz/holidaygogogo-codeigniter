@@ -3,7 +3,7 @@ class Guest_List_Model extends CI_Model
 {
 	function Read_Guest_Lists1()
 	{
-		$this->db->select('GuestListID, guest_list.BookingID, guest_list.guest_list_room_id, guest_list.CountryCodeID As GuestCountryCode, Type, guest_list.Name As Guest, guest_list.LastName As GuestLastName, guest_list.Gender, DateOfBirth, Nationality, guest_list.IdentificationNumber, guest_list.PassportNumber, guest_list.Mobile As GuestMobile, guest_list.Email, MaritalStatus, Employment, Address, Postcode, guest_list.City, guest_list.State, guest_list.Country, Nominee, NomineeIdentificationNumber, Relationship, booking.BookingID, BookingNumber, ReservationNumber, Customer, booking.Mobile As CustomerMobile, StartDate, EndDate, Adult, Children, Infant, ChatLanguage, LockStatus, TravelInsuranceStatus, AfterSalesService, GLSessionLock, GLSessionExpiration, booking.Status, admin.CountryCodeID As SalesAgentCountryCode, admin.Name As SalesAgent, admin.Mobile As SalesAgentMobile, category.Name As Destination, CountryCode, guest_list_room.room_name As RoomName');
+		$this->db->select('GuestListID, guest_list.BookingID, guest_list.guest_list_room_id, guest_list.CountryCodeID As GuestCountryCode, Type, guest_list.Name As Guest, guest_list.LastName As GuestLastName, guest_list.Gender, DateOfBirth, Nationality, guest_list.IdentificationNumber, guest_list.PassportNumber, guest_list.PassportIssueDate, guest_list.PassportExpiryDate, guest_list.PassportCopy, guest_list.DietaryRequirement, guest_list.Mobile As GuestMobile, guest_list.Email, MaritalStatus, Employment, Address, Postcode, guest_list.City, guest_list.State, guest_list.Country, Nominee, NomineeIdentificationNumber, Relationship, booking.BookingID, BookingNumber, ReservationNumber, Customer, booking.Mobile As CustomerMobile, StartDate, EndDate, Adult, Children, Infant, ChatLanguage, LockStatus, TravelInsuranceStatus, AfterSalesService, GLSessionLock, GLSessionExpiration, booking.Status, admin.CountryCodeID As SalesAgentCountryCode, admin.Name As SalesAgent, admin.Mobile As SalesAgentMobile, category.Name As Destination, CountryCode, guest_list_room.room_name As RoomName');
 		$this->db->join('guest_list', 'guest_list.BookingID = booking.BookingID', 'left');
 		$this->db->join('guest_list_room', 'guest_list_room.id = guest_list.guest_list_room_id', 'left');
 		$this->db->join('admin', 'admin.AdminID = booking.SalesAgent', 'left');
@@ -75,6 +75,10 @@ class Guest_List_Model extends CI_Model
 				'Nationality' => empty($this->input->post('new_nationalities')[$i]) ? null : $this->input->post('new_nationalities')[$i],
 				'IdentificationNumber' => empty($this->input->post('new_identification_numbers')[$i]) ? null : $this->input->post('new_identification_numbers')[$i],
 				'PassportNumber' => empty($this->input->post('new_passport_numbers')[$i]) ? null : strtoupper($this->input->post('new_passport_numbers')[$i]),
+				'PassportIssueDate' => empty($this->input->post('new_passport_issue_dates')[$i]) ? null : (strtotime(str_replace('/', '-', $this->input->post('new_passport_issue_dates')[$i])) !== false ? date('Y-m-d', strtotime(str_replace('/', '-', $this->input->post('new_passport_issue_dates')[$i]))) : null),
+				'PassportExpiryDate' => empty($this->input->post('new_passport_expiry_dates')[$i]) ? null : (strtotime(str_replace('/', '-', $this->input->post('new_passport_expiry_dates')[$i])) !== false ? date('Y-m-d', strtotime(str_replace('/', '-', $this->input->post('new_passport_expiry_dates')[$i]))) : null),
+				'PassportCopy' => (isset($this->input->post('new_passport_copies')[$i]) && !empty($this->input->post('new_passport_copies')[$i])) ? $this->input->post('new_passport_copies')[$i] : null,
+				'DietaryRequirement' => empty($this->input->post('new_dietary_requirements')[$i]) ? null : $this->input->post('new_dietary_requirements')[$i],
 				'Mobile' => empty($this->input->post('new_mobiles')[$i]) ? null : $this->input->post('new_mobiles')[$i],
 				'Email' => empty($this->input->post('new_emails')[$i]) ? null : strtoupper($this->input->post('new_emails')[$i]),
 				'MaritalStatus' => empty($this->input->post('new_marital_statuses')[$i]) ? null : $this->input->post('new_marital_statuses')[$i],
@@ -120,6 +124,9 @@ class Guest_List_Model extends CI_Model
 					'Nationality' => empty($this->input->post('nationalities')[$i]) ? null : $this->input->post('nationalities')[$i],
 					'IdentificationNumber' => empty($this->input->post('identification_numbers')[$i]) ? null : $this->input->post('identification_numbers')[$i],
 					'PassportNumber' => empty($this->input->post('passport_numbers')[$i]) ? null : strtoupper($this->input->post('passport_numbers')[$i]),
+					'PassportIssueDate' => empty($this->input->post('passport_issue_dates')[$i]) ? null : (strtotime(str_replace('/', '-', $this->input->post('passport_issue_dates')[$i])) !== false ? date('Y-m-d', strtotime(str_replace('/', '-', $this->input->post('passport_issue_dates')[$i]))) : null),
+					'PassportExpiryDate' => empty($this->input->post('passport_expiry_dates')[$i]) ? null : (strtotime(str_replace('/', '-', $this->input->post('passport_expiry_dates')[$i])) !== false ? date('Y-m-d', strtotime(str_replace('/', '-', $this->input->post('passport_expiry_dates')[$i]))) : null),
+					'DietaryRequirement' => empty($this->input->post('dietary_requirements')[$i]) ? null : $this->input->post('dietary_requirements')[$i],
 					'Mobile' => empty($this->input->post('mobiles')[$i]) ? null : $this->input->post('mobiles')[$i],
 					'Email' => empty($this->input->post('emails')[$i]) ? null : strtoupper($this->input->post('emails')[$i]),
 					'MaritalStatus' => empty($this->input->post('marital_statuses')[$i]) ? null : $this->input->post('marital_statuses')[$i],
@@ -133,6 +140,11 @@ class Guest_List_Model extends CI_Model
 					'NomineeIdentificationNumber' => empty($this->input->post('nominee_identification_numbers')[$i]) ? null : $this->input->post('nominee_identification_numbers')[$i],
 					'Relationship' => empty($this->input->post('relationships')[$i]) ? null : strtoupper($this->input->post('relationships')[$i])
 				);
+				// Update PassportCopy if provided in POST (either new upload or existing file)
+				if (isset($this->input->post('passport_copies')[$i])) {
+					$passport_copy_value = $this->input->post('passport_copies')[$i];
+					$array['PassportCopy'] = !empty($passport_copy_value) ? $passport_copy_value : null;
+				}
 				$this->db->where('GuestListID', $this->input->post('guests')[$i]);
 				$this->db->update('guest_list', $array);
 				if($this->db->affected_rows() > 0) {

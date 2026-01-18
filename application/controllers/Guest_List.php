@@ -35,6 +35,40 @@ class Guest_List extends CI_Controller
 	{
 		if($this->input->post()) {
 			$booking_id = $this->Guest_List_Model->Read_Booking_ID();
+			
+			// Handle passport copy file uploads for existing guests
+			$passport_copy_paths = $this->handle_passport_uploads('passport_copies', $booking_id);
+			
+			// Handle passport copy file uploads for new guests
+			$new_passport_copy_paths = $this->handle_passport_uploads('new_passport_copies', $booking_id);
+			
+			// Set uploaded file paths in POST data - ensure array indices match guest indices
+			if (!empty($this->input->post('guests'))) {
+				// Get the number of guests being updated
+				$guest_count = count($this->input->post('guests'));
+				$passport_copies_array = array();
+				for ($i = 0; $i < $guest_count; $i++) {
+					// Check if new file was uploaded for this guest
+					if (isset($passport_copy_paths[$i]) && !empty($passport_copy_paths[$i])) {
+						$passport_copies_array[$i] = $passport_copy_paths[$i];
+					} 
+					// Otherwise, keep existing file if available
+					elseif (!empty($this->input->post('existing_passport_copies')) && isset($this->input->post('existing_passport_copies')[$i]) && !empty($this->input->post('existing_passport_copies')[$i])) {
+						$passport_copies_array[$i] = $this->input->post('existing_passport_copies')[$i];
+					}
+					// If neither exists, set to empty string (will be saved as null in model)
+					else {
+						$passport_copies_array[$i] = '';
+					}
+				}
+				$_POST['passport_copies'] = $passport_copies_array;
+			}
+			
+			// Handle new guests passport copies
+			if (!empty($new_passport_copy_paths)) {
+				$_POST['new_passport_copies'] = $new_passport_copy_paths;
+			}
+			
 			if($this->Guest_List_Model->Update() || !empty($this->input->post('new_guests')) || !empty($this->input->post('deleted_guests'))) {
 				if(!empty($this->input->post('new_guests'))) {
 					$this->Booking_Model->Update_Pax_Number($booking_id);
@@ -238,24 +272,28 @@ class Guest_List extends CI_Controller
 		$spreadsheet->getActiveSheet()->setCellValue('N1', 'NATIONALITY');
 		$spreadsheet->getActiveSheet()->setCellValue('O1', 'GUEST IDENTIFICATION NUMBER');
 		$spreadsheet->getActiveSheet()->setCellValue('P1', 'PASSPORT NUMBER');
-		$spreadsheet->getActiveSheet()->setCellValue('Q1', 'GUEST MOBILE');
-		$spreadsheet->getActiveSheet()->setCellValue('R1', 'EMAIL');
-		$spreadsheet->getActiveSheet()->setCellValue('S1', 'MARITAL STATUS');
-		$spreadsheet->getActiveSheet()->setCellValue('T1', 'EMPLOYMENT');
-		$spreadsheet->getActiveSheet()->setCellValue('U1', 'ADDRESS');
-		$spreadsheet->getActiveSheet()->setCellValue('V1', 'POSTCODE');
-		$spreadsheet->getActiveSheet()->setCellValue('W1', 'CITY');
-		$spreadsheet->getActiveSheet()->setCellValue('X1', 'STATE');
-		$spreadsheet->getActiveSheet()->setCellValue('Y1', 'COUNTRY');
-		$spreadsheet->getActiveSheet()->setCellValue('Z1', 'NOMINEE');
-		$spreadsheet->getActiveSheet()->setCellValue('AA1', 'NOMINEE IDENTIFICATION NUMBER');
-		$spreadsheet->getActiveSheet()->setCellValue('AB1', 'RELATIONSHIP');
-		$spreadsheet->getActiveSheet()->setCellValue('AC1', 'ROOM');
+		$spreadsheet->getActiveSheet()->setCellValue('Q1', 'PASSPORT ISSUE DATE');
+		$spreadsheet->getActiveSheet()->setCellValue('R1', 'PASSPORT EXPIRY DATE');
+		$spreadsheet->getActiveSheet()->setCellValue('S1', 'PASSPORT COPY');
+		$spreadsheet->getActiveSheet()->setCellValue('T1', 'DIETARY REQUIREMENT');
+		$spreadsheet->getActiveSheet()->setCellValue('U1', 'GUEST MOBILE');
+		$spreadsheet->getActiveSheet()->setCellValue('V1', 'EMAIL');
+		$spreadsheet->getActiveSheet()->setCellValue('W1', 'MARITAL STATUS');
+		$spreadsheet->getActiveSheet()->setCellValue('X1', 'EMPLOYMENT');
+		$spreadsheet->getActiveSheet()->setCellValue('Y1', 'ADDRESS');
+		$spreadsheet->getActiveSheet()->setCellValue('Z1', 'POSTCODE');
+		$spreadsheet->getActiveSheet()->setCellValue('AA1', 'CITY');
+		$spreadsheet->getActiveSheet()->setCellValue('AB1', 'STATE');
+		$spreadsheet->getActiveSheet()->setCellValue('AC1', 'COUNTRY');
+		$spreadsheet->getActiveSheet()->setCellValue('AD1', 'NOMINEE');
+		$spreadsheet->getActiveSheet()->setCellValue('AE1', 'NOMINEE IDENTIFICATION NUMBER');
+		$spreadsheet->getActiveSheet()->setCellValue('AF1', 'RELATIONSHIP');
+		$spreadsheet->getActiveSheet()->setCellValue('AG1', 'ROOM');
 		$row = 2;
 		$guest_lists = $this->Guest_List_Model->Read_Guest_Lists1();
-		$spreadsheet->getActiveSheet()->getStyle('A1:AC1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_BLACK);
-		$spreadsheet->getActiveSheet()->getStyle('A1:AC1')->getFont()->getColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_WHITE);
-		$spreadsheet->getActiveSheet()->getStyle('A1:AC1')->getFont()->setBold(true);
+		$spreadsheet->getActiveSheet()->getStyle('A1:AG1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_BLACK);
+		$spreadsheet->getActiveSheet()->getStyle('A1:AG1')->getFont()->getColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_WHITE);
+		$spreadsheet->getActiveSheet()->getStyle('A1:AG1')->getFont()->setBold(true);
 		foreach($guest_lists as $guest) {
 			$guest->CustomerMobile = $guest->CountryCode . $guest->CustomerMobile;
 			if(!empty($guest->StartDate) && !empty($guest->EndDate)) {
@@ -265,6 +303,16 @@ class Guest_List extends CI_Controller
 			}
 			if(!empty($guest->DateOfBirth)) {
 				$guest->DateOfBirth = strtoupper(date('j M Y', strtotime($guest->DateOfBirth)));
+			}
+			if(!empty($guest->PassportIssueDate)) {
+				$guest->PassportIssueDate = strtoupper(date('j M Y', strtotime($guest->PassportIssueDate)));
+			} else {
+				$guest->PassportIssueDate = null;
+			}
+			if(!empty($guest->PassportExpiryDate)) {
+				$guest->PassportExpiryDate = strtoupper(date('j M Y', strtotime($guest->PassportExpiryDate)));
+			} else {
+				$guest->PassportExpiryDate = null;
 			}
 			if(!empty($guest->Nationality)) {
 				$guest->Nationality = $this->Universal_Model->Read_Country($guest->Nationality);
@@ -294,22 +342,40 @@ class Guest_List extends CI_Controller
 			$spreadsheet->getActiveSheet()->setCellValueExplicit('N' . $row, $guest->Nationality, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 			$spreadsheet->getActiveSheet()->setCellValueExplicit('O' . $row, $guest->IdentificationNumber, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 			$spreadsheet->getActiveSheet()->setCellValueExplicit('P' . $row, $guest->PassportNumber, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-			$spreadsheet->getActiveSheet()->setCellValueExplicit('Q' . $row, $guest->GuestMobile, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-			$spreadsheet->getActiveSheet()->setCellValueExplicit('R' . $row, $guest->Email, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-			$spreadsheet->getActiveSheet()->setCellValueExplicit('S' . $row, $guest->MaritalStatus, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-			$spreadsheet->getActiveSheet()->setCellValueExplicit('T' . $row, $guest->Employment, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-			$spreadsheet->getActiveSheet()->setCellValueExplicit('U' . $row, $guest->Address, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-			$spreadsheet->getActiveSheet()->setCellValueExplicit('V' . $row, $guest->Postcode, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-			$spreadsheet->getActiveSheet()->setCellValueExplicit('W' . $row, $guest->City, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-			$spreadsheet->getActiveSheet()->setCellValueExplicit('X' . $row, $guest->State, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-			$spreadsheet->getActiveSheet()->setCellValueExplicit('Y' . $row, $guest->Country, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-			$spreadsheet->getActiveSheet()->setCellValueExplicit('Z' . $row, $guest->Nominee, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-			$spreadsheet->getActiveSheet()->setCellValueExplicit('AA' . $row, $guest->NomineeIdentificationNumber, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-			$spreadsheet->getActiveSheet()->setCellValueExplicit('AB' . $row, $guest->Relationship, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-			$spreadsheet->getActiveSheet()->setCellValueExplicit('AC' . $row, isset($guest->RoomName) ? $guest->RoomName : '', \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('Q' . $row, $guest->PassportIssueDate, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('R' . $row, $guest->PassportExpiryDate, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			
+			// Passport Copy as clickable link
+			if(!empty($guest->PassportCopy)) {
+				$passport_copy_url = base_url($guest->PassportCopy);
+				$passport_copy_filename = basename($guest->PassportCopy);
+				$spreadsheet->getActiveSheet()->setCellValue('S' . $row, $passport_copy_filename);
+				$spreadsheet->getActiveSheet()->getCell('S' . $row)->getHyperlink()->setUrl($passport_copy_url);
+				$spreadsheet->getActiveSheet()->getCell('S' . $row)->getHyperlink()->setTooltip('Click to open passport copy');
+				$spreadsheet->getActiveSheet()->getStyle('S' . $row)->getFont()->getColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_BLUE);
+				$spreadsheet->getActiveSheet()->getStyle('S' . $row)->getFont()->setUnderline(true);
+				$spreadsheet->getActiveSheet()->getStyle('S' . $row)->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_LEFT);
+			} else {
+				$spreadsheet->getActiveSheet()->setCellValueExplicit('S' . $row, '', \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			}
+			
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('T' . $row, $guest->DietaryRequirement, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('U' . $row, $guest->GuestMobile, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('V' . $row, $guest->Email, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('W' . $row, $guest->MaritalStatus, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('X' . $row, $guest->Employment, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('Y' . $row, $guest->Address, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('Z' . $row, $guest->Postcode, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('AA' . $row, $guest->City, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('AB' . $row, $guest->State, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('AC' . $row, $guest->Country, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('AD' . $row, $guest->Nominee, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('AE' . $row, $guest->NomineeIdentificationNumber, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('AF' . $row, $guest->Relationship, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('AG' . $row, isset($guest->RoomName) ? $guest->RoomName : '', \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 			$row++;
 		}
-		$spreadsheet->getActiveSheet()->getStyle('A:AC')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_RIGHT);
+		$spreadsheet->getActiveSheet()->getStyle('A:AG')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_RIGHT);
 		$spreadsheet->getActiveSheet()->getColumnDimension('A')->setWidth(35);
 		$spreadsheet->getActiveSheet()->getColumnDimension('B')->setWidth(35);
 		$spreadsheet->getActiveSheet()->getColumnDimension('C')->setWidth(35);
@@ -339,6 +405,10 @@ class Guest_List extends CI_Controller
 		$spreadsheet->getActiveSheet()->getColumnDimension('AA')->setWidth(35);
 		$spreadsheet->getActiveSheet()->getColumnDimension('AB')->setWidth(35);
 		$spreadsheet->getActiveSheet()->getColumnDimension('AC')->setWidth(35);
+		$spreadsheet->getActiveSheet()->getColumnDimension('AD')->setWidth(35);
+		$spreadsheet->getActiveSheet()->getColumnDimension('AE')->setWidth(35);
+		$spreadsheet->getActiveSheet()->getColumnDimension('AF')->setWidth(35);
+		$spreadsheet->getActiveSheet()->getColumnDimension('AG')->setWidth(35);
 		$guest_lists = 'GUEST_LISTS_' . $guest_lists[0]->BookingNumber . '.xlsx';
 		header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 		header('Content-Disposition: attachment;filename="' . $guest_lists . '"');
@@ -350,5 +420,87 @@ class Guest_List extends CI_Controller
 	
 	function Unlock() {
 		$this->Guest_List_Model->Update_GL_Session('BookingID', $this->input->post('booking_id'), 'N', null);
+	}
+	
+	/**
+	 * Handle passport copy file uploads
+	 * @param string $field_name The name of the file input field
+	 * @param int $booking_id The booking ID
+	 * @return array Array of file paths indexed by guest index
+	 */
+	private function handle_passport_uploads($field_name, $booking_id) {
+		$uploaded_paths = array();
+		$upload_path = FCPATH . 'assets/upload/passport/';
+		
+		// Create upload directory if it doesn't exist
+		if (!is_dir($upload_path)) {
+			mkdir($upload_path, 0755, true);
+		}
+		
+		// Handle multiple file uploads
+		if (isset($_FILES[$field_name]) && is_array($_FILES[$field_name]['name'])) {
+			$file_count = count($_FILES[$field_name]['name']);
+			$existing_field = str_replace('new_', '', $field_name);
+			$allowed_extensions = array('pdf', 'jpg', 'jpeg', 'png', 'gif');
+			$max_size = 10240 * 1024; // 10MB in bytes
+			
+			for ($i = 0; $i < $file_count; $i++) {
+				// Check if file was uploaded for this index
+				if (isset($_FILES[$field_name]['name'][$i]) && !empty($_FILES[$field_name]['name'][$i]) && $_FILES[$field_name]['error'][$i] == UPLOAD_ERR_OK) {
+					$tmp_name = $_FILES[$field_name]['tmp_name'][$i];
+					$original_name = $_FILES[$field_name]['name'][$i];
+					$file_size = $_FILES[$field_name]['size'][$i];
+					
+					// Validate file size
+					if ($file_size > $max_size) {
+						log_message('error', 'Passport upload failed: File too large for guest index ' . $i);
+						// Keep existing file if available
+						$existing_key = 'existing_' . $existing_field;
+						if (!empty($this->input->post($existing_key)) && isset($this->input->post($existing_key)[$i]) && !empty($this->input->post($existing_key)[$i])) {
+							$uploaded_paths[$i] = $this->input->post($existing_key)[$i];
+						}
+						continue;
+					}
+					
+					// Get file extension
+					$file_extension = strtolower(pathinfo($original_name, PATHINFO_EXTENSION));
+					
+					// Validate file type
+					if (!in_array($file_extension, $allowed_extensions)) {
+						log_message('error', 'Passport upload failed: Invalid file type for guest index ' . $i);
+						// Keep existing file if available
+						$existing_key = 'existing_' . $existing_field;
+						if (!empty($this->input->post($existing_key)) && isset($this->input->post($existing_key)[$i]) && !empty($this->input->post($existing_key)[$i])) {
+							$uploaded_paths[$i] = $this->input->post($existing_key)[$i];
+						}
+						continue;
+					}
+					
+					// Generate encrypted filename
+					$encrypted_name = md5(uniqid(rand(), true) . time() . $i) . '.' . $file_extension;
+					$destination = $upload_path . $encrypted_name;
+					
+					// Move uploaded file
+					if (move_uploaded_file($tmp_name, $destination)) {
+						$uploaded_paths[$i] = 'assets/upload/passport/' . $encrypted_name;
+					} else {
+						log_message('error', 'Passport upload failed: Could not move file for guest index ' . $i);
+						// Keep existing file if available
+						$existing_key = 'existing_' . $existing_field;
+						if (!empty($this->input->post($existing_key)) && isset($this->input->post($existing_key)[$i]) && !empty($this->input->post($existing_key)[$i])) {
+							$uploaded_paths[$i] = $this->input->post($existing_key)[$i];
+						}
+					}
+				} else {
+					// No new file uploaded, keep existing file if available
+					$existing_key = 'existing_' . $existing_field;
+					if (!empty($this->input->post($existing_key)) && isset($this->input->post($existing_key)[$i]) && !empty($this->input->post($existing_key)[$i])) {
+						$uploaded_paths[$i] = $this->input->post($existing_key)[$i];
+					}
+				}
+			}
+		}
+		
+		return $uploaded_paths;
 	}
 }
