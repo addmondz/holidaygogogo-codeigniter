@@ -942,7 +942,62 @@ class Booking extends MY_Controller
 					$array['Tag'] = explode(',', $array['Tag']);
 					$array['Subtotal'] = number_format($array['Subtotal'], 2, '.', ',');
 					$array['Discount'] = $array['Discount'] != 0.00 ? number_format($array['Discount'], 2, '.', ',') : '';
+					// Store raw NetTotal before formatting for deposit calculation
+					$net_total_raw = isset($array['NetTotal']) ? floatval($array['NetTotal']) : 0;
 					$array['NetTotal'] = number_format($array['NetTotal'], 2, '.', ',');
+					// Handle DepositPercentage - store original DB value for comparison
+					$array['DepositPercentageOriginal'] = isset($array['DepositPercentage']) ? $array['DepositPercentage'] : 0;
+					// For Update page: use actual DB value (even if 0). For Create/Duplicate: default to 50 if 0 or not set
+					if (current_url() == base_url('Booking/Update')) {
+						// Update page: use actual database value
+						if (!isset($array['DepositPercentage'])) {
+							$array['DepositPercentage'] = 0;
+						}
+					} else {
+						// Create/Duplicate page: default to 50 if 0 or not set
+						if (!isset($array['DepositPercentage']) || $array['DepositPercentage'] == 0) {
+							$array['DepositPercentage'] = 50; // Default UI value
+						}
+					}
+					// Calculate deposit information
+					$deposit_percentage_raw = isset($array['DepositPercentage']) ? $array['DepositPercentage'] : 0;
+					$deposit_total = ($net_total_raw * $deposit_percentage_raw) / 100;
+					$array['DepositTotal'] = $deposit_total;
+					// Calculate deposit paid from payments
+					$deposit_paid = 0;
+					if (isset($array['BookingID'])) {
+						$payments = $this->Booking_Model->Read_Payments($array['BookingID']);
+						if (!empty($payments)) {
+							foreach ($payments as $payment) {
+								if (($payment->Status == 'Y' || $payment->Status == 'P') && $payment->Credit > 0) {
+									$deposit_paid += $payment->Credit;
+								}
+							}
+						}
+					}
+					$array['DepositPaid'] = $deposit_paid;
+					// Calculate deposit status and format Deposit Paid display
+					$deposit_difference = $deposit_paid - $deposit_total;
+					if ($deposit_paid > 0) {
+						$deposit_paid_display = number_format($deposit_paid, 2, '.', ',');
+						
+						if ($deposit_difference > 0.01) {
+							// Overpaid - apply red color
+							$deposit_paid_display .= ' (Overpaid: RM ' . number_format($deposit_difference, 2, '.', ',') . ')';
+							$array['DepositPaidColor'] = '#FF6B6B'; // Red
+						} elseif ($deposit_difference < -0.01) {
+							// Underpaid - apply orange color
+							$deposit_paid_display .= ' (Underpaid: RM ' . number_format(abs($deposit_difference), 2, '.', ',') . ')';
+							$array['DepositPaidColor'] = '#FFA500'; // Orange
+						} else {
+							// Paid - no special color (normal/default)
+							// Don't set DepositPaidColor for normal paid status
+						}
+					} else {
+						$deposit_paid_display = '0.00';
+						// Don't set DepositPaidColor for no payment
+					}
+					$array['DepositPaidDisplay'] = $deposit_paid_display;
 					$array['admins'] = $this->Booking_Model->Read_Admins();
 
 					if(empty($array['ProductSequence'])) {
@@ -1044,7 +1099,54 @@ class Booking extends MY_Controller
 				$array['Tag'] = explode(',', $array['Tag']);
 				$array['Subtotal'] = number_format($array['Subtotal'], 2, '.', ',');
 				$array['Discount'] = $array['Discount'] != 0.00 ? number_format($array['Discount'], 2, '.', ',') : '';
+				// Store raw NetTotal before formatting for deposit calculation
+				$net_total_raw = isset($array['NetTotal']) ? floatval($array['NetTotal']) : 0;
 				$array['NetTotal'] = number_format($array['NetTotal'], 2, '.', ',');
+				// Handle DepositPercentage - store original DB value for comparison
+				$array['DepositPercentageOriginal'] = isset($array['DepositPercentage']) ? $array['DepositPercentage'] : 0;
+				// For View page: use actual DB value (even if 0)
+				if (!isset($array['DepositPercentage'])) {
+					$array['DepositPercentage'] = 0;
+				}
+				// Calculate deposit information
+				$deposit_percentage_raw = isset($array['DepositPercentage']) ? $array['DepositPercentage'] : 0;
+				$deposit_total = ($net_total_raw * $deposit_percentage_raw) / 100;
+				$array['DepositTotal'] = $deposit_total;
+				// Calculate deposit paid from payments
+				$deposit_paid = 0;
+				if (isset($array['BookingID'])) {
+					$payments = $this->Booking_Model->Read_Payments($array['BookingID']);
+					if (!empty($payments)) {
+						foreach ($payments as $payment) {
+							if (($payment->Status == 'Y' || $payment->Status == 'P') && $payment->Credit > 0) {
+								$deposit_paid += $payment->Credit;
+							}
+						}
+					}
+				}
+				$array['DepositPaid'] = $deposit_paid;
+				// Calculate deposit status and format Deposit Paid display
+				$deposit_difference = $deposit_paid - $deposit_total;
+				if ($deposit_paid > 0) {
+					$deposit_paid_display = number_format($deposit_paid, 2, '.', ',');
+					
+					if ($deposit_difference > 0.01) {
+						// Overpaid - apply red color
+						$deposit_paid_display .= ' (Overpaid: RM ' . number_format($deposit_difference, 2, '.', ',') . ')';
+						$array['DepositPaidColor'] = '#FF6B6B'; // Red
+					} elseif ($deposit_difference < -0.01) {
+						// Underpaid - apply orange color
+						$deposit_paid_display .= ' (Underpaid: RM ' . number_format(abs($deposit_difference), 2, '.', ',') . ')';
+						$array['DepositPaidColor'] = '#FFA500'; // Orange
+					} else {
+						// Paid - no special color (normal/default)
+						// Don't set DepositPaidColor for normal paid status
+					}
+				} else {
+					$deposit_paid_display = '0.00';
+					// Don't set DepositPaidColor for no payment
+				}
+				$array['DepositPaidDisplay'] = $deposit_paid_display;
 				$array['admins'] = $this->Booking_Model->Read_Admins();
 
 				if(empty($array['ProductSequence'])) {
