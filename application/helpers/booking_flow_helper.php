@@ -296,9 +296,16 @@ if (!function_exists('display_booking_status')) {
 
         // Determine display status
         $display_status = $booking->Status;
+        
+        // If guest list is locked and status is PGL, it should be PTV
+        if ($booking->LockStatus == 'Y' && $booking->Status == 'PGL') {
+            $display_status = 'PTV';
+        }
+        // If guest list is unlocked and status is PTV, show as PGL
         if ($booking->LockStatus == 'N' && $booking->Status == 'PTV') {
             $display_status = 'PGL';
         }
+        // If after sales service is pending and status is Y, show as PR
         if ($booking->AfterSalesService == 'PENDING' && $booking->Status == 'Y') {
             $display_status = 'PR';
         }
@@ -312,6 +319,19 @@ if (!function_exists('display_booking_status')) {
             }
         }
 
+        $status_colors = array(
+            'Y' => '#50C878',
+            'PR' => '#C3B1E1',
+            'P' => '#FFBF00',
+            'PP' => '#A7C7E7',
+            'PTV' => '#F89880',
+            'PGL' => '#FAC898',
+            'PT' => '#F8C8DC',
+            'OG' => '#CCCCFF',
+            'PO' => '#DA70D6',
+            'PBC' => '#FFD700',
+            'PBO' => '#87CEEB'
+        );
         $status_texts = array(
             'Y' => 'COMPLETED',
             'PR' => 'PENDING REVIEW',
@@ -580,14 +600,14 @@ if (!function_exists('is_travel_voucher_sent')) {
 if (!function_exists('is_bc_approved')) {
     /**
      * Check if BC (Booking Confirmation) is approved
-     * BC is approved if status is not PBC (PENDING BC CONFIRMATION)
+     * BC is approved if bc_approved field is 1 (true)
      * 
      * @param object $booking Booking object
      * @return bool True if BC is approved
      */
     function is_bc_approved($booking)
     {
-        return (!empty($booking->Status) && $booking->Status != 'PBC');
+        return (!empty($booking->bc_approved) && $booking->bc_approved == 1);
     }
 }
 
@@ -637,14 +657,14 @@ if (!function_exists('determine_booking_status_from_state')) {
     /**
      * Determine booking status based on sequential checks
      * Checks in order and returns first condition that fails:
-     * 1. BC approved → if not, return PBC (PENDING BC CONFIRMATION)
-     * 2. Payment received → if not, return P (PENDING PAYMENT)
-     * 3. Checklist completed → if not, return PBO (PENDING BOOKING OPERATION)
-     * 4. Guest list locked → if not, return PGL (PENDING GUEST LIST) - derived status
-     * 5. Travel voucher sent → if not, return PTV (PENDING TRAVEL VOUCHER)
-     * 6. Travel completed → if not, return PT (PENDING TRAVEL)
-     * 7. Completed → return Y (COMPLETED)
-     * 8. Cancelled → return CANCELLED (highest priority)
+     * 1. Cancelled → return CANCELLED (highest priority - check first)
+     * 2. BC approved → if not, return PBC (PENDING BC CONFIRMATION)
+     * 3. Payment received → if not, return P (PENDING PAYMENT)
+     * 4. Checklist completed → if not, return PBO (PENDING BOOKING OPERATION)
+     * 5. Guest list locked → if not, return PGL (PENDING GUEST LIST)
+     * 6. Travel voucher sent → if not, return PTV (PENDING TRAVEL VOUCHER)
+     * 7. Travel completed → if not, return PT (PENDING TRAVEL)
+     * 8. Completed → return Y (COMPLETED)
      * 
      * @param int $booking_id Booking ID
      * @param object $booking Booking object
@@ -653,7 +673,7 @@ if (!function_exists('determine_booking_status_from_state')) {
      */
     function determine_booking_status_from_state($booking_id, $booking, $CI)
     {
-        // Step 8: Check if cancelled (highest priority - check first)
+        // Step 1: Check if cancelled (highest priority - check first)
         if (is_booking_cancelled($booking)) {
             return array(
                 'status' => 'CANCELLED',
@@ -661,15 +681,7 @@ if (!function_exists('determine_booking_status_from_state')) {
             );
         }
 
-        // Step 7: Check if completed
-        if (is_travel_completed($booking)) {
-            return array(
-                'status' => 'Y',
-                'description' => 'Travel completed - Status: COMPLETED'
-            );
-        }
-
-        // Step 1: Check if BC approved
+        // Step 2: Check if BC approved
         if (!is_bc_approved($booking)) {
             return array(
                 'status' => 'PBC',
@@ -677,7 +689,7 @@ if (!function_exists('determine_booking_status_from_state')) {
             );
         }
 
-        // Step 2: Check if payment received
+        // Step 3: Check if payment received
         if (!has_booking_payment($booking_id, $CI)) {
             return array(
                 'status' => 'P',
@@ -685,7 +697,7 @@ if (!function_exists('determine_booking_status_from_state')) {
             );
         }
 
-        // Step 3: Check if checklist completed
+        // Step 4: Check if checklist completed
         if (!are_all_checklists_completed($booking_id, $CI)) {
             return array(
                 'status' => 'PBO',
@@ -693,32 +705,43 @@ if (!function_exists('determine_booking_status_from_state')) {
             );
         }
 
-        // Step 4: Check if guest list locked
-        // Note: PGL is a derived status that only applies when we're at PTV stage
-        // Check if travel voucher was sent first to determine if we're at the right stage
-        $travel_voucher_sent = is_travel_voucher_sent($booking_id, $CI);
-
-        // If travel voucher not sent yet, we can't check guest list lock status
-        // So check travel voucher first, then guest list
-        if (!$travel_voucher_sent) {
-            return array(
-                'status' => 'PTV',
-                'description' => 'All checklists completed but travel voucher not sent - Status: PENDING TRAVEL VOUCHER'
-            );
-        }
-
-        // Travel voucher sent, now check if guest list is locked
+        // Step 5: Check if guest list locked
         if (!is_guest_list_locked($booking)) {
             return array(
                 'status' => 'PGL',
-                'description' => 'Travel voucher sent but guest list not locked - Status: PENDING GUEST LIST'
+                'description' => 'All checklists completed but guest list not locked - Status: PENDING GUEST LIST'
             );
         }
 
-        // Step 6: Travel not completed yet
+        // Step 6: Check if travel voucher sent
+        if (!is_travel_voucher_sent($booking_id, $CI)) {
+            return array(
+                'status' => 'PTV',
+                'description' => 'Guest list locked but travel voucher not sent - Status: PENDING TRAVEL VOUCHER'
+            );
+        }
+
+        // Step 7: Check if travel completed (travel dates have passed)
+        $travel_date_passed = false;
+        $travel_end_date = !empty($booking->EndDate) ? $booking->EndDate : $booking->StartDate;
+        if (!empty($travel_end_date)) {
+            // Compare dates (ignore time)
+            $travel_date = date('Y-m-d', strtotime($travel_end_date));
+            $today = date('Y-m-d');
+            $travel_date_passed = $travel_date < $today;
+        }
+
+        if (!$travel_date_passed) {
+            return array(
+                'status' => 'PT',
+                'description' => 'All conditions met but travel not completed - Status: PENDING TRAVEL'
+            );
+        }
+
+        // Step 8: Completed (travel dates have passed)
         return array(
-            'status' => 'PT',
-            'description' => 'All conditions met but travel not completed - Status: PENDING TRAVEL'
+            'status' => 'Y',
+            'description' => 'Travel completed - Status: COMPLETED'
         );
     }
 }

@@ -460,8 +460,8 @@ class Booking extends MY_Controller
 				} else {
 					$html .= '<a href="' . base_url('Booking/Update_Cancel_Status?booking_id=') . $booking->BookingID . '&current_cancel_status=' . $booking->CancelStatus . '&new_cancel_status=Y&param=' . urlencode($current_url) . '" class="dropdown-item" style="color:#E0115F; font-size:11px;">Cancel Booking</a>';
 				}
-				// Approve BC - only show when status is PBC
-				if($booking->Status == 'PBC') {
+				// Approve BC - only show when BC is not approved
+				if(empty($booking->bc_approved) || $booking->bc_approved == 0) {
 					$html .= '<a href="' . base_url('Booking/Approve_BC?booking_id=') . $booking->BookingID . '&param=' . urlencode($current_url) . '" class="dropdown-item" style="color:#50C878; font-size:11px;">Approve BC</a>';
 					$shown_approve_bc = true;
 				}
@@ -483,8 +483,8 @@ class Booking extends MY_Controller
 				$html .= '<a href="' . (strpos($current_url, '?') ? base_url('Booking/View?booking_id=') . $booking->BookingID . '&' . explode('?', $current_url)[1] : base_url('Booking/View?booking_id=') . $booking->BookingID) . '" class="dropdown-item" style="font-size:11px;">View Booking</a>';
 			}
 		}
-		// Approve BC - Allow SA us . $is_sales_agentir own bookings
-		if($is_sales_agent && $booking->Status == 'PBC' && !empty($booking->SalesAgentID) && $booking->SalesAgentID == $this->session->userdata('admin_id') && !$shown_approve_bc) {
+		// Approve BC - Allow SA users to approve their own bookings
+		if($is_sales_agent && (empty($booking->bc_approved) || $booking->bc_approved == 0) && !empty($booking->SalesAgentID) && $booking->SalesAgentID == $this->session->userdata('admin_id') && !$shown_approve_bc) {
 			$html .= '<a href="' . base_url('Booking/Approve_BC?booking_id=') . $booking->BookingID . '&param=' . urlencode($current_url) . '" class="dropdown-item" style="color:#50C878; font-size:11px;">Approve BC</a>';
 		}
 		// Complete Booking / Revert Pending Review - Allow SA users to complete after-sales service
@@ -1269,8 +1269,49 @@ class Booking extends MY_Controller
 
 	function Update_Lock_Status() 
 	{
+		$booking_id = $this->input->get('booking_id');
+		$new_lock_status = $this->input->get('new_lock_status');
+		
+		// Update lock status
 		$this->Booking_Model->Update_Lock_Status();
 		$this->Booking_Model->Create_Booking_Log();
+		
+		// If locking guest list (LockStatus = 'Y'), automatically advance status to PTV if conditions are met
+		if ($new_lock_status == 'Y') {
+			$this->load->helper('booking_flow');
+			
+			// Get updated booking
+			$booking = $this->Booking_Model->getBookingById($booking_id);
+			
+			if ($booking) {
+				// Determine the correct status based on current state
+				$status_info = determine_booking_status_from_state($booking_id, $booking, $this);
+
+				$this->load->helper('debug_log_helper');
+				debug_log(array(
+					'status_info' => $status_info
+				), 'Update_Lock_Status - Status Determination');
+				
+				// If determined status is PTV and current status is not PTV, update it
+				if ($status_info['status'] == 'PTV' && $booking->Status != 'PTV') {
+					$this->Booking_Model->Update_Status('PTV', $booking_id);
+					$this->Booking_Model->Create_Booking_Log2($booking->Status, 'PTV', $booking_id);
+					
+					// Log the status change
+					$this->load->helper('booking_status_log');
+					$admin_id = $this->session->userdata('admin_id') ?: 0;
+					log_booking_status_change(
+						$booking_id,
+						'PTV',
+						$booking->Status,
+						$admin_id,
+						'Guest list locked - Status advanced to PENDING TRAVEL VOUCHER',
+						true
+					);
+				}
+			}
+		}
+		
 		redirect('Guest_List?gl=' . $this->input->get('gl'));
 	}
 
@@ -1468,9 +1509,9 @@ class Booking extends MY_Controller
 				}
 			}
 			
-			// Validate that booking is in PBC status
-			if ($booking->Status != 'PBC') {
-				$this->session->set_flashdata('error', 'Only bookings with PENDING BC CONFIRMATION status can be approved.');
+			// Validate that BC is not already approved
+			if (!empty($booking->bc_approved) && $booking->bc_approved == 1) {
+				$this->session->set_flashdata('error', 'This booking BC has already been approved.');
 				if(strpos($this->input->get('param'), '?') == true) {
 					redirect('Booking?' . explode('?', $this->input->get('param'))[1]);
 				} else {
@@ -1522,8 +1563,11 @@ class Booking extends MY_Controller
 			// Update status to target status
 			$this->Booking_Model->Update_Status($target_status, $booking_id);
 			
-			// Log the status change with custom description
+			// Update BC approval fields
 			$admin_id = $this->session->userdata('admin_id');
+			$this->Booking_Model->Update_BC_Approval($booking_id, 1, $admin_id);
+			
+			// Log the status change with custom description
 			log_booking_status_change(
 				$booking_id,
 				$target_status,  // to_status
