@@ -310,16 +310,28 @@ class Customer_Model extends CI_Model
             $first_char = strtoupper($first_char);
         }
 
-        $prefix = '303-' . $first_char;
+        // Start from prefix 303, increment if sequence exceeds 999
+        $prefix_num = 303;
+        $max_prefix = 399;
 
-        $this->db->select("MAX(CAST(SUBSTRING(CustomerCode, 6) AS UNSIGNED)) as max_seq");
-        $this->db->from('customer');
-        $this->db->like('CustomerCode', $prefix, 'after');
-        $result = $this->db->get()->row();
+        while ($prefix_num <= $max_prefix) {
+            $prefix = $prefix_num . '-' . $first_char;
 
-        $next_seq = ($result && $result->max_seq !== null) ? (int)$result->max_seq + 1 : 1;
+            $this->db->select("MAX(CAST(SUBSTRING(CustomerCode, 6) AS UNSIGNED)) as max_seq");
+            $this->db->from('customer');
+            $this->db->like('CustomerCode', $prefix, 'after');
+            $result = $this->db->get()->row();
 
-        return $prefix . sprintf('%03d', $next_seq);
+            $max_seq = ($result && $result->max_seq !== null) ? (int)$result->max_seq : 0;
+
+            if ($max_seq < 999) {
+                return $prefix . sprintf('%03d', $max_seq + 1);
+            }
+
+            $prefix_num++;
+        }
+
+        return null;
     }
 
 	public function get_pending_sycn_customers()
