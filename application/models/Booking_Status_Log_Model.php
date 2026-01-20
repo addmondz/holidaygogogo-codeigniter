@@ -16,6 +16,12 @@ class Booking_Status_Log_Model extends CI_Model
      */
     function create($booking_id, $to_status, $from_status = null, $created_by = 0, $description = null, $show_to_customer = true)
     {
+        // Validate booking_id
+        if (empty($booking_id)) {
+            log_message('error', 'Booking_Status_Log_Model::create() called with empty booking_id');
+            return false;
+        }
+        
         $data = array(
             'booking_id' => $booking_id,
             'from_status' => $from_status,
@@ -210,5 +216,55 @@ class Booking_Status_Log_Model extends CI_Model
     {
         $this->db->where('booking_id', $booking_id);
         return $this->db->delete('booking_status_log');
+    }
+
+    /**
+     * Get the maximum status reached for a booking (excluding PBC and derived statuses)
+     * This is used to restore booking to the highest status it previously reached
+     * 
+     * @param int $booking_id Booking ID
+     * @return string|null Maximum status code or null if none found
+     */
+    function get_maximum_status_reached($booking_id)
+    {
+        // Get all status logs for this booking
+        $logs = $this->get_by_booking_id($booking_id, true);
+        
+        // Define status priority (higher number = higher priority/more advanced)
+        $status_priority = array(
+            'PBC' => 0,
+            'P' => 1,
+            'PP' => 1, // Same as P
+            'PBO' => 2,
+            'PTV' => 3,
+            'PT' => 4,
+            'OG' => 4, // Same as PT
+            'Y' => 5,
+            'PR' => 5, // Derived from Y
+            'PGL' => 3, // Derived from PTV
+            'PO' => 1, // Derived from P/PP
+            'CANCELLED' => -1 // Exclude cancelled
+        );
+        
+        $max_status = null;
+        $max_priority = -1;
+        
+        foreach ($logs as $log) {
+            $status = $log->to_status;
+            
+            // Skip cancelled and derived statuses that shouldn't be restored
+            if ($status == 'CANCELLED' || $status == 'PO' || $status == 'PR' || $status == 'PGL' || $status == 'OG') {
+                continue;
+            }
+            
+            $priority = isset($status_priority[$status]) ? $status_priority[$status] : 0;
+            
+            if ($priority > $max_priority) {
+                $max_priority = $priority;
+                $max_status = $status;
+            }
+        }
+        
+        return $max_status;
     }
 }

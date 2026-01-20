@@ -3,7 +3,7 @@ class Booking_Model extends CI_Model
 {
 	function Read_Booking()
 	{
-		$this->db->select('booking.BookingID, booking.AllowReview, booking.CustomerReview, booking.CustomerReviewTimestamp, BookingConfirmationFooterID, TravelVoucherFooterID, booking.CountryCodeID AS CustomerCountryCode, BookingNumber, ReservationNumber, DepositDeadline, FullPaymentDeadline, AdditionalPaymentDeadline, Customer, booking.Mobile AS CustomerMobile, StartDate, EndDate, Adult, Children, Infant, Destination, SalesAgent, Tag, BookingRemark, Subtotal, Discount, NetTotal, DepositPercentage, booking.ChatLanguage, Source, Token, booking.BookingConfirmationTitle, BookingConfirmationFooter, TravelVoucherFooter, ProductSequence, admin.Name AS SalesAgentName, booking.AutocountSyncStatus, booking.AutocountSyncMessage, booking.AutocountSyncAction, booking.CustomerAutocountSyncStatus, booking.CustomerAutocountSyncMessage, booking.CustomerAutocountSyncAction, customer.CustomerCode AS CustomerCode, booking.CustomerID');
+		$this->db->select('booking.BookingID, booking.AllowReview, booking.CustomerReview, booking.CustomerReviewTimestamp, BookingConfirmationFooterID, TravelVoucherFooterID, booking.CountryCodeID AS CustomerCountryCode, BookingNumber, ReservationNumber, DepositDeadline, FullPaymentDeadline, AdditionalPaymentDeadline, Customer, booking.Mobile AS CustomerMobile, StartDate, EndDate, Adult, Children, Infant, Destination, SalesAgent, Tag, BookingRemark, Subtotal, Discount, NetTotal, DepositPercentage, booking.ChatLanguage, Source, Token, booking.BookingConfirmationTitle, BookingConfirmationFooter, TravelVoucherFooter, ProductSequence, booking.Status, booking.CancelStatus, booking.LockStatus, booking.AfterSalesService, admin.Name AS SalesAgentName, booking.AutocountSyncStatus, booking.AutocountSyncMessage, booking.AutocountSyncAction, booking.CustomerAutocountSyncStatus, booking.CustomerAutocountSyncMessage, booking.CustomerAutocountSyncAction, customer.CustomerCode AS CustomerCode, booking.CustomerID');
 		$this->db->join('admin', 'admin.AdminID = booking.SalesAgent', 'left');
 		$this->db->join('customer', 'customer.CustomerID = booking.CustomerID', 'left');
 		$this->db->where('booking.BookingID', $this->input->get('booking_id'));
@@ -460,7 +460,7 @@ class Booking_Model extends CI_Model
 			$this->load->helper('booking_status_log');
 			$initial_status = !empty($booking_data[0]['Status']) ? $booking_data[0]['Status'] : 'PBC';
 			$creator_id = $this->session->userdata('admin_id');
-			log_booking_creation($booking_id, $initial_status, "Booking created", $creator_id);
+			log_booking_creation($booking_id, $initial_status, "Booking Created", $creator_id);
 
 			// Notify Sales Agent when a booking is created under them by someone else
 			$sales_agent = isset($booking_data[0]['SalesAgent']) ? $booking_data[0]['SalesAgent'] : null;
@@ -706,6 +706,10 @@ class Booking_Model extends CI_Model
 
 	function Update()
 	{
+		// Get current booking data before update to compare changes
+		$booking_id = $this->input->post('booking_id');
+		$current_booking = $this->getBookingById($booking_id);
+		
 		// Get booking data and ensure AllowReview is properly formatted as integer (0 or 1)
 		$booking_data = $this->input->post('booking');
 		if (!empty($booking_data) && is_array($booking_data)) {
@@ -718,6 +722,78 @@ class Booking_Model extends CI_Model
 						$booking_data[$key]['AllowReview'] = 1; // Default to 1 if invalid
 					}
 				}
+			}
+		}
+		
+		// Check for critical changes that require status revert to PBC
+		$needs_revert = false;
+		$revert_reason = '';
+		
+		if ($current_booking) {
+			// Check if NetTotal changed
+			$new_net_total = isset($booking_data[0]['NetTotal']) ? floatval($booking_data[0]['NetTotal']) : null;
+			$old_net_total = isset($current_booking->NetTotal) ? floatval($current_booking->NetTotal) : null;
+			
+			if ($new_net_total !== null && $old_net_total !== null && abs($new_net_total - $old_net_total) > 0.01) {
+				$needs_revert = true;
+				$revert_reason = 'Booking total price changed from RM ' . number_format($old_net_total, 2) . ' to RM ' . number_format($new_net_total, 2);
+			}
+			
+			// Check if travel dates changed
+			$new_start_date = isset($booking_data[0]['StartDate']) ? $booking_data[0]['StartDate'] : null;
+			$new_end_date = isset($booking_data[0]['EndDate']) ? $booking_data[0]['EndDate'] : null;
+			$old_start_date = $current_booking->StartDate;
+			$old_end_date = $current_booking->EndDate;
+			
+			// Normalize dates for comparison (handle different formats)
+			$normalize_date = function($date) {
+				if (empty($date) || $date == '0000-00-00' || $date == '0000-00-00 00:00:00') return null;
+				// Try to parse date
+				$parsed = strtotime($date);
+				return $parsed ? date('Y-m-d', $parsed) : null;
+			};
+			
+			$new_start_normalized = $normalize_date($new_start_date);
+			$new_end_normalized = $normalize_date($new_end_date);
+			$old_start_normalized = $normalize_date($old_start_date);
+			$old_end_normalized = $normalize_date($old_end_date);
+			
+			if (($new_start_normalized && $new_start_normalized != $old_start_normalized) ||
+			    ($new_end_normalized && $new_end_normalized != $old_end_normalized)) {
+				$needs_revert = true;
+				$date_change_desc = '';
+				if ($new_start_normalized != $old_start_normalized) {
+					$date_change_desc .= 'Start date changed from ' . ($old_start_normalized ? date('d/m/Y', strtotime($old_start_normalized)) : 'N/A') . 
+					                     ' to ' . ($new_start_normalized ? date('d/m/Y', strtotime($new_start_normalized)) : 'N/A');
+				}
+				if ($new_end_normalized != $old_end_normalized) {
+					if ($date_change_desc) $date_change_desc .= '; ';
+					$date_change_desc .= 'End date changed from ' . ($old_end_normalized ? date('d/m/Y', strtotime($old_end_normalized)) : 'N/A') . 
+					                     ' to ' . ($new_end_normalized ? date('d/m/Y', strtotime($new_end_normalized)) : 'N/A');
+				}
+				$revert_reason = $revert_reason ? $revert_reason . '; ' . $date_change_desc : $date_change_desc;
+			}
+			
+			// If revert is needed and current status is not PBC, revert to PBC
+			if ($needs_revert && $current_booking->Status != 'PBC') {
+				// Store current status as max status reached (if not already stored)
+				// We'll use a custom field or check status log
+				$this->load->model('Booking_Status_Log_Model');
+				
+				// Update status to PBC
+				$booking_data[0]['Status'] = 'PBC';
+				
+				// Log the revert with reason
+				$this->load->helper('booking_status_log');
+				$admin_id = $this->session->userdata('admin_id') ?: 0;
+				log_booking_status_change(
+					$booking_id,
+					'PBC',
+					$current_booking->Status,
+					$admin_id,
+					'Status reverted to PENDING BC CONFIRMATION - ' . $revert_reason,
+					true
+				);
 			}
 		}
 		

@@ -711,6 +711,7 @@ class Payment extends MY_Controller
 							// After PENDING PAYMENT (P), once receive any payment (deposit or full), move to PBO
 							if(strval($total_approved_credit) >= $booking->NetTotal) {
 								// Full payment received
+								$full_payment_description = "Full Payment Received - Ready for Booking Operation";
 								$full_payment_existed = $this->Payment_Model->Read_Type($payment['BookingID']);
 								if($full_payment_existed) {
 									// Full payment exists, move to PBO (PENDING BOOKING OPERATION)
@@ -723,7 +724,7 @@ class Payment extends MY_Controller
 											'PBO',
 											$booking->Status,
 											$approver_id,
-											"Full payment received - ready for booking operation",
+											$full_payment_description,
 											true
 										);
 										
@@ -740,7 +741,7 @@ class Payment extends MY_Controller
 											$booking->Status,
 											$booking->Status,
 											$approver_id,
-											"Full payment received - ready for booking operation",
+											$full_payment_description,
 											true
 										);
 									}
@@ -755,7 +756,7 @@ class Payment extends MY_Controller
 											'PBO',
 											$booking->Status,
 											$approver_id,
-											"Full payment received - ready for booking operation",
+											$full_payment_description,
 											true
 										);
 										
@@ -772,7 +773,7 @@ class Payment extends MY_Controller
 											$booking->Status,
 											$booking->Status,
 											$approver_id,
-											"Full payment received - ready for booking operation",
+											$full_payment_description,
 											true
 										);
 									}

@@ -680,10 +680,12 @@ class Booking extends MY_Controller
 						}
 						$this->Booking_Model->Update_Product_Sequence(implode(',', $booking['ProductSequence']));
 					}
+					// Check if price changed due to new product (will be checked when booking NetTotal is updated)
 				}
 				// Action : Update
 				if(!empty($this->input->post('booking_products')[1])) {
 					$this->Booking_Product_Model->Update($this->input->post('booking_products')[1]);
+					// Check if price changed due to product update (will be checked when booking NetTotal is updated)
 				}
 				// Action : Delete
 				if(!empty($this->input->post('booking_products')[2])) {
@@ -703,6 +705,7 @@ class Booking extends MY_Controller
 						}
 						$this->Booking_Model->Update_Product_Sequence(implode(',', $booking['ProductSequence']));
 					}
+					// Check if price changed due to product deletion (will be checked when booking NetTotal is updated)
 				}
 
 				$bookingInfo = get_object_vars($this->Booking_Model->find($this->input->post('booking_id')));
@@ -876,13 +879,54 @@ class Booking extends MY_Controller
 							// Get previous completions from map (extract keys)
 							$previous_map = $this->Booking_Checklist_Completion_Model->Read_Completion_Map($booking_id);
 							$previous_completions = array_keys($previous_map);
-							$this->Booking_Checklist_Completion_Model->Create($booking_id, $checklist_completions, $created_by);
 							
-							// Check if all checklists are completed and move to next status
+							// Get booking to check current status
 							$this->load->helper('booking_flow');
 							$booking = $this->Booking_Model->getBookingById($booking_id);
+							
 							if($booking) {
-								check_and_advance_status_if_no_checklist_or_all_completed($booking_id, $booking, $created_by, $this);
+								// Check if checklist was unchecked (going from all completed to not all completed)
+								$was_all_completed = are_all_checklists_completed($booking_id, $this);
+								
+								// Update checklist completions
+								$this->Booking_Checklist_Completion_Model->Create($booking_id, $checklist_completions, $created_by);
+								
+								// Check if now all completed
+								$is_now_all_completed = are_all_checklists_completed($booking_id, $this);
+								
+								// If was all completed but now not all completed, revert to PBO
+								if ($was_all_completed && !$is_now_all_completed) {
+									$this->load->helper('booking_status_log');
+									
+									// Only revert if status is beyond PBO
+									if ($booking->Status != 'PBO' && in_array($booking->Status, ['PTV', 'PT'])) {
+										// Revert to PBO
+										$this->Booking_Model->Update_Status('PBO', $booking_id);
+										log_booking_status_change(
+											$booking_id,
+											'PBO',
+											$booking->Status,
+											$created_by,
+											'Status reverted to PENDING BOOKING OPERATION - Checklist unchecked',
+											true
+										);
+									}
+								} else if ($booking->Status == 'PBO' && $is_now_all_completed) {
+									// All checklists are now completed, advance status
+									$status_info = determine_booking_status_from_state($booking_id, $booking, $this);
+									if ($status_info['status'] != 'PBO') {
+										$this->load->helper('booking_status_log');
+										$this->Booking_Model->Update_Status($status_info['status'], $booking_id);
+										log_booking_status_change(
+											$booking_id,
+											$status_info['status'],
+											'PBO',
+											$created_by,
+											'All Booking Checklists Completed - Status changed to ' . $status_info['status'],
+											true
+										);
+									}
+								}
 							}
 						} else {
 							// Table doesn't exist - log error
@@ -1022,6 +1066,10 @@ class Booking extends MY_Controller
 					// Get booking status log timeline
 					$this->load->model('Booking_Status_Log_Model');
 					$array['status_logs'] = $this->Booking_Status_Log_Model->get_timeline_data($array['BookingID'], false);
+
+					// Calculate and get display status for the booking
+					$this->load->helper('booking_flow');
+					$array['display_status'] = display_booking_status($array, true); // true = return all applicable statuses
 
 					if(isset($_GET['nick'])) { echo "<pre>"; print_r($array); exit; }
 					$this->load->view('layout/header', $titles);
@@ -1303,7 +1351,7 @@ class Booking extends MY_Controller
 			// Create description based on status transition
 			$description = "Status changed from {$from_label} to {$to_label}";
 			if($current_status == 'PTV' && $new_status == 'PT') {
-				$description = "Travel voucher sent - status changed to PENDING TRAVEL";
+				$description = "Travel Voucher Sent - Status changed to PENDING TRAVEL";
 			}
 			
 			log_booking_status_change(
@@ -1383,11 +1431,27 @@ class Booking extends MY_Controller
 			$this->load->helper('booking_flow');
 			$this->load->helper('booking_status_log');
 			
+			// Get and validate booking_id
+			$booking_id = $this->input->get('booking_id');
+			if (empty($booking_id)) {
+				$this->session->set_flashdata('error', 'Booking ID is required.');
+				if(strpos($this->input->get('param'), '?') == true) {
+					redirect('Booking?' . explode('?', $this->input->get('param'))[1]);
+				} else {
+					redirect('Booking');
+				}
+				return;
+			}
+			
 			// Get booking
-			$booking = $this->Booking_Model->getBookingById($this->input->get('booking_id'));
+			$booking = $this->Booking_Model->getBookingById($booking_id);
 			if (!$booking) {
 				$this->session->set_flashdata('error', 'Booking not found.');
-				redirect('Booking');
+				if(strpos($this->input->get('param'), '?') == true) {
+					redirect('Booking?' . explode('?', $this->input->get('param'))[1]);
+				} else {
+					redirect('Booking');
+				}
 				return;
 			}
 			
@@ -1415,35 +1479,84 @@ class Booking extends MY_Controller
 				return;
 			}
 			
+			// Determine target status based on current booking state (payment, checklists, travel voucher)
+			$status_info = determine_status_after_bc_approval($booking_id, $booking, $this);
+			$target_status = $status_info['status'];
+			$status_description = $status_info['description'];
+			
+			// Debug: Log the determined status
+			$this->load->helper('debug_log_helper');
+			debug_log(array(
+				'from_status' => $booking->Status,
+				'target_status' => $target_status,
+				'description' => $status_description
+			), 'Approve_BC - Status Determination');
+			
 			// Validate status transition
-			$validation = validate_booking_status_flow($booking->Status, 'P', false);
+			$validation = validate_booking_status_flow($booking->Status, $target_status, false);
+			debug_log(array(
+				'validation_valid' => $validation['valid'],
+				'validation_message' => $validation['message']
+			), 'Approve_BC - Validation Result');
+			
 			if (!$validation['valid']) {
-				$this->session->set_flashdata('error', $validation['message']);
-				if(strpos($this->input->get('param'), '?') == true) {
-					redirect('Booking?' . explode('?', $this->input->get('param'))[1]);
-				} else {
-					redirect('Booking');
+				// If can't progress to determined status, fall back to P
+				if ($target_status != 'P') {
+					debug_log("Validation failed for {$target_status}, falling back to P", 'Approve_BC');
+					$target_status = 'P';
+					$status_description = 'BC Approved - Status changed to PENDING PAYMENT';
+					$validation = validate_booking_status_flow($booking->Status, $target_status, false);
 				}
-				return;
+				
+				if (!$validation['valid']) {
+					$this->session->set_flashdata('error', $validation['message']);
+					if(strpos($this->input->get('param'), '?') == true) {
+						redirect('Booking?' . explode('?', $this->input->get('param'))[1]);
+					} else {
+						redirect('Booking');
+					}
+					return;
+				}
 			}
 			
-			// Update status from PBC to P
-			$this->Booking_Model->Update_Status('P', $this->input->get('booking_id'));
+			// Update status to target status
+			$this->Booking_Model->Update_Status($target_status, $booking_id);
 			
 			// Log the status change with custom description
 			$admin_id = $this->session->userdata('admin_id');
-			// Use log_booking_status_change directly to avoid auto-generated description
 			log_booking_status_change(
-				$this->input->get('booking_id'),
-				'P',  // to_status
+				$booking_id,
+				$target_status,  // to_status
 				'PBC',  // from_status
 				$admin_id,  // created_by
-				'BC approved - status changed to PENDING PAYMENT',  // description
+				$status_description,  // description
 				true  // show_to_customer
 			);
 			
+			// If status is PBO, check if we can advance further (checklists might be completed)
+			if ($target_status == 'PBO') {
+				$updated_booking = $this->Booking_Model->getBookingById($booking_id);
+				if ($updated_booking) {
+					check_and_advance_status_if_no_checklist_or_all_completed($booking_id, $updated_booking, $admin_id, $this);
+					// Re-fetch booking in case status was advanced
+					$updated_booking = $this->Booking_Model->getBookingById($booking_id);
+					$target_status = $updated_booking->Status;
+				}
+			}
+			
 			// Set success message
-			$this->session->set_flashdata('success', 'Booking BC has been approved. Status changed to PENDING PAYMENT.');
+			$success_message = 'Booking BC has been approved.';
+			$status_labels = array(
+				'P' => 'PENDING PAYMENT',
+				'PP' => 'PARTIAL PAYMENT',
+				'PBO' => 'PENDING BOOKING OPERATION',
+				'PTV' => 'PENDING TRAVEL VOUCHER',
+				'PT' => 'PENDING TRAVEL',
+				'Y' => 'COMPLETED'
+			);
+			$target_label = isset($status_labels[$target_status]) ? $status_labels[$target_status] : $target_status;
+			$success_message .= " Status advanced to {$target_label}.";
+			$this->session->set_flashdata('success', $success_message);
 			
 			// Redirect back to booking list
 			if(strpos($this->input->get('param'), '?') == true) {

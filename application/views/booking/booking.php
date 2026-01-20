@@ -7,13 +7,49 @@
 
             <div class="card-header flex-wrap py-3" style="background-color:#D7E2F2;">
 
-                <div class="card-title">
+                <div class="card-title d-flex justify-content-between align-items-center w-100">
 
-                    <h3 class="card-label" style="color:#6082B6;">
+                    <h3 class="card-label" style="color:#6082B6; margin: 0;">
 
                         <strong><?php if(current_url() == base_url('Booking/Create') || current_url() == base_url('Booking/Duplicate')) { echo 'New Booking Record'; } else { echo 'Booking Record : ' . $BookingNumber; } ?></strong>
 
                     </h3>
+
+                    <?php if(current_url() == base_url('Booking/Update') && !empty($display_status)): ?>
+                        <?php 
+                        // Load helper if not already loaded
+                        $this->load->helper('booking_flow');
+                        
+                        $status = $display_status;
+                        $status_code = $status['status_code'];
+                        $status_text = $status['status_text'];
+                        $status_color = $status['status_color'];
+                        $all_statuses = !empty($status['all_statuses']) ? $status['all_statuses'] : [$status_code];
+                        $status_info = get_booking_status_info();
+                        ?>
+                        <div class="booking-status-display">
+                            <!-- Primary Status Badge -->
+                            <span class="badge badge-lg" style="background-color: <?php echo $status_color; ?>; color: #fff; font-size: 0.9rem; font-weight: 600; padding: 8px 16px; border-radius: 4px;">
+                                <?php echo htmlspecialchars($status_text); ?>
+                            </span>
+                            
+                            <?php if(count($all_statuses) > 1): ?>
+                                <!-- Multiple Statuses Indicator -->
+                                <?php
+                                $status_labels = array();
+                                foreach($all_statuses as $s) {
+                                    $status_labels[] = isset($status_info['texts'][$s]) ? $status_info['texts'][$s] : $s;
+                                }
+                                ?>
+                                <span class="badge badge-secondary ml-2" style="font-size: 0.75rem; padding: 4px 8px; cursor: help;" 
+                                      data-toggle="tooltip" 
+                                      data-placement="left" 
+                                      title="Multiple statuses: <?php echo htmlspecialchars(implode(', ', $status_labels)); ?>">
+                                    <i class="la la-info-circle"></i> <?php echo count($all_statuses); ?> status<?php echo count($all_statuses) > 1 ? 'es' : ''; ?>
+                                </span>
+                            <?php endif; ?>
+                        </div>
+                    <?php endif; ?>
 
                 </div>
 
