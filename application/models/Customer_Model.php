@@ -298,6 +298,30 @@ class Customer_Model extends CI_Model
             ->update('customer', $data);
     }
 
+    public function generate_customer_code($customer_name)
+    {
+        if (empty($customer_name)) {
+            return null;
+        }
+
+        // Get first character, uppercase if alphabetic
+        $first_char = substr(trim($customer_name), 0, 1);
+        if (ctype_alpha($first_char)) {
+            $first_char = strtoupper($first_char);
+        }
+
+        $prefix = '303-' . $first_char;
+
+        $this->db->select("MAX(CAST(SUBSTRING(CustomerCode, 6) AS UNSIGNED)) as max_seq");
+        $this->db->from('customer');
+        $this->db->like('CustomerCode', $prefix, 'after');
+        $result = $this->db->get()->row();
+
+        $next_seq = ($result && $result->max_seq !== null) ? (int)$result->max_seq + 1 : 1;
+
+        return $prefix . sprintf('%03d', $next_seq);
+    }
+
 	public function get_pending_sycn_customers()
 	{
 		$this->load->helper('autocount');
