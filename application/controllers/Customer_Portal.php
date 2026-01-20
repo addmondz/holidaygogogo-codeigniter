@@ -131,6 +131,8 @@ class Customer_Portal extends CI_Controller
         $this->db->join('country_code', 'country_code.CountryCodeID = booking.CountryCodeID', 'left');
         $this->db->where('booking.CustomerID', $customer_id);
         $this->db->where('booking.Status !=', 'N');
+        // Only show BC approved bookings in customer portal
+        $this->db->where('booking.bc_approved', 1);
         $this->db->order_by('booking.BookingID', 'DESC');
         
         return $this->db->get()->result_array();
@@ -156,8 +158,8 @@ class Customer_Portal extends CI_Controller
         $this->db->where('booking.CustomerID', $customer_id);
         $this->db->where('booking.Status !=', 'N');
         $this->db->where('CancelStatus', 'N'); // Always exclude cancelled
-        // Hide pending bookings (Status = 'P') from customers - only show confirmed bookings
-        $this->db->where('booking.Status !=', 'P'); // Exclude pending bookings
+        // Only show BC approved bookings in customer portal
+        $this->db->where('booking.bc_approved', 1);
         $this->db->order_by('booking.StartDate', 'DESC');
         $this->db->order_by('booking.BookingID', 'DESC');
         
@@ -268,7 +270,7 @@ class Customer_Portal extends CI_Controller
                           FullPaymentDeadline, AdditionalPaymentDeadline, Customer, booking.Mobile As CustomerMobile, 
                           StartDate, EndDate, Adult, Children, Infant, BookingRemark, Subtotal, Discount, NetTotal, 
                           booking.ChatLanguage, Token, booking.BookingConfirmationTitle, CancelStatus, LockStatus, 
-                          AfterSalesService, booking.Status, booking.InsertDate, booking.CustomerID,
+                          AfterSalesService, booking.Status, booking.InsertDate, booking.UpdateDate, booking.CustomerID,
                           booking.AllowReview, booking.CustomerReview, booking.CustomerReviewTimestamp,
                           category.Name As DestinationName, CountryCode, admin.Name As SalesAgentName, admin.Mobile As SalesAgentMobile');
         $this->db->from('booking');
@@ -277,6 +279,8 @@ class Customer_Portal extends CI_Controller
         $this->db->join('admin', 'admin.AdminID = booking.SalesAgent', 'left');
         $this->db->where('booking.Token', $hashed_bc);
         $this->db->where('booking.Status !=', 'N');
+        // Only show BC approved bookings in customer portal
+        $this->db->where('booking.bc_approved', 1);
         $booking = $this->db->get()->row_array();
 
         if (empty($booking)) {
@@ -409,6 +413,41 @@ class Customer_Portal extends CI_Controller
 
         // Get status display info
         $booking['status_display'] = $this->get_booking_status_display($booking);
+
+        // Get booking status logs to find dates for timeline events
+        $this->load->model('Booking_Status_Log_Model');
+        $status_logs = $this->Booking_Status_Log_Model->get_by_booking_id($booking['BookingID'], true);
+        
+        // Find BC approval date (when status changed from PBC to P or when BC was approved)
+        $bc_approval_date = null;
+        foreach ($status_logs as $log) {
+            if ($log->from_status == 'PBC' && ($log->to_status == 'P' || $log->to_status == 'PBO')) {
+                $bc_approval_date = $log->created_at;
+                break;
+            }
+            if (stripos($log->description, 'BC Approved') !== false) {
+                $bc_approval_date = $log->created_at;
+                break;
+            }
+        }
+        // Fallback to UpdateDate if BC was just approved
+        if (empty($bc_approval_date) && !empty($booking['UpdateDate'])) {
+            $bc_approval_date = $booking['UpdateDate'];
+        }
+        // Final fallback to InsertDate
+        if (empty($bc_approval_date)) {
+            $bc_approval_date = $booking['InsertDateRaw'];
+        }
+        $booking['bc_approval_date'] = $bc_approval_date;
+        
+        // Find status change dates for timeline
+        $status_change_dates = [];
+        foreach ($status_logs as $log) {
+            if (!empty($log->to_status)) {
+                $status_change_dates[$log->to_status] = $log->created_at;
+            }
+        }
+        $booking['status_change_dates'] = $status_change_dates;
 
         // Generate customer hash for back button
         $customer_hash = '';

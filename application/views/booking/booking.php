@@ -1149,7 +1149,8 @@
                                                 </div>
                                             </div>
                                             <div class="card-body">
-                                                <div class="timeline-container" style="max-height: 500px; overflow-y: auto;">
+                                                <!-- <div class="timeline-container" style="max-height: 500px; overflow-y: auto;"> -->
+                                                <div class="timeline-container">
                                                     <?php foreach($status_logs as $log): ?>
                                                         <div class="timeline-item status-log-item <?php echo $log['status']; ?>" style="padding: 12px 0; border-left: 2px solid #e0e0e0; padding-left: 20px; margin-left: 15px; position: relative;">
                                                             <div class="timeline-marker" style="position: absolute; left: -7px; top: 15px; width: 12px; height: 12px; border-radius: 50%; background-color: <?php echo $log['status'] == 'completed' ? '#50C878' : ($log['status'] == 'cancelled' ? '#FF69B4' : '#FFBF00'); ?>; border: 2px solid white; box-shadow: 0 0 0 2px <?php echo $log['status'] == 'completed' ? '#50C878' : ($log['status'] == 'cancelled' ? '#FF69B4' : '#FFBF00'); ?>;"></div>
