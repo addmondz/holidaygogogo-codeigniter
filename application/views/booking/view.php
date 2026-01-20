@@ -378,7 +378,7 @@ $is_view_mode = true;
                             '<div class="flex-grow-1" style="min-width: 0;">' +
                             '<div class="d-flex align-items-baseline mb-1">' +
                             '<strong class="mr-2" style="font-size: 0.8125rem; color: #050505;">' + escapeHtml(remark.commenter_name) + '</strong>' +
-                            '<span class="text-muted" style="font-size: 0.75rem; color: #65676b;">' + (remark.created_at_relative || remark.created_at) + '</span>' +
+                            '<span class="text-muted" style="font-size: 0.75rem; color: #65676b;">' + remark.created_at + (remark.created_at_relative ? ' <span style="margin: 0 4px;">•</span> ' + remark.created_at_relative : '') + '</span>' +
                             '</div>' +
                             '<div class="comment-text" style="font-size: 0.8125rem; color: #050505; line-height: 1.3; white-space: pre-wrap; word-wrap: break-word;">' + escapeHtml(remark.content) + '</div>' +
                             '</div>' +

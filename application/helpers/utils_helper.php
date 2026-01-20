@@ -329,3 +329,34 @@ function get_offical_whatsapp_link($text = null){
     }
     return 'https://api.whatsapp.com/send?phone=60102956786&text=' . urlencode($text);
 }
+
+function return_timestamp_output($timestamp, $show_time_ago = true)
+{
+    $formatted = date('d M Y, H:i', strtotime($timestamp));
+
+    return $formatted . ($show_time_ago ? '<span style="margin: 0 4px;">•</span> ' . time_ago($timestamp) : '');
+}
+
+function time_ago($timestamp)
+{
+    $diff = time() - strtotime($timestamp);
+
+    if ($diff < 60) {
+        return 'just now';
+    }
+
+    $units = [
+        31536000 => 'year',
+        2592000  => 'month',
+        86400    => 'day',
+        3600     => 'hour',
+        60       => 'minute',
+    ];
+
+    foreach ($units as $seconds => $label) {
+        if ($diff >= $seconds) {
+            $value = floor($diff / $seconds);
+            return $value . ' ' . $label . ($value > 1 ? 's' : '') . ' ago';
+        }
+    }
+}

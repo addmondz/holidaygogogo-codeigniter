@@ -935,7 +935,7 @@
                                                                          </div>
                                                                          <small class="text-muted d-block" style="font-size: 0.75rem; line-height: 1.4;">
                                                                              <i class="la la-user-circle"></i> <?php echo htmlspecialchars($upload['CreatedByName']); ?><br>
-                                                                             <i class="la la-clock"></i> <?php echo date('d/m/Y H:i', strtotime($upload['created_at'])); ?>
+                                                                             <i class="la la-clock"></i> <?php echo return_timestamp_output($upload['created_at']); ?>
                                                                          </small>
                                                                      </div>
                                                                      <div class="d-flex align-items-center flex-shrink-0">
@@ -1049,7 +1049,7 @@
                                                                             <span class="completion-text">
                                                                                 Completed by <strong><?php echo htmlspecialchars($completion_info['created_by_name']); ?></strong>
                                                                                 <span class="completion-separator">•</span>
-                                                                                <span class="completion-date"><?php echo date('d M Y, H:i', strtotime($completion_info['created_at'])); ?></span>
+                                                                                <span class="completion-date"><?php echo return_timestamp_output($completion_info['created_at']); ?></span>
                                                                             </span>
                                                                         </div>
                                                                     <?php } ?>
@@ -1111,7 +1111,7 @@
                                                                         <?php echo htmlspecialchars($log['title']); ?>
                                                                     </div>
                                                                     <div class="timeline-date" style="font-size: 0.8125rem; color: #6c757d;">
-                                                                        <?php echo $log['date']; ?>
+                                                                        <?php echo return_timestamp_output($log['date_raw']); ?>
                                                                     </div>
                                                                 </div>
                                                                 <div class="timeline-description" style="font-size: 0.875rem; color: #495057; margin-top: 4px;">
@@ -3214,7 +3214,7 @@ $(document).ready(function() {
                             '<div class="flex-grow-1" style="min-width: 0;">' +
                             '<div class="d-flex align-items-baseline mb-1">' +
                             '<strong class="mr-2" style="font-size: 0.8125rem; color: #050505;">' + escapeHtml(remark.commenter_name) + '</strong>' +
-                            '<span class="text-muted" style="font-size: 0.75rem; color: #65676b;">' + (remark.created_at_relative || remark.created_at) + '</span>' +
+                            '<span class="text-muted" style="font-size: 0.75rem; color: #65676b;">' + remark.created_at + (remark.created_at_relative ? ' <span style="margin: 0 4px;">•</span> ' + remark.created_at_relative : '') + '</span>' +
                             '</div>' +
                             '<div class="comment-text" style="font-size: 0.8125rem; color: #050505; line-height: 1.3; white-space: pre-wrap; word-wrap: break-word;">' + escapeHtml(remark.content) + '</div>' +
                             '</div>' +
@@ -3258,7 +3258,7 @@ $(document).ready(function() {
                             '<div class="flex-grow-1" style="min-width: 0;">' +
                             '<div class="d-flex align-items-baseline mb-1">' +
                             '<strong class="mr-2" style="font-size: 0.8125rem; color: #050505; cursor: pointer;">' + escapeHtml(remark.commenter_name) + '</strong>' +
-                            '<span class="text-muted" style="font-size: 0.75rem; color: #65676b;">' + (remark.created_at_relative || remark.created_at) + '</span>' +
+                            '<span class="text-muted" style="font-size: 0.75rem; color: #65676b;">' + remark.created_at + (remark.created_at_relative ? ' <span style="margin: 0 4px;">•</span> ' + remark.created_at_relative : '') + '</span>' +
                             '</div>' +
                             '<div class="comment-text" style="font-size: 0.8125rem; color: #050505; line-height: 1.3; white-space: pre-wrap; word-wrap: break-word;">' + escapeHtml(remark.content) + '</div>' +
                             '</div>' +
@@ -3651,7 +3651,7 @@ $(document).ready(function() {
                         '</div>' +
                         '<small class="text-muted d-block" style="font-size: 0.75rem; line-height: 1.4;">' +
                         '<i class="la la-user-circle"></i> ' + escapeHtml(result.upload.created_by) + '<br>' +
-                        '<i class="la la-clock"></i> ' + result.upload.created_at.replace(/\s+\d{2}:\d{2}:\d{2}$/, '') +
+                        '<i class="la la-clock"></i> ' + result.upload.created_at + (result.upload.created_at_relative ? ' <span style="margin: 0 4px;">•</span> ' + result.upload.created_at_relative : '') +
                         '</small>' +
                         '</div>' +
                         '</div>' +

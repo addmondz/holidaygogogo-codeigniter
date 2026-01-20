@@ -1282,7 +1282,7 @@
 
                     // Event 1: View Booking Confirmation (always available)
                     $timeline_events[] = [
-                        'date' => !empty($booking['InsertDateRaw']) ? date('d/m/y', strtotime($booking['InsertDateRaw'])) : 'N/A',
+                        'date' => !empty($booking['InsertDateRaw']) ? return_timestamp_output($booking['InsertDateRaw']) : 'N/A',
                         'title' => 'View Booking Confirmation',
                         'action' => '<a href="' . $booking['documents']['bc']['url'] . '" target="_blank">View BC</a>',
                         'status' => 'available',
@@ -1385,7 +1385,7 @@
                             $full_paid = $booking['balance_due'] <= 0 || $has_full_payment;
                             
                             $timeline_events[] = [
-                                'date' => date('d/m/y', strtotime($full_event_date)),
+                                'date' => return_timestamp_output($full_event_date),
                                 'title' => 'Upload payment proof (Full Payment)',
                                 'action' => $full_paid ? 'Completed' : ($full_deadline_passed ? 'Overdue' : 'Pending'),
                                 'status' => $full_paid ? 'completed' : ($full_deadline_passed ? 'pending' : 'pending'),
@@ -1400,7 +1400,7 @@
                             $deposit_deadline_passed = !empty($booking['DepositDeadlineRaw']) ? (strtotime($booking['DepositDeadlineRaw']) < strtotime($today)) : false;
                             
                             $timeline_events[] = [
-                                'date' => date('d/m/y', strtotime($deposit_event_date)),
+                                'date' => return_timestamp_output($deposit_event_date),
                                 'title' => 'Upload payment proof (Deposit)',
                                 'action' => $has_deposit_payment ? 'Completed' : ($deposit_deadline_passed ? 'Overdue' : 'Pending'),
                                 'status' => $has_deposit_payment ? 'completed' : ($deposit_deadline_passed ? 'pending' : 'pending'),
@@ -1412,7 +1412,7 @@
                     // Event 3: Submit namelist - if guest list is available
                     if (!empty($booking['has_guest_list'])) {
                         $timeline_events[] = [
-                            'date' => !empty($booking['InsertDateRaw']) ? date('d/m/y', strtotime($booking['InsertDateRaw'])) : 'N/A',
+                            'date' => !empty($booking['InsertDateRaw']) ? return_timestamp_output($booking['InsertDateRaw']) : 'N/A',
                             'title' => 'Submit namelist',
                             'action' => '<a href="' . $booking['documents']['gl']['url'] . '" target="_blank">View Guest List</a>',
                             'status' => 'completed',
@@ -1435,7 +1435,7 @@
                         if ($has_approved_payment) {
                             $receipt_date = 'N/A';
                             if ($first_payment_date) {
-                                $receipt_date = date('d/m/y', strtotime($first_payment_date));
+                                $receipt_date = return_timestamp_output($first_payment_date);
                             }
                             $timeline_events[] = [
                                 'date' => $receipt_date,
@@ -1466,7 +1466,7 @@
                             $balance_paid = $booking['balance_due'] <= 0 || $has_balance_payment || ($has_full_payment && $has_deposit_payment);
                             
                             $timeline_events[] = [
-                                'date' => date('d/m/y', strtotime($balance_event_date)),
+                                'date' => return_timestamp_output($balance_event_date),
                                 'title' => 'Upload payment proof (Full)',
                                 'action' => $balance_paid ? 'Completed' : ($balance_deadline_passed ? 'Overdue' : 'Pending'),
                                 'status' => $balance_paid ? 'completed' : ($balance_deadline_passed ? 'pending' : 'pending'),
@@ -1478,7 +1478,7 @@
                     // Event 6: Download Travel Voucher - if TV is available (usually after full payment)
                     if ($booking['balance_due'] <= 0 || !empty($booking['documents']['tv']['available'])) {
                         $timeline_events[] = [
-                            'date' => !empty($booking['FullPaymentDeadlineRaw']) ? date('d/m/y', strtotime($booking['FullPaymentDeadlineRaw'])) : 'N/A',
+                            'date' => !empty($booking['FullPaymentDeadlineRaw']) ? return_timestamp_output($booking['FullPaymentDeadlineRaw']) : 'N/A',
                             'title' => 'Download Travel Voucher',
                             'action' => '<a href="' . $booking['documents']['tv']['url'] . '" target="_blank">View TV</a>',
                             'status' => ($booking['balance_due'] <= 0) ? 'available' : 'pending',
@@ -1497,8 +1497,8 @@
                             if ($has_review) {
                                 // Review already submitted - show view option
                                 $review_date = !empty($booking['CustomerReviewTimestamp'])
-                                    ? date('d/m/y', strtotime($booking['CustomerReviewTimestamp']))
-                                    : date('d/m/y', strtotime($booking['EndDateRaw']));
+                                    ? return_timestamp_output($booking['CustomerReviewTimestamp'])
+                                    : return_timestamp_output($booking['EndDateRaw']);
                                 $timeline_events[] = [
                                     'date' => $review_date,
                                     'title' => 'View Review',
@@ -1509,7 +1509,7 @@
                             } else {
                                 // No review yet - show submit option with prominent styling
                                 $timeline_events[] = [
-                                    'date' => date('d/m/y', strtotime($booking['EndDateRaw'])),
+                                    'date' => return_timestamp_output($booking['EndDateRaw']),
                                     'title' => 'Submit Review',
                                     'action' => '<span class="timeline-review-cta"><i class="la la-star" style="color: white;"></i> Submit Your Review</span>',
                                     'status' => 'pending',
@@ -1793,7 +1793,7 @@
                     </div>
                     <?php if (!empty($booking['CustomerReviewTimestamp'])): ?>
                         <div class="review-date-info">
-                            <small>Review submitted on <?php echo date('d/m/Y h:i:s A', strtotime($booking['CustomerReviewTimestamp'])); ?></small>
+                            <small>Review submitted on <?php echo return_timestamp_output($booking['CustomerReviewTimestamp']); ?></small>
                         </div>
                     <?php endif; ?>
                     <div class="review-modal-actions">
@@ -2019,7 +2019,7 @@
                                     '<div class="flex-grow-1" style="min-width: 0;">' +
                                     '<div class="d-flex align-items-baseline mb-1">' +
                                     '<strong class="mr-2" style="font-size: 0.875rem; color: #050505;">' + escapeHtml(remark.commenter_name) + '</strong>' +
-                                    '<span class="text-muted" style="font-size: 0.75rem; color: #65676b;">' + (remark.created_at_relative || remark.created_at) + '</span>' +
+                                    '<span class="text-muted" style="font-size: 0.75rem; color: #65676b;">' + remark.created_at + (remark.created_at_relative ? ' <span style="margin: 0 4px;">•</span> ' + remark.created_at_relative : '') + '</span>' +
                                     '</div>' +
                                     '<div class="comment-text" style="font-size: 0.875rem; color: #050505; line-height: 1.4; white-space: pre-wrap; word-wrap: break-word;">' + escapeHtml(remark.content) + '</div>' +
                                     '</div>' +

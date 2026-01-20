@@ -624,8 +624,8 @@ class Customer_Portal extends CI_Controller
                 'content' => $remark->content,
                 'commenter_name' => $commenter_name,
                 'commenter_initials' => $initials,
-                'created_at' => date('d/m/Y H:i:s', strtotime($remark->created_at)),
-                'created_at_relative' => $this->time_ago($remark->created_at),
+                'created_at' => return_timestamp_output($remark->created_at),
+                'created_at_relative' => time_ago($remark->created_at),
                 'created_at_raw' => $remark->created_at
             );
         }

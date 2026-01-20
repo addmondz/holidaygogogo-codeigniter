@@ -43,6 +43,9 @@ class Booking extends MY_Controller
 			// Load status log helper
 			$this->load->helper('booking_status_log');
 			
+			// Load utils helper for date formatting
+			$this->load->helper('utils');
+			
 			// Update status for all bookings (this runs before the AJAX calls)
 			$bookings = $this->Booking_Model->Read_All_Bookings();
 			foreach($bookings as $booking) {
@@ -327,25 +330,7 @@ class Booking extends MY_Controller
 				foreach ($remarks as $remark) {
 					$commenter_name = !empty($remark->CommenterName) ? $remark->CommenterName : 'Unknown';
 					$commenter_initials = strtoupper(substr($commenter_name, 0, 2));
-					$created_at = !empty($remark->created_at) ? date('d/m/Y H:i', strtotime($remark->created_at)) : '';
-					
-					// Calculate relative time
-					$created_timestamp = strtotime($remark->created_at);
-					$current_timestamp = time();
-					$time_diff = $current_timestamp - $created_timestamp;
-					$created_at_relative = '';
-					if ($time_diff < 60) {
-						$created_at_relative = 'Just now';
-					} elseif ($time_diff < 3600) {
-						$created_at_relative = floor($time_diff / 60) . 'm ago';
-					} elseif ($time_diff < 86400) {
-						$created_at_relative = floor($time_diff / 3600) . 'h ago';
-					} elseif ($time_diff < 604800) {
-						$created_at_relative = floor($time_diff / 86400) . 'd ago';
-					} else {
-						$created_at_relative = $created_at;
-					}
-					
+					$created_at = !empty($remark->created_at) ? return_timestamp_output($remark->created_at) : '';
 					// Avatar color based on first letter
 					$avatar_colors = ['primary', 'success', 'info', 'warning', 'danger'];
 					$avatar_color = $avatar_colors[ord($commenter_name[0]) % 5];
@@ -365,7 +350,7 @@ class Booking extends MY_Controller
 						'<div class="flex-grow-1" style="min-width: 0; padding-right: 4px;">' .
 						'<div class="d-flex align-items-baseline mb-1">' .
 						'<strong class="mr-2" style="font-size: 0.8rem; color: #050505;">' . htmlspecialchars($commenter_name, ENT_QUOTES) . '</strong>' .
-						'<span class="text-muted" style="font-size: 0.7rem; color: #65676b;">' . $created_at_relative . '</span>' .
+						'<span class="text-muted" style="font-size: 0.7rem; color: #65676b;">' . $created_at . '</span>' .
 						'</div>' .
 						'<div style="font-size: 0.8rem; color: #050505; line-height: 1.3; word-wrap: break-word; white-space: pre-line;">' . $content . '</div>' .
 						'</div>' .
@@ -2541,6 +2526,11 @@ class Booking extends MY_Controller
 		$this->db->select('Name');
 		$this->db->where('AdminID', $this->session->userdata('admin_id'));
 		$admin = $this->db->get('admin')->row_array();
+		
+		// Load utils helper for date formatting
+		$this->load->helper('utils');
+		$upload_record = $this->Custom_Upload_Model->Get_By_Id($upload_id);
+		$created_at_formatted = return_timestamp_output($upload_record['created_at']);
 
 		$this->output
 			->set_content_type('application/json')
@@ -2552,7 +2542,7 @@ class Booking extends MY_Controller
 					'upload_name' => $upload_name,
 					'upload_content' => base_url($file_path),
 					'created_by' => $admin['Name'],
-					'created_at' => date('d/m/Y H:i:s')
+					'created_at' => $created_at_formatted
 				]
 			]));
 	}
@@ -2681,8 +2671,7 @@ class Booking extends MY_Controller
 				'commenter_initials' => $initials,
 				'type' => isset($remark->type) ? $remark->type : 1,
 				'type_label' => $remark_type_label,
-				'created_at' => date('d/m/Y H:i:s', strtotime($remark->created_at)),
-				'created_at_relative' => $this->time_ago($remark->created_at),
+				'created_at' => return_timestamp_output($remark->created_at),
 				'created_at_raw' => $remark->created_at
 			);
 		}
@@ -2776,8 +2765,7 @@ class Booking extends MY_Controller
                 'commenter_name' => $commenter_name,
                 'commenter_id' => $remark->commenter_id,
                 'commenter_initials' => $initials,
-                'created_at' => date('d/m/Y H:i:s', strtotime($remark->created_at)),
-                'created_at_relative' => $this->time_ago($remark->created_at),
+                'created_at' => return_timestamp_output($remark->created_at),
                 'created_at_raw' => $remark->created_at
             );
         }
