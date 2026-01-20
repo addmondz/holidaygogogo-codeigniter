@@ -688,31 +688,44 @@
 
                                 </div>
 
-                                <div class="col-md-4 mt-5">
-                                    <label style="color:#50C878;">Deposit Percentage</label>
-                                    <div class="input-icon">
-                                        <input type="number" id="DepositPercentage" class="form-control" style="text-align:right;" min="0" max="100" <?php if(current_url() == base_url('Booking/Create')) { ?> value="50" <?php } else { ?> value="<?php echo isset($DepositPercentage) ? $DepositPercentage : 0; ?>" <?php } ?>>
-                                        <span>
-                                            <i class="la la-percentage"></i>
-                                        </span>
+                                <div class="col-12">
+                                    <div class="row" id="deposit_container" <?php 
+                                        // Hide deposit container if DepositDeadline is null or empty
+                                        $deposit_deadline_value = '';
+                                        if(current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) {
+                                            $deposit_deadline_value = isset($DepositDeadline) ? $DepositDeadline : '';
+                                        }
+                                        if(empty($deposit_deadline_value)) {
+                                            echo 'style="display: none;"';
+                                        }
+                                    ?>>
+                                        <div class="col-md-4 mt-5">
+                                        <label style="color:#50C878;">Deposit Percentage</label>
+                                        <div class="input-icon">
+                                            <input type="number" id="DepositPercentage" class="form-control" style="text-align:right;" min="0" max="100" <?php if(current_url() == base_url('Booking/Create')) { ?> value="50" <?php } else { ?> value="<?php echo isset($DepositPercentage) ? $DepositPercentage : 0; ?>" <?php } ?>>
+                                            <span>
+                                                <i class="la la-percentage"></i>
+                                            </span>
+                                        </div>
                                     </div>
-                                </div>
-                                <div class="col-md-4 mt-5">
-                                    <label style="color:#50C878;">Deposit Total (RM)</label>
-                                    <div class="input-icon">
-                                        <input disabled type="text" id="DepositTotal" value="0.00" class="form-control" style="text-align:right;">
-                                        <span>
-                                            <i class="la la-dollar"></i>
-                                        </span>
+                                    <div class="col-md-4 mt-5">
+                                        <label style="color:#50C878;">Deposit Total (RM)</label>
+                                        <div class="input-icon">
+                                            <input disabled type="text" id="DepositTotal" value="0.00" class="form-control" style="text-align:right;">
+                                            <span>
+                                                <i class="la la-dollar"></i>
+                                            </span>
+                                        </div>
                                     </div>
-                                </div>
-                                <div class="col-md-4 mt-5">
-                                    <label style="color:#50C878;">Deposit Paid (RM)</label>
-                                    <div class="input-icon">
-                                        <input disabled type="text" id="DepositPaid" value="<?php echo isset($DepositPaidDisplay) ? $DepositPaidDisplay : '0.00'; ?>" class="form-control" style="text-align:right; <?php echo (isset($DepositPaidColor) && ($DepositPaidColor == '#FF6B6B' || $DepositPaidColor == '#FFA500')) ? 'color: ' . $DepositPaidColor . '; font-weight: bold;' : ''; ?>">
-                                        <span>
-                                            <i class="la la-dollar"></i>
-                                        </span>
+                                    <div class="col-md-4 mt-5">
+                                        <label style="color:#50C878;">Deposit Paid (RM)</label>
+                                        <div class="input-icon">
+                                            <input disabled type="text" id="DepositPaid" value="<?php echo isset($DepositPaidDisplay) ? $DepositPaidDisplay : '0.00'; ?>" class="form-control" style="text-align:right; <?php echo (isset($DepositPaidColor) && ($DepositPaidColor == '#FF6B6B' || $DepositPaidColor == '#FFA500')) ? 'color: ' . $DepositPaidColor . '; font-weight: bold;' : ''; ?>">
+                                            <span>
+                                                <i class="la la-dollar"></i>
+                                            </span>
+                                        </div>
+                                    </div>
                                     </div>
                                 </div>
 
@@ -1280,10 +1293,40 @@
 
 
     function Reset_Deposit_Deadline() {
-
         $('input[name="DepositDeadline"]').val('');
-
+        // Hide deposit container when Deposit Deadline is reset
+        $('#deposit_container').hide();
     }
+    
+    // Function to toggle deposit container based on Deposit Deadline value
+    function toggleDepositContainer() {
+        var depositDeadline = $('input[name="DepositDeadline"]').val();
+        if (depositDeadline && depositDeadline.trim() !== '') {
+            $('#deposit_container').show();
+        } else {
+            $('#deposit_container').hide();
+        }
+    }
+    
+    // Check deposit deadline on page load
+    $(document).ready(function() {
+        toggleDepositContainer();
+        
+        // Listen for changes on Deposit Deadline field
+        $('input[name="DepositDeadline"]').on('change', function() {
+            toggleDepositContainer();
+        });
+        
+        // Also listen for datepicker change events (if using datepicker)
+        $('input[name="DepositDeadline"]').on('changeDate', function() {
+            toggleDepositContainer();
+        });
+        
+        // Listen for input events (when manually typing or clearing)
+        $('input[name="DepositDeadline"]').on('input', function() {
+            toggleDepositContainer();
+        });
+    });
 
 
 
