@@ -657,6 +657,22 @@ class Booking extends MY_Controller
 
 	function Update()
 	{
+		if($this->session->userdata('level') == 20) {
+			// check if user is sales agent && booking >= booking.startDate
+			$valid_booking_id = $this->Universal_Model->Validate_Id('BookingID', $this->input->get('booking_id'), 'booking');
+
+			if($valid_booking_id) {
+				$booking = $this->Booking_Model->Read_Booking();
+				$today = strtotime(date('Y-m-d'));
+				$startDate = strtotime($booking['StartDate']);
+				
+				if ($today >= $startDate) {
+					// if travel started, redirect to view booking page 
+					redirect('Booking/View?booking_id=' . $this->input->get('booking_id'));
+				}
+			}
+		}
+		
 		if(in_array('AB', $this->session->access_control)) {
 			if($this->input->is_ajax_request()) {
 				// Booking

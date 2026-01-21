@@ -4,6 +4,11 @@ $is_view_mode = true;
 
 <div class="d-flex flex-column-fluid">
     <div class="container-fluid">
+        
+        <div class="alert alert-warning">
+            <strong>Note:</strong> Once the booking is started, you can no longer update the booking.
+        </div>
+        
         <div class="card card-custom mb-5">
             <div class="card-header flex-wrap py-3" style="background-color:#D7E2F2;">
                 <div class="card-title">
