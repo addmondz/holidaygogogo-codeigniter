@@ -352,18 +352,25 @@ class Customer_Model extends CI_Model
 		$this->db->where('AutocountSyncAction IS NOT NULL', null, false);
 		$this->db->where('name IS NOT NULL', null, false);
 
-		// --- NEW, CLEARER QUERY START ---
+		// --- old, CLEARER QUERY START ---
 		// This query uses a nested EXISTS, which is easier to read
 		// and just as performant.
+		// $subquery = "EXISTS (
+		// 	SELECT 1 
+		// 	FROM booking b
+		// 	WHERE b.CustomerID = customer.CustomerID 
+		// 	AND EXISTS (
+		// 		SELECT 1 
+		// 		FROM payment p
+		// 		WHERE p.BookingID = b.BookingID
+		// 	)
+		// )";
+		
+		// new logic condition
 		$subquery = "EXISTS (
 			SELECT 1 
 			FROM booking b
 			WHERE b.CustomerID = customer.CustomerID 
-			AND EXISTS (
-				SELECT 1 
-				FROM payment p
-				WHERE p.BookingID = b.BookingID
-			)
 		)";
 		
 		// Pass the whole string to where()

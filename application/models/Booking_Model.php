@@ -462,25 +462,26 @@ class Booking_Model extends CI_Model
 
 				$this->db->insert('customer', $data);
 				$customer_id = $this->db->insert_id();
+ 
+				// remove this no need sync directly, cron will sync customer at first 
+				// // Immediately sync to Autocount
+				// $this->load->library('CustomerSync');
+				// $this->load->helper('autocount');
+				// $config = get_autocount_config();
+				// $data['CustomerID'] = $customer_id;
+				// $result = $this->customersync->autocount_create($data, $config);
 
-				// Immediately sync to Autocount
-				$this->load->library('CustomerSync');
-				$this->load->helper('autocount');
-				$config = get_autocount_config();
-				$data['CustomerID'] = $customer_id;
-				$result = $this->customersync->autocount_create($data, $config);
-
-				if (isset($result['status']) && ($result['status'] == 201 || $result['status'] == 204) && $result['error'] === null) {
-					$this->Customer_Model->update_by_id($customer_id, [
-						'AutocountSyncStatus'  => 'S',
-						'AutocountSyncMessage' => json_encode($result)
-					]);
-				} else {
-					$this->Customer_Model->update_by_id($customer_id, [
-						'AutocountSyncStatus'  => 'F',
-						'AutocountSyncMessage' => json_encode($result)
-					]);
-				}
+				// if (isset($result['status']) && ($result['status'] == 201 || $result['status'] == 204) && $result['error'] === null) {
+				// 	$this->Customer_Model->update_by_id($customer_id, [
+				// 		'AutocountSyncStatus'  => 'S',
+				// 		'AutocountSyncMessage' => json_encode($result)
+				// 	]);
+				// } else {
+				// 	$this->Customer_Model->update_by_id($customer_id, [
+				// 		'AutocountSyncStatus'  => 'F',
+				// 		'AutocountSyncMessage' => json_encode($result)
+				// 	]);
+				// }
 			} else {
 				$customer_id = null;
 			}
@@ -728,24 +729,25 @@ class Booking_Model extends CI_Model
 				$this->db->insert('customer', $data);
 				$customer_id = $this->db->insert_id();
 
-				// Immediately sync to Autocount
-				$this->load->library('CustomerSync');
-				$this->load->helper('autocount');
-				$config = get_autocount_config();
-				$data['CustomerID'] = $customer_id;
-				$result = $this->customersync->autocount_create($data, $config);
+				// no need sync directly, cron will sync customer at first
+				// // Immediately sync to Autocount
+				// $this->load->library('CustomerSync');
+				// $this->load->helper('autocount');
+				// $config = get_autocount_config();
+				// $data['CustomerID'] = $customer_id;
+				// $result = $this->customersync->autocount_create($data, $config);
 
-				if (isset($result['status']) && ($result['status'] == 201 || $result['status'] == 204) && $result['error'] === null) {
-					$this->Customer_Model->update_by_id($customer_id, [
-						'AutocountSyncStatus'  => 'S',
-						'AutocountSyncMessage' => json_encode($result)
-					]);
-				} else {
-					$this->Customer_Model->update_by_id($customer_id, [
-						'AutocountSyncStatus'  => 'F',
-						'AutocountSyncMessage' => json_encode($result)
-					]);
-				}
+				// if (isset($result['status']) && ($result['status'] == 201 || $result['status'] == 204) && $result['error'] === null) {
+				// 	$this->Customer_Model->update_by_id($customer_id, [
+				// 		'AutocountSyncStatus'  => 'S',
+				// 		'AutocountSyncMessage' => json_encode($result)
+				// 	]);
+				// } else {
+				// 	$this->Customer_Model->update_by_id($customer_id, [
+				// 		'AutocountSyncStatus'  => 'F',
+				// 		'AutocountSyncMessage' => json_encode($result)
+				// 	]);
+				// }
 			} else {
 				$customer_id = null;
 			}
@@ -1062,9 +1064,10 @@ class Booking_Model extends CI_Model
 			->where_in('booking.AutocountSyncStatus', $statuses)
 			->where_in('booking.BookingConfirmationTitle', $titles)
 			->where('booking.AutocountSyncAction IS NOT NULL')
-			->where("EXISTS (SELECT 1 FROM payment WHERE payment.BookingID = booking.BookingID AND payment.Status = 'Y')")
 			->order_by('booking.BookingID', 'ASC')
 			->limit($booking_qty_cront);
+
+			// new condition remove have payment only can sync : ->where("EXISTS (SELECT 1 FROM payment WHERE payment.BookingID = booking.BookingID AND payment.Status = 'Y')")
 
 		if (!empty($config['booking_cutoff_date'])) {
 			$date = date('Y-m-d', strtotime($config['booking_cutoff_date']));
