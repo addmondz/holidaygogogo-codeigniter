@@ -208,10 +208,16 @@ $is_view_mode = true;
                                             <strong><?php echo htmlspecialchars($booking_product->Name ?? $booking_product->Description ?? 'N/A'); ?></strong>
                                         </div>
                                         <div class="col-md-3 text-right">
-                                            <span>Price: RM <?php echo number_format($booking_product->Price, 2); ?></span>
+                                            <span>Price: RM <?php 
+                                                $price = $booking_product->Price ?? 0;
+                                                echo is_numeric($price) ? number_format((float)$price, 2) : $price;
+                                            ?></span>
                                         </div>
                                         <div class="col-md-3 text-right">
-                                            <span>Total: RM <?php echo number_format($booking_product->Total, 2); ?></span>
+                                            <span>Total: RM <?php 
+                                                $total = $booking_product->Total ?? 0;
+                                                echo is_numeric($total) ? number_format((float)$total, 2) : $total;
+                                            ?></span>
                                         </div>
                                     </div>
                                 </div>

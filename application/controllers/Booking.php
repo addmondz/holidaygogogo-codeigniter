@@ -1222,8 +1222,8 @@ class Booking extends MY_Controller
 				}
 				
 				foreach($array['booking_products'] as $booking_product) {
-					$booking_product->Price = number_format($booking_product->Price, 2, '.', ',');
-					$booking_product->Total = number_format($booking_product->Total, 2, '.', ',');
+					$booking_product->Price = number_format((float)($booking_product->Price ?? 0), 2, '.', ',');
+					$booking_product->Total = number_format((float)($booking_product->Total ?? 0), 2, '.', ',');
 				}
 
 				// Get booking checklists
