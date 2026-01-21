@@ -1537,6 +1537,9 @@ class Booking extends MY_Controller
 			$target_status = $status_info['status'];
 			$status_description = $status_info['description'];
 			
+			// Validate the status transition from current status to target status
+			$validation = validate_booking_status_flow($booking->Status, $target_status, false);
+			
 			if (!$validation['valid']) {
 				// If can't progress to determined status, fall back to P
 				if ($target_status != 'P') {

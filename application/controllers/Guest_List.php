@@ -205,6 +205,27 @@ class Guest_List extends CI_Controller
 							$country_code = $this->Universal_Model->Read_Country_Code($array['guest_lists'][0]->SalesAgentCountryCode);
 							$array['guest_lists'][0]->SalesAgentMobile = $country_code . $array['guest_lists'][0]->SalesAgentMobile;
 							$array['country_codes'] = $this->Guest_List_Model->Read_Country_Codes();
+							
+							// Get booking products with category country
+							$this->db->select('booking_product.ProductID, product.CategoryID, category.Country As CategoryCountry, country_code.Country As CategoryCountryName');
+							$this->db->from('booking_product');
+							$this->db->join('product', 'product.ProductID = booking_product.ProductID', 'left');
+							$this->db->join('category', 'category.CategoryID = product.CategoryID', 'left');
+							$this->db->join('country_code', 'country_code.CountryCodeID = category.Country', 'left');
+							$this->db->where('booking_product.BookingID', $array['guest_lists'][0]->BookingID);
+							$this->db->where('booking_product.Status', 'Y');
+							$array['booking_products'] = $this->db->get()->result();
+							
+							// Determine destination country from products (use first product's category country)
+							$destination_country = null;
+							$destination_country_name = null;
+							if(!empty($array['booking_products']) && !empty($array['booking_products'][0]->CategoryCountry)) {
+								$destination_country = $array['booking_products'][0]->CategoryCountry;
+								$destination_country_name = strtoupper($array['booking_products'][0]->CategoryCountryName);
+							}
+							$array['destination_country'] = $destination_country;
+							$array['destination_country_name'] = $destination_country_name;
+							
 							// Load rooms for this booking
 							$this->db->select('id, booking_id, room_name, Status');
 							$this->db->where('booking_id', $array['guest_lists'][0]->BookingID);

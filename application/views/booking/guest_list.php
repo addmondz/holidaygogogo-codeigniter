@@ -45,6 +45,20 @@
                 	<div class="col-md-6">
                 		<p>Destination : 
 							<b><?php echo $guest_lists[0]->Destination; ?></b>
+							<?php 
+								// only show for admin
+								if(!empty($this->session->userdata('admin_id'))) {
+									// Use product category country instead of booking destination
+									$destination_country_upper = isset($destination_country_name) ? strtoupper($destination_country_name) : '';
+									if($destination_country_upper == 'MALAYSIA') {
+										echo ' <span style="color: #28a745; font-weight: bold;">(Malaysia)</span>';
+									} else if(!empty($destination_country_upper)) {
+										echo ' <span style="color: #dc3545; font-weight: bold;">(Overseas)</span>';
+									} else {
+										echo ' <span style="color: #6c757d; font-weight: bold;">(Not Set)</span>';
+									}
+								}
+							?>
 						</p>
                 		<p>Travel Date : 
 							<b><?php echo $guest_lists[0]->TravelDate; ?></b>
@@ -243,8 +257,18 @@
 													<label id="<?php echo 'nationality_label-' . $guest->GuestListID; ?>">Nationality <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>
 													<select <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> name="nationalities[]" id="<?php echo 'nationality-' . $guest->GuestListID; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" class="form-control">
 														<option selected disabled value="">--SELECT NATIONALITY--</option>
-														<?php foreach($country_codes as $nationality) { ?>
-															<option <?php if(!empty($guest->Nationality) && $nationality->CountryCodeID == $guest->Nationality) { echo 'selected'; } ?> value="<?php echo $nationality->CountryCodeID; ?>"><?php echo $nationality->Country; ?></option>
+														<?php 
+															$malaysia_id = null;
+															foreach($country_codes as $nationality) {
+																if(strtoupper($nationality->Country) == 'MALAYSIA') {
+																	$malaysia_id = $nationality->CountryCodeID;
+																}
+															}
+															// Determine default selection: use existing nationality if set, otherwise default to Malaysia
+															$default_nationality = !empty($guest->Nationality) ? $guest->Nationality : $malaysia_id;
+															foreach($country_codes as $nationality) { 
+														?>
+															<option <?php if($nationality->CountryCodeID == $default_nationality) { echo 'selected'; } ?> value="<?php echo $nationality->CountryCodeID; ?>"><?php echo $nationality->Country; ?></option>
 														<?php } ?>
 													</select>
 												</div>
@@ -254,37 +278,67 @@
 												</div>
 											</div>
 											<br>
-											<div class="row">
-												<div class="col-md-6 mb-7 mb-md-0">
-													<label id="<?php echo 'passport_number_label-' . $guest->GuestListID; ?>">Passport Number <?php if((!empty($guest->Guest) || !empty($guest->GuestLastName)) && !empty($guest->NationalityName) && $guest->NationalityName != 'MALAYSIA') { echo '<span style="color:red;">*</span>'; } ?></label>
-													<input <?php if((!empty($guest->Guest) || !empty($guest->GuestLastName)) && !empty($guest->NationalityName) && $guest->NationalityName != 'MALAYSIA') { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="passport_numbers[]" id="<?php echo 'passport_number-' . $guest->GuestListID; ?>" value="<?php echo $guest->PassportNumber; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="form-control">
+											<?php 
+												// Determine if passport fields should be shown
+												// Default: hide passport fields (will be shown by JS if needed)
+												$show_passport_fields = false;
+												$is_passport_required = false;
+												
+												// Get current nationality (use default Malaysia if not set)
+												$current_nationality = !empty($guest->Nationality) ? $guest->Nationality : $malaysia_id;
+												$current_nationality_name = null;
+												foreach($country_codes as $nc) {
+													if($nc->CountryCodeID == $current_nationality) {
+														$current_nationality_name = strtoupper($nc->Country);
+														break;
+													}
+												}
+												
+												if((!empty($guest->Guest) || !empty($guest->GuestLastName)) && !empty($current_nationality_name)) {
+													// Use product category country instead of booking destination
+													$destination_country_upper = isset($destination_country_name) ? strtoupper($destination_country_name) : '';
+													
+													// Show passport fields if: (Malaysian AND destination country is set and not Malaysia) OR (Non-Malaysian)
+													// If destination country is empty, Malaysians don't need passport fields
+													if(($current_nationality_name == 'MALAYSIA' && !empty($destination_country_upper) && $destination_country_upper != 'MALAYSIA') || $current_nationality_name != 'MALAYSIA') {
+														$show_passport_fields = true;
+														$is_passport_required = true;
+													}
+												}
+											?>
+											<div id="<?php echo 'passport_fields-' . $guest->GuestListID; ?>" class="passport-fields-container" style="<?php echo $show_passport_fields ? '' : 'display:none;'; ?>">
+												<div class="row">
+													<div class="col-md-6 mb-7 mb-md-0">
+														<label id="<?php echo 'passport_number_label-' . $guest->GuestListID; ?>">Passport Number <?php if($is_passport_required) { echo '<span style="color:red;">*</span>'; } ?></label>
+														<input <?php if($is_passport_required) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="passport_numbers[]" id="<?php echo 'passport_number-' . $guest->GuestListID; ?>" value="<?php echo $guest->PassportNumber; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="form-control">
+													</div>
+													<div class="col-md-6">
+														<label id="<?php echo 'passport_issue_date_label-' . $guest->GuestListID; ?>">Passport Issue Date <?php if($is_passport_required) { echo '<span style="color:red;">*</span>'; } ?></label>
+														<input <?php if($is_passport_required) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="passport_issue_dates[]" id="<?php echo 'passport_issue_date-' . $guest->GuestListID; ?>" value="<?php echo !empty($guest->PassportIssueDate) ? date('d/m/Y', strtotime($guest->PassportIssueDate)) : ''; ?>" autocomplete="off" class="form-control kt_datepicker_4_3">
+													</div>
 												</div>
-												<div class="col-md-6">
-													<label>Passport Issue Date</label>
-													<input <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="passport_issue_dates[]" id="<?php echo 'passport_issue_date-' . $guest->GuestListID; ?>" value="<?php echo !empty($guest->PassportIssueDate) ? date('d/m/Y', strtotime($guest->PassportIssueDate)) : ''; ?>" autocomplete="off" class="form-control kt_datepicker_4_3">
-												</div>
-											</div>
-											<br>
-											<div class="row">
-												<div class="col-md-6 mb-7 mb-md-0">
-													<label>Passport Expiry Date</label>
-													<input <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="passport_expiry_dates[]" id="<?php echo 'passport_expiry_date-' . $guest->GuestListID; ?>" value="<?php echo !empty($guest->PassportExpiryDate) ? date('d/m/Y', strtotime($guest->PassportExpiryDate)) : ''; ?>" autocomplete="off" class="form-control kt_datepicker_4_3">
-												</div>
-												<div class="col-md-6">
-													<label>Passport Copy</label>
-													<div class="d-flex align-items-center">
-														<div class="custom-file flex-grow-1">
-															<input type="file" name="passport_copies[]" id="<?php echo 'passport_copy-' . $guest->GuestListID; ?>" <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> class="custom-file-input passport-copy-upload" accept=".pdf,.jpg,.jpeg,.png,.gif" data-guest-id="<?php echo $guest->GuestListID; ?>">
-															<label class="custom-file-label" for="<?php echo 'passport_copy-' . $guest->GuestListID; ?>">Choose file</label>
+												<br>
+												<div class="row">
+													<div class="col-md-6 mb-7 mb-md-0">
+														<label id="<?php echo 'passport_expiry_date_label-' . $guest->GuestListID; ?>">Passport Expiry Date <?php if($is_passport_required) { echo '<span style="color:red;">*</span>'; } ?></label>
+														<input <?php if($is_passport_required) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="passport_expiry_dates[]" id="<?php echo 'passport_expiry_date-' . $guest->GuestListID; ?>" value="<?php echo !empty($guest->PassportExpiryDate) ? date('d/m/Y', strtotime($guest->PassportExpiryDate)) : ''; ?>" autocomplete="off" class="form-control kt_datepicker_4_3">
+													</div>
+													<div class="col-md-6">
+														<label id="<?php echo 'passport_copy_label-' . $guest->GuestListID; ?>">Passport Copy <?php if($is_passport_required) { echo '<span style="color:red;">*</span>'; } ?></label>
+														<div class="d-flex align-items-center">
+															<div class="custom-file flex-grow-1">
+																<input type="file" name="passport_copies[]" id="<?php echo 'passport_copy-' . $guest->GuestListID; ?>" <?php if($is_passport_required) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> class="custom-file-input passport-copy-upload" accept=".pdf,.jpg,.jpeg,.png,.gif" data-guest-id="<?php echo $guest->GuestListID; ?>">
+																<label class="custom-file-label" for="<?php echo 'passport_copy-' . $guest->GuestListID; ?>">Choose file</label>
+															</div>
+															<?php if(!empty($guest->PassportCopy)) { ?>
+																<button type="button" class="btn btn-sm btn-light-primary ml-2" onclick="viewPassportCopy('<?php echo base_url($guest->PassportCopy); ?>', '<?php echo basename($guest->PassportCopy); ?>', '<?php echo $counter; ?>')" style="flex-shrink: 0;" title="View Uploaded Passport">
+																	<i class="la la-eye" style="font-size: 1.2rem;"></i>
+																</button>
+																<input type="hidden" name="existing_passport_copies[]" value="<?php echo $guest->PassportCopy; ?>">
+															<?php } else { ?>
+																<input type="hidden" name="existing_passport_copies[]" value="">
+															<?php } ?>
 														</div>
-														<?php if(!empty($guest->PassportCopy)) { ?>
-															<button type="button" class="btn btn-sm btn-light-primary ml-2" onclick="viewPassportCopy('<?php echo base_url($guest->PassportCopy); ?>', '<?php echo basename($guest->PassportCopy); ?>', '<?php echo $counter; ?>')" style="flex-shrink: 0;" title="View Uploaded Passport">
-																<i class="la la-eye" style="font-size: 1.2rem;"></i>
-															</button>
-															<input type="hidden" name="existing_passport_copies[]" value="<?php echo $guest->PassportCopy; ?>">
-														<?php } else { ?>
-															<input type="hidden" name="existing_passport_copies[]" value="">
-														<?php } ?>
 													</div>
 												</div>
 											</div>
@@ -442,6 +496,8 @@
 		var guest_list_id = -1;
 		var new_guests = [];
 		var deleted_guests = [];
+		// Use product category country instead of booking destination
+		var destination = <?php echo json_encode(isset($destination_country_name) ? strtoupper($destination_country_name) : ''); ?>;
 
 		function Set_Required_Field(guest_list_id)
 		{
@@ -487,19 +543,82 @@
 				$(`#mobile_label-${guest_list_id}`).html('Mobile <span style="color:red;">*</span>');
 				$(`#mobile-${guest_list_id}`).prop('required', 'true');
 
-				//Nationality
+				//Nationality and Passport validation
 				if(nationality != null) {
-					if($(`#nationality-${guest_list_id} option:selected`).text() == 'MALAYSIA') {
+					var nationality_text = $(`#nationality-${guest_list_id} option:selected`).text().toUpperCase();
+					var destination_upper = (destination || '').toUpperCase();
+					var is_malaysian = (nationality_text == 'MALAYSIA');
+					var passport_container = $(`#passport_fields-${guest_list_id}`);
+					
+					if(is_malaysian) {
+						// Malaysian: show identification number as required
 						$(`#identification_number_label-${guest_list_id}`).html('Identification Number <span style="color:red;">*</span>');
 						$(`#identification_number-${guest_list_id}`).prop('required', 'true');
-						$(`#passport_number_label-${guest_list_id}`).html('Passport Number');
-						$(`#passport_number-${guest_list_id}`).removeAttr('required');
+						
+						// Check destination for Malaysians
+						// If destination is empty or Malaysia, don't require passport fields
+						if(!destination_upper || destination_upper == '' || destination_upper == 'MALAYSIA') {
+							// Malaysian traveling within Malaysia or destination not set - hide passport fields
+							passport_container.hide();
+							
+							// Remove required from all passport fields
+							$(`#passport_number_label-${guest_list_id}`).html('Passport Number');
+							$(`#passport_number-${guest_list_id}`).removeAttr('required').val('');
+							$(`#passport_issue_date_label-${guest_list_id}`).html('Passport Issue Date');
+							$(`#passport_issue_date-${guest_list_id}`).removeAttr('required').val('');
+							$(`#passport_expiry_date_label-${guest_list_id}`).html('Passport Expiry Date');
+							$(`#passport_expiry_date-${guest_list_id}`).removeAttr('required').val('');
+							$(`#passport_copy_label-${guest_list_id}`).html('Passport Copy');
+							$(`#passport_copy-${guest_list_id}`).removeAttr('required');
+							// Clear file input
+							$(`#passport_copy-${guest_list_id}`).val('');
+						} else {
+							// Malaysian traveling outside Malaysia - show and require passport fields
+							passport_container.show();
+							
+							// Set all passport fields as required
+							$(`#passport_number_label-${guest_list_id}`).html('Passport Number <span style="color:red;">*</span>');
+							$(`#passport_number-${guest_list_id}`).prop('required', 'true');
+							$(`#passport_issue_date_label-${guest_list_id}`).html('Passport Issue Date <span style="color:red;">*</span>');
+							$(`#passport_issue_date-${guest_list_id}`).prop('required', 'true');
+							$(`#passport_expiry_date_label-${guest_list_id}`).html('Passport Expiry Date <span style="color:red;">*</span>');
+							$(`#passport_expiry_date-${guest_list_id}`).prop('required', 'true');
+							$(`#passport_copy_label-${guest_list_id}`).html('Passport Copy <span style="color:red;">*</span>');
+							$(`#passport_copy-${guest_list_id}`).prop('required', 'true');
+						}
 					} else {
+						// Non-Malaysian - show and require passport fields
+						passport_container.show();
+						
+						// Set all passport fields as required
 						$(`#passport_number_label-${guest_list_id}`).html('Passport Number <span style="color:red;">*</span>');
 						$(`#passport_number-${guest_list_id}`).prop('required', 'true');
+						$(`#passport_issue_date_label-${guest_list_id}`).html('Passport Issue Date <span style="color:red;">*</span>');
+						$(`#passport_issue_date-${guest_list_id}`).prop('required', 'true');
+						$(`#passport_expiry_date_label-${guest_list_id}`).html('Passport Expiry Date <span style="color:red;">*</span>');
+						$(`#passport_expiry_date-${guest_list_id}`).prop('required', 'true');
+						$(`#passport_copy_label-${guest_list_id}`).html('Passport Copy <span style="color:red;">*</span>');
+						$(`#passport_copy-${guest_list_id}`).prop('required', 'true');
+						
+						// Remove identification number requirement for non-Malaysians
 						$(`#identification_number_label-${guest_list_id}`).html('Identification Number');
 						$(`#identification_number-${guest_list_id}`).removeAttr('required');
 					}
+				} else {
+					// No nationality selected - hide passport fields by default
+					var passport_container = $(`#passport_fields-${guest_list_id}`);
+					if(passport_container.length) {
+						passport_container.hide();
+					}
+					// Remove required from passport fields
+					$(`#passport_number_label-${guest_list_id}`).html('Passport Number');
+					$(`#passport_number-${guest_list_id}`).removeAttr('required');
+					$(`#passport_issue_date_label-${guest_list_id}`).html('Passport Issue Date');
+					$(`#passport_issue_date-${guest_list_id}`).removeAttr('required');
+					$(`#passport_expiry_date_label-${guest_list_id}`).html('Passport Expiry Date');
+					$(`#passport_expiry_date-${guest_list_id}`).removeAttr('required');
+					$(`#passport_copy_label-${guest_list_id}`).html('Passport Copy');
+					$(`#passport_copy-${guest_list_id}`).removeAttr('required');
 				}
 
 				//Travel Insurance
@@ -542,6 +661,22 @@
 				$(`#country_code-${guest_list_id}`).removeAttr('required');
 				$(`#mobile_label-${guest_list_id}`).html('Mobile');
 				$(`#mobile-${guest_list_id}`).removeAttr('required');
+				
+				// Clear passport and identification number requirements when form is cleared
+				var passport_container = $(`#passport_fields-${guest_list_id}`);
+				if(passport_container.length) {
+					passport_container.hide(); // Hide by default when form is cleared
+				}
+				$(`#passport_number_label-${guest_list_id}`).html('Passport Number');
+				$(`#passport_number-${guest_list_id}`).removeAttr('required');
+				$(`#passport_issue_date_label-${guest_list_id}`).html('Passport Issue Date');
+				$(`#passport_issue_date-${guest_list_id}`).removeAttr('required');
+				$(`#passport_expiry_date_label-${guest_list_id}`).html('Passport Expiry Date');
+				$(`#passport_expiry_date-${guest_list_id}`).removeAttr('required');
+				$(`#passport_copy_label-${guest_list_id}`).html('Passport Copy');
+				$(`#passport_copy-${guest_list_id}`).removeAttr('required');
+				$(`#identification_number_label-${guest_list_id}`).html('Identification Number');
+				$(`#identification_number-${guest_list_id}`).removeAttr('required');
 
 				//Travel Insurance
 				<?php if($guest_lists[0]->TravelInsuranceStatus == 'Y') { ?>
@@ -632,27 +767,29 @@
 								'</div>' +
 							'</div>' +
 							'<br>' +
-							'<div class="row">' +
-								'<div class="col-md-6 mb-7 mb-md-0">' +
-									'<label id="passport_number_label-'+ guest_list_id +'">Passport Number</label>' +
-									'<input type="text" name="new_passport_numbers[]" id="passport_number-'+ guest_list_id +'" onchange="Set_Required_Field('+ guest_list_id +')" autocomplete="off" class="form-control">' +
+							'<div id="passport_fields-'+ guest_list_id +'" class="passport-fields-container" style="display:none;">' +
+								'<div class="row">' +
+									'<div class="col-md-6 mb-7 mb-md-0">' +
+										'<label id="passport_number_label-'+ guest_list_id +'">Passport Number</label>' +
+										'<input type="text" name="new_passport_numbers[]" id="passport_number-'+ guest_list_id +'" onchange="Set_Required_Field('+ guest_list_id +')" autocomplete="off" class="form-control">' +
+									'</div>' +
+									'<div class="col-md-6">' +
+										'<label id="passport_issue_date_label-'+ guest_list_id +'">Passport Issue Date</label>' +
+										'<input type="text" name="new_passport_issue_dates[]" id="passport_issue_date-'+ guest_list_id +'" autocomplete="off" class="form-control kt_datepicker_4_3">' +
+									'</div>' +
 								'</div>' +
-								'<div class="col-md-6">' +
-									'<label>Passport Issue Date</label>' +
-									'<input type="text" name="new_passport_issue_dates[]" id="passport_issue_date-'+ guest_list_id +'" autocomplete="off" class="form-control kt_datepicker_4_3">' +
-								'</div>' +
-							'</div>' +
-							'<br>' +
-							'<div class="row">' +
-								'<div class="col-md-6 mb-7 mb-md-0">' +
-									'<label>Passport Expiry Date</label>' +
-									'<input type="text" name="new_passport_expiry_dates[]" id="passport_expiry_date-'+ guest_list_id +'" autocomplete="off" class="form-control kt_datepicker_4_3">' +
-								'</div>' +
-								'<div class="col-md-6">' +
-									'<label>Passport Copy</label>' +
-									'<div class="custom-file">' +
-										'<input type="file" name="new_passport_copies[]" id="passport_copy-'+ guest_list_id +'" class="custom-file-input passport-copy-upload" accept=".pdf,.jpg,.jpeg,.png,.gif" data-guest-id="'+ guest_list_id +'">' +
-										'<label class="custom-file-label" for="passport_copy-'+ guest_list_id +'">Choose file</label>' +
+								'<br>' +
+								'<div class="row">' +
+									'<div class="col-md-6 mb-7 mb-md-0">' +
+										'<label id="passport_expiry_date_label-'+ guest_list_id +'">Passport Expiry Date</label>' +
+										'<input type="text" name="new_passport_expiry_dates[]" id="passport_expiry_date-'+ guest_list_id +'" autocomplete="off" class="form-control kt_datepicker_4_3">' +
+									'</div>' +
+									'<div class="col-md-6">' +
+										'<label id="passport_copy_label-'+ guest_list_id +'">Passport Copy</label>' +
+										'<div class="custom-file">' +
+											'<input type="file" name="new_passport_copies[]" id="passport_copy-'+ guest_list_id +'" class="custom-file-input passport-copy-upload" accept=".pdf,.jpg,.jpeg,.png,.gif" data-guest-id="'+ guest_list_id +'">' +
+											'<label class="custom-file-label" for="passport_copy-'+ guest_list_id +'">Choose file</label>' +
+										'</div>' +
 									'</div>' +
 								'</div>' +
 							'</div>' +
@@ -791,6 +928,13 @@
 				// Keep label as "Choose file" - don't show filename
 				$(this).next('.custom-file-label').html('Choose file');
 			});
+			// Set default nationality to Malaysia for new guests
+			var malaysiaOption = $(`#nationality-${guest_list_id} option`).filter(function() { 
+				return $(this).text().toUpperCase() === 'MALAYSIA'; 
+			});
+			if(malaysiaOption.length) {
+				$(`#nationality-${guest_list_id}`).val(malaysiaOption.val()).trigger('change');
+			}
 			Update_Pax_Number(guest_list_id, 'C');
 			new_guests.push(guest_list_id);
 			$('input[name="new_guests"]').val(new_guests);
@@ -1745,6 +1889,15 @@
 			$('.passport-copy-upload').on('change', function() {
 				// Keep label as "Choose file" - don't show filename
 				$(this).next('.custom-file-label').html('Choose file');
+			});
+			
+			// Trigger Set_Required_Field for all existing guests to ensure proper initial state
+			$('select[id^="nationality-"]').each(function() {
+				var guestId = $(this).attr('id').replace('nationality-', '');
+				if(guestId && !isNaN(guestId) && guestId > 0) {
+					// Only trigger for existing guests (positive IDs)
+					Set_Required_Field(guestId);
+				}
 			});
 		});
 
