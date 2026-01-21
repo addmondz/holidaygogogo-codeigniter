@@ -462,6 +462,25 @@ class Booking_Model extends CI_Model
 
 				$this->db->insert('customer', $data);
 				$customer_id = $this->db->insert_id();
+
+				// Immediately sync to Autocount
+				$this->load->library('CustomerSync');
+				$this->load->helper('autocount');
+				$config = get_autocount_config();
+				$data['CustomerID'] = $customer_id;
+				$result = $this->customersync->autocount_create($data, $config);
+
+				if (isset($result['status']) && ($result['status'] == 201 || $result['status'] == 204) && $result['error'] === null) {
+					$this->Customer_Model->update_by_id($customer_id, [
+						'AutocountSyncStatus'  => 'S',
+						'AutocountSyncMessage' => json_encode($result)
+					]);
+				} else {
+					$this->Customer_Model->update_by_id($customer_id, [
+						'AutocountSyncStatus'  => 'F',
+						'AutocountSyncMessage' => json_encode($result)
+					]);
+				}
 			} else {
 				$customer_id = null;
 			}
@@ -708,6 +727,25 @@ class Booking_Model extends CI_Model
 
 				$this->db->insert('customer', $data);
 				$customer_id = $this->db->insert_id();
+
+				// Immediately sync to Autocount
+				$this->load->library('CustomerSync');
+				$this->load->helper('autocount');
+				$config = get_autocount_config();
+				$data['CustomerID'] = $customer_id;
+				$result = $this->customersync->autocount_create($data, $config);
+
+				if (isset($result['status']) && ($result['status'] == 201 || $result['status'] == 204) && $result['error'] === null) {
+					$this->Customer_Model->update_by_id($customer_id, [
+						'AutocountSyncStatus'  => 'S',
+						'AutocountSyncMessage' => json_encode($result)
+					]);
+				} else {
+					$this->Customer_Model->update_by_id($customer_id, [
+						'AutocountSyncStatus'  => 'F',
+						'AutocountSyncMessage' => json_encode($result)
+					]);
+				}
 			} else {
 				$customer_id = null;
 			}
