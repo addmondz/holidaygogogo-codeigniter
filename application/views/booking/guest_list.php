@@ -23,6 +23,167 @@
 		font-weight: bold;
 		text-align: center;
 	}
+	
+	/* Merged Phone Input Styles */
+	.phone-input-wrapper {
+		position: relative;
+		display: flex;
+		align-items: stretch;
+		border: 1px solid #e4e6ef;
+		border-radius: 0.42rem;
+		background-color: #fff;
+		transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+	}
+	
+	.phone-input-wrapper:focus-within {
+		border-color: #5e72e4;
+		box-shadow: 0 0 0 0.2rem rgba(94, 114, 228, 0.25);
+	}
+	
+	.phone-input-wrapper.disabled {
+		background-color: #f3f6f9;
+		opacity: 0.6;
+		cursor: not-allowed;
+	}
+	
+	.phone-country-selector {
+		position: relative;
+		display: flex;
+		align-items: center;
+		padding: 0.75rem 0.75rem;
+		background-color: #f7f8fa;
+		border-right: 1px solid #e4e6ef;
+		cursor: pointer;
+		min-width: 120px;
+		user-select: none;
+	}
+	
+	.phone-country-selector.disabled {
+		cursor: not-allowed;
+	}
+	
+	.phone-country-flag {
+		font-size: 1.25rem;
+		margin-right: 0.5rem;
+		line-height: 1;
+	}
+	
+	.phone-country-code {
+		font-weight: 500;
+		color: #3f4254;
+		font-size: 0.95rem;
+		margin-right: 0.25rem;
+	}
+	
+	.phone-country-arrow {
+		margin-left: auto;
+		color: #7e8299;
+		font-size: 0.75rem;
+		transition: transform 0.2s;
+	}
+	
+	.phone-country-selector.open .phone-country-arrow {
+		transform: rotate(180deg);
+	}
+	
+	.phone-input-field {
+		flex: 1;
+		border: none;
+		padding: 0.75rem 1rem;
+		font-size: 0.95rem;
+		background: transparent;
+		outline: none;
+	}
+	
+	.phone-input-field:disabled {
+		background-color: transparent;
+		cursor: not-allowed;
+	}
+	
+	.phone-dropdown {
+		position: absolute;
+		top: 100%;
+		left: 0;
+		right: 0;
+		background: #fff;
+		border: 1px solid #e4e6ef;
+		border-radius: 0.42rem;
+		box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+		z-index: 1000;
+		max-height: 300px;
+		overflow-y: auto;
+		display: none;
+		margin-top: 0.25rem;
+	}
+	
+	.phone-dropdown.show {
+		display: block;
+	}
+	
+	.phone-dropdown-search {
+		padding: 0.75rem;
+		border-bottom: 1px solid #e4e6ef;
+		position: sticky;
+		top: 0;
+		background: #fff;
+		z-index: 1;
+	}
+	
+	.phone-dropdown-search input {
+		width: 100%;
+		padding: 0.5rem;
+		border: 1px solid #e4e6ef;
+		border-radius: 0.25rem;
+		font-size: 0.9rem;
+	}
+	
+	.phone-dropdown-list {
+		padding: 0.25rem 0;
+		max-height: 250px;
+		overflow-y: auto;
+	}
+	
+	.phone-dropdown-item {
+		display: flex;
+		align-items: center;
+		padding: 0.75rem;
+		cursor: pointer;
+		transition: background-color 0.15s;
+	}
+	
+	.phone-dropdown-item:hover {
+		background-color: #f7f8fa;
+	}
+	
+	.phone-dropdown-item.selected {
+		background-color: #e4e6ef;
+	}
+	
+	.phone-dropdown-item-flag {
+		font-size: 1.25rem;
+		margin-right: 0.75rem;
+		line-height: 1;
+		width: 24px;
+		text-align: center;
+	}
+	
+	.phone-dropdown-item-name {
+		flex: 1;
+		color: #3f4254;
+		font-size: 0.9rem;
+	}
+	
+	.phone-dropdown-item-code {
+		color: #7e8299;
+		font-size: 0.85rem;
+		font-weight: 500;
+		margin-left: 0.5rem;
+	}
+	
+	/* Hide original fields but keep them for form submission */
+	.phone-hidden-field {
+		display: none;
+	}
 </style>
 
 <body>
@@ -351,18 +512,76 @@
 											</div>
 											<br>
 											<div class="row">
-												<div class="col-md-6 mb-7 mb-md-0">
-													<label id="<?php echo 'country_code_label-' . $guest->GuestListID; ?>">Country Code <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>
-													<select <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> name="country_codes[]" id="<?php echo 'country_code-' . $guest->GuestListID; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" class="form-control">
-														<option selected disabled value="">--SELECT COUNTRY CODE--</option>
-														<?php foreach($country_codes as $country_code) { ?>
-															<option <?php if(!empty($guest->GuestCountryCode) && $country_code->CountryCodeID == $guest->GuestCountryCode) { echo 'selected'; } ?> value="<?php echo $country_code->CountryCodeID; ?>"><?php echo $country_code->Country . ' ' . $country_code->CountryCode; ?></option>
-														<?php } ?>
-													</select>
-												</div>
-												<div class="col-md-6">
+												<div class="col-md-12">
 													<label id="<?php echo 'mobile_label-' . $guest->GuestListID; ?>">Mobile <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>
-													<input <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="mobiles[]" id="<?php echo 'mobile-' . $guest->GuestListID; ?>" value="<?php echo $guest->GuestMobile; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="form-control">
+													<div class="phone-input-wrapper <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?>" id="phone-wrapper-<?php echo $guest->GuestListID; ?>">
+														<div class="phone-country-selector <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?>" id="phone-selector-<?php echo $guest->GuestListID; ?>">
+															<span class="phone-country-flag" id="phone-flag-<?php echo $guest->GuestListID; ?>">🌐</span>
+															<span class="phone-country-code" id="phone-code-<?php echo $guest->GuestListID; ?>">--</span>
+															<span class="phone-country-arrow">▼</span>
+														</div>
+														<input type="text" name="mobiles[]" id="<?php echo 'mobile-' . $guest->GuestListID; ?>" value="<?php echo $guest->GuestMobile; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="phone-input-field" placeholder="Enter phone number" <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?>>
+														<!-- Hidden field for country code -->
+														<select name="country_codes[]" id="<?php echo 'country_code-' . $guest->GuestListID; ?>" class="phone-hidden-field" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>); updatePhoneFromSelect(<?php echo $guest->GuestListID; ?>);">
+															<option value="">--SELECT COUNTRY CODE--</option>
+															<?php 
+															$selected_country_code = null;
+															$malaysia_phone_id = null;
+															// Find Malaysia country code ID for phone
+															foreach($country_codes as $country_code) {
+																if(strtoupper($country_code->Country) == 'MALAYSIA') {
+																	$malaysia_phone_id = $country_code->CountryCodeID;
+																	break;
+																}
+															}
+															// Determine default: use existing if set, otherwise default to Malaysia
+															$default_phone_country = !empty($guest->GuestCountryCode) ? $guest->GuestCountryCode : $malaysia_phone_id;
+															foreach($country_codes as $country_code) { 
+																$selected = '';
+																if($country_code->CountryCodeID == $default_phone_country) {
+																	$selected = 'selected';
+																	$selected_country_code = $country_code;
+																}
+															?>
+																<option <?php echo $selected; ?> value="<?php echo $country_code->CountryCodeID; ?>" data-country="<?php echo htmlspecialchars($country_code->Country); ?>" data-code="<?php echo htmlspecialchars($country_code->CountryCode); ?>"><?php echo $country_code->Country . ' ' . $country_code->CountryCode; ?></option>
+															<?php } ?>
+														</select>
+														<div class="phone-dropdown" id="phone-dropdown-<?php echo $guest->GuestListID; ?>">
+															<div class="phone-dropdown-search">
+																<input type="text" placeholder="Search country..." id="phone-search-<?php echo $guest->GuestListID; ?>">
+															</div>
+															<div class="phone-dropdown-list" id="phone-list-<?php echo $guest->GuestListID; ?>">
+																<?php foreach($country_codes as $country_code) { ?>
+																	<div class="phone-dropdown-item" data-country-id="<?php echo $country_code->CountryCodeID; ?>" data-country="<?php echo htmlspecialchars(strtolower($country_code->Country)); ?>" data-code="<?php echo htmlspecialchars($country_code->CountryCode); ?>" data-country-name="<?php echo htmlspecialchars($country_code->Country); ?>">
+																		<span class="phone-dropdown-item-flag">🌐</span>
+																		<span class="phone-dropdown-item-name"><?php echo $country_code->Country; ?></span>
+																		<span class="phone-dropdown-item-code"><?php echo $country_code->CountryCode; ?></span>
+																	</div>
+																<?php } ?>
+															</div>
+														</div>
+													</div>
+													<script>
+													$(document).ready(function() {
+														var selectedCountry = <?php echo !empty($selected_country_code) ? json_encode(['CountryCodeID' => $selected_country_code->CountryCodeID, 'Country' => $selected_country_code->Country, 'CountryCode' => $selected_country_code->CountryCode]) : 'null'; ?>;
+														// If no country selected, default to Malaysia
+														if(!selectedCountry && <?php echo !empty($malaysia_phone_id) ? 'true' : 'false'; ?>) {
+															var malaysiaCountry = null;
+															for(var i = 0; i < country_codes.length; i++) {
+																if(country_codes[i].Country.toUpperCase() === 'MALAYSIA') {
+																	malaysiaCountry = {
+																		CountryCodeID: country_codes[i].CountryCodeID,
+																		Country: country_codes[i].Country,
+																		CountryCode: country_codes[i].CountryCode
+																	};
+																	break;
+																}
+															}
+															selectedCountry = malaysiaCountry;
+														}
+														initPhoneInput(<?php echo $guest->GuestListID; ?>, selectedCountry);
+													});
+													</script>
 												</div>
 											</div>
 											<br>
@@ -487,7 +706,195 @@
 		var array2 = [];
 		for(var i = 0; i < country_codes.length; i++) {
 			array1.push('<option value="'+ country_codes[i].CountryCodeID +'">'+ country_codes[i].Country +'</option>');
-			array2.push('<option value="'+ country_codes[i].CountryCodeID +'">'+ country_codes[i].Country + ' ' + country_codes[i].CountryCode + '</option>');
+			array2.push('<option value="'+ country_codes[i].CountryCodeID +'" data-country="'+ country_codes[i].Country +'" data-code="'+ country_codes[i].CountryCode +'">'+ country_codes[i].Country + ' ' + country_codes[i].CountryCode + '</option>');
+		}
+		
+		// Comprehensive country flag mapping
+		function getCountryFlag(countryName) {
+			if(!countryName) return '🌐';
+			var country = countryName.toUpperCase().trim();
+			// Comprehensive country flags mapping
+			var flags = {
+				// Southeast Asia
+				'MALAYSIA': '🇲🇾', 'SINGAPORE': '🇸🇬', 'THAILAND': '🇹🇭', 'INDONESIA': '🇮🇩',
+				'PHILIPPINES': '🇵🇭', 'VIETNAM': '🇻🇳', 'CAMBODIA': '🇰🇭', 'MYANMAR': '🇲🇲', 'BURMA': '🇲🇲',
+				'LAOS': '🇱🇦', 'BRUNEI': '🇧🇳', 'BRUNEI DARUSSALAM': '🇧🇳', 'EAST TIMOR': '🇹🇱', 'TIMOR-LESTE': '🇹🇱',
+				// East Asia
+				'CHINA': '🇨🇳', 'JAPAN': '🇯🇵', 'SOUTH KOREA': '🇰🇷', 'KOREA': '🇰🇷', 'NORTH KOREA': '🇰🇵',
+				'HONG KONG': '🇭🇰', 'MACAU': '🇲🇴', 'TAIWAN': '🇹🇼', 'MONGOLIA': '🇲🇳',
+				// South Asia
+				'INDIA': '🇮🇳', 'PAKISTAN': '🇵🇰', 'BANGLADESH': '🇧🇩', 'SRI LANKA': '🇱🇰',
+				'NEPAL': '🇳🇵', 'BHUTAN': '🇧🇹', 'MALDIVES': '🇲🇻', 'AFGHANISTAN': '🇦🇫',
+				// Oceania
+				'AUSTRALIA': '🇦🇺', 'NEW ZEALAND': '🇳🇿', 'FIJI': '🇫🇯', 'PAPUA NEW GUINEA': '🇵🇬',
+				'NEW CALEDONIA': '🇳🇨', 'FRENCH POLYNESIA': '🇵🇫', 'SAMOA': '🇼🇸', 'TONGA': '🇹🇴',
+				// North America
+				'UNITED STATES': '🇺🇸', 'USA': '🇺🇸', 'CANADA': '🇨🇦', 'MEXICO': '🇲🇽',
+				// Central America & Caribbean
+				'GUATEMALA': '🇬🇹', 'BELIZE': '🇧🇿', 'EL SALVADOR': '🇸🇻', 'HONDURAS': '🇭🇳',
+				'NICARAGUA': '🇳🇮', 'COSTA RICA': '🇨🇷', 'PANAMA': '🇵🇦', 'CUBA': '🇨🇺',
+				'JAMAICA': '🇯🇲', 'HAITI': '🇭🇹', 'DOMINICAN REPUBLIC': '🇩🇴', 'BAHAMAS': '🇧🇸',
+				'BARBADOS': '🇧🇧', 'TRINIDAD AND TOBAGO': '🇹🇹', 'PUERTO RICO': '🇵🇷',
+				// South America
+				'BRAZIL': '🇧🇷', 'ARGENTINA': '🇦🇷', 'CHILE': '🇨🇱', 'COLOMBIA': '🇨🇴',
+				'PERU': '🇵🇪', 'VENEZUELA': '🇻🇪', 'ECUADOR': '🇪🇨', 'BOLIVIA': '🇧🇴',
+				'PARAGUAY': '🇵🇾', 'URUGUAY': '🇺🇾', 'GUYANA': '🇬🇾', 'SURINAME': '🇸🇷',
+				// Europe - Western
+				'UNITED KINGDOM': '🇬🇧', 'UK': '🇬🇧', 'IRELAND': '🇮🇪', 'FRANCE': '🇫🇷',
+				'GERMANY': '🇩🇪', 'ITALY': '🇮🇹', 'SPAIN': '🇪🇸', 'PORTUGAL': '🇵🇹',
+				'NETHERLANDS': '🇳🇱', 'BELGIUM': '🇧🇪', 'SWITZERLAND': '🇨🇭', 'AUSTRIA': '🇦🇹',
+				'LUXEMBOURG': '🇱🇺', 'MONACO': '🇲🇨', 'LIECHTENSTEIN': '🇱🇮', 'ANDORRA': '🇦🇩',
+				'SAN MARINO': '🇸🇲', 'VATICAN CITY': '🇻🇦', 'MALTA': '🇲🇹',
+				// Europe - Northern
+				'SWEDEN': '🇸🇪', 'NORWAY': '🇳🇴', 'DENMARK': '🇩🇰', 'FINLAND': '🇫🇮',
+				'ICELAND': '🇮🇸', 'ESTONIA': '🇪🇪', 'LATVIA': '🇱🇻', 'LITHUANIA': '🇱🇹',
+				// Europe - Eastern
+				'RUSSIA': '🇷🇺', 'POLAND': '🇵🇱', 'CZECH REPUBLIC': '🇨🇿', 'HUNGARY': '🇭🇺',
+				'ROMANIA': '🇷🇴', 'BULGARIA': '🇧🇬', 'CROATIA': '🇭🇷', 'SERBIA': '🇷🇸',
+				'SLOVAKIA': '🇸🇰', 'SLOVENIA': '🇸🇮', 'BOSNIA AND HERZEGOVINA': '🇧🇦',
+				'MACEDONIA': '🇲🇰', 'ALBANIA': '🇦🇱', 'MONTENEGRO': '🇲🇪', 'KOSOVO': '🇽🇰',
+				'BELARUS': '🇧🇾', 'UKRAINE': '🇺🇦', 'MOLDOVA': '🇲🇩', 'GEORGIA': '🇬🇪',
+				'ARMENIA': '🇦🇲', 'AZERBAIJAN': '🇦🇿',
+				// Europe - Southern
+				'GREECE': '🇬🇷', 'TURKEY': '🇹🇷', 'CYPRUS': '🇨🇾',
+				// Middle East
+				'SAUDI ARABIA': '🇸🇦', 'UNITED ARAB EMIRATES': '🇦🇪', 'UAE': '🇦🇪',
+				'QATAR': '🇶🇦', 'KUWAIT': '🇰🇼', 'BAHRAIN': '🇧🇭', 'OMAN': '🇴🇲',
+				'YEMEN': '🇾🇪', 'IRAQ': '🇮🇶', 'IRAN': '🇮🇷', 'ISRAEL': '🇮🇱',
+				'PALESTINE': '🇵🇸', 'JORDAN': '🇯🇴', 'LEBANON': '🇱🇧', 'SYRIA': '🇸🇾',
+				// Africa - North
+				'EGYPT': '🇪🇬', 'LIBYA': '🇱🇾', 'TUNISIA': '🇹🇳', 'ALGERIA': '🇩🇿',
+				'MOROCCO': '🇲🇦', 'SUDAN': '🇸🇩', 'SOUTH SUDAN': '🇸🇸', 'ETHIOPIA': '🇪🇹',
+				// Africa - South & East
+				'SOUTH AFRICA': '🇿🇦', 'KENYA': '🇰🇪', 'TANZANIA': '🇹🇿', 'UGANDA': '🇺🇬',
+				'RWANDA': '🇷🇼', 'GHANA': '🇬🇭', 'NIGERIA': '🇳🇬', 'SENEGAL': '🇸🇳',
+				'IVORY COAST': '🇨🇮', 'CAMEROON': '🇨🇲', 'GABON': '🇬🇦', 'CONGO': '🇨🇬',
+				'ANGOLA': '🇦🇴', 'MOZAMBIQUE': '🇲🇿', 'MADAGASCAR': '🇲🇬', 'MAURITIUS': '🇲🇺',
+				'SEYCHELLES': '🇸🇨', 'ZIMBABWE': '🇿🇼', 'BOTSWANA': '🇧🇼', 'NAMIBIA': '🇳🇦',
+				// Other
+				'KAZAKHSTAN': '🇰🇿', 'UZBEKISTAN': '🇺🇿', 'TURKMENISTAN': '🇹🇲', 'KYRGYZSTAN': '🇰🇬',
+				'TAJIKISTAN': '🇹🇯'
+			};
+			return flags[country] || '🌐';
+		}
+		
+		// Update all flags in dropdown after page load
+		function updateAllFlags() {
+			$('.phone-dropdown-item').each(function() {
+				var countryName = $(this).data('country-name') || $(this).find('.phone-dropdown-item-name').text();
+				var flag = getCountryFlag(countryName);
+				$(this).find('.phone-dropdown-item-flag').text(flag);
+			});
+		}
+		
+		// Generate phone dropdown items for new guests
+		function generatePhoneDropdownItems(guestId) {
+			var html = '';
+			for(var i = 0; i < country_codes.length; i++) {
+				var country = country_codes[i].Country;
+				var code = country_codes[i].CountryCode;
+				var id = country_codes[i].CountryCodeID;
+				html += '<div class="phone-dropdown-item" data-country-id="'+ id +'" data-country="'+ country.toLowerCase() +'" data-code="'+ code +'" data-country-name="'+ country +'">' +
+					'<span class="phone-dropdown-item-flag">'+ getCountryFlag(country) +'</span>' +
+					'<span class="phone-dropdown-item-name">'+ country +'</span>' +
+					'<span class="phone-dropdown-item-code">'+ code +'</span>' +
+					'</div>';
+			}
+			return html;
+		}
+		
+		// Initialize phone input
+		function initPhoneInput(guestId, selectedCountry) {
+			var selector = $('#phone-selector-' + guestId);
+			var dropdown = $('#phone-dropdown-' + guestId);
+			var searchInput = $('#phone-search-' + guestId);
+			var countrySelect = $('#country_code-' + guestId);
+			var phoneInput = $('#mobile-' + guestId);
+			var flagSpan = $('#phone-flag-' + guestId);
+			var codeSpan = $('#phone-code-' + guestId);
+			
+			// Update flags in dropdown for this guest
+			$('#phone-list-' + guestId + ' .phone-dropdown-item').each(function() {
+				var countryName = $(this).data('country-name') || $(this).find('.phone-dropdown-item-name').text();
+				var flag = getCountryFlag(countryName);
+				$(this).find('.phone-dropdown-item-flag').text(flag);
+			});
+			
+			// Set initial value if selectedCountry is provided
+			if(selectedCountry) {
+				updatePhoneDisplay(guestId, selectedCountry.Country, selectedCountry.CountryCode, selectedCountry.CountryCodeID);
+			}
+			
+			// Toggle dropdown
+			selector.on('click', function(e) {
+				if(selector.hasClass('disabled')) return;
+				e.stopPropagation();
+				dropdown.toggleClass('show');
+				if(dropdown.hasClass('show')) {
+					searchInput.focus();
+				}
+			});
+			
+			// Search functionality
+			searchInput.on('input', function() {
+				var searchTerm = $(this).val().toLowerCase();
+				$('#phone-list-' + guestId + ' .phone-dropdown-item').each(function() {
+					var country = $(this).data('country') || '';
+					var code = $(this).data('code') || '';
+					var name = $(this).find('.phone-dropdown-item-name').text().toLowerCase();
+					if(name.indexOf(searchTerm) !== -1 || code.indexOf(searchTerm) !== -1 || country.indexOf(searchTerm) !== -1) {
+						$(this).show();
+					} else {
+						$(this).hide();
+					}
+				});
+			});
+			
+			// Select country
+			$(document).on('click', '#phone-list-' + guestId + ' .phone-dropdown-item', function() {
+				var countryId = $(this).data('country-id');
+				var country = $(this).find('.phone-dropdown-item-name').text();
+				var code = $(this).data('code');
+				
+				updatePhoneDisplay(guestId, country, code, countryId);
+				countrySelect.val(countryId).trigger('change');
+				dropdown.removeClass('show');
+				searchInput.val('');
+				$('#phone-list-' + guestId + ' .phone-dropdown-item').show();
+			});
+			
+			// Close dropdown when clicking outside
+			$(document).on('click', function(e) {
+				if(!$(e.target).closest('#phone-wrapper-' + guestId).length) {
+					dropdown.removeClass('show');
+				}
+			});
+		}
+		
+		// Update phone display
+		function updatePhoneDisplay(guestId, country, code, countryId) {
+			$('#phone-flag-' + guestId).text(getCountryFlag(country));
+			$('#phone-code-' + guestId).text(code || '--');
+			$('#phone-selector-' + guestId).removeClass('open');
+			
+			// Update selected state in dropdown
+			$('#phone-list-' + guestId + ' .phone-dropdown-item').removeClass('selected');
+			$('#phone-list-' + guestId + ' .phone-dropdown-item[data-country-id="' + countryId + '"]').addClass('selected');
+		}
+		
+		// Update phone display from hidden select field
+		function updatePhoneFromSelect(guestId) {
+			var select = $('#country_code-' + guestId);
+			var selectedOption = select.find('option:selected');
+			if(selectedOption.length && selectedOption.val()) {
+				var country = selectedOption.data('country') || selectedOption.text().split(' ')[0];
+				var code = selectedOption.data('code') || selectedOption.text().split(' ').pop();
+				var countryId = selectedOption.val();
+				updatePhoneDisplay(guestId, country, code, countryId);
+			} else {
+				$('#phone-flag-' + guestId).text('🌐');
+				$('#phone-code-' + guestId).text('--');
+			}
 		}
 		var counter = <?php echo $counter ?>;
 		var adult = <?php echo $adult ?>;
@@ -802,15 +1209,27 @@
 							'</div>' +
 							'<br>' +
 							'<div class="row">' +
-								'<div class="col-md-6 mb-7 mb-md-0">' +
-									'<label id="country_code_label-'+ guest_list_id +'">Country Code</label>' +
-									'<select name="new_country_codes[]" id="country_code-'+ guest_list_id +'" onchange="Set_Required_Field('+ guest_list_id +')" class="form-control">' +
-										'<option selected disabled value="">--SELECT COUNTRY CODE--</option>' + array2 +
-									'</select>' +
-								'</div>' +
-								'<div class="col-md-6">' +
+								'<div class="col-md-12">' +
 									'<label id="mobile_label-'+ guest_list_id +'">Mobile</label>' +
-									'<input type="text" name="new_mobiles[]" id="mobile-'+ guest_list_id +'" onchange="Set_Required_Field('+ guest_list_id +')" autocomplete="off" class="form-control">' +
+									'<div class="phone-input-wrapper" id="phone-wrapper-'+ guest_list_id +'">' +
+										'<div class="phone-country-selector" id="phone-selector-'+ guest_list_id +'">' +
+											'<span class="phone-country-flag" id="phone-flag-'+ guest_list_id +'">🌐</span>' +
+											'<span class="phone-country-code" id="phone-code-'+ guest_list_id +'">--</span>' +
+											'<span class="phone-country-arrow">▼</span>' +
+										'</div>' +
+										'<input type="text" name="new_mobiles[]" id="mobile-'+ guest_list_id +'" onchange="Set_Required_Field('+ guest_list_id +')" autocomplete="off" class="phone-input-field" placeholder="Enter phone number">' +
+										'<select name="new_country_codes[]" id="country_code-'+ guest_list_id +'" class="phone-hidden-field" onchange="Set_Required_Field('+ guest_list_id +'); updatePhoneFromSelect('+ guest_list_id +');">' +
+											'<option value="">--SELECT COUNTRY CODE--</option>' + array2 +
+										'</select>' +
+										'<div class="phone-dropdown" id="phone-dropdown-'+ guest_list_id +'">' +
+											'<div class="phone-dropdown-search">' +
+												'<input type="text" placeholder="Search country..." id="phone-search-'+ guest_list_id +'">' +
+											'</div>' +
+											'<div class="phone-dropdown-list" id="phone-list-'+ guest_list_id +'">' +
+												generatePhoneDropdownItems(guest_list_id) +
+											'</div>' +
+										'</div>' +
+									'</div>' +
 								'</div>' +
 							'</div>' +
 							'<br>' +
@@ -928,6 +1347,21 @@
 				// Keep label as "Choose file" - don't show filename
 				$(this).next('.custom-file-label').html('Choose file');
 			});
+			// Initialize phone input for new guest with Malaysia as default
+			var malaysiaCountry = null;
+			for(var i = 0; i < country_codes.length; i++) {
+				if(country_codes[i].Country.toUpperCase() === 'MALAYSIA') {
+					malaysiaCountry = {
+						CountryCodeID: country_codes[i].CountryCodeID,
+						Country: country_codes[i].Country,
+						CountryCode: country_codes[i].CountryCode
+					};
+					// Set Malaysia as selected in hidden select
+					$('#country_code-' + guest_list_id).val(country_codes[i].CountryCodeID);
+					break;
+				}
+			}
+			initPhoneInput(guest_list_id, malaysiaCountry);
 			// Set default nationality to Malaysia for new guests
 			var malaysiaOption = $(`#nationality-${guest_list_id} option`).filter(function() { 
 				return $(this).text().toUpperCase() === 'MALAYSIA'; 
@@ -1088,6 +1522,13 @@
 							}
 							if(value.GuestCountryCode != null && $(`#country_code-${value.GuestListID}`).val() == null) {
 								$(`#country_code-${value.GuestListID}`).val(value.GuestCountryCode).change();
+								// Update phone input display
+								var selectedOption = $(`#country_code-${value.GuestListID} option:selected`);
+								if(selectedOption.length && selectedOption.val()) {
+									var country = selectedOption.data('country') || selectedOption.text().split(' ')[0];
+									var code = selectedOption.data('code') || selectedOption.text().split(' ').pop();
+									updatePhoneDisplay(value.GuestListID, country, code, value.GuestCountryCode);
+								}
 							}
 							if(value.GuestMobile != null && $(`#mobile-${value.GuestListID}`).val() == '') {
 								$(`#mobile-${value.GuestListID}`).val(value.GuestMobile);
@@ -1899,6 +2340,9 @@
 					Set_Required_Field(guestId);
 				}
 			});
+			
+			// Update all flags in dropdowns
+			updateAllFlags();
 		});
 
 		// Function to view passport copy in modal
