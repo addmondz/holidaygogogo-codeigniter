@@ -272,6 +272,7 @@ class Customer_Portal extends CI_Controller
                           booking.ChatLanguage, Token, booking.BookingConfirmationTitle, CancelStatus, LockStatus, 
                           AfterSalesService, booking.Status, booking.InsertDate, booking.UpdateDate, booking.CustomerID,
                           booking.AllowReview, booking.CustomerReview, booking.CustomerReviewTimestamp,
+                          booking.bc_approved, booking.bc_approval_admin_id, booking.bc_approval_date,
                           category.Name As DestinationName, CountryCode, admin.Name As SalesAgentName, admin.Mobile As SalesAgentMobile');
         $this->db->from('booking');
         $this->db->join('category', 'category.CategoryID = booking.Destination', 'left');
@@ -418,27 +419,26 @@ class Customer_Portal extends CI_Controller
         $this->load->model('Booking_Status_Log_Model');
         $status_logs = $this->Booking_Status_Log_Model->get_by_booking_id($booking['BookingID'], true);
         
-        // Find BC approval date (when status changed from PBC to P or when BC was approved)
-        $bc_approval_date = null;
-        foreach ($status_logs as $log) {
-            if ($log->from_status == 'PBC' && ($log->to_status == 'P' || $log->to_status == 'PBO')) {
-                $bc_approval_date = $log->created_at;
-                break;
+        // Use bc_approval_date from database if available
+        // Otherwise, find BC approval date from status logs (when status changed from PBC to P or when BC was approved)
+        if (empty($booking['bc_approval_date'])) {
+            $bc_approval_date = null;
+            foreach ($status_logs as $log) {
+                if ($log->from_status == 'PBC' && ($log->to_status == 'P' || $log->to_status == 'PBO')) {
+                    $bc_approval_date = $log->created_at;
+                    break;
+                }
+                if (stripos($log->description, 'BC Approved') !== false) {
+                    $bc_approval_date = $log->created_at;
+                    break;
+                }
             }
-            if (stripos($log->description, 'BC Approved') !== false) {
-                $bc_approval_date = $log->created_at;
-                break;
+            // Final fallback to InsertDate
+            if (empty($bc_approval_date)) {
+                $bc_approval_date = $booking['InsertDateRaw'];
             }
+            $booking['bc_approval_date'] = $bc_approval_date;
         }
-        // Fallback to UpdateDate if BC was just approved
-        if (empty($bc_approval_date) && !empty($booking['UpdateDate'])) {
-            $bc_approval_date = $booking['UpdateDate'];
-        }
-        // Final fallback to InsertDate
-        if (empty($bc_approval_date)) {
-            $bc_approval_date = $booking['InsertDateRaw'];
-        }
-        $booking['bc_approval_date'] = $bc_approval_date;
         
         // Find status change dates for timeline
         $status_change_dates = [];

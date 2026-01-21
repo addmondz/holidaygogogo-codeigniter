@@ -330,9 +330,10 @@ function get_offical_whatsapp_link($text = null){
     return 'https://api.whatsapp.com/send?phone=60102956786&text=' . urlencode($text);
 }
 
-function return_timestamp_output($timestamp, $show_time_ago = true)
+function return_timestamp_output($timestamp, $show_time_ago = true, $show_time = true)
 {
-    $formatted = date('d M Y, H:i', strtotime($timestamp));
+    $format = 'd M Y' . ($show_time ? ', H:i' : '');
+    $formatted = date($format, strtotime($timestamp));
 
     return $formatted . ($show_time_ago ? '<span style="margin: 0 4px;">•</span> ' . time_ago($timestamp) : '');
 }
