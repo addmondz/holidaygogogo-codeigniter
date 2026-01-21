@@ -368,18 +368,6 @@ class Customer_Portal extends CI_Controller
                 'icon' => 'file-text',
                 'available' => true
             ],
-            'tv' => [
-                'name' => 'Travel Voucher',
-                'url' => $base_url . 'Travel_Voucher?token=' . $hashed_bc,
-                'icon' => 'plane',
-                'available' => true
-            ],
-            'or' => [
-                'name' => 'Official Receipt',
-                'url' => $base_url . 'Receipt?token=' . $hashed_bc,
-                'icon' => 'receipt',
-                'available' => true
-            ],
             'gl' => [
                 'name' => 'Guest List',
                 'url' => $base_url . 'Guest_List?gl=' . $hashed_bc,
@@ -387,6 +375,29 @@ class Customer_Portal extends CI_Controller
                 'available' => true
             ]
         ];
+        
+        // Only show Travel Voucher if guest list is submitted (LockStatus = 'Y') AND travel voucher has been sent (Status = 'PT' or later)
+        $guest_list_submitted = !empty($booking['LockStatus']) && $booking['LockStatus'] == 'Y';
+        $travel_voucher_sent = in_array($booking['Status'], array('PT', 'OG', 'Y', 'PR'));
+        
+        if ($guest_list_submitted && $travel_voucher_sent) {
+            $booking['documents']['tv'] = [
+                'name' => 'Travel Voucher',
+                'url' => $base_url . 'Travel_Voucher?token=' . $hashed_bc,
+                'icon' => 'plane',
+                'available' => true
+            ];
+        }
+
+        // Only show Official Receipt if booking is completed (Status = 'Y') AND guest list is submitted (LockStatus = 'Y')
+        if($booking['Status'] == 'Y' && !empty($booking['LockStatus']) && $booking['LockStatus'] == 'Y') {
+            $booking['documents']['or'] = [
+                'name' => 'Official Receipt',
+                'url' => $base_url . 'Receipt?token=' . $hashed_bc,
+                'icon' => 'receipt',
+                'available' => true
+            ];
+        }
 
         // Get custom uploads
         $this->db->select('custom_upload.*');
