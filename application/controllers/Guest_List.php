@@ -418,6 +418,283 @@ class Guest_List extends CI_Controller
 		$writer->save('php://output');
 	}
 	
+	function Download_ZIP() {
+		// Get booking_id from GET parameter
+		$booking_id = $this->input->get('booking_id');
+		if(empty($booking_id)) {
+			show_error('Booking ID is required');
+		}
+		
+		// Get guest lists data
+		$guest_lists = $this->Guest_List_Model->Read_Guest_Lists1();
+		if(empty($guest_lists)) {
+			show_error('No guest list found for this booking');
+		}
+		
+		// Create temporary directory
+		$temp_dir = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'guestlist_' . $booking_id . '_' . time();
+		if(!mkdir($temp_dir, 0755, true)) {
+			show_error('Failed to create temporary directory');
+		}
+		
+		// Generate Excel file (similar to Download function)
+		$spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+		$spreadsheet->getActiveSheet()->setTitle('Guest Lists');
+		$spreadsheet->getProperties()->setCreator('HolidayGoGoGo');
+		$spreadsheet->getActiveSheet()->setCellValue('A1', 'BOOKING NUMBER');
+		$spreadsheet->getActiveSheet()->setCellValue('B1', 'RESERVATION NUMBER');
+		$spreadsheet->getActiveSheet()->setCellValue('C1', 'CUSTOMER FIRST NAME');
+		$spreadsheet->getActiveSheet()->setCellValue('D1', 'CUSTOMER LAST NAME');
+		$spreadsheet->getActiveSheet()->setCellValue('E1', 'CUSTOMER MOBILE');
+		$spreadsheet->getActiveSheet()->setCellValue('F1', 'CHAT LANGUAGE');
+		$spreadsheet->getActiveSheet()->setCellValue('G1', 'TRAVEL DATE');
+		$spreadsheet->getActiveSheet()->setCellValue('H1', 'DESTINATION');
+		$spreadsheet->getActiveSheet()->setCellValue('I1', 'SALES AGENT');
+		$spreadsheet->getActiveSheet()->setCellValue('J1', 'GUEST TYPE');
+		$spreadsheet->getActiveSheet()->setCellValue('K1', 'GUEST');
+		$spreadsheet->getActiveSheet()->setCellValue('L1', 'GENDER');
+		$spreadsheet->getActiveSheet()->setCellValue('M1', 'DATE OF BIRTH');
+		$spreadsheet->getActiveSheet()->setCellValue('N1', 'NATIONALITY');
+		$spreadsheet->getActiveSheet()->setCellValue('O1', 'GUEST IDENTIFICATION NUMBER');
+		$spreadsheet->getActiveSheet()->setCellValue('P1', 'PASSPORT NUMBER');
+		$spreadsheet->getActiveSheet()->setCellValue('Q1', 'PASSPORT ISSUE DATE');
+		$spreadsheet->getActiveSheet()->setCellValue('R1', 'PASSPORT EXPIRY DATE');
+		$spreadsheet->getActiveSheet()->setCellValue('S1', 'PASSPORT COPY');
+		$spreadsheet->getActiveSheet()->setCellValue('T1', 'DIETARY REQUIREMENT');
+		$spreadsheet->getActiveSheet()->setCellValue('U1', 'GUEST MOBILE');
+		$spreadsheet->getActiveSheet()->setCellValue('V1', 'EMAIL');
+		$spreadsheet->getActiveSheet()->setCellValue('W1', 'MARITAL STATUS');
+		$spreadsheet->getActiveSheet()->setCellValue('X1', 'EMPLOYMENT');
+		$spreadsheet->getActiveSheet()->setCellValue('Y1', 'ADDRESS');
+		$spreadsheet->getActiveSheet()->setCellValue('Z1', 'POSTCODE');
+		$spreadsheet->getActiveSheet()->setCellValue('AA1', 'CITY');
+		$spreadsheet->getActiveSheet()->setCellValue('AB1', 'STATE');
+		$spreadsheet->getActiveSheet()->setCellValue('AC1', 'COUNTRY');
+		$spreadsheet->getActiveSheet()->setCellValue('AD1', 'NOMINEE');
+		$spreadsheet->getActiveSheet()->setCellValue('AE1', 'NOMINEE IDENTIFICATION NUMBER');
+		$spreadsheet->getActiveSheet()->setCellValue('AF1', 'RELATIONSHIP');
+		$spreadsheet->getActiveSheet()->setCellValue('AG1', 'ROOM');
+		$row = 2;
+		$spreadsheet->getActiveSheet()->getStyle('A1:AG1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_BLACK);
+		$spreadsheet->getActiveSheet()->getStyle('A1:AG1')->getFont()->getColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_WHITE);
+		$spreadsheet->getActiveSheet()->getStyle('A1:AG1')->getFont()->setBold(true);
+		
+		// Create passport images directory inside temp folder
+		$passport_dir = $temp_dir . DIRECTORY_SEPARATOR . 'passport_images';
+		if(!mkdir($passport_dir, 0755, true)) {
+			$this->cleanup_temp_dir($temp_dir);
+			show_error('Failed to create passport images directory');
+		}
+		
+		foreach($guest_lists as $guest) {
+			$guest->CustomerMobile = $guest->CountryCode . $guest->CustomerMobile;
+			if(!empty($guest->StartDate) && !empty($guest->EndDate)) {
+				$guest->TravelDate = strtoupper(date('j M', strtotime($guest->StartDate)) . ' - ' . date('j M Y', strtotime($guest->EndDate)));
+			} else {
+				$guest->TravelDate = null;
+			}
+			if(!empty($guest->DateOfBirth)) {
+				$guest->DateOfBirth = strtoupper(date('j M Y', strtotime($guest->DateOfBirth)));
+			}
+			if(!empty($guest->PassportIssueDate)) {
+				$guest->PassportIssueDate = strtoupper(date('j M Y', strtotime($guest->PassportIssueDate)));
+			} else {
+				$guest->PassportIssueDate = null;
+			}
+			if(!empty($guest->PassportExpiryDate)) {
+				$guest->PassportExpiryDate = strtoupper(date('j M Y', strtotime($guest->PassportExpiryDate)));
+			} else {
+				$guest->PassportExpiryDate = null;
+			}
+			if(!empty($guest->Nationality)) {
+				$guest->Nationality = $this->Universal_Model->Read_Country($guest->Nationality);
+			}
+			if(!empty($guest->GuestCountryCode) && !empty($guest->GuestMobile)) {
+				$country_code = $this->Universal_Model->Read_Country_Code($guest->GuestCountryCode);
+				$guest->GuestMobile = $country_code . $guest->GuestMobile;
+			} else {
+				$guest->GuestMobile = null;
+			}
+			if(!empty($guest->Country)) {
+				$guest->Country = $this->Universal_Model->Read_Country($guest->Country);
+			}
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('A' . $row, $guest->BookingNumber, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('B' . $row, $guest->ReservationNumber, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('C' . $row, $guest->Guest, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('D' . $row, $guest->GuestLastName, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('E' . $row, $guest->CustomerMobile, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('F' . $row, $guest->ChatLanguage, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('G' . $row, $guest->TravelDate, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('H' . $row, $guest->Destination, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('I' . $row, $guest->SalesAgent, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('J' . $row, $guest->Type, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('K' . $row, $guest->Guest, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('L' . $row, $guest->Gender, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('M' . $row, $guest->DateOfBirth, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('N' . $row, $guest->Nationality, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('O' . $row, $guest->IdentificationNumber, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('P' . $row, $guest->PassportNumber, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('Q' . $row, $guest->PassportIssueDate, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('R' . $row, $guest->PassportExpiryDate, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			
+			// Handle passport copy - copy file to temp directory
+			if(!empty($guest->PassportCopy)) {
+				$passport_copy_path = FCPATH . $guest->PassportCopy;
+				$passport_copy_filename = basename($guest->PassportCopy);
+				
+				// Generate filename: use guest name + last name, fallback to original filename
+				$file_extension = pathinfo($passport_copy_filename, PATHINFO_EXTENSION);
+				
+				// Try to use guest name + last name
+				if(!empty($guest->Guest) && !empty($guest->GuestLastName)) {
+					$guest_name_safe = preg_replace('/[^a-zA-Z0-9_-]/', '_', trim($guest->Guest . '_' . $guest->GuestLastName));
+					$unique_filename = $guest_name_safe . '.' . $file_extension;
+				} elseif(!empty($guest->Guest)) {
+					// Only first name available
+					$guest_name_safe = preg_replace('/[^a-zA-Z0-9_-]/', '_', trim($guest->Guest));
+					$unique_filename = $guest_name_safe . '.' . $file_extension;
+				} else {
+					// Fallback to original passport copy filename
+					$unique_filename = $passport_copy_filename;
+				}
+				
+				// Handle filename conflicts by adding a counter
+				$base_filename = pathinfo($unique_filename, PATHINFO_FILENAME);
+				$final_filename = $unique_filename;
+				$counter = 1;
+				while(file_exists($passport_dir . DIRECTORY_SEPARATOR . $final_filename)) {
+					$final_filename = $base_filename . '_' . $counter . '.' . $file_extension;
+					$counter++;
+				}
+				
+				$destination_path = $passport_dir . DIRECTORY_SEPARATOR . $final_filename;
+				
+				// Copy passport image if it exists
+				if(file_exists($passport_copy_path)) {
+					if(copy($passport_copy_path, $destination_path)) {
+						$spreadsheet->getActiveSheet()->setCellValue('S' . $row, 'passport_images/' . $final_filename);
+					} else {
+						$spreadsheet->getActiveSheet()->setCellValueExplicit('S' . $row, $passport_copy_filename . ' (copy failed)', \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+					}
+				} else {
+					$spreadsheet->getActiveSheet()->setCellValueExplicit('S' . $row, $passport_copy_filename . ' (file not found)', \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+				}
+			} else {
+				$spreadsheet->getActiveSheet()->setCellValueExplicit('S' . $row, '', \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			}
+			
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('T' . $row, $guest->DietaryRequirement, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('U' . $row, $guest->GuestMobile, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('V' . $row, $guest->Email, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('W' . $row, $guest->MaritalStatus, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('X' . $row, $guest->Employment, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('Y' . $row, $guest->Address, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('Z' . $row, $guest->Postcode, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('AA' . $row, $guest->City, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('AB' . $row, $guest->State, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('AC' . $row, $guest->Country, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('AD' . $row, $guest->Nominee, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('AE' . $row, $guest->NomineeIdentificationNumber, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('AF' . $row, $guest->Relationship, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('AG' . $row, isset($guest->RoomName) ? $guest->RoomName : '', \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$row++;
+		}
+		$spreadsheet->getActiveSheet()->getStyle('A:AG')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_RIGHT);
+		$spreadsheet->getActiveSheet()->getColumnDimension('A')->setWidth(35);
+		$spreadsheet->getActiveSheet()->getColumnDimension('B')->setWidth(35);
+		$spreadsheet->getActiveSheet()->getColumnDimension('C')->setWidth(35);
+		$spreadsheet->getActiveSheet()->getColumnDimension('D')->setWidth(35);
+		$spreadsheet->getActiveSheet()->getColumnDimension('E')->setWidth(35);
+		$spreadsheet->getActiveSheet()->getColumnDimension('F')->setWidth(35);
+		$spreadsheet->getActiveSheet()->getColumnDimension('G')->setWidth(35);
+		$spreadsheet->getActiveSheet()->getColumnDimension('H')->setWidth(35);
+		$spreadsheet->getActiveSheet()->getColumnDimension('I')->setWidth(35);
+		$spreadsheet->getActiveSheet()->getColumnDimension('J')->setWidth(35);
+		$spreadsheet->getActiveSheet()->getColumnDimension('K')->setWidth(35);
+		$spreadsheet->getActiveSheet()->getColumnDimension('L')->setWidth(35);
+		$spreadsheet->getActiveSheet()->getColumnDimension('M')->setWidth(35);
+		$spreadsheet->getActiveSheet()->getColumnDimension('N')->setWidth(35);
+		$spreadsheet->getActiveSheet()->getColumnDimension('O')->setWidth(35);
+		$spreadsheet->getActiveSheet()->getColumnDimension('P')->setWidth(35);
+		$spreadsheet->getActiveSheet()->getColumnDimension('Q')->setWidth(35);
+		$spreadsheet->getActiveSheet()->getColumnDimension('R')->setWidth(35);
+		$spreadsheet->getActiveSheet()->getColumnDimension('S')->setWidth(35);
+		$spreadsheet->getActiveSheet()->getColumnDimension('T')->setWidth(35);
+		$spreadsheet->getActiveSheet()->getColumnDimension('U')->setWidth(35);
+		$spreadsheet->getActiveSheet()->getColumnDimension('V')->setWidth(35);
+		$spreadsheet->getActiveSheet()->getColumnDimension('W')->setWidth(35);
+		$spreadsheet->getActiveSheet()->getColumnDimension('X')->setWidth(35);
+		$spreadsheet->getActiveSheet()->getColumnDimension('Y')->setWidth(35);
+		$spreadsheet->getActiveSheet()->getColumnDimension('Z')->setWidth(35);
+		$spreadsheet->getActiveSheet()->getColumnDimension('AA')->setWidth(35);
+		$spreadsheet->getActiveSheet()->getColumnDimension('AB')->setWidth(35);
+		$spreadsheet->getActiveSheet()->getColumnDimension('AC')->setWidth(35);
+		$spreadsheet->getActiveSheet()->getColumnDimension('AD')->setWidth(35);
+		$spreadsheet->getActiveSheet()->getColumnDimension('AE')->setWidth(35);
+		$spreadsheet->getActiveSheet()->getColumnDimension('AF')->setWidth(35);
+		$spreadsheet->getActiveSheet()->getColumnDimension('AG')->setWidth(35);
+		
+		// Save Excel file to temp directory
+		$excel_filename = 'GUEST_LISTS_' . $guest_lists[0]->BookingNumber . '.xlsx';
+		$excel_path = $temp_dir . DIRECTORY_SEPARATOR . $excel_filename;
+		$writer = \PhpOffice\PhpSpreadsheet\IOFactory::createWriter($spreadsheet, 'Xlsx');
+		$writer->save($excel_path);
+		
+		// Create ZIP file
+		$zip_filename = 'GUEST_LISTS_' . $guest_lists[0]->BookingNumber . '.zip';
+		$zip_path = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $zip_filename;
+		
+		$zip = new \ZipArchive();
+		if($zip->open($zip_path, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) !== TRUE) {
+			$this->cleanup_temp_dir($temp_dir);
+			show_error('Failed to create ZIP file');
+		}
+		
+		// Add Excel file to ZIP
+		$zip->addFile($excel_path, $excel_filename);
+		
+		// Add all passport images to ZIP
+		$passport_files = glob($passport_dir . DIRECTORY_SEPARATOR . '*');
+		foreach($passport_files as $file) {
+			if(is_file($file)) {
+				$zip->addFile($file, 'passport_images/' . basename($file));
+			}
+		}
+		
+		$zip->close();
+		
+		// Download ZIP file
+		header('Content-Type: application/zip');
+		header('Content-Disposition: attachment;filename="' . $zip_filename . '"');
+		header('Content-Length: ' . filesize($zip_path));
+		header('Cache-Control: max-age=0');
+		readfile($zip_path);
+		
+		// Clean up temporary files
+		unlink($zip_path);
+		$this->cleanup_temp_dir($temp_dir);
+		exit;
+	}
+	
+	/**
+	 * Clean up temporary directory and its contents
+	 * @param string $dir Directory path to clean up
+	 */
+	private function cleanup_temp_dir($dir) {
+		if(is_dir($dir)) {
+			$files = array_diff(scandir($dir), array('.', '..'));
+			foreach($files as $file) {
+				$file_path = $dir . DIRECTORY_SEPARATOR . $file;
+				if(is_dir($file_path)) {
+					$this->cleanup_temp_dir($file_path);
+				} else {
+					@unlink($file_path);
+				}
+			}
+			@rmdir($dir);
+		}
+	}
+	
 	function Unlock() {
 		$this->Guest_List_Model->Update_GL_Session('BookingID', $this->input->post('booking_id'), 'N', null);
 	}

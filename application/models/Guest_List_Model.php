@@ -9,7 +9,7 @@ class Guest_List_Model extends CI_Model
 		$this->db->join('admin', 'admin.AdminID = booking.SalesAgent', 'left');
 		$this->db->join('category', 'category.CategoryID = booking.Destination', 'left');
 		$this->db->join('country_code', 'country_code.CountryCodeID = booking.CountryCodeID', 'left');
-		if(current_url() == base_url('Guest_List/Download')) {
+		if(current_url() == base_url('Guest_List/Download') || current_url() == base_url('Guest_List/Download_ZIP')) {
 			$this->db->where('booking.BookingID', $this->input->get('booking_id'));
 		} else {
         	$this->db->where('Token', $this->input->get('gl'));

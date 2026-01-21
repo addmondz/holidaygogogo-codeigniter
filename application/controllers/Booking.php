@@ -510,6 +510,7 @@ class Booking extends MY_Controller
 			$html .= '<a href="' . base_url('Guest_List?gl=') . $booking->Token . '" target="_blank" class="dropdown-item" style="font-size:11px;">Guest List</a>';
 		}
 		$html .= '<a href="' . base_url('Guest_List/Download?booking_id=') . $booking->BookingID . '" class="dropdown-item" style="font-size:11px;">Download Guest List</a>';
+		$html .= '<a href="' . base_url('Guest_List/Download_ZIP?booking_id=') . $booking->BookingID . '" class="dropdown-item" style="font-size:11px;">Download Guestlist ZIP</a>';
 		$html .= '<button id="gl_url-' . $booking->BookingID . '" value="' . base_url('Guest_List?gl=') . $booking->Token . '" onclick="Copy_URL(\'GL URL\', ' . $booking->BookingID . ')" class="dropdown-item" style="font-size:11px;">Copy GL Link</button>';
 		$html .= '<div class="dropdown-divider"></div>';
 		$html .= '<a href="' . base_url('Travel_Voucher?token=') . $booking->Token . '" target="_blank" class="dropdown-item" style="font-size:11px;">Travel Voucher</a>';
@@ -1287,11 +1288,6 @@ class Booking extends MY_Controller
 				// Determine the correct status based on current state
 				$status_info = determine_booking_status_from_state($booking_id, $booking, $this);
 
-				$this->load->helper('debug_log_helper');
-				debug_log(array(
-					'status_info' => $status_info
-				), 'Update_Lock_Status - Status Determination');
-				
 				// If determined status is PTV and current status is not PTV, update it
 				if ($status_info['status'] == 'PTV' && $booking->Status != 'PTV') {
 					$this->Booking_Model->Update_Status('PTV', $booking_id);
@@ -1524,21 +1520,6 @@ class Booking extends MY_Controller
 			$status_info = determine_status_after_bc_approval($booking_id, $booking, $this);
 			$target_status = $status_info['status'];
 			$status_description = $status_info['description'];
-			
-			// Debug: Log the determined status
-			$this->load->helper('debug_log_helper');
-			debug_log(array(
-				'from_status' => $booking->Status,
-				'target_status' => $target_status,
-				'description' => $status_description
-			), 'Approve_BC - Status Determination');
-			
-			// Validate status transition
-			$validation = validate_booking_status_flow($booking->Status, $target_status, false);
-			debug_log(array(
-				'validation_valid' => $validation['valid'],
-				'validation_message' => $validation['message']
-			), 'Approve_BC - Validation Result');
 			
 			if (!$validation['valid']) {
 				// If can't progress to determined status, fall back to P

@@ -1494,7 +1494,7 @@
                         }
                             $timeline_events[] = [
                             'date' => !empty($booking['InsertDateRaw']) ? return_timestamp_output($booking['InsertDateRaw'], true, false) : 'N/A',
-                            'title' => 'Submit namelist',
+                            'title' => 'Submit Namelist',
                             'action' => '<a href="' . $booking['documents']['gl']['url'] . '" target="_blank">Click here</a>',
                             'status' => 'pending',
                             'icon' => 'la la-users',
@@ -1525,7 +1525,7 @@
                         }
                         $timeline_events[] = [
                             'date' => !empty($booking['InsertDateRaw']) ? return_timestamp_output($booking['InsertDateRaw'], true, false) : 'N/A',
-                            'title' => 'Submit namelist',
+                            'title' => 'Submit Namelist',
                             'action' => '<a href="' . $booking['documents']['gl']['url'] . '" target="_blank">View here</a>',
                             'status' => 'completed',
                             'icon' => 'la la-check-circle',
@@ -1572,7 +1572,7 @@
                         }
                         $timeline_events[] = [
                             'date' => !empty($booking['InsertDateRaw']) ? return_timestamp_output($booking['InsertDateRaw'], true, false) : 'N/A',
-                            'title' => 'Submit namelist',
+                            'title' => 'Submit Namelist',
                             'action' => '<a href="' . $booking['documents']['gl']['url'] . '" target="_blank">View here</a>',
                             'status' => 'completed',
                             'icon' => 'la la-check-circle',
@@ -1633,7 +1633,7 @@
                         }
                         $timeline_events[] = [
                             'date' => !empty($booking['InsertDateRaw']) ? return_timestamp_output($booking['InsertDateRaw'], true, false) : 'N/A',
-                            'title' => 'Submit namelist',
+                            'title' => 'Submit Namelist',
                             'action' => '<a href="' . $booking['documents']['gl']['url'] . '" target="_blank">View here</a>',
                             'status' => 'completed',
                             'icon' => 'la la-check-circle',
