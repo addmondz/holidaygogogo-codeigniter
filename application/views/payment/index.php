@@ -830,33 +830,36 @@
     });
 </script>
 <script>
-document.getElementById('sync-autocount-payment').addEventListener('click', function() {
-    let selected = Array.from(document.querySelectorAll('.check_item:checked'))
-                        .map(cb => cb.value);
+var syncAutocountBtn = document.getElementById('sync-autocount-payment');
+if (syncAutocountBtn) {
+    syncAutocountBtn.addEventListener('click', function() {
+        let selected = Array.from(document.querySelectorAll('.check_item:checked'))
+                            .map(cb => cb.value);
 
-    if (selected.length === 0) {
-        alert("Please select at least one payment.");
-        return;
-    }
-
-   fetch("<?php echo base_url('Payment/bulkSyncToAutocount'); ?>", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ payment_ids: selected })
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (data.success) {
-            alert(data.message);
-        } else {
-            alert("❌ " + data.message);
+        if (selected.length === 0) {
+            alert("Please select at least one payment.");
+            return;
         }
-    })
-    .catch(err => {
-        console.error(err);
-        alert("Error occurred during sync.");
+
+       fetch("<?php echo base_url('Payment/bulkSyncToAutocount'); ?>", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ payment_ids: selected })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                alert(data.message);
+            } else {
+                alert("❌ " + data.message);
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            alert("Error occurred during sync.");
+        });
     });
-});
+}
 
 document.getElementById('change-payment-autocount-to-pending').addEventListener('click', function() {
     let selected = Array.from(document.querySelectorAll('.check_item:checked'))
