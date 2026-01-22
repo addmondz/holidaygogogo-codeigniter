@@ -355,7 +355,7 @@ class Payment extends MY_Controller
 
 		// Generate Receipt option
 		if($payment->Status == 'Y' && substr($payment->AutocountReferenceNumber, 0, 2) !== 'PV') {
-			$html .= '<a href="' . base_url('Receipt?token=' . $payment->Token . '&type=' . urlencode($payment->Type)) . '" target="_blank" class="dropdown-item" style="font-size:11px; color:#28a745;">Generate Receipt</a>';
+			$html .= '<a href="' . base_url('Receipt?token=' . $payment->Token . '&payment_id=' . $payment->PaymentID) . '" target="_blank" class="dropdown-item" style="font-size:11px; color:#28a745;">Generate Receipt</a>';
 		}
 
 		// Update option

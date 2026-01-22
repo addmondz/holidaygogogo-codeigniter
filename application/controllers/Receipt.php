@@ -62,16 +62,17 @@ class Receipt extends CI_Controller
         $array['Title'] = 'Receipt_' . $array['BookingNumber'];
         $array['InsertDate'] = strtoupper(date('j M Y'));
         
-        // Get type filter from URL
-        $payment_type = $this->input->get('type');
+        // Get payment_id filter from URL (for single payment receipt)
+        $payment_id = $this->input->get('payment_id');
 
         // Get approved payments for this booking
         $this->db->select('Date, Type, Credit, ReferenceNumber, AutocountReferenceNumber, Status');
         $this->db->where('BookingID', $array['BookingID']);
         $this->db->where('Status', 'Y');
         $this->db->where('Credit >', 0);
-        if(!empty($payment_type)) {
-            $this->db->where('Type', $payment_type);
+        // Filter to specific payment if payment_id provided
+        if(!empty($payment_id)) {
+            $this->db->where('PaymentID', $payment_id);
         }
         $this->db->order_by('Date', 'ASC');
         $approved_payments = $this->db->get('payment')->result();
