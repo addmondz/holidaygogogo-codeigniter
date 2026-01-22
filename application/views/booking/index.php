@@ -253,24 +253,28 @@
                 </div>
                 <br><br>
                 <?php if ($bulkBookingSyncToAutocount) { ?>
-                    <button type="button" 
-                            class="btn btn-primary font-weight-bold mb-2" 
-                            id="sync-autocount-booking" 
+                    <button type="button"
+                            class="btn btn-primary font-weight-bold mb-2"
+                            id="sync-autocount-booking"
                             style="width:180px; display:none;">
                         Sync Autocount
                     </button>
                 <?php } ?>
+                <button type="button"
+                        class="btn btn-warning font-weight-bold mb-2"
+                        id="change-autocount-to-pending"
+                        style="width:180px; display:none;">
+                    Change to P Status
+                </button>
 
                 <div class="dataTables_wrapper dt-bootstrap4 no-footer" style="overflow-x:auto;">
                     <table id="kt_datatable" class="table table-bordered table-head-custom table-checkable dataTable no-footer dtr-inline" style="width:100%;">
                         <thead>
                             <tr>
                                 <th style="text-align:center;">No.</th>
-                                <?php /* Checkbox column - commented out for now
                                 <th class="booking_checkbox" style="text-align:center;">
                                     <input class="booking_checkbox" type="checkbox" id="check_all">
                                 </th>
-                                */ ?>
                                 <?php if($this->session->userdata('level') != 20) { ?>
                                     <th style="text-align:center;">SA</th>
                                 <?php } ?>
@@ -486,10 +490,11 @@ $(document).ready(function() {
                 createdCell: function(td) {
                     $(td).css('text-align', 'center');
                 }
-            },
-            // Checkbox column - commented out for now
-            // { data: 'checkbox', orderable: false, searchable: false, className: 'text-center', responsivePriority: 2 },
+            }
         ];
+
+        // Checkbox column - always show (only populated for Failed status)
+        columns.push({ data: 'checkbox', orderable: false, searchable: false, className: 'text-center', responsivePriority: 2 });
 
         if (!is_sales_agent) {
             columns.push({ data: 'sales_agent', className: 'text-center', responsivePriority: 10000 });
@@ -604,15 +609,11 @@ function loadSummaryTotals() {
 
 // Function to attach checkbox listeners (called after each DataTable draw)
 function attachCheckboxListeners() {
-    var bulkBookingSyncToAutocount = <?php echo $bulkBookingSyncToAutocount ? 'true' : 'false'; ?>;
-
     // Check All toggle
     $('#check_all').off('change').on('change', function() {
         var checked = this.checked;
         $('.check_item').prop('checked', checked);
-        if (bulkBookingSyncToAutocount) {
-            toggleButton();
-        }
+        toggleButton();
     });
 
     // Individual checkbox toggle
@@ -625,9 +626,7 @@ function attachCheckboxListeners() {
         else if ($('.check_item:checked').length === $('.check_item').length) {
             $('#check_all').prop('checked', true);
         }
-        if (bulkBookingSyncToAutocount) {
-            toggleButton();
-        }
+        toggleButton();
     });
 }
 </script>
@@ -636,8 +635,13 @@ function attachCheckboxListeners() {
 function toggleButton() {
     let anyChecked = document.querySelectorAll('.check_item:checked').length > 0;
     var syncBtn = document.getElementById('sync-autocount-booking');
+    var changeToPendingBtn = document.getElementById('change-autocount-to-pending');
+
     if (syncBtn) {
         syncBtn.style.display = anyChecked ? 'inline-block' : 'none';
+    }
+    if (changeToPendingBtn) {
+        changeToPendingBtn.style.display = anyChecked ? 'inline-block' : 'none';
     }
 }
 </script>
@@ -669,6 +673,42 @@ if (syncAutocountBtn) {
         .catch(err => {
             console.error(err);
             alert("Error occurred during sync.");
+        });
+    });
+}
+
+// Handler for "Chg to P Status" button
+var changeAutocountBtn = document.getElementById('change-autocount-to-pending');
+if (changeAutocountBtn) {
+    changeAutocountBtn.addEventListener('click', function() {
+        let selected = Array.from(document.querySelectorAll('.check_item:checked'))
+                            .map(cb => cb.value);
+
+        if (selected.length === 0) {
+            alert("Please select at least one booking.");
+            return;
+        }
+
+        // Confirmation dialog
+        if (!confirm("Are you sure you want to change " + selected.length + " booking(s) to Pending (P) status?")) {
+            return;
+        }
+
+        fetch("<?php echo base_url('Booking/bulkChangeAutocountStatusToPending'); ?>", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ booking_ids: selected })
+        })
+        .then(res => res.json())
+        .then(data => {
+            alert(data.message);
+            if (data.success) {
+                bookingTable.ajax.reload(); // Refresh table
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            alert("Error occurred during status change.");
         });
     });
 }

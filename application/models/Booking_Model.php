@@ -1426,5 +1426,20 @@ class Booking_Model extends CI_Model
 		);
 	}
 
+	/**
+	 * Bulk update AutocountSyncStatus for multiple bookings
+	 * @param array $booking_ids Array of booking IDs to update
+	 * @param string $status The new status to set (e.g., 'P' for Pending)
+	 * @return bool True if at least one row was affected
+	 */
+	function Update_Autocount_Status_Bulk($booking_ids, $status)
+	{
+		$this->db->where_in('BookingID', $booking_ids);
+		$this->db->update('booking', [
+			'AutocountSyncStatus' => $status,
+			'AutocountSyncMessage' => null
+		]);
+		return $this->db->affected_rows() > 0;
+	}
 
 }

@@ -282,8 +282,12 @@ class Booking extends MY_Controller
 			// Build row data
 			$row = array();
 
-			// Checkbox
-			// $row['checkbox'] = '<input type="checkbox" class="check_item" value="' . $booking->BookingID . '">';
+			// Checkbox - only show for Failed autocount status
+			if ($booking->AutocountSyncStatus == 'F') {
+				$row['checkbox'] = '<input type="checkbox" class="check_item" value="' . $booking->BookingID . '">';
+			} else {
+				$row['checkbox'] = ''; // Empty for non-Failed status
+			}
 
 			// Row number
 			$row['row_number'] = $count;
@@ -1508,6 +1512,29 @@ class Booking extends MY_Controller
             'message' => implode("\n", $results) // return as plain text
         ]));
     }
+
+	/**
+	 * Bulk change autocount status from Failed (F) to Pending (P)
+	 */
+	public function bulkChangeAutocountStatusToPending()
+	{
+		$json = file_get_contents('php://input');
+		$data = json_decode($json, true);
+		$booking_ids = isset($data['booking_ids']) ? $data['booking_ids'] : [];
+
+		if (empty($booking_ids)) {
+			echo json_encode(['success' => false, 'message' => 'No bookings selected']);
+			return;
+		}
+
+		$result = $this->Booking_Model->Update_Autocount_Status_Bulk($booking_ids, 'P');
+
+		if ($result) {
+			echo json_encode(['success' => true, 'message' => count($booking_ids) . ' booking(s) updated to Pending status']);
+		} else {
+			echo json_encode(['success' => false, 'message' => 'Failed to update bookings']);
+		}
+	}
 
 	public function autocount_create($data)
 	{
