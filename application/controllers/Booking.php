@@ -282,11 +282,11 @@ class Booking extends MY_Controller
 			// Build row data
 			$row = array();
 
-			// Checkbox - only show for Failed autocount status
-			if ($booking->AutocountSyncStatus == 'F') {
+			// Checkbox - show for Failed and Pending autocount status
+			if (in_array($booking->AutocountSyncStatus, ['F', 'P'])) {
 				$row['checkbox'] = '<input type="checkbox" class="check_item" value="' . $booking->BookingID . '">';
 			} else {
-				$row['checkbox'] = ''; // Empty for non-Failed status
+				$row['checkbox'] = ''; // Empty for Synced status
 			}
 
 			// Row number
