@@ -130,14 +130,21 @@ class Payment extends MY_Controller
 		$order_column_index = intval($this->input->get('order[0][column]'));
 		$order_dir = $this->input->get('order[0][dir]') == 'asc' ? 'ASC' : 'DESC';
 
-		// Column mapping (adjusts based on user role and filters)
+		// Build column mapping dynamically based on user role and permissions
 		$columns = array(
-			0 => 'payment.PaymentID',        // row number
-			1 => 'payment.PaymentID',        // checkbox
-			2 => 'payment.Date',             // transaction date
+			0 => 'payment.PaymentID',  // row number
 		);
 
-		$col_index = 3;
+		$col_index = 1;
+
+		// Checkbox column only exists for non-SA with AP permission
+		if(!$is_sales_agent && $has_ap_permission) {
+			$columns[$col_index] = 'payment.PaymentID';  // checkbox
+			$col_index++;
+		}
+
+		$columns[$col_index++] = 'payment.Date';  // transaction date
+
 		if(!$is_sales_agent) {
 			$columns[$col_index] = 'admin.Name';  // sales agent
 			$col_index++;
