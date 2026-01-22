@@ -554,7 +554,7 @@ $(document).ready(function() {
                 }
             },
             columns: columns,
-            order: [[is_sales_agent ? 1 : 2, 'desc']], // Order by Creation Date descending
+            order: [[is_sales_agent ? 8 : 9, 'desc']], // Order by Start Date descending
             pageLength: 100,
             lengthMenu: [[50, 100, 200, 500], [50, 100, 200, 500]],
             searchDelay: 300, // 300ms debounce on search

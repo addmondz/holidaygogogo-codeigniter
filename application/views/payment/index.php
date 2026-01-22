@@ -153,7 +153,7 @@
                                                 <select name="status" class="form-control selectpicker">
                                                     <option data-icon="la la-dollar font-size-lg bs-icon" value="">--SELECT STATUS--</option>
                                                     <?php foreach(unserialize(PAYMENT_STATUS) as $key => $value) { ?>
-                                                        <option data-icon="<?php if($key == 'Y') { echo 'la la-check-circle'; } else if($key == 'P') { echo 'la la-exclamation-circle'; } else { echo 'la la-times-circle'; } ?> font-size-lg bs-icon" value="<?php echo $key; ?>" <?php if((!empty($this->input->get('status')) && $this->input->get('status') == $key) || (empty($this->input->get('status')) && $key == 'P' && strpos($_SERVER['REQUEST_URI'], '?') == false)) { echo 'selected'; } ?>><?php echo $value; ?></option>
+                                                        <option data-icon="<?php if($key == 'Y') { echo 'la la-check-circle'; } else if($key == 'P') { echo 'la la-exclamation-circle'; } else { echo 'la la-times-circle'; } ?> font-size-lg bs-icon" value="<?php echo $key; ?>" <?php if(!empty($this->input->get('status')) && $this->input->get('status') == $key) { echo 'selected'; } ?>><?php echo $value; ?></option>
                                                     <?php } ?>
                                                 </select>
                                             </div>

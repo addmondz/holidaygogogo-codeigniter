@@ -738,13 +738,9 @@ return $query->result_array(); // instead of result()
 			$this->db->where('payment.BankHolder', $this->input->get('bank_holder'));
 		}
 
-		// Status filter (default to 'P' if no query params)
+		// Status filter (only apply if explicitly selected)
 		if(!empty($this->input->get('status'))) {
 			$this->db->where('payment.Status', $this->input->get('status'));
-		} else {
-			if(strpos($_SERVER['REQUEST_URI'], '?') == false) {
-				$this->db->where('payment.Status', 'P');
-			}
 		}
 
 		// Booking number filter
