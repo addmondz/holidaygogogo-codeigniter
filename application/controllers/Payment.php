@@ -1168,6 +1168,26 @@ class Payment extends MY_Controller
         ]));
     }
 
+	public function bulkChangePaymentAutocountStatusToPending()
+	{
+		$json = file_get_contents('php://input');
+		$data = json_decode($json, true);
+		$payment_ids = isset($data['payment_ids']) ? $data['payment_ids'] : [];
+
+		if (empty($payment_ids)) {
+			echo json_encode(['success' => false, 'message' => 'No payments selected']);
+			return;
+		}
+
+		$result = $this->Payment_Model->Update_Payment_Autocount_Status_To_Pending_With_Reset($payment_ids);
+
+		if ($result) {
+			echo json_encode(['success' => true, 'message' => count($payment_ids) . ' payment(s) updated to Pending status']);
+		} else {
+			echo json_encode(['success' => false, 'message' => 'Failed to update payments']);
+		}
+	}
+
 	public function autocount_create($data = [])
 	{
 		try {

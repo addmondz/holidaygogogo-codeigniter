@@ -1442,4 +1442,38 @@ class Booking_Model extends CI_Model
 		return $this->db->affected_rows() > 0;
 	}
 
+	/**
+	 * Update AutocountSyncStatus to Pending with reset logic
+	 * If status is F: update directly to P
+	 * If status is P: update to F first, then to P (to trigger re-sync)
+	 * @param array $booking_ids Array of booking IDs to update
+	 * @return bool True on success
+	 */
+	function Update_Autocount_Status_To_Pending_With_Reset($booking_ids)
+	{
+		// Get current status for all selected bookings
+		$this->db->select('BookingID, AutocountSyncStatus');
+		$this->db->where_in('BookingID', $booking_ids);
+		$bookings = $this->db->get('booking')->result_array();
+
+		foreach ($bookings as $booking) {
+			if ($booking['AutocountSyncStatus'] == 'P') {
+				// P -> F -> P (intermediate F to reset)
+				$this->db->where('BookingID', $booking['BookingID']);
+				$this->db->update('booking', [
+					'AutocountSyncStatus' => 'F',
+					'AutocountSyncMessage' => 'Reset from P status'
+				]);
+			}
+			// Now update to P
+			$this->db->where('BookingID', $booking['BookingID']);
+			$this->db->update('booking', [
+				'AutocountSyncStatus' => 'P',
+				'AutocountSyncMessage' => null
+			]);
+		}
+
+		return true;
+	}
+
 }

@@ -1514,7 +1514,9 @@ class Booking extends MY_Controller
     }
 
 	/**
-	 * Bulk change autocount status from Failed (F) to Pending (P)
+	 * Bulk change autocount status to Pending (P) with reset logic
+	 * If status is F: update directly to P
+	 * If status is P: update to F first, then to P (to trigger re-sync)
 	 */
 	public function bulkChangeAutocountStatusToPending()
 	{
@@ -1527,7 +1529,7 @@ class Booking extends MY_Controller
 			return;
 		}
 
-		$result = $this->Booking_Model->Update_Autocount_Status_Bulk($booking_ids, 'P');
+		$result = $this->Booking_Model->Update_Autocount_Status_To_Pending_With_Reset($booking_ids);
 
 		if ($result) {
 			echo json_encode(['success' => true, 'message' => count($booking_ids) . ' booking(s) updated to Pending status']);

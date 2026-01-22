@@ -910,4 +910,48 @@ return $query->result_array(); // instead of result()
 		return $this->db->get()->result();
 	}
 
+	function Update_Payment_Autocount_Status_Bulk($payment_ids, $status)
+	{
+		$this->db->where_in('PaymentID', $payment_ids);
+		$this->db->update('payment', [
+			'AutocountSyncStatus' => $status,
+			'AutocountSyncMessage' => null
+		]);
+		return $this->db->affected_rows() > 0;
+	}
+
+	/**
+	 * Update AutocountSyncStatus to Pending with reset logic
+	 * If status is F: update directly to P
+	 * If status is P: update to F first, then to P (to trigger re-sync)
+	 * @param array $payment_ids Array of payment IDs to update
+	 * @return bool True on success
+	 */
+	function Update_Payment_Autocount_Status_To_Pending_With_Reset($payment_ids)
+	{
+		// Get current status for all selected payments
+		$this->db->select('PaymentID, AutocountSyncStatus');
+		$this->db->where_in('PaymentID', $payment_ids);
+		$payments = $this->db->get('payment')->result_array();
+
+		foreach ($payments as $payment) {
+			if ($payment['AutocountSyncStatus'] == 'P') {
+				// P -> F -> P (intermediate F to reset)
+				$this->db->where('PaymentID', $payment['PaymentID']);
+				$this->db->update('payment', [
+					'AutocountSyncStatus' => 'F',
+					'AutocountSyncMessage' => 'Reset from P status'
+				]);
+			}
+			// Now update to P
+			$this->db->where('PaymentID', $payment['PaymentID']);
+			$this->db->update('payment', [
+				'AutocountSyncStatus' => 'P',
+				'AutocountSyncMessage' => null
+			]);
+		}
+
+		return true;
+	}
+
 }

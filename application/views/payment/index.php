@@ -368,13 +368,19 @@
                 <?php } ?>
                 <br><br>
                 <?php if ($bulkPaymentSyncToAutocount) { ?>
-                    <button type="button" 
-                            class="btn btn-primary font-weight-bold mb-2" 
-                            id="sync-autocount-payment" 
+                    <button type="button"
+                            class="btn btn-primary font-weight-bold mb-2"
+                            id="sync-autocount-payment"
                             style="width:180px; display:none;">
                         Sync Autocount
                     </button>
                 <?php } ?>
+                <button type="button"
+                        class="btn btn-warning font-weight-bold mb-2"
+                        id="change-payment-autocount-to-pending"
+                        style="width:180px; display:none;">
+                    Change to P Status
+                </button>
                 <div class="dataTables_wrapper dt-bootstrap4 no-footer" <?php if(empty($payments)) { echo 'style="overflow-x:auto;"'; } ?>>
                     <table id="kt_datatable" class="table table-bordered table-head-custom table-checkable dataTable no-footer dtr-inline">
                         <thead>
@@ -628,6 +634,12 @@
                 $('#sync-autocount-payment').hide();
             }
         }
+
+        if (isChecked) {
+            $('#change-payment-autocount-to-pending').show();
+        } else {
+            $('#change-payment-autocount-to-pending').hide();
+        }
     });
 
     function Select_Payment(payment_id) {
@@ -649,6 +661,12 @@
             } else {
                 $('#sync-autocount-payment').hide();
             }
+        }
+
+        if (payment_ids.length > 0) {
+            $('#change-payment-autocount-to-pending').show();
+        } else {
+            $('#change-payment-autocount-to-pending').hide();
         }
 
         // Update the "Select All" checkbox based on visible checkboxes
@@ -839,6 +857,37 @@ document.getElementById('sync-autocount-payment').addEventListener('click', func
         alert("Error occurred during sync.");
     });
 });
+
+document.getElementById('change-payment-autocount-to-pending').addEventListener('click', function() {
+    let selected = Array.from(document.querySelectorAll('.check_item:checked'))
+                        .map(cb => cb.id);
+
+    if (selected.length === 0) {
+        alert("Please select at least one payment.");
+        return;
+    }
+
+    if (!confirm("Are you sure you want to change " + selected.length + " payment(s) to Pending (P) status?")) {
+        return;
+    }
+
+    fetch("<?php echo base_url('Payment/bulkChangePaymentAutocountStatusToPending'); ?>", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ payment_ids: selected })
+    })
+    .then(res => res.json())
+    .then(data => {
+        alert(data.message);
+        if (data.success) {
+            paymentTable.ajax.reload();
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        alert("Error occurred during status change.");
+    });
+});
 </script>
 
 <!-- Server-Side DataTables Initialization -->
@@ -943,6 +992,7 @@ $(document).ready(function() {
                 payment_ids = [];
                 $('#all').prop('checked', false);
                 $('#sync-autocount-payment').hide();
+                $('#change-payment-autocount-to-pending').hide();
             }
         });
 
