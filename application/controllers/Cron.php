@@ -350,9 +350,6 @@ class Cron extends CI_Controller
 
 	private function enrichCustomer($customer)
 	{
-		if ($customer['AutocountSyncAction'] == 'C' && !empty($customer['CustomerCode'])) {
-			$customer['AutocountSyncAction'] = 'U';
-		}
 		return $customer;
 	}
 
