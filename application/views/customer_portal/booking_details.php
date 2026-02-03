@@ -9,6 +9,7 @@
     <link href="https://fonts.googleapis.com/css?family=Poppins:300,400,500,600,700" rel="stylesheet">
     <link href="<?php echo base_url('assets/css/plugins-bundle.css'); ?>" type="text/css" rel="stylesheet">
     <link href="<?php echo base_url('assets/css/style-bundle.css'); ?>" type="text/css" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
         * {
             margin: 0;
@@ -441,348 +442,6 @@
             border-color: #162447;
         }
 
-        /* Timeline and Payment History Layout */
-        .timeline-payment-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 30px;
-            margin-bottom: 30px;
-        }
-
-        /* Timeline Section */
-        .timeline-section {
-            background: white;
-            border-radius: 12px;
-            padding: 25px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-        }
-
-        .timeline {
-            position: relative;
-            padding-left: 27px;
-        }
-
-        .timeline::before {
-            content: '';
-            position: absolute;
-            left: 8px;
-            top: 0;
-            bottom: 0;
-            width: 2px;
-            background: #e0e0e0;
-        }
-
-        .timeline-item {
-            position: relative;
-            margin-bottom: 20px;
-        }
-
-        .timeline-item:last-child {
-            margin-bottom: 0;
-        }
-
-        .timeline-item::before {
-            content: '';
-            position: absolute;
-            left: -26px;
-            top: 5px;
-            width: 16px;
-            height: 16px;
-            border-radius: 50%;
-            background: white;
-            border: 3px solid #162447;
-            z-index: 1;
-        }
-
-        .timeline-item.completed::before {
-            background: #6c757d;
-            border-color: #6c757d;
-            box-shadow: 0 0 0 3px rgba(108, 117, 125, 0.2);
-        }
-
-        .timeline-item.completed::after {
-            content: '\f00c';
-            font-family: 'Line Awesome Free';
-            font-weight: 900;
-            position: absolute;
-            left: -26px;
-            top: 5px;
-            width: 16px;
-            height: 16px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 10px;
-            z-index: 2;
-        }
-
-        .timeline-item.pending::before {
-            background: #FF9800;
-            border-color: #FF9800;
-            box-shadow: 0 0 0 3px rgba(255, 152, 0, 0.2);
-            animation: pendingPulse 2s ease-in-out infinite;
-        }
-
-        .timeline-item.pending::after {
-            content: '\f071';
-            font-family: 'Line Awesome Free';
-            font-weight: 900;
-            position: absolute;
-            left: -26px;
-            top: 5px;
-            width: 16px;
-            height: 16px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 9px;
-            z-index: 2;
-        }
-
-        @keyframes pendingPulse {
-            0%, 100% {
-                box-shadow: 0 0 0 3px rgba(255, 152, 0, 0.2);
-            }
-            50% {
-                box-shadow: 0 0 0 5px rgba(255, 152, 0, 0.3);
-            }
-        }
-
-        .timeline-item.available::before {
-            background: #6c757d;
-            border-color: #6c757d;
-        }
-
-        .timeline-content {
-            background: #ffffff;
-            border-radius: 6px;
-            padding: 12px;
-            border-left: 3px solid #e0e0e0;
-            transition: all 0.3s ease;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-        }
-
-        .timeline-item.completed .timeline-content {
-            border-left-color: #6c757d;
-            border-left-width: 3px;
-            background: #f8f9fa;
-        }
-
-        .timeline-item.pending .timeline-content {
-            border-left-color: #FF9800;
-            border-left-width: 3px;
-            background: #fffbf0;
-        }
-
-        .timeline-item.available .timeline-content {
-            border-left-color: #6c757d;
-            border-left-width: 3px;
-            background: #f8f9fa;
-        }
-
-        /* Overdue styling - more prominent red */
-        .timeline-item.pending .timeline-action-text.overdue {
-            color: #d32f2f;
-            font-weight: 600;
-        }
-
-        .timeline-date {
-            font-size: 11px;
-            color: #666;
-            font-weight: 600;
-            margin-bottom: 4px;
-        }
-
-        .timeline-title {
-            font-size: 13px;
-            font-weight: 600;
-            color: #333;
-            margin-bottom: 6px;
-        }
-
-        .timeline-action {
-            font-size: 11px;
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            width: auto;
-            border-radius: 8px;
-            padding: 4px 20px;
-            font-weight: 500;
-        }
-
-        /* Completed status - gray badge */
-        .timeline-item.completed .timeline-action {
-            background-color: #e9ecef;
-            color: #495057;
-        }
-        
-        /* Latest item - yellow styling */
-        .timeline-item.latest::before {
-            background: #FFBF00;
-            border-color: #FFBF00;
-            box-shadow: 0 0 0 3px rgba(255, 191, 0, 0.2);
-        }
-        
-        .timeline-item.latest .timeline-content {
-            border-left-color: #FFBF00;
-            border-left-width: 3px;
-            background: #fffbf0;
-        }
-        
-        .timeline-item.latest .timeline-action {
-            background-color: #fff3cd;
-            color: #856404;
-        }
-        
-        /* Review status - special purple gradient styling */
-        .timeline-item.review::before {
-            background: #667eea;
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
-        }
-        
-        .timeline-item.review .timeline-content {
-            border-left-color: #667eea;
-            border-left-width: 3px;
-            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
-            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
-        }
-        
-        .timeline-item.review .timeline-action {
-            background: transparent;
-            padding: 0;
-        }
-        
-        .timeline-item.review .timeline-title {
-            color: #667eea;
-            font-weight: 700;
-        }
-
-        /* Pending status - yellow badge (including overdue) */
-        .timeline-item.pending .timeline-action {
-            background-color: #fff3cd;
-            color: #856404;
-        }
-
-        /* Overdue - also yellow (same as pending) */
-        .timeline-item.pending .timeline-action.overdue {
-            background-color: #fff3cd;
-            color: #856404;
-        }
-
-        /* Available/Default status - gray badge */
-        .timeline-item.available .timeline-action {
-            background-color: #e9ecef;
-            color: #495057;
-        }
-
-        .timeline-action a {
-            color: inherit;
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        .timeline-action a:hover {
-            opacity: 0.8;
-        }
-
-        .timeline-action-text {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        /* Icons for different action types - inherit text color */
-        .timeline-action i,
-        .timeline-action-text i,
-        .timeline-action a i {
-            font-size: 12px;
-            color: inherit !important;
-        }
-
-        /* Remove status badges - visual indicators are enough */
-
-        /* Highlighted timeline item for review */
-        .timeline-item-highlight {
-            animation: highlightPulse 2s ease-in-out infinite;
-        }
-
-        .timeline-item-highlight .timeline-content {
-            background: linear-gradient(135deg, #fff5e6 0%, #ffe6cc 100%);
-            border-left: 4px solid #ff9800;
-            box-shadow: 0 2px 8px rgba(255, 152, 0, 0.2);
-        }
-
-        .timeline-item-highlight::before {
-            background: #ff9800;
-            border-color: #ff9800;
-            box-shadow: 0 0 10px rgba(255, 152, 0, 0.5);
-        }
-
-        @keyframes highlightPulse {
-
-            0%,
-            100% {
-                opacity: 1;
-            }
-
-            50% {
-                opacity: 0.9;
-            }
-        }
-
-        .timeline-review-cta {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            background: #ff9800;
-            color: white !important;
-            padding: 8px 16px;
-            border-radius: 6px;
-            font-weight: 600;
-            text-decoration: none !important;
-            transition: all 0.3s ease;
-            box-shadow: 0 2px 8px rgba(255, 152, 0, 0.3);
-            cursor: pointer;
-        }
-
-        .timeline-review-cta:hover {
-            background: #f57c00;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(255, 152, 0, 0.4);
-        }
-
-        .timeline-review-cta i {
-            font-size: 16px;
-        }
-
-        /* Clickable timeline item */
-        .timeline-item-clickable .timeline-content {
-            transition: all 0.3s ease;
-        }
-
-        .timeline-item-clickable:hover .timeline-content {
-            transform: translateX(5px);
-            box-shadow: 0 4px 12px rgba(255, 152, 0, 0.3);
-        }
-
-        .timeline-item-clickable:hover .timeline-review-cta {
-            background: #f57c00;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(255, 152, 0, 0.4);
-        }
-
-        .timeline-icon {
-            display: inline-block;
-            margin-right: 6px;
-            font-size: 12px;
-        }
-
         /* Payment History Section */
         .payments-section {
             background: white;
@@ -979,17 +638,11 @@
                 margin-bottom: 20px;
             }
 
-            .timeline-payment-grid {
-                grid-template-columns: 1fr;
-                gap: 20px;
-            }
-
             .details-card,
             .documents-card,
             .products-section,
             .payments-section,
-            .summary-card,
-            .timeline-section {
+            .summary-card {
                 padding: 20px 15px;
                 margin-bottom: 20px;
             }
@@ -1165,6 +818,81 @@
                 grid-template-columns: repeat(2, 1fr);
             }
         }
+
+        /* Timeline CTA Button - Simple small button */
+        .timeline-cta-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 500;
+            text-decoration: none;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+            margin-top: 10px;
+            min-width: 140px;
+        }
+
+        .timeline-cta-btn:hover {
+            text-decoration: none;
+        }
+
+        .timeline-cta-btn svg {
+            width: 12px;
+            height: 12px;
+            flex-shrink: 0;
+        }
+
+        /* Gray - Future status (matches bg-gray-300) */
+        .cta-btn-gray {
+            background: #d1d5db;
+            color: #4b5563;
+            border: none;
+        }
+
+        .cta-btn-gray:hover {
+            background: #9ca3af;
+            color: #1f2937;
+        }
+
+        /* Green - Completed status (matches bg-green-500) */
+        .cta-btn-green {
+            background: #22c55e;
+            color: #ffffff;
+            border: none;
+        }
+
+        .cta-btn-green:hover {
+            background: #16a34a;
+            color: #ffffff;
+        }
+
+        /* Yellow - Current status (matches bg-yellow-400) */
+        .cta-btn-yellow {
+            background: #facc15;
+            color: #713f12;
+            border: none;
+        }
+
+        .cta-btn-yellow:hover {
+            background: #eab308;
+            color: #422006;
+        }
+
+        /* Red - Overdue status (matches bg-red-500) */
+        .cta-btn-red {
+            background: #ef4444;
+            color: #ffffff;
+            border: none;
+        }
+
+        .cta-btn-red:hover {
+            background: #dc2626;
+            color: #ffffff;
+        }
     </style>
 </head>
 
@@ -1261,18 +989,6 @@
                         <span class="detail-value"><?php echo htmlspecialchars($booking['SalesAgentName']); ?></span>
                     </div>
                 <?php endif; ?>
-                <?php if (!empty($booking['DepositDeadline'])): ?>
-                    <div class="detail-item">
-                        <span class="detail-label">Deposit Deadline</span>
-                        <span class="detail-value"><?php echo $booking['DepositDeadline']; ?></span>
-                    </div>
-                <?php endif; ?>
-                <?php if (!empty($booking['FullPaymentDeadline'])): ?>
-                    <div class="detail-item">
-                        <span class="detail-label">Full Payment Deadline</span>
-                        <span class="detail-value"><?php echo $booking['FullPaymentDeadline']; ?></span>
-                    </div>
-                <?php endif; ?>
                 <?php if (!empty($booking['InsertDate'])): ?>
                     <div class="detail-item">
                         <span class="detail-label">Booking Date</span>
@@ -1288,551 +1004,606 @@
 
                 <!-- Contact Actions -->
                 <div class="documents-grid" style="margin-top: 20px;">
-                    <?php if (!empty($booking['SalesAgentMobile'])): 
+                    <?php if (!empty($booking['SalesAgentMobile'])):
                         $formatted_mobile = format_mobile_number($booking['SalesAgentMobile']);
                         if ($formatted_mobile): ?>
                             <a href="tel:<?php echo $formatted_mobile; ?>" class="document-item">
                                 <div class="document-icon">
                                     <i class="la la-phone"></i>
                                 </div>
-                                <div class="document-name">Call Sales Agent</div>
-                                <div class="document-action">Click to Call</div>
+                                <div class="document-name">Call Your Travel Consultant</div>
+                                <div class="document-action">Call <?php echo htmlspecialchars($booking['SalesAgentName']); ?> Now</div>
                             </a>
                         <?php endif; ?>
                     <?php endif; ?>
                     <?php if (get_offical_whatsapp_link() != null): ?>
-                        <a href="<?php echo get_offical_whatsapp_link('Hi, I have a question about my booking. Booking no. ' . $booking['BookingNumber']); ?>" target="_blank" class="document-item">
+                        <?php
+                            $message = "Hi, I’d like to check on a question regarding my booking.\nBooking number: {$booking['BookingNumber']}";
+                        ?>
+                        <a href="<?php echo get_offical_whatsapp_link($message, $formatted_mobile); ?>" target="_blank" class="document-item">
                             <div class="document-icon">
                                 <i class="la la-whatsapp"></i>
                             </div>
-                            <div class="document-name">WhatsApp Us</div>
-                            <div class="document-action">Click to Chat</div>
+                            <div class="document-name">WhatsApp Travel Consultant</div>
+                            <div class="document-action">WhatsApp <?php echo htmlspecialchars($booking['SalesAgentName']); ?></div>
                         </a>
                     <?php endif; ?>
                 </div>
             </div>
 
-            <!-- Timeline -->
-            <div class="timeline-section">
-                <div class="card-title">
-                    Timeline
-                </div>
-                <div class="timeline">
-                    <?php
-                    $today = date('Y-m-d');
-                    $timeline_events = [];
-                    $booking_status = !empty($booking['Status']) ? $booking['Status'] : '';
-                    $lock_status = !empty($booking['LockStatus']) ? $booking['LockStatus'] : '';
-
-                    // Event 1: Booking Confirmation Approved (always available)
-                    // Use BC approval date from status log as the main date
-                    $bc_approval_display_date = null;
-                    if (!empty($booking['bc_approval_date'])) {
-                        $bc_approval_display_date = return_timestamp_output($booking['bc_approval_date'], true, false);
-                    }
-                    $bc_approval_date_formatted = 'N/A';
-                    if (!empty($booking['bc_approval_date'])) {
-                        $bc_approval_date_formatted = date('d M Y', strtotime($booking['bc_approval_date']));
-                    }
-                    $timeline_events[] = [
-                        'date' => $bc_approval_display_date,
-                        'title' => 'Booking Confirmation Approved',
-                        'action' => '<a href="' . $booking['documents']['bc']['url'] . '" target="_blank">View here</a>',
-                        'status' => 'completed',
-                        'icon' => 'la la-check-circle',
-                        'expected_date' => null
-                    ];
-
-                    // Analyze payment information
-                    $has_deposit_payment = false;
-                    $has_full_payment = false;
-                    $deposit_payment_date = null;
-                    $full_payment_date = null;
-                    $first_payment_date = null;
-                    
-                    if (!empty($booking['payments'])) {
-                        foreach ($booking['payments'] as $payment) {
-                            if (!empty($payment['Credit']) && $payment['Credit'] > 0 && 
-                                ($payment['Status'] == 'Y' || $payment['Status'] == 'P')) {
-                                
-                                $payment_type = !empty($payment['Type']) ? strtoupper(trim($payment['Type'])) : '';
-                                $payment_date = !empty($payment['DateRaw']) ? $payment['DateRaw'] : null;
-                                
-                                if ($payment_type == 'DEPOSIT') {
-                                    $has_deposit_payment = true;
-                                    if (empty($deposit_payment_date) && $payment_date) {
-                                        $deposit_payment_date = $payment_date;
-                                    }
-                                } elseif ($payment_type == 'FULL') {
-                                    $has_full_payment = true;
-                                    if (empty($full_payment_date) && $payment_date) {
-                                        $full_payment_date = $payment_date;
-                                    }
-                                }
-                                
-                                // Track first payment date for display
-                                if (empty($first_payment_date) && $payment_date) {
-                                    $first_payment_date = $payment_date;
-                                }
-                            }
-                        }
-                    }
-                    
-                    // Determine payment received info
-                    $payment_received_text = null;
-                    $payment_received_date = null;
-                    $payment_received_date_formatted = null;
-                    if ($has_deposit_payment && $deposit_payment_date) {
-                        $payment_received_text = 'Deposit Payment Received';
-                        $payment_received_date = $deposit_payment_date;
-                        $payment_received_date_formatted = return_timestamp_output($deposit_payment_date, true, false);
-                    } elseif ($has_full_payment && $full_payment_date) {
-                        $payment_received_text = 'Full Payment Received';
-                        $payment_received_date = $full_payment_date;
-                        $payment_received_date_formatted = return_timestamp_output($full_payment_date, true, false);
-                    } elseif ($first_payment_date) {
-                        // Fallback: use first payment date if available
-                        $payment_received_text = 'Payment Received';
-                        $payment_received_date = $first_payment_date;
-                        $payment_received_date_formatted = return_timestamp_output($first_payment_date, true, false);
-                    }
-
-                    // Build timeline based on booking status
-                    if ($booking_status == 'P') {
-                        // Status: PENDING PAYMENT
-                        // Show pending payment with deadline
-                        $has_deposit_deadline = !empty($booking['DepositDeadlineRaw']);
-                        $has_full_payment_deadline = !empty($booking['FullPaymentDeadlineRaw']);
-                        
-                        if ($has_deposit_deadline) {
-                            // Has deposit deadline - show pending deposit
-                            $deadline_date = date('d M Y', strtotime($booking['DepositDeadlineRaw']));
-                            $timeline_events[] = [
-                                'date' => return_timestamp_output($booking['DepositDeadlineRaw'], true, false),
-                                'title' => 'Pending Deposit Payment',
-                                'action' => 'Deadline ' . (!empty($booking['DepositDeadline']) ? $booking['DepositDeadline'] : $deadline_date),
-                                'status' => 'pending',
-                                'icon' => 'la la-clock',
-                                'expected_date' => $deadline_date
-                            ];
-                        } elseif ($has_full_payment_deadline) {
-                            // No deposit deadline but has full payment deadline - show pending full payment
-                            $deadline_date = date('d M Y', strtotime($booking['FullPaymentDeadlineRaw']));
-                            $timeline_events[] = [
-                                'date' => return_timestamp_output($booking['FullPaymentDeadlineRaw'], true, false),
-                                'title' => 'Pending full payment',
-                                'action' => 'Deadline ' . (!empty($booking['FullPaymentDeadline']) ? $booking['FullPaymentDeadline'] : $deadline_date),
-                                'status' => 'pending',
-                                'icon' => 'la la-clock',
-                                'expected_date' => $deadline_date
-                            ];
-                        } else {
-                            // No deadlines - just show pending payment
-                            $timeline_events[] = [
-                                'date' => !empty($booking['InsertDateRaw']) ? return_timestamp_output($booking['InsertDateRaw'], true, false) : 'N/A',
-                                'title' => 'Pending payment',
-                                'action' => 'Pending',
-                                'status' => 'pending',
-                                'icon' => 'la la-clock',
-                                'expected_date' => !empty($booking['bc_approval_date']) ? date('d M Y', strtotime($booking['bc_approval_date'])) : 'N/A'
-                            ];
-                        }
-                    } elseif ($booking_status == 'PBO') {
-                        // Status: PENDING BOOKING OPERATION (ENDING BOOKING OPERATION)
-                        // Show payment received and booking processing
-                        if ($payment_received_text && $payment_received_date && $payment_received_date_formatted) {
-                            $receipt_url = base_url('Receipt?token=' . $booking['Token']);
-                            $timeline_events[] = [
-                                'date' => $payment_received_date_formatted,
-                                'title' => $payment_received_text,
-                                'action' => '<a href="' . $receipt_url . '" target="_blank">View Here</a>',
-                                'status' => 'completed',
-                                'icon' => 'la la-check-circle'
-                            ];
-                        }
-                        
-                        // Get expected processing date
-                        $expected_processing_date = date('d M Y', strtotime($today));
-                        if (!empty($booking['status_change_dates']['PBO'])) {
-                            $expected_processing_date = date('d M Y', strtotime($booking['status_change_dates']['PBO']));
-                        } elseif ($payment_received_date) {
-                            // Use payment date + 1 day as expected processing start
-                            $expected_processing_date = date('d M Y', strtotime($payment_received_date . ' +1 day'));
-                        }
-                            $timeline_events[] = [
-                            'date' => date('d M Y', strtotime($today)),
-                            'title' => 'Booking is Being Processed',
-                            'action' => 'Processing',
-                            'status' => 'pending',
-                            'icon' => 'la la-cog',
-                            // 'expected_date' => $expected_processing_date
-                            'expected_date' => null
-                        ];
-                    } elseif ($booking_status == 'PGL' || ($booking_status == 'PTV' && $lock_status == 'N')) {
-                        // Status: PENDING GUEST LIST
-                        // Show payment received, submit namelist
-                        if ($payment_received_text && $payment_received_date && $payment_received_date_formatted) {
-                            $receipt_url = base_url('Receipt?token=' . $booking['Token']);
-                            $timeline_events[] = [
-                                'date' => $payment_received_date_formatted,
-                                'title' => $payment_received_text,
-                                'action' => '<a href="' . $receipt_url . '" target="_blank">View Here</a>',
-                                'status' => 'completed',
-                                'icon' => 'la la-check-circle'
-                            ];
-                        }
-                        
-                        // Get expected namelist submission date
-                        $expected_namelist_date = 'N/A';
-                        if (!empty($booking['status_change_dates']['PGL'])) {
-                            $expected_namelist_date = date('d M Y', strtotime($booking['status_change_dates']['PGL']));
-                        } elseif ($payment_received_date) {
-                            // Use payment date + 3 days as expected submission date
-                            $expected_namelist_date = date('d M Y', strtotime($payment_received_date . ' +3 days'));
-                        } elseif (!empty($booking['InsertDateRaw'])) {
-                            $expected_namelist_date = date('d M Y', strtotime($booking['InsertDateRaw']));
-                        }
-                            $timeline_events[] = [
-                            'date' => !empty($booking['InsertDateRaw']) ? return_timestamp_output($booking['InsertDateRaw'], true, false) : 'N/A',
-                            'title' => 'Submit Namelist',
-                            'action' => '<a href="' . $booking['documents']['gl']['url'] . '" target="_blank">Click here</a>',
-                            'status' => 'pending',
-                            'icon' => 'la la-users',
-                            'expected_date' => date('d M Y', strtotime($booking['bc_approval_date'] . ' +1 day'))
-                        ];
-                    } elseif ($booking_status == 'PTV' && $lock_status == 'Y') {
-                        // Status: PENDING TRAVEL VOUCHER (with locked guest list)
-                        // Show payment received, submit namelist (view), booking processing
-                        if ($payment_received_text && $payment_received_date && $payment_received_date_formatted) {
-                            $receipt_url = base_url('Receipt?token=' . $booking['Token']);
-                            $timeline_events[] = [
-                                'date' => $payment_received_date_formatted,
-                                'title' => $payment_received_text,
-                                'action' => '<a href="' . $receipt_url . '" target="_blank">View Here</a>',
-                                'status' => 'completed',
-                                'icon' => 'la la-check-circle'
-                            ];
-                        }
-                        
-                        // Get expected namelist submission date
-                        $expected_namelist_date = 'N/A';
-                        if (!empty($booking['status_change_dates']['PGL'])) {
-                            $expected_namelist_date = date('d M Y', strtotime($booking['status_change_dates']['PGL']));
-                        } elseif ($payment_received_date) {
-                            $expected_namelist_date = date('d M Y', strtotime($payment_received_date . ' +3 days'));
-                        } elseif (!empty($booking['InsertDateRaw'])) {
-                            $expected_namelist_date = date('d M Y', strtotime($booking['InsertDateRaw']));
-                        }
-                        $timeline_events[] = [
-                            'date' => !empty($booking['InsertDateRaw']) ? return_timestamp_output($booking['InsertDateRaw'], true, false) : 'N/A',
-                            'title' => 'Submit Namelist',
-                            'action' => '<a href="' . $booking['documents']['gl']['url'] . '" target="_blank">View here</a>',
-                            'status' => 'completed',
-                            'icon' => 'la la-check-circle',
-                            'expected_date' => $expected_namelist_date
-                        ];
-                        
-                        // Get expected processing date
-                        $expected_processing_date = date('d M Y', strtotime($today));
-                        if (!empty($booking['status_change_dates']['PBO'])) {
-                            $expected_processing_date = date('d M Y', strtotime($booking['status_change_dates']['PBO']));
-                        } elseif ($payment_received_date) {
-                            $expected_processing_date = date('d M Y', strtotime($payment_received_date . ' +1 day'));
-                            }
-                            $timeline_events[] = [
-                            'date' => date('d M Y', strtotime($today)),
-                            'title' => 'Generating Travel Voucher',
-                            'action' => 'Processing',
-                            'status' => 'pending',
-                            'icon' => 'la la-cog',
-                            'expected_date' => date('d M Y', strtotime($booking['StartDate'] . ' -1 week'))
-                        ];
-                    } elseif ($booking_status == 'PT') {
-                        // Status: PENDING TRAVEL
-                        // Show payment received, submit namelist (view), travel voucher approved
-                        if ($payment_received_text && $payment_received_date && $payment_received_date_formatted) {
-                            $receipt_url = base_url('Receipt?token=' . $booking['Token']);
-                            $timeline_events[] = [
-                                'date' => $payment_received_date_formatted,
-                                'title' => $payment_received_text,
-                                'action' => '<a href="' . $receipt_url . '" target="_blank">View Here</a>',
-                                'status' => 'completed',
-                                'icon' => 'la la-check-circle'
-                            ];
-                        }
-                        
-                        // Get expected namelist submission date
-                        $expected_namelist_date = 'N/A';
-                        if (!empty($booking['status_change_dates']['PGL'])) {
-                            $expected_namelist_date = date('d M Y', strtotime($booking['status_change_dates']['PGL']));
-                        } elseif ($payment_received_date) {
-                            $expected_namelist_date = date('d M Y', strtotime($payment_received_date . ' +3 days'));
-                        } elseif (!empty($booking['InsertDateRaw'])) {
-                            $expected_namelist_date = date('d M Y', strtotime($booking['InsertDateRaw']));
-                        }
-                        $timeline_events[] = [
-                            'date' => !empty($booking['InsertDateRaw']) ? return_timestamp_output($booking['InsertDateRaw'], true, false) : 'N/A',
-                            'title' => 'Submit Namelist',
-                            'action' => '<a href="' . $booking['documents']['gl']['url'] . '" target="_blank">View here</a>',
-                            'status' => 'completed',
-                            'icon' => 'la la-check-circle',
-                            'expected_date' => $expected_namelist_date
-                        ];
-                        
-                        // Get expected Travel Voucher approval date
-                        $expected_tv_date = 'N/A';
-                        if (!empty($booking['status_change_dates']['PTV'])) {
-                            $expected_tv_date = date('d M Y', strtotime($booking['status_change_dates']['PTV']));
-                        } elseif (!empty($booking['status_change_dates']['PT'])) {
-                            $expected_tv_date = date('d M Y', strtotime($booking['status_change_dates']['PT']));
-                        } elseif (!empty($booking['FullPaymentDeadlineRaw'])) {
-                            $expected_tv_date = date('d M Y', strtotime($booking['FullPaymentDeadlineRaw']));
-                        } elseif ($payment_received_date) {
-                            // Use payment date + 7 days as expected TV date
-                            $expected_tv_date = date('d M Y', strtotime($payment_received_date . ' +7 days'));
-                        }
-                        $timeline_events[] = [
-                            'date' => !empty($booking['FullPaymentDeadlineRaw']) ? return_timestamp_output($booking['FullPaymentDeadlineRaw'], true, false) : 'N/A',
-                            'title' => 'Travel Voucher Approved',
-                            'action' => '<a href="' . $booking['documents']['tv']['url'] . '" target="_blank">View here</a>',
-                            'status' => 'completed',
-                            'icon' => 'la la-check-circle',
-                            'expected_date' => $expected_tv_date
-                        ];
-                            
-                            $timeline_events[] = [
-                            'date' => !empty($booking['FullPaymentDeadlineRaw']) ? return_timestamp_output($booking['FullPaymentDeadlineRaw'], true, false) : 'N/A',
-                            'title' => 'Pending Travel',
-                            'action' => '',
-                            'status' => 'pending',
-                            'icon' => 'la la-check-circle',
-                            'expected_date' => date('d M Y', strtotime($booking['StartDate'] . ' -1 week'))
-                        ];
-                    } elseif ($booking_status == 'Y') {
-                        // Status: COMPLETED
-                        // Show all completed steps: payment received, namelist submitted, travel voucher approved, travel completed
-                        if ($payment_received_text && $payment_received_date && $payment_received_date_formatted) {
-                            $receipt_url = base_url('Receipt?token=' . $booking['Token']);
-                            $timeline_events[] = [
-                                'date' => $payment_received_date_formatted,
-                                'title' => $payment_received_text,
-                                'action' => '<a href="' . $receipt_url . '" target="_blank">View Here</a>',
-                                'status' => 'completed',
-                                'icon' => 'la la-check-circle'
-                            ];
-                        }
-                        
-                        // Get expected namelist submission date
-                        $expected_namelist_date = 'N/A';
-                        if (!empty($booking['status_change_dates']['PGL'])) {
-                            $expected_namelist_date = date('d M Y', strtotime($booking['status_change_dates']['PGL']));
-                        } elseif ($payment_received_date) {
-                            $expected_namelist_date = date('d M Y', strtotime($payment_received_date . ' +3 days'));
-                        } elseif (!empty($booking['InsertDateRaw'])) {
-                            $expected_namelist_date = date('d M Y', strtotime($booking['InsertDateRaw']));
-                        }
-                        $timeline_events[] = [
-                            'date' => !empty($booking['InsertDateRaw']) ? return_timestamp_output($booking['InsertDateRaw'], true, false) : 'N/A',
-                            'title' => 'Submit Namelist',
-                            'action' => '<a href="' . $booking['documents']['gl']['url'] . '" target="_blank">View here</a>',
-                            'status' => 'completed',
-                            'icon' => 'la la-check-circle',
-                            'expected_date' => $expected_namelist_date
-                        ];
-                        
-                        // Get expected Travel Voucher approval date
-                        $expected_tv_date = 'N/A';
-                        if (!empty($booking['status_change_dates']['PTV'])) {
-                            $expected_tv_date = date('d M Y', strtotime($booking['status_change_dates']['PTV']));
-                        } elseif (!empty($booking['status_change_dates']['PT'])) {
-                            $expected_tv_date = date('d M Y', strtotime($booking['status_change_dates']['PT']));
-                        } elseif (!empty($booking['FullPaymentDeadlineRaw'])) {
-                            $expected_tv_date = date('d M Y', strtotime($booking['FullPaymentDeadlineRaw']));
-                        } elseif ($payment_received_date) {
-                            $expected_tv_date = date('d M Y', strtotime($payment_received_date . ' +7 days'));
-                        }
-                        $timeline_events[] = [
-                            'date' => !empty($booking['status_change_dates']['PT']) ? return_timestamp_output($booking['status_change_dates']['PT'], true, false) : (!empty($booking['FullPaymentDeadlineRaw']) ? return_timestamp_output($booking['FullPaymentDeadlineRaw'], true, false) : 'N/A'),
-                            'title' => 'Travel Voucher Approved',
-                            'action' => '<a href="' . $booking['documents']['tv']['url'] . '" target="_blank">View here</a>',
-                            'status' => 'completed',
-                            'icon' => 'la la-check-circle',
-                            'expected_date' => $expected_tv_date
-                        ];
-                        
-                        // Travel completed - always show this
-                        $travel_completed_date = 'N/A';
-                        if (!empty($booking['status_change_dates']['Y'])) {
-                            $travel_completed_date = return_timestamp_output($booking['status_change_dates']['Y'], true, false);
-                        } elseif (!empty($booking['EndDateRaw'])) {
-                            $travel_completed_date = return_timestamp_output($booking['EndDateRaw'], true, false);
-                        } elseif (!empty($booking['StartDateRaw'])) {
-                            $travel_completed_date = return_timestamp_output($booking['StartDateRaw'], true, false);
-                        }
-                        
-                        // Always show "Travel Completed"
-                        $timeline_events[] = [
-                            'date' => $travel_completed_date,
-                            'title' => 'Travel Completed',
-                            'action' => 'Completed',
-                            'status' => 'completed',
-                            'icon' => 'la la-check-circle',
-                            'expected_date' => !empty($booking['EndDateRaw']) ? date('d M Y', strtotime($booking['EndDateRaw'])) : 'N/A'
-                        ];
-                        
-                        // Check if review is enabled and not submitted - add "Share Your Experience!" as last status
-                        $allow_review = !empty($booking['AllowReview']) && $booking['AllowReview'] == 1;
-                        $has_review = !empty($booking['CustomerReview']);
-                        
-                        if ($allow_review && !$has_review) {
-                            // Add "Share Your Experience!" as the last status if review is enabled but not submitted
-                            $timeline_events[] = [
-                                'date' => $travel_completed_date,
-                                'title' => 'Share Your Experience!',
-                                'action' => '<button class="submit-review-link" data-booking-token="' . htmlspecialchars($booking['Token']) . '" style="background: white; color: #667eea; border: 2px solid white; padding: 6px 16px; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 11px;"><i class="la la-star"></i> Submit Review</button>',
-                                'status' => 'review',
-                                'icon' => 'la la-star',
-                                'expected_date' => null
-                            ];
-                        }
-                            } else {
-                        // For other statuses (OG, etc.), show payment received if available
-                        if ($payment_received_text && $payment_received_date && $payment_received_date_formatted) {
-                            $receipt_url = base_url('Receipt?token=' . $booking['Token']);
-                                $timeline_events[] = [
-                                'date' => $payment_received_date_formatted,
-                                'title' => $payment_received_text,
-                                'action' => '<a href="' . $receipt_url . '" target="_blank">View Here</a>',
-                                'status' => 'completed',
-                                'icon' => 'la la-check-circle'
-                            ];
-                        }
-                    }
-
-                    // Display timeline events
-                    $total_events = count($timeline_events);
-                    $event_index = 0;
-                    foreach ($timeline_events as $event):
-                        $event_index++;
-                        $is_latest = ($event_index === $total_events);
-                        $latest_class = $is_latest ? 'latest' : '';
-                        $highlight_class = !empty($event['highlight']) ? 'timeline-item-highlight' : '';
-                        $clickable_class = !empty($event['clickable']) ? 'timeline-item-clickable' : '';
-                        $data_attrs = '';
-                        if (!empty($event['booking_token'])) {
-                            $data_attrs = 'data-booking-token="' . htmlspecialchars($event['booking_token']) . '"';
-                        }
-                        
-                        // Determine action type and prepare display
-                        $original_action = $event['action'];
-                        $has_link = stripos($original_action, '<a') !== false || stripos($original_action, '<span') !== false || stripos($original_action, '<button') !== false;
-                        $action_display = $original_action;
-                        
-                        // Only simplify if it's not a link
-                        if (!$has_link) {
-                            if ($event['status'] == 'completed' && stripos($original_action, 'Completed') !== false) {
-                                $action_display = '';
-                            } elseif ($event['status'] == 'pending') {
-                                if (stripos($original_action, 'Overdue') !== false) {
-                                    $action_display = 'Overdue';
-                                } elseif (stripos($original_action, 'Pending') !== false) {
-                                    $action_display = 'Pending';
-                                }
-                            }
-                        }
-                    ?>
-                        <div class="timeline-item <?php echo $event['status']; ?> <?php echo $latest_class; ?> <?php echo $highlight_class; ?> <?php echo $clickable_class; ?>" <?php echo $data_attrs; ?>>
-                            <div class="timeline-content">
-                                <div class="timeline-date">
-                                    <i class="<?php echo $event['icon']; ?> timeline-icon"></i>
-                                    <?php echo $event['date']; ?>
-                                </div>
-                                <div class="timeline-title">
-                                    <?php echo htmlspecialchars($event['title']); ?>
-                                    <?php if (!empty($event['expected_date']) && $event['expected_date'] != 'N/A'): ?>
-                                        <small class="timeline-expected-date" style="display: block; font-size: 11px; color: #666; margin-top: 4px; font-weight: normal;">
-                                            Expected date: <?php echo htmlspecialchars($event['expected_date']); ?>
-                                        </small>
-                                    <?php endif; ?>
-                                </div>
-                                <div class="timeline-action<?php echo ($event['status'] == 'pending' && stripos($action_display, 'Overdue') !== false) ? ' overdue' : ''; ?>">
-                                    <?php 
-                                    if ($has_link) {
-                                        // For links (View BC, View Receipt, etc.) - add view icon
-                                        // Add icon before the link text (but not for buttons)
-                                        if (stripos($original_action, '<button') !== false) {
-                                            // For buttons, output directly without modification
-                                            echo $original_action;
-                                        } else {
-                                            // For links, add view icon
-                                            $link_html = preg_replace('/(<a[^>]*>)(.*?)(<\/a>)/i', '$1<i class="la la-eye"></i> $2$3', $original_action);
-                                            echo $link_html;
-                                        }
-                                    } elseif ($event['status'] == 'completed') {
-                                        // For completed actions - add checkmark icon
-                                        $text = !empty($action_display) ? htmlspecialchars($action_display) : 'Completed';
-                                        echo '<span class="timeline-action-text"><i class="la la-check"></i> ' . $text . '</span>';
-                                    } elseif (stripos($action_display, 'Overdue') !== false) {
-                                        // For overdue actions - add warning icon
-                                        echo '<span class="timeline-action-text"><i class="la la-exclamation-triangle"></i> Overdue</span>';
-                                    } elseif (stripos($action_display, 'Pending') !== false || $event['status'] == 'pending') {
-                                        // For pending actions - add clock icon
-                                        echo '<span class="timeline-action-text"><i class="la la-clock"></i> Pending</span>';
-                                    } elseif (!empty($action_display)) {
-                                        // Fallback for any other text
-                                        echo '<span class="timeline-action-text">' . htmlspecialchars($action_display) . '</span>';
-                                    }
-                                    ?>
-                                </div>
+            <!-- Products Section -->
+            <?php if (!empty($booking['products'])): ?>
+                <div class="products-section" style="display: none !important;">
+                    <div class="card-title">
+                        Products & Services
+                    </div>
+                    <?php foreach ($booking['products'] as $product): ?>
+                        <div class="product-item">
+                            <div class="product-name"><?php echo htmlspecialchars($product['Name'] ?? $product['Description'] ?? 'N/A'); ?></div>
+                            <div class="product-details">
+                                <?php if (!empty($product['ProductCode'])): ?>
+                                    <div class="product-detail">
+                                        <span class="detail-label">Code:</span>
+                                        <span><?php echo htmlspecialchars($product['ProductCode']); ?></span>
+                                    </div>
+                                <?php endif; ?>
+                                <?php if (!empty($product['Quantity'])): ?>
+                                    <div class="product-detail">
+                                        <span class="detail-label">Quantity:</span>
+                                        <span><?php echo htmlspecialchars($product['Quantity']); ?></span>
+                                    </div>
+                                <?php endif; ?>
+                                <?php if (!empty($product['Price'])): ?>
+                                    <div class="product-detail">
+                                        <span class="detail-label">Price:</span>
+                                        <span>RM <?php echo number_format($product['Price'], 2); ?></span>
+                                    </div>
+                                <?php endif; ?>
+                                <?php if (!empty($product['Total'])): ?>
+                                    <div class="product-detail">
+                                        <span class="detail-label">Total:</span>
+                                        <span>RM <?php echo number_format($product['Total'], 2); ?></span>
+                                    </div>
+                                <?php endif; ?>
                             </div>
                         </div>
                     <?php endforeach; ?>
                 </div>
-            </div>
-        </div>
+            <?php endif; ?>
 
-        <!-- Products Section -->
-        <?php if (!empty($booking['products'])): ?>
-            <div class="products-section" style="display: none !important;">
+            <!-- Booking Timeline Section -->
+            <?php
+            // ==========================================
+            // TIMELINE DATA CALCULATION
+            // ==========================================
+
+            // Helper function to get relative time
+            if (!function_exists('get_relative_time')) {
+                function get_relative_time($date)
+                {
+                    if (empty($date)) return '';
+                    $timestamp = strtotime($date);
+                    $now = time();
+                    $diff = $now - $timestamp;
+
+                    if ($diff < 0) {
+                        // Future date
+                        $diff = abs($diff);
+                        if ($diff < 86400) return 'today';
+                        if ($diff < 172800) return 'tomorrow';
+                        $days = floor($diff / 86400);
+                        if ($days < 7) return 'in ' . $days . ' days';
+                        if ($days < 30) return 'in ' . ceil($days / 7) . ' weeks';
+                        return 'in ' . ceil($days / 30) . ' months';
+                    } else {
+                        // Past date
+                        if ($diff < 60) return 'just now';
+                        if ($diff < 3600) return floor($diff / 60) . ' mins ago';
+                        if ($diff < 86400) return floor($diff / 3600) . ' hours ago';
+                        if ($diff < 172800) return 'yesterday';
+                        $days = floor($diff / 86400);
+                        if ($days < 7) return $days . ' days ago';
+                        if ($days < 30) return ceil($days / 7) . ' weeks ago';
+                        return ceil($days / 30) . ' months ago';
+                    }
+                }
+            }
+
+            // Get CI instance for model access
+            $CI = &get_instance();
+            $CI->load->helper('booking_flow');
+
+            // Initialize timeline steps
+            $timeline_steps = [];
+            $today = date('Y-m-d');
+            $booking_id = $booking['BookingID'];
+            $booking_status = $booking['Status'];
+            $lock_status = !empty($booking['LockStatus']) ? $booking['LockStatus'] : 'N';
+
+            // Determine which step is current based on sequential checks
+            // 1. BC Approved? -> if not, step 1 is current
+            // 2. Payment Received? -> if not, step 2/3 is current
+            // 3. Checklist Completed? -> if not, step 4 is current
+            // 4. Guest List Locked? -> if not, step 5 is current
+            // 5. Travel Voucher Sent? -> if not, step 6 is current
+            // 6. Travel Ongoing/Completed? -> step 7 or 8
+
+            $bc_approved = !empty($booking['bc_approved']) && $booking['bc_approved'] == 1;
+
+            // Check payments
+            $has_any_payment = false;
+            $payment_date = null;
+            $payment_details = [];
+            if (!empty($booking['payments'])) {
+                foreach ($booking['payments'] as $payment) {
+                    if (
+                        !empty($payment['Credit']) && $payment['Credit'] > 0 &&
+                        ($payment['Status'] == 'Y' || $payment['Status'] == 'P')
+                    ) {
+                        $has_any_payment = true;
+                        if (empty($payment_date)) {
+                            $payment_date = !empty($payment['DateRaw']) ? $payment['DateRaw'] : $payment['Date'];
+                        }
+                        $payment_details[] = [
+                            'type' => $payment['Type'] ?? 'Payment',
+                            'amount' => $payment['Credit'],
+                            'date' => !empty($payment['DateRaw']) ? $payment['DateRaw'] : $payment['Date'],
+                            'status' => $payment['Status']
+                        ];
+                    }
+                }
+            }
+
+            // Check if all required payment is received (deposit or full)
+            $has_deposit_deadline = !empty($booking['DepositDeadlineRaw']);
+            $deposit_paid = false;
+            $full_paid = false;
+            foreach ($payment_details as $p) {
+                $type = strtoupper(trim($p['type'] ?? ''));
+                if ($type == 'DEPOSIT') $deposit_paid = true;
+                if ($type == 'FULL') $full_paid = true;
+            }
+            $payment_complete = $has_deposit_deadline ? ($deposit_paid || $full_paid) : ($has_any_payment || $full_paid);
+
+            // Check checklist completion
+            $checklists_completed = false;
+            if (function_exists('are_all_checklists_completed')) {
+                $booking_obj = (object) $booking;
+                $checklists_completed = are_all_checklists_completed($booking_id, $CI);
+            } else {
+                // Fallback: check if status is past PBO
+                $checklists_completed = in_array($booking_status, ['PTV', 'PT', 'OG', 'Y']);
+            }
+
+            // Check guest list locked
+            $guest_list_locked = ($lock_status == 'Y');
+
+            // Check travel voucher sent (status is PT or later)
+            $travel_voucher_sent = in_array($booking_status, ['PT', 'OG', 'Y']);
+
+            // Check travel dates
+            $travel_start = !empty($booking['StartDateRaw']) ? $booking['StartDateRaw'] : null;
+            $travel_end = !empty($booking['EndDateRaw']) ? $booking['EndDateRaw'] : (!empty($booking['StartDateRaw']) ? $booking['StartDateRaw'] : null);
+            $travel_ongoing = false;
+            $travel_completed = false;
+            if ($travel_start && $travel_end) {
+                $start_date = date('Y-m-d', strtotime($travel_start));
+                $end_date = date('Y-m-d', strtotime($travel_end));
+                if ($today >= $start_date && $today <= $end_date) {
+                    $travel_ongoing = true;
+                } elseif ($today > $end_date) {
+                    $travel_completed = true;
+                }
+            }
+
+            // Status change dates from logs
+            $status_dates = $booking['status_change_dates'] ?? [];
+
+            // Determine current step (first incomplete step)
+            // For full payment only bookings (no deposit deadline), skip step 2 "Payment Received"
+            $current_step = 0;
+            if (!$bc_approved) $current_step = 1;
+            elseif (!$has_deposit_deadline && !$payment_complete) $current_step = 3; // Skip step 2 for full payment only
+            elseif (!$has_any_payment) $current_step = 2;
+            elseif (!$payment_complete) $current_step = 3;
+            elseif (!$checklists_completed) $current_step = 4;
+            elseif (!$guest_list_locked) $current_step = 5;
+            elseif (!$travel_voucher_sent) $current_step = 6;
+            elseif ($travel_ongoing) $current_step = 7;
+            elseif (!$travel_completed) $current_step = 7;
+            else $current_step = 8;
+
+            // Build timeline steps
+            // Prepare document URLs for CTAs
+            $bc_url = base_url('Booking_Confirmation?token=' . $booking['Token']);
+            $receipt_url = base_url('Receipt?token=' . $booking['Token']);
+            $gl_url = base_url('Guest_List?gl=' . $booking['Token']);
+            $tv_url = base_url('Travel_Voucher?token=' . $booking['Token']);
+            
+            // Step 1: BC Approved
+            $bc_date = $booking['bc_approval_date'] ?? $booking['InsertDateRaw'] ?? null;
+            $bc_step_status = $bc_approved ? 'completed' : ($current_step == 1 ? 'current' : 'future');
+            $timeline_steps[] = [
+                'step' => count($timeline_steps) + 1,
+                'title' => 'Booking Confirmed',
+                'description' => 'Your booking has been confirmed',
+                'event_date' => $bc_date,
+                'relative_time' => get_relative_time($bc_date),
+                'expected_date' => null,
+                'status' => $bc_step_status,
+                'icon' => 'check-circle',
+                // CTA: View Booking Confirmation (available when not future)
+                'cta_text' => 'View',
+                'cta_url' => $bc_url,
+                'cta_icon' => 'file-text',
+                'cta_enabled' => ($bc_step_status != 'future')
+            ];
+
+            // Step: Payment Received (only show for bookings with deposit deadline - i.e., deposit + full payment flow)
+            // For full payment only bookings, skip this step and go directly to Full Payment step
+            if ($has_deposit_deadline) {
+                $payment_step_status = $has_any_payment ? 'completed' : ($current_step == 2 ? 'current' : 'future');
+                $timeline_steps[] = [
+                    'step' => count($timeline_steps) + 1,
+                    'title' => 'Payment Received',
+                    'description' => $has_any_payment ? 'Payment has been received' : 'Awaiting payment',
+                    'event_date' => $payment_date,
+                    'relative_time' => get_relative_time($payment_date),
+                    'expected_date' => null,
+                    'status' => $payment_step_status,
+                    'icon' => 'credit-card',
+                    'payment_details' => $payment_details,
+                    // CTA: Download Receipt (available when payment received)
+                    'cta_text' => 'Download',
+                    'cta_url' => $receipt_url,
+                    'cta_icon' => 'download',
+                    'cta_enabled' => $has_any_payment
+                ];
+            }
+
+            // Step: Pending Deposit or Full Payment
+            $payment_deadline = $has_deposit_deadline ? $booking['DepositDeadlineRaw'] : $booking['FullPaymentDeadlineRaw'];
+            $is_overdue = !empty($payment_deadline) && $today > date('Y-m-d', strtotime($payment_deadline)) && !$payment_complete;
+            $full_payment_step_status = $payment_complete ? 'completed' : ($is_overdue ? 'overdue' : ($current_step == 3 ? 'current' : 'future'));
+            
+            $timeline_steps[] = [
+                'step' => count($timeline_steps) + 1,
+                'title' => $has_deposit_deadline ? 'Deposit Payment' : 'Full Payment',
+                'description' => $payment_complete ? 'Payment requirement met' : ($has_deposit_deadline ? 'Deposit payment required' : 'Full payment required'),
+                'event_date' => $payment_complete ? $payment_date : null,
+                'relative_time' => $payment_complete ? get_relative_time($payment_date) : '',
+                'expected_date' => $payment_deadline,
+                'status' => $full_payment_step_status,
+                'icon' => 'dollar-sign',
+                // CTA: Download Receipt (available when payment complete)
+                'cta_text' => 'Download',
+                'cta_url' => $receipt_url,
+                'cta_icon' => 'download',
+                'cta_enabled' => $payment_complete
+            ];
+
+            // Step: Checklist Completed (step number is sequential)
+            $checklist_date = $status_dates['PBO'] ?? null;
+            $checklist_step_status = $checklists_completed ? 'completed' : ($current_step == 4 ? 'current' : 'future');
+            $timeline_steps[] = [
+                'step' => count($timeline_steps) + 1,
+                'title' => 'Checklist Completed',
+                'description' => $checklists_completed ? 'All booking requirements verified' : 'Booking requirements being processed',
+                'event_date' => $checklists_completed ? $checklist_date : null,
+                'relative_time' => $checklists_completed ? get_relative_time($checklist_date) : '',
+                'expected_date' => null,
+                'status' => $checklist_step_status,
+                'icon' => 'clipboard-check',
+                // No CTA for checklist step
+                'cta_text' => null,
+                'cta_url' => null,
+                'cta_icon' => null,
+                'cta_enabled' => false
+            ];
+
+            // Step: Guest List Completed & Locked
+            $gl_date = $status_dates['PTV'] ?? $status_dates['PGL'] ?? null;
+            $gl_step_status = $guest_list_locked ? 'completed' : ($current_step == 5 ? 'current' : 'future');
+            $timeline_steps[] = [
+                'step' => count($timeline_steps) + 1,
+                'title' => 'Guest List Finalized',
+                'description' => $guest_list_locked ? 'Guest list has been submitted and locked' : 'Please submit your guest list',
+                'event_date' => $guest_list_locked ? $gl_date : null,
+                'relative_time' => $guest_list_locked ? get_relative_time($gl_date) : '',
+                'expected_date' => $travel_start ? date('Y-m-d', strtotime($travel_start . ' -7 days')) : null,
+                'status' => $gl_step_status,
+                'icon' => 'users',
+                // CTA: View/Edit Guest List (available when not future - can view or edit)
+                'cta_text' => $guest_list_locked ? 'View' : 'Edit',
+                'cta_url' => $gl_url,
+                'cta_icon' => 'users',
+                'cta_enabled' => ($gl_step_status != 'future')
+            ];
+
+            // Step: Travel Voucher Sent
+            $tv_date = $status_dates['PT'] ?? null;
+            $tv_step_status = $travel_voucher_sent ? 'completed' : ($current_step == 6 ? 'current' : 'future');
+            $timeline_steps[] = [
+                'step' => count($timeline_steps) + 1,
+                'title' => 'Travel Voucher Sent',
+                'description' => $travel_voucher_sent ? 'Your travel voucher is ready' : 'Travel voucher will be sent before your trip',
+                'event_date' => $travel_voucher_sent ? $tv_date : null,
+                'relative_time' => $travel_voucher_sent ? get_relative_time($tv_date) : '',
+                'expected_date' => $travel_start ? date('Y-m-d', strtotime($travel_start . ' -3 days')) : null,
+                'status' => $tv_step_status,
+                'icon' => 'file-text',
+                // CTA: View Travel Voucher (available when travel voucher sent AND guest list locked)
+                'cta_text' => 'View',
+                'cta_url' => $tv_url,
+                'cta_icon' => 'plane',
+                'cta_enabled' => ($travel_voucher_sent && $guest_list_locked)
+            ];
+
+            // Step: Travel Ongoing (optional - only show if relevant)
+            if ($travel_ongoing || ($travel_voucher_sent && !$travel_completed)) {
+                $trip_step_status = $travel_ongoing ? 'current' : ($travel_completed ? 'completed' : 'future');
+                $timeline_steps[] = [
+                    'step' => count($timeline_steps) + 1,
+                    'title' => 'Trip In Progress',
+                    'description' => $travel_ongoing ? 'Enjoy your trip!' : 'Your trip will begin soon',
+                    'event_date' => $travel_ongoing ? $travel_start : null,
+                    'relative_time' => $travel_ongoing ? 'ongoing' : get_relative_time($travel_start),
+                    'expected_date' => $travel_start,
+                    'status' => $trip_step_status,
+                    'icon' => 'plane',
+                    // No CTA for trip in progress
+                    'cta_text' => null,
+                    'cta_url' => null,
+                    'cta_icon' => null,
+                    'cta_enabled' => false
+                ];
+            }
+
+            // Step: Travel Completed
+            $completed_step_status = $travel_completed ? 'completed' : 'future';
+            $timeline_steps[] = [
+                'step' => count($timeline_steps) + 1,
+                'title' => 'Trip Completed',
+                'description' => $travel_completed ? 'We hope you had a wonderful trip!' : 'Trip completion',
+                'event_date' => $travel_completed ? $travel_end : null,
+                'relative_time' => $travel_completed ? get_relative_time($travel_end) : '',
+                'expected_date' => $travel_end,
+                'status' => $completed_step_status,
+                'icon' => 'flag',
+                // No CTA for trip completed
+                'cta_text' => null,
+                'cta_url' => null,
+                'cta_icon' => null,
+                'cta_enabled' => false
+            ];
+            ?>
+
+            <div class="details-card">
                 <div class="card-title">
-                    Products & Services
+                    Timeline
                 </div>
-                <?php foreach ($booking['products'] as $product): ?>
-                    <div class="product-item">
-                        <div class="product-name"><?php echo htmlspecialchars($product['Name'] ?? $product['Description'] ?? 'N/A'); ?></div>
-                        <div class="product-details">
-                            <?php if (!empty($product['ProductCode'])): ?>
-                                <div class="product-detail">
-                                    <span class="detail-label">Code:</span>
-                                    <span><?php echo htmlspecialchars($product['ProductCode']); ?></span>
-                                </div>
-                            <?php endif; ?>
-                            <?php if (!empty($product['Quantity'])): ?>
-                                <div class="product-detail">
-                                    <span class="detail-label">Quantity:</span>
-                                    <span><?php echo htmlspecialchars($product['Quantity']); ?></span>
-                                </div>
-                            <?php endif; ?>
-                            <?php if (!empty($product['Price'])): ?>
-                                <div class="product-detail">
-                                    <span class="detail-label">Price:</span>
-                                    <span>RM <?php echo number_format($product['Price'], 2); ?></span>
-                                </div>
-                            <?php endif; ?>
-                            <?php if (!empty($product['Total'])): ?>
-                                <div class="product-detail">
-                                    <span class="detail-label">Total:</span>
-                                    <span>RM <?php echo number_format($product['Total'], 2); ?></span>
-                                </div>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                <?php endforeach; ?>
-            </div>
-        <?php endif; ?>
 
-        <!-- Timeline and Payment History -->
-        <div class="timeline-payment-grid">
+                <div class="relative">
+                    <!-- Timeline line -->
+                    <div class="absolute left-4 top-0 bottom-0 w-0.5 bg-gray-200"></div>
+
+                    <!-- Timeline items -->
+                    <div class="space-y-6">
+                        <?php foreach ($timeline_steps as $index => $step): ?>
+                            <?php
+                            // Determine colors based on status
+                            $status = $step['status'];
+                            $dot_classes = '';
+                            $text_classes = '';
+                            $bg_classes = '';
+                            $ring_classes = '';
+
+                            switch ($status) {
+                                case 'completed':
+                                    $dot_classes = 'bg-green-500 text-white';
+                                    $text_classes = 'text-gray-700';
+                                    $bg_classes = 'bg-green-50 border-green-200';
+                                    break;
+                                case 'current':
+                                    $dot_classes = 'bg-yellow-400 text-white';
+                                    $text_classes = 'text-gray-900 font-semibold';
+                                    $bg_classes = 'bg-yellow-50 border-yellow-300';
+                                    $ring_classes = 'ring-4 ring-yellow-200';
+                                    break;
+                                case 'overdue':
+                                    $dot_classes = 'bg-red-500 text-white';
+                                    $text_classes = 'text-red-700 font-semibold';
+                                    $bg_classes = 'bg-red-50 border-red-300';
+                                    $ring_classes = 'ring-4 ring-red-200';
+                                    break;
+                                default: // future
+                                    $dot_classes = 'bg-gray-300 text-gray-500';
+                                    $text_classes = 'text-gray-400';
+                                    $bg_classes = 'bg-gray-50 border-gray-200';
+                            }
+
+                            // Icon SVG based on type
+                            $icon_svg = '';
+                            switch ($step['icon']) {
+                                case 'check-circle':
+                                    $icon_svg = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>';
+                                    break;
+                                case 'credit-card':
+                                    $icon_svg = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path>';
+                                    break;
+                                case 'dollar-sign':
+                                    $icon_svg = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>';
+                                    break;
+                                case 'clipboard-check':
+                                    $icon_svg = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>';
+                                    break;
+                                case 'users':
+                                    $icon_svg = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>';
+                                    break;
+                                case 'file-text':
+                                    $icon_svg = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>';
+                                    break;
+                                case 'plane':
+                                    $icon_svg = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>';
+                                    break;
+                                case 'flag':
+                                    $icon_svg = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9"></path>';
+                                    break;
+                                default:
+                                    $icon_svg = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>';
+                            }
+                            ?>
+
+                            <div class="relative flex items-start gap-4 md:gap-8">
+                                <!-- Timeline dot -->
+                                <div class="relative z-10 flex-shrink-0">
+                                    <div class="w-8 h-8 rounded-full flex items-center justify-center <?php echo $dot_classes; ?> <?php echo $ring_classes; ?> transition-all duration-300">
+                                        <?php if ($status == 'completed'): ?>
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path>
+                                            </svg>
+                                        <?php elseif ($status == 'current'): ?>
+                                            <span class="w-2 h-2 bg-white rounded-full animate-pulse"></span>
+                                        <?php elseif ($status == 'overdue'): ?>
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                                            </svg>
+                                        <?php else: ?>
+                                            <span class="text-xs font-medium"><?php echo $step['step']; ?></span>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+
+                                <!-- Content card -->
+                                <div class="flex-1 ml-0 md:ml-0">
+                                    <div class="p-4 rounded-lg border <?php echo $bg_classes; ?> transition-all duration-300 <?php echo ($status == 'current') ? 'shadow-md' : ''; ?>">
+                                        <?php 
+                                        // Prepare CTA data first
+                                        $has_cta = !empty($step['cta_enabled']) && !empty($step['cta_text']) && !empty($step['cta_url']);
+                                        $cta_btn_class = 'timeline-cta-btn rounded-lg';
+                                        $cta_icon_svg = '';
+                                        
+                                        if ($has_cta) {
+                                            if ($status == 'completed') {
+                                                $cta_btn_class .= ' cta-btn-completed';
+                                            } elseif ($status == 'current' || $status == 'overdue') {
+                                                $cta_btn_class .= ' cta-btn-current';
+                                            } else {
+                                                $cta_btn_class .= ' cta-btn-default';
+                                            }
+                                            
+                                            switch ($step['cta_icon'] ?? 'external-link') {
+                                                case 'file-text':
+                                                    $cta_icon_svg = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>';
+                                                    break;
+                                                case 'download':
+                                                    $cta_icon_svg = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>';
+                                                    break;
+                                                case 'users':
+                                                    $cta_icon_svg = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>';
+                                                    break;
+                                                case 'plane':
+                                                    $cta_icon_svg = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>';
+                                                    break;
+                                                default:
+                                                    $cta_icon_svg = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>';
+                                            }
+                                        }
+                                        ?>
+                                        
+                                        <div class="flex items-center gap-2 mb-1">
+                                            <svg class="w-4 h-4 flex-shrink-0 <?php echo ($status == 'completed') ? 'text-green-600' : (($status == 'current') ? 'text-yellow-600' : (($status == 'overdue') ? 'text-red-600' : 'text-gray-400')); ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <?php echo $icon_svg; ?>
+                                            </svg>
+                                            <h3 class="font-semibold <?php echo $text_classes; ?>"><?php echo htmlspecialchars($step['title']); ?></h3>
+                                        </div>
+
+                                        <p class="text-sm <?php echo ($status == 'future') ? 'text-gray-400' : 'text-gray-600'; ?> mb-2">
+                                            <?php echo htmlspecialchars($step['description']); ?>
+                                        </p>
+
+                                        <div class="flex flex-wrap items-center gap-3 text-xs">
+                                            <?php if (!empty($step['event_date'])): ?>
+                                                <span class="inline-flex items-center gap-1 <?php echo ($status == 'completed') ? 'text-green-600' : (($status == 'overdue') ? 'text-red-600' : 'text-gray-500'); ?>">
+                                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                                    </svg>
+                                                    <?php echo date('d M Y', strtotime($step['event_date'])); ?>
+                                                </span>
+                                                <?php if (!empty($step['relative_time'])): ?>
+                                                    <span class="text-gray-400">(<?php echo $step['relative_time']; ?>)</span>
+                                                <?php endif; ?>
+                                            <?php elseif (!empty($step['expected_date']) && $status != 'completed'): ?>
+                                                <span class="inline-flex items-center gap-1 <?php echo ($status == 'overdue') ? 'text-red-600 font-medium' : 'text-gray-400'; ?>">
+                                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                                    </svg>
+                                                    Expected: <?php echo date('d M Y', strtotime($step['expected_date'])); ?>
+                                                </span>
+                                            <?php endif; ?>
+
+                                            <?php if ($status == 'current'): ?>
+                                                <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-yellow-200 text-yellow-800 rounded-full font-medium">
+                                                    <span class="w-1.5 h-1.5 bg-yellow-500 rounded-full animate-pulse"></span>
+                                                    Current Step
+                                                </span>
+                                            <?php elseif ($status == 'overdue'): ?>
+                                                <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-red-200 text-red-800 rounded-full font-medium">
+                                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01"></path>
+                                                    </svg>
+                                                    Overdue
+                                                </span>
+                                            <?php endif; ?>
+                                        </div>
+                                        
+                                        <?php if ($has_cta): 
+                                            // Determine button color based on status
+                                            $btn_color_class = 'cta-btn-gray';
+                                            if ($status == 'completed') {
+                                                $btn_color_class = 'cta-btn-green';
+                                            } elseif ($status == 'current') {
+                                                $btn_color_class = 'cta-btn-yellow';
+                                            } elseif ($status == 'overdue') {
+                                                $btn_color_class = 'cta-btn-red';
+                                            }
+                                        ?>
+                                            <a href="<?php echo htmlspecialchars($step['cta_url']); ?>" 
+                                               target="_blank" 
+                                               class="timeline-cta-btn <?php echo $btn_color_class; ?>">
+                                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                                                </svg>
+                                                <span><?php echo htmlspecialchars($step['cta_text']); ?></span>
+                                            </a>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+
+                <!-- Progress summary -->
+                <div class="mt-6 pt-4 border-t border-gray-100 hidden">
+                    <div class="flex items-center justify-between text-sm">
+                        <span class="text-gray-500">Progress</span>
+                        <?php
+                        $completed_count = 0;
+                        $total_count = count($timeline_steps);
+                        foreach ($timeline_steps as $s) {
+                            if ($s['status'] == 'completed') $completed_count++;
+                        }
+                        $progress_percent = $total_count > 0 ? round(($completed_count / $total_count) * 100) : 0;
+                        ?>
+                        <span class="font-medium text-gray-700"><?php echo $completed_count; ?> of <?php echo $total_count; ?> steps completed</span>
+                    </div>
+                    <div class="mt-2 h-2 bg-gray-200 rounded-full overflow-hidden">
+                        <div class="h-full bg-gradient-to-r from-green-400 to-green-500 rounded-full transition-all duration-500" style="width: <?php echo $progress_percent; ?>%"></div>
+                    </div>
+                </div>
+            </div>
 
             <!-- Payment History Section -->
             <div class="payments-section">
@@ -1918,11 +1689,11 @@
                     Documents
                 </div>
                 <div class="documents-grid">
-                    <?php 
+                    <?php
                     // Check if travel voucher has been sent (status PT or later)
                     $travel_voucher_sent = in_array($booking['Status'], array('PT', 'OG', 'Y', 'PR'));
-                    
-                    foreach ($booking['documents'] as $doc_key => $doc): 
+
+                    foreach ($booking['documents'] as $doc_key => $doc):
                         // Hide custom uploads (extra documents) until travel voucher is sent
                         if (strpos($doc_key, 'cu_') === 0 && !$travel_voucher_sent) {
                             continue;
@@ -1962,21 +1733,21 @@
                     </div>
                 </div>
 
-                <?php 
+                <?php
                 // Hide comment form after travel voucher is sent (status PT or later)
                 // Status progression: P/PP -> PTV -> PT (travel voucher sent) -> OG -> Y
                 $hide_comment_form = in_array($booking['Status'], array('PT', 'OG', 'Y', 'PR'));
-                if (!$hide_comment_form): 
+                if (!$hide_comment_form):
                 ?>
-                <!-- Add New Comment Form -->
-                <div class="pt-3">
-                    <div class="form-group mb-2">
-                        <textarea id="new-customer-comment-content" class="form-control" rows="3" placeholder="Enter your comment or question here..." style="font-size: 14px; resize: vertical;"></textarea>
+                    <!-- Add New Comment Form -->
+                    <div class="pt-3">
+                        <div class="form-group mb-2">
+                            <textarea id="new-customer-comment-content" class="form-control" rows="3" placeholder="Enter your comment or question here..." style="font-size: 14px; resize: vertical;"></textarea>
+                        </div>
+                        <button type="button" id="add-customer-comment-btn" class="btn btn-primary btn-sm" style="font-weight: 600;">
+                            <i class="la la-comment"></i> Add Comment
+                        </button>
                     </div>
-                    <button type="button" id="add-customer-comment-btn" class="btn btn-primary btn-sm" style="font-weight: 600;">
-                        <i class="la la-comment"></i> Add Comment
-                    </button>
-                </div>
                 <?php endif; ?>
             </div>
         </div>
@@ -2060,13 +1831,6 @@
                 openSubmitReviewModal();
             });
 
-            $(document).on('click', '.timeline-review-cta', function(e) {
-                console.log('clicked');
-                e.preventDefault();
-                e.stopPropagation();
-                openSubmitReviewModal();
-            });
-
             // Handle view review link click (fallback if clicked directly)
             $(document).on('click', '.view-review-link', function(e) {
                 e.preventDefault();
@@ -2134,7 +1898,7 @@
                             if (response && response.message) {
                                 errorMsg = response.message;
                             }
-                        } catch(e) {
+                        } catch (e) {
                             // If response is not JSON, use default message
                             if (xhr.status === 404) {
                                 errorMsg = 'Review submission endpoint not found. Please contact support.';
@@ -2182,7 +1946,9 @@
                     '"': '&quot;',
                     "'": '&#039;'
                 };
-                return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+                return text.replace(/[&<>"']/g, function(m) {
+                    return map[m];
+                });
             }
 
             // Helper function to calculate time ago
@@ -2202,7 +1968,11 @@
                     var days = Math.floor(diff / 86400000);
                     return days + ' day' + (days > 1 ? 's' : '') + ' ago';
                 } else {
-                    return new Date(datetime).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                    return new Date(datetime).toLocaleDateString('en-GB', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric'
+                    });
                 }
             }
 
@@ -2220,7 +1990,7 @@
                             response.remarks.forEach(function(remark) {
                                 // Get first letter for avatar color
                                 var avatarColor = ['primary', 'success', 'info', 'warning', 'danger'][remark.commenter_name.charCodeAt(0) % 5];
-                                
+
                                 var commentHtml = '<div class="comment-item d-flex mb-3 pb-3" style="border-bottom: 1px solid #e4e6eb;">' +
                                     // Avatar
                                     '<div class="flex-shrink-0 mr-3">' +
@@ -2252,7 +2022,7 @@
             // Add new customer comment
             $('#add-customer-comment-btn').on('click', function() {
                 var content = $('#new-customer-comment-content').val().trim();
-                
+
                 if (!content) {
                     Swal.fire({
                         icon: 'warning',
@@ -2276,7 +2046,7 @@
                     dataType: 'json',
                     success: function(response) {
                         $btn.prop('disabled', false).html(originalText);
-                        
+
                         if (response.success) {
                             $('#new-customer-comment-content').val('');
                             loadCustomerComments(); // Reload comments to show the new one

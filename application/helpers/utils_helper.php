@@ -323,11 +323,14 @@ function format_mobile_number($mobile_number)
     return null;
 }
 
-function get_offical_whatsapp_link($text = null){
+function get_offical_whatsapp_link($text = null, $phone_number = null){
     if (empty($text)) {
-        $text = 'Welcome to Holidaygogogo!';
+        $text = 'Hi, can i get more information about your travel package?';
     }
-    return 'https://api.whatsapp.com/send?phone=60102956786&text=' . urlencode($text);
+    if (empty($phone_number)) {
+        $phone_number = '60102956786';
+    }
+    return 'https://api.whatsapp.com/send?phone=' . $phone_number . '&text=' . urlencode($text);
 }
 
 function return_timestamp_output($timestamp, $show_time_ago = true, $show_time = true)

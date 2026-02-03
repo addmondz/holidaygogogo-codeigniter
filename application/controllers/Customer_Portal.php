@@ -488,6 +488,7 @@ class Customer_Portal extends CI_Controller
         $status = $booking['Status'];
         $cancel_status = $booking['CancelStatus'];
         $after_sales = $booking['AfterSalesService'];
+        $today = date('Y-m-d');
 
         if ($cancel_status == 'Y') {
             return [
@@ -495,6 +496,40 @@ class Customer_Portal extends CI_Controller
                 'class' => 'status-cancelled',
                 'color' => '#E0115F'
             ];
+        }
+
+        // Check for payment overdue status (only for pending/partial payment statuses)
+        if (in_array($status, ['P', 'PP'])) {
+            $has_deposit_deadline = !empty($booking['DepositDeadlineRaw']);
+            $has_full_payment_deadline = !empty($booking['FullPaymentDeadlineRaw']);
+            $balance_due = isset($booking['balance_due']) ? $booking['balance_due'] : $booking['NetTotal'];
+            
+            // Check if payment is overdue
+            $is_payment_overdue = false;
+            
+            if ($has_deposit_deadline) {
+                // Has deposit deadline - check if deposit deadline passed and balance still due
+                $deposit_deadline = date('Y-m-d', strtotime($booking['DepositDeadlineRaw']));
+                if ($today > $deposit_deadline && $balance_due > 0) {
+                    $is_payment_overdue = true;
+                }
+            }
+            
+            if ($has_full_payment_deadline && !$is_payment_overdue) {
+                // Check full payment deadline
+                $full_payment_deadline = date('Y-m-d', strtotime($booking['FullPaymentDeadlineRaw']));
+                if ($today > $full_payment_deadline && $balance_due > 0) {
+                    $is_payment_overdue = true;
+                }
+            }
+            
+            if ($is_payment_overdue) {
+                return [
+                    'text' => 'Payment Overdue',
+                    'class' => 'status-overdue',
+                    'color' => '#DC3545'
+                ];
+            }
         }
 
         // Determine display status based on BC stage visibility rules

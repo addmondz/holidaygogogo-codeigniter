@@ -65,6 +65,83 @@
             font-weight: 500;
         }
 
+        /* What You Can Do Section */
+        .portal-features-divider {
+            height: 1px;
+            background: linear-gradient(to right, transparent, #e0e0e0, transparent);
+            margin: 25px 0;
+        }
+
+        .portal-features-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #666;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .portal-features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
+        }
+
+        .portal-feature-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 12px 0;
+        }
+
+        .portal-feature-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            font-size: 18px;
+        }
+
+        .portal-feature-icon.icon-view {
+            background: rgba(102, 126, 234, 0.1);
+            color: #667eea;
+        }
+
+        .portal-feature-icon.icon-download {
+            background: rgba(17, 153, 142, 0.1);
+            color: #11998e;
+        }
+
+        .portal-feature-icon.icon-track {
+            background: rgba(245, 87, 108, 0.1);
+            color: #f5576c;
+        }
+
+        .portal-feature-icon.icon-review {
+            background: rgba(255, 193, 7, 0.1);
+            color: #ffc107;
+        }
+
+        .portal-feature-content {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .portal-feature-label {
+            font-size: 14px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .portal-feature-desc {
+            font-size: 13px;
+            color: #777;
+            line-height: 1.4;
+        }
 
         /* Tabs Section */
         .tabs-container {
@@ -355,13 +432,36 @@
             text-decoration: none;
             color: inherit;
             display: block;
-            cursor: pointer;
         }
 
         .booking-card:hover {
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-            transform: translateY(-2px);
             border-color: #667eea;
+        }
+
+        /* Booking Card CTA Button */
+        .booking-card-cta {
+            display: block;
+            width: 100%;
+            padding: 6px 16px;
+            margin-top: 15px;
+            background: #667eea;
+            color: white;
+            text: white;
+            text-align: center;
+            text-decoration: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .booking-card-cta:hover {
+            background: #5a6fd6;
+            color: white;
+        }
+
+        .booking-card-cta i {
+            margin-right: 6px;
+            color: white;
         }
 
         .booking-header {
@@ -732,6 +832,48 @@
         <div class="dashboard-container-header">
             <h1>My Bookings</h1>
             <p>View and manage your travel bookings</p>
+            <div class="search-section">
+                <!-- What You Can Do Here -->
+                <div class="portal-features-title">What You Can Do Here</div>
+                <div class="portal-features-grid">
+                    <div class="portal-feature-item">
+                        <div class="portal-feature-icon icon-view">
+                            <i class="la la-eye"></i>
+                        </div>
+                        <div class="portal-feature-content">
+                            <span class="portal-feature-label">View Bookings</span>
+                            <span class="portal-feature-desc">See all your upcoming and completed travel bookings</span>
+                        </div>
+                    </div>
+                    <div class="portal-feature-item">
+                        <div class="portal-feature-icon icon-download">
+                            <i class="la la-download"></i>
+                        </div>
+                        <div class="portal-feature-content">
+                            <span class="portal-feature-label">Download Documents</span>
+                            <span class="portal-feature-desc">Access booking confirmations and travel vouchers</span>
+                        </div>
+                    </div>
+                    <div class="portal-feature-item">
+                        <div class="portal-feature-icon icon-track">
+                            <i class="la la-map-marker"></i>
+                        </div>
+                        <div class="portal-feature-content">
+                            <span class="portal-feature-label">Track Trip Status</span>
+                            <span class="portal-feature-desc">Monitor payment and booking confirmation status</span>
+                        </div>
+                    </div>
+                    <div class="portal-feature-item">
+                        <div class="portal-feature-icon icon-review">
+                            <i class="la la-star"></i>
+                        </div>
+                        <div class="portal-feature-content">
+                            <span class="portal-feature-label">Leave Reviews</span>
+                            <span class="portal-feature-desc">Share your travel experience and feedback</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
         
         <!-- Customer Details Section -->
@@ -905,7 +1047,7 @@
                             }
                         }
                         ?>
-                        <a href="<?php echo base_url('customer/booking/' . urlencode($booking['Token'] ?? '')); ?>" class="booking-card" data-booking-id="<?php echo htmlspecialchars($booking['BookingID'] ?? 'N/A'); ?>">
+                        <div class="booking-card" data-booking-id="<?php echo htmlspecialchars($booking['BookingID'] ?? 'N/A'); ?>">
                             <div class="booking-header">
                                 <div class="booking-number">
                                     <?php echo htmlspecialchars($booking['BookingNumber'] ?? 'N/A'); ?>
@@ -963,7 +1105,10 @@
                                 </div>
                                 <?php endif; ?>
                             </div>
-                        </a>
+                            <a href="<?php echo base_url('customer/booking/' . urlencode($booking['Token'] ?? '')); ?>" class="booking-card-cta">
+                                <i class="la la-eye"></i> View Details
+                            </a>
+                        </div>
                         <?php endforeach; ?>
                     </div>
 
@@ -988,7 +1133,7 @@
                             $status_class = 'status-completed';
                             $status_text = 'Completed';
                             ?>
-                            <a href="<?php echo base_url('customer/booking/' . urlencode($booking['Token'] ?? '')); ?>" class="booking-card" data-booking-id="<?php echo htmlspecialchars($booking['BookingID'] ?? 'N/A'); ?>">
+                            <div class="booking-card" data-booking-id="<?php echo htmlspecialchars($booking['BookingID'] ?? 'N/A'); ?>">
                                 <div class="booking-header">
                                     <div class="booking-number">
                                         <?php echo htmlspecialchars($booking['BookingNumber'] ?? 'N/A'); ?>
@@ -1030,7 +1175,10 @@
                                     </div>
                                     <?php endif; ?>
                                 </div>
-                            </a>
+                                <a href="<?php echo base_url('customer/booking/' . urlencode($booking['Token'] ?? '')); ?>" class="booking-card-cta">
+                                    <i class="la la-eye"></i> View Details
+                                </a>
+                            </div>
                         <?php endforeach; ?>
                     </div>
 
