@@ -192,29 +192,31 @@
             display: block;
         }
 
-        /* Search Section */
+        /* Search Section - Compact Design */
         .search-section {
             background: white;
             border-radius: 12px;
-            padding: 25px;
-            margin-bottom: 30px;
+            padding: 15px 20px;
+            margin-bottom: 20px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.08);
         }
 
+        .search-section.features-section {
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
         .search-header {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 15px;
+            display: none;
         }
 
         .search-title {
-            font-size: 18px;
+            font-size: 14px;
             font-weight: 600;
             color: #333;
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 8px;
         }
 
         .search-title i {
@@ -222,51 +224,59 @@
         }
 
         .search-helper {
-            font-size: 13px;
+            font-size: 11px;
             color: #999;
             margin-top: 8px;
         }
 
         .search-filters-wrapper {
             display: flex;
-            flex-direction: column;
-            gap: 15px;
+            flex-direction: row;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
         }
 
         .search-input-wrapper {
             position: relative;
-            max-width: 100%;
+            flex: 2;
+            min-width: 200px;
         }
 
         .date-filters-wrapper {
             display: flex;
-            gap: 15px;
-            align-items: flex-end;
+            gap: 10px;
+            align-items: center;
             flex-wrap: wrap;
+            flex: 3;
         }
 
         .date-filter-item {
             display: flex;
-            flex-direction: column;
-            gap: 5px;
+            flex-direction: row;
+            align-items: center;
+            gap: 6px;
             flex: 1;
-            min-width: 150px;
+            min-width: 140px;
         }
 
         .date-filter-label {
-            font-size: 13px;
+            font-size: 12px;
             color: #666;
             font-weight: 500;
+            white-space: nowrap;
         }
 
         .date-filter-input {
-            padding: 10px 12px;
+            padding: 8px 10px;
             border: 1px solid #e0e0e0;
-            border-radius: 8px;
-            font-size: 14px;
+            border-radius: 6px;
+            font-size: 13px;
             font-family: 'Poppins', sans-serif;
             color: #333;
             transition: border-color 0.3s;
+            flex: 1;
+            min-width: 0;
         }
 
         .date-filter-input:focus {
@@ -275,11 +285,11 @@
         }
 
         .btn-clear-filters {
-            padding: 10px 20px;
+            padding: 8px 14px;
             background: #f5f7fa;
             border: 1px solid #e0e0e0;
-            border-radius: 8px;
-            font-size: 14px;
+            border-radius: 6px;
+            font-size: 12px;
             font-weight: 500;
             color: #666;
             cursor: pointer;
@@ -287,7 +297,7 @@
             font-family: 'Poppins', sans-serif;
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 4px;
             white-space: nowrap;
         }
 
@@ -299,10 +309,10 @@
 
         .search-input {
             width: 100%;
-            padding: 12px 40px 12px 15px;
+            padding: 8px 35px 8px 12px;
             border: 1px solid #e0e0e0;
-            border-radius: 8px;
-            font-size: 14px;
+            border-radius: 6px;
+            font-size: 13px;
             font-family: 'Poppins', sans-serif;
             transition: border-color 0.3s;
         }
@@ -314,11 +324,11 @@
 
         .search-icon {
             position: absolute;
-            right: 15px;
+            right: 12px;
             top: 50%;
             transform: translateY(-50%);
             color: #999;
-            font-size: 18px;
+            font-size: 16px;
         }
 
         /* Pagination */
@@ -446,7 +456,6 @@
             margin-top: 15px;
             background: #667eea;
             color: white;
-            text: white;
             text-align: center;
             text-decoration: none;
             border-radius: 8px;
@@ -487,13 +496,60 @@
             text-transform: uppercase;
         }
 
-        .status-pending { background: #fff3cd; color: #856404; }
-        .status-partial { background: #d1ecf1; color: #0c5460; }
-        .status-ongoing { background: #cce5ff; color: #004085; }
-        .status-completed { background: #d4edda; color: #155724; }
-        .status-overdue { background: #f8d7da; color: #721c24; }
-        .status-cancelled { background: #f5c6cb; color: #721c24; }
-        .status-pending-travel {background: #e7f3ff;color: #0b5ed7;}
+        .status-completed {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-pending-review {
+            background: #e2d9f3;
+            color: #6f42c1;
+        }
+
+        .status-pending-payment {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .status-partial-payment {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .status-pending-tv {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .status-pending-gl {
+            background: #ffeaa7;
+            color: #856404;
+        }
+
+        .status-pending-travel {
+            background: #e2e3e5;
+            color: #383d41;
+        }
+
+        .status-ongoing {
+            background: #cce5ff;
+            color: #004085;
+        }
+
+        .status-overdue {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .status-cancelled {
+            background: #f5c6cb;
+            color: #721c24;
+        }
+
+        .status-unknown {
+            background: #e9ecef;
+            color: #495057;
+        }
 
 
         .booking-details {
@@ -597,43 +653,64 @@
             }
 
             .search-section {
-                padding: 20px 15px;
-                margin-bottom: 20px;
+                padding: 12px;
+                margin-bottom: 15px;
+            }
+
+            .search-section.features-section {
+                padding: 15px;
             }
 
             .search-title {
-                font-size: 16px;
-            }
-
-            .search-helper {
-                font-size: 12px;
-            }
-
-            .search-filters-wrapper {
-                gap: 12px;
-            }
-
-            .search-input-wrapper {
-                max-width: 100%;
-            }
-
-            .search-input {
-                padding: 10px 35px 10px 12px;
                 font-size: 13px;
             }
 
-            .date-filters-wrapper {
-                flex-direction: column;
-                gap: 12px;
+            .search-helper {
+                font-size: 10px;
+                margin-top: 6px;
             }
 
-            .date-filter-item {
+            .search-filters-wrapper {
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .search-input-wrapper {
+                width: 100%;
                 min-width: 100%;
             }
 
-            .btn-clear-filters {
+            .search-input {
+                padding: 8px 32px 8px 10px;
+                font-size: 12px;
+            }
+
+            .date-filters-wrapper {
+                flex-direction: row;
+                flex-wrap: wrap;
+                gap: 8px;
                 width: 100%;
-                justify-content: center;
+            }
+
+            .date-filter-item {
+                flex: 1;
+                min-width: calc(50% - 4px);
+            }
+
+            .date-filter-label {
+                font-size: 10px;
+                display: none;
+            }
+
+            .date-filter-input {
+                padding: 8px;
+                font-size: 12px;
+                width: 100%;
+            }
+
+            .btn-clear-filters {
+                padding: 8px 12px;
+                font-size: 11px;
             }
 
             .pagination-container {
@@ -745,6 +822,43 @@
                 font-size: 18px;
             }
 
+            .search-section {
+                padding: 10px;
+                margin-bottom: 12px;
+            }
+
+            .search-filters-wrapper {
+                gap: 8px;
+            }
+
+            .search-input {
+                padding: 7px 30px 7px 10px;
+                font-size: 11px;
+            }
+
+            .search-icon {
+                font-size: 14px;
+                right: 10px;
+            }
+
+            .date-filters-wrapper {
+                gap: 6px;
+            }
+
+            .date-filter-item {
+                min-width: calc(50% - 20px);
+            }
+
+            .date-filter-input {
+                padding: 7px 6px;
+                font-size: 11px;
+            }
+
+            .btn-clear-filters {
+                padding: 7px 10px;
+                font-size: 10px;
+            }
+
             .tabs-container {
                 padding: 15px 10px;
             }
@@ -832,48 +946,6 @@
         <div class="dashboard-container-header">
             <h1>My Bookings</h1>
             <p>View and manage your travel bookings</p>
-            <div class="search-section">
-                <!-- What You Can Do Here -->
-                <div class="portal-features-title">What You Can Do Here</div>
-                <div class="portal-features-grid">
-                    <div class="portal-feature-item">
-                        <div class="portal-feature-icon icon-view">
-                            <i class="la la-eye"></i>
-                        </div>
-                        <div class="portal-feature-content">
-                            <span class="portal-feature-label">View Bookings</span>
-                            <span class="portal-feature-desc">See all your upcoming and completed travel bookings</span>
-                        </div>
-                    </div>
-                    <div class="portal-feature-item">
-                        <div class="portal-feature-icon icon-download">
-                            <i class="la la-download"></i>
-                        </div>
-                        <div class="portal-feature-content">
-                            <span class="portal-feature-label">Download Documents</span>
-                            <span class="portal-feature-desc">Access booking confirmations and travel vouchers</span>
-                        </div>
-                    </div>
-                    <div class="portal-feature-item">
-                        <div class="portal-feature-icon icon-track">
-                            <i class="la la-map-marker"></i>
-                        </div>
-                        <div class="portal-feature-content">
-                            <span class="portal-feature-label">Track Trip Status</span>
-                            <span class="portal-feature-desc">Monitor payment and booking confirmation status</span>
-                        </div>
-                    </div>
-                    <div class="portal-feature-item">
-                        <div class="portal-feature-icon icon-review">
-                            <i class="la la-star"></i>
-                        </div>
-                        <div class="portal-feature-content">
-                            <span class="portal-feature-label">Leave Reviews</span>
-                            <span class="portal-feature-desc">Share your travel experience and feedback</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
         </div>
         
         <!-- Customer Details Section -->
@@ -924,43 +996,33 @@
             </div>
         </div>
 
-        <!-- Global Search Section -->
+        <!-- Compact Search & Filter Section -->
         <div class="search-section">
-            <div class="search-header">
-                <div class="search-title">
-                    Search & Filter Bookings
-                </div>
-            </div>
             <div class="search-filters-wrapper">
                 <div class="search-input-wrapper">
                     <input type="text" 
                            class="search-input" 
                            id="global-search" 
-                           placeholder="Search by booking number or destination...">
+                           placeholder="Search booking number or destination...">
                     <i class="la la-search search-icon"></i>
                 </div>
                 <div class="date-filters-wrapper">
                     <div class="date-filter-item">
-                        <label for="date-from" class="date-filter-label">From Date</label>
+                        <label for="date-from" class="date-filter-label">From</label>
                         <input type="date" 
                                class="date-filter-input" 
-                               id="date-from" 
-                               placeholder="From date">
+                               id="date-from">
                     </div>
                     <div class="date-filter-item">
-                        <label for="date-to" class="date-filter-label">To Date</label>
+                        <label for="date-to" class="date-filter-label">To</label>
                         <input type="date" 
                                class="date-filter-input" 
-                               id="date-to" 
-                               placeholder="To date">
+                               id="date-to">
                     </div>
                     <button type="button" class="btn-clear-filters" id="clear-filters">
-                        <i class="la la-times"></i> Clear
+                        <i class="la la-undo"></i> Reset
                     </button>
                 </div>
-            </div>
-            <div class="search-helper">
-                Search and date filters apply to all bookings across both tabs
             </div>
         </div>
 
@@ -992,68 +1054,13 @@
                 <?php else: ?>
                     <div class="bookings-grid" id="bookings-upcoming" data-original-count="<?php echo count($upcoming_bookings); ?>">
                         <?php foreach ($upcoming_bookings as $booking): ?>
-                        <?php
-                        // Determine booking status based on BC stage visibility rules
-                        $display_status = $booking['Status'];
-                        $status_class = 'status-pending';
-                        $status_text = 'Pending';
-                        
-                        // Check if travel date has passed
-                        // Use EndDate if available, otherwise use StartDate
-                        $travel_date_passed = false;
-                        $travel_end_date = !empty($booking['EndDate']) ? $booking['EndDate'] : $booking['StartDate'];
-                        if (!empty($travel_end_date)) {
-                            // Compare dates (ignore time)
-                            $travel_date = date('Y-m-d', strtotime($travel_end_date));
-                            $travel_date_passed = $travel_date < date('Y-m-d');
-                        }
-
-                        if ($booking['CancelStatus'] == 'Y') {
-                            $status_class = 'status-cancelled';
-                            $status_text = 'Cancelled';
-                        } elseif ($booking['Status'] == 'Y' && $booking['AfterSalesService'] == 'COMPLETE') {
-                            // Completed: Status = 'Y' AND AfterSalesService = 'COMPLETE'
-                            $status_class = 'status-completed';
-                            $status_text = 'Completed';
-                        } elseif ($travel_date_passed) {
-                            // Travel date has passed - show as Completed
-                            $status_class = 'status-completed';
-                            $status_text = 'Completed';
-                        } elseif (in_array($booking['Status'], ['PP', 'PTV', 'PT', 'OG'])) {
-                            // Confirmed: Status IN ('PP', 'PTV', 'PT', 'OG') - after booking confirmation
-                            if ($booking['Status'] == 'OG') {
-                                $status_class = 'status-ongoing';
-                                $status_text = 'Confirmed';
-                            } elseif ($booking['Status'] == 'PP') {
-                                $status_class = 'status-partial';
-                                $status_text = 'Confirmed';
-                            } elseif ($booking['Status'] == 'PT') {
-                                $status_class = 'status-pending-travel';
-                                $status_text = 'Confirmed';
-                            } elseif ($booking['Status'] == 'PTV') {
-                                $status_class = 'status-pending-travel';
-                                $status_text = 'Confirmed';
-                            }
-                        } elseif ($booking['Status'] == 'P') {
-                            // Pending: Status = 'P' (Pending Payment - before booking confirmation)
-                            // Check if overdue
-                            $deadline = !empty($booking['DepositDeadline']) ? $booking['DepositDeadline'] : $booking['FullPaymentDeadline'];
-                            if (!empty($deadline) && strtotime($deadline) < strtotime('today')) {
-                                $status_class = 'status-overdue';
-                                $status_text = 'Pending';
-                            } else {
-                                $status_class = 'status-pending';
-                                $status_text = 'Pending';
-                            }
-                        }
-                        ?>
                         <div class="booking-card" data-booking-id="<?php echo htmlspecialchars($booking['BookingID'] ?? 'N/A'); ?>">
                             <div class="booking-header">
                                 <div class="booking-number">
                                     <?php echo htmlspecialchars($booking['BookingNumber'] ?? 'N/A'); ?>
                                 </div>
-                                <span class="booking-status <?php echo $status_class; ?>">
-                                    <?php echo $status_text; ?>
+                                <span class="booking-status <?php echo $booking['status_display']['class']; ?>">
+                                    <?php echo $booking['status_display']['text']; ?>
                                 </span>
                             </div>
                             <div class="booking-details">
@@ -1128,18 +1135,13 @@
                 <?php else: ?>
                     <div class="bookings-grid" id="bookings-completed" data-original-count="<?php echo count($completed_bookings); ?>">
                         <?php foreach ($completed_bookings as $booking): ?>
-                            <?php
-                            // Completed bookings always show as completed
-                            $status_class = 'status-completed';
-                            $status_text = 'Completed';
-                            ?>
                             <div class="booking-card" data-booking-id="<?php echo htmlspecialchars($booking['BookingID'] ?? 'N/A'); ?>">
                                 <div class="booking-header">
                                     <div class="booking-number">
                                         <?php echo htmlspecialchars($booking['BookingNumber'] ?? 'N/A'); ?>
                                     </div>
-                                    <span class="booking-status <?php echo $status_class; ?>">
-                                        <?php echo $status_text; ?>
+                                    <span class="booking-status <?php echo $booking['status_display']['class']; ?>">
+                                        <?php echo $booking['status_display']['text']; ?>
                                     </span>
                                 </div>
                                 <div class="booking-details">

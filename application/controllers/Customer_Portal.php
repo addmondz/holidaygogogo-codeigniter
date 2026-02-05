@@ -46,12 +46,14 @@ class Customer_Portal extends CI_Controller
         // Get customer bookings separated into upcoming and completed
         $bookings_data = $this->get_customer_bookings_by_category($customer['CustomerID']);
 
-        // Format pax information for each booking
+        // Format pax information and status display for each booking
         foreach ($bookings_data['upcoming'] as &$booking) {
             $booking['PaxInfo'] = $this->format_pax_info($booking['Adult'] ?? 0, $booking['Children'] ?? 0, $booking['Infant'] ?? 0);
+            $booking['status_display'] = $this->get_booking_status_display_for_list($booking);
         }
         foreach ($bookings_data['completed'] as &$booking) {
             $booking['PaxInfo'] = $this->format_pax_info($booking['Adult'] ?? 0, $booking['Children'] ?? 0, $booking['Infant'] ?? 0);
+            $booking['status_display'] = $this->get_booking_status_display_for_list($booking);
         }
 
         // Prepare data for view
@@ -539,6 +541,98 @@ class Customer_Portal extends CI_Controller
         
         if ($status == 'Y' && $after_sales == 'COMPLETE') {
             // Completed
+            return [
+                'text' => 'Completed',
+                'class' => 'status-completed',
+                'color' => '#50C878'
+            ];
+        } elseif (in_array($status, ['PP', 'PTV', 'PT', 'OG'])) {
+            // Confirmed - after booking confirmation
+            return [
+                'text' => 'Confirmed',
+                'class' => 'status-partial-payment',
+                'color' => '#A7C7E7'
+            ];
+        } elseif ($status == 'P') {
+            // Pending - before booking confirmation
+            return [
+                'text' => 'Pending',
+                'class' => 'status-pending-payment',
+                'color' => '#FFBF00'
+            ];
+        }
+
+        // Fallback for any other status
+        return [
+            'text' => 'Unknown',
+            'class' => 'status-unknown',
+            'color' => '#999'
+        ];
+    }
+
+    /**
+     * Get booking status display information for list view (dashboard)
+     * Simplified version that doesn't require payment data
+     * 
+     * @param array $booking
+     * @return array
+     */
+    private function get_booking_status_display_for_list($booking)
+    {
+        $status = $booking['Status'];
+        $cancel_status = $booking['CancelStatus'] ?? 'N';
+        $after_sales = $booking['AfterSalesService'] ?? '';
+        $today = date('Y-m-d');
+
+        if ($cancel_status == 'Y') {
+            return [
+                'text' => 'Cancelled',
+                'class' => 'status-cancelled',
+                'color' => '#E0115F'
+            ];
+        }
+
+        // Check if travel date has passed
+        $travel_end_date = !empty($booking['EndDate']) ? $booking['EndDate'] : $booking['StartDate'];
+        $travel_date_passed = false;
+        if (!empty($travel_end_date)) {
+            $travel_date = date('Y-m-d', strtotime($travel_end_date));
+            $travel_date_passed = $travel_date < $today;
+        }
+
+        // Check for payment overdue status (only for pending/partial payment statuses)
+        if (in_array($status, ['P', 'PP'])) {
+            $has_deposit_deadline = !empty($booking['DepositDeadline']);
+            $has_full_payment_deadline = !empty($booking['FullPaymentDeadline']);
+            
+            // Check if payment is overdue
+            $is_payment_overdue = false;
+            
+            if ($has_deposit_deadline) {
+                $deposit_deadline = date('Y-m-d', strtotime($booking['DepositDeadline']));
+                if ($today > $deposit_deadline) {
+                    $is_payment_overdue = true;
+                }
+            }
+            
+            if ($has_full_payment_deadline && !$is_payment_overdue) {
+                $full_payment_deadline = date('Y-m-d', strtotime($booking['FullPaymentDeadline']));
+                if ($today > $full_payment_deadline) {
+                    $is_payment_overdue = true;
+                }
+            }
+            
+            if ($is_payment_overdue) {
+                return [
+                    'text' => 'Payment Overdue',
+                    'class' => 'status-overdue',
+                    'color' => '#DC3545'
+                ];
+            }
+        }
+
+        // Completed: Status = 'Y' AND AfterSalesService = 'COMPLETE' OR travel date passed
+        if (($status == 'Y' && $after_sales == 'COMPLETE') || $travel_date_passed) {
             return [
                 'text' => 'Completed',
                 'class' => 'status-completed',

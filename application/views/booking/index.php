@@ -51,6 +51,26 @@
     pointer-events: auto !important;
 }
 
+/* Mobile responsive action button - make it smaller and tidier */
+@media (max-width: 768px) {
+    .btn-group .btn-sm.dropdown-toggle {
+        padding: 0.15rem 0.35rem !important;
+        font-size: 0.7rem !important;
+        min-width: 28px !important;
+    }
+    
+    .btn-group .btn-sm.dropdown-toggle::after {
+        margin-left: 0.15em !important;
+        vertical-align: 0.15em !important;
+    }
+    
+    /* Make dropdown menu items smaller on mobile */
+    .btn-group .dropdown-menu .dropdown-item {
+        padding: 0.35rem 0.75rem !important;
+        font-size: 10px !important;
+    }
+}
+
 </style>
 <div class="d-flex flex-column-fluid">
     <div class="container-fluid">
