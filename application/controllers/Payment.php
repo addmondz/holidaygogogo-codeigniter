@@ -117,6 +117,8 @@ class Payment extends MY_Controller
 			return;
 		}
 
+		ob_start();
+
 		$is_sales_agent = $this->session->userdata('level') == 20;
 		$has_ap_permission = in_array('AP', $this->session->access_control);
 		$has_payment_deadline_filter = !empty($this->input->get('payment_deadline'));
@@ -273,8 +275,24 @@ class Payment extends MY_Controller
 			'data' => $data
 		);
 
+		$php_errors = ob_get_clean();
+		if(!empty($php_errors)) {
+			log_message('error', 'Payment::ajax_list() PHP errors: ' . $php_errors);
+		}
+
 		header('Content-Type: application/json');
-		echo json_encode($output);
+		$json = json_encode($output, JSON_INVALID_UTF8_SUBSTITUTE);
+		if($json === false) {
+			echo json_encode(array(
+				'draw' => $draw,
+				'recordsTotal' => 0,
+				'recordsFiltered' => 0,
+				'data' => array(),
+				'error' => 'JSON encoding failed: ' . json_last_error_msg()
+			));
+		} else {
+			echo $json;
+		}
 	}
 
 	function ajax_summary()
@@ -284,6 +302,8 @@ class Payment extends MY_Controller
 			echo json_encode(array('error' => 'Access denied'));
 			return;
 		}
+
+		ob_start();
 
 		$summary = $this->Payment_Model->Calculate_Payment_Summary();
 
@@ -303,8 +323,14 @@ class Payment extends MY_Controller
 			'total_net_profit' => number_format($total_net_profit, 2, '.', ',') . ' (' . $profit_percentage . '%)'
 		);
 
+		$php_errors = ob_get_clean();
+		if(!empty($php_errors)) {
+			log_message('error', 'Payment::ajax_summary() PHP errors: ' . $php_errors);
+		}
+
 		header('Content-Type: application/json');
 		echo json_encode($output);
+		exit;
 	}
 
 	private function build_autocount_status($payment)
