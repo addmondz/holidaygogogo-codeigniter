@@ -102,6 +102,9 @@ class Travel_Voucher extends CI_Controller
                 $this->dompdf->set_option('isRemoteEnabled', true);
                 $this->dompdf->setPaper('A4', 'potrait');
                 $this->dompdf->render();
+                header('Cache-Control: no-cache, no-store, must-revalidate');
+                header('Pragma: no-cache');
+                header('Expires: 0');
                 $this->dompdf->stream($array['Title'] . '.pdf', array('Attachment' => 0));
             } else {
                 $array = array('type' => 'Travel Voucher');

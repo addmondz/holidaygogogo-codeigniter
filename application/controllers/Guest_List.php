@@ -125,6 +125,9 @@ class Guest_List extends CI_Controller
 							$country_code = $this->Universal_Model->Read_Country_Code($array['guest_lists'][0]->SalesAgentCountryCode);
 							$array['guest_lists'][0]->SalesAgentMobile = $country_code . $array['guest_lists'][0]->SalesAgentMobile;
 							$array['country_codes'] = $this->Guest_List_Model->Read_Country_Codes();
+							header('Cache-Control: no-cache, no-store, must-revalidate');
+							header('Pragma: no-cache');
+							header('Expires: 0');
 							$this->load->view('booking/guest_list', $array);
 						} else {							
 							$array = $this->Guest_List_Model->Read_GL_Session_Expiration();

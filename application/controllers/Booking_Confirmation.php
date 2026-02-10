@@ -134,6 +134,10 @@ class Booking_Confirmation extends CI_Controller
                 $output2 = $pdf2->output();
                 file_put_contents('assets/upload/2_'.$identifier.'.pdf', $output2);
 
+                header('Cache-Control: no-cache, no-store, must-revalidate');
+                header('Pragma: no-cache');
+                header('Expires: 0');
+
                 $pdf = new \Clegginabox\PDFMerger\PDFMerger;
 
                 $pdf->addPDF('assets/upload/1_'.$identifier.'.pdf', 'all'); 
