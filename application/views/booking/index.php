@@ -17,65 +17,6 @@
     padding-left: 0.75rem !important;
     text-align: center !important;
 }
-
-/* remarks tooltip styling */
-.tooltip-inner {
-    max-width: 450px !important;
-    text-align: left !important;
-    padding: 0 5px !important;
-    background: #fff !important;
-    color: #050505 !important;
-    border: 1px solid #e4e6eb;
-    border-radius: 8px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35), 0 2px 8px rgba(0, 0, 0, 0.2) !important;
-
-    white-space: pre-line;
-    word-break: break-word;
-    overflow-wrap: break-word;
-    font-size: 0.8rem;
-}
-
-.tooltip.bs-tooltip-left .arrow::before {
-    border-left-color: #e4e6eb !important;
-}
-
-.tooltip.bs-tooltip-left .arrow::after {
-    border-left-color: #fff !important;
-}
-
-.remarks-status[data-toggle="tooltip"]:hover {
-    text-decoration: underline;
-}
-
-/* Ensure tooltip can be interacted with */
-.tooltip {
-    pointer-events: auto !important;
-}
-
-.tooltip-inner {
-    pointer-events: auto !important;
-}
-
-/* Mobile responsive action button - make it smaller and tidier */
-@media (max-width: 768px) {
-    .btn-group .btn-sm.dropdown-toggle {
-        padding: 0.15rem 0.35rem !important;
-        font-size: 0.7rem !important;
-        min-width: 28px !important;
-    }
-    
-    .btn-group .btn-sm.dropdown-toggle::after {
-        margin-left: 0.15em !important;
-        vertical-align: 0.15em !important;
-    }
-    
-    /* Make dropdown menu items smaller on mobile */
-    .btn-group .dropdown-menu .dropdown-item {
-        padding: 0.35rem 0.75rem !important;
-        font-size: 10px !important;
-    }
-}
-
 </style>
 <div class="d-flex flex-column-fluid">
     <div class="container-fluid">
