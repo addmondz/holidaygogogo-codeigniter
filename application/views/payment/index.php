@@ -153,7 +153,7 @@
                                                 <select name="status" class="form-control selectpicker">
                                                     <option data-icon="la la-dollar font-size-lg bs-icon" value="">--SELECT STATUS--</option>
                                                     <?php foreach(unserialize(PAYMENT_STATUS) as $key => $value) { ?>
-                                                        <option data-icon="<?php if($key == 'Y') { echo 'la la-check-circle'; } else if($key == 'P') { echo 'la la-exclamation-circle'; } else { echo 'la la-times-circle'; } ?> font-size-lg bs-icon" value="<?php echo $key; ?>" <?php if((!empty($this->input->get('status')) && $this->input->get('status') == $key) || (empty($this->input->get('status')) && $key == 'P' && strpos($_SERVER['REQUEST_URI'], '?') == false)) { echo 'selected'; } ?>><?php echo $value; ?></option>
+                                                        <option data-icon="<?php if($key == 'Y') { echo 'la la-check-circle'; } else if($key == 'P') { echo 'la la-exclamation-circle'; } else { echo 'la la-times-circle'; } ?> font-size-lg bs-icon" value="<?php echo $key; ?>" <?php if(!empty($this->input->get('status')) && $this->input->get('status') == $key) { echo 'selected'; } ?>><?php echo $value; ?></option>
                                                     <?php } ?>
                                                 </select>
                                             </div>
@@ -272,6 +272,17 @@
                                                 </div>
                                             </div>
                                         </div>
+                                        <div class="col-md-3">
+                                            <div class="form-group">
+                                                <label>Autocount Status</label>
+                                                <select name="autocount_status" class="form-control selectpicker">
+                                                    <option value="">--SELECT AUTOCOUNT STATUS--</option>
+                                                    <option data-icon="la la-clock font-size-lg bs-icon" value="P" <?php if($this->input->get('autocount_status') == 'P') echo 'selected'; ?>>Pending</option>
+                                                    <option data-icon="la la-check-circle font-size-lg bs-icon" value="S" <?php if($this->input->get('autocount_status') == 'S') echo 'selected'; ?>>Synced</option>
+                                                    <option data-icon="la la-times-circle font-size-lg bs-icon" value="F" <?php if($this->input->get('autocount_status') == 'F') echo 'selected'; ?>>Failed</option>
+                                                </select>
+                                            </div>
+                                        </div>
                                     </div>
                                     <input type="button" id="filter" value="Filter" class="btn btn-light-success font-weight-bold" style="width:80px;">
                                     <input type="button" id="reset" value="Reset" class="btn btn-light-primary font-weight-bold" style="width:80px;">
@@ -357,13 +368,19 @@
                 <?php } ?>
                 <br><br>
                 <?php if ($bulkPaymentSyncToAutocount) { ?>
-                    <button type="button" 
-                            class="btn btn-primary font-weight-bold mb-2" 
-                            id="sync-autocount-payment" 
+                    <button type="button"
+                            class="btn btn-primary font-weight-bold mb-2"
+                            id="sync-autocount-payment"
                             style="width:180px; display:none;">
                         Sync Autocount
                     </button>
                 <?php } ?>
+                <button type="button"
+                        class="btn btn-warning font-weight-bold mb-2"
+                        id="change-payment-autocount-to-pending"
+                        style="width:180px; display:none;">
+                    Change to P Status
+                </button>
                 <div class="dataTables_wrapper dt-bootstrap4 no-footer" <?php if(empty($payments)) { echo 'style="overflow-x:auto;"'; } ?>>
                     <table id="kt_datatable" class="table table-bordered table-head-custom table-checkable dataTable no-footer dtr-inline">
                         <thead>
@@ -486,6 +503,7 @@
                             </div>
                         </div>
                     <?php } ?>
+                    <?php if($this->session->userdata('level') != 20) { ?>
                         <div class="row">
                             <br>
                             <div class="col-md-12 pt-3 pb-3" style="background-color:white; border:3px solid #D7E2F2; border-radius:8px;">
@@ -520,6 +538,7 @@
                                 </div>
                             </div>
                         </div>
+                    <?php } ?>
                     <br>
                     <?php if(in_array('GP', $this->session->access_control)) { ?>
                         <a href="<?php if(strpos($current_url, '?') == true) { echo base_url('Payment/Create?') . (explode('?', $current_url))[1]; } else { echo base_url('Payment/Create'); } ?>" class="btn btn-primary font-weight-bold" style="width:180px; float:right;">
@@ -615,6 +634,12 @@
                 $('#sync-autocount-payment').hide();
             }
         }
+
+        if (isChecked) {
+            $('#change-payment-autocount-to-pending').show();
+        } else {
+            $('#change-payment-autocount-to-pending').hide();
+        }
     });
 
     function Select_Payment(payment_id) {
@@ -636,6 +661,12 @@
             } else {
                 $('#sync-autocount-payment').hide();
             }
+        }
+
+        if (payment_ids.length > 0) {
+            $('#change-payment-autocount-to-pending').show();
+        } else {
+            $('#change-payment-autocount-to-pending').hide();
         }
 
         // Update the "Select All" checkbox based on visible checkboxes
@@ -799,31 +830,65 @@
     });
 </script>
 <script>
-document.getElementById('sync-autocount-payment').addEventListener('click', function() {
+var syncAutocountBtn = document.getElementById('sync-autocount-payment');
+if (syncAutocountBtn) {
+    syncAutocountBtn.addEventListener('click', function() {
+        let selected = Array.from(document.querySelectorAll('.check_item:checked'))
+                            .map(cb => cb.value);
+
+        if (selected.length === 0) {
+            alert("Please select at least one payment.");
+            return;
+        }
+
+       fetch("<?php echo base_url('Payment/bulkSyncToAutocount'); ?>", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ payment_ids: selected })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                alert(data.message);
+            } else {
+                alert("❌ " + data.message);
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            alert("Error occurred during sync.");
+        });
+    });
+}
+
+document.getElementById('change-payment-autocount-to-pending').addEventListener('click', function() {
     let selected = Array.from(document.querySelectorAll('.check_item:checked'))
-                        .map(cb => cb.value);
+                        .map(cb => cb.id);
 
     if (selected.length === 0) {
         alert("Please select at least one payment.");
         return;
     }
 
-   fetch("<?php echo base_url('Payment/bulkSyncToAutocount'); ?>", {
+    if (!confirm("Are you sure you want to change " + selected.length + " payment(s) to Pending (P) status?")) {
+        return;
+    }
+
+    fetch("<?php echo base_url('Payment/bulkChangePaymentAutocountStatusToPending'); ?>", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ payment_ids: selected })
     })
     .then(res => res.json())
     .then(data => {
+        alert(data.message);
         if (data.success) {
-            alert(data.message);
-        } else {
-            alert("❌ " + data.message);
+            paymentTable.ajax.reload();
         }
     })
     .catch(err => {
         console.error(err);
-        alert("Error occurred during sync.");
+        alert("Error occurred during status change.");
     });
 });
 </script>
@@ -890,7 +955,7 @@ $(document).ready(function() {
         var filterParams = {};
         var filterKeys = ['booking_number', 'customer', 'travel_date', 'transaction_date', 'payment_deadline',
             'status', 'payment_type', 'transaction_type', 'reference_number', 'supplier',
-            'quotation_number', 'invoice_number', 'bank', 'bank_account', 'bank_holder', 'sales_agent', 'autocount_reference'];
+            'quotation_number', 'invoice_number', 'bank', 'bank_account', 'bank_holder', 'sales_agent', 'autocount_reference', 'autocount_status'];
 
         filterKeys.forEach(function(param) {
             if (urlParams.has(param)) {
@@ -930,6 +995,7 @@ $(document).ready(function() {
                 payment_ids = [];
                 $('#all').prop('checked', false);
                 $('#sync-autocount-payment').hide();
+                $('#change-payment-autocount-to-pending').hide();
             }
         });
 

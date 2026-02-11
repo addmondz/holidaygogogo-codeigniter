@@ -45,7 +45,10 @@ class CustomerSync {
 			$CustomerCode = arr_get($data, 'CustomerCode', '');
 			if (!empty($CustomerCode)) {
 				$param['accNo'] = $CustomerCode;
-			}
+			} 
+			// else {
+			// 	$param['accNo'] = ''; // Let AutoCount generate the customer code
+			// }
 
 			// Send request to AutoCount (Debtor)
 			return autocount_request('POST', 'debtor.create', $param);

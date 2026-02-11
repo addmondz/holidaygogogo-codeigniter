@@ -78,6 +78,20 @@ class Customer_Model extends CI_Model
 			$this->db->where('ChatLanguage', $this->input->get('ChatLanguage'));
 		}
 
+		if ($this->input->get('autocount_status')) {
+			$this->db->where('AutocountSyncStatus', $this->input->get('autocount_status'));
+		}
+
+		if ($this->input->get('created_date')) {
+			$dates = explode(' - ', $this->input->get('created_date'));
+			if (count($dates) == 2) {
+				$start_date = date('Y-m-d', strtotime(str_replace('/', '-', $dates[0])));
+				$end_date = date('Y-m-d', strtotime(str_replace('/', '-', $dates[1])));
+				$this->db->where('DATE(created_at) >=', $start_date);
+				$this->db->where('DATE(created_at) <=', $end_date);
+			}
+		}
+
 		$this->db->where('Status', 'Y');
 		$this->db->where('name IS NOT NULL', null, false);
 		$this->db->where('phone_number IS NOT NULL', null, false);
@@ -111,7 +125,21 @@ class Customer_Model extends CI_Model
 		if ($this->input->get('ChatLanguage')) {
 			$this->db->where('ChatLanguage', $this->input->get('ChatLanguage'));
 		}
-		
+
+		if ($this->input->get('autocount_status')) {
+			$this->db->where('AutocountSyncStatus', $this->input->get('autocount_status'));
+		}
+
+		if ($this->input->get('created_date')) {
+			$dates = explode(' - ', $this->input->get('created_date'));
+			if (count($dates) == 2) {
+				$start_date = date('Y-m-d', strtotime(str_replace('/', '-', $dates[0])));
+				$end_date = date('Y-m-d', strtotime(str_replace('/', '-', $dates[1])));
+				$this->db->where('DATE(created_at) >=', $start_date);
+				$this->db->where('DATE(created_at) <=', $end_date);
+			}
+		}
+
 		$this->db->from('customer');
 		$this->db->where('Status', 'Y');
 		$this->db->where('name IS NOT NULL', null, false);
@@ -270,6 +298,42 @@ class Customer_Model extends CI_Model
             ->update('customer', $data);
     }
 
+    public function generate_customer_code($customer_name)
+    {
+        if (empty($customer_name)) {
+            return null;
+        }
+
+        // Get first character, uppercase if alphabetic
+        $first_char = substr(trim($customer_name), 0, 1);
+        if (ctype_alpha($first_char)) {
+            $first_char = strtoupper($first_char);
+        }
+
+        // Start from prefix 303, increment if sequence exceeds 999
+        $prefix_num = 303;
+        $max_prefix = 399;
+
+        while ($prefix_num <= $max_prefix) {
+            $prefix = $prefix_num . '-' . $first_char;
+
+            $this->db->select("MAX(CAST(SUBSTRING(CustomerCode, 6) AS UNSIGNED)) as max_seq");
+            $this->db->from('customer');
+            $this->db->like('CustomerCode', $prefix, 'after');
+            $result = $this->db->get()->row();
+
+            $max_seq = ($result && $result->max_seq !== null) ? (int)$result->max_seq : 0;
+
+            if ($max_seq < 999) {
+                return $prefix . sprintf('%03d', $max_seq + 1);
+            }
+
+            $prefix_num++;
+        }
+
+        return null;
+    }
+
 	public function get_pending_sycn_customers()
 	{
 		$this->load->helper('autocount');
@@ -288,18 +352,25 @@ class Customer_Model extends CI_Model
 		$this->db->where('AutocountSyncAction IS NOT NULL', null, false);
 		$this->db->where('name IS NOT NULL', null, false);
 
-		// --- NEW, CLEARER QUERY START ---
+		// --- old, CLEARER QUERY START ---
 		// This query uses a nested EXISTS, which is easier to read
 		// and just as performant.
+		// $subquery = "EXISTS (
+		// 	SELECT 1 
+		// 	FROM booking b
+		// 	WHERE b.CustomerID = customer.CustomerID 
+		// 	AND EXISTS (
+		// 		SELECT 1 
+		// 		FROM payment p
+		// 		WHERE p.BookingID = b.BookingID
+		// 	)
+		// )";
+		
+		// new logic condition
 		$subquery = "EXISTS (
 			SELECT 1 
 			FROM booking b
 			WHERE b.CustomerID = customer.CustomerID 
-			AND EXISTS (
-				SELECT 1 
-				FROM payment p
-				WHERE p.BookingID = b.BookingID
-			)
 		)";
 		
 		// Pass the whole string to where()

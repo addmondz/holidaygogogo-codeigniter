@@ -70,6 +70,7 @@ $config['autocount'] = [
 
     'payment_acc_no_1' => '300-d277', // payment in OR
     'payment_acc_no_2' => '400-d019', // payment out PV
+    'payment_acc_no_3' => '310-1000', // special case for BANK CHARGES, CREDIT CARD CHARGES(MAYBANK) 
 
     'supplier_creditTerm' => 'C.O.D.', // supplier need creditTerm
     'customer_creditTerm' => 'C.O.D.', // customer need creditTerm

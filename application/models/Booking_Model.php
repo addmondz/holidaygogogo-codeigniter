@@ -183,11 +183,11 @@ class Booking_Model extends CI_Model
 		} else {
 
 			if($ignore == 0 && isset($level2Ignore) && $level2Ignore == 0) {
-				$this->db->where('CAST(booking.InsertDate AS DATE) >=', date('Y-m-d', strtotime('-7 days')));
+				$this->db->where('CAST(booking.InsertDate AS DATE) >=', date('Y-m-d', strtotime('-14 days')));
 				$this->db->where('CAST(booking.InsertDate AS DATE) <=', date('Y-m-d'));
 			}
 		}
-		
+
 		$this->db->where('booking.Status !=', 'N');
 		$this->db->order_by('booking.BookingID', 'DESC');
 
@@ -481,7 +481,8 @@ class Booking_Model extends CI_Model
 			'ChatLanguage'  => $this->input->post('booking')[0]['ChatLanguage'] ? $this->input->post('booking')[0]['ChatLanguage'] : null,
 			'updated_at'    => date('Y-m-d H:i:s'),
 		];
-		if ((!empty($this->input->post('CustomerID')) && $this->input->post('CustomerID') != 'undefiend')) {
+		$customerId = $this->input->post('CustomerID');
+		if (!empty($customerId) && $customerId != 'undefined' && $customerId != 'null' && is_numeric($customerId)) {
 			$customer_id = $this->input->post('CustomerID');
 			$this->load->model('Customer_Model');
 			$this->Customer_Model->update_by_id($this->input->post('CustomerID'), $data);
@@ -504,9 +505,40 @@ class Booking_Model extends CI_Model
 				}
 			}
 		} else {
-			$data['created_at'] = date('Y-m-d H:i:s');
-			$this->db->insert('customer', $data);
-			$customer_id = $this->db->insert_id();
+			if (!empty($data['name']) || !empty($data['phone_number'])) {
+				$this->load->model('Customer_Model');
+				$customer_code = $this->Customer_Model->generate_customer_code($data['name']);
+
+				$data['created_at'] = date('Y-m-d H:i:s');
+				$data['CustomerCode'] = $customer_code;
+				$data['AutocountSyncAction'] = 'C';
+				$data['AutocountSyncStatus'] = 'P';
+
+				$this->db->insert('customer', $data);
+				$customer_id = $this->db->insert_id();
+ 
+				// remove this no need sync directly, cron will sync customer at first 
+				// // Immediately sync to Autocount
+				// $this->load->library('CustomerSync');
+				// $this->load->helper('autocount');
+				// $config = get_autocount_config();
+				// $data['CustomerID'] = $customer_id;
+				// $result = $this->customersync->autocount_create($data, $config);
+
+				// if (isset($result['status']) && ($result['status'] == 201 || $result['status'] == 204) && $result['error'] === null) {
+				// 	$this->Customer_Model->update_by_id($customer_id, [
+				// 		'AutocountSyncStatus'  => 'S',
+				// 		'AutocountSyncMessage' => json_encode($result)
+				// 	]);
+				// } else {
+				// 	$this->Customer_Model->update_by_id($customer_id, [
+				// 		'AutocountSyncStatus'  => 'F',
+				// 		'AutocountSyncMessage' => json_encode($result)
+				// 	]);
+				// }
+			} else {
+				$customer_id = null;
+			}
 		}
 
 		if($this->input->post('booking_number') != '' || $this->input->post('booking_number') != null) {
@@ -818,7 +850,8 @@ class Booking_Model extends CI_Model
 			if ($data) { $data['updated_at'] = date('Y-m-d H:i:s'); }
 		}
 
-		if ((!empty($this->input->post('CustomerID')) && $this->input->post('CustomerID') != 'undefiend')) {
+		$customerId = $this->input->post('CustomerID');
+		if (!empty($customerId) && $customerId != 'undefined' && $customerId != 'null' && is_numeric($customerId)) {			
 			$this->load->model('Customer_Model');
 			$customer_id = $this->input->post('CustomerID');
 
@@ -844,10 +877,42 @@ class Booking_Model extends CI_Model
 				}
 			}
 		} else {
-			$data['created_at'] = date('Y-m-d H:i:s');
-			$this->db->insert('customer', $data);
-			$customer_id = $this->db->insert_id();
+			if (!empty($data['name']) || !empty($data['phone_number'])) {
+				$this->load->model('Customer_Model');
+				$customer_code = $this->Customer_Model->generate_customer_code($data['name']);
+
+				$data['created_at'] = date('Y-m-d H:i:s');
+				$data['CustomerCode'] = $customer_code;
+				$data['AutocountSyncAction'] = 'C';
+				$data['AutocountSyncStatus'] = 'P';
+
+				$this->db->insert('customer', $data);
+				$customer_id = $this->db->insert_id();
+
+				// no need sync directly, cron will sync customer at first
+				// // Immediately sync to Autocount
+				// $this->load->library('CustomerSync');
+				// $this->load->helper('autocount');
+				// $config = get_autocount_config();
+				// $data['CustomerID'] = $customer_id;
+				// $result = $this->customersync->autocount_create($data, $config);
+
+				// if (isset($result['status']) && ($result['status'] == 201 || $result['status'] == 204) && $result['error'] === null) {
+				// 	$this->Customer_Model->update_by_id($customer_id, [
+				// 		'AutocountSyncStatus'  => 'S',
+				// 		'AutocountSyncMessage' => json_encode($result)
+				// 	]);
+				// } else {
+				// 	$this->Customer_Model->update_by_id($customer_id, [
+				// 		'AutocountSyncStatus'  => 'F',
+				// 		'AutocountSyncMessage' => json_encode($result)
+				// 	]);
+				// }
+			} else {
+				$customer_id = null;
+			}
 		}
+
 
 		$this->db->set('BookingConfirmationFooterID', null);
 		$this->db->where('BookingID', $this->input->post('booking_id'));
@@ -1201,9 +1266,10 @@ class Booking_Model extends CI_Model
 			->where_in('booking.AutocountSyncStatus', $statuses)
 			->where_in('booking.BookingConfirmationTitle', $titles)
 			->where('booking.AutocountSyncAction IS NOT NULL')
-			->where("EXISTS (SELECT 1 FROM payment WHERE payment.BookingID = booking.BookingID AND payment.Status = 'Y')")
 			->order_by('booking.BookingID', 'ASC')
 			->limit($booking_qty_cront);
+
+			// new condition remove have payment only can sync : ->where("EXISTS (SELECT 1 FROM payment WHERE payment.BookingID = booking.BookingID AND payment.Status = 'Y')")
 
 		if (!empty($config['booking_cutoff_date'])) {
 			$date = date('Y-m-d', strtotime($config['booking_cutoff_date']));
@@ -1458,7 +1524,7 @@ class Booking_Model extends CI_Model
 			$this->db->where('CAST(booking.InsertDate AS DATE) <=', $end_date);
 		} else {
 			if($ignore == 0 && isset($level2Ignore) && $level2Ignore == 0) {
-				$this->db->where('CAST(booking.InsertDate AS DATE) >=', date('Y-m-d', strtotime('-7 days')));
+				$this->db->where('CAST(booking.InsertDate AS DATE) >=', date('Y-m-d', strtotime('-14 days')));
 				$this->db->where('CAST(booking.InsertDate AS DATE) <=', date('Y-m-d'));
 			}
 		}
@@ -1566,5 +1632,54 @@ class Booking_Model extends CI_Model
 		);
 	}
 
+	/**
+	 * Bulk update AutocountSyncStatus for multiple bookings
+	 * @param array $booking_ids Array of booking IDs to update
+	 * @param string $status The new status to set (e.g., 'P' for Pending)
+	 * @return bool True if at least one row was affected
+	 */
+	function Update_Autocount_Status_Bulk($booking_ids, $status)
+	{
+		$this->db->where_in('BookingID', $booking_ids);
+		$this->db->update('booking', [
+			'AutocountSyncStatus' => $status,
+			'AutocountSyncMessage' => null
+		]);
+		return $this->db->affected_rows() > 0;
+	}
+
+	/**
+	 * Update AutocountSyncStatus to Pending with reset logic
+	 * If status is F: update directly to P
+	 * If status is P: update to F first, then to P (to trigger re-sync)
+	 * @param array $booking_ids Array of booking IDs to update
+	 * @return bool True on success
+	 */
+	function Update_Autocount_Status_To_Pending_With_Reset($booking_ids)
+	{
+		// Get current status for all selected bookings
+		$this->db->select('BookingID, AutocountSyncStatus');
+		$this->db->where_in('BookingID', $booking_ids);
+		$bookings = $this->db->get('booking')->result_array();
+
+		foreach ($bookings as $booking) {
+			if ($booking['AutocountSyncStatus'] == 'P') {
+				// P -> F -> P (intermediate F to reset)
+				$this->db->where('BookingID', $booking['BookingID']);
+				$this->db->update('booking', [
+					'AutocountSyncStatus' => 'F',
+					'AutocountSyncMessage' => 'Reset from P status'
+				]);
+			}
+			// Now update to P
+			$this->db->where('BookingID', $booking['BookingID']);
+			$this->db->update('booking', [
+				'AutocountSyncStatus' => 'P',
+				'AutocountSyncMessage' => null
+			]);
+		}
+
+		return true;
+	}
 
 }

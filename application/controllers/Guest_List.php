@@ -232,6 +232,10 @@ class Guest_List extends CI_Controller
 							$this->db->where('Status', 'Y');
 							$this->db->order_by('room_name', 'ASC');
 							$array['rooms'] = $this->db->get('guest_list_room')->result();
+							
+							header('Cache-Control: no-cache, no-store, must-revalidate');
+							header('Pragma: no-cache');
+							header('Expires: 0');
 							$this->load->view('booking/guest_list', $array);
 						} else {							
 							$array = $this->Guest_List_Model->Read_GL_Session_Expiration();

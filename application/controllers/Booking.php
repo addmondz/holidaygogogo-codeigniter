@@ -127,31 +127,42 @@ class Booking extends MY_Controller
 		$order_dir = $this->input->get('order[0][dir]') == 'asc' ? 'ASC' : 'DESC';
 
 		// Map column index to database column
+		// Note: Column indices must match the frontend DataTables columns array
+		// For non-sales agents: row_number(0), checkbox(1), sales_agent(2), insert_date(3), booking_number(4), ...
+		// For sales agents: row_number(0), checkbox(1), insert_date(2), booking_number(3), ...
 		$columns = array(
-			0 => 'booking.BookingID',      // checkbox
-			1 => 'booking.BookingID',      // row number
-			2 => 'admin.Name',             // sales agent (or skip for sales agents)
-			3 => 'booking.InsertDate',     // creation date
-			4 => 'BookingNumber',          // BC number
-			5 => 'booking.BookingConfirmationTitle', // BC
-			6 => 'Customer',               // customer
-			7 => 'booking.ChatLanguage',   // chat
-			8 => 'booking.Mobile',         // mobile
-			9 => 'StartDate',              // start
-			10 => 'EndDate',               // end
-			11 => 'category.Name',         // destination
-			12 => 'NetTotal',              // net sales
-			13 => 'NetTotal',              // profit (calculated, use NetTotal as proxy)
-			14 => 'NetTotal',              // profit margin (calculated)
-			15 => 'booking.Status',        // BC status
-			16 => 'LockStatus',            // GL status
-			17 => 'booking.AutocountSyncStatus', // autocount status
-			18 => 'booking.BookingID'      // action
+			0 => 'booking.BookingID',             // row number
+			1 => 'booking.BookingID',             // checkbox (placeholder)
+			2 => 'admin.Name',                    // sales agent
+			3 => 'booking.InsertDate',            // creation date
+			4 => 'BookingNumber',                 // BC number
+			5 => 'booking.BookingConfirmationTitle', // BC title
+			6 => 'Customer',                      // customer
+			7 => 'booking.ChatLanguage',          // chat
+			8 => 'booking.Mobile',                // mobile
+			9 => 'StartDate',                     // start
+			10 => 'EndDate',                      // end
+			11 => 'category.Name',                // destination
+			12 => 'NetTotal',                     // net sales
+			13 => 'NetTotal',                     // profit
+			14 => 'NetTotal',                     // profit margin
+			15 => 'booking.Status',               // BC status
+			16 => 'LockStatus',                   // GL status
+			17 => 'booking.AutocountSyncStatus',  // autocount status
+			18 => 'booking.BookingID'             // action
 		);
 
-		// Adjust column index for sales agents (they don't see SA column)
-		if($is_sales_agent && $order_column_index > 1) {
-			$order_column_index++;
+		// Adjust column index for sales agents
+		// Sales agents don't see: sales_agent (index 2), profit (index 13), profit_margin (index 14)
+		// So their column indices need to be mapped back to the full column array
+		if($is_sales_agent) {
+			if($order_column_index >= 2 && $order_column_index <= 11) {
+				// Columns 2-11: add 1 for missing sales_agent column
+				$order_column_index++;
+			} else if($order_column_index >= 12) {
+				// Columns 12+: add 3 for missing sales_agent + profit + profit_margin
+				$order_column_index += 3;
+			}
 		}
 
 		$order_column = isset($columns[$order_column_index]) ? $columns[$order_column_index] : 'booking.BookingID';
@@ -268,8 +279,12 @@ class Booking extends MY_Controller
 			// Build row data
 			$row = array();
 
-			// Checkbox
-			$row['checkbox'] = '<input type="checkbox" class="check_item" value="' . $booking->BookingID . '">';
+			// Checkbox - show for Failed and Pending autocount status
+			if (in_array($booking->AutocountSyncStatus, ['F', 'P'])) {
+				$row['checkbox'] = '<input type="checkbox" class="check_item" value="' . $booking->BookingID . '">';
+			} else {
+				$row['checkbox'] = ''; // Empty for Synced status
+			}
 
 			// Row number
 			$row['row_number'] = $count;
@@ -2213,6 +2228,31 @@ class Booking extends MY_Controller
             'message' => implode("\n", $results) // return as plain text
         ]));
     }
+
+	/**
+	 * Bulk change autocount status to Pending (P) with reset logic
+	 * If status is F: update directly to P
+	 * If status is P: update to F first, then to P (to trigger re-sync)
+	 */
+	public function bulkChangeAutocountStatusToPending()
+	{
+		$json = file_get_contents('php://input');
+		$data = json_decode($json, true);
+		$booking_ids = isset($data['booking_ids']) ? $data['booking_ids'] : [];
+
+		if (empty($booking_ids)) {
+			echo json_encode(['success' => false, 'message' => 'No bookings selected']);
+			return;
+		}
+
+		$result = $this->Booking_Model->Update_Autocount_Status_To_Pending_With_Reset($booking_ids);
+
+		if ($result) {
+			echo json_encode(['success' => true, 'message' => count($booking_ids) . ' booking(s) updated to Pending status']);
+		} else {
+			echo json_encode(['success' => false, 'message' => 'Failed to update bookings']);
+		}
+	}
 
 	public function autocount_create($data)
 	{

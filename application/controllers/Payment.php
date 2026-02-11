@@ -117,6 +117,8 @@ class Payment extends MY_Controller
 			return;
 		}
 
+		ob_start();
+
 		$is_sales_agent = $this->session->userdata('level') == 20;
 		$has_ap_permission = in_array('AP', $this->session->access_control);
 		$has_payment_deadline_filter = !empty($this->input->get('payment_deadline'));
@@ -130,14 +132,21 @@ class Payment extends MY_Controller
 		$order_column_index = intval($this->input->get('order[0][column]'));
 		$order_dir = $this->input->get('order[0][dir]') == 'asc' ? 'ASC' : 'DESC';
 
-		// Column mapping (adjusts based on user role and filters)
+		// Build column mapping dynamically based on user role and permissions
 		$columns = array(
-			0 => 'payment.PaymentID',        // row number
-			1 => 'payment.PaymentID',        // checkbox
-			2 => 'payment.Date',             // transaction date
+			0 => 'payment.PaymentID',  // row number
 		);
 
-		$col_index = 3;
+		$col_index = 1;
+
+		// Checkbox column only exists for non-SA with AP permission
+		if(!$is_sales_agent && $has_ap_permission) {
+			$columns[$col_index] = 'payment.PaymentID';  // checkbox
+			$col_index++;
+		}
+
+		$columns[$col_index++] = 'payment.Date';  // transaction date
+
 		if(!$is_sales_agent) {
 			$columns[$col_index] = 'admin.Name';  // sales agent
 			$col_index++;
@@ -266,8 +275,24 @@ class Payment extends MY_Controller
 			'data' => $data
 		);
 
+		$php_errors = ob_get_clean();
+		if(!empty($php_errors)) {
+			log_message('error', 'Payment::ajax_list() PHP errors: ' . $php_errors);
+		}
+
 		header('Content-Type: application/json');
-		echo json_encode($output);
+		$json = json_encode($output, JSON_INVALID_UTF8_SUBSTITUTE);
+		if($json === false) {
+			echo json_encode(array(
+				'draw' => $draw,
+				'recordsTotal' => 0,
+				'recordsFiltered' => 0,
+				'data' => array(),
+				'error' => 'JSON encoding failed: ' . json_last_error_msg()
+			));
+		} else {
+			echo $json;
+		}
 	}
 
 	function ajax_summary()
@@ -277,6 +302,8 @@ class Payment extends MY_Controller
 			echo json_encode(array('error' => 'Access denied'));
 			return;
 		}
+
+		ob_start();
 
 		$summary = $this->Payment_Model->Calculate_Payment_Summary();
 
@@ -296,8 +323,14 @@ class Payment extends MY_Controller
 			'total_net_profit' => number_format($total_net_profit, 2, '.', ',') . ' (' . $profit_percentage . '%)'
 		);
 
+		$php_errors = ob_get_clean();
+		if(!empty($php_errors)) {
+			log_message('error', 'Payment::ajax_summary() PHP errors: ' . $php_errors);
+		}
+
 		header('Content-Type: application/json');
 		echo json_encode($output);
+		exit;
 	}
 
 	private function build_autocount_status($payment)
@@ -355,7 +388,7 @@ class Payment extends MY_Controller
 
 		// Generate Receipt option
 		if($payment->Status == 'Y' && substr($payment->AutocountReferenceNumber, 0, 2) !== 'PV') {
-			$html .= '<a href="' . base_url('Receipt?token=' . $payment->Token) . '" target="_blank" class="dropdown-item" style="font-size:11px; color:#28a745;">Generate Receipt</a>';
+			$html .= '<a href="' . base_url('Receipt?token=' . $payment->Token . '&payment_id=' . $payment->PaymentID) . '" target="_blank" class="dropdown-item" style="font-size:11px; color:#28a745;">Generate Receipt</a>';
 		}
 
 		// Update option
@@ -1320,6 +1353,26 @@ class Payment extends MY_Controller
             'message' => implode("\n", $results) // return as plain text
         ]));
     }
+
+	public function bulkChangePaymentAutocountStatusToPending()
+	{
+		$json = file_get_contents('php://input');
+		$data = json_decode($json, true);
+		$payment_ids = isset($data['payment_ids']) ? $data['payment_ids'] : [];
+
+		if (empty($payment_ids)) {
+			echo json_encode(['success' => false, 'message' => 'No payments selected']);
+			return;
+		}
+
+		$result = $this->Payment_Model->Update_Payment_Autocount_Status_To_Pending_With_Reset($payment_ids);
+
+		if ($result) {
+			echo json_encode(['success' => true, 'message' => count($payment_ids) . ' payment(s) updated to Pending status']);
+		} else {
+			echo json_encode(['success' => false, 'message' => 'Failed to update payments']);
+		}
+	}
 
 	public function autocount_create($data = [])
 	{

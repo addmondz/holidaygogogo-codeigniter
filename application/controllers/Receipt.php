@@ -62,11 +62,18 @@ class Receipt extends CI_Controller
         $array['Title'] = 'Receipt_' . $array['BookingNumber'];
         $array['InsertDate'] = strtoupper(date('j M Y'));
         
+        // Get payment_id filter from URL (for single payment receipt)
+        $payment_id = $this->input->get('payment_id');
+
         // Get approved payments for this booking
         $this->db->select('Date, Type, Credit, ReferenceNumber, AutocountReferenceNumber, Status');
         $this->db->where('BookingID', $array['BookingID']);
         $this->db->where('Status', 'Y');
         $this->db->where('Credit >', 0);
+        // Filter to specific payment if payment_id provided
+        if(!empty($payment_id)) {
+            $this->db->where('PaymentID', $payment_id);
+        }
         $this->db->order_by('Date', 'ASC');
         $approved_payments = $this->db->get('payment')->result();
         
@@ -170,13 +177,13 @@ class Receipt extends CI_Controller
         } else {
             $sen = '';
         }
-        $array['ReceiveSumOf'] = 'RINGGIT MALAYSIA ' . strtoupper($ringgit) . ' ' . $sen . ' ONLY.';
+        $array['ReceiveSumOf'] = 'RINGGIT MALAYSIA ' . strtoupper($ringgit) . ' ' . strtoupper($sen) . ' ONLY.';
 
         // Format payments for view
         $payments = [];
         foreach($approved_payments as $payment) {
             $pay = new stdClass();
-            $pay->PaymentBy = ($payment->Type == 'FULL') ? 'M2U' : $payment->Type;
+            $pay->PaymentBy = $payment->Type;
             $pay->ChequeNo = $payment->ReferenceNumber;
             $pay->Amount = $payment->Credit;
             $payments[] = $pay;
