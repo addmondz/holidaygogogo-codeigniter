@@ -983,12 +983,6 @@
                     <span class="detail-label">Customer Mobile</span>
                     <span class="detail-value"><?php echo htmlspecialchars($booking['CustomerMobile']); ?></span>
                 </div>
-                <?php if (!empty($booking['SalesAgentName'])): ?>
-                    <div class="detail-item">
-                        <span class="detail-label">Sales Agent</span>
-                        <span class="detail-value"><?php echo htmlspecialchars($booking['SalesAgentName']); ?></span>
-                    </div>
-                <?php endif; ?>
                 <?php if (!empty($booking['InsertDate'])): ?>
                     <div class="detail-item">
                         <span class="detail-label">Booking Date</span>
@@ -1549,9 +1543,6 @@
                                                 </span>
                                             <?php elseif ($status == 'overdue'): ?>
                                                 <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-red-200 text-red-800 rounded-full font-medium">
-                                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01"></path>
-                                                    </svg>
                                                     Overdue
                                                 </span>
                                             <?php endif; ?>
@@ -1727,6 +1718,23 @@
                 <div class="card-title">
                     Your Comments
                 </div>
+                <?php
+                $hide_comment_form = in_array($booking['Status'], array('PT', 'OG', 'Y', 'PR'));
+                if (!$hide_comment_form):
+                ?>
+                <div class="mb-3 p-3 rounded" style="background: #f0f7ff; border: 1px solid #cce5ff; font-size: 13px; color: #004085;">
+                    <strong>How to use:</strong>
+                    <ul class="mb-0 pl-3" style="line-height: 1.6;">
+                        <li><strong>Ask questions</strong> or add notes about your booking — type in the box below and click <strong>Add Comment</strong>.</li>
+                        <li>Our team will see your message and can reply here. You can read all comments and replies in this section.</li>
+                        <li><strong>Commenting closes</strong> once your travel voucher has been sent. After that you can still read the conversation but cannot add new comments.</li>
+                    </ul>
+                </div>
+                <?php else: ?>
+                <div class="mb-3 p-3 rounded" style="background: #fff3cd; border: 1px solid #ffc107; font-size: 13px; color: #856404;">
+                    <strong>Commenting is closed.</strong> You can no longer add new comments because your travel voucher has been sent. You can still read the conversation below.
+                </div>
+                <?php endif; ?>
                 <div id="customer-comments-list" class="mb-3" style="min-height: 100px;">
                     <div class="text-center text-muted py-3" style="font-size: 14px;">
                         <i class="la la-spinner la-spin"></i> Loading comments...
@@ -1736,7 +1744,6 @@
                 <?php
                 // Hide comment form after travel voucher is sent (status PT or later)
                 // Status progression: P/PP -> PTV -> PT (travel voucher sent) -> OG -> Y
-                $hide_comment_form = in_array($booking['Status'], array('PT', 'OG', 'Y', 'PR'));
                 if (!$hide_comment_form):
                 ?>
                     <!-- Add New Comment Form -->
