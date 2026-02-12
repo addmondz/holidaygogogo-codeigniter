@@ -296,6 +296,13 @@
 																		<input <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="nominee_identification_numbers[]" id="<?php echo 'nominee_identification_number-' . $guest->GuestListID; ?>" value="<?php echo $guest->NomineeIdentificationNumber; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="form-control">
 																	</div>
 																	<div class="col-md-6">
+																		<label>Nominee Contact Number</label>
+																		<input <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="nominee_contact_numbers[]" id="<?php echo 'nominee_contact_number-' . $guest->GuestListID; ?>" value="<?php echo $guest->NomineeContactNumber; ?>" autocomplete="off" class="form-control">
+																	</div>
+																</div>
+																<br>
+																<div class="row">
+																	<div class="col-md-6 mb-7 mb-md-0">
 																		<label id="<?php echo 'relationship_label-' . $guest->GuestListID; ?>">Relationship <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>
 																		<input <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="relationships[]" id="<?php echo 'relationship-' . $guest->GuestListID; ?>" value="<?php echo $guest->Relationship; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="form-control">
 																		<p style="color:#FAA0A0; font-size:10px; margin-top:5px;">(must be relative and not in the trip, eg cousin, uncle, sister, brother, father, mother & etc)</p>
@@ -627,6 +634,13 @@
 														'<input type="text" name="new_nominee_identification_numbers[]" id="nominee_identification_number-'+ guest_list_id +'" onchange="Set_Required_Field('+ guest_list_id +')" autocomplete="off" class="form-control">' +
 													'</div>' +
 													'<div class="col-md-6">' +
+														'<label>Nominee Contact Number</label>' +
+														'<input type="text" name="new_nominee_contact_numbers[]" id="nominee_contact_number-'+ guest_list_id +'" autocomplete="off" class="form-control">' +
+													'</div>' +
+												'</div>' +
+												'<br>' +
+												'<div class="row">' +
+													'<div class="col-md-6 mb-7 mb-md-0">' +
 														'<label id="relationship_label-'+ guest_list_id +'">Relationship</label>' +
 														'<input type="text" name="new_relationships[]" id="relationship-'+ guest_list_id +'" onchange="Set_Required_Field('+ guest_list_id +')" autocomplete="off" class="form-control">' +
 														'<p style="color:#FAA0A0; font-size:10px; margin-top:5px;">(must be relative and not in the trip, eg cousin, uncle, sister, brother, father, mother & etc)</p>' +
@@ -834,6 +848,9 @@
 							}
 							if(value.NomineeIdentificationNumber != null && $(`#nominee_identification_number-${value.GuestListID}`).val() == '') {
 								$(`#nominee_identification_number-${value.GuestListID}`).val(value.NomineeIdentificationNumber);
+							}
+							if(value.NomineeContactNumber != null && $(`#nominee_contact_number-${value.GuestListID}`).val() == '') {
+								$(`#nominee_contact_number-${value.GuestListID}`).val(value.NomineeContactNumber);
 							}
 							if(value.Relationship != null && $(`#relationship-${value.GuestListID}`).val() == '') {
 								$(`#relationship-${value.GuestListID}`).val(value.Relationship);

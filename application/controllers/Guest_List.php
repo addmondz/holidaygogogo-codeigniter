@@ -200,12 +200,13 @@ class Guest_List extends CI_Controller
 		$spreadsheet->getActiveSheet()->setCellValue('Y1', 'COUNTRY');
 		$spreadsheet->getActiveSheet()->setCellValue('Z1', 'NOMINEE');
 		$spreadsheet->getActiveSheet()->setCellValue('AA1', 'NOMINEE IDENTIFICATION NUMBER');
-		$spreadsheet->getActiveSheet()->setCellValue('AB1', 'RELATIONSHIP');
+		$spreadsheet->getActiveSheet()->setCellValue('AB1', 'NOMINEE CONTACT NUMBER');
+		$spreadsheet->getActiveSheet()->setCellValue('AC1', 'RELATIONSHIP');
 		$row = 2;
 		$guest_lists = $this->Guest_List_Model->Read_Guest_Lists1();
-		$spreadsheet->getActiveSheet()->getStyle('A1:AB1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_BLACK);
-		$spreadsheet->getActiveSheet()->getStyle('A1:AB1')->getFont()->getColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_WHITE);
-		$spreadsheet->getActiveSheet()->getStyle('A1:AB1')->getFont()->setBold(true);
+		$spreadsheet->getActiveSheet()->getStyle('A1:AC1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_BLACK);
+		$spreadsheet->getActiveSheet()->getStyle('A1:AC1')->getFont()->getColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_WHITE);
+		$spreadsheet->getActiveSheet()->getStyle('A1:AC1')->getFont()->setBold(true);
 		foreach($guest_lists as $guest) {
 			$guest->CustomerMobile = $guest->CountryCode . $guest->CustomerMobile;
 			if(!empty($guest->StartDate) && !empty($guest->EndDate)) {
@@ -255,10 +256,11 @@ class Guest_List extends CI_Controller
 			$spreadsheet->getActiveSheet()->setCellValueExplicit('Y' . $row, $guest->Country, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 			$spreadsheet->getActiveSheet()->setCellValueExplicit('Z' . $row, $guest->Nominee, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 			$spreadsheet->getActiveSheet()->setCellValueExplicit('AA' . $row, $guest->NomineeIdentificationNumber, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-			$spreadsheet->getActiveSheet()->setCellValueExplicit('AB' . $row, $guest->Relationship, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('AB' . $row, $guest->NomineeContactNumber, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('AC' . $row, $guest->Relationship, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 			$row++;
 		}
-		$spreadsheet->getActiveSheet()->getStyle('A:AB')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_RIGHT);
+		$spreadsheet->getActiveSheet()->getStyle('A:AC')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_RIGHT);
 		$spreadsheet->getActiveSheet()->getColumnDimension('A')->setWidth(35);
 		$spreadsheet->getActiveSheet()->getColumnDimension('B')->setWidth(35);
 		$spreadsheet->getActiveSheet()->getColumnDimension('C')->setWidth(35);
@@ -287,6 +289,7 @@ class Guest_List extends CI_Controller
 		$spreadsheet->getActiveSheet()->getColumnDimension('Z')->setWidth(35);
 		$spreadsheet->getActiveSheet()->getColumnDimension('AA')->setWidth(35);
 		$spreadsheet->getActiveSheet()->getColumnDimension('AB')->setWidth(35);
+		$spreadsheet->getActiveSheet()->getColumnDimension('AC')->setWidth(35);
 		$guest_lists = 'GUEST_LISTS_' . $guest_lists[0]->BookingNumber . '.xlsx';
 		header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 		header('Content-Disposition: attachment;filename="' . $guest_lists . '"');
