@@ -1157,7 +1157,10 @@
                 if ($type == 'DEPOSIT') $deposit_paid = true;
                 if ($type == 'FULL') $full_paid = true;
             }
-            $payment_complete = $has_deposit_deadline ? ($deposit_paid || $full_paid) : ($has_any_payment || $full_paid);
+            $total_paid = isset($booking['total_paid']) ? floatval($booking['total_paid']) : 0;
+            $net_total = isset($booking['NetTotal']) ? floatval($booking['NetTotal']) : 0;
+            $deposit_complete = $has_deposit_deadline ? ($has_any_payment || $deposit_paid || $full_paid) : false;
+            $full_payment_complete = ($total_paid >= $net_total && $net_total > 0) || $full_paid;
 
             // Check checklist completion
             $checklists_completed = false;
@@ -1181,11 +1184,12 @@
             $travel_ongoing = false;
             $travel_completed = false;
             if ($travel_start && $travel_end) {
-                $start_date = date('Y-m-d', strtotime($travel_start));
-                $end_date = date('Y-m-d', strtotime($travel_end));
-                if ($today >= $start_date && $today <= $end_date) {
+                $start_ts = strtotime(date('Y-m-d 00:00:00', strtotime($travel_start)));
+                $end_ts = strtotime(date('Y-m-d 23:59:59', strtotime($travel_end)));
+                $today_ts = time();
+                if ($today_ts >= $start_ts && $today_ts <= $end_ts) {
                     $travel_ongoing = true;
-                } elseif ($today > $end_date) {
+                } elseif ($today_ts > $end_ts) {
                     $travel_completed = true;
                 }
             }
@@ -1194,18 +1198,27 @@
             $status_dates = $booking['status_change_dates'] ?? [];
 
             // Determine current step (first incomplete step)
-            // For full payment only bookings (no deposit deadline), skip step 2 "Payment Received"
             $current_step = 0;
-            if (!$bc_approved) $current_step = 1;
-            elseif (!$has_deposit_deadline && !$payment_complete) $current_step = 3; // Skip step 2 for full payment only
-            elseif (!$has_any_payment) $current_step = 2;
-            elseif (!$payment_complete) $current_step = 3;
-            elseif (!$checklists_completed) $current_step = 4;
-            elseif (!$guest_list_locked) $current_step = 5;
-            elseif (!$travel_voucher_sent) $current_step = 6;
-            elseif ($travel_ongoing) $current_step = 7;
-            elseif (!$travel_completed) $current_step = 7;
-            else $current_step = 8;
+            if ($has_deposit_deadline) {
+                if (!$bc_approved) $current_step = 1;
+                elseif (!$deposit_complete) $current_step = 2;
+                elseif (!$checklists_completed) $current_step = 3;
+                elseif (!$guest_list_locked) $current_step = 4;
+                elseif (!$travel_voucher_sent) $current_step = 5;
+                elseif (!$full_payment_complete) $current_step = 6;
+                elseif ($travel_ongoing) $current_step = 7;
+                elseif (!$travel_completed) $current_step = 7;
+                else $current_step = 8;
+            } else {
+                if (!$bc_approved) $current_step = 1;
+                elseif (!$full_payment_complete) $current_step = 2;
+                elseif (!$checklists_completed) $current_step = 3;
+                elseif (!$guest_list_locked) $current_step = 4;
+                elseif (!$travel_voucher_sent) $current_step = 5;
+                elseif ($travel_ongoing) $current_step = 6;
+                elseif (!$travel_completed) $current_step = 6;
+                else $current_step = 7;
+            }
 
             // Build timeline steps
             // Prepare document URLs for CTAs
@@ -1233,52 +1246,50 @@
                 'cta_enabled' => ($bc_step_status != 'future')
             ];
 
-            // Step: Payment Received (only show for bookings with deposit deadline - i.e., deposit + full payment flow)
-            // For full payment only bookings, skip this step and go directly to Full Payment step
-            if ($has_deposit_deadline) {
-                $payment_step_status = $has_any_payment ? 'completed' : ($current_step == 2 ? 'current' : 'future');
-                $timeline_steps[] = [
-                    'step' => count($timeline_steps) + 1,
-                    'title' => 'Payment Received',
-                    'description' => $has_any_payment ? 'Payment has been received' : 'Awaiting payment',
-                    'event_date' => $payment_date,
-                    'relative_time' => get_relative_time($payment_date),
-                    'expected_date' => null,
-                    'status' => $payment_step_status,
-                    'icon' => 'credit-card',
-                    'payment_details' => $payment_details,
-                    // CTA: Download Receipt (available when payment received)
-                    'cta_text' => 'Download',
-                    'cta_url' => $receipt_url,
-                    'cta_icon' => 'download',
-                    'cta_enabled' => $has_any_payment
-                ];
-            }
-
-            // Step: Pending Deposit or Full Payment
+            // Step: Deposit / Full / Partial / Pending Payment
             $payment_deadline = $has_deposit_deadline ? $booking['DepositDeadlineRaw'] : $booking['FullPaymentDeadlineRaw'];
-            $is_overdue = !empty($payment_deadline) && $today > date('Y-m-d', strtotime($payment_deadline)) && !$payment_complete;
-            $full_payment_step_status = $payment_complete ? 'completed' : ($is_overdue ? 'overdue' : ($current_step == 3 ? 'current' : 'future'));
+            $is_overdue = !empty($payment_deadline) && $today > date('Y-m-d', strtotime($payment_deadline)) && ($has_deposit_deadline ? !$deposit_complete : !$full_payment_complete);
+            $payment_step_status = ($has_deposit_deadline ? $deposit_complete : $full_payment_complete)
+                ? 'completed'
+                : ($is_overdue ? 'overdue' : ($current_step == 2 ? 'current' : 'future'));
+
+            // Determine payment title/description based on rules
+            if ($has_deposit_deadline) {
+                $payment_title = $deposit_complete ? 'Deposit Received' : 'Pending Deposit';
+                $payment_description = $deposit_complete ? 'Deposit payment received' : 'Deposit payment required';
+            } else {
+                if ($total_paid <= 0) {
+                    $payment_title = 'Pending Payment';
+                    $payment_description = 'Full payment required';
+                } elseif ($total_paid < $net_total) {
+                    $payment_title = 'Partial Payment Received';
+                    $payment_description = 'Partial payment received';
+                } else {
+                    $payment_title = 'Full Payment Received';
+                    $payment_description = 'Full payment received';
+                }
+            }
             
             $timeline_steps[] = [
                 'step' => count($timeline_steps) + 1,
-                'title' => $has_deposit_deadline ? 'Deposit Payment' : 'Full Payment',
-                'description' => $payment_complete ? 'Payment requirement met' : ($has_deposit_deadline ? 'Deposit payment required' : 'Full payment required'),
-                'event_date' => $payment_complete ? $payment_date : null,
-                'relative_time' => $payment_complete ? get_relative_time($payment_date) : '',
+                'title' => $payment_title,
+                'description' => $payment_description,
+                'event_date' => ($has_deposit_deadline ? $deposit_complete : $full_payment_complete) ? $payment_date : ($has_any_payment ? $payment_date : null),
+                'relative_time' => (($has_deposit_deadline ? $deposit_complete : $full_payment_complete) || $has_any_payment) ? get_relative_time($payment_date) : '',
                 'expected_date' => $payment_deadline,
-                'status' => $full_payment_step_status,
+                'status' => $payment_step_status,
                 'icon' => 'dollar-sign',
-                // CTA: Download Receipt (available when payment complete)
+                'payment_details' => $payment_details,
+                // CTA: Download Receipt (available only when this step is completed)
                 'cta_text' => 'Download',
                 'cta_url' => $receipt_url,
                 'cta_icon' => 'download',
-                'cta_enabled' => $payment_complete
+                'cta_enabled' => ($has_deposit_deadline ? $deposit_complete : $full_payment_complete)
             ];
 
             // Step: Checklist Completed (step number is sequential)
             $checklist_date = $status_dates['PBO'] ?? null;
-            $checklist_step_status = $checklists_completed ? 'completed' : ($current_step == 4 ? 'current' : 'future');
+            $checklist_step_status = $checklists_completed ? 'completed' : ($current_step == 3 ? 'current' : 'future');
             $timeline_steps[] = [
                 'step' => count($timeline_steps) + 1,
                 'title' => 'Checklist Completed',
@@ -1297,14 +1308,16 @@
 
             // Step: Guest List Completed & Locked
             $gl_date = $status_dates['PTV'] ?? $status_dates['PGL'] ?? null;
-            $gl_step_status = $guest_list_locked ? 'completed' : ($current_step == 5 ? 'current' : 'future');
+            // Guest list should become current right after BC is confirmed (in parallel with payment stage)
+            $gl_step_status = $guest_list_locked ? 'completed' : ($bc_approved ? 'current' : 'future');
+            $gl_expected_date = $bc_date ? date('Y-m-d', strtotime($bc_date . ' +2 days')) : null;
             $timeline_steps[] = [
                 'step' => count($timeline_steps) + 1,
                 'title' => 'Guest List Finalized',
                 'description' => $guest_list_locked ? 'Guest list has been submitted and locked' : 'Please submit your guest list',
                 'event_date' => $guest_list_locked ? $gl_date : null,
                 'relative_time' => $guest_list_locked ? get_relative_time($gl_date) : '',
-                'expected_date' => $travel_start ? date('Y-m-d', strtotime($travel_start . ' -7 days')) : null,
+                'expected_date' => $gl_expected_date,
                 'status' => $gl_step_status,
                 'icon' => 'users',
                 // CTA: View/Edit Guest List (available when not future - can view or edit)
@@ -1316,14 +1329,24 @@
 
             // Step: Travel Voucher Sent
             $tv_date = $status_dates['PT'] ?? null;
-            $tv_step_status = $travel_voucher_sent ? 'completed' : ($current_step == 6 ? 'current' : 'future');
+            $tv_step_status = $travel_voucher_sent ? 'completed' : ($current_step == 5 ? 'current' : 'future');
+            $tv_expected_date = null;
+            if ($travel_start) {
+                $travel_ts = strtotime($travel_start);
+                $bc_ts = !empty($bc_date) ? strtotime($bc_date) : null;
+                if (!empty($bc_ts) && ($travel_ts - $bc_ts) < 7 * 86400) {
+                    $tv_expected_date = date('Y-m-d', strtotime($travel_start . ' -1 days'));
+                } else {
+                    $tv_expected_date = date('Y-m-d', strtotime($travel_start . ' -7 days'));
+                }
+            }
             $timeline_steps[] = [
                 'step' => count($timeline_steps) + 1,
                 'title' => 'Travel Voucher Sent',
                 'description' => $travel_voucher_sent ? 'Your travel voucher is ready' : 'Travel voucher will be sent before your trip',
                 'event_date' => $travel_voucher_sent ? $tv_date : null,
                 'relative_time' => $travel_voucher_sent ? get_relative_time($tv_date) : '',
-                'expected_date' => $travel_start ? date('Y-m-d', strtotime($travel_start . ' -3 days')) : null,
+                'expected_date' => $tv_expected_date,
                 'status' => $tv_step_status,
                 'icon' => 'file-text',
                 // CTA: View Travel Voucher (available when travel voucher sent AND guest list locked)
@@ -1333,43 +1356,73 @@
                 'cta_enabled' => ($travel_voucher_sent && $guest_list_locked)
             ];
 
-            // Step: Travel Ongoing (optional - only show if relevant)
-            if ($travel_ongoing || ($travel_voucher_sent && !$travel_completed)) {
-                $trip_step_status = $travel_ongoing ? 'current' : ($travel_completed ? 'completed' : 'future');
+            // Step: Full Payment (only for deposit-flow bookings, shown after Travel Voucher)
+            if ($has_deposit_deadline) {
+                $full_payment_deadline = $booking['FullPaymentDeadlineRaw'] ?? null;
+                $full_payment_overdue = !empty($full_payment_deadline) && $today > date('Y-m-d', strtotime($full_payment_deadline)) && !$full_payment_complete;
+                $full_payment_step_status = $full_payment_complete
+                    ? 'completed'
+                    : (($travel_voucher_sent && $full_payment_overdue) ? 'overdue' : ($current_step == 6 ? 'current' : 'future'));
+
+                $full_payment_title = $full_payment_complete ? 'Full Payment Received' : 'Pending Full Payment';
+                $full_payment_description = $full_payment_complete ? 'Full payment received' : 'Full payment required';
+
                 $timeline_steps[] = [
                     'step' => count($timeline_steps) + 1,
-                    'title' => 'Trip In Progress',
-                    'description' => $travel_ongoing ? 'Enjoy your trip!' : 'Your trip will begin soon',
-                    'event_date' => $travel_ongoing ? $travel_start : null,
-                    'relative_time' => $travel_ongoing ? 'ongoing' : get_relative_time($travel_start),
-                    'expected_date' => $travel_start,
+                    'title' => $full_payment_title,
+                    'description' => $full_payment_description,
+                    'event_date' => $full_payment_complete ? $payment_date : null,
+                    'relative_time' => $full_payment_complete ? get_relative_time($payment_date) : '',
+                    'expected_date' => $full_payment_deadline,
+                    'status' => $full_payment_step_status,
+                    'icon' => 'credit-card',
+                    'payment_details' => $payment_details,
+                    // CTA: Download Receipt (available only when full payment is completed)
+                    'cta_text' => 'Download',
+                    'cta_url' => $receipt_url,
+                    'cta_icon' => 'download',
+                    'cta_enabled' => $full_payment_complete
+                ];
+            }
+
+            // Step: Trip Status (expected / ongoing / completed)
+            $trip_step_status = $travel_completed ? 'completed' : ($travel_ongoing ? 'current' : 'future');
+            if ($travel_start && $travel_end) {
+                if ($travel_completed) {
+                    $trip_title = 'Trip Completed';
+                    $trip_description = 'We hope you had a wonderful trip!';
+                    $trip_event_date = $travel_end;
+                    $trip_relative = get_relative_time($travel_end);
+                    $trip_expected = null;
+                } elseif ($travel_ongoing) {
+                    $trip_title = 'Trip Ongoing';
+                    $trip_description = 'Your trip is currently in progress';
+                    $trip_event_date = $travel_start;
+                    $trip_relative = 'ongoing';
+                    $trip_expected = $travel_end;
+                } else {
+                    $trip_title = 'Trip Date';
+                    $trip_description = 'Your trip is scheduled to begin soon';
+                    $trip_event_date = null;
+                    $trip_relative = get_relative_time($travel_start);
+                    $trip_expected = $travel_start;
+                }
+                $timeline_steps[] = [
+                    'step' => count($timeline_steps) + 1,
+                    'title' => $trip_title,
+                    'description' => $trip_description,
+                    'event_date' => $trip_event_date,
+                    'relative_time' => $trip_relative,
+                    'expected_date' => $trip_expected,
                     'status' => $trip_step_status,
-                    'icon' => 'plane',
-                    // No CTA for trip in progress
+                    'icon' => 'flag',
+                    // No CTA for trip status
                     'cta_text' => null,
                     'cta_url' => null,
                     'cta_icon' => null,
                     'cta_enabled' => false
                 ];
             }
-
-            // Step: Travel Completed
-            $completed_step_status = $travel_completed ? 'completed' : 'future';
-            $timeline_steps[] = [
-                'step' => count($timeline_steps) + 1,
-                'title' => 'Trip Completed',
-                'description' => $travel_completed ? 'We hope you had a wonderful trip!' : 'Trip completion',
-                'event_date' => $travel_completed ? $travel_end : null,
-                'relative_time' => $travel_completed ? get_relative_time($travel_end) : '',
-                'expected_date' => $travel_end,
-                'status' => $completed_step_status,
-                'icon' => 'flag',
-                // No CTA for trip completed
-                'cta_text' => null,
-                'cta_url' => null,
-                'cta_icon' => null,
-                'cta_enabled' => false
-            ];
             ?>
 
             <div class="details-card">
