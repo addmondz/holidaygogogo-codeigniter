@@ -1136,6 +1136,78 @@
                                     </div>
                                 </div>
                             <?php } ?>
+
+                            <!-- Invoice Split by Pax (Read-Only) -->
+                            <?php if(!empty($invoice_split)) { ?>
+                                <div class="row mt-5">
+                                    <div class="col-12">
+                                        <div class="card card-custom">
+                                            <div class="card-header flex-wrap py-2" style="background-color:#D7E2F2;">
+                                                <div class="card-title">
+                                                    <h4 class="card-label mb-0" style="color:#6082B6; font-size: 1.1rem;">
+                                                        <strong>Invoice Split by Pax</strong>
+                                                    </h4>
+                                                </div>
+                                            </div>
+                                            <div class="card-body">
+                                                <?php
+                                                $grand_subtotal = 0;
+                                                $grand_discount = 0;
+                                                $grand_net = 0;
+                                                foreach($invoice_split as $idx => $pax) {
+                                                    $grand_subtotal += $pax['SubtotalAmount'];
+                                                    $grand_discount += $pax['DiscountAmount'];
+                                                    $grand_net += $pax['NetAmount'];
+                                                ?>
+                                                <div style="background: #f8f9fa; border-radius: 6px; padding: 12px; margin-bottom: 10px; border: 1px solid #e8e8e8;">
+                                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                                        <strong>Pax <?php echo $idx + 1; ?>: <?php echo htmlspecialchars($pax['PaxName']); ?></strong>
+                                                        <?php if(!empty($pax['TIN'])) { ?>
+                                                            <span class="text-muted" style="font-size: 0.85rem;">TIN: <?php echo htmlspecialchars($pax['TIN']); ?></span>
+                                                        <?php } ?>
+                                                    </div>
+                                                    <table class="table table-sm table-bordered mb-2" style="font-size: 0.85rem;">
+                                                        <thead style="background: #e9ecef;">
+                                                            <tr>
+                                                                <th>Product</th>
+                                                                <th class="text-center" style="width:80px;">Qty</th>
+                                                                <th class="text-right" style="width:120px;">Unit Price</th>
+                                                                <th class="text-right" style="width:120px;">Amount</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            <?php foreach($pax['products'] as $prod) { ?>
+                                                                <tr>
+                                                                    <td><?php echo htmlspecialchars($prod['ProductName']); ?></td>
+                                                                    <td class="text-center"><?php echo rtrim(rtrim(number_format($prod['Quantity'], 2), '0'), '.'); ?></td>
+                                                                    <td class="text-right">RM <?php echo number_format($prod['UnitPrice'], 2); ?></td>
+                                                                    <td class="text-right">RM <?php echo number_format($prod['Amount'], 2); ?></td>
+                                                                </tr>
+                                                            <?php } ?>
+                                                        </tbody>
+                                                    </table>
+                                                    <div class="text-right" style="font-size: 0.85rem;">
+                                                        <span>Subtotal: <strong>RM <?php echo number_format($pax['SubtotalAmount'], 2); ?></strong></span>
+                                                        <?php if(floatval($pax['DiscountAmount']) > 0) { ?>
+                                                            <span class="ml-3 text-danger">Discount: <strong>- RM <?php echo number_format($pax['DiscountAmount'], 2); ?></strong></span>
+                                                        <?php } ?>
+                                                        <span class="ml-3" style="color:#6082B6;">Net: <strong>RM <?php echo number_format($pax['NetAmount'], 2); ?></strong></span>
+                                                    </div>
+                                                </div>
+                                                <?php } ?>
+                                                <div class="text-right mt-3 p-3" style="background: #D7E2F2; border-radius: 6px; font-size: 0.9rem;">
+                                                    <span>Grand Subtotal: <strong>RM <?php echo number_format($grand_subtotal, 2); ?></strong></span>
+                                                    <?php if($grand_discount > 0) { ?>
+                                                        <span class="ml-3">Discount: <strong>- RM <?php echo number_format($grand_discount, 2); ?></strong></span>
+                                                    <?php } ?>
+                                                    <span class="ml-3"><strong>Net Total: RM <?php echo number_format($grand_net, 2); ?></strong></span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            <?php } ?>
+
                              <!-- Booking Status Log Timeline -->
                             <?php if(!empty($status_logs)) { ?>
                                 <div class="row mt-5">

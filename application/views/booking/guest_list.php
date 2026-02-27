@@ -288,6 +288,7 @@
 						<?php } ?>
 					</div>
 				</div>
+
 				<?php if(!empty($this->session->userdata('admin_id')) && $guest_lists[0]->LockStatus == 'N') { ?>
 				<div class="row mb-5">
 					<div class="col-md-12">
@@ -692,6 +693,129 @@
 						</div>
 					<?php } ?>
 				</form>
+
+				<!-- Name Formatting Guidelines -->
+				<div class="row mb-5 mt-5">
+					<div class="col-md-12">
+						<div class="card card-custom mb-5">
+							<div class="card-header py-3" style="background-color:#D7E2F2;">
+								<div class="card-title">
+									<h3 class="card-label" style="color:#6082B6;">
+										<strong>Name Formatting Guidelines</strong>
+									</h3>
+								</div>
+							</div>
+							<div class="card-body" style="font-size:14px; color:#333;">
+
+								<p><strong>Examples:</strong></p>
+								<div class="table-responsive mb-4">
+									<table class="table table-bordered text-center" style="border:1px solid #ddd;">
+										<thead>
+											<tr style="background-color:#f5c518; color:#333;">
+												<th style="font-weight:bold; padding:12px; width:35%;">Name on the Passport / Identification Card</th>
+												<th style="font-weight:bold; padding:12px; width:32.5%;">First / Given Name</th>
+												<th style="font-weight:bold; padding:12px; width:32.5%;">Family Name / Surname</th>
+											</tr>
+										</thead>
+										<tbody>
+											<tr><td>Mohd Ali Ahmad Bin Mohd Abu</td><td>Mohd Ali Ahmad</td><td>Bin Mohd Abu</td></tr>
+											<tr><td>Deepika Kumar</td><td>Deepika</td><td>Kumar</td></tr>
+											<tr><td>Alice Lim Su Ye</td><td>Alice Su Ye</td><td>Lim</td></tr>
+											<tr><td>Ng Ah Hock</td><td>Ah Hock</td><td>Ng</td></tr>
+											<tr><td>Juan M. Dela Cruz</td><td>Juan M</td><td>Dela Cruz</td></tr>
+											<tr><td>Chalita Sakornchan</td><td>Chalita</td><td>Sakornchan</td></tr>
+											<tr><td>Nguyen Ho Minh Lam</td><td>Ho Minh Lam</td><td>Nguyen</td></tr>
+										</tbody>
+									</table>
+								</div>
+
+								<h5 style="color:#d4a017; font-weight:bold;">Multiple names formatting</h5>
+								<p>Our system does not accept symbols, special characters and has a limit on the length of our guest's names.</p>
+
+								<h6><strong>1. Names with alias '@', 'A/P' or 'A/L'</strong></h6>
+								<p style="margin-left:20px;">If your name is spelled with a '@' or second name in your Identification Card, remove the '@', insert a space between the two names.</p>
+								<p style="margin-left:20px;">If your name contains 'A/P' or 'A/L' remove it unless it appears in the 'Name' section of your passport.</p>
+								<p><strong>Examples:</strong></p>
+								<div class="table-responsive mb-4">
+									<table class="table table-bordered text-center" style="border:1px solid #ddd;">
+										<thead>
+											<tr style="background-color:#f5c518; color:#333;">
+												<th style="font-weight:bold; padding:12px; width:35%;">Name on the Passport / Identification Card</th>
+												<th style="font-weight:bold; padding:12px; width:32.5%;">First / Given Name</th>
+												<th style="font-weight:bold; padding:12px; width:32.5%;">Family Name / Surname</th>
+											</tr>
+										</thead>
+										<tbody>
+											<tr><td>Aliff@Imran Bin Ahmad</td><td>Aliff Imran</td><td>Bin Ahmad</td></tr>
+											<tr><td>Lim Swee Teng @ Lim Swee Tin</td><td>Lim Swee Teng</td><td>Lim Swee Tin</td></tr>
+											<tr><td>Manimala A/P Murthy Muthu</td><td>Manimala</td><td>AP Murthy Muthu</td></tr>
+										</tbody>
+									</table>
+								</div>
+
+								<h6><strong>2. Names with hyphen</strong></h6>
+								<p style="margin-left:20px;">If your name is spelled with a hyphen '-', please replace it with a space.</p>
+								<p><strong>Examples:</strong></p>
+								<div class="table-responsive mb-4">
+									<table class="table table-bordered text-center" style="border:1px solid #ddd;">
+										<thead>
+											<tr style="background-color:#f5c518; color:#333;">
+												<th style="font-weight:bold; padding:12px; width:35%;">Name on the Passport / Identification Card</th>
+												<th style="font-weight:bold; padding:12px; width:32.5%;">First / Given Name</th>
+												<th style="font-weight:bold; padding:12px; width:32.5%;">Family Name / Surname</th>
+											</tr>
+										</thead>
+										<tbody>
+											<tr><td>Laura Applebee-Jones</td><td>Laura</td><td>Applebee Jones</td></tr>
+											<tr><td>Lim Ker-Hoong</td><td>Ker Hoong</td><td>Lim</td></tr>
+										</tbody>
+									</table>
+								</div>
+
+								<h6><strong>3. Single Names</strong></h6>
+								<p style="margin-left:20px;">If your name only consists of a single name, e.g: Suryadi, please fill up the "Family Name / Surname" field with the same name filled up in the "Given Name" field.</p>
+								<p><strong>Examples:</strong></p>
+								<div class="table-responsive mb-4">
+									<table class="table table-bordered text-center" style="border:1px solid #ddd;">
+										<thead>
+											<tr style="background-color:#f5c518; color:#333;">
+												<th style="font-weight:bold; padding:12px; width:35%;">Name on the Passport / Identification Card</th>
+												<th style="font-weight:bold; padding:12px; width:32.5%;">First / Given Name</th>
+												<th style="font-weight:bold; padding:12px; width:32.5%;">Family Name / Surname</th>
+											</tr>
+										</thead>
+										<tbody>
+											<tr><td>Suryadi</td><td>Suryadi</td><td>Suryadi</td></tr>
+										</tbody>
+									</table>
+								</div>
+
+								<h6><strong>4. Long Names</strong></h6>
+								<p style="margin-left:20px;">If you have a long name and cannot fill in your full name while making a booking, we advise you to fill in as many of your names as possible in the First/Given Name and Family Name/Surname.</p>
+								<p><strong>Examples:</strong></p>
+								<div class="table-responsive mb-4">
+									<table class="table table-bordered text-center" style="border:1px solid #ddd;">
+										<thead>
+											<tr style="background-color:#f5c518; color:#333;">
+												<th style="font-weight:bold; padding:12px; width:35%;">Name on the Passport / Identification Card</th>
+												<th style="font-weight:bold; padding:12px; width:32.5%;">First / Given Name</th>
+												<th style="font-weight:bold; padding:12px; width:32.5%;">Family Name / Surname</th>
+											</tr>
+										</thead>
+										<tbody>
+											<tr><td>Muhammad Faizal Zulkarnain bin Muhammad Zulfikli Amiruddin Syahrezan</td><td>Muhammad Faizal Zulkarnain bin</td><td>Muhammad Zulfikli Amiruddin Syahr</td></tr>
+											<tr><td>Mahalakshmi Janhavi Saraswati Devi Rajeswari Krishnapriya Sri Singhaniya Venkatesan</td><td>Mahalakshmi Janhavi Saraswati</td><td>Devi Rajeswari Krishnapriya Sri</td></tr>
+											<tr><td>Charles Lewis George Andrea Maximillian Gabriel Nicholas Alexander</td><td>Charles Lewis George Andrea</td><td>Maximillian Gabriel Nicholas Ale</td></tr>
+										</tbody>
+									</table>
+								</div>
+
+							</div>
+						</div>
+					</div>
+				</div>
+				<!-- End Name Formatting Guidelines -->
+
             </div>
         </div>
     </div>

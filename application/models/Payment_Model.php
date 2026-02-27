@@ -205,6 +205,7 @@ class Payment_Model extends CI_Model
 		}
 		$this->db->where('CancelStatus', 'N');
 		$this->db->where('booking.Status !=', 'N');
+		$this->db->where('booking.Status !=', 'Y');
 		$this->db->order_by('booking.BookingID', 'DESC');
 		return $this->db->get('booking')->result();
 	}

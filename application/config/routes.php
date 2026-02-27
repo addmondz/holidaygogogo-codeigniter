@@ -83,6 +83,8 @@ $route['customer/search'] = 'customer/search';
 |--------------------------------------------------------------------------
 |
 */
+$route['customer/booking/(:any)/invoice-split/save'] = 'Customer_Portal/save_invoice_split/$1';
+$route['customer/booking/(:any)/invoice-split'] = 'Customer_Portal/get_invoice_split/$1';
 $route['customer/booking/(:any)/review'] = 'Customer_Portal/submit_review/$1';
 $route['customer/booking/(:any)/remarks'] = 'Customer_Portal/get_customer_remarks/$1';
 $route['customer/booking/(:any)/remark'] = 'Customer_Portal/add_customer_remark/$1';

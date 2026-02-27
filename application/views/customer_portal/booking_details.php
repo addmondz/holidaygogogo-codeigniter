@@ -1784,6 +1784,107 @@
                 <?php endif; ?>
             </div>
 
+            <!-- Invoice Split by Pax Section -->
+            <div class="details-card" id="invoice-split-section">
+                <div class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
+                    <span>Invoice Split by Pax</span>
+                    <button type="button" id="toggle-split-form" class="btn-toggle-split" style="background: #162447; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;">
+                        <i class="la la-plus"></i> Split Invoice
+                    </button>
+                </div>
+
+                <!-- Summary Bar -->
+                <div id="split-summary-bar" style="display: none; background: #f8f9fa; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; border: 2px solid #e0e0e0;">
+                    <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; font-size: 14px;">
+                        <div><strong>Total Allocated:</strong> <span id="split-total-allocated">RM 0.00</span></div>
+                        <div><strong>Booking Subtotal:</strong> <span>RM <?php echo number_format($booking['Subtotal'], 2); ?></span></div>
+                        <div><strong>Remaining:</strong> <span id="split-remaining">RM <?php echo number_format($booking['Subtotal'], 2); ?></span></div>
+                    </div>
+                </div>
+
+                <!-- Existing Split Display (read-only, shown when split exists and form is closed) -->
+                <div id="split-display-readonly">
+                    <?php if (!empty($booking['invoice_split'])): ?>
+                        <?php
+                        $grand_subtotal = 0;
+                        $grand_discount = 0;
+                        $grand_net = 0;
+                        ?>
+                        <?php foreach ($booking['invoice_split'] as $idx => $pax): ?>
+                            <div style="background: #f8f9fa; border-radius: 8px; padding: 16px; margin-bottom: 12px; border: 1px solid #e8e8e8;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                    <strong style="font-size: 15px;">Pax <?php echo $idx + 1; ?>: <?php echo htmlspecialchars($pax['PaxName']); ?></strong>
+                                    <?php if (!empty($pax['TIN'])): ?>
+                                        <span style="color: #666; font-size: 13px;">TIN: <?php echo htmlspecialchars($pax['TIN']); ?></span>
+                                    <?php endif; ?>
+                                </div>
+                                <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
+                                    <thead>
+                                        <tr style="background: #e9ecef; text-align: left;">
+                                            <th style="padding: 8px;">Product</th>
+                                            <th style="padding: 8px; text-align: center;">Qty</th>
+                                            <th style="padding: 8px; text-align: right;">Unit Price</th>
+                                            <th style="padding: 8px; text-align: right;">Amount</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($pax['products'] as $prod): ?>
+                                            <tr style="border-bottom: 1px solid #e8e8e8;">
+                                                <td style="padding: 8px;"><?php echo htmlspecialchars($prod['ProductName']); ?></td>
+                                                <td style="padding: 8px; text-align: center;"><?php echo rtrim(rtrim(number_format($prod['Quantity'], 2), '0'), '.'); ?></td>
+                                                <td style="padding: 8px; text-align: right;">RM <?php echo number_format($prod['UnitPrice'], 2); ?></td>
+                                                <td style="padding: 8px; text-align: right;">RM <?php echo number_format($prod['Amount'], 2); ?></td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                                <div style="text-align: right; margin-top: 8px; font-size: 13px;">
+                                    <div>Subtotal: <strong>RM <?php echo number_format($pax['SubtotalAmount'], 2); ?></strong></div>
+                                    <?php if (floatval($pax['DiscountAmount']) > 0): ?>
+                                        <div style="color: #dc3545;">Discount: <strong>- RM <?php echo number_format($pax['DiscountAmount'], 2); ?></strong></div>
+                                    <?php endif; ?>
+                                    <div style="font-size: 14px; margin-top: 4px; color: #162447;">Net: <strong>RM <?php echo number_format($pax['NetAmount'], 2); ?></strong></div>
+                                </div>
+                                <?php
+                                $grand_subtotal += $pax['SubtotalAmount'];
+                                $grand_discount += $pax['DiscountAmount'];
+                                $grand_net += $pax['NetAmount'];
+                                ?>
+                            </div>
+                        <?php endforeach; ?>
+                        <div style="background: #162447; color: white; border-radius: 8px; padding: 12px 16px; text-align: right; font-size: 14px;">
+                            <span>Grand Total — Subtotal: <strong>RM <?php echo number_format($grand_subtotal, 2); ?></strong></span>
+                            <?php if ($grand_discount > 0): ?>
+                                <span style="margin-left: 15px;">Discount: <strong>- RM <?php echo number_format($grand_discount, 2); ?></strong></span>
+                            <?php endif; ?>
+                            <span style="margin-left: 15px;">Net: <strong>RM <?php echo number_format($grand_net, 2); ?></strong></span>
+                        </div>
+                    <?php else: ?>
+                        <div class="empty-state" style="text-align: center; padding: 30px; color: #999;">
+                            <i class="la la-file-invoice" style="font-size: 36px; display: block; margin-bottom: 10px;"></i>
+                            <p>No invoice split configured. Click "Split Invoice" to allocate products across pax.</p>
+                        </div>
+                    <?php endif; ?>
+                </div>
+
+                <!-- Split Form (hidden by default) -->
+                <div id="split-form-container" style="display: none;">
+                    <div id="pax-cards-container"></div>
+
+                    <div style="margin-top: 15px; display: flex; gap: 10px; flex-wrap: wrap;">
+                        <button type="button" id="add-pax-btn" style="background: #28a745; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;">
+                            <i class="la la-plus"></i> Add Pax
+                        </button>
+                        <button type="button" id="save-split-btn" style="background: #162447; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;">
+                            <i class="la la-save"></i> Save Invoice Split
+                        </button>
+                        <button type="button" id="cancel-split-btn" style="background: #6c757d; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;">
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             <!-- Documents -->
             <div class="documents-card">
                 <div class="card-title">
@@ -2227,6 +2328,276 @@
 
             // Load comments on page load
             loadCustomerComments();
+
+            // =====================================================
+            // Invoice Split by Pax
+            // =====================================================
+            var bookingProducts = <?php echo json_encode($booking['products']); ?>;
+            var bookingSubtotal = parseFloat('<?php echo $booking['Subtotal']; ?>') || 0;
+            var bookingDiscount = parseFloat('<?php echo $booking['Discount']; ?>') || 0;
+            var bookingNetTotal = parseFloat('<?php echo $booking['NetTotal']; ?>') || 0;
+            var existingSplit = <?php echo json_encode($booking['invoice_split']); ?>;
+            var splitSaveUrl = '<?php echo base_url('customer/booking/' . $booking['Token'] . '/invoice-split/save'); ?>';
+            var paxCounter = 0;
+
+            function formatCurrency(val) {
+                return 'RM ' + parseFloat(val).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+            }
+
+            function getProductOptions(selectedBpId) {
+                var html = '<option value="">-- Select Product --</option>';
+                for (var i = 0; i < bookingProducts.length; i++) {
+                    var bp = bookingProducts[i];
+                    var sel = (bp.BookingProductID == selectedBpId) ? ' selected' : '';
+                    html += '<option value="' + bp.BookingProductID + '" data-price="' + bp.Price + '" data-max-qty="' + bp.Quantity + '">' + bp.Name + ' (Qty: ' + bp.Quantity + ' × RM ' + parseFloat(bp.Price).toFixed(2) + ')</option>';
+                }
+                return html;
+            }
+
+            function addProductRow(paxIdx, product) {
+                var bpId = product ? product.BookingProductID : '';
+                var qty = product ? product.Quantity : '';
+                var price = product ? parseFloat(product.UnitPrice).toFixed(2) : '0.00';
+                var amount = product ? parseFloat(product.Amount).toFixed(2) : '0.00';
+
+                var html = '<tr class="product-row" data-pax="' + paxIdx + '">';
+                html += '<td><select class="split-product-select" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:4px;font-size:13px;">' + getProductOptions(bpId) + '</select></td>';
+                html += '<td><input type="number" class="split-qty" value="' + qty + '" min="0.01" step="0.01" style="width:80px;padding:6px;border:1px solid #ddd;border-radius:4px;text-align:center;font-size:13px;"></td>';
+                html += '<td class="split-price" style="text-align:right;font-size:13px;">RM ' + price + '</td>';
+                html += '<td class="split-amount" style="text-align:right;font-size:13px;">RM ' + amount + '</td>';
+                html += '<td><button type="button" class="remove-product-row" style="background:#dc3545;color:white;border:none;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:12px;"><i class="la la-trash"></i></button></td>';
+                html += '</tr>';
+                return html;
+            }
+
+            function addPaxCard(paxData) {
+                paxCounter++;
+                var idx = paxCounter;
+                var name = paxData ? paxData.PaxName : '';
+                var tin = paxData ? (paxData.TIN || '') : '';
+
+                var html = '<div class="pax-card" data-pax-idx="' + idx + '" style="background:#f8f9fa;border:1px solid #e0e0e0;border-radius:8px;padding:16px;margin-bottom:12px;">';
+                html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">';
+                html += '<strong style="font-size:15px;">Pax #' + idx + '</strong>';
+                html += '<button type="button" class="remove-pax-btn" style="background:#dc3545;color:white;border:none;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600;"><i class="la la-trash"></i> Remove</button>';
+                html += '</div>';
+                html += '<div style="display:flex;gap:12px;margin-bottom:12px;flex-wrap:wrap;">';
+                html += '<div style="flex:1;min-width:200px;"><label style="font-size:12px;font-weight:600;color:#666;">Pax Name <span style="color:red;">*</span></label><input type="text" class="pax-name" value="' + name.replace(/"/g, '&quot;') + '" placeholder="Full Name" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;font-size:13px;"></div>';
+                html += '<div style="min-width:180px;"><label style="font-size:12px;font-weight:600;color:#666;">TIN (Tax ID) <span style="color:red;">*</span></label><input type="text" class="pax-tin" value="' + tin.replace(/"/g, '&quot;') + '" placeholder="Tax Identification Number" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;font-size:13px;" required></div>';
+                html += '</div>';
+                html += '<table style="width:100%;border-collapse:collapse;font-size:13px;">';
+                html += '<thead><tr style="background:#e9ecef;"><th style="padding:8px;text-align:left;">Product</th><th style="padding:8px;text-align:center;width:100px;">Qty</th><th style="padding:8px;text-align:right;">Unit Price</th><th style="padding:8px;text-align:right;">Amount</th><th style="padding:8px;width:50px;"></th></tr></thead>';
+                html += '<tbody class="pax-products-body">';
+
+                if (paxData && paxData.products) {
+                    for (var i = 0; i < paxData.products.length; i++) {
+                        html += addProductRow(idx, paxData.products[i]);
+                    }
+                } else {
+                    html += addProductRow(idx, null);
+                }
+
+                html += '</tbody></table>';
+                html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">';
+                html += '<button type="button" class="add-product-btn" data-pax="' + idx + '" style="background:#007bff;color:white;border:none;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600;"><i class="la la-plus"></i> Add Product</button>';
+                html += '<div class="pax-subtotal" style="font-weight:600;font-size:14px;">Subtotal: RM 0.00</div>';
+                html += '</div>';
+                html += '</div>';
+
+                $('#pax-cards-container').append(html);
+                recalculate();
+            }
+
+            function recalculate() {
+                var totalAllocated = 0;
+
+                $('.pax-card').each(function() {
+                    var paxSubtotal = 0;
+                    $(this).find('.product-row').each(function() {
+                        var $select = $(this).find('.split-product-select');
+                        var $qty = $(this).find('.split-qty');
+                        var price = parseFloat($select.find('option:selected').data('price')) || 0;
+                        var qty = parseFloat($qty.val()) || 0;
+                        var amount = Math.round(price * qty * 100) / 100;
+
+                        $(this).find('.split-price').text('RM ' + price.toFixed(2));
+                        $(this).find('.split-amount').text('RM ' + amount.toFixed(2));
+                        paxSubtotal += amount;
+                    });
+                    $(this).find('.pax-subtotal').text('Subtotal: ' + formatCurrency(paxSubtotal));
+                    totalAllocated += paxSubtotal;
+                });
+
+                var remaining = bookingSubtotal - totalAllocated;
+                $('#split-total-allocated').text(formatCurrency(totalAllocated));
+                $('#split-remaining').text(formatCurrency(remaining));
+
+                var $bar = $('#split-summary-bar');
+                if (Math.abs(remaining) < 0.02) {
+                    $bar.css('border-color', '#28a745');
+                    $bar.css('background', '#d4edda');
+                } else {
+                    $bar.css('border-color', '#dc3545');
+                    $bar.css('background', '#f8d7da');
+                }
+            }
+
+            // Event handlers
+            $(document).on('change', '.split-product-select', function() {
+                recalculate();
+            });
+
+            $(document).on('input change', '.split-qty', function() {
+                recalculate();
+            });
+
+            $(document).on('click', '.add-product-btn', function() {
+                var paxIdx = $(this).data('pax');
+                var $card = $(this).closest('.pax-card');
+                $card.find('.pax-products-body').append(addProductRow(paxIdx, null));
+                recalculate();
+            });
+
+            $(document).on('click', '.remove-product-row', function() {
+                var $card = $(this).closest('.pax-card');
+                if ($card.find('.product-row').length > 1) {
+                    $(this).closest('.product-row').remove();
+                    recalculate();
+                }
+            });
+
+            $(document).on('click', '.remove-pax-btn', function() {
+                if ($('.pax-card').length > 1) {
+                    $(this).closest('.pax-card').remove();
+                    recalculate();
+                }
+            });
+
+            // Toggle form
+            $('#toggle-split-form').on('click', function() {
+                $('#split-display-readonly').hide();
+                $('#split-form-container').show();
+                $('#split-summary-bar').show();
+                $(this).hide();
+
+                // If form is empty, populate from existing data or add one blank pax
+                if ($('#pax-cards-container').children().length === 0) {
+                    if (existingSplit && existingSplit.length > 0) {
+                        for (var i = 0; i < existingSplit.length; i++) {
+                            addPaxCard(existingSplit[i]);
+                        }
+                    } else {
+                        addPaxCard(null);
+                    }
+                }
+                recalculate();
+            });
+
+            $('#cancel-split-btn').on('click', function() {
+                $('#split-form-container').hide();
+                $('#split-summary-bar').hide();
+                $('#split-display-readonly').show();
+                $('#toggle-split-form').show();
+            });
+
+            $('#add-pax-btn').on('click', function() {
+                addPaxCard(null);
+            });
+
+            // Save
+            $('#save-split-btn').on('click', function() {
+                var paxList = [];
+                var hasError = false;
+
+                $('.pax-card').each(function() {
+                    var paxName = $(this).find('.pax-name').val().trim();
+                    var paxTin = $(this).find('.pax-tin').val().trim();
+
+                    if (!paxName) {
+                        hasError = true;
+                        Swal.fire('Error', 'Each pax must have a name.', 'error');
+                        return false;
+                    }
+
+                    if (!paxTin) {
+                        hasError = true;
+                        Swal.fire('Error', 'Each pax must have a TIN (Tax Identification Number).', 'error');
+                        return false;
+                    }
+
+                    var products = [];
+                    $(this).find('.product-row').each(function() {
+                        var bpId = $(this).find('.split-product-select').val();
+                        var qty = parseFloat($(this).find('.split-qty').val()) || 0;
+                        if (bpId && qty > 0) {
+                            products.push({ BookingProductID: parseInt(bpId), Quantity: qty });
+                        }
+                    });
+
+                    if (products.length === 0) {
+                        hasError = true;
+                        Swal.fire('Error', 'Pax "' + paxName + '" must have at least one product.', 'error');
+                        return false;
+                    }
+
+                    paxList.push({ PaxName: paxName, TIN: paxTin, products: products });
+                });
+
+                if (hasError) return;
+
+                // Validate full allocation per product
+                var productQtyMap = {};
+                for (var i = 0; i < bookingProducts.length; i++) {
+                    productQtyMap[bookingProducts[i].BookingProductID] = {
+                        name: bookingProducts[i].Name,
+                        expected: parseFloat(bookingProducts[i].Quantity),
+                        allocated: 0
+                    };
+                }
+
+                for (var p = 0; p < paxList.length; p++) {
+                    for (var pr = 0; pr < paxList[p].products.length; pr++) {
+                        var bpId = paxList[p].products[pr].BookingProductID;
+                        if (productQtyMap[bpId]) {
+                            productQtyMap[bpId].allocated += paxList[p].products[pr].Quantity;
+                        }
+                    }
+                }
+
+                for (var key in productQtyMap) {
+                    var prod = productQtyMap[key];
+                    if (Math.abs(prod.expected - prod.allocated) > 0.01) {
+                        Swal.fire('Allocation Error', 'Product "' + prod.name + '" requires total quantity of ' + prod.expected + ' but ' + prod.allocated.toFixed(2) + ' was allocated.', 'error');
+                        return;
+                    }
+                }
+
+                // Submit
+                var $btn = $('#save-split-btn');
+                $btn.prop('disabled', true).html('<i class="la la-spinner la-spin"></i> Saving...');
+
+                $.ajax({
+                    url: splitSaveUrl,
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ pax: paxList }),
+                    dataType: 'json',
+                    success: function(response) {
+                        if (response && response.success) {
+                            Swal.fire('Success', response.message || 'Invoice split saved!', 'success').then(function() {
+                                location.reload();
+                            });
+                        } else {
+                            Swal.fire('Error', response.message || 'Failed to save.', 'error');
+                            $btn.prop('disabled', false).html('<i class="la la-save"></i> Save Invoice Split');
+                        }
+                    },
+                    error: function() {
+                        Swal.fire('Error', 'An unexpected error occurred.', 'error');
+                        $btn.prop('disabled', false).html('<i class="la la-save"></i> Save Invoice Split');
+                    }
+                });
+            });
         });
     </script>
 

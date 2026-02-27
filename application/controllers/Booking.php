@@ -1091,6 +1091,10 @@ class Booking extends MY_Controller
 					$array['booking_checklists'] = $this->get_booking_checklists($array['booking_products']);
 					$array['completion_map'] = $this->Booking_Checklist_Completion_Model->Read_Completion_Map($array['BookingID']);
 
+					// Get invoice split data
+					$this->load->model('Invoice_Split_Model');
+					$array['invoice_split'] = $this->Invoice_Split_Model->Get_Pax_By_Booking($array['BookingID']);
+
 					// Get custom uploads
 					$this->load->model('Custom_Upload_Model');
 					$array['custom_uploads'] = $this->Custom_Upload_Model->Read($array['BookingID']);

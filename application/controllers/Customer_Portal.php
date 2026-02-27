@@ -323,6 +323,10 @@ class Customer_Portal extends CI_Controller
         $this->db->order_by('BookingProductID', 'ASC');
         $booking['products'] = $this->db->get('booking_product')->result_array();
 
+        // Get invoice split data
+        $this->load->model('Invoice_Split_Model');
+        $booking['invoice_split'] = $this->Invoice_Split_Model->Get_Pax_By_Booking($booking['BookingID']);
+
         // Get payment history (exclude SUPPLIER PAYMENT)
         $this->db->select('Date, Type, Credit, ReferenceNumber, Debit, Deadline, payment.Status, PaymentRemark, DebitRemark, payment.Bank, payment.BankAccount, payment.BankHolder, supplier.Name As SupplierName');
         $this->db->from('payment');
@@ -930,6 +934,190 @@ class Customer_Portal extends CI_Controller
             return $days . ' day' . ($days > 1 ? 's' : '') . ' ago';
         } else {
             return date('d/m/Y H:i', $timestamp);
+        }
+    }
+
+    /**
+     * Get invoice split data for a booking (AJAX)
+     */
+    public function get_invoice_split($hashed_bc = null)
+    {
+        $this->output->set_content_type('application/json');
+
+        if (empty($hashed_bc)) {
+            $this->output->set_output(json_encode(['success' => false, 'message' => 'Invalid booking token']));
+            return;
+        }
+
+        $this->db->select('BookingID');
+        $this->db->where('Token', $hashed_bc);
+        $this->db->where('Status !=', 'N');
+        $booking = $this->db->get('booking')->row_array();
+
+        if (empty($booking)) {
+            $this->output->set_output(json_encode(['success' => false, 'message' => 'Booking not found']));
+            return;
+        }
+
+        $this->load->model('Invoice_Split_Model');
+        $pax = $this->Invoice_Split_Model->Get_Pax_By_Booking($booking['BookingID']);
+
+        $this->output->set_output(json_encode(['success' => true, 'pax' => $pax]));
+    }
+
+    /**
+     * Save invoice split data (AJAX)
+     */
+    public function save_invoice_split($hashed_bc = null)
+    {
+        $this->output->set_content_type('application/json');
+
+        if (empty($hashed_bc)) {
+            $this->output->set_output(json_encode(['success' => false, 'message' => 'Invalid booking token']));
+            return;
+        }
+
+        // Verify booking
+        $this->db->select('BookingID, Subtotal, Discount, NetTotal');
+        $this->db->where('Token', $hashed_bc);
+        $this->db->where('Status !=', 'N');
+        $booking = $this->db->get('booking')->row_array();
+
+        if (empty($booking)) {
+            $this->output->set_output(json_encode(['success' => false, 'message' => 'Booking not found']));
+            return;
+        }
+
+        // Get POST data
+        $json = $this->input->raw_input_stream;
+        $data = json_decode($json, true);
+
+        if (empty($data) || empty($data['pax'])) {
+            $this->output->set_output(json_encode(['success' => false, 'message' => 'No pax data provided']));
+            return;
+        }
+
+        // Get booking products for validation
+        $this->db->select('BookingProductID, Name as ProductName, Quantity, Price');
+        $this->db->where('BookingID', $booking['BookingID']);
+        $this->db->where('Status', 'Y');
+        $booking_products = $this->db->get('booking_product')->result_array();
+
+        // Build product lookup
+        $product_lookup = [];
+        foreach ($booking_products as $bp) {
+            $product_lookup[$bp['BookingProductID']] = $bp;
+        }
+
+        // Track quantity allocation per product
+        $qty_allocated = [];
+        foreach ($booking_products as $bp) {
+            $qty_allocated[$bp['BookingProductID']] = 0;
+        }
+
+        // Validate pax data
+        $pax_data = [];
+        foreach ($data['pax'] as $index => $pax) {
+            $pax_name = isset($pax['PaxName']) ? trim($pax['PaxName']) : '';
+            if (empty($pax_name)) {
+                $this->output->set_output(json_encode([
+                    'success' => false,
+                    'message' => 'Pax #' . ($index + 1) . ' must have a name'
+                ]));
+                return;
+            }
+
+            if (empty($pax['products']) || !is_array($pax['products'])) {
+                $this->output->set_output(json_encode([
+                    'success' => false,
+                    'message' => 'Pax "' . htmlspecialchars($pax_name) . '" must have at least one product'
+                ]));
+                return;
+            }
+
+            $validated_products = [];
+            foreach ($pax['products'] as $product) {
+                $bp_id = isset($product['BookingProductID']) ? intval($product['BookingProductID']) : 0;
+                $qty = isset($product['Quantity']) ? floatval($product['Quantity']) : 0;
+
+                if (!isset($product_lookup[$bp_id])) {
+                    $this->output->set_output(json_encode([
+                        'success' => false,
+                        'message' => 'Invalid product selected for pax "' . htmlspecialchars($pax_name) . '"'
+                    ]));
+                    return;
+                }
+
+                if ($qty <= 0) {
+                    $this->output->set_output(json_encode([
+                        'success' => false,
+                        'message' => 'Quantity must be greater than 0 for pax "' . htmlspecialchars($pax_name) . '"'
+                    ]));
+                    return;
+                }
+
+                $qty_allocated[$bp_id] += $qty;
+                $validated_products[] = [
+                    'BookingProductID' => $bp_id,
+                    'Quantity' => $qty,
+                    'UnitPrice' => floatval($product_lookup[$bp_id]['Price'])
+                ];
+            }
+
+            $tin = isset($pax['TIN']) ? trim($pax['TIN']) : '';
+            if (empty($tin)) {
+                $this->output->set_output(json_encode([
+                    'success' => false,
+                    'message' => 'TIN (Tax Identification Number) is required for pax "' . htmlspecialchars($pax_name) . '"'
+                ]));
+                return;
+            }
+
+            $pax_data[] = [
+                'PaxName' => $pax_name,
+                'TIN' => $tin,
+                'products' => $validated_products
+            ];
+        }
+
+        // Validate all product quantities are fully allocated
+        foreach ($booking_products as $bp) {
+            $bp_id = $bp['BookingProductID'];
+            $expected = floatval($bp['Quantity']);
+            $actual = $qty_allocated[$bp_id];
+            if (abs($expected - $actual) > 0.01) {
+                $this->output->set_output(json_encode([
+                    'success' => false,
+                    'message' => 'Product "' . htmlspecialchars($bp['ProductName']) . '" requires total quantity of ' . $expected . ' but ' . $actual . ' was allocated'
+                ]));
+                return;
+            }
+        }
+
+        // Save
+        $this->load->model('Invoice_Split_Model');
+        $booking_subtotal = floatval($booking['Subtotal']);
+        $booking_discount = floatval($booking['Discount']);
+
+        $result = $this->Invoice_Split_Model->Save_Split(
+            $booking['BookingID'],
+            $pax_data,
+            $booking_subtotal,
+            $booking_discount
+        );
+
+        if ($result) {
+            $pax = $this->Invoice_Split_Model->Get_Pax_By_Booking($booking['BookingID']);
+            $this->output->set_output(json_encode([
+                'success' => true,
+                'message' => 'Invoice split saved successfully',
+                'pax' => $pax
+            ]));
+        } else {
+            $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => 'Failed to save invoice split'
+            ]));
         }
     }
 }
