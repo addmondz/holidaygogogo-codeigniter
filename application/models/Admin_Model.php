@@ -17,55 +17,57 @@ class Admin_Model extends CI_Model
 			case 'Admin':
 				switch($this->router->method) {
 					case 'index':
-						$this->db->select('AdminID, Name, Username, Level, Status');
-						$this->db->where('AdminID !=', $this->session->admin_id);
-						$this->db->where('AdminID !=', 8);
+						$this->db->select('a.AdminID, a.Name, a.Username, a.Level, a.Status, a.TeamLeadID, tl.Name as TeamLeadName');
+						$this->db->from('admin a');
+						$this->db->join('admin tl', 'a.TeamLeadID = tl.AdminID', 'left');
+						$this->db->where('a.AdminID !=', $this->session->admin_id);
+						$this->db->where('a.AdminID !=', 8);
 
 						//Do Not Display Owner Records If Session Is Finance
 						if($this->session->level == 30) {
-							$this->db->where('Level !=', '10');
+							$this->db->where('a.Level !=', '10');
 						}
 
 						//Filters
 						if($this->input->get('name')) {
-							$this->db->where('Name', $this->input->get('name'));
+							$this->db->where('a.Name', $this->input->get('name'));
 						}
 						if($this->input->get('gender')) {
-							$this->db->where('Gender', $this->input->get('gender'));
+							$this->db->where('a.Gender', $this->input->get('gender'));
 						}
 						if($this->input->get('identification_number')) {
-							$this->db->where('IdentificationNumber', $this->input->get('identification_number'));
+							$this->db->where('a.IdentificationNumber', $this->input->get('identification_number'));
 						}
 						if($this->input->get('passport_number')) {
-							$this->db->where('PassportNumber', $this->input->get('passport_number'));
+							$this->db->where('a.PassportNumber', $this->input->get('passport_number'));
 						}
 						if($this->input->get('mobile')) {
-							$this->db->where('Mobile', $this->input->get('mobile'));
+							$this->db->where('a.Mobile', $this->input->get('mobile'));
 						}
 						if($this->input->get('email')) {
-							$this->db->where('Email', $this->input->get('email'));
+							$this->db->where('a.Email', $this->input->get('email'));
 						}
 						if($this->input->get('username')) {
-							$this->db->where('Username', $this->input->get('username'));
+							$this->db->where('a.Username', $this->input->get('username'));
 						}
 						if($this->input->get('level')) {
-							$this->db->where('Level', $this->input->get('level'));
+							$this->db->where('a.Level', $this->input->get('level'));
 						}
 						if($this->input->get('status')) {
-							$this->db->where('Status', $this->input->get('status'));
+							$this->db->where('a.Status', $this->input->get('status'));
 						} else {
-							$this->db->where('Status !=', 'N');
+							$this->db->where('a.Status !=', 'N');
 						}
-						
-						$this->db->order_by('Name', 'ASC');
-						$admins = $this->db->get('admin');
+
+						$this->db->order_by('a.Name', 'ASC');
+						$admins = $this->db->get();
 						if($admins->num_rows() > 0) {
 							return $admins->result();
 						} else {
 							return false;
 						}
 					case 'Update':
-						$this->db->select('AdminID, CountryCodeID, Name, Gender, IdentificationNumber, PassportNumber, Mobile, Email, Username, Level, AccessControl');
+						$this->db->select('AdminID, CountryCodeID, Name, Gender, IdentificationNumber, PassportNumber, Mobile, Email, Username, Level, AccessControl, TeamLeadID');
 						$this->db->where('AdminID', $this->input->get('admin_id'));
 						$this->db->limit(1);
 						$admin = $this->db->get('admin');
@@ -87,7 +89,16 @@ class Admin_Model extends CI_Model
 		$this->db->order_by('Country', 'ASC');
 		return $this->db->get('country_code')->result();
 	}
-	
+
+	function Read_Team_Leads()
+	{
+		$this->db->select('AdminID, Name');
+		$this->db->where('Level', '25');
+		$this->db->where('Status', 'Y');
+		$this->db->order_by('Name', 'ASC');
+		return $this->db->get('admin')->result();
+	}
+
 	function Create()
 	{
 		$this->db->insert_batch('admin', json_decode(json_encode($this->input->post('admin'))));
@@ -98,10 +109,10 @@ class Admin_Model extends CI_Model
 			return false;
 		}
 	}
-	
+
 	function Update()
 	{
-		switch($this->router->class) { 
+		switch($this->router->class) {
 			case 'Profile':
 				$this->db->update_batch('admin', json_decode(json_encode($this->input->post('admin'))), 'AdminID');
 				$this->db->limit(1);
@@ -186,5 +197,5 @@ class Admin_Model extends CI_Model
     {
         return $this->db->get_where('admin', ['AdminID' => $admin_id])->row();
     }
-	
+
 }

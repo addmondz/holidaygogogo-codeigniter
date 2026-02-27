@@ -341,6 +341,63 @@
             color: #666;
         }
 
+        /* Custom Upload Row Layout */
+        .custom-uploads-section {
+            margin-top: 15px;
+        }
+
+        .custom-upload-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            text-decoration: none;
+            color: inherit;
+            transition: background 0.2s;
+        }
+
+        .custom-upload-row:hover {
+            background: #e9ecef;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .custom-upload-row.disabled {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+
+        .custom-upload-row-name {
+            font-size: 14px;
+            font-weight: 600;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .custom-upload-row-name i {
+            font-size: 18px;
+            color: #162447;
+        }
+
+        .custom-upload-row-btn {
+            font-size: 12px;
+            font-weight: 600;
+            color: #162447;
+            background: #e8ecf4;
+            padding: 5px 15px;
+            border-radius: 5px;
+            white-space: nowrap;
+        }
+
+        .custom-upload-row:hover .custom-upload-row-btn {
+            background: #d0d7e5;
+        }
+
         /* Products Section */
         .products-section {
             background: white;
@@ -1732,17 +1789,27 @@
                 <div class="card-title">
                     Documents
                 </div>
-                <div class="documents-grid">
-                    <?php
-                    // Check if travel voucher has been sent (status PT or later)
-                    $travel_voucher_sent = in_array($booking['Status'], array('PT', 'OG', 'Y', 'PR'));
+                <?php
+                // Check if travel voucher has been sent (status PT or later)
+                $travel_voucher_sent = in_array($booking['Status'], array('PT', 'OG', 'Y', 'PR'));
 
-                    foreach ($booking['documents'] as $doc_key => $doc):
-                        // Hide custom uploads (extra documents) until travel voucher is sent
-                        if (strpos($doc_key, 'cu_') === 0 && !$travel_voucher_sent) {
-                            continue;
+                // Separate standard docs from custom uploads
+                $standard_docs = array();
+                $custom_uploads = array();
+                foreach ($booking['documents'] as $doc_key => $doc) {
+                    if (strpos($doc_key, 'cu_') === 0) {
+                        if ($travel_voucher_sent) {
+                            $custom_uploads[$doc_key] = $doc;
                         }
-                    ?>
+                    } else {
+                        $standard_docs[$doc_key] = $doc;
+                    }
+                }
+                ?>
+
+                <!-- Standard Documents (Card Layout) -->
+                <div class="documents-grid">
+                    <?php foreach ($standard_docs as $doc_key => $doc): ?>
                         <a href="<?php echo $doc['url']; ?>" target="_blank" class="document-item <?php echo $doc['available'] ? '' : 'disabled'; ?>">
                             <div class="document-icon">
                                 <?php if ($doc_key == 'bc'): ?>
@@ -1753,8 +1820,6 @@
                                     <i class="la la-receipt"></i>
                                 <?php elseif ($doc_key == 'gl'): ?>
                                     <i class="la la-users"></i>
-                                <?php elseif (strpos($doc_key, 'cu_') === 0): ?>
-                                    <i class="la la-file-alt"></i>
                                 <?php else: ?>
                                     <i class="la la-file"></i>
                                 <?php endif; ?>
@@ -1764,6 +1829,21 @@
                         </a>
                     <?php endforeach; ?>
                 </div>
+
+                <!-- Custom Uploaded Documents (Row Layout) -->
+                <?php if (!empty($custom_uploads)): ?>
+                    <div class="custom-uploads-section">
+                        <?php foreach ($custom_uploads as $doc_key => $doc): ?>
+                            <a href="<?php echo $doc['url']; ?>" target="_blank" class="custom-upload-row <?php echo $doc['available'] ? '' : 'disabled'; ?>">
+                                <span class="custom-upload-row-name">
+                                    <i class="la la-file-alt"></i>
+                                    <?php echo htmlspecialchars($doc['name']); ?>
+                                </span>
+                                <span class="custom-upload-row-btn">View</span>
+                            </a>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
             </div>
 
             <!-- Customer Comments Section -->
