@@ -20,12 +20,12 @@ class Recalculate {
 
         // 2. Run the logic
         foreach($bookings as $booking) {
-            if((date('Y-m-d') >= $booking->StartDate && date('Y-m-d') <= $booking->EndDate) && ($booking->Status == 'PT' || $booking->Status == 'Y')) {
+            if((date('Y-m-d') >= $booking->StartDate && date('Y-m-d') <= $booking->EndDate) && ($booking->Status == 'PT')) {
                 $this->CI->Booking_Model->Update_After_Sales_Service2($booking->BookingID);
                 $this->CI->Booking_Model->Update_Status('OG', $booking->BookingID);
                 $this->CI->Booking_Model->Create_Booking_Log2($booking->Status, 'OG', $booking->BookingID);
             } else {
-                if((date('Y-m-d') < $booking->StartDate && ($booking->Status == 'OG' || $booking->Status == 'Y'))) {
+                if((date('Y-m-d') < $booking->StartDate && ($booking->Status == 'OG'))) {
                     $this->CI->Booking_Model->Update_After_Sales_Service2($booking->BookingID);
                     $this->CI->Booking_Model->Update_Status('PT', $booking->BookingID);
                     $this->CI->Booking_Model->Create_Booking_Log2($booking->Status, 'PT', $booking->BookingID);
@@ -37,7 +37,12 @@ class Recalculate {
                     }
                 }
             }
-            
+
+            // Skip payment-based status transitions for completed bookings
+            if($booking->Status == 'Y') {
+                continue;
+            }
+
             $payments = $this->CI->Booking_Model->Read_Payments($booking->BookingID);
             $total_approved_credit = 0;
             if(!empty($payments)) {

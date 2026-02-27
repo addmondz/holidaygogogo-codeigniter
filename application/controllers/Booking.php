@@ -38,12 +38,12 @@ class Booking extends MY_Controller
 			// Update status for all bookings (this runs before the AJAX calls)
 			$bookings = $this->Booking_Model->Read_All_Bookings();
 			foreach($bookings as $booking) {
-				if((date('Y-m-d') >= $booking->StartDate && date('Y-m-d') <= $booking->EndDate) && ($booking->Status == 'PT' || $booking->Status == 'Y')) {
+				if((date('Y-m-d') >= $booking->StartDate && date('Y-m-d') <= $booking->EndDate) && ($booking->Status == 'PT')) {
 					$this->Booking_Model->Update_After_Sales_Service2($booking->BookingID);
 					$this->Booking_Model->Update_Status('OG', $booking->BookingID);
 					$this->Booking_Model->Create_Booking_Log2($booking->Status, 'OG', $booking->BookingID);
 				} else {
-					if((date('Y-m-d') < $booking->StartDate && ($booking->Status == 'OG' || $booking->Status == 'Y'))) {
+					if((date('Y-m-d') < $booking->StartDate && ($booking->Status == 'OG'))) {
 						$this->Booking_Model->Update_After_Sales_Service2($booking->BookingID);
 						$this->Booking_Model->Update_Status('PT', $booking->BookingID);
 						$this->Booking_Model->Create_Booking_Log2($booking->Status, 'PT', $booking->BookingID);
@@ -54,6 +54,11 @@ class Booking extends MY_Controller
 							$this->Booking_Model->Create_Booking_Log2($booking->Status, 'Y', $booking->BookingID);
 						}
 					}
+				}
+
+				// Skip payment-based status transitions for completed bookings
+				if($booking->Status == 'Y') {
+					continue;
 				}
 
 				$payments = $this->Booking_Model->Read_Payments($booking->BookingID);
