@@ -1065,18 +1065,34 @@
                                 <div class="document-name">Call Your Travel Consultant</div>
                                 <div class="document-action">Call <?php echo htmlspecialchars($booking['SalesAgentName']); ?> Now</div>
                             </a>
+                        <?php else: ?>
+                            <a href="tel:<?php echo get_offical_phone_number(); ?>" class="document-item">
+                                <div class="document-icon">
+                                    <i class="la la-phone"></i>
+                                </div>
+                                <div class="document-name">Call us</div>
+                                <div class="document-action">Call us Now</div>
+                            </a>
                         <?php endif; ?>
                     <?php endif; ?>
-                    <?php if (get_offical_whatsapp_link() != null): ?>
-                        <?php
-                            $message = "Hi, I’d like to check on a question regarding my booking.\nBooking number: {$booking['BookingNumber']}";
-                        ?>
+                    <?php
+                        $message = "Hi, I’d like to check on a question regarding my booking.\nBooking number: {$booking['BookingNumber']}";
+                    ?>
+                    <?php if ($formatted_mobile): ?>
                         <a href="<?php echo get_offical_whatsapp_link($message, $formatted_mobile); ?>" target="_blank" class="document-item">
                             <div class="document-icon">
                                 <i class="la la-whatsapp"></i>
                             </div>
                             <div class="document-name">WhatsApp Travel Consultant</div>
                             <div class="document-action">WhatsApp <?php echo htmlspecialchars($booking['SalesAgentName']); ?></div>
+                        </a>
+                        <?php else: ?>
+                        <a href="<?php echo get_offical_whatsapp_link($message, get_offical_phone_number()); ?>" target="_blank" class="document-item">
+                            <div class="document-icon">
+                                <i class="la la-whatsapp"></i>
+                            </div>
+                            <div class="document-name">WhatsApp us</div>
+                            <div class="document-action">WhatsApp us Now</div>
                         </a>
                     <?php endif; ?>
                 </div>
@@ -1289,8 +1305,8 @@
             $bc_step_status = $bc_approved ? 'completed' : ($current_step == 1 ? 'current' : 'future');
             $timeline_steps[] = [
                 'step' => count($timeline_steps) + 1,
-                'title' => 'Booking Confirmed',
-                'description' => 'Your booking has been confirmed',
+                'title' => $bc_approved ? 'Booking Confirmed' : 'Pending Booking Confirmation',
+                'description' => $bc_approved ? 'Your booking has been confirmed' : 'Your booking is being confirmed',
                 'event_date' => $bc_date,
                 'relative_time' => get_relative_time($bc_date),
                 'expected_date' => null,
@@ -1319,8 +1335,8 @@
                     $payment_title = 'Pending Payment';
                     $payment_description = 'Full payment required';
                 } elseif ($total_paid < $net_total) {
-                    $payment_title = 'Partial Payment Received';
-                    $payment_description = 'Partial payment received';
+                    $payment_title = 'Pending Full Payment';
+                    $payment_description = 'Full payment required';
                 } else {
                     $payment_title = 'Full Payment Received';
                     $payment_description = 'Full payment received';
@@ -1349,7 +1365,8 @@
             $checklist_step_status = $checklists_completed ? 'completed' : ($current_step == 3 ? 'current' : 'future');
             $timeline_steps[] = [
                 'step' => count($timeline_steps) + 1,
-                'title' => 'Checklist Completed',
+                // 'title' => $checklists_completed ? 'Checklist Completed' : 'Pending Checklist',
+                'title' => $checklists_completed ? 'Booking Process Completed' : 'Booking Processing',
                 'description' => $checklists_completed ? 'All booking requirements verified' : 'Booking requirements being processed',
                 'event_date' => $checklists_completed ? $checklist_date : null,
                 'relative_time' => $checklists_completed ? get_relative_time($checklist_date) : '',
@@ -1370,7 +1387,7 @@
             $gl_expected_date = $bc_date ? date('Y-m-d', strtotime($bc_date . ' +2 days')) : null;
             $timeline_steps[] = [
                 'step' => count($timeline_steps) + 1,
-                'title' => 'Guest List Finalized',
+                'title' => $guest_list_locked ? 'Guest List Finalized' : 'Pending Guest List',
                 'description' => $guest_list_locked ? 'Guest list has been submitted and locked' : 'Please submit your guest list',
                 'event_date' => $guest_list_locked ? $gl_date : null,
                 'relative_time' => $guest_list_locked ? get_relative_time($gl_date) : '',
@@ -1399,7 +1416,7 @@
             }
             $timeline_steps[] = [
                 'step' => count($timeline_steps) + 1,
-                'title' => 'Travel Voucher Sent',
+                'title' => $travel_voucher_sent ? 'Travel Voucher Sent' : 'Pending Travel Voucher',
                 'description' => $travel_voucher_sent ? 'Your travel voucher is ready' : 'Travel voucher will be sent before your trip',
                 'event_date' => $travel_voucher_sent ? $tv_date : null,
                 'relative_time' => $travel_voucher_sent ? get_relative_time($tv_date) : '',
@@ -1458,7 +1475,7 @@
                     $trip_relative = 'ongoing';
                     $trip_expected = $travel_end;
                 } else {
-                    $trip_title = 'Trip Date';
+                    $trip_title = 'Pending Trip';
                     $trip_description = 'Your trip is scheduled to begin soon';
                     $trip_event_date = null;
                     $trip_relative = get_relative_time($travel_start);

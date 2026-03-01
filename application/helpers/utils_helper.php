@@ -328,9 +328,13 @@ function get_offical_whatsapp_link($text = null, $phone_number = null){
         $text = 'Hi, can i get more information about your travel package?';
     }
     if (empty($phone_number)) {
-        $phone_number = '60102956786';
+        $phone_number = get_offical_phone_number();
     }
     return 'https://api.whatsapp.com/send?phone=' . $phone_number . '&text=' . urlencode($text);
+}
+
+function get_offical_phone_number() {
+    return '60102956786';
 }
 
 function return_timestamp_output($timestamp, $show_time_ago = true, $show_time = true)
