@@ -1316,11 +1316,6 @@ class Booking_Model extends CI_Model
 			$end_date = date('Y-m-d', strtotime(str_replace('/', '-', $booking_date[1])));
 			$this->db->where('CAST(booking.InsertDate AS DATE) >=', $start_date);
 			$this->db->where('CAST(booking.InsertDate AS DATE) <=', $end_date);
-		} else {
-			if($ignore == 0 && isset($level2Ignore) && $level2Ignore == 0) {
-				$this->db->where('CAST(booking.InsertDate AS DATE) >=', date('Y-m-d', strtotime('-14 days')));
-				$this->db->where('CAST(booking.InsertDate AS DATE) <=', date('Y-m-d'));
-			}
 		}
 
 		$this->db->where('booking.Status !=', 'N');
