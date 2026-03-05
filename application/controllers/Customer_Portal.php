@@ -133,8 +133,11 @@ class Customer_Portal extends CI_Controller
         $this->db->join('country_code', 'country_code.CountryCodeID = booking.CountryCodeID', 'left');
         $this->db->where('booking.CustomerID', $customer_id);
         $this->db->where('booking.Status !=', 'N');
-        // Only show BC approved bookings in customer portal
+        // Show bookings if BC is currently approved OR was approved at least once before
+        $this->db->group_start();
         $this->db->where('booking.bc_approved', 1);
+        $this->db->or_where('booking.customer_portal_visible', 1);
+        $this->db->group_end();
         $this->db->order_by('booking.BookingID', 'DESC');
         
         return $this->db->get()->result_array();
@@ -160,8 +163,11 @@ class Customer_Portal extends CI_Controller
         $this->db->where('booking.CustomerID', $customer_id);
         $this->db->where('booking.Status !=', 'N');
         $this->db->where('CancelStatus', 'N'); // Always exclude cancelled
-        // Only show BC approved bookings in customer portal
+        // Show bookings if BC is currently approved OR was approved at least once before
+        $this->db->group_start();
         $this->db->where('booking.bc_approved', 1);
+        $this->db->or_where('booking.customer_portal_visible', 1);
+        $this->db->group_end();
         $this->db->order_by('booking.StartDate', 'DESC');
         $this->db->order_by('booking.BookingID', 'DESC');
         
@@ -282,8 +288,11 @@ class Customer_Portal extends CI_Controller
         $this->db->join('admin', 'admin.AdminID = booking.SalesAgent', 'left');
         $this->db->where('booking.Token', $hashed_bc);
         $this->db->where('booking.Status !=', 'N');
-        // Only show BC approved bookings in customer portal
+        // Show booking if BC is currently approved OR was approved at least once before
+        $this->db->group_start();
         $this->db->where('booking.bc_approved', 1);
+        $this->db->or_where('booking.customer_portal_visible', 1);
+        $this->db->group_end();
         $booking = $this->db->get()->row_array();
 
         if (empty($booking)) {
@@ -1121,4 +1130,3 @@ class Customer_Portal extends CI_Controller
         }
     }
 }
-

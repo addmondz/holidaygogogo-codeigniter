@@ -1172,6 +1172,8 @@ class Booking_Model extends CI_Model
 		if ($bc_approved && $admin_id !== null) {
 			$array['bc_approval_admin_id'] = $admin_id;
 			$array['bc_approval_date'] = date('Y-m-d H:i:s');
+			// Keep booking visible in customer portal permanently after first BC approval
+			$array['customer_portal_visible'] = 1;
 		} else {
 			$array['bc_approval_admin_id'] = null;
 			$array['bc_approval_date'] = null;
