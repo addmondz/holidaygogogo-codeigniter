@@ -652,9 +652,10 @@ class Booking extends MY_Controller
 				// }
         } else {
 				$titles = array('tab_title' => 'HolidayGoGoGo | Booking', 'breadcrumb_title' => 'Booking >> Create');
-				$array = array('BookingID' => 'NA', 'BookingConfirmationFooterID' => 'NA', 'TravelVoucherFooterID' => 'NA', 'BookingNumber' => 'NA', 'Tag' => array(), 'Discount' => 'NA', 'NetTotal' => 'NA', 'ProductSequence' => array(), 'BookingProductID' => ($this->Booking_Product_Model->Read_Last_Booking_Product_ID()) + 1, 'AllowReview' => 1);
-				$array['admins'] = $this->Booking_Model->Read_Admins();
-				$array['booking_products'][0] = (object) array('BookingProductID' => 'NA');
+					$array = array('BookingID' => 'NA', 'BookingConfirmationFooterID' => 'NA', 'TravelVoucherFooterID' => 'NA', 'BookingNumber' => 'NA', 'Tag' => array(), 'Discount' => 'NA', 'NetTotal' => 'NA', 'ProductSequence' => array(), 'BookingProductID' => ($this->Booking_Product_Model->Read_Last_Booking_Product_ID()) + 1, 'AllowReview' => 1);
+					$array['admins'] = $this->Booking_Model->Read_Admins();
+					$array['booking_op_admins'] = $this->Booking_Model->Read_Booking_OP_Admins();
+					$array['booking_products'][0] = (object) array('BookingProductID' => 'NA');
 				$array['categories'] = $this->Booking_Model->Read_Categories();
 				$array['products'] = $this->Booking_Model->Read_Products();
 				$array['footers'] = $this->Booking_Model->Read_Footers();
@@ -1058,8 +1059,9 @@ class Booking extends MY_Controller
 						$deposit_paid_display = '0.00';
 						// Don't set DepositPaidColor for no payment
 					}
-					$array['DepositPaidDisplay'] = $deposit_paid_display;
-					$array['admins'] = $this->Booking_Model->Read_Admins();
+						$array['DepositPaidDisplay'] = $deposit_paid_display;
+						$array['admins'] = $this->Booking_Model->Read_Admins();
+						$array['booking_op_admins'] = $this->Booking_Model->Read_Booking_OP_Admins();
 
 					if(empty($array['ProductSequence'])) {
 						$array['ProductSequence'] = explode(',', $array['ProductSequence']);
@@ -1215,8 +1217,9 @@ class Booking extends MY_Controller
 					$deposit_paid_display = '0.00';
 					// Don't set DepositPaidColor for no payment
 				}
-				$array['DepositPaidDisplay'] = $deposit_paid_display;
-				$array['admins'] = $this->Booking_Model->Read_Admins();
+					$array['DepositPaidDisplay'] = $deposit_paid_display;
+					$array['admins'] = $this->Booking_Model->Read_Admins();
+					$array['booking_op_admins'] = $this->Booking_Model->Read_Booking_OP_Admins();
 
 				if(empty($array['ProductSequence'])) {
 					$array['ProductSequence'] = explode(',', $array['ProductSequence']);

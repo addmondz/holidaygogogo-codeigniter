@@ -159,6 +159,28 @@
                         </div>
 
                         <div class="col-md-6">
+
+                            <div class="form-group">
+
+                                <label>Booking OP</label>
+
+                                <select id="BookingOP" data-live-search="true" class="form-control selectpicker">
+
+                                    <option data-icon="la la-user-cog font-size-lg bs-icon" value="">--SELECT BOOKING OP--</option>
+
+                                    <?php foreach($booking_op_admins as $admin) { ?>
+
+                                        <option <?php if((current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) && $admin->AdminID == $BookingOP) { echo 'selected'; } ?> data-icon="la la-user-cog font-size-lg bs-icon" value="<?php echo $admin->AdminID; ?>"><?php echo $admin->Name; ?></option>
+
+                                    <?php } ?>
+
+                                </select>
+
+                            </div>
+
+                        </div>
+
+                        <div class="col-md-6">
                             <div class="form-group">
                                 <label>Customer <span style="color:red;">*</span></label>
 
@@ -2161,6 +2183,8 @@
 
                 var sales_agent = $('#SalesAgent').hasOwnProperty('length') ? $('#SalesAgent').val() : <?php echo $this->session->userdata('admin_id') ?>;
 
+                var booking_op = $('#BookingOP').val();
+
                 var chat_language = $('#ChatLanguage').val();
 
                 var source = $('#Source').val();
@@ -2247,6 +2271,12 @@
                                     var deposit_percentage = $('#DepositPercentage').val() != '' ? parseInt($('#DepositPercentage').val()) : 50;
 
                                     booking.push({CountryCodeID:country_code, ReservationNumber:reservation_number, FullPaymentDeadline:`${full_payment_deadline[2]}-${full_payment_deadline[1]}-${full_payment_deadline[0]}`, Customer:customer, Mobile:mobile, Destination:destination, SalesAgent:sales_agent, Source:source, Subtotal:subtotal, NetTotal:net_total, DepositPercentage:deposit_percentage, ChatLanguage:chat_language, BookingConfirmationTitle:bc_title, InsertBy:<?php echo $this->session->userdata('admin_id') ?>, InsertDate:'<?php echo date('Y-m-d H:i:s') ?>', UpdateBy:<?php echo $this->session->userdata('admin_id') ?>, UpdateDate:'<?php echo date('Y-m-d H:i:s') ?>'});
+
+                                    if(booking_op != '') {
+
+                                        booking[0]['BookingOP'] = booking_op;
+
+                                    }
 
                                     if(booking_confirmation_footer != '') {
 
@@ -2395,6 +2425,7 @@
                                     var dirty_fields = $('#form').dirty('showDirtyFields');
 
                                     var admins = <?php echo json_encode($admins) ?>;
+                                    var booking_op_admins = <?php echo json_encode($booking_op_admins) ?>;
 
                                     var sources = <?php echo json_encode($sources) ?>;
 
@@ -2418,11 +2449,17 @@
 
                                                 // Action : Update
 
-                                                if(key == 'CountryCodeID' && Object.values(dirty_fields[i])[country_codes.length + 1].hasOwnProperty('dirtyInitialValue') || key == 'ReservationNumber' || key == 'DepositDeadline' || key == 'FullPaymentDeadline' || key == 'AdditionalPaymentDeadline' || key == 'Customer' || key == 'Mobile' || key == 'Destination' && Object.values(dirty_fields[i])[categories.length + 1].hasOwnProperty('dirtyInitialValue') || key == 'SalesAgent' && Object.values(dirty_fields[i])[admins.length + 1].hasOwnProperty('dirtyInitialValue') || key == 'BookingRemark' || key == 'Subtotal' || key == 'ChatLanguage' && Object.values(dirty_fields[i])[4].hasOwnProperty('dirtyInitialValue') || key == 'Source' && Object.values(dirty_fields[i])[sources.length + 1].hasOwnProperty('dirtyInitialValue') || key == 'BookingConfirmationTitle' && Object.values(dirty_fields[i])[4].hasOwnProperty('dirtyInitialValue')) {
+                                                if(key == 'CountryCodeID' && Object.values(dirty_fields[i])[country_codes.length + 1].hasOwnProperty('dirtyInitialValue') || key == 'ReservationNumber' || key == 'DepositDeadline' || key == 'FullPaymentDeadline' || key == 'AdditionalPaymentDeadline' || key == 'Customer' || key == 'Mobile' || key == 'Destination' && Object.values(dirty_fields[i])[categories.length + 1].hasOwnProperty('dirtyInitialValue') || key == 'SalesAgent' && Object.values(dirty_fields[i])[admins.length + 1].hasOwnProperty('dirtyInitialValue') || key == 'BookingOP' && Object.values(dirty_fields[i])[booking_op_admins.length + 1].hasOwnProperty('dirtyInitialValue') || key == 'BookingRemark' || key == 'Subtotal' || key == 'ChatLanguage' && Object.values(dirty_fields[i])[4].hasOwnProperty('dirtyInitialValue') || key == 'Source' && Object.values(dirty_fields[i])[sources.length + 1].hasOwnProperty('dirtyInitialValue') || key == 'BookingConfirmationTitle' && Object.values(dirty_fields[i])[4].hasOwnProperty('dirtyInitialValue')) {
 
                                                     if(key == 'Subtotal') {
 
                                                         value = value.replace(/,/g, '');
+
+                                                    }
+
+                                                    if(key == 'BookingOP' && value == '') {
+
+                                                        value = null;
 
                                                     }
 
@@ -2451,6 +2488,12 @@
                                                         case 'SalesAgent':
 
                                                             default_value = (Object.values(dirty_fields[i])[admins.length + 1]).dirtyInitialValue;
+
+                                                            break;
+
+                                                        case 'BookingOP':
+
+                                                            default_value = (Object.values(dirty_fields[i])[booking_op_admins.length + 1]).dirtyInitialValue;
 
                                                             break;
 
