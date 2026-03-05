@@ -35,6 +35,7 @@ class Guest_List extends CI_Controller
 	{
 		if($this->input->post()) {
 			$booking_id = $this->Guest_List_Model->Read_Booking_ID();
+			$this->Booking_Model->Mark_Guest_List_Submitted($booking_id);
 			
 			// Handle passport copy file uploads for existing guests
 			$passport_copy_paths = $this->handle_passport_uploads('passport_copies', $booking_id);

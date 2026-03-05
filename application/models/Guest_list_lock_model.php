@@ -278,5 +278,5 @@ class Guest_list_lock_model extends CI_Model
 			'extension_used' => $lock->extension_used == 1
 		);
 	}
-}
 
+}

@@ -383,38 +383,39 @@ class Booking extends MY_Controller
 			$status_icon = $remarks_count > 0 ? ' <i class="la la-comment" style="font-size: 0.85em; opacity: 0.7;"></i>' : '';
 			$row['status'] = '<span class="font-weight-bold remarks-status" style="color:' . $status_color . '; cursor: help;" data-toggle="tooltip" data-html="true" data-placement="left" data-booking-id="' . $booking->BookingID . '" title="' . htmlspecialchars($remarks_html, ENT_QUOTES) . '">' . $status_text . $status_icon . '</span>';
 
-			// GL Status - Basic rule:
-			// 1. If old LockStatus = 'Y' -> display locked (red lock)
-			// 2. If has active guest_list_lock (someone is filling) -> display loading (spinner)
-			// 3. Else -> display green open lock
+			// GL Status rules:
+			// 1. If hard-locked (LockStatus = 'Y') -> locked icon (red)
+			// 2. Else if active soft-lock exists -> loading spinner (blue)
+			// 3. Else if guest list has submitted data -> submitted icon (orange)
+			// 4. Else -> default unlocked icon (green)
 			$gl_status_icon = '';
 			
-			// First check: Old LockStatus field
+			// 1) Hard lock
 			if ($booking->LockStatus == 'Y') {
-				// Locked - display red lock icon
-				$gl_status_icon = '<i class="la la-lock text-danger"></i>';
+				$gl_status_icon = '<i class="la la-lock text-danger" data-toggle="tooltip" data-placement="top" title="Guest list is locked"></i>';
 			} else {
-				// Second check: Active guest_list_lock (someone is filling)
+				$has_active_editor_lock = false;
+
+				// 2) Active soft lock (someone is filling)
 				if (!empty($booking->Token)) {
 					$lock = $this->Guest_list_lock_model->getByHash($booking->Token);
 					if (!empty($lock)) {
-						// Check if lock is expired (checks both lock_expires_at timestamp and missing heartbeat)
 						$is_expired = $this->Guest_list_lock_model->isExpired($lock);
-						
 						if (!$is_expired) {
-							// Active lock exists (someone is filling) - show loading spinner
+							$has_active_editor_lock = true;
 							$gl_status_icon = '<i class="la la-spinner la-spin text-primary" data-toggle="tooltip" data-placement="top" title="Guest list is being edited"></i>';
-						} else {
-							// Lock exists but expired - show green open lock
-							$gl_status_icon = '<i class="la la-unlock text-success"></i>';
 						}
-					} else {
-						// No lock exists - show green open lock
-						$gl_status_icon = '<i class="la la-unlock text-success"></i>';
 					}
-				} else {
-					// No token - show green open lock
-					$gl_status_icon = '<i class="la la-unlock text-success"></i>';
+				}
+
+				if (!$has_active_editor_lock) {
+					// 3) Submitted
+					if (!empty($booking->is_submitted) && intval($booking->is_submitted) === 1) {
+						$gl_status_icon = '<i class="la la-check-circle text-warning" data-toggle="tooltip" data-placement="top" title="Guest list submitted"></i>';
+					} else {
+						// 4) Default unlocked
+						$gl_status_icon = '<i class="la la-unlock text-success" data-toggle="tooltip" data-placement="top" title="Guest list is unlocked"></i>';
+					}
 				}
 			}
 			$row['gl_status'] = $gl_status_icon;
