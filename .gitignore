@@ -1,2 +1,3 @@
 .env
 application/cache/sessions/*
+assets/upload/

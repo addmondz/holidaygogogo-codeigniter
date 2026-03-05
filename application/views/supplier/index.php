@@ -217,7 +217,17 @@
                                             <div class="btn-group">
                                                 <button type="button" data-toggle="dropdown" class="btn btn-light-primary btn-sm dropdown-toggle" style="padding-left:3px;"></button>
                                                 <div class="dropdown-menu">
-                                                    <!-- delete disable -- controller, model, autocount all done QA, just add the button back -->
+                                                    <?php if($this->session->level == 10) { ?>
+                                                    <button onclick="Delete_Record(
+                                                        '<?php echo base_url('assets/image/sweetalert.jpg'); ?>',
+                                                        '<?php echo 'Supplier Record : ' . str_replace('\'', '', $supplier->Name); ?>',
+                                                        '<?php echo base_url('Supplier/Delete'); ?>',
+                                                        'supplier_id',
+                                                        <?php echo $supplier->SupplierID; ?>,
+                                                        '<?php echo $supplier->Status; ?>',
+                                                        '<?php if(strpos($current_url, '?') == true) { echo base_url('Supplier?') . (explode('?', $current_url))[1]; } else { echo base_url('Supplier'); } ?>'
+                                                    )" class="dropdown-item" style="color:#E37383; font-size:11px;">Delete Supplier</button>
+                                                    <?php } ?>
                                                     <a href="<?php echo base_url('Supplier/Update?supplier_id=') . $supplier->SupplierID; ?>" class="dropdown-item" style="font-size:11px;">Update Supplier</a>
                                                 </div>
                                             </div>
