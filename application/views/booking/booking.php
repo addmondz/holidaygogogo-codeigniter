@@ -556,6 +556,62 @@
 
                             <div class="form-group">
 
+                                <label>Payment Out to Supplier (Full)
+
+                                    <span style="color:red;">*</span>
+
+                                </label>
+
+                                <div class="input-icon">
+
+                                    <input readonly type="text" name="PaymentOutSupplierFull" id="kt_datepicker_6" <?php if(current_url() == base_url('Booking/Update')) { ?> value="<?php echo $PaymentOutSupplierFull; ?>" <?php } ?> autocomplete="off" class="form-control">
+
+                                    <span>
+
+                                        <i class="la la-calendar"></i>
+
+                                    </span>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                        <div class="col-md-6">
+
+                            <div class="form-group">
+
+                                <label>Payment Out to Supplier (Deposit)
+
+                                    <a onclick="Reset_PaymentOutSupplierDeposit()" class="btn btn-icon btn-light-warning btn-xs">
+
+                                        <i class="la la-undo"></i>
+
+                                    </a>
+
+                                </label>
+
+                                <div class="input-icon">
+
+                                    <input readonly type="text" name="PaymentOutSupplierDeposit" id="kt_datepicker_7" <?php if(current_url() == base_url('Booking/Update')) { ?> value="<?php echo $PaymentOutSupplierDeposit; ?>" <?php } ?> autocomplete="off" class="form-control">
+
+                                    <span>
+
+                                        <i class="la la-calendar"></i>
+
+                                    </span>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                        <div class="col-md-6">
+
+                            <div class="form-group">
+
                                 <label>BC Title
 
                                     <span style="color:red;">*</span>
@@ -759,6 +815,63 @@
 
                     <br>
 
+                    <?php if(current_url() == base_url('Booking/Update')) { ?>
+                    <div class="d-flex justify-content-between border-top pt-5"></div>
+
+                    <strong>Room Management :</strong>
+
+                    <br><br>
+
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="card card-custom mb-5" style="border: 1px solid #D7E2F2;">
+                                <div class="card-header flex-wrap py-3" style="background-color:#D7E2F2;">
+                                    <div class="card-title">
+                                        <h3 class="card-label" style="color:#6082B6;">
+                                            <strong>Room Management</strong>
+                                        </h3>
+                                    </div>
+                                    <div class="card-toolbar">
+                                        <button type="button" id="create_room_btn" class="btn btn-sm btn-light-success font-weight-bold">
+                                            <i class="la la-plus"></i> Add Room
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <small class="text-muted">
+                                            Booking Pax — Adult: <strong id="booking_adult_count"><?php echo $Adult; ?></strong>,
+                                            Children: <strong id="booking_child_count"><?php echo $Children; ?></strong>,
+                                            Infant: <strong id="booking_infant_count"><?php echo $Infant; ?></strong>
+                                            | Allocated — Adult: <strong id="allocated_adult">0</strong>,
+                                            Children: <strong id="allocated_child">0</strong>,
+                                            Infant: <strong id="allocated_infant">0</strong>
+                                        </small>
+                                    </div>
+                                    <div class="table-responsive">
+                                        <table class="table table-bordered table-head-solid" id="rooms_table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Room Name</th>
+                                                    <th class="text-center" style="width:100px;">Adult</th>
+                                                    <th class="text-center" style="width:100px;">Child</th>
+                                                    <th class="text-center" style="width:100px;">Infant</th>
+                                                    <th class="text-center" style="width:120px;">Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="rooms_list">
+                                                <tr id="no_rooms_row"><td colspan="5" class="text-muted text-center">No rooms created yet. Click "Add Room" to create one.</td></tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <br>
+                    <?php } ?>
+
                     <div class="d-flex justify-content-between border-top pt-5"></div>
 
                     <strong>Footer Information :</strong>
@@ -833,25 +946,25 @@
 
                             </div>
 
-                            <div id="travel_voucher_key_contacts" class="show mb-2" style="overflow-x:auto; display:none; padding: 8px 12px; border: 1px solid #D7E2F2;">
+                            <div id="travel_voucher_key_contacts" class="alert alert-custom alert-light-info fade show mb-5" style="overflow-x:auto;">
 
-                                <div class="alert-text" style="margin: 0;">
+                                <div class="alert-text">
 
-                                    <label style="color:#3F4254; font-size: 12px; margin-bottom: 4px;"><strong>Key Contacts:</strong></label>
+                                    <label style="color:#3F4254;">Key Contacts :</label>
 
-                                    <div id="travel_voucher_key_contacts_content" style="font-size: 11px; line-height: 1.4;"></div>
+                                    <textarea id="kt-tinymce-6" autocomplete="off" class="tox-target"><?php if(current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) { echo isset($KeyContacts) ? $KeyContacts : ''; } ?></textarea>
 
                                 </div>
 
                             </div>
 
-                            <div id="travel_voucher_special_remarks" class="show mb-2" style="overflow-x:auto; display:none; padding: 8px 12px; border: 1px solid #D7E2F2;">
+                            <div id="travel_voucher_special_remarks" class="alert alert-custom alert-light-info fade show mb-5" style="overflow-x:auto;">
 
-                                <div class="alert-text" style="margin: 0;">
+                                <div class="alert-text">
 
-                                    <label style="color:#3F4254; font-size: 12px; margin-bottom: 4px;"><strong>Special Remarks:</strong></label>
+                                    <label style="color:#3F4254;">Special Remarks :</label>
 
-                                    <div id="travel_voucher_special_remarks_content" style="font-size: 11px; line-height: 1.4;"></div>
+                                    <textarea id="kt-tinymce-7" autocomplete="off" class="tox-target"><?php if(current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) { echo isset($SpecialRemarks) ? $SpecialRemarks : ''; } ?></textarea>
 
                                 </div>
 
@@ -891,7 +1004,7 @@
                 <div class="col-lg-6 col-md-12">
                     <div class="row">
                         <div class="col">
-                            <div class="card card-custom">
+                            <div class="card card-custom" id="internal-comments">
                                 <div class="card-header flex-wrap py-2" style="background-color:#D7E2F2;">
                                     <div class="card-title">
                                         <h4 class="card-label mb-0" style="color:#6082B6; font-size: 1.1rem;">
@@ -922,7 +1035,7 @@
                     </div>
                     <div class="row mt-5">
                         <div class="col">
-                            <div class="card card-custom">
+                            <div class="card card-custom" id="customer-remarks">
                                 <div class="card-header flex-wrap py-2" style="background-color:#E8F5E9;">
                                     <div class="card-title">
                                         <h4 class="card-label mb-0" style="color:#4CAF50; font-size: 1.1rem;">
@@ -1077,7 +1190,13 @@
                     <div class="row">
                         <div class="col">
                             <!-- Booking Checklist Section -->
-                            <?php if(isset($booking_checklists) && !empty($booking_checklists)) { ?>
+                            <?php if(isset($booking_checklists) && !empty($booking_checklists['groups'])) {
+                                $is_multi = $booking_checklists['is_multi_product'];
+                                $groups = $booking_checklists['groups'];
+                                $total_count = $booking_checklists['total_count'];
+                                $completion_map = isset($completion_map) ? $completion_map : array();
+                                $checked_count = 0;
+                            ?>
                                 <div class="row mt-5">
                                     <div class="col-12">
                                         <div class="card card-custom">
@@ -1089,47 +1208,53 @@
                                                 </div>
                                             </div>
                                             <div class="card-body">
-                                                <div class="checklist-container">
-                                                    <?php 
-                                                    $completion_map = isset($completion_map) ? $completion_map : array();
-                                                    $checked_count = 0;
-                                                    $total_count = count($booking_checklists);
-                                                    foreach($booking_checklists as $index => $checklist) { 
-                                                        $is_checked = isset($completion_map[$checklist->ID]);
-                                                        $completion_info = $is_checked ? $completion_map[$checklist->ID] : null;
-                                                        if($is_checked) $checked_count++;
-                                                    ?>
-                                                        <div class="checklist-item <?php echo $is_checked ? 'checked' : ''; ?>" data-checklist-id="<?php echo $checklist->ID; ?>">
-                                                            <div class="checklist-item-content">
-                                                                <div class="checklist-checkbox-wrapper">
-                                                                    <input class="form-check-input checklist-checkbox" type="checkbox" 
-                                                                        id="checklist_<?php echo $checklist->ID; ?>" 
-                                                                        value="<?php echo $checklist->ID; ?>"
-                                                                        <?php echo $is_checked ? 'checked' : ''; ?>>
-                                                                    <label class="checklist-checkbox-label" for="checklist_<?php echo $checklist->ID; ?>"></label>
-                                                                </div>
-                                                                <div class="checklist-details">
-                                                                    <div class="checklist-name-wrapper">
-                                                                        <label class="checklist-name" for="checklist_<?php echo $checklist->ID; ?>">
-                                                                            <?php echo htmlspecialchars($checklist->name); ?>
-                                                                        </label>
+                                                <?php foreach($groups as $group_index => $group) { ?>
+                                                    <?php if($is_multi && $group_index > 0) { ?>
+                                                        <div style="margin: 1rem 0;"></div>
+                                                    <?php } ?>
+                                                    <h6 class="font-weight-bold mb-3" style="color:#6082B6;">
+                                                        <?php echo htmlspecialchars($group['product_name']); ?>
+                                                    </h6>
+                                                    <div class="checklist-container">
+                                                        <?php foreach($group['checklists'] as $checklist) {
+                                                            $is_checked = isset($completion_map[$group['product_id']][$checklist->ID]);
+                                                            $completion_info = $is_checked ? $completion_map[$group['product_id']][$checklist->ID] : null;
+                                                            if($is_checked) {
+                                                                $checked_count++;
+                                                            }
+                                                        ?>
+                                                            <div class="checklist-item <?php echo $is_checked ? 'checked' : ''; ?>" data-checklist-id="<?php echo $checklist->ID; ?>">
+                                                                <div class="checklist-item-content">
+                                                                    <div class="checklist-checkbox-wrapper">
+                                                                        <input class="form-check-input checklist-checkbox" type="checkbox"
+                                                                            id="checklist_<?php echo $group['product_id']; ?>_<?php echo $checklist->ID; ?>"
+                                                                            value="<?php echo $group['product_id'] . '_' . $checklist->ID; ?>"
+                                                                            <?php echo $is_checked ? 'checked' : ''; ?>>
+                                                                        <label class="checklist-checkbox-label" for="checklist_<?php echo $group['product_id']; ?>_<?php echo $checklist->ID; ?>"></label>
                                                                     </div>
-                                                                    <?php if($is_checked && $completion_info) { ?>
-                                                                        <div class="checklist-completion-info">
-                                                                            <i class="la la-user-circle text-primary"></i>
-                                                                            <span class="completion-text">
-                                                                                Completed by <strong><?php echo htmlspecialchars($completion_info['created_by_name']); ?></strong>
-                                                                                <span class="completion-separator">•</span>
-                                                                                <span class="completion-date"><?php echo return_timestamp_output($completion_info['created_at']); ?></span>
-                                                                            </span>
+                                                                    <div class="checklist-details">
+                                                                        <div class="checklist-name-wrapper">
+                                                                            <label class="checklist-name" for="checklist_<?php echo $group['product_id']; ?>_<?php echo $checklist->ID; ?>">
+                                                                                <?php echo htmlspecialchars($checklist->name); ?>
+                                                                            </label>
                                                                         </div>
-                                                                    <?php } ?>
+                                                                        <?php if($is_checked && $completion_info) { ?>
+                                                                            <div class="checklist-completion-info">
+                                                                                <i class="la la-user-circle text-primary"></i>
+                                                                                <span class="completion-text">
+                                                                                    Completed by <strong><?php echo htmlspecialchars($completion_info['created_by_name']); ?></strong>
+                                                                                    <span class="completion-separator">•</span>
+                                                                                    <span class="completion-date"><?php echo return_timestamp_output($completion_info['created_at']); ?></span>
+                                                                                </span>
+                                                                            </div>
+                                                                        <?php } ?>
+                                                                    </div>
                                                                 </div>
                                                             </div>
-                                                        </div>
-                                                    <?php } ?>
-                                                </div>
-                                                
+                                                        <?php } ?>
+                                                    </div>
+                                                <?php } ?>
+
                                                 <div class="checklist-footer">
                                                     <div class="checklist-progress">
                                                         <div class="progress-info">
@@ -1140,10 +1265,10 @@
                                                         </div>
                                                         <div class="progress-bar-wrapper">
                                                             <div class="progress" style="height: 8px; background-color: #e9ecef; border-radius: 4px;">
-                                                                <div class="progress-bar bg-success" role="progressbar" 
-                                                                     style="width: <?php echo $total_count > 0 ? ($checked_count / $total_count) * 100 : 0; ?>%;" 
-                                                                     aria-valuenow="<?php echo $checked_count; ?>" 
-                                                                     aria-valuemin="0" 
+                                                                <div class="progress-bar bg-success" role="progressbar"
+                                                                     style="width: <?php echo $total_count > 0 ? ($checked_count / $total_count) * 100 : 0; ?>%;"
+                                                                     aria-valuenow="<?php echo $checked_count; ?>"
+                                                                     aria-valuemin="0"
                                                                      aria-valuemax="<?php echo $total_count; ?>">
                                                                 </div>
                                                             </div>
@@ -1159,7 +1284,7 @@
                                 </div>
                             <?php } ?>
 
-                            <!-- Invoice Split by Pax (Read-Only) -->
+                            <!-- E-Invoice Request by Pax (Read-Only) -->
                             <?php if(!empty($invoice_split)) { ?>
                                 <div class="row mt-5">
                                     <div class="col-12">
@@ -1167,7 +1292,7 @@
                                             <div class="card-header flex-wrap py-2" style="background-color:#D7E2F2;">
                                                 <div class="card-title">
                                                     <h4 class="card-label mb-0" style="color:#6082B6; font-size: 1.1rem;">
-                                                        <strong>Invoice Split by Pax</strong>
+                                                        <strong>E-Invoice Request by Pax</strong>
                                                     </h4>
                                                 </div>
                                             </div>
@@ -1182,10 +1307,21 @@
                                                     $grand_net += $pax['NetAmount'];
                                                 ?>
                                                 <div style="background: #f8f9fa; border-radius: 6px; padding: 12px; margin-bottom: 10px; border: 1px solid #e8e8e8;">
-                                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                                    <div class="d-flex justify-content-between align-items-center mb-1">
                                                         <strong>Pax <?php echo $idx + 1; ?>: <?php echo htmlspecialchars($pax['PaxName']); ?></strong>
                                                         <?php if(!empty($pax['TIN'])) { ?>
                                                             <span class="text-muted" style="font-size: 0.85rem;">TIN: <?php echo htmlspecialchars($pax['TIN']); ?></span>
+                                                        <?php } ?>
+                                                    </div>
+                                                    <div class="text-muted mb-2" style="font-size: 0.82rem;">
+                                                        <?php if(!empty($pax['Email'])) { ?>
+                                                            <span class="mr-3">Email: <?php echo htmlspecialchars($pax['Email']); ?></span>
+                                                        <?php } ?>
+                                                        <?php if(!empty($pax['PhoneNumber'])) { ?>
+                                                            <span>Phone: <?php echo htmlspecialchars($pax['PhoneNumber']); ?></span>
+                                                        <?php } ?>
+                                                        <?php if(!empty($pax['Address'])) { ?>
+                                                            <div>Address: <?php echo htmlspecialchars($pax['Address']); ?></div>
                                                         <?php } ?>
                                                     </div>
                                                     <table class="table table-sm table-bordered mb-2" style="font-size: 0.85rem;">
@@ -1308,44 +1444,34 @@
 
         $('#travel_voucher_content').show();
 
-        // Load Key Contacts and Special Remarks for existing travel voucher footer
-        $.ajax({
+        $('#travel_voucher_key_contacts').show();
 
-            url: '<?php echo base_url('Footer/Read') ?>',
+        $('#travel_voucher_special_remarks').show();
 
-            type: 'get',
-
-            data: {
-
-                footer_id: '<?php echo isset($TravelVoucherFooterID) ? $TravelVoucherFooterID : ''; ?>'
-
-            },
-
-            dataType: 'json',
-
-            success: function(array) {
-
-                // Show Key Contacts if available
-                if(array.KeyContacts && array.KeyContacts.trim() != '') {
-
-                    $('#travel_voucher_key_contacts_content').html(array.KeyContacts);
-
-                    $('#travel_voucher_key_contacts').show();
-
-                }
-
-                // Show Special Remarks if available
-                if(array.SpecialRemarks && array.SpecialRemarks.trim() != '') {
-
-                    $('#travel_voucher_special_remarks_content').html(array.SpecialRemarks);
-
-                    $('#travel_voucher_special_remarks').show();
-
-                }
-
-            }
-
-        });
+        <?php if(empty($KeyContacts) || empty($SpecialRemarks)) { ?>
+            $(document).ready(function() {
+                setTimeout(function() {
+                    $.ajax({
+                        url: '<?php echo base_url('Footer/Read') ?>',
+                        type: 'get',
+                        data: { footer_id: '<?php echo $TravelVoucherFooterID; ?>' },
+                        dataType: 'json',
+                        success: function(array) {
+                            <?php if(empty($KeyContacts)) { ?>
+                                if(array.KeyContacts && array.KeyContacts.trim() != '') {
+                                    tinyMCE.editors[2].setContent(array.KeyContacts);
+                                }
+                            <?php } ?>
+                            <?php if(empty($SpecialRemarks)) { ?>
+                                if(array.SpecialRemarks && array.SpecialRemarks.trim() != '') {
+                                    tinyMCE.editors[3].setContent(array.SpecialRemarks);
+                                }
+                            <?php } ?>
+                        }
+                    });
+                }, 500);
+            });
+        <?php } ?>
 
     <?php } ?>
 
@@ -1382,6 +1508,10 @@
     var initial_booking_confirmation_footer = $('#kt-tinymce-4').val();
 
     var initial_travel_voucher_footer = $('#kt-tinymce-5').val();
+
+    var initial_key_contacts = $('#kt-tinymce-6').val();
+
+    var initial_special_remarks = $('#kt-tinymce-7').val();
 
     var product_sequence = [];
 
@@ -1436,6 +1566,12 @@
     function Reset_Additional_Payment_Deadline() {
 
         $('input[name="AdditionalPaymentDeadline"]').val('');
+
+    }
+
+    function Reset_PaymentOutSupplierDeposit() {
+
+        $('input[name="PaymentOutSupplierDeposit"]').val('');
 
     }
 
@@ -1515,6 +1651,10 @@
 
             tinyMCE.editors[1].setContent('');
 
+            tinyMCE.editors[2].setContent('');
+
+            tinyMCE.editors[3].setContent('');
+
         } else {
 
             $('#travel_voucher_content').show();
@@ -1537,31 +1677,14 @@
 
                     tinyMCE.editors[1].setContent(array.TravelVoucherContent);
 
-                    // Show Key Contacts if available
-                    if(array.KeyContacts && array.KeyContacts.trim() != '') {
+                    // Populate Key Contacts and Special Remarks editors with footer values
+                    tinyMCE.editors[2].setContent(array.KeyContacts || '');
 
-                        $('#travel_voucher_key_contacts_content').html(array.KeyContacts);
+                    $('#travel_voucher_key_contacts').show();
 
-                        $('#travel_voucher_key_contacts').show();
+                    tinyMCE.editors[3].setContent(array.SpecialRemarks || '');
 
-                    } else {
-
-                        $('#travel_voucher_key_contacts').hide();
-
-                    }
-
-                    // Show Special Remarks if available
-                    if(array.SpecialRemarks && array.SpecialRemarks.trim() != '') {
-
-                        $('#travel_voucher_special_remarks_content').html(array.SpecialRemarks);
-
-                        $('#travel_voucher_special_remarks').show();
-
-                    } else {
-
-                        $('#travel_voucher_special_remarks').hide();
-
-                    }
+                    $('#travel_voucher_special_remarks').show();
 
                 }
 
@@ -2046,8 +2169,8 @@
 
             if(!isNaN(net_total_value) && !isNaN(percentage_value) && percentage_value >= 0 && percentage_value <= 100) {
                 var deposit_total = (net_total_value * percentage_value / 100);
-                // Round to 2 decimal places
-                deposit_total = Math.round(deposit_total * 100) / 100;
+                // Round up to nearest whole number
+                deposit_total = Math.ceil(deposit_total);
                 $('#DepositTotal').val(deposit_total.toLocaleString('en-US', {minimumFractionDigits: 2}));
                 
                 // Calculate deposit status and update Deposit Paid field
@@ -2195,10 +2318,13 @@
                 validateLength('ReservationNumber', 'ReservationNumberError', 20);
                 validateLength('Mobile', 'MobileError', 25, true);
 
+                var payment_out_supplier_full = $('input[name="PaymentOutSupplierFull"]').val();
+
                 const fields = {
                     'Country code': country_code,
                     'Reservation number': reservation_number,
                     'Full payment deadline': full_payment_deadline,
+                    'Payment out to supplier (full)': payment_out_supplier_full,
                     'Customer': customer,
                     'Mobile': mobile,
                     'Travel date': travel_date,
@@ -2310,6 +2436,26 @@
 
                                     }
 
+                                    var payment_out_supplier_full = $('input[name="PaymentOutSupplierFull"]').val();
+
+                                    if(payment_out_supplier_full != '') {
+
+                                        payment_out_supplier_full = payment_out_supplier_full.split('/');
+
+                                        booking[0]['PaymentOutSupplierFull'] = `${payment_out_supplier_full[2]}-${payment_out_supplier_full[1]}-${payment_out_supplier_full[0]}`;
+
+                                    }
+
+                                    var payment_out_supplier_deposit = $('input[name="PaymentOutSupplierDeposit"]').val();
+
+                                    if(payment_out_supplier_deposit != '') {
+
+                                        payment_out_supplier_deposit = payment_out_supplier_deposit.split('/');
+
+                                        booking[0]['PaymentOutSupplierDeposit'] = `${payment_out_supplier_deposit[2]}-${payment_out_supplier_deposit[1]}-${payment_out_supplier_deposit[0]}`;
+
+                                    }
+
                                     if(travel_date != '') {
 
                                         travel_date = travel_date.split(' - ');
@@ -2378,6 +2524,10 @@
 
                                     }
 
+                                    booking[0]['KeyContacts'] = tinyMCE.editors[2].getContent();
+
+                                    booking[0]['SpecialRemarks'] = tinyMCE.editors[3].getContent();
+
 
 
                                     booking_products = Create_Booking_Products();
@@ -2441,15 +2591,15 @@
 
                                             if(dirty_fields[i].localName == 'select' || Object.values(dirty_fields[i])[0].hasOwnProperty('dirtyInitialValue')) {
 
-                                                var key = dirty_fields[i].id == 'kt_datepicker_4_3' || dirty_fields[i].id == 'kt_datepicker_4_4' || dirty_fields[i].id == 'kt_datepicker_5' ? dirty_fields[i].name : dirty_fields[i].id;
+                                                var key = dirty_fields[i].id == 'kt_datepicker_4_3' || dirty_fields[i].id == 'kt_datepicker_4_4' || dirty_fields[i].id == 'kt_datepicker_5' || dirty_fields[i].id == 'kt_datepicker_6' || dirty_fields[i].id == 'kt_datepicker_7' ? dirty_fields[i].name : dirty_fields[i].id;
 
-                                                var value = dirty_fields[i].id == 'kt_datepicker_4_3' || dirty_fields[i].id == 'kt_datepicker_4_4' || dirty_fields[i].id == 'kt_datepicker_5' ? `${((dirty_fields[i].value).split('/'))[2]}-${((dirty_fields[i].value).split('/'))[1]}-${((dirty_fields[i].value).split('/'))[0]}` : (dirty_fields[i].value).toUpperCase();
+                                                var value = dirty_fields[i].id == 'kt_datepicker_4_3' || dirty_fields[i].id == 'kt_datepicker_4_4' || dirty_fields[i].id == 'kt_datepicker_5' || dirty_fields[i].id == 'kt_datepicker_6' || dirty_fields[i].id == 'kt_datepicker_7' ? `${((dirty_fields[i].value).split('/'))[2]}-${((dirty_fields[i].value).split('/'))[1]}-${((dirty_fields[i].value).split('/'))[0]}` : (dirty_fields[i].value).toUpperCase();
 
                                                 // Booking
 
                                                 // Action : Update
 
-                                                if(key == 'CountryCodeID' && Object.values(dirty_fields[i])[country_codes.length + 1].hasOwnProperty('dirtyInitialValue') || key == 'ReservationNumber' || key == 'DepositDeadline' || key == 'FullPaymentDeadline' || key == 'AdditionalPaymentDeadline' || key == 'Customer' || key == 'Mobile' || key == 'Destination' && Object.values(dirty_fields[i])[categories.length + 1].hasOwnProperty('dirtyInitialValue') || key == 'SalesAgent' && Object.values(dirty_fields[i])[admins.length + 1].hasOwnProperty('dirtyInitialValue') || key == 'BookingOP' && Object.values(dirty_fields[i])[booking_op_admins.length + 1].hasOwnProperty('dirtyInitialValue') || key == 'BookingRemark' || key == 'Subtotal' || key == 'ChatLanguage' && Object.values(dirty_fields[i])[4].hasOwnProperty('dirtyInitialValue') || key == 'Source' && Object.values(dirty_fields[i])[sources.length + 1].hasOwnProperty('dirtyInitialValue') || key == 'BookingConfirmationTitle' && Object.values(dirty_fields[i])[4].hasOwnProperty('dirtyInitialValue')) {
+                                                if(key == 'CountryCodeID' && Object.values(dirty_fields[i])[country_codes.length + 1].hasOwnProperty('dirtyInitialValue') || key == 'ReservationNumber' || key == 'DepositDeadline' || key == 'FullPaymentDeadline' || key == 'AdditionalPaymentDeadline' || key == 'PaymentOutSupplierFull' || key == 'PaymentOutSupplierDeposit' || key == 'Customer' || key == 'Mobile' || key == 'Destination' && Object.values(dirty_fields[i])[categories.length + 1].hasOwnProperty('dirtyInitialValue') || key == 'SalesAgent' && Object.values(dirty_fields[i])[admins.length + 1].hasOwnProperty('dirtyInitialValue') || key == 'BookingRemark' || key == 'Subtotal' || key == 'ChatLanguage' && Object.values(dirty_fields[i])[4].hasOwnProperty('dirtyInitialValue') || key == 'Source' && Object.values(dirty_fields[i])[sources.length + 1].hasOwnProperty('dirtyInitialValue') || key == 'BookingConfirmationTitle' && Object.values(dirty_fields[i])[4].hasOwnProperty('dirtyInitialValue')) {
 
                                                     if(key == 'Subtotal') {
 
@@ -2517,7 +2667,7 @@
 
                                                         default:
 
-                                                            if(key == 'DepositDeadline' || key == 'FullPaymentDeadline' || key == 'AdditionalPaymentDeadline') {
+                                                            if(key == 'DepositDeadline' || key == 'FullPaymentDeadline' || key == 'AdditionalPaymentDeadline' || key == 'PaymentOutSupplierFull' || key == 'PaymentOutSupplierDeposit') {
 
                                                                 var date = ((Object.values(dirty_fields[i])[0]).dirtyInitialValue).split('/');
 
@@ -2754,6 +2904,38 @@
                                         booking[0]['TravelVoucherFooter'] = tinyMCE.editors[1].getContent();
 
                                         booking_log.push({BookingID:<?php echo $BookingID ?>, Column:'TravelVoucherFooter', CurrentData:initial_travel_voucher_footer, NewData:tinyMCE.editors[1].getContent(), InsertBy:<?php echo $this->session->userdata('admin_id') ?>, InsertDate:'<?php echo date('Y-m-d H:i:s') ?>'});
+
+                                    }
+
+
+
+                                    // Booking
+
+                                    // Action : Update Key Contacts
+
+                                    var updated_key_contacts = Decode_HTML(tinyMCE.editors[2].getContent());
+
+                                    if(updated_key_contacts != initial_key_contacts) {
+
+                                        booking[0]['KeyContacts'] = tinyMCE.editors[2].getContent();
+
+                                        booking_log.push({BookingID:<?php echo $BookingID ?>, Column:'KeyContacts', CurrentData:initial_key_contacts, NewData:tinyMCE.editors[2].getContent(), InsertBy:<?php echo $this->session->userdata('admin_id') ?>, InsertDate:'<?php echo date('Y-m-d H:i:s') ?>'});
+
+                                    }
+
+
+
+                                    // Booking
+
+                                    // Action : Update Special Remarks
+
+                                    var updated_special_remarks = Decode_HTML(tinyMCE.editors[3].getContent());
+
+                                    if(updated_special_remarks != initial_special_remarks) {
+
+                                        booking[0]['SpecialRemarks'] = tinyMCE.editors[3].getContent();
+
+                                        booking_log.push({BookingID:<?php echo $BookingID ?>, Column:'SpecialRemarks', CurrentData:initial_special_remarks, NewData:tinyMCE.editors[3].getContent(), InsertBy:<?php echo $this->session->userdata('admin_id') ?>, InsertDate:'<?php echo date('Y-m-d H:i:s') ?>'});
 
                                     }
 
@@ -3668,10 +3850,10 @@ $(document).ready(function() {
     <?php } ?>
     
     // Booking Checklist functionality
-    <?php if(isset($booking_checklists) && !empty($booking_checklists) && current_url() == base_url('Booking/Update')) { ?>
+    <?php if(isset($booking_checklists) && !empty($booking_checklists['groups']) && current_url() == base_url('Booking/Update')) { ?>
     var bookingId = <?php echo $BookingID; ?>;
     var checklistCompletions = [];
-    var totalChecklistItems = <?php echo count($booking_checklists); ?>;
+    var totalChecklistItems = <?php echo $booking_checklists['total_count']; ?>;
     
     // Update checklist completions array and UI when checkbox changes
     $('.checklist-checkbox').on('change', function() {
@@ -3695,7 +3877,7 @@ $(document).ready(function() {
     function updateChecklistCompletions() {
         checklistCompletions = [];
         $('.checklist-checkbox:checked').each(function() {
-            checklistCompletions.push(parseInt($(this).val()));
+            checklistCompletions.push($(this).val());
         });
     }
     
@@ -3724,6 +3906,9 @@ $(document).ready(function() {
         var postData = 'booking_id=' + bookingId;
         
         // Add each checklist ID as checklist_completions[]
+        if(checklistCompletions.length === 0) {
+            postData += '&checklist_completions=';
+        }
         $.each(checklistCompletions, function(index, value) {
             postData += '&checklist_completions[]=' + encodeURIComponent(value);
         });
@@ -4256,3 +4441,277 @@ $(document).ready(function() {
         }
     }
 </style>
+<script>
+    // Scroll to hash anchor on page load (for remarks panel redirect)
+    $(document).ready(function() {
+        if (window.location.hash) {
+            var target = $(window.location.hash);
+            if (target.length) {
+                setTimeout(function() {
+                    $('html, body').animate({ scrollTop: target.offset().top - 100 }, 400);
+                }, 500);
+            }
+        }
+    });
+
+    <?php if(current_url() == base_url('Booking/Update')) { ?>
+    // Room Management Functions
+    var roomsList = [];
+    var roomBookingId = <?php echo $BookingID; ?>;
+
+    function getBookingPax() {
+        return {
+            adult: parseInt($('#booking_adult_count').text()) || 0,
+            child: parseInt($('#booking_child_count').text()) || 0,
+            infant: parseInt($('#booking_infant_count').text()) || 0
+        };
+    }
+
+    function getAllocatedPax(excludeRoomId) {
+        var totals = { adult: 0, child: 0, infant: 0 };
+        roomsList.forEach(function(room) {
+            if (excludeRoomId && room.id == excludeRoomId) return;
+            totals.adult += parseInt(room.adult_count) || 0;
+            totals.child += parseInt(room.child_count) || 0;
+            totals.infant += parseInt(room.infant_count) || 0;
+        });
+        return totals;
+    }
+
+    function updateAllocatedDisplay() {
+        var totals = getAllocatedPax();
+        var pax = getBookingPax();
+        $('#allocated_adult').text(totals.adult).css('color', totals.adult > pax.adult ? 'red' : '');
+        $('#allocated_child').text(totals.child).css('color', totals.child > pax.child ? 'red' : '');
+        $('#allocated_infant').text(totals.infant).css('color', totals.infant > pax.infant ? 'red' : '');
+    }
+
+    function validatePaxCounts(adultCount, childCount, infantCount, excludeRoomId) {
+        var allocated = getAllocatedPax(excludeRoomId);
+        var pax = getBookingPax();
+        var errors = [];
+        if (allocated.adult + adultCount > pax.adult) {
+            errors.push('Adult count would exceed booking limit (' + pax.adult + '). Currently allocated: ' + allocated.adult);
+        }
+        if (allocated.child + childCount > pax.child) {
+            errors.push('Child count would exceed booking limit (' + pax.child + '). Currently allocated: ' + allocated.child);
+        }
+        if (allocated.infant + infantCount > pax.infant) {
+            errors.push('Infant count would exceed booking limit (' + pax.infant + '). Currently allocated: ' + allocated.infant);
+        }
+        return errors;
+    }
+
+    function renderRoomsTable() {
+        var tbody = $('#rooms_list');
+        tbody.empty();
+        if (roomsList.length === 0) {
+            tbody.html('<tr id="no_rooms_row"><td colspan="5" class="text-muted text-center">No rooms created yet. Click "Add Room" to create one.</td></tr>');
+        } else {
+            roomsList.forEach(function(room) {
+                tbody.append(
+                    '<tr data-room-id="' + room.id + '">' +
+                    '<td class="font-weight-bold">' + $('<span>').text(room.room_name).html() + '</td>' +
+                    '<td class="text-center">' + (room.adult_count || 0) + '</td>' +
+                    '<td class="text-center">' + (room.child_count || 0) + '</td>' +
+                    '<td class="text-center">' + (room.infant_count || 0) + '</td>' +
+                    '<td class="text-center">' +
+                    '<button type="button" class="btn btn-sm btn-icon btn-light-primary edit-room-btn mr-1" data-room-id="' + room.id + '"><i class="la la-edit"></i></button>' +
+                    '<button type="button" class="btn btn-sm btn-icon btn-light-danger delete-room-btn" data-room-id="' + room.id + '"><i class="la la-trash"></i></button>' +
+                    '</td>' +
+                    '</tr>'
+                );
+            });
+        }
+        updateAllocatedDisplay();
+        attachRoomEventHandlers();
+    }
+
+    function loadRooms() {
+        $.ajax({
+            url: '<?php echo base_url("Guest_List_Room/Read"); ?>',
+            type: 'get',
+            data: { booking_id: roomBookingId },
+            dataType: 'json',
+            success: function(data) {
+                roomsList = data || [];
+                renderRoomsTable();
+            }
+        });
+    }
+
+    function getRoomFormHtml() {
+        return '<div class="row">' +
+            '<div class="col-12 mb-3">' +
+            '<label class="font-weight-bold">Room Name <span style="color:red;">*</span></label>' +
+            '<input type="text" id="swal_room_name" class="form-control" placeholder="e.g. Room 101">' +
+            '</div>' +
+            '<div class="col-4">' +
+            '<label class="font-weight-bold">Adult</label>' +
+            '<input type="number" id="swal_adult_count" class="form-control" min="0" value="0">' +
+            '</div>' +
+            '<div class="col-4">' +
+            '<label class="font-weight-bold">Child</label>' +
+            '<input type="number" id="swal_child_count" class="form-control" min="0" value="0">' +
+            '</div>' +
+            '<div class="col-4">' +
+            '<label class="font-weight-bold">Infant</label>' +
+            '<input type="number" id="swal_infant_count" class="form-control" min="0" value="0">' +
+            '</div>' +
+            '</div>';
+    }
+
+    function attachRoomEventHandlers() {
+        $('.edit-room-btn').off('click').on('click', function() {
+            var roomId = $(this).data('room-id');
+            var room = roomsList.find(function(r) { return r.id == roomId; });
+            if (!room) return;
+
+            Swal.fire({
+                title: 'Edit Room',
+                html: getRoomFormHtml(),
+                showCancelButton: true,
+                confirmButtonText: 'Update',
+                cancelButtonText: 'Cancel',
+                didOpen: function() {
+                    $('#swal_room_name').val(room.room_name);
+                    $('#swal_adult_count').val(room.adult_count || 0);
+                    $('#swal_child_count').val(room.child_count || 0);
+                    $('#swal_infant_count').val(room.infant_count || 0);
+                },
+                preConfirm: function() {
+                    var roomName = $('#swal_room_name').val().trim();
+                    var adultCount = parseInt($('#swal_adult_count').val()) || 0;
+                    var childCount = parseInt($('#swal_child_count').val()) || 0;
+                    var infantCount = parseInt($('#swal_infant_count').val()) || 0;
+                    if (!roomName) {
+                        Swal.showValidationMessage('Room name is required!');
+                        return false;
+                    }
+                    var errors = validatePaxCounts(adultCount, childCount, infantCount, roomId);
+                    if (errors.length > 0) {
+                        Swal.showValidationMessage(errors.join('<br>'));
+                        return false;
+                    }
+                    return { room_name: roomName, adult_count: adultCount, child_count: childCount, infant_count: infantCount };
+                }
+            }).then(function(result) {
+                if (result.isConfirmed) {
+                    $.ajax({
+                        url: '<?php echo base_url("Guest_List_Room/Update"); ?>',
+                        type: 'post',
+                        data: {
+                            room_id: roomId,
+                            room_name: result.value.room_name,
+                            adult_count: result.value.adult_count,
+                            child_count: result.value.child_count,
+                            infant_count: result.value.infant_count
+                        },
+                        dataType: 'json',
+                        success: function(response) {
+                            if (response.success) {
+                                Swal.fire('Success!', response.message, 'success');
+                                loadRooms();
+                            } else {
+                                Swal.fire('Error!', response.message, 'error');
+                            }
+                        },
+                        error: function() {
+                            Swal.fire('Error!', 'Failed to update room', 'error');
+                        }
+                    });
+                }
+            });
+        });
+
+        $('.delete-room-btn').off('click').on('click', function() {
+            var roomId = $(this).data('room-id');
+            Swal.fire({
+                title: 'Are you sure?',
+                text: 'This will delete the room. Guests assigned to this room will be unassigned.',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Yes, delete it!',
+                cancelButtonText: 'Cancel'
+            }).then(function(result) {
+                if (result.isConfirmed) {
+                    $.ajax({
+                        url: '<?php echo base_url("Guest_List_Room/Delete"); ?>',
+                        type: 'get',
+                        data: { room_id: roomId },
+                        dataType: 'json',
+                        success: function(response) {
+                            if (response.success) {
+                                Swal.fire('Deleted!', response.message, 'success');
+                                loadRooms();
+                            } else {
+                                Swal.fire('Error!', response.message, 'error');
+                            }
+                        },
+                        error: function() {
+                            Swal.fire('Error!', 'Failed to delete room', 'error');
+                        }
+                    });
+                }
+            });
+        });
+    }
+
+    $('#create_room_btn').click(function() {
+        Swal.fire({
+            title: 'Create New Room',
+            html: getRoomFormHtml(),
+            showCancelButton: true,
+            confirmButtonText: 'Create',
+            cancelButtonText: 'Cancel',
+            preConfirm: function() {
+                var roomName = $('#swal_room_name').val().trim();
+                var adultCount = parseInt($('#swal_adult_count').val()) || 0;
+                var childCount = parseInt($('#swal_child_count').val()) || 0;
+                var infantCount = parseInt($('#swal_infant_count').val()) || 0;
+                if (!roomName) {
+                    Swal.showValidationMessage('Room name is required!');
+                    return false;
+                }
+                var errors = validatePaxCounts(adultCount, childCount, infantCount);
+                if (errors.length > 0) {
+                    Swal.showValidationMessage(errors.join('<br>'));
+                    return false;
+                }
+                return { room_name: roomName, adult_count: adultCount, child_count: childCount, infant_count: infantCount };
+            }
+        }).then(function(result) {
+            if (result.isConfirmed) {
+                $.ajax({
+                    url: '<?php echo base_url("Guest_List_Room/Create"); ?>',
+                    type: 'post',
+                    data: {
+                        booking_id: roomBookingId,
+                        room_name: result.value.room_name,
+                        adult_count: result.value.adult_count,
+                        child_count: result.value.child_count,
+                        infant_count: result.value.infant_count
+                    },
+                    dataType: 'json',
+                    success: function(response) {
+                        if (response.success) {
+                            Swal.fire('Success!', response.message, 'success');
+                            loadRooms();
+                        } else {
+                            Swal.fire('Error!', response.message, 'error');
+                        }
+                    },
+                    error: function() {
+                        Swal.fire('Error!', 'Failed to create room', 'error');
+                    }
+                });
+            }
+        });
+    });
+
+    // Load rooms on page load
+    $(document).ready(function() {
+        loadRooms();
+    });
+    <?php } ?>
+</script>

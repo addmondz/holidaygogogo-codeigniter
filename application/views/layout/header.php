@@ -375,6 +375,49 @@ $is_dev_env = ($app_env !== 'prod');
 						<div class="header-menu header-menu-mobile header-menu-layout-default"></div>
 					</div>
 					<div class="topbar">
+						<!-- Remarks/Messages Dropdown -->
+						<div class="topbar-item position-relative">
+							<div class="btn btn-icon btn-clean btn-lg mr-1 position-relative" id="kt_remarks_toggle" data-toggle="dropdown" data-offset="10px,10px">
+								<i class="la la-comment-dots la-2x text-primary"></i>
+							</div>
+							<div class="dropdown-menu dropdown-menu-right p-0 m-0 dropdown-menu-anim-up dropdown-menu-lg" id="remarks-dropdown" style="width: 420px; right: 0; left: auto;">
+								<div class="d-flex align-items-center justify-content-between p-5 border-bottom">
+									<h5 class="mb-0">Messages</h5>
+								</div>
+								<ul class="nav nav-tabs nav-tabs-line nav-tabs-bold px-5 pt-2 mb-0" role="tablist">
+									<li class="nav-item">
+										<a class="nav-link active" data-toggle="tab" href="#remarks-tab-internal" role="tab" data-type="1">Internal Comments</a>
+									</li>
+									<li class="nav-item">
+										<a class="nav-link" data-toggle="tab" href="#remarks-tab-customer" role="tab" data-type="2">Customer Remarks</a>
+									</li>
+								</ul>
+								<div class="tab-content" style="max-height: 400px; overflow-y: auto;">
+									<div class="tab-pane fade show active" id="remarks-tab-internal" role="tabpanel">
+										<div class="remarks-list" data-type="1">
+											<div class="text-center p-10">
+												<div class="spinner spinner-primary spinner-lg"></div>
+												<div class="mt-3">Loading...</div>
+											</div>
+										</div>
+										<div class="text-center py-3 border-top d-none" id="load-more-internal">
+											<a href="javascript:;" class="btn btn-sm btn-light-primary font-weight-bold load-more-remarks" data-type="1">Load More</a>
+										</div>
+									</div>
+									<div class="tab-pane fade" id="remarks-tab-customer" role="tabpanel">
+										<div class="remarks-list" data-type="2">
+											<div class="text-center p-10">
+												<div class="spinner spinner-primary spinner-lg"></div>
+												<div class="mt-3">Loading...</div>
+											</div>
+										</div>
+										<div class="text-center py-3 border-top d-none" id="load-more-customer">
+											<a href="javascript:;" class="btn btn-sm btn-light-primary font-weight-bold load-more-remarks" data-type="2">Load More</a>
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
 						<!-- Notifications Dropdown -->
 						<div class="topbar-item position-relative">
 							<div class="btn btn-icon btn-clean btn-lg mr-1 position-relative" id="kt_notification_toggle" data-toggle="dropdown" data-offset="10px,10px">

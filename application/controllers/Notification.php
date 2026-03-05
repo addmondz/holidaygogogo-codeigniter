@@ -143,6 +143,70 @@ class Notification extends MY_Controller
 	}
 
 	/**
+	 * Get remarks list for global remarks panel (AJAX)
+	 */
+	function Get_Remarks()
+	{
+		if (empty($this->session->userdata('admin_id'))) {
+			$this->output
+				->set_content_type('application/json')
+				->set_output(json_encode([
+					'success' => false,
+					'message' => 'Not authenticated',
+					'remarks' => [],
+					'total' => 0
+				]));
+			return;
+		}
+
+		$user_id = $this->session->userdata('admin_id');
+		$user_level = $this->session->userdata('level');
+		$type = intval($this->input->get('type')) ?: 1; // 1=INTERNAL, 2=CUSTOMER
+		$limit = intval($this->input->get('limit')) ?: 10;
+		$offset = intval($this->input->get('offset')) ?: 0;
+
+		$this->load->model('Remark_Model');
+		$remarks = $this->Remark_Model->Get_All_Remarks($type, $limit, $offset, $user_id, $user_level);
+		$total = $this->Remark_Model->Get_All_Remarks_Count($type, $user_id, $user_level);
+
+		$formatted_remarks = array();
+		foreach ($remarks as $remark) {
+			$created_timestamp = strtotime($remark->created_at);
+			$time_diff = time() - $created_timestamp;
+
+			if ($time_diff < 60) {
+				$time_ago = 'Just now';
+			} elseif ($time_diff < 3600) {
+				$time_ago = floor($time_diff / 60) . 'm ago';
+			} elseif ($time_diff < 86400) {
+				$time_ago = floor($time_diff / 3600) . 'h ago';
+			} elseif ($time_diff < 604800) {
+				$time_ago = floor($time_diff / 86400) . 'd ago';
+			} else {
+				$time_ago = date('d/m/Y H:i', $created_timestamp);
+			}
+
+			$formatted_remarks[] = array(
+				'RemarkID' => $remark->RemarkID,
+				'content' => $remark->content,
+				'CommenterName' => $remark->CommenterName,
+				'BookingNumber' => $remark->BookingNumber,
+				'BookingID' => $remark->BookingID,
+				'created_at' => date('d/m/Y H:i:s', $created_timestamp),
+				'time_ago' => $time_ago
+			);
+		}
+
+		$this->output
+			->set_content_type('application/json')
+			->set_output(json_encode([
+				'success' => true,
+				'remarks' => $formatted_remarks,
+				'total' => $total
+			]));
+	}
+
+	/**
 	 * Mark all notifications as read (AJAX)
 	 */
 	function Mark_All_As_Read()

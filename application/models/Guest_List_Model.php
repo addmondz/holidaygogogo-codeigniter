@@ -3,7 +3,7 @@ class Guest_List_Model extends CI_Model
 {
 	function Read_Guest_Lists1()
 	{
-		$this->db->select('GuestListID, guest_list.BookingID, guest_list.guest_list_room_id, guest_list.CountryCodeID As GuestCountryCode, Type, guest_list.Name As Guest, guest_list.LastName As GuestLastName, guest_list.Gender, DateOfBirth, Nationality, guest_list.IdentificationNumber, guest_list.PassportNumber, guest_list.PassportIssueDate, guest_list.PassportExpiryDate, guest_list.PassportCopy, guest_list.DietaryRequirement, guest_list.Mobile As GuestMobile, guest_list.Email, MaritalStatus, Employment, Address, Postcode, guest_list.City, guest_list.State, guest_list.Country, Nominee, NomineeIdentificationNumber, Relationship, booking.BookingID, BookingNumber, ReservationNumber, Customer, booking.Mobile As CustomerMobile, StartDate, EndDate, Adult, Children, Infant, ChatLanguage, LockStatus, TravelInsuranceStatus, AfterSalesService, GLSessionLock, GLSessionExpiration, booking.Status, admin.CountryCodeID As SalesAgentCountryCode, admin.Name As SalesAgent, admin.Mobile As SalesAgentMobile, category.Name As Destination, CountryCode, guest_list_room.room_name As RoomName');
+		$this->db->select('GuestListID, guest_list.BookingID, guest_list.guest_list_room_id, guest_list.CountryCodeID As GuestCountryCode, Type, guest_list.Name As Guest, guest_list.LastName As GuestLastName, guest_list.Gender, DateOfBirth, Nationality, guest_list.IdentificationNumber, guest_list.PassportNumber, guest_list.PassportIssueDate, guest_list.PassportExpiryDate, guest_list.PassportCopy, guest_list.DietaryRequirement, guest_list.Mobile As GuestMobile, guest_list.Email, MaritalStatus, Employment, Address, Postcode, guest_list.City, guest_list.State, guest_list.Country, Nominee, NomineeIdentificationNumber, Relationship, NomineeContact, booking.BookingID, BookingNumber, ReservationNumber, Customer, booking.Mobile As CustomerMobile, StartDate, EndDate, Adult, Children, Infant, ChatLanguage, LockStatus, TravelInsuranceStatus, AfterSalesService, GLSessionLock, GLSessionExpiration, booking.Status, admin.CountryCodeID As SalesAgentCountryCode, admin.Name As SalesAgent, admin.Mobile As SalesAgentMobile, category.Name As Destination, CountryCode, guest_list_room.room_name As RoomName');
 		$this->db->join('guest_list', 'guest_list.BookingID = booking.BookingID', 'left');
 		$this->db->join('guest_list_room', 'guest_list_room.id = guest_list.guest_list_room_id', 'left');
 		$this->db->join('admin', 'admin.AdminID = booking.SalesAgent', 'left');
@@ -21,7 +21,7 @@ class Guest_List_Model extends CI_Model
 
     function Read_Guest_Lists2()
 	{
-		$this->db->select('GuestListID, guest_list.CountryCodeID As GuestCountryCode, guest_list.Name As Guest, guest_list.LastName As GuestLastName, guest_list.Gender, DateOfBirth, Nationality, guest_list.IdentificationNumber, guest_list.PassportNumber, guest_list.Mobile As GuestMobile, guest_list.Email, MaritalStatus, Employment, Address, Postcode, guest_list.City, guest_list.State, guest_list.Country, Nominee, NomineeIdentificationNumber, Relationship, Adult, Children, Infant, LockStatus, TravelInsuranceStatus');
+		$this->db->select('GuestListID, guest_list.CountryCodeID As GuestCountryCode, guest_list.Name As Guest, guest_list.LastName As GuestLastName, guest_list.Gender, DateOfBirth, Nationality, guest_list.IdentificationNumber, guest_list.PassportNumber, guest_list.Mobile As GuestMobile, guest_list.Email, MaritalStatus, Employment, Address, Postcode, guest_list.City, guest_list.State, guest_list.Country, Nominee, NomineeIdentificationNumber, Relationship, NomineeContact, Adult, Children, Infant, LockStatus, TravelInsuranceStatus');
 		$this->db->join('guest_list', 'guest_list.BookingID = booking.BookingID', 'left');
         $this->db->where('booking.BookingID', $this->input->post('booking_id'));
 		$this->db->where('guest_list.Status', 'Y');
@@ -65,7 +65,6 @@ class Guest_List_Model extends CI_Model
 		for($i = 0; $i < count(explode(',', $this->input->post('new_guests'))); $i++) {
 			$array = array(
 				'BookingID' => $booking_id,
-				'guest_list_room_id' => empty($this->input->post('new_room_ids')[$i]) ? null : $this->input->post('new_room_ids')[$i],
 				'CountryCodeID' => empty($this->input->post('new_country_codes')[$i]) ? null : $this->input->post('new_country_codes')[$i],
 				'Type' => $this->input->post('new_types')[$i],
 				'Name' => empty($this->input->post('new_names')[$i]) ? null : strtoupper($this->input->post('new_names')[$i]),
@@ -91,6 +90,7 @@ class Guest_List_Model extends CI_Model
 				'Nominee' => empty($this->input->post('new_nominee_names')[$i]) ? null : strtoupper($this->input->post('new_nominee_names')[$i]),
 				'NomineeIdentificationNumber' => empty($this->input->post('new_nominee_identification_numbers')[$i]) ? null : $this->input->post('new_nominee_identification_numbers')[$i],
 				'Relationship' => empty($this->input->post('new_relationships')[$i]) ? null : strtoupper($this->input->post('new_relationships')[$i]),
+				'NomineeContact' => empty($this->input->post('new_nominee_contacts')[$i]) ? null : $this->input->post('new_nominee_contacts')[$i],
 				'InsertBy' => $this->session->userdata('admin_id'),
 				'InsertDate' => date('Y-m-d H:i:s')
 			);
@@ -115,7 +115,6 @@ class Guest_List_Model extends CI_Model
 		if(!empty($this->input->post('names'))) {
 			for($i = 0; $i < count($this->input->post('names')); $i++) {
 				$array = array(
-					'guest_list_room_id' => empty($this->input->post('room_ids')[$i]) ? null : $this->input->post('room_ids')[$i],
 					'CountryCodeID' => empty($this->input->post('country_codes')[$i]) ? null : $this->input->post('country_codes')[$i],
 					'Name' => empty($this->input->post('names')[$i]) ? null : strtoupper($this->input->post('names')[$i]),
 					'LastName' => empty($this->input->post('last_names')[$i]) ? null : strtoupper($this->input->post('last_names')[$i]),
@@ -138,7 +137,8 @@ class Guest_List_Model extends CI_Model
 					'Country' => empty($this->input->post('countries')[$i]) ? null : $this->input->post('countries')[$i],
 					'Nominee' => empty($this->input->post('nominee_names')[$i]) ? null : strtoupper($this->input->post('nominee_names')[$i]),
 					'NomineeIdentificationNumber' => empty($this->input->post('nominee_identification_numbers')[$i]) ? null : $this->input->post('nominee_identification_numbers')[$i],
-					'Relationship' => empty($this->input->post('relationships')[$i]) ? null : strtoupper($this->input->post('relationships')[$i])
+					'Relationship' => empty($this->input->post('relationships')[$i]) ? null : strtoupper($this->input->post('relationships')[$i]),
+					'NomineeContact' => empty($this->input->post('nominee_contacts')[$i]) ? null : $this->input->post('nominee_contacts')[$i]
 				);
 				// Update PassportCopy if provided in POST (either new upload or existing file)
 				if (isset($this->input->post('passport_copies')[$i])) {
@@ -177,5 +177,46 @@ class Guest_List_Model extends CI_Model
 		);
 		$this->db->where('GuestListID', $guest_list_id);
 		$this->db->update('guest_list', $array);
+	}
+
+	function Auto_Assign_Rooms($booking_id)
+	{
+		$this->load->model('Guest_List_Room_Model');
+		$rooms = $this->Guest_List_Room_Model->Read_Rooms_By_Booking_ID($booking_id);
+
+		if (empty($rooms)) return;
+
+		$types = array('ADULT' => 'adult_count', 'CHILD' => 'child_count', 'INFANT' => 'infant_count');
+
+		foreach ($types as $type => $count_field) {
+			$this->db->select('GuestListID');
+			$this->db->where('BookingID', $booking_id);
+			$this->db->where('Type', $type);
+			$this->db->where('Status', 'Y');
+			$this->db->order_by('GuestListID', 'ASC');
+			$guests = $this->db->get('guest_list')->result();
+
+			$room_index = 0;
+			$slot = 0;
+
+			foreach ($guests as $guest) {
+				$assigned_room_id = null;
+
+				while ($room_index < count($rooms)) {
+					$capacity = (int)$rooms[$room_index]->$count_field;
+					if ($slot < $capacity) {
+						$assigned_room_id = $rooms[$room_index]->id;
+						$slot++;
+						break;
+					} else {
+						$room_index++;
+						$slot = 0;
+					}
+				}
+
+				$this->db->where('GuestListID', $guest->GuestListID);
+				$this->db->update('guest_list', array('guest_list_room_id' => $assigned_room_id));
+			}
+		}
 	}
 }

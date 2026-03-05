@@ -83,6 +83,51 @@ class Remark_Model extends CI_Model
 	}
 
 	/**
+	 * Get all remarks across all bookings (for global remarks panel)
+	 * @param int $type Remark type (1=INTERNAL, 2=CUSTOMER)
+	 * @param int $limit Number of records to return
+	 * @param int $offset Offset for pagination
+	 * @param int $user_id Current admin user ID
+	 * @param int $user_level Current admin level (20=Sales Agent)
+	 * @return array Array of remark objects
+	 */
+	function Get_All_Remarks($type, $limit = 10, $offset = 0, $user_id = null, $user_level = null)
+	{
+		$this->db->select('remark.RemarkID, remark.content, remark.created_at, admin.Name AS CommenterName, booking.BookingNumber, booking.BookingID');
+		$this->db->join('admin', 'admin.AdminID = remark.commenter_id', 'left');
+		$this->db->join('booking', 'booking.BookingID = remark.owner_id AND remark.owner_type = "booking"', 'inner');
+		$this->db->where('remark.type', $type);
+
+		// Sales agents (level 20) only see remarks from their bookings
+		if ($user_level == 20 && $user_id) {
+			$this->db->where('booking.SalesAgentID', $user_id);
+		}
+
+		$this->db->order_by('remark.created_at', 'DESC');
+		$this->db->limit($limit, $offset);
+		return $this->db->get('remark')->result();
+	}
+
+	/**
+	 * Get total count of remarks for pagination
+	 * @param int $type Remark type (1=INTERNAL, 2=CUSTOMER)
+	 * @param int $user_id Current admin user ID
+	 * @param int $user_level Current admin level
+	 * @return int Total count
+	 */
+	function Get_All_Remarks_Count($type, $user_id = null, $user_level = null)
+	{
+		$this->db->join('booking', 'booking.BookingID = remark.owner_id AND remark.owner_type = "booking"', 'inner');
+		$this->db->where('remark.type', $type);
+
+		if ($user_level == 20 && $user_id) {
+			$this->db->where('booking.SalesAgentID', $user_id);
+		}
+
+		return $this->db->count_all_results('remark');
+	}
+
+	/**
 	 * Get a single remark by ID
 	 * @param int $remark_id Remark ID
 	 * @return object|null Remark object or null

@@ -52,8 +52,9 @@ class Package_Checklist extends MY_Controller
 	{
 		$package_checklist_id = $this->input->get('package_checklist_id') ?: (isset($this->input->post('package_checklist')[0]['ID']) ? $this->input->post('package_checklist')[0]['ID'] : null);
 		
-		// Prevent editing ID 1
-		if($package_checklist_id == 1) {
+		// Prevent editing protected checklist records (Payment Out To Supplier variants)
+		$checklist = $this->Package_Checklist_Model->Read_Package_Checklist_By_Id($package_checklist_id);
+		if($checklist && strpos($checklist['name'], 'Payment Out To Supplier') !== false) {
 			if($this->input->is_ajax_request()) {
 				$this->output
 					->set_content_type('application/json')
@@ -101,8 +102,9 @@ class Package_Checklist extends MY_Controller
 	{
 		$package_checklist_id = $this->input->get('package_checklist_id');
 		
-		// Prevent deleting ID 1
-		if($package_checklist_id == 1) {
+		// Prevent deleting protected checklist records (Payment Out To Supplier variants)
+		$checklist = $this->Package_Checklist_Model->Read_Package_Checklist_By_Id($package_checklist_id);
+		if($checklist && strpos($checklist['name'], 'Payment Out To Supplier') !== false) {
 			$this->output
 				->set_content_type('application/json')
 				->set_output(json_encode(['success' => false, 'message' => 'This package checklist cannot be deleted.']));

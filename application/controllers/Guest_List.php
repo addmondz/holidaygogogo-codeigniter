@@ -144,6 +144,12 @@ class Guest_List extends CI_Controller
 					return;
 				}
 				
+				// Auto-assign rooms before reading guest lists
+				$auto_assign_booking_id = $this->Guest_List_Model->Read_Booking_ID();
+				if(!empty($auto_assign_booking_id)) {
+					$this->Guest_List_Model->Auto_Assign_Rooms($auto_assign_booking_id);
+				}
+
 	    		$array['guest_lists'] = $this->Guest_List_Model->Read_Guest_Lists1();
 	    		if(!empty($array['guest_lists'])) {
 					if(($this->session->has_userdata('admin_id') && $this->session->has_userdata('level')) || ($array['guest_lists'][0]->Status != 'Y' && $array['guest_lists'][0]->AfterSalesService != 'COMPLETE' || $array['guest_lists'][0]->Status == 'Y' && $array['guest_lists'][0]->AfterSalesService == 'PENDING')) {
@@ -216,7 +222,21 @@ class Guest_List extends CI_Controller
 							$this->db->where('booking_product.BookingID', $array['guest_lists'][0]->BookingID);
 							$this->db->where('booking_product.Status', 'Y');
 							$array['booking_products'] = $this->db->get()->result();
-							
+
+							// Auto-enable insurance if any product belongs to an insurance category
+							$this->db->from('booking_product');
+							$this->db->join('product', 'product.ProductID = booking_product.ProductID', 'left');
+							$this->db->join('category', 'category.CategoryID = product.CategoryID', 'left');
+							$this->db->where('booking_product.BookingID', $array['guest_lists'][0]->BookingID);
+							$this->db->where('booking_product.Status', 'Y');
+							$this->db->like('category.Name', 'Insurance', 'both');
+							$insurance_count = $this->db->count_all_results();
+
+							if($insurance_count > 0 && $array['guest_lists'][0]->TravelInsuranceStatus == 'N') {
+								$this->Booking_Model->update_by_id($array['guest_lists'][0]->BookingID, ['TravelInsuranceStatus' => 'Y']);
+								$array['guest_lists'] = $this->Guest_List_Model->Read_Guest_Lists1();
+							}
+
 							// Determine destination country from products (use first product's category country)
 							$destination_country = null;
 							$destination_country_name = null;
@@ -228,12 +248,8 @@ class Guest_List extends CI_Controller
 							$array['destination_country_name'] = $destination_country_name;
 							
 							// Load rooms for this booking
-							$this->db->select('id, booking_id, room_name, Status');
-							$this->db->where('booking_id', $array['guest_lists'][0]->BookingID);
-							$this->db->where('Status', 'Y');
-							$this->db->order_by('room_name', 'ASC');
-							$array['rooms'] = $this->db->get('guest_list_room')->result();
-							
+							$array['rooms'] = $this->Guest_List_Room_Model->Read_Rooms_By_Booking_ID($array['guest_lists'][0]->BookingID);
+
 							header('Cache-Control: no-cache, no-store, must-revalidate');
 							header('Pragma: no-cache');
 							header('Expires: 0');
@@ -312,14 +328,15 @@ class Guest_List extends CI_Controller
 		$spreadsheet->getActiveSheet()->setCellValue('AB1', 'STATE');
 		$spreadsheet->getActiveSheet()->setCellValue('AC1', 'COUNTRY');
 		$spreadsheet->getActiveSheet()->setCellValue('AD1', 'NOMINEE');
-		$spreadsheet->getActiveSheet()->setCellValue('AE1', 'NOMINEE IDENTIFICATION NUMBER');
-		$spreadsheet->getActiveSheet()->setCellValue('AF1', 'RELATIONSHIP');
-		$spreadsheet->getActiveSheet()->setCellValue('AG1', 'ROOM');
+		$spreadsheet->getActiveSheet()->setCellValue('AE1', 'NOMINEE CONTACT');
+		$spreadsheet->getActiveSheet()->setCellValue('AF1', 'NOMINEE IDENTIFICATION NUMBER');
+		$spreadsheet->getActiveSheet()->setCellValue('AG1', 'RELATIONSHIP');
+		$spreadsheet->getActiveSheet()->setCellValue('AH1', 'ROOM');
 		$row = 2;
 		$guest_lists = $this->Guest_List_Model->Read_Guest_Lists1();
-		$spreadsheet->getActiveSheet()->getStyle('A1:AG1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_BLACK);
-		$spreadsheet->getActiveSheet()->getStyle('A1:AG1')->getFont()->getColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_WHITE);
-		$spreadsheet->getActiveSheet()->getStyle('A1:AG1')->getFont()->setBold(true);
+		$spreadsheet->getActiveSheet()->getStyle('A1:AH1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_BLACK);
+		$spreadsheet->getActiveSheet()->getStyle('A1:AH1')->getFont()->getColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_WHITE);
+		$spreadsheet->getActiveSheet()->getStyle('A1:AH1')->getFont()->setBold(true);
 		foreach($guest_lists as $guest) {
 			$guest->CustomerMobile = $guest->CountryCode . $guest->CustomerMobile;
 			if(!empty($guest->StartDate) && !empty($guest->EndDate)) {
@@ -396,12 +413,13 @@ class Guest_List extends CI_Controller
 			$spreadsheet->getActiveSheet()->setCellValueExplicit('AB' . $row, $guest->State, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 			$spreadsheet->getActiveSheet()->setCellValueExplicit('AC' . $row, $guest->Country, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 			$spreadsheet->getActiveSheet()->setCellValueExplicit('AD' . $row, $guest->Nominee, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-			$spreadsheet->getActiveSheet()->setCellValueExplicit('AE' . $row, $guest->NomineeIdentificationNumber, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-			$spreadsheet->getActiveSheet()->setCellValueExplicit('AF' . $row, $guest->Relationship, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-			$spreadsheet->getActiveSheet()->setCellValueExplicit('AG' . $row, isset($guest->RoomName) ? $guest->RoomName : '', \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('AE' . $row, $guest->NomineeContact, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('AF' . $row, $guest->NomineeIdentificationNumber, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('AG' . $row, $guest->Relationship, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('AH' . $row, isset($guest->RoomName) ? $guest->RoomName : '', \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 			$row++;
 		}
-		$spreadsheet->getActiveSheet()->getStyle('A:AG')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_RIGHT);
+		$spreadsheet->getActiveSheet()->getStyle('A:AH')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_RIGHT);
 		$spreadsheet->getActiveSheet()->getColumnDimension('A')->setWidth(35);
 		$spreadsheet->getActiveSheet()->getColumnDimension('B')->setWidth(35);
 		$spreadsheet->getActiveSheet()->getColumnDimension('C')->setWidth(35);
@@ -435,6 +453,7 @@ class Guest_List extends CI_Controller
 		$spreadsheet->getActiveSheet()->getColumnDimension('AE')->setWidth(35);
 		$spreadsheet->getActiveSheet()->getColumnDimension('AF')->setWidth(35);
 		$spreadsheet->getActiveSheet()->getColumnDimension('AG')->setWidth(35);
+		$spreadsheet->getActiveSheet()->getColumnDimension('AH')->setWidth(35);
 		$guest_lists = 'GUEST_LISTS_' . $guest_lists[0]->BookingNumber . '.xlsx';
 		header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 		header('Content-Disposition: attachment;filename="' . $guest_lists . '"');
@@ -497,13 +516,14 @@ class Guest_List extends CI_Controller
 		$spreadsheet->getActiveSheet()->setCellValue('AB1', 'STATE');
 		$spreadsheet->getActiveSheet()->setCellValue('AC1', 'COUNTRY');
 		$spreadsheet->getActiveSheet()->setCellValue('AD1', 'NOMINEE');
-		$spreadsheet->getActiveSheet()->setCellValue('AE1', 'NOMINEE IDENTIFICATION NUMBER');
-		$spreadsheet->getActiveSheet()->setCellValue('AF1', 'RELATIONSHIP');
-		$spreadsheet->getActiveSheet()->setCellValue('AG1', 'ROOM');
+		$spreadsheet->getActiveSheet()->setCellValue('AE1', 'NOMINEE CONTACT');
+		$spreadsheet->getActiveSheet()->setCellValue('AF1', 'NOMINEE IDENTIFICATION NUMBER');
+		$spreadsheet->getActiveSheet()->setCellValue('AG1', 'RELATIONSHIP');
+		$spreadsheet->getActiveSheet()->setCellValue('AH1', 'ROOM');
 		$row = 2;
-		$spreadsheet->getActiveSheet()->getStyle('A1:AG1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_BLACK);
-		$spreadsheet->getActiveSheet()->getStyle('A1:AG1')->getFont()->getColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_WHITE);
-		$spreadsheet->getActiveSheet()->getStyle('A1:AG1')->getFont()->setBold(true);
+		$spreadsheet->getActiveSheet()->getStyle('A1:AH1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_BLACK);
+		$spreadsheet->getActiveSheet()->getStyle('A1:AH1')->getFont()->getColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_WHITE);
+		$spreadsheet->getActiveSheet()->getStyle('A1:AH1')->getFont()->setBold(true);
 		
 		// Create passport images directory inside temp folder
 		$passport_dir = $temp_dir . DIRECTORY_SEPARATOR . 'passport_images';
@@ -620,12 +640,13 @@ class Guest_List extends CI_Controller
 			$spreadsheet->getActiveSheet()->setCellValueExplicit('AB' . $row, $guest->State, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 			$spreadsheet->getActiveSheet()->setCellValueExplicit('AC' . $row, $guest->Country, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 			$spreadsheet->getActiveSheet()->setCellValueExplicit('AD' . $row, $guest->Nominee, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-			$spreadsheet->getActiveSheet()->setCellValueExplicit('AE' . $row, $guest->NomineeIdentificationNumber, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-			$spreadsheet->getActiveSheet()->setCellValueExplicit('AF' . $row, $guest->Relationship, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-			$spreadsheet->getActiveSheet()->setCellValueExplicit('AG' . $row, isset($guest->RoomName) ? $guest->RoomName : '', \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('AE' . $row, $guest->NomineeContact, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('AF' . $row, $guest->NomineeIdentificationNumber, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('AG' . $row, $guest->Relationship, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('AH' . $row, isset($guest->RoomName) ? $guest->RoomName : '', \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 			$row++;
 		}
-		$spreadsheet->getActiveSheet()->getStyle('A:AG')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_RIGHT);
+		$spreadsheet->getActiveSheet()->getStyle('A:AH')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_RIGHT);
 		$spreadsheet->getActiveSheet()->getColumnDimension('A')->setWidth(35);
 		$spreadsheet->getActiveSheet()->getColumnDimension('B')->setWidth(35);
 		$spreadsheet->getActiveSheet()->getColumnDimension('C')->setWidth(35);
@@ -659,7 +680,8 @@ class Guest_List extends CI_Controller
 		$spreadsheet->getActiveSheet()->getColumnDimension('AE')->setWidth(35);
 		$spreadsheet->getActiveSheet()->getColumnDimension('AF')->setWidth(35);
 		$spreadsheet->getActiveSheet()->getColumnDimension('AG')->setWidth(35);
-		
+		$spreadsheet->getActiveSheet()->getColumnDimension('AH')->setWidth(35);
+
 		// Save Excel file to temp directory
 		$excel_filename = 'GUEST_LISTS_' . $guest_lists[0]->BookingNumber . '.xlsx';
 		$excel_path = $temp_dir . DIRECTORY_SEPARATOR . $excel_filename;

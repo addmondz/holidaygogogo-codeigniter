@@ -289,56 +289,74 @@
 					</div>
 				</div>
 
-				<?php if(!empty($this->session->userdata('admin_id')) && $guest_lists[0]->LockStatus == 'N') { ?>
-				<div class="row mb-5">
+				<!-- Name Formatting Guidelines -->
+				<div class="row mb-5 mt-5">
 					<div class="col-md-12">
 						<div class="card card-custom mb-5">
-							<div class="card-header flex-wrap py-3" style="background-color:#D7E2F2;">
+							<div class="card-header py-3" style="background-color:#D7E2F2;">
 								<div class="card-title">
 									<h3 class="card-label" style="color:#6082B6;">
-										<strong>Room Management</strong>
+										<strong>Name Formatting Guidelines</strong>
 									</h3>
 								</div>
-								<div class="card-toolbar">
-									<button type="button" id="create_room_btn" class="btn btn-sm btn-light-success font-weight-bold">
-										<i class="la la-plus"></i> Add Room
-									</button>
-								</div>
 							</div>
-							<div class="card-body">
-								<div id="rooms_list" class="row">
-									<?php if(!empty($rooms)) { 
-										foreach($rooms as $room) { ?>
-										<div class="col-md-3 mb-3 room-item" data-room-id="<?php echo $room->id; ?>">
-											<div class="card" style="border: 1px solid #D7E2F2;">
-												<div class="card-body p-3">
-													<div class="d-flex justify-content-between align-items-center">
-														<span class="font-weight-bold room-name"><?php echo $room->room_name; ?></span>
-														<div>
-															<button type="button" class="btn btn-sm btn-icon btn-light-primary edit-room-btn" data-room-id="<?php echo $room->id; ?>" data-room-name="<?php echo htmlspecialchars($room->room_name); ?>">
-																<i class="la la-edit"></i>
-															</button>
-															<button type="button" class="btn btn-sm btn-icon btn-light-danger delete-room-btn" data-room-id="<?php echo $room->id; ?>">
-																<i class="la la-trash"></i>
-															</button>
-														</div>
-													</div>
-												</div>
-											</div>
-										</div>
-									<?php } 
-									} else { ?>
-										<div class="col-md-12">
-											<p class="text-muted">No rooms created yet. Click "Add Room" to create one.</p>
-										</div>
-									<?php } ?>
+							<div class="card-body" style="font-size:14px; color:#333;">
+
+								<p><strong>Examples:</strong></p>
+								<div class="table-responsive mb-4">
+									<table class="table table-bordered text-center" style="border:1px solid #ddd;">
+										<thead>
+											<tr style="background-color:#f5c518; color:#333;">
+												<th style="font-weight:bold; padding:12px; width:35%;">Name on the Passport / Identification Card</th>
+												<th style="font-weight:bold; padding:12px; width:32.5%;">First / Given Name</th>
+												<th style="font-weight:bold; padding:12px; width:32.5%;">Family Name / Surname</th>
+											</tr>
+										</thead>
+										<tbody>
+											<tr><td>Mohd Ali Ahmad Bin Mohd Abu</td><td>Mohd Ali Ahmad</td><td>Bin Mohd Abu</td></tr>
+											<tr><td>Deepika Kumar</td><td>Deepika</td><td>Kumar</td></tr>
+											<tr><td>Alice Lim Su Ye</td><td>Alice Su Ye</td><td>Lim</td></tr>
+											<tr><td>Ng Ah Hock</td><td>Ah Hock</td><td>Ng</td></tr>
+											<tr><td>Juan M. Dela Cruz</td><td>Juan M</td><td>Dela Cruz</td></tr>
+											<tr><td>Chalita Sakornchan</td><td>Chalita</td><td>Sakornchan</td></tr>
+											<tr><td>Nguyen Ho Minh Lam</td><td>Ho Minh Lam</td><td>Nguyen</td></tr>
+										</tbody>
+									</table>
 								</div>
+
+								<h5 style="color:#d4a017; font-weight:bold;">Multiple names formatting</h5>
+								<p>Our system does not accept symbols, special characters and has a limit on the length of our guest's names.</p>
+
+								<h6><strong>1. Names with alias '@', 'A/P' or 'A/L'</strong></h6>
+								<p style="margin-left:20px;">If your name is spelled with a '@' or second name in your Identification Card, remove the '@', insert a space between the two names.</p>
+								<p style="margin-left:20px;">If your name contains 'A/P' or 'A/L' remove it unless it appears in the 'Name' section of your passport.</p>
+								<p><strong>Examples:</strong></p>
+								<div class="table-responsive mb-4">
+									<table class="table table-bordered text-center" style="border:1px solid #ddd;">
+										<thead>
+											<tr style="background-color:#f5c518; color:#333;">
+												<th style="font-weight:bold; padding:12px; width:35%;">Name on the Passport / Identification Card</th>
+												<th style="font-weight:bold; padding:12px; width:32.5%;">First / Given Name</th>
+												<th style="font-weight:bold; padding:12px; width:32.5%;">Family Name / Surname</th>
+											</tr>
+										</thead>
+										<tbody>
+											<tr><td>Aliff@Imran Bin Ahmad</td><td>Aliff Imran</td><td>Bin Ahmad</td></tr>
+											<tr><td>Lim Swee Teng @ Lim Swee Tin</td><td>Lim Swee Teng</td><td>Lim Swee Tin</td></tr>
+											<tr><td>Manimala A/P Murthy Muthu</td><td>Manimala</td><td>AP Murthy Muthu</td></tr>
+										</tbody>
+									</table>
+								</div>
+
+								<p class="mt-3 mb-0"><strong style="color: red;">* Providing wrong name not according to guideline will be denied from check in hotel / flight.</strong></p>
+
 							</div>
 						</div>
 					</div>
 				</div>
-				<?php } ?>
-                <form id="form" action="<?php if($_SERVER['SERVER_NAME'] != 'gl.holidaygogogo.com') { echo base_url('Guest_List?gl=') . $this->input->get('gl'); } else { echo 'https://gl.holidaygogogo.com/?gl=' . $this->input->get('gl'); } ?>" method="post" enctype="multipart/form-data">
+				<!-- End Name Formatting Guidelines -->
+
+	                <form id="form" action="<?php if($_SERVER['SERVER_NAME'] != 'gl.holidaygogogo.com') { echo base_url('Guest_List?gl=') . $this->input->get('gl'); } else { echo 'https://gl.holidaygogogo.com/?gl=' . $this->input->get('gl'); } ?>" method="post" enctype="multipart/form-data">
 					<div id="benchmark" class="row">
 						<?php $counter = 1;
 							$adult = 0;
@@ -383,14 +401,7 @@
 											<div class="row">
 												<div class="col-md-12 mb-6">
 													<label>Room Assignment</label>
-													<select name="room_ids[]" id="<?php echo 'room-' . $guest->GuestListID; ?>" <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> class="form-control room-select">
-														<option value="">-- No Room --</option>
-														<?php if(!empty($rooms)) {
-															foreach($rooms as $room) { ?>
-																<option value="<?php echo $room->id; ?>" <?php if(isset($guest->guest_list_room_id) && $guest->guest_list_room_id == $room->id) { echo 'selected'; } ?>><?php echo $room->room_name; ?></option>
-															<?php }
-														} ?>
-													</select>
+													<input type="text" class="form-control room-assignment-readonly" disabled value="<?php echo !empty($guest->RoomName) ? htmlspecialchars($guest->RoomName) : '-- No Room --'; ?>">
 												</div>
 												<div class="col-md-6 mb-6">
 													<label id="<?php echo 'name_label-' . $guest->GuestListID; ?>">First Name (As per IC/Passport) <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>
@@ -661,6 +672,13 @@
 																<br>
 																<div class="row">
 																	<div class="col-md-6 mb-7 mb-md-0">
+																		<label id="<?php echo 'nominee_contact_label-' . $guest->GuestListID; ?>">Nominee Contact <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>
+																		<input <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="nominee_contacts[]" id="<?php echo 'nominee_contact-' . $guest->GuestListID; ?>" value="<?php echo $guest->NomineeContact; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="form-control">
+																	</div>
+																</div>
+																<br>
+																<div class="row">
+																	<div class="col-md-6 mb-7 mb-md-0">
 																		<label id="<?php echo 'nominee_identification_number_label-' . $guest->GuestListID; ?>">Nominee Identification Number <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>
 																		<input <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="nominee_identification_numbers[]" id="<?php echo 'nominee_identification_number-' . $guest->GuestListID; ?>" value="<?php echo $guest->NomineeIdentificationNumber; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="form-control">
 																	</div>
@@ -693,128 +711,6 @@
 						</div>
 					<?php } ?>
 				</form>
-
-				<!-- Name Formatting Guidelines -->
-				<div class="row mb-5 mt-5">
-					<div class="col-md-12">
-						<div class="card card-custom mb-5">
-							<div class="card-header py-3" style="background-color:#D7E2F2;">
-								<div class="card-title">
-									<h3 class="card-label" style="color:#6082B6;">
-										<strong>Name Formatting Guidelines</strong>
-									</h3>
-								</div>
-							</div>
-							<div class="card-body" style="font-size:14px; color:#333;">
-
-								<p><strong>Examples:</strong></p>
-								<div class="table-responsive mb-4">
-									<table class="table table-bordered text-center" style="border:1px solid #ddd;">
-										<thead>
-											<tr style="background-color:#f5c518; color:#333;">
-												<th style="font-weight:bold; padding:12px; width:35%;">Name on the Passport / Identification Card</th>
-												<th style="font-weight:bold; padding:12px; width:32.5%;">First / Given Name</th>
-												<th style="font-weight:bold; padding:12px; width:32.5%;">Family Name / Surname</th>
-											</tr>
-										</thead>
-										<tbody>
-											<tr><td>Mohd Ali Ahmad Bin Mohd Abu</td><td>Mohd Ali Ahmad</td><td>Bin Mohd Abu</td></tr>
-											<tr><td>Deepika Kumar</td><td>Deepika</td><td>Kumar</td></tr>
-											<tr><td>Alice Lim Su Ye</td><td>Alice Su Ye</td><td>Lim</td></tr>
-											<tr><td>Ng Ah Hock</td><td>Ah Hock</td><td>Ng</td></tr>
-											<tr><td>Juan M. Dela Cruz</td><td>Juan M</td><td>Dela Cruz</td></tr>
-											<tr><td>Chalita Sakornchan</td><td>Chalita</td><td>Sakornchan</td></tr>
-											<tr><td>Nguyen Ho Minh Lam</td><td>Ho Minh Lam</td><td>Nguyen</td></tr>
-										</tbody>
-									</table>
-								</div>
-
-								<h5 style="color:#d4a017; font-weight:bold;">Multiple names formatting</h5>
-								<p>Our system does not accept symbols, special characters and has a limit on the length of our guest's names.</p>
-
-								<h6><strong>1. Names with alias '@', 'A/P' or 'A/L'</strong></h6>
-								<p style="margin-left:20px;">If your name is spelled with a '@' or second name in your Identification Card, remove the '@', insert a space between the two names.</p>
-								<p style="margin-left:20px;">If your name contains 'A/P' or 'A/L' remove it unless it appears in the 'Name' section of your passport.</p>
-								<p><strong>Examples:</strong></p>
-								<div class="table-responsive mb-4">
-									<table class="table table-bordered text-center" style="border:1px solid #ddd;">
-										<thead>
-											<tr style="background-color:#f5c518; color:#333;">
-												<th style="font-weight:bold; padding:12px; width:35%;">Name on the Passport / Identification Card</th>
-												<th style="font-weight:bold; padding:12px; width:32.5%;">First / Given Name</th>
-												<th style="font-weight:bold; padding:12px; width:32.5%;">Family Name / Surname</th>
-											</tr>
-										</thead>
-										<tbody>
-											<tr><td>Aliff@Imran Bin Ahmad</td><td>Aliff Imran</td><td>Bin Ahmad</td></tr>
-											<tr><td>Lim Swee Teng @ Lim Swee Tin</td><td>Lim Swee Teng</td><td>Lim Swee Tin</td></tr>
-											<tr><td>Manimala A/P Murthy Muthu</td><td>Manimala</td><td>AP Murthy Muthu</td></tr>
-										</tbody>
-									</table>
-								</div>
-
-								<h6><strong>2. Names with hyphen</strong></h6>
-								<p style="margin-left:20px;">If your name is spelled with a hyphen '-', please replace it with a space.</p>
-								<p><strong>Examples:</strong></p>
-								<div class="table-responsive mb-4">
-									<table class="table table-bordered text-center" style="border:1px solid #ddd;">
-										<thead>
-											<tr style="background-color:#f5c518; color:#333;">
-												<th style="font-weight:bold; padding:12px; width:35%;">Name on the Passport / Identification Card</th>
-												<th style="font-weight:bold; padding:12px; width:32.5%;">First / Given Name</th>
-												<th style="font-weight:bold; padding:12px; width:32.5%;">Family Name / Surname</th>
-											</tr>
-										</thead>
-										<tbody>
-											<tr><td>Laura Applebee-Jones</td><td>Laura</td><td>Applebee Jones</td></tr>
-											<tr><td>Lim Ker-Hoong</td><td>Ker Hoong</td><td>Lim</td></tr>
-										</tbody>
-									</table>
-								</div>
-
-								<h6><strong>3. Single Names</strong></h6>
-								<p style="margin-left:20px;">If your name only consists of a single name, e.g: Suryadi, please fill up the "Family Name / Surname" field with the same name filled up in the "Given Name" field.</p>
-								<p><strong>Examples:</strong></p>
-								<div class="table-responsive mb-4">
-									<table class="table table-bordered text-center" style="border:1px solid #ddd;">
-										<thead>
-											<tr style="background-color:#f5c518; color:#333;">
-												<th style="font-weight:bold; padding:12px; width:35%;">Name on the Passport / Identification Card</th>
-												<th style="font-weight:bold; padding:12px; width:32.5%;">First / Given Name</th>
-												<th style="font-weight:bold; padding:12px; width:32.5%;">Family Name / Surname</th>
-											</tr>
-										</thead>
-										<tbody>
-											<tr><td>Suryadi</td><td>Suryadi</td><td>Suryadi</td></tr>
-										</tbody>
-									</table>
-								</div>
-
-								<h6><strong>4. Long Names</strong></h6>
-								<p style="margin-left:20px;">If you have a long name and cannot fill in your full name while making a booking, we advise you to fill in as many of your names as possible in the First/Given Name and Family Name/Surname.</p>
-								<p><strong>Examples:</strong></p>
-								<div class="table-responsive mb-4">
-									<table class="table table-bordered text-center" style="border:1px solid #ddd;">
-										<thead>
-											<tr style="background-color:#f5c518; color:#333;">
-												<th style="font-weight:bold; padding:12px; width:35%;">Name on the Passport / Identification Card</th>
-												<th style="font-weight:bold; padding:12px; width:32.5%;">First / Given Name</th>
-												<th style="font-weight:bold; padding:12px; width:32.5%;">Family Name / Surname</th>
-											</tr>
-										</thead>
-										<tbody>
-											<tr><td>Muhammad Faizal Zulkarnain bin Muhammad Zulfikli Amiruddin Syahrezan</td><td>Muhammad Faizal Zulkarnain bin</td><td>Muhammad Zulfikli Amiruddin Syahr</td></tr>
-											<tr><td>Mahalakshmi Janhavi Saraswati Devi Rajeswari Krishnapriya Sri Singhaniya Venkatesan</td><td>Mahalakshmi Janhavi Saraswati</td><td>Devi Rajeswari Krishnapriya Sri</td></tr>
-											<tr><td>Charles Lewis George Andrea Maximillian Gabriel Nicholas Alexander</td><td>Charles Lewis George Andrea</td><td>Maximillian Gabriel Nicholas Ale</td></tr>
-										</tbody>
-									</table>
-								</div>
-
-							</div>
-						</div>
-					</div>
-				</div>
-				<!-- End Name Formatting Guidelines -->
 
             </div>
         </div>
@@ -1055,8 +951,9 @@
 			var nominee_name = $(`#nominee_name-${guest_list_id}`).val();
 			var nominee_identification_number = $(`#nominee_identification_number-${guest_list_id}`).val();
 			var relationship = $(`#relationship-${guest_list_id}`).val();
+			var nominee_contact = $(`#nominee_contact-${guest_list_id}`).val();
 
-			if(name != '' || last_name != '' || gender != null || date_of_birth != '' || nationality != null || identification_number != '' || passport_number != '' || country_code != null || mobile != '' || email != '' || marital_status != null || employment != '' || address != '' || postcode != '' || city != '' || state != '' || country != null || nominee_name != '' || nominee_identification_number != '' || relationship != '') {
+			if(name != '' || last_name != '' || gender != null || date_of_birth != '' || nationality != null || identification_number != '' || passport_number != '' || country_code != null || mobile != '' || email != '' || marital_status != null || employment != '' || address != '' || postcode != '' || city != '' || state != '' || country != null || nominee_name != '' || nominee_identification_number != '' || relationship != '' || nominee_contact != '') {
 				$(`#name_label-${guest_list_id}`).html('First Name <span style="color:red;">*</span>');
 				$(`#name-${guest_list_id}`).prop('required', 'true');
 				$(`#last_name_label-${guest_list_id}`).html('Last Name <span style="color:red;">*</span>');
@@ -1174,6 +1071,8 @@
 					$(`#nominee_identification_number-${guest_list_id}`).prop('required', 'true');
 					$(`#relationship_label-${guest_list_id}`).html('Relationship <span style="color:red;">*</span>');
 					$(`#relationship-${guest_list_id}`).prop('required', 'true');
+					$(`#nominee_contact_label-${guest_list_id}`).html('Nominee Contact <span style="color:red;">*</span>');
+					$(`#nominee_contact-${guest_list_id}`).prop('required', 'true');
 				<?php } ?>
 			} else {
 				$(`#name_label-${guest_list_id}`).html('First Name');
@@ -1231,6 +1130,8 @@
 					$(`#nominee_identification_number-${guest_list_id}`).removeAttr('required');
 					$(`#relationship_label-${guest_list_id}`).html('Relationship');
 					$(`#relationship-${guest_list_id}`).removeAttr('required');
+					$(`#nominee_contact_label-${guest_list_id}`).html('Nominee Contact');
+					$(`#nominee_contact-${guest_list_id}`).removeAttr('required');
 				<?php } ?>
 			}
 		}
@@ -1259,9 +1160,7 @@
 							'<div class="row">' +
 								'<div class="col-md-12 mb-6">' +
 									'<label>Room Assignment</label>' +
-									'<select name="new_room_ids[]" id="room-'+ guest_list_id +'" class="form-control room-select">' +
-										'<option value="">-- No Room --</option>' + getRoomOptions() +
-									'</select>' +
+									'<input type="text" class="form-control room-assignment-readonly" disabled value="-- Auto-assigned after save --">' +
 								'</div>' +
 								'<div class="col-md-6 mb-6">' +
 									'<label id="name_label-'+ guest_list_id +'">First Name (As per IC/Passport) </label>' +
@@ -1424,6 +1323,13 @@
 													'<div class="col-md-6">' +
 														'<label id="nominee_name_label-'+ guest_list_id +'">Nominee Name</label>' +
 														'<input type="text" name="new_nominee_names[]" id="nominee_name-'+ guest_list_id +'" onchange="Set_Required_Field('+ guest_list_id +')" autocomplete="off" class="form-control">' +
+													'</div>' +
+												'</div>' +
+												'<br>' +
+												'<div class="row">' +
+													'<div class="col-md-6 mb-7 mb-md-0">' +
+														'<label id="nominee_contact_label-'+ guest_list_id +'">Nominee Contact</label>' +
+														'<input type="text" name="new_nominee_contacts[]" id="nominee_contact-'+ guest_list_id +'" onchange="Set_Required_Field('+ guest_list_id +')" autocomplete="off" class="form-control">' +
 													'</div>' +
 												'</div>' +
 												'<br>' +
@@ -1873,7 +1779,7 @@
 
 			// Enable form editing
 			function enableForm() {
-				$('input, select, textarea').not('[type="hidden"]').prop('disabled', false);
+				$('input, select, textarea').not('[type="hidden"]').not('.room-assignment-readonly').prop('disabled', false);
 				$('#lock-message').hide();
 			}
 
@@ -2246,187 +2152,9 @@
 			});
 		}
 
-		// Room Management Functions
-		var rooms = <?php echo json_encode(isset($rooms) ? $rooms : array()); ?>;
-		var booking_id = <?php echo $guest_lists[0]->BookingID; ?>;
-
-		function getRoomOptions() {
-			var options = '';
-			if(rooms && rooms.length > 0) {
-				rooms.forEach(function(room) {
-					options += '<option value="' + room.id + '">' + room.room_name + '</option>';
-				});
-			}
-			return options;
-		}
-
-		function refreshRoomDropdowns() {
-			var roomOptions = '<option value="">-- No Room --</option>' + getRoomOptions();
-			$('.room-select').each(function() {
-				var currentValue = $(this).val();
-				$(this).html(roomOptions);
-				$(this).val(currentValue);
-			});
-		}
-
-		function refreshRoomsList() {
-			$.ajax({
-				url: '<?php echo base_url('Guest_List_Room/Read'); ?>',
-				type: 'get',
-				data: { booking_id: booking_id },
-				dataType: 'json',
-				success: function(data) {
-					rooms = data;
-					var roomsHtml = '';
-					if(data && data.length > 0) {
-						data.forEach(function(room) {
-							roomsHtml += '<div class="col-md-3 mb-3 room-item" data-room-id="' + room.id + '">' +
-								'<div class="card" style="border: 1px solid #D7E2F2;">' +
-								'<div class="card-body p-3">' +
-								'<div class="d-flex justify-content-between align-items-center">' +
-								'<span class="font-weight-bold room-name">' + room.room_name + '</span>' +
-								'<div>' +
-								'<button type="button" class="btn btn-sm btn-icon btn-light-primary edit-room-btn" data-room-id="' + room.id + '" data-room-name="' + room.room_name.replace(/"/g, '&quot;') + '">' +
-								'<i class="la la-edit"></i>' +
-								'</button>' +
-								'<button type="button" class="btn btn-sm btn-icon btn-light-danger delete-room-btn" data-room-id="' + room.id + '">' +
-								'<i class="la la-trash"></i>' +
-								'</button>' +
-								'</div>' +
-								'</div>' +
-								'</div>' +
-								'</div>' +
-								'</div>';
-						});
-					} else {
-						roomsHtml = '<div class="col-md-12"><p class="text-muted">No rooms created yet. Click "Add Room" to create one.</p></div>';
-					}
-					$('#rooms_list').html(roomsHtml);
-					refreshRoomDropdowns();
-					attachRoomEventHandlers();
-				}
-			});
-		}
-
-		function attachRoomEventHandlers() {
-			$('.edit-room-btn').off('click').on('click', function() {
-				var roomId = $(this).data('room-id');
-				var roomName = $(this).data('room-name');
-				Swal.fire({
-					title: 'Edit Room',
-					input: 'text',
-					inputValue: roomName,
-					inputPlaceholder: 'Enter room name',
-					showCancelButton: true,
-					confirmButtonText: 'Update',
-					cancelButtonText: 'Cancel',
-					inputValidator: (value) => {
-						if (!value) {
-							return 'Room name is required!';
-						}
-					}
-				}).then((result) => {
-					if (result.isConfirmed) {
-						$.ajax({
-							url: '<?php echo base_url('Guest_List_Room/Update'); ?>',
-							type: 'post',
-							data: {
-								room_id: roomId,
-								room_name: result.value
-							},
-							dataType: 'json',
-							success: function(response) {
-								if(response.success) {
-									Swal.fire('Success!', response.message, 'success');
-									refreshRoomsList();
-								} else {
-									Swal.fire('Error!', response.message, 'error');
-								}
-							},
-							error: function() {
-								Swal.fire('Error!', 'Failed to update room', 'error');
-							}
-						});
-					}
-				});
-			});
-
-			$('.delete-room-btn').off('click').on('click', function() {
-				var roomId = $(this).data('room-id');
-				Swal.fire({
-					title: 'Are you sure?',
-					text: 'This will delete the room. Guests assigned to this room will be unassigned.',
-					icon: 'warning',
-					showCancelButton: true,
-					confirmButtonText: 'Yes, delete it!',
-					cancelButtonText: 'Cancel'
-				}).then((result) => {
-					if (result.isConfirmed) {
-						$.ajax({
-							url: '<?php echo base_url('Guest_List_Room/Delete'); ?>',
-							type: 'get',
-							data: { room_id: roomId },
-							dataType: 'json',
-							success: function(response) {
-								if(response.success) {
-									Swal.fire('Deleted!', response.message, 'success');
-									refreshRoomsList();
-								} else {
-									Swal.fire('Error!', response.message, 'error');
-								}
-							},
-							error: function() {
-								Swal.fire('Error!', 'Failed to delete room', 'error');
-							}
-						});
-					}
-				});
-			});
-		}
-
-		$('#create_room_btn').click(function() {
-			Swal.fire({
-				title: 'Create New Room',
-				input: 'text',
-				inputPlaceholder: 'Enter room name (e.g., Room 101)',
-				showCancelButton: true,
-				confirmButtonText: 'Create',
-				cancelButtonText: 'Cancel',
-				inputValidator: (value) => {
-					if (!value) {
-						return 'Room name is required!';
-					}
-				}
-			}).then((result) => {
-				if (result.isConfirmed) {
-					$.ajax({
-						url: '<?php echo base_url('Guest_List_Room/Create'); ?>',
-						type: 'post',
-						data: {
-							booking_id: booking_id,
-							room_name: result.value
-						},
-						dataType: 'json',
-						success: function(response) {
-							if(response.success) {
-								Swal.fire('Success!', response.message, 'success');
-								refreshRoomsList();
-							} else {
-								Swal.fire('Error!', response.message, 'error');
-							}
-						},
-						error: function() {
-							Swal.fire('Error!', 'Failed to create room', 'error');
-						}
-					});
-				}
-			});
-		});
-
 		// Attach event handlers on page load
 		$(document).ready(function() {
-			attachRoomEventHandlers();
-			
+
 			// Initialize date pickers for existing passport date fields
 			$('input[id^="passport_issue_date-"]').each(function() {
 				if ($(this).hasClass('kt_datepicker_4_3')) {

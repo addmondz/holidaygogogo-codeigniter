@@ -17,6 +17,135 @@
     padding-left: 0.75rem !important;
     text-align: center !important;
 }
+
+/* Checklist Modal Styles */
+#checklistModal .checklist-container {
+    padding: 0;
+}
+#checklistModal .checklist-item {
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    background-color: #ffffff;
+    border: 1px solid #e4e6eb;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+}
+#checklistModal .checklist-item:hover {
+    border-color: #c1c7d0;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+#checklistModal .checklist-item.checked {
+    background-color: #f8f9fa;
+    border-color: #d4edda;
+}
+#checklistModal .checklist-item.checked:hover {
+    border-color: #c3e6cb;
+}
+#checklistModal .checklist-item-content {
+    display: flex;
+    align-items: flex-start;
+    gap: 28px;
+}
+#checklistModal .checklist-checkbox-wrapper {
+    position: relative;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+#checklistModal .checklist-checkbox {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    margin: 0;
+    accent-color: #6082B6;
+}
+#checklistModal .checklist-checkbox-label {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    margin: 0;
+}
+#checklistModal .checklist-details {
+    flex: 1;
+    min-width: 0;
+}
+#checklistModal .checklist-name-wrapper {
+    margin-bottom: 4px;
+}
+#checklistModal .checklist-name {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #212529;
+    cursor: pointer;
+    margin: 0;
+    line-height: 1.3;
+}
+#checklistModal .checklist-completion-info {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid #e9ecef;
+    font-size: 0.75rem;
+    color: #6c757d;
+}
+#checklistModal .checklist-completion-info i {
+    font-size: 0.875rem;
+    color: #6082B6;
+}
+#checklistModal .completion-text {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+#checklistModal .completion-separator {
+    color: #adb5bd;
+    margin: 0 4px;
+}
+#checklistModal .completion-date {
+    color: #868e96;
+}
+#checklistModal .checklist-footer {
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 2px solid #e4e6eb;
+}
+#checklistModal .checklist-progress {
+    min-width: 200px;
+}
+#checklistModal .progress-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+}
+#checklistModal .progress-text {
+    font-size: 0.8125rem;
+    color: #495057;
+}
+#checklistModal .progress-text strong {
+    color: #212529;
+}
+#checklistModal .progress-percentage {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #6082B6;
+}
+#checklistModal .progress-bar-wrapper {
+    width: 100%;
+}
+#checklistModal .progress-bar-wrapper .progress {
+    height: 6px;
+    border-radius: 3px;
+    overflow: hidden;
+}
+#checklistModal .progress-bar-wrapper .progress-bar {
+    transition: width 0.3s ease;
+}
 </style>
 <div class="d-flex flex-column-fluid">
     <div class="container-fluid">
@@ -744,5 +873,211 @@ if (changeAutocountBtn) {
             alert("Error occurred during status change.");
         });
     });
+}
+</script>
+
+<!-- Checklist Modal -->
+<div class="modal fade" id="checklistModal" tabindex="-1" role="dialog" aria-labelledby="checklistModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header" style="background-color:#D7E2F2;">
+                <h5 class="modal-title" id="checklistModalLabel" style="color:#6082B6;">
+                    <strong>Booking Checklist</strong>
+                </h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body" id="checklistModalBody">
+                <div class="text-center py-5">
+                    <div class="spinner spinner-primary spinner-lg"></div>
+                    <p class="mt-3 text-muted">Loading checklist...</p>
+                </div>
+            </div>
+            <div class="modal-footer" id="checklistModalFooter" style="display:none;">
+                <div style="width:100%;">
+                    <div class="checklist-progress">
+                        <div class="progress-info">
+                            <span class="progress-text">
+                                <strong id="modal_checked_count">0</strong> of <strong id="modal_total_count">0</strong> items completed
+                            </span>
+                            <span class="progress-percentage" id="modal_percentage">0%</span>
+                        </div>
+                        <div class="progress-bar-wrapper">
+                            <div class="progress" style="height: 8px; background-color: #e9ecef; border-radius: 4px;">
+                                <div class="progress-bar bg-success" id="modal_progress_bar" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="0"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <button type="button" id="modal_save_checklist_btn" class="btn btn-primary btn-sm font-weight-bold mt-3">
+                        <i class="la la-save"></i> Save Changes
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+var modalBookingId = null;
+var modalTotalItems = 0;
+
+function openChecklistModal(bookingId) {
+    modalBookingId = bookingId;
+
+    // Reset modal
+    $('#checklistModalLabel').html('<strong>Booking Checklist</strong>');
+    $('#checklistModalBody').html('<div class="text-center py-5"><div class="spinner spinner-primary spinner-lg"></div><p class="mt-3 text-muted">Loading checklist...</p></div>');
+    $('#checklistModalFooter').hide();
+    $('#checklistModal').modal('show');
+
+    // Fetch checklist data
+    $.ajax({
+        url: '<?php echo base_url("Booking/Get_Checklist/"); ?>' + bookingId,
+        type: 'GET',
+        dataType: 'json',
+        success: function(data) {
+            if(!data.success) {
+                $('#checklistModalBody').html('<div class="text-center py-5"><p class="text-danger">' + (data.message || 'Failed to load checklist') + '</p></div>');
+                return;
+            }
+
+            $('#checklistModalLabel').html('<strong>Booking Checklist &mdash; ' + escapeHtml(data.booking_number) + '</strong>');
+            modalTotalItems = data.total_count;
+
+            // Build checklist HTML
+            var html = '';
+            for(var gi = 0; gi < data.groups.length; gi++) {
+                var group = data.groups[gi];
+                if(data.is_multi_product && gi > 0) {
+                    html += '<div style="margin: 1rem 0;"></div>';
+                }
+                html += '<h6 class="font-weight-bold mb-3" style="color:#6082B6;">' + escapeHtml(group.product_name) + '</h6>';
+                html += '<div class="checklist-container">';
+
+                for(var ci = 0; ci < group.checklists.length; ci++) {
+                    var cl = group.checklists[ci];
+                    var pid = group.product_id;
+                    var isChecked = data.completion_map[pid] && data.completion_map[pid][cl.ID];
+                    var completionInfo = isChecked ? data.completion_map[pid][cl.ID] : null;
+                    var value = pid + '_' + cl.ID;
+                    var inputId = 'modal_cl_' + pid + '_' + cl.ID;
+
+                    html += '<div class="checklist-item ' + (isChecked ? 'checked' : '') + '">';
+                    html += '<div class="checklist-item-content">';
+                    html += '<div class="checklist-checkbox-wrapper">';
+                    html += '<input class="form-check-input checklist-checkbox modal-checklist-cb" type="checkbox" id="' + inputId + '" value="' + value + '"' + (isChecked ? ' checked' : '') + '>';
+                    html += '<label class="checklist-checkbox-label" for="' + inputId + '"></label>';
+                    html += '</div>';
+                    html += '<div class="checklist-details">';
+                    html += '<div class="checklist-name-wrapper">';
+                    html += '<label class="checklist-name" for="' + inputId + '">' + escapeHtml(cl.name) + '</label>';
+                    html += '</div>';
+                    if(isChecked && completionInfo) {
+                        html += '<div class="checklist-completion-info">';
+                        html += '<i class="la la-user-circle text-primary"></i>';
+                        html += '<span class="completion-text">Completed by <strong>' + escapeHtml(completionInfo.created_by_name) + '</strong>';
+                        html += '<span class="completion-separator">&bull;</span>';
+                        html += '<span class="completion-date">' + escapeHtml(completionInfo.created_at) + '</span></span>';
+                        html += '</div>';
+                    }
+                    html += '</div></div></div>';
+                }
+                html += '</div>';
+            }
+
+            $('#checklistModalBody').html(html);
+            $('#checklistModalFooter').show();
+            updateModalProgress();
+        },
+        error: function() {
+            $('#checklistModalBody').html('<div class="text-center py-5"><p class="text-danger">Failed to load checklist. Please try again.</p></div>');
+        }
+    });
+}
+
+// Checkbox change handler (delegated)
+$(document).on('change', '.modal-checklist-cb', function() {
+    var $cb = $(this);
+    var $item = $cb.closest('.checklist-item');
+    if($cb.is(':checked')) {
+        $item.addClass('checked');
+    } else {
+        $item.removeClass('checked');
+        $item.find('.checklist-completion-info').remove();
+    }
+    updateModalProgress();
+});
+
+function updateModalProgress() {
+    var checked = $('#checklistModal .modal-checklist-cb:checked').length;
+    var pct = modalTotalItems > 0 ? Math.round((checked / modalTotalItems) * 100) : 0;
+    $('#modal_checked_count').text(checked);
+    $('#modal_total_count').text(modalTotalItems);
+    $('#modal_percentage').text(pct + '%');
+    $('#modal_progress_bar').css('width', pct + '%').attr('aria-valuenow', checked).attr('aria-valuemax', modalTotalItems);
+}
+
+// Save handler
+$('#modal_save_checklist_btn').on('click', function() {
+    var $btn = $(this);
+    var originalText = $btn.html();
+    $btn.prop('disabled', true).html('<i class="la la-spinner la-spin"></i> Saving...');
+
+    // Collect checked values
+    var completions = [];
+    $('#checklistModal .modal-checklist-cb:checked').each(function() {
+        completions.push($(this).val());
+    });
+
+    // Build POST data
+    var postData = 'booking_id=' + modalBookingId;
+    if(completions.length === 0) {
+        postData += '&checklist_completions=';
+    }
+    $.each(completions, function(i, val) {
+        postData += '&checklist_completions[]=' + encodeURIComponent(val);
+    });
+
+    $.ajax({
+        url: '<?php echo base_url("Booking/Update"); ?>',
+        type: 'POST',
+        data: postData,
+        contentType: 'application/x-www-form-urlencoded; charset=UTF-8',
+        success: function() {
+            $btn.prop('disabled', false).html(originalText);
+            $('#checklistModal').modal('hide');
+            Swal.fire({
+                width: 550,
+                background: 'url(<?php echo base_url("assets/image/sweetalert.jpg"); ?>)',
+                icon: 'success',
+                title: 'Booking Checklist Updated',
+                showConfirmButton: false,
+                timer: 1500
+            });
+            // Refresh DataTable to reflect any status changes
+            if(typeof bookingTable !== 'undefined') {
+                bookingTable.ajax.reload(null, false);
+            }
+        },
+        error: function() {
+            $btn.prop('disabled', false).html(originalText);
+            Swal.fire({
+                width: 550,
+                background: 'url(<?php echo base_url("assets/image/sweetalert.jpg"); ?>)',
+                icon: 'error',
+                title: 'Failed to Update Checklist',
+                showConfirmButton: false,
+                timer: 3000
+            });
+        }
+    });
+});
+
+function escapeHtml(text) {
+    if(!text) return '';
+    var div = document.createElement('div');
+    div.appendChild(document.createTextNode(text));
+    return div.innerHTML;
 }
 </script>

@@ -1235,6 +1235,21 @@
             $deposit_complete = $has_deposit_deadline ? ($has_any_payment || $deposit_paid || $full_paid) : false;
             $full_payment_complete = ($total_paid >= $net_total && $net_total > 0) || $full_paid;
 
+            // Check for additional payment requirement
+            $has_additional_payment = !empty($booking['AdditionalPaymentDeadlineRaw']);
+            $additional_payment_paid = false;
+            $additional_payment_date = null;
+            if ($has_additional_payment) {
+                foreach ($payment_details as $p) {
+                    $type = strtoupper(trim($p['type'] ?? ''));
+                    if ($type == 'ADDITIONAL PAYMENT') {
+                        $additional_payment_paid = true;
+                        $additional_payment_date = $p['date'];
+                    }
+                }
+            }
+            $additional_payment_complete = $has_additional_payment && ($total_paid >= $net_total && $net_total > 0);
+
             // Check checklist completion
             $checklists_completed = false;
             if (function_exists('are_all_checklists_completed')) {
@@ -1271,26 +1286,36 @@
             $status_dates = $booking['status_change_dates'] ?? [];
 
             // Determine current step (first incomplete step)
+            // Use dynamic step numbering - track the next step number as we go
             $current_step = 0;
             if ($has_deposit_deadline) {
                 if (!$bc_approved) $current_step = 1;
                 elseif (!$deposit_complete) $current_step = 2;
-                elseif (!$checklists_completed) $current_step = 3;
-                elseif (!$guest_list_locked) $current_step = 4;
-                elseif (!$travel_voucher_sent) $current_step = 5;
-                elseif (!$full_payment_complete) $current_step = 6;
-                elseif ($travel_ongoing) $current_step = 7;
-                elseif (!$travel_completed) $current_step = 7;
-                else $current_step = 8;
+                elseif (!$full_payment_complete) $current_step = 3;
+                elseif ($has_additional_payment && !$additional_payment_complete) $current_step = 4;
+                else {
+                    // Steps after payment: offset by 1 if additional payment step exists
+                    $offset = $has_additional_payment ? 1 : 0;
+                    if (!$guest_list_locked) $current_step = 4 + $offset;
+                    elseif (!$checklists_completed) $current_step = 5 + $offset;
+                    elseif (!$travel_voucher_sent) $current_step = 6 + $offset;
+                    elseif ($travel_ongoing) $current_step = 7 + $offset;
+                    elseif (!$travel_completed) $current_step = 7 + $offset;
+                    else $current_step = 8 + $offset;
+                }
             } else {
                 if (!$bc_approved) $current_step = 1;
                 elseif (!$full_payment_complete) $current_step = 2;
-                elseif (!$checklists_completed) $current_step = 3;
-                elseif (!$guest_list_locked) $current_step = 4;
-                elseif (!$travel_voucher_sent) $current_step = 5;
-                elseif ($travel_ongoing) $current_step = 6;
-                elseif (!$travel_completed) $current_step = 6;
-                else $current_step = 7;
+                elseif ($has_additional_payment && !$additional_payment_complete) $current_step = 3;
+                else {
+                    $offset = $has_additional_payment ? 1 : 0;
+                    if (!$checklists_completed) $current_step = 3 + $offset;
+                    elseif (!$guest_list_locked) $current_step = 4 + $offset;
+                    elseif (!$travel_voucher_sent) $current_step = 5 + $offset;
+                    elseif ($travel_ongoing) $current_step = 6 + $offset;
+                    elseif (!$travel_completed) $current_step = 6 + $offset;
+                    else $current_step = 7 + $offset;
+                }
             }
 
             // Build timeline steps
@@ -1360,25 +1385,64 @@
                 'cta_enabled' => ($has_deposit_deadline ? $deposit_complete : $full_payment_complete)
             ];
 
-            // Step: Checklist Completed (step number is sequential)
-            $checklist_date = $status_dates['PBO'] ?? null;
-            $checklist_step_status = $checklists_completed ? 'completed' : ($current_step == 3 ? 'current' : 'future');
-            $timeline_steps[] = [
-                'step' => count($timeline_steps) + 1,
-                // 'title' => $checklists_completed ? 'Checklist Completed' : 'Pending Checklist',
-                'title' => $checklists_completed ? 'Booking Process Completed' : 'Booking Processing',
-                'description' => $checklists_completed ? 'All booking requirements verified' : 'Booking requirements being processed',
-                'event_date' => $checklists_completed ? $checklist_date : null,
-                'relative_time' => $checklists_completed ? get_relative_time($checklist_date) : '',
-                'expected_date' => null,
-                'status' => $checklist_step_status,
-                'icon' => 'clipboard-check',
-                // No CTA for checklist step
-                'cta_text' => null,
-                'cta_url' => null,
-                'cta_icon' => null,
-                'cta_enabled' => false
-            ];
+            // Step: Full Payment (only for deposit-flow bookings, shown after Deposit)
+            if ($has_deposit_deadline) {
+                $full_payment_deadline = $booking['FullPaymentDeadlineRaw'] ?? null;
+                $full_payment_overdue = !empty($full_payment_deadline) && $today > date('Y-m-d', strtotime($full_payment_deadline)) && !$full_payment_complete;
+                $full_payment_step_status = $full_payment_complete
+                    ? 'completed'
+                    : ($full_payment_overdue ? 'overdue' : ($current_step == 3 ? 'current' : 'future'));
+
+                $full_payment_title = $full_payment_complete ? 'Full Payment Received' : 'Pending Full Payment';
+                $full_payment_description = $full_payment_complete ? 'Full payment received' : 'Full payment required';
+
+                $timeline_steps[] = [
+                    'step' => count($timeline_steps) + 1,
+                    'title' => $full_payment_title,
+                    'description' => $full_payment_description,
+                    'event_date' => $full_payment_complete ? $payment_date : null,
+                    'relative_time' => $full_payment_complete ? get_relative_time($payment_date) : '',
+                    'expected_date' => $full_payment_deadline,
+                    'status' => $full_payment_step_status,
+                    'icon' => 'credit-card',
+                    'payment_details' => $payment_details,
+                    // CTA: Download Receipt (available only when full payment is completed)
+                    'cta_text' => 'Download',
+                    'cta_url' => $receipt_url,
+                    'cta_icon' => 'download',
+                    'cta_enabled' => $full_payment_complete
+                ];
+            }
+
+            // Step: Additional Payment (only when AdditionalPaymentDeadline is set)
+            if ($has_additional_payment) {
+                $additional_step_num = count($timeline_steps) + 1;
+                $additional_payment_deadline = $booking['AdditionalPaymentDeadlineRaw'];
+                $additional_payment_overdue = !empty($additional_payment_deadline) && $today > date('Y-m-d', strtotime($additional_payment_deadline)) && !$additional_payment_complete;
+                $additional_payment_step_status = $additional_payment_complete
+                    ? 'completed'
+                    : ($additional_payment_overdue ? 'overdue' : ($current_step == $additional_step_num ? 'current' : 'future'));
+
+                $additional_payment_title = $additional_payment_complete ? 'Additional Payment Received' : 'Pending Additional Payment';
+                $additional_payment_description = $additional_payment_complete ? 'Additional payment received' : 'Additional payment required due to booking changes';
+
+                $timeline_steps[] = [
+                    'step' => $additional_step_num,
+                    'title' => $additional_payment_title,
+                    'description' => $additional_payment_description,
+                    'event_date' => $additional_payment_complete ? $additional_payment_date : null,
+                    'relative_time' => $additional_payment_complete ? get_relative_time($additional_payment_date) : '',
+                    'expected_date' => $additional_payment_deadline,
+                    'status' => $additional_payment_step_status,
+                    'icon' => 'dollar-sign',
+                    'payment_details' => $payment_details,
+                    // CTA: Download Receipt (available only when additional payment is completed)
+                    'cta_text' => 'Download',
+                    'cta_url' => $receipt_url,
+                    'cta_icon' => 'download',
+                    'cta_enabled' => $additional_payment_complete
+                ];
+            }
 
             // Step: Guest List Completed & Locked
             $gl_date = $status_dates['PTV'] ?? $status_dates['PGL'] ?? null;
@@ -1401,9 +1465,31 @@
                 'cta_enabled' => ($gl_step_status != 'future')
             ];
 
+            // Step: Checklist Completed (step number is sequential)
+            $checklist_date = $status_dates['PBO'] ?? null;
+            $checklist_step_num = count($timeline_steps) + 1;
+            $checklist_step_status = $checklists_completed ? 'completed' : ($current_step == $checklist_step_num ? 'current' : 'future');
+            $timeline_steps[] = [
+                'step' => count($timeline_steps) + 1,
+                // 'title' => $checklists_completed ? 'Checklist Completed' : 'Pending Checklist',
+                'title' => $checklists_completed ? 'Booking Process Completed' : 'Booking Processing',
+                'description' => $checklists_completed ? 'All booking requirements verified' : 'Booking requirements being processed',
+                'event_date' => $checklists_completed ? $checklist_date : null,
+                'relative_time' => $checklists_completed ? get_relative_time($checklist_date) : '',
+                'expected_date' => null,
+                'status' => $checklist_step_status,
+                'icon' => 'clipboard-check',
+                // No CTA for checklist step
+                'cta_text' => null,
+                'cta_url' => null,
+                'cta_icon' => null,
+                'cta_enabled' => false
+            ];
+
             // Step: Travel Voucher Sent
             $tv_date = $status_dates['PT'] ?? null;
-            $tv_step_status = $travel_voucher_sent ? 'completed' : ($current_step == 5 ? 'current' : 'future');
+            $tv_step_num = count($timeline_steps) + 1;
+            $tv_step_status = $travel_voucher_sent ? 'completed' : ($current_step == $tv_step_num ? 'current' : 'future');
             $tv_expected_date = null;
             if ($travel_start) {
                 $travel_ts = strtotime($travel_start);
@@ -1429,35 +1515,6 @@
                 'cta_icon' => 'plane',
                 'cta_enabled' => ($travel_voucher_sent && $guest_list_locked)
             ];
-
-            // Step: Full Payment (only for deposit-flow bookings, shown after Travel Voucher)
-            if ($has_deposit_deadline) {
-                $full_payment_deadline = $booking['FullPaymentDeadlineRaw'] ?? null;
-                $full_payment_overdue = !empty($full_payment_deadline) && $today > date('Y-m-d', strtotime($full_payment_deadline)) && !$full_payment_complete;
-                $full_payment_step_status = $full_payment_complete
-                    ? 'completed'
-                    : (($travel_voucher_sent && $full_payment_overdue) ? 'overdue' : ($current_step == 6 ? 'current' : 'future'));
-
-                $full_payment_title = $full_payment_complete ? 'Full Payment Received' : 'Pending Full Payment';
-                $full_payment_description = $full_payment_complete ? 'Full payment received' : 'Full payment required';
-
-                $timeline_steps[] = [
-                    'step' => count($timeline_steps) + 1,
-                    'title' => $full_payment_title,
-                    'description' => $full_payment_description,
-                    'event_date' => $full_payment_complete ? $payment_date : null,
-                    'relative_time' => $full_payment_complete ? get_relative_time($payment_date) : '',
-                    'expected_date' => $full_payment_deadline,
-                    'status' => $full_payment_step_status,
-                    'icon' => 'credit-card',
-                    'payment_details' => $payment_details,
-                    // CTA: Download Receipt (available only when full payment is completed)
-                    'cta_text' => 'Download',
-                    'cta_url' => $receipt_url,
-                    'cta_icon' => 'download',
-                    'cta_enabled' => $full_payment_complete
-                ];
-            }
 
             // Step: Trip Status (expected / ongoing / completed)
             $trip_step_status = $travel_completed ? 'completed' : ($travel_ongoing ? 'current' : 'future');
@@ -1801,13 +1858,19 @@
                 <?php endif; ?>
             </div>
 
-            <!-- Invoice Split by Pax Section -->
+            <!-- E-Invoice Request by Pax Section -->
             <div class="details-card" id="invoice-split-section">
                 <div class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
-                    <span>Invoice Split by Pax</span>
-                    <button type="button" id="toggle-split-form" class="btn-toggle-split" style="background: #162447; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;">
-                        <i class="la la-plus"></i> Split Invoice
-                    </button>
+                    <span>E-Invoice Request by Pax</span>
+                    <?php if (!empty($booking['invoice_split'])): ?>
+                        <button type="button" id="toggle-split-form" class="btn-toggle-split" style="background: #162447; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;">
+                            <i class="la la-edit"></i> Edit E-Invoice Request
+                        </button>
+                    <?php else: ?>
+                        <button type="button" id="toggle-split-form" class="btn-toggle-split" style="background: #162447; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;">
+                            <i class="la la-plus"></i> E-Invoice Request
+                        </button>
+                    <?php endif; ?>
                 </div>
 
                 <!-- Summary Bar -->
@@ -1829,10 +1892,21 @@
                         ?>
                         <?php foreach ($booking['invoice_split'] as $idx => $pax): ?>
                             <div style="background: #f8f9fa; border-radius: 8px; padding: 16px; margin-bottom: 12px; border: 1px solid #e8e8e8;">
-                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
                                     <strong style="font-size: 15px;">Pax <?php echo $idx + 1; ?>: <?php echo htmlspecialchars($pax['PaxName']); ?></strong>
                                     <?php if (!empty($pax['TIN'])): ?>
                                         <span style="color: #666; font-size: 13px;">TIN: <?php echo htmlspecialchars($pax['TIN']); ?></span>
+                                    <?php endif; ?>
+                                </div>
+                                <div style="font-size: 13px; color: #555; margin-bottom: 10px;">
+                                    <?php if (!empty($pax['Email'])): ?>
+                                        <span style="margin-right: 15px;">Email: <?php echo htmlspecialchars($pax['Email']); ?></span>
+                                    <?php endif; ?>
+                                    <?php if (!empty($pax['PhoneNumber'])): ?>
+                                        <span>Phone: <?php echo htmlspecialchars($pax['PhoneNumber']); ?></span>
+                                    <?php endif; ?>
+                                    <?php if (!empty($pax['Address'])): ?>
+                                        <div style="margin-top: 2px;">Address: <?php echo htmlspecialchars($pax['Address']); ?></div>
                                     <?php endif; ?>
                                 </div>
                                 <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
@@ -1879,7 +1953,7 @@
                     <?php else: ?>
                         <div class="empty-state" style="text-align: center; padding: 30px; color: #999;">
                             <i class="la la-file-invoice" style="font-size: 36px; display: block; margin-bottom: 10px;"></i>
-                            <p>No invoice split configured. Click "Split Invoice" to allocate products across pax.</p>
+                            <p>No e-invoice request configured. Click "E-Invoice Request" to allocate products across pax.</p>
                         </div>
                     <?php endif; ?>
                 </div>
@@ -1893,7 +1967,7 @@
                             <i class="la la-plus"></i> Add Pax
                         </button>
                         <button type="button" id="save-split-btn" style="background: #162447; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;">
-                            <i class="la la-save"></i> Save Invoice Split
+                            <i class="la la-save"></i> <?php echo !empty($booking['invoice_split']) ? 'Update' : 'Save'; ?> E-Invoice Request
                         </button>
                         <button type="button" id="cancel-split-btn" style="background: #6c757d; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;">
                             Cancel
@@ -2347,7 +2421,7 @@
             loadCustomerComments();
 
             // =====================================================
-            // Invoice Split by Pax
+            // E-Invoice Request by Pax
             // =====================================================
             var bookingProducts = <?php echo json_encode($booking['products']); ?>;
             var bookingSubtotal = parseFloat('<?php echo $booking['Subtotal']; ?>') || 0;
@@ -2366,7 +2440,7 @@
                 for (var i = 0; i < bookingProducts.length; i++) {
                     var bp = bookingProducts[i];
                     var sel = (bp.BookingProductID == selectedBpId) ? ' selected' : '';
-                    html += '<option value="' + bp.BookingProductID + '" data-price="' + bp.Price + '" data-max-qty="' + bp.Quantity + '">' + bp.Name + ' (Qty: ' + bp.Quantity + ' × RM ' + parseFloat(bp.Price).toFixed(2) + ')</option>';
+                    html += '<option value="' + bp.BookingProductID + '"' + sel + ' data-price="' + bp.Price + '" data-max-qty="' + bp.Quantity + '">' + bp.Name + ' (Qty: ' + bp.Quantity + ' × RM ' + parseFloat(bp.Price).toFixed(2) + ')</option>';
                 }
                 return html;
             }
@@ -2392,6 +2466,9 @@
                 var idx = paxCounter;
                 var name = paxData ? paxData.PaxName : '';
                 var tin = paxData ? (paxData.TIN || '') : '';
+                var email = paxData ? (paxData.Email || '') : '';
+                var address = paxData ? (paxData.Address || '') : '';
+                var phone = paxData ? (paxData.PhoneNumber || '') : '';
 
                 var html = '<div class="pax-card" data-pax-idx="' + idx + '" style="background:#f8f9fa;border:1px solid #e0e0e0;border-radius:8px;padding:16px;margin-bottom:12px;">';
                 html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">';
@@ -2402,6 +2479,11 @@
                 html += '<div style="flex:1;min-width:200px;"><label style="font-size:12px;font-weight:600;color:#666;">Pax Name <span style="color:red;">*</span></label><input type="text" class="pax-name" value="' + name.replace(/"/g, '&quot;') + '" placeholder="Full Name" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;font-size:13px;"></div>';
                 html += '<div style="min-width:180px;"><label style="font-size:12px;font-weight:600;color:#666;">TIN (Tax ID) <span style="color:red;">*</span></label><input type="text" class="pax-tin" value="' + tin.replace(/"/g, '&quot;') + '" placeholder="Tax Identification Number" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;font-size:13px;" required></div>';
                 html += '</div>';
+                html += '<div style="display:flex;gap:12px;margin-bottom:12px;flex-wrap:wrap;">';
+                html += '<div style="flex:1;min-width:200px;"><label style="font-size:12px;font-weight:600;color:#666;">Email <span style="color:red;">*</span></label><input type="email" class="pax-email" value="' + email.replace(/"/g, '&quot;') + '" placeholder="Email Address" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;font-size:13px;" required></div>';
+                html += '<div style="min-width:180px;"><label style="font-size:12px;font-weight:600;color:#666;">Phone Number <span style="color:red;">*</span></label><input type="text" class="pax-phone" value="' + phone.replace(/"/g, '&quot;') + '" placeholder="Phone Number" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;font-size:13px;" required></div>';
+                html += '</div>';
+                html += '<div style="margin-bottom:12px;"><label style="font-size:12px;font-weight:600;color:#666;">Address <span style="color:red;">*</span></label><textarea class="pax-address" placeholder="Full Address" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;font-size:13px;resize:vertical;min-height:60px;" required>' + address.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</textarea></div>';
                 html += '<table style="width:100%;border-collapse:collapse;font-size:13px;">';
                 html += '<thead><tr style="background:#e9ecef;"><th style="padding:8px;text-align:left;">Product</th><th style="padding:8px;text-align:center;width:100px;">Qty</th><th style="padding:8px;text-align:right;">Unit Price</th><th style="padding:8px;text-align:right;">Amount</th><th style="padding:8px;width:50px;"></th></tr></thead>';
                 html += '<tbody class="pax-products-body">';
@@ -2529,6 +2611,9 @@
                 $('.pax-card').each(function() {
                     var paxName = $(this).find('.pax-name').val().trim();
                     var paxTin = $(this).find('.pax-tin').val().trim();
+                    var paxEmail = $(this).find('.pax-email').val().trim();
+                    var paxAddress = $(this).find('.pax-address').val().trim();
+                    var paxPhone = $(this).find('.pax-phone').val().trim();
 
                     if (!paxName) {
                         hasError = true;
@@ -2539,6 +2624,24 @@
                     if (!paxTin) {
                         hasError = true;
                         Swal.fire('Error', 'Each pax must have a TIN (Tax Identification Number).', 'error');
+                        return false;
+                    }
+
+                    if (!paxEmail) {
+                        hasError = true;
+                        Swal.fire('Error', 'Each pax must have an Email.', 'error');
+                        return false;
+                    }
+
+                    if (!paxAddress) {
+                        hasError = true;
+                        Swal.fire('Error', 'Each pax must have an Address.', 'error');
+                        return false;
+                    }
+
+                    if (!paxPhone) {
+                        hasError = true;
+                        Swal.fire('Error', 'Each pax must have a Phone Number.', 'error');
                         return false;
                     }
 
@@ -2557,7 +2660,7 @@
                         return false;
                     }
 
-                    paxList.push({ PaxName: paxName, TIN: paxTin, products: products });
+                    paxList.push({ PaxName: paxName, TIN: paxTin, Email: paxEmail, Address: paxAddress, PhoneNumber: paxPhone, products: products });
                 });
 
                 if (hasError) return;
@@ -2601,17 +2704,17 @@
                     dataType: 'json',
                     success: function(response) {
                         if (response && response.success) {
-                            Swal.fire('Success', response.message || 'Invoice split saved!', 'success').then(function() {
+                            Swal.fire('Success', response.message || 'E-Invoice request saved!', 'success').then(function() {
                                 location.reload();
                             });
                         } else {
                             Swal.fire('Error', response.message || 'Failed to save.', 'error');
-                            $btn.prop('disabled', false).html('<i class="la la-save"></i> Save Invoice Split');
+                            $btn.prop('disabled', false).html('<i class="la la-save"></i> Save E-Invoice Request');
                         }
                     },
                     error: function() {
                         Swal.fire('Error', 'An unexpected error occurred.', 'error');
-                        $btn.prop('disabled', false).html('<i class="la la-save"></i> Save Invoice Split');
+                        $btn.prop('disabled', false).html('<i class="la la-save"></i> Save E-Invoice Request');
                     }
                 });
             });

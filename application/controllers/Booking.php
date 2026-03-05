@@ -333,55 +333,8 @@ class Booking extends MY_Controller
 				$row['profit_margin'] = '<span style="color:' . $profit_color . '">' . $profit_margin . '</span>';
 			}
 
-			// Status with remarks tooltip
-			$remarks = $this->Remark_Model->Read_Remarks('booking', $booking->BookingID);
-			$remarks_count = count($remarks);
-			$remarks_html = '';
-
-			$bc_text = '<strong>' . $booking->BookingNumber . '</strong><br>';
-			
-			if (!empty($remarks)) {
-				$remarks_list = array();
-				foreach ($remarks as $remark) {
-					$commenter_name = !empty($remark->CommenterName) ? $remark->CommenterName : 'Unknown';
-					$commenter_initials = strtoupper(substr($commenter_name, 0, 2));
-					$created_at = !empty($remark->created_at) ? return_timestamp_output($remark->created_at) : '';
-					// Avatar color based on first letter
-					$avatar_colors = ['primary', 'success', 'info', 'warning', 'danger'];
-					$avatar_color = $avatar_colors[ord($commenter_name[0]) % 5];
-					
-					// Convert newlines to <br> tags and escape HTML
-					$content = htmlspecialchars($remark->content, ENT_QUOTES);
-					$content = nl2br($content);
-					
-					$remarks_list[] = '<div class="d-flex mb-2 pb-2" style="border-bottom: 1px solid #e4e6eb;">' .
-						// Avatar
-						'<div class="flex-shrink-0 mr-2">' .
-						'<div class="symbol symbol-30 symbol-circle symbol-light-' . $avatar_color . '">' .
-						'<span class="symbol-label font-weight-bold" style="font-size: 0.7rem;">' . $commenter_initials . '</span>' .
-						'</div>' .
-						'</div>' .
-						// Comment content
-						'<div class="flex-grow-1" style="min-width: 0; padding-right: 4px;">' .
-						'<div class="d-flex align-items-baseline mb-1">' .
-						'<strong class="mr-2" style="font-size: 0.8rem; color: #050505;">' . htmlspecialchars($commenter_name, ENT_QUOTES) . '</strong>' .
-						'<span class="text-muted" style="font-size: 0.7rem; color: #65676b;">' . $created_at . '</span>' .
-						'</div>' .
-						'<div style="font-size: 0.8rem; color: #050505; line-height: 1.3; word-wrap: break-word; white-space: pre-line;">' . $content . '</div>' .
-						'</div>' .
-						'</div>';
-				}
-				$remarks_html = '<div style="max-width: 450px; text-align: left; padding: 0; background: #fff;">' .
-					'<div class="p-2 pb-1" style="border-bottom: 1px solid #e4e6eb; background: #f8f9fa; padding-right: 16px !important;">' . '<span style="font-size: 0.85rem; font-weight: 600; color: #333;">' . $bc_text . '</span></div>' .
-					'<div style="padding: 10px 12px 10px 12px; padding-right: 18px !important;">' . implode('', $remarks_list) . '</div>' .
-					'</div>';
-			} else {
-				$remarks_html = '<div class="p-2" style="text-align: center; padding: 15px; color: #65676b; font-size: 0.8rem;">'.$bc_text.' No comments found.</div>';
-			}
-			
-			// Status with tooltip for remarks
-			$status_icon = $remarks_count > 0 ? ' <i class="la la-comment" style="font-size: 0.85em; opacity: 0.7;"></i>' : '';
-			$row['status'] = '<span class="font-weight-bold remarks-status" style="color:' . $status_color . '; cursor: help;" data-toggle="tooltip" data-html="true" data-placement="left" data-booking-id="' . $booking->BookingID . '" title="' . htmlspecialchars($remarks_html, ENT_QUOTES) . '">' . $status_text . $status_icon . '</span>';
+			// Status
+			$row['status'] = '<span class="font-weight-bold" style="color:' . $status_color . ';">' . $status_text . '</span>';
 
 			// GL Status rules:
 			// 1. If hard-locked (LockStatus = 'Y') -> locked icon (red)
@@ -518,6 +471,10 @@ class Booking extends MY_Controller
 		if(in_array('GB', $this->session->access_control)) {
 			$html .= '<a href="' . (strpos($current_url, '?') ? base_url('Booking/Duplicate?booking_id=') . $booking->BookingID . '&' . explode('?', $current_url)[1] : base_url('Booking/Duplicate?booking_id=') . $booking->BookingID) . '" class="dropdown-item" style="font-size:11px;">Duplicate Booking</a>';
 		}
+		// Edit Checklist - AB users or SA viewing own booking
+		if(in_array('AB', $access_control) || ($is_sales_agent && !empty($booking->SalesAgentID) && $booking->SalesAgentID == $this->session->userdata('admin_id'))) {
+			$html .= '<button onclick="openChecklistModal(' . $booking->BookingID . ')" class="dropdown-item" style="font-size:11px;">Edit Checklist</button>';
+		}
 		$html .= '<div class="dropdown-divider"></div>';
 		$html .= '<a href="' . base_url('Booking_Confirmation?token=') . $booking->Token . '" target="_blank" class="dropdown-item" style="font-size:11px;">Booking Confirmation</a>';
 		$html .= '<button id="bc_url-' . $booking->BookingID . '" value="' . base_url('Booking_Confirmation?token=') . $booking->Token . '" onclick="Copy_URL(\'BC URL\', ' . $booking->BookingID . ')" class="dropdown-item" style="font-size:11px;">Copy BC Link</button>';
@@ -599,6 +556,17 @@ class Booking extends MY_Controller
 				$booking_id = $this->Booking_Model->Create();
 
 				$this->Booking_Product_Model->Create($this->input->post('booking_products'), $booking_id);
+
+				// Auto-enable insurance if any product belongs to an insurance category
+				$this->db->from('booking_product');
+				$this->db->join('product', 'product.ProductID = booking_product.ProductID', 'left');
+				$this->db->join('category', 'category.CategoryID = product.CategoryID', 'left');
+				$this->db->where('booking_product.BookingID', $booking_id);
+				$this->db->where('booking_product.Status', 'Y');
+				$this->db->like('category.Name', 'Insurance', 'both');
+				if($this->db->count_all_results() > 0) {
+					$this->Booking_Model->update_by_id($booking_id, ['TravelInsuranceStatus' => 'Y']);
+				}
 
 				$this->Booking_Model->update_by_id($booking_id, [
 						'AutocountSyncAction'  => 'C'
@@ -682,10 +650,26 @@ class Booking extends MY_Controller
 				$booking = $this->Booking_Model->Read_Booking();
 				$today = strtotime(date('Y-m-d'));
 				$startDate = strtotime($booking['StartDate']);
-				
+
 				if ($today >= $startDate) {
-					// if travel started, redirect to view booking page 
+					// if travel started, redirect to view booking page
 					redirect('Booking/View?booking_id=' . $this->input->get('booking_id'));
+				}
+			}
+		}
+
+		// Block SA and TC from updating completed bookings
+		if(in_array($this->session->userdata('level'), [20, 50])) {
+			$valid_booking_id = $this->Universal_Model->Validate_Id('BookingID', $this->input->get('booking_id'), 'booking');
+			if($valid_booking_id) {
+				$booking = $this->Booking_Model->Read_Booking();
+				if($booking['Status'] == 'Y' && $booking['AfterSalesService'] == 'COMPLETE') {
+					if($this->input->is_ajax_request()) {
+						echo json_encode(array('error' => 'Access denied'));
+					} else {
+						$this->load->view('errors/access_denied');
+					}
+					return;
 				}
 			}
 		}
@@ -694,7 +678,7 @@ class Booking extends MY_Controller
 			if($this->input->is_ajax_request()) {
 				// Booking
 				// Action : Update
-				if(count($this->input->post('booking')[0]) > 3) {
+				if(!empty($this->input->post('booking')) && count($this->input->post('booking')[0]) > 3) {
 					$this->Booking_Model->Update();
 					$this->Booking_Model->Create_Booking_Log();
 				}
@@ -740,6 +724,18 @@ class Booking extends MY_Controller
 						$this->Booking_Model->Update_Product_Sequence(implode(',', $booking['ProductSequence']));
 					}
 					// Check if price changed due to product deletion (will be checked when booking NetTotal is updated)
+				}
+
+				// Auto-enable insurance if any product belongs to an insurance category
+				$booking_id = $this->input->post('booking_id');
+				$this->db->from('booking_product');
+				$this->db->join('product', 'product.ProductID = booking_product.ProductID', 'left');
+				$this->db->join('category', 'category.CategoryID = product.CategoryID', 'left');
+				$this->db->where('booking_product.BookingID', $booking_id);
+				$this->db->where('booking_product.Status', 'Y');
+				$this->db->like('category.Name', 'Insurance', 'both');
+				if($this->db->count_all_results() > 0) {
+					$this->Booking_Model->update_by_id($booking_id, ['TravelInsuranceStatus' => 'Y']);
 				}
 
 				$bookingInfo = get_object_vars($this->Booking_Model->find($this->input->post('booking_id')));
@@ -891,50 +887,62 @@ class Booking extends MY_Controller
 				// Booking Checklist Completion
 				$booking_id = $this->input->post('booking_id');
 				$checklist_completions = $this->input->post('checklist_completions');
-				
+
 				// Always process checklist completions if booking_id and checklist_completions are provided
 				if(!empty($booking_id) && $checklist_completions !== null) {
 					// Ensure it's an array
 					if(!is_array($checklist_completions)) {
-						// If it's a single value, convert to array
 						if(!empty($checklist_completions)) {
 							$checklist_completions = array($checklist_completions);
 						} else {
 							$checklist_completions = array();
 						}
 					}
-					
+
+					// Parse "productId_checklistId" pairs
+					$completion_pairs = array(); // [[product_id, checklist_id], ...]
+					foreach($checklist_completions as $value) {
+						$parts = explode('_', $value, 2);
+						if(count($parts) == 2) {
+							$completion_pairs[] = array(intval($parts[0]), intval($parts[1]));
+						}
+					}
+
 					$created_by = $this->session->userdata('admin_id');
-					
+
 					if(!empty($created_by)) {
 						// Get previous completions for logging (before updating)
-						$previous_completions = array();
+						$previous_keys = array();
 						if($this->db->table_exists('booking_checklist_completion')) {
-							// Get previous completions from map (extract keys)
+							// Get previous completions (nested map: product_id => checklist_id => info)
 							$previous_map = $this->Booking_Checklist_Completion_Model->Read_Completion_Map($booking_id);
-							$previous_completions = array_keys($previous_map);
-							
+							// Flatten to "productId_checklistId" strings for comparison
+							foreach($previous_map as $pid => $checklists) {
+								foreach($checklists as $cid => $info) {
+									$previous_keys[] = $pid . '_' . $cid;
+								}
+							}
+
 							// Get booking to check current status
 							$this->load->helper('booking_flow');
 							$booking = $this->Booking_Model->getBookingById($booking_id);
-							
+
 							if($booking) {
 								// Check if checklist was unchecked (going from all completed to not all completed)
 								$was_all_completed = are_all_checklists_completed($booking_id, $this);
-								
-								// Update checklist completions
-								$this->Booking_Checklist_Completion_Model->Create($booking_id, $checklist_completions, $created_by);
-								
+
+								// Update checklist completions with product-aware pairs
+								$this->Booking_Checklist_Completion_Model->Create($booking_id, $completion_pairs, $created_by);
+
 								// Check if now all completed
 								$is_now_all_completed = are_all_checklists_completed($booking_id, $this);
-								
+
 								// If was all completed but now not all completed, revert to PBO
 								if ($was_all_completed && !$is_now_all_completed) {
 									$this->load->helper('booking_status_log');
-									
+
 									// Only revert if status is beyond PBO
 									if ($booking->Status != 'PBO' && in_array($booking->Status, ['PTV', 'PT'])) {
-										// Revert to PBO
 										$this->Booking_Model->Update_Status('PBO', $booking_id);
 										log_booking_status_change(
 											$booking_id,
@@ -963,12 +971,15 @@ class Booking extends MY_Controller
 								}
 							}
 						} else {
-							// Table doesn't exist - log error
 							log_message('error', 'booking_checklist_completion table does not exist. Please run migration.');
 						}
-						
+
 						// Create activity logs for changes
-						$this->log_checklist_changes($booking_id, $previous_completions, $checklist_completions, $created_by);
+						$new_keys = array();
+						foreach($completion_pairs as $pair) {
+							$new_keys[] = $pair[0] . '_' . $pair[1];
+						}
+						$this->log_checklist_changes($booking_id, $previous_keys, $new_keys, $created_by);
 					}
 				}
 			} else {
@@ -988,6 +999,18 @@ class Booking extends MY_Controller
 					$array['FullPaymentDeadline'] = date('d/m/Y', strtotime($array['FullPaymentDeadline']));
 					if(!empty($array['AdditionalPaymentDeadline'])) {
 						$array['AdditionalPaymentDeadline'] = date('d/m/Y', strtotime($array['AdditionalPaymentDeadline']));
+					}
+					if(!isset($array['PaymentOutSupplierFull'])) {
+						$array['PaymentOutSupplierFull'] = '';
+					}
+					if(!isset($array['PaymentOutSupplierDeposit'])) {
+						$array['PaymentOutSupplierDeposit'] = '';
+					}
+					if(!empty($array['PaymentOutSupplierFull'])) {
+						$array['PaymentOutSupplierFull'] = date('d/m/Y', strtotime($array['PaymentOutSupplierFull']));
+					}
+					if(!empty($array['PaymentOutSupplierDeposit'])) {
+						$array['PaymentOutSupplierDeposit'] = date('d/m/Y', strtotime($array['PaymentOutSupplierDeposit']));
 					}
 					if(!empty($array['StartDate']) && !empty($array['EndDate'])) {
 						$array['TravelDate'] = date('d/m/Y', strtotime($array['StartDate'])) . ' - ' . date('d/m/Y', strtotime($array['EndDate']));
@@ -1136,7 +1159,13 @@ class Booking extends MY_Controller
 			
 			if($valid_booking_id) {
 				$array = $this->Booking_Model->Read_Booking();
-				
+
+				// Block SA and TC from viewing completed bookings
+				if(in_array($this->session->userdata('level'), [20, 50]) && $array['Status'] == 'Y' && $array['AfterSalesService'] == 'COMPLETE') {
+					$this->load->view('errors/access_denied');
+					return;
+				}
+
 				// If sales agent without AB access, verify they own the booking
 				if($is_sales_agent && !$has_ab_access) {
 					if($array['SalesAgent'] != $this->session->userdata('admin_id')) {
@@ -1154,6 +1183,12 @@ class Booking extends MY_Controller
 				$array['FullPaymentDeadline'] = date('d/m/Y', strtotime($array['FullPaymentDeadline']));
 				if(!empty($array['AdditionalPaymentDeadline'])) {
 					$array['AdditionalPaymentDeadline'] = date('d/m/Y', strtotime($array['AdditionalPaymentDeadline']));
+				}
+				if(!empty($array['PaymentOutSupplierFull'])) {
+					$array['PaymentOutSupplierFull'] = date('d/m/Y', strtotime($array['PaymentOutSupplierFull']));
+				}
+				if(!empty($array['PaymentOutSupplierDeposit'])) {
+					$array['PaymentOutSupplierDeposit'] = date('d/m/Y', strtotime($array['PaymentOutSupplierDeposit']));
 				}
 				if(!empty($array['StartDate']) && !empty($array['EndDate'])) {
 					$array['TravelDate'] = date('d/m/Y', strtotime($array['StartDate'])) . ' - ' . date('d/m/Y', strtotime($array['EndDate']));
@@ -1182,7 +1217,7 @@ class Booking extends MY_Controller
 				}
 				// Calculate deposit information
 				$deposit_percentage_raw = isset($array['DepositPercentage']) ? $array['DepositPercentage'] : 0;
-				$deposit_total = ($net_total_raw * $deposit_percentage_raw) / 100;
+				$deposit_total = ceil(($net_total_raw * $deposit_percentage_raw) / 100);
 				$array['DepositTotal'] = $deposit_total;
 				// Calculate deposit paid from payments
 				$deposit_paid = 0;
@@ -3196,21 +3231,104 @@ class Booking extends MY_Controller
 	}
 
 	/**
+	 * AJAX endpoint to get checklist data for a booking (used by listing page modal)
+	 */
+	public function Get_Checklist($booking_id = null)
+	{
+		if(empty($booking_id)) {
+			echo json_encode(array('success' => false, 'message' => 'Invalid booking ID'));
+			return;
+		}
+
+		// Check access
+		$access_control = $this->session->access_control ?? array();
+		$is_sales_agent = $this->session->userdata('level') == 20;
+		if(!in_array('AB', $access_control) && !$is_sales_agent) {
+			echo json_encode(array('success' => false, 'message' => 'Access denied'));
+			return;
+		}
+
+		// Get booking info
+		$booking = $this->Booking_Model->getBookingById($booking_id);
+		if(!$booking) {
+			echo json_encode(array('success' => false, 'message' => 'Booking not found'));
+			return;
+		}
+
+		// Sales agents can only access their own bookings
+		if($is_sales_agent && !in_array('AB', $access_control)) {
+			if(empty($booking->SalesAgentID) || $booking->SalesAgentID != $this->session->userdata('admin_id')) {
+				echo json_encode(array('success' => false, 'message' => 'Access denied'));
+				return;
+			}
+		}
+
+		// Get booking products (need ProductID and Name for checklist grouping)
+		$this->db->select('bp.BookingProductID, bp.ProductID, p.Name');
+		$this->db->from('booking_product bp');
+		$this->db->join('product p', 'p.ProductID = bp.ProductID', 'left');
+		$this->db->where('bp.BookingID', $booking_id);
+		$this->db->where('bp.Status', 'Y');
+		$booking_products = $this->db->get()->result();
+
+		if(empty($booking_products)) {
+			echo json_encode(array('success' => false, 'message' => 'No products found for this booking'));
+			return;
+		}
+
+		// Get checklists and completion map
+		$booking_checklists = $this->get_booking_checklists($booking_products);
+		$completion_map = $this->Booking_Checklist_Completion_Model->Read_Completion_Map($booking_id);
+
+		// Format completion map for JSON (convert nested associative array)
+		$formatted_completion = array();
+		foreach($completion_map as $product_id => $checklists) {
+			$formatted_completion[$product_id] = array();
+			foreach($checklists as $checklist_id => $info) {
+				$formatted_completion[$product_id][$checklist_id] = array(
+					'created_by_name' => $info['created_by_name'],
+					'created_at' => date('d/m/Y h:i A', strtotime($info['created_at']))
+				);
+			}
+		}
+
+		// Serialize checklist groups for JSON
+		$groups = array();
+		foreach($booking_checklists['groups'] as $group) {
+			$checklists = array();
+			foreach($group['checklists'] as $cl) {
+				$checklists[] = array('ID' => $cl->ID, 'name' => $cl->name);
+			}
+			$groups[] = array(
+				'product_name' => $group['product_name'],
+				'product_id' => $group['product_id'],
+				'checklists' => $checklists
+			);
+		}
+
+		echo json_encode(array(
+			'success' => true,
+			'booking_number' => $booking->BookingNumber,
+			'is_multi_product' => $booking_checklists['is_multi_product'],
+			'groups' => $groups,
+			'total_count' => $booking_checklists['total_count'],
+			'completion_map' => $formatted_completion
+		));
+	}
+
+	/**
 	 * Get all checklists for booking products
 	 * If product doesn't have checklists, create default (required) ones
 	 */
 	private function get_booking_checklists($booking_products)
 	{
-		$all_checklists = array();
-		$all_checklist_ids = array();
-		
 		// Get all package checklists
 		$package_checklists = $this->Package_Checklist_Model->Read_Package_Checklists();
 		$checklist_map = array();
 		foreach($package_checklists as $pc) {
 			$checklist_map[$pc->ID] = $pc;
 		}
-		
+
 		// Get required checklist IDs
 		$required_ids = array();
 		foreach($package_checklists as $pc) {
@@ -3218,31 +3336,53 @@ class Booking extends MY_Controller
 				$required_ids[] = $pc->ID;
 			}
 		}
-		
-		// Process each booking product
+
+		// Group booking products by ProductID (collapse duplicates)
+		$product_groups = array();
 		foreach($booking_products as $booking_product) {
 			$product_id = $booking_product->ProductID;
-			
+			if(!isset($product_groups[$product_id])) {
+				$product_groups[$product_id] = $booking_product;
+			}
+		}
+
+		// Build groups with checklists
+		$groups = array();
+		$total_count = 0;
+
+		foreach($product_groups as $product_id => $booking_product) {
 			// Get checklists for this product
 			$product_checklist_ids = $this->Product_Package_Checklist_Model->Get_Checklists_For_Product($product_id);
-			
+
 			// If product doesn't have checklists, use required ones and create entry
 			if(empty($product_checklist_ids)) {
 				$product_checklist_ids = $required_ids;
-				// Create entry in product_package_checklist
 				$this->Product_Package_Checklist_Model->Bulk_Update_Product_Checklists($product_id, $required_ids);
 			}
-			
-			// Build checklist list in order
+
+			// Build checklist list for this group
+			$group_checklists = array();
 			foreach($product_checklist_ids as $checklist_id) {
-				if(isset($checklist_map[$checklist_id]) && !in_array($checklist_id, $all_checklist_ids)) {
-					$all_checklists[] = $checklist_map[$checklist_id];
-					$all_checklist_ids[] = $checklist_id;
+				if(isset($checklist_map[$checklist_id])) {
+					$group_checklists[] = $checklist_map[$checklist_id];
+					$total_count++;
 				}
 			}
+
+			if(!empty($group_checklists)) {
+				$groups[] = array(
+					'product_name' => isset($booking_product->Name) ? $booking_product->Name : 'Product #' . $product_id,
+					'product_id' => $product_id,
+					'checklists' => $group_checklists
+				);
+			}
 		}
-		
-		return $all_checklists;
+
+		return array(
+			'is_multi_product' => count($product_groups) > 1,
+			'groups' => $groups,
+			'total_count' => $total_count
+		);
 	}
 
 	/**
@@ -3250,24 +3390,35 @@ class Booking extends MY_Controller
 	 */
 	private function log_checklist_changes($booking_id, $previous_completions, $new_completions, $created_by)
 	{
-		// Get checklist names for logging
-		$checklist_map = array();
-		$all_checklist_ids = array_unique(array_merge($previous_completions, $new_completions));
+		// Both arrays contain "productId_checklistId" strings
+		// Extract unique checklist IDs for name lookup
+		$all_checklist_ids = array();
+		foreach(array_merge($previous_completions, $new_completions) as $key) {
+			$parts = explode('_', $key, 2);
+			if(count($parts) == 2) {
+				$all_checklist_ids[] = intval($parts[1]);
+			}
+		}
+		$all_checklist_ids = array_unique($all_checklist_ids);
+
+		$checklist_name_map = array();
 		if(!empty($all_checklist_ids)) {
 			$this->db->select('ID, name');
 			$this->db->where_in('ID', $all_checklist_ids);
 			$checklists = $this->db->get('package_checklist')->result();
 			foreach($checklists as $checklist) {
-				$checklist_map[$checklist->ID] = $checklist->name;
+				$checklist_name_map[$checklist->ID] = $checklist->name;
 			}
 		}
-		
+
 		$booking_logs = array();
-		
+
 		// Find items that were added (ticked)
 		$added = array_diff($new_completions, $previous_completions);
-		foreach($added as $checklist_id) {
-			$checklist_name = isset($checklist_map[$checklist_id]) ? $checklist_map[$checklist_id] : 'Checklist ID: ' . $checklist_id;
+		foreach($added as $key) {
+			$parts = explode('_', $key, 2);
+			$checklist_id = isset($parts[1]) ? intval($parts[1]) : $key;
+			$checklist_name = isset($checklist_name_map[$checklist_id]) ? $checklist_name_map[$checklist_id] : 'Checklist ID: ' . $checklist_id;
 			$booking_logs[] = array(
 				'BookingID' => $booking_id,
 				'Column' => 'BookingChecklist',
@@ -3277,11 +3428,13 @@ class Booking extends MY_Controller
 				'InsertDate' => date('Y-m-d H:i:s')
 			);
 		}
-		
+
 		// Find items that were removed (unticked)
 		$removed = array_diff($previous_completions, $new_completions);
-		foreach($removed as $checklist_id) {
-			$checklist_name = isset($checklist_map[$checklist_id]) ? $checklist_map[$checklist_id] : 'Checklist ID: ' . $checklist_id;
+		foreach($removed as $key) {
+			$parts = explode('_', $key, 2);
+			$checklist_id = isset($parts[1]) ? intval($parts[1]) : $key;
+			$checklist_name = isset($checklist_name_map[$checklist_id]) ? $checklist_name_map[$checklist_id] : 'Checklist ID: ' . $checklist_id;
 			$booking_logs[] = array(
 				'BookingID' => $booking_id,
 				'Column' => 'BookingChecklist',
@@ -3291,11 +3444,10 @@ class Booking extends MY_Controller
 				'InsertDate' => date('Y-m-d H:i:s')
 			);
 		}
-		
+
 		// Insert logs if there are any changes
 		if(!empty($booking_logs)) {
-			$result = $this->db->insert_batch('booking_log', $booking_logs);
-			// Log for debugging
+			$this->db->insert_batch('booking_log', $booking_logs);
 			log_message('debug', 'Booking Checklist Logs: ' . count($booking_logs) . ' entries inserted for BookingID: ' . $booking_id);
 		}
 	}

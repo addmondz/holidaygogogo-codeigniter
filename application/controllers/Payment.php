@@ -18,6 +18,12 @@ class Payment extends MY_Controller
 	function index()
 	{
 		if(in_array('VP', $this->session->access_control)) {
+			// Block SA/TC from viewing completed booking payments
+			if($this->is_completed_booking_blocked()) {
+				$this->load->view('errors/access_denied');
+				return;
+			}
+
 			$titles = array('tab_title' => 'HolidayGoGoGo | Payment', 'breadcrumb_title' => 'Payment');
 
 			// Initialize array with default values - totals will be loaded via AJAX
@@ -112,6 +118,13 @@ class Payment extends MY_Controller
 	function ajax_list()
 	{
 		if(!in_array('VP', $this->session->access_control)) {
+			header('Content-Type: application/json');
+			echo json_encode(array('error' => 'Access denied'));
+			return;
+		}
+
+		// Block SA/TC from viewing completed booking payments
+		if($this->is_completed_booking_blocked()) {
 			header('Content-Type: application/json');
 			echo json_encode(array('error' => 'Access denied'));
 			return;
@@ -298,6 +311,13 @@ class Payment extends MY_Controller
 	function ajax_summary()
 	{
 		if(!in_array('VP', $this->session->access_control)) {
+			header('Content-Type: application/json');
+			echo json_encode(array('error' => 'Access denied'));
+			return;
+		}
+
+		// Block SA/TC from viewing completed booking payments
+		if($this->is_completed_booking_blocked()) {
 			header('Content-Type: application/json');
 			echo json_encode(array('error' => 'Access denied'));
 			return;
@@ -1593,5 +1613,21 @@ class Payment extends MY_Controller
             ['docNo' => $docNo]
         );
         
-    }    
+    }
+
+	private function is_completed_booking_blocked()
+	{
+		if(in_array($this->session->userdata('level'), [20, 50]) && !empty($this->input->get('booking_number'))) {
+			$booking_data = $this->Booking_Model->Read_Booking_ID();
+			if(!empty($booking_data)) {
+				$this->db->select('Status, AfterSalesService');
+				$this->db->where('BookingID', $booking_data['BookingID']);
+				$booking = $this->db->get('booking')->row_array();
+				if($booking && $booking['Status'] == 'Y' && $booking['AfterSalesService'] == 'COMPLETE') {
+					return true;
+				}
+			}
+		}
+		return false;
+	}
 }

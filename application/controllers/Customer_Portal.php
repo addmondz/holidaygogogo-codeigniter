@@ -20,6 +20,8 @@ class Customer_Portal extends CI_Controller
         $this->load->model('Remark_Model');
         $this->load->model('Notification_Model');
         $this->load->helper('utils');
+        $this->load->library('session');
+        $this->config->load('features');
     }
 
     /**
@@ -41,6 +43,14 @@ class Customer_Portal extends CI_Controller
         if (!$customer) {
             show_404();
             return;
+        }
+
+        // Check phone verification (skip if no phone number on file)
+        if ($this->config->item('enable_phone_verification')) {
+            if (!empty($customer['phone_number']) && !$this->is_customer_verified($customer['CustomerID'])) {
+                redirect('customer/' . $hash . '/verify');
+                return;
+            }
         }
 
         // Get customer bookings separated into upcoming and completed
@@ -77,6 +87,70 @@ class Customer_Portal extends CI_Controller
     {
         // Redirect to dashboard
         redirect('customer/' . $hash);
+    }
+
+    /**
+     * Phone verification page
+     *
+     * @param string $hash HMAC hash from URL
+     */
+    public function verify_phone($hash = null)
+    {
+        if (empty($hash)) {
+            show_404();
+            return;
+        }
+
+        $customer = $this->find_customer_by_hash($hash);
+
+        if (!$customer) {
+            show_404();
+            return;
+        }
+
+        // If phone verification is disabled, skip straight to dashboard
+        if (!$this->config->item('enable_phone_verification')) {
+            redirect('customer/' . $hash);
+            return;
+        }
+
+        // No phone number on file or already verified — skip straight to dashboard
+        if (empty($customer['phone_number']) || $this->is_customer_verified($customer['CustomerID'])) {
+            redirect('customer/' . $hash);
+            return;
+        }
+
+        $data = [
+            'customer' => $customer,
+            'hash' => $hash,
+            'error' => null,
+            'customer_name' => $customer['name'],
+        ];
+
+        // Handle POST submission
+        if ($this->input->method() === 'post') {
+            $input_digits = $this->input->post('phone_last4');
+            $phone_clean = preg_replace('/[^0-9]/', '', $customer['phone_number']);
+            $last4 = substr($phone_clean, -4);
+
+            if ($input_digits === $last4) {
+                $this->session->set_userdata('customer_verified_' . $customer['CustomerID'], true);
+                redirect('customer/' . $hash);
+                return;
+            } else {
+                $data['error'] = 'Incorrect digits. Please try again.';
+            }
+        }
+
+        $this->load->view('customer_portal/verify_phone', $data);
+    }
+
+    /**
+     * Check if a customer has been verified in the current session
+     */
+    private function is_customer_verified($customer_id)
+    {
+        return $this->session->userdata('customer_verified_' . $customer_id) === true;
     }
 
     /**
@@ -308,11 +382,21 @@ class Customer_Portal extends CI_Controller
             $customer = $this->db->get('customer')->row_array();
         }
 
+        // Check phone verification for booking details (skip if no phone number on file)
+        if ($this->config->item('enable_phone_verification')) {
+            if ($customer && !empty($customer['phone_number']) && !$this->is_customer_verified($customer['CustomerID'])) {
+                $customer_hash = generate_customer_portal_hash($customer['CustomerID']);
+                redirect('customer/' . $customer_hash . '/verify');
+                return;
+            }
+        }
+
         // Store raw dates before formatting (for timeline calculations)
         $booking['StartDateRaw'] = !empty($booking['StartDate']) ? $booking['StartDate'] : null;
         $booking['EndDateRaw'] = !empty($booking['EndDate']) ? $booking['EndDate'] : null;
         $booking['DepositDeadlineRaw'] = !empty($booking['DepositDeadline']) ? $booking['DepositDeadline'] : null;
         $booking['FullPaymentDeadlineRaw'] = !empty($booking['FullPaymentDeadline']) ? $booking['FullPaymentDeadline'] : null;
+        $booking['AdditionalPaymentDeadlineRaw'] = !empty($booking['AdditionalPaymentDeadline']) ? $booking['AdditionalPaymentDeadline'] : null;
         $booking['InsertDateRaw'] = !empty($booking['InsertDate']) ? $booking['InsertDate'] : null;
 
         // Format booking data
@@ -1082,9 +1166,39 @@ class Customer_Portal extends CI_Controller
                 return;
             }
 
+            $email = isset($pax['Email']) ? trim($pax['Email']) : '';
+            if (empty($email)) {
+                $this->output->set_output(json_encode([
+                    'success' => false,
+                    'message' => 'Email is required for pax "' . htmlspecialchars($pax_name) . '"'
+                ]));
+                return;
+            }
+
+            $address = isset($pax['Address']) ? trim($pax['Address']) : '';
+            if (empty($address)) {
+                $this->output->set_output(json_encode([
+                    'success' => false,
+                    'message' => 'Address is required for pax "' . htmlspecialchars($pax_name) . '"'
+                ]));
+                return;
+            }
+
+            $phone_number = isset($pax['PhoneNumber']) ? trim($pax['PhoneNumber']) : '';
+            if (empty($phone_number)) {
+                $this->output->set_output(json_encode([
+                    'success' => false,
+                    'message' => 'Phone Number is required for pax "' . htmlspecialchars($pax_name) . '"'
+                ]));
+                return;
+            }
+
             $pax_data[] = [
                 'PaxName' => $pax_name,
                 'TIN' => $tin,
+                'Email' => $email,
+                'Address' => $address,
+                'PhoneNumber' => $phone_number,
                 'products' => $validated_products
             ];
         }

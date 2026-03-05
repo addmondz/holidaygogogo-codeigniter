@@ -89,4 +89,5 @@ $route['customer/booking/(:any)/review'] = 'Customer_Portal/submit_review/$1';
 $route['customer/booking/(:any)/remarks'] = 'Customer_Portal/get_customer_remarks/$1';
 $route['customer/booking/(:any)/remark'] = 'Customer_Portal/add_customer_remark/$1';
 $route['customer/booking/(:any)'] = 'Customer_Portal/booking_details/$1';
+$route['customer/(:any)/verify'] = 'Customer_Portal/verify_phone/$1';
 $route['customer/(:any)'] = 'Customer_Portal/dashboard/$1';

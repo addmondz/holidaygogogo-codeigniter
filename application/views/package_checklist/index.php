@@ -75,7 +75,7 @@
                                         <td style="text-align:center;"><?php echo !empty($package_checklist->created_at) ? date('d/m/Y H:i', strtotime($package_checklist->created_at)) : 'N/A'; ?></td>
                                         <td style="text-align:center;"><?php echo !empty($package_checklist->updated_at) ? date('d/m/Y H:i', strtotime($package_checklist->updated_at)) : 'N/A'; ?></td>
                                         <td style="text-align:center;">
-                                            <?php if($package_checklist->ID == 1) { ?>
+                                            <?php if(strpos($package_checklist->name, 'Payment Out To Supplier') !== false) { ?>
                                                 <!-- <span class="label label-lg label-light-info label-inline">Protected</span> -->
                                             <?php } else { ?>
                                                 <div class="btn-group">

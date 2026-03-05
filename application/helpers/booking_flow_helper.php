@@ -98,6 +98,11 @@ if (!function_exists('is_valid_status_transition')) {
             return true; // Allow PBC → P, PBO, PTV, PT, Y
         }
 
+        // Special case: Y (Completed) can revert to P (Pending Payment) for additional payment
+        if ($from_status === 'Y' && $to_status === 'P') {
+            return true;
+        }
+
         // Allow forward movement (next step) or backward movement (previous step)
         // For now, we allow both forward and backward, but you can restrict to forward only
         $diff = $to_index - $from_index;
@@ -381,12 +386,14 @@ if (!function_exists('check_and_revert_status_if_price_or_date_changed')) {
 
         $needs_revert = false;
         $revert_reason = '';
+        $price_increased = false;
 
         // Check if NetTotal changed
         if ($new_net_total !== null) {
             $old_net_total = isset($current_booking->NetTotal) ? floatval($current_booking->NetTotal) : null;
             if ($old_net_total !== null && abs($new_net_total - $old_net_total) > 0.01) {
                 $needs_revert = true;
+                $price_increased = ($new_net_total > $old_net_total);
                 $revert_reason = 'Booking total price changed from RM ' . number_format($old_net_total, 2) . ' to RM ' . number_format($new_net_total, 2);
             }
         }
@@ -422,23 +429,36 @@ if (!function_exists('check_and_revert_status_if_price_or_date_changed')) {
             }
         }
 
-        // If revert is needed, revert to PBC
+        // If revert is needed, revert status
         if ($needs_revert) {
             $CI->load->helper('booking_status_log');
             $admin_id = $CI->session->userdata('admin_id') ?: 0;
 
-            // Update status to PBC
-            $CI->Booking_Model->Update_Status('PBC', $booking_id);
+            // Special case: Completed bookings with price increase → revert to P (Pending Payment)
+            if ($current_booking->Status == 'Y' && $price_increased) {
+                $CI->Booking_Model->Update_Status('P', $booking_id);
 
-            // Log the revert with reason
-            log_booking_status_change(
-                $booking_id,
-                'PBC',
-                $current_booking->Status,
-                $admin_id,
-                'Status reverted to PENDING BC CONFIRMATION - ' . $revert_reason,
-                true
-            );
+                log_booking_status_change(
+                    $booking_id,
+                    'P',
+                    $current_booking->Status,
+                    $admin_id,
+                    'Status changed to PENDING PAYMENT - Additional payment required: ' . $revert_reason,
+                    true
+                );
+            } else {
+                // All other cases: revert to PBC
+                $CI->Booking_Model->Update_Status('PBC', $booking_id);
+
+                log_booking_status_change(
+                    $booking_id,
+                    'PBC',
+                    $current_booking->Status,
+                    $admin_id,
+                    'Status reverted to PENDING BC CONFIRMATION - ' . $revert_reason,
+                    true
+                );
+            }
 
             return true;
         }
@@ -511,10 +531,6 @@ if (!function_exists('are_all_checklists_completed')) {
         $booking_products = $CI->Booking_Product_Model->Read();
         unset($_GET['booking_id']);
 
-        // Get all booking checklists
-        $all_checklists = array();
-        $all_checklist_ids = array();
-
         // Get all package checklists
         $package_checklists = $CI->Package_Checklist_Model->Read_Package_Checklists();
         $checklist_map = array();
@@ -530,39 +546,48 @@ if (!function_exists('are_all_checklists_completed')) {
             }
         }
 
-        // Process each booking product
+        // Group by product (collapse duplicates)
+        $product_groups = array();
         foreach ($booking_products as $booking_product) {
             $product_id = $booking_product->ProductID;
+            if (!isset($product_groups[$product_id])) {
+                $product_groups[$product_id] = $booking_product;
+            }
+        }
 
-            // Get checklists for this product
+        // Count total checklists per-product (not deduplicated)
+        $total_count = 0;
+        $required_completions = array(); // [[product_id, checklist_id], ...]
+        foreach ($product_groups as $product_id => $booking_product) {
             $product_checklist_ids = $CI->Product_Package_Checklist_Model->Get_Checklists_For_Product($product_id);
-
-            // If product doesn't have checklists, use required ones
             if (empty($product_checklist_ids)) {
                 $product_checklist_ids = $required_ids;
             }
 
-            // Build checklist list in order
             foreach ($product_checklist_ids as $checklist_id) {
-                if (isset($checklist_map[$checklist_id]) && !in_array($checklist_id, $all_checklist_ids)) {
-                    $all_checklists[] = $checklist_map[$checklist_id];
-                    $all_checklist_ids[] = $checklist_id;
+                if (isset($checklist_map[$checklist_id])) {
+                    $total_count++;
+                    $required_completions[] = array($product_id, $checklist_id);
                 }
             }
         }
 
         // If no checklists, consider as completed
-        if (empty($all_checklists)) {
+        if ($total_count == 0) {
             return true;
         }
 
-        // Get completed checklists
+        // Get completed checklists (nested map: product_id => checklist_id => info)
         $completion_map = $CI->Booking_Checklist_Completion_Model->Read_Completion_Map($booking_id);
-        $completed_count = count($completion_map);
-        $total_count = count($all_checklists);
 
-        // All checklists are completed
-        return ($completed_count >= $total_count && $total_count > 0);
+        // Check each product's checklists are individually completed
+        foreach ($required_completions as $pair) {
+            if (!isset($completion_map[$pair[0]][$pair[1]])) {
+                return false;
+            }
+        }
+
+        return true;
     }
 }
 

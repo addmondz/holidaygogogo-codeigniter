@@ -130,6 +130,15 @@ var KTBootstrapDatepicker = function () {
             format: 'dd/mm/yyyy',
             autoclose: true
         });
+
+        $('#kt_datepicker_7').datepicker({
+            rtl: KTUtil.isRTL(),
+            orientation: "bottom left",
+            todayHighlight: true,
+            templates: arrows,
+            format: 'dd/mm/yyyy',
+            autoclose: true
+        });
     }
 
     return {

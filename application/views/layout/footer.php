@@ -84,6 +84,7 @@
 <script src="<?php echo base_url('assets/plugins/custom/draggable/draggable.bundle.js'); ?>"></script>
 <script src="<?php echo base_url('assets/js/universal-js.js?param=angiethay'); ?>"></script>
 <script src="<?php echo base_url('assets/js/notifications.js'); ?>"></script>
+<script src="<?php echo base_url('assets/js/remarks-panel.js'); ?>"></script>
 
 </body>
 
