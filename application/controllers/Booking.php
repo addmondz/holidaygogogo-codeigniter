@@ -31,6 +31,7 @@ class Booking extends MY_Controller
 
 			// Load filter dropdowns data
 			$array['admins'] = $this->Booking_Model->Read_Admins();
+			$array['booking_op_admins'] = $this->Booking_Model->Read_Booking_OP_Admins();
 			$array['categories'] = $this->Booking_Model->Read_Categories();
 			$array['tags'] = $this->Booking_Model->Read_Tags();
 			$array['sources'] = $this->Booking_Model->Read_Sources();
@@ -134,34 +135,35 @@ class Booking extends MY_Controller
 			0 => 'booking.BookingID',             // row number
 			1 => 'booking.BookingID',             // checkbox (placeholder)
 			2 => 'admin.Name',                    // sales agent
-			3 => 'booking.InsertDate',            // creation date
-			4 => 'BookingNumber',                 // BC number
-			5 => 'booking.BookingConfirmationTitle', // BC title
-			6 => 'Customer',                      // customer
-			7 => 'booking.ChatLanguage',          // chat
-			8 => 'booking.Mobile',                // mobile
-			9 => 'StartDate',                     // start
-			10 => 'EndDate',                      // end
-			11 => 'category.Name',                // destination
-			12 => 'NetTotal',                     // net sales
-			13 => 'NetTotal',                     // profit
-			14 => 'NetTotal',                     // profit margin
-			15 => 'booking.Status',               // BC status
-			16 => 'LockStatus',                   // GL status
-			17 => 'booking.AutocountSyncStatus',  // autocount status
-			18 => 'booking.BookingID'             // action
+			3 => 'op_admin.Name',                 // OP
+			4 => 'booking.InsertDate',            // creation date
+			5 => 'BookingNumber',                 // BC number
+			6 => 'booking.BookingConfirmationTitle', // BC title
+			7 => 'Customer',                      // customer
+			8 => 'booking.ChatLanguage',          // chat
+			9 => 'booking.Mobile',                // mobile
+			10 => 'StartDate',                    // start
+			11 => 'EndDate',                      // end
+			12 => 'category.Name',                // destination
+			13 => 'NetTotal',                     // net sales
+			14 => 'NetTotal',                     // profit
+			15 => 'NetTotal',                     // profit margin
+			16 => 'booking.Status',               // BC status
+			17 => 'LockStatus',                   // GL status
+			18 => 'booking.AutocountSyncStatus',  // autocount status
+			19 => 'booking.BookingID'             // action
 		);
 
 		// Adjust column index for sales agents
-		// Sales agents don't see: sales_agent (index 2), profit (index 13), profit_margin (index 14)
+		// Sales agents don't see: sales_agent (index 2), OP (index 3), profit (index 14), profit_margin (index 15)
 		// So their column indices need to be mapped back to the full column array
 		if($is_sales_agent) {
 			if($order_column_index >= 2 && $order_column_index <= 11) {
-				// Columns 2-11: add 1 for missing sales_agent column
-				$order_column_index++;
+				// Columns 2-11: add 2 for missing sales_agent + OP columns
+				$order_column_index += 2;
 			} else if($order_column_index >= 12) {
-				// Columns 12+: add 3 for missing sales_agent + profit + profit_margin
-				$order_column_index += 3;
+				// Columns 12+: add 4 for missing sales_agent + OP + profit + profit_margin
+				$order_column_index += 4;
 			}
 		}
 
@@ -289,9 +291,10 @@ class Booking extends MY_Controller
 			// Row number
 			$row['row_number'] = $count;
 
-			// Sales agent (only for non-sales agents)
+			// Sales agent and OP (only for non-sales agents)
 			if(!$is_sales_agent) {
 				$row['sales_agent'] = $booking->SalesAgentName;
+				$row['booking_op'] = $booking->BookingOPName;
 			}
 
 			// Insert date

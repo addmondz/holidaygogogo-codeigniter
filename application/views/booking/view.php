@@ -165,6 +165,14 @@ $is_view_mode = true;
                                 </div>
                             </div>
                         </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between border-top pt-5"></div>
+
+                    <strong>Payment Deadline :</strong>
+                    <br><br>
+
+                    <div class="row">
                         <div class="col-md-6">
                             <div class="form-group">
                                 <label>Deposit Deadline</label>
@@ -186,9 +194,7 @@ $is_view_mode = true;
                                     </span>
                                 </div>
                             </div>
-                        </div>
-                        <?php if(!empty($AdditionalPaymentDeadline)): ?>
-                        <div class="col-md-6">
+                            <?php if(!empty($AdditionalPaymentDeadline)): ?>
                             <div class="form-group">
                                 <label>Additional Payment Deadline</label>
                                 <div class="input-icon">
@@ -198,9 +204,10 @@ $is_view_mode = true;
                                     </span>
                                 </div>
                             </div>
+                            <?php endif; ?>
                         </div>
-                        <?php endif; ?>
                     </div>
+
                     <div class="d-flex justify-content-between border-top pt-5"></div>
                     <strong>Product Information :</strong>
                     <br><br>

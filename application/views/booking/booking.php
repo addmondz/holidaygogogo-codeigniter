@@ -466,152 +466,6 @@
 
                             <div class="form-group">
 
-                                <label>Deposit Deadline
-
-                                    <a onclick="Reset_Deposit_Deadline()" class="btn btn-icon btn-light-warning btn-xs">
-
-                                        <i class="la la-undo"></i>
-
-                                    </a>
-
-                                </label>
-
-                                <div class="input-icon">
-
-                                    <input readonly type="text" name="DepositDeadline" id="kt_datepicker_4_3" <?php if(current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) { ?> value="<?php echo $DepositDeadline; ?>" <?php } ?> autocomplete="off" class="form-control">
-
-                                    <span>
-
-                                        <i class="la la-calendar"></i>
-
-                                    </span>
-
-                                </div>
-
-                            </div>
-
-                        </div>
-
-                        <div class="col-md-6">
-
-                            <div class="form-group">
-
-                                <label>Full Payment Deadline
-
-                                    <span style="color:red;">*</span>
-
-                                </label>
-
-                                <div class="input-icon">
-
-                                    <input readonly type="text" name="FullPaymentDeadline" id="kt_datepicker_4_4" <?php if(current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) { ?> value="<?php echo $FullPaymentDeadline; ?>" <?php } ?> autocomplete="off" class="form-control">
-
-                                    <span>
-
-                                        <i class="la la-calendar"></i>
-
-                                    </span>
-
-                                </div>
-
-                            </div>
-
-                        </div>
-
-                        <div class="col-md-6">
-
-                            <div class="form-group">
-
-                                <label>Additional Payment Deadline
-
-                                    <?php if(current_url() == base_url('Booking/Update')) { ?>
-
-                                        <a onclick="Reset_Additional_Payment_Deadline()" class="btn btn-icon btn-light-warning btn-xs">
-
-                                            <i class="la la-undo"></i>
-
-                                        </a>
-
-                                    <?php } ?>
-
-                                </label>
-
-                                <div class="input-icon">
-
-                                    <input <?php if(current_url() == base_url('Booking/Create') || current_url() == base_url('Booking/Duplicate')) { echo 'disabled'; } else { echo 'readonly'; } ?> type="text" name="AdditionalPaymentDeadline" id="kt_datepicker_5" <?php if(current_url() == base_url('Booking/Update')) { ?> value="<?php echo $AdditionalPaymentDeadline; ?>" <?php } ?> autocomplete="off" class="form-control">
-
-                                    <span>
-
-                                        <i class="la la-calendar"></i>
-
-                                    </span>
-
-                                </div>
-
-                            </div>
-
-                        </div>
-
-                        <div class="col-md-6">
-
-                            <div class="form-group">
-
-                                <label>Payment Out to Supplier (Full)
-
-                                    <span style="color:red;">*</span>
-
-                                </label>
-
-                                <div class="input-icon">
-
-                                    <input readonly type="text" name="PaymentOutSupplierFull" id="kt_datepicker_6" <?php if(current_url() == base_url('Booking/Update')) { ?> value="<?php echo $PaymentOutSupplierFull; ?>" <?php } ?> autocomplete="off" class="form-control">
-
-                                    <span>
-
-                                        <i class="la la-calendar"></i>
-
-                                    </span>
-
-                                </div>
-
-                            </div>
-
-                        </div>
-
-                        <div class="col-md-6">
-
-                            <div class="form-group">
-
-                                <label>Payment Out to Supplier (Deposit)
-
-                                    <a onclick="Reset_PaymentOutSupplierDeposit()" class="btn btn-icon btn-light-warning btn-xs">
-
-                                        <i class="la la-undo"></i>
-
-                                    </a>
-
-                                </label>
-
-                                <div class="input-icon">
-
-                                    <input readonly type="text" name="PaymentOutSupplierDeposit" id="kt_datepicker_7" <?php if(current_url() == base_url('Booking/Update')) { ?> value="<?php echo $PaymentOutSupplierDeposit; ?>" <?php } ?> autocomplete="off" class="form-control">
-
-                                    <span>
-
-                                        <i class="la la-calendar"></i>
-
-                                    </span>
-
-                                </div>
-
-                            </div>
-
-                        </div>
-
-                        <div class="col-md-6">
-
-                            <div class="form-group">
-
                                 <label>BC Title
 
                                     <span style="color:red;">*</span>
@@ -667,6 +521,150 @@
                                 <?php print_allow_review($AllowReview); ?>
                             </div>
                         <?php } ?>
+
+                    </div>
+
+                    <div class="d-flex justify-content-between border-top pt-5"></div>
+
+                    <strong>Payment Deadline :</strong>
+
+                    <br><br>
+
+                    <div class="row">
+
+                        <div class="col-md-6">
+
+                            <div class="form-group">
+
+                                <label>Deposit Deadline
+
+                                    <a onclick="Reset_Deposit_Deadline()" class="btn btn-icon btn-light-warning btn-xs">
+
+                                        <i class="la la-undo"></i>
+
+                                    </a>
+
+                                </label>
+
+                                <div class="input-icon">
+
+                                    <input readonly type="text" name="DepositDeadline" id="kt_datepicker_4_3" <?php if(current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) { ?> value="<?php echo $DepositDeadline; ?>" <?php } ?> autocomplete="off" class="form-control">
+
+                                    <span>
+
+                                        <i class="la la-calendar"></i>
+
+                                    </span>
+
+                                </div>
+
+                            </div>
+
+                            <div class="form-group">
+
+                                <label>Payment Out to Supplier (Deposit)
+
+                                    <a onclick="Reset_PaymentOutSupplierDeposit()" class="btn btn-icon btn-light-warning btn-xs">
+
+                                        <i class="la la-undo"></i>
+
+                                    </a>
+
+                                </label>
+
+                                <div class="input-icon">
+
+                                    <input readonly type="text" name="PaymentOutSupplierDeposit" id="kt_datepicker_7" <?php if(current_url() == base_url('Booking/Update')) { ?> value="<?php echo $PaymentOutSupplierDeposit; ?>" <?php } ?> autocomplete="off" class="form-control">
+
+                                    <span>
+
+                                        <i class="la la-calendar"></i>
+
+                                    </span>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                        <div class="col-md-6">
+
+                            <div class="form-group">
+
+                                <label>Full Payment Deadline
+
+                                    <span style="color:red;">*</span>
+
+                                </label>
+
+                                <div class="input-icon">
+
+                                    <input readonly type="text" name="FullPaymentDeadline" id="kt_datepicker_4_4" <?php if(current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) { ?> value="<?php echo $FullPaymentDeadline; ?>" <?php } ?> autocomplete="off" class="form-control">
+
+                                    <span>
+
+                                        <i class="la la-calendar"></i>
+
+                                    </span>
+
+                                </div>
+
+                            </div>
+
+                            <div class="form-group">
+
+                                <label>Additional Payment Deadline
+
+                                    <?php if(current_url() == base_url('Booking/Update')) { ?>
+
+                                        <a onclick="Reset_Additional_Payment_Deadline()" class="btn btn-icon btn-light-warning btn-xs">
+
+                                            <i class="la la-undo"></i>
+
+                                        </a>
+
+                                    <?php } ?>
+
+                                </label>
+
+                                <div class="input-icon">
+
+                                    <input <?php if(current_url() == base_url('Booking/Create') || current_url() == base_url('Booking/Duplicate')) { echo 'disabled'; } else { echo 'readonly'; } ?> type="text" name="AdditionalPaymentDeadline" id="kt_datepicker_5" <?php if(current_url() == base_url('Booking/Update')) { ?> value="<?php echo $AdditionalPaymentDeadline; ?>" <?php } ?> autocomplete="off" class="form-control">
+
+                                    <span>
+
+                                        <i class="la la-calendar"></i>
+
+                                    </span>
+
+                                </div>
+
+                            </div>
+
+                            <div class="form-group">
+
+                                <label>Payment Out to Supplier (Full)
+
+                                    <span style="color:red;">*</span>
+
+                                </label>
+
+                                <div class="input-icon">
+
+                                    <input readonly type="text" name="PaymentOutSupplierFull" id="kt_datepicker_6" <?php if(current_url() == base_url('Booking/Update')) { ?> value="<?php echo $PaymentOutSupplierFull; ?>" <?php } ?> autocomplete="off" class="form-control">
+
+                                    <span>
+
+                                        <i class="la la-calendar"></i>
+
+                                    </span>
+
+                                </div>
+
+                            </div>
+
+                        </div>
 
                     </div>
 

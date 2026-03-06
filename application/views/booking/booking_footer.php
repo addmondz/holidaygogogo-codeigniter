@@ -167,7 +167,7 @@
 			<tr>
 				<td>Deposit By</td>
 				<td> : </td>
-				<td><?php echo $DepositDeadline; ?></td>
+				<td><?php echo $DepositDeadline; ?><br>Deposit Amount : RM <?php echo number_format($DepositAmount, 2, '.', ','); ?></td>
 				<td>Full Payment By</td>
 				<td> : </td>
 				<td><?php echo $FullPaymentDeadline; ?></td>

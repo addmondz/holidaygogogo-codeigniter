@@ -1205,7 +1205,7 @@
                 foreach ($booking['payments'] as $payment) {
                     if (
                         !empty($payment['Credit']) && $payment['Credit'] > 0 &&
-                        ($payment['Status'] == 'Y' || $payment['Status'] == 'P')
+                        $payment['Status'] == 'Y'
                     ) {
                         $has_any_payment = true;
                         if (empty($payment_date)) {
@@ -2499,6 +2499,7 @@
                 html += '</tbody></table>';
                 html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">';
                 html += '<button type="button" class="add-product-btn" data-pax="' + idx + '" style="background:#007bff;color:white;border:none;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600;"><i class="la la-plus"></i> Add Product</button>';
+                html += '<button type="button" class="add-all-products-btn" data-pax="' + idx + '" style="background:#28a745;color:white;border:none;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600;margin-left:8px;"><i class="la la-plus-square"></i> Add All</button>';
                 html += '<div class="pax-subtotal" style="font-weight:600;font-size:14px;">Subtotal: RM 0.00</div>';
                 html += '</div>';
                 html += '</div>';
@@ -2554,6 +2555,23 @@
                 var paxIdx = $(this).data('pax');
                 var $card = $(this).closest('.pax-card');
                 $card.find('.pax-products-body').append(addProductRow(paxIdx, null));
+                recalculate();
+            });
+
+            $(document).on('click', '.add-all-products-btn', function() {
+                var paxIdx = $(this).data('pax');
+                var $card = $(this).closest('.pax-card');
+                var $body = $card.find('.pax-products-body');
+                $body.empty();
+                for (var i = 0; i < bookingProducts.length; i++) {
+                    var bp = bookingProducts[i];
+                    $body.append(addProductRow(paxIdx, {
+                        BookingProductID: bp.BookingProductID,
+                        Quantity: bp.Quantity,
+                        UnitPrice: bp.Price,
+                        Amount: (parseFloat(bp.Price) * parseFloat(bp.Quantity)).toFixed(2)
+                    }));
+                }
                 recalculate();
             });
 

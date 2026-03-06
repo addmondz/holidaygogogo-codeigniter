@@ -360,6 +360,17 @@
                                                     </select>
                                                 </div>
                                             </div>
+                                            <div class="col-md-3">
+                                                <div class="form-group">
+                                                    <label>OP</label>
+                                                    <select name="booking_op" data-live-search="true" class="form-control selectpicker">
+                                                        <option selected data-icon="la la-user-alt font-size-lg bs-icon" value="">--SELECT OP--</option>
+                                                        <?php foreach($booking_op_admins as $op_admin) { ?>
+                                                            <option data-icon="la la-user-alt font-size-lg bs-icon" value="<?php echo $op_admin->AdminID; ?>" <?php if(!empty($this->input->get('booking_op')) && $this->input->get('booking_op') == $op_admin->AdminID) { echo 'selected'; } ?>><?php echo $op_admin->Name; ?></option>
+                                                        <?php } ?>
+                                                    </select>
+                                                </div>
+                                            </div>
                                         <?php } ?>
                                         <div class="col-md-3">
                                             <div class="form-group">
@@ -418,6 +429,7 @@
                                 </th>
                                 <?php if($this->session->userdata('level') != 20) { ?>
                                     <th style="text-align:center;">SA</th>
+                                    <th style="text-align:center;">OP</th>
                                 <?php } ?>
                                 <th class="bc_date" style="text-align:center;">Creation Date</th>
                                 <th style="text-align:center;">BC Number</th>
@@ -641,6 +653,7 @@ $(document).ready(function() {
 
         if (!is_sales_agent) {
             columns.push({ data: 'sales_agent', className: 'text-center', responsivePriority: 10000 });
+            columns.push({ data: 'booking_op', className: 'text-center', responsivePriority: 10000 });
         }
 
         columns = columns.concat([
@@ -673,7 +686,7 @@ $(document).ready(function() {
         var filterParams = {};
         ['customer', 'booking_number', 'reservation_number', 'mobile', 'destination', 'travel_date',
          'deadline', 'source', 'chat_language', 'booking_date', 'status', 'booking_confirmation_title',
-         'tag', 'sales_agent', 'autocount_status', 'guest_list_status'].forEach(function(param) {
+         'tag', 'sales_agent', 'booking_op', 'autocount_status', 'guest_list_status'].forEach(function(param) {
             if (urlParams.has(param)) {
                 filterParams[param] = urlParams.get(param);
             }
@@ -744,7 +757,7 @@ function loadSummaryTotals() {
     var params = [];
     ['customer', 'booking_number', 'reservation_number', 'mobile', 'destination', 'travel_date',
      'deadline', 'source', 'chat_language', 'booking_date', 'status', 'booking_confirmation_title',
-     'tag', 'sales_agent', 'autocount_status', 'guest_list_status'].forEach(function(param) {
+     'tag', 'sales_agent', 'booking_op', 'autocount_status', 'guest_list_status'].forEach(function(param) {
         if (urlParams.has(param)) {
             params.push(param + '=' + encodeURIComponent(urlParams.get(param)));
         }
