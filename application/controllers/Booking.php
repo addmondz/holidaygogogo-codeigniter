@@ -437,8 +437,8 @@ class Booking extends MY_Controller
 					$html .= '<a href="' . base_url('Booking/Approve_BC?booking_id=') . $booking->BookingID . '&param=' . urlencode($current_url) . '" class="dropdown-item" style="color:#50C878; font-size:11px;">Approve BC</a>';
 					$shown_approve_bc = true;
 				}
-				if($booking->Status == 'PTV' || $booking->Status == 'PT') {
-					if($booking->Status == 'PTV') {
+				if($booking->Status == 'PBO' || $booking->Status == 'PTV' || $booking->Status == 'PT') {
+					if($booking->Status == 'PBO' || $booking->Status == 'PTV') {
 						$html .= '<a href="' . base_url('Booking/Update_Status?booking_id=') . $booking->BookingID . '&current_status=' . $booking->Status . '&new_status=PT&param=' . urlencode($current_url) . '" class="dropdown-item" style="color:#6082B6; font-size:11px;">Approve Travel Voucher ?</a>';
 					} else {
 						$html .= '<a href="' . base_url('Booking/Update_Status?booking_id=') . $booking->BookingID . '&current_status=' . $booking->Status . '&new_status=PTV&param=' . urlencode($current_url) . '" class="dropdown-item" style="color:#F4BB44; font-size:11px;">Revert Pending Travel Voucher</a>';
@@ -1482,6 +1482,9 @@ class Booking extends MY_Controller
 			$description = "Status changed from {$from_label} to {$to_label}";
 			if($current_status == 'PTV' && $new_status == 'PT') {
 				$description = "Travel Voucher Sent - Status changed to PENDING TRAVEL";
+			}
+			if($current_status == 'PBO' && $new_status == 'PT') {
+				$description = "Approve Travel Voucher - Status changed from PENDING BOOKING OPERATION to PENDING TRAVEL";
 			}
 			
 			log_booking_status_change(

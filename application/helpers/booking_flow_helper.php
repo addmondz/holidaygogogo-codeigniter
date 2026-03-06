@@ -103,6 +103,11 @@ if (!function_exists('is_valid_status_transition')) {
             return true;
         }
 
+        // Special case: PBO can skip to PT (Approve Travel Voucher from PBO)
+        if ($from_status === 'PBO' && $to_status === 'PT') {
+            return true;
+        }
+
         // Allow forward movement (next step) or backward movement (previous step)
         // For now, we allow both forward and backward, but you can restrict to forward only
         $diff = $to_index - $from_index;
