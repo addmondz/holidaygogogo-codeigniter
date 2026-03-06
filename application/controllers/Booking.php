@@ -439,7 +439,7 @@ class Booking extends MY_Controller
 				}
 				if($booking->Status == 'PTV' || $booking->Status == 'PT') {
 					if($booking->Status == 'PTV') {
-						$html .= '<a href="' . base_url('Booking/Update_Status?booking_id=') . $booking->BookingID . '&current_status=' . $booking->Status . '&new_status=PT&param=' . urlencode($current_url) . '" class="dropdown-item" style="color:#6082B6; font-size:11px;">Sent Travel Voucher ?</a>';
+						$html .= '<a href="' . base_url('Booking/Update_Status?booking_id=') . $booking->BookingID . '&current_status=' . $booking->Status . '&new_status=PT&param=' . urlencode($current_url) . '" class="dropdown-item" style="color:#6082B6; font-size:11px;">Approve Travel Voucher ?</a>';
 					} else {
 						$html .= '<a href="' . base_url('Booking/Update_Status?booking_id=') . $booking->BookingID . '&current_status=' . $booking->Status . '&new_status=PTV&param=' . urlencode($current_url) . '" class="dropdown-item" style="color:#F4BB44; font-size:11px;">Revert Pending Travel Voucher</a>';
 					}
@@ -559,6 +559,22 @@ class Booking extends MY_Controller
 				$booking_id = $this->Booking_Model->Create();
 
 				$this->Booking_Product_Model->Create($this->input->post('booking_products'), $booking_id);
+
+				// Create rooms if provided
+				$booking_rooms = $this->input->post('booking_rooms');
+				if (!empty($booking_rooms)) {
+					foreach ($booking_rooms as $room) {
+						$this->db->insert('guest_list_room', array(
+							'booking_id' => $booking_id,
+							'room_name' => strtoupper($room['room_name']),
+							'adult_count' => (int)$room['adult_count'],
+							'child_count' => (int)$room['child_count'],
+							'infant_count' => (int)$room['infant_count'],
+							'InsertBy' => $this->session->userdata('admin_id'),
+							'InsertDate' => date('Y-m-d H:i:s')
+						));
+					}
+				}
 
 				// Auto-enable insurance if any product belongs to an insurance category
 				$this->db->from('booking_product');

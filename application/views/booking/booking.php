@@ -813,7 +813,7 @@
 
                     <br>
 
-                    <?php if(current_url() == base_url('Booking/Update')) { ?>
+                    <?php if(current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Create') || current_url() == base_url('Booking/Duplicate')) { ?>
                     <div class="d-flex justify-content-between border-top pt-5"></div>
 
                     <strong>Room Management :</strong>
@@ -838,9 +838,9 @@
                                 <div class="card-body">
                                     <div class="mb-3">
                                         <small class="text-muted">
-                                            Booking Pax — Adult: <strong id="booking_adult_count"><?php echo $Adult; ?></strong>,
-                                            Children: <strong id="booking_child_count"><?php echo $Children; ?></strong>,
-                                            Infant: <strong id="booking_infant_count"><?php echo $Infant; ?></strong>
+                                            Booking Pax — Adult: <strong id="booking_adult_count"><?php echo isset($Adult) ? $Adult : '0'; ?></strong>,
+                                            Children: <strong id="booking_child_count"><?php echo isset($Children) ? $Children : '0'; ?></strong>,
+                                            Infant: <strong id="booking_infant_count"><?php echo isset($Infant) ? $Infant : '0'; ?></strong>
                                             | Allocated — Adult: <strong id="allocated_adult">0</strong>,
                                             Children: <strong id="allocated_child">0</strong>,
                                             Infant: <strong id="allocated_infant">0</strong>
@@ -2532,7 +2532,8 @@
 
 
 
-                                    Submit_Booking('<?php echo base_url('Booking/Create') ?>', null, booking_number, booking, null, booking_products, CustomerID);
+                                    var createRooms = (typeof roomsList !== 'undefined') ? roomsList : [];
+                                    Submit_Booking('<?php echo base_url('Booking/Create') ?>', null, booking_number, booking, null, booking_products, CustomerID, createRooms);
 
                                 } else {
 
@@ -3041,18 +3042,11 @@
 
 
 
-    function Submit_Booking(url, booking_id, booking_number, booking, booking_log, booking_products, CustomerID)
+    function Submit_Booking(url, booking_id, booking_number, booking, booking_log, booking_products, CustomerID, booking_rooms)
 
     {
 
-
-        $.ajax({
-
-            url: url,
-
-            type: 'post',
-
-            data: {
+        var postData = {
 
                 booking_id: booking_id,
 
@@ -3063,10 +3057,22 @@
                 booking_log: booking_log,
 
                 booking_products: booking_products,
-            
+
                 CustomerID: CustomerID,
 
-            },
+            };
+
+        if (booking_rooms && booking_rooms.length > 0) {
+            postData.booking_rooms = booking_rooms;
+        }
+
+        $.ajax({
+
+            url: url,
+
+            type: 'post',
+
+            data: postData,
 
             success: function() {
 
@@ -4452,18 +4458,28 @@ $(document).ready(function() {
         }
     });
 
-    <?php if(current_url() == base_url('Booking/Update')) { ?>
+    <?php if(current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Create') || current_url() == base_url('Booking/Duplicate')) { ?>
     // Room Management Functions
     var roomsList = [];
-    var roomBookingId = <?php echo $BookingID; ?>;
+    var roomBookingId = <?php echo isset($BookingID) ? $BookingID : 'null'; ?>;
+    var tempRoomCounter = 0;
 
     function getBookingPax() {
         return {
-            adult: parseInt($('#booking_adult_count').text()) || 0,
-            child: parseInt($('#booking_child_count').text()) || 0,
-            infant: parseInt($('#booking_infant_count').text()) || 0
+            adult: parseInt($('#Adult').val()) || 0,
+            child: parseInt($('#Children').val()) || 0,
+            infant: parseInt($('#Infant').val()) || 0
         };
     }
+
+    // Update pax display when form inputs change
+    $('#Adult, #Children, #Infant').on('change keyup', function() {
+        var pax = getBookingPax();
+        $('#booking_adult_count').text(pax.adult);
+        $('#booking_child_count').text(pax.child);
+        $('#booking_infant_count').text(pax.infant);
+        updateAllocatedDisplay();
+    });
 
     function getAllocatedPax(excludeRoomId) {
         var totals = { adult: 0, child: 0, infant: 0 };
@@ -4526,16 +4542,20 @@ $(document).ready(function() {
     }
 
     function loadRooms() {
-        $.ajax({
-            url: '<?php echo base_url("Guest_List_Room/Read"); ?>',
-            type: 'get',
-            data: { booking_id: roomBookingId },
-            dataType: 'json',
-            success: function(data) {
-                roomsList = data || [];
-                renderRoomsTable();
-            }
-        });
+        if (roomBookingId) {
+            $.ajax({
+                url: '<?php echo base_url("Guest_List_Room/Read"); ?>',
+                type: 'get',
+                data: { booking_id: roomBookingId },
+                dataType: 'json',
+                success: function(data) {
+                    roomsList = data || [];
+                    renderRoomsTable();
+                }
+            });
+        } else {
+            renderRoomsTable();
+        }
     }
 
     function getRoomFormHtml() {
@@ -4595,29 +4615,41 @@ $(document).ready(function() {
                 }
             }).then(function(result) {
                 if (result.isConfirmed) {
-                    $.ajax({
-                        url: '<?php echo base_url("Guest_List_Room/Update"); ?>',
-                        type: 'post',
-                        data: {
-                            room_id: roomId,
-                            room_name: result.value.room_name,
-                            adult_count: result.value.adult_count,
-                            child_count: result.value.child_count,
-                            infant_count: result.value.infant_count
-                        },
-                        dataType: 'json',
-                        success: function(response) {
-                            if (response.success) {
-                                Swal.fire('Success!', response.message, 'success');
-                                loadRooms();
-                            } else {
-                                Swal.fire('Error!', response.message, 'error');
+                    if (roomBookingId) {
+                        $.ajax({
+                            url: '<?php echo base_url("Guest_List_Room/Update"); ?>',
+                            type: 'post',
+                            data: {
+                                room_id: roomId,
+                                room_name: result.value.room_name,
+                                adult_count: result.value.adult_count,
+                                child_count: result.value.child_count,
+                                infant_count: result.value.infant_count
+                            },
+                            dataType: 'json',
+                            success: function(response) {
+                                if (response.success) {
+                                    Swal.fire('Success!', response.message, 'success');
+                                    loadRooms();
+                                } else {
+                                    Swal.fire('Error!', response.message, 'error');
+                                }
+                            },
+                            error: function() {
+                                Swal.fire('Error!', 'Failed to update room', 'error');
                             }
-                        },
-                        error: function() {
-                            Swal.fire('Error!', 'Failed to update room', 'error');
+                        });
+                    } else {
+                        var idx = roomsList.findIndex(function(r) { return r.id == roomId; });
+                        if (idx !== -1) {
+                            roomsList[idx].room_name = result.value.room_name;
+                            roomsList[idx].adult_count = result.value.adult_count;
+                            roomsList[idx].child_count = result.value.child_count;
+                            roomsList[idx].infant_count = result.value.infant_count;
+                            renderRoomsTable();
+                            Swal.fire('Success!', 'Room updated', 'success');
                         }
-                    });
+                    }
                 }
             });
         });
@@ -4626,30 +4658,36 @@ $(document).ready(function() {
             var roomId = $(this).data('room-id');
             Swal.fire({
                 title: 'Are you sure?',
-                text: 'This will delete the room. Guests assigned to this room will be unassigned.',
+                text: 'This will delete the room.' + (roomBookingId ? ' Guests assigned to this room will be unassigned.' : ''),
                 icon: 'warning',
                 showCancelButton: true,
                 confirmButtonText: 'Yes, delete it!',
                 cancelButtonText: 'Cancel'
             }).then(function(result) {
                 if (result.isConfirmed) {
-                    $.ajax({
-                        url: '<?php echo base_url("Guest_List_Room/Delete"); ?>',
-                        type: 'get',
-                        data: { room_id: roomId },
-                        dataType: 'json',
-                        success: function(response) {
-                            if (response.success) {
-                                Swal.fire('Deleted!', response.message, 'success');
-                                loadRooms();
-                            } else {
-                                Swal.fire('Error!', response.message, 'error');
+                    if (roomBookingId) {
+                        $.ajax({
+                            url: '<?php echo base_url("Guest_List_Room/Delete"); ?>',
+                            type: 'get',
+                            data: { room_id: roomId },
+                            dataType: 'json',
+                            success: function(response) {
+                                if (response.success) {
+                                    Swal.fire('Deleted!', response.message, 'success');
+                                    loadRooms();
+                                } else {
+                                    Swal.fire('Error!', response.message, 'error');
+                                }
+                            },
+                            error: function() {
+                                Swal.fire('Error!', 'Failed to delete room', 'error');
                             }
-                        },
-                        error: function() {
-                            Swal.fire('Error!', 'Failed to delete room', 'error');
-                        }
-                    });
+                        });
+                    } else {
+                        roomsList = roomsList.filter(function(r) { return r.id != roomId; });
+                        renderRoomsTable();
+                        Swal.fire('Deleted!', 'Room removed', 'success');
+                    }
                 }
             });
         });
@@ -4680,29 +4718,42 @@ $(document).ready(function() {
             }
         }).then(function(result) {
             if (result.isConfirmed) {
-                $.ajax({
-                    url: '<?php echo base_url("Guest_List_Room/Create"); ?>',
-                    type: 'post',
-                    data: {
-                        booking_id: roomBookingId,
+                if (roomBookingId) {
+                    $.ajax({
+                        url: '<?php echo base_url("Guest_List_Room/Create"); ?>',
+                        type: 'post',
+                        data: {
+                            booking_id: roomBookingId,
+                            room_name: result.value.room_name,
+                            adult_count: result.value.adult_count,
+                            child_count: result.value.child_count,
+                            infant_count: result.value.infant_count
+                        },
+                        dataType: 'json',
+                        success: function(response) {
+                            if (response.success) {
+                                Swal.fire('Success!', response.message, 'success');
+                                loadRooms();
+                            } else {
+                                Swal.fire('Error!', response.message, 'error');
+                            }
+                        },
+                        error: function() {
+                            Swal.fire('Error!', 'Failed to create room', 'error');
+                        }
+                    });
+                } else {
+                    tempRoomCounter++;
+                    roomsList.push({
+                        id: 'temp_' + tempRoomCounter,
                         room_name: result.value.room_name,
                         adult_count: result.value.adult_count,
                         child_count: result.value.child_count,
                         infant_count: result.value.infant_count
-                    },
-                    dataType: 'json',
-                    success: function(response) {
-                        if (response.success) {
-                            Swal.fire('Success!', response.message, 'success');
-                            loadRooms();
-                        } else {
-                            Swal.fire('Error!', response.message, 'error');
-                        }
-                    },
-                    error: function() {
-                        Swal.fire('Error!', 'Failed to create room', 'error');
-                    }
-                });
+                    });
+                    renderRoomsTable();
+                    Swal.fire('Success!', 'Room added', 'success');
+                }
             }
         });
     });

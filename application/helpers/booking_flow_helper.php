@@ -612,7 +612,7 @@ if (!function_exists('is_travel_voucher_sent')) {
             // Also check if description mentions travel voucher sent
             if (
                 stripos($log->description, 'travel voucher sent') !== false ||
-                stripos($log->description, 'sent travel voucher') !== false
+                stripos($log->description, 'approve travel voucher') !== false
             ) {
                 return true;
             }
