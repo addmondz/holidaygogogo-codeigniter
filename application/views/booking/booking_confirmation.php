@@ -156,10 +156,18 @@
 			<tr>
 				<td>Deposit By</td>
 				<td> : </td>
-				<td><?php echo $DepositDeadline; ?><br>Deposit Amount : RM <?php echo number_format($DepositAmount, 2, '.', ','); ?></td>
+				<td><?php echo $DepositDeadline; ?></td>
 				<td>Full Payment By</td>
 				<td> : </td>
 				<td><?php echo $FullPaymentDeadline; ?></td>
+			</tr>
+			<tr>
+				<td>Deposit Amount</td>
+				<td> : </td>
+				<td>RM <?php echo number_format($DepositAmount, 2, '.', ','); ?></td>
+				<td></td>
+				<td></td>
+				<td></td>
 			</tr>
 		</table>
 		<hr style="margin-bottom:0px;">
