@@ -354,9 +354,16 @@
                                                     <label>Sales Agent</label>
                                                     <select name="sales_agent" data-live-search="true" class="form-control selectpicker">
                                                         <option selected data-icon="la la-user-alt font-size-lg bs-icon" value="">--SELECT SALES AGENT--</option>
-                                                        <?php foreach($admins as $admin) { ?>
+                                                        <optgroup label="Active">
+                                                        <?php foreach($admins as $admin) { if($admin->Status == 'Y') { ?>
                                                             <option data-icon="la la-user-alt font-size-lg bs-icon" value="<?php echo $admin->AdminID; ?>" <?php if(!empty($this->input->get('sales_agent')) && $this->input->get('sales_agent') == $admin->AdminID) { echo 'selected'; } ?>><?php echo $admin->Name; ?></option>
-                                                        <?php } ?>
+                                                        <?php } } ?>
+                                                        </optgroup>
+                                                        <optgroup label="Deactivated">
+                                                        <?php foreach($admins as $admin) { if($admin->Status == 'D') { ?>
+                                                            <option data-icon="la la-user-alt font-size-lg bs-icon" value="<?php echo $admin->AdminID; ?>" <?php if(!empty($this->input->get('sales_agent')) && $this->input->get('sales_agent') == $admin->AdminID) { echo 'selected'; } ?>><?php echo $admin->Name; ?></option>
+                                                        <?php } } ?>
+                                                        </optgroup>
                                                     </select>
                                                 </div>
                                             </div>
@@ -435,6 +442,7 @@
                                 <th style="text-align:center;">BC Number</th>
                                 <th style="text-align:center;">BC</th>
                                 <th style="text-align:center;">Customer</th>
+                                <th style="text-align:center;">Source</th>
                                 <th style="text-align:center;">Chat</th>
                                 <th class="test" style="text-align:center;">Mobile</th>
                                 <th class="start_date" style="text-align:center;">Start</th>
@@ -661,6 +669,7 @@ $(document).ready(function() {
             { data: 'booking_number', className: 'text-center', responsivePriority: 3 },
             { data: 'bc_title', className: 'text-center', responsivePriority: 10002 },
             { data: 'customer', className: 'text-center', responsivePriority: 4 },
+            { data: 'source', className: 'text-center', responsivePriority: 10011 },
             { data: 'chat_language', className: 'text-center', responsivePriority: 10003 },
             { data: 'mobile', orderable: false, searchable: false, className: 'text-center', responsivePriority: 5 },
             { data: 'start_date', className: 'text-center', responsivePriority: 10004 },
