@@ -145,7 +145,7 @@ class Booking extends MY_Controller
 			0 => 'booking.BookingID',             // row number
 			1 => 'booking.BookingID',             // checkbox (placeholder)
 			2 => 'admin.Name',                    // sales agent
-			3 => 'op_admin.Name',                 // OP
+			3 => 'booking.BookingID',             // OP (placeholder)
 			4 => 'booking.InsertDate',            // creation date
 			5 => 'BookingNumber',                 // BC number
 			6 => 'booking.BookingConfirmationTitle', // BC title
