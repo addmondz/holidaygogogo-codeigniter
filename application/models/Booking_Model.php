@@ -1367,6 +1367,7 @@ class Booking_Model extends CI_Model
 		$this->db->join('country_code', 'country_code.CountryCodeID = booking.CountryCodeID', 'left');
 		$this->db->join('customer', 'customer.CustomerID = booking.CustomerID', 'left');
 		$this->db->join('source', 'source.SourceID = booking.Source', 'left');
+		$this->db->join('admin AS op_admin', 'op_admin.AdminID = booking.BookingOp', 'left');
 
 		$this->apply_booking_filters();
 
