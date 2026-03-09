@@ -50,12 +50,13 @@
                             <tr>
                                 <th style="text-align:center;">No.</th>
                                 <th style="text-align:center;">Name</th>
+                                <th style="text-align:center;">Status</th>
                                 <th class="action" style="text-align:center;">Action</th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php if(empty($sources)) { ?>
-                                <td colspan="3" style="text-align:center; padding-top:10px; padding-bottom:10px;">Source Records Not Found</td>
+                                <td colspan="4" style="text-align:center; padding-top:10px; padding-bottom:10px;">Source Records Not Found</td>
                             <?php } else { ?>
                                 <?php $count = 1; ?>
                                 <?php foreach($sources as $source) { ?>
@@ -63,10 +64,17 @@
                                         <td style="text-align:center; padding-top:15px; padding-bottom:15px;"><?php echo $count; ?></td>
                                         <td style="text-align:center;"><?php echo $source->Name; ?></td>
                                         <td style="text-align:center;">
+                                            <?php if($source->Status == 'Y') { ?>
+                                                <span class="label label-lg label-light-success label-inline font-weight-bold">Active</span>
+                                            <?php } else { ?>
+                                                <span class="label label-lg label-light-danger label-inline font-weight-bold">Inactive</span>
+                                            <?php } ?>
+                                        </td>
+                                        <td style="text-align:center;">
                                             <div class="btn-group">
                                                 <button type="button" data-toggle="dropdown" class="btn btn-light-primary btn-sm dropdown-toggle" style="padding-left:3px;"></button>
                                                 <div class="dropdown-menu">
-                                                    <button onclick="Delete_Record('<?php echo base_url('assets/image/sweetalert.jpg'); ?>', '<?php echo 'Source Record : ' . str_replace('\'', '', $source->Name); ?>', '<?php echo base_url('Source/Delete'); ?>', 'source_id', <?php echo $source->SourceID; ?>, '<?php echo $source->Status; ?>', '<?php if(strpos($current_url, '?') == true) { echo base_url('Source?') . (explode('?', $current_url))[1]; } else { echo base_url('Source'); } ?>')" class="dropdown-item" style="color:#E37383; font-size:11px;">Delete Source</button>
+                                                    <button onclick="Toggle_Status(<?php echo $source->SourceID; ?>, '<?php echo str_replace('\'', '', $source->Name); ?>', '<?php echo $source->Status; ?>')" class="dropdown-item" style="color:<?php echo ($source->Status == 'Y') ? '#E37383' : '#50CD89'; ?>; font-size:11px;"><?php echo ($source->Status == 'Y') ? 'Deactivate Source' : 'Activate Source'; ?></button>
                                                     <a href="<?php echo base_url('Source/Update?source_id=') . $source->SourceID; ?>" class="dropdown-item" style="font-size:11px;">Update Source</a>
                                                 </div>
                                             </div>
@@ -91,4 +99,39 @@
     $('#reset').click(function() {
         Reset('<?php echo base_url('Source'); ?>');
     });
+
+    function Toggle_Status(source_id, name, current_status) {
+        var action = (current_status == 'Y') ? 'Deactivate' : 'Activate';
+        var swalWithBootstrapButtons = Swal.mixin({
+            customClass: {
+                confirmButton: 'btn btn-light-success m-2',
+                cancelButton: 'btn btn-danger m-2'
+            },
+            buttonsStyling: true
+        });
+        swalWithBootstrapButtons.fire({
+            width: 550,
+            background: "url(<?php echo base_url('assets/image/sweetalert.jpg'); ?>)",
+            icon: 'warning',
+            title: action + ' Source Record : ' + name + ' ?',
+            confirmButtonText: 'Confirm',
+            cancelButtonText: 'Cancel',
+            showCancelButton: true
+        }).then(function(action_result) {
+            if(action_result.isConfirmed) {
+                $.ajax({
+                    url: '<?php echo base_url('Source/Toggle_Status'); ?>',
+                    type: 'get',
+                    data: { source_id: source_id },
+                    timeout: 2000,
+                    success: function() {
+                        Display_Message("<?php echo base_url('assets/image/sweetalert.jpg'); ?>", 'Source Record : ' + name + ' Successfully ' + action + 'd', '<?php if(strpos($current_url, '?') == true) { echo base_url('Source?') . (explode('?', $current_url))[1]; } else { echo base_url('Source'); } ?>');
+                    },
+                    error: function() {
+                        Display_Message("<?php echo base_url('assets/image/sweetalert.jpg'); ?>", 'Error. Please Try Again', '<?php echo base_url('Source'); ?>');
+                    }
+                });
+            }
+        });
+    }
 </script>

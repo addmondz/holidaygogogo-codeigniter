@@ -145,34 +145,43 @@ class Booking extends MY_Controller
 			0 => 'booking.BookingID',             // row number
 			1 => 'booking.BookingID',             // checkbox (placeholder)
 			2 => 'admin.Name',                    // sales agent
-			3 => 'booking.InsertDate',            // creation date
-			4 => 'BookingNumber',                 // BC number
-			5 => 'booking.BookingConfirmationTitle', // BC title
-			6 => 'Customer',                      // customer
-			7 => 'booking.ChatLanguage',          // chat
-			8 => 'booking.Mobile',                // mobile
-			9 => 'StartDate',                     // start
-			10 => 'EndDate',                      // end
-			11 => 'category.Name',                // destination
-			12 => 'NetTotal',                     // net sales
-			13 => 'NetTotal',                     // profit
-			14 => 'NetTotal',                     // profit margin
-			15 => 'booking.Status',               // BC status
-			16 => 'LockStatus',                   // GL status
-			17 => 'booking.AutocountSyncStatus',  // autocount status
-			18 => 'booking.BookingID'             // action
+			3 => 'op_admin.Name',                 // OP
+			4 => 'booking.InsertDate',            // creation date
+			5 => 'BookingNumber',                 // BC number
+			6 => 'booking.BookingConfirmationTitle', // BC title
+			7 => 'Customer',                      // customer
+			8 => 'source.Name',                   // source
+			9 => 'booking.ChatLanguage',          // chat
+			10 => 'booking.Mobile',               // mobile
+			11 => 'StartDate',                    // start
+			12 => 'EndDate',                      // end
+			13 => 'category.Name',                // destination
+			14 => 'NetTotal',                     // net sales
+			15 => 'NetTotal',                     // profit
+			16 => 'NetTotal',                     // profit margin
+			17 => "CASE
+				WHEN booking.CancelStatus = 'Y' THEN 'CANCELLED'
+				WHEN booking.LockStatus = 'N' AND booking.Status = 'PTV' THEN 'PGL'
+				WHEN booking.AfterSalesService = 'PENDING' AND booking.Status = 'Y' THEN 'PR'
+				WHEN booking.DepositDeadline IS NULL AND FullPaymentDeadline < CURDATE() AND booking.Status IN ('P','PP') THEN 'PO'
+				WHEN booking.DepositDeadline IS NOT NULL AND ((booking.DepositDeadline < CURDATE() AND booking.Status = 'P') OR (FullPaymentDeadline < CURDATE() AND booking.Status IN ('P','PP'))) THEN 'PO'
+				ELSE booking.Status
+			END",                                 // BC status
+			18 => 'LockStatus',                   // GL status
+			19 => 'booking.AutocountSyncStatus',  // autocount status
+			20 => 'booking.BookingID'             // action
 		);
 
 		// Adjust column index for sales agents
-		// Sales agents don't see: sales_agent (index 2), profit (index 13), profit_margin (index 14)
+		// Sales agents don't see: sales_agent (index 2), OP (index 3), profit (index 15), profit_margin (index 16)
 		// So their column indices need to be mapped back to the full column array
 		if($is_sales_agent) {
-			if($order_column_index >= 2 && $order_column_index <= 11) {
-				// Columns 2-11: add 1 for missing sales_agent column
-				$order_column_index++;
-			} else if($order_column_index >= 12) {
-				// Columns 12+: add 3 for missing sales_agent + profit + profit_margin
-				$order_column_index += 3;
+			if($order_column_index >= 2 && $order_column_index <= 12) {
+				// Columns 2-12: add 2 for missing sales_agent + OP columns
+				$order_column_index += 2;
+			} else if($order_column_index >= 13) {
+				// Columns 13+: add 4 for missing sales_agent + OP + profit + profit_margin
+				$order_column_index += 4;
 			}
 		}
 
@@ -314,6 +323,9 @@ class Booking extends MY_Controller
 
 			// Customer
 			$row['customer'] = $booking->Customer;
+
+			// Source
+			$row['source'] = $booking->SourceName ?? '-';
 
 			// Customer Code
 			$row['customer_code'] = $booking->CustomerCode;
@@ -796,7 +808,7 @@ class Booking extends MY_Controller
 					$array['footers'] = $this->Booking_Model->Read_Footers();
 					$array['country_codes'] = $this->Booking_Model->Read_Country_Codes();
 					$array['tags'] = $this->Booking_Model->Read_Tags();
-					$array['sources'] = $this->Booking_Model->Read_Sources();
+					$array['sources'] = $this->Booking_Model->Read_Sources_With_Inactive($array['Source']);
 					foreach($array['booking_products'] as $booking_product) {
 						$booking_product->Price = number_format($booking_product->Price, 2, '.', ',');
 						$booking_product->Total = number_format($booking_product->Total, 2, '.', ',');
@@ -809,6 +821,187 @@ class Booking extends MY_Controller
 				} else {
 					redirect('Booking');
 				}
+			}
+		} else {
+			redirect('Dashboard');
+		}
+	}
+
+	function View()
+	{
+		// Allow sales agents (level 20) to view their own bookings even without AB access
+		$is_sales_agent = $this->session->userdata('level') == 20;
+		$has_ab_access = in_array('AB', $this->session->access_control);
+		$has_vb_access = in_array('VB', $this->session->access_control);
+		
+		// Check if user has VB access OR is a sales agent
+		if($has_vb_access || $is_sales_agent) {
+			$valid_booking_id = $this->Universal_Model->Validate_Id('BookingID', $this->input->get('booking_id'), 'booking');
+			
+			if($valid_booking_id) {
+				$array = $this->Booking_Model->Read_Booking();
+
+				// Block SA and TC from viewing completed bookings
+				if(in_array($this->session->userdata('level'), [20, 50]) && $array['Status'] == 'Y' && $array['AfterSalesService'] == 'COMPLETE') {
+					$this->load->view('errors/access_denied');
+					return;
+				}
+
+				// If sales agent without AB access, verify they own the booking
+				if($is_sales_agent && !$has_ab_access) {
+					if($array['SalesAgent'] != $this->session->userdata('admin_id')) {
+						$this->session->set_flashdata('error', 'You can only view bookings assigned to you.');
+						redirect('Booking');
+						return;
+					}
+				}
+				
+				$titles = array('tab_title' => 'HolidayGoGoGo | Booking', 'breadcrumb_title' => 'Booking >> View');
+				
+				if(!empty($array['DepositDeadline'])) {
+					$array['DepositDeadline'] = date('d/m/Y', strtotime($array['DepositDeadline']));
+				}
+				$array['FullPaymentDeadline'] = date('d/m/Y', strtotime($array['FullPaymentDeadline']));
+				if(!empty($array['AdditionalPaymentDeadline'])) {
+					$array['AdditionalPaymentDeadline'] = date('d/m/Y', strtotime($array['AdditionalPaymentDeadline']));
+				}
+				if(!empty($array['PaymentOutSupplierFull'])) {
+					$array['PaymentOutSupplierFull'] = date('d/m/Y', strtotime($array['PaymentOutSupplierFull']));
+				}
+				if(!empty($array['PaymentOutSupplierDeposit'])) {
+					$array['PaymentOutSupplierDeposit'] = date('d/m/Y', strtotime($array['PaymentOutSupplierDeposit']));
+				}
+				if(!empty($array['StartDate']) && !empty($array['EndDate'])) {
+					$array['TravelDate'] = date('d/m/Y', strtotime($array['StartDate'])) . ' - ' . date('d/m/Y', strtotime($array['EndDate']));
+				} else {
+					$array['TravelDate'] = null;
+				}
+				// Ensure AllowReview is set (default to 1 if not set or null)
+				if (!isset($array['AllowReview']) || $array['AllowReview'] === null) {
+					$array['AllowReview'] = 1;
+				} else {
+					// Convert to integer to ensure it's 0 or 1
+					$array['AllowReview'] = (int)$array['AllowReview'];
+				}
+				$array['BookingProductID'] = ($this->Booking_Product_Model->Read_Last_Booking_Product_ID()) + 1;
+				$array['Tag'] = explode(',', $array['Tag']);
+				$array['Subtotal'] = number_format($array['Subtotal'], 2, '.', ',');
+				$array['Discount'] = $array['Discount'] != 0.00 ? number_format($array['Discount'], 2, '.', ',') : '';
+				// Store raw NetTotal before formatting for deposit calculation
+				$net_total_raw = isset($array['NetTotal']) ? floatval($array['NetTotal']) : 0;
+				$array['NetTotal'] = number_format($array['NetTotal'], 2, '.', ',');
+				// Handle DepositPercentage - store original DB value for comparison
+				$array['DepositPercentageOriginal'] = isset($array['DepositPercentage']) ? $array['DepositPercentage'] : 0;
+				// For View page: use actual DB value (even if 0)
+				if (!isset($array['DepositPercentage'])) {
+					$array['DepositPercentage'] = 0;
+				}
+				// Calculate deposit information
+				$deposit_percentage_raw = isset($array['DepositPercentage']) ? $array['DepositPercentage'] : 0;
+				$deposit_total = ceil(($net_total_raw * $deposit_percentage_raw) / 100);
+				$array['DepositTotal'] = $deposit_total;
+				// Calculate deposit paid from payments
+				$deposit_paid = 0;
+				if (isset($array['BookingID'])) {
+					$payments = $this->Booking_Model->Read_Payments($array['BookingID']);
+					if (!empty($payments)) {
+						foreach ($payments as $payment) {
+							if (($payment->Status == 'Y' || $payment->Status == 'P') && $payment->Credit > 0) {
+								$deposit_paid += $payment->Credit;
+							}
+						}
+					}
+				}
+				$array['DepositPaid'] = $deposit_paid;
+				// Calculate deposit status and format Deposit Paid display
+				$deposit_difference = $deposit_paid - $deposit_total;
+				if ($deposit_paid > 0) {
+					$deposit_paid_display = number_format($deposit_paid, 2, '.', ',');
+					
+					if ($deposit_difference > 0.01) {
+						// Overpaid - apply red color
+						$deposit_paid_display .= ' (Overpaid: RM ' . number_format($deposit_difference, 2, '.', ',') . ')';
+						$array['DepositPaidColor'] = '#FF6B6B'; // Red
+					} elseif ($deposit_difference < -0.01) {
+						// Underpaid - apply orange color
+						$deposit_paid_display .= ' (Underpaid: RM ' . number_format(abs($deposit_difference), 2, '.', ',') . ')';
+						$array['DepositPaidColor'] = '#FFA500'; // Orange
+					} else {
+						// Paid - no special color (normal/default)
+						// Don't set DepositPaidColor for normal paid status
+					}
+				} else {
+					$deposit_paid_display = '0.00';
+					// Don't set DepositPaidColor for no payment
+				}
+					$array['DepositPaidDisplay'] = $deposit_paid_display;
+					$array['admins'] = $this->Booking_Model->Read_Admins();
+					$array['booking_op_admins'] = $this->Booking_Model->Read_Booking_OP_Admins();
+
+				if(empty($array['ProductSequence'])) {
+					$array['ProductSequence'] = explode(',', $array['ProductSequence']);
+					$array['booking_products'] = $this->Booking_Product_Model->Read();
+				} else {
+					$array['ProductSequence'] = explode(',', $array['ProductSequence']);
+					$booking_products = $this->Booking_Product_Model->Read();
+					$array['booking_products'] = [];
+					for($i = 0; $i < count($array['ProductSequence']); $i++) {
+						foreach($booking_products as $booking_product) {
+							if($booking_product->BookingProductID == $array['ProductSequence'][$i]) {
+								array_push($array['booking_products'], $booking_product);
+							}
+						}
+					}
+				}
+				$array['categories'] = $this->Booking_Model->Read_Categories();
+				$array['products'] = $this->Booking_Model->Read_Products();
+				$array['footers'] = $this->Booking_Model->Read_Footers();
+				$array['country_codes'] = $this->Booking_Model->Read_Country_Codes();
+				$array['tags'] = $this->Booking_Model->Read_Tags();
+				$array['sources'] = $this->Booking_Model->Read_Sources_With_Inactive($array['Source']);
+
+				// Get Destination Name
+				foreach($array['categories'] as $category) {
+					if($category->CategoryID == $array['Destination']) {
+						$array['DestinationName'] = $category->Name;
+						break;
+					}
+				}
+				
+				// Get Source Name
+				foreach($array['sources'] as $source) {
+					if($source->SourceID == $array['Source']) {
+						$array['SourceName'] = $source->Name;
+						break;
+					}
+				}
+				
+				foreach($array['booking_products'] as $booking_product) {
+					$booking_product->Price = number_format((float)($booking_product->Price ?? 0), 2, '.', ',');
+					$booking_product->Total = number_format((float)($booking_product->Total ?? 0), 2, '.', ',');
+				}
+
+				// Get booking checklists
+				$array['booking_checklists'] = $this->get_booking_checklists($array['booking_products']);
+				$array['completion_map'] = $this->Booking_Checklist_Completion_Model->Read_Completion_Map($array['BookingID']);
+
+				// Get custom uploads
+				$this->load->model('Custom_Upload_Model');
+				$array['custom_uploads'] = $this->Custom_Upload_Model->Read($array['BookingID']);
+
+				// Get booking status log timeline
+				$this->load->model('Booking_Status_Log_Model');
+				$array['status_logs'] = $this->Booking_Status_Log_Model->get_timeline_data($array['BookingID'], false);
+				
+				// Mark as view mode (read-only)
+				$array['is_view_mode'] = true;
+
+				if(isset($_GET['nick'])) { echo "<pre>"; print_r($array); exit; }
+				$this->load->view('layout/header', $titles);
+				$this->load->view('booking/view', $array);
+				$this->load->view('layout/footer');
+			} else {
+				redirect('Booking');
 			}
 		} else {
 			redirect('Dashboard');

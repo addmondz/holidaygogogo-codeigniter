@@ -276,6 +276,14 @@ class Booking_Model extends CI_Model
 				$this->db->where('LockStatus', 'N');
 				$this->db->where('booking.Status', 'PTV');
 			}
+			if($this->input->get('status') == 'PBC') {
+				$this->db->where('CancelStatus', 'N');
+				$this->db->where('booking.Status', 'PBC');
+			}
+			if($this->input->get('status') == 'PBO') {
+				$this->db->where('CancelStatus', 'N');
+				$this->db->where('booking.Status', 'PBO');
+			}
 			if($this->input->get('status') == 'P') {
 				$this->db->where('CancelStatus', 'N');
 				$this->db->where("(`DepositDeadline` >= '".date('Y-m-d')."' OR (`DepositDeadline` IS NULL AND `FullPaymentDeadline` >= '".date('Y-m-d')."'))");
@@ -335,6 +343,16 @@ class Booking_Model extends CI_Model
 		return $this->db->get('admin')->result();
 	}
 
+	function Read_Booking_OP_Admins()
+	{
+		$this->db->select('AdminID, Name');
+		$this->db->where('AdminID !=', 8);
+		$this->db->where('Level', '40');
+		$this->db->where('Status', 'Y');
+		$this->db->order_by('Name', 'ASC');
+		return $this->db->get('admin')->result();
+	}
+
 	function Read_Categories()
 	{
 		$this->db->select('CategoryID, Name');
@@ -383,6 +401,18 @@ class Booking_Model extends CI_Model
 	{
 		$this->db->select('SourceID, Name');
 		$this->db->where('Status', 'Y');
+		$this->db->order_by('Name', 'ASC');
+		return $this->db->get('source')->result();
+	}
+
+	function Read_Sources_With_Inactive($source_id)
+	{
+		$this->db->select('SourceID, Name');
+		if(!empty($source_id)) {
+			$this->db->where("(Status = 'Y' OR SourceID = " . intval($source_id) . ")", NULL, FALSE);
+		} else {
+			$this->db->where('Status', 'Y');
+		}
 		$this->db->order_by('Name', 'ASC');
 		return $this->db->get('source')->result();
 	}
@@ -1303,6 +1333,10 @@ class Booking_Model extends CI_Model
 					$this->db->where('LockStatus', 'Y');
 					$this->db->where('booking.Status', 'PTV');
 				}
+				if($this->input->get('status') == 'PBO') {
+					$this->db->where('CancelStatus', 'N');
+					$this->db->where('booking.Status', 'PBO');
+				}
 
 				$level2Ignore = 1;
 			} else {
@@ -1327,16 +1361,17 @@ class Booking_Model extends CI_Model
 	 */
 	function Read_Bookings_Paginated($start, $length, $order_column, $order_dir)
 	{
-		$this->db->select('booking.BookingID, BookingNumber, DepositDeadline, FullPaymentDeadline, Customer, booking.Mobile As CustomerMobile, StartDate, EndDate, NetTotal, booking.ChatLanguage, Token, booking.BookingConfirmationTitle, CancelStatus, LockStatus, AfterSalesService, booking.Status, booking.InsertDate, admin.Name As SalesAgentName, category.Name As DestinationName, CountryCode, booking.AutocountSyncStatus, booking.AutocountSyncMessage, booking.AutocountSyncAction, booking.CustomerAutocountSyncStatus, booking.CustomerAutocountSyncMessage, booking.CustomerAutocountSyncAction, customer.CustomerCode, booking.CustomerID');
+		$this->db->select('booking.BookingID, BookingNumber, DepositDeadline, FullPaymentDeadline, Customer, booking.Mobile As CustomerMobile, StartDate, EndDate, NetTotal, booking.ChatLanguage, Token, booking.BookingConfirmationTitle, CancelStatus, LockStatus, booking.is_submitted, AfterSalesService, booking.Status, booking.bc_approved, booking.bc_approval_admin_id, booking.bc_approval_date, booking.InsertDate, admin.Name As SalesAgentName, admin.AdminID AS SalesAgentID, op_admin.Name As BookingOPName, category.Name As DestinationName, CountryCode, booking.AutocountSyncStatus, booking.AutocountSyncMessage, booking.AutocountSyncAction, booking.CustomerAutocountSyncStatus, booking.CustomerAutocountSyncMessage, booking.CustomerAutocountSyncAction, customer.CustomerCode, booking.CustomerID, source.Name AS SourceName');
 		$this->db->join('admin', 'admin.AdminID = booking.SalesAgent', 'left');
 		$this->db->join('category', 'category.CategoryID = booking.Destination', 'left');
 		$this->db->join('country_code', 'country_code.CountryCodeID = booking.CountryCodeID', 'left');
 		$this->db->join('customer', 'customer.CustomerID = booking.CustomerID', 'left');
+		$this->db->join('source', 'source.SourceID = booking.Source', 'left');
 
 		$this->apply_booking_filters();
 
 		// Order by
-		$this->db->order_by($order_column, $order_dir);
+		$this->db->order_by($order_column, $order_dir, FALSE);
 
 		// Pagination
 		$this->db->limit($length, $start);
@@ -1367,6 +1402,7 @@ class Booking_Model extends CI_Model
 		$this->db->join('category', 'category.CategoryID = booking.Destination', 'left');
 		$this->db->join('country_code', 'country_code.CountryCodeID = booking.CountryCodeID', 'left');
 		$this->db->join('customer', 'customer.CustomerID = booking.CustomerID', 'left');
+		$this->db->join('source', 'source.SourceID = booking.Source', 'left');
 
 		$this->apply_booking_filters();
 
@@ -1386,6 +1422,7 @@ class Booking_Model extends CI_Model
 		$this->db->join('category', 'category.CategoryID = booking.Destination', 'left');
 		$this->db->join('country_code', 'country_code.CountryCodeID = booking.CountryCodeID', 'left');
 		$this->db->join('customer', 'customer.CustomerID = booking.CustomerID', 'left');
+		$this->db->join('source', 'source.SourceID = booking.Source', 'left');
 
 		$this->apply_booking_filters();
 
