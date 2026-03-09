@@ -149,14 +149,7 @@ class Booking extends MY_Controller
 			14 => 'NetTotal',                     // net sales
 			15 => 'NetTotal',                     // profit
 			16 => 'NetTotal',                     // profit margin
-			17 => "CASE
-				WHEN booking.CancelStatus = 'Y' THEN 'CANCELLED'
-				WHEN booking.LockStatus = 'N' AND booking.Status = 'PTV' THEN 'PGL'
-				WHEN booking.AfterSalesService = 'PENDING' AND booking.Status = 'Y' THEN 'PR'
-				WHEN booking.DepositDeadline IS NULL AND FullPaymentDeadline < CURDATE() AND booking.Status IN ('P','PP') THEN 'PO'
-				WHEN booking.DepositDeadline IS NOT NULL AND ((booking.DepositDeadline < CURDATE() AND booking.Status = 'P') OR (FullPaymentDeadline < CURDATE() AND booking.Status IN ('P','PP'))) THEN 'PO'
-				ELSE booking.Status
-			END",                                 // BC status
+			17 => "status_sort_priority",          // BC status
 			18 => 'LockStatus',                   // GL status
 			19 => 'booking.AutocountSyncStatus',  // autocount status
 			20 => 'booking.BookingID'             // action
