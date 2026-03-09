@@ -141,25 +141,25 @@ class Booking extends MY_Controller
 		// Note: Column indices must match the frontend DataTables columns array
 		// For non-sales agents: row_number(0), checkbox(1), sales_agent(2), insert_date(3), booking_number(4), ...
 		// For sales agents: row_number(0), checkbox(1), insert_date(2), booking_number(3), ...
+		// OP column was removed from frontend, so no placeholder needed here
 		$columns = array(
 			0 => 'booking.BookingID',             // row number
 			1 => 'booking.BookingID',             // checkbox (placeholder)
 			2 => 'admin.Name',                    // sales agent
-			3 => 'booking.BookingID',             // OP (placeholder)
-			4 => 'booking.InsertDate',            // creation date
-			5 => 'BookingNumber',                 // BC number
-			6 => 'booking.BookingConfirmationTitle', // BC title
-			7 => 'Customer',                      // customer
-			8 => 'source.Name',                   // source
-			9 => 'booking.ChatLanguage',          // chat
-			10 => 'booking.Mobile',               // mobile
-			11 => 'StartDate',                    // start
-			12 => 'EndDate',                      // end
-			13 => 'category.Name',                // destination
-			14 => 'NetTotal',                     // net sales
-			15 => 'NetTotal',                     // profit
-			16 => 'NetTotal',                     // profit margin
-			17 => "CASE
+			3 => 'booking.InsertDate',            // creation date
+			4 => 'BookingNumber',                 // BC number
+			5 => 'booking.BookingConfirmationTitle', // BC title
+			6 => 'Customer',                      // customer
+			7 => 'source.Name',                   // source
+			8 => 'booking.ChatLanguage',          // chat
+			9 => 'booking.Mobile',                // mobile
+			10 => 'StartDate',                    // start
+			11 => 'EndDate',                      // end
+			12 => 'category.Name',                // destination
+			13 => 'NetTotal',                     // net sales
+			14 => 'NetTotal',                     // profit
+			15 => 'NetTotal',                     // profit margin
+			16 => "CASE
 				WHEN booking.CancelStatus = 'Y' THEN 'CANCELLED'
 				WHEN booking.LockStatus = 'N' AND booking.Status = 'PTV' THEN 'PGL'
 				WHEN booking.AfterSalesService = 'PENDING' AND booking.Status = 'Y' THEN 'PR'
@@ -167,21 +167,21 @@ class Booking extends MY_Controller
 				WHEN booking.DepositDeadline IS NOT NULL AND ((booking.DepositDeadline < CURDATE() AND booking.Status = 'P') OR (FullPaymentDeadline < CURDATE() AND booking.Status IN ('P','PP'))) THEN 'PO'
 				ELSE booking.Status
 			END",                                 // BC status
-			18 => 'LockStatus',                   // GL status
-			19 => 'booking.AutocountSyncStatus',  // autocount status
-			20 => 'booking.BookingID'             // action
+			17 => 'LockStatus',                   // GL status
+			18 => 'booking.AutocountSyncStatus',  // autocount status
+			19 => 'booking.BookingID'             // action
 		);
 
 		// Adjust column index for sales agents
-		// Sales agents don't see: sales_agent (index 2), OP (index 3), profit (index 15), profit_margin (index 16)
+		// Sales agents don't see: sales_agent (index 2), profit (index 14), profit_margin (index 15)
 		// So their column indices need to be mapped back to the full column array
 		if($is_sales_agent) {
 			if($order_column_index >= 2 && $order_column_index <= 12) {
-				// Columns 2-12: add 2 for missing sales_agent + OP columns
-				$order_column_index += 2;
+				// Columns 2-12: add 1 for missing sales_agent column
+				$order_column_index += 1;
 			} else if($order_column_index >= 13) {
-				// Columns 13+: add 4 for missing sales_agent + OP + profit + profit_margin
-				$order_column_index += 4;
+				// Columns 13+: add 3 for missing sales_agent + profit + profit_margin
+				$order_column_index += 3;
 			}
 		}
 
