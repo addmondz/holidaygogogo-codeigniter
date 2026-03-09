@@ -211,10 +211,11 @@ class Payment_Model extends CI_Model
 
 	function Read_Admins()
 	{
-		$this->db->select('AdminID, Name');
+		$this->db->select('AdminID, Name, Status');
 		$this->db->where('AdminID !=', 8);
 		$this->db->where('Level !=', '30');
-		$this->db->where('Status', 'Y');
+		$this->db->where_in('Status', array('Y', 'D'));
+		$this->db->order_by('Status', 'ASC');
 		$this->db->order_by('Name', 'ASC');
 		return $this->db->get('admin')->result();
 	}

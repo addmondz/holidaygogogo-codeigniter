@@ -134,15 +134,19 @@ class Booking_Confirmation extends CI_Controller
                 $output2 = $pdf2->output();
                 file_put_contents('assets/upload/2_'.$identifier.'.pdf', $output2);
 
-                header('Cache-Control: no-cache, no-store, must-revalidate');
-                header('Pragma: no-cache');
-                header('Expires: 0');
-
                 $pdf = new \Clegginabox\PDFMerger\PDFMerger;
 
-                $pdf->addPDF('assets/upload/1_'.$identifier.'.pdf', 'all'); 
+                $pdf->addPDF('assets/upload/1_'.$identifier.'.pdf', 'all');
                 $pdf->addPDF('assets/upload/2_'.$identifier.'.pdf', 'all');
-                $pdf->merge('browser', $array['Title'].'3.pdf', 'P');
+                $pdfContent = $pdf->merge('string', $array['Title'].'3.pdf', 'P');
+
+                header('Content-Type: application/pdf');
+                header('Content-Disposition: inline; filename="'.$array['Title'].'3.pdf"');
+                header('Content-Length: '.strlen($pdfContent));
+                header('Cache-Control: no-cache, no-store, must-revalidate');
+                header('Pragma: no-cache');
+                header('Expires: 0');
+                echo $pdfContent;
                 unlink('assets/upload/1_'.$identifier.'.pdf');
                 unlink('assets/upload/2_'.$identifier.'.pdf');
                 
