@@ -668,7 +668,7 @@ $(document).ready(function() {
             { data: 'insert_date', className: 'text-center', responsivePriority: 10001 },
             { data: 'booking_number', className: 'text-center', responsivePriority: 3 },
             { data: 'bc_title', className: 'text-center', responsivePriority: 10002 },
-            { data: 'customer', className: 'text-center', responsivePriority: 4 },
+            { data: 'customer', className: 'text-center', responsivePriority: 4, createdCell: function(td, cellData, rowData) { if (rowData.has_einvoice) { $(td).css('background-color', '#c8e6c9'); } } },
             { data: 'source', className: 'text-center', responsivePriority: 10011 },
             { data: 'chat_language', className: 'text-center', responsivePriority: 10003 },
             { data: 'mobile', orderable: false, searchable: false, className: 'text-center', responsivePriority: 5 },

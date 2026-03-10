@@ -207,6 +207,76 @@ class Notification extends MY_Controller
 	}
 
 	/**
+	 * Get unread remarks count (AJAX)
+	 */
+	function Get_Remarks_Unread_Count()
+	{
+		if (empty($this->session->userdata('admin_id'))) {
+			$this->output
+				->set_content_type('application/json')
+				->set_output(json_encode([
+					'success' => false,
+					'count' => 0
+				]));
+			return;
+		}
+
+		$user_id = $this->session->userdata('admin_id');
+		$user_level = $this->session->userdata('level');
+
+		$this->load->model('Remark_Model');
+		$internal_count = $this->Remark_Model->Get_Unread_Count(1, $user_id, $user_level);
+		$customer_count = $this->Remark_Model->Get_Unread_Count(2, $user_id, $user_level);
+
+		$this->output
+			->set_content_type('application/json')
+			->set_output(json_encode([
+				'success' => true,
+				'count' => $internal_count + $customer_count,
+				'internal_count' => $internal_count,
+				'customer_count' => $customer_count
+			]));
+	}
+
+	/**
+	 * Mark remarks as read (AJAX)
+	 */
+	function Mark_Remarks_As_Read()
+	{
+		if (empty($this->session->userdata('admin_id'))) {
+			$this->output
+				->set_content_type('application/json')
+				->set_output(json_encode([
+					'success' => false,
+					'message' => 'Not authenticated'
+				]));
+			return;
+		}
+
+		$user_id = $this->session->userdata('admin_id');
+		$type = intval($this->input->post('type'));
+
+		if (empty($type) || !in_array($type, [1, 2])) {
+			$this->output
+				->set_content_type('application/json')
+				->set_output(json_encode([
+					'success' => false,
+					'message' => 'Invalid remark type'
+				]));
+			return;
+		}
+
+		$this->load->model('Remark_Model');
+		$success = $this->Remark_Model->Mark_Remarks_As_Read($user_id, $type);
+
+		$this->output
+			->set_content_type('application/json')
+			->set_output(json_encode([
+				'success' => $success
+			]));
+	}
+
+	/**
 	 * Mark all notifications as read (AJAX)
 	 */
 	function Mark_All_As_Read()

@@ -1977,6 +1977,7 @@
             </div>
 
             <!-- Documents -->
+            <?php if ($booking['CancelStatus'] != 'Y'): ?>
             <div class="documents-card">
                 <div class="card-title">
                     Documents
@@ -2037,6 +2038,7 @@
                     </div>
                 <?php endif; ?>
             </div>
+            <?php endif; ?>
 
             <!-- Customer Comments Section -->
             <div class="details-card">

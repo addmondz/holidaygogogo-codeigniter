@@ -309,6 +309,7 @@ class Booking extends MY_Controller
 
 			// Customer
 			$row['customer'] = $booking->Customer;
+			$row['has_einvoice'] = $booking->has_einvoice > 0;
 
 			// Source
 			$row['source'] = $booking->SourceName ?? '-';

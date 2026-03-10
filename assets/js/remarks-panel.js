@@ -13,6 +13,48 @@
     var REMARKS_LIMIT = 10;
     var isDropdownOpen = false;
 
+    function updateRemarksUnreadCount() {
+        $.ajax({
+            url: HOST_URL + 'Notification/Get_Remarks_Unread_Count',
+            type: 'GET',
+            dataType: 'json',
+            success: function(response) {
+                if (response.success) {
+                    var $badge = $('#remarks-badge');
+                    if (response.count > 0) {
+                        $badge.text(response.count > 99 ? '99+' : response.count).show();
+                    } else {
+                        $badge.hide();
+                    }
+
+                    // Show/hide per-tab "Mark all as read" buttons
+                    if (response.internal_count > 0) {
+                        $('#mark-read-internal').removeClass('d-none');
+                    } else {
+                        $('#mark-read-internal').addClass('d-none');
+                    }
+                    if (response.customer_count > 0) {
+                        $('#mark-read-customer').removeClass('d-none');
+                    } else {
+                        $('#mark-read-customer').addClass('d-none');
+                    }
+                }
+            }
+        });
+    }
+
+    function markRemarksAsRead(type, callback) {
+        $.ajax({
+            url: HOST_URL + 'Notification/Mark_Remarks_As_Read',
+            type: 'POST',
+            dataType: 'json',
+            data: { type: type },
+            success: function() {
+                if (callback) callback();
+            }
+        });
+    }
+
     function initRemarksPanel() {
         // Load remarks when dropdown is opened
         $('#kt_remarks_toggle').on('click', function() {
@@ -108,6 +150,11 @@
 
                     renderRemarks(response.remarks, type, $list);
 
+                    // Auto-mark this type as read when viewed
+                    markRemarksAsRead(type, function() {
+                        updateRemarksUnreadCount();
+                    });
+
                     // Show/hide load more
                     if (remarksState[type].offset < remarksState[type].total) {
                         $loadMore.removeClass('d-none');
@@ -198,6 +245,21 @@
 
     $(document).ready(function() {
         initRemarksPanel();
+
+        // Per-tab "Mark all as read" click handler
+        $(document).on('click', '.mark-tab-remarks-read', function() {
+            var $link = $(this);
+            var type = parseInt($link.data('type'));
+            $link.css('pointer-events', 'none');
+            markRemarksAsRead(type, function() {
+                updateRemarksUnreadCount();
+                $link.css('pointer-events', '');
+            });
+        });
+
+        // Initial badge fetch and periodic refresh every 30 seconds
+        updateRemarksUnreadCount();
+        setInterval(updateRemarksUnreadCount, 30000);
     });
 
 })();

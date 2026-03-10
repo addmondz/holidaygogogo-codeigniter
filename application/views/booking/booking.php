@@ -4461,7 +4461,7 @@ $(document).ready(function() {
     <?php if(current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Create') || current_url() == base_url('Booking/Duplicate')) { ?>
     // Room Management Functions
     var roomsList = [];
-    var roomBookingId = <?php echo isset($BookingID) ? $BookingID : 'null'; ?>;
+    var roomBookingId = <?php echo (isset($BookingID) && $BookingID !== 'NA') ? $BookingID : 'null'; ?>;
     var tempRoomCounter = 0;
 
     function getBookingPax() {

@@ -109,7 +109,7 @@ $is_dev_env = ($app_env !== 'prod');
 			<div id="kt_aside" class="aside aside-left aside-fixed d-flex flex-column flex-row-auto">
 				<div class="brand flex-column-auto">
 					<a href="<?php echo base_url('Dashboard'); ?>" class="brand-logo">
-						<img src="<?php echo base_url('assets/image/logo.png'); ?>" class="w-100">
+						<img src="<?php echo base_url('assets/image/logo.png'); ?>" style="max-height: 60px; width: auto; object-fit: contain;">
 					</a>
 					<button id="kt_aside_toggle" class="brand-toggle btn btn-sm px-0">
 						<span class="svg-icon svg-icon-xl">
@@ -379,6 +379,7 @@ $is_dev_env = ($app_env !== 'prod');
 						<div class="topbar-item position-relative">
 							<div class="btn btn-icon btn-clean btn-lg mr-1 position-relative" id="kt_remarks_toggle" data-toggle="dropdown" data-offset="10px,10px">
 								<i class="la la-comment-dots la-2x text-primary"></i>
+								<span class="label label-lg label-light-danger label-inline label-rounded position-absolute" id="remarks-badge" style="top: -5px; right: -5px; display: none; min-width: 20px; padding: 2px 6px;">0</span>
 							</div>
 							<div class="dropdown-menu dropdown-menu-right p-0 m-0 dropdown-menu-anim-up dropdown-menu-lg" id="remarks-dropdown" style="width: 420px; right: 0; left: auto;">
 								<div class="d-flex align-items-center justify-content-between p-5 border-bottom">
@@ -400,6 +401,9 @@ $is_dev_env = ($app_env !== 'prod');
 												<div class="mt-3">Loading...</div>
 											</div>
 										</div>
+										<div class="text-center py-2 d-none" id="mark-read-internal">
+											<a href="javascript:;" class="mark-tab-remarks-read text-primary font-weight-bold font-size-sm" data-type="1">Mark all as read</a>
+										</div>
 										<div class="text-center py-3 border-top d-none" id="load-more-internal">
 											<a href="javascript:;" class="btn btn-sm btn-light-primary font-weight-bold load-more-remarks" data-type="1">Load More</a>
 										</div>
@@ -410,6 +414,9 @@ $is_dev_env = ($app_env !== 'prod');
 												<div class="spinner spinner-primary spinner-lg"></div>
 												<div class="mt-3">Loading...</div>
 											</div>
+										</div>
+										<div class="text-center py-2 d-none" id="mark-read-customer">
+											<a href="javascript:;" class="mark-tab-remarks-read text-primary font-weight-bold font-size-sm" data-type="2">Mark all as read</a>
 										</div>
 										<div class="text-center py-3 border-top d-none" id="load-more-customer">
 											<a href="javascript:;" class="btn btn-sm btn-light-primary font-weight-bold load-more-remarks" data-type="2">Load More</a>

@@ -65,12 +65,17 @@ class Customer_Portal extends CI_Controller
             $booking['PaxInfo'] = $this->format_pax_info($booking['Adult'] ?? 0, $booking['Children'] ?? 0, $booking['Infant'] ?? 0);
             $booking['status_display'] = $this->get_booking_status_display_for_list($booking);
         }
+        foreach ($bookings_data['cancelled'] as &$booking) {
+            $booking['PaxInfo'] = $this->format_pax_info($booking['Adult'] ?? 0, $booking['Children'] ?? 0, $booking['Infant'] ?? 0);
+            $booking['status_display'] = $this->get_booking_status_display_for_list($booking);
+        }
 
         // Prepare data for view
         $data = [
             'customer' => $customer,
             'upcoming_bookings' => $bookings_data['upcoming'],
             'completed_bookings' => $bookings_data['completed'],
+            'cancelled_bookings' => $bookings_data['cancelled'],
             'hash' => $hash
         ];
 
@@ -236,7 +241,7 @@ class Customer_Portal extends CI_Controller
         $this->db->join('country_code', 'country_code.CountryCodeID = booking.CountryCodeID', 'left');
         $this->db->where('booking.CustomerID', $customer_id);
         $this->db->where('booking.Status !=', 'N');
-        $this->db->where('CancelStatus', 'N'); // Always exclude cancelled
+        // CancelStatus filter removed - cancelled bookings now shown in their own tab
         // Show bookings if BC is currently approved OR was approved at least once before
         $this->db->group_start();
         $this->db->where('booking.bc_approved', 1);
@@ -249,10 +254,16 @@ class Customer_Portal extends CI_Controller
         
         $upcoming = [];
         $completed = [];
-        
+        $cancelled = [];
+
         $today = date('Y-m-d');
-        
+
         foreach ($all_bookings as $booking) {
+            if ($booking['CancelStatus'] == 'Y') {
+                $cancelled[] = $booking;
+                continue;
+            }
+
             // Check if travel date has passed
             // Use EndDate if available, otherwise use StartDate
             $travel_date_passed = false;
@@ -277,7 +288,8 @@ class Customer_Portal extends CI_Controller
         
         return [
             'upcoming' => $upcoming,
-            'completed' => $completed
+            'completed' => $completed,
+            'cancelled' => $cancelled
         ];
     }
 
@@ -636,7 +648,7 @@ class Customer_Portal extends CI_Controller
         // Confirmed: Status IN ('PP', 'PTV', 'PT', 'OG') - after booking confirmation
         // Completed: Status = 'Y' AND AfterSalesService = 'COMPLETE'
         
-        if ($status == 'Y' && $after_sales == 'COMPLETE') {
+        if (($status == 'Y' && $after_sales == 'COMPLETE') || $status == 'PBO') {
             // Completed
             return [
                 'text' => 'Completed',
@@ -729,7 +741,7 @@ class Customer_Portal extends CI_Controller
         }
 
         // Completed: Status = 'Y' AND AfterSalesService = 'COMPLETE' OR travel date passed
-        if (($status == 'Y' && $after_sales == 'COMPLETE') || $travel_date_passed) {
+        if (($status == 'Y' && $after_sales == 'COMPLETE') || $travel_date_passed || $status == 'PBO') {
             return [
                 'text' => 'Completed',
                 'class' => 'status-completed',

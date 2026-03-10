@@ -128,6 +128,76 @@ class Remark_Model extends CI_Model
 	}
 
 	/**
+	 * Get unread count for a specific remark type
+	 * @param int $type Remark type (1=INTERNAL, 2=CUSTOMER)
+	 * @param int $user_id Current admin user ID
+	 * @param int $user_level Current admin level
+	 * @return int Unread count
+	 */
+	function Get_Unread_Count($type, $user_id, $user_level = null)
+	{
+		// Get last read timestamp first
+		$last_read = $this->db->select('last_read_at')
+			->get_where('remark_read_status', [
+				'user_id' => $user_id,
+				'remark_type' => $type
+			])->row();
+
+		// Build count query
+		$this->db->join('booking', 'booking.BookingID = remark.owner_id AND remark.owner_type = "booking"', 'inner');
+		$this->db->where('remark.type', $type);
+
+		if ($user_level == 20 && $user_id) {
+			$this->db->where('booking.SalesAgentID', $user_id);
+		}
+
+		if ($last_read) {
+			$this->db->where('remark.created_at >', $last_read->last_read_at);
+		}
+
+		return $this->db->count_all_results('remark');
+	}
+
+	/**
+	 * Get total unread count across all remark types (for badge)
+	 * @param int $user_id Current admin user ID
+	 * @param int $user_level Current admin level
+	 * @return int Total unread count
+	 */
+	function Get_Total_Unread_Count($user_id, $user_level = null)
+	{
+		return $this->Get_Unread_Count(1, $user_id, $user_level)
+			 + $this->Get_Unread_Count(2, $user_id, $user_level);
+	}
+
+	/**
+	 * Mark remarks of a specific type as read for a user (upsert)
+	 * @param int $user_id Current admin user ID
+	 * @param int $remark_type Remark type (1=INTERNAL, 2=CUSTOMER)
+	 * @return bool Success status
+	 */
+	function Mark_Remarks_As_Read($user_id, $remark_type)
+	{
+		$existing = $this->db->get_where('remark_read_status', [
+			'user_id' => $user_id,
+			'remark_type' => $remark_type
+		])->row();
+
+		if ($existing) {
+			$this->db->where('id', $existing->id);
+			return $this->db->update('remark_read_status', [
+				'last_read_at' => date('Y-m-d H:i:s')
+			]);
+		} else {
+			return $this->db->insert('remark_read_status', [
+				'user_id' => $user_id,
+				'remark_type' => $remark_type,
+				'last_read_at' => date('Y-m-d H:i:s')
+			]);
+		}
+	}
+
+	/**
 	 * Get a single remark by ID
 	 * @param int $remark_id Remark ID
 	 * @return object|null Remark object or null

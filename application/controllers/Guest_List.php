@@ -96,6 +96,14 @@ class Guest_List extends CI_Controller
 					}
 				}
 			}
+			// Auto-detect if all guests have complete information and auto-lock
+			if ($this->Guest_List_Model->Are_All_Guests_Complete($booking_id)) {
+				$this->Booking_Model->update_by_id($booking_id, [
+					'LockStatus' => 'Y',
+					'is_submitted' => 1
+				]);
+			}
+
 			$this->Guest_List_Model->Update_GL_Session('BookingID', $booking_id, 'N', null);
 			redirect('Message?url=' . base_url($_SERVER['REQUEST_URI']));
 		} else {
