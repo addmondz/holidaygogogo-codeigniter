@@ -54,7 +54,7 @@
 	<div class="d-flex flex-column flex-root">
 		<div class="d-flex flex-row flex-column-fluid page">
 			<div id="kt_aside" class="aside aside-left aside-fixed d-flex flex-column flex-row-auto">
-				<div class="brand flex-column-auto">
+				<div class="brand flex-column-auto mt-6">
 					<a href="<?php echo base_url('Dashboard'); ?>" class="brand-logo">
 						<img src="<?php echo base_url('assets/image/logo.png'); ?>" class="w-100">
 					</a>
