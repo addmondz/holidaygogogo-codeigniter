@@ -107,9 +107,9 @@ $is_dev_env = ($app_env !== 'prod');
 	<div class="d-flex flex-column flex-root">
 		<div class="d-flex flex-row flex-column-fluid page">
 			<div id="kt_aside" class="aside aside-left aside-fixed d-flex flex-column flex-row-auto">
-				<div class="brand flex-column-auto">
+				<div class="brand flex-column-auto mt-4">
 					<a href="<?php echo base_url('Dashboard'); ?>" class="brand-logo">
-						<img src="<?php echo base_url('assets/image/logo.png'); ?>" style="max-height: 60px; width: auto; object-fit: contain;">
+						<img src="<?php echo base_url('assets/image/logo.png'); ?>" style="max-height: 80px; width: auto; object-fit: contain;">
 					</a>
 					<button id="kt_aside_toggle" class="brand-toggle btn btn-sm px-0">
 						<span class="svg-icon svg-icon-xl">
