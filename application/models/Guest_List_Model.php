@@ -191,7 +191,7 @@ class Guest_List_Model extends CI_Model
 
 		foreach ($guests as $guest) {
 			if (empty($guest->Name) || empty($guest->LastName) || empty($guest->Gender) ||
-				empty($guest->DateOfBirth) || empty($guest->Nationality) ||
+				empty($guest->DateOfBirth) ||
 				empty($guest->Email) || empty($guest->Mobile) || empty($guest->CountryCodeID)) {
 				return false;
 			}

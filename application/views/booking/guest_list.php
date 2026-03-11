@@ -404,8 +404,8 @@
 											<br>
 											<div class="row">
 												<div class="col-md-6 mb-7 mb-md-0">
-													<label id="<?php echo 'nationality_label-' . $guest->GuestListID; ?>">Nationality <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>
-													<select <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> name="nationalities[]" id="<?php echo 'nationality-' . $guest->GuestListID; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" class="form-control">
+													<label id="<?php echo 'nationality_label-' . $guest->GuestListID; ?>">Nationality</label>
+													<select <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> name="nationalities[]" id="<?php echo 'nationality-' . $guest->GuestListID; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" class="form-control">
 														<option selected disabled value="">--SELECT NATIONALITY--</option>
 														<?php 
 															$malaysia_id = null;
@@ -939,8 +939,6 @@
 				$(`#gender-${guest_list_id}`).prop('required', 'true');
 				$(`#date_of_birth_label-${guest_list_id}`).html('Date Of Birth <span style="color:red;">*</span>');
 				$(`#date_of_birth-${guest_list_id}`).prop('required', 'true');
-				$(`#nationality_label-${guest_list_id}`).html('Nationality <span style="color:red;">*</span>');
-				$(`#nationality-${guest_list_id}`).prop('required', 'true');
 				$(`#email_label-${guest_list_id}`).html('Email <span style="color:red;">*</span>');
 				$(`#email-${guest_list_id}`).prop('required', 'true');
 				$(`#country_code_label-${guest_list_id}`).html('Country Code <span style="color:red;">*</span>');
@@ -1060,8 +1058,6 @@
 				$(`#gender-${guest_list_id}`).removeAttr('required');
 				$(`#date_of_birth_label-${guest_list_id}`).html('Date Of Birth');
 				$(`#date_of_birth-${guest_list_id}`).removeAttr('required');
-				$(`#nationality_label-${guest_list_id}`).html('Nationality');
-				$(`#nationality-${guest_list_id}`).removeAttr('required');
 				$(`#email_label-${guest_list_id}`).html('Email');
 				$(`#email-${guest_list_id}`).removeAttr('required');
 				$(`#country_code_label-${guest_list_id}`).html('Country Code');
@@ -1485,7 +1481,7 @@
 		}
 
 		$('input[type="submit"]').click(function() {
-			$('#form').submit(function(event) {
+			$('#form').off('submit').on('submit', function(event) {
 				event.preventDefault();
 				const swalWithBootstrapButtons = Swal.mixin({
 					customClass: {
@@ -1573,6 +1569,117 @@
 								$(`#relationship-${value.GuestListID}`).val(value.Relationship);
 							}
 						});
+
+						// Validate: if any field has a value for a guest, all required fields must be filled
+						var validation_errors = [];
+						var guest_counter = 1;
+
+						// Validate existing guests
+						$('input[name="guests[]"]').each(function() {
+							var gid = $(this).val();
+							if ($(`#guest-${gid}`).length == 0) return; // skip deleted existing guests
+							var name = $(`#name-${gid}`).val();
+							var last_name = $(`#last-name-${gid}`).val();
+							var gender = $(`#gender-${gid}`).val();
+							var dob = $(`#date_of_birth-${gid}`).val();
+							var email = $(`#email-${gid}`).val();
+							var country_code = $(`#country_code-${gid}`).val();
+							var mobile = $(`#mobile-${gid}`).val();
+							var identification_number = $(`#identification_number-${gid}`).val();
+							var nationality_text = $(`#nationality-${gid} option:selected`).text().toUpperCase();
+
+							var has_any = (name != '' || last_name != '' || (gender != '' && gender != null) || dob != '' || email != '' || mobile != '');
+
+							if (has_any) {
+								var missing = [];
+								if (name == '') missing.push('First Name');
+								if (last_name == '') missing.push('Last Name');
+								if (gender == '' || gender == null) missing.push('Gender');
+								if (dob == '') missing.push('Date Of Birth');
+								if (email == '') missing.push('Email');
+								if (country_code == '' || country_code == null) missing.push('Country Code');
+								if (mobile == '') missing.push('Mobile');
+								if (nationality_text == 'MALAYSIA' && (identification_number == '' || identification_number == null)) missing.push('Identification Number');
+								<?php if($guest_lists[0]->TravelInsuranceStatus == 'Y') { ?>
+								if ($(`#marital_status-${gid}`).val() == '' || $(`#marital_status-${gid}`).val() == null) missing.push('Marital Status');
+								if ($(`#employment-${gid}`).val() == '') missing.push('Employment');
+								if ($(`#address-${gid}`).val() == '') missing.push('Address');
+								if ($(`#postcode-${gid}`).val() == '') missing.push('Postcode');
+								if ($(`#city-${gid}`).val() == '') missing.push('City');
+								if ($(`#state-${gid}`).val() == '') missing.push('State');
+								if ($(`#country-${gid}`).val() == '' || $(`#country-${gid}`).val() == null) missing.push('Country');
+								if ($(`#nominee_name-${gid}`).val() == '') missing.push('Nominee Name');
+								if ($(`#nominee_contact-${gid}`).val() == '') missing.push('Nominee Contact');
+								if ($(`#nominee_identification_number-${gid}`).val() == '') missing.push('Nominee Identification Number');
+								if ($(`#relationship-${gid}`).val() == '') missing.push('Relationship');
+								<?php } ?>
+
+								if (missing.length > 0) {
+									validation_errors.push('Guest ' + guest_counter + ': ' + missing.join(', '));
+								}
+							}
+							guest_counter++;
+						});
+
+						// Validate new guests
+						$.each(new_guests, function(index, gid) {
+							if ($(`#guest-${gid}`).length == 0) return; // skip deleted new guests
+							var name = $(`#name-${gid}`).val();
+							var last_name = $(`#last-name-${gid}`).val();
+							var gender = $(`#gender-${gid}`).val();
+							var dob = $(`#date_of_birth-${gid}`).val();
+							var email = $(`#email-${gid}`).val();
+							var country_code = $(`#country_code-${gid}`).val();
+							var mobile = $(`#mobile-${gid}`).val();
+							var identification_number = $(`#identification_number-${gid}`).val();
+							var nationality_text = $(`#nationality-${gid} option:selected`).text().toUpperCase();
+
+							var has_any = (name != '' || last_name != '' || (gender != '' && gender != null) || dob != '' || email != '' || mobile != '');
+
+							if (has_any) {
+								var missing = [];
+								if (name == '') missing.push('First Name');
+								if (last_name == '') missing.push('Last Name');
+								if (gender == '' || gender == null) missing.push('Gender');
+								if (dob == '') missing.push('Date Of Birth');
+								if (email == '') missing.push('Email');
+								if (country_code == '' || country_code == null) missing.push('Country Code');
+								if (mobile == '') missing.push('Mobile');
+								if (nationality_text == 'MALAYSIA' && (identification_number == '' || identification_number == null)) missing.push('Identification Number');
+								<?php if($guest_lists[0]->TravelInsuranceStatus == 'Y') { ?>
+								if ($(`#marital_status-${gid}`).val() == '' || $(`#marital_status-${gid}`).val() == null) missing.push('Marital Status');
+								if ($(`#employment-${gid}`).val() == '') missing.push('Employment');
+								if ($(`#address-${gid}`).val() == '') missing.push('Address');
+								if ($(`#postcode-${gid}`).val() == '') missing.push('Postcode');
+								if ($(`#city-${gid}`).val() == '') missing.push('City');
+								if ($(`#state-${gid}`).val() == '') missing.push('State');
+								if ($(`#country-${gid}`).val() == '' || $(`#country-${gid}`).val() == null) missing.push('Country');
+								if ($(`#nominee_name-${gid}`).val() == '') missing.push('Nominee Name');
+								if ($(`#nominee_contact-${gid}`).val() == '') missing.push('Nominee Contact');
+								if ($(`#nominee_identification_number-${gid}`).val() == '') missing.push('Nominee Identification Number');
+								if ($(`#relationship-${gid}`).val() == '') missing.push('Relationship');
+								<?php } ?>
+
+								if (missing.length > 0) {
+									validation_errors.push('Guest ' + guest_counter + ': ' + missing.join(', '));
+								}
+							}
+							guest_counter++;
+						});
+
+						if (validation_errors.length > 0) {
+							Swal.fire({
+								width: 550,
+								background: 'url(<?php echo base_url('assets/image/sweetalert.jpg') ?>)',
+								icon: 'error',
+								title: 'Please complete all required fields',
+								html: validation_errors.join('<br>'),
+								showConfirmButton: true
+							});
+							$('#form').off('submit');
+							return;
+						}
+
 						swalWithBootstrapButtons.fire({
 							width: 550,
 							background: 'url(<?php echo base_url('assets/image/sweetalert.jpg') ?>)',

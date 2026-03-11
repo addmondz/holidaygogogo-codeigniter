@@ -92,10 +92,6 @@ class Notification extends MY_Controller
 			);
 		}
 
-		// Mark all notifications as read AFTER formatting (so response has original is_read status)
-		// This way frontend can show unread styling initially, but on next fetch they're already read
-		$this->Notification_Model->Mark_All_As_Read($user_id);
-
 		$this->output
 			->set_content_type('application/json')
 			->set_output(json_encode([
@@ -139,6 +135,44 @@ class Notification extends MY_Controller
 			->set_output(json_encode([
 				'success' => $success,
 				'message' => $success ? 'Notification marked as read' : 'Failed to mark notification as read'
+			]));
+	}
+
+	/**
+	 * Mark notification as unread (AJAX)
+	 */
+	function Mark_As_Unread()
+	{
+		if (empty($this->session->userdata('admin_id'))) {
+			$this->output
+				->set_content_type('application/json')
+				->set_output(json_encode([
+					'success' => false,
+					'message' => 'Not authenticated'
+				]));
+			return;
+		}
+
+		$notification_id = intval($this->input->post('notification_id'));
+		$user_id = $this->session->userdata('admin_id');
+
+		if (empty($notification_id)) {
+			$this->output
+				->set_content_type('application/json')
+				->set_output(json_encode([
+					'success' => false,
+					'message' => 'Notification ID is required'
+				]));
+			return;
+		}
+
+		$success = $this->Notification_Model->Mark_As_Unread($notification_id, $user_id);
+
+		$this->output
+			->set_content_type('application/json')
+			->set_output(json_encode([
+				'success' => $success,
+				'message' => $success ? 'Notification marked as unread' : 'Failed to mark notification as unread'
 			]));
 	}
 
