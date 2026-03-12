@@ -227,7 +227,8 @@ class Notification extends MY_Controller
 				'BookingNumber' => $remark->BookingNumber,
 				'BookingID' => $remark->BookingID,
 				'created_at' => date('d/m/Y H:i:s', $created_timestamp),
-				'time_ago' => $time_ago
+				'time_ago' => $time_ago,
+				'is_read' => $remark->is_read == 1
 			);
 		}
 
@@ -300,8 +301,86 @@ class Notification extends MY_Controller
 			return;
 		}
 
+		$user_level = $this->session->userdata('level');
+
 		$this->load->model('Remark_Model');
-		$success = $this->Remark_Model->Mark_Remarks_As_Read($user_id, $type);
+		$success = $this->Remark_Model->Mark_Remarks_As_Read($user_id, $type, $user_level);
+
+		$this->output
+			->set_content_type('application/json')
+			->set_output(json_encode([
+				'success' => $success
+			]));
+	}
+
+	/**
+	 * Mark a single remark as read (AJAX)
+	 */
+	function Mark_Remark_As_Read()
+	{
+		if (empty($this->session->userdata('admin_id'))) {
+			$this->output
+				->set_content_type('application/json')
+				->set_output(json_encode([
+					'success' => false,
+					'message' => 'Not authenticated'
+				]));
+			return;
+		}
+
+		$remark_id = intval($this->input->post('remark_id'));
+		$user_id = $this->session->userdata('admin_id');
+
+		if (empty($remark_id)) {
+			$this->output
+				->set_content_type('application/json')
+				->set_output(json_encode([
+					'success' => false,
+					'message' => 'Remark ID is required'
+				]));
+			return;
+		}
+
+		$this->load->model('Remark_Model');
+		$success = $this->Remark_Model->Mark_Remark_As_Read($remark_id, $user_id);
+
+		$this->output
+			->set_content_type('application/json')
+			->set_output(json_encode([
+				'success' => $success
+			]));
+	}
+
+	/**
+	 * Mark a single remark as unread (AJAX)
+	 */
+	function Mark_Remark_As_Unread()
+	{
+		if (empty($this->session->userdata('admin_id'))) {
+			$this->output
+				->set_content_type('application/json')
+				->set_output(json_encode([
+					'success' => false,
+					'message' => 'Not authenticated'
+				]));
+			return;
+		}
+
+		$remark_id = intval($this->input->post('remark_id'));
+		$user_id = $this->session->userdata('admin_id');
+
+		if (empty($remark_id)) {
+			$this->output
+				->set_content_type('application/json')
+				->set_output(json_encode([
+					'success' => false,
+					'message' => 'Remark ID is required'
+				]));
+			return;
+		}
+
+		$this->load->model('Remark_Model');
+		$success = $this->Remark_Model->Mark_Remark_As_Unread($remark_id, $user_id);
 
 		$this->output
 			->set_content_type('application/json')

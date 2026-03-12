@@ -36,14 +36,14 @@ class Cronjob extends CI_Controller
 
 		// Process full payment reminders
 		if($full_checklist_id) {
-			$bookings = $this->Cronjob_Model->get_bookings_with_supplier_date('PaymentOutSupplierFull');
-			foreach($bookings as $booking) {
-				if($this->has_incomplete_checklist($booking, $full_checklist_id)) {
+			$booking_products = $this->Cronjob_Model->get_bookings_with_supplier_date('PaymentOutSupplierFull');
+			foreach($booking_products as $bp) {
+				if($this->is_checklist_incomplete_for_product($bp->BookingID, $bp->ProductID, $full_checklist_id)) {
 					$count += $this->Cronjob_Model->create_supplier_reminder_notifications(
-						$booking->BookingID,
-						$booking->BookingNumber,
+						$bp->BookingID,
+						$bp->BookingNumber,
 						'supplier_reminder_full',
-						$booking->PaymentOutSupplierFull
+						$bp->PaymentOutSupplierFull
 					);
 				}
 			}
@@ -51,14 +51,14 @@ class Cronjob extends CI_Controller
 
 		// Process deposit payment reminders
 		if($deposit_checklist_id) {
-			$bookings = $this->Cronjob_Model->get_bookings_with_supplier_date('PaymentOutSupplierDeposit');
-			foreach($bookings as $booking) {
-				if($this->has_incomplete_checklist($booking, $deposit_checklist_id)) {
+			$booking_products = $this->Cronjob_Model->get_bookings_with_supplier_date('PaymentOutSupplierDeposit');
+			foreach($booking_products as $bp) {
+				if($this->is_checklist_incomplete_for_product($bp->BookingID, $bp->ProductID, $deposit_checklist_id)) {
 					$count += $this->Cronjob_Model->create_supplier_reminder_notifications(
-						$booking->BookingID,
-						$booking->BookingNumber,
+						$bp->BookingID,
+						$bp->BookingNumber,
 						'supplier_reminder_deposit',
-						$booking->PaymentOutSupplierDeposit
+						$bp->PaymentOutSupplierDeposit
 					);
 				}
 			}
@@ -68,42 +68,22 @@ class Cronjob extends CI_Controller
 	}
 
 	/**
-	 * Check if a booking has any product with the given checklist assigned but not completed
+	 * Check if a specific product in a booking has the given checklist assigned but not completed
 	 */
-	private function has_incomplete_checklist($booking, $checklist_id) {
-		// Get all products for this booking
-		$this->db->select('ProductID');
-		$this->db->where('BookingID', $booking->BookingID);
-		$this->db->where('Status', 'Y');
-		$products = $this->db->get('booking_product')->result();
+	private function is_checklist_incomplete_for_product($booking_id, $product_id, $checklist_id) {
+		$assigned_checklists = $this->Product_Package_Checklist_Model->Get_Checklists_For_Product($product_id);
 
-		if(empty($products)) {
+		if(!in_array($checklist_id, $assigned_checklists)) {
 			return false;
 		}
 
-		// Get completion map for this booking
-		$this->db->select('product_id, package_checklist_id');
-		$this->db->where('booking_id', $booking->BookingID);
-		$completions = $this->db->get('booking_checklist_completion')->result();
+		// Check if this specific product's checklist is completed
+		$this->db->where('booking_id', $booking_id);
+		$this->db->where('product_id', $product_id);
+		$this->db->where('package_checklist_id', $checklist_id);
+		$completed = $this->db->get('booking_checklist_completion')->num_rows() > 0;
 
-		$completion_map = array();
-		foreach($completions as $c) {
-			$completion_map[$c->product_id . '_' . $c->package_checklist_id] = true;
-		}
-
-		// Check each product
-		foreach($products as $product) {
-			$assigned_checklists = $this->Product_Package_Checklist_Model->Get_Checklists_For_Product($product->ProductID);
-
-			if(in_array($checklist_id, $assigned_checklists)) {
-				$key = $product->ProductID . '_' . $checklist_id;
-				if(!isset($completion_map[$key])) {
-					return true; // Found an incomplete checklist
-				}
-			}
-		}
-
-		return false;
+		return !$completed;
 	}
 
 }

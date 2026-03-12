@@ -83,6 +83,15 @@
                                 </div>
                             </div>
                         </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Is Child/Infant</label>
+                                <select id="is_child_or_infant" class="form-control">
+                                    <option value="0" <?php if(!isset($is_child_or_infant) || $is_child_or_infant == 0) { echo 'selected'; } ?>>No</option>
+                                    <option value="1" <?php if(isset($is_child_or_infant) && $is_child_or_infant == 1) { echo 'selected'; } ?>>Yes</option>
+                                </select>
+                            </div>
+                        </div>
                     </div>
                     <?php if(isset($package_checklists)) {
                         // Get required checklist IDs
@@ -447,7 +456,7 @@
                                     Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', 'Product Name Must Not Exceed '+maxNameLength+' Characters', null);
                                 } else {
                                     var product = [];
-                                    product.push({CategoryID:category, SupplierID:supplier, Name:name, InsertBy:<?php echo $this->session->userdata('admin_id') ?>, InsertDate:'<?php echo date('Y-m-d H:i:s') ?>'});
+                                    product.push({CategoryID:category, SupplierID:supplier, Name:name, is_child_or_infant:$('#is_child_or_infant').val(), InsertBy:<?php echo $this->session->userdata('admin_id') ?>, InsertDate:'<?php echo date('Y-m-d H:i:s') ?>'});
                                     var retail_price = $('#RetailPrice').val();
                                     if(retail_price != '') {
                                         product[0]['RetailPrice'] = retail_price.replace(/,/g, '');;
@@ -492,7 +501,13 @@
                                     product[0][key] = value;
                                 }
                             }
-                            
+
+                            var original_is_child_or_infant = '<?php echo $is_child_or_infant ?? 0; ?>';
+                            var current_is_child_or_infant = $('#is_child_or_infant').val();
+                            if(current_is_child_or_infant !== original_is_child_or_infant) {
+                                product[0]['is_child_or_infant'] = current_is_child_or_infant;
+                            }
+
                             // Collect chosen checklists in order (from DOM to preserve drag-and-drop order)
                             var selected_checklists = [];
                             <?php if(isset($package_checklists)) { ?>

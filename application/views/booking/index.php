@@ -402,6 +402,28 @@
                                                 </select>
                                             </div>
                                         </div>
+                                        <div class="col-md-3">
+                                            <div class="form-group">
+                                                <label>Checklist</label>
+                                                <select name="checklist_filter" class="form-control selectpicker" data-live-search="true">
+                                                    <option selected value="">--SELECT CHECKLIST--</option>
+                                                    <?php if(isset($filter_checklists)) { foreach($filter_checklists as $checklist) { ?>
+                                                        <option value="<?php echo $checklist->ID; ?>" <?php if($this->input->get('checklist_filter') == $checklist->ID) echo 'selected'; ?>><?php echo htmlspecialchars($checklist->name); ?></option>
+                                                    <?php } } ?>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="form-group">
+                                                <label>Cancellation Reason</label>
+                                                <select name="cancellation_reason" data-live-search="true" class="form-control selectpicker">
+                                                    <option selected data-icon="la la-times-circle font-size-lg bs-icon" value="">--SELECT CANCELLATION REASON--</option>
+                                                    <?php if(isset($cancellation_reasons)) { foreach($cancellation_reasons as $reason) { ?>
+                                                        <option data-icon="la la-times-circle font-size-lg bs-icon" value="<?php echo $reason->CancellationReasonID; ?>" <?php if(!empty($this->input->get('cancellation_reason')) && $this->input->get('cancellation_reason') == $reason->CancellationReasonID) { echo 'selected'; } ?>><?php echo $reason->Name; ?></option>
+                                                    <?php } } ?>
+                                                </select>
+                                            </div>
+                                        </div>
                                     </div>
                                     <input type="submit" value="Filter" class="btn btn-light-success font-weight-bold" style="width:80px;">
                                     <input type="button" id="reset" value="Reset" class="btn btn-light-primary font-weight-bold" style="width:80px;">
@@ -435,7 +457,7 @@
                                     <input class="booking_checkbox" type="checkbox" id="check_all">
                                 </th>
                                 <?php if($this->session->userdata('level') != 20) { ?>
-                                    <th style="text-align:center;">SA</th>
+                                    <th style="text-align:center;">TC</th>
                                     <th style="text-align:center;">OP</th>
                                 <?php } ?>
                                 <th class="bc_date" style="text-align:center;">Creation Date</th>
@@ -534,7 +556,7 @@
         $('input[name="booking_date"]').val('');
     }
 
-    <?php if(!empty($this->input->get('booking_number')) || !empty($this->input->get('reservation_number')) || !empty($this->input->get('deadline')) || !empty($this->input->get('customer')) || !empty($this->input->get('mobile')) || !empty($this->input->get('travel_date')) || !empty($this->input->get('destination')) || !empty($this->input->get('sales_agent')) || !empty($this->input->get('tag')) || !empty($this->input->get('chat_language')) || !empty($this->input->get('source')) || !empty($this->input->get('booking_confirmation_title')) || !empty($this->input->get('status')) || !empty($this->input->get('booking_date')) || !empty($this->input->get('autocount_status')) || !empty($this->input->get('guest_list_status'))) { ?>
+    <?php if(!empty($this->input->get('booking_number')) || !empty($this->input->get('reservation_number')) || !empty($this->input->get('deadline')) || !empty($this->input->get('customer')) || !empty($this->input->get('mobile')) || !empty($this->input->get('travel_date')) || !empty($this->input->get('destination')) || !empty($this->input->get('sales_agent')) || !empty($this->input->get('tag')) || !empty($this->input->get('chat_language')) || !empty($this->input->get('source')) || !empty($this->input->get('booking_confirmation_title')) || !empty($this->input->get('status')) || !empty($this->input->get('booking_date')) || !empty($this->input->get('autocount_status')) || !empty($this->input->get('guest_list_status')) || !empty($this->input->get('cancellation_reason'))) { ?>
         $('#booking_header').click();
     <?php } ?>
     
@@ -625,6 +647,61 @@
         
         document.body.removeChild(textArea);
     }
+
+    function Cancel_Booking(background, bookingNumber, bookingId, param)
+    {
+        var reasonOptions = '';
+        <?php if(isset($cancellation_reasons)) { foreach($cancellation_reasons as $reason) { ?>
+            reasonOptions += '<option value="<?php echo $reason->CancellationReasonID; ?>"><?php echo str_replace("'", "\\'", $reason->Name); ?></option>';
+        <?php } } ?>
+
+        const swalWithBootstrapButtons = Swal.mixin({
+            customClass: {
+                confirmButton: 'btn btn-light-success m-2',
+                cancelButton: 'btn btn-danger m-2'
+            },
+            buttonsStyling: true
+        });
+        swalWithBootstrapButtons.fire({
+            width: 550,
+            background: 'url(' + background + ')',
+            icon: 'warning',
+            title: 'Cancel Booking ?',
+            html: '<b>' + bookingNumber + '</b><br><br>' +
+                  '<select id="swal_cancellation_reason" class="form-control" style="text-align:center;">' +
+                  '<option value="">-- SELECT CANCELLATION REASON --</option>' +
+                  reasonOptions +
+                  '</select>',
+            confirmButtonText: 'Confirm',
+            cancelButtonText: 'Cancel',
+            showCancelButton: true,
+            preConfirm: () => {
+                var reason = document.getElementById('swal_cancellation_reason').value;
+                if(!reason) {
+                    Swal.showValidationMessage('Please select a cancellation reason');
+                    return false;
+                }
+                return reason;
+            }
+        }).then((action) => {
+            if(action.isConfirmed) {
+                $.ajax({
+                    url: '<?php echo base_url('Booking/Update_Cancel_Status'); ?>',
+                    type: 'post',
+                    data: {
+                        booking_id: bookingId,
+                        cancellation_reason_id: action.value
+                    },
+                    success: function() {
+                        Display_Message(background, 'Booking ' + bookingNumber + ' Successfully Cancelled', window.location.href);
+                    },
+                    error: function() {
+                        Display_Message(background, 'Booking ' + bookingNumber + ' Could Not Be Cancelled', null);
+                    }
+                });
+            }
+        });
+    }
 </script>
 
 <script>
@@ -695,7 +772,7 @@ $(document).ready(function() {
         var filterParams = {};
         ['customer', 'booking_number', 'reservation_number', 'mobile', 'destination', 'travel_date',
          'deadline', 'source', 'chat_language', 'booking_date', 'status', 'booking_confirmation_title',
-         'tag', 'sales_agent', 'booking_op', 'autocount_status', 'guest_list_status'].forEach(function(param) {
+         'tag', 'sales_agent', 'booking_op', 'autocount_status', 'guest_list_status', 'checklist_filter'].forEach(function(param) {
             if (urlParams.has(param)) {
                 filterParams[param] = urlParams.get(param);
             }
@@ -975,6 +1052,20 @@ function openChecklistModal(bookingId) {
                     html += '<div style="margin: 1rem 0;"></div>';
                 }
                 html += '<h6 class="font-weight-bold mb-3" style="color:#6082B6;">' + escapeHtml(group.product_name) + '</h6>';
+                if(group.PaymentOutSupplierDeposit || group.PaymentOutSupplierFull) {
+                    html += '<div class="mb-3" style="margin-top:-0.5rem;">';
+                    if(group.PaymentOutSupplierDeposit) {
+                        html += '<span class="label label-inline label-light-warning font-weight-bold mr-2">';
+                        html += '<i class="la la-calendar-check-o mr-1" style="font-size:14px;"></i>Supplier Deposit: ' + escapeHtml(group.PaymentOutSupplierDeposit);
+                        html += '</span>';
+                    }
+                    if(group.PaymentOutSupplierFull) {
+                        html += '<span class="label label-inline label-light-primary font-weight-bold">';
+                        html += '<i class="la la-calendar-check-o mr-1" style="font-size:14px;"></i>Supplier Full: ' + escapeHtml(group.PaymentOutSupplierFull);
+                        html += '</span>';
+                    }
+                    html += '</div>';
+                }
                 html += '<div class="checklist-container">';
 
                 for(var ci = 0; ci < group.checklists.length; ci++) {

@@ -46,6 +46,19 @@
                                 </div>
                             </div>
                         </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label>Include Booking Filter
+                                        <span style="color:red;">*</span>
+                                    </label>
+                                    <select id="include_booking_filter" class="form-control">
+                                        <option value="0" <?php if(current_url() == base_url('Package_Checklist/Update') && isset($include_booking_filter) && $include_booking_filter == 0) { echo 'selected'; } elseif(current_url() == base_url('Package_Checklist/Create')) { echo 'selected'; } ?>>No</option>
+                                        <option value="1" <?php if(current_url() == base_url('Package_Checklist/Update') && isset($include_booking_filter) && $include_booking_filter == 1) { echo 'selected'; } ?>>Yes</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
                         <div class="d-flex justify-content-between border-top pt-5">
                             <a class="btn btn-light-primary font-weight-bold d-flex align-items-center justify-content-center px-9 py-4" href="<?php echo base_url('Package_Checklist'); ?>"><i class="la la-arrow-left"></i> Back to List</a>
                             <input type="button" value="<?php if(current_url() == base_url('Package_Checklist/Create')) { echo 'Create'; } else { echo 'Update'; } ?>" class="btn btn-success font-weight-bold px-9 py-4" style="width:180px; margin-left:auto;">
@@ -111,6 +124,7 @@
                         package_checklist.push({
                             name: name,
                             is_required: is_required,
+                            include_booking_filter: $('#include_booking_filter').val(),
                             InsertBy: <?php echo $this->session->userdata('admin_id') ?>,
                             InsertDate: '<?php echo date('Y-m-d H:i:s') ?>'
                         });

@@ -3,14 +3,14 @@ class Package_Checklist_Model extends CI_Model
 {
 	function Read_Package_Checklist()
 	{
-		$this->db->select('ID, name, is_required');
+		$this->db->select('ID, name, is_required, include_booking_filter');
 		$this->db->where('ID', $this->input->get('package_checklist_id'));
 		return $this->db->get('package_checklist')->row_array();
 	}
 
 	function Read_Package_Checklists()
 	{
-		$this->db->select('ID, name, is_required, created_at, updated_at');
+		$this->db->select('ID, name, is_required, include_booking_filter, created_at, updated_at');
 		if(!empty($this->input->get('name'))) {
 			$this->db->like('name', $this->input->get('name'));
 		}
@@ -57,9 +57,17 @@ class Package_Checklist_Model extends CI_Model
 		$this->db->delete('package_checklist');
 	}
 
+	function Read_Booking_Filter_Checklists()
+	{
+		$this->db->select('ID, name');
+		$this->db->where('include_booking_filter', 1);
+		$this->db->order_by('name', 'ASC');
+		return $this->db->get('package_checklist')->result();
+	}
+
 	function Read_Package_Checklist_By_Id($id)
 	{
-		$this->db->select('ID, name, is_required');
+		$this->db->select('ID, name, is_required, include_booking_filter');
 		$this->db->where('ID', $id);
 		return $this->db->get('package_checklist')->row_array();
 	}

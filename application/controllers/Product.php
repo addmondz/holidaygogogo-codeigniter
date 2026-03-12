@@ -51,7 +51,7 @@ class Product extends MY_Controller
 			}
 		} else {
 			$titles = array('tab_title' => 'HolidayGoGoGo | Product', 'breadcrumb_title' => 'Product >> Create');
-			$array = array('ProductID' => 'NA', 'ProductCode' => 'NA');
+			$array = array('ProductID' => 'NA', 'ProductCode' => 'NA', 'is_child_or_infant' => 0);
 			$array['categories'] = $this->Product_Model->Read_Categories();
 			$array['suppliers'] = $this->Product_Model->Read_Suppliers();
 			
@@ -79,6 +79,7 @@ class Product extends MY_Controller
 				$array = $this->Product_Model->Read_Product();
 				$array['RetailPrice'] = $array['RetailPrice'] == 0.00 ? null : number_format($array['RetailPrice'], 2, '.', ',');
             	$array['SupplierPrice'] = $array['SupplierPrice'] == 0.00 ? null : number_format($array['SupplierPrice'], 2, '.', ',');
+				$array['is_child_or_infant'] = $array['is_child_or_infant'] ?? 0;
 				$array['categories'] = $this->Product_Model->Read_Categories();
 				$array['suppliers'] = $this->Product_Model->Read_Suppliers();
             	$array['maxNameLength'] = 99 - strlen($array['ProductCode']) - 3;

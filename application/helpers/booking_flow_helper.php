@@ -564,6 +564,12 @@ if (!function_exists('are_all_checklists_completed')) {
         $total_count = 0;
         $required_completions = array(); // [[product_id, checklist_id], ...]
         foreach ($product_groups as $product_id => $booking_product) {
+            // Skip child/infant products — they don't require checklist completion
+            $product_row = $CI->db->select('is_child_or_infant')->where('ProductID', $product_id)->get('product')->row();
+            if ($product_row && $product_row->is_child_or_infant == 1) {
+                continue;
+            }
+
             $product_checklist_ids = $CI->Product_Package_Checklist_Model->Get_Checklists_For_Product($product_id);
             if (empty($product_checklist_ids)) {
                 $product_checklist_ids = $required_ids;

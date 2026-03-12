@@ -3,7 +3,7 @@ class Payment_Model extends CI_Model
 {
 	function Read_Payment()
 	{
-		$this->db->select('PaymentID, payment.BookingID, payment.SupplierID, Date, Type, Currency, ForeignCurrency, Credit, ReferenceNumber, BankSlip, Debit, Deadline, QuotationNumber, Quotation, InvoiceNumber, Invoice, payment.Bank, payment.BankAccount, payment.BankHolder, DebitRemark, PaymentRemark, payment.Status, Remark, BookingNumber, ReservationNumber, Customer, payment.AutocountSyncAction, payment.AutocountSyncStatus, payment.AutocountSyncMessage, payment.AutocountReferenceNumber');
+		$this->db->select('PaymentID, payment.BookingID, payment.SupplierID, payment.BookingProductID, Date, Type, Currency, ForeignCurrency, Credit, ReferenceNumber, BankSlip, Debit, Deadline, QuotationNumber, Quotation, InvoiceNumber, Invoice, payment.Bank, payment.BankAccount, payment.BankHolder, DebitRemark, PaymentRemark, payment.Status, Remark, BookingNumber, ReservationNumber, Customer, payment.AutocountSyncAction, payment.AutocountSyncStatus, payment.AutocountSyncMessage, payment.AutocountReferenceNumber');
 		$this->db->join('booking', 'booking.BookingID = payment.BookingID', 'left');
 		$this->db->where('PaymentID', $this->input->get('payment_id'));
 		return $this->db->get('payment')->row_array();
@@ -237,6 +237,16 @@ class Payment_Model extends CI_Model
 		return $this->db->get('country_code')->result();
 	}
 
+	function Read_Booking_Products_For_Payment($booking_id)
+	{
+		$this->db->select('bp.BookingProductID, bp.ProductID, p.Name, p.ProductCode');
+		$this->db->from('booking_product bp');
+		$this->db->join('product p', 'p.ProductID = bp.ProductID', 'left');
+		$this->db->where('bp.BookingID', $booking_id);
+		$this->db->where('bp.Status', 'Y');
+		return $this->db->get()->result();
+	}
+
 	function Read_Received_Payments($booking_id) {
 		$this->db->select('Type, Credit, Debit');
 		$this->db->where('BookingID', $booking_id);
@@ -294,6 +304,7 @@ class Payment_Model extends CI_Model
 		$array = array(
 			'BookingID' => $this->input->post('booking'),
 			'SupplierID' => $this->input->post('debit_type-' . $count) == 'SUPPLIER PAYMENT' ? $this->input->post('supplier-' . $count) : null,
+			'BookingProductID' => $this->input->post('debit_type-' . $count) == 'SUPPLIER PAYMENT' ? $this->input->post('booking_product-' . $count) : null,
 			'Date' => $this->input->post('credit_type-' . $count) == 'DEPOSIT' || $this->input->post('credit_type-' . $count) == 'FULL' || $this->input->post('credit_type-' . $count) == 'SUPPLIER REFUND' || $this->input->post('credit_type-' . $count) == 'ADDITIONAL PAYMENT' || $this->input->post('credit_type-' . $count) == 'AGENT COMMISSION FROM SUPPLIER' ? date('Y-m-d', strtotime(str_replace('/', '-', $this->input->post('transaction_date-' . $count)))) : null,
 			'Type' => $this->input->post('credit_type-' . $count) == 'DEPOSIT' || $this->input->post('credit_type-' . $count) == 'FULL' || $this->input->post('credit_type-' . $count) == 'SUPPLIER REFUND' || $this->input->post('credit_type-' . $count) == 'ADDITIONAL PAYMENT' || $this->input->post('credit_type-' . $count) == 'AGENT COMMISSION FROM SUPPLIER' ? $this->input->post('credit_type-' . $count) : $this->input->post('debit_type-' . $count),
 			'Credit' => $this->input->post('credit_type-' . $count) == 'DEPOSIT' || $this->input->post('credit_type-' . $count) == 'FULL' || $this->input->post('credit_type-' . $count) == 'SUPPLIER REFUND' || $this->input->post('credit_type-' . $count) == 'ADDITIONAL PAYMENT' || $this->input->post('credit_type-' . $count) == 'AGENT COMMISSION FROM SUPPLIER' ? str_replace(',', '', $this->input->post('credit-' . $count)) : 0.00,
@@ -844,7 +855,7 @@ return $query->result_array(); // instead of result()
 
 	function Calculate_Payment_Summary()
 	{
-		$this->db->select('SUM(Credit) as total_credit, SUM(Debit) as total_debit');
+		$this->db->select("SUM(CASE WHEN Type != 'AGENT COMMISSION FROM SUPPLIER' THEN Credit ELSE 0 END) as total_credit, SUM(Debit) as total_debit");
 		$this->db->from('booking');
 		$this->db->join('payment', 'payment.BookingID = booking.BookingID', 'left');
 		$this->db->join('admin', 'admin.AdminID = booking.SalesAgent', 'left');
