@@ -11,5 +11,4 @@ Any API keys or custom config
 php index.php run_sql_patches
 
 4. GoHighLevel sync
-   - Conversations: `php index.php Cron syncGhlConversations`
    - Users: `php index.php Cron syncGhlUsers`
