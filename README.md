@@ -15,3 +15,4 @@
 	- Contacts recent 3 days sync: `php index.php Cron syncGhlContacts` | Sync full `php index.php Cron syncGhlContacts --full`
 	- Conversations recent 3 days sync: `php index.php Cron syncGhlConversations` | Sync full `php index.php Cron syncGhlConversations --full`
 	- Messages recent 3 days sync: `php index.php Cron syncGhlMessages` | Sync full `php index.php Cron syncGhlMessages --full`
+	- Opportunities recent 3 days sync: `php index.php Cron syncGhlOpportunities` | Sync full `php index.php Cron syncGhlOpportunities --full`

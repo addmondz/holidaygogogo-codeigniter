@@ -1213,6 +1213,33 @@ class Cron extends CI_Controller
 	}
 
 	/**
+	 * GHL opportunities sync. CLI only: php index.php Cron syncGhlOpportunities
+	 */
+	public function syncGhlOpportunities()
+	{
+		if (!$this->input->is_cli_request()) {
+			show_error('Not allowed', 403);
+			return;
+		}
+
+		$args = isset($_SERVER['argv']) ? $_SERVER['argv'] : array();
+		$uriSegments = $this->uri->segment_array();
+		$flags = array_merge(
+			array_slice($args, 3),
+			$uriSegments ? array_slice($uriSegments, 2) : array()
+		);
+
+		$this->load->library('GhlOpportunitiesSyncService');
+		$result = $this->ghlopportunitiessyncservice->sync(array(
+			'mode' => in_array('--full', $flags, true) ? 'full' : 'recent',
+		));
+
+		$this->output
+			->set_content_type('application/json')
+			->set_output(json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+	}
+
+	/**
 	 * GHL messages sync. CLI only: php index.php Cron syncGhlMessages
 	 */
 	public function syncGhlMessages()
