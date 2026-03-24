@@ -80,7 +80,8 @@ class GhlUsersSyncService
                 'total_page' => 1,
                 'total_data' => $apiTotal !== null ? (int) $apiTotal : 0,
                 'pulled_count' => (int) $pulled,
-                'updated_count' => (int) $updated
+                'updated_count' => (int) $updated,
+                'completed_at' => date('Y-m-d H:i:s'),
             ));
 
             return array(
@@ -159,6 +160,10 @@ class GhlUsersSyncService
         }
         if (isset($meta['updated_count'])) {
             $record['updated_count'] = (int) $meta['updated_count'];
+        }
+
+        if (isset($meta['completed_at'])) {
+            $record['completed_at'] = $meta['completed_at'];
         }
         $this->CI->Ghl_Sync_Model->create_log($record);
     }

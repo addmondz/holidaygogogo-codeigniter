@@ -44,6 +44,9 @@ class Ghl_Sync_Model extends CI_Model
             'pulled_count' => isset($data['pulled_count']) ? (int) $data['pulled_count'] : 0,
             'updated_count' => isset($data['updated_count']) ? (int) $data['updated_count'] : 0,
         );
+        if (isset($data['completed_at']) && $data['completed_at'] !== '') {
+            $payload['completed_at'] = (string) $data['completed_at'];
+        }
         $payload = $this->filter_run_log_payload($payload);
 
         $existing = $this->db

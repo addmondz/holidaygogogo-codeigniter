@@ -1,7 +1,7 @@
 <?php
 defined('BASEPATH') or exit('No direct script access allowed');
 
-class GhlConversationsSyncService
+class GhlMessagesSyncService
 {
     protected $CI;
 
@@ -9,7 +9,7 @@ class GhlConversationsSyncService
     {
         $this->CI = &get_instance();
         $this->CI->load->model('Ghl_Sync_Model');
-        $this->CI->load->model('Ghl_Conversations_Model');
+        $this->CI->load->model('Ghl_Messages_Model');
     }
 
     public function sync($options = array())
@@ -22,8 +22,8 @@ class GhlConversationsSyncService
             $mode = 'recent';
         }
 
-        $syncKey = 'ghl_conversations_' . $config['location_id'];
-        $moduleName = 'ghl_conversations';
+        $syncKey = 'ghl_messages_' . $config['location_id'];
+        $moduleName = 'ghl_messages';
         $runId = $this->CI->Ghl_Sync_Model->generate_run_id($moduleName);
         $cutoff = $this->buildCutoffDateTime($config['days_back']);
 
@@ -41,12 +41,12 @@ class GhlConversationsSyncService
         $updatedTotal = 0;
         $insertedTotal = 0;
         $apiTotal = null;
-        $startAfterDate = null;
+        $cursor = null;
 
         try {
             do {
                 $page++;
-                $response = $this->requestConversations($config, $startAfterDate);
+                $response = $this->requestMessages($config, $cursor);
 
                 if ($response['status'] >= 400) {
                     $this->logEvent($runId, $moduleName, array(
@@ -60,13 +60,10 @@ class GhlConversationsSyncService
                     throw new Exception('GHL API error: HTTP ' . $response['status'] . ' - ' . $response['error']);
                 }
 
-                $conversations = $this->extractConversations($response['body']);
-                $pulled = count($conversations);
+                $messages = $this->extractMessages($response['body']);
+                $pulled = count($messages);
                 $pulledTotal += $pulled;
 
-                if ($apiTotal === null && isset($response['body']['total'])) {
-                    $apiTotal = (int) $response['body']['total'];
-                }
                 if ($apiTotal === null) {
                     $apiTotal = $this->extractApiTotal($response['body'], $pulled);
                 }
@@ -75,13 +72,13 @@ class GhlConversationsSyncService
                     break;
                 }
 
-                foreach ($conversations as $conversation) {
-                    $normalized = $this->normalizeConversation($conversation);
+                foreach ($messages as $message) {
+                    $normalized = $this->normalizeMessage($message);
                     if (!$normalized) {
                         continue;
                     }
 
-                    $writeResult = $this->CI->Ghl_Conversations_Model->upsert_conversation($normalized);
+                    $writeResult = $this->CI->Ghl_Messages_Model->upsert_message($normalized);
                     if ($writeResult === 'inserted') {
                         $insertedTotal++;
                     } elseif ($writeResult === 'updated') {
@@ -89,8 +86,8 @@ class GhlConversationsSyncService
                     }
                 }
 
-                $lastConversation = end($conversations);
-                $startAfterDate = $this->extractCursor($lastConversation);
+                $lastMessage = end($messages);
+                $cursor = isset($response['body']['nextCursor']) ? (string) $response['body']['nextCursor'] : null;
 
                 $this->logEvent($runId, $moduleName, array(
                     'full_sync' => $mode === 'full' ? 1 : 0,
@@ -101,11 +98,11 @@ class GhlConversationsSyncService
                     'updated_count' => (int) $updatedTotal,
                 ));
 
-                if ($mode !== 'full' && $this->shouldStopAfterPage($lastConversation, $cutoff)) {
+                if ($mode !== 'full' && $this->shouldStopAfterPage($lastMessage, $cutoff)) {
                     break;
                 }
 
-                if ($startAfterDate === null) {
+                if ($cursor === null || $cursor === '') {
                     break;
                 }
             } while (true);
@@ -161,12 +158,13 @@ class GhlConversationsSyncService
     {
         return array(
             'base_url' => 'https://services.leadconnectorhq.com',
-            'conversations_path' => '/conversations/search',
+            'messages_path' => '/conversations/messages/export',
             'token' => (string) get_env('GHL_API_TOKEN'),
             'api_version' => (string) (get_env('GHL_API_VERSION') ?: '2021-07-28'),
             'location_id' => (string) get_env('GHL_LOCATION_ID'),
             'page_limit' => (int) (get_env('GHL_PAGE_SIZE') ?: 100),
-            'days_back' => (int) (get_env('GHL_CONVERSATIONS_SYNC_DAYS') ?: 3),
+            'days_back' => (int) (get_env('GHL_MESSAGES_SYNC_DAYS') ?: 3),
+            'channel' => trim((string) get_env('GHL_MESSAGES_CHANNEL')),
         );
     }
 
@@ -180,29 +178,31 @@ class GhlConversationsSyncService
             throw new Exception('Missing GHL_LOCATION_ID in .env');
         }
 
-        if ((int) $config['page_limit'] <= 0) {
-            throw new Exception('GHL_PAGE_SIZE must be greater than 0');
+        if ((int) $config['page_limit'] < 10) {
+            throw new Exception('GHL_PAGE_SIZE must be at least 10 for messages export');
         }
 
         if ((int) $config['days_back'] < 0) {
-            throw new Exception('GHL_CONVERSATIONS_SYNC_DAYS cannot be negative');
+            throw new Exception('GHL_MESSAGES_SYNC_DAYS cannot be negative');
         }
     }
 
-    protected function requestConversations($config, $startAfterDate = null)
+    protected function requestMessages($config, $cursor = null)
     {
         $query = array(
             'locationId' => $config['location_id'],
             'limit' => $config['page_limit'],
-            'sortBy' => 'last_message_date',
-            'sort' => 'desc',
         );
 
-        if ($startAfterDate !== null && $startAfterDate !== '') {
-            $query['startAfterDate'] = $startAfterDate;
+        if (!empty($config['channel'])) {
+            $query['channel'] = $config['channel'];
         }
 
-        $url = rtrim($config['base_url'], '/') . $config['conversations_path'] . '?' . http_build_query($query);
+        if ($cursor !== null && $cursor !== '') {
+            $query['cursor'] = $cursor;
+        }
+
+        $url = rtrim($config['base_url'], '/') . $config['messages_path'] . '?' . http_build_query($query);
 
         $headers = array(
             'Accept: application/json',
@@ -213,9 +213,9 @@ class GhlConversationsSyncService
         return $this->curlRequest('GET', $url, array(), $headers);
     }
 
-    protected function extractConversations($body)
+    protected function extractMessages($body)
     {
-        return isset($body['conversations']) && is_array($body['conversations']) ? $body['conversations'] : array();
+        return isset($body['messages']) && is_array($body['messages']) ? $body['messages'] : array();
     }
 
     protected function extractApiTotal($body, $fallback = null)
@@ -226,7 +226,6 @@ class GhlConversationsSyncService
             isset($body['meta']['total']) ? $body['meta']['total'] : null,
             isset($body['meta']['count']) ? $body['meta']['count'] : null,
             isset($body['meta']['totalCount']) ? $body['meta']['totalCount'] : null,
-            isset($body['meta']['records']) ? $body['meta']['records'] : null,
         );
 
         foreach ($candidates as $candidate) {
@@ -238,67 +237,50 @@ class GhlConversationsSyncService
         return $fallback !== null ? (int) $fallback : null;
     }
 
-    protected function normalizeConversation($conversation)
+    protected function normalizeMessage($message)
     {
-        if (!is_array($conversation)) {
+        if (!is_array($message)) {
             return null;
         }
 
-        $conversationId = isset($conversation['id']) ? trim((string) $conversation['id']) : '';
-        if ($conversationId === '') {
+        $messageId = isset($message['id']) ? trim((string) $message['id']) : '';
+        if ($messageId === '') {
             return null;
         }
+
+        $meta = $message;
+        unset($meta['attachments']);
 
         return array(
-            'conversation_id' => $conversationId,
-            'location_id' => isset($conversation['locationId']) ? (string) $conversation['locationId'] : null,
-            'contact_id' => isset($conversation['contactId']) ? (string) $conversation['contactId'] : null,
-            'assigned_to' => isset($conversation['assignedTo']) ? (string) $conversation['assignedTo'] : null,
-            'full_name' => isset($conversation['fullName']) ? (string) $conversation['fullName'] : null,
-            'contact_name' => isset($conversation['contactName']) ? (string) $conversation['contactName'] : null,
-            'company_name' => isset($conversation['companyName']) ? (string) $conversation['companyName'] : null,
-            'phone' => isset($conversation['phone']) ? (string) $conversation['phone'] : null,
-            'conversation_type' => isset($conversation['type']) ? (string) $conversation['type'] : null,
-            'inbox' => !empty($conversation['inbox']) ? 1 : 0,
-            'unread_count' => isset($conversation['unreadCount']) ? (int) $conversation['unreadCount'] : 0,
-            'last_message_type' => isset($conversation['lastMessageType']) ? (string) $conversation['lastMessageType'] : null,
-            'last_message_body' => isset($conversation['lastMessageBody']) ? (string) $conversation['lastMessageBody'] : null,
-            'last_message_direction' => isset($conversation['lastMessageDirection']) ? (string) $conversation['lastMessageDirection'] : null,
-            'last_outbound_message_action' => isset($conversation['lastOutboundMessageAction']) ? (string) $conversation['lastOutboundMessageAction'] : null,
-            'last_internal_comment' => isset($conversation['lastInternalComment']) ? (string) $conversation['lastInternalComment'] : null,
-            'is_last_message_internal_comment' => !empty($conversation['isLastMessageInternalComment']) ? 1 : 0,
-            'date_added' => $this->normalizeTimestampMs(isset($conversation['dateAdded']) ? $conversation['dateAdded'] : null),
-            'date_updated' => $this->normalizeTimestampMs(isset($conversation['dateUpdated']) ? $conversation['dateUpdated'] : null),
-            'last_message_date' => $this->normalizeTimestampMs(isset($conversation['lastMessageDate']) ? $conversation['lastMessageDate'] : null),
-            'last_inbound_whatsapp_message_date' => $this->normalizeTimestampMs(isset($conversation['lastInboundWhatsappMessageDate']) ? $conversation['lastInboundWhatsappMessageDate'] : null),
-            'last_manual_message_date' => $this->normalizeTimestampMs(isset($conversation['lastManualMessageDate']) ? $conversation['lastManualMessageDate'] : null),
-            'followers_json' => $this->encodeJson(isset($conversation['followers']) ? $conversation['followers'] : null),
-            'mentions_json' => $this->encodeJson(isset($conversation['mentions']) ? $conversation['mentions'] : null),
-            'tags_json' => $this->encodeJson(isset($conversation['tags']) ? $conversation['tags'] : null),
-            'scoring_json' => $this->encodeJson(isset($conversation['scoring']) ? $conversation['scoring'] : null),
-            'sort_json' => $this->encodeJson(isset($conversation['sort']) ? $conversation['sort'] : null),
-            'attributed_json' => $this->encodeJson(isset($conversation['attributed']) ? $conversation['attributed'] : null),
-            // 'raw_json' => $this->encodeJson($conversation),
+            'message_id' => $messageId,
+            'location_id' => isset($message['locationId']) ? (string) $message['locationId'] : null,
+            'conversation_id' => isset($message['conversationId']) ? (string) $message['conversationId'] : null,
+            'contact_id' => isset($message['contactId']) ? (string) $message['contactId'] : null,
+            'user_id' => isset($message['userId']) ? (string) $message['userId'] : null,
+            'alt_id' => isset($message['altId']) ? (string) $message['altId'] : null,
+            'direction' => isset($message['direction']) ? (string) $message['direction'] : null,
+            'status' => isset($message['status']) ? (string) $message['status'] : null,
+            'message_type_code' => isset($message['type']) && $message['type'] !== '' ? (int) $message['type'] : null,
+            'message_type' => isset($message['messageType']) ? (string) $message['messageType'] : null,
+            'content_type' => isset($message['contentType']) ? (string) $message['contentType'] : null,
+            'body' => isset($message['body']) ? (string) $message['body'] : null,
+            'from_number' => isset($message['from']) ? (string) $message['from'] : null,
+            'to_number' => isset($message['to']) ? (string) $message['to'] : null,
+            'date_added' => $this->normalizeUtcDateTime(isset($message['dateAdded']) ? $message['dateAdded'] : null),
+            'date_updated' => $this->normalizeUtcDateTime(isset($message['dateUpdated']) ? $message['dateUpdated'] : null),
+            'attachments_json' => $this->encodeJson(isset($message['attachments']) ? $message['attachments'] : null),
+            // 'meta_json' => $this->encodeJson($meta),
+            // 'raw_json' => $this->encodeJson($message),
         );
     }
 
-    protected function extractCursor($conversation)
+    protected function shouldStopAfterPage($lastMessage, DateTimeImmutable $cutoff)
     {
-        if (!is_array($conversation) || !isset($conversation['lastMessageDate'])) {
-            return null;
-        }
-
-        $cursor = (string) $conversation['lastMessageDate'];
-        return $cursor === '' ? null : $cursor;
-    }
-
-    protected function shouldStopAfterPage($lastConversation, DateTimeImmutable $cutoff)
-    {
-        if (!is_array($lastConversation) || !isset($lastConversation['lastMessageDate'])) {
+        if (!is_array($lastMessage)) {
             return false;
         }
 
-        $date = $this->timestampMsToDateTimeImmutable($lastConversation['lastMessageDate'], $cutoff->getTimezone());
+        $date = $this->parseUtcDateTime(isset($lastMessage['dateAdded']) ? $lastMessage['dateAdded'] : null, $cutoff->getTimezone());
         if ($date === null) {
             return false;
         }
@@ -316,29 +298,21 @@ class GhlConversationsSyncService
             ->modify('-' . $daysBack . ' days');
     }
 
-    protected function normalizeTimestampMs($value)
+    protected function normalizeUtcDateTime($value)
     {
-        $date = $this->timestampMsToDateTimeImmutable($value, new DateTimeZone('UTC'));
+        $date = $this->parseUtcDateTime($value, new DateTimeZone('UTC'));
         return $date ? $date->format('Y-m-d H:i:s') : null;
     }
 
-    protected function timestampMsToDateTimeImmutable($value, DateTimeZone $timezone)
+    protected function parseUtcDateTime($value, DateTimeZone $timezone)
     {
-        if ($value === null || $value === '') {
-            return null;
-        }
-
-        if (!is_numeric($value)) {
+        $value = trim((string) $value);
+        if ($value === '') {
             return null;
         }
 
         try {
-            $seconds = ((float) $value) / 1000;
-            $date = DateTimeImmutable::createFromFormat('U.u', number_format($seconds, 3, '.', ''), new DateTimeZone('UTC'));
-            if (!$date) {
-                $date = new DateTimeImmutable('@' . (int) floor($seconds));
-            }
-
+            $date = new DateTimeImmutable($value, new DateTimeZone('UTC'));
             return $date->setTimezone($timezone);
         } catch (Exception $e) {
             return null;
@@ -428,7 +402,13 @@ class GhlConversationsSyncService
         }
 
         if ($error === null && $status >= 400) {
-            $error = isset($decoded['message']) ? $decoded['message'] : 'HTTP error';
+            if (isset($decoded['message'])) {
+                $error = is_array($decoded['message'])
+                    ? implode('; ', $decoded['message'])
+                    : (string) $decoded['message'];
+            } else {
+                $error = 'HTTP error';
+            }
         }
 
         return array(

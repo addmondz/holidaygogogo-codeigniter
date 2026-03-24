@@ -1,0 +1,35 @@
+-- GHL (GoHighLevel) messages sync table
+-- Stores messages fetched from GET https://services.leadconnectorhq.com/conversations/messages/export
+
+CREATE TABLE IF NOT EXISTS `ghl_messages` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `message_id` VARCHAR(100) NOT NULL COMMENT 'GHL message id',
+  `location_id` VARCHAR(100) NULL DEFAULT NULL,
+  `conversation_id` VARCHAR(100) NULL DEFAULT NULL,
+  `contact_id` VARCHAR(100) NULL DEFAULT NULL,
+  `user_id` VARCHAR(100) NULL DEFAULT NULL COMMENT 'GHL user id',
+  `alt_id` VARCHAR(255) NULL DEFAULT NULL,
+  `direction` VARCHAR(50) NULL DEFAULT NULL,
+  `status` VARCHAR(100) NULL DEFAULT NULL,
+  `message_type_code` INT NULL DEFAULT NULL,
+  `message_type` VARCHAR(100) NULL DEFAULT NULL,
+  `content_type` VARCHAR(100) NULL DEFAULT NULL,
+  `body` MEDIUMTEXT NULL,
+  `from_number` VARCHAR(100) NULL DEFAULT NULL,
+  `to_number` VARCHAR(100) NULL DEFAULT NULL,
+  `date_added` DATETIME NULL DEFAULT NULL,
+  `date_updated` DATETIME NULL DEFAULT NULL,
+  `attachments_json` JSON NULL,
+  `meta_json` JSON NULL,
+  `raw_json` JSON NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_message_id` (`message_id`),
+  KEY `idx_location_id` (`location_id`),
+  KEY `idx_conversation_id` (`conversation_id`),
+  KEY `idx_contact_id` (`contact_id`),
+  KEY `idx_user_id` (`user_id`),
+  KEY `idx_date_added` (`date_added`),
+  KEY `idx_date_updated` (`date_updated`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
