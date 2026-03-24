@@ -39,6 +39,8 @@ class GhlContactsSyncService
         );
 
         $this->logEvent($runId, $moduleName, array(
+            'full_sync' => $mode === 'full' ? 1 : 0,
+            'status' => 'running',
             'mode' => $mode,
             'days_back' => (int) $config['days_back'],
             'page_limit' => (int) $config['page_limit'],
@@ -55,6 +57,7 @@ class GhlContactsSyncService
         $pulledTotal = 0;
         $insertedTotal = 0;
         $updatedTotal = 0;
+        $apiTotal = null;
         $nextPageUrl = null;
 
         try {
@@ -64,7 +67,10 @@ class GhlContactsSyncService
 
                 if ($response['status'] >= 400) {
                     $this->logEvent($runId, $moduleName, array(
+                        'full_sync' => $mode === 'full' ? 1 : 0,
+                        'status' => 'running',
                         'total_page' => (int) $page,
+                        'total_data' => $apiTotal !== null ? (int) $apiTotal : 0,
                         'pulled_count' => (int) $pulledTotal,
                         'updated_count' => (int) $updatedTotal,
                     ));
@@ -74,6 +80,9 @@ class GhlContactsSyncService
                 $contacts = $this->extractContacts($response['body']);
                 $pulled = count($contacts);
                 $pulledTotal += $pulled;
+                if ($apiTotal === null) {
+                    $apiTotal = $this->extractApiTotal($response['body'], $pulled);
+                }
 
                 if ($pulled === 0) {
                     break; // no more data
@@ -105,14 +114,20 @@ class GhlContactsSyncService
                 );
 
                 $this->logEvent($runId, $moduleName, array(
+                    'full_sync' => $mode === 'full' ? 1 : 0,
+                    'status' => 'running',
                     'total_page' => (int) $page,
+                    'total_data' => $apiTotal !== null ? (int) $apiTotal : 0,
                     'pulled_count' => (int) $pulledTotal,
                     'updated_count' => (int) $updatedTotal,
                 ));
 
                 if ($mode !== 'full' && $this->shouldStopAfterPage($lastContact, $cutoff)) {
                     $this->logEvent($runId, $moduleName, array(
+                        'full_sync' => $mode === 'full' ? 1 : 0,
+                        'status' => 'running',
                         'total_page' => (int) $page,
+                        'total_data' => $apiTotal !== null ? (int) $apiTotal : 0,
                         'pulled_count' => (int) $pulledTotal,
                         'updated_count' => (int) $updatedTotal,
                     ));
@@ -124,7 +139,10 @@ class GhlContactsSyncService
             } while (!empty($nextPageUrl));
 
             $this->logEvent($runId, $moduleName, array(
+                'full_sync' => $mode === 'full' ? 1 : 0,
+                'status' => 'completed',
                 'total_page' => (int) $page,
+                'total_data' => $apiTotal !== null ? (int) $apiTotal : 0,
                 'pulled_count' => (int) $pulledTotal,
                 'updated_count' => (int) $updatedTotal,
             ));
@@ -136,6 +154,7 @@ class GhlContactsSyncService
                 'mode' => $mode,
                 'sync_key' => $syncKey,
                 'total_page' => (int) $page,
+                'total_data' => $apiTotal !== null ? (int) $apiTotal : 0,
                 'pulled_count' => (int) $pulledTotal,
                 'updated_count' => (int) $updatedTotal,
                 'page_limit' => (int) $config['page_limit'],
@@ -145,7 +164,10 @@ class GhlContactsSyncService
             );
         } catch (Exception $e) {
             $this->logEvent($runId, $moduleName, array(
+                'full_sync' => $mode === 'full' ? 1 : 0,
+                'status' => 'failed',
                 'total_page' => (int) $page,
+                'total_data' => $apiTotal !== null ? (int) $apiTotal : 0,
                 'pulled_count' => (int) $pulledTotal,
                 'updated_count' => (int) $updatedTotal
             ));
@@ -220,6 +242,26 @@ class GhlContactsSyncService
         return isset($body['contacts']) && is_array($body['contacts']) ? $body['contacts'] : array();
     }
 
+    protected function extractApiTotal($body, $fallback = null)
+    {
+        $candidates = array(
+            isset($body['total']) ? $body['total'] : null,
+            isset($body['count']) ? $body['count'] : null,
+            isset($body['meta']['total']) ? $body['meta']['total'] : null,
+            isset($body['meta']['count']) ? $body['meta']['count'] : null,
+            isset($body['meta']['totalCount']) ? $body['meta']['totalCount'] : null,
+            isset($body['meta']['records']) ? $body['meta']['records'] : null,
+        );
+
+        foreach ($candidates as $candidate) {
+            if ($candidate !== null && $candidate !== '' && is_numeric($candidate)) {
+                return (int) $candidate;
+            }
+        }
+
+        return $fallback !== null ? (int) $fallback : null;
+    }
+
     protected function normalizeContact($contact)
     {
         if (!is_array($contact)) {
@@ -264,6 +306,18 @@ class GhlContactsSyncService
 
         if (isset($meta['total_page'])) {
             $record['total_page'] = (int) $meta['total_page'];
+        }
+
+        if (isset($meta['total_data'])) {
+            $record['total_data'] = (int) $meta['total_data'];
+        }
+
+        if (isset($meta['full_sync'])) {
+            $record['full_sync'] = !empty($meta['full_sync']) ? 1 : 0;
+        }
+
+        if (isset($meta['status'])) {
+            $record['status'] = (string) $meta['status'];
         }
 
         if (isset($meta['pulled_count'])) {

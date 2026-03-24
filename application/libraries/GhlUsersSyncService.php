@@ -28,7 +28,10 @@ class GhlUsersSyncService
         $runId = $this->CI->Ghl_Sync_Model->generate_run_id($moduleName);
 
         $this->logEvent($runId, $moduleName, array(
+            'full_sync' => 1,
+            'status' => 'running',
             'total_page' => 0,
+            'total_data' => 0,
             'pulled_count' => 0,
             'updated_count' => 0,
         ));
@@ -36,13 +39,17 @@ class GhlUsersSyncService
         $pulled = 0;
         $inserted = 0;
         $updated = 0;
+        $apiTotal = null;
 
         try {
             $response = $this->requestUsers($config);
 
             if ($response['status'] >= 400) {
                 $this->logEvent($runId, $moduleName, array(
+                    'full_sync' => 1,
+                    'status' => 'running',
                     'total_page' => 0,
+                    'total_data' => $apiTotal !== null ? (int) $apiTotal : 0,
                     'pulled_count' => (int) $pulled,
                     'updated_count' => (int) $updated,
                 ));
@@ -51,6 +58,7 @@ class GhlUsersSyncService
 
             $users = $this->extractUsers($response['body']);
             $pulled = count($users);
+            $apiTotal = $this->extractApiTotal($response['body'], $pulled);
 
             foreach ($users as $user) {
                 $normalized = $this->normalizeUser($user, $config['location_id'], $runId);
@@ -67,7 +75,10 @@ class GhlUsersSyncService
             }
 
             $this->logEvent($runId, $moduleName, array(
+                'full_sync' => 1,
+                'status' => 'completed',
                 'total_page' => 1,
+                'total_data' => $apiTotal !== null ? (int) $apiTotal : 0,
                 'pulled_count' => (int) $pulled,
                 'updated_count' => (int) $updated
             ));
@@ -78,6 +89,7 @@ class GhlUsersSyncService
                 'module_name' => $moduleName,
                 'sync_key' => $syncKey,
                 'total_page' => 1,
+                'total_data' => $apiTotal !== null ? (int) $apiTotal : 0,
                 'pulled' => $pulled,
                 'updated' => $updated,
                 'pulled_count' => $pulled,
@@ -85,7 +97,10 @@ class GhlUsersSyncService
             );
         } catch (Exception $e) {
             $this->logEvent($runId, $moduleName, array(
+                'full_sync' => 1,
+                'status' => 'failed',
                 'total_page' => 0,
+                'total_data' => $apiTotal !== null ? (int) $apiTotal : 0,
                 'pulled_count' => (int) $pulled,
                 'updated_count' => (int) $updated
             ));
@@ -129,6 +144,15 @@ class GhlUsersSyncService
         );
         if (isset($meta['total_page'])) {
             $record['total_page'] = (int) $meta['total_page'];
+        }
+        if (isset($meta['total_data'])) {
+            $record['total_data'] = (int) $meta['total_data'];
+        }
+        if (isset($meta['full_sync'])) {
+            $record['full_sync'] = !empty($meta['full_sync']) ? 1 : 0;
+        }
+        if (isset($meta['status'])) {
+            $record['status'] = (string) $meta['status'];
         }
         if (isset($meta['pulled_count'])) {
             $record['pulled_count'] = (int) $meta['pulled_count'];
@@ -210,6 +234,26 @@ class GhlUsersSyncService
             return $body['data']['users'];
         }
         return array();
+    }
+
+    protected function extractApiTotal($body, $fallback = null)
+    {
+        $candidates = array(
+            isset($body['total']) ? $body['total'] : null,
+            isset($body['count']) ? $body['count'] : null,
+            isset($body['meta']['total']) ? $body['meta']['total'] : null,
+            isset($body['meta']['count']) ? $body['meta']['count'] : null,
+            isset($body['meta']['totalCount']) ? $body['meta']['totalCount'] : null,
+            isset($body['meta']['records']) ? $body['meta']['records'] : null,
+        );
+
+        foreach ($candidates as $candidate) {
+            if ($candidate !== null && $candidate !== '' && is_numeric($candidate)) {
+                return (int) $candidate;
+            }
+        }
+
+        return $fallback !== null ? (int) $fallback : null;
     }
 
     /**

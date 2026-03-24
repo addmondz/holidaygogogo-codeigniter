@@ -34,31 +34,23 @@ class Ghl_Contacts_Model extends CI_Model
             $insert[$column] = array_key_exists($column, $data) ? $data[$column] : null;
         }
 
-        $sql = "INSERT INTO `ghl_contacts` (`contact_id`, `first_name`, `last_name`, `email`, `phone`, `assigned_to`, `date_added`) VALUES (?, ?, ?, ?, ?, ?, ?) "
-            . "ON DUPLICATE KEY UPDATE "
-            . "`first_name` = VALUES(`first_name`), "
-            . "`last_name` = VALUES(`last_name`), "
-            . "`email` = VALUES(`email`), "
-            . "`phone` = VALUES(`phone`), "
-            . "`assigned_to` = VALUES(`assigned_to`), "
-            . "`date_added` = VALUES(`date_added`), "
-            . "`updated_at` = CURRENT_TIMESTAMP";
+        if (!empty($existing['id'])) {
+            $updated = $this->db
+                ->where('id', (int) $existing['id'])
+                ->update('ghl_contacts', array(
+                    'first_name' => $insert['first_name'],
+                    'last_name' => $insert['last_name'],
+                    'email' => $insert['email'],
+                    'phone' => $insert['phone'],
+                    'assigned_to' => $insert['assigned_to'],
+                    'date_added' => $insert['date_added'],
+                ));
 
-        $success = $this->db->query($sql, array(
-            $insert['contact_id'],
-            $insert['first_name'],
-            $insert['last_name'],
-            $insert['email'],
-            $insert['phone'],
-            $insert['assigned_to'],
-            $insert['date_added'],
-        ));
-
-        if (!$success) {
-            return false;
+            return $updated ? 'updated' : false;
         }
 
-        return empty($existing['id']) ? 'inserted' : 'updated';
+        $inserted = $this->db->insert('ghl_contacts', $insert);
+        return $inserted ? 'inserted' : false;
     }
 
     public function get_last_contact_cursor()

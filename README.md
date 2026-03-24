@@ -12,5 +12,5 @@
 
 4. GoHighLevel sync
 	- Users: full sync on every run via `php index.php Cron syncGhlUsers`
-	- Contacts recent sync: `php index.php Cron syncGhlContacts` - pulls by page and stops when the last record on a page is older than `GHL_CONTACTS_SYNC_DAYS` (default `3`).
-	- Contacts full sync: `php index.php Cron syncGhlContacts --full` - pulls all pages until the end.
+	- Contacts recent 3 days sync: `php index.php Cron syncGhlContacts` | Sync full `php index.php Cron syncGhlContacts --full`
+	- Conversations recent 3 days sync: `php index.php Cron syncGhlConversations` | Sync full `php index.php Cron syncGhlConversations --full`

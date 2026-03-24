@@ -1185,6 +1185,33 @@ class Cron extends CI_Controller
 			->set_output(json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
 	}
 
+	/**
+	 * GHL conversations sync. CLI only: php index.php Cron syncGhlConversations
+	 */
+	public function syncGhlConversations()
+	{
+		if (!$this->input->is_cli_request()) {
+			show_error('Not allowed', 403);
+			return;
+		}
+
+		$args = isset($_SERVER['argv']) ? $_SERVER['argv'] : array();
+		$uriSegments = $this->uri->segment_array();
+		$flags = array_merge(
+			array_slice($args, 3),
+			$uriSegments ? array_slice($uriSegments, 2) : array()
+		);
+
+		$this->load->library('GhlConversationsSyncService');
+		$result = $this->ghlconversationssyncservice->sync(array(
+			'mode' => in_array('--full', $flags, true) ? 'full' : 'recent',
+		));
+
+		$this->output
+			->set_content_type('application/json')
+			->set_output(json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+	}
+
 	public function AddCustomerFromAutoCount()
 	{
 		$this->load->helper('autocount');

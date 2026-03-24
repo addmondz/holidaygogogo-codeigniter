@@ -12,7 +12,7 @@ class Ghl_Sync_Model extends CI_Model
             return '';
         }
 
-        $timestamp = date('Ymd-Hi');
+        $timestamp = date('Ymd-His');
         $baseRunId = $moduleName . '_' . $timestamp;
         $runId = $baseRunId;
         $suffix = 1;
@@ -38,6 +38,9 @@ class Ghl_Sync_Model extends CI_Model
             'RunID' => $runId,
             'module_name' => $moduleName,
             'total_page' => isset($data['total_page']) ? (int) $data['total_page'] : 0,
+            'total_data' => isset($data['total_data']) ? (int) $data['total_data'] : 0,
+            'full_sync' => isset($data['full_sync']) ? ((int) !empty($data['full_sync'])) : 0,
+            'status' => $this->normalize_run_log_status(isset($data['status']) ? $data['status'] : null),
             'pulled_count' => isset($data['pulled_count']) ? (int) $data['pulled_count'] : 0,
             'updated_count' => isset($data['updated_count']) ? (int) $data['updated_count'] : 0,
         );
@@ -89,6 +92,19 @@ class Ghl_Sync_Model extends CI_Model
         }
 
         return $filtered;
+    }
+
+    protected function normalize_run_log_status($status)
+    {
+        $status = strtolower(trim((string) $status));
+        $allowed = array(
+            'pending' => true,
+            'running' => true,
+            'completed' => true,
+            'failed' => true,
+        );
+
+        return isset($allowed[$status]) ? $status : 'pending';
     }
 
     protected function get_run_log_columns()
