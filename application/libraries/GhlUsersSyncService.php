@@ -24,9 +24,14 @@ class GhlUsersSyncService
         $this->validateConfig($config);
 
         $syncKey = 'ghl_users_' . $config['location_id'];
-        $runId = 'ghl_users_' . date('YmdHis') . '_' . substr(md5(uniqid('', true)), 0, 8);
+        $moduleName = 'ghl_users';
+        $runId = $this->CI->Ghl_Sync_Model->generate_run_id($moduleName);
 
-        $this->logEvent($runId, $syncKey, 'RUN_START', 'GHL users sync started', array());
+        $this->logEvent($runId, $moduleName, array(
+            'total_page' => 0,
+            'pulled_count' => 0,
+            'updated_count' => 0,
+        ));
 
         $pulled = 0;
         $inserted = 0;
@@ -36,9 +41,10 @@ class GhlUsersSyncService
             $response = $this->requestUsers($config);
 
             if ($response['status'] >= 400) {
-                $this->logEvent($runId, $syncKey, 'API_ERROR', 'GHL users API error', array(
-                    'http_status' => (int) $response['status'],
-                    'error' => (string) $response['error']
+                $this->logEvent($runId, $moduleName, array(
+                    'total_page' => 0,
+                    'pulled_count' => (int) $pulled,
+                    'updated_count' => (int) $updated,
                 ));
                 throw new Exception('GHL API error: HTTP ' . $response['status'] . ' - ' . $response['error']);
             }
@@ -60,31 +66,35 @@ class GhlUsersSyncService
                 }
             }
 
-            $this->logEvent($runId, $syncKey, 'RUN_SUCCESS', 'GHL users sync completed', array(
+            $this->logEvent($runId, $moduleName, array(
+                'total_page' => 1,
                 'pulled_count' => (int) $pulled,
-                'inserted_count' => (int) $inserted,
                 'updated_count' => (int) $updated
             ));
 
             return array(
                 'ok' => true,
                 'run_id' => $runId,
+                'module_name' => $moduleName,
                 'sync_key' => $syncKey,
+                'total_page' => 1,
                 'pulled' => $pulled,
-                'inserted' => $inserted,
-                'updated' => $updated
+                'updated' => $updated,
+                'pulled_count' => $pulled,
+                'updated_count' => $updated
             );
         } catch (Exception $e) {
-            $this->logEvent($runId, $syncKey, 'RUN_FAILED', 'GHL users sync failed', array(
-                'error' => $e->getMessage(),
+            $this->logEvent($runId, $moduleName, array(
+                'total_page' => 0,
                 'pulled_count' => (int) $pulled,
-                'inserted_count' => (int) $inserted,
                 'updated_count' => (int) $updated
             ));
 
             return array(
                 'ok' => false,
                 'run_id' => $runId,
+                'module_name' => $moduleName,
+                'sync_key' => $syncKey,
                 'error' => $e->getMessage()
             );
         }
@@ -111,25 +121,20 @@ class GhlUsersSyncService
         }
     }
 
-    protected function logEvent($runId, $syncKey, $type, $message, $meta = array())
+    protected function logEvent($runId, $moduleName, $meta = array())
     {
         $record = array(
             'RunID' => (string) $runId,
-            'SyncKey' => (string) $syncKey,
-            'LogType' => (string) $type,
-            'Message' => (string) $message
+            'module_name' => (string) $moduleName
         );
+        if (isset($meta['total_page'])) {
+            $record['total_page'] = (int) $meta['total_page'];
+        }
         if (isset($meta['pulled_count'])) {
-            $record['PulledCount'] = (int) $meta['pulled_count'];
+            $record['pulled_count'] = (int) $meta['pulled_count'];
         }
-        if (isset($meta['inserted_count'])) {
-            $record['InsertedCount'] = (int) $meta['inserted_count'];
-        }
-        if (isset($meta['http_status'])) {
-            $record['HttpStatus'] = (int) $meta['http_status'];
-        }
-        if (!empty($meta)) {
-            $record['Meta'] = json_encode($meta, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        if (isset($meta['updated_count'])) {
+            $record['updated_count'] = (int) $meta['updated_count'];
         }
         $this->CI->Ghl_Sync_Model->create_log($record);
     }
