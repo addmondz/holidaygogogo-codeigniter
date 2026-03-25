@@ -1625,6 +1625,24 @@
 
     }
 
+    function Toggle_PaymentOutFields(booking_product_id) {
+
+        if($(`#DisableChecklistPaymentOut-${booking_product_id}`).is(':checked')) {
+
+            $(`#PaymentOutSection-${booking_product_id}`).hide();
+
+            $(`#PaymentOutSupplierFull-${booking_product_id}`).val('');
+
+            $(`#PaymentOutSupplierDeposit-${booking_product_id}`).val('');
+
+        } else {
+
+            $(`#PaymentOutSection-${booking_product_id}`).show();
+
+        }
+
+    }
+
     
 
     var current_date = (new Date()).toLocaleDateString();
@@ -1932,6 +1950,28 @@
 
                 '<div class="row">' +
 
+                    '<div class="col-md-12">' +
+
+                        '<label class="checkbox checkbox-outline checkbox-primary">' +
+
+                            '<input disabled type="checkbox" id="DisableChecklistPaymentOut-'+ booking_product_id +'" onchange="Toggle_PaymentOutFields('+ booking_product_id +')">' +
+
+                            '<span></span>' +
+
+                            '&nbsp;Disable Checklist & Payment Out' +
+
+                        '</label>' +
+
+                    '</div>' +
+
+                '</div>' +
+
+                '<div id="PaymentOutSection-'+ booking_product_id +'">' +
+
+                '<br>' +
+
+                '<div class="row">' +
+
                     '<div class="col-md-6 mb-7 mb-md-0">' +
 
                         '<label>Payment Out to Supplier (Deposit)' +
@@ -1975,6 +2015,8 @@
                         '</div>' +
 
                     '</div>' +
+
+                '</div>' +
 
                 '</div>' +
 
@@ -2036,24 +2078,29 @@
 
             var total = quantity * price;
 
-            var supplier_full = $(`#PaymentOutSupplierFull-${product_sequence[i]}`).val();
-            var supplier_deposit = $(`#PaymentOutSupplierDeposit-${product_sequence[i]}`).val();
-            if(supplier_full && supplier_full != '') {
-                var parts = supplier_full.split('/');
-                supplier_full = `${parts[2]}-${parts[1]}-${parts[0]}`;
-            } else {
-                supplier_full = null;
-            }
-            if(supplier_deposit && supplier_deposit != '') {
-                var parts = supplier_deposit.split('/');
-                supplier_deposit = `${parts[2]}-${parts[1]}-${parts[0]}`;
-            } else {
-                supplier_deposit = null;
+            var disable_checklist = $(`#DisableChecklistPaymentOut-${product_sequence[i]}`).is(':checked') ? 1 : 0;
+            var supplier_full = null;
+            var supplier_deposit = null;
+            if(!disable_checklist) {
+                supplier_full = $(`#PaymentOutSupplierFull-${product_sequence[i]}`).val();
+                supplier_deposit = $(`#PaymentOutSupplierDeposit-${product_sequence[i]}`).val();
+                if(supplier_full && supplier_full != '') {
+                    var parts = supplier_full.split('/');
+                    supplier_full = `${parts[2]}-${parts[1]}-${parts[0]}`;
+                } else {
+                    supplier_full = null;
+                }
+                if(supplier_deposit && supplier_deposit != '') {
+                    var parts = supplier_deposit.split('/');
+                    supplier_deposit = `${parts[2]}-${parts[1]}-${parts[0]}`;
+                } else {
+                    supplier_deposit = null;
+                }
             }
 
             if(window.location.href == '<?php echo base_url('Booking/Create'); ?>' || window.location.href.split('?')[0] == '<?php echo base_url('Booking/Create'); ?>' || window.location.href.split('?')[0] == '<?php echo base_url('Booking/Duplicate'); ?>' || (window.location.href.split('?')[0] == '<?php echo base_url('Booking/Update'); ?>' && jQuery.inArray(product_sequence[i], array) == -1)) {
 
-                booking_products.push({ProductID:product_id, ProductCode:product_code, Name:name, Description:description, Quantity:quantity, Price:price, Total:total, PaymentOutSupplierFull:supplier_full, PaymentOutSupplierDeposit:supplier_deposit, InsertBy:<?php echo $this->session->userdata('admin_id') ?>, InsertDate:'<?php echo date('Y-m-d H:i:s') ?>'});
+                booking_products.push({ProductID:product_id, ProductCode:product_code, Name:name, Description:description, Quantity:quantity, Price:price, Total:total, PaymentOutSupplierFull:supplier_full, PaymentOutSupplierDeposit:supplier_deposit, disable_checklist_payment_out:disable_checklist, InsertBy:<?php echo $this->session->userdata('admin_id') ?>, InsertDate:'<?php echo date('Y-m-d H:i:s') ?>'});
 
             }
 
@@ -2080,6 +2127,8 @@
             $(`#PaymentOutSupplierFull-${booking_product_id}`).removeAttr('disabled');
 
             $(`#PaymentOutSupplierDeposit-${booking_product_id}`).removeAttr('disabled');
+
+            $(`#DisableChecklistPaymentOut-${booking_product_id}`).removeAttr('disabled');
 
         }
 
@@ -2496,11 +2545,15 @@
 
                                     }
 
-                                    if($(`#PaymentOutSupplierFull-${booking_product_ids[i]}`).val() == null || $(`#PaymentOutSupplierFull-${booking_product_ids[i]}`).val() == '') {
+                                    if(!$(`#DisableChecklistPaymentOut-${booking_product_ids[i]}`).is(':checked')) {
 
-                                        Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', 'Please Insert Payment Out to Supplier (Full) For All Products', null);
+                                        if($(`#PaymentOutSupplierFull-${booking_product_ids[i]}`).val() == null || $(`#PaymentOutSupplierFull-${booking_product_ids[i]}`).val() == '') {
 
-                                        return;
+                                            Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', 'Please Insert Payment Out to Supplier (Full) For All Products', null);
+
+                                            return;
+
+                                        }
 
                                     }
 
@@ -2894,6 +2947,14 @@
                                     }
 
 
+                                    // Collect disable_checklist_payment_out checkbox state for all existing booking products
+                                    var existing_bp_ids = <?php echo json_encode(array_map(function($bp) { return $bp->BookingProductID; }, $booking_products ?? [])); ?>;
+                                    for(var bp = 0; bp < existing_bp_ids.length; bp++) {
+                                        var bp_id = existing_bp_ids[bp];
+                                        var is_disabled = $(`#DisableChecklistPaymentOut-${bp_id}`).is(':checked') ? 1 : 0;
+                                        booking_products[1].push({BookingProductID:bp_id, disable_checklist_payment_out:is_disabled, UpdateBy:<?php echo $this->session->userdata('admin_id') ?>, UpdateDate:'<?php echo date('Y-m-d H:i:s') ?>'});
+                                    }
+
                                     var CustomerID = $('input[name="CustomerID"]').val();
 
                                     // Booking
@@ -3277,6 +3338,13 @@
 
                 $(`#Total-${booking_products[i].BookingProductID}`).val(total);
 
+                // Set disable checklist checkbox state
+                $(`#DisableChecklistPaymentOut-${booking_products[i].BookingProductID}`).removeAttr('disabled');
+                if(booking_products[i].disable_checklist_payment_out == 1) {
+                    $(`#DisableChecklistPaymentOut-${booking_products[i].BookingProductID}`).prop('checked', true);
+                    $(`#PaymentOutSection-${booking_products[i].BookingProductID}`).hide();
+                }
+
                 if(booking_products[i].PaymentOutSupplierFull) {
                     $(`#PaymentOutSupplierFull-${booking_products[i].BookingProductID}`).val(booking_products[i].PaymentOutSupplierFull);
                 }
@@ -3317,6 +3385,13 @@
                 $(`#Price-${booking_product_id - 1}`).removeAttr('disabled');
 
                 $(`#Total-${booking_product_id - 1}`).val(total);
+
+                // Set disable checklist checkbox state for Duplicate
+                $(`#DisableChecklistPaymentOut-${booking_product_id - 1}`).removeAttr('disabled');
+                if(booking_products[i].disable_checklist_payment_out == 1) {
+                    $(`#DisableChecklistPaymentOut-${booking_product_id - 1}`).prop('checked', true);
+                    $(`#PaymentOutSection-${booking_product_id - 1}`).hide();
+                }
 
                 if(booking_products[i].PaymentOutSupplierFull) {
                     $(`#PaymentOutSupplierFull-${booking_product_id - 1}`).val(booking_products[i].PaymentOutSupplierFull);

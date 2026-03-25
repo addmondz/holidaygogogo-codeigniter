@@ -516,6 +516,34 @@ if (!function_exists('has_booking_payment')) {
     }
 }
 
+if (!function_exists('has_full_payment')) {
+    /**
+     * Check if booking has full payment (total approved credit >= NetTotal)
+     *
+     * @param int $booking_id Booking ID
+     * @param object $booking Booking object (must have NetTotal)
+     * @param CI_Controller $CI CodeIgniter instance
+     * @return bool True if booking has full payment
+     */
+    function has_full_payment($booking_id, $booking, $CI)
+    {
+        $CI->load->model('Booking_Model');
+        $payments = $CI->Booking_Model->Read_Payments($booking_id);
+
+        $total_approved_credit = 0;
+        if (!empty($payments)) {
+            foreach ($payments as $payment) {
+                $credit_amount = !empty($payment->Credit) ? floatval($payment->Credit) : 0;
+                if ($payment->Type != 'SUPPLIER REFUND' && $credit_amount > 0 && $payment->Status == 'Y') {
+                    $total_approved_credit += $credit_amount;
+                }
+            }
+        }
+
+        return $total_approved_credit >= floatval($booking->NetTotal);
+    }
+}
+
 if (!function_exists('are_all_checklists_completed')) {
     /**
      * Check if all booking checklists are completed
@@ -564,6 +592,11 @@ if (!function_exists('are_all_checklists_completed')) {
         $total_count = 0;
         $required_completions = array(); // [[product_id, checklist_id], ...]
         foreach ($product_groups as $product_id => $booking_product) {
+            // Skip products with disable_checklist_payment_out enabled
+            if (isset($booking_product->disable_checklist_payment_out) && $booking_product->disable_checklist_payment_out == 1) {
+                continue;
+            }
+
             // Skip child/infant products — they don't require checklist completion
             $product_row = $CI->db->select('is_child_or_infant')->where('ProductID', $product_id)->get('product')->row();
             if ($product_row && $product_row->is_child_or_infant == 1) {
@@ -696,11 +729,12 @@ if (!function_exists('determine_booking_status_from_state')) {
      * 1. Cancelled → return CANCELLED (highest priority - check first)
      * 2. BC approved → if not, return PBC (PENDING BC CONFIRMATION)
      * 3. Payment received → if not, return P (PENDING PAYMENT)
-     * 4. Checklist completed → if not, return PBO (PENDING BOOKING OPERATION)
-     * 5. Guest list locked → if not, return PGL (PENDING GUEST LIST)
-     * 6. Travel voucher sent → if not, return PTV (PENDING TRAVEL VOUCHER)
-     * 7. Travel completed → if not, return PT (PENDING TRAVEL)
-     * 8. Completed → return Y (COMPLETED)
+     * 4. Full payment received → if not, return PP (PARTIAL PAYMENT)
+     * 5. Checklist completed → if not, return PBO (PENDING BOOKING OPERATION)
+     * 6. Guest list locked → if not, return PGL (PENDING GUEST LIST)
+     * 7. Travel voucher sent → if not, return PTV (PENDING TRAVEL VOUCHER)
+     * 8. Travel completed → if not, return PT (PENDING TRAVEL)
+     * 9. Completed → return Y (COMPLETED)
      * 
      * @param int $booking_id Booking ID
      * @param object $booking Booking object
@@ -733,15 +767,23 @@ if (!function_exists('determine_booking_status_from_state')) {
             );
         }
 
-        // Step 4: Check if checklist completed
-        if (!are_all_checklists_completed($booking_id, $CI)) {
+        // Step 4: Check if full payment received
+        if (!has_full_payment($booking_id, $booking, $CI)) {
             return array(
-                'status' => 'PBO',
-                'description' => 'Payment received but checklists not completed - Status: PENDING BOOKING OPERATION'
+                'status' => 'PP',
+                'description' => 'Partial payment received but not full payment - Status: PARTIAL PAYMENT'
             );
         }
 
-        // Step 5: Check if guest list locked
+        // Step 5: Check if checklist completed
+        if (!are_all_checklists_completed($booking_id, $CI)) {
+            return array(
+                'status' => 'PBO',
+                'description' => 'Full payment received but checklists not completed - Status: PENDING BOOKING OPERATION'
+            );
+        }
+
+        // Step 6: Check if guest list locked
         if (!is_guest_list_locked($booking)) {
             return array(
                 'status' => 'PGL',
@@ -749,7 +791,7 @@ if (!function_exists('determine_booking_status_from_state')) {
             );
         }
 
-        // Step 6: Check if travel voucher sent
+        // Step 7: Check if travel voucher sent
         if (!is_travel_voucher_sent($booking_id, $CI)) {
             return array(
                 'status' => 'PTV',
@@ -757,7 +799,7 @@ if (!function_exists('determine_booking_status_from_state')) {
             );
         }
 
-        // Step 7: Check if travel completed (travel dates have passed)
+        // Step 8: Check if travel completed (travel dates have passed)
         $travel_date_passed = false;
         $travel_end_date = !empty($booking->EndDate) ? $booking->EndDate : $booking->StartDate;
         if (!empty($travel_end_date)) {
@@ -774,7 +816,7 @@ if (!function_exists('determine_booking_status_from_state')) {
             );
         }
 
-        // Step 8: Completed (travel dates have passed)
+        // Step 9: Completed (travel dates have passed)
         return array(
             'status' => 'Y',
             'description' => 'Travel completed - Status: COMPLETED'

@@ -770,81 +770,12 @@ class Payment extends MY_Controller
 							$approver_name = $approver ? $approver->Name : 'Unknown';
 							
 							// Determine if full or partial payment
-							// According to booking flow: PBC -> P -> PBO
-							// After PENDING PAYMENT (P), once receive any payment (deposit or full), move to PBO
+							// According to booking flow: PBC -> P -> PP -> PBO
+							// Partial payment moves to PP, full payment moves to PBO
 							if(strval($total_approved_credit) >= $booking->NetTotal) {
-								// Full payment received
+								// Full payment received - move to PBO
 								$full_payment_description = "Full Payment Received - Ready for Booking Operation";
-								$full_payment_existed = $this->Payment_Model->Read_Type($payment['BookingID']);
-								if($full_payment_existed) {
-									// Full payment exists, move to PBO (PENDING BOOKING OPERATION)
-									// If status is P or PBC, move to PBO when full payment is received
-									if($booking->Status == 'P' || $booking->Status == 'PBC') {
-										$this->Booking_Model->Update_Status('PBO', $payment['BookingID']);
-										$this->Booking_Model->Create_Booking_Log2($booking->Status, 'PBO', $payment['BookingID']);
-										log_booking_status_change(
-											$payment['BookingID'],
-											'PBO',
-											$booking->Status,
-											$approver_id,
-											$full_payment_description,
-											true
-										);
-										
-										// After moving to PBO, check if no checklist or all completed, then move to next step
-										$this->load->helper('booking_flow');
-										$updated_booking = $this->Booking_Model->getBookingById($payment['BookingID']);
-										if($updated_booking) {
-											check_and_advance_status_if_no_checklist_or_all_completed($payment['BookingID'], $updated_booking, $approver_id, $this);
-										}
-									} else {
-										// Log status history even if status doesn't change
-										log_booking_status_change(
-											$payment['BookingID'],
-											$booking->Status,
-											$booking->Status,
-											$approver_id,
-											$full_payment_description,
-											true
-										);
-									}
-								} else {
-									// Full payment amount received but no FULL payment type exists yet
-									// Still move to PBO if status is P or PBC
-									if($booking->Status == 'P' || $booking->Status == 'PBC') {
-										$this->Booking_Model->Update_Status('PBO', $payment['BookingID']);
-										$this->Booking_Model->Create_Booking_Log2($booking->Status, 'PBO', $payment['BookingID']);
-										log_booking_status_change(
-											$payment['BookingID'],
-											'PBO',
-											$booking->Status,
-											$approver_id,
-											$full_payment_description,
-											true
-										);
-										
-										// After moving to PBO, check if no checklist or all completed, then move to next step
-										$this->load->helper('booking_flow');
-										$updated_booking = $this->Booking_Model->getBookingById($payment['BookingID']);
-										if($updated_booking) {
-											check_and_advance_status_if_no_checklist_or_all_completed($payment['BookingID'], $updated_booking, $approver_id, $this);
-										}
-									} else {
-										// Log status history for full payment (but no full payment type exists yet)
-										log_booking_status_change(
-											$payment['BookingID'],
-											$booking->Status,
-											$booking->Status,
-											$approver_id,
-											$full_payment_description,
-											true
-										);
-									}
-								}
-							} else {
-								// Partial payment received (deposit or partial)
-								// After PENDING PAYMENT (P), once receive any payment, move to PBO
-								if($booking->Status == 'P') {
+								if($booking->Status == 'P' || $booking->Status == 'PBC' || $booking->Status == 'PP') {
 									$this->Booking_Model->Update_Status('PBO', $payment['BookingID']);
 									$this->Booking_Model->Create_Booking_Log2($booking->Status, 'PBO', $payment['BookingID']);
 									log_booking_status_change(
@@ -852,10 +783,10 @@ class Payment extends MY_Controller
 										'PBO',
 										$booking->Status,
 										$approver_id,
-										"Partial payment received - ready for booking operation",
+										$full_payment_description,
 										true
 									);
-									
+
 									// After moving to PBO, check if no checklist or all completed, then move to next step
 									$this->load->helper('booking_flow');
 									$updated_booking = $this->Booking_Model->getBookingById($payment['BookingID']);
@@ -863,13 +794,38 @@ class Payment extends MY_Controller
 										check_and_advance_status_if_no_checklist_or_all_completed($payment['BookingID'], $updated_booking, $approver_id, $this);
 									}
 								} else {
+									// Log status history even if status doesn't change
+									log_booking_status_change(
+										$payment['BookingID'],
+										$booking->Status,
+										$booking->Status,
+										$approver_id,
+										$full_payment_description,
+										true
+									);
+								}
+							} else {
+								// Partial payment received (deposit or partial)
+								// After PENDING PAYMENT (P), move to PP (PARTIAL PAYMENT), not PBO
+								if($booking->Status == 'P') {
+									$this->Booking_Model->Update_Status('PP', $payment['BookingID']);
+									$this->Booking_Model->Create_Booking_Log2($booking->Status, 'PP', $payment['BookingID']);
+									log_booking_status_change(
+										$payment['BookingID'],
+										'PP',
+										$booking->Status,
+										$approver_id,
+										"Partial payment received",
+										true
+									);
+								} else {
 									// Log status history for partial payment
 									log_booking_status_change(
 										$payment['BookingID'],
 										$booking->Status,
 										$booking->Status,
 										$approver_id,
-										"Partial payment received - ready for booking operation",
+										"Partial payment received",
 										true
 									);
 								}
@@ -1269,6 +1225,22 @@ class Payment extends MY_Controller
 				}
 			}
 			$product_checklist_ids = $required_ids;
+		}
+
+		// Auto-add deposit checklist if product has supplier deposit
+		$product_row = $this->db->select('has_supplier_deposit')->where('ProductID', $product_id)->get('product')->row();
+		if($product_row && $product_row->has_supplier_deposit == 1) {
+			$deposit_checklist_id = null;
+			foreach($package_checklists as $pc) {
+				if(strpos($pc->name, 'Payment Out To Supplier (deposit)') !== false) {
+					$deposit_checklist_id = $pc->ID;
+					break;
+				}
+			}
+			if($deposit_checklist_id && !in_array($deposit_checklist_id, $product_checklist_ids)) {
+				$product_checklist_ids[] = $deposit_checklist_id;
+				$this->Product_Package_Checklist_Model->Bulk_Update_Product_Checklists($product_id, $product_checklist_ids);
+			}
 		}
 
 		// Build checklist list

@@ -126,7 +126,24 @@ class Product_Package_Checklist_Model extends CI_Model
 				$checklist_ids[] = $req_id;
 			}
 		}
-		
+
+		// Auto-add deposit checklist if product has supplier deposit
+		$this->db->select('has_supplier_deposit');
+		$this->db->where('ProductID', $product_id);
+		$product_row = $this->db->get('product')->row();
+
+		if($product_row && $product_row->has_supplier_deposit == 1) {
+			$this->db->select('ID');
+			$this->db->like('name', 'Payment Out To Supplier (deposit)');
+			$deposit_checklist = $this->db->get('package_checklist')->row();
+			if($deposit_checklist) {
+				$deposit_id = (int)$deposit_checklist->ID;
+				if(!in_array($deposit_id, $checklist_ids)) {
+					$checklist_ids[] = $deposit_id;
+				}
+			}
+		}
+
 		// Check if table exists
 		if(!$this->db->table_exists('product_package_checklist')) {
 			log_message('error', 'Table product_package_checklist does not exist. Please run SQL migration.');

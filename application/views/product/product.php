@@ -92,6 +92,15 @@
                                 </select>
                             </div>
                         </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Has Supplier Deposit</label>
+                                <select id="has_supplier_deposit" class="form-control">
+                                    <option value="0" <?php if(!isset($has_supplier_deposit) || $has_supplier_deposit == 0) { echo 'selected'; } ?>>No</option>
+                                    <option value="1" <?php if(isset($has_supplier_deposit) && $has_supplier_deposit == 1) { echo 'selected'; } ?>>Yes</option>
+                                </select>
+                            </div>
+                        </div>
                     </div>
                     <?php if(isset($package_checklists)) {
                         // Get required checklist IDs
@@ -217,7 +226,22 @@
 </div>
 
 <script>
-    <?php if(isset($package_checklists)) { 
+    <?php
+        // Find deposit checklist ID for auto-add behavior
+        $deposit_checklist_id = null;
+        $deposit_checklist_name = '';
+        if(isset($package_checklists)) {
+            foreach($package_checklists as $checklist) {
+                if(strpos($checklist->name, 'Payment Out To Supplier (deposit)') !== false) {
+                    $deposit_checklist_id = $checklist->ID;
+                    $deposit_checklist_name = $checklist->name;
+                    break;
+                }
+            }
+        }
+    ?>
+
+    <?php if(isset($package_checklists)) {
         // Calculate final selected_ids (with required ones included) for JavaScript
         $js_selected_ids = $selected_checklist_ids ?? array();
         $js_required_ids = array();
@@ -384,6 +408,24 @@
             }
         });
     });
+    // Auto-add/remove deposit checklist when "Has Supplier Deposit" toggle changes
+    var depositChecklistId = <?php echo $deposit_checklist_id ? $deposit_checklist_id : 'null'; ?>;
+    var depositChecklistName = '<?php echo addslashes($deposit_checklist_name); ?>';
+
+    $('#has_supplier_deposit').change(function() {
+        if(!depositChecklistId) return;
+
+        if($(this).val() === '1') {
+            // Auto-add the deposit checklist if not already chosen
+            if(typeof chosenChecklists !== 'undefined' && !chosenChecklists.includes(depositChecklistId)) {
+                var $availableItem = $('#available-checklist-list .available-item[data-checklist-id="' + depositChecklistId + '"]');
+                if($availableItem.length) {
+                    $availableItem.find('.add-checklist-btn').click();
+                }
+            }
+        }
+        $('#form').dirty('setDirty');
+    });
     <?php } ?>
 
     function Validate_Price(value) {
@@ -456,7 +498,7 @@
                                     Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', 'Product Name Must Not Exceed '+maxNameLength+' Characters', null);
                                 } else {
                                     var product = [];
-                                    product.push({CategoryID:category, SupplierID:supplier, Name:name, is_child_or_infant:$('#is_child_or_infant').val(), InsertBy:<?php echo $this->session->userdata('admin_id') ?>, InsertDate:'<?php echo date('Y-m-d H:i:s') ?>'});
+                                    product.push({CategoryID:category, SupplierID:supplier, Name:name, is_child_or_infant:$('#is_child_or_infant').val(), has_supplier_deposit:$('#has_supplier_deposit').val(), InsertBy:<?php echo $this->session->userdata('admin_id') ?>, InsertDate:'<?php echo date('Y-m-d H:i:s') ?>'});
                                     var retail_price = $('#RetailPrice').val();
                                     if(retail_price != '') {
                                         product[0]['RetailPrice'] = retail_price.replace(/,/g, '');;
@@ -506,6 +548,12 @@
                             var current_is_child_or_infant = $('#is_child_or_infant').val();
                             if(current_is_child_or_infant !== original_is_child_or_infant) {
                                 product[0]['is_child_or_infant'] = current_is_child_or_infant;
+                            }
+
+                            var original_has_supplier_deposit = '<?php echo $has_supplier_deposit ?? 0; ?>';
+                            var current_has_supplier_deposit = $('#has_supplier_deposit').val();
+                            if(current_has_supplier_deposit !== original_has_supplier_deposit) {
+                                product[0]['has_supplier_deposit'] = current_has_supplier_deposit;
                             }
 
                             // Collect chosen checklists in order (from DOM to preserve drag-and-drop order)

@@ -3,7 +3,7 @@ class Booking_Product_Model extends CI_Model
 {
 	function Read()
 	{
-		$this->db->select('BookingProductID, ProductID, ProductCode, Name, Description, Quantity, Price, Total, booking_product.PaymentOutSupplierFull, booking_product.PaymentOutSupplierDeposit');
+		$this->db->select('BookingProductID, ProductID, ProductCode, Name, Description, Quantity, Price, Total, booking_product.PaymentOutSupplierFull, booking_product.PaymentOutSupplierDeposit, booking_product.disable_checklist_payment_out');
 		$this->db->join('booking_product', 'booking_product.BookingID = booking.BookingID', 'left');
         if(!empty($this->input->get('booking_id'))) {
 			$this->db->where('booking.BookingID', $this->input->get('booking_id'));

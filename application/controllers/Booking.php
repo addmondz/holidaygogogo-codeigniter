@@ -3310,7 +3310,7 @@ class Booking extends MY_Controller
 		}
 
 		// Get booking products (need ProductID and Name for checklist grouping)
-		$this->db->select('bp.BookingProductID, bp.ProductID, p.Name, bp.PaymentOutSupplierFull, bp.PaymentOutSupplierDeposit');
+		$this->db->select('bp.BookingProductID, bp.ProductID, p.Name, bp.PaymentOutSupplierFull, bp.PaymentOutSupplierDeposit, bp.disable_checklist_payment_out');
 		$this->db->from('booking_product bp');
 		$this->db->join('product p', 'p.ProductID = bp.ProductID', 'left');
 		$this->db->where('bp.BookingID', $booking_id);
@@ -3385,6 +3385,15 @@ class Booking extends MY_Controller
 			}
 		}
 
+		// Get deposit checklist ID
+		$deposit_checklist_id = null;
+		foreach($package_checklists as $pc) {
+			if(strpos($pc->name, 'Payment Out To Supplier (deposit)') !== false) {
+				$deposit_checklist_id = $pc->ID;
+				break;
+			}
+		}
+
 		// Group booking products by ProductID (collapse duplicates)
 		$product_groups = array();
 		foreach($booking_products as $booking_product) {
@@ -3399,8 +3408,13 @@ class Booking extends MY_Controller
 		$total_count = 0;
 
 		foreach($product_groups as $product_id => $booking_product) {
+			// Skip products with disable_checklist_payment_out enabled
+			if(isset($booking_product->disable_checklist_payment_out) && $booking_product->disable_checklist_payment_out == 1) {
+				continue;
+			}
+
 			// Skip child/infant products — they don't require checklists
-			$product_row = $this->db->select('is_child_or_infant')->where('ProductID', $product_id)->get('product')->row();
+			$product_row = $this->db->select('is_child_or_infant, has_supplier_deposit')->where('ProductID', $product_id)->get('product')->row();
 			if($product_row && $product_row->is_child_or_infant == 1) {
 				continue;
 			}
@@ -3412,6 +3426,14 @@ class Booking extends MY_Controller
 			if(empty($product_checklist_ids)) {
 				$product_checklist_ids = $required_ids;
 				$this->Product_Package_Checklist_Model->Bulk_Update_Product_Checklists($product_id, $required_ids);
+			}
+
+			// Auto-add deposit checklist if product has supplier deposit
+			if($deposit_checklist_id && $product_row && $product_row->has_supplier_deposit == 1) {
+				if(!in_array($deposit_checklist_id, $product_checklist_ids)) {
+					$product_checklist_ids[] = $deposit_checklist_id;
+					$this->Product_Package_Checklist_Model->Bulk_Update_Product_Checklists($product_id, $product_checklist_ids);
+				}
 			}
 
 			// Build checklist list for this group
