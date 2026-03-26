@@ -685,6 +685,33 @@ class Booking extends MY_Controller
 		}
 	}
 
+	function View_Snapshot()
+	{
+		if (!$this->session->has_userdata('admin_id')) {
+			$this->load->view('errors/access_denied');
+			return;
+		}
+
+		$file = $this->input->get('file');
+		if (!preg_match('/^[a-zA-Z0-9_\-\.]+\.pdf$/', $file)) {
+			show_404();
+			return;
+		}
+
+		$path = FCPATH . 'assets/upload/booking_snapshots/' . $file;
+		if (!file_exists($path)) {
+			show_404();
+			return;
+		}
+
+		header('Content-Type: application/pdf');
+		header('Content-Disposition: inline; filename="' . $file . '"');
+		header('Cache-Control: no-cache, no-store, must-revalidate');
+		header('Pragma: no-cache');
+		header('Expires: 0');
+		readfile($path);
+	}
+
 	function Update()
 	{
 		if($this->session->userdata('level') == 20) {

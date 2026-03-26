@@ -772,7 +772,7 @@ $(document).ready(function() {
         var filterParams = {};
         ['customer', 'booking_number', 'reservation_number', 'mobile', 'destination', 'travel_date',
          'deadline', 'source', 'chat_language', 'booking_date', 'status', 'booking_confirmation_title',
-         'tag', 'sales_agent', 'booking_op', 'autocount_status', 'guest_list_status', 'checklist_filter'].forEach(function(param) {
+         'tag', 'sales_agent', 'booking_op', 'autocount_status', 'guest_list_status', 'checklist_filter', 'cancellation_reason'].forEach(function(param) {
             if (urlParams.has(param)) {
                 filterParams[param] = urlParams.get(param);
             }
@@ -843,7 +843,7 @@ function loadSummaryTotals() {
     var params = [];
     ['customer', 'booking_number', 'reservation_number', 'mobile', 'destination', 'travel_date',
      'deadline', 'source', 'chat_language', 'booking_date', 'status', 'booking_confirmation_title',
-     'tag', 'sales_agent', 'booking_op', 'autocount_status', 'guest_list_status'].forEach(function(param) {
+     'tag', 'sales_agent', 'booking_op', 'autocount_status', 'guest_list_status', 'checklist_filter', 'cancellation_reason'].forEach(function(param) {
         if (urlParams.has(param)) {
             params.push(param + '=' + encodeURIComponent(urlParams.get(param)));
         }

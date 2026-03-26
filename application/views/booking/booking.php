@@ -1397,6 +1397,7 @@
                                                             <th style="min-width: 120px;">Field</th>
                                                             <th>Old Value</th>
                                                             <th>New Value</th>
+                                                            <th style="min-width: 90px;">Snapshot</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody>
@@ -1407,6 +1408,15 @@
                                                             <td><?php echo audit_log_field_label($log['Column']); ?></td>
                                                             <td><?php echo audit_log_value($log['Column'], $log['CurrentData']); ?></td>
                                                             <td><?php echo audit_log_value($log['Column'], $log['NewData']); ?></td>
+                                                            <td>
+                                                                <?php if (!empty($log['SnapshotPDF'])): ?>
+                                                                    <a href="<?php echo base_url('Booking/View_Snapshot?file=' . basename($log['SnapshotPDF'])); ?>" target="_blank" title="View previous booking confirmation">
+                                                                        <i class="la la-file-pdf" style="font-size: 1.2rem;"></i> View PDF
+                                                                    </a>
+                                                                <?php else: ?>
+                                                                    -
+                                                                <?php endif; ?>
+                                                            </td>
                                                         </tr>
                                                         <?php endforeach; ?>
                                                     </tbody>
@@ -2761,13 +2771,7 @@
 
                                                 // Action : Update
 
-                                                if(key == 'CountryCodeID' && Object.values(dirty_fields[i])[country_codes.length + 1].hasOwnProperty('dirtyInitialValue') || key == 'ReservationNumber' || key == 'DepositDeadline' || key == 'FullPaymentDeadline' || key == 'AdditionalPaymentDeadline' || key == 'Customer' || key == 'Mobile' || key == 'Destination' && Object.values(dirty_fields[i])[categories.length + 1].hasOwnProperty('dirtyInitialValue') || key == 'SalesAgent' && Object.values(dirty_fields[i])[admins.length + 1].hasOwnProperty('dirtyInitialValue') || key == 'BookingRemark' || key == 'Subtotal' || key == 'ChatLanguage' && Object.values(dirty_fields[i])[4].hasOwnProperty('dirtyInitialValue') || key == 'Source' && Object.values(dirty_fields[i])[sources.length + 1].hasOwnProperty('dirtyInitialValue') || key == 'BookingConfirmationTitle' && Object.values(dirty_fields[i])[4].hasOwnProperty('dirtyInitialValue')) {
-
-                                                    if(key == 'Subtotal') {
-
-                                                        value = value.replace(/,/g, '');
-
-                                                    }
+                                                if(key == 'CountryCodeID' && Object.values(dirty_fields[i])[country_codes.length + 1].hasOwnProperty('dirtyInitialValue') || key == 'ReservationNumber' || key == 'DepositDeadline' || key == 'FullPaymentDeadline' || key == 'AdditionalPaymentDeadline' || key == 'Customer' || key == 'Mobile' || key == 'Destination' && Object.values(dirty_fields[i])[categories.length + 1].hasOwnProperty('dirtyInitialValue') || key == 'SalesAgent' && Object.values(dirty_fields[i])[admins.length + 1].hasOwnProperty('dirtyInitialValue') || key == 'BookingRemark' || key == 'ChatLanguage' && Object.values(dirty_fields[i])[4].hasOwnProperty('dirtyInitialValue') || key == 'Source' && Object.values(dirty_fields[i])[sources.length + 1].hasOwnProperty('dirtyInitialValue') || key == 'BookingConfirmationTitle' && Object.values(dirty_fields[i])[4].hasOwnProperty('dirtyInitialValue')) {
 
                                                     if(key == 'BookingOP' && value == '') {
 

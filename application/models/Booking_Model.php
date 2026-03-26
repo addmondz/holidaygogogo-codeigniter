@@ -16,9 +16,8 @@ class Booking_Model extends CI_Model
 			FROM booking_product bp
 			JOIN product p ON p.ProductID = bp.ProductID AND p.is_child_or_infant = 0
 			JOIN product_package_checklist ppc ON ppc.product_id = bp.ProductID
-				AND JSON_CONTAINS(ppc.package_checklist_json, CAST({$checklist_id} AS JSON))
-			WHERE bp.BookingID = booking.BookingID
-			AND NOT EXISTS (
+				AND JSON_CONTAINS(ppc.package_checklist_json, '{$checklist_id}')
+			WHERE NOT EXISTS (
 				SELECT 1 FROM booking_checklist_completion bcc
 				WHERE bcc.booking_id = bp.BookingID
 				AND bcc.product_id = bp.ProductID
@@ -781,7 +780,25 @@ class Booking_Model extends CI_Model
 	function Create_Booking_Log()
 	{
 		if(current_url() == base_url('Booking/Update')) {
-			$this->db->insert_batch('booking_log', json_decode(json_encode($this->input->post('booking_log'))));
+			$log_data = json_decode(json_encode($this->input->post('booking_log')));
+			// Filter out Subtotal entries - Subtotal is a calculated field and should not be in audit log
+			if (!empty($log_data)) {
+				$log_data = array_values(array_filter($log_data, function($entry) {
+					return !isset($entry->Column) || $entry->Column !== 'Subtotal';
+				}));
+			}
+			if (!empty($this->_snapshot_pdf_path) && !empty($log_data)) {
+				$snapshot_columns = array('NetTotal', 'StartDate', 'EndDate');
+				foreach ($log_data as &$entry) {
+					if (isset($entry->Column) && in_array($entry->Column, $snapshot_columns)) {
+						$entry->SnapshotPDF = $this->_snapshot_pdf_path;
+					} else {
+						$entry->SnapshotPDF = null;
+					}
+				}
+				unset($entry);
+			}
+			$this->db->insert_batch('booking_log', $log_data);
 		} else {
 			if(current_url() == base_url('Booking/Update_Cancel_Status')) {
 				$array = array(
@@ -860,6 +877,30 @@ class Booking_Model extends CI_Model
 		$this->load->helper('booking_status_log');
 		$created_by = !empty($this->session->admin_id) ? $this->session->admin_id : 0;
 		log_booking_status_update($booking_id, $current_status, $new_status, $created_by, null, true);
+	}
+
+	protected $_snapshot_pdf_path = null;
+
+	function generate_booking_snapshot($token, $booking_id)
+	{
+		$CI =& get_instance();
+		$CI->load->library('Booking_PDF_Generator');
+
+		$snapshot_dir = FCPATH . 'assets/upload/booking_snapshots/';
+		if (!is_dir($snapshot_dir)) {
+			mkdir($snapshot_dir, 0755, true);
+		}
+
+		$filename = $booking_id . '_' . date('Ymd_His') . '.pdf';
+		$filepath = $snapshot_dir . $filename;
+
+		$success = $CI->booking_pdf_generator->generate_to_file($token, $filepath);
+
+		if ($success) {
+			$this->_snapshot_pdf_path = 'booking_snapshots/' . $filename;
+			return $this->_snapshot_pdf_path;
+		}
+		return null;
 	}
 
 	function Update()
@@ -970,10 +1011,19 @@ class Booking_Model extends CI_Model
 					);
 				}
 			}
+
+			// Generate PDF snapshot before update when travel date or total value changed
+			if ($needs_revert && !empty($current_booking->Token)) {
+				try {
+					$this->generate_booking_snapshot($current_booking->Token, $booking_id);
+				} catch (\Throwable $e) {
+					log_message('error', 'Failed to generate booking snapshot for BookingID ' . $booking_id . ': ' . $e->getMessage());
+				}
+			}
 		}
-		
+
 		$this->db->update_batch('booking', json_decode(json_encode($booking_data)), 'BookingID');
-		
+
 		$data = [];
 		$booking = $this->input->post('booking');
 		if (!empty($booking) && isset($booking[0])) {
@@ -1293,6 +1343,17 @@ class Booking_Model extends CI_Model
 		$this->db->join('footer', 'footer.FooterID = booking.TravelVoucherFooterID', 'left');
 		$this->db->join('country_code', 'country_code.CountryCodeID = booking.CountryCodeID', 'left');
 		$this->db->where('Token', $this->input->get('token'));
+		return $this->db->get('booking')->row_array();
+	}
+
+	function Booking_Document_By_Token($token)
+	{
+		$this->db->select('BookingID, BookingNumber, ReservationNumber, DepositDeadline, FullPaymentDeadline, Customer, booking.Mobile As CustomerMobile, StartDate, EndDate, Adult, Children, Infant, Subtotal, Discount, NetTotal, DepositPercentage, booking.BookingConfirmationTitle, BookingConfirmationFooter, TravelVoucherFooter, AfterSalesService, ProductSequence, booking.Status, booking.InsertDate, admin.CountryCodeID As SalesAgentCountryCode, admin.Name As SalesAgentName, admin.Mobile As SalesAgentMobile, category.Name As DestinationName, TravelVoucherTitle, booking.KeyContacts As TravelVoucherKeyContacts, booking.SpecialRemarks As TravelVoucherSpecialRemarks, CountryCode');
+		$this->db->join('admin', 'admin.AdminID = booking.SalesAgent', 'left');
+		$this->db->join('category', 'category.CategoryID = booking.Destination', 'left');
+		$this->db->join('footer', 'footer.FooterID = booking.TravelVoucherFooterID', 'left');
+		$this->db->join('country_code', 'country_code.CountryCodeID = booking.CountryCodeID', 'left');
+		$this->db->where('Token', $token);
 		return $this->db->get('booking')->row_array();
 	}
 
@@ -1895,7 +1956,7 @@ class Booking_Model extends CI_Model
 
 	function Read_Booking_Logs($booking_id)
 	{
-		$this->db->select('booking_log.Column, booking_log.CurrentData, booking_log.NewData, booking_log.InsertDate, admin.Name As AdminName');
+		$this->db->select('booking_log.Column, booking_log.CurrentData, booking_log.NewData, booking_log.InsertDate, booking_log.SnapshotPDF, admin.Name As AdminName');
 		$this->db->from('booking_log');
 		$this->db->join('admin', 'admin.AdminID = booking_log.InsertBy', 'left');
 		$this->db->where('booking_log.BookingID', $booking_id);
