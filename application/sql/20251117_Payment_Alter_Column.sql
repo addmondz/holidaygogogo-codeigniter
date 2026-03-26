@@ -1,2 +1,2 @@
 ALTER TABLE payment
-  ADD COLUMN AutocountSyncMessage TEXT AFTER AutocountSyncStatus;
+  ADD COLUMN IF NOT EXISTS AutocountSyncMessage TEXT AFTER AutocountSyncStatus;

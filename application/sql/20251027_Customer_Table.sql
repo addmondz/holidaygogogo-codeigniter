@@ -20,5 +20,5 @@ CREATE TABLE IF NOT EXISTS `customer` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 ALTER TABLE `booking`
-	ADD COLUMN `CustomerID` INT(15) NULL DEFAULT NULL AFTER `CustomerCode`,
-	ADD INDEX `CustomerID` (`CustomerID`);
+	ADD COLUMN IF NOT EXISTS `CustomerID` INT(15) NULL DEFAULT NULL AFTER `CustomerCode`,
+	ADD INDEX IF NOT EXISTS `CustomerID` (`CustomerID`);

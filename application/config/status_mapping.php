@@ -8,5 +8,7 @@ $config['booking_to_autocount_status'] = [
     'PP'  => 0, // Pending (Partial Payment)
     'PT'  => 1, // Success (Payment Taken)
     'OG'  => 3, // Closed
-    'PTV' => 4  // Void
+    'PTV' => 4, // Void
+    'PBC' => 0, // Pending (BC Confirmation)
+    'PBO' => 0  // Pending (Booking Operation)
 ];

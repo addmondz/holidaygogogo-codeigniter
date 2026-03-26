@@ -20,6 +20,9 @@ class Login extends CI_Controller
 					case 20:
 						$priviledge = 'SALES AGENT';
 						break;
+					case 25:
+						$priviledge = 'TEAM LEAD';
+						break;
 					case 30:
 						$priviledge = 'FINANCE';
 						break;

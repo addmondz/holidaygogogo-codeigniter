@@ -145,14 +145,15 @@
                                 <th style="text-align:center;">Name</th>
                                 <th style="text-align:center;">Username</th>
                                 <th style="text-align:center;">Level</th>
+                                <th style="text-align:center;">Team Lead</th>
                                 <th class="status" style="text-align:center;">Status</th>
                                 <th class="action" style="text-align:center;">Action</th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php if(empty($admins)) { ?>
-                                <td colspan="6" style="text-align:center; padding-top:10px; padding-bottom:10px;">Admin Records Not Found</td>
-                            <?php } else { 
+                                <td colspan="7" style="text-align:center; padding-top:10px; padding-bottom:10px;">Admin Records Not Found</td>
+                            <?php } else {
                                 $count = 1;
                                 foreach($admins as $admin) { ?>
                                     <tr>
@@ -160,6 +161,7 @@
                                         <td style="text-align:center;"><?php echo $admin->Name; ?></td>
                                         <td style="text-align:center;"><?php echo $admin->Username; ?></td>
                                         <td style="text-align:center;"><?php echo $admin->Level; ?></td>
+                                        <td style="text-align:center;"><?php echo !empty($admin->TeamLeadName) ? $admin->TeamLeadName : ''; ?></td>
                                         <td style="text-align:center;"><?php echo $admin->StatusIcon; ?></td>
                                         <td style="text-align:center;">
                                             <div class="btn-group">
@@ -200,7 +202,7 @@
 
     function Deactivate_Or_Activate_Admin(title, admin_id, current_status, new_status)
     {
-        const swalWithBootstrapButtons = Swal.mixin({ 
+        const swalWithBootstrapButtons = Swal.mixin({
             customClass: {
                 confirmButton: 'btn btn-light-success m-2',
                 cancelButton: 'btn btn-danger m-2'

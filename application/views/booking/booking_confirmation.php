@@ -161,6 +161,14 @@
 				<td> : </td>
 				<td><?php echo $FullPaymentDeadline; ?></td>
 			</tr>
+			<tr>
+				<td>Deposit Amount</td>
+				<td> : </td>
+				<td>RM <?php echo number_format($DepositAmount, 2, '.', ','); ?></td>
+				<td></td>
+				<td></td>
+				<td></td>
+			</tr>
 		</table>
 		<hr style="margin-bottom:0px;">
 		<table style="width:100%; font-size:13px;">
@@ -200,7 +208,7 @@
 			<table style="width:100%; margin-bottom:10px;">
 				<?php if($Discount != 0.00){ ?>
 				<tr>
-					<td style="width:32%">Deposit By : <?php echo $DepositDeadline; ?></td>
+					<td style="width:32%">Deposit By : <?php echo $DepositDeadline; ?><br>Deposit Amount : RM <?php echo number_format($DepositAmount, 2, '.', ','); ?></td>
 					<td style="width:42%">Full Payment By : <?php echo $FullPaymentDeadline; ?></td>
 					<td style="width:16%; border-bottom: 1px solid black;">Subtotal (RM):</td>
 					<td style="width:12%; text-align:right; float: left; border-bottom: 1px solid black;"><label><?php echo number_format($Subtotal, 2, '.', ','); ?></label></td>
@@ -219,12 +227,24 @@
 				</tr>
 				<?php }else{ ?>
 					<tr style="font-weight:bold;">
-						<td style="width:32%">Deposit By : <?php echo $DepositDeadline; ?></td>
+						<td style="width:32%">Deposit By : <?php echo $DepositDeadline; ?><br>Deposit Amount : RM <?php echo number_format($DepositAmount, 2, '.', ','); ?></td>
 						<td style="width:42%">Full Payment By : <?php echo $FullPaymentDeadline; ?></td>
 						<td style="width:20%;">Total (RM):</td>
 						<td style="width:8%; text-align:right; float: left;"><label><?php echo number_format($NetTotal, 2, '.', ','); ?></label></td>
 					</tr>
 				<?php } ?>
+				<tr>
+					<td>&nbsp;</td>
+					<td>&nbsp;</td>
+					<td style="border-bottom: 1px solid black;">Total Paid (RM):</td>
+					<td style="text-align:right; float: left; border-bottom: 1px solid black;"><label><?php echo number_format(isset($TotalPaid) ? $TotalPaid : 0, 2, '.', ','); ?></label></td>
+				</tr>
+				<tr>
+					<td>&nbsp;</td>
+					<td>&nbsp;</td>
+					<td style="border-bottom: 1px solid black;">Outstanding (RM):</td>
+					<td style="text-align:right; float: left; border-bottom: 1px solid black;"><label><?php echo number_format(isset($OutstandingBalance) ? $OutstandingBalance : $NetTotal, 2, '.', ','); ?></label></td>
+				</tr>
 				<tr>
 					<td colspan="2"><p style="margin-top:10px;">MayBank 5128-4851-0541 "HolidayGoGoGo Tours Sdn Bhd"</p></td>
 					<td>

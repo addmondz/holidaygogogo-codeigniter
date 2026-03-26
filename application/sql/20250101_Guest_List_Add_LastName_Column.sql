@@ -4,9 +4,9 @@
 
 -- Add LastName column
 ALTER TABLE guest_list
-  ADD COLUMN LastName VARCHAR(255) NULL
+  ADD COLUMN IF NOT EXISTS LastName VARCHAR(255) NULL
   COMMENT 'Guest last name'
   AFTER Name;
 
--- Create index for better performance
-CREATE INDEX IX_guest_list_LastName ON guest_list (LastName);
+CREATE INDEX IF NOT EXISTS IX_guest_list_LastName
+  ON guest_list (LastName);

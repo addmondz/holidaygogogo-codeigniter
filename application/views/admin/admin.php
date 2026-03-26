@@ -165,6 +165,19 @@
                                 </select>
                             </div>
                         </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Team Lead</label>
+                                <select id="TeamLeadID" class="form-control selectpicker">
+                                    <option selected data-icon="la la-users font-size-lg bs-icon" value="">--SELECT TEAM LEAD--</option>
+                                    <?php if(!empty($team_leads)) {
+                                        foreach($team_leads as $team_lead) { ?>
+                                            <option <?php if($Action == 'U' && $TeamLeadID == $team_lead->AdminID) { echo 'selected'; } ?> data-icon="la la-user-tie font-size-lg bs-icon" value="<?php echo $team_lead->AdminID; ?>"><?php echo $team_lead->Name; ?></option>
+                                        <?php }
+                                    } ?>
+                                </select>
+                            </div>
+                        </div>
                     </div>
                     <div class="d-flex justify-content-between border-top pt-5">
                         <input type="button" value="<?php if($Action == 'C') { echo 'Create Admin'; } else { echo 'Update Admin'; } ?>" class="btn btn-success font-weight-bold px-9 py-4" style="width:180px; margin-left:auto;">
@@ -216,13 +229,14 @@
                 var password = ($('#Password').val()).toUpperCase();
                 var level = $('#Level').val();
                 var access_control = ($('#AccessControl').val()).toString();
+                var team_lead_id = $('#TeamLeadID').val();
                 if(country_code == null || name == '' || (action == 'C' && gender == null) || mobile == '' || email == '' || (action == 'C' && username == '') || (action == 'C' && password == '') || (action == 'C' && level == null) || access_control == '') {
                     Display_Message(background, 'Please Insert All Required Admin Information', null);
                 } else {
                     if(action == 'C') {
                         var admin = [];
                         var url = '<?php echo base_url('Admin/Create') ?>';
-                        admin.push({CountryCodeID:country_code, Name:name, Gender:gender, IdentificationNumber:identification_number, PassportNumber:passport_number, Mobile:mobile, Email:email, Username:username, Password:password, Level:level, AccessControl:access_control, InsertBy:session_id, InsertDate:current_datetime});
+                        admin.push({CountryCodeID:country_code, Name:name, Gender:gender, IdentificationNumber:identification_number, PassportNumber:passport_number, Mobile:mobile, Email:email, Username:username, Password:password, Level:level, AccessControl:access_control, TeamLeadID:team_lead_id ? team_lead_id : null, InsertBy:session_id, InsertDate:current_datetime});
                         Submit_Admin(url, admin, null);
                     } else {
                         var dirty_fields = $('#form').dirty('showDirtyFields');
@@ -234,6 +248,11 @@
                             var key = dirty_fields[i].id;
                             if(key != 'AccessControl') {
                                 var value = key == 'Name' || key == 'PassportNumber' || key == 'Email' || key == 'Password' ? (dirty_fields[i].value).toUpperCase() : dirty_fields[i].value;
+
+                                //Handle TeamLeadID empty value as null
+                                if(key == 'TeamLeadID' && value == '') {
+                                    value = null;
+                                }
 
                                 //Update Admin
                                 admin[0][key] = value;
@@ -250,6 +269,13 @@
                                         break;
                                     case 'Level':
                                         default_value = (Object.values(dirty_fields[i])[4]).dirtyInitialValue;
+                                        break;
+                                    case 'TeamLeadID':
+                                        <?php if(!empty($team_leads)) { ?>
+                                            default_value = (Object.values(dirty_fields[i])[<?php echo count($team_leads) + 1; ?>]).dirtyInitialValue;
+                                        <?php } else { ?>
+                                            default_value = (Object.values(dirty_fields[i])[1]).dirtyInitialValue;
+                                        <?php } ?>
                                         break;
                                     default:
                                         default_value = (Object.values(dirty_fields[i])[0]).dirtyInitialValue;
@@ -303,6 +329,6 @@
             }
         });
     }
-    
+
     $('#form').dirty('isClean');
 </script>

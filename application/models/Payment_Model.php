@@ -3,7 +3,7 @@ class Payment_Model extends CI_Model
 {
 	function Read_Payment()
 	{
-		$this->db->select('PaymentID, payment.BookingID, payment.SupplierID, Date, Type, Currency, ForeignCurrency, Credit, ReferenceNumber, BankSlip, Debit, Deadline, QuotationNumber, Quotation, InvoiceNumber, Invoice, payment.Bank, payment.BankAccount, payment.BankHolder, DebitRemark, PaymentRemark, payment.Status, Remark, BookingNumber, ReservationNumber, Customer, payment.AutocountSyncAction, payment.AutocountSyncStatus, payment.AutocountSyncMessage, payment.AutocountReferenceNumber');
+		$this->db->select('PaymentID, payment.BookingID, payment.SupplierID, payment.BookingProductID, Date, Type, Currency, ForeignCurrency, Credit, ReferenceNumber, BankSlip, Debit, Deadline, QuotationNumber, Quotation, InvoiceNumber, Invoice, payment.Bank, payment.BankAccount, payment.BankHolder, DebitRemark, PaymentRemark, payment.Status, Remark, BookingNumber, ReservationNumber, Customer, payment.AutocountSyncAction, payment.AutocountSyncStatus, payment.AutocountSyncMessage, payment.AutocountReferenceNumber');
 		$this->db->join('booking', 'booking.BookingID = payment.BookingID', 'left');
 		$this->db->where('PaymentID', $this->input->get('payment_id'));
 		return $this->db->get('payment')->row_array();
@@ -205,6 +205,7 @@ class Payment_Model extends CI_Model
 		}
 		$this->db->where('CancelStatus', 'N');
 		$this->db->where('booking.Status !=', 'N');
+		$this->db->where('booking.Status !=', 'Y');
 		$this->db->order_by('booking.BookingID', 'DESC');
 		return $this->db->get('booking')->result();
 	}
@@ -234,6 +235,16 @@ class Payment_Model extends CI_Model
 		$this->db->where('Status', 'Y');
 		$this->db->order_by('Country', 'ASC');
 		return $this->db->get('country_code')->result();
+	}
+
+	function Read_Booking_Products_For_Payment($booking_id)
+	{
+		$this->db->select('bp.BookingProductID, bp.ProductID, p.Name, p.ProductCode');
+		$this->db->from('booking_product bp');
+		$this->db->join('product p', 'p.ProductID = bp.ProductID', 'left');
+		$this->db->where('bp.BookingID', $booking_id);
+		$this->db->where('bp.Status', 'Y');
+		return $this->db->get()->result();
 	}
 
 	function Read_Received_Payments($booking_id) {
@@ -293,20 +304,21 @@ class Payment_Model extends CI_Model
 		$array = array(
 			'BookingID' => $this->input->post('booking'),
 			'SupplierID' => $this->input->post('debit_type-' . $count) == 'SUPPLIER PAYMENT' ? $this->input->post('supplier-' . $count) : null,
-			'Date' => $this->input->post('credit_type-' . $count) == 'DEPOSIT' || $this->input->post('credit_type-' . $count) == 'FULL' || $this->input->post('credit_type-' . $count) == 'SUPPLIER REFUND' || $this->input->post('credit_type-' . $count) == 'ADDITIONAL PAYMENT' ? date('Y-m-d', strtotime(str_replace('/', '-', $this->input->post('transaction_date-' . $count)))) : null,
-			'Type' => $this->input->post('credit_type-' . $count) == 'DEPOSIT' || $this->input->post('credit_type-' . $count) == 'FULL' || $this->input->post('credit_type-' . $count) == 'SUPPLIER REFUND' || $this->input->post('credit_type-' . $count) == 'ADDITIONAL PAYMENT' ? $this->input->post('credit_type-' . $count) : $this->input->post('debit_type-' . $count),
-			'Credit' => $this->input->post('credit_type-' . $count) == 'DEPOSIT' || $this->input->post('credit_type-' . $count) == 'FULL' || $this->input->post('credit_type-' . $count) == 'SUPPLIER REFUND' || $this->input->post('credit_type-' . $count) == 'ADDITIONAL PAYMENT' ? str_replace(',', '', $this->input->post('credit-' . $count)) : 0.00,
+			'BookingProductID' => $this->input->post('debit_type-' . $count) == 'SUPPLIER PAYMENT' ? $this->input->post('booking_product-' . $count) : null,
+			'Date' => $this->input->post('credit_type-' . $count) == 'DEPOSIT' || $this->input->post('credit_type-' . $count) == 'FULL' || $this->input->post('credit_type-' . $count) == 'SUPPLIER REFUND' || $this->input->post('credit_type-' . $count) == 'ADDITIONAL PAYMENT' || $this->input->post('credit_type-' . $count) == 'AGENT COMMISSION FROM SUPPLIER' ? date('Y-m-d', strtotime(str_replace('/', '-', $this->input->post('transaction_date-' . $count)))) : null,
+			'Type' => $this->input->post('credit_type-' . $count) == 'DEPOSIT' || $this->input->post('credit_type-' . $count) == 'FULL' || $this->input->post('credit_type-' . $count) == 'SUPPLIER REFUND' || $this->input->post('credit_type-' . $count) == 'ADDITIONAL PAYMENT' || $this->input->post('credit_type-' . $count) == 'AGENT COMMISSION FROM SUPPLIER' ? $this->input->post('credit_type-' . $count) : $this->input->post('debit_type-' . $count),
+			'Credit' => $this->input->post('credit_type-' . $count) == 'DEPOSIT' || $this->input->post('credit_type-' . $count) == 'FULL' || $this->input->post('credit_type-' . $count) == 'SUPPLIER REFUND' || $this->input->post('credit_type-' . $count) == 'ADDITIONAL PAYMENT' || $this->input->post('credit_type-' . $count) == 'AGENT COMMISSION FROM SUPPLIER' ? str_replace(',', '', $this->input->post('credit-' . $count)) : 0.00,
 			'ReferenceNumber' => !empty($this->input->post('reference_number-' . $count)) ? strtoupper($this->input->post('reference_number-' . $count)) : null,
-			'Debit' => ($this->input->post('debit_type-' . $count) == 'SUPPLIER PAYMENT' || $this->input->post('debit_type-' . $count) == 'CUSTOMER REFUND' || $this->input->post('debit_type-' . $count) == 'ONE-TIME PAYMENT' || $this->input->post('debit_type-' . $count) == 'AGENT COMMISSION' || $this->input->post('debit_type-' . $count) == 'BANK CHARGES') && !empty($this->input->post('debit-' . $count)) ? str_replace(',', '', $this->input->post('debit-' . $count)) : 0.00,
-			'Deadline' => $this->input->post('debit_type-' . $count) == 'SUPPLIER PAYMENT' || $this->input->post('debit_type-' . $count) == 'CUSTOMER REFUND' || $this->input->post('debit_type-' . $count) == 'ONE-TIME PAYMENT' || $this->input->post('debit_type-' . $count) == 'AGENT COMMISSION' || $this->input->post('debit_type-' . $count) == 'BANK CHARGES' ? date('Y-m-d', strtotime(str_replace('/', '-', $this->input->post('payment_deadline-' . $count)))) : null,
+			'Debit' => ($this->input->post('debit_type-' . $count) == 'SUPPLIER PAYMENT' || $this->input->post('debit_type-' . $count) == 'CUSTOMER REFUND' || $this->input->post('debit_type-' . $count) == 'ONE-TIME PAYMENT' || $this->input->post('debit_type-' . $count) == 'AGENT COMMISSION' || $this->input->post('debit_type-' . $count) == 'BANK CHARGES' || $this->input->post('debit_type-' . $count) == 'AGENT COMMISSION FROM SUPPLIER' || $this->input->post('debit_type-' . $count) == 'CREDIT CARD CHARGES') && !empty($this->input->post('debit-' . $count)) ? str_replace(',', '', $this->input->post('debit-' . $count)) : 0.00,
+			'Deadline' => $this->input->post('debit_type-' . $count) == 'SUPPLIER PAYMENT' || $this->input->post('debit_type-' . $count) == 'CUSTOMER REFUND' || $this->input->post('debit_type-' . $count) == 'ONE-TIME PAYMENT' || $this->input->post('debit_type-' . $count) == 'AGENT COMMISSION' || $this->input->post('debit_type-' . $count) == 'BANK CHARGES' || $this->input->post('debit_type-' . $count) == 'AGENT COMMISSION FROM SUPPLIER' || $this->input->post('debit_type-' . $count) == 'CREDIT CARD CHARGES' ? date('Y-m-d', strtotime(str_replace('/', '-', $this->input->post('payment_deadline-' . $count)))) : null,
 			'QuotationNumber' => $this->input->post('debit_type-' . $count) == 'SUPPLIER PAYMENT' && !empty($this->input->post('quotation_number-' . $count)) ? strtoupper($this->input->post('quotation_number-' . $count)) : null,
 			'InvoiceNumber' => $this->input->post('debit_type-' . $count) == 'SUPPLIER PAYMENT' && !empty($this->input->post('invoice_number-' . $count)) ? strtoupper($this->input->post('invoice_number-' . $count)) : null,
-			'Currency' => ($this->input->post('debit_type-' . $count) == 'SUPPLIER PAYMENT' || $this->input->post('debit_type-' . $count) == 'CUSTOMER REFUND' || $this->input->post('debit_type-' . $count) == 'ONE-TIME PAYMENT' || $this->input->post('debit_type-' . $count) == 'AGENT COMMISSION' || $this->input->post('debit_type-' . $count) == 'BANK CHARGES') && !empty($this->input->post('currency_code-' . $count)) ? $this->input->post('currency_code-' . $count) : null,
-			'ForeignCurrency' => ($this->input->post('debit_type-' . $count) == 'SUPPLIER PAYMENT' || $this->input->post('debit_type-' . $count) == 'CUSTOMER REFUND' || $this->input->post('debit_type-' . $count) == 'ONE-TIME PAYMENT' || $this->input->post('debit_type-' . $count) == 'AGENT COMMISSION' || $this->input->post('debit_type-' . $count) == 'BANK CHARGES') && !empty($this->input->post('foreign_currency-' . $count)) ? str_replace(',', '', $this->input->post('foreign_currency-' . $count)) : 0.00,
-			'Bank' => $this->input->post('debit_type-' . $count) == 'CUSTOMER REFUND' || $this->input->post('debit_type-' . $count) == 'ONE-TIME PAYMENT' || $this->input->post('debit_type-' . $count) == 'AGENT COMMISSION' || $this->input->post('debit_type-' . $count) == 'BANK CHARGES' ? strtoupper($this->input->post('bank-' . $count)) : null,
-			'BankAccount' => $this->input->post('debit_type-' . $count) == 'CUSTOMER REFUND' || $this->input->post('debit_type-' . $count) == 'ONE-TIME PAYMENT' || $this->input->post('debit_type-' . $count) == 'AGENT COMMISSION' || $this->input->post('debit_type-' . $count) == 'BANK CHARGES' ? strtoupper($this->input->post('bank_account-' . $count)) : null,
-			'BankHolder' => $this->input->post('debit_type-' . $count) == 'CUSTOMER REFUND' || $this->input->post('debit_type-' . $count) == 'ONE-TIME PAYMENT' || $this->input->post('debit_type-' . $count) == 'AGENT COMMISSION' || $this->input->post('debit_type-' . $count) == 'BANK CHARGES' ? strtoupper($this->input->post('bank_holder-' . $count)) : null,
-			'DebitRemark' => ($this->input->post('debit_type-' . $count) == 'CUSTOMER REFUND' || $this->input->post('debit_type-' . $count) == 'ONE-TIME PAYMENT' || $this->input->post('debit_type-' . $count) == 'AGENT COMMISSION' || $this->input->post('debit_type-' . $count) == 'BANK CHARGES') && !empty($this->input->post('remark-' . $count)) ? strtoupper($this->input->post('remark-' . $count)) : null,
+			'Currency' => ($this->input->post('debit_type-' . $count) == 'SUPPLIER PAYMENT' || $this->input->post('debit_type-' . $count) == 'CUSTOMER REFUND' || $this->input->post('debit_type-' . $count) == 'ONE-TIME PAYMENT' || $this->input->post('debit_type-' . $count) == 'AGENT COMMISSION' || $this->input->post('debit_type-' . $count) == 'BANK CHARGES' || $this->input->post('debit_type-' . $count) == 'AGENT COMMISSION FROM SUPPLIER' || $this->input->post('debit_type-' . $count) == 'CREDIT CARD CHARGES') && !empty($this->input->post('currency_code-' . $count)) ? $this->input->post('currency_code-' . $count) : null,
+			'ForeignCurrency' => ($this->input->post('debit_type-' . $count) == 'SUPPLIER PAYMENT' || $this->input->post('debit_type-' . $count) == 'CUSTOMER REFUND' || $this->input->post('debit_type-' . $count) == 'ONE-TIME PAYMENT' || $this->input->post('debit_type-' . $count) == 'AGENT COMMISSION' || $this->input->post('debit_type-' . $count) == 'BANK CHARGES' || $this->input->post('debit_type-' . $count) == 'AGENT COMMISSION FROM SUPPLIER' || $this->input->post('debit_type-' . $count) == 'CREDIT CARD CHARGES') && !empty($this->input->post('foreign_currency-' . $count)) ? str_replace(',', '', $this->input->post('foreign_currency-' . $count)) : 0.00,
+			'Bank' => $this->input->post('debit_type-' . $count) == 'CUSTOMER REFUND' || $this->input->post('debit_type-' . $count) == 'ONE-TIME PAYMENT' || $this->input->post('debit_type-' . $count) == 'AGENT COMMISSION' || $this->input->post('debit_type-' . $count) == 'BANK CHARGES' || $this->input->post('debit_type-' . $count) == 'AGENT COMMISSION FROM SUPPLIER' || $this->input->post('debit_type-' . $count) == 'CREDIT CARD CHARGES' ? strtoupper($this->input->post('bank-' . $count)) : null,
+			'BankAccount' => $this->input->post('debit_type-' . $count) == 'CUSTOMER REFUND' || $this->input->post('debit_type-' . $count) == 'ONE-TIME PAYMENT' || $this->input->post('debit_type-' . $count) == 'AGENT COMMISSION' || $this->input->post('debit_type-' . $count) == 'BANK CHARGES' || $this->input->post('debit_type-' . $count) == 'AGENT COMMISSION FROM SUPPLIER' || $this->input->post('debit_type-' . $count) == 'CREDIT CARD CHARGES' ? strtoupper($this->input->post('bank_account-' . $count)) : null,
+			'BankHolder' => $this->input->post('debit_type-' . $count) == 'CUSTOMER REFUND' || $this->input->post('debit_type-' . $count) == 'ONE-TIME PAYMENT' || $this->input->post('debit_type-' . $count) == 'AGENT COMMISSION' || $this->input->post('debit_type-' . $count) == 'BANK CHARGES' || $this->input->post('debit_type-' . $count) == 'AGENT COMMISSION FROM SUPPLIER' || $this->input->post('debit_type-' . $count) == 'CREDIT CARD CHARGES' ? strtoupper($this->input->post('bank_holder-' . $count)) : null,
+			'DebitRemark' => ($this->input->post('debit_type-' . $count) == 'CUSTOMER REFUND' || $this->input->post('debit_type-' . $count) == 'ONE-TIME PAYMENT' || $this->input->post('debit_type-' . $count) == 'AGENT COMMISSION' || $this->input->post('debit_type-' . $count) == 'BANK CHARGES' || $this->input->post('debit_type-' . $count) == 'AGENT COMMISSION FROM SUPPLIER' || $this->input->post('debit_type-' . $count) == 'CREDIT CARD CHARGES') && !empty($this->input->post('remark-' . $count)) ? strtoupper($this->input->post('remark-' . $count)) : null,
 			'PaymentRemark' => !empty($this->input->post('payment_remark-' . $count)) ? strtoupper($this->input->post('payment_remark-' . $count)) : null,
 			'InsertBy' => $this->session->userdata('admin_id'),
 			'InsertDate' => date('Y-m-d H:i:s')
@@ -343,7 +355,13 @@ class Payment_Model extends CI_Model
 				$text = urlencode('New Payment Record Successfully Created' . "\n\n" . 'Booking Number : ' . "\n" . $payment['BookingNumber'] . "\n\n" . 'Travel Date : ' . "\n" . $payment['TravelDate'] . "\n\n" . 'Destination : ' . "\n" . $payment['Destination'] . "\n\n" . 'Sales Agent : ' . "\n" . $payment['SalesAgent'] . "\n\n" . 'Transaction Date : ' . "\n" . $payment['Date'] . "\n\n" . 'Payment Out : ' . "\n" . $payment['Debit'] . "\n\n" . 'Payment Type : ' . "\n" . $payment['Type'] . "\n\n" . 'Payment Deadline : ' . "\n" . $payment['Deadline'] . "\n\n" . 'Bank : ' . "\n" . $payment['Bank'] . "\n\n" . 'Bank Account : ' . "\n" . $payment['BankAccount'] . "\n\n" . 'Bank Holder : ' . "\n" . $payment['BankHolder'] . "\n\n" . 'Remark : ' . "\n" . $payment['DebitRemark']);
 			}
 		}
-		file_get_contents('https://api.telegram.org/bot7521016286:AAEMDyjd789UEHBH5LK4xfBzIzY9TZ80tCg/sendMessage?chat_id=-1002546036574&text=' . $text);
+
+		// Send Telegram notification only if APP_ENV is 'prod'
+		$this->load->helper('utils');
+		$app_env = get_app_env();
+		if ($app_env === 'prod') {
+			file_get_contents('https://api.telegram.org/bot7521016286:AAEMDyjd789UEHBH5LK4xfBzIzY9TZ80tCg/sendMessage?chat_id=-1002546036574&text=' . $text);
+		}
 
 		return $payment_id;
 	}
@@ -837,7 +855,7 @@ return $query->result_array(); // instead of result()
 
 	function Calculate_Payment_Summary()
 	{
-		$this->db->select('SUM(Credit) as total_credit, SUM(Debit) as total_debit');
+		$this->db->select("SUM(CASE WHEN Type != 'AGENT COMMISSION FROM SUPPLIER' THEN Credit ELSE 0 END) as total_credit, SUM(Debit) as total_debit");
 		$this->db->from('booking');
 		$this->db->join('payment', 'payment.BookingID = booking.BookingID', 'left');
 		$this->db->join('admin', 'admin.AdminID = booking.SalesAgent', 'left');

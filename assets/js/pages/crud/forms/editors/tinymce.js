@@ -35,6 +35,22 @@ var KTTinymce = function () {
                 'undo redo | bold italic underline | link | alignleft aligncenter alignright alignjustify',
                 'bullist numlist | preview'], 
             plugins: 'link lists preview'
+        });
+
+        tinymce.init({
+            selector: '#kt-tinymce-6',
+            toolbar: ['styleselect fontselect fontsizeselect',
+                'undo redo | bold italic underline | link | alignleft aligncenter alignright alignjustify',
+                'bullist numlist | preview'], 
+            plugins: 'link lists preview'
+        });
+
+        tinymce.init({
+            selector: '#kt-tinymce-7',
+            toolbar: ['styleselect fontselect fontsizeselect',
+                'undo redo | bold italic underline | link | alignleft aligncenter alignright alignjustify',
+                'bullist numlist | preview'], 
+            plugins: 'link lists preview'
         });       
     }
     

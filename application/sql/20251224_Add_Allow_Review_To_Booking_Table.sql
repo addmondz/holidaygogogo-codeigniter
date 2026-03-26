@@ -1,0 +1,4 @@
+ALTER TABLE booking
+  ADD COLUMN IF NOT EXISTS AllowReview BOOLEAN DEFAULT TRUE AFTER AutocountSyncMessage,
+  ADD COLUMN IF NOT EXISTS CustomerReview TEXT NULL AFTER AllowReview,
+  Add COLUMN IF NOT EXISTS CustomerReviewTimestamp DATETIME NULL AFTER CustomerReview;
