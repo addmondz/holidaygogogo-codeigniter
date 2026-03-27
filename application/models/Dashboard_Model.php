@@ -275,7 +275,7 @@ class Dashboard_Model extends CI_Model
 
 		$this->db->where('payment.Status', 'Y');
 
-		$this->db->group_by('BookingNumber');
+		$this->db->group_by('BookingNumber, Customer, NetTotal, AfterSalesService, booking.Status, CAST(booking.InsertDate AS DATE), Name');
 
 		$this->db->order_by('BookingNumber', 'ASC');
 
@@ -861,7 +861,7 @@ class Dashboard_Model extends CI_Model
 
 		$this->db->where('payment.Status', 'Y');
 
-		$this->db->group_by('BookingNumber');
+		$this->db->group_by('BookingNumber, Customer, NetTotal, AfterSalesService, booking.Status, CAST(booking.InsertDate AS DATE), AdminID, admin.Name, category.Name');
 
 		$this->db->order_by('SalesAgent', 'ASC');
 
