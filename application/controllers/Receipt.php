@@ -1,7 +1,6 @@
 <?php
 
-require FCPATH.'vendor/autoload.php';  
-use Clegginabox\PDFMerger\PDFMerger;
+require FCPATH.'vendor/autoload.php';
 
 class Receipt extends CI_Controller
 {

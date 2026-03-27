@@ -6,8 +6,6 @@ require_once APPPATH.'libraries/dompdf/autoload.inc.php';
 
 require FCPATH.'vendor/autoload.php';  
 
-use Clegginabox\PDFMerger\PDFMerger;
-
 use Dompdf\Dompdf;
 
 
@@ -288,15 +286,25 @@ class Booking_Confirmation extends CI_Controller
                 header('Pragma: no-cache');
                 header('Expires: 0');
 
-                $pdf = new \Clegginabox\PDFMerger\PDFMerger;
+                $merger = new \setasign\Fpdi\Fpdi();
 
+                $pageCount1 = $merger->setSourceFile('assets/upload/1_'.$identifier.'.pdf');
+                for ($i = 1; $i <= $pageCount1; $i++) {
+                    $tpl = $merger->importPage($i);
+                    $size = $merger->getTemplateSize($tpl);
+                    $merger->AddPage($size['orientation'], [$size['width'], $size['height']]);
+                    $merger->useTemplate($tpl);
+                }
 
+                $pageCount2 = $merger->setSourceFile('assets/upload/2_'.$identifier.'.pdf');
+                for ($i = 1; $i <= $pageCount2; $i++) {
+                    $tpl = $merger->importPage($i);
+                    $size = $merger->getTemplateSize($tpl);
+                    $merger->AddPage($size['orientation'], [$size['width'], $size['height']]);
+                    $merger->useTemplate($tpl);
+                }
 
-                $pdf->addPDF('assets/upload/1_'.$identifier.'.pdf', 'all'); 
-
-                $pdf->addPDF('assets/upload/2_'.$identifier.'.pdf', 'all');
-
-                $pdf->merge('browser', $array['Title'].'3.pdf', 'P');
+                $merger->Output('I', $array['Title'].'3.pdf');
 
                 unlink('assets/upload/1_'.$identifier.'.pdf');
 
