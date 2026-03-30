@@ -250,7 +250,7 @@ class Payment_Model extends CI_Model
 	function Read_Received_Payments($booking_id) {
 		$this->db->select('Type, Credit, Debit');
 		$this->db->where('BookingID', $booking_id);
-		$this->db->where_in('Type', array('ADDITIONAL PAYMENT', 'DEPOSIT', 'FULL', 'CUSTOMER REFUND'));
+		$this->db->where_in('Type', array('ADDITIONAL PAYMENT', 'DEPOSIT', 'FULL'));
 		$this->db->where('Status', 'Y');
 		return $this->db->get('payment')->result();
 	}
@@ -862,6 +862,7 @@ return $query->result_array(); // instead of result()
 		$this->db->join('supplier', 'supplier.SupplierID = payment.SupplierID', 'left');
 
 		$this->apply_payment_filters();
+		$this->db->where_in('payment.Type', array('DEPOSIT', 'FULL', 'ADDITIONAL PAYMENT'));
 
 		$result = $this->db->get()->row();
 
@@ -877,6 +878,7 @@ return $query->result_array(); // instead of result()
 		$this->db->join('supplier', 'supplier.SupplierID = payment.SupplierID', 'left');
 
 		$this->apply_payment_filters();
+		$this->db->where_in('payment.Type', array('DEPOSIT', 'FULL', 'ADDITIONAL PAYMENT'));
 
 		$sales_result = $this->db->get()->row();
 		$total_sales = $sales_result->total_sales ?? 0;

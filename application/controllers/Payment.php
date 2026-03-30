@@ -105,11 +105,7 @@ class Payment extends MY_Controller
 		$payments = $this->Payment_Model->Read_Received_Payments($booking_id);
 		$total_credit = 0;
 		foreach($payments as $payment) {
-			if($payment->Type != 'CUSTOMER REFUND') {
-				$total_credit += $payment->Credit;
-			} else {
-				$total_credit -= $payment->Debit;
-			}
+			$total_credit += $payment->Credit;
 		}
 		return $total_credit;
 	}

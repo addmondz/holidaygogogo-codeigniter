@@ -1857,7 +1857,6 @@
                                 <th>Date</th>
                                 <th>Type</th>
                                 <th>Amount</th>
-                                <th>Reference</th>
                                 <th>Status</th>
                                 <th>Receipt</th>
                             </tr>
@@ -1870,11 +1869,12 @@
                                     <td data-label="Amount" class="payment-credit">
                                         <?php if (!empty($payment['Credit']) && $payment['Credit'] > 0): ?>
                                             RM <?php echo number_format($payment['Credit'], 2); ?>
+                                        <?php elseif (!empty($payment['Debit']) && $payment['Debit'] > 0): ?>
+                                            RM <?php echo number_format($payment['Debit'], 2); ?>
                                         <?php else: ?>
                                             -
                                         <?php endif; ?>
                                     </td>
-                                    <td data-label="Reference"><?php echo !empty($payment['ReferenceNumber']) ? htmlspecialchars($payment['ReferenceNumber']) : '-'; ?></td>
                                     <td data-label="Status">
                                         <span class="payment-status <?php echo $payment['Status'] == 'Y' ? 'status-approved' : 'status-pending'; ?>">
                                             <?php echo $payment['Status'] == 'Y' ? 'Approved' : 'Pending'; ?>
