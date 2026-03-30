@@ -1232,7 +1232,9 @@
             }
             $total_paid = isset($booking['total_paid']) ? floatval($booking['total_paid']) : 0;
             $net_total = isset($booking['NetTotal']) ? floatval($booking['NetTotal']) : 0;
-            $deposit_complete = $has_deposit_deadline ? ($has_any_payment || $deposit_paid || $full_paid) : false;
+            $deposit_percentage = isset($booking['DepositPercentage']) ? floatval($booking['DepositPercentage']) : 0;
+            $deposit_total = ceil(($net_total * $deposit_percentage) / 100);
+            $deposit_complete = $has_deposit_deadline ? (($total_paid >= $deposit_total && $deposit_total > 0) || $full_paid) : false;
             $full_payment_complete = ($total_paid >= $net_total && $net_total > 0) || $full_paid;
 
             // Check for additional payment requirement
@@ -1880,7 +1882,7 @@
                                     </td>
                                     <td data-label="Receipt">
                                         <?php if (!empty($payment['Credit']) && $payment['Credit'] > 0 && $payment['Status'] == 'Y'): ?>
-                                            <a href="<?php echo base_url('Receipt?token=' . $booking['Token']); ?>" target="_blank">
+                                            <a href="<?php echo base_url('Receipt?token=' . $booking['Token'] . '&payment_id=' . $payment['PaymentID']); ?>" target="_blank">
                                                 View
                                             </a>
                                         <?php else: ?>
@@ -3038,6 +3040,8 @@
             }
         }
     </style>
+
+    <?php $this->load->view('customer_portal/footer'); ?>
 </body>
 
 </html>

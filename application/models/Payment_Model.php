@@ -855,7 +855,7 @@ return $query->result_array(); // instead of result()
 
 	function Calculate_Payment_Summary()
 	{
-		$this->db->select("SUM(CASE WHEN Type != 'AGENT COMMISSION FROM SUPPLIER' THEN Credit ELSE 0 END) as total_credit, SUM(Debit) as total_debit");
+		$this->db->select("SUM(Credit) as total_credit, SUM(Debit) as total_debit");
 		$this->db->from('booking');
 		$this->db->join('payment', 'payment.BookingID = booking.BookingID', 'left');
 		$this->db->join('admin', 'admin.AdminID = booking.SalesAgent', 'left');

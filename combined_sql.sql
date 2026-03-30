@@ -500,3 +500,13 @@ WHERE p.ProductID IN (
 -- 39. 20260326_Add_SnapshotPDF_To_Booking_Log
 -- =============================================
 ALTER TABLE `booking_log` ADD COLUMN `SnapshotPDF` VARCHAR(255) DEFAULT NULL AFTER `NewData`;
+
+-- =============================================
+-- 40. 20260329_Payment_Add_Agent_Commission_From_Supplier_Type
+-- =============================================
+ALTER TABLE payment
+  MODIFY COLUMN Type ENUM(
+    'ADDITIONAL PAYMENT','AGENT COMMISSION','AGENT COMMISSION FROM SUPPLIER',
+    'BANK CHARGES','CUSTOMER REFUND','CREDIT CARD CHARGES','DEPOSIT','FULL',
+    'ONE-TIME PAYMENT','SUPPLIER PAYMENT','SUPPLIER REFUND'
+  ) NULL;

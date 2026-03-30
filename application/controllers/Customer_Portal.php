@@ -360,9 +360,9 @@ class Customer_Portal extends CI_Controller
         }
 
         // Get booking by token
-        $this->db->select('booking.BookingID, BookingNumber, ReservationNumber, DepositDeadline, 
-                          FullPaymentDeadline, AdditionalPaymentDeadline, Customer, booking.Mobile As CustomerMobile, 
-                          StartDate, EndDate, Adult, Children, Infant, BookingRemark, Subtotal, Discount, NetTotal, 
+        $this->db->select('booking.BookingID, BookingNumber, ReservationNumber, DepositDeadline,
+                          FullPaymentDeadline, AdditionalPaymentDeadline, Customer, booking.Mobile As CustomerMobile,
+                          StartDate, EndDate, Adult, Children, Infant, BookingRemark, Subtotal, Discount, NetTotal, DepositPercentage,
                           booking.ChatLanguage, Token, booking.BookingConfirmationTitle, CancelStatus, LockStatus, 
                           AfterSalesService, booking.Status, booking.InsertDate, booking.UpdateDate, booking.CustomerID,
                           booking.AllowReview, booking.CustomerReview, booking.CustomerReviewTimestamp,
@@ -433,12 +433,13 @@ class Customer_Portal extends CI_Controller
         $booking['invoice_split'] = $this->Invoice_Split_Model->Get_Pax_By_Booking($booking['BookingID']);
 
         // Get payment history (exclude SUPPLIER PAYMENT)
-        $this->db->select('Date, Type, Credit, ReferenceNumber, Debit, Deadline, payment.Status, PaymentRemark, DebitRemark, payment.Bank, payment.BankAccount, payment.BankHolder, supplier.Name As SupplierName');
+        $this->db->select('payment.PaymentID, Date, Type, Credit, ReferenceNumber, Debit, Deadline, payment.Status, PaymentRemark, DebitRemark, payment.Bank, payment.BankAccount, payment.BankHolder, supplier.Name As SupplierName');
         $this->db->from('payment');
         $this->db->join('supplier', 'supplier.SupplierID = payment.SupplierID', 'left');
         $this->db->where('payment.BookingID', $booking['BookingID']);
         $this->db->where('payment.Status !=', 'N');
         $this->db->where('payment.Type !=', 'SUPPLIER PAYMENT');
+        $this->db->where('payment.Type !=', 'AGENT COMMISSION FROM SUPPLIER');
         $this->db->order_by('Date', 'ASC');
         $this->db->order_by('PaymentID', 'ASC');
         $payments = $this->db->get()->result_array();
@@ -457,7 +458,7 @@ class Customer_Portal extends CI_Controller
                 $payment['Deadline'] = date('d M Y', strtotime($payment['Deadline']));
             }
             if ($payment['Status'] == 'Y' || $payment['Status'] == 'P') {
-                if (!empty($payment['Credit']) && $payment['Credit'] > 0) {
+                if (!empty($payment['Credit']) && $payment['Credit'] > 0 && $payment['Type'] != 'AGENT COMMISSION FROM SUPPLIER') {
                     $total_credit += $payment['Credit'];
                 }
                 if (!empty($payment['Debit']) && $payment['Debit'] > 0) {

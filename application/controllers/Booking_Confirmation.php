@@ -233,7 +233,7 @@ class Booking_Confirmation extends CI_Controller
                 $payments = $this->Payment_Model->Read_Approved_Payments($array['BookingID']);
                 if(!empty($payments)) {
                     foreach($payments as $payment) {
-                        if($payment->Type != 'SUPPLIER REFUND' && $payment->Credit > 0) {
+                        if($payment->Type != 'SUPPLIER REFUND' && $payment->Type != 'AGENT COMMISSION FROM SUPPLIER' && $payment->Credit > 0) {
                             $total_paid += $payment->Credit;
                         }
                     }

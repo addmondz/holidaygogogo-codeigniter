@@ -422,7 +422,7 @@ class Booking_Model extends CI_Model
 
 	function Read_Payments($booking_id)
 	{
-		$this->db->select('Type, Credit, Debit, payment.Status');
+		$this->db->select('payment.PaymentID, Type, Credit, Debit, payment.Status');
 		$this->db->where('payment.BookingID', $booking_id);
 		$this->db->where('payment.Status !=', 'N');
 		return $this->db->get('payment')->result();

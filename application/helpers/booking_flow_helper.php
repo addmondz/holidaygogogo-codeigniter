@@ -534,13 +534,13 @@ if (!function_exists('has_full_payment')) {
         if (!empty($payments)) {
             foreach ($payments as $payment) {
                 $credit_amount = !empty($payment->Credit) ? floatval($payment->Credit) : 0;
-                if ($payment->Type != 'SUPPLIER REFUND' && $credit_amount > 0 && $payment->Status == 'Y') {
+                if ($payment->Type != 'SUPPLIER REFUND' && $payment->Type != 'AGENT COMMISSION FROM SUPPLIER' && $credit_amount > 0 && $payment->Status == 'Y') {
                     $total_approved_credit += $credit_amount;
                 }
             }
         }
 
-        return $total_approved_credit >= floatval($booking->NetTotal);
+        return round($total_approved_credit, 2) >= round(floatval($booking->NetTotal), 2);
     }
 }
 

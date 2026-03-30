@@ -47,12 +47,12 @@ class Recalculate {
             $total_approved_credit = 0;
             if(!empty($payments)) {
                 foreach($payments as $payment) {
-                    if($payment->Type != 'SUPPLIER REFUND' && $payment->Credit != 0.00 && $payment->Status == 'Y') {
+                    if($payment->Type != 'SUPPLIER REFUND' && $payment->Type != 'AGENT COMMISSION FROM SUPPLIER' && $payment->Credit != 0.00 && $payment->Status == 'Y') {
                         $total_approved_credit += $payment->Credit;
                     }
                 }
                 if($total_approved_credit != 0) {
-                    if(strval($total_approved_credit) >= $booking->NetTotal) {
+                    if(round($total_approved_credit, 2) >= round(floatval($booking->NetTotal), 2)) {
                         // Full payment received - move to PBO (Pending Booking Operation)
                         if($booking->Status == 'P' || $booking->Status == 'PP') {
                             $this->CI->Booking_Model->Update_Status('PBO', $booking->BookingID);

@@ -229,5 +229,6 @@
     });
 </script>
 
+    <?php $this->load->view('customer_portal/footer'); ?>
 </body>
 </html>

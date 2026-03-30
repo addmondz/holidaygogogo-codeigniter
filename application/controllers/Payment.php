@@ -571,7 +571,7 @@ class Payment extends MY_Controller
 			$payment->ReferenceNumber = empty($payment->ReferenceNumber) ? '-' : $payment->ReferenceNumber;
 			$payment->Debit = $payment->Credit != 0.00 ? '' : number_format($payment->Debit, 2, '.', ',');
 			$payment->PaymentRemark = empty($payment->PaymentRemark) ? '-' : $payment->PaymentRemark;
-			if($payment->Type == 'DEPOSIT' || $payment->Type == 'FULL' || $payment->Type == 'SUPPLIER REFUND' || $payment->Type == 'ADDITIONAL PAYMENT') {
+			if($payment->Type == 'DEPOSIT' || $payment->Type == 'FULL' || $payment->Type == 'SUPPLIER REFUND' || $payment->Type == 'ADDITIONAL PAYMENT' || $payment->Type == 'AGENT COMMISSION FROM SUPPLIER') {
 				array_push($array['credit_payments'], $payment);
 			} else {
 				$payment->Deadline = strtoupper(date('j M Y', strtotime($payment->Deadline)));
@@ -772,7 +772,7 @@ class Payment extends MY_Controller
 							// Determine if full or partial payment
 							// According to booking flow: PBC -> P -> PP -> PBO
 							// Partial payment moves to PP, full payment moves to PBO
-							if(strval($total_approved_credit) >= $booking->NetTotal) {
+							if(round($total_approved_credit, 2) >= round(floatval($booking->NetTotal), 2)) {
 								// Full payment received - move to PBO
 								$full_payment_description = "Full Payment Received - Ready for Booking Operation";
 								if($booking->Status == 'P' || $booking->Status == 'PBC' || $booking->Status == 'PP') {

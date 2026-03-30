@@ -3,7 +3,7 @@ class Guest_List_Model extends CI_Model
 {
 	function Read_Guest_Lists1()
 	{
-		$this->db->select('GuestListID, guest_list.BookingID, guest_list.guest_list_room_id, guest_list.CountryCodeID As GuestCountryCode, Type, guest_list.Name As Guest, guest_list.LastName As GuestLastName, guest_list.Gender, DateOfBirth, Nationality, guest_list.IdentificationNumber, guest_list.PassportNumber, guest_list.PassportIssueDate, guest_list.PassportExpiryDate, guest_list.PassportCopy, guest_list.DietaryRequirement, guest_list.Mobile As GuestMobile, guest_list.Email, MaritalStatus, Employment, Address, Postcode, guest_list.City, guest_list.State, guest_list.Country, Nominee, NomineeIdentificationNumber, Relationship, NomineeContact, booking.BookingID, BookingNumber, ReservationNumber, Customer, booking.Mobile As CustomerMobile, StartDate, EndDate, Adult, Children, Infant, ChatLanguage, LockStatus, TravelInsuranceStatus, AfterSalesService, GLSessionLock, GLSessionExpiration, booking.Status, admin.CountryCodeID As SalesAgentCountryCode, admin.Name As SalesAgent, admin.Mobile As SalesAgentMobile, category.Name As Destination, CountryCode, guest_list_room.room_name As RoomName');
+		$this->db->select('GuestListID, guest_list.BookingID, guest_list.guest_list_room_id, guest_list.CountryCodeID As GuestCountryCode, Type, guest_list.Name As Guest, guest_list.LastName As GuestLastName, guest_list.Gender, DateOfBirth, Nationality, guest_list.IdentificationNumber, guest_list.PassportNumber, guest_list.PassportIssueDate, guest_list.PassportExpiryDate, guest_list.PassportCopy, guest_list.DietaryRequirement, guest_list.Mobile As GuestMobile, guest_list.Email, MaritalStatus, Employment, Address, Postcode, guest_list.City, guest_list.State, guest_list.Country, Nominee, NomineeIdentificationNumber, NomineeContactNumber, Relationship, NomineeContact, booking.BookingID, BookingNumber, ReservationNumber, Customer, booking.Mobile As CustomerMobile, StartDate, EndDate, Adult, Children, Infant, ChatLanguage, LockStatus, TravelInsuranceStatus, AfterSalesService, GLSessionLock, GLSessionExpiration, booking.Status, admin.CountryCodeID As SalesAgentCountryCode, admin.Name As SalesAgent, admin.Mobile As SalesAgentMobile, category.Name As Destination, CountryCode, guest_list_room.room_name As RoomName');
 		$this->db->join('guest_list', 'guest_list.BookingID = booking.BookingID', 'left');
 		$this->db->join('guest_list_room', 'guest_list_room.id = guest_list.guest_list_room_id', 'left');
 		$this->db->join('admin', 'admin.AdminID = booking.SalesAgent', 'left');
@@ -21,7 +21,7 @@ class Guest_List_Model extends CI_Model
 
     function Read_Guest_Lists2()
 	{
-		$this->db->select('GuestListID, guest_list.CountryCodeID As GuestCountryCode, guest_list.Name As Guest, guest_list.LastName As GuestLastName, guest_list.Gender, DateOfBirth, Nationality, guest_list.IdentificationNumber, guest_list.PassportNumber, guest_list.Mobile As GuestMobile, guest_list.Email, MaritalStatus, Employment, Address, Postcode, guest_list.City, guest_list.State, guest_list.Country, Nominee, NomineeIdentificationNumber, Relationship, NomineeContact, Adult, Children, Infant, LockStatus, TravelInsuranceStatus');
+		$this->db->select('GuestListID, guest_list.CountryCodeID As GuestCountryCode, guest_list.Name As Guest, guest_list.LastName As GuestLastName, guest_list.Gender, DateOfBirth, Nationality, guest_list.IdentificationNumber, guest_list.PassportNumber, guest_list.Mobile As GuestMobile, guest_list.Email, MaritalStatus, Employment, Address, Postcode, guest_list.City, guest_list.State, guest_list.Country, Nominee, NomineeIdentificationNumber, NomineeContactNumber, Relationship, NomineeContact, Adult, Children, Infant, LockStatus, TravelInsuranceStatus');
 		$this->db->join('guest_list', 'guest_list.BookingID = booking.BookingID', 'left');
         $this->db->where('booking.BookingID', $this->input->post('booking_id'));
 		$this->db->where('guest_list.Status', 'Y');
@@ -138,6 +138,7 @@ class Guest_List_Model extends CI_Model
 					'Country' => empty($this->input->post('countries')[$i]) ? null : $this->input->post('countries')[$i],
 					'Nominee' => empty($this->input->post('nominee_names')[$i]) ? null : strtoupper($this->input->post('nominee_names')[$i]),
 					'NomineeIdentificationNumber' => empty($this->input->post('nominee_identification_numbers')[$i]) ? null : $this->input->post('nominee_identification_numbers')[$i],
+					'NomineeContactNumber' => empty($this->input->post('nominee_contact_numbers')[$i]) ? null : $this->input->post('nominee_contact_numbers')[$i],
 					'Relationship' => empty($this->input->post('relationships')[$i]) ? null : strtoupper($this->input->post('relationships')[$i]),
 					'NomineeContact' => empty($this->input->post('nominee_contacts')[$i]) ? null : $this->input->post('nominee_contacts')[$i]
 				);

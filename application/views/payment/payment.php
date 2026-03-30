@@ -660,9 +660,6 @@
                                 if(payment_ids.length > 0) {
                                     for(var i = 0; i < payment_ids.length; i++) {
                                         if($(`#transaction_type-${payment_ids[i]}`).val() == 'PAYMENT IN') {
-                                            if($(`select[name="credit_type-${payment_ids[i]}"]`).val() == 'AGENT COMMISSION FROM SUPPLIER') {
-                                                continue;
-                                            }
                                             if($(`input[name="credit-${payment_ids[i]}"]`).val() != '') {
                                                 total_credit += parseFloat(($(`input[name="credit-${payment_ids[i]}"]`).val()).replace(/,/g, ''));
                                             } else {
@@ -860,7 +857,7 @@
                                     <label>Payment Type</label>
                                     <select <?php if(current_url() == base_url('Payment/View')) { echo 'disabled'; } ?> name="payment_type" class="form-control selectpicker">
                                         <?php foreach(unserialize(PAYMENT_TYPE) as $key => $value) {
-                                            if($Credit != 0.00 && ($key == 'SUPPLIER PAYMENT' || $key == 'CUSTOMER REFUND' || $key == 'ONE-TIME PAYMENT' || $key == 'AGENT COMMISSION' || $key == 'BANK CHARGES')) { continue; }
+                                            if($Credit != 0.00 && ($key == 'SUPPLIER PAYMENT' || $key == 'CUSTOMER REFUND' || $key == 'ONE-TIME PAYMENT' || $key == 'AGENT COMMISSION' || $key == 'BANK CHARGES' || $key == 'CREDIT CARD CHARGES')) { continue; }
                                             if($Credit == 0.00 && ($key == 'DEPOSIT' || $key == 'FULL' || $key == 'SUPPLIER REFUND' || $key == 'ADDITIONAL PAYMENT')) { continue; } ?>
                                             <option <?php if($key == $Type) { echo 'selected'; } ?> data-icon="la la-dollar font-size-lg bs-icon" value="<?php echo $key; ?>"><?php echo $value; ?></option>
                                         <?php } ?>
