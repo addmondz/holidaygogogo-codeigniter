@@ -369,6 +369,24 @@
                                             </div>
                                             <div class="col-md-3">
                                                 <div class="form-group">
+                                                    <label>Sales Agent 2</label>
+                                                    <select name="sales_agent_2" data-live-search="true" class="form-control selectpicker">
+                                                        <option selected data-icon="la la-user-alt font-size-lg bs-icon" value="">--SELECT SALES AGENT 2--</option>
+                                                        <optgroup label="Active">
+                                                        <?php foreach($admins as $admin) { if($admin->Status == 'Y') { ?>
+                                                            <option data-icon="la la-user-alt font-size-lg bs-icon" value="<?php echo $admin->AdminID; ?>" <?php if(!empty($this->input->get('sales_agent_2')) && $this->input->get('sales_agent_2') == $admin->AdminID) { echo 'selected'; } ?>><?php echo $admin->Name; ?></option>
+                                                        <?php } } ?>
+                                                        </optgroup>
+                                                        <optgroup label="Deactivated">
+                                                        <?php foreach($admins as $admin) { if($admin->Status == 'D') { ?>
+                                                            <option data-icon="la la-user-alt font-size-lg bs-icon" value="<?php echo $admin->AdminID; ?>" <?php if(!empty($this->input->get('sales_agent_2')) && $this->input->get('sales_agent_2') == $admin->AdminID) { echo 'selected'; } ?>><?php echo $admin->Name; ?></option>
+                                                        <?php } } ?>
+                                                        </optgroup>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <div class="form-group">
                                                     <label>OP</label>
                                                     <select name="booking_op" data-live-search="true" class="form-control selectpicker">
                                                         <option selected data-icon="la la-user-alt font-size-lg bs-icon" value="">--SELECT OP--</option>
@@ -458,6 +476,7 @@
                                 </th>
                                 <?php if($this->session->userdata('level') != 20) { ?>
                                     <th style="text-align:center;">TC</th>
+                                    <th style="text-align:center;">TC 2</th>
                                     <th style="text-align:center;">OP</th>
                                 <?php } ?>
                                 <th class="bc_date" style="text-align:center;">Creation Date</th>
@@ -738,6 +757,7 @@ $(document).ready(function() {
 
         if (!is_sales_agent) {
             columns.push({ data: 'sales_agent', className: 'text-center', responsivePriority: 10000 });
+            columns.push({ data: 'sales_agent_2', className: 'text-center', responsivePriority: 10000 });
             columns.push({ data: 'booking_op', className: 'text-center', responsivePriority: 10000 });
         }
 
@@ -772,7 +792,7 @@ $(document).ready(function() {
         var filterParams = {};
         ['customer', 'booking_number', 'reservation_number', 'mobile', 'destination', 'travel_date',
          'deadline', 'source', 'chat_language', 'booking_date', 'status', 'booking_confirmation_title',
-         'tag', 'sales_agent', 'booking_op', 'autocount_status', 'guest_list_status', 'checklist_filter', 'cancellation_reason'].forEach(function(param) {
+         'tag', 'sales_agent', 'sales_agent_2', 'booking_op', 'autocount_status', 'guest_list_status', 'checklist_filter', 'cancellation_reason'].forEach(function(param) {
             if (urlParams.has(param)) {
                 filterParams[param] = urlParams.get(param);
             }
@@ -796,7 +816,7 @@ $(document).ready(function() {
                 }
             },
             columns: columns,
-            order: [[is_sales_agent ? 2 : 4, 'desc']], // Order by Insert Date (creation date) descending
+            order: [[is_sales_agent ? 2 : 5, 'desc']], // Order by Insert Date (creation date) descending
             pageLength: 100,
             lengthMenu: [[50, 100, 200, 500], [50, 100, 200, 500]],
             searchDelay: 300, // 300ms debounce on search

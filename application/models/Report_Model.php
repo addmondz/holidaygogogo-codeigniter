@@ -12,6 +12,9 @@ class Report_Model extends CI_Model
         if(!empty($this->input->get('sales_agent'))) {
             $this->db->where('SalesAgent', $this->input->get('sales_agent'));
         }
+        if(!empty($this->input->get('sales_agent_2'))) {
+            $this->db->where('SalesAgent2', $this->input->get('sales_agent_2'));
+        }
         if(!empty($this->input->get('travel_date'))) {
             $travel_date = explode(' - ', $this->input->get('travel_date'));
             $start_date = date('Y-m-d', strtotime(str_replace('/', '-', $travel_date[0])));
@@ -44,6 +47,9 @@ class Report_Model extends CI_Model
         }
         if(!empty($this->input->get('sales_agent'))) {
             $this->db->where('SalesAgent', $this->input->get('sales_agent'));
+        }
+        if(!empty($this->input->get('sales_agent_2'))) {
+            $this->db->where('SalesAgent2', $this->input->get('sales_agent_2'));
         }
         if(!empty($this->input->get('travel_date'))) {
             $travel_date = explode(' - ', $this->input->get('travel_date'));
@@ -84,6 +90,9 @@ class Report_Model extends CI_Model
         }
         if(!empty($this->input->get('sales_agent'))) {
             $this->db->where('SalesAgent', $this->input->get('sales_agent'));
+        }
+        if(!empty($this->input->get('sales_agent_2'))) {
+            $this->db->where('SalesAgent2', $this->input->get('sales_agent_2'));
         }
         if(!empty($this->input->get('travel_date'))) {
             $travel_date = explode(' - ', $this->input->get('travel_date'));
@@ -126,6 +135,9 @@ class Report_Model extends CI_Model
         if(!empty($this->input->get('sales_agent'))) {
             $this->db->where('SalesAgent', $this->input->get('sales_agent'));
         }
+        if(!empty($this->input->get('sales_agent_2'))) {
+            $this->db->where('SalesAgent2', $this->input->get('sales_agent_2'));
+        }
         if(!empty($this->input->get('travel_date'))) {
             $travel_date = explode(' - ', $this->input->get('travel_date'));
             $start_date = date('Y-m-d', strtotime(str_replace('/', '-', $travel_date[0])));
@@ -163,6 +175,9 @@ class Report_Model extends CI_Model
         }
         if(!empty($this->input->get('sales_agent'))) {
             $this->db->where('SalesAgent', $this->input->get('sales_agent'));
+        }
+        if(!empty($this->input->get('sales_agent_2'))) {
+            $this->db->where('SalesAgent2', $this->input->get('sales_agent_2'));
         }
         if(!empty($this->input->get('travel_date'))) {
             $travel_date = explode(' - ', $this->input->get('travel_date'));
@@ -202,6 +217,9 @@ class Report_Model extends CI_Model
         if(!empty($this->input->get('sales_agent'))) {
             $this->db->where('SalesAgent', $this->input->get('sales_agent'));
         }
+        if(!empty($this->input->get('sales_agent_2'))) {
+            $this->db->where('SalesAgent2', $this->input->get('sales_agent_2'));
+        }
         if(!empty($this->input->get('travel_date'))) {
             $travel_date = explode(' - ', $this->input->get('travel_date'));
             $start_date = date('Y-m-d', strtotime(str_replace('/', '-', $travel_date[0])));
@@ -237,6 +255,9 @@ class Report_Model extends CI_Model
         if(!empty($this->input->get('sales_agent'))) {
             $this->db->where('SalesAgent', $this->input->get('sales_agent'));
         }
+        if(!empty($this->input->get('sales_agent_2'))) {
+            $this->db->where('SalesAgent2', $this->input->get('sales_agent_2'));
+        }
         if(!empty($this->input->get('travel_date'))) {
             $travel_date = explode(' - ', $this->input->get('travel_date'));
             $start_date = date('Y-m-d', strtotime(str_replace('/', '-', $travel_date[0])));
@@ -271,6 +292,9 @@ class Report_Model extends CI_Model
         if(!empty($this->input->get('sales_agent'))) {
             $this->db->where('SalesAgent', $this->input->get('sales_agent'));
         }
+        if(!empty($this->input->get('sales_agent_2'))) {
+            $this->db->where('SalesAgent2', $this->input->get('sales_agent_2'));
+        }
         if(!empty($this->input->get('travel_date'))) {
             $travel_date = explode(' - ', $this->input->get('travel_date'));
             $start_date = date('Y-m-d', strtotime(str_replace('/', '-', $travel_date[0])));
@@ -303,6 +327,9 @@ class Report_Model extends CI_Model
         }
         if(!empty($this->input->get('sales_agent'))) {
             $this->db->where('SalesAgent', $this->input->get('sales_agent'));
+        }
+        if(!empty($this->input->get('sales_agent_2'))) {
+            $this->db->where('SalesAgent2', $this->input->get('sales_agent_2'));
         }
         if(!empty($this->input->get('travel_date'))) {
             $travel_date = explode(' - ', $this->input->get('travel_date'));
@@ -338,6 +365,9 @@ class Report_Model extends CI_Model
         if(!empty($this->input->get('sales_agent'))) {
             $this->db->where('SalesAgent', $this->input->get('sales_agent'));
         }
+        if(!empty($this->input->get('sales_agent_2'))) {
+            $this->db->where('SalesAgent2', $this->input->get('sales_agent_2'));
+        }
         if(!empty($this->input->get('travel_date'))) {
             $travel_date = explode(' - ', $this->input->get('travel_date'));
             $start_date = date('Y-m-d', strtotime(str_replace('/', '-', $travel_date[0])));
@@ -366,6 +396,9 @@ class Report_Model extends CI_Model
         }
         if(!empty($this->input->get('sales_agent'))) {
             $this->db->where('SalesAgent', $this->input->get('sales_agent'));
+        }
+        if(!empty($this->input->get('sales_agent_2'))) {
+            $this->db->where('SalesAgent2', $this->input->get('sales_agent_2'));
         }
         if(!empty($this->input->get('travel_date'))) {
             $travel_date = explode(' - ', $this->input->get('travel_date'));
@@ -400,6 +433,9 @@ class Report_Model extends CI_Model
         if(!empty($this->input->get('sales_agent'))) {
             $this->db->where('SalesAgent', $this->input->get('sales_agent'));
         }
+        if(!empty($this->input->get('sales_agent_2'))) {
+            $this->db->where('SalesAgent2', $this->input->get('sales_agent_2'));
+        }
         if(!empty($this->input->get('travel_date'))) {
             $travel_date = explode(' - ', $this->input->get('travel_date'));
             $start_date = date('Y-m-d', strtotime(str_replace('/', '-', $travel_date[0])));
@@ -432,6 +468,9 @@ class Report_Model extends CI_Model
         }
         if(!empty($this->input->get('sales_agent'))) {
             $this->db->where('SalesAgent', $this->input->get('sales_agent'));
+        }
+        if(!empty($this->input->get('sales_agent_2'))) {
+            $this->db->where('SalesAgent2', $this->input->get('sales_agent_2'));
         }
         if(!empty($this->input->get('travel_date'))) {
             $travel_date = explode(' - ', $this->input->get('travel_date'));
@@ -557,6 +596,9 @@ class Report_Model extends CI_Model
         }
         if(!empty($this->input->get('sales_agent'))) {
             $this->db->where('SalesAgent', $this->input->get('sales_agent'));
+        }
+        if(!empty($this->input->get('sales_agent_2'))) {
+            $this->db->where('SalesAgent2', $this->input->get('sales_agent_2'));
         }
         if(!empty($this->input->get('travel_date'))) {
             $travel_date = explode(' - ', $this->input->get('travel_date'));

@@ -134,43 +134,43 @@ class Booking extends MY_Controller
 
 		// Map column index to database column
 		// Note: Column indices must match the frontend DataTables columns array
-		// For non-sales agents: row_number(0), checkbox(1), sales_agent(2), insert_date(3), booking_number(4), ...
+		// For non-sales agents: row_number(0), checkbox(1), sales_agent(2), sales_agent_2(3), OP(4), insert_date(5), booking_number(6), ...
 		// For sales agents: row_number(0), checkbox(1), insert_date(2), booking_number(3), ...
-		// OP column was removed from frontend, so no placeholder needed here
 		$columns = array(
 			0 => 'booking.BookingID',             // row number
 			1 => 'booking.BookingID',             // checkbox (placeholder)
 			2 => 'admin.Name',                    // sales agent
-			3 => 'op_admin.Name',                 // OP
-			4 => 'booking.InsertDate',            // creation date
-			5 => 'BookingNumber',                 // BC number
-			6 => 'booking.BookingConfirmationTitle', // BC title
-			7 => 'Customer',                      // customer
-			8 => 'source.Name',                   // source
-			9 => 'booking.ChatLanguage',          // chat
-			10 => 'booking.Mobile',               // mobile
-			11 => 'StartDate',                    // start
-			12 => 'EndDate',                      // end
-			13 => 'category.Name',                // destination
-			14 => 'NetTotal',                     // net sales
-			15 => 'NetTotal',                     // profit
-			16 => 'NetTotal',                     // profit margin
-			17 => "status_sort_priority",          // BC status
-			18 => 'LockStatus',                   // GL status
-			19 => 'booking.AutocountSyncStatus',  // autocount status
-			20 => 'booking.BookingID'             // action
+			3 => 'sa2_admin.Name',                // sales agent 2
+			4 => 'op_admin.Name',                 // OP
+			5 => 'booking.InsertDate',            // creation date
+			6 => 'BookingNumber',                 // BC number
+			7 => 'booking.BookingConfirmationTitle', // BC title
+			8 => 'Customer',                      // customer
+			9 => 'source.Name',                   // source
+			10 => 'booking.ChatLanguage',          // chat
+			11 => 'booking.Mobile',               // mobile
+			12 => 'StartDate',                    // start
+			13 => 'EndDate',                      // end
+			14 => 'category.Name',                // destination
+			15 => 'NetTotal',                     // net sales
+			16 => 'NetTotal',                     // profit
+			17 => 'NetTotal',                     // profit margin
+			18 => "status_sort_priority",          // BC status
+			19 => 'LockStatus',                   // GL status
+			20 => 'booking.AutocountSyncStatus',  // autocount status
+			21 => 'booking.BookingID'             // action
 		);
 
 		// Adjust column index for sales agents
-		// Sales agents don't see: sales_agent (index 2), OP (index 3), profit (index 15), profit_margin (index 16)
+		// Sales agents don't see: sales_agent (index 2), sales_agent_2 (index 3), OP (index 4), profit (index 16), profit_margin (index 17)
 		// So their column indices need to be mapped back to the full column array
 		if($is_sales_agent) {
 			if($order_column_index >= 2 && $order_column_index <= 12) {
-				// Columns 2-12: add 2 for missing sales_agent + OP columns
-				$order_column_index += 2;
+				// Columns 2-12: add 3 for missing sales_agent + sales_agent_2 + OP columns
+				$order_column_index += 3;
 			} else if($order_column_index >= 13) {
-				// Columns 13+: add 4 for missing sales_agent + OP + profit + profit_margin
-				$order_column_index += 4;
+				// Columns 13+: add 5 for missing sales_agent + sales_agent_2 + OP + profit + profit_margin
+				$order_column_index += 5;
 			}
 		}
 
@@ -298,9 +298,10 @@ class Booking extends MY_Controller
 			// Row number
 			$row['row_number'] = $count;
 
-			// Sales agent and OP (only for non-sales agents)
+			// Sales agent, Sales agent 2 and OP (only for non-sales agents)
 			if(!$is_sales_agent) {
 				$row['sales_agent'] = $booking->SalesAgentName;
+				$row['sales_agent_2'] = $booking->SalesAgent2Name;
 				$row['booking_op'] = $booking->BookingOPName;
 			}
 
