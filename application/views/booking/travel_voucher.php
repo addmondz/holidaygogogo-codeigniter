@@ -198,7 +198,8 @@
 				<tr style="background-color: #f8f8f8;">
 					<th style="padding: 10px 6px; text-align: center; font-weight: 700; width: 4%; border-bottom: 2px solid #000;">#</th>
 					<th style="padding: 10px 6px; text-align: left; font-weight: 700; width: 9%; border-bottom: 2px solid #000;">Type</th>
-					<th style="padding: 10px 6px; text-align: left; font-weight: 700; width: 30%; border-bottom: 2px solid #000;">Full Name</th>
+					<th style="padding: 10px 6px; text-align: left; font-weight: 700; width: 20%; border-bottom: 2px solid #000;">Full Name</th>
+					<th style="padding: 10px 6px; text-align: left; font-weight: 700; width: 12%; border-bottom: 2px solid #000;">Room</th>
 					<th style="padding: 10px 6px; text-align: center; font-weight: 700; width: 9%; border-bottom: 2px solid #000;">Gender</th>
 					<th style="padding: 10px 6px; text-align: center; font-weight: 700; width: 14%; border-bottom: 2px solid #000;">Date of Birth</th>
 					<th style="padding: 10px 6px; text-align: left; font-weight: 700; width: 17%; border-bottom: 2px solid #000;">IC Number</th>
@@ -223,6 +224,7 @@
 					<td style="padding: 12px 6px; text-align: center; color: #888; font-weight: 600; border-bottom: 1px solid #e8e8e8;"><?php echo $guest_count; ?></td>
 					<td style="padding: 12px 6px; font-weight: 600; border-bottom: 1px solid #e8e8e8;"><?php echo $guest->Type; ?></td>
 					<td style="padding: 12px 6px; font-weight: 600; border-bottom: 1px solid #e8e8e8;"><?php echo strtoupper($full_name); ?></td>
+					<td style="padding: 12px 6px; border-bottom: 1px solid #e8e8e8;"><?php echo !empty($guest->RoomName) ? strtoupper($guest->RoomName) : '-'; ?></td>
 					<td style="padding: 12px 6px; text-align: center; border-bottom: 1px solid #e8e8e8;"><?php echo $gender; ?></td>
 					<td style="padding: 12px 6px; text-align: center; font-family: 'Courier New', monospace; border-bottom: 1px solid #e8e8e8;"><?php echo $dob; ?></td>
 					<td style="padding: 12px 6px; font-family: 'Courier New', monospace; font-size: 10px; border-bottom: 1px solid #e8e8e8;"><?php echo $ic; ?></td>
@@ -235,7 +237,7 @@
 			</tbody>
 			<tfoot>
 				<tr style="background-color: #f8f8f8;">
-					<td colspan="7" style="padding: 12px 6px; text-align: right; border-top: 2px solid #000;">
+					<td colspan="8" style="padding: 12px 6px; text-align: right; border-top: 2px solid #000;">
 						<?php 
 						$adults = 0; $children = 0; $infants = 0;
 						foreach($guest_lists as $g) {

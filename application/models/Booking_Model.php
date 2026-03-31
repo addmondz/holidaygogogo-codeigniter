@@ -201,6 +201,14 @@ class Booking_Model extends CI_Model
 				$this->db->where('CancelStatus', 'Y');
 				$level2Ignore = 1;
 			}
+			if(!empty($this->input->get('einvoice_status'))) {
+				if($this->input->get('einvoice_status') == 'yes') {
+					$this->db->where("(SELECT COUNT(*) FROM invoice_split_pax WHERE invoice_split_pax.BookingID = booking.BookingID AND invoice_split_pax.Status = 'Y') > 0");
+				} else if($this->input->get('einvoice_status') == 'no') {
+					$this->db->where("(SELECT COUNT(*) FROM invoice_split_pax WHERE invoice_split_pax.BookingID = booking.BookingID AND invoice_split_pax.Status = 'Y') = 0");
+				}
+				$level2Ignore = 1;
+			}
 			if(!empty($this->input->get('status'))) {
 				if($this->input->get('status') == 'A') {
 					$this->db->where('CancelStatus', 'N');
@@ -1714,6 +1722,14 @@ class Booking_Model extends CI_Model
 			if(!empty($this->input->get('cancellation_reason'))) {
 				$this->db->where('booking.CancellationReasonID', $this->input->get('cancellation_reason'));
 				$this->db->where('CancelStatus', 'Y');
+				$level2Ignore = 1;
+			}
+			if(!empty($this->input->get('einvoice_status'))) {
+				if($this->input->get('einvoice_status') == 'yes') {
+					$this->db->where("(SELECT COUNT(*) FROM invoice_split_pax WHERE invoice_split_pax.BookingID = booking.BookingID AND invoice_split_pax.Status = 'Y') > 0");
+				} else if($this->input->get('einvoice_status') == 'no') {
+					$this->db->where("(SELECT COUNT(*) FROM invoice_split_pax WHERE invoice_split_pax.BookingID = booking.BookingID AND invoice_split_pax.Status = 'Y') = 0");
+				}
 				$level2Ignore = 1;
 			}
 			if(!empty($this->input->get('status'))) {

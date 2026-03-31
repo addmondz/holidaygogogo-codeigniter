@@ -141,7 +141,7 @@
                                         if(array.debit_payments.length > 0) {
                                             $.each(array.debit_payments, function(key, value) {
                                                 count++;
-                                                if(value.Type == 'SUPPLIER PAYMENT') {
+                                                if(value.Type == 'SUPPLIER PAYMENT' || ((value.Type == 'DEPOSIT' || value.Type == 'FULL' || value.Type == 'ADDITIONAL PAYMENT') && value.Supplier)) {
                                                     debit_payments.push('<tr><td>' + count + '</td><td>' + value.Date + '</td><td>' + value.Type + '</td><td style="color:#F64E60;">' + value.Status + '</td><td>Payment Deadline : ' + value.Deadline + '<br>Supplier : ' + value.Supplier + '<br>Quotation Number : ' + value.QuotationNumber + '<br>Invoice Number : ' + value.InvoiceNumber + '<br>Reference Number : ' + value.ReferenceNumber + '<br>Remark : ' + value.PaymentRemark + '</td><td>' + value.Credit + '</td><td style="color:#F88379; text-align:right;">' + value.Debit + '</td></tr>');
                                                 } else {
                                                     debit_payments.push('<tr><td>' + count + '</td><td>' + value.Date + '</td><td>' + value.Type + '</td><td style="color:#F64E60;">' + value.Status + '</td><td>Payment Deadline : ' + value.Deadline + '<br>Bank : ' + value.Bank + '<br>Bank Account : ' + value.BankAccount + '<br>Bank Holder : ' + value.BankHolder + '<br>Reference Number : ' + value.ReferenceNumber + '<br>Remark : ' + value.DebitRemark + '</td><td>' + value.Credit + '</td><td style="color:#F88379; text-align:right;">' + value.Debit + '</td></tr>');
@@ -392,7 +392,7 @@
                                                 '<select name="debit_type-'+ payment_id +'" onchange="Debit('+ payment_id +')" class="form-control selectpicker">' +
                                                     '<option selected disabled data-icon="la la-dollar font-size-lg bs-icon" value="">--SELECT PAYMENT TYPE--</option>' +
                                                     '<?php foreach(unserialize(PAYMENT_TYPE) as $key => $value) { ?>' +
-                                                        '<?php if($key == 'DEPOSIT' || $key == 'FULL' || $key == 'SUPPLIER REFUND' || $key == 'ADDITIONAL PAYMENT') { continue; } ?>' +
+                                                        '<?php if($key == 'SUPPLIER REFUND') { continue; } ?>' +
                                                         '<option data-icon="la la-dollar font-size-lg bs-icon" value="<?php echo $key; ?>"><?php echo $value; ?></option>' +
                                                     '<?php } ?>' +
                                                 '</select>' +
@@ -477,7 +477,7 @@
                             function Debit(payment_id) {
                                 $(`#debit-${payment_id}`).remove();
                                 var payment_type = $(`select[name="debit_type-${payment_id}"]`).val();
-                                if(payment_type == 'SUPPLIER PAYMENT') {
+                                if(payment_type == 'SUPPLIER PAYMENT' || payment_type == 'DEPOSIT' || payment_type == 'FULL' || payment_type == 'ADDITIONAL PAYMENT') {
                                     $('<div id="debit-'+ payment_id +'" class="p-3" style="background-color:#DE316310;">' +
                                         '<div class="row">' +
                                             '<div class="col-md-12">' +
@@ -749,7 +749,7 @@
                                                         }
                                                     } else {
                                                         if($(`#transaction_type-${payment_ids[i]}`).val() == 'PAYMENT OUT') {
-                                                            if(($(`select[name="debit_type-${payment_ids[i]}"]`).val() == 'SUPPLIER PAYMENT' && $(`select[name="supplier-${payment_ids[i]}"]`).val() == null) || $(`select[name="debit_type-${payment_ids[i]}"]`).val() == null || $(`input[name="payment_deadline-${payment_ids[i]}"]`).val() == '' || ($(`select[name="debit_type-${payment_ids[i]}"]`).val() != 'SUPPLIER PAYMENT' && ($(`select[name="bank-${payment_ids[i]}"]`).val() == '' || $(`input[name="bank_account-${payment_ids[i]}"]`).val() == '' || $(`input[name="bank_holder-${payment_ids[i]}"]`).val() == ''))) {
+                                                            if((($(`select[name="debit_type-${payment_ids[i]}"]`).val() == 'SUPPLIER PAYMENT' || $(`select[name="debit_type-${payment_ids[i]}"]`).val() == 'DEPOSIT' || $(`select[name="debit_type-${payment_ids[i]}"]`).val() == 'FULL' || $(`select[name="debit_type-${payment_ids[i]}"]`).val() == 'ADDITIONAL PAYMENT') && $(`select[name="supplier-${payment_ids[i]}"]`).val() == null) || $(`select[name="debit_type-${payment_ids[i]}"]`).val() == null || $(`input[name="payment_deadline-${payment_ids[i]}"]`).val() == '' || ($(`select[name="debit_type-${payment_ids[i]}"]`).val() != 'SUPPLIER PAYMENT' && $(`select[name="debit_type-${payment_ids[i]}"]`).val() != 'DEPOSIT' && $(`select[name="debit_type-${payment_ids[i]}"]`).val() != 'FULL' && $(`select[name="debit_type-${payment_ids[i]}"]`).val() != 'ADDITIONAL PAYMENT' && ($(`select[name="bank-${payment_ids[i]}"]`).val() == '' || $(`input[name="bank_account-${payment_ids[i]}"]`).val() == '' || $(`input[name="bank_holder-${payment_ids[i]}"]`).val() == ''))) {
                                                                 Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', 'Please Insert All Required Payment Out Details', null);
                                                                 return;
                                                             } else {
@@ -858,7 +858,7 @@
                                     <select <?php if(current_url() == base_url('Payment/View')) { echo 'disabled'; } ?> name="payment_type" class="form-control selectpicker">
                                         <?php foreach(unserialize(PAYMENT_TYPE) as $key => $value) {
                                             if($Credit != 0.00 && ($key == 'SUPPLIER PAYMENT' || $key == 'CUSTOMER REFUND' || $key == 'ONE-TIME PAYMENT' || $key == 'AGENT COMMISSION' || $key == 'BANK CHARGES' || $key == 'CREDIT CARD CHARGES')) { continue; }
-                                            if($Credit == 0.00 && ($key == 'DEPOSIT' || $key == 'FULL' || $key == 'SUPPLIER REFUND' || $key == 'ADDITIONAL PAYMENT')) { continue; } ?>
+                                            if($Credit == 0.00 && ($key == 'SUPPLIER REFUND')) { continue; } ?>
                                             <option <?php if($key == $Type) { echo 'selected'; } ?> data-icon="la la-dollar font-size-lg bs-icon" value="<?php echo $key; ?>"><?php echo $value; ?></option>
                                         <?php } ?>
                                     </select>
@@ -951,7 +951,7 @@
                                         </div>
                                     </div>
                                 </div>
-                                <div class="supplier_payment col-md-6" <?php if($Type != 'SUPPLIER PAYMENT') { echo 'style="display:none;"'; } ?>>
+                                <div class="supplier_payment col-md-6" <?php if($Type != 'SUPPLIER PAYMENT' && $Type != 'DEPOSIT' && $Type != 'FULL' && $Type != 'ADDITIONAL PAYMENT') { echo 'style="display:none;"'; } ?>>
                                     <div class="form-group">
                                         <label>Supplier
                                             <span style="color:red;">*</span>
@@ -964,7 +964,7 @@
                                         </select>
                                     </div>
                                 </div>
-                                <div class="supplier_payment col-md-6" <?php if($Type != 'SUPPLIER PAYMENT') { echo 'style="display:none;"'; } ?>>
+                                <div class="supplier_payment col-md-6" <?php if($Type != 'SUPPLIER PAYMENT' && $Type != 'DEPOSIT' && $Type != 'FULL' && $Type != 'ADDITIONAL PAYMENT') { echo 'style="display:none;"'; } ?>>
                                     <div class="form-group">
                                         <label>Quotation Number</label>
                                         <div class="input-icon">
@@ -975,7 +975,7 @@
                                         </div>
                                     </div>
                                 </div>
-                                <div class="supplier_payment col-md-6" <?php if($Type != 'SUPPLIER PAYMENT') { echo 'style="display:none;"'; } ?>>
+                                <div class="supplier_payment col-md-6" <?php if($Type != 'SUPPLIER PAYMENT' && $Type != 'DEPOSIT' && $Type != 'FULL' && $Type != 'ADDITIONAL PAYMENT') { echo 'style="display:none;"'; } ?>>
                                     <div class="form-group">
                                         <label>Quotation</label>
                                         <div class="custom-file mb-2">
@@ -989,7 +989,7 @@
                                         <?php } ?>
                                     </div>
                                 </div>
-                                <div class="supplier_payment col-md-6" <?php if($Type != 'SUPPLIER PAYMENT') { echo 'style="display:none;"'; } ?>>
+                                <div class="supplier_payment col-md-6" <?php if($Type != 'SUPPLIER PAYMENT' && $Type != 'DEPOSIT' && $Type != 'FULL' && $Type != 'ADDITIONAL PAYMENT') { echo 'style="display:none;"'; } ?>>
                                     <div class="form-group">
                                         <label>Invoice Number</label>
                                         <div class="input-icon">
@@ -1000,7 +1000,7 @@
                                         </div>
                                     </div>
                                 </div>
-                                <div class="supplier_payment col-md-6" <?php if($Type != 'SUPPLIER PAYMENT') { echo 'style="display:none;"'; } ?>>
+                                <div class="supplier_payment col-md-6" <?php if($Type != 'SUPPLIER PAYMENT' && $Type != 'DEPOSIT' && $Type != 'FULL' && $Type != 'ADDITIONAL PAYMENT') { echo 'style="display:none;"'; } ?>>
                                     <div class="form-group">
                                         <label>Invoice</label>
                                         <div class="custom-file mb-2">
@@ -1014,7 +1014,7 @@
                                         <?php } ?>
                                     </div>
                                 </div>
-                                <div class="supplier_payment col-md-6" <?php if($Type != 'SUPPLIER PAYMENT') { echo 'style="display:none;"'; } ?>>
+                                <div class="supplier_payment col-md-6" <?php if($Type != 'SUPPLIER PAYMENT' && $Type != 'DEPOSIT' && $Type != 'FULL' && $Type != 'ADDITIONAL PAYMENT') { echo 'style="display:none;"'; } ?>>
                                     <div class="form-group">
                                         <label>Product</label>
                                         <select <?php if(current_url() == base_url('Payment/View')) { echo 'disabled'; } ?> name="booking_product" data-live-search="true" onchange="Select_Product_Update()" class="form-control selectpicker">
@@ -1025,7 +1025,7 @@
                                         </select>
                                     </div>
                                 </div>
-                                <div class="supplier_payment col-md-12" <?php if($Type != 'SUPPLIER PAYMENT') { echo 'style="display:none;"'; } ?>>
+                                <div class="supplier_payment col-md-12" <?php if($Type != 'SUPPLIER PAYMENT' && $Type != 'DEPOSIT' && $Type != 'FULL' && $Type != 'ADDITIONAL PAYMENT') { echo 'style="display:none;"'; } ?>>
                                     <div id="checklist-container-update"></div>
                                 </div>
                                 <div class="customer_refund_one_time_payment col-md-6" <?php if($Type != 'CUSTOMER REFUND' && $Type != 'ONE-TIME PAYMENT' && $Type != 'AGENT COMMISSION' && $Type != 'BANK CHARGES') { echo 'style="display:none;"'; } ?>>
@@ -1172,7 +1172,7 @@
                                     $('input[name="bank_account"]').val('');
                                     $('input[name="bank_holder"]').val('');
                                     $('input[name="remark"]').val('');
-                                    if(payment_type == 'SUPPLIER PAYMENT') {
+                                    if(payment_type == 'SUPPLIER PAYMENT' || payment_type == 'DEPOSIT' || payment_type == 'FULL' || payment_type == 'ADDITIONAL PAYMENT') {
                                         $('.supplier_payment').show();
                                         $('.customer_refund_one_time_payment').hide();
                                     } else {
@@ -1221,7 +1221,7 @@
                                 }).then((action) => {
                                     if(action.isConfirmed) {
                                         var credit = <?php echo str_replace(',', '', $Credit) ?>;
-                                        if((credit != 0.00 && $('input[name="transaction_date"]').val() == '') || $('input[name="credit-'+ <?php echo $this->input->get('payment_id'); ?> +'"]').val() == '' || $('input[name="payment_deadline"]').val() == '' || ($('select[name="payment_type"]').val() == 'SUPPLIER PAYMENT' && $('select[name="supplier"]').val() == '') || (($('select[name="payment_type"]').val() == 'CUSTOMER REFUND' || $('select[name="payment_type"]').val() == 'ONE-TIME PAYMENT' || $('select[name="payment_type"]').val() == 'AGENT COMMISSION' || $('select[name="payment_type"]').val() == 'BANK CHARGES') && $('input[name="bank"]').val() == '') || (($('select[name="payment_type"]').val() == 'CUSTOMER REFUND' || $('select[name="payment_type"]').val() == 'ONE-TIME PAYMENT' || $('select[name="payment_type"]').val() == 'AGENT COMMISSION' || $('select[name="payment_type"]').val() == 'BANK CHARGES') && $('input[name="bank_account"]').val() == '') || (($('select[name="payment_type"]').val() == 'CUSTOMER REFUND' || $('select[name="payment_type"]').val() == 'ONE-TIME PAYMENT' || $('select[name="payment_type"]').val() == 'AGENT COMMISSION' || $('select[name="payment_type"]').val() == 'BANK CHARGES') && $('input[name="bank_holder"]').val() == '')) {
+                                        if((credit != 0.00 && $('input[name="transaction_date"]').val() == '') || $('input[name="credit-'+ <?php echo $this->input->get('payment_id'); ?> +'"]').val() == '' || $('input[name="payment_deadline"]').val() == '' || (($('select[name="payment_type"]').val() == 'SUPPLIER PAYMENT' || $('select[name="payment_type"]').val() == 'DEPOSIT' || $('select[name="payment_type"]').val() == 'FULL' || $('select[name="payment_type"]').val() == 'ADDITIONAL PAYMENT') && $('select[name="supplier"]').val() == '') || (($('select[name="payment_type"]').val() == 'CUSTOMER REFUND' || $('select[name="payment_type"]').val() == 'ONE-TIME PAYMENT' || $('select[name="payment_type"]').val() == 'AGENT COMMISSION' || $('select[name="payment_type"]').val() == 'BANK CHARGES') && $('input[name="bank"]').val() == '') || (($('select[name="payment_type"]').val() == 'CUSTOMER REFUND' || $('select[name="payment_type"]').val() == 'ONE-TIME PAYMENT' || $('select[name="payment_type"]').val() == 'AGENT COMMISSION' || $('select[name="payment_type"]').val() == 'BANK CHARGES') && $('input[name="bank_account"]').val() == '') || (($('select[name="payment_type"]').val() == 'CUSTOMER REFUND' || $('select[name="payment_type"]').val() == 'ONE-TIME PAYMENT' || $('select[name="payment_type"]').val() == 'AGENT COMMISSION' || $('select[name="payment_type"]').val() == 'BANK CHARGES') && $('input[name="bank_holder"]').val() == '')) {
                                             Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', 'Please Insert All Required Payment Information', null);
                                         } else {
                                             if(($('input[name="debit-'+ <?php echo $this->input->get('payment_id'); ?> +'"]').val() == '' && ($('select[name="currency_code"]').val() == '' && $('input[name="foreign_currency-'+ <?php echo $this->input->get('payment_id'); ?> +'"]').val() == ''))) {

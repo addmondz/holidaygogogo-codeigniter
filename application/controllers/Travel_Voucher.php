@@ -91,7 +91,10 @@ class Travel_Voucher extends CI_Controller
 
                 // Get guest list data
                 $bookingID = $array['BookingID'];
-                $this->db->select('guest_list.Name As GuestFirstName, guest_list.LastName As GuestLastName, guest_list.Gender, DateOfBirth, guest_list.IdentificationNumber, guest_list.PassportNumber, Type');
+                $this->load->model('Guest_List_Model');
+                $this->Guest_List_Model->Auto_Assign_Rooms($bookingID);
+                $this->db->select('guest_list.Name As GuestFirstName, guest_list.LastName As GuestLastName, guest_list.Gender, DateOfBirth, guest_list.IdentificationNumber, guest_list.PassportNumber, Type, guest_list_room.room_name As RoomName');
+                $this->db->join('guest_list_room', 'guest_list_room.id = guest_list.guest_list_room_id', 'left');
                 $this->db->where('guest_list.BookingID', $bookingID);
                 $this->db->where('guest_list.Status', 'Y');
                 $this->db->order_by('Type', 'ASC');

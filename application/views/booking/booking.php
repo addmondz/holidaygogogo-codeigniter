@@ -2593,6 +2593,18 @@
 
                                 }
 
+                                // Validate room management - at least 1 room required
+                                var hasRooms = false;
+                                if(window.location.href == '<?php echo base_url('Booking/Create'); ?>' || window.location.href.split('?')[0] == '<?php echo base_url('Booking/Create'); ?>' || window.location.href.split('?')[0] == '<?php echo base_url('Booking/Duplicate'); ?>') {
+                                    hasRooms = (typeof roomsList !== 'undefined') && roomsList.length > 0;
+                                } else {
+                                    hasRooms = $('#rooms_table tbody tr').length > 0 && $('#no_rooms_row').length === 0;
+                                }
+                                if(!hasRooms) {
+                                    Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', 'Please set up at least 1 room in Room Management', null);
+                                    return;
+                                }
+
                                 $('#benchmark').children().each((index, element) => {
 
                                     product_sequence.push(parseInt(element.id));
