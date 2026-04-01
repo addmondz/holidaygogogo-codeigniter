@@ -1232,8 +1232,13 @@
             }
             $total_paid = isset($booking['total_paid']) ? floatval($booking['total_paid']) : 0;
             $net_total = isset($booking['NetTotal']) ? floatval($booking['NetTotal']) : 0;
-            $deposit_percentage = isset($booking['DepositPercentage']) ? floatval($booking['DepositPercentage']) : 0;
-            $deposit_total = ceil(($net_total * $deposit_percentage) / 100);
+            $deposit_mode = isset($booking['DepositMode']) ? $booking['DepositMode'] : 'percentage';
+            if ($deposit_mode == 'fixed') {
+                $deposit_total = isset($booking['DepositFixedAmount']) ? floatval($booking['DepositFixedAmount']) : 0;
+            } else {
+                $deposit_percentage = isset($booking['DepositPercentage']) ? floatval($booking['DepositPercentage']) : 0;
+                $deposit_total = ceil(($net_total * $deposit_percentage) / 100);
+            }
             $deposit_complete = $has_deposit_deadline ? (($total_paid >= $deposit_total && $deposit_total > 0) || $full_paid) : false;
             $full_payment_complete = ($total_paid >= $net_total && $net_total > 0) || $full_paid;
 

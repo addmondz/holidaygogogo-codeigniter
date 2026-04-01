@@ -366,7 +366,7 @@
                                                                 </label>
                                                                 <div class="d-flex flex-column flex-grow-1">
                                                                     <a href="<?php echo base_url('Payment/View?payment_id=') . $sales_agent_pending_debit_payment->PaymentID; ?>" target="_blank" class="text-dark-75 text-hover-primary font-weight-bold font-size-xs"><?php echo $sales_agent_pending_debit_payment->BookingNumber; ?></a>
-                                                                    <?php if($sales_agent_pending_debit_payment->Type == 'SUPPLIER PAYMENT') { ?>
+                                                                    <?php if(in_array($sales_agent_pending_debit_payment->Type, array('SUPPLIER PAYMENT (DEPOSIT)', 'SUPPLIER PAYMENT (FULL)', 'SUPPLIER PAYMENT (ADDITIONAL)'))) { ?>
                                                                         <span class="text-muted font-weight-bold" style="color:#A7C7E7 !important; font-size:10px;"><?php echo $sales_agent_pending_debit_payment->Name; ?></span>
                                                                     <?php } else { ?>
                                                                         <span class="text-muted font-weight-bold" style="color:#A7C7E7 !important; font-size:10px;"><?php echo $sales_agent_pending_debit_payment->BankHolder; ?></span>
@@ -752,7 +752,7 @@
                                                                 <div class="d-flex flex-column flex-grow-1">
                                                                     <span class="font-weight-bold" style="color:#C3B1E1; font-size:11px;"><?php echo $pending_debit_payment->SalesAgent; ?></span>
                                                                     <a href="<?php echo base_url('Payment/Update?payment_id=') . $pending_debit_payment->PaymentID; ?>" target="_blank" class="text-dark-75 text-hover-primary font-weight-bold font-size-xs"><?php echo $pending_debit_payment->BookingNumber; ?></a>
-                                                                    <?php if($pending_debit_payment->Type == 'SUPPLIER PAYMENT') { ?>
+                                                                    <?php if(in_array($pending_debit_payment->Type, array('SUPPLIER PAYMENT (DEPOSIT)', 'SUPPLIER PAYMENT (FULL)', 'SUPPLIER PAYMENT (ADDITIONAL)'))) { ?>
                                                                         <span class="text-muted font-weight-bold" style="color:#A7C7E7 !important; font-size:10px;"><?php echo $pending_debit_payment->Supplier; ?></span>
                                                                     <?php } else { ?>
                                                                         <span class="text-muted font-weight-bold" style="color:#A7C7E7 !important; font-size:10px;"><?php echo $pending_debit_payment->BankHolder; ?></span>

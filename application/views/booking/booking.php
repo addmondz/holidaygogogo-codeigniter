@@ -749,33 +749,56 @@
                                             echo 'style="display: none;"';
                                         }
                                     ?>>
-                                        <div class="col-md-4 mt-5">
-                                        <label style="color:#50C878;">Deposit Percentage</label>
-                                        <div class="input-icon">
-                                            <input type="number" id="DepositPercentage" class="form-control" style="text-align:right;" min="0" max="100" <?php if(current_url() == base_url('Booking/Create')) { ?> value="50" <?php } else { ?> value="<?php echo isset($DepositPercentage) ? $DepositPercentage : 0; ?>" <?php } ?>>
-                                            <span>
-                                                <i class="la la-percentage"></i>
-                                            </span>
+                                        <?php
+                                            $deposit_mode_value = 'percentage';
+                                            if(current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) {
+                                                $deposit_mode_value = isset($DepositMode) ? $DepositMode : 'percentage';
+                                            }
+                                            $deposit_fixed_amount_value = 0;
+                                            if(current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) {
+                                                $deposit_fixed_amount_value = isset($DepositFixedAmount) ? $DepositFixedAmount : 0;
+                                            }
+                                        ?>
+                                        <div class="col-md-3 mt-5">
+                                            <label style="color:#50C878;">Deposit Mode</label>
+                                            <select id="DepositMode" class="form-control">
+                                                <option value="percentage" <?php echo $deposit_mode_value == 'percentage' ? 'selected' : ''; ?>>Percentage</option>
+                                                <option value="fixed" <?php echo $deposit_mode_value == 'fixed' ? 'selected' : ''; ?>>Fixed Amount</option>
+                                            </select>
                                         </div>
-                                    </div>
-                                    <div class="col-md-4 mt-5">
-                                        <label style="color:#50C878;">Deposit Total (RM)</label>
-                                        <div class="input-icon">
-                                            <input disabled type="text" id="DepositTotal" value="0.00" class="form-control" style="text-align:right;">
-                                            <span>
-                                                <i class="la la-dollar"></i>
-                                            </span>
+                                        <div class="col-md-3 mt-5">
+                                            <label id="DepositValueLabel" style="color:#50C878;"><?php echo $deposit_mode_value == 'fixed' ? 'Deposit Amount (RM)' : 'Deposit Percentage'; ?></label>
+                                            <div class="input-icon">
+                                                <?php if($deposit_mode_value == 'fixed') { ?>
+                                                    <input type="number" id="DepositPercentage" class="form-control" style="text-align:right; display:none;" min="0" max="100" <?php if(current_url() == base_url('Booking/Create')) { ?> value="50" <?php } else { ?> value="<?php echo isset($DepositPercentage) ? $DepositPercentage : 0; ?>" <?php } ?>>
+                                                    <input type="number" id="DepositFixedAmount" class="form-control" style="text-align:right;" min="0" step="0.01" value="<?php echo $deposit_fixed_amount_value; ?>">
+                                                <?php } else { ?>
+                                                    <input type="number" id="DepositPercentage" class="form-control" style="text-align:right;" min="0" max="100" <?php if(current_url() == base_url('Booking/Create')) { ?> value="50" <?php } else { ?> value="<?php echo isset($DepositPercentage) ? $DepositPercentage : 0; ?>" <?php } ?>>
+                                                    <input type="number" id="DepositFixedAmount" class="form-control" style="text-align:right; display:none;" min="0" step="0.01" value="<?php echo $deposit_fixed_amount_value; ?>">
+                                                <?php } ?>
+                                                <span id="DepositValueIcon">
+                                                    <i class="la <?php echo $deposit_mode_value == 'fixed' ? 'la-dollar' : 'la-percentage'; ?>"></i>
+                                                </span>
+                                            </div>
                                         </div>
-                                    </div>
-                                    <div class="col-md-4 mt-5">
-                                        <label style="color:#50C878;">Deposit Paid (RM)</label>
-                                        <div class="input-icon">
-                                            <input disabled type="text" id="DepositPaid" value="<?php echo isset($DepositPaidDisplay) ? $DepositPaidDisplay : '0.00'; ?>" class="form-control" style="text-align:right; <?php echo (isset($DepositPaidColor) && ($DepositPaidColor == '#FF6B6B' || $DepositPaidColor == '#FFA500')) ? 'color: ' . $DepositPaidColor . '; font-weight: bold;' : ''; ?>">
-                                            <span>
-                                                <i class="la la-dollar"></i>
-                                            </span>
+                                        <div class="col-md-3 mt-5">
+                                            <label style="color:#50C878;">Deposit Total (RM)</label>
+                                            <div class="input-icon">
+                                                <input disabled type="text" id="DepositTotal" value="0.00" class="form-control" style="text-align:right;">
+                                                <span>
+                                                    <i class="la la-dollar"></i>
+                                                </span>
+                                            </div>
                                         </div>
-                                    </div>
+                                        <div class="col-md-3 mt-5">
+                                            <label style="color:#50C878;">Deposit Paid (RM)</label>
+                                            <div class="input-icon">
+                                                <input disabled type="text" id="DepositPaid" value="<?php echo isset($DepositPaidDisplay) ? $DepositPaidDisplay : '0.00'; ?>" class="form-control" style="text-align:right; <?php echo (isset($DepositPaidColor) && ($DepositPaidColor == '#FF6B6B' || $DepositPaidColor == '#FFA500')) ? 'color: ' . $DepositPaidColor . '; font-weight: bold;' : ''; ?>">
+                                                <span>
+                                                    <i class="la la-dollar"></i>
+                                                </span>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
 
@@ -2362,80 +2385,100 @@
         Calculate_Deposit_Amount();
     });
 
-    // Function to calculate deposit amount and status based on percentage and net total
+    // Function to calculate deposit amount and status based on mode (percentage or fixed)
     function Calculate_Deposit_Amount() {
+        var deposit_mode = $('#DepositMode').val();
         var net_total = $('#NetTotal').val();
-        var deposit_percentage = $('#DepositPercentage').val();
+        var deposit_total = 0;
 
-        if(net_total && deposit_percentage) {
-            var net_total_value = parseFloat(net_total.replace(/,/g, ''));
-            var percentage_value = parseFloat(deposit_percentage);
-
-            if(!isNaN(net_total_value) && !isNaN(percentage_value) && percentage_value >= 0 && percentage_value <= 100) {
-                var deposit_total = (net_total_value * percentage_value / 100);
-                // Round up to nearest whole number
-                deposit_total = Math.ceil(deposit_total);
-                $('#DepositTotal').val(deposit_total.toLocaleString('en-US', {minimumFractionDigits: 2}));
-                
-                // Calculate deposit status and update Deposit Paid field
-                var deposit_difference = deposit_paid_value - deposit_total;
-                var deposit_paid_display = '';
-                var deposit_paid_color = '';
-                
-                if (deposit_paid_value > 0) {
-                    deposit_paid_display = deposit_paid_value.toLocaleString('en-US', {minimumFractionDigits: 2});
-                    
-                    if (deposit_difference > 0.01) {
-                        // Overpaid - apply red color only for status
-                        deposit_paid_display += ' (Overpaid: RM ' + Math.abs(deposit_difference).toLocaleString('en-US', {minimumFractionDigits: 2}) + ')';
-                        deposit_paid_color = '#FF6B6B'; // Red
-                    } else if (deposit_difference < -0.01) {
-                        // Underpaid - apply orange color only for status
-                        deposit_paid_display += ' (Underpaid: RM ' + Math.abs(deposit_difference).toLocaleString('en-US', {minimumFractionDigits: 2}) + ')';
-                        deposit_paid_color = '#FFA500'; // Orange
-                    } else {
-                        // Paid - no special color (normal/default)
-                        deposit_paid_color = '';
-                    }
-                } else {
-                    deposit_paid_display = '0.00';
-                    deposit_paid_color = ''; // No special color
-                }
-                
-                $('#DepositPaid').val(deposit_paid_display);
-                // Only apply color for overpaid/underpaid, remove color for normal cases
-                if (deposit_paid_color) {
-                    $('#DepositPaid').css('color', deposit_paid_color);
-                    $('#DepositPaid').css('font-weight', 'bold');
-                } else {
-                    $('#DepositPaid').css('color', '');
-                    $('#DepositPaid').css('font-weight', '');
-                }
-            } else {
-                $('#DepositTotal').val('0.00');
-                $('#DepositPaid').val('0.00');
-                $('#DepositPaid').css('color', '');
-                $('#DepositPaid').css('font-weight', '');
+        if(deposit_mode == 'fixed') {
+            var fixed_amount = parseFloat($('#DepositFixedAmount').val());
+            if(!isNaN(fixed_amount) && fixed_amount >= 0) {
+                deposit_total = fixed_amount;
             }
         } else {
-            $('#DepositTotal').val('0.00');
-            $('#DepositPaid').val('0.00');
+            var deposit_percentage = $('#DepositPercentage').val();
+            if(net_total && deposit_percentage) {
+                var net_total_value = parseFloat(net_total.replace(/,/g, ''));
+                var percentage_value = parseFloat(deposit_percentage);
+                if(!isNaN(net_total_value) && !isNaN(percentage_value) && percentage_value >= 0 && percentage_value <= 100) {
+                    deposit_total = (net_total_value * percentage_value / 100);
+                    deposit_total = Math.ceil(deposit_total);
+                }
+            }
+        }
+
+        $('#DepositTotal').val(deposit_total.toLocaleString('en-US', {minimumFractionDigits: 2}));
+
+        // Calculate deposit status and update Deposit Paid field
+        var deposit_difference = deposit_paid_value - deposit_total;
+        var deposit_paid_display = '';
+        var deposit_paid_color = '';
+
+        if (deposit_paid_value > 0) {
+            deposit_paid_display = deposit_paid_value.toLocaleString('en-US', {minimumFractionDigits: 2});
+
+            if (deposit_difference > 0.01) {
+                deposit_paid_display += ' (Overpaid: RM ' + Math.abs(deposit_difference).toLocaleString('en-US', {minimumFractionDigits: 2}) + ')';
+                deposit_paid_color = '#FF6B6B';
+            } else if (deposit_difference < -0.01) {
+                deposit_paid_display += ' (Underpaid: RM ' + Math.abs(deposit_difference).toLocaleString('en-US', {minimumFractionDigits: 2}) + ')';
+                deposit_paid_color = '#FFA500';
+            } else {
+                deposit_paid_color = '';
+            }
+        } else {
+            deposit_paid_display = '0.00';
+            deposit_paid_color = '';
+        }
+
+        $('#DepositPaid').val(deposit_paid_display);
+        if (deposit_paid_color) {
+            $('#DepositPaid').css('color', deposit_paid_color);
+            $('#DepositPaid').css('font-weight', 'bold');
+        } else {
             $('#DepositPaid').css('color', '');
             $('#DepositPaid').css('font-weight', '');
         }
     }
 
+    // Toggle deposit mode: show/hide percentage vs fixed amount input
+    $('#DepositMode').on('change', function() {
+        var mode = $(this).val();
+        if(mode == 'fixed') {
+            $('#DepositPercentage').hide();
+            $('#DepositFixedAmount').show();
+            $('#DepositValueLabel').text('Deposit Amount (RM)');
+            $('#DepositValueIcon').html('<i class="la la-dollar"></i>');
+        } else {
+            $('#DepositPercentage').show();
+            $('#DepositFixedAmount').hide();
+            $('#DepositValueLabel').text('Deposit Percentage');
+            $('#DepositValueIcon').html('<i class="la la-percentage"></i>');
+        }
+        Calculate_Deposit_Amount();
+    });
+
     // Calculate deposit amount when percentage changes
     $('#DepositPercentage').on('input change', function() {
         var percentage = $(this).val();
-        
+
         // Validate percentage is between 0 and 100
         if(percentage < 0) {
             $(this).val(0);
         } else if(percentage > 100) {
             $(this).val(100);
         }
-        
+
+        Calculate_Deposit_Amount();
+    });
+
+    // Calculate deposit amount when fixed amount changes
+    $('#DepositFixedAmount').on('input change', function() {
+        var amount = parseFloat($(this).val());
+        if(amount < 0) {
+            $(this).val(0);
+        }
         Calculate_Deposit_Amount();
     });
 
@@ -2622,8 +2665,10 @@
                                     var net_total = ($('#NetTotal').val()).replace(/,/g, '');
 
                                     var deposit_percentage = $('#DepositPercentage').val() != '' ? parseInt($('#DepositPercentage').val()) : 50;
+                                    var deposit_mode = $('#DepositMode').val();
+                                    var deposit_fixed_amount = $('#DepositFixedAmount').val() != '' ? parseFloat($('#DepositFixedAmount').val()) : 0;
 
-                                    booking.push({CountryCodeID:country_code, ReservationNumber:reservation_number, FullPaymentDeadline:`${full_payment_deadline[2]}-${full_payment_deadline[1]}-${full_payment_deadline[0]}`, Customer:customer, Mobile:mobile, Destination:destination, SalesAgent:sales_agent, Source:source, Subtotal:subtotal, NetTotal:net_total, DepositPercentage:deposit_percentage, ChatLanguage:chat_language, BookingConfirmationTitle:bc_title, InsertBy:<?php echo $this->session->userdata('admin_id') ?>, InsertDate:'<?php echo date('Y-m-d H:i:s') ?>', UpdateBy:<?php echo $this->session->userdata('admin_id') ?>, UpdateDate:'<?php echo date('Y-m-d H:i:s') ?>'});
+                                    booking.push({CountryCodeID:country_code, ReservationNumber:reservation_number, FullPaymentDeadline:`${full_payment_deadline[2]}-${full_payment_deadline[1]}-${full_payment_deadline[0]}`, Customer:customer, Mobile:mobile, Destination:destination, SalesAgent:sales_agent, Source:source, Subtotal:subtotal, NetTotal:net_total, DepositPercentage:deposit_percentage, DepositMode:deposit_mode, DepositFixedAmount:deposit_fixed_amount, ChatLanguage:chat_language, BookingConfirmationTitle:bc_title, InsertBy:<?php echo $this->session->userdata('admin_id') ?>, InsertDate:'<?php echo date('Y-m-d H:i:s') ?>', UpdateBy:<?php echo $this->session->userdata('admin_id') ?>, UpdateDate:'<?php echo date('Y-m-d H:i:s') ?>'});
 
                                     if(booking_op != '') {
 
@@ -3077,6 +3122,34 @@
                                         booking[0]['DepositPercentage'] = deposit_percentage;
 
                                         booking_log.push({BookingID:<?php echo $BookingID ?>, Column:'DepositPercentage', CurrentData:current_deposit_percentage, NewData:deposit_percentage.toString(), InsertBy:<?php echo $this->session->userdata('admin_id') ?>, InsertDate:'<?php echo date('Y-m-d H:i:s') ?>'});
+
+                                    }
+
+                                    // Action : Update DepositMode
+
+                                    var deposit_mode = $('#DepositMode').val();
+
+                                    var current_deposit_mode = '<?php echo isset($DepositModeOriginal) ? $DepositModeOriginal : "percentage"; ?>';
+
+                                    if(deposit_mode != current_deposit_mode) {
+
+                                        booking[0]['DepositMode'] = deposit_mode;
+
+                                        booking_log.push({BookingID:<?php echo $BookingID ?>, Column:'DepositMode', CurrentData:current_deposit_mode, NewData:deposit_mode, InsertBy:<?php echo $this->session->userdata('admin_id') ?>, InsertDate:'<?php echo date('Y-m-d H:i:s') ?>'});
+
+                                    }
+
+                                    // Action : Update DepositFixedAmount
+
+                                    var deposit_fixed_amount = $('#DepositFixedAmount').val() != '' ? parseFloat($('#DepositFixedAmount').val()) : 0;
+
+                                    var current_deposit_fixed_amount = '<?php echo isset($DepositFixedAmountOriginal) ? $DepositFixedAmountOriginal : 0; ?>';
+
+                                    if(deposit_fixed_amount != parseFloat(current_deposit_fixed_amount)) {
+
+                                        booking[0]['DepositFixedAmount'] = deposit_fixed_amount;
+
+                                        booking_log.push({BookingID:<?php echo $BookingID ?>, Column:'DepositFixedAmount', CurrentData:current_deposit_fixed_amount, NewData:deposit_fixed_amount.toString(), InsertBy:<?php echo $this->session->userdata('admin_id') ?>, InsertDate:'<?php echo date('Y-m-d H:i:s') ?>'});
 
                                     }
 

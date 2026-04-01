@@ -1101,21 +1101,41 @@ class Booking extends MY_Controller
 					$array['NetTotal'] = number_format($array['NetTotal'], 2, '.', ',');
 					// Handle DepositPercentage - store original DB value for comparison
 					$array['DepositPercentageOriginal'] = isset($array['DepositPercentage']) ? $array['DepositPercentage'] : 0;
+					// Handle DepositMode and DepositFixedAmount - store originals for comparison
+					$array['DepositModeOriginal'] = isset($array['DepositMode']) ? $array['DepositMode'] : 'percentage';
+					$array['DepositFixedAmountOriginal'] = isset($array['DepositFixedAmount']) ? $array['DepositFixedAmount'] : 0;
 					// For Update page: use actual DB value (even if 0). For Create/Duplicate: default to 50 if 0 or not set
 					if (current_url() == base_url('Booking/Update')) {
 						// Update page: use actual database value
 						if (!isset($array['DepositPercentage'])) {
 							$array['DepositPercentage'] = 0;
 						}
+						if (!isset($array['DepositMode'])) {
+							$array['DepositMode'] = 'percentage';
+						}
+						if (!isset($array['DepositFixedAmount'])) {
+							$array['DepositFixedAmount'] = 0;
+						}
 					} else {
 						// Create/Duplicate page: default to 50 if 0 or not set
 						if (!isset($array['DepositPercentage']) || $array['DepositPercentage'] == 0) {
 							$array['DepositPercentage'] = 50; // Default UI value
 						}
+						if (!isset($array['DepositMode'])) {
+							$array['DepositMode'] = 'percentage';
+						}
+						if (!isset($array['DepositFixedAmount'])) {
+							$array['DepositFixedAmount'] = 0;
+						}
 					}
 					// Calculate deposit information
-					$deposit_percentage_raw = isset($array['DepositPercentage']) ? $array['DepositPercentage'] : 0;
-					$deposit_total = ($net_total_raw * $deposit_percentage_raw) / 100;
+					$deposit_mode = isset($array['DepositMode']) ? $array['DepositMode'] : 'percentage';
+					if ($deposit_mode == 'fixed') {
+						$deposit_total = isset($array['DepositFixedAmount']) ? floatval($array['DepositFixedAmount']) : 0;
+					} else {
+						$deposit_percentage_raw = isset($array['DepositPercentage']) ? $array['DepositPercentage'] : 0;
+						$deposit_total = ($net_total_raw * $deposit_percentage_raw) / 100;
+					}
 					$array['DepositTotal'] = $deposit_total;
 					// Calculate deposit paid from payments
 					$deposit_paid = 0;
@@ -1284,13 +1304,26 @@ class Booking extends MY_Controller
 				$array['NetTotal'] = number_format($array['NetTotal'], 2, '.', ',');
 				// Handle DepositPercentage - store original DB value for comparison
 				$array['DepositPercentageOriginal'] = isset($array['DepositPercentage']) ? $array['DepositPercentage'] : 0;
+				$array['DepositModeOriginal'] = isset($array['DepositMode']) ? $array['DepositMode'] : 'percentage';
+				$array['DepositFixedAmountOriginal'] = isset($array['DepositFixedAmount']) ? $array['DepositFixedAmount'] : 0;
 				// For View page: use actual DB value (even if 0)
 				if (!isset($array['DepositPercentage'])) {
 					$array['DepositPercentage'] = 0;
 				}
+				if (!isset($array['DepositMode'])) {
+					$array['DepositMode'] = 'percentage';
+				}
+				if (!isset($array['DepositFixedAmount'])) {
+					$array['DepositFixedAmount'] = 0;
+				}
 				// Calculate deposit information
-				$deposit_percentage_raw = isset($array['DepositPercentage']) ? $array['DepositPercentage'] : 0;
-				$deposit_total = ceil(($net_total_raw * $deposit_percentage_raw) / 100);
+				$deposit_mode = isset($array['DepositMode']) ? $array['DepositMode'] : 'percentage';
+				if ($deposit_mode == 'fixed') {
+					$deposit_total = isset($array['DepositFixedAmount']) ? floatval($array['DepositFixedAmount']) : 0;
+				} else {
+					$deposit_percentage_raw = isset($array['DepositPercentage']) ? $array['DepositPercentage'] : 0;
+					$deposit_total = ceil(($net_total_raw * $deposit_percentage_raw) / 100);
+				}
 				$array['DepositTotal'] = $deposit_total;
 				// Calculate deposit paid from payments
 				$deposit_paid = 0;

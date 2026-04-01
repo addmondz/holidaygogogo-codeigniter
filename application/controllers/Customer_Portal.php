@@ -362,7 +362,7 @@ class Customer_Portal extends CI_Controller
         // Get booking by token
         $this->db->select('booking.BookingID, BookingNumber, ReservationNumber, DepositDeadline,
                           FullPaymentDeadline, AdditionalPaymentDeadline, Customer, booking.Mobile As CustomerMobile,
-                          StartDate, EndDate, Adult, Children, Infant, BookingRemark, Subtotal, Discount, NetTotal, DepositPercentage,
+                          StartDate, EndDate, Adult, Children, Infant, BookingRemark, Subtotal, Discount, NetTotal, DepositPercentage, DepositMode, DepositFixedAmount,
                           booking.ChatLanguage, Token, booking.BookingConfirmationTitle, CancelStatus, LockStatus, 
                           AfterSalesService, booking.Status, booking.InsertDate, booking.UpdateDate, booking.CustomerID,
                           booking.AllowReview, booking.CustomerReview, booking.CustomerReviewTimestamp,
@@ -438,7 +438,7 @@ class Customer_Portal extends CI_Controller
         $this->db->join('supplier', 'supplier.SupplierID = payment.SupplierID', 'left');
         $this->db->where('payment.BookingID', $booking['BookingID']);
         $this->db->where('payment.Status !=', 'N');
-        $this->db->where('payment.Type !=', 'SUPPLIER PAYMENT');
+        $this->db->where_not_in('payment.Type', array('SUPPLIER PAYMENT (DEPOSIT)', 'SUPPLIER PAYMENT (FULL)', 'SUPPLIER PAYMENT (ADDITIONAL)'));
         $this->db->where('payment.Type !=', 'AGENT COMMISSION FROM SUPPLIER');
         $this->db->order_by('Date', 'ASC');
         $this->db->order_by('PaymentID', 'ASC');

@@ -55,8 +55,13 @@ class Booking_Confirmation extends CI_Controller
 
                 $array['DepositDeadline'] = empty($array['DepositDeadline']) ? '-' : strtoupper(date('j M Y', strtotime($array['DepositDeadline'])));
 
-                $deposit_percentage = isset($array['DepositPercentage']) ? $array['DepositPercentage'] : 0;
-                $array['DepositAmount'] = ceil($array['NetTotal'] * $deposit_percentage / 100);
+                $deposit_mode = isset($array['DepositMode']) ? $array['DepositMode'] : 'percentage';
+                if ($deposit_mode == 'fixed') {
+                    $array['DepositAmount'] = isset($array['DepositFixedAmount']) ? floatval($array['DepositFixedAmount']) : 0;
+                } else {
+                    $deposit_percentage = isset($array['DepositPercentage']) ? $array['DepositPercentage'] : 0;
+                    $array['DepositAmount'] = ceil($array['NetTotal'] * $deposit_percentage / 100);
+                }
 
                 $array['FullPaymentDeadline'] = strtoupper(date('j M Y', strtotime($array['FullPaymentDeadline'])));
 
