@@ -127,6 +127,9 @@ class Booking_PDF_Generator {
 		$array['CompanyAddress'] = $company['Address'];
 		$array['CompanyWebsite'] = $company['Website'];
 
+		// Generate customer portal profile URL
+		$array['CustomerProfileURL'] = base_url('customer/' . generate_customer_portal_hash($array['CustomerID']));
+
 		// Calculate total paid and outstanding balance
 		$total_paid = 0;
 		$payments = $this->CI->Payment_Model->Read_Approved_Payments($array['BookingID']);

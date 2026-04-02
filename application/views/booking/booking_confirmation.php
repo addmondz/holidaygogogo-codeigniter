@@ -188,6 +188,7 @@
 	</div>
 	<div style="position: absolute; top: auto; bottom: 0; ">
 		<footer style="">
+			<p style="font-size:12px; margin-bottom:5px;">Check your booking status - <?php echo $CustomerProfileURL; ?></p>
 			<hr style="margin-bottom:5px;">
 			<table style="width:100%; margin-bottom:10px;">
 				<?php if($Discount != 0.00){ ?>

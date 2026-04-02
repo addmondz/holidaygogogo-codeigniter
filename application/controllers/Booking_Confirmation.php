@@ -232,6 +232,8 @@ class Booking_Confirmation extends CI_Controller
 
                 $array['CompanyWebsite'] = $company['Website'];
 
+                // Generate customer portal profile URL
+                $array['CustomerProfileURL'] = base_url('customer/' . generate_customer_portal_hash($array['CustomerID']));
 
                 // Calculate total paid and outstanding balance - start
                 $total_paid = 0;

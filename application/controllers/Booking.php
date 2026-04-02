@@ -2178,12 +2178,16 @@ class Booking extends MY_Controller
 		
 		$spreadsheet->setActiveSheetIndex(0);
 		$booking_records = 'BOOKING_RECORDS_' . date('Ymd') . '.xlsx';
+
+		if (ob_get_length()) ob_end_clean();
+
 		header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 		header('Content-Disposition: attachment;filename="' . $booking_records . '"');
 		header('Cache-Control: max-age=0');
 		header('Cache-Control: max-age=1');
 		$writer = \PhpOffice\PhpSpreadsheet\IOFactory::createWriter($spreadsheet, 'Xlsx');
 		$writer->save('php://output');
+		exit;
 	}
 
 	function Duplicate()
