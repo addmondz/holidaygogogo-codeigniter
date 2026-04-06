@@ -193,8 +193,7 @@
 			<table style="width:100%; margin-bottom:10px;">
 				<?php if($Discount != 0.00){ ?>
 				<tr>
-					<td style="width:32%">Deposit By : <?php echo $DepositDeadline; ?><br>Deposit Amount : RM <?php echo number_format($DepositAmount, 2, '.', ','); ?></td>
-					<td style="width:42%">Full Payment By : <?php echo $FullPaymentDeadline; ?></td>
+					<td style="width:74%">Full Payment By : <?php echo $FullPaymentDeadline; ?></td>
 					<td style="width:16%; border-bottom: 1px solid black;">Subtotal (RM):</td>
 					<td style="width:12%; text-align:right; float: left; border-bottom: 1px solid black;"><label><?php echo number_format($Subtotal, 2, '.', ','); ?></label></td>
 				</tr>
@@ -212,8 +211,7 @@
 				</tr>
 				<?php }else{ ?>
 					<tr style="font-weight:bold;">
-						<td style="width:32%">Deposit By : <?php echo $DepositDeadline; ?><br>Deposit Amount : RM <?php echo number_format($DepositAmount, 2, '.', ','); ?></td>
-						<td style="width:42%">Full Payment By : <?php echo $FullPaymentDeadline; ?></td>
+						<td style="width:74%">Full Payment By : <?php echo $FullPaymentDeadline; ?></td>
 						<td style="width:20%;">Total (RM):</td>
 						<td style="width:8%; text-align:right; float: left;"><label><?php echo number_format($NetTotal, 2, '.', ','); ?></label></td>
 					</tr>
