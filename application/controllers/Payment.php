@@ -1223,9 +1223,16 @@ class Payment extends MY_Controller
 			$product_checklist_ids = $required_ids;
 		}
 
-		// Auto-add deposit checklist if product has supplier deposit
-		$product_row = $this->db->select('has_supplier_deposit')->where('ProductID', $product_id)->get('product')->row();
-		if($product_row && $product_row->has_supplier_deposit == 1) {
+		// Auto-add deposit checklist if booking product has a PaymentOutSupplierDeposit date
+		$bp_row = $this->db->select('PaymentOutSupplierDeposit')
+			->where('BookingID', $booking_id)
+			->where('ProductID', $product_id)
+			->where('Status', 'Y')
+			->get('booking_product')->row();
+		$has_deposit_date = $bp_row
+			&& !empty($bp_row->PaymentOutSupplierDeposit)
+			&& $bp_row->PaymentOutSupplierDeposit != '0000-00-00';
+		if($has_deposit_date) {
 			$deposit_checklist_id = null;
 			foreach($package_checklists as $pc) {
 				if(strpos($pc->name, 'Payment Out To Supplier (deposit)') !== false) {
@@ -1235,7 +1242,6 @@ class Payment extends MY_Controller
 			}
 			if($deposit_checklist_id && !in_array($deposit_checklist_id, $product_checklist_ids)) {
 				$product_checklist_ids[] = $deposit_checklist_id;
-				$this->Product_Package_Checklist_Model->Bulk_Update_Product_Checklists($product_id, $product_checklist_ids);
 			}
 		}
 

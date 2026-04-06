@@ -579,6 +579,15 @@ if (!function_exists('are_all_checklists_completed')) {
             }
         }
 
+        // Get deposit checklist ID
+        $deposit_checklist_id = null;
+        foreach ($package_checklists as $pc) {
+            if (strpos($pc->name, 'Payment Out To Supplier (deposit)') !== false) {
+                $deposit_checklist_id = $pc->ID;
+                break;
+            }
+        }
+
         // Group by product (collapse duplicates)
         $product_groups = array();
         foreach ($booking_products as $booking_product) {
@@ -606,6 +615,15 @@ if (!function_exists('are_all_checklists_completed')) {
             $product_checklist_ids = $CI->Product_Package_Checklist_Model->Get_Checklists_For_Product($product_id);
             if (empty($product_checklist_ids)) {
                 $product_checklist_ids = $required_ids;
+            }
+
+            // Auto-add deposit checklist if booking product has a PaymentOutSupplierDeposit date
+            $has_deposit_date = !empty($booking_product->PaymentOutSupplierDeposit)
+                && $booking_product->PaymentOutSupplierDeposit != '0000-00-00';
+            if ($deposit_checklist_id && $has_deposit_date) {
+                if (!in_array($deposit_checklist_id, $product_checklist_ids)) {
+                    $product_checklist_ids[] = $deposit_checklist_id;
+                }
             }
 
             foreach ($product_checklist_ids as $checklist_id) {

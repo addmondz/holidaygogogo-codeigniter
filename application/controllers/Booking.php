@@ -3501,11 +3501,12 @@ class Booking extends MY_Controller
 				$this->Product_Package_Checklist_Model->Bulk_Update_Product_Checklists($product_id, $required_ids);
 			}
 
-			// Auto-add deposit checklist if product has supplier deposit
-			if($deposit_checklist_id && $product_row && $product_row->has_supplier_deposit == 1) {
+			// Auto-add deposit checklist if booking product has a PaymentOutSupplierDeposit date
+			$has_deposit_date = !empty($booking_product->PaymentOutSupplierDeposit)
+				&& $booking_product->PaymentOutSupplierDeposit != '0000-00-00';
+			if($deposit_checklist_id && $has_deposit_date) {
 				if(!in_array($deposit_checklist_id, $product_checklist_ids)) {
 					$product_checklist_ids[] = $deposit_checklist_id;
-					$this->Product_Package_Checklist_Model->Bulk_Update_Product_Checklists($product_id, $product_checklist_ids);
 				}
 			}
 

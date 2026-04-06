@@ -10,6 +10,11 @@
                 <?php $current_url = base_url($_SERVER['REQUEST_URI']); ?>
             </div>
             <div class="card-body">
+                <script>
+                    function isSupplierPaymentType(type) {
+                        return type == 'SUPPLIER PAYMENT (DEPOSIT)' || type == 'SUPPLIER PAYMENT (FULL)' || type == 'SUPPLIER PAYMENT (ADDITIONAL)';
+                    }
+                </script>
                 <form id="form" action="<?php if(current_url() == base_url('Payment/Create')) { echo base_url('Payment/Create'); } else { echo base_url('Payment/Update?payment_id=') . $this->input->get('payment_id'); } ?>" method="post" enctype="multipart/form-data">
                     <?php if(current_url() == base_url('Payment/Create')) { ?>
                         <div id="booking"></div>
@@ -69,9 +74,6 @@
                         </div>
 
                         <script>
-                            function isSupplierPaymentType(type) {
-                                return type == 'SUPPLIER PAYMENT (DEPOSIT)' || type == 'SUPPLIER PAYMENT (FULL)' || type == 'SUPPLIER PAYMENT (ADDITIONAL)';
-                            }
                             var reservation_number = null;
                             var suppliers = <?php echo json_encode($suppliers) ?>;
                             var country_codes = <?php echo json_encode($country_codes) ?>;
