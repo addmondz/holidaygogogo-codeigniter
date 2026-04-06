@@ -862,7 +862,6 @@ return $query->result_array(); // instead of result()
 		$this->db->join('supplier', 'supplier.SupplierID = payment.SupplierID', 'left');
 
 		$this->apply_payment_filters();
-		$this->db->where_in('payment.Type', array('DEPOSIT', 'FULL', 'ADDITIONAL PAYMENT'));
 
 		$result = $this->db->get()->row();
 
@@ -878,7 +877,6 @@ return $query->result_array(); // instead of result()
 		$this->db->join('supplier', 'supplier.SupplierID = payment.SupplierID', 'left');
 
 		$this->apply_payment_filters();
-		$this->db->where_in('payment.Type', array('DEPOSIT', 'FULL', 'ADDITIONAL PAYMENT'));
 
 		$sales_result = $this->db->get()->row();
 		$total_sales = $sales_result->total_sales ?? 0;
