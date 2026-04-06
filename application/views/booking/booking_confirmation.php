@@ -199,12 +199,10 @@
 				</tr>
 				<tr>
 					<td>&nbsp;</td>
-					<td>&nbsp;</td>
 					<td style="border-bottom: 1px solid black;">Discount (RM):<br></td>
 					<td style="text-align:right; float: left; border-bottom: 1px solid black;"><label>- <?php echo number_format($Discount, 2, '.', ','); ?></label></td>
 				</tr>
 				<tr style="font-weight:bold;">
-					<td>&nbsp;</td>
 					<td>&nbsp;</td>
 					<td>Total (RM):</td>
 					<td style="text-align:right; float: left;"><label><?php echo number_format($NetTotal, 2, '.', ','); ?></label></td>
@@ -218,21 +216,17 @@
 				<?php } ?>
 				<tr>
 					<td>&nbsp;</td>
-					<td>&nbsp;</td>
 					<td style="border-bottom: 1px solid black;">Total Paid (RM):</td>
 					<td style="text-align:right; float: left; border-bottom: 1px solid black;"><label><?php echo number_format(isset($TotalPaid) ? $TotalPaid : 0, 2, '.', ','); ?></label></td>
 				</tr>
 				<tr>
 					<td>&nbsp;</td>
-					<td>&nbsp;</td>
 					<td style="border-bottom: 1px solid black;">Outstanding (RM):</td>
 					<td style="text-align:right; float: left; border-bottom: 1px solid black;"><label><?php echo number_format(isset($OutstandingBalance) ? $OutstandingBalance : $NetTotal, 2, '.', ','); ?></label></td>
 				</tr>
 				<tr>
-					<td colspan="2"><p style="margin-top:10px;">MayBank 5128-4851-0541 "HolidayGoGoGo Tours Sdn Bhd"</p></td>
-					<td>
-						&nbsp;
-					</td>
+					<td><p style="margin-top:10px;">MayBank 5128-4851-0541 "HolidayGoGoGo Tours Sdn Bhd"</p></td>
+					<td>&nbsp;</td>
 					<td>&nbsp;</td>
 				</tr>
 			</table>
