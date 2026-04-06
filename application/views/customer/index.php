@@ -206,7 +206,7 @@ div.kt-datatable__pager-container {
                                                     <?php 
                                                         // Generate portal hash for direct link
                                                         $this->load->helper('utils');
-                                                        $portal_hash = generate_customer_portal_hash($customer->CustomerID);
+                                                        $portal_hash = generate_customer_portal_slug($customer->CustomerID);
                                                         // Only show link if hash was generated successfully
                                                         if (!empty($portal_hash) && $portal_hash !== false):
                                                     ?>

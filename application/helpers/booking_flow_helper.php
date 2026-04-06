@@ -531,16 +531,20 @@ if (!function_exists('has_full_payment')) {
         $payments = $CI->Booking_Model->Read_Payments($booking_id);
 
         $total_approved_credit = 0;
+        $has_full_type = false;
         if (!empty($payments)) {
             foreach ($payments as $payment) {
                 $credit_amount = !empty($payment->Credit) ? floatval($payment->Credit) : 0;
                 if ($payment->Type != 'SUPPLIER REFUND' && $payment->Type != 'AGENT COMMISSION FROM SUPPLIER' && $credit_amount > 0 && $payment->Status == 'Y') {
                     $total_approved_credit += $credit_amount;
                 }
+                if ($payment->Type == 'FULL' && $payment->Status == 'Y') {
+                    $has_full_type = true;
+                }
             }
         }
 
-        return round($total_approved_credit, 2) >= round(floatval($booking->NetTotal), 2);
+        return $has_full_type && round($total_approved_credit, 2) >= round(floatval($booking->NetTotal), 2);
     }
 }
 

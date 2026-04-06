@@ -529,7 +529,7 @@ class Booking extends MY_Controller
 		if($booking->CustomerID != null) {
 			// Load helper for generating portal hash
 			$this->load->helper('utils');
-			$customer_hash = generate_customer_portal_hash($booking->CustomerID);
+			$customer_hash = generate_customer_portal_slug($booking->CustomerID);
 			if (!empty($customer_hash)) {
 				$portal_url = base_url('customer/' . urlencode($customer_hash));
 				$html .= '<a href="' . $portal_url . '" target="_blank" class="dropdown-item" style="font-size:11px;">Go to Customer Portal</a>';

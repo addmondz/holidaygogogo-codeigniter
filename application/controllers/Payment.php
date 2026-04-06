@@ -768,7 +768,13 @@ class Payment extends MY_Controller
 							// Determine if full or partial payment
 							// According to booking flow: PBC -> P -> PP -> PBO
 							// Partial payment moves to PP, full payment moves to PBO
-							if(round($total_approved_credit, 2) >= round(floatval($booking->NetTotal), 2)) {
+							// Must have FULL type payment to advance to PBO
+							$full_payment_existed = $this->Payment_Model->Read_Type($payment['BookingID']);
+							// Also check if the payment being approved right now is FULL type
+							if(!$full_payment_existed && $payment['Type'] == 'FULL') {
+								$full_payment_existed = true;
+							}
+							if($full_payment_existed && round($total_approved_credit, 2) >= round(floatval($booking->NetTotal), 2)) {
 								// Full payment received - move to PBO
 								$full_payment_description = "Full Payment Received - Ready for Booking Operation";
 								if($booking->Status == 'P' || $booking->Status == 'PBC' || $booking->Status == 'PP') {

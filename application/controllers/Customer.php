@@ -268,7 +268,7 @@ class Customer extends MY_Controller
 			return;
 		}
 
-		$hash = generate_customer_portal_hash($customer->CustomerID);
+		$hash = generate_customer_portal_slug($customer->CustomerID);
 		$portal_url = base_url('customer/' . $hash);
 
 		$this->output

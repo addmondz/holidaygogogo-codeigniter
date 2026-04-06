@@ -38,7 +38,7 @@ class Customer_Portal extends CI_Controller
         }
 
         // Find customer by verifying hash against all customer codes
-        $customer = $this->find_customer_by_hash($hash);
+        $customer = $this->find_customer_by_slug($hash);
         
         if (!$customer) {
             show_404();
@@ -106,7 +106,7 @@ class Customer_Portal extends CI_Controller
             return;
         }
 
-        $customer = $this->find_customer_by_hash($hash);
+        $customer = $this->find_customer_by_slug($hash);
 
         if (!$customer) {
             show_404();
@@ -159,39 +159,56 @@ class Customer_Portal extends CI_Controller
     }
 
     /**
-     * Find customer by verifying HMAC hash against all customer IDs
-     * 
-     * @param string $hash The HMAC hash from URL
+     * Find customer by matching their name-based slug
+     *
+     * @param string $slug The slug from URL (e.g. "john-doe-89")
      * @return array|null Customer data if found, null otherwise
      */
-    private function find_customer_by_hash($hash)
+    private function find_customer_by_slug($slug)
     {
-        // Get all active customers
+        // Get all active customers ordered by ID so lower IDs get the 2-digit slug
         $this->db->select('CustomerID, CustomerCode, name, phone_number, ChatLanguage, Status');
         $this->db->where('Status', 'Y');
+        $this->db->order_by('CustomerID', 'ASC');
         $customers = $this->db->get('customer')->result_array();
 
-        // Try each customer ID until we find a match
+        // Build slug for each customer and detect duplicates
+        $slug_map = []; // slug => customer
         foreach ($customers as $customer) {
-            if (verify_customer_portal_hash($hash, $customer['CustomerID'])) {
-                // Get customer email from guest_list (get first email from their bookings)
-                $this->db->select('guest_list.Email');
-                $this->db->from('guest_list');
-                $this->db->join('booking', 'booking.BookingID = guest_list.BookingID', 'left');
-                $this->db->where('booking.CustomerID', $customer['CustomerID']);
-                $this->db->where('guest_list.Email IS NOT NULL', null, false);
-                $this->db->where('guest_list.Email !=', '');
-                $this->db->where('guest_list.Status', 'Y');
-                $this->db->order_by('guest_list.GuestListID', 'ASC');
-                $this->db->limit(1);
-                $email_result = $this->db->get()->row_array();
-                
-                $customer['email'] = !empty($email_result['Email']) ? $email_result['Email'] : null;
-                return $customer;
+            if (empty($customer['name']) || empty($customer['phone_number'])) {
+                continue;
             }
+
+            $customer_slug = build_customer_slug($customer['name'], $customer['phone_number'], 2);
+
+            if (isset($slug_map[$customer_slug])) {
+                // Duplicate: this customer (higher ID) gets 3-digit slug
+                $customer_slug = build_customer_slug($customer['name'], $customer['phone_number'], 3);
+            }
+
+            $slug_map[$customer_slug] = $customer;
         }
 
-        return null;
+        if (!isset($slug_map[$slug])) {
+            return null;
+        }
+
+        $customer = $slug_map[$slug];
+
+        // Get customer email from guest_list (get first email from their bookings)
+        $this->db->select('guest_list.Email');
+        $this->db->from('guest_list');
+        $this->db->join('booking', 'booking.BookingID = guest_list.BookingID', 'left');
+        $this->db->where('booking.CustomerID', $customer['CustomerID']);
+        $this->db->where('guest_list.Email IS NOT NULL', null, false);
+        $this->db->where('guest_list.Email !=', '');
+        $this->db->where('guest_list.Status', 'Y');
+        $this->db->order_by('guest_list.GuestListID', 'ASC');
+        $this->db->limit(1);
+        $email_result = $this->db->get()->row_array();
+
+        $customer['email'] = !empty($email_result['Email']) ? $email_result['Email'] : null;
+        return $customer;
     }
 
     /**
@@ -397,7 +414,7 @@ class Customer_Portal extends CI_Controller
         // Check phone verification for booking details (skip if no phone number on file)
         if ($this->config->item('enable_phone_verification')) {
             if ($customer && !empty($customer['phone_number']) && !$this->is_customer_verified($customer['CustomerID'])) {
-                $customer_hash = generate_customer_portal_hash($customer['CustomerID']);
+                $customer_hash = generate_customer_portal_slug($customer['CustomerID']);
                 redirect('customer/' . $customer_hash . '/verify');
                 return;
             }
@@ -575,7 +592,7 @@ class Customer_Portal extends CI_Controller
         // Generate customer hash for back button
         $customer_hash = '';
         if (!empty($customer) && !empty($customer['CustomerID'])) {
-            $customer_hash = generate_customer_portal_hash($customer['CustomerID']);
+            $customer_hash = generate_customer_portal_slug($customer['CustomerID']);
         }
 
         // Prepare data for view

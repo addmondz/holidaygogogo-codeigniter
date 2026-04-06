@@ -205,93 +205,73 @@ if (!function_exists('hex_to_base36')) {
 }
 
 /**
- * Generate simple hash for customer portal URL
- * 
- * @param int|string $customer_id The customer ID to sign
- * @param string $secret Secret key (defaults to config value)
- * @param int $length Optional length to truncate (default: 20)
- * @return string Base36 encoded hash (lowercase letters and numbers only)
+ * Build a URL slug from a customer name and phone number.
+ *
+ * @param string $name    Customer name
+ * @param string $phone   Phone number (may include country code, spaces, dashes)
+ * @param int    $digits  Number of trailing phone digits to append (default 2)
+ * @return string Slug like "john-doe-89"
  */
-if (!function_exists('generate_customer_portal_hash')) {
-    function generate_customer_portal_hash($customer_id, $secret = null, $length = 20)
+if (!function_exists('build_customer_slug')) {
+    function build_customer_slug($name, $phone, $digits = 2)
     {
-        if (empty($customer_id)) {
-            return false;
-        }
-        
-        // Convert customer ID to string
-        $customer_id_str = (string)$customer_id;
-        
-        // Get secret from config or .env
-        if ($secret === null) {
-            $CI =& get_instance();
-            $secret = $CI->config->item('customer_portal_hmac_secret');
-            if (empty($secret)) {
-                if (function_exists('get_env')) {
-                    $secret = get_env('CUSTOMER_PORTAL_HMAC_SECRET');
-                }
-                if (empty($secret)) {
-                    show_error('Customer portal HMAC secret not configured');
-                }
-            }
-        }
-        
-        // Simple method: MD5 hash of customer_id + secret, then convert to base36
-        $md5_hash = md5($customer_id_str . $secret);
-        
-        // Convert first 16 hex characters to base36 (simple, works everywhere)
-        $hex_short = substr($md5_hash, 0, 16);
-        $base36_hash = base_convert($hex_short, 16, 36);
-        
-        // Truncate to desired length
-        if ($length > 0 && strlen($base36_hash) > $length) {
-            $base36_hash = substr($base36_hash, 0, $length);
-        }
-        
-        return $base36_hash;
+        $slug = strtolower(trim($name));
+        $slug = preg_replace('/[^a-z0-9]+/', '-', $slug);
+        $slug = trim($slug, '-');
+
+        $phone_clean = preg_replace('/[^0-9]/', '', $phone);
+        $suffix = substr($phone_clean, -$digits);
+
+        return $slug . '-' . $suffix;
     }
 }
 
 /**
- * Verify HMAC hash for customer portal URL
- * 
- * @param string $hash The hash from the URL
- * @param int|string $customer_id The customer ID to verify against
- * @param string $secret Secret key for HMAC (defaults to config value)
- * @param int $length Expected length of hash (if 0, uses actual hash length)
- * @return bool True if hash is valid, false otherwise
+ * Generate a customer portal slug for a given customer ID.
+ *
+ * Queries the database for the customer's name and phone number, builds a
+ * slug, and checks for duplicates among active customers with a lower ID.
+ * If a collision is found the slug uses 3 phone digits instead of 2.
+ *
+ * @param int|string $customer_id
+ * @return string|false  Slug string, or false on failure
  */
-if (!function_exists('verify_customer_portal_hash')) {
-    function verify_customer_portal_hash($hash, $customer_id, $secret = null, $length = 0)
+if (!function_exists('generate_customer_portal_slug')) {
+    function generate_customer_portal_slug($customer_id)
     {
-        if (empty($hash) || empty($customer_id)) {
+        if (empty($customer_id)) {
             return false;
         }
-        
-        // Use actual hash length if not specified
-        if ($length === 0) {
-            $length = strlen($hash);
+
+        $CI =& get_instance();
+
+        $customer = $CI->db->select('CustomerID, name, phone_number')
+            ->where('CustomerID', $customer_id)
+            ->get('customer')
+            ->row_array();
+
+        if (!$customer || empty($customer['name']) || empty($customer['phone_number'])) {
+            return false;
         }
-        
-        if ($secret === null) {
-            $CI =& get_instance();
-            $secret = $CI->config->item('customer_portal_hmac_secret');
-            if (empty($secret)) {
-                // Fallback to .env if config not set
-                if (function_exists('get_env')) {
-                    $secret = get_env('CUSTOMER_PORTAL_HMAC_SECRET');
-                }
-                if (empty($secret)) {
-                    return false;
+
+        $base_slug = build_customer_slug($customer['name'], $customer['phone_number'], 2);
+
+        // Check for duplicate slugs among customers with a lower ID
+        $others = $CI->db->select('name, phone_number')
+            ->where('Status', 'Y')
+            ->where('CustomerID <', $customer_id)
+            ->get('customer')
+            ->result_array();
+
+        foreach ($others as $other) {
+            if (!empty($other['name']) && !empty($other['phone_number'])) {
+                if (build_customer_slug($other['name'], $other['phone_number'], 2) === $base_slug) {
+                    return build_customer_slug($customer['name'], $customer['phone_number'], 3);
                 }
             }
         }
-        
-        // Generate expected hash with same length as provided hash
-        $expected_hash = generate_customer_portal_hash($customer_id, $secret, $length);
-        
-        // Use timing-safe comparison to prevent timing attacks
-        return hash_equals($expected_hash, $hash);
+
+        return $base_slug;
     }
 }
 

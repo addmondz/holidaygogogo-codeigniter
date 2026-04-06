@@ -52,8 +52,9 @@ class Recalculate {
                     }
                 }
                 if($total_approved_credit != 0) {
-                    if(round($total_approved_credit, 2) >= round(floatval($booking->NetTotal), 2)) {
-                        // Full payment received - move to PBO (Pending Booking Operation)
+                    $full_payment_existed = $this->CI->Payment_Model->Read_Type($booking->BookingID);
+                    if($full_payment_existed && round($total_approved_credit, 2) >= round(floatval($booking->NetTotal), 2)) {
+                        // Full payment received (with FULL type payment) - move to PBO (Pending Booking Operation)
                         if($booking->Status == 'P' || $booking->Status == 'PP') {
                             $this->CI->Booking_Model->Update_Status('PBO', $booking->BookingID);
                             $this->CI->Booking_Model->Create_Booking_Log2($booking->Status, 'PBO', $booking->BookingID);
@@ -67,7 +68,8 @@ class Recalculate {
                         }
                     } else {
                         // Partial payment - move to PP
-                        if($booking->Status == 'P') {
+                        // Also revert PBO to PP if no FULL type payment exists (incorrectly advanced)
+                        if($booking->Status == 'P' || $booking->Status == 'PBO') {
                             $this->CI->Booking_Model->Update_Status('PP', $booking->BookingID);
                             $this->CI->Booking_Model->Create_Booking_Log2($booking->Status, 'PP', $booking->BookingID);
                         }
