@@ -504,6 +504,19 @@ ALTER TABLE `booking_log` ADD COLUMN `SnapshotPDF` VARCHAR(255) DEFAULT NULL AFT
 -- =============================================
 -- 40. 20260329_Payment_Add_Agent_Commission_From_Supplier_Type
 -- =============================================
+-- Step 1: Add new types while keeping old 'SUPPLIER PAYMENT' temporarily
+ALTER TABLE payment
+  MODIFY COLUMN Type ENUM(
+    'ADDITIONAL PAYMENT','AGENT COMMISSION','AGENT COMMISSION FROM SUPPLIER',
+    'BANK CHARGES','CUSTOMER REFUND','CREDIT CARD CHARGES','DEPOSIT','FULL',
+    'ONE-TIME PAYMENT','SUPPLIER PAYMENT','SUPPLIER PAYMENT (DEPOSIT)','SUPPLIER PAYMENT (FULL)',
+    'SUPPLIER PAYMENT (ADDITIONAL)','SUPPLIER REFUND'
+  ) NULL;
+
+-- Step 2: Migrate old 'SUPPLIER PAYMENT' rows to 'SUPPLIER PAYMENT (FULL)'
+UPDATE payment SET Type = 'SUPPLIER PAYMENT (FULL)' WHERE Type = 'SUPPLIER PAYMENT';
+
+-- Step 3: Remove old 'SUPPLIER PAYMENT' from ENUM
 ALTER TABLE payment
   MODIFY COLUMN Type ENUM(
     'ADDITIONAL PAYMENT','AGENT COMMISSION','AGENT COMMISSION FROM SUPPLIER',
@@ -512,19 +525,14 @@ ALTER TABLE payment
     'SUPPLIER PAYMENT (ADDITIONAL)','SUPPLIER REFUND'
   ) NULL;
 
--- 20260401: Replace SUPPLIER PAYMENT with 3 sub-types
-ALTER TABLE payment
-  MODIFY COLUMN Type ENUM(
-    'ADDITIONAL PAYMENT','AGENT COMMISSION','AGENT COMMISSION FROM SUPPLIER',
-    'BANK CHARGES','CUSTOMER REFUND','CREDIT CARD CHARGES','DEPOSIT','FULL',
-    'ONE-TIME PAYMENT','SUPPLIER PAYMENT (DEPOSIT)','SUPPLIER PAYMENT (FULL)',
-    'SUPPLIER PAYMENT (ADDITIONAL)','SUPPLIER REFUND'
-  ) NULL;
-
--- 20260331: Add SalesAgent2 to booking
+-- =============================================
+-- 41. 20260331_Add_SalesAgent2_To_Booking
+-- =============================================
 ALTER TABLE `booking` ADD `SalesAgent2` INT(11) NULL AFTER `BookingOP`;
 
--- 20260401: Add DepositMode and DepositFixedAmount to booking
+-- =============================================
+-- 42. 20260401_Add_DepositMode_And_DepositFixedAmount_To_Booking
+-- =============================================
 ALTER TABLE booking
   ADD COLUMN DepositMode VARCHAR(10) NOT NULL DEFAULT 'percentage'
   COMMENT 'Deposit mode: percentage or fixed'
