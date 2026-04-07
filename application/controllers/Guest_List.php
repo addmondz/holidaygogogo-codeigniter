@@ -341,7 +341,7 @@ class Guest_List extends CI_Controller
 		$spreadsheet->getActiveSheet()->setCellValue('AB1', 'STATE');
 		$spreadsheet->getActiveSheet()->setCellValue('AC1', 'COUNTRY');
 		$spreadsheet->getActiveSheet()->setCellValue('AD1', 'NOMINEE');
-		$spreadsheet->getActiveSheet()->setCellValue('AE1', 'NOMINEE CONTACT');
+		$spreadsheet->getActiveSheet()->setCellValue('AE1', 'NOMINEE CONTACT NUMBER');
 		$spreadsheet->getActiveSheet()->setCellValue('AF1', 'NOMINEE IDENTIFICATION NUMBER');
 		$spreadsheet->getActiveSheet()->setCellValue('AG1', 'RELATIONSHIP');
 		$spreadsheet->getActiveSheet()->setCellValue('AH1', 'ROOM');
@@ -426,7 +426,7 @@ class Guest_List extends CI_Controller
 			$spreadsheet->getActiveSheet()->setCellValueExplicit('AB' . $row, $guest->State, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 			$spreadsheet->getActiveSheet()->setCellValueExplicit('AC' . $row, $guest->Country, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 			$spreadsheet->getActiveSheet()->setCellValueExplicit('AD' . $row, $guest->Nominee, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-			$spreadsheet->getActiveSheet()->setCellValueExplicit('AE' . $row, $guest->NomineeContact, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('AE' . $row, $guest->NomineeContactNumber, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 			$spreadsheet->getActiveSheet()->setCellValueExplicit('AF' . $row, $guest->NomineeIdentificationNumber, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 			$spreadsheet->getActiveSheet()->setCellValueExplicit('AG' . $row, $guest->Relationship, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 			$spreadsheet->getActiveSheet()->setCellValueExplicit('AH' . $row, isset($guest->RoomName) ? $guest->RoomName : '', \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
@@ -529,7 +529,7 @@ class Guest_List extends CI_Controller
 		$spreadsheet->getActiveSheet()->setCellValue('AB1', 'STATE');
 		$spreadsheet->getActiveSheet()->setCellValue('AC1', 'COUNTRY');
 		$spreadsheet->getActiveSheet()->setCellValue('AD1', 'NOMINEE');
-		$spreadsheet->getActiveSheet()->setCellValue('AE1', 'NOMINEE CONTACT');
+		$spreadsheet->getActiveSheet()->setCellValue('AE1', 'NOMINEE CONTACT NUMBER');
 		$spreadsheet->getActiveSheet()->setCellValue('AF1', 'NOMINEE IDENTIFICATION NUMBER');
 		$spreadsheet->getActiveSheet()->setCellValue('AG1', 'RELATIONSHIP');
 		$spreadsheet->getActiveSheet()->setCellValue('AH1', 'ROOM');
@@ -653,7 +653,7 @@ class Guest_List extends CI_Controller
 			$spreadsheet->getActiveSheet()->setCellValueExplicit('AB' . $row, $guest->State, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 			$spreadsheet->getActiveSheet()->setCellValueExplicit('AC' . $row, $guest->Country, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 			$spreadsheet->getActiveSheet()->setCellValueExplicit('AD' . $row, $guest->Nominee, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-			$spreadsheet->getActiveSheet()->setCellValueExplicit('AE' . $row, $guest->NomineeContact, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('AE' . $row, $guest->NomineeContactNumber, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 			$spreadsheet->getActiveSheet()->setCellValueExplicit('AF' . $row, $guest->NomineeIdentificationNumber, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 			$spreadsheet->getActiveSheet()->setCellValueExplicit('AG' . $row, $guest->Relationship, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 			$spreadsheet->getActiveSheet()->setCellValueExplicit('AH' . $row, isset($guest->RoomName) ? $guest->RoomName : '', \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);

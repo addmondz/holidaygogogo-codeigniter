@@ -646,19 +646,12 @@
 																<br>
 																<div class="row">
 																	<div class="col-md-6 mb-7 mb-md-0">
-																		<label id="<?php echo 'nominee_contact_label-' . $guest->GuestListID; ?>">Nominee Contact <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>
-																		<input <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="nominee_contacts[]" id="<?php echo 'nominee_contact-' . $guest->GuestListID; ?>" value="<?php echo $guest->NomineeContact; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="form-control">
-																	</div>
-																</div>
-																<br>
-																<div class="row">
-																	<div class="col-md-6 mb-7 mb-md-0">
 																		<label id="<?php echo 'nominee_identification_number_label-' . $guest->GuestListID; ?>">Nominee Identification Number <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>
 																		<input <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="nominee_identification_numbers[]" id="<?php echo 'nominee_identification_number-' . $guest->GuestListID; ?>" value="<?php echo $guest->NomineeIdentificationNumber; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="form-control">
 																	</div>
 																	<div class="col-md-6">
-																		<label>Nominee Contact Number</label>
-																		<input <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="nominee_contact_numbers[]" id="<?php echo 'nominee_contact_number-' . $guest->GuestListID; ?>" value="<?php echo $guest->NomineeContactNumber; ?>" autocomplete="off" class="form-control">
+																		<label id="<?php echo 'nominee_contact_number_label-' . $guest->GuestListID; ?>">Nominee Contact Number <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>
+																		<input <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="nominee_contact_numbers[]" id="<?php echo 'nominee_contact_number-' . $guest->GuestListID; ?>" value="<?php echo $guest->NomineeContactNumber; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="form-control">
 																	</div>
 																</div>
 																<br>
@@ -932,9 +925,9 @@
 			var nominee_name = $(`#nominee_name-${guest_list_id}`).val();
 			var nominee_identification_number = $(`#nominee_identification_number-${guest_list_id}`).val();
 			var relationship = $(`#relationship-${guest_list_id}`).val();
-			var nominee_contact = $(`#nominee_contact-${guest_list_id}`).val();
+			var nominee_contact_number = $(`#nominee_contact_number-${guest_list_id}`).val();
 
-			if(name != '' || last_name != '' || gender != '' || date_of_birth != '' || identification_number != '' || passport_number != '' || mobile != '' || email != '' || marital_status != '' || employment != '' || address != '' || postcode != '' || city != '' || state != '' || country != '' || nominee_name != '' || nominee_identification_number != '' || relationship != '' || nominee_contact != '') {
+			if(name != '' || last_name != '' || gender != '' || date_of_birth != '' || identification_number != '' || passport_number != '' || mobile != '' || email != '' || marital_status != '' || employment != '' || address != '' || postcode != '' || city != '' || state != '' || country != '' || nominee_name != '' || nominee_identification_number != '' || relationship != '' || nominee_contact_number != '') {
 				$(`#name_label-${guest_list_id}`).html('First Name <span style="color:red;">*</span>');
 				$(`#name-${guest_list_id}`).prop('required', 'true');
 				$(`#last_name_label-${guest_list_id}`).html('Last Name <span style="color:red;">*</span>');
@@ -1050,8 +1043,8 @@
 					$(`#nominee_identification_number-${guest_list_id}`).prop('required', 'true');
 					$(`#relationship_label-${guest_list_id}`).html('Relationship <span style="color:red;">*</span>');
 					$(`#relationship-${guest_list_id}`).prop('required', 'true');
-					$(`#nominee_contact_label-${guest_list_id}`).html('Nominee Contact <span style="color:red;">*</span>');
-					$(`#nominee_contact-${guest_list_id}`).prop('required', 'true');
+					$(`#nominee_contact_number_label-${guest_list_id}`).html('Nominee Contact Number <span style="color:red;">*</span>');
+					$(`#nominee_contact_number-${guest_list_id}`).prop('required', 'true');
 				<?php } ?>
 			} else {
 				$(`#name_label-${guest_list_id}`).html('First Name');
@@ -1107,8 +1100,8 @@
 					$(`#nominee_identification_number-${guest_list_id}`).removeAttr('required');
 					$(`#relationship_label-${guest_list_id}`).html('Relationship');
 					$(`#relationship-${guest_list_id}`).removeAttr('required');
-					$(`#nominee_contact_label-${guest_list_id}`).html('Nominee Contact');
-					$(`#nominee_contact-${guest_list_id}`).removeAttr('required');
+					$(`#nominee_contact_number_label-${guest_list_id}`).html('Nominee Contact Number');
+					$(`#nominee_contact_number-${guest_list_id}`).removeAttr('required');
 				<?php } ?>
 			}
 		}
@@ -1348,7 +1341,7 @@
 								if ($(`#state-${gid}`).val() == '') missing.push('State');
 								if ($(`#country-${gid}`).val() == '' || $(`#country-${gid}`).val() == null) missing.push('Country');
 								if ($(`#nominee_name-${gid}`).val() == '') missing.push('Nominee Name');
-								if ($(`#nominee_contact-${gid}`).val() == '') missing.push('Nominee Contact');
+								if ($(`#nominee_contact_number-${gid}`).val() == '') missing.push('Nominee Contact Number');
 								if ($(`#nominee_identification_number-${gid}`).val() == '') missing.push('Nominee Identification Number');
 								if ($(`#relationship-${gid}`).val() == '') missing.push('Relationship');
 								<?php } ?>
@@ -1394,7 +1387,7 @@
 								if ($(`#state-${gid}`).val() == '') missing.push('State');
 								if ($(`#country-${gid}`).val() == '' || $(`#country-${gid}`).val() == null) missing.push('Country');
 								if ($(`#nominee_name-${gid}`).val() == '') missing.push('Nominee Name');
-								if ($(`#nominee_contact-${gid}`).val() == '') missing.push('Nominee Contact');
+								if ($(`#nominee_contact_number-${gid}`).val() == '') missing.push('Nominee Contact Number');
 								if ($(`#nominee_identification_number-${gid}`).val() == '') missing.push('Nominee Identification Number');
 								if ($(`#relationship-${gid}`).val() == '') missing.push('Relationship');
 								<?php } ?>

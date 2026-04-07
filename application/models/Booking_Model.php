@@ -17,7 +17,8 @@ class Booking_Model extends CI_Model
 			JOIN product p ON p.ProductID = bp.ProductID AND p.is_child_or_infant = 0
 			JOIN product_package_checklist ppc ON ppc.product_id = bp.ProductID
 				AND JSON_CONTAINS(ppc.package_checklist_json, '{$checklist_id}')
-			WHERE NOT EXISTS (
+			WHERE bp.Status = 'Y'
+			AND NOT EXISTS (
 				SELECT 1 FROM booking_checklist_completion bcc
 				WHERE bcc.booking_id = bp.BookingID
 				AND bcc.product_id = bp.ProductID

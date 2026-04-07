@@ -4901,6 +4901,15 @@ $(document).ready(function() {
                 }
             });
         } else {
+            // Add default room for new bookings
+            tempRoomCounter++;
+            roomsList.push({
+                id: 'temp_' + tempRoomCounter,
+                room_name: 'ROOM 1',
+                adult_count: 0,
+                child_count: 0,
+                infant_count: 0
+            });
             renderRoomsTable();
         }
     }
