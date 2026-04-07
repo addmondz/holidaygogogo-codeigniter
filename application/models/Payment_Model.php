@@ -246,6 +246,7 @@ class Payment_Model extends CI_Model
 		$this->db->join('product p', 'p.ProductID = bp.ProductID', 'left');
 		$this->db->where('bp.BookingID', $booking_id);
 		$this->db->where('bp.Status', 'Y');
+		$this->db->where('bp.disable_checklist_payment_out', 0);
 		return $this->db->get()->result();
 	}
 

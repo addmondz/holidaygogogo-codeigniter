@@ -267,7 +267,7 @@ if (!function_exists('get_booking_status_info')) {
             'colors' => [
                 'Y' => '#50C878',      // COMPLETED - Green
                 'PR' => '#C3B1E1',      // PENDING REVIEW - Purple
-                'P' => '#FFBF00',       // PENDING PAYMENT - Orange
+                'P' => '#DC143C',       // PENDING PAYMENT - Crimson Red
                 'PP' => '#A7C7E7',      // PARTIAL PAYMENT - Light Blue
                 'PTV' => '#F89880',     // PENDING TRAVEL VOUCHER - Light Red
                 'PGL' => '#FAC898',     // PENDING GUEST LIST - Peach
@@ -332,7 +332,7 @@ if (!function_exists('display_booking_status')) {
         $status_colors = array(
             'Y' => '#50C878',
             'PR' => '#C3B1E1',
-            'P' => '#FFBF00',
+            'P' => '#DC143C',
             'PP' => '#A7C7E7',
             'PTV' => '#F89880',
             'PGL' => '#FAC898',

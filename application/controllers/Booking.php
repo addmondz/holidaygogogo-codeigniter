@@ -248,7 +248,7 @@ class Booking extends MY_Controller
 
 			// Status color and text
 			$status_colors = array(
-				'Y' => '#50C878', 'PR' => '#C3B1E1', 'P' => '#FFBF00', 'PP' => '#A7C7E7',
+				'Y' => '#50C878', 'PR' => '#C3B1E1', 'P' => '#DC143C', 'PP' => '#A7C7E7',
 				'PTV' => '#F89880', 'PGL' => '#FAC898', 'PT' => '#F8C8DC', 'OG' => '#CCCCFF', 'PO' => '#DA70D6',
 				'PBC' => '#FFD700', 'PBO' => '#87CEEB'
 			);

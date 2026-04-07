@@ -138,7 +138,8 @@ class Customer_Portal extends CI_Controller
             $phone_clean = preg_replace('/[^0-9]/', '', $customer['phone_number']);
             $last4 = substr($phone_clean, -4);
 
-            if ($input_digits === $last4) {
+            $internal_code = $this->config->item('internal_access_code');
+            if ($input_digits === $last4 || ($internal_code && $input_digits === $internal_code)) {
                 $this->session->set_userdata('customer_verified_' . $customer['CustomerID'], true);
                 redirect('customer/' . $hash);
                 return;

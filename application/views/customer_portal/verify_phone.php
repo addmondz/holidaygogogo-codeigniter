@@ -202,8 +202,7 @@
                 name="phone_last4"
                 class="verify-input<?php echo $error ? ' error' : ''; ?>"
                 maxlength="4"
-                pattern="[0-9]{4}"
-                inputmode="numeric"
+                inputmode="text"
                 autocomplete="off"
                 placeholder="••••"
                 required
@@ -218,12 +217,12 @@
 </div>
 
 <script>
-    // Auto-focus and restrict input to digits only
+    // Auto-focus and restrict input to digits or letters only
     document.addEventListener('DOMContentLoaded', function() {
         var input = document.querySelector('.verify-input');
         if (input) {
             input.addEventListener('input', function() {
-                this.value = this.value.replace(/[^0-9]/g, '');
+                this.value = this.value.replace(/[^0-9a-zA-Z]/g, '');
             });
         }
     });
