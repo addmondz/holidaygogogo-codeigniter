@@ -12,6 +12,7 @@ class Product extends MY_Controller
 		$this->load->model('Product_Model');
 		$this->load->model('Universal_Model');
 		$this->load->model('Product_Package_Checklist_Model');
+		$this->load->model('Package_Checklist_Model');
 	}
 
 	function index()
@@ -20,6 +21,7 @@ class Product extends MY_Controller
 		$array['products'] = $this->Product_Model->Read_Products1();
 		$array['categories'] = $this->Product_Model->Read_Categories();
 		$array['suppliers'] = $this->Product_Model->Read_Suppliers();
+		$array['checklists'] = $this->Product_Package_Checklist_Model->Read_Package_Checklists();
 		foreach($array['products'] as $product) {
             $product->RetailPrice = $product->RetailPrice == 0.00 ? '' : number_format($product->RetailPrice, 2, '.', ',');
             $product->SupplierPrice = $product->SupplierPrice == 0.00 ? '' : number_format($product->SupplierPrice, 2, '.', ',');
@@ -160,6 +162,63 @@ class Product extends MY_Controller
 		}
 	}
 	
+	function BulkAddChecklist()
+	{
+		if($this->input->is_ajax_request()) {
+			$checklist_ids = $this->input->post('checklist_ids');
+			$product_ids = $this->input->post('product_ids');
+
+			if(empty($checklist_ids) || !is_array($checklist_ids) || empty($product_ids) || !is_array($product_ids)) {
+				$this->output
+					->set_content_type('application/json')
+					->set_output(json_encode(['success' => false, 'message' => 'Checklist(s) and product IDs are required']));
+				return;
+			}
+
+			$checklist_ids = array_map('intval', $checklist_ids);
+			$checklist_ids = array_values(array_filter($checklist_ids, function($id) { return $id > 0; }));
+
+			$success_count = 0;
+			$fail_count = 0;
+
+			foreach($product_ids as $product_id) {
+				$product_id = (int)$product_id;
+				if($product_id <= 0) continue;
+
+				// Get current checklists for this product
+				$current_ids = $this->Product_Package_Checklist_Model->Get_Checklists_For_Product($product_id);
+
+				// Add the new checklists if not already present
+				foreach($checklist_ids as $checklist_id) {
+					if(!in_array($checklist_id, $current_ids)) {
+						$current_ids[] = $checklist_id;
+					}
+				}
+
+				$result = $this->Product_Package_Checklist_Model->Bulk_Update_Product_Checklists($product_id, $current_ids);
+				if($result) {
+					$success_count++;
+				} else {
+					$fail_count++;
+				}
+			}
+
+			$checklist_count = count($checklist_ids);
+			$this->output
+				->set_content_type('application/json')
+				->set_output(json_encode([
+					'success' => true,
+					'message' => "{$checklist_count} checklist(s) added to {$success_count} product(s)." . ($fail_count > 0 ? " {$fail_count} failed." : ''),
+					'success_count' => $success_count,
+					'fail_count' => $fail_count
+				]));
+		} else {
+			$this->output
+				->set_content_type('application/json')
+				->set_output(json_encode(['success' => false, 'message' => 'Invalid request']));
+		}
+	}
+
 	function Download() {
 		$spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
 		$spreadsheet->getActiveSheet()->setTitle('Product Records');
