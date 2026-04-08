@@ -71,7 +71,7 @@ class Recalculate {
                     } else {
                         // Partial payment - move to PP
                         // Also revert PBO to PP if no FULL type payment exists (incorrectly advanced)
-                        if($booking->Status == 'P' || $booking->Status == 'PBO') {
+                        if($booking->Status == 'P' || $booking->Status == 'PBO' || $booking->Status == 'PTV') {
                             $this->CI->Booking_Model->Update_Status('PP', $booking->BookingID);
                             $this->CI->Booking_Model->Create_Booking_Log2($booking->Status, 'PP', $booking->BookingID);
                         }

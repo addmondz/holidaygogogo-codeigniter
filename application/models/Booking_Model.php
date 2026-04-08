@@ -113,7 +113,7 @@ class Booking_Model extends CI_Model
 			$this->db->where('SalesAgent', $this->session->userdata('admin_id'));
 		}
 
-		$this->db->where_in('booking.Status', array('P', 'PP', 'PBO', 'PT', 'OG', 'PBC'));
+		$this->db->where_in('booking.Status', array('P', 'PP', 'PBO', 'PTV', 'PT', 'OG', 'PBC'));
 		$this->db->order_by('booking.BookingID', 'DESC');
 
 		return $this->db->get('booking')->result();

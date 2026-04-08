@@ -973,4 +973,15 @@ return $query->result_array(); // instead of result()
 		return true;
 	}
 
+	function Read_Payment_Logs($booking_id)
+	{
+		$this->db->select('payment_log.Column, payment_log.CurrentData, payment_log.NewData, payment_log.InsertDate, payment.Type as PaymentType, payment.PaymentID, admin.Name as AdminName');
+		$this->db->from('payment_log');
+		$this->db->join('payment', 'payment.PaymentID = payment_log.PaymentID', 'left');
+		$this->db->join('admin', 'admin.AdminID = payment_log.InsertBy', 'left');
+		$this->db->where('payment.BookingID', $booking_id);
+		$this->db->order_by('payment_log.InsertDate', 'DESC');
+		return $this->db->get()->result_array();
+	}
+
 }

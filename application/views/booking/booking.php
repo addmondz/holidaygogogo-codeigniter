@@ -1472,6 +1472,50 @@
                                     </div>
                                 </div>
                             <?php } ?>
+
+                            <?php if(!empty($payment_logs)) { ?>
+                                <div class="row mt-5">
+                                    <div class="col-12">
+                                        <div class="card card-custom">
+                                        <div class="card-header flex-wrap py-2" style="background-color:#D7E2F2;">
+                                            <div class="card-title">
+                                                <h4 class="card-label mb-0" style="color:#6082B6; font-size: 1.1rem;">
+                                                    <i class="la la-money-bill"></i> <strong>Payment Changes Log</strong>
+                                                </h4>
+                                            </div>
+                                        </div>
+                                        <div class="card-body p-0">
+                                            <div style="max-height: 500px; overflow-y: auto;">
+                                                <table class="table table-striped table-bordered mb-0" style="font-size: 0.85rem;">
+                                                    <thead style="position: sticky; top: 0; background: #f8f9fa; z-index: 1;">
+                                                        <tr>
+                                                            <th style="min-width: 140px;">Date/Time</th>
+                                                            <th style="min-width: 120px;">Changed By</th>
+                                                            <th style="min-width: 140px;">Payment (Type)</th>
+                                                            <th style="min-width: 120px;">Field</th>
+                                                            <th>Old Value</th>
+                                                            <th>New Value</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        <?php foreach($payment_logs as $log): ?>
+                                                        <tr>
+                                                            <td><?php echo date('d M Y H:i', strtotime($log['InsertDate'])); ?></td>
+                                                            <td><?php echo htmlspecialchars($log['AdminName'] ?? '-'); ?></td>
+                                                            <td><?php echo '#' . $log['PaymentID'] . ' (' . htmlspecialchars($log['PaymentType'] ?? '-') . ')'; ?></td>
+                                                            <td><?php echo payment_log_field_label($log['Column']); ?></td>
+                                                            <td><?php echo audit_log_value($log['Column'], $log['CurrentData']); ?></td>
+                                                            <td><?php echo audit_log_value($log['Column'], $log['NewData']); ?></td>
+                                                        </tr>
+                                                        <?php endforeach; ?>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            <?php } ?>
                         </div>
                     </div>
                 </div>
@@ -1533,6 +1577,33 @@
         return htmlspecialchars(substr($value, 0, 100)) . '...';
     }
     return $escaped;
+} ?>
+
+<?php function payment_log_field_label($column) {
+    $labels = array(
+        'Status' => 'Status',
+        'Credit' => 'Credit (RM)',
+        'Debit' => 'Debit (RM)',
+        'Date' => 'Date',
+        'Type' => 'Type',
+        'ReferenceNumber' => 'Reference Number',
+        'Deadline' => 'Deadline',
+        'Bank' => 'Bank',
+        'BankAccount' => 'Bank Account',
+        'BankHolder' => 'Bank Holder',
+        'BankSlip' => 'Bank Slip',
+        'Quotation' => 'Quotation',
+        'Invoice' => 'Invoice',
+        'QuotationNumber' => 'Quotation Number',
+        'InvoiceNumber' => 'Invoice Number',
+        'Currency' => 'Currency',
+        'ForeignCurrency' => 'Foreign Currency',
+        'SupplierID' => 'Supplier',
+        'BookingProductID' => 'Booking Product',
+        'DebitRemark' => 'Debit Remark',
+        'PaymentRemark' => 'Payment Remark',
+    );
+    return isset($labels[$column]) ? $labels[$column] : ucwords(str_replace('_', ' ', preg_replace('/([a-z])([A-Z])/', '$1 $2', $column)));
 } ?>
 
 <script>

@@ -1231,6 +1231,9 @@ class Booking extends MY_Controller
 					// Get booking audit logs
 					$array['booking_logs'] = $this->Booking_Model->Read_Booking_Logs($array['BookingID']);
 
+					// Get payment change logs
+					$array['payment_logs'] = $this->Payment_Model->Read_Payment_Logs($array['BookingID']);
+
 					// Calculate and get display status for the booking
 					$this->load->helper('booking_flow');
 					$array['display_status'] = display_booking_status($array, true); // true = return all applicable statuses

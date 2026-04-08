@@ -873,11 +873,19 @@ if (!function_exists('determine_status_after_bc_approval')) {
                 );
             }
 
-            // Has payment, check checklist
+            // Has payment, check if full payment received
+            if (!has_full_payment($booking_id, $booking, $CI)) {
+                return array(
+                    'status' => 'PP',
+                    'description' => 'BC Approved - Partial payment received, status advanced to PARTIAL PAYMENT'
+                );
+            }
+
+            // Full payment received, check checklist
             if (!are_all_checklists_completed($booking_id, $CI)) {
                 return array(
                     'status' => 'PBO',
-                    'description' => 'BC Approved - Payment received, status advanced to PENDING BOOKING OPERATION'
+                    'description' => 'BC Approved - Full payment received, status advanced to PENDING BOOKING OPERATION'
                 );
             }
 
