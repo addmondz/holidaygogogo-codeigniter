@@ -15,8 +15,10 @@ class Recalculate {
 
     public function recalculate_all_bookings() {
 
-        // 1. Get all the bookings
-        $bookings = $this->CI->Booking_Model->Read_All_Bookings();
+        set_time_limit(30);
+
+        // 1. Get only bookings with statuses that can transition
+        $bookings = $this->CI->Booking_Model->Read_Actionable_Bookings();
 
         // 2. Run the logic
         foreach($bookings as $booking) {
@@ -63,7 +65,7 @@ class Recalculate {
                             $this->CI->load->helper('booking_flow');
                             $updated_booking = $this->CI->Booking_Model->getBookingById($booking->BookingID);
                             if($updated_booking) {
-                                check_and_advance_status_if_no_checklist_or_all_completed($booking->BookingID, $updated_booking, null, $this->CI);
+                                check_and_advance_status_if_no_checklist_or_all_completed($booking->BookingID, $updated_booking, 0, $this->CI);
                             }
                         }
                     } else {

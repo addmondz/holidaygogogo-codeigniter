@@ -23,8 +23,8 @@ class Cron extends CI_Controller
 	function index()
 	{
 
-		// 1. Get all the bookings
-		$bookings = $this->Booking_Model->Read_All_Bookings();
+		// 1. Get only bookings with statuses that can transition
+		$bookings = $this->Booking_Model->Read_Actionable_Bookings();
 
 		// 2. Run the logic
 		foreach($bookings as $booking) {
