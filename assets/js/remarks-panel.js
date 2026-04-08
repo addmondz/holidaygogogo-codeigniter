@@ -256,6 +256,7 @@
                                     '<div class="remark-content-text text-muted mb-1" style="' + textStyleString + '">' + escapeHtml(preview) + '</div>' +
                                     '<div class="text-primary font-size-sm">' +
                                         '<i class="la la-file-text" style="font-size: 0.85rem;"></i> ' + escapeHtml(remark.BookingNumber) +
+                                        (remark.Customer ? ' — ' + escapeHtml(remark.Customer) : '') +
                                     '</div>' +
                                 '</div>' +
                                 '<span class="text-muted font-size-xs ml-2" style="white-space: nowrap;">' + escapeHtml(remark.time_ago) + '</span>' +

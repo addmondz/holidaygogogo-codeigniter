@@ -227,6 +227,7 @@ class Notification extends MY_Controller
 				'CommenterName' => $remark->CommenterName,
 				'BookingNumber' => $remark->BookingNumber,
 				'BookingID' => $remark->BookingID,
+				'Customer' => $remark->Customer,
 				'created_at' => date('d/m/Y H:i:s', $created_timestamp),
 				'time_ago' => $time_ago,
 				'is_read' => $remark->is_read == 1

@@ -971,7 +971,7 @@ class Customer_Portal extends CI_Controller
         }
 
         // Verify booking exists and get details
-        $this->db->select('BookingID, Customer, SalesAgent');
+        $this->db->select('BookingID, Customer, SalesAgent, BookingOP');
         $this->db->where('Token', $hashed_bc);
         $this->db->where('Status !=', 'N');
         $booking = $this->db->get('booking')->row_array();
@@ -996,14 +996,15 @@ class Customer_Portal extends CI_Controller
         $remark_id = $this->Remark_Model->Create($remark_data);
 
         if ($remark_id) {
-            // Create notification for Sales Agent
-            if (!empty($booking['SalesAgent'])) {
+            // Create notification for Sales Agent and BookingOP
+            if (!empty($booking['SalesAgent']) || !empty($booking['BookingOP'])) {
                 $this->Notification_Model->Create_Customer_Remark_Notification(
                     $booking['BookingID'],
                     $remark_id,
                     $booking['SalesAgent'],
                     $booking['Customer'],
-                    $content
+                    $content,
+                    $booking['BookingOP']
                 );
             }
 

@@ -94,7 +94,7 @@ class Remark_Model extends CI_Model
 	 */
 	function Get_All_Remarks($type, $limit = 10, $offset = 0, $user_id = null, $user_level = null)
 	{
-		$this->db->select('remark.RemarkID, remark.content, remark.created_at, admin.Name AS CommenterName, booking.BookingNumber, booking.BookingID, IF(rur.id IS NOT NULL, 1, 0) AS is_read');
+		$this->db->select('remark.RemarkID, remark.content, remark.created_at, admin.Name AS CommenterName, booking.BookingNumber, booking.BookingID, booking.Customer, IF(rur.id IS NOT NULL, 1, 0) AS is_read');
 		$this->db->join('admin', 'admin.AdminID = remark.commenter_id', 'left');
 		$this->db->join('booking', 'booking.BookingID = remark.owner_id AND remark.owner_type = "booking"', 'inner');
 		if ($user_id) {
@@ -109,7 +109,11 @@ class Remark_Model extends CI_Model
 
 		// Sales agents (level 20) only see remarks from their bookings
 		if ($user_level == 20 && $user_id) {
-			$this->db->where('booking.SalesAgentID', $user_id);
+			$this->db->where('booking.SalesAgent', $user_id);
+		}
+		// BookingOP (level 40) only see remarks from their bookings
+		elseif ($user_level == 40 && $user_id) {
+			$this->db->where('booking.BookingOP', $user_id);
 		}
 
 		$this->db->order_by('remark.created_at', 'DESC');
@@ -133,7 +137,10 @@ class Remark_Model extends CI_Model
 		}
 
 		if ($user_level == 20 && $user_id) {
-			$this->db->where('booking.SalesAgentID', $user_id);
+			$this->db->where('booking.SalesAgent', $user_id);
+		}
+		elseif ($user_level == 40 && $user_id) {
+			$this->db->where('booking.BookingOP', $user_id);
 		}
 
 		return $this->db->count_all_results('remark');
@@ -155,7 +162,10 @@ class Remark_Model extends CI_Model
 		$this->db->where('remark.commenter_id !=', intval($user_id));
 
 		if ($user_level == 20 && $user_id) {
-			$this->db->where('booking.SalesAgentID', $user_id);
+			$this->db->where('booking.SalesAgent', $user_id);
+		}
+		elseif ($user_level == 40 && $user_id) {
+			$this->db->where('booking.BookingOP', $user_id);
 		}
 
 		return $this->db->count_all_results('remark');
@@ -189,7 +199,10 @@ class Remark_Model extends CI_Model
 		$this->db->where('rur.id IS NULL', null, false);
 
 		if ($user_level == 20 && $user_id) {
-			$this->db->where('booking.SalesAgentID', $user_id);
+			$this->db->where('booking.SalesAgent', $user_id);
+		}
+		elseif ($user_level == 40 && $user_id) {
+			$this->db->where('booking.BookingOP', $user_id);
 		}
 
 		$unread_remarks = $this->db->get('remark')->result();
