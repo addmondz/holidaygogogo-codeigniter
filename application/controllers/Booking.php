@@ -758,6 +758,15 @@ class Booking extends MY_Controller
 				if(!empty($this->input->post('booking')) && count($this->input->post('booking')[0]) > 3) {
 					$this->Booking_Model->Update();
 					$this->Booking_Model->Create_Booking_Log();
+
+					// Notify TC (SalesAgent), TC 2 (SalesAgent2), and Owners on booking update
+					$this->load->model('Notification_Model');
+					$updater_name = $this->session->userdata('name') ?: 'Someone';
+					$this->Notification_Model->Create_Booking_Updated_Notification(
+						$this->input->post('booking_id'),
+						$this->session->userdata('admin_id'),
+						$updater_name
+					);
 				}
 
 				// Booking Product

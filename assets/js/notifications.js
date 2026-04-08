@@ -157,6 +157,7 @@
             const notificationId = notification.NotificationID || '';
             const bookingId = notification.BookingID || '';
             const bookingNumber = escapeHtml(notification.BookingNumber || '');
+            const customerName = escapeHtml(notification.Customer || '');
             const isReadAttr = (isUnread ? 'false' : 'true');
 
             // Toggle button: text link for read/unread
@@ -187,6 +188,7 @@
                                     (notification.BookingNumber ?
                                         '<div class="text-primary font-size-sm mb-1">' +
                                             '<i class="la la-file-text"></i> ' + escapeHtml(notification.BookingNumber) +
+                                            (customerName ? ' — ' + customerName : '') +
                                         '</div>' : '') +
                                 '</div>' +
                                 '<div class="d-flex align-items-center ml-2" style="white-space: nowrap;">' +

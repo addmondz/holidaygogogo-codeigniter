@@ -88,6 +88,7 @@ class Notification extends MY_Controller
 				'time_ago' => $time_ago,
 				'BookingNumber' => $notification->BookingNumber,
 				'BookingID' => $notification->BookingID,
+				'Customer' => $notification->Customer,
 				'CommenterName' => $notification->CommenterName
 			);
 		}

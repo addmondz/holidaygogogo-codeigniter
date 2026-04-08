@@ -38,11 +38,12 @@ class Remark_Model extends CI_Model
 			'owner_id' => $data['owner_id'],
 			'commenter_id' => $data['commenter_id'],
 			'content' => $data['content'],
-			'type' => $remark_type
+			'type' => $remark_type,
+			'created_at' => date('Y-m-d H:i:s')
 		);
 		$this->db->insert('remark', $remark_data);
 		$remark_id = $this->db->insert_id();
-		
+
 		// Create notifications for relevant users (only for internal remarks, not customer remarks)
 		// Customer remarks have their own notification logic handled separately
 		// Skip notifications if flag is set
@@ -102,6 +103,9 @@ class Remark_Model extends CI_Model
 			$this->db->join('remark_user_read rur', 'rur.remark_id = remark.RemarkID AND 1=0', 'left');
 		}
 		$this->db->where('remark.type', $type);
+		if ($user_id) {
+			$this->db->where('remark.commenter_id !=', intval($user_id));
+		}
 
 		// Sales agents (level 20) only see remarks from their bookings
 		if ($user_level == 20 && $user_id) {
@@ -124,6 +128,9 @@ class Remark_Model extends CI_Model
 	{
 		$this->db->join('booking', 'booking.BookingID = remark.owner_id AND remark.owner_type = "booking"', 'inner');
 		$this->db->where('remark.type', $type);
+		if ($user_id) {
+			$this->db->where('remark.commenter_id !=', intval($user_id));
+		}
 
 		if ($user_level == 20 && $user_id) {
 			$this->db->where('booking.SalesAgentID', $user_id);
@@ -145,6 +152,7 @@ class Remark_Model extends CI_Model
 		$this->db->join('remark_user_read rur', 'rur.remark_id = remark.RemarkID AND rur.user_id = ' . intval($user_id), 'left');
 		$this->db->where('remark.type', $type);
 		$this->db->where('rur.id IS NULL', null, false);
+		$this->db->where('remark.commenter_id !=', intval($user_id));
 
 		if ($user_level == 20 && $user_id) {
 			$this->db->where('booking.SalesAgentID', $user_id);
