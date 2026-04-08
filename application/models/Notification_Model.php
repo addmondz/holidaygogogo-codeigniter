@@ -151,7 +151,7 @@ class Notification_Model extends CI_Model
 	function Create_Remark_Notifications($booking_id, $remark_id, $commenter_id, $remark_content)
 	{
 		// Get booking details
-		$this->db->select('BookingID, BookingNumber, Customer, SalesAgent, SalesAgent2');
+		$this->db->select('BookingID, BookingNumber, Customer, SalesAgent');
 		$this->db->where('BookingID', $booking_id);
 		$booking = $this->db->get('booking')->row();
 		
@@ -231,34 +231,6 @@ class Notification_Model extends CI_Model
 					$this->Create($notification_data);
 					$notifications_created++;
 					$notified_user_ids[] = $booking->SalesAgent;
-				}
-			}
-		}
-
-		// Create notification for SalesAgent2 (TC 2) of this specific booking
-		if (!empty($booking->SalesAgent2) && $booking->SalesAgent2 != $commenter_id && !in_array($booking->SalesAgent2, $notified_user_ids)) {
-			$this->db->select('AdminID');
-			$this->db->where('AdminID', $booking->SalesAgent2);
-			$this->db->where('Status', 'Y');
-			$sales_agent_2 = $this->db->get('admin')->row();
-
-			if (!empty($sales_agent_2)) {
-				$this->db->where('user_id', $booking->SalesAgent2);
-				$this->db->where('remark_id', $remark_id);
-				$existing = $this->db->get('notification')->row();
-
-				if (empty($existing)) {
-					$notification_data = array(
-						'user_id' => $booking->SalesAgent2,
-						'type' => 'remark',
-						'owner_type' => 'booking',
-						'owner_id' => $booking_id,
-						'remark_id' => $remark_id,
-						'message' => $message
-					);
-					$this->Create($notification_data);
-					$notifications_created++;
-					$notified_user_ids[] = $booking->SalesAgent2;
 				}
 			}
 		}
@@ -360,7 +332,7 @@ class Notification_Model extends CI_Model
 	function Create_Booking_Updated_Notification($booking_id, $updater_id, $updater_name)
 	{
 		// Get booking details
-		$this->db->select('BookingID, BookingNumber, SalesAgent, SalesAgent2');
+		$this->db->select('BookingID, BookingNumber, SalesAgent');
 		$this->db->where('BookingID', $booking_id);
 		$booking = $this->db->get('booking')->row();
 
@@ -413,28 +385,6 @@ class Notification_Model extends CI_Model
 				$this->Create($notification_data);
 				$notifications_created++;
 				$notified_user_ids[] = $booking->SalesAgent;
-			}
-		}
-
-		// Notify SalesAgent2 (TC 2)
-		if (!empty($booking->SalesAgent2) && $booking->SalesAgent2 != $updater_id && !in_array($booking->SalesAgent2, $notified_user_ids)) {
-			$this->db->select('AdminID');
-			$this->db->where('AdminID', $booking->SalesAgent2);
-			$this->db->where('Status', 'Y');
-			$sa2 = $this->db->get('admin')->row();
-
-			if (!empty($sa2)) {
-				$notification_data = array(
-					'user_id' => $booking->SalesAgent2,
-					'type' => 'booking_updated',
-					'owner_type' => 'booking',
-					'owner_id' => $booking_id,
-					'remark_id' => null,
-					'message' => $message
-				);
-				$this->Create($notification_data);
-				$notifications_created++;
-				$notified_user_ids[] = $booking->SalesAgent2;
 			}
 		}
 
