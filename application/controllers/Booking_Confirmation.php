@@ -29,7 +29,7 @@ class Booking_Confirmation extends CI_Controller
 		$this->load->model('Company_Model');
 
 		$this->load->model('Payment_Model');
-		$this->load->model('Guest_List_Room_Model');
+		$this->load->model('Guest_List_Model');
 	}
 
 
@@ -78,17 +78,17 @@ class Booking_Confirmation extends CI_Controller
 
                 }
 
-                // Compute PaxNumber from room management totals (same as GL)
-                $rooms = $this->Guest_List_Room_Model->Read_Rooms_By_Booking_ID($array['BookingID']);
-                $room_adult = 0; $room_child = 0; $room_infant = 0;
-                foreach ($rooms as $r) {
-                    $room_adult += (int)$r->adult_count;
-                    $room_child += (int)$r->child_count;
-                    $room_infant += (int)$r->infant_count;
+                // Compute PaxNumber by counting guest_list records (Type = ADULT/CHILD/INFANT)
+                $guests = $this->Guest_List_Model->Read_Guests_By_Booking_ID($array['BookingID']);
+                $gl_adult = 0; $gl_child = 0; $gl_infant = 0;
+                foreach ($guests as $g) {
+                    if ($g->Type == 'ADULT') { $gl_adult++; }
+                    elseif ($g->Type == 'CHILD') { $gl_child++; }
+                    elseif ($g->Type == 'INFANT') { $gl_infant++; }
                 }
-                $adult_str = $room_adult > 0 ? ($room_adult == 1 ? $room_adult . ' ADULT ' : $room_adult . ' ADULTS ') : '';
-                $child_str = $room_child > 0 ? ($room_child == 1 ? $room_child . ' CHILD ' : $room_child . ' CHILDREN ') : '';
-                $infant_str = $room_infant > 0 ? ($room_infant == 1 ? $room_infant . ' INFANT ' : $room_infant . ' INFANTS ') : '';
+                $adult_str = $gl_adult > 0 ? ($gl_adult == 1 ? $gl_adult . ' ADULT ' : $gl_adult . ' ADULTS ') : '';
+                $child_str = $gl_child > 0 ? ($gl_child == 1 ? $gl_child . ' CHILD ' : $gl_child . ' CHILDREN ') : '';
+                $infant_str = $gl_infant > 0 ? ($gl_infant == 1 ? $gl_infant . ' INFANT ' : $gl_infant . ' INFANTS ') : '';
                 $pax_parts = array_filter(array($adult_str, $child_str, $infant_str));
                 $array['PaxNumber'] = !empty($pax_parts) ? implode('& ', $pax_parts) : '0 Pax';
 

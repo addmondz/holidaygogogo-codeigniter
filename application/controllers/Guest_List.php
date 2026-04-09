@@ -214,29 +214,19 @@ class Guest_List extends CI_Controller
 								$array['guest_lists'][0]->TravelDate = '-';
 							}
 
-							// Compute PaxNumber from room management totals (if rooms exist), else fall back to booking fields
-							$rooms = $this->Guest_List_Room_Model->Read_Rooms_By_Booking_ID($array['guest_lists'][0]->BookingID);
-							if (!empty($rooms)) {
-								$room_adult = 0; $room_child = 0; $room_infant = 0;
-								foreach ($rooms as $r) {
-									$room_adult += (int)$r->adult_count;
-									$room_child += (int)$r->child_count;
-									$room_infant += (int)$r->infant_count;
-								}
-								$adult_str = $room_adult > 0 ? ($room_adult == 1 ? $room_adult . ' ADULT ' : $room_adult . ' ADULTS ') : '';
-								$child_str = $room_child > 0 ? ($room_child == 1 ? $room_child . ' CHILD ' : $room_child . ' CHILDREN ') : '';
-								$infant_str = $room_infant > 0 ? ($room_infant == 1 ? $room_infant . ' INFANT ' : $room_infant . ' INFANTS ') : '';
-								$pax_parts = array_filter(array($adult_str, $child_str, $infant_str));
-								$array['guest_lists'][0]->PaxNumber = !empty($pax_parts) ? implode('& ', $pax_parts) : '0 Pax';
-							} else {
-								// Fall back to booking-level Adult/Children/Infant fields
-								$gl = $array['guest_lists'][0];
-								$adult_str = !empty($gl->Adult) ? ($gl->Adult == 1 ? $gl->Adult . ' ADULT ' : $gl->Adult . ' ADULTS ') : '';
-								$child_str = !empty($gl->Children) ? ($gl->Children == 1 ? $gl->Children . ' CHILD ' : $gl->Children . ' CHILDREN ') : '';
-								$infant_str = !empty($gl->Infant) ? ($gl->Infant == 1 ? $gl->Infant . ' INFANT ' : $gl->Infant . ' INFANTS ') : '';
-								$pax_parts = array_filter(array($adult_str, $child_str, $infant_str));
-								$array['guest_lists'][0]->PaxNumber = !empty($pax_parts) ? implode('& ', $pax_parts) : '';
+							// Compute PaxNumber by counting guest_list records (Type = ADULT/CHILD/INFANT)
+							$guests_for_pax = $this->Guest_List_Model->Read_Guests_By_Booking_ID($array['guest_lists'][0]->BookingID);
+							$gl_adult = 0; $gl_child = 0; $gl_infant = 0;
+							foreach ($guests_for_pax as $g) {
+								if ($g->Type == 'ADULT') { $gl_adult++; }
+								elseif ($g->Type == 'CHILD') { $gl_child++; }
+								elseif ($g->Type == 'INFANT') { $gl_infant++; }
 							}
+							$adult_str = $gl_adult > 0 ? ($gl_adult == 1 ? $gl_adult . ' ADULT ' : $gl_adult . ' ADULTS ') : '';
+							$child_str = $gl_child > 0 ? ($gl_child == 1 ? $gl_child . ' CHILD ' : $gl_child . ' CHILDREN ') : '';
+							$infant_str = $gl_infant > 0 ? ($gl_infant == 1 ? $gl_infant . ' INFANT ' : $gl_infant . ' INFANTS ') : '';
+							$pax_parts = array_filter(array($adult_str, $child_str, $infant_str));
+							$array['guest_lists'][0]->PaxNumber = !empty($pax_parts) ? implode('& ', $pax_parts) : '0 Pax';
 
 							// Determine destination country from products (use first product's category country)
 							$destination_country = null;
