@@ -1260,8 +1260,8 @@ function escapeHtml(text) {
                         <textarea id="modal-new-comment-content" class="form-control" rows="2" placeholder="Enter your comment here..." style="font-size: 0.8125rem;"></textarea>
                     </div>
                     <div class="form-group mb-2">
-                        <label class="font-weight-bold" style="font-size: 0.8125rem;">Notify Users</label>
-                        <select id="modal-comment-notify-users" multiple="multiple" data-live-search="true" data-actions-box="true" class="form-control selectpicker" title="--Select users to notify--">
+                        <label class="font-weight-bold" style="font-size: 0.8125rem;">Also Notify</label>
+                        <select id="modal-comment-notify-users" multiple="multiple" data-live-search="true" data-actions-box="true" class="form-control selectpicker" title="--Select additional users to notify--">
                             <?php foreach($admins as $admin) { ?>
                                 <?php if($admin->Status == 'Y') { ?>
                                     <option data-admin-level="<?php echo $admin->Level; ?>" data-icon="la la-user-alt font-size-lg bs-icon" value="<?php echo $admin->AdminID; ?>"><?php echo $admin->Name; ?></option>
@@ -1380,16 +1380,8 @@ function openRemarksModal(bookingId, bookingNumber, salesAgentId, bookingOpId) {
     $('#modal-new-comment-content').val('');
     $('#modal-new-customer-remark-content').val('');
 
-    // Pre-select default notify users: Level 10 (owners) + SalesAgent + BookingOP
-    var defaultIds = [];
-    $('#modal-comment-notify-users option').each(function() {
-        var val = $(this).val();
-        var level = $(this).data('admin-level');
-        if (level == 10 || val == salesAgentId || val == bookingOpId) {
-            defaultIds.push(val);
-        }
-    });
-    $('#modal-comment-notify-users').selectpicker('val', defaultIds);
+    // Clear notify users selection (these are for additional recipients only)
+    $('#modal-comment-notify-users').selectpicker('deselectAll');
 
     $('#remarksModal').modal('show');
 
@@ -1429,16 +1421,7 @@ $('#modal-add-comment-btn').on('click', function() {
             $btn.prop('disabled', false).html(originalText);
             if (response.success) {
                 $('#modal-new-comment-content').val('');
-                // Reset notify users to defaults
-                var defaultIds = [];
-                $('#modal-comment-notify-users option').each(function() {
-                    var val = $(this).val();
-                    var level = $(this).data('admin-level');
-                    if (level == 10 || val == remarksModalSalesAgentId || val == remarksModalBookingOpId) {
-                        defaultIds.push(val);
-                    }
-                });
-                $('#modal-comment-notify-users').selectpicker('val', defaultIds);
+                $('#modal-comment-notify-users').selectpicker('deselectAll');
                 loadModalInternalComments();
                 Swal.fire({
                     width: 550,

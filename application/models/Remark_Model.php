@@ -50,26 +50,23 @@ class Remark_Model extends CI_Model
 		if ($remark_id && $data['owner_type'] == 'booking' && $remark_type == REMARK_TYPE::INTERNAL && !$skip_notifications) {
 			$this->load->model('Notification_Model');
 
-			$notify_user_ids = isset($data['notify_user_ids']) ? $data['notify_user_ids'] : null;
+			// Always send automatic notifications to Owners, SalesAgent, BookingOP
+			$this->Notification_Model->Create_Remark_Notifications(
+				$data['owner_id'],
+				$remark_id,
+				$data['commenter_id'],
+				$data['content']
+			);
 
+			// Also notify any additional users selected via checkbox
+			$notify_user_ids = isset($data['notify_user_ids']) ? $data['notify_user_ids'] : null;
 			if (!empty($notify_user_ids)) {
-				// Targeted notifications: only notify selected users
 				$this->Notification_Model->Create_Remark_Notifications_For_Users(
 					$data['owner_id'],
 					$remark_id,
 					$data['commenter_id'],
 					$data['content'],
 					$notify_user_ids
-				);
-			}
-			// If notify_user_ids is null (not provided), fall back to automatic notifications
-			// If notify_user_ids is empty array, no notifications are sent
-			if ($notify_user_ids === null) {
-				$this->Notification_Model->Create_Remark_Notifications(
-					$data['owner_id'],
-					$remark_id,
-					$data['commenter_id'],
-					$data['content']
 				);
 			}
 		}

@@ -40,7 +40,8 @@ class Guest_List_Model extends CI_Model
 	function Read_Booking_ID() {
 		$this->db->select('BookingID');
 		$this->db->where('Token', $this->input->get('gl'));
-		return $this->db->get('booking')->row()->BookingID;
+		$row = $this->db->get('booking')->row();
+		return $row ? $row->BookingID : null;
 	}
 
 	function Read_GL_Session_Expiration() {

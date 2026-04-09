@@ -2018,6 +2018,11 @@ class Booking_Model extends CI_Model
 		$this->load->model('Guest_List_Model');
 		$rooms = $this->Guest_List_Room_Model->Read_Rooms_By_Booking_ID($booking_id);
 
+		// Skip sync if booking has no rooms set up yet — avoid wiping existing GL entries
+		if (empty($rooms)) {
+			return;
+		}
+
 		$target = array('ADULT' => 0, 'CHILD' => 0, 'INFANT' => 0);
 		foreach ($rooms as $room) {
 			$target['ADULT'] += (int)$room->adult_count;
