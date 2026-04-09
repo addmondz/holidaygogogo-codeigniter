@@ -214,17 +214,28 @@ class Guest_List extends CI_Controller
 								$array['guest_lists'][0]->TravelDate = '-';
 							}
 
-							// Compute PaxNumber by counting guest_list records (Type = ADULT/CHILD/INFANT)
-							$guests_for_pax = $this->Guest_List_Model->Read_Guests_By_Booking_ID($array['guest_lists'][0]->BookingID);
-							$gl_adult = 0; $gl_child = 0; $gl_infant = 0;
-							foreach ($guests_for_pax as $g) {
-								if ($g->Type == 'ADULT') { $gl_adult++; }
-								elseif ($g->Type == 'CHILD') { $gl_child++; }
-								elseif ($g->Type == 'INFANT') { $gl_infant++; }
+							// Compute PaxNumber from room management totals; fall back to counting
+							// guest_list records (Type = ADULT/CHILD/INFANT) when no rooms exist.
+							$rooms_for_pax = $this->Guest_List_Room_Model->Read_Rooms_By_Booking_ID($array['guest_lists'][0]->BookingID);
+							if (!empty($rooms_for_pax)) {
+								$pax_adult = 0; $pax_child = 0; $pax_infant = 0;
+								foreach ($rooms_for_pax as $r) {
+									$pax_adult += (int)$r->adult_count;
+									$pax_child += (int)$r->child_count;
+									$pax_infant += (int)$r->infant_count;
+								}
+							} else {
+								$pax_adult = 0; $pax_child = 0; $pax_infant = 0;
+								$guests_for_pax = $this->Guest_List_Model->Read_Guests_By_Booking_ID($array['guest_lists'][0]->BookingID);
+								foreach ($guests_for_pax as $g) {
+									if ($g->Type == 'ADULT') { $pax_adult++; }
+									elseif ($g->Type == 'CHILD') { $pax_child++; }
+									elseif ($g->Type == 'INFANT') { $pax_infant++; }
+								}
 							}
-							$adult_str = $gl_adult > 0 ? ($gl_adult == 1 ? $gl_adult . ' ADULT ' : $gl_adult . ' ADULTS ') : '';
-							$child_str = $gl_child > 0 ? ($gl_child == 1 ? $gl_child . ' CHILD ' : $gl_child . ' CHILDREN ') : '';
-							$infant_str = $gl_infant > 0 ? ($gl_infant == 1 ? $gl_infant . ' INFANT ' : $gl_infant . ' INFANTS ') : '';
+							$adult_str = $pax_adult > 0 ? ($pax_adult == 1 ? $pax_adult . ' ADULT ' : $pax_adult . ' ADULTS ') : '';
+							$child_str = $pax_child > 0 ? ($pax_child == 1 ? $pax_child . ' CHILD ' : $pax_child . ' CHILDREN ') : '';
+							$infant_str = $pax_infant > 0 ? ($pax_infant == 1 ? $pax_infant . ' INFANT ' : $pax_infant . ' INFANTS ') : '';
 							$pax_parts = array_filter(array($adult_str, $child_str, $infant_str));
 							$array['guest_lists'][0]->PaxNumber = !empty($pax_parts) ? implode('& ', $pax_parts) : '0 Pax';
 
