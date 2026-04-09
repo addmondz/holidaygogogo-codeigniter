@@ -720,26 +720,6 @@ class Booking_Model extends CI_Model
 		$this->db->where('CustomerID', null);
 		$this->db->update('booking');
 
-		$this->db->select('Adult, Children, Infant');
-		$this->db->where('BookingID', $booking_id);
-		$booking = $this->db->get('booking')->row_array();
-		$this->load->model('Guest_List_Model');
-		if(!empty($booking['Adult'])) {
-			for($i = 1; $i <= $booking['Adult']; $i++) {
-				$this->Guest_List_Model->Create($booking_id, 'ADULT');
-			}
-		}
-		if(!empty($booking['Children'])) {
-			for($i = 1; $i <= $booking['Children']; $i++) {
-				$this->Guest_List_Model->Create($booking_id, 'CHILD');
-			}
-		}
-		if(!empty($booking['Infant'])) {
-			for($i = 1; $i <= $booking['Infant']; $i++) {
-				$this->Guest_List_Model->Create($booking_id, 'INFANT');
-			}
-		}
-
 		$this->db->select('BookingNumber, ReservationNumber, DepositDeadline, FullPaymentDeadline, Customer, booking.Mobile As CustomerMobile, StartDate, EndDate, Adult, Children, Infant, BookingRemark, NetTotal, ChatLanguage, Source, admin.CountryCodeID, admin.Name As SalesAgent, admin.Mobile As SalesAgentMobile, category.Name As Destination, CountryCode, source.Name As SourceName');
 		$this->db->join('admin', 'admin.AdminID = booking.SalesAgent', 'left');
 		$this->db->join('category', 'category.CategoryID = booking.Destination', 'left');
@@ -1189,19 +1169,6 @@ class Booking_Model extends CI_Model
 		$this->db->update('booking');
 	}
 
-	function Update_Pax_Number($booking_id)
-	{
-		$array = array(
-			'Adult' => empty($this->input->post('adult')) ? null : $this->input->post('adult'),
-			'Children' => empty($this->input->post('child')) ? null : $this->input->post('child'),
-			'Infant' => empty($this->input->post('infant')) ? null : $this->input->post('infant'),
-			'UpdateBy' => $this->session->userdata('admin_id'),
-			'UpdateDate' => date('Y-m-d H:i:s')
-		);
-		$this->db->where('BookingID', $booking_id);
-		$this->db->update('booking', $array);
-	}
-	
 	function Update_Cancel_Status()
 	{
 		$array = array(
@@ -1751,64 +1718,76 @@ class Booking_Model extends CI_Model
 				$level2Ignore = 1;
 			}
 			if(!empty($this->input->get('status'))) {
-				if($this->input->get('status') == 'A') {
-					$this->db->where('CancelStatus', 'N');
-					$this->db->where('booking.Status !=', 'N');
+				$statuses = explode(',', $this->input->get('status'));
+				$this->db->group_start();
+				foreach($statuses as $i => $status) {
+					$status = trim($status);
+					if($i == 0) {
+						$this->db->group_start();
+					} else {
+						$this->db->or_group_start();
+					}
+					if($status == 'A') {
+						$this->db->where('CancelStatus', 'N');
+						$this->db->where('booking.Status !=', 'N');
+					}
+					if($status == 'C') {
+						$this->db->where('CancelStatus', 'Y');
+						$this->db->where('booking.Status !=', 'N');
+					}
+					if($status == 'Y') {
+						$this->db->where('CancelStatus', 'N');
+						$this->db->where('AfterSalesService', 'COMPLETE');
+						$this->db->where('booking.Status', 'Y');
+					}
+					if($status == 'OG') {
+						$this->db->where('CancelStatus', 'N');
+						$this->db->where('booking.Status', 'OG');
+					}
+					if($status == 'PP') {
+						$this->db->where('CancelStatus', 'N');
+						$this->db->where('FullPaymentDeadline >=', date('Y-m-d'));
+						$this->db->where('booking.Status', 'PP');
+					}
+					if($status == 'PO') {
+						$this->db->where('CancelStatus', 'N');
+						$this->db->where("((`FullPaymentDeadline` < '".date('Y-m-d')."' AND `booking`.`Status` IN ('P','PP')) OR ((`DepositDeadline` < '".date('Y-m-d')."' AND `booking`.`Status` = 'P') OR (`FullPaymentDeadline` < '".date('Y-m-d')."' AND `booking`.`Status` IN ('P','PP'))))");
+					}
+					if($status == 'PGL') {
+						$this->db->where('CancelStatus', 'N');
+						$this->db->where('LockStatus', 'N');
+						$this->db->where('booking.Status', 'PTV');
+					}
+					if($status == 'PBC') {
+						$this->db->where('CancelStatus', 'N');
+						$this->db->where('booking.Status', 'PBC');
+					}
+					if($status == 'P') {
+						$this->db->where('CancelStatus', 'N');
+						$this->db->where("(`DepositDeadline` >= '".date('Y-m-d')."' OR (`DepositDeadline` IS NULL AND `FullPaymentDeadline` >= '".date('Y-m-d')."'))");
+						$this->db->where('booking.Status', 'P');
+					}
+					if($status == 'PR') {
+						$this->db->where('CancelStatus', 'N');
+						$this->db->where('AfterSalesService', 'PENDING');
+						$this->db->where('booking.Status', 'Y');
+					}
+					if($status == 'PT') {
+						$this->db->where('CancelStatus', 'N');
+						$this->db->where('booking.Status', 'PT');
+					}
+					if($status == 'PTV') {
+						$this->db->where('CancelStatus', 'N');
+						$this->db->where('LockStatus', 'Y');
+						$this->db->where('booking.Status', 'PTV');
+					}
+					if($status == 'PBO') {
+						$this->db->where('CancelStatus', 'N');
+						$this->db->where('booking.Status', 'PBO');
+					}
+					$this->db->group_end();
 				}
-				if($this->input->get('status') == 'C') {
-					$this->db->where('CancelStatus', 'Y');
-					$this->db->where('booking.Status !=', 'N');
-				}
-				if($this->input->get('status') == 'Y') {
-					$this->db->where('CancelStatus', 'N');
-					$this->db->where('AfterSalesService', 'COMPLETE');
-					$this->db->where('booking.Status', 'Y');
-				}
-				if($this->input->get('status') == 'OG') {
-					$this->db->where('CancelStatus', 'N');
-					$this->db->where('booking.Status', 'OG');
-				}
-				if($this->input->get('status') == 'PP') {
-					$this->db->where('CancelStatus', 'N');
-					$this->db->where('FullPaymentDeadline >=', date('Y-m-d'));
-					$this->db->where('booking.Status', 'PP');
-				}
-				if($this->input->get('status') == 'PO') {
-					$this->db->where('CancelStatus', 'N');
-					$this->db->where("((`FullPaymentDeadline` < '".date('Y-m-d')."' AND `booking`.`Status` IN ('P','PP')) OR ((`DepositDeadline` < '".date('Y-m-d')."' AND `booking`.`Status` = 'P') OR (`FullPaymentDeadline` < '".date('Y-m-d')."' AND `booking`.`Status` IN ('P','PP'))))");
-				}
-				if($this->input->get('status') == 'PGL') {
-					$this->db->where('CancelStatus', 'N');
-					$this->db->where('LockStatus', 'N');
-					$this->db->where('booking.Status', 'PTV');
-				}
-				if($this->input->get('status') == 'PBC') {
-					$this->db->where('CancelStatus', 'N');
-					$this->db->where('booking.Status', 'PBC');
-				}
-				if($this->input->get('status') == 'P') {
-					$this->db->where('CancelStatus', 'N');
-					$this->db->where("(`DepositDeadline` >= '".date('Y-m-d')."' OR (`DepositDeadline` IS NULL AND `FullPaymentDeadline` >= '".date('Y-m-d')."'))");
-					$this->db->where('booking.Status', 'P');
-				}
-				if($this->input->get('status') == 'PR') {
-					$this->db->where('CancelStatus', 'N');
-					$this->db->where('AfterSalesService', 'PENDING');
-					$this->db->where('booking.Status', 'Y');
-				}
-				if($this->input->get('status') == 'PT') {
-					$this->db->where('CancelStatus', 'N');
-					$this->db->where('booking.Status', 'PT');
-				}
-				if($this->input->get('status') == 'PTV') {
-					$this->db->where('CancelStatus', 'N');
-					$this->db->where('LockStatus', 'Y');
-					$this->db->where('booking.Status', 'PTV');
-				}
-				if($this->input->get('status') == 'PBO') {
-					$this->db->where('CancelStatus', 'N');
-					$this->db->where('booking.Status', 'PBO');
-				}
+				$this->db->group_end();
 
 				$level2Ignore = 1;
 			} else {
@@ -2000,6 +1979,88 @@ class Booking_Model extends CI_Model
 		$this->db->where('booking_log.BookingID', $booking_id);
 		$this->db->order_by('booking_log.InsertDate', 'DESC');
 		return $this->db->get()->result_array();
+	}
+
+	function Create_GL_From_Rooms($booking_id)
+	{
+		$this->load->model('Guest_List_Room_Model');
+		$this->load->model('Guest_List_Model');
+		$rooms = $this->Guest_List_Room_Model->Read_Rooms_By_Booking_ID($booking_id);
+
+		$adult_total = 0;
+		$child_total = 0;
+		$infant_total = 0;
+
+		if (!empty($rooms)) {
+			foreach ($rooms as $room) {
+				$adult_total += (int)$room->adult_count;
+				$child_total += (int)$room->child_count;
+				$infant_total += (int)$room->infant_count;
+			}
+		}
+
+		for ($i = 0; $i < $adult_total; $i++) {
+			$this->Guest_List_Model->Create($booking_id, 'ADULT');
+		}
+		for ($i = 0; $i < $child_total; $i++) {
+			$this->Guest_List_Model->Create($booking_id, 'CHILD');
+		}
+		for ($i = 0; $i < $infant_total; $i++) {
+			$this->Guest_List_Model->Create($booking_id, 'INFANT');
+		}
+
+		$this->Guest_List_Model->Auto_Assign_Rooms($booking_id);
+	}
+
+	function Sync_GL_From_Rooms($booking_id)
+	{
+		$this->load->model('Guest_List_Room_Model');
+		$this->load->model('Guest_List_Model');
+		$rooms = $this->Guest_List_Room_Model->Read_Rooms_By_Booking_ID($booking_id);
+
+		$target = array('ADULT' => 0, 'CHILD' => 0, 'INFANT' => 0);
+		foreach ($rooms as $room) {
+			$target['ADULT'] += (int)$room->adult_count;
+			$target['CHILD'] += (int)$room->child_count;
+			$target['INFANT'] += (int)$room->infant_count;
+		}
+
+		foreach ($target as $type => $needed) {
+			// Count current active GL entries of this type
+			$this->db->where('BookingID', $booking_id);
+			$this->db->where('Type', $type);
+			$this->db->where('Status', 'Y');
+			$this->db->order_by('GuestListID', 'ASC');
+			$existing = $this->db->get('guest_list')->result();
+			$current_count = count($existing);
+
+			if ($current_count < $needed) {
+				// Create missing GL entries
+				for ($i = 0; $i < ($needed - $current_count); $i++) {
+					$this->Guest_List_Model->Create($booking_id, $type);
+				}
+			} elseif ($current_count > $needed) {
+				// Soft-delete excess GL entries (from the end, preferring blank ones)
+				$to_remove = $current_count - $needed;
+				// Sort: prefer removing blank entries (no Name) first
+				$blank = array();
+				$filled = array();
+				foreach ($existing as $gl) {
+					if (empty($gl->Name)) {
+						$blank[] = $gl;
+					} else {
+						$filled[] = $gl;
+					}
+				}
+				// Remove from blank first (reversed so we remove latest), then filled
+				$removable = array_merge(array_reverse($blank), array_reverse($filled));
+				for ($i = 0; $i < $to_remove && $i < count($removable); $i++) {
+					$this->Guest_List_Model->Delete($removable[$i]->GuestListID);
+				}
+			}
+		}
+
+		$this->Guest_List_Model->Auto_Assign_Rooms($booking_id);
 	}
 
 }

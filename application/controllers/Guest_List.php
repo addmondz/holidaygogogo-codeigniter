@@ -70,11 +70,9 @@ class Guest_List extends CI_Controller
 			
 			if($this->Guest_List_Model->Update() || !empty($this->input->post('new_guests')) || !empty($this->input->post('deleted_guests'))) {
 				if(!empty($this->input->post('new_guests'))) {
-					$this->Booking_Model->Update_Pax_Number($booking_id);
 					$this->Guest_List_Model->Create_Guest($booking_id);
 				}
 				if(!empty($this->input->post('deleted_guests'))) {
-					$this->Booking_Model->Update_Pax_Number($booking_id);
 					$deleted_guests = explode(',', $this->input->post('deleted_guests'));
 					for($i = 0; $i < count($deleted_guests); $i++) {
 						$this->Guest_List_Model->Delete($deleted_guests[$i]);
@@ -155,10 +153,10 @@ class Guest_List extends CI_Controller
 					return;
 				}
 				
-				// Auto-assign rooms before reading guest lists
+				// Sync GL entries from room data and auto-assign
 				$auto_assign_booking_id = $this->Guest_List_Model->Read_Booking_ID();
 				if(!empty($auto_assign_booking_id)) {
-					$this->Guest_List_Model->Auto_Assign_Rooms($auto_assign_booking_id);
+					$this->Booking_Model->Sync_GL_From_Rooms($auto_assign_booking_id);
 				}
 
 	    		$array['guest_lists'] = $this->Guest_List_Model->Read_Guest_Lists1();
@@ -215,40 +213,20 @@ class Guest_List extends CI_Controller
 							} else {
 								$array['guest_lists'][0]->TravelDate = '-';
 							}
-							if(!empty($array['guest_lists'][0]->Adult)) {
-								$array['guest_lists'][0]->Adult = $array['guest_lists'][0]->Adult == 1 ? $array['guest_lists'][0]->Adult . ' ADULT ' : $array['guest_lists'][0]->Adult . ' ADULTS ';
+
+							// Compute PaxNumber from room management totals
+							$rooms = $this->Guest_List_Room_Model->Read_Rooms_By_Booking_ID($array['guest_lists'][0]->BookingID);
+							$room_adult = 0; $room_child = 0; $room_infant = 0;
+							foreach ($rooms as $r) {
+								$room_adult += (int)$r->adult_count;
+								$room_child += (int)$r->child_count;
+								$room_infant += (int)$r->infant_count;
 							}
-							if(!empty($array['guest_lists'][0]->Children)) {
-								$array['guest_lists'][0]->Children = $array['guest_lists'][0]->Children == 1 ? $array['guest_lists'][0]->Children . ' CHILD ' : $array['guest_lists'][0]->Children . ' CHILDREN ';
-							}
-							if(!empty($array['guest_lists'][0]->Infant)) {
-								$array['guest_lists'][0]->Infant = $array['guest_lists'][0]->Infant == 1 ? $array['guest_lists'][0]->Infant . ' INFANT ' : $array['guest_lists'][0]->Infant . ' INFANTS ';
-							}
-							if(!empty($array['guest_lists'][0]->Adult) && !empty($array['guest_lists'][0]->Children) && !empty($array['guest_lists'][0]->Infant)) {
-								$array['guest_lists'][0]->PaxNumber = $array['guest_lists'][0]->Adult . '& ' . $array['guest_lists'][0]->Children . '& ' . $array['guest_lists'][0]->Infant;
-							} else {
-								if(!empty($array['guest_lists'][0]->Adult) && empty($array['guest_lists'][0]->Children) && !empty($array['guest_lists'][0]->Infant)) {
-									$array['guest_lists'][0]->PaxNumber = $array['guest_lists'][0]->Adult . '& ' . $array['guest_lists'][0]->Infant;
-								} else {
-									if(!empty($array['guest_lists'][0]->Adult) && !empty($array['guest_lists'][0]->Children) && empty($array['guest_lists'][0]->Infant)) {
-										$array['guest_lists'][0]->PaxNumber = $array['guest_lists'][0]->Adult . '& ' . $array['guest_lists'][0]->Children;
-									} else {
-										if(!empty($array['guest_lists'][0]->Adult) && empty($array['guest_lists'][0]->Children) && empty($array['guest_lists'][0]->Infant)) {
-											$array['guest_lists'][0]->PaxNumber = $array['guest_lists'][0]->Adult;
-										} else {
-											if(empty($array['guest_lists'][0]->Adult) && !empty($array['guest_lists'][0]->Children) && !empty($array['guest_lists'][0]->Infant)) {
-												$array['guest_lists'][0]->PaxNumber = $array['guest_lists'][0]->Children . '& ' . $array['guest_lists'][0]->Infant;
-											} else {
-												if(empty($array['guest_lists'][0]->Adult) && empty($array['guest_lists'][0]->Children) && !empty($array['guest_lists'][0]->Infant)) {
-													$array['guest_lists'][0]->PaxNumber = $array['guest_lists'][0]->Infant;
-												} else {
-													$array['guest_lists'][0]->PaxNumber = $array['guest_lists'][0]->Children;
-												}
-											}
-										}
-									}
-								}
-							}
+							$adult_str = $room_adult > 0 ? ($room_adult == 1 ? $room_adult . ' ADULT ' : $room_adult . ' ADULTS ') : '';
+							$child_str = $room_child > 0 ? ($room_child == 1 ? $room_child . ' CHILD ' : $room_child . ' CHILDREN ') : '';
+							$infant_str = $room_infant > 0 ? ($room_infant == 1 ? $room_infant . ' INFANT ' : $room_infant . ' INFANTS ') : '';
+							$pax_parts = array_filter(array($adult_str, $child_str, $infant_str));
+							$array['guest_lists'][0]->PaxNumber = !empty($pax_parts) ? implode('& ', $pax_parts) : '0 Pax';
 
 							// Determine destination country from products (use first product's category country)
 							$destination_country = null;

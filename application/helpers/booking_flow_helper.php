@@ -859,54 +859,16 @@ if (!function_exists('determine_status_after_bc_approval')) {
      */
     function determine_status_after_bc_approval($booking_id, $booking, $CI)
     {
-        // Use simplified status determination function
-        $result = determine_booking_status_from_state($booking_id, $booking, $CI);
+        // Simulate BC being approved so determine_booking_status_from_state() skips the PBC check
+        $simulated_booking = clone $booking;
+        $simulated_booking->bc_approved = 1;
 
-        // If result is PBC, it means BC is not approved, but we're approving it now
-        // So skip to next check (payment)
-        if ($result['status'] == 'PBC') {
-            // BC is being approved, so check next step: payment
-            if (!has_booking_payment($booking_id, $CI)) {
-                return array(
-                    'status' => 'P',
-                    'description' => 'BC Approved - Status advanced to PENDING PAYMENT'
-                );
-            }
+        $result = determine_booking_status_from_state($booking_id, $simulated_booking, $CI);
 
-            // Has payment, check if full payment received
-            if (!has_full_payment($booking_id, $booking, $CI)) {
-                return array(
-                    'status' => 'PP',
-                    'description' => 'BC Approved - Partial payment received, status advanced to PARTIAL PAYMENT'
-                );
-            }
-
-            // Full payment received, check checklist
-            if (!are_all_checklists_completed($booking_id, $CI)) {
-                return array(
-                    'status' => 'PBO',
-                    'description' => 'BC Approved - Full payment received, status advanced to PENDING BOOKING OPERATION'
-                );
-            }
-
-            // All checklists completed, check travel voucher
-            if (!is_travel_voucher_sent($booking_id, $CI)) {
-                return array(
-                    'status' => 'PTV',
-                    'description' => 'BC Approved - All checklists completed, status advanced to PENDING TRAVEL VOUCHER'
-                );
-            }
-
-            // Travel voucher sent
-            return array(
-                'status' => 'PT',
-                'description' => 'BC Approved - Travel voucher sent, status advanced to PENDING TRAVEL'
-            );
-        }
-
-        // Update description for BC approval context (for other statuses)
+        // Update description for BC approval context
         $status_labels = array(
             'P' => 'PENDING PAYMENT',
+            'PP' => 'PARTIAL PAYMENT',
             'PBO' => 'PENDING BOOKING OPERATION',
             'PGL' => 'PENDING GUEST LIST',
             'PTV' => 'PENDING TRAVEL VOUCHER',
@@ -916,7 +878,6 @@ if (!function_exists('determine_status_after_bc_approval')) {
         );
         $status_label = isset($status_labels[$result['status']]) ? $status_labels[$result['status']] : $result['status'];
 
-        // Only update description if not already set for cancelled/completed
         if ($result['status'] != 'CANCELLED' && $result['status'] != 'Y') {
             $result['description'] = 'BC Approved - Status advanced to ' . $status_label;
         }

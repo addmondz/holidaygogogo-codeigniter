@@ -316,12 +316,13 @@
                                             <div class="form-group">
                                                 <label>Status</a>
                                                 </label>
-                                                <select name="status" class="form-control selectpicker">
-                                                    <option selected data-icon="la la-suitcase font-size-lg bs-icon" value="">--SELECT STATUS--</option>
+                                                <?php $selected_statuses = !empty($this->input->get('status')) ? explode(',', $this->input->get('status')) : []; ?>
+                                                <select id="status_select" class="form-control selectpicker" multiple data-actions-box="true" title="--SELECT STATUS--">
                                                     <?php foreach(unserialize(BOOKING_STATUS) as $key => $value) { ?>
-                                                        <option data-icon="<?php if($key == 'A') { echo 'la la-font'; } else if($key == 'Y') { echo 'la la-check-circle'; } else if($key == 'PR') { echo 'la la-user-edit'; } else if($key == 'P') { echo 'la la-exclamation-circle'; } else if($key == 'PP') { echo 'la la-dollar'; } else if($key == 'PTV') { echo 'la la-file-alt'; } else if($key == 'PGL') { echo 'la la-user-friends'; } else if($key == 'PT') { echo 'la la-suitcase'; } else if($key == 'OG') { echo 'la la-luggage-cart'; } else if($key == 'PO') { echo 'la la-exclamation-triangle'; } else { echo 'la la-times-circle'; } ?> font-size-lg bs-icon" value="<?php echo $key; ?>" <?php if(!empty($this->input->get('status')) && $this->input->get('status') == $key) { echo 'selected'; } ?>><?php echo $value; ?></option>
+                                                        <option data-icon="<?php if($key == 'A') { echo 'la la-font'; } else if($key == 'Y') { echo 'la la-check-circle'; } else if($key == 'PR') { echo 'la la-user-edit'; } else if($key == 'P') { echo 'la la-exclamation-circle'; } else if($key == 'PP') { echo 'la la-dollar'; } else if($key == 'PTV') { echo 'la la-file-alt'; } else if($key == 'PGL') { echo 'la la-user-friends'; } else if($key == 'PT') { echo 'la la-suitcase'; } else if($key == 'OG') { echo 'la la-luggage-cart'; } else if($key == 'PO') { echo 'la la-exclamation-triangle'; } else { echo 'la la-times-circle'; } ?> font-size-lg bs-icon" value="<?php echo $key; ?>" <?php if(in_array($key, $selected_statuses)) { echo 'selected'; } ?>><?php echo $value; ?></option>
                                                     <?php } ?>
                                                 </select>
+                                                <input type="hidden" name="status" id="status_hidden" value="<?php echo $this->input->get('status'); ?>">
                                             </div>
                                         </div>
                                         <div class="col-md-3">
@@ -589,6 +590,17 @@
         $('#booking_header').click();
     <?php } ?>
     
+    // Sync multi-select status to hidden input on change and form submit
+    $('#status_select').on('changed.bs.select', function() {
+        var selected = $(this).val();
+        $('#status_hidden').val(selected ? selected.join(',') : '');
+    });
+
+    $('#form').on('submit', function() {
+        var selected = $('#status_select').val();
+        $('#status_hidden').val(selected ? selected.join(',') : '');
+    });
+
     $('#reset').click(function() {
         Reset('<?php echo base_url('Booking'); ?>');
     });

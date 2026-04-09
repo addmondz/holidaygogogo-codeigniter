@@ -607,6 +607,9 @@ class Booking extends MY_Controller
 					}
 				}
 
+				// Create GL entries based on room data
+				$this->Booking_Model->Create_GL_From_Rooms($booking_id);
+
 				// Auto-enable insurance if any product belongs to an insurance category
 				$this->db->from('booking_product');
 				$this->db->join('product', 'product.ProductID = booking_product.ProductID', 'left');

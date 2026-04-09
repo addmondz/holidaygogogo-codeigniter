@@ -1108,7 +1108,6 @@
 		
 
 		function Delete_Guest(guest_list_id) {
-			Update_Pax_Number(guest_list_id, 'D');
 			if(guest_list_id > 0) {
 				deleted_guests.push(guest_list_id);
 				$('input[name="deleted_guests"]').val(deleted_guests);
@@ -1119,94 +1118,6 @@
 				$('input[name="new_guests"]').val(new_guests);
 			}
 			$(`#guest-${guest_list_id}`).remove();
-		}
-
-		function Update_Pax_Number(guest_list_id, action) {
-			if(action == null) {
-				var default_type = $(`#default_type-${guest_list_id}`).val();
-				switch(default_type) {
-					case 'ADULT':
-						adult--;
-						break;
-					case 'CHILD':
-						child--;
-						break;
-					case 'INFANT':
-						infant--;
-				}
-			}
-			var type = $(`#type-${guest_list_id}`).val();
-			var adult_pax = null;
-			var child_pax = null;
-			var infant_pax = null;
-			var pax_number = null;
-			switch(type) {
-				case 'ADULT':
-					if(action == 'C' || action == null) {
-						adult++;
-					} else {
-						adult--;
-					}
-					break;
-				case 'CHILD':
-					if(action == 'C' || action == null) {
-						child++;
-					} else {
-						child--;
-					}
-					break;
-				case 'INFANT':
-					if(action == 'C' || action == null) {
-						infant++;
-					} else {
-						infant--;
-					}
-			}
-			if(adult != 0) {
-				adult_pax = adult == 1 ? adult + ' ADULT ' : adult + ' ADULTS ';
-			}
-			if(child != 0) {
-				child_pax = child == 1 ? child + ' CHILD ' : child + ' CHILDREN ';
-			}
-			if(infant != 0) {
-				infant_pax = infant == 1 ? infant + ' INFANT ' : infant + ' INFANTS ';
-			}
-			if(adult != 0 && child != 0 && infant != 0) {
-				pax_number = adult_pax + '& ' + child_pax + '& ' + infant_pax;
-			} else {
-				if(adult != 0 && child == 0 && infant != 0) {
-					pax_number = adult_pax + '& ' + infant_pax;
-				} else {
-					if(adult != 0 && child != 0 && infant == 0) {
-						pax_number = adult_pax + '& ' + child_pax;
-					} else {
-						if(adult != 0 && child == 0 && infant == 0) {
-							pax_number = adult_pax;
-						} else {
-							if(adult == 0 && child != 0 && infant != 0) {
-								pax_number = child_pax + '& ' + infant_pax;
-							} else {
-								if(adult == 0 && child == 0 && infant != 0) {
-									pax_number = infant_pax;
-								} else {
-									if(adult == 0 && child != 0 && infant == 0) {
-										pax_number = child_pax;
-									} else {
-										pax_number = '0 Pax';
-									}
-								}
-							}
-						}
-					}
-				}
-			}
-			$('#pax_number').html('Pax Number : ' + pax_number);
-			if(action == null) {
-				$(`#default_type-${guest_list_id}`).val(type);
-			}
-			$('input[name="adult"]').val(adult);
-			$('input[name="child"]').val(child);
-			$('input[name="infant"]').val(infant);
 		}
 
 		$('input[type="submit"]').click(function() {

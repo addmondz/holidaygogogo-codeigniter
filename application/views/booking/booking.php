@@ -827,18 +827,19 @@
                                         </h3>
                                     </div>
                                     <div class="card-toolbar">
-                                        <button type="button" id="create_room_btn" class="btn btn-sm btn-light-success font-weight-bold">
-                                            <i class="la la-plus"></i> Add Room
-                                        </button>
+                                        <?php if(isset($LockStatus) && $LockStatus == 'Y') { ?>
+                                            <span class="badge badge-danger font-weight-bold"><i class="la la-lock"></i> GL Locked</span>
+                                        <?php } else { ?>
+                                            <button type="button" id="create_room_btn" class="btn btn-sm btn-light-success font-weight-bold">
+                                                <i class="la la-plus"></i> Add Room
+                                            </button>
+                                        <?php } ?>
                                     </div>
                                 </div>
                                 <div class="card-body">
                                     <div class="mb-3">
                                         <small class="text-muted">
-                                            Booking Pax — Adult: <strong id="booking_adult_count"><?php echo isset($Adult) ? $Adult : '0'; ?></strong>,
-                                            Children: <strong id="booking_child_count"><?php echo isset($Children) ? $Children : '0'; ?></strong>,
-                                            Infant: <strong id="booking_infant_count"><?php echo isset($Infant) ? $Infant : '0'; ?></strong>
-                                            | Allocated — Adult: <strong id="allocated_adult">0</strong>,
+                                            Total Room Pax — Adult: <strong id="allocated_adult">0</strong>,
                                             Children: <strong id="allocated_child">0</strong>,
                                             Infant: <strong id="allocated_infant">0</strong>
                                         </small>
@@ -4880,24 +4881,8 @@ $(document).ready(function() {
     // Room Management Functions
     var roomsList = [];
     var roomBookingId = <?php echo (isset($BookingID) && $BookingID !== 'NA') ? $BookingID : 'null'; ?>;
+    var glLocked = <?php echo (isset($LockStatus) && $LockStatus == 'Y') ? 'true' : 'false'; ?>;
     var tempRoomCounter = 0;
-
-    function getBookingPax() {
-        return {
-            adult: parseInt($('#Adult').val()) || 0,
-            child: parseInt($('#Children').val()) || 0,
-            infant: parseInt($('#Infant').val()) || 0
-        };
-    }
-
-    // Update pax display when form inputs change
-    $('#Adult, #Children, #Infant').on('change keyup', function() {
-        var pax = getBookingPax();
-        $('#booking_adult_count').text(pax.adult);
-        $('#booking_child_count').text(pax.child);
-        $('#booking_infant_count').text(pax.infant);
-        updateAllocatedDisplay();
-    });
 
     function getAllocatedPax(excludeRoomId) {
         var totals = { adult: 0, child: 0, infant: 0 };
@@ -4912,26 +4897,9 @@ $(document).ready(function() {
 
     function updateAllocatedDisplay() {
         var totals = getAllocatedPax();
-        var pax = getBookingPax();
-        $('#allocated_adult').text(totals.adult).css('color', totals.adult > pax.adult ? 'red' : '');
-        $('#allocated_child').text(totals.child).css('color', totals.child > pax.child ? 'red' : '');
-        $('#allocated_infant').text(totals.infant).css('color', totals.infant > pax.infant ? 'red' : '');
-    }
-
-    function validatePaxCounts(adultCount, childCount, infantCount, excludeRoomId) {
-        var allocated = getAllocatedPax(excludeRoomId);
-        var pax = getBookingPax();
-        var errors = [];
-        if (allocated.adult + adultCount > pax.adult) {
-            errors.push('Adult count would exceed booking limit (' + pax.adult + '). Currently allocated: ' + allocated.adult);
-        }
-        if (allocated.child + childCount > pax.child) {
-            errors.push('Child count would exceed booking limit (' + pax.child + '). Currently allocated: ' + allocated.child);
-        }
-        if (allocated.infant + infantCount > pax.infant) {
-            errors.push('Infant count would exceed booking limit (' + pax.infant + '). Currently allocated: ' + allocated.infant);
-        }
-        return errors;
+        $('#allocated_adult').text(totals.adult);
+        $('#allocated_child').text(totals.child);
+        $('#allocated_infant').text(totals.infant);
     }
 
     function renderRoomsTable() {
@@ -4941,16 +4909,20 @@ $(document).ready(function() {
             tbody.html('<tr id="no_rooms_row"><td colspan="5" class="text-muted text-center">No rooms created yet. Click "Add Room" to create one.</td></tr>');
         } else {
             roomsList.forEach(function(room) {
+                var actionsTd = glLocked
+                    ? '<td class="text-center text-muted">—</td>'
+                    : '<td class="text-center">' +
+                      '<button type="button" class="btn btn-sm btn-icon btn-light-primary edit-room-btn mr-1" data-room-id="' + room.id + '"><i class="la la-edit"></i></button>' +
+                      '<button type="button" class="btn btn-sm btn-icon btn-light-warning duplicate-room-btn mr-1" data-room-id="' + room.id + '" title="Duplicate"><i class="la la-copy"></i></button>' +
+                      '<button type="button" class="btn btn-sm btn-icon btn-light-danger delete-room-btn" data-room-id="' + room.id + '"><i class="la la-trash"></i></button>' +
+                      '</td>';
                 tbody.append(
                     '<tr data-room-id="' + room.id + '">' +
                     '<td class="font-weight-bold">' + $('<span>').text(room.room_name).html() + '</td>' +
                     '<td class="text-center">' + (room.adult_count || 0) + '</td>' +
                     '<td class="text-center">' + (room.child_count || 0) + '</td>' +
                     '<td class="text-center">' + (room.infant_count || 0) + '</td>' +
-                    '<td class="text-center">' +
-                    '<button type="button" class="btn btn-sm btn-icon btn-light-primary edit-room-btn mr-1" data-room-id="' + room.id + '"><i class="la la-edit"></i></button>' +
-                    '<button type="button" class="btn btn-sm btn-icon btn-light-danger delete-room-btn" data-room-id="' + room.id + '"><i class="la la-trash"></i></button>' +
-                    '</td>' +
+                    actionsTd +
                     '</tr>'
                 );
             });
@@ -5033,11 +5005,6 @@ $(document).ready(function() {
                         Swal.showValidationMessage('Room name is required!');
                         return false;
                     }
-                    var errors = validatePaxCounts(adultCount, childCount, infantCount, roomId);
-                    if (errors.length > 0) {
-                        Swal.showValidationMessage(errors.join('<br>'));
-                        return false;
-                    }
                     return { room_name: roomName, adult_count: adultCount, child_count: childCount, infant_count: infantCount };
                 }
             }).then(function(result) {
@@ -5118,6 +5085,51 @@ $(document).ready(function() {
                 }
             });
         });
+
+        $('.duplicate-room-btn').off('click').on('click', function() {
+            var roomId = $(this).data('room-id');
+            var room = roomsList.find(function(r) { return r.id == roomId; });
+            if (!room) return;
+
+            var newName = room.room_name + ' (COPY)';
+            var dupData = {
+                room_name: newName,
+                adult_count: room.adult_count || 0,
+                child_count: room.child_count || 0,
+                infant_count: room.infant_count || 0
+            };
+
+            if (roomBookingId) {
+                $.ajax({
+                    url: '<?php echo base_url("Guest_List_Room/Create"); ?>',
+                    type: 'post',
+                    data: $.extend({ booking_id: roomBookingId }, dupData),
+                    dataType: 'json',
+                    success: function(response) {
+                        if (response.success) {
+                            Swal.fire('Success!', 'Room duplicated', 'success');
+                            loadRooms();
+                        } else {
+                            Swal.fire('Error!', response.message, 'error');
+                        }
+                    },
+                    error: function() {
+                        Swal.fire('Error!', 'Failed to duplicate room', 'error');
+                    }
+                });
+            } else {
+                tempRoomCounter++;
+                roomsList.push({
+                    id: 'temp_' + tempRoomCounter,
+                    room_name: dupData.room_name,
+                    adult_count: dupData.adult_count,
+                    child_count: dupData.child_count,
+                    infant_count: dupData.infant_count
+                });
+                renderRoomsTable();
+                Swal.fire('Success!', 'Room duplicated', 'success');
+            }
+        });
     }
 
     $('#create_room_btn').click(function() {
@@ -5134,11 +5146,6 @@ $(document).ready(function() {
                 var infantCount = parseInt($('#swal_infant_count').val()) || 0;
                 if (!roomName) {
                     Swal.showValidationMessage('Room name is required!');
-                    return false;
-                }
-                var errors = validatePaxCounts(adultCount, childCount, infantCount);
-                if (errors.length > 0) {
-                    Swal.showValidationMessage(errors.join('<br>'));
                     return false;
                 }
                 return { room_name: roomName, adult_count: adultCount, child_count: childCount, infant_count: infantCount };
