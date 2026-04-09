@@ -29,6 +29,7 @@ class Booking_Confirmation extends CI_Controller
 		$this->load->model('Company_Model');
 
 		$this->load->model('Payment_Model');
+		$this->load->model('Guest_List_Room_Model');
 	}
 
 
@@ -77,72 +78,19 @@ class Booking_Confirmation extends CI_Controller
 
                 }
 
-                if(!empty($array['Adult'])) {
-
-                    $array['Adult'] = $array['Adult'] == 1 ? $array['Adult'] . ' ADULT ' : $array['Adult'] . ' ADULTS ';
-
+                // Compute PaxNumber from room management totals (same as GL)
+                $rooms = $this->Guest_List_Room_Model->Read_Rooms_By_Booking_ID($array['BookingID']);
+                $room_adult = 0; $room_child = 0; $room_infant = 0;
+                foreach ($rooms as $r) {
+                    $room_adult += (int)$r->adult_count;
+                    $room_child += (int)$r->child_count;
+                    $room_infant += (int)$r->infant_count;
                 }
-
-                if(!empty($array['Children'])) {
-
-                    $array['Children'] = $array['Children'] == 1 ? $array['Children'] . ' CHILD ' : $array['Children'] . ' CHILDREN ';
-
-                }
-
-                if(!empty($array['Infant'])) {
-
-                    $array['Infant'] = $array['Infant'] == 1 ? $array['Infant'] . ' INFANT ' : $array['Infant'] . ' INFANTS ';
-
-                }
-
-                if(!empty($array['Adult']) && !empty($array['Children']) && !empty($array['Infant'])) {
-
-                    $array['PaxNumber'] = $array['Adult'] . '& ' . $array['Children'] . '& ' . $array['Infant'];
-
-                } else {
-
-                    if(!empty($array['Adult']) && empty($array['Children']) && !empty($array['Infant'])) {
-
-                        $array['PaxNumber'] = $array['Adult'] . '& ' . $array['Infant'];
-
-                    } else {
-
-                        if(!empty($array['Adult']) && !empty($array['Children']) && empty($array['Infant'])) {
-
-                            $array['PaxNumber'] = $array['Adult'] . '& ' . $array['Children'];
-
-                        } else {
-
-                            if(!empty($array['Adult']) && empty($array['Children']) && empty($array['Infant'])) {
-
-                                $array['PaxNumber'] = $array['Adult'];
-
-                            } else {
-                                if(empty($array['Adult']) && !empty($array['Children']) && !empty($array['Infant'])) {
-
-                                    $array['PaxNumber'] = $array['Children'] . '& ' . $array['Infant'];
-
-                                } else {
-
-                                    if(empty($array['Adult']) && empty($array['Children']) && !empty($array['Infant'])) {
-
-                                        $array['PaxNumber'] = $array['Infant'];
-
-                                    } else {
-
-                                        $array['PaxNumber'] = $array['Children'];
-
-                                    }
-
-                                }
-
-                            }
-
-                        }
-
-                    }
-
-                }
+                $adult_str = $room_adult > 0 ? ($room_adult == 1 ? $room_adult . ' ADULT ' : $room_adult . ' ADULTS ') : '';
+                $child_str = $room_child > 0 ? ($room_child == 1 ? $room_child . ' CHILD ' : $room_child . ' CHILDREN ') : '';
+                $infant_str = $room_infant > 0 ? ($room_infant == 1 ? $room_infant . ' INFANT ' : $room_infant . ' INFANTS ') : '';
+                $pax_parts = array_filter(array($adult_str, $child_str, $infant_str));
+                $array['PaxNumber'] = !empty($pax_parts) ? implode('& ', $pax_parts) : '0 Pax';
 
                 $array['InsertDate'] = strtoupper(date('j M Y', strtotime($array['InsertDate'])));
 

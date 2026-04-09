@@ -1021,6 +1021,19 @@
                                         <div class="form-group mb-2">
                                             <textarea id="new-comment-content" class="form-control" rows="2" placeholder="Enter your comment here..." style="font-size: 0.8125rem;"></textarea>
                                         </div>
+                                        <div class="form-group mb-2">
+                                            <label class="font-weight-bold" style="font-size: 0.8125rem;">Notify Users</label>
+                                            <select id="comment-notify-users" multiple="multiple" data-live-search="true" data-actions-box="true" class="form-control selectpicker" title="--Select users to notify--">
+                                                <?php foreach($admins as $admin) { ?>
+                                                    <?php if($admin->Status == 'Y') { ?>
+                                                        <?php
+                                                            $is_default = ($admin->Level == '10' || $admin->AdminID == $SalesAgent || $admin->AdminID == $BookingOP);
+                                                        ?>
+                                                        <option <?php if($is_default) echo 'selected'; ?> data-icon="la la-user-alt font-size-lg bs-icon" value="<?php echo $admin->AdminID; ?>"><?php echo $admin->Name; ?></option>
+                                                    <?php } ?>
+                                                <?php } ?>
+                                            </select>
+                                        </div>
                                         <button type="button" id="add-comment-btn" class="btn btn-primary btn-sm font-weight-bold mt-2 mb-2">
                                             <i class="la la-comment"></i> Add Comment
                                         </button>
@@ -4097,14 +4110,26 @@ $(document).ready(function() {
             type: 'post',
             data: {
                 booking_id: bookingId,
-                content: content
+                content: content,
+                notify_user_ids: $('#comment-notify-users').val()
             },
             dataType: 'json',
             success: function(response) {
                 $btn.prop('disabled', false).html(originalText);
-                
+
                 if (response.success) {
                     $('#new-comment-content').val('');
+                    // Reset notify users to defaults
+                    var defaultUsers = [<?php
+                        $default_ids = array();
+                        foreach($admins as $admin) {
+                            if($admin->Status == 'Y' && ($admin->Level == '10' || $admin->AdminID == $SalesAgent || $admin->AdminID == $BookingOP)) {
+                                $default_ids[] = "'" . $admin->AdminID . "'";
+                            }
+                        }
+                        echo implode(',', $default_ids);
+                    ?>];
+                    $('#comment-notify-users').selectpicker('val', defaultUsers);
                     loadComments(); // Reload comments to show the new one
                     // Don't redirect, just show success message
                     Swal.fire({

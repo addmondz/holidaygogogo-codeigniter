@@ -276,6 +276,64 @@ class Notification_Model extends CI_Model
 	}
 
 	/**
+	 * Create notifications for specific users when a remark is added
+	 *
+	 * @param int $booking_id Booking ID
+	 * @param int $remark_id Remark ID
+	 * @param int $commenter_id Admin ID who created the remark
+	 * @param string $remark_content Remark content
+	 * @param array $user_ids Array of Admin IDs to notify
+	 * @return int Number of notifications created
+	 */
+	function Create_Remark_Notifications_For_Users($booking_id, $remark_id, $commenter_id, $remark_content, $user_ids)
+	{
+		// Get commenter name
+		$this->db->select('Name');
+		$this->db->where('AdminID', $commenter_id);
+		$commenter = $this->db->get('admin')->row();
+		$commenter_name = !empty($commenter) ? $commenter->Name : 'Unknown';
+
+		$message = $commenter_name . ' added a remark';
+
+		// Remove commenter from the list (never self-notify)
+		$user_ids = array_diff($user_ids, array($commenter_id));
+
+		$notifications_created = 0;
+
+		foreach ($user_ids as $user_id) {
+			// Verify admin exists and is active
+			$this->db->select('AdminID');
+			$this->db->where('AdminID', $user_id);
+			$this->db->where('Status', 'Y');
+			$admin = $this->db->get('admin')->row();
+
+			if (empty($admin)) {
+				continue;
+			}
+
+			// Check for duplicate notification
+			$this->db->where('user_id', $user_id);
+			$this->db->where('remark_id', $remark_id);
+			$existing = $this->db->get('notification')->row();
+
+			if (empty($existing)) {
+				$notification_data = array(
+					'user_id' => $user_id,
+					'type' => 'remark',
+					'owner_type' => 'booking',
+					'owner_id' => $booking_id,
+					'remark_id' => $remark_id,
+					'message' => $message
+				);
+				$this->Create($notification_data);
+				$notifications_created++;
+			}
+		}
+
+		return $notifications_created;
+	}
+
+	/**
 	 * Create notification for Sales Agent and BookingOP when customer adds a remark
 	 *
 	 * @param int $booking_id Booking ID
@@ -290,9 +348,35 @@ class Notification_Model extends CI_Model
 	{
 		$message = 'Customer added a remark';
 		$notified = false;
+		$notified_user_ids = array();
+
+		// Notify all Level 10 (Owner) admins
+		$this->db->select('AdminID');
+		$this->db->where('Status', 'Y');
+		$this->db->where('level', '10');
+		$admins = $this->db->get('admin')->result();
+
+		foreach ($admins as $admin) {
+			$this->db->where('user_id', $admin->AdminID);
+			$this->db->where('remark_id', $remark_id);
+			$existing = $this->db->get('notification')->row();
+
+			if (empty($existing)) {
+				$this->Create(array(
+					'user_id' => $admin->AdminID,
+					'type' => 'remark',
+					'owner_type' => 'booking',
+					'owner_id' => $booking_id,
+					'remark_id' => $remark_id,
+					'message' => $message
+				));
+				$notified = true;
+			}
+			$notified_user_ids[] = $admin->AdminID;
+		}
 
 		// Notify Sales Agent
-		if (!empty($sales_agent_id)) {
+		if (!empty($sales_agent_id) && !in_array($sales_agent_id, $notified_user_ids)) {
 			$this->db->select('AdminID');
 			$this->db->where('AdminID', $sales_agent_id);
 			$this->db->where('Status', 'Y');
@@ -315,10 +399,11 @@ class Notification_Model extends CI_Model
 					$notified = true;
 				}
 			}
+			$notified_user_ids[] = $sales_agent_id;
 		}
 
 		// Notify BookingOP
-		if (!empty($booking_op_id) && $booking_op_id != $sales_agent_id) {
+		if (!empty($booking_op_id) && !in_array($booking_op_id, $notified_user_ids)) {
 			$this->db->select('AdminID');
 			$this->db->where('AdminID', $booking_op_id);
 			$this->db->where('Status', 'Y');

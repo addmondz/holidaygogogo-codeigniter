@@ -509,6 +509,9 @@ class Booking extends MY_Controller
 		if(in_array('AB', $access_control) || ($is_sales_agent && !empty($booking->SalesAgentID) && $booking->SalesAgentID == $this->session->userdata('admin_id'))) {
 			$html .= '<button onclick="openChecklistModal(' . $booking->BookingID . ')" class="dropdown-item" style="font-size:11px;">Edit Checklist</button>';
 		}
+		$sales_agent_id = isset($booking->SalesAgentID) ? $booking->SalesAgentID : '';
+		$booking_op_id = isset($booking->BookingOP) ? $booking->BookingOP : '';
+		$html .= '<button onclick="openRemarksModal(' . $booking->BookingID . ', \'' . addslashes($booking->BookingNumber) . '\', \'' . $sales_agent_id . '\', \'' . $booking_op_id . '\')" class="dropdown-item" style="font-size:11px;">View Remarks</button>';
 		$html .= '<div class="dropdown-divider"></div>';
 		$html .= '<a href="' . base_url('Booking_Confirmation?token=') . $booking->Token . '" target="_blank" class="dropdown-item" style="font-size:11px;">Booking Confirmation</a>';
 		$html .= '<button id="bc_url-' . $booking->BookingID . '" value="' . base_url('Booking_Confirmation?token=') . $booking->Token . '" onclick="Copy_URL(\'BC URL\', ' . $booking->BookingID . ')" class="dropdown-item" style="font-size:11px;">Copy BC Link</button>';
@@ -1671,7 +1674,8 @@ class Booking extends MY_Controller
 			// Load helpers
 			$this->load->helper('booking_flow');
 			$this->load->helper('booking_status_log');
-			
+			$this->load->helper('debug_log');
+
 			// Get and validate booking_id
 			$booking_id = $this->input->get('booking_id');
 			if (empty($booking_id)) {
@@ -3224,14 +3228,23 @@ class Booking extends MY_Controller
 		
 		// Check if notifications should be skipped (when adding from Customer Remarks section)
 		$skip_notifications = $this->input->post('skip_notifications') == '1' ? true : false;
-		
+
+		// Get selected users to notify (for internal comments)
+		$notify_user_ids = $this->input->post('notify_user_ids');
+		if (!empty($notify_user_ids) && is_array($notify_user_ids)) {
+			$notify_user_ids = array_map('intval', $notify_user_ids);
+		} else {
+			$notify_user_ids = null;
+		}
+
 		$remark_data = array(
 			'owner_type' => 'booking',
 			'owner_id' => $booking_id,
 			'commenter_id' => $this->session->userdata('admin_id'),
 			'content' => $content,
 			'type' => $remark_type,
-			'skip_notifications' => $skip_notifications
+			'skip_notifications' => $skip_notifications,
+			'notify_user_ids' => $notify_user_ids
 		);
 
 		$remark_id = $this->Remark_Model->Create($remark_data);

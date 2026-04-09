@@ -1236,3 +1236,326 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 </script>
+
+<!-- Remarks Modal -->
+<div class="modal fade" id="remarksModal" tabindex="-1" role="dialog" aria-labelledby="remarksModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header" style="background-color:#D7E2F2;">
+                <h5 class="modal-title" id="remarksModalLabel" style="color:#6082B6;">
+                    <strong>Remarks</strong>
+                </h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body" id="remarksModalBody">
+                <!-- Internal Comments Section -->
+                <h6 class="font-weight-bold mb-2" style="color:#6082B6;">Internal Comments</h6>
+                <div id="remarks-internal-list" style="max-height:250px; overflow-y:auto;">
+                    <div class="text-center py-3"><div class="spinner spinner-primary spinner-lg"></div></div>
+                </div>
+                <div class="border-top pt-2 mt-2">
+                    <div class="form-group mb-2">
+                        <textarea id="modal-new-comment-content" class="form-control" rows="2" placeholder="Enter your comment here..." style="font-size: 0.8125rem;"></textarea>
+                    </div>
+                    <div class="form-group mb-2">
+                        <label class="font-weight-bold" style="font-size: 0.8125rem;">Notify Users</label>
+                        <select id="modal-comment-notify-users" multiple="multiple" data-live-search="true" data-actions-box="true" class="form-control selectpicker" title="--Select users to notify--">
+                            <?php foreach($admins as $admin) { ?>
+                                <?php if($admin->Status == 'Y') { ?>
+                                    <option data-admin-level="<?php echo $admin->Level; ?>" data-icon="la la-user-alt font-size-lg bs-icon" value="<?php echo $admin->AdminID; ?>"><?php echo $admin->Name; ?></option>
+                                <?php } ?>
+                            <?php } ?>
+                        </select>
+                    </div>
+                    <button type="button" id="modal-add-comment-btn" class="btn btn-primary btn-sm font-weight-bold mt-2 mb-2">
+                        <i class="la la-comment"></i> Add Comment
+                    </button>
+                </div>
+
+                <hr>
+
+                <!-- Customer Remarks Section -->
+                <h6 class="font-weight-bold mb-2" style="color:#388E3C;">Customer Remarks</h6>
+                <div id="remarks-customer-list" style="max-height:250px; overflow-y:auto;">
+                    <div class="text-center py-3"><div class="spinner spinner-primary spinner-lg"></div></div>
+                </div>
+                <div class="border-top pt-2 mt-2">
+                    <div class="form-group mb-2">
+                        <textarea id="modal-new-customer-remark-content" class="form-control" rows="2" placeholder="Add your response or remark here..." style="font-size: 0.8125rem;"></textarea>
+                    </div>
+                    <button type="button" id="modal-add-customer-remark-btn" class="btn btn-primary btn-sm font-weight-bold mt-2 mb-2">
+                        <i class="la la-comment"></i> Add Remark
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+var remarksModalBookingId = null;
+var remarksModalSalesAgentId = null;
+var remarksModalBookingOpId = null;
+
+function renderRemarkItem(remark) {
+    var avatarColor = ['primary', 'success', 'info', 'warning', 'danger'][remark.commenter_name.charCodeAt(0) % 5];
+    return '<div class="comment-item d-flex mb-2 mx-2 pb-2 pl-1" style="border-bottom: 1px solid #e4e6eb;">' +
+        '<div class="flex-shrink-0 mr-2">' +
+        '<div class="symbol symbol-32 symbol-circle symbol-light-' + avatarColor + '">' +
+        '<span class="symbol-label font-weight-bold" style="font-size: 0.75rem;">' + (remark.commenter_initials || remark.commenter_name.substring(0, 2).toUpperCase()) + '</span>' +
+        '</div>' +
+        '</div>' +
+        '<div class="flex-grow-1" style="min-width: 0;">' +
+        '<div class="d-flex align-items-baseline mb-1">' +
+        '<strong class="mr-2" style="font-size: 0.8125rem; color: #050505;">' + escapeHtml(remark.commenter_name) + '</strong>' +
+        '<span class="text-muted" style="font-size: 0.75rem; color: #65676b;">' + remark.created_at + '</span>' +
+        '</div>' +
+        '<div class="comment-text" style="font-size: 0.8125rem; color: #050505; line-height: 1.3; white-space: pre-wrap; word-wrap: break-word;">' + escapeHtml(remark.content) + '</div>' +
+        '</div>' +
+        '</div>';
+}
+
+function loadModalInternalComments() {
+    $.ajax({
+        url: '<?php echo base_url("Booking/Get_Remarks"); ?>',
+        type: 'get',
+        data: { booking_id: remarksModalBookingId },
+        dataType: 'json',
+        success: function(response) {
+            var list = $('#remarks-internal-list');
+            list.empty();
+            if (response.success && response.remarks && response.remarks.length > 0) {
+                response.remarks.forEach(function(remark) {
+                    list.append(renderRemarkItem(remark));
+                });
+                // Scroll to bottom
+                list.scrollTop(list[0].scrollHeight);
+            } else {
+                list.html('<div class="text-center text-muted py-3" style="font-size: 0.8125rem;">No internal comments yet.</div>');
+            }
+        },
+        error: function() {
+            $('#remarks-internal-list').html('<div class="text-center text-danger py-3" style="font-size: 0.8125rem;">Error loading comments.</div>');
+        }
+    });
+}
+
+function loadModalCustomerRemarks() {
+    $.ajax({
+        url: '<?php echo base_url("Booking/Get_Customer_Remarks"); ?>',
+        type: 'get',
+        data: { booking_id: remarksModalBookingId },
+        dataType: 'json',
+        success: function(response) {
+            var list = $('#remarks-customer-list');
+            list.empty();
+            if (response.success && response.remarks && response.remarks.length > 0) {
+                response.remarks.forEach(function(remark) {
+                    list.append(renderRemarkItem(remark));
+                });
+                list.scrollTop(list[0].scrollHeight);
+            } else {
+                list.html('<div class="text-center text-muted py-3" style="font-size: 0.8125rem;">No customer remarks yet.</div>');
+            }
+        },
+        error: function() {
+            $('#remarks-customer-list').html('<div class="text-center text-danger py-3" style="font-size: 0.8125rem;">Error loading remarks.</div>');
+        }
+    });
+}
+
+function openRemarksModal(bookingId, bookingNumber, salesAgentId, bookingOpId) {
+    remarksModalBookingId = bookingId;
+    remarksModalSalesAgentId = salesAgentId;
+    remarksModalBookingOpId = bookingOpId;
+
+    $('#remarksModalLabel').html('<strong>Remarks &mdash; ' + escapeHtml(bookingNumber) + '</strong>');
+    var spinnerHtml = '<div class="text-center py-3"><div class="spinner spinner-primary spinner-lg"></div></div>';
+    $('#remarks-internal-list').html(spinnerHtml);
+    $('#remarks-customer-list').html(spinnerHtml);
+
+    // Clear form fields
+    $('#modal-new-comment-content').val('');
+    $('#modal-new-customer-remark-content').val('');
+
+    // Pre-select default notify users: Level 10 (owners) + SalesAgent + BookingOP
+    var defaultIds = [];
+    $('#modal-comment-notify-users option').each(function() {
+        var val = $(this).val();
+        var level = $(this).data('admin-level');
+        if (level == 10 || val == salesAgentId || val == bookingOpId) {
+            defaultIds.push(val);
+        }
+    });
+    $('#modal-comment-notify-users').selectpicker('val', defaultIds);
+
+    $('#remarksModal').modal('show');
+
+    loadModalInternalComments();
+    loadModalCustomerRemarks();
+}
+
+// Add internal comment from modal
+$('#modal-add-comment-btn').on('click', function() {
+    var content = $('#modal-new-comment-content').val().trim();
+    if (!content) {
+        Swal.fire({
+            width: 550,
+            background: 'url(<?php echo base_url("assets/image/sweetalert.jpg"); ?>)',
+            icon: 'warning',
+            title: 'Please enter a comment',
+            showConfirmButton: false,
+            timer: 2000
+        });
+        return;
+    }
+
+    var $btn = $(this);
+    var originalText = $btn.html();
+    $btn.prop('disabled', true).html('<i class="la la-spinner la-spin"></i> Adding...');
+
+    $.ajax({
+        url: '<?php echo base_url("Booking/Add_Remark"); ?>',
+        type: 'post',
+        data: {
+            booking_id: remarksModalBookingId,
+            content: content,
+            notify_user_ids: $('#modal-comment-notify-users').val()
+        },
+        dataType: 'json',
+        success: function(response) {
+            $btn.prop('disabled', false).html(originalText);
+            if (response.success) {
+                $('#modal-new-comment-content').val('');
+                // Reset notify users to defaults
+                var defaultIds = [];
+                $('#modal-comment-notify-users option').each(function() {
+                    var val = $(this).val();
+                    var level = $(this).data('admin-level');
+                    if (level == 10 || val == remarksModalSalesAgentId || val == remarksModalBookingOpId) {
+                        defaultIds.push(val);
+                    }
+                });
+                $('#modal-comment-notify-users').selectpicker('val', defaultIds);
+                loadModalInternalComments();
+                Swal.fire({
+                    width: 550,
+                    background: 'url(<?php echo base_url("assets/image/sweetalert.jpg"); ?>)',
+                    icon: 'success',
+                    title: 'Comment added Successfully',
+                    showConfirmButton: false,
+                    timer: 2200
+                });
+            } else {
+                Swal.fire({
+                    width: 550,
+                    background: 'url(<?php echo base_url("assets/image/sweetalert.jpg"); ?>)',
+                    icon: 'error',
+                    title: response.message || 'Failed to add comment',
+                    showConfirmButton: false,
+                    timer: 3000
+                });
+            }
+        },
+        error: function() {
+            $btn.prop('disabled', false).html(originalText);
+            Swal.fire({
+                width: 550,
+                background: 'url(<?php echo base_url("assets/image/sweetalert.jpg"); ?>)',
+                icon: 'error',
+                title: 'Error adding comment. Please try again.',
+                showConfirmButton: false,
+                timer: 3000
+            });
+        }
+    });
+});
+
+// Add customer remark from modal
+$('#modal-add-customer-remark-btn').on('click', function() {
+    var content = $('#modal-new-customer-remark-content').val().trim();
+    if (!content) {
+        Swal.fire({
+            width: 550,
+            background: 'url(<?php echo base_url("assets/image/sweetalert.jpg"); ?>)',
+            icon: 'warning',
+            title: 'Please enter a remark',
+            showConfirmButton: false,
+            timer: 2000
+        });
+        return;
+    }
+
+    var $btn = $(this);
+    var originalText = $btn.html();
+    $btn.prop('disabled', true).html('<i class="la la-spinner la-spin"></i> Adding...');
+
+    $.ajax({
+        url: '<?php echo base_url("Booking/Add_Remark"); ?>',
+        type: 'post',
+        data: {
+            booking_id: remarksModalBookingId,
+            content: content,
+            remark_type: '2',
+            skip_notifications: '1'
+        },
+        dataType: 'json',
+        success: function(response) {
+            $btn.prop('disabled', false).html(originalText);
+            if (response.success) {
+                $('#modal-new-customer-remark-content').val('');
+                loadModalCustomerRemarks();
+                Swal.fire({
+                    width: 550,
+                    background: 'url(<?php echo base_url("assets/image/sweetalert.jpg"); ?>)',
+                    icon: 'success',
+                    title: 'Remark added Successfully',
+                    showConfirmButton: false,
+                    timer: 2200
+                });
+            } else {
+                Swal.fire({
+                    width: 550,
+                    background: 'url(<?php echo base_url("assets/image/sweetalert.jpg"); ?>)',
+                    icon: 'error',
+                    title: response.message || 'Failed to add remark',
+                    showConfirmButton: false,
+                    timer: 3000
+                });
+            }
+        },
+        error: function() {
+            $btn.prop('disabled', false).html(originalText);
+            Swal.fire({
+                width: 550,
+                background: 'url(<?php echo base_url("assets/image/sweetalert.jpg"); ?>)',
+                icon: 'error',
+                title: 'Error adding remark. Please try again.',
+                showConfirmButton: false,
+                timer: 3000
+            });
+        }
+    });
+});
+
+// Allow Ctrl+Enter / Shift+Enter to submit in modal textareas
+$('#modal-new-comment-content').on('keydown', function(e) {
+    if ((e.ctrlKey || e.shiftKey) && e.keyCode === 13) {
+        e.preventDefault();
+        $('#modal-add-comment-btn').click();
+    }
+});
+$('#modal-new-customer-remark-content').on('keydown', function(e) {
+    if ((e.ctrlKey || e.shiftKey) && e.keyCode === 13) {
+        e.preventDefault();
+        $('#modal-add-customer-remark-btn').click();
+    }
+});
+
+// Initialize selectpicker when modal is shown
+$('#remarksModal').on('shown.bs.modal', function() {
+    $('#modal-comment-notify-users').selectpicker('refresh');
+});
+</script>
