@@ -59,6 +59,78 @@ class Guest_List_Room extends MY_Controller
 		echo json_encode(array('success' => true, 'message' => 'Room successfully deleted'));
 	}
 
+	function Add_Count()
+	{
+		if($this->input->post()) {
+			$room_id = $this->input->post('room_id');
+			$type = $this->input->post('type');
+			$allowed = array('adult_count', 'child_count', 'infant_count');
+			if(!in_array($type, $allowed)) {
+				echo json_encode(array('success' => false, 'message' => 'Invalid type'));
+				return;
+			}
+			$room = $this->_get_room_by_id($room_id);
+			if(!$room) {
+				echo json_encode(array('success' => false, 'message' => 'Room not found'));
+				return;
+			}
+			if($this->_is_gl_locked($room['booking_id'])) {
+				echo json_encode(array('success' => false, 'message' => 'Room management is locked because Guest List has been locked'));
+				return;
+			}
+			$this->db->set($type, $type . ' + 1', FALSE);
+			$this->db->where('id', $room_id);
+			$this->db->update('guest_list_room');
+			$this->Booking_Model->Sync_GL_From_Rooms($room['booking_id']);
+			echo json_encode(array('success' => true, 'message' => 'Count increased'));
+		} else {
+			echo json_encode(array('success' => false, 'message' => 'Invalid request'));
+		}
+	}
+
+	function Read_Guests()
+	{
+		$this->load->model('Guest_List_Model');
+		$guests = $this->Guest_List_Model->Read_Guests_By_Booking_ID($this->input->get('booking_id'));
+		echo json_encode($guests);
+	}
+
+	function Delete_Guest()
+	{
+		$guest_list_id = $this->input->get('guest_list_id');
+		$this->db->select('BookingID, Type, guest_list_room_id');
+		$this->db->where('GuestListID', $guest_list_id);
+		$guest = $this->db->get('guest_list')->row();
+
+		if(!$guest) {
+			echo json_encode(array('success' => false, 'message' => 'Guest not found'));
+			return;
+		}
+
+		if($this->_is_gl_locked($guest->BookingID)) {
+			echo json_encode(array('success' => false, 'message' => 'Guest List is locked'));
+			return;
+		}
+
+		$this->load->model('Guest_List_Model');
+		$this->Guest_List_Model->Delete($guest_list_id);
+
+		// Decrease the room pax count for this guest's type
+		if(!empty($guest->guest_list_room_id)) {
+			$type_map = array('ADULT' => 'adult_count', 'CHILD' => 'child_count', 'INFANT' => 'infant_count');
+			if(isset($type_map[$guest->Type])) {
+				$col = $type_map[$guest->Type];
+				$this->db->set($col, $col . ' - 1', FALSE);
+				$this->db->where('id', $guest->guest_list_room_id);
+				$this->db->where($col . ' > ', 0);
+				$this->db->update('guest_list_room');
+			}
+		}
+
+		$this->Guest_List_Model->Auto_Assign_Rooms($guest->BookingID);
+		echo json_encode(array('success' => true, 'message' => 'Guest successfully deleted'));
+	}
+
 	private function _get_room_by_id($room_id)
 	{
 		$this->db->select('id, booking_id');

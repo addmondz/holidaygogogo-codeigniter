@@ -293,7 +293,7 @@ $is_dev_env = ($app_env !== 'prod');
 													<span class="menu-text">Category</span>
 												</a>
 											</li>
-											<?php if ($this->session->level == '10' || $this->session->level == '30') { ?>
+											<?php if ($this->session->level == '10' || $this->session->level == '30' || $this->session->level == '40') { ?>
 												<li class="menu-item <?php if($this->router->class == 'Supplier') { echo 'menu-item-active'; } ?>">
 													<a href="<?php echo base_url('Supplier'); ?>" class="menu-link">
 														<i class="menu-bullet menu-bullet-dot">

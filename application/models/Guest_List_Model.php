@@ -204,6 +204,16 @@ class Guest_List_Model extends CI_Model
 		return true;
 	}
 
+	function Read_Guests_By_Booking_ID($booking_id)
+	{
+		$this->db->select('GuestListID, Name, LastName, Type, guest_list_room_id');
+		$this->db->where('BookingID', $booking_id);
+		$this->db->where('Status', 'Y');
+		$this->db->order_by('Type', 'ASC');
+		$this->db->order_by('Name', 'ASC');
+		return $this->db->get('guest_list')->result();
+	}
+
 	function Auto_Assign_Rooms($booking_id)
 	{
 		$this->load->model('Guest_List_Room_Model');

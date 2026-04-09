@@ -849,9 +849,9 @@
                                             <thead>
                                                 <tr>
                                                     <th>Room Name</th>
-                                                    <th class="text-center" style="width:100px;">Adult</th>
-                                                    <th class="text-center" style="width:100px;">Child</th>
-                                                    <th class="text-center" style="width:100px;">Infant</th>
+                                                    <th class="text-center" style="width:130px;">Adult</th>
+                                                    <th class="text-center" style="width:130px;">Child</th>
+                                                    <th class="text-center" style="width:130px;">Infant</th>
                                                     <th class="text-center" style="width:120px;">Actions</th>
                                                 </tr>
                                             </thead>
@@ -4892,6 +4892,7 @@ $(document).ready(function() {
     <?php if(current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Create') || current_url() == base_url('Booking/Duplicate')) { ?>
     // Room Management Functions
     var roomsList = [];
+    var guestsList = [];
     var roomBookingId = <?php echo (isset($BookingID) && $BookingID !== 'NA') ? $BookingID : 'null'; ?>;
     var glLocked = <?php echo (isset($LockStatus) && $LockStatus == 'Y') ? 'true' : 'false'; ?>;
     var tempRoomCounter = 0;
@@ -4914,6 +4915,38 @@ $(document).ready(function() {
         $('#allocated_infant').text(totals.infant);
     }
 
+    function getGuestTypeBadge(type) {
+        var badges = { 'ADULT': 'primary', 'CHILD': 'info', 'INFANT': 'warning' };
+        return '<span class="label label-inline label-light-' + (badges[type] || 'secondary') + ' font-weight-bold">' + type + '</span>';
+    }
+
+    function renderGuestRows(roomId) {
+        var roomGuests = guestsList.filter(function(g) {
+            return roomId === null ? !g.guest_list_room_id : g.guest_list_room_id == roomId;
+        });
+        if (roomGuests.length === 0) return '';
+
+        var html = '<tr class="guest-sub-row" data-parent-room="' + (roomId || 'unassigned') + '">' +
+            '<td colspan="5" style="padding:0; border-top:0;">' +
+            '<table class="table table-sm mb-0" style="background:#f9fbfd;">';
+
+        roomGuests.forEach(function(guest) {
+            var guestName = $('<span>').text((guest.Name || '') + ' ' + (guest.LastName || '')).html().trim() || '<em class="text-muted">No Name</em>';
+            var deleteBtn = glLocked ? '' :
+                '<button type="button" class="btn btn-xs btn-icon btn-light-danger delete-guest-btn ml-2" data-guest-id="' + guest.GuestListID + '" title="Delete Guest"><i class="la la-trash"></i></button>';
+            html += '<tr>' +
+                '<td style="padding:4px 12px;">' +
+                '<i class="la la-user text-muted mr-1"></i>' + guestName +
+                ' ' + getGuestTypeBadge(guest.Type) +
+                deleteBtn +
+                '</td>' +
+                '</tr>';
+        });
+
+        html += '</table></td></tr>';
+        return html;
+    }
+
     function renderRoomsTable() {
         var tbody = $('#rooms_list');
         tbody.empty();
@@ -4928,16 +4961,32 @@ $(document).ready(function() {
                       '<button type="button" class="btn btn-sm btn-icon btn-light-warning duplicate-room-btn mr-1" data-room-id="' + room.id + '" title="Duplicate"><i class="la la-copy"></i></button>' +
                       '<button type="button" class="btn btn-sm btn-icon btn-light-danger delete-room-btn" data-room-id="' + room.id + '"><i class="la la-trash"></i></button>' +
                       '</td>';
+                var addBtn = function(roomId, type) {
+                    return glLocked ? '' : ' &nbsp;<button type="button" class="btn btn-xs btn-icon btn-light-success add-count-btn ml-2" data-room-id="' + roomId + '" data-type="' + type + '" title="Add 1"><i class="la la-plus"></i></button>';
+                };
                 tbody.append(
                     '<tr data-room-id="' + room.id + '">' +
                     '<td class="font-weight-bold">' + $('<span>').text(room.room_name).html() + '</td>' +
-                    '<td class="text-center">' + (room.adult_count || 0) + '</td>' +
-                    '<td class="text-center">' + (room.child_count || 0) + '</td>' +
-                    '<td class="text-center">' + (room.infant_count || 0) + '</td>' +
+                    '<td class="text-center" style="padding:8px 12px;">' + (room.adult_count || 0) + addBtn(room.id, 'adult_count') + '</td>' +
+                    '<td class="text-center" style="padding:8px 12px;">' + (room.child_count || 0) + addBtn(room.id, 'child_count') + '</td>' +
+                    '<td class="text-center" style="padding:8px 12px;">' + (room.infant_count || 0) + addBtn(room.id, 'infant_count') + '</td>' +
                     actionsTd +
-                    '</tr>'
+                    '</tr>' +
+                    renderGuestRows(room.id)
                 );
             });
+
+            // Show unassigned guests
+            var unassignedHtml = renderGuestRows(null);
+            if (unassignedHtml) {
+                tbody.append(
+                    '<tr class="bg-light-warning">' +
+                    '<td class="font-weight-bold text-muted" colspan="4"><i class="la la-exclamation-circle text-warning mr-1"></i>Unassigned Guests</td>' +
+                    '<td></td>' +
+                    '</tr>' +
+                    unassignedHtml
+                );
+            }
         }
         updateAllocatedDisplay();
         attachRoomEventHandlers();
@@ -4952,7 +5001,17 @@ $(document).ready(function() {
                 dataType: 'json',
                 success: function(data) {
                     roomsList = data || [];
-                    renderRoomsTable();
+                    // Also fetch guests
+                    $.ajax({
+                        url: '<?php echo base_url("Guest_List_Room/Read_Guests"); ?>',
+                        type: 'get',
+                        data: { booking_id: roomBookingId },
+                        dataType: 'json',
+                        success: function(guests) {
+                            guestsList = guests || [];
+                            renderRoomsTable();
+                        }
+                    });
                 }
             });
         } else {
@@ -4991,6 +5050,35 @@ $(document).ready(function() {
     }
 
     function attachRoomEventHandlers() {
+        $('.add-count-btn').off('click').on('click', function() {
+            var roomId = $(this).data('room-id');
+            var type = $(this).data('type');
+            if (roomBookingId) {
+                $.ajax({
+                    url: '<?php echo base_url("Guest_List_Room/Add_Count"); ?>',
+                    type: 'post',
+                    data: { room_id: roomId, type: type },
+                    dataType: 'json',
+                    success: function(response) {
+                        if (response.success) {
+                            loadRooms();
+                        } else {
+                            Swal.fire('Error!', response.message, 'error');
+                        }
+                    },
+                    error: function() {
+                        Swal.fire('Error!', 'Failed to add count', 'error');
+                    }
+                });
+            } else {
+                var room = roomsList.find(function(r) { return r.id == roomId; });
+                if (room) {
+                    room[type] = (parseInt(room[type]) || 0) + 1;
+                    renderRoomsTable();
+                }
+            }
+        });
+
         $('.edit-room-btn').off('click').on('click', function() {
             var roomId = $(this).data('room-id');
             var room = roomsList.find(function(r) { return r.id == roomId; });
@@ -5141,6 +5229,38 @@ $(document).ready(function() {
                 renderRoomsTable();
                 Swal.fire('Success!', 'Room duplicated', 'success');
             }
+        });
+
+        $('.delete-guest-btn').off('click').on('click', function() {
+            var guestId = $(this).data('guest-id');
+            Swal.fire({
+                title: 'Are you sure?',
+                text: 'This will delete the guest entry.',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Yes, delete it!',
+                cancelButtonText: 'Cancel'
+            }).then(function(result) {
+                if (result.isConfirmed) {
+                    $.ajax({
+                        url: '<?php echo base_url("Guest_List_Room/Delete_Guest"); ?>',
+                        type: 'get',
+                        data: { guest_list_id: guestId },
+                        dataType: 'json',
+                        success: function(response) {
+                            if (response.success) {
+                                Swal.fire('Deleted!', response.message, 'success');
+                                loadRooms();
+                            } else {
+                                Swal.fire('Error!', response.message, 'error');
+                            }
+                        },
+                        error: function() {
+                            Swal.fire('Error!', 'Failed to delete guest', 'error');
+                        }
+                    });
+                }
+            });
         });
     }
 
