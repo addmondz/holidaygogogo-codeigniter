@@ -594,6 +594,9 @@ class Booking extends MY_Controller
 
 				$this->Booking_Product_Model->Create($this->input->post('booking_products'), $booking_id);
 
+				// Recompute Subtotal from booking_product totals to keep booking.Subtotal authoritative
+				$this->Booking_Product_Model->Recompute_Subtotal($booking_id);
+
 				// Create rooms if provided
 				$booking_rooms = $this->input->post('booking_rooms');
 				if (!empty($booking_rooms)) {
@@ -820,6 +823,9 @@ class Booking extends MY_Controller
 
 				// Cleanup invalid supplier dates on booking products
 				$this->Booking_Product_Model->Cleanup_Supplier_Dates($this->input->post('booking_id'));
+
+				// Recompute Subtotal from booking_product totals to keep booking.Subtotal authoritative
+				$this->Booking_Product_Model->Recompute_Subtotal($this->input->post('booking_id'));
 
 				// Auto-enable insurance if any product belongs to an insurance category
 				$booking_id = $this->input->post('booking_id');

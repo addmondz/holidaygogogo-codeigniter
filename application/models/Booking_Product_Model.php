@@ -54,6 +54,19 @@ class Booking_Product_Model extends CI_Model
 		$this->db->update('booking_product');
 	}
 
+	function Recompute_Subtotal($booking_id)
+	{
+		$this->db->select_sum('Total');
+		$this->db->where('BookingID', $booking_id);
+		$this->db->where('Status', 'Y');
+		$row = $this->db->get('booking_product')->row();
+		$subtotal = !empty($row) && $row->Total !== null ? $row->Total : 0;
+
+		$this->db->set('Subtotal', $subtotal);
+		$this->db->where('BookingID', $booking_id);
+		$this->db->update('booking');
+	}
+
 	function Cleanup_Supplier_Dates($booking_id)
 	{
 		$this->db->set('PaymentOutSupplierFull', null);
