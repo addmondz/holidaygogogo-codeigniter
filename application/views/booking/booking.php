@@ -4911,7 +4911,7 @@ $(document).ready(function() {
             roomsList.forEach(function(room) {
                 var actionsTd = glLocked
                     ? '<td class="text-center text-muted">—</td>'
-                    : '<td class="text-center">' +
+                    : '<td class="text-center" style="white-space:nowrap">' +
                       '<button type="button" class="btn btn-sm btn-icon btn-light-primary edit-room-btn mr-1" data-room-id="' + room.id + '"><i class="la la-edit"></i></button>' +
                       '<button type="button" class="btn btn-sm btn-icon btn-light-warning duplicate-room-btn mr-1" data-room-id="' + room.id + '" title="Duplicate"><i class="la la-copy"></i></button>' +
                       '<button type="button" class="btn btn-sm btn-icon btn-light-danger delete-room-btn" data-room-id="' + room.id + '"><i class="la la-trash"></i></button>' +

@@ -295,7 +295,7 @@ class Customer_Portal extends CI_Controller
             // Completed: 
             // 1. Status = 'Y' AND AfterSalesService = 'COMPLETE', OR
             // 2. Travel date has passed (EndDate < today)
-            if (($booking['Status'] == 'Y' && $booking['AfterSalesService'] == 'COMPLETE') || $travel_date_passed) {
+            if (($booking['Status'] == 'Y' && $booking['AfterSalesService'] == 'COMPLETE') || $travel_date_passed || $booking['Status'] == 'PBO') {
                 $completed[] = $booking;
             } else {
                 // Upcoming: Confirmed bookings (PP, PTV, PT, OG, etc.) where travel date hasn't passed
