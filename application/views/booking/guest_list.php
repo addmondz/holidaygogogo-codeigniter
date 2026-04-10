@@ -1136,7 +1136,7 @@
 					data: { booking_id: <?php echo $guest_lists[0]->BookingID; ?> },
 					dataType: 'json',
 					success: function(array) { 
-						if(array[0].LockStatus != '<?php echo $guest_lists[0]->LockStatus ?>' || array[0].TravelInsuranceStatus != '<?php echo $guest_lists[0]->TravelInsuranceStatus ?>' || array[0].Adult != '<?php echo $adult == "" ? "0" : $adult; ?>' || array[0].Children != '<?php echo $child == "" ? "0" : $child; ?>' || array[0].Infant != '<?php echo $infant == "" ? "0" : $infant; ?>') {
+						if(array[0].LockStatus != '<?php echo $guest_lists[0]->LockStatus ?>' || array[0].TravelInsuranceStatus != '<?php echo $guest_lists[0]->TravelInsuranceStatus ?>') {
 							Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', 'Data Has Been Changed, Page Will Refresh', window.location.href);
 							return;
 						}
