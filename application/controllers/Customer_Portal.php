@@ -295,7 +295,7 @@ class Customer_Portal extends CI_Controller
             // Completed: 
             // 1. Status = 'Y' AND AfterSalesService = 'COMPLETE', OR
             // 2. Travel date has passed (EndDate < today)
-            if (($booking['Status'] == 'Y' && $booking['AfterSalesService'] == 'COMPLETE') || $travel_date_passed || $booking['Status'] == 'PBO') {
+            if (($booking['Status'] == 'Y' && $booking['AfterSalesService'] == 'COMPLETE') || $travel_date_passed) {
                 $completed[] = $booking;
             } else {
                 // Upcoming: Confirmed bookings (PP, PTV, PT, OG, etc.) where travel date hasn't passed
@@ -667,14 +667,14 @@ class Customer_Portal extends CI_Controller
         // Confirmed: Status IN ('PP', 'PTV', 'PT', 'OG') - after booking confirmation
         // Completed: Status = 'Y' AND AfterSalesService = 'COMPLETE'
         
-        if (($status == 'Y' && $after_sales == 'COMPLETE') || $status == 'PBO') {
+        if ($status == 'Y' && $after_sales == 'COMPLETE') {
             // Completed
             return [
                 'text' => 'Completed',
                 'class' => 'status-completed',
                 'color' => '#50C878'
             ];
-        } elseif (in_array($status, ['PP', 'PTV', 'PT', 'OG'])) {
+        } elseif (in_array($status, ['PP', 'PBO', 'PGL', 'PTV', 'PT', 'OG'])) {
             // Confirmed - after booking confirmation
             return [
                 'text' => 'Confirmed',
@@ -760,13 +760,13 @@ class Customer_Portal extends CI_Controller
         }
 
         // Completed: Status = 'Y' AND AfterSalesService = 'COMPLETE' OR travel date passed
-        if (($status == 'Y' && $after_sales == 'COMPLETE') || $travel_date_passed || $status == 'PBO') {
+        if (($status == 'Y' && $after_sales == 'COMPLETE') || $travel_date_passed) {
             return [
                 'text' => 'Completed',
                 'class' => 'status-completed',
                 'color' => '#50C878'
             ];
-        } elseif (in_array($status, ['PP', 'PTV', 'PT', 'OG'])) {
+        } elseif (in_array($status, ['PP', 'PBO', 'PGL', 'PTV', 'PT', 'OG'])) {
             // Confirmed - after booking confirmation
             return [
                 'text' => 'Confirmed',
