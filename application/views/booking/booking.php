@@ -739,16 +739,26 @@
                                 </div>
 
                                 <div class="col-12">
-                                    <div class="row" id="deposit_container" <?php 
-                                        // Hide deposit container if DepositDeadline is null or empty
-                                        $deposit_deadline_value = '';
+                                    <?php
+                                        // Legacy bookings created on/before 2026-04-06 don't have deposit fields (Update page only)
+                                        $is_legacy_deposit_booking = (
+                                            current_url() == base_url('Booking/Update')
+                                            && !empty($InsertDate)
+                                            && strtotime($InsertDate) <= strtotime('2026-04-06 23:59:59')
+                                        );
+
+                                        $hide_deposit_container = false;
                                         if(current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) {
                                             $deposit_deadline_value = isset($DepositDeadline) ? $DepositDeadline : '';
+                                            if(empty($deposit_deadline_value)) {
+                                                $hide_deposit_container = true;
+                                            }
                                         }
-                                        if(empty($deposit_deadline_value)) {
-                                            echo 'style="display: none;"';
+                                        if($is_legacy_deposit_booking) {
+                                            $hide_deposit_container = true;
                                         }
-                                    ?>>
+                                    ?>
+                                    <div class="row" id="deposit_container" <?php if($hide_deposit_container) { echo 'style="display: none;"'; } ?>>
                                         <?php
                                             $deposit_mode_value = 'percentage';
                                             if(current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) {
@@ -1704,14 +1714,21 @@
 
 
 
+    // Legacy bookings (created on/before 2026-04-06) must never show the deposit container
+    var is_legacy_deposit_booking = <?php echo !empty($is_legacy_deposit_booking) ? 'true' : 'false'; ?>;
+
     function Reset_Deposit_Deadline() {
         $('input[name="DepositDeadline"]').val('');
         // Hide deposit container when Deposit Deadline is reset
         $('#deposit_container').hide();
     }
-    
+
     // Function to toggle deposit container based on Deposit Deadline value
     function toggleDepositContainer() {
+        if (is_legacy_deposit_booking) {
+            $('#deposit_container').hide();
+            return;
+        }
         var depositDeadline = $('input[name="DepositDeadline"]').val();
         if (depositDeadline && depositDeadline.trim() !== '') {
             $('#deposit_container').show();

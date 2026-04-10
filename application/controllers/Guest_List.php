@@ -748,7 +748,168 @@ class Guest_List extends CI_Controller
 	function Unlock() {
 		$this->Guest_List_Model->Update_GL_Session('BookingID', $this->input->post('booking_id'), 'N', null);
 	}
-	
+
+	/**
+	 * Auto-save endpoint called when the GL countdown is about to expire or when
+	 * the user declines the extension. Writes whatever the user has typed so far
+	 * into the real guest_list rows without enforcing the "all fields required"
+	 * validation that gates the normal submit. Does NOT release the lock, does
+	 * NOT flip LockStatus / is_submitted, and does NOT redirect — the frontend
+	 * runs its existing release-and-reload flow after this call completes.
+	 */
+	function auto_save() {
+		header('Content-Type: application/json');
+
+		if (!$this->input->post()) {
+			echo json_encode(array('status' => 'error', 'message' => 'No data'));
+			return;
+		}
+
+		try {
+			$booking_id = $this->Guest_List_Model->Read_Booking_ID();
+
+			// Resolve passport copies the same way index() does, so that auto-save
+			// respects freshly uploaded files and preserves existing ones.
+			$this->resolve_passport_copies($booking_id);
+
+			// preserve_case=true: auto-save must store exactly what the user
+			// typed so the reload shows their text verbatim. Normal submit
+			// (index()) still uppercases as it always has.
+			$this->Guest_List_Model->Update(true);
+
+			if (!empty($this->input->post('new_guests'))) {
+				$this->Guest_List_Model->Create_Guest($booking_id, true);
+			}
+
+			if (!empty($this->input->post('deleted_guests'))) {
+				$deleted_guests = explode(',', $this->input->post('deleted_guests'));
+				for ($i = 0; $i < count($deleted_guests); $i++) {
+					if ($deleted_guests[$i] !== '') {
+						$this->Guest_List_Model->Delete($deleted_guests[$i]);
+					}
+				}
+			}
+
+			echo json_encode(array('status' => 'ok'));
+		} catch (Exception $e) {
+			log_message('error', 'Guest_List auto_save failed: ' . $e->getMessage());
+			echo json_encode(array('status' => 'error', 'message' => $e->getMessage()));
+		}
+	}
+
+	/**
+	 * Upload a single passport file triggered by an onchange on the file input.
+	 * Accepts a slot in the form "existing:<GuestListID>" or "new:<rowIndex>".
+	 * For existing guests the filename is written straight to the DB so it
+	 * survives timeout without relying on a subsequent auto_save call.
+	 */
+	function upload_passport_single() {
+		header('Content-Type: application/json');
+
+		$slot = $this->input->post('slot');
+		if (empty($slot) || !isset($_FILES['passport_copy'])) {
+			echo json_encode(array('status' => 'error', 'message' => 'Missing slot or file'));
+			return;
+		}
+
+		$booking_id = $this->Guest_List_Model->Read_Booking_ID();
+		if (empty($booking_id)) {
+			echo json_encode(array('status' => 'error', 'message' => 'Invalid booking'));
+			return;
+		}
+
+		$result = $this->store_single_passport_file('passport_copy');
+		if ($result['status'] !== 'ok') {
+			echo json_encode($result);
+			return;
+		}
+
+		$filename = $result['filename'];
+
+		// existing:<GuestListID> — persist to DB immediately so a reload
+		// before auto_save still shows the uploaded file.
+		if (strpos($slot, 'existing:') === 0) {
+			$guest_list_id = (int) substr($slot, strlen('existing:'));
+			if ($guest_list_id > 0) {
+				$this->Guest_List_Model->Update_Passport_Copy($guest_list_id, $filename);
+			}
+		}
+		// new:<rowIndex> — just return the filename; the frontend will stuff
+		// it into the matching new_passport_copies hidden input and auto_save
+		// / normal submit will pick it up.
+
+		echo json_encode(array('status' => 'ok', 'filename' => $filename));
+	}
+
+	/**
+	 * Shared passport merging logic used by both index() and auto_save():
+	 * handles freshly uploaded files, preserves existing ones, and mutates
+	 * $_POST so Guest_List_Model->Update() / Create_Guest() pick up the paths.
+	 */
+	private function resolve_passport_copies($booking_id) {
+		$passport_copy_paths = $this->handle_passport_uploads('passport_copies', $booking_id);
+		$new_passport_copy_paths = $this->handle_passport_uploads('new_passport_copies', $booking_id);
+
+		if (!empty($this->input->post('guests'))) {
+			$guest_count = count($this->input->post('guests'));
+			$passport_copies_array = array();
+			for ($i = 0; $i < $guest_count; $i++) {
+				if (isset($passport_copy_paths[$i]) && !empty($passport_copy_paths[$i])) {
+					$passport_copies_array[$i] = $passport_copy_paths[$i];
+				} elseif (!empty($this->input->post('existing_passport_copies')) && isset($this->input->post('existing_passport_copies')[$i]) && !empty($this->input->post('existing_passport_copies')[$i])) {
+					$passport_copies_array[$i] = $this->input->post('existing_passport_copies')[$i];
+				} else {
+					$passport_copies_array[$i] = '';
+				}
+			}
+			$_POST['passport_copies'] = $passport_copies_array;
+		}
+
+		if (!empty($new_passport_copy_paths)) {
+			$_POST['new_passport_copies'] = $new_passport_copy_paths;
+		}
+	}
+
+	/**
+	 * Store a single uploaded file (same validation + naming as
+	 * handle_passport_uploads) and return the relative path.
+	 */
+	private function store_single_passport_file($field_key) {
+		$upload_path = FCPATH . 'assets/upload/passport/';
+		if (!is_dir($upload_path)) {
+			mkdir($upload_path, 0755, true);
+		}
+
+		if (!isset($_FILES[$field_key]) || $_FILES[$field_key]['error'] != UPLOAD_ERR_OK) {
+			return array('status' => 'error', 'message' => 'Upload failed');
+		}
+
+		$allowed_extensions = array('pdf', 'jpg', 'jpeg', 'png', 'gif');
+		$max_size = 10240 * 1024; // 10MB
+
+		$tmp_name = $_FILES[$field_key]['tmp_name'];
+		$original_name = $_FILES[$field_key]['name'];
+		$file_size = $_FILES[$field_key]['size'];
+
+		if ($file_size > $max_size) {
+			return array('status' => 'error', 'message' => 'File too large (max 10MB)');
+		}
+
+		$file_extension = strtolower(pathinfo($original_name, PATHINFO_EXTENSION));
+		if (!in_array($file_extension, $allowed_extensions)) {
+			return array('status' => 'error', 'message' => 'Invalid file type');
+		}
+
+		$encrypted_name = md5(uniqid(rand(), true) . time()) . '.' . $file_extension;
+		$destination = $upload_path . $encrypted_name;
+
+		if (!move_uploaded_file($tmp_name, $destination)) {
+			return array('status' => 'error', 'message' => 'Could not move uploaded file');
+		}
+
+		return array('status' => 'ok', 'filename' => 'assets/upload/passport/' . $encrypted_name);
+	}
+
 	/**
 	 * Handle passport copy file uploads
 	 * @param string $field_name The name of the file input field

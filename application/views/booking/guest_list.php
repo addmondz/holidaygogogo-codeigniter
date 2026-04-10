@@ -1503,6 +1503,109 @@
 				});
 			}
 
+			// ============================================
+			// Auto-save on timeout
+			// ============================================
+			// Saves whatever the user has typed so far into the real guest_list
+			// rows without the "all required" validation that gates normal submit.
+			// Called when the timer hits 0 or the user declines the extension.
+			// Runs best-effort: onDone is always invoked so the caller's release
+			// + reload flow still runs even if the save fails.
+			var autoSaveInFlight = false;
+			function performAutoSave(onDone) {
+				if (autoSaveInFlight) {
+					if (onDone) onDone();
+					return;
+				}
+				autoSaveInFlight = true;
+
+				// $('#form').serialize() skips file inputs automatically — passport
+				// files are uploaded on change via uploadSinglePassport() and their
+				// filenames live in the existing_passport_copies / new_passport_copies
+				// hidden inputs, so they travel with the serialized payload.
+				var payload = $('#form').serialize();
+
+				$.ajax({
+					url: '<?php echo base_url('Guest_List/auto_save'); ?>',
+					type: 'POST',
+					data: payload,
+					dataType: 'json',
+					timeout: 15000,
+					complete: function() {
+						autoSaveInFlight = false;
+						if (onDone) onDone();
+					}
+				});
+			}
+
+			// Upload a passport file immediately when the user picks it, so it's
+			// preserved even if they never hit submit and the timer runs out.
+			function uploadSinglePassport(fileInput) {
+				var $input = $(fileInput);
+				if (!fileInput.files || fileInput.files.length === 0) return;
+
+				var file = fileInput.files[0];
+				var isNew = $input.attr('name') === 'new_passport_copies[]';
+				var slot;
+
+				if (isNew) {
+					// Position among sibling new_passport_copies inputs
+					var newInputs = $('input[type="file"][name="new_passport_copies[]"]');
+					var idx = newInputs.index(fileInput);
+					slot = 'new:' + idx;
+				} else {
+					var guestId = $input.data('guest-id');
+					if (!guestId) return;
+					slot = 'existing:' + guestId;
+				}
+
+				var fd = new FormData();
+				fd.append('passport_copy', file);
+				fd.append('slot', slot);
+
+				var $label = $input.siblings('.custom-file-label');
+				var originalLabel = $label.text();
+				$label.text('Uploading…');
+
+				$.ajax({
+					url: '<?php echo base_url('Guest_List/upload_passport_single'); ?>',
+					type: 'POST',
+					data: fd,
+					processData: false,
+					contentType: false,
+					dataType: 'json',
+					success: function(response) {
+						if (response && response.status === 'ok' && response.filename) {
+							// Stash the returned path in the parallel hidden input so
+							// both auto_save and normal submit see it.
+							var hiddenName = isNew ? 'new_passport_copies[]' : 'existing_passport_copies[]';
+							var $hidden = $input.closest('.custom-file').parent().find('input[type="hidden"][name="' + hiddenName + '"]');
+							if ($hidden.length === 0) {
+								// Existing guest with no prior passport — the view
+								// renders an empty existing_passport_copies hidden
+								// input, but only in that positional slot. Create one
+								// if missing (defensive; shouldn't usually hit this).
+								$hidden = $('<input type="hidden" name="' + hiddenName + '">').appendTo($input.closest('.custom-file').parent());
+							}
+							$hidden.val(response.filename);
+							$label.text('File uploaded');
+						} else {
+							$label.text(originalLabel);
+							console.warn('Passport upload failed:', response);
+						}
+					},
+					error: function(xhr) {
+						$label.text(originalLabel);
+						console.warn('Passport upload error:', xhr);
+					}
+				});
+			}
+
+			// Bind to both existing (passport_copies[]) and any new-guest rows
+			$(document).on('change', 'input[type="file"][name="passport_copies[]"], input[type="file"][name="new_passport_copies[]"]', function() {
+				uploadSinglePassport(this);
+			});
+
 			// Enable form editing
 			function enableForm() {
 				$('input, select, textarea').not('[type="hidden"]').not('.room-assignment-readonly').prop('disabled', false);
@@ -1629,18 +1732,22 @@
 					if (msLeft <= 0) {
 						clearInterval(timerInterval);
 						element.innerHTML = '00:00';
-						// Time expired - show message
-						swal.fire({
-							width: 550,
-							background: 'url(<?php echo base_url('assets/image/sweetalert.jpg') ?>)',
-							icon: 'warning',
-							title: 'Time Expired',
-							text: 'Your time has expired. The page will reload.',
-							confirmButtonText: 'OK',
-							allowOutsideClick: false
-						}).then(() => {
-							releaseLock();
-							window.location.reload();
+						// Time expired - auto-save partial form data first so the user
+						// doesn't have to refill on next load, then show the expiry
+						// message and do the existing release/reload flow.
+						performAutoSave(function() {
+							swal.fire({
+								width: 550,
+								background: 'url(<?php echo base_url('assets/image/sweetalert.jpg') ?>)',
+								icon: 'warning',
+								title: 'Time Expired',
+								text: 'Your time has expired. Your progress has been saved. The page will reload.',
+								confirmButtonText: 'OK',
+								allowOutsideClick: false
+							}).then(() => {
+								releaseLock();
+								window.location.reload();
+							});
 						});
 						return;
 					}
@@ -1653,7 +1760,7 @@
 							background: 'url(<?php echo base_url('assets/image/sweetalert.jpg') ?>)',
 							icon: 'question',
 							title: 'Time Over Soon, Need More Time ?',
-							text: 'You have one chance to extend the timer by 12 minutes. By clicking "No", all changes will not be saved automatically.',
+							text: 'You have one chance to extend the timer by 12 minutes. By clicking "No", your progress will be saved automatically.',
 							confirmButtonText: 'Yes, Extend',
 							cancelButtonText: 'No',
 							showCancelButton: true,
@@ -1705,9 +1812,12 @@
 									}
 								});
 							} else {
-								// User declined extension
-								releaseLock();
-								window.location.href = '<?php echo base_url('Message?url=' . base_url($_SERVER['REQUEST_URI'])) ?>';
+								// User declined extension — save progress before
+								// releasing the lock so it survives the redirect.
+								performAutoSave(function() {
+									releaseLock();
+									window.location.href = '<?php echo base_url('Message?url=' . base_url($_SERVER['REQUEST_URI'])) ?>';
+								});
 							}
 						});
 					} else {

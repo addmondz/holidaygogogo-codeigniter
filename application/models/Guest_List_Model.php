@@ -61,37 +61,40 @@ class Guest_List_Model extends CI_Model
 		$this->db->insert('guest_list', $array);
 	}
 
-	function Create_Guest($booking_id)
+	function Create_Guest($booking_id, $preserve_case = false)
 	{
+		$upper = function($value) use ($preserve_case) {
+			return $preserve_case ? $value : strtoupper($value);
+		};
 		for($i = 0; $i < count(explode(',', $this->input->post('new_guests'))); $i++) {
 			$array = array(
 				'BookingID' => $booking_id,
 				'CountryCodeID' => empty($this->input->post('new_country_codes')[$i]) ? null : $this->input->post('new_country_codes')[$i],
 				'Type' => $this->input->post('new_types')[$i],
-				'Name' => empty($this->input->post('new_names')[$i]) ? null : strtoupper($this->input->post('new_names')[$i]),
-				'LastName' => empty($this->input->post('new_last_names')[$i]) ? null : strtoupper($this->input->post('new_last_names')[$i]),
+				'Name' => empty($this->input->post('new_names')[$i]) ? null : $upper($this->input->post('new_names')[$i]),
+				'LastName' => empty($this->input->post('new_last_names')[$i]) ? null : $upper($this->input->post('new_last_names')[$i]),
 				'Gender' => empty($this->input->post('new_genders')[$i]) ? null : $this->input->post('new_genders')[$i],
 				'DateOfBirth' => empty($this->input->post('new_date_of_births')[$i]) ? null : date('Y-m-d', strtotime(str_replace('/', '-', $this->input->post('new_date_of_births')[$i]))),
 				'Nationality' => empty($this->input->post('new_nationalities')[$i]) ? null : $this->input->post('new_nationalities')[$i],
 				'IdentificationNumber' => empty($this->input->post('new_identification_numbers')[$i]) ? null : $this->input->post('new_identification_numbers')[$i],
-				'PassportNumber' => empty($this->input->post('new_passport_numbers')[$i]) ? null : strtoupper($this->input->post('new_passport_numbers')[$i]),
+				'PassportNumber' => empty($this->input->post('new_passport_numbers')[$i]) ? null : $upper($this->input->post('new_passport_numbers')[$i]),
 				'PassportIssueDate' => empty($this->input->post('new_passport_issue_dates')[$i]) ? null : (strtotime(str_replace('/', '-', $this->input->post('new_passport_issue_dates')[$i])) !== false ? date('Y-m-d', strtotime(str_replace('/', '-', $this->input->post('new_passport_issue_dates')[$i]))) : null),
 				'PassportExpiryDate' => empty($this->input->post('new_passport_expiry_dates')[$i]) ? null : (strtotime(str_replace('/', '-', $this->input->post('new_passport_expiry_dates')[$i])) !== false ? date('Y-m-d', strtotime(str_replace('/', '-', $this->input->post('new_passport_expiry_dates')[$i]))) : null),
 				'PassportCopy' => (isset($this->input->post('new_passport_copies')[$i]) && !empty($this->input->post('new_passport_copies')[$i])) ? $this->input->post('new_passport_copies')[$i] : null,
 				'DietaryRequirement' => empty($this->input->post('new_dietary_requirements')[$i]) ? null : $this->input->post('new_dietary_requirements')[$i],
 				'Mobile' => empty($this->input->post('new_mobiles')[$i]) ? null : $this->input->post('new_mobiles')[$i],
-				'Email' => empty($this->input->post('new_emails')[$i]) ? null : strtoupper($this->input->post('new_emails')[$i]),
+				'Email' => empty($this->input->post('new_emails')[$i]) ? null : $upper($this->input->post('new_emails')[$i]),
 				'MaritalStatus' => empty($this->input->post('new_marital_statuses')[$i]) ? null : $this->input->post('new_marital_statuses')[$i],
-				'Employment' => empty($this->input->post('new_employments')[$i]) ? null : strtoupper($this->input->post('new_employments')[$i]),
-				'Address' => empty($this->input->post('new_addresses')[$i]) ? null : strtoupper($this->input->post('new_addresses')[$i]),
+				'Employment' => empty($this->input->post('new_employments')[$i]) ? null : $upper($this->input->post('new_employments')[$i]),
+				'Address' => empty($this->input->post('new_addresses')[$i]) ? null : $upper($this->input->post('new_addresses')[$i]),
 				'Postcode' => empty($this->input->post('new_postcodes')[$i]) ? null : $this->input->post('new_postcodes')[$i],
-				'City' => empty($this->input->post('new_cities')[$i]) ? null : strtoupper($this->input->post('new_cities')[$i]),
-				'State' => empty($this->input->post('new_states')[$i]) ? null : strtoupper($this->input->post('new_states')[$i]),
+				'City' => empty($this->input->post('new_cities')[$i]) ? null : $upper($this->input->post('new_cities')[$i]),
+				'State' => empty($this->input->post('new_states')[$i]) ? null : $upper($this->input->post('new_states')[$i]),
 				'Country' => empty($this->input->post('new_countries')[$i]) ? null : $this->input->post('new_countries')[$i],
-				'Nominee' => empty($this->input->post('new_nominee_names')[$i]) ? null : strtoupper($this->input->post('new_nominee_names')[$i]),
+				'Nominee' => empty($this->input->post('new_nominee_names')[$i]) ? null : $upper($this->input->post('new_nominee_names')[$i]),
 				'NomineeIdentificationNumber' => empty($this->input->post('new_nominee_identification_numbers')[$i]) ? null : $this->input->post('new_nominee_identification_numbers')[$i],
 				'NomineeContactNumber' => empty($this->input->post('new_nominee_contact_numbers')[$i]) ? null : $this->input->post('new_nominee_contact_numbers')[$i],
-				'Relationship' => empty($this->input->post('new_relationships')[$i]) ? null : strtoupper($this->input->post('new_relationships')[$i]),
+				'Relationship' => empty($this->input->post('new_relationships')[$i]) ? null : $upper($this->input->post('new_relationships')[$i]),
 				'InsertBy' => $this->session->userdata('admin_id'),
 				'InsertDate' => date('Y-m-d H:i:s')
 			);
@@ -110,36 +113,39 @@ class Guest_List_Model extends CI_Model
 		$this->db->insert('guest_list_log', $array);
 	}
 
-	function Update()
+	function Update($preserve_case = false)
 	{
+		$upper = function($value) use ($preserve_case) {
+			return $preserve_case ? $value : strtoupper($value);
+		};
 		$value = false;
 		if(!empty($this->input->post('names'))) {
 			for($i = 0; $i < count($this->input->post('names')); $i++) {
 				$array = array(
 					'CountryCodeID' => empty($this->input->post('country_codes')[$i]) ? null : $this->input->post('country_codes')[$i],
-					'Name' => empty($this->input->post('names')[$i]) ? null : strtoupper($this->input->post('names')[$i]),
-					'LastName' => empty($this->input->post('last_names')[$i]) ? null : strtoupper($this->input->post('last_names')[$i]),
+					'Name' => empty($this->input->post('names')[$i]) ? null : $upper($this->input->post('names')[$i]),
+					'LastName' => empty($this->input->post('last_names')[$i]) ? null : $upper($this->input->post('last_names')[$i]),
 					'Gender' => empty($this->input->post('genders')[$i]) ? null : $this->input->post('genders')[$i],
 					'DateOfBirth' => empty($this->input->post('date_of_births')[$i]) ? null : date('Y-m-d', strtotime(str_replace('/', '-', $this->input->post('date_of_births')[$i]))),
 					'Nationality' => empty($this->input->post('nationalities')[$i]) ? null : $this->input->post('nationalities')[$i],
 					'IdentificationNumber' => empty($this->input->post('identification_numbers')[$i]) ? null : $this->input->post('identification_numbers')[$i],
-					'PassportNumber' => empty($this->input->post('passport_numbers')[$i]) ? null : strtoupper($this->input->post('passport_numbers')[$i]),
+					'PassportNumber' => empty($this->input->post('passport_numbers')[$i]) ? null : $upper($this->input->post('passport_numbers')[$i]),
 					'PassportIssueDate' => empty($this->input->post('passport_issue_dates')[$i]) ? null : (strtotime(str_replace('/', '-', $this->input->post('passport_issue_dates')[$i])) !== false ? date('Y-m-d', strtotime(str_replace('/', '-', $this->input->post('passport_issue_dates')[$i]))) : null),
 					'PassportExpiryDate' => empty($this->input->post('passport_expiry_dates')[$i]) ? null : (strtotime(str_replace('/', '-', $this->input->post('passport_expiry_dates')[$i])) !== false ? date('Y-m-d', strtotime(str_replace('/', '-', $this->input->post('passport_expiry_dates')[$i]))) : null),
 					'DietaryRequirement' => empty($this->input->post('dietary_requirements')[$i]) ? null : $this->input->post('dietary_requirements')[$i],
 					'Mobile' => empty($this->input->post('mobiles')[$i]) ? null : $this->input->post('mobiles')[$i],
-					'Email' => empty($this->input->post('emails')[$i]) ? null : strtoupper($this->input->post('emails')[$i]),
+					'Email' => empty($this->input->post('emails')[$i]) ? null : $upper($this->input->post('emails')[$i]),
 					'MaritalStatus' => empty($this->input->post('marital_statuses')[$i]) ? null : $this->input->post('marital_statuses')[$i],
-					'Employment' => empty($this->input->post('employments')[$i]) ? null : strtoupper($this->input->post('employments')[$i]),
-					'Address' => empty($this->input->post('addresses')[$i]) ? null : strtoupper($this->input->post('addresses')[$i]),
+					'Employment' => empty($this->input->post('employments')[$i]) ? null : $upper($this->input->post('employments')[$i]),
+					'Address' => empty($this->input->post('addresses')[$i]) ? null : $upper($this->input->post('addresses')[$i]),
 					'Postcode' => empty($this->input->post('postcodes')[$i]) ? null : $this->input->post('postcodes')[$i],
-					'City' => empty($this->input->post('cities')[$i]) ? null : strtoupper($this->input->post('cities')[$i]),
-					'State' => empty($this->input->post('states')[$i]) ? null : strtoupper($this->input->post('states')[$i]),
+					'City' => empty($this->input->post('cities')[$i]) ? null : $upper($this->input->post('cities')[$i]),
+					'State' => empty($this->input->post('states')[$i]) ? null : $upper($this->input->post('states')[$i]),
 					'Country' => empty($this->input->post('countries')[$i]) ? null : $this->input->post('countries')[$i],
-					'Nominee' => empty($this->input->post('nominee_names')[$i]) ? null : strtoupper($this->input->post('nominee_names')[$i]),
+					'Nominee' => empty($this->input->post('nominee_names')[$i]) ? null : $upper($this->input->post('nominee_names')[$i]),
 					'NomineeIdentificationNumber' => empty($this->input->post('nominee_identification_numbers')[$i]) ? null : $this->input->post('nominee_identification_numbers')[$i],
 					'NomineeContactNumber' => empty($this->input->post('nominee_contact_numbers')[$i]) ? null : $this->input->post('nominee_contact_numbers')[$i],
-					'Relationship' => empty($this->input->post('relationships')[$i]) ? null : strtoupper($this->input->post('relationships')[$i])
+					'Relationship' => empty($this->input->post('relationships')[$i]) ? null : $upper($this->input->post('relationships')[$i])
 				);
 				// Update PassportCopy if provided in POST (either new upload or existing file)
 				if (isset($this->input->post('passport_copies')[$i])) {
@@ -178,6 +184,16 @@ class Guest_List_Model extends CI_Model
 		);
 		$this->db->where('GuestListID', $guest_list_id);
 		$this->db->update('guest_list', $array);
+	}
+
+	function Update_Passport_Copy($guest_list_id, $filename)
+	{
+		$this->db->where('GuestListID', $guest_list_id);
+		$this->db->update('guest_list', array(
+			'PassportCopy' => !empty($filename) ? $filename : null,
+			'UpdateBy' => $this->session->userdata('admin_id'),
+			'UpdateDate' => date('Y-m-d H:i:s')
+		));
 	}
 
 	function Are_All_Guests_Complete($booking_id)

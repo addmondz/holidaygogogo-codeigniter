@@ -941,31 +941,106 @@ class Payment extends MY_Controller
 			$payments_exempted_from_updating_payment_deadline = explode(',', $this->input->post('payment_ids_exempted_from_updating_payment_deadline'));
 			$payments_exempted_from_updating_reference_number = explode(',', $this->input->post('payment_ids_exempted_from_updating_reference_number'));
 			$payments = explode(',', $this->input->post('payment_ids'));
+			$approved_payment_ids = array();
 			for($i = 0; $i < count($payments); $i++) {
 				if(!empty($date)) {
 					if(!in_array($payments[$i], $payments_exempted_from_updating_transaction_date)) {
-						$this->Payment_Model->Update_Date(date('Y-m-d', strtotime(str_replace('/', '-', $date))), $payments[$i]);
-						$this->Payment_Model->Create_Payment_Log('Date', $this->Payment_Model->Read_Date($payments[$i]), date('Y-m-d', strtotime(str_replace('/', '-', $date))), $payments[$i]);
+						$new_date = date('Y-m-d', strtotime(str_replace('/', '-', $date)));
+						$old_date = $this->Payment_Model->Read_Date($payments[$i]);
+						if($old_date != $new_date) {
+							$this->Payment_Model->Update_Date($new_date, $payments[$i]);
+							$this->Payment_Model->Create_Payment_Log('Date', $old_date, $new_date, $payments[$i]);
+						}
 					}
 				}
 				if(!empty($deadline)) {
 					if(!in_array($payments[$i], $payments_exempted_from_updating_payment_deadline)) {
-						$this->Payment_Model->Update_Deadline(date('Y-m-d', strtotime(str_replace('/', '-', $deadline))), $payments[$i]);
-						$this->Payment_Model->Create_Payment_Log('Deadline', $this->Payment_Model->Read_Deadline($payments[$i]), date('Y-m-d', strtotime(str_replace('/', '-', $deadline))), $payments[$i]);
+						$new_deadline = date('Y-m-d', strtotime(str_replace('/', '-', $deadline)));
+						$old_deadline = $this->Payment_Model->Read_Deadline($payments[$i]);
+						if($old_deadline != $new_deadline) {
+							$this->Payment_Model->Update_Deadline($new_deadline, $payments[$i]);
+							$this->Payment_Model->Create_Payment_Log('Deadline', $old_deadline, $new_deadline, $payments[$i]);
+						}
 					}
 				}
 				if(!empty($reference_number)) {
 					if(!in_array($payments[$i], $payments_exempted_from_updating_reference_number)) {
-						$this->Payment_Model->Update_Reference_Number($reference_number, $payments[$i]);
-						$this->Payment_Model->Create_Payment_Log('ReferenceNumber', $this->Payment_Model->Read_Reference_Number($payments[$i]), $reference_number, $payments[$i]);
+						$old_reference_number = $this->Payment_Model->Read_Reference_Number($payments[$i]);
+						if($old_reference_number != $reference_number) {
+							$this->Payment_Model->Update_Reference_Number($reference_number, $payments[$i]);
+							$this->Payment_Model->Create_Payment_Log('ReferenceNumber', $old_reference_number, $reference_number, $payments[$i]);
+						}
 					}
 				}
 				if(!empty($status)) {
-					$this->Payment_Model->Update_Status($status, $payments[$i]);
-					$this->Payment_Model->Create_Payment_Log('Status', $this->Payment_Model->Read_Status($payments[$i]), $status, $payments[$i]);
+					$old_status = $this->Payment_Model->Read_Status($payments[$i]);
+					if($old_status != $status) {
+						$this->Payment_Model->Update_Status($status, $payments[$i]);
+						$this->Payment_Model->Create_Payment_Log('Status', $old_status, $status, $payments[$i]);
+						if($status == 'Y') {
+							$approved_payment_ids[] = $payments[$i];
+						}
+					}
 				}
-				
+
 			}
+
+			// After bulk-approving credit payments, advance booking.Status forward if applicable.
+			// Mirrors the per-payment logic in Payment::Update() at lines 719-836 so the
+			// booking list's "PAYMENT OVERDUE" display is updated without waiting for the
+			// Dashboard recalculate side-effect.
+			if(!empty($approved_payment_ids)) {
+				$this->load->helper('booking_flow');
+				$this->load->helper('booking_status_log');
+				$this->load->model('Booking_Model');
+
+				$this->db->distinct();
+				$this->db->select('BookingID');
+				$this->db->where_in('PaymentID', $approved_payment_ids);
+				$this->db->where('Credit >', 0);
+				$this->db->where('Type !=', 'SUPPLIER REFUND');
+				$booking_rows = $this->db->get('payment')->result();
+
+				$approver_id = $this->session->userdata('admin_id') ?: 0;
+
+				foreach($booking_rows as $row) {
+					$booking_id = $row->BookingID;
+					$booking = $this->Booking_Model->getBookingById($booking_id);
+					if(!$booking || $booking->CancelStatus == 'Y') continue;
+
+					$status_info = determine_booking_status_from_state($booking_id, $booking, $this);
+					$new_booking_status = $status_info['status'];
+
+					// Forward-only: advance from PBC/P/PP to PP/PBO. Never regress
+					// PBO/PGL/PTV/PT/OG/Y back down when a single payment flips.
+					$forward_from = array('PBC', 'P', 'PP');
+					$forward_to   = array('PP', 'PBO');
+					if(in_array($booking->Status, $forward_from, true)
+					   && in_array($new_booking_status, $forward_to, true)
+					   && $new_booking_status !== $booking->Status) {
+						$this->Booking_Model->Update_Status($new_booking_status, $booking_id);
+						$this->Booking_Model->Create_Booking_Log2($booking->Status, $new_booking_status, $booking_id);
+						log_booking_status_change(
+							$booking_id,
+							$new_booking_status,
+							$booking->Status,
+							$approver_id,
+							'Status advanced via bulk payment update - ' . $status_info['description'],
+							true
+						);
+
+						// If landing on PBO, try to advance further through the checklist gate
+						// (matches Payment::Update() at Payment.php:793-797).
+						if($new_booking_status === 'PBO') {
+							$updated_booking = $this->Booking_Model->getBookingById($booking_id);
+							if($updated_booking) {
+								check_and_advance_status_if_no_checklist_or_all_completed($booking_id, $updated_booking, $approver_id, $this);
+							}
+						}
+					}
+				}
+			}
+
 			$this->session->set_flashdata('message_success', 'Payment Records Successfully Updated');
 			if(strpos($this->input->get('url'), '?') == true) {
 				redirect('Payment?' . explode('?', $this->input->get('url'))[1]);

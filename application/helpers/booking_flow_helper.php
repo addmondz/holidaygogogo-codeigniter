@@ -39,7 +39,6 @@ if (!function_exists('get_derived_statuses')) {
         return [
             'PGL',  // PENDING GUEST LIST (derived from PTV + LockStatus = 'N')
             'OG',   // ON-GOING (derived from PT/Y based on travel dates)
-            'PP',   // PARTIAL PAYMENT (derived from P based on payment amount)
             'PO',   // PAYMENT OVERDUE (derived from P/PP based on deadlines)
             'PR'    // PENDING REVIEW (derived from Y + AfterSalesService = 'PENDING')
         ];
