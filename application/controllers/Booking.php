@@ -1094,6 +1094,11 @@ class Booking extends MY_Controller
 					}
 					$array = $this->Booking_Model->Read_Booking();
 
+					// Reset lock status for Duplicate - new booking should not inherit GL lock
+					if (current_url() == base_url('Booking/Duplicate')) {
+						$array['LockStatus'] = 'N';
+					}
+
 					if(!empty($array['DepositDeadline'])) {
 						$array['DepositDeadline'] = date('d/m/Y', strtotime($array['DepositDeadline']));
 					}
