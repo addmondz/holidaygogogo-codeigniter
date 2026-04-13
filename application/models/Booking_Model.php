@@ -93,10 +93,10 @@ class Booking_Model extends CI_Model
 		$this->db->join('category', 'category.CategoryID = booking.Destination', 'left');
 		$this->db->join('country_code', 'country_code.CountryCodeID = booking.CountryCodeID', 'left');
 		$this->db->join('customer', 'customer.CustomerID = booking.CustomerID', 'left');
-		if($this->session->userdata('level') == 20) {
+		if(in_array($this->session->userdata('level'), [20, 50])) {
 			$this->db->where('SalesAgent', $this->session->userdata('admin_id'));
 		}
-		
+
 		$this->db->where('booking.Status !=', 'N');
 		$this->db->order_by('booking.BookingID', 'DESC');
 
@@ -110,7 +110,7 @@ class Booking_Model extends CI_Model
 		$this->db->join('category', 'category.CategoryID = booking.Destination', 'left');
 		$this->db->join('country_code', 'country_code.CountryCodeID = booking.CountryCodeID', 'left');
 		$this->db->join('customer', 'customer.CustomerID = booking.CustomerID', 'left');
-		if($this->session->userdata('level') == 20) {
+		if(in_array($this->session->userdata('level'), [20, 50])) {
 			$this->db->where('SalesAgent', $this->session->userdata('admin_id'));
 		}
 
@@ -127,7 +127,7 @@ class Booking_Model extends CI_Model
 		$this->db->join('category', 'category.CategoryID = booking.Destination', 'left');
 		$this->db->join('country_code', 'country_code.CountryCodeID = booking.CountryCodeID', 'left');
 		$this->db->join('customer', 'customer.CustomerID = booking.CustomerID', 'left');
-		if($this->session->userdata('level') == 20) {
+		if(in_array($this->session->userdata('level'), [20, 50])) {
 			$this->db->where('SalesAgent', $this->session->userdata('admin_id'));
 		}
 
@@ -319,7 +319,7 @@ class Booking_Model extends CI_Model
 		$this->db->join('category', 'category.CategoryID = booking.Destination', 'left');
 		$this->db->join('country_code', 'country_code.CountryCodeID = booking.CountryCodeID', 'left');
 		$this->db->join('source', 'source.SourceID = booking.Source', 'left');
-		if($this->session->userdata('level') == 20) {
+		if(in_array($this->session->userdata('level'), [20, 50])) {
 			$this->db->where('SalesAgent', $this->session->userdata('admin_id'));
 		}
 		if(!empty($this->input->get('booking_number'))) {
@@ -1601,7 +1601,7 @@ class Booking_Model extends CI_Model
 	 */
 	private function apply_booking_filters()
 	{
-		if($this->session->userdata('level') == 20) {
+		if(in_array($this->session->userdata('level'), [20, 50])) {
 			$this->db->where('SalesAgent', $this->session->userdata('admin_id'));
 		}
 
@@ -1842,7 +1842,7 @@ class Booking_Model extends CI_Model
 	function Count_Bookings_Total()
 	{
 		$this->db->from('booking');
-		if($this->session->userdata('level') == 20) {
+		if(in_array($this->session->userdata('level'), [20, 50])) {
 			$this->db->where('SalesAgent', $this->session->userdata('admin_id'));
 		}
 		// Hide completed bookings from SA and TC

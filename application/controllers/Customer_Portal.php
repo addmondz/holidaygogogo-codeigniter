@@ -475,7 +475,7 @@ class Customer_Portal extends CI_Controller
             if (!empty($payment['Deadline'])) {
                 $payment['Deadline'] = date('d M Y', strtotime($payment['Deadline']));
             }
-            if ($payment['Status'] == 'Y' || $payment['Status'] == 'P') {
+            if ($payment['Status'] == 'Y') {
                 if (!empty($payment['Credit']) && $payment['Credit'] > 0 && $payment['Type'] != 'AGENT COMMISSION FROM SUPPLIER') {
                     $total_credit += $payment['Credit'];
                 }

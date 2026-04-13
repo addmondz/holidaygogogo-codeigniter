@@ -1200,6 +1200,8 @@
             // Check payments
             $has_any_payment = false;
             $payment_date = null;
+            $full_payment_date = null;
+            $latest_credit_date = null;
             $payment_details = [];
             if (!empty($booking['payments'])) {
                 foreach ($booking['payments'] as $payment) {
@@ -1208,17 +1210,29 @@
                         $payment['Status'] == 'Y'
                     ) {
                         $has_any_payment = true;
+                        $p_date = !empty($payment['DateRaw']) ? $payment['DateRaw'] : $payment['Date'];
                         if (empty($payment_date)) {
-                            $payment_date = !empty($payment['DateRaw']) ? $payment['DateRaw'] : $payment['Date'];
+                            $payment_date = $p_date;
+                        }
+                        $p_type = strtoupper(trim($payment['Type'] ?? ''));
+                        if ($p_type == 'FULL') {
+                            $full_payment_date = $p_date;
+                        }
+                        // Track latest credit date as fallback when no explicit FULL row exists
+                        if (empty($latest_credit_date) || strtotime($p_date) >= strtotime($latest_credit_date)) {
+                            $latest_credit_date = $p_date;
                         }
                         $payment_details[] = [
                             'type' => $payment['Type'] ?? 'Payment',
                             'amount' => $payment['Credit'],
-                            'date' => !empty($payment['DateRaw']) ? $payment['DateRaw'] : $payment['Date'],
+                            'date' => $p_date,
                             'status' => $payment['Status']
                         ];
                     }
                 }
+            }
+            if (empty($full_payment_date)) {
+                $full_payment_date = $latest_credit_date;
             }
 
             // Check if all required payment is received (deposit or full)
@@ -1424,8 +1438,8 @@
                     'step' => count($timeline_steps) + 1,
                     'title' => $full_payment_title,
                     'description' => $full_payment_description,
-                    'event_date' => $full_payment_complete ? $payment_date : null,
-                    'relative_time' => $full_payment_complete ? get_relative_time($payment_date) : '',
+                    'event_date' => $full_payment_complete ? ($full_payment_date ?: $payment_date) : null,
+                    'relative_time' => $full_payment_complete ? get_relative_time($full_payment_date ?: $payment_date) : '',
                     'expected_date' => $full_payment_deadline,
                     'status' => $full_payment_step_status,
                     'icon' => 'credit-card',
