@@ -100,6 +100,8 @@ class Travel_Voucher extends CI_Controller
                 $this->db->order_by('Type', 'ASC');
                 $array['guest_lists'] = $this->db->get('guest_list')->result();
                 
+                $array['CustomerProfileURL'] = base_url('customer/' . generate_customer_portal_slug($array['CustomerID']));
+
                 $this->load->library('pdf');
                 $this->dompdf->loadHtml($this->load->view('booking/travel_voucher', $array, true));
                 $this->dompdf->set_option('isRemoteEnabled', true);

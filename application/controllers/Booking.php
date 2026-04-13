@@ -680,7 +680,7 @@ class Booking extends MY_Controller
 				// }
         } else {
 				$titles = array('tab_title' => 'HolidayGoGoGo | Booking', 'breadcrumb_title' => 'Booking >> Create');
-					$array = array('BookingID' => 'NA', 'BookingConfirmationFooterID' => 'NA', 'TravelVoucherFooterID' => 'NA', 'BookingNumber' => 'NA', 'Tag' => array(), 'Discount' => 'NA', 'NetTotal' => 'NA', 'ProductSequence' => array(), 'BookingProductID' => ($this->Booking_Product_Model->Read_Last_Booking_Product_ID()) + 1, 'AllowReview' => 1);
+					$array = array('BookingID' => 'NA', 'BookingConfirmationFooterID' => 'NA', 'TravelVoucherFooterID' => 'NA', 'BookingNumber' => 'NA', 'Tag' => array(), 'Discount' => 'NA', 'NetTotal' => 'NA', 'ProductSequence' => array(), 'BookingProductID' => ($this->Booking_Product_Model->Read_Last_Booking_Product_ID()) + 1, 'AllowReview' => 1, 'ic_passport_no' => '');
 					$array['admins'] = $this->Booking_Model->Read_Admins();
 					$array['booking_op_admins'] = $this->Booking_Model->Read_Booking_OP_Admins();
 					$array['booking_products'][0] = (object) array('BookingProductID' => 'NA');
@@ -762,6 +762,17 @@ class Booking extends MY_Controller
 		
 		if(in_array('AB', $this->session->access_control)) {
 			if($this->input->is_ajax_request()) {
+				// Always persist IC/Passport No. on the linked customer when posted,
+				// independent of whether other booking fields changed.
+				$posted_ic = $this->input->post('ic_passport_no');
+				$posted_customer_id = $this->input->post('CustomerID');
+				if (!empty($posted_ic) && !empty($posted_customer_id) && is_numeric($posted_customer_id)) {
+					$this->Customer_Model->update_by_id($posted_customer_id, [
+						'ic_passport_no' => strtoupper($posted_ic),
+						'updated_at'     => date('Y-m-d H:i:s'),
+					]);
+				}
+
 				// Booking
 				// Action : Update
 				if(!empty($this->input->post('booking')) && count($this->input->post('booking')[0]) > 3) {

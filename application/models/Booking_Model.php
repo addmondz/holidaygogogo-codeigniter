@@ -76,7 +76,7 @@ class Booking_Model extends CI_Model
 
 	function Read_Booking()
 	{
-		$this->db->select('booking.BookingID, booking.AllowReview, booking.CustomerReview, booking.CustomerReviewTimestamp, BookingConfirmationFooterID, TravelVoucherFooterID, booking.CountryCodeID AS CustomerCountryCode, BookingNumber, ReservationNumber, DepositDeadline, FullPaymentDeadline, AdditionalPaymentDeadline, Customer, booking.Mobile AS CustomerMobile, StartDate, EndDate, Adult, Children, Infant, Destination, SalesAgent, Tag, BookingRemark, Subtotal, Discount, NetTotal, DepositPercentage, DepositMode, DepositFixedAmount, booking.ChatLanguage, Source, Token, booking.BookingConfirmationTitle, BookingConfirmationFooter, TravelVoucherFooter, booking.KeyContacts, booking.SpecialRemarks, ProductSequence, booking.Status, booking.CancelStatus, booking.LockStatus, booking.AfterSalesService, booking.bc_approved, booking.bc_approval_admin_id, booking.bc_approval_date, admin.Name AS SalesAgentName, booking.AutocountSyncStatus, booking.AutocountSyncMessage, booking.AutocountSyncAction, booking.CustomerAutocountSyncStatus, booking.CustomerAutocountSyncMessage, booking.CustomerAutocountSyncAction, customer.CustomerCode AS CustomerCode, booking.CustomerID, booking.BookingOP, booking.SalesAgent2, booking.InsertDate');
+		$this->db->select('booking.BookingID, booking.AllowReview, booking.CustomerReview, booking.CustomerReviewTimestamp, BookingConfirmationFooterID, TravelVoucherFooterID, booking.CountryCodeID AS CustomerCountryCode, BookingNumber, ReservationNumber, DepositDeadline, FullPaymentDeadline, AdditionalPaymentDeadline, Customer, booking.Mobile AS CustomerMobile, StartDate, EndDate, Adult, Children, Infant, Destination, SalesAgent, Tag, BookingRemark, Subtotal, Discount, NetTotal, DepositPercentage, DepositMode, DepositFixedAmount, booking.ChatLanguage, Source, Token, booking.BookingConfirmationTitle, BookingConfirmationFooter, TravelVoucherFooter, booking.KeyContacts, booking.SpecialRemarks, ProductSequence, booking.Status, booking.CancelStatus, booking.LockStatus, booking.AfterSalesService, booking.bc_approved, booking.bc_approval_admin_id, booking.bc_approval_date, admin.Name AS SalesAgentName, booking.AutocountSyncStatus, booking.AutocountSyncMessage, booking.AutocountSyncAction, booking.CustomerAutocountSyncStatus, booking.CustomerAutocountSyncMessage, booking.CustomerAutocountSyncAction, customer.CustomerCode AS CustomerCode, customer.ic_passport_no AS ic_passport_no, booking.CustomerID, booking.BookingOP, booking.SalesAgent2, booking.InsertDate');
 		$this->db->join('admin', 'admin.AdminID = booking.SalesAgent', 'left');
 		$this->db->join('customer', 'customer.CustomerID = booking.CustomerID', 'left');
 		$this->db->where('booking.BookingID', $this->input->get('booking_id'));
@@ -631,6 +631,9 @@ class Booking_Model extends CI_Model
 			'ChatLanguage'  => $this->input->post('booking')[0]['ChatLanguage'] ? $this->input->post('booking')[0]['ChatLanguage'] : null,
 			'updated_at'    => date('Y-m-d H:i:s'),
 		];
+		if (!empty($this->input->post('ic_passport_no'))) {
+			$data['ic_passport_no'] = strtoupper($this->input->post('ic_passport_no'));
+		}
 		$customerId = $this->input->post('CustomerID');
 		if (!empty($customerId) && $customerId != 'undefined' && $customerId != 'null' && is_numeric($customerId)) {
 			$customer_id = $this->input->post('CustomerID');
@@ -1042,6 +1045,7 @@ class Booking_Model extends CI_Model
 			if (!empty($booking['Customer'])) { $data['name'] = $booking['Customer']; }
 			if (!empty($booking['Mobile'])) { $data['phone_number'] = $booking['Mobile']; }
 			if (!empty($booking['ChatLanguage'])) { $data['ChatLanguage'] = $booking['ChatLanguage'];}
+			if (!empty($this->input->post('ic_passport_no'))) { $data['ic_passport_no'] = strtoupper($this->input->post('ic_passport_no')); }
 			if ($data) { $data['updated_at'] = date('Y-m-d H:i:s'); }
 		}
 
@@ -1357,7 +1361,7 @@ class Booking_Model extends CI_Model
 
 	function Booking_Document_for_receipt()
 	{
-		$this->db->select('booking.BookingID, BookingNumber, ReservationNumber, DepositDeadline, FullPaymentDeadline, Customer, booking.Mobile As CustomerMobile, StartDate, EndDate, Adult, Children, Infant, Subtotal, Discount, NetTotal, booking.BookingConfirmationTitle, BookingConfirmationFooter, TravelVoucherFooter, AfterSalesService, ProductSequence, booking.Status, booking.InsertDate, admin.CountryCodeID As SalesAgentCountryCode, admin.Name As SalesAgentName, admin.Mobile As SalesAgentMobile, category.Name As DestinationName, TravelVoucherTitle, CountryCode, customer.CustomerCode');
+		$this->db->select('booking.BookingID, BookingNumber, ReservationNumber, DepositDeadline, DepositMode, DepositPercentage, DepositFixedAmount, FullPaymentDeadline, Customer, booking.Mobile As CustomerMobile, StartDate, EndDate, Adult, Children, Infant, Subtotal, Discount, NetTotal, booking.BookingConfirmationTitle, BookingConfirmationFooter, TravelVoucherFooter, AfterSalesService, ProductSequence, booking.Status, booking.InsertDate, admin.CountryCodeID As SalesAgentCountryCode, admin.Name As SalesAgentName, admin.Mobile As SalesAgentMobile, category.Name As DestinationName, TravelVoucherTitle, CountryCode, customer.CustomerCode');
 		$this->db->join('admin', 'admin.AdminID = booking.SalesAgent', 'left');
 		$this->db->join('category', 'category.CategoryID = booking.Destination', 'left');
 		$this->db->join('footer', 'footer.FooterID = booking.TravelVoucherFooterID', 'left');

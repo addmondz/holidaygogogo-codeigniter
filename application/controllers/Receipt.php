@@ -60,9 +60,12 @@ class Receipt extends CI_Controller
         $array['BookingConfirmationTitle'] = 'PAYMENT RECEIPT';
         $array['Title'] = 'Receipt_' . $array['BookingNumber'];
         $array['InsertDate'] = strtoupper(date('j M Y'));
+        $array['CustomerProfileURL'] = base_url('customer/' . generate_customer_portal_slug($booking->CustomerID));
         
         // Get payment_id filter from URL (for single payment receipt)
         $payment_id = $this->input->get('payment_id');
+        // Get payment_type filter from URL (e.g. DEPOSIT, FULL, ADDITIONAL PAYMENT)
+        $payment_type = $this->input->get('payment_type');
 
         // Get approved payments for this booking
         $this->db->select('Date, Type, Credit, ReferenceNumber, AutocountReferenceNumber, Status');
@@ -72,6 +75,9 @@ class Receipt extends CI_Controller
         // Filter to specific payment if payment_id provided
         if(!empty($payment_id)) {
             $this->db->where('PaymentID', $payment_id);
+        }
+        if(!empty($payment_type)) {
+            $this->db->where('Type', strtoupper(trim($payment_type)));
         }
         $this->db->order_by('Date', 'ASC');
         $approved_payments = $this->db->get('payment')->result();
@@ -85,6 +91,16 @@ class Receipt extends CI_Controller
         // Get booking products
         $_GET['booking_id'] = $array['BookingID'];
         $array['booking_products'] = $this->Booking_Product_Model->Read();
+
+        // Compute required deposit (mirrors customer_portal/booking_details.php logic)
+        $has_deposit_deadline = !empty($array['DepositDeadline']);
+        $deposit_mode = isset($array['DepositMode']) ? $array['DepositMode'] : 'percentage';
+        if ($deposit_mode == 'fixed') {
+            $deposit_required = isset($array['DepositFixedAmount']) ? floatval($array['DepositFixedAmount']) : 0;
+        } else {
+            $deposit_percentage = isset($array['DepositPercentage']) ? floatval($array['DepositPercentage']) : 0;
+            $deposit_required = ceil(floatval($array['NetTotal'] ?? 0) * $deposit_percentage / 100);
+        }
 
         // Format dates
         $array['DepositDeadline'] = empty($array['DepositDeadline']) ? '-' : strtoupper(date('j M Y', strtotime($array['DepositDeadline'])));
@@ -157,7 +173,16 @@ class Receipt extends CI_Controller
 
         // Loop through each payment and render a separate receipt page
         $html_pages = [];
+        $cumulative_paid = 0;
         foreach($approved_payments as $payment) {
+            $cumulative_paid += floatval($payment->Credit);
+            $is_deposit_payment = strtoupper(trim($payment->Type)) === 'DEPOSIT';
+            $shortfall = $deposit_required - $cumulative_paid;
+            if ($has_deposit_deadline && $deposit_required > 0 && $is_deposit_payment && $shortfall > 0) {
+                $array['DepositShortfallRemark'] = 'Deposit amount is still short of RM' . number_format($shortfall, 2, '.', ',') . '.';
+            } else {
+                unset($array['DepositShortfallRemark']);
+            }
             // VoucherNo from this payment's AutocountReferenceNumber
             $array['VoucherNo'] = !empty($payment->AutocountReferenceNumber)
                 ? $payment->AutocountReferenceNumber

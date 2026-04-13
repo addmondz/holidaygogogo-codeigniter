@@ -228,10 +228,26 @@
 
                                     <span><i class="la la-user"></i></span>
 
-                                    <div id="customerResults" 
-                                        class="list-group position-absolute w-100 shadow-sm" 
+                                    <div id="customerResults"
+                                        class="list-group position-absolute w-100 shadow-sm"
                                         style="z-index:1000; display:none; top:100%; left:0; max-height:200px; overflow-y:auto;">
                                     </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>IC / Passport No. <span style="color:red;">*</span></label>
+                                <div class="input-icon">
+                                    <input type="text"
+                                        id="ic_passport_no"
+                                        name="ic_passport_no"
+                                        value="<?php echo isset($ic_passport_no) ? htmlspecialchars($ic_passport_no, ENT_QUOTES) : ''; ?>"
+                                        autocomplete="off"
+                                        class="form-control"
+                                        placeholder="Enter IC or Passport number">
+                                    <span><i class="la la-id-card"></i></span>
                                 </div>
                             </div>
                         </div>
@@ -2636,6 +2652,8 @@
 
                 var customer = ($('#Customer').val()).toUpperCase();
 
+                var ic_passport_no = ($('#ic_passport_no').val() || '').toUpperCase();
+
                 var CustomerID = $('input[name="CustomerID"]').val();
 
                 var mobile = $('#Mobile').val();
@@ -2671,6 +2689,7 @@
                     'Reservation number': reservation_number,
                     'Full payment deadline': full_payment_deadline,
                     'Customer': customer,
+                    'IC / Passport No.': ic_passport_no,
                     'Mobile': mobile,
                     'Travel date': travel_date,
                     'Destination': destination,
@@ -3469,6 +3488,8 @@
                 booking_products: booking_products,
 
                 CustomerID: CustomerID,
+
+                ic_passport_no: ($('#ic_passport_no').val() || '').toUpperCase(),
 
             };
 

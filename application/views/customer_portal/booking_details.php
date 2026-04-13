@@ -1079,7 +1079,7 @@
                         $message = "Hi, I’d like to check on a question regarding my booking.\nBooking number: {$booking['BookingNumber']}";
                     ?>
                     <?php if ($formatted_mobile): ?>
-                        <a href="<?php echo get_offical_whatsapp_link($message, $formatted_mobile); ?>" target="_blank" class="document-item">
+                        <a href="<?php echo get_offical_whatsapp_link($message); ?>" target="_blank" class="document-item">
                             <div class="document-icon">
                                 <i class="la la-whatsapp"></i>
                             </div>
@@ -1254,6 +1254,20 @@
                 $deposit_total = ceil(($net_total * $deposit_percentage) / 100);
             }
             $deposit_complete = $has_deposit_deadline ? (($total_paid >= $deposit_total && $deposit_total > 0) || $full_paid) : false;
+
+            // Build deposit-only payment list (approved deposits only) and track latest deposit date
+            $deposit_payments = [];
+            $latest_deposit_date = null;
+            foreach ($payment_details as $p) {
+                if (strtoupper(trim($p['type'] ?? '')) === 'DEPOSIT') {
+                    $deposit_payments[] = $p;
+                    $d_date = $p['date'] ?? null;
+                    if (!empty($d_date) && (empty($latest_deposit_date) || strtotime($d_date) >= strtotime($latest_deposit_date))) {
+                        $latest_deposit_date = $d_date;
+                    }
+                }
+            }
+            $deposit_count = count($deposit_payments);
             $full_payment_complete = ($total_paid >= $net_total && $net_total > 0) || $full_paid;
 
             // Check for additional payment requirement
@@ -1391,8 +1405,16 @@
 
             // Determine payment title/description based on rules
             if ($has_deposit_deadline) {
-                $payment_title = $deposit_complete ? 'Deposit Received' : 'Pending Deposit';
-                $payment_description = $deposit_complete ? 'Deposit payment received' : 'Deposit payment required';
+                if ($deposit_complete) {
+                    $payment_title = $deposit_count > 1 ? 'Deposits Received' : 'Deposit Received';
+                    $payment_description = $deposit_count > 1 ? 'All deposit payments received' : 'Deposit payment received';
+                } elseif ($deposit_count > 0) {
+                    $payment_title = 'Partial Deposit Received';
+                    $payment_description = $deposit_count . ' deposit payment' . ($deposit_count > 1 ? 's' : '') . ' received — balance pending';
+                } else {
+                    $payment_title = 'Pending Deposit';
+                    $payment_description = 'Deposit payment required';
+                }
             } else {
                 if ($total_paid <= 0) {
                     $payment_title = 'Pending Payment';
@@ -1410,17 +1432,24 @@
                 'step' => count($timeline_steps) + 1,
                 'title' => $payment_title,
                 'description' => $payment_description,
-                'event_date' => ($has_deposit_deadline ? $deposit_complete : $full_payment_complete) ? $payment_date : ($has_any_payment ? $payment_date : null),
-                'relative_time' => (($has_deposit_deadline ? $deposit_complete : $full_payment_complete) || $has_any_payment) ? get_relative_time($payment_date) : '',
+                'event_date' => $has_deposit_deadline
+                    ? ($deposit_complete ? ($latest_deposit_date ?: $payment_date) : ($deposit_count > 0 ? $latest_deposit_date : null))
+                    : ($full_payment_complete ? $payment_date : ($has_any_payment ? $payment_date : null)),
+                'relative_time' => $has_deposit_deadline
+                    ? (($deposit_complete || $deposit_count > 0) ? get_relative_time($latest_deposit_date ?: $payment_date) : '')
+                    : (($full_payment_complete || $has_any_payment) ? get_relative_time($payment_date) : ''),
                 'expected_date' => $payment_deadline,
                 'status' => $payment_step_status,
                 'icon' => 'dollar-sign',
-                'payment_details' => $payment_details,
+                'payment_details' => $has_deposit_deadline ? $deposit_payments : $payment_details,
+                'show_payment_list' => $has_deposit_deadline && $deposit_count > 0,
                 // CTA: Download Receipt (available only when this step is completed)
                 'cta_text' => 'Download',
-                'cta_url' => $receipt_url,
+                'cta_url' => $receipt_url . '&payment_type=' . ($has_deposit_deadline ? 'DEPOSIT' : 'FULL'),
                 'cta_icon' => 'download',
-                'cta_enabled' => ($has_deposit_deadline ? $deposit_complete : $full_payment_complete)
+                'cta_enabled' => ($has_deposit_deadline
+                    ? ($deposit_complete || $total_paid > 0)
+                    : $full_payment_complete)
             ];
 
             // Step: Full Payment (only for deposit-flow bookings, shown after Deposit)
@@ -1446,7 +1475,7 @@
                     'payment_details' => $payment_details,
                     // CTA: Download Receipt (available only when full payment is completed)
                     'cta_text' => 'Download',
-                    'cta_url' => $receipt_url,
+                    'cta_url' => $receipt_url . '&payment_type=FULL',
                     'cta_icon' => 'download',
                     'cta_enabled' => $full_payment_complete
                 ];
@@ -1476,7 +1505,7 @@
                     'payment_details' => $payment_details,
                     // CTA: Download Receipt (available only when additional payment is completed)
                     'cta_text' => 'Download',
-                    'cta_url' => $receipt_url,
+                    'cta_url' => $receipt_url . '&payment_type=' . urlencode('ADDITIONAL PAYMENT'),
                     'cta_icon' => 'download',
                     'cta_enabled' => $additional_payment_complete
                 ];
@@ -1810,8 +1839,24 @@
                                                 </span>
                                             <?php endif; ?>
                                         </div>
-                                        
-                                        <?php if ($has_cta): 
+
+                                        <?php if (!empty($step['show_payment_list']) && !empty($step['payment_details'])): ?>
+                                            <ul class="mt-3 space-y-1 text-xs">
+                                                <?php foreach ($step['payment_details'] as $pd_i => $pd): ?>
+                                                    <li class="flex flex-wrap items-center gap-2">
+                                                        <span class="font-medium text-gray-700"><?php echo htmlspecialchars(ucwords(strtolower($pd['type'] ?? 'Payment'))); ?> #<?php echo $pd_i + 1; ?></span>
+                                                        <span class="text-gray-600">RM <?php echo number_format($pd['amount'], 2); ?></span>
+                                                        <?php if (!empty($pd['date'])): ?>
+                                                            <span class="text-gray-400">·</span>
+                                                            <span class="text-gray-500"><?php echo date('d M Y', strtotime($pd['date'])); ?></span>
+                                                        <?php endif; ?>
+                                                        <span class="ml-auto inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">Approved</span>
+                                                    </li>
+                                                <?php endforeach; ?>
+                                            </ul>
+                                        <?php endif; ?>
+
+                                        <?php if ($has_cta):
                                             // Determine button color based on status
                                             $btn_color_class = 'cta-btn-gray';
                                             if ($status == 'completed') {
@@ -1901,8 +1946,15 @@
                                     </td>
                                     <td data-label="Receipt">
                                         <?php if (!empty($payment['Credit']) && $payment['Credit'] > 0 && $payment['Status'] == 'Y'): ?>
-                                            <a href="<?php echo base_url('Receipt?token=' . $booking['Token'] . '&payment_id=' . $payment['PaymentID']); ?>" target="_blank">
-                                                View
+                                            <a href="<?php echo base_url('Receipt?token=' . $booking['Token'] . '&payment_id=' . $payment['PaymentID']); ?>"
+                                               target="_blank"
+                                               class="timeline-cta-btn cta-btn-green"
+                                               style="margin-top: 0;">
+                                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                                                </svg>
+                                                <span>View</span>
                                             </a>
                                         <?php else: ?>
                                             <span style="color: #999; font-size: 12px;">-</span>
@@ -1950,6 +2002,10 @@
                             <i class="la la-plus"></i> E-Invoice Request
                         </button>
                     <?php endif; ?>
+                </div>
+
+                <div class="mb-3 p-3 rounded" style="background: #f0f7ff; border: 1px solid #cce5ff; font-size: 13px; color: #004085;">
+                    <strong>Remark:</strong> E-Invoice request must be submitted on/before end of trip.
                 </div>
 
                 <!-- Summary Bar -->

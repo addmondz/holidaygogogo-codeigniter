@@ -172,6 +172,9 @@
 		<?php } ?>
 	</table>
 	
+	<p style="font-size:12px; margin-bottom:2px;">Check your booking status and request E Invoice - <?php echo $CustomerProfileURL; ?></p>
+	<p style="font-size:12px; margin-bottom:5px;">E Invoice request must be submitted on/before end of trip.*</p>
+
 	<!-- Guest List Details -->
 	<?php
 	$has_filled_guests = false;
