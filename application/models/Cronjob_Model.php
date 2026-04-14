@@ -48,18 +48,16 @@ class Cronjob_Model extends CI_Model
 		$this->db->where('level', '10');
 		$admins = $this->db->get('admin')->result();
 
-		if(empty($admins)) {
-			return 0;
-		}
-
 		$label = ($type == 'supplier_reminder_full') ? 'full' : 'deposit';
 		$formatted_date = date('d/m/Y', strtotime($date));
 		$message = "Reminder: Payment Out To Supplier ($label) for $booking_number is due on $formatted_date - checklist not completed";
 
 		$count = 0;
+		$notified = array();
 		foreach($admins as $admin) {
 			// Check if notification already exists for today
 			if($this->has_today_notification($admin->AdminID, $type, $booking_id)) {
+				$notified[] = $admin->AdminID;
 				continue;
 			}
 
@@ -74,6 +72,49 @@ class Cronjob_Model extends CI_Model
 				'created_at' => date('Y-m-d H:i:s')
 			));
 			$count++;
+			$notified[] = $admin->AdminID;
+		}
+
+		// Also notify the booking's TC (SalesAgent) and OP (BookingOP)
+		$this->db->select('SalesAgent, BookingOP');
+		$this->db->where('BookingID', $booking_id);
+		$booking = $this->db->get('booking')->row();
+
+		if(!empty($booking)) {
+			$extra_ids = array();
+			if(!empty($booking->SalesAgent)) $extra_ids[] = $booking->SalesAgent;
+			if(!empty($booking->BookingOP)) $extra_ids[] = $booking->BookingOP;
+			$extra_ids = array_values(array_unique($extra_ids));
+
+			if(!empty($extra_ids)) {
+				$this->db->select('AdminID');
+				$this->db->where('Status', 'Y');
+				$this->db->where_in('AdminID', $extra_ids);
+				$active_extras = $this->db->get('admin')->result();
+
+				foreach($active_extras as $admin) {
+					if(in_array($admin->AdminID, $notified)) {
+						continue;
+					}
+					if($this->has_today_notification($admin->AdminID, $type, $booking_id)) {
+						$notified[] = $admin->AdminID;
+						continue;
+					}
+
+					$this->db->insert('notification', array(
+						'user_id' => $admin->AdminID,
+						'type' => $type,
+						'owner_type' => 'booking',
+						'owner_id' => $booking_id,
+						'remark_id' => null,
+						'message' => $message,
+						'is_read' => 0,
+						'created_at' => date('Y-m-d H:i:s')
+					));
+					$count++;
+					$notified[] = $admin->AdminID;
+				}
+			}
 		}
 
 		return $count;
