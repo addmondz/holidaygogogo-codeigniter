@@ -130,9 +130,12 @@
 
                                         <option selected disabled data-icon="la la-user-alt font-size-lg bs-icon" value="">--SELECT SALES AGENT--</option>
 
-                                        <?php foreach($admins as $admin) { ?>
+                                        <?php foreach($admins as $admin) {
+                                            $isSelected = (current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) && $admin->AdminID == $SalesAgent;
+                                            if ($admin->Status == 'D' && !$isSelected) continue;
+                                        ?>
 
-                                            <option <?php if((current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) && $admin->AdminID == $SalesAgent) { echo 'selected'; } ?> data-icon="la la-user-alt font-size-lg bs-icon" value="<?php echo $admin->AdminID; ?>"><?php echo $admin->Name; ?></option>
+                                            <option <?php if($isSelected) { echo 'selected'; } ?> data-icon="la la-user-alt font-size-lg bs-icon" value="<?php echo $admin->AdminID; ?>"><?php echo $admin->Name; ?></option>
 
                                         <?php } ?>
 
@@ -168,9 +171,12 @@
 
                                     <option data-icon="la la-user-alt font-size-lg bs-icon" value="">--SELECT SALES AGENT 2--</option>
 
-                                    <?php foreach($admins as $admin) { ?>
+                                    <?php foreach($admins as $admin) {
+                                        $isSelected2 = (current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) && $admin->AdminID == $SalesAgent2;
+                                        if ($admin->Status == 'D' && !$isSelected2) continue;
+                                    ?>
 
-                                        <option <?php if((current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) && $admin->AdminID == $SalesAgent2) { echo 'selected'; } ?> data-icon="la la-user-alt font-size-lg bs-icon" value="<?php echo $admin->AdminID; ?>"><?php echo $admin->Name; ?></option>
+                                        <option <?php if($isSelected2) { echo 'selected'; } ?> data-icon="la la-user-alt font-size-lg bs-icon" value="<?php echo $admin->AdminID; ?>"><?php echo $admin->Name; ?></option>
 
                                     <?php } ?>
 
