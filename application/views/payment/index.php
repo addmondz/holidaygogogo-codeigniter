@@ -157,12 +157,13 @@
                                         <div class="col-md-3">
                                             <div class="form-group">
                                                 <label>Status</label>
-                                                <select name="status" class="form-control selectpicker">
-                                                    <option data-icon="la la-dollar font-size-lg bs-icon" value="">--SELECT STATUS--</option>
+                                                <?php $selected_statuses = !empty($this->input->get('status')) ? explode(',', $this->input->get('status')) : []; ?>
+                                                <select id="status_select" class="form-control selectpicker" multiple data-actions-box="true" title="--SELECT STATUS--">
                                                     <?php foreach(unserialize(PAYMENT_STATUS) as $key => $value) { ?>
-                                                        <option data-icon="<?php if($key == 'Y') { echo 'la la-check-circle'; } else if($key == 'P') { echo 'la la-exclamation-circle'; } else { echo 'la la-times-circle'; } ?> font-size-lg bs-icon" value="<?php echo $key; ?>" <?php if(!empty($this->input->get('status')) && $this->input->get('status') == $key) { echo 'selected'; } ?>><?php echo $value; ?></option>
+                                                        <option data-icon="<?php if($key == 'Y') { echo 'la la-check-circle'; } else if($key == 'P') { echo 'la la-exclamation-circle'; } else { echo 'la la-times-circle'; } ?> font-size-lg bs-icon" value="<?php echo $key; ?>" <?php if(in_array($key, $selected_statuses)) { echo 'selected'; } ?>><?php echo $value; ?></option>
                                                     <?php } ?>
                                                 </select>
+                                                <input type="hidden" name="status" id="status_hidden" value="<?php echo $this->input->get('status'); ?>">
                                             </div>
                                         </div>
                                         <div class="col-md-3">
@@ -609,6 +610,16 @@
     <?php if(!empty($this->input->get('supplier')) || !empty($this->input->get('transaction_date')) || !empty($this->input->get('payment_type')) || !empty($this->input->get('transaction_type')) || !empty($this->input->get('reference_number')) || !empty($this->input->get('payment_deadline')) || !empty($this->input->get('quotation_number')) || !empty($this->input->get('invoice_number')) || !empty($this->input->get('bank')) || !empty($this->input->get('bank_account')) || !empty($this->input->get('bank_holder')) || !empty($this->input->get('status')) || !empty($this->input->get('booking_number')) || !empty($this->input->get('customer')) || !empty($this->input->get('travel_date')) || !empty($this->input->get('sales_agent')) || !empty($this->input->get('autocount_reference'))) { ?>
         $('#payment_header').click();
     <?php } ?>
+
+    $('#status_select').on('changed.bs.select', function() {
+        var selected = $(this).val();
+        $('#status_hidden').val(selected ? selected.join(',') : '');
+    });
+
+    $('#form1').on('submit', function() {
+        var selected = $('#status_select').val();
+        $('#status_hidden').val(selected ? selected.join(',') : '');
+    });
 
     $('#filter').click(function() {
         $('#form1').submit();

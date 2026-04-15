@@ -1,4 +1,59 @@
 
+<script>
+    // Install error suppressors at capture phase before any other script runs, so the
+    // known Shopify draggable.bundle.js MutationObserver flush race cannot surface as
+    // an unhandled rejection / uncaught error that blocks unrelated logic.
+    (function() {
+        function isDraggableFlushError(msg, stack, filename) {
+            if(!msg) return false;
+            if(msg.indexOf('hasOwnProperty') === -1) return false;
+            if(stack && stack.indexOf('draggable.bundle.js') !== -1) return true;
+            if(filename && filename.indexOf('draggable.bundle.js') !== -1) return true;
+            if(stack && stack.indexOf('MutationObserver') !== -1) return true;
+            return true; // message alone is specific enough
+        }
+        window.addEventListener('unhandledrejection', function(e) {
+            var r = e && e.reason;
+            var msg = r && r.message ? String(r.message) : String(r || '');
+            var stack = r && r.stack ? String(r.stack) : '';
+            if(isDraggableFlushError(msg, stack, '')) { e.preventDefault(); e.stopImmediatePropagation && e.stopImmediatePropagation(); }
+        }, true);
+        window.addEventListener('error', function(e) {
+            var msg = e && e.message ? String(e.message) : '';
+            var src = e && e.filename ? String(e.filename) : '';
+            var stack = e && e.error && e.error.stack ? String(e.error.stack) : '';
+            if(isDraggableFlushError(msg, stack, src)) { e.preventDefault(); e.stopImmediatePropagation && e.stopImmediatePropagation(); return true; }
+        }, true);
+    })();
+</script>
+
+<style>
+    /* Merged Phone Input Styles (booking customer contact) */
+    .phone-input-wrapper { position: relative; display: flex; align-items: stretch; border: 1px solid #e4e6ef; border-radius: 0.42rem; background-color: #fff; transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out; }
+    .phone-input-wrapper:focus-within { border-color: #5e72e4; box-shadow: 0 0 0 0.2rem rgba(94, 114, 228, 0.25); }
+    .phone-input-wrapper.disabled { background-color: #f3f6f9; opacity: 0.6; cursor: not-allowed; }
+    .phone-country-selector { position: relative; display: flex; align-items: center; padding: 0.75rem 0.75rem; background-color: #f7f8fa; border-right: 1px solid #e4e6ef; cursor: pointer; min-width: 120px; user-select: none; }
+    .phone-country-selector.disabled { cursor: not-allowed; }
+    .phone-country-flag { font-size: 1.25rem; margin-right: 0.5rem; line-height: 1; }
+    .phone-country-code { font-weight: 500; color: #3f4254; font-size: 0.95rem; margin-right: 0.25rem; }
+    .phone-country-arrow { margin-left: auto; color: #7e8299; font-size: 0.75rem; transition: transform 0.2s; }
+    .phone-country-selector.open .phone-country-arrow { transform: rotate(180deg); }
+    .phone-input-field { flex: 1; border: none; padding: 0.75rem 1rem; font-size: 0.95rem; background: transparent; outline: none; }
+    .phone-input-field:disabled { background-color: transparent; cursor: not-allowed; }
+    .phone-dropdown { position: absolute; top: 100%; left: 0; right: 0; background: #fff; border: 1px solid #e4e6ef; border-radius: 0.42rem; box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15); z-index: 1000; max-height: 300px; overflow-y: auto; display: none; margin-top: 0.25rem; }
+    .phone-dropdown.show { display: block; }
+    .phone-dropdown-search { padding: 0.75rem; border-bottom: 1px solid #e4e6ef; position: sticky; top: 0; background: #fff; z-index: 1; }
+    .phone-dropdown-search input { width: 100%; padding: 0.5rem; border: 1px solid #e4e6ef; border-radius: 0.25rem; font-size: 0.9rem; }
+    .phone-dropdown-list { padding: 0.25rem 0; max-height: 250px; overflow-y: auto; }
+    .phone-dropdown-item { display: flex; align-items: center; padding: 0.75rem; cursor: pointer; transition: background-color 0.15s; }
+    .phone-dropdown-item:hover { background-color: #f7f8fa; }
+    .phone-dropdown-item.selected { background-color: #e4e6ef; }
+    .phone-dropdown-item-flag { font-size: 1.25rem; margin-right: 0.75rem; line-height: 1; width: 24px; text-align: center; }
+    .phone-dropdown-item-name { flex: 1; color: #3f4254; font-size: 0.9rem; }
+    .phone-dropdown-item-code { color: #7e8299; font-size: 0.85rem; font-weight: 500; margin-left: 0.5rem; }
+    .phone-hidden-field { display: none !important; }
+</style>
+
 <div class="d-flex flex-column-fluid">
 
     <div class="container-fluid">
@@ -264,51 +319,60 @@
 
                             <div class="form-group">
 
-                                <label>Country Code
+                                <label>Mobile <span style="color:red;">*</span></label>
 
-                                    <?php if(current_url() == base_url('Booking/Create')) { ?><span style="color:red;">*</span><?php } ?>
+                                <?php
+                                    $selected_booking_country_code = null;
+                                    $malaysia_booking_phone_id = null;
+                                    foreach($country_codes as $cc) {
+                                        if(strtoupper($cc->Country) == 'MALAYSIA') { $malaysia_booking_phone_id = $cc->CountryCodeID; break; }
+                                    }
+                                    $existing_booking_country = ((current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) && !empty($CustomerCountryCode)) ? $CustomerCountryCode : null;
+                                    $default_booking_country = $existing_booking_country ? $existing_booking_country : $malaysia_booking_phone_id;
+                                ?>
 
-                                </label>
-
-                                <select id="CountryCodeID" data-live-search="true" class="form-control selectpicker">
-
-                                    <option selected disabled data-icon="la la-phone font-size-lg bs-icon" value="">--SELECT COUNTRY CODE--</option>
-
-                                    <?php foreach($country_codes as $country_code) { ?>
-
-                                        <option <?php if((current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) && $country_code->CountryCodeID == $CustomerCountryCode) { echo 'selected'; } ?> data-icon="la la-phone font-size-lg bs-icon" value="<?php echo $country_code->CountryCodeID; ?>"><?php echo $country_code->Country . ' ' . $country_code->CountryCode; ?></option>
-
-                                    <?php } ?>
-
-                                </select>
-
-                            </div>
-
-                        </div>
-
-                        <div class="col-md-6">
-
-                            <div class="form-group">
-
-                                <label>Mobile
-
-                                    <span style="color:red;">*</span>
-
-                                </label>
-
-                                <div class="input-icon">
-
-                                    <input type="text" id="Mobile" <?php if(current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) { ?> value="<?php echo $CustomerMobile; ?>" <?php } ?> autocomplete="off" class="form-control">
-
-                                    <span>
-
-                                        <i class="la la-mobile"></i>
-
-                                    </span>
-
+                                <div class="phone-input-wrapper" id="phone-wrapper-main">
+                                    <div class="phone-country-selector" id="phone-selector-main">
+                                        <span class="phone-country-flag" id="phone-flag-main">🌐</span>
+                                        <span class="phone-country-code" id="phone-code-main">--</span>
+                                        <span class="phone-country-arrow">▼</span>
+                                    </div>
+                                    <input type="text" id="Mobile" <?php if(current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) { ?> value="<?php echo $CustomerMobile; ?>" <?php } ?> autocomplete="off" class="phone-input-field" placeholder="Enter phone number">
+                                    <select id="CountryCodeID" class="phone-hidden-field" onchange="updatePhoneFromSelectMain();">
+                                        <option value="">--SELECT COUNTRY CODE--</option>
+                                        <?php foreach($country_codes as $country_code) {
+                                            $selected = '';
+                                            if($country_code->CountryCodeID == $default_booking_country) {
+                                                $selected = 'selected';
+                                                $selected_booking_country_code = $country_code;
+                                            }
+                                        ?>
+                                            <option <?php echo $selected; ?> value="<?php echo $country_code->CountryCodeID; ?>" data-country="<?php echo htmlspecialchars($country_code->Country); ?>" data-code="<?php echo htmlspecialchars($country_code->CountryCode); ?>"><?php echo $country_code->Country . ' ' . $country_code->CountryCode; ?></option>
+                                        <?php } ?>
+                                    </select>
+                                    <div class="phone-dropdown" id="phone-dropdown-main">
+                                        <div class="phone-dropdown-search">
+                                            <input type="text" placeholder="Search country..." id="phone-search-main">
+                                        </div>
+                                        <div class="phone-dropdown-list" id="phone-list-main">
+                                            <?php foreach($country_codes as $country_code) { ?>
+                                                <div class="phone-dropdown-item" data-country-id="<?php echo $country_code->CountryCodeID; ?>" data-country="<?php echo htmlspecialchars(strtolower($country_code->Country)); ?>" data-code="<?php echo htmlspecialchars($country_code->CountryCode); ?>" data-country-name="<?php echo htmlspecialchars($country_code->Country); ?>">
+                                                    <span class="phone-dropdown-item-flag">🌐</span>
+                                                    <span class="phone-dropdown-item-name"><?php echo $country_code->Country; ?></span>
+                                                    <span class="phone-dropdown-item-code"><?php echo $country_code->CountryCode; ?></span>
+                                                </div>
+                                            <?php } ?>
+                                        </div>
+                                    </div>
                                 </div>
                                 <small id="MobileError" class="text-danger"></small>
 
+                                <script>
+                                $(document).ready(function() {
+                                    var selectedCountry = <?php echo !empty($selected_booking_country_code) ? json_encode(['CountryCodeID' => $selected_booking_country_code->CountryCodeID, 'Country' => $selected_booking_country_code->Country, 'CountryCode' => $selected_booking_country_code->CountryCode]) : 'null'; ?>;
+                                    initPhoneInputMain(selectedCountry);
+                                });
+                                </script>
 
                             </div>
 
@@ -1056,7 +1120,7 @@
                                         <div class="form-group mb-2">
                                             <label class="font-weight-bold" style="font-size: 0.8125rem;">Also Notify</label>
                                             <select id="comment-notify-users" multiple="multiple" data-live-search="true" data-actions-box="true" class="form-control selectpicker" title="--Select additional users to notify--">
-                                                <?php foreach($admins as $admin) { ?>
+                                                <?php foreach($notify_admins as $admin) { ?>
                                                     <?php if($admin->Status == 'Y') { ?>
                                                         <option data-icon="la la-user-alt font-size-lg bs-icon" value="<?php echo $admin->AdminID; ?>"><?php echo $admin->Name; ?></option>
                                                     <?php } ?>
@@ -1386,12 +1450,26 @@
                                                             </tr>
                                                         </thead>
                                                         <tbody>
-                                                            <?php foreach($pax['products'] as $prod) { ?>
-                                                                <tr>
-                                                                    <td><?php echo htmlspecialchars($prod['ProductName']); ?></td>
+                                                            <?php foreach($pax['products'] as $prod) {
+                                                                $line_discount = isset($prod['DiscountAmount']) ? floatval($prod['DiscountAmount']) : 0;
+                                                                $line_net = floatval($prod['Amount']) - $line_discount;
+                                                            ?>
+                                                                <tr<?php echo $line_discount > 0 ? ' style="background:#fff8e1;"' : ''; ?>>
+                                                                    <td>
+                                                                        <?php echo htmlspecialchars($prod['ProductName']); ?>
+                                                                        <?php if($line_discount > 0) { ?>
+                                                                            <span class="label label-warning ml-2" style="font-size:0.7rem; background:#f0ad4e; color:#fff; padding:2px 6px; border-radius:3px;">BC Discount Applied</span>
+                                                                        <?php } ?>
+                                                                    </td>
                                                                     <td class="text-center"><?php echo rtrim(rtrim(number_format($prod['Quantity'], 2), '0'), '.'); ?></td>
                                                                     <td class="text-right">RM <?php echo number_format($prod['UnitPrice'], 2); ?></td>
-                                                                    <td class="text-right">RM <?php echo number_format($prod['Amount'], 2); ?></td>
+                                                                    <td class="text-right">
+                                                                        RM <?php echo number_format($prod['Amount'], 2); ?>
+                                                                        <?php if($line_discount > 0) { ?>
+                                                                            <div class="text-danger" style="font-size:0.78rem;">- RM <?php echo number_format($line_discount, 2); ?> discount</div>
+                                                                            <div style="font-size:0.78rem;">Net: RM <?php echo number_format($line_net, 2); ?></div>
+                                                                        <?php } ?>
+                                                                    </td>
                                                                 </tr>
                                                             <?php } ?>
                                                         </tbody>
@@ -2214,12 +2292,6 @@
 
         booking_product_id++;
 
-        if(window.location.href.split('?')[0] == '<?php echo base_url('Booking/Update'); ?>' && $('#product_action').val() == 'INSERT PRODUCT') {
-
-            $('.draggable-handle').hide();
-
-        }
-
         if(window.location.href.split('?')[0] == '<?php echo base_url('Booking/Update'); ?>' && count > booking_products.length) {
 
             $('#product_action').prop('disabled', true);
@@ -2968,11 +3040,39 @@
 
                                     var country_codes = <?php echo json_encode($country_codes) ?>;
 
+                                    // Safe accessor: Object.values(el)[idx] may be undefined when
+                                    // PHP-side arrays (admins, country_codes, ...) diverge from the
+                                    // rendered DOM option counts (e.g. after filtering deactivated
+                                    // salesagents). Calling .hasOwnProperty on undefined throws and
+                                    // blows up the entire save flow — wrap the lookup defensively.
+                                    // jQuery Dirty plugin stores the initial value as an expando
+                                    // `dirtyInitialValue` on the element itself (or on jQuery data).
+                                    // Read it directly instead of the old Object.values(el)[idx] magic,
+                                    // which broke after $admins was filtered (length mismatch with DOM).
+                                    var hasDirtyInitial = function(el) {
+                                        if(el == null) return false;
+                                        if(el.dirtyInitialValue !== undefined) return true;
+                                        try {
+                                            var d = $(el).data('dirtyInitialValue');
+                                            if(d !== undefined) return true;
+                                        } catch(e) {}
+                                        return false;
+                                    };
+                                    var getDirtyInitial = function(el) {
+                                        if(el == null) return null;
+                                        if(el.dirtyInitialValue !== undefined) return el.dirtyInitialValue;
+                                        try {
+                                            var d = $(el).data('dirtyInitialValue');
+                                            if(d !== undefined) return d;
+                                        } catch(e) {}
+                                        return null;
+                                    };
+
                                     if(dirty_fields.length > 0) {
 
                                         for(var i = 0; i < dirty_fields.length; i++) {
 
-                                            if(dirty_fields[i].localName == 'select' || Object.values(dirty_fields[i])[0].hasOwnProperty('dirtyInitialValue')) {
+                                            if(dirty_fields[i].localName == 'select' || hasDirtyInitial(dirty_fields[i])) {
 
                                                 var key = dirty_fields[i].id == 'kt_datepicker_4_3' || dirty_fields[i].id == 'kt_datepicker_4_4' || dirty_fields[i].id == 'kt_datepicker_5' ? dirty_fields[i].name : dirty_fields[i].id;
 
@@ -2982,7 +3082,7 @@
 
                                                 // Action : Update
 
-                                                if(key == 'CountryCodeID' && Object.values(dirty_fields[i])[country_codes.length + 1].hasOwnProperty('dirtyInitialValue') || key == 'ReservationNumber' || key == 'DepositDeadline' || key == 'FullPaymentDeadline' || key == 'AdditionalPaymentDeadline' || key == 'Customer' || key == 'Mobile' || key == 'Destination' && Object.values(dirty_fields[i])[categories.length + 1].hasOwnProperty('dirtyInitialValue') || key == 'SalesAgent' && Object.values(dirty_fields[i])[admins.length + 1].hasOwnProperty('dirtyInitialValue') || key == 'SalesAgent2' && Object.values(dirty_fields[i])[admins.length + 1].hasOwnProperty('dirtyInitialValue') || key == 'BookingRemark' || key == 'ChatLanguage' && Object.values(dirty_fields[i])[4].hasOwnProperty('dirtyInitialValue') || key == 'Source' && Object.values(dirty_fields[i])[sources.length + 1].hasOwnProperty('dirtyInitialValue') || key == 'BookingConfirmationTitle' && Object.values(dirty_fields[i])[4].hasOwnProperty('dirtyInitialValue') || key == 'BookingOP' && Object.values(dirty_fields[i])[booking_op_admins.length + 1].hasOwnProperty('dirtyInitialValue')) {
+                                                if(key == 'CountryCodeID' || key == 'ReservationNumber' || key == 'DepositDeadline' || key == 'FullPaymentDeadline' || key == 'AdditionalPaymentDeadline' || key == 'Customer' || key == 'Mobile' || key == 'Destination' || key == 'SalesAgent' || key == 'SalesAgent2' || key == 'BookingRemark' || key == 'ChatLanguage' || key == 'Source' || key == 'BookingConfirmationTitle' || key == 'BookingOP') {
 
                                                     if(key == 'BookingOP' && value == '') {
 
@@ -3008,49 +3108,49 @@
 
                                                         case 'CountryCodeID':
 
-                                                            default_value = (Object.values(dirty_fields[i])[country_codes.length + 1]).dirtyInitialValue;
+                                                            default_value = getDirtyInitial(dirty_fields[i]);
 
                                                             break;
 
                                                         case 'Destination':
 
-                                                            default_value = (Object.values(dirty_fields[i])[categories.length + 1]).dirtyInitialValue;
+                                                            default_value = getDirtyInitial(dirty_fields[i]);
 
                                                             break;
 
                                                         case 'SalesAgent':
 
-                                                            default_value = (Object.values(dirty_fields[i])[admins.length + 1]).dirtyInitialValue;
+                                                            default_value = getDirtyInitial(dirty_fields[i]);
 
                                                             break;
 
                                                         case 'SalesAgent2':
 
-                                                            default_value = (Object.values(dirty_fields[i])[admins.length + 1]).dirtyInitialValue;
+                                                            default_value = getDirtyInitial(dirty_fields[i]);
 
                                                             break;
 
                                                         case 'BookingOP':
 
-                                                            default_value = (Object.values(dirty_fields[i])[booking_op_admins.length + 1]).dirtyInitialValue;
+                                                            default_value = getDirtyInitial(dirty_fields[i]);
 
                                                             break;
 
                                                         case 'ChatLanguage':
 
-                                                            default_value = (Object.values(dirty_fields[i])[4]).dirtyInitialValue;
+                                                            default_value = getDirtyInitial(dirty_fields[i]);
 
                                                             break;
 
                                                         case 'Source':
 
-                                                            default_value = (Object.values(dirty_fields[i])[sources.length + 1]).dirtyInitialValue;
+                                                            default_value = getDirtyInitial(dirty_fields[i]);
 
                                                             break;
 
                                                         case 'BookingConfirmationTitle':
 
-                                                            default_value = (Object.values(dirty_fields[i])[4]).dirtyInitialValue;
+                                                            default_value = getDirtyInitial(dirty_fields[i]);
 
                                                             break;
 
@@ -3058,13 +3158,17 @@
 
                                                             if(key == 'DepositDeadline' || key == 'FullPaymentDeadline' || key == 'AdditionalPaymentDeadline') {
 
-                                                                var date = ((Object.values(dirty_fields[i])[0]).dirtyInitialValue).split('/');
-
-                                                                default_value = `${date[2]}-${date[1]}-${date[0]}`;
+                                                                var initial_raw = getDirtyInitial(dirty_fields[i]);
+                                                                if(initial_raw) {
+                                                                    var date = initial_raw.split('/');
+                                                                    default_value = `${date[2]}-${date[1]}-${date[0]}`;
+                                                                } else {
+                                                                    default_value = null;
+                                                                }
 
                                                             } else {
 
-                                                                default_value = (Object.values(dirty_fields[i])[0]).dirtyInitialValue;
+                                                                default_value = getDirtyInitial(dirty_fields[i]);
 
                                                             }
 
@@ -3076,7 +3180,8 @@
 
                                                     if(key == 'TravelDate') {
 
-                                                        var initial_travel_date = (Object.values(dirty_fields[i])[0].dirtyInitialValue).split(' - ');
+                                                        var _td_raw = getDirtyInitial(dirty_fields[i]) || '';
+                                                        var initial_travel_date = _td_raw.split(' - ');
 
                                                         var initial_start_date = initial_travel_date[0];
 
@@ -3134,7 +3239,7 @@
 
                                                         key = key.split('-');
 
-                                                        if(key[0] == 'ProductID' && Object.values(dirty_fields[i])[products.length + 1].hasOwnProperty('dirtyInitialValue') || key[0] == 'ProductCode' || key[0] == 'Description' || key[0] == 'Quantity' || key[0] == 'Price' || key[0] == 'Total' || key[0] == 'PaymentOutSupplierFull' || key[0] == 'PaymentOutSupplierDeposit') {
+                                                        if(key[0] == 'ProductID' && hasDirtyInitial(dirty_fields[i]) || key[0] == 'ProductCode' || key[0] == 'Description' || key[0] == 'Quantity' || key[0] == 'Price' || key[0] == 'Total' || key[0] == 'PaymentOutSupplierFull' || key[0] == 'PaymentOutSupplierDeposit') {
 
                                                             if(key[0] == 'Price' || key[0] == 'Total') {
 
@@ -3153,7 +3258,7 @@
 
                                                             booking_products[1].push({BookingProductID:key[1], [key[0]]:value, UpdateBy:<?php echo $this->session->userdata('admin_id') ?>, UpdateDate:'<?php echo date('Y-m-d H:i:s') ?>'});
 
-                                                            if(key[0] == 'ProductID' && Object.values(dirty_fields[i])[products.length + 1].hasOwnProperty('dirtyInitialValue')) {
+                                                            if(key[0] == 'ProductID' && hasDirtyInitial(dirty_fields[i])) {
 
                                                                 var name = $(`#ProductID-${key[1]} option:selected`).text();
 
@@ -3379,7 +3484,7 @@
 
                                     // Action : Update Product Sequence
 
-                                    if(window.location.href.split('?')[0] == '<?php echo base_url('Booking/Update'); ?>' && $('#product_action').val() == 'ORGANIZE PRODUCT') {
+                                    if(window.location.href.split('?')[0] == '<?php echo base_url('Booking/Update'); ?>') {
 
                                         if(product_sequence.toString() != '<?php echo implode(',', $ProductSequence); ?>') {
 
@@ -3669,59 +3774,125 @@
 
 
 
-    <?php if(current_url() == base_url('Booking/Update')) { ?>
-
-        $('.draggable-handle').hide();
-
-    <?php } ?>
-
-
-
     $('#form').dirty('isClean');
 
 
 
+    // Override Metronic's global KTCardDraggable (from assets/js/pages/features/cards/draggable.js)
+    // to prevent Sortable from initializing on this page. The shipped draggable.bundle.js has a
+    // MutationObserver flush race that throws "Cannot read properties of undefined (reading
+    // 'hasOwnProperty')" during save, which poisons unrelated promise chains.
     var KTCardDraggable = function() {
 
-	return {
+		var instance = null;
+		var tracked_count = 0;
+		var pending = false;
+		return {
 
-		init: function() {
+			init: function() {
 
-			var containers = document.querySelectorAll('.draggable-zone');
+				var containers = document.querySelectorAll('.draggable-zone');
 
-			if(containers.length === 0) {
+				if(containers.length === 0) {
 
-				return false;
-
-			}
-
-			var swappable = new Sortable.default(containers, {
-
-				draggable: '.draggable',
-
-				handle: '.draggable .draggable-handle',
-
-				mirror: {
-
-					appendTo: 'body',
-
-					constrainDimensions: true
+					return false;
 
 				}
 
-			});
+				if(instance && tracked_count === containers.length) {
+
+					return;
+
+				}
+
+				if(instance) {
+
+					try { instance.destroy(); } catch(e) {}
+
+					instance = null;
+
+				}
+
+				if(pending) { return; }
+				pending = true;
+
+				var schedule = (typeof window.requestAnimationFrame === 'function') ? window.requestAnimationFrame : function(cb) { return setTimeout(cb, 16); };
+
+				schedule(function() {
+
+					pending = false;
+
+					try {
+
+						var current = document.querySelectorAll('.draggable-zone');
+
+						if(current.length === 0) { return; }
+
+						instance = new Sortable.default(current, {
+
+							draggable: '.draggable',
+
+							handle: '.draggable .draggable-handle',
+
+							mirror: {
+
+								appendTo: 'body',
+
+								constrainDimensions: true
+
+							}
+
+						});
+
+						tracked_count = current.length;
+
+					} catch(e) {
+
+						instance = null;
+						tracked_count = 0;
+
+					}
+
+				});
+
+			}
+
+		};
+
+	}();
+
+	jQuery(document).ready(function() {
+
+		KTCardDraggable.init();
+
+	});
+
+	// Swallow known Sortable/draggable MutationObserver flush race so it cannot
+	// poison unrelated save-flow promise chains.
+	window.addEventListener('unhandledrejection', function(e) {
+
+		var reason = e.reason;
+		var msg = reason && reason.message ? String(reason.message) : String(reason || '');
+
+		if(msg.indexOf("hasOwnProperty") !== -1) {
+
+			e.preventDefault();
 
 		}
 
-	};
+	});
+	window.addEventListener('error', function(e) {
 
-}();
+		var msg = e && e.message ? String(e.message) : '';
+		var src = e && e.filename ? String(e.filename) : '';
 
-jQuery(document).ready(function() {
+		if(msg.indexOf("hasOwnProperty") !== -1 && src.indexOf('draggable.bundle.js') !== -1) {
 
-	KTCardDraggable.init();
+			e.preventDefault();
 
-});
+		}
+
+	});
 
 </script>
 
@@ -5235,7 +5406,23 @@ $(document).ready(function() {
             var room = roomsList.find(function(r) { return r.id == roomId; });
             if (!room) return;
 
-            var newName = room.room_name + ' (COPY)';
+            var srcMatch = (room.room_name || '').match(/^(.*?)(\d+)\s*$/);
+            var newName;
+            if (srcMatch) {
+                var prefix = srcMatch[1];
+                var maxIdx = 0;
+                var prefixRe = new RegExp('^' + prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(\\d+)\\s*$', 'i');
+                roomsList.forEach(function(r) {
+                    var m = (r.room_name || '').match(prefixRe);
+                    if (m) {
+                        var n = parseInt(m[1], 10);
+                        if (n > maxIdx) maxIdx = n;
+                    }
+                });
+                newName = prefix + (maxIdx + 1);
+            } else {
+                newName = room.room_name + ' (COPY)';
+            }
             var dupData = {
                 room_name: newName,
                 adult_count: room.adult_count || 0,
@@ -5373,4 +5560,138 @@ $(document).ready(function() {
         loadRooms();
     });
     <?php } ?>
+</script>
+
+<script>
+    // Merged phone input helpers for booking customer contact
+    (function() {
+        var country_codes_main = <?php echo json_encode($country_codes) ?>;
+
+        function getCountryFlagMain(countryName) {
+            if(!countryName) return '🌐';
+            var country = countryName.toUpperCase().trim();
+            var flags = {
+                'MALAYSIA': '🇲🇾', 'SINGAPORE': '🇸🇬', 'THAILAND': '🇹🇭', 'INDONESIA': '🇮🇩',
+                'PHILIPPINES': '🇵🇭', 'VIETNAM': '🇻🇳', 'CAMBODIA': '🇰🇭', 'MYANMAR': '🇲🇲', 'BURMA': '🇲🇲',
+                'LAOS': '🇱🇦', 'BRUNEI': '🇧🇳', 'BRUNEI DARUSSALAM': '🇧🇳', 'EAST TIMOR': '🇹🇱', 'TIMOR-LESTE': '🇹🇱',
+                'CHINA': '🇨🇳', 'JAPAN': '🇯🇵', 'SOUTH KOREA': '🇰🇷', 'KOREA': '🇰🇷', 'NORTH KOREA': '🇰🇵',
+                'HONG KONG': '🇭🇰', 'MACAU': '🇲🇴', 'TAIWAN': '🇹🇼', 'MONGOLIA': '🇲🇳',
+                'INDIA': '🇮🇳', 'PAKISTAN': '🇵🇰', 'BANGLADESH': '🇧🇩', 'SRI LANKA': '🇱🇰',
+                'NEPAL': '🇳🇵', 'BHUTAN': '🇧🇹', 'MALDIVES': '🇲🇻', 'AFGHANISTAN': '🇦🇫',
+                'AUSTRALIA': '🇦🇺', 'NEW ZEALAND': '🇳🇿', 'FIJI': '🇫🇯', 'PAPUA NEW GUINEA': '🇵🇬',
+                'NEW CALEDONIA': '🇳🇨', 'FRENCH POLYNESIA': '🇵🇫', 'SAMOA': '🇼🇸', 'TONGA': '🇹🇴',
+                'UNITED STATES': '🇺🇸', 'USA': '🇺🇸', 'CANADA': '🇨🇦', 'MEXICO': '🇲🇽',
+                'GUATEMALA': '🇬🇹', 'BELIZE': '🇧🇿', 'EL SALVADOR': '🇸🇻', 'HONDURAS': '🇭🇳',
+                'NICARAGUA': '🇳🇮', 'COSTA RICA': '🇨🇷', 'PANAMA': '🇵🇦', 'CUBA': '🇨🇺',
+                'JAMAICA': '🇯🇲', 'HAITI': '🇭🇹', 'DOMINICAN REPUBLIC': '🇩🇴', 'BAHAMAS': '🇧🇸',
+                'BARBADOS': '🇧🇧', 'TRINIDAD AND TOBAGO': '🇹🇹', 'PUERTO RICO': '🇵🇷',
+                'BRAZIL': '🇧🇷', 'ARGENTINA': '🇦🇷', 'CHILE': '🇨🇱', 'COLOMBIA': '🇨🇴',
+                'PERU': '🇵🇪', 'VENEZUELA': '🇻🇪', 'ECUADOR': '🇪🇨', 'BOLIVIA': '🇧🇴',
+                'PARAGUAY': '🇵🇾', 'URUGUAY': '🇺🇾', 'GUYANA': '🇬🇾', 'SURINAME': '🇸🇷',
+                'UNITED KINGDOM': '🇬🇧', 'UK': '🇬🇧', 'IRELAND': '🇮🇪', 'FRANCE': '🇫🇷',
+                'GERMANY': '🇩🇪', 'ITALY': '🇮🇹', 'SPAIN': '🇪🇸', 'PORTUGAL': '🇵🇹',
+                'NETHERLANDS': '🇳🇱', 'BELGIUM': '🇧🇪', 'SWITZERLAND': '🇨🇭', 'AUSTRIA': '🇦🇹',
+                'LUXEMBOURG': '🇱🇺', 'MONACO': '🇲🇨', 'LIECHTENSTEIN': '🇱🇮', 'ANDORRA': '🇦🇩',
+                'SAN MARINO': '🇸🇲', 'VATICAN CITY': '🇻🇦', 'MALTA': '🇲🇹',
+                'SWEDEN': '🇸🇪', 'NORWAY': '🇳🇴', 'DENMARK': '🇩🇰', 'FINLAND': '🇫🇮',
+                'ICELAND': '🇮🇸', 'ESTONIA': '🇪🇪', 'LATVIA': '🇱🇻', 'LITHUANIA': '🇱🇹',
+                'RUSSIA': '🇷🇺', 'POLAND': '🇵🇱', 'CZECH REPUBLIC': '🇨🇿', 'HUNGARY': '🇭🇺',
+                'ROMANIA': '🇷🇴', 'BULGARIA': '🇧🇬', 'CROATIA': '🇭🇷', 'SERBIA': '🇷🇸',
+                'SLOVAKIA': '🇸🇰', 'SLOVENIA': '🇸🇮', 'BOSNIA AND HERZEGOVINA': '🇧🇦',
+                'MACEDONIA': '🇲🇰', 'ALBANIA': '🇦🇱', 'MONTENEGRO': '🇲🇪', 'KOSOVO': '🇽🇰',
+                'BELARUS': '🇧🇾', 'UKRAINE': '🇺🇦', 'MOLDOVA': '🇲🇩', 'GEORGIA': '🇬🇪',
+                'ARMENIA': '🇦🇲', 'AZERBAIJAN': '🇦🇿',
+                'GREECE': '🇬🇷', 'TURKEY': '🇹🇷', 'CYPRUS': '🇨🇾',
+                'SAUDI ARABIA': '🇸🇦', 'UNITED ARAB EMIRATES': '🇦🇪', 'UAE': '🇦🇪',
+                'QATAR': '🇶🇦', 'KUWAIT': '🇰🇼', 'BAHRAIN': '🇧🇭', 'OMAN': '🇴🇲',
+                'YEMEN': '🇾🇪', 'IRAQ': '🇮🇶', 'IRAN': '🇮🇷', 'ISRAEL': '🇮🇱',
+                'PALESTINE': '🇵🇸', 'JORDAN': '🇯🇴', 'LEBANON': '🇱🇧', 'SYRIA': '🇸🇾',
+                'EGYPT': '🇪🇬', 'LIBYA': '🇱🇾', 'TUNISIA': '🇹🇳', 'ALGERIA': '🇩🇿',
+                'MOROCCO': '🇲🇦', 'SUDAN': '🇸🇩', 'SOUTH SUDAN': '🇸🇸', 'ETHIOPIA': '🇪🇹',
+                'SOUTH AFRICA': '🇿🇦', 'KENYA': '🇰🇪', 'TANZANIA': '🇹🇿', 'UGANDA': '🇺🇬',
+                'RWANDA': '🇷🇼', 'GHANA': '🇬🇭', 'NIGERIA': '🇳🇬', 'SENEGAL': '🇸🇳',
+                'IVORY COAST': '🇨🇮', 'CAMEROON': '🇨🇲', 'GABON': '🇬🇦', 'CONGO': '🇨🇬',
+                'ANGOLA': '🇦🇴', 'MOZAMBIQUE': '🇲🇿', 'MADAGASCAR': '🇲🇬', 'MAURITIUS': '🇲🇺',
+                'SEYCHELLES': '🇸🇨', 'ZIMBABWE': '🇿🇼', 'BOTSWANA': '🇧🇼', 'NAMIBIA': '🇳🇦',
+                'KAZAKHSTAN': '🇰🇿', 'UZBEKISTAN': '🇺🇿', 'TURKMENISTAN': '🇹🇲', 'KYRGYZSTAN': '🇰🇬',
+                'TAJIKISTAN': '🇹🇯'
+            };
+            return flags[country] || '🌐';
+        }
+
+        function updatePhoneDisplayMain(country, code, countryId) {
+            $('#phone-flag-main').text(getCountryFlagMain(country));
+            $('#phone-code-main').text(code || '--');
+            $('#phone-selector-main').removeClass('open');
+            $('#phone-list-main .phone-dropdown-item').removeClass('selected');
+            $('#phone-list-main .phone-dropdown-item[data-country-id="' + countryId + '"]').addClass('selected');
+        }
+
+        window.updatePhoneFromSelectMain = function() {
+            var select = $('#CountryCodeID');
+            var selectedOption = select.find('option:selected');
+            if(selectedOption.length && selectedOption.val()) {
+                var country = selectedOption.data('country') || selectedOption.text().split(' ')[0];
+                var code = selectedOption.data('code') || selectedOption.text().split(' ').pop();
+                updatePhoneDisplayMain(country, code, selectedOption.val());
+            } else {
+                $('#phone-flag-main').text('🌐');
+                $('#phone-code-main').text('--');
+            }
+        };
+
+        window.initPhoneInputMain = function(selectedCountry) {
+            var selector = $('#phone-selector-main');
+            var dropdown = $('#phone-dropdown-main');
+            var searchInput = $('#phone-search-main');
+            var countrySelect = $('#CountryCodeID');
+
+            $('#phone-list-main .phone-dropdown-item').each(function() {
+                var countryName = $(this).data('country-name') || $(this).find('.phone-dropdown-item-name').text();
+                $(this).find('.phone-dropdown-item-flag').text(getCountryFlagMain(countryName));
+            });
+
+            if(selectedCountry) {
+                updatePhoneDisplayMain(selectedCountry.Country, selectedCountry.CountryCode, selectedCountry.CountryCodeID);
+            }
+
+            selector.on('click', function(e) {
+                if(selector.hasClass('disabled')) return;
+                e.stopPropagation();
+                dropdown.toggleClass('show');
+                if(dropdown.hasClass('show')) { searchInput.focus(); }
+            });
+
+            searchInput.on('input', function() {
+                var searchTerm = $(this).val().toLowerCase();
+                $('#phone-list-main .phone-dropdown-item').each(function() {
+                    var country = $(this).data('country') || '';
+                    var code = ($(this).data('code') || '').toString();
+                    var name = $(this).find('.phone-dropdown-item-name').text().toLowerCase();
+                    if(name.indexOf(searchTerm) !== -1 || code.indexOf(searchTerm) !== -1 || country.indexOf(searchTerm) !== -1) {
+                        $(this).show();
+                    } else {
+                        $(this).hide();
+                    }
+                });
+            });
+
+            $(document).on('click', '#phone-list-main .phone-dropdown-item', function() {
+                var countryId = $(this).data('country-id');
+                var country = $(this).find('.phone-dropdown-item-name').text();
+                var code = $(this).data('code');
+                updatePhoneDisplayMain(country, code, countryId);
+                countrySelect.val(countryId).trigger('change');
+                dropdown.removeClass('show');
+                searchInput.val('');
+                $('#phone-list-main .phone-dropdown-item').show();
+            });
+
+            $(document).on('click', function(e) {
+                if(!$(e.target).closest('#phone-wrapper-main').length) {
+                    dropdown.removeClass('show');
+                }
+            });
+        };
+    })();
 </script>

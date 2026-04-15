@@ -1262,7 +1262,7 @@ function escapeHtml(text) {
                     <div class="form-group mb-2">
                         <label class="font-weight-bold" style="font-size: 0.8125rem;">Also Notify</label>
                         <select id="modal-comment-notify-users" multiple="multiple" data-live-search="true" data-actions-box="true" class="form-control selectpicker" title="--Select additional users to notify--">
-                            <?php foreach($admins as $admin) { ?>
+                            <?php foreach($notify_admins as $admin) { ?>
                                 <?php if($admin->Status == 'Y') { ?>
                                     <option data-admin-level="<?php echo $admin->Level; ?>" data-icon="la la-user-alt font-size-lg bs-icon" value="<?php echo $admin->AdminID; ?>"><?php echo $admin->Name; ?></option>
                                 <?php } ?>

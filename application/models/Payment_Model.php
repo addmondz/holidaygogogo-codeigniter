@@ -64,7 +64,8 @@ class Payment_Model extends CI_Model
 			$this->db->where('payment.BankHolder', $this->input->get('bank_holder'));
 		}
 		if(!empty($this->input->get('status'))) {
-			$this->db->where('payment.Status', $this->input->get('status'));
+			$statuses = explode(',', $this->input->get('status'));
+			$this->db->where_in('payment.Status', $statuses);
 		} else {
 			if(strpos($_SERVER['REQUEST_URI'], '?') == false) {
 				$this->db->where('payment.Status', 'P');
@@ -152,7 +153,8 @@ class Payment_Model extends CI_Model
 			$this->db->where('payment.BankHolder', $this->input->get('bank_holder'));
 		}
 		if(!empty($this->input->get('status'))) {
-			$this->db->where('payment.Status', $this->input->get('status'));
+			$statuses = explode(',', $this->input->get('status'));
+			$this->db->where_in('payment.Status', $statuses);
 		} else {
 			if(strpos($_SERVER['REQUEST_URI'], '?') == false) {
 				$this->db->where('payment.Status', 'P');
@@ -206,7 +208,7 @@ class Payment_Model extends CI_Model
 		$this->db->where('CancelStatus', 'N');
 		$this->db->where('booking.Status !=', 'N');
 		if(!in_array($this->session->userdata('level'), [10, 30])) {
-			$this->db->where('booking.Status !=', 'Y');
+			$this->db->where("(booking.Status != 'Y' OR booking.AfterSalesService = 'PENDING')", null, false);
 		}
 		$this->db->order_by('booking.BookingID', 'DESC');
 		return $this->db->get('booking')->result();
@@ -253,7 +255,7 @@ class Payment_Model extends CI_Model
 	function Read_Received_Payments($booking_id) {
 		$this->db->select('Type, Credit, Debit');
 		$this->db->where('BookingID', $booking_id);
-		$this->db->where_in('Type', array('ADDITIONAL PAYMENT', 'DEPOSIT', 'FULL'));
+		$this->db->where_in('Type', array('ADDITIONAL PAYMENT', 'DEPOSIT', 'FULL', 'CUSTOMER REFUND'));
 		$this->db->where('Status', 'Y');
 		return $this->db->get('payment')->result();
 	}
@@ -762,7 +764,8 @@ return $query->result_array(); // instead of result()
 
 		// Status filter (only apply if explicitly selected)
 		if(!empty($this->input->get('status'))) {
-			$this->db->where('payment.Status', $this->input->get('status'));
+			$statuses = explode(',', $this->input->get('status'));
+			$this->db->where_in('payment.Status', $statuses);
 		}
 
 		// Booking number filter

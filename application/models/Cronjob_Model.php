@@ -121,6 +121,41 @@ class Cronjob_Model extends CI_Model
 	}
 
 	/**
+	 * Create "product has no checklist" notifications for all active Level 40 OP admins.
+	 * Dedupes once per day per admin per product via has_today_notification().
+	 */
+	function create_product_no_checklist_notifications($product_id, $product_name) {
+		$this->db->select('AdminID');
+		$this->db->where('Status', 'Y');
+		$this->db->where('Level', '40');
+		$admins = $this->db->get('admin')->result();
+
+		$type = 'product_no_checklist';
+		$message = "Product '{$product_name}' has no checklist assigned. Please configure.";
+
+		$count = 0;
+		foreach($admins as $admin) {
+			if($this->has_today_notification($admin->AdminID, $type, $product_id)) {
+				continue;
+			}
+
+			$this->db->insert('notification', array(
+				'user_id' => $admin->AdminID,
+				'type' => $type,
+				'owner_type' => 'product',
+				'owner_id' => $product_id,
+				'remark_id' => null,
+				'message' => $message,
+				'is_read' => 0,
+				'created_at' => date('Y-m-d H:i:s')
+			));
+			$count++;
+		}
+
+		return $count;
+	}
+
+	/**
 	 * Check if a notification of the given type already exists for today
 	 */
 	private function has_today_notification($user_id, $type, $owner_id) {

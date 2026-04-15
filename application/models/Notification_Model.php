@@ -48,15 +48,16 @@ class Notification_Model extends CI_Model
 		$this->db->where('notification.user_id', $user_id);
 		$this->db->where('notification.is_read', 0);
 		
-		// For Sales Agents (level 20), only count notifications for their bookings
+		// For Sales Agents (level 20), only count booking notifications for their bookings
+		// (non-booking notifications, e.g. owner_type='product', are always shown)
 		if ($user_level == 20) {
 			$this->db->join('booking', 'booking.BookingID = notification.owner_id AND notification.owner_type = "booking"', 'left');
-			$this->db->where('booking.SalesAgent', $user_id);
+			$this->db->where('(notification.owner_type != "booking" OR booking.SalesAgent = ' . (int)$user_id . ')', NULL, FALSE);
 		}
-		// For BookingOP (level 40), only count notifications for their bookings
+		// For BookingOP (level 40), only count booking notifications for their bookings
 		elseif ($user_level == 40) {
 			$this->db->join('booking', 'booking.BookingID = notification.owner_id AND notification.owner_type = "booking"', 'left');
-			$this->db->where('booking.BookingOP', $user_id);
+			$this->db->where('(notification.owner_type != "booking" OR booking.BookingOP = ' . (int)$user_id . ')', NULL, FALSE);
 		}
 
 		return $this->db->count_all_results('notification');
@@ -84,13 +85,14 @@ class Notification_Model extends CI_Model
 		$this->db->join('admin', 'admin.AdminID = remark.commenter_id', 'left');
 		$this->db->where('notification.user_id', $user_id);
 		
-		// For Sales Agents (level 20), only show notifications for their bookings
+		// For Sales Agents (level 20), only show booking notifications for their bookings
+		// (non-booking notifications, e.g. owner_type='product', are always shown)
 		if ($user_level == 20) {
-			$this->db->where('booking.SalesAgent', $user_id);
+			$this->db->where('(notification.owner_type != "booking" OR booking.SalesAgent = ' . (int)$user_id . ')', NULL, FALSE);
 		}
-		// For BookingOP (level 40), only show notifications for their bookings
+		// For BookingOP (level 40), only show booking notifications for their bookings
 		elseif ($user_level == 40) {
-			$this->db->where('booking.BookingOP', $user_id);
+			$this->db->where('(notification.owner_type != "booking" OR booking.BookingOP = ' . (int)$user_id . ')', NULL, FALSE);
 		}
 		
 		$this->db->order_by('notification.created_at', 'DESC');

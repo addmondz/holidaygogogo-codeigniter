@@ -6,7 +6,7 @@ class Invoice_Split_Model extends CI_Model
      */
     function Get_Pax_By_Booking($booking_id)
     {
-        $this->db->select('isp.*, ispp.InvoiceSplitPaxProductID, ispp.BookingProductID, ispp.Quantity, ispp.UnitPrice, ispp.Amount, bp.Name as ProductName, bp.Quantity as BookingProductQuantity');
+        $this->db->select('isp.*, ispp.InvoiceSplitPaxProductID, ispp.BookingProductID, ispp.Quantity, ispp.UnitPrice, ispp.Amount, ispp.DiscountAmount as ProductDiscountAmount, bp.Name as ProductName, bp.Quantity as BookingProductQuantity');
         $this->db->from('invoice_split_pax isp');
         $this->db->join('invoice_split_pax_product ispp', 'ispp.InvoiceSplitPaxID = isp.InvoiceSplitPaxID AND ispp.Status = "Y"', 'left');
         $this->db->join('booking_product bp', 'bp.BookingProductID = ispp.BookingProductID', 'left');
@@ -43,7 +43,8 @@ class Invoice_Split_Model extends CI_Model
                     'ProductName' => $row['ProductName'],
                     'Quantity' => $row['Quantity'],
                     'UnitPrice' => $row['UnitPrice'],
-                    'Amount' => $row['Amount']
+                    'Amount' => $row['Amount'],
+                    'DiscountAmount' => $row['ProductDiscountAmount']
                 ];
             }
         }
@@ -78,6 +79,34 @@ class Invoice_Split_Model extends CI_Model
 
         $now = date('Y-m-d H:i:s');
 
+        // Determine the target BookingProductID to absorb the full booking discount:
+        // the first allocated product (lowest BookingProductID) whose line amount (Qty × UnitPrice)
+        // is greater than or equal to the booking discount. The line amount itself is not reduced;
+        // only an accompanying DiscountAmount is recorded on that line.
+        $target_bp_id = null;
+        $booking_discount = round(floatval($booking_discount), 2);
+        if ($booking_discount > 0) {
+            $line_amounts = [];
+            foreach ($pax_data as $pax) {
+                foreach ($pax['products'] as $product) {
+                    $bp_id = intval($product['BookingProductID']);
+                    $amt = round($product['UnitPrice'] * $product['Quantity'], 2);
+                    $line_amounts[$bp_id] = isset($line_amounts[$bp_id]) ? round($line_amounts[$bp_id] + $amt, 2) : $amt;
+                }
+            }
+            $candidates = [];
+            foreach ($line_amounts as $bp_id => $amt) {
+                if ($amt >= $booking_discount) {
+                    $candidates[] = $bp_id;
+                }
+            }
+            if (!empty($candidates)) {
+                sort($candidates);
+                $target_bp_id = $candidates[0];
+            }
+        }
+        $discount_applied = false;
+
         foreach ($pax_data as $sort_order => $pax) {
             // Calculate pax subtotal
             $pax_subtotal = 0;
@@ -85,15 +114,7 @@ class Invoice_Split_Model extends CI_Model
                 $pax_subtotal += round($product['UnitPrice'] * $product['Quantity'], 2);
             }
 
-            // Calculate pro-rata discount
-            $pax_discount = 0;
-            if ($booking_subtotal > 0 && $booking_discount > 0) {
-                $pax_discount = round(($pax_subtotal / $booking_subtotal) * $booking_discount, 2);
-            }
-
-            $pax_net = round($pax_subtotal - $pax_discount, 2);
-
-            // Insert pax record
+            // Insert pax record (totals updated below once product-level discount is known)
             $this->db->insert('invoice_split_pax', [
                 'BookingID' => $booking_id,
                 'PaxName' => $pax['PaxName'],
@@ -102,8 +123,8 @@ class Invoice_Split_Model extends CI_Model
                 'Address' => $pax['Address'],
                 'PhoneNumber' => $pax['PhoneNumber'],
                 'SubtotalAmount' => $pax_subtotal,
-                'DiscountAmount' => $pax_discount,
-                'NetAmount' => $pax_net,
+                'DiscountAmount' => 0,
+                'NetAmount' => $pax_subtotal,
                 'SortOrder' => $sort_order,
                 'Status' => 'Y',
                 'InsertDate' => $now,
@@ -112,18 +133,39 @@ class Invoice_Split_Model extends CI_Model
 
             $pax_id = $this->db->insert_id();
 
-            // Insert product records
+            // Insert product records; apply full booking discount to the first qualifying target line.
+            $pax_discount_total = 0;
             foreach ($pax['products'] as $product) {
                 $amount = round($product['UnitPrice'] * $product['Quantity'], 2);
+                $line_discount = 0;
+                if (!$discount_applied && $target_bp_id !== null && intval($product['BookingProductID']) === $target_bp_id && $amount >= $booking_discount) {
+                    $line_discount = $booking_discount;
+                    $discount_applied = true;
+                }
                 $this->db->insert('invoice_split_pax_product', [
                     'InvoiceSplitPaxID' => $pax_id,
                     'BookingProductID' => $product['BookingProductID'],
                     'Quantity' => $product['Quantity'],
                     'UnitPrice' => $product['UnitPrice'],
                     'Amount' => $amount,
+                    'DiscountAmount' => $line_discount,
                     'Status' => 'Y'
                 ]);
+                $pax_discount_total = round($pax_discount_total + $line_discount, 2);
             }
+
+            if ($pax_discount_total > 0) {
+                $this->db->where('InvoiceSplitPaxID', $pax_id);
+                $this->db->update('invoice_split_pax', [
+                    'DiscountAmount' => $pax_discount_total,
+                    'NetAmount' => round($pax_subtotal - $pax_discount_total, 2),
+                    'UpdateDate' => $now
+                ]);
+            }
+        }
+
+        if ($booking_discount > 0 && !$discount_applied) {
+            log_message('warning', 'Invoice_Split_Model::Save_Split booking ' . $booking_id . ' has RM ' . $booking_discount . ' discount but no single product line amount is >= the discount; no product-level discount applied.');
         }
 
         $this->db->trans_complete();

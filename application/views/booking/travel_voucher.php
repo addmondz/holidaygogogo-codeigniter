@@ -172,7 +172,8 @@
 		<?php } ?>
 	</table>
 	
-	<p style="font-size:12px; margin-bottom:2px;">Check your booking status and request E Invoice - <?php echo $CustomerProfileURL; ?></p>
+	<div style="border-top:1px dotted #999; margin-top:10px;">&nbsp;</div>
+	<p style="font-size:12px; margin-top:0; margin-bottom:2px;">Check your booking status and request E Invoice - <?php echo $CustomerProfileURL; ?></p>
 	<p style="font-size:12px; margin-bottom:5px;">E Invoice request must be submitted on/before end of trip.*</p>
 
 	<!-- Guest List Details -->
@@ -250,7 +251,7 @@
 						}
 						?>
 						<strong style="font-size: 11px; font-weight: 700;">
-							Total: <?php echo count($guest_lists); ?> Passenger<?php echo count($guest_lists) > 1 ? 's' : ''; ?>
+							Total: <?php echo count($guest_lists); ?> Traveller<?php echo count($guest_lists) > 1 ? 's' : ''; ?>
 						</strong>
 						<span style="color: #777; font-size: 10px; margin-left: 12px;">
 							(<?php echo $adults; ?> Adult<?php echo $adults != 1 ? 's' : ''; ?>, 

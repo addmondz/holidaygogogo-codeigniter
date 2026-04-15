@@ -32,6 +32,7 @@ class Booking extends MY_Controller
 
 			// Load filter dropdowns data
 			$array['admins'] = $this->Booking_Model->Read_Admins();
+			$array['notify_admins'] = $this->Booking_Model->Read_Notify_Admins();
 			$array['booking_op_admins'] = $this->Booking_Model->Read_Booking_OP_Admins();
 			$array['categories'] = $this->Booking_Model->Read_Categories();
 			$array['tags'] = $this->Booking_Model->Read_Tags();
@@ -682,6 +683,7 @@ class Booking extends MY_Controller
 				$titles = array('tab_title' => 'HolidayGoGoGo | Booking', 'breadcrumb_title' => 'Booking >> Create');
 					$array = array('BookingID' => 'NA', 'BookingConfirmationFooterID' => 'NA', 'TravelVoucherFooterID' => 'NA', 'BookingNumber' => 'NA', 'Tag' => array(), 'Discount' => 'NA', 'NetTotal' => 'NA', 'ProductSequence' => array(), 'BookingProductID' => ($this->Booking_Product_Model->Read_Last_Booking_Product_ID()) + 1, 'AllowReview' => 1, 'ic_passport_no' => '');
 					$array['admins'] = $this->Booking_Model->Read_Admins();
+					$array['notify_admins'] = $this->Booking_Model->Read_Notify_Admins();
 					$array['booking_op_admins'] = $this->Booking_Model->Read_Booking_OP_Admins();
 					$array['booking_products'][0] = (object) array('BookingProductID' => 'NA');
 				$array['categories'] = $this->Booking_Model->Read_Categories();
@@ -1210,6 +1212,7 @@ class Booking extends MY_Controller
 					}
 						$array['DepositPaidDisplay'] = $deposit_paid_display;
 						$array['admins'] = $this->Booking_Model->Read_Admins();
+						$array['notify_admins'] = $this->Booking_Model->Read_Notify_Admins();
 						$array['booking_op_admins'] = $this->Booking_Model->Read_Booking_OP_Admins();
 
 					if(empty($array['ProductSequence'])) {
@@ -1401,6 +1404,7 @@ class Booking extends MY_Controller
 				}
 					$array['DepositPaidDisplay'] = $deposit_paid_display;
 					$array['admins'] = $this->Booking_Model->Read_Admins();
+					$array['notify_admins'] = $this->Booking_Model->Read_Notify_Admins();
 					$array['booking_op_admins'] = $this->Booking_Model->Read_Booking_OP_Admins();
 
 				if(empty($array['ProductSequence'])) {

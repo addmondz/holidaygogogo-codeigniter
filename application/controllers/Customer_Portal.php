@@ -248,11 +248,12 @@ class Customer_Portal extends CI_Controller
      */
     private function get_customer_bookings_by_category($customer_id)
     {
-        $this->db->select('booking.BookingID, BookingNumber, DepositDeadline, FullPaymentDeadline, 
-                          Customer, booking.Mobile As CustomerMobile, StartDate, EndDate, NetTotal, 
-                          booking.ChatLanguage, Token, booking.BookingConfirmationTitle, CancelStatus, 
+        $this->db->select('booking.BookingID, BookingNumber, DepositDeadline, FullPaymentDeadline,
+                          Customer, booking.Mobile As CustomerMobile, StartDate, EndDate, NetTotal,
+                          booking.ChatLanguage, Token, booking.BookingConfirmationTitle, CancelStatus,
                           LockStatus, AfterSalesService, booking.Status, booking.InsertDate,
                           booking.Adult, booking.Children, booking.Infant,
+                          booking.DepositMode, booking.DepositPercentage, booking.DepositFixedAmount,
                           category.Name As DestinationName, CountryCode');
         $this->db->from('booking');
         $this->db->join('category', 'category.CategoryID = booking.Destination', 'left');
@@ -267,8 +268,24 @@ class Customer_Portal extends CI_Controller
         $this->db->group_end();
         $this->db->order_by('booking.StartDate', 'DESC');
         $this->db->order_by('booking.BookingID', 'DESC');
-        
+
         $all_bookings = $this->db->get()->result_array();
+
+        // Compute total_paid per booking in one grouped query (approved customer credits only)
+        $paid_by_booking = [];
+        if (!empty($all_bookings)) {
+            $booking_ids = array_column($all_bookings, 'BookingID');
+            $this->db->select('BookingID, SUM(Credit) As TotalPaid');
+            $this->db->from('payment');
+            $this->db->where_in('BookingID', $booking_ids);
+            $this->db->where('Status', 'Y');
+            $this->db->where('Credit >', 0);
+            $this->db->where_not_in('Type', array('SUPPLIER PAYMENT (DEPOSIT)', 'SUPPLIER PAYMENT (FULL)', 'SUPPLIER PAYMENT (ADDITIONAL)', 'AGENT COMMISSION FROM SUPPLIER'));
+            $this->db->group_by('BookingID');
+            foreach ($this->db->get()->result_array() as $row) {
+                $paid_by_booking[$row['BookingID']] = floatval($row['TotalPaid']);
+            }
+        }
         
         $upcoming = [];
         $completed = [];
@@ -277,6 +294,20 @@ class Customer_Portal extends CI_Controller
         $today = date('Y-m-d');
 
         foreach ($all_bookings as $booking) {
+            // Attach payment-derived fields used by status display
+            $total_paid = isset($paid_by_booking[$booking['BookingID']]) ? $paid_by_booking[$booking['BookingID']] : 0;
+            $net_total = floatval($booking['NetTotal']);
+            $deposit_mode = !empty($booking['DepositMode']) ? $booking['DepositMode'] : 'percentage';
+            if ($deposit_mode == 'fixed') {
+                $deposit_total = isset($booking['DepositFixedAmount']) ? floatval($booking['DepositFixedAmount']) : 0;
+            } else {
+                $deposit_percentage = isset($booking['DepositPercentage']) ? floatval($booking['DepositPercentage']) : 0;
+                $deposit_total = ceil(($net_total * $deposit_percentage) / 100);
+            }
+            $booking['total_paid'] = $total_paid;
+            $booking['balance_due'] = $net_total - $total_paid;
+            $booking['deposit_complete'] = ($deposit_total > 0 && $total_paid >= $deposit_total);
+
             if ($booking['CancelStatus'] == 'Y') {
                 $cancelled[] = $booking;
                 continue;
@@ -489,6 +520,16 @@ class Customer_Portal extends CI_Controller
         $booking['total_debit'] = $total_debit;
         $booking['balance_due'] = $booking['NetTotal'] - $total_credit;
 
+        // Deposit completion (mirrors booking_details.php deposit_complete rule)
+        $deposit_mode = !empty($booking['DepositMode']) ? $booking['DepositMode'] : 'percentage';
+        if ($deposit_mode == 'fixed') {
+            $deposit_total_required = isset($booking['DepositFixedAmount']) ? floatval($booking['DepositFixedAmount']) : 0;
+        } else {
+            $deposit_percentage = isset($booking['DepositPercentage']) ? floatval($booking['DepositPercentage']) : 0;
+            $deposit_total_required = ceil((floatval($booking['NetTotal']) * $deposit_percentage) / 100);
+        }
+        $booking['deposit_complete'] = ($deposit_total_required > 0 && $total_credit >= $deposit_total_required);
+
         // Prepare document URLs
         $base_url = base_url();
         $booking['documents'] = [
@@ -633,12 +674,13 @@ class Customer_Portal extends CI_Controller
             $has_deposit_deadline = !empty($booking['DepositDeadlineRaw']);
             $has_full_payment_deadline = !empty($booking['FullPaymentDeadlineRaw']);
             $balance_due = isset($booking['balance_due']) ? $booking['balance_due'] : $booking['NetTotal'];
-            
+            $deposit_complete = !empty($booking['deposit_complete']);
+
             // Check if payment is overdue
             $is_payment_overdue = false;
-            
-            if ($has_deposit_deadline) {
-                // Has deposit deadline - check if deposit deadline passed and balance still due
+
+            if ($has_deposit_deadline && !$deposit_complete) {
+                // Deposit deadline passed and deposit requirement not yet met
                 $deposit_deadline = date('Y-m-d', strtotime($booking['DepositDeadlineRaw']));
                 if ($today > $deposit_deadline && $balance_due > 0) {
                     $is_payment_overdue = true;
@@ -732,18 +774,20 @@ class Customer_Portal extends CI_Controller
         if (in_array($status, ['P', 'PP'])) {
             $has_deposit_deadline = !empty($booking['DepositDeadline']);
             $has_full_payment_deadline = !empty($booking['FullPaymentDeadline']);
-            
+            $deposit_complete = !empty($booking['deposit_complete']);
+            $balance_due = isset($booking['balance_due']) ? floatval($booking['balance_due']) : floatval($booking['NetTotal']);
+
             // Check if payment is overdue
             $is_payment_overdue = false;
-            
-            if ($has_deposit_deadline) {
+
+            if ($has_deposit_deadline && !$deposit_complete) {
                 $deposit_deadline = date('Y-m-d', strtotime($booking['DepositDeadline']));
                 if ($today > $deposit_deadline) {
                     $is_payment_overdue = true;
                 }
             }
-            
-            if ($has_full_payment_deadline && !$is_payment_overdue) {
+
+            if ($has_full_payment_deadline && !$is_payment_overdue && $balance_due > 0) {
                 $full_payment_deadline = date('Y-m-d', strtotime($booking['FullPaymentDeadline']));
                 if ($today > $full_payment_deadline) {
                     $is_payment_overdue = true;

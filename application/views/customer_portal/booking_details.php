@@ -1532,27 +1532,6 @@
                 'cta_enabled' => ($gl_step_status != 'future')
             ];
 
-            // Step: Checklist Completed (step number is sequential)
-            $checklist_date = $status_dates['PBO'] ?? null;
-            $checklist_step_num = count($timeline_steps) + 1;
-            $checklist_step_status = $checklists_completed ? 'completed' : ($current_step == $checklist_step_num ? 'current' : 'future');
-            $timeline_steps[] = [
-                'step' => count($timeline_steps) + 1,
-                // 'title' => $checklists_completed ? 'Checklist Completed' : 'Pending Checklist',
-                'title' => $checklists_completed ? 'Booking Process Completed' : 'Booking Processing',
-                'description' => $checklists_completed ? 'All booking requirements verified' : 'Booking requirements being processed',
-                'event_date' => $checklists_completed ? $checklist_date : null,
-                'relative_time' => $checklists_completed ? get_relative_time($checklist_date) : '',
-                'expected_date' => null,
-                'status' => $checklist_step_status,
-                'icon' => 'clipboard-check',
-                // No CTA for checklist step
-                'cta_text' => null,
-                'cta_url' => null,
-                'cta_icon' => null,
-                'cta_enabled' => false
-            ];
-
             // Step: Travel Voucher Sent
             $tv_date = $status_dates['PT'] ?? null;
             $tv_step_num = count($timeline_steps) + 1;
@@ -2054,12 +2033,26 @@
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <?php foreach ($pax['products'] as $prod): ?>
-                                            <tr style="border-bottom: 1px solid #e8e8e8;">
-                                                <td style="padding: 8px;"><?php echo htmlspecialchars($prod['ProductName']); ?></td>
+                                        <?php foreach ($pax['products'] as $prod):
+                                            $line_discount = isset($prod['DiscountAmount']) ? floatval($prod['DiscountAmount']) : 0;
+                                            $line_net = floatval($prod['Amount']) - $line_discount;
+                                        ?>
+                                            <tr style="border-bottom: 1px solid #e8e8e8;<?php echo $line_discount > 0 ? ' background:#fff8e1;' : ''; ?>">
+                                                <td style="padding: 8px;">
+                                                    <?php echo htmlspecialchars($prod['ProductName']); ?>
+                                                    <?php if ($line_discount > 0): ?>
+                                                        <span style="display:inline-block; margin-left:6px; font-size:10px; background:#f0ad4e; color:#fff; padding:2px 6px; border-radius:3px;">BC Discount Applied</span>
+                                                    <?php endif; ?>
+                                                </td>
                                                 <td style="padding: 8px; text-align: center;"><?php echo rtrim(rtrim(number_format($prod['Quantity'], 2), '0'), '.'); ?></td>
                                                 <td style="padding: 8px; text-align: right;">RM <?php echo number_format($prod['UnitPrice'], 2); ?></td>
-                                                <td style="padding: 8px; text-align: right;">RM <?php echo number_format($prod['Amount'], 2); ?></td>
+                                                <td style="padding: 8px; text-align: right;">
+                                                    RM <?php echo number_format($prod['Amount'], 2); ?>
+                                                    <?php if ($line_discount > 0): ?>
+                                                        <div style="color:#dc3545; font-size:11px;">- RM <?php echo number_format($line_discount, 2); ?> discount</div>
+                                                        <div style="font-size:11px;">Net: RM <?php echo number_format($line_net, 2); ?></div>
+                                                    <?php endif; ?>
+                                                </td>
                                             </tr>
                                         <?php endforeach; ?>
                                     </tbody>
@@ -2592,7 +2585,7 @@
                 html += '<td><select class="split-product-select" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:4px;font-size:13px;">' + getProductOptions(bpId) + '</select></td>';
                 html += '<td><input type="number" class="split-qty" value="' + qty + '" min="0.01" step="0.01" style="width:80px;padding:6px;border:1px solid #ddd;border-radius:4px;text-align:center;font-size:13px;"></td>';
                 html += '<td class="split-price" style="text-align:right;font-size:13px;">RM ' + price + '</td>';
-                html += '<td class="split-amount" style="text-align:right;font-size:13px;">RM ' + amount + '</td>';
+                html += '<td class="split-amount-cell" style="text-align:right;font-size:13px;"><div class="split-amount">RM ' + amount + '</div><div class="split-product-discount" style="display:none;"></div></td>';
                 html += '<td><button type="button" class="remove-product-row" style="background:#dc3545;color:white;border:none;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:12px;"><i class="la la-trash"></i></button></td>';
                 html += '</tr>';
                 return html;
@@ -2647,23 +2640,61 @@
 
             function recalculate() {
                 var totalAllocated = 0;
+                var aggregate = {};
+                var rowsInOrder = [];
 
                 $('.pax-card').each(function() {
                     var paxSubtotal = 0;
                     $(this).find('.product-row').each(function() {
-                        var $select = $(this).find('.split-product-select');
-                        var $qty = $(this).find('.split-qty');
+                        var $row = $(this);
+                        var $select = $row.find('.split-product-select');
+                        var $qty = $row.find('.split-qty');
+                        var bpId = parseInt($select.val(), 10) || 0;
                         var price = parseFloat($select.find('option:selected').data('price')) || 0;
                         var qty = parseFloat($qty.val()) || 0;
                         var amount = Math.round(price * qty * 100) / 100;
 
-                        $(this).find('.split-price').text('RM ' + price.toFixed(2));
-                        $(this).find('.split-amount').text('RM ' + amount.toFixed(2));
+                        $row.find('.split-price').text('RM ' + price.toFixed(2));
+                        $row.find('.split-amount').text('RM ' + amount.toFixed(2));
+                        $row.css('background', '');
+                        $row.find('.split-product-discount').hide().empty();
+
+                        if (bpId > 0) {
+                            aggregate[bpId] = Math.round(((aggregate[bpId] || 0) + amount) * 100) / 100;
+                            rowsInOrder.push({ bpId: bpId, amount: amount, $row: $row });
+                        }
                         paxSubtotal += amount;
                     });
                     $(this).find('.pax-subtotal').text('Subtotal: ' + formatCurrency(paxSubtotal));
                     totalAllocated += paxSubtotal;
                 });
+
+                if (bookingDiscount > 0) {
+                    var targetBp = null;
+                    Object.keys(aggregate).forEach(function(k) {
+                        var bp = parseInt(k, 10);
+                        if (aggregate[k] >= bookingDiscount) {
+                            if (targetBp === null || bp < targetBp) targetBp = bp;
+                        }
+                    });
+                    if (targetBp !== null) {
+                        for (var i = 0; i < rowsInOrder.length; i++) {
+                            if (rowsInOrder[i].bpId === targetBp) {
+                                var amt = rowsInOrder[i].amount;
+                                var net = Math.round((amt - bookingDiscount) * 100) / 100;
+                                rowsInOrder[i].$row.css('background', '#fff8e1');
+                                rowsInOrder[i].$row.find('.split-product-discount')
+                                    .show()
+                                    .html(
+                                        '<div style="display:inline-block;margin-top:4px;font-size:10px;background:#f0ad4e;color:#fff;padding:2px 6px;border-radius:3px;">BC Discount Applied</div>' +
+                                        '<div style="color:#dc3545;font-size:11px;">- ' + formatCurrency(bookingDiscount) + ' discount</div>' +
+                                        '<div style="font-size:11px;">Net: ' + formatCurrency(net) + '</div>'
+                                    );
+                                break;
+                            }
+                        }
+                    }
+                }
 
                 var remaining = bookingSubtotal - totalAllocated;
                 $('#split-total-allocated').text(formatCurrency(totalAllocated));
