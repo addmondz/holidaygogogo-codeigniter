@@ -9,6 +9,7 @@ class Travel_Voucher extends CI_Controller
 		$this->load->model('Booking_Product_Model');
 		$this->load->model('Company_Model');
 		$this->load->model('Guest_List_Model');
+		$this->load->model('Guest_List_Room_Model');
 	}
     
 	function index()
@@ -26,40 +27,28 @@ class Travel_Voucher extends CI_Controller
                 } else {
                     $array['TravelDate'] = '-';
                 }
-                if(!empty($array['Adult'])) {
-                    $array['Adult'] = $array['Adult'] == 1 ? $array['Adult'] . ' ADULT ' : $array['Adult'] . ' ADULTS ';
-                }
-                if(!empty($array['Children'])) {
-                    $array['Children'] = $array['Children'] == 1 ? $array['Children'] . ' CHILD ' : $array['Children'] . ' CHILDREN ';
-                }
-                if(!empty($array['Infant'])) {
-                    $array['Infant'] = $array['Infant'] == 1 ? $array['Infant'] . ' INFANT ' : $array['Infant'] . ' INFANTS ';
-                }
-                if(!empty($array['Adult']) && !empty($array['Children']) && !empty($array['Infant'])) {
-                    $array['PaxNumber'] = $array['Adult'] . '& ' . $array['Children'] . '& ' . $array['Infant'];
+                $rooms = $this->Guest_List_Room_Model->Read_Rooms_By_Booking_ID($array['BookingID']);
+                if(!empty($rooms)) {
+                    $pax_adult = 0; $pax_child = 0; $pax_infant = 0;
+                    foreach($rooms as $r) {
+                        $pax_adult  += (int)$r->adult_count;
+                        $pax_child  += (int)$r->child_count;
+                        $pax_infant += (int)$r->infant_count;
+                    }
                 } else {
-                    if(!empty($array['Adult']) && empty($array['Children']) && !empty($array['Infant'])) {
-                        $array['PaxNumber'] = $array['Adult'] . '& ' . $array['Infant'];
-                    } else {
-                        if(!empty($array['Adult']) && !empty($array['Children']) && empty($array['Infant'])) {
-                            $array['PaxNumber'] = $array['Adult'] . '& ' . $array['Children'];
-                        } else {
-                            if(!empty($array['Adult']) && empty($array['Children']) && empty($array['Infant'])) {
-                                $array['PaxNumber'] = $array['Adult'];
-                            } else {
-                                if(empty($array['Adult']) && !empty($array['Children']) && !empty($array['Infant'])) {
-                                    $array['PaxNumber'] = $array['Children'] . '& ' . $array['Infant'];
-                                } else {
-                                    if(empty($array['Adult']) && empty($array['Children']) && !empty($array['Infant'])) {
-                                        $array['PaxNumber'] = $array['Infant'];
-                                    } else {
-                                        $array['PaxNumber'] = $array['Children'];
-                                    }
-                                }
-                            }
-                        }
+                    $pax_adult = 0; $pax_child = 0; $pax_infant = 0;
+                    $guests = $this->Guest_List_Model->Read_Guests_By_Booking_ID($array['BookingID']);
+                    foreach($guests as $g) {
+                        if     ($g->Type == 'ADULT')  { $pax_adult++; }
+                        elseif ($g->Type == 'CHILD')  { $pax_child++; }
+                        elseif ($g->Type == 'INFANT') { $pax_infant++; }
                     }
                 }
+                $adult_str  = $pax_adult  > 0 ? ($pax_adult  == 1 ? $pax_adult  . ' ADULT '  : $pax_adult  . ' ADULTS '  ) : '';
+                $child_str  = $pax_child  > 0 ? ($pax_child  == 1 ? $pax_child  . ' CHILD '  : $pax_child  . ' CHILDREN ') : '';
+                $infant_str = $pax_infant > 0 ? ($pax_infant == 1 ? $pax_infant . ' INFANT ' : $pax_infant . ' INFANTS ' ) : '';
+                $pax_parts = array_filter(array($adult_str, $child_str, $infant_str));
+                $array['PaxNumber'] = !empty($pax_parts) ? implode('& ', $pax_parts) : '0 Pax';
                 $array['InsertDate'] = strtoupper(date('j M Y', strtotime($array['InsertDate'])));
                 $country_code = $this->Universal_Model->Read_Country_Code($array['SalesAgentCountryCode']);
                 $array['SalesAgentMobile'] = $country_code . $array['SalesAgentMobile'];
