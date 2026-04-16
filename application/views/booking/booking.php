@@ -140,10 +140,6 @@
 
                             </div>
 
-                        </div>
-
-                        <div class="col-md-6">
-
                             <div class="form-group">
 
                                 <label>Reservation Number
@@ -166,10 +162,6 @@
                                 <small id="ReservationNumberError" class="text-danger"></small>
 
                             </div>
-
-                        </div>
-
-                        <div class="col-md-6">
 
                             <div class="form-group">
 
@@ -214,10 +206,6 @@
 
                             </div>
 
-                        </div>
-
-                        <div class="col-md-6">
-
                             <div class="form-group">
 
                                 <label>Sales Agent 2</label>
@@ -239,10 +227,6 @@
 
                             </div>
 
-                        </div>
-
-                        <div class="col-md-6">
-
                             <div class="form-group">
 
                                 <label>Booking OP</label>
@@ -261,26 +245,135 @@
 
                             </div>
 
+                            <div class="form-group">
+
+                                <label>Remark</label>
+
+                                <div class="input-icon">
+
+                                    <input type="text" id="BookingRemark" <?php if(current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) { ?> value="<?php echo $BookingRemark; ?>" <?php } ?> autocomplete="off" class="form-control">
+
+                                    <span>
+
+                                        <i class="la la-pencil-alt"></i>
+
+                                    </span>
+
+                                </div>
+
+                            </div>
+
+                            <div class="form-group">
+
+                                <label>Source
+
+                                    <span style="color:red;">*</span>
+
+                                </label>
+
+                                <select id="Source" data-live-search="true" class="form-control selectpicker">
+
+                                    <option selected disabled data-icon="la la-clipboard-list font-size-lg bs-icon" value="">--SELECT SOURCE--</option>
+
+                                    <?php foreach($sources as $source) { ?>
+
+                                        <option <?php if((current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) && $source->SourceID == $Source) { echo 'selected'; } ?> data-icon="<?php if($source->Name == 'WHATSAPP') { echo 'la la-whatsapp'; } else if($source->Name == 'WECHAT') { echo 'la la-wechat'; } else if($source->Name == 'EMAIL') { echo 'la la-envelope'; } else if($source->Name == 'CALL') { echo 'la la-phone-volume'; } else if($source->Name == 'TELEGRAM') { echo 'la la-telegram'; } else if($source->Name == 'FACEBOOK') { echo 'la la-facebook'; } else { echo 'la la-clipboard-list'; } ?> font-size-lg bs-icon" value="<?php echo $source->SourceID; ?>"><?php echo $source->Name; ?></option>
+
+                                    <?php } ?>
+
+                                </select>
+
+                            </div>
+
+                            <div class="form-group">
+
+                                <label>Chat Language
+
+                                    <span style="color:red;">*</span>
+
+                                </label>
+
+                                <select id="ChatLanguage" class="form-control selectpicker">
+
+                                    <option selected disabled data-icon="la la-language font-size-lg bs-icon" value="">--SELECT CHAT LANGUAGE--</option>
+
+                                    <?php foreach(unserialize(CHAT_LANGUAGE) as $key => $value) { ?>
+
+                                        <option <?php if((current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) && $key == $ChatLanguage) { echo 'selected'; } ?> data-icon="la la-language font-size-lg bs-icon" value="<?php echo $key; ?>"><?php echo $value; ?></option>
+
+                                    <?php } ?>
+
+                                </select>
+
+                            </div>
+
+                            <div class="form-group">
+
+                                <label>BC Title
+
+                                    <span style="color:red;">*</span>
+
+                                </label>
+
+                                <select id="BookingConfirmationTitle" class="form-control selectpicker">
+
+                                    <option selected disabled data-icon="la la-heading font-size-lg bs-icon" value="">--SELECT BC TITLE--</option>
+
+                                    <?php foreach(unserialize(BC_TITLE) as $key => $value) { ?>
+
+                                        <option <?php if((current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) && $key == $BookingConfirmationTitle) { echo 'selected'; } ?> data-icon="la la-heading font-size-lg bs-icon" value="<?php echo $key; ?>"><?php echo $value; ?></option>
+
+                                    <?php } ?>
+
+                                </select>
+
+                            </div>
+
+                            <div class="form-group">
+
+                                <label>BC Tag
+
+                                    <a onclick="Reset_Tag()" class="btn btn-icon btn-light-warning btn-xs">
+
+                                        <i class="la la-undo"></i>
+
+                                    </a>
+
+                                </label>
+
+                                <select title="--SELECT BC TAG--" id="Tag" multiple data-live-search="true" class="form-control selectpicker">
+
+                                    <?php foreach($tags as $tag) { ?>
+
+                                        <option <?php if((current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) && in_array($tag->TagID, $Tag)) { echo 'selected'; } ?> data-icon="la la-tags font-size-lg bs-icon" value="<?php echo $tag->TagID; ?>"><?php echo $tag->Name; ?></option>
+
+                                    <?php } ?>
+
+                                </select>
+
+                            </div>
+
                         </div>
 
                         <div class="col-md-6">
+
                             <div class="form-group">
                                 <label>Customer <span style="color:red;">*</span></label>
 
                                 <div class="input-icon position-relative">
-                                    <input type="text" 
-                                        id="Customer" 
+                                    <input type="text"
+                                        id="Customer"
                                         name="Customer"
-                                        <?php if (current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) { ?> 
-                                            value="<?php echo $Customer; ?>" 
-                                        <?php } ?> 
-                                        autocomplete="off" 
-                                        class="form-control" 
+                                        <?php if (current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) { ?>
+                                            value="<?php echo $Customer; ?>"
+                                        <?php } ?>
+                                        autocomplete="off"
+                                        class="form-control"
                                         placeholder="Search or select customer">
                                     <small id="customerInfo" class="form-text text-muted">&laquo; New Customer &raquo;</small>
 
                                     <!-- Hidden field to detect existing customer -->
-                                    <?php 
+                                    <?php
                                     $is_edit_page = in_array(current_url(), [base_url('Booking/Update'), base_url('Booking/Duplicate')]);
                                     $customer_id_value = ($is_edit_page && !empty($CustomerID)) ? $CustomerID : '';
                                     ?>
@@ -295,9 +388,7 @@
                                     </div>
                                 </div>
                             </div>
-                        </div>
 
-                        <div class="col-md-6">
                             <div class="form-group">
                                 <label>IC / Passport No. <span style="color:red;">*</span></label>
                                 <div class="input-icon">
@@ -311,11 +402,6 @@
                                     <span><i class="la la-id-card"></i></span>
                                 </div>
                             </div>
-                        </div>
-
-
-
-                        <div class="col-md-6">
 
                             <div class="form-group">
 
@@ -376,10 +462,6 @@
 
                             </div>
 
-                        </div>
-
-                        <div class="col-md-6">
-
                             <div class="form-group">
 
                                 <label>Destination
@@ -402,10 +484,6 @@
 
                             </div>
 
-                        </div>
-
-                        <div class="col-md-6">
-
                             <div class="form-group">
 
                                 <label>Travel Date
@@ -427,220 +505,6 @@
                                 </div>
 
                             </div>
-
-                        </div>
-
-                        <div class="col-md-6">
-
-                            <div class="form-group">
-
-                                <label>Adult</label>
-
-                                <div class="input-icon">
-
-                                    <input <?php if(current_url() == base_url('Booking/Update')) { echo 'disabled'; } ?> type="text" id="Adult" <?php if(current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) { ?> value="<?php echo $Adult; ?>" <?php } ?> autocomplete="off" class="form-control">
-
-                                    <span>
-
-                                        <i class="la la-male"></i>
-
-                                    </span>
-
-                                </div>
-
-                            </div>
-
-                        </div>
-
-                        <div class="col-md-6">
-
-                            <div class="form-group">
-
-                                <label>Children</label>
-
-                                <div class="input-icon">
-
-                                    <input <?php if(current_url() == base_url('Booking/Update')) { echo 'disabled'; } ?> type="text" id="Children" <?php if(current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) { ?> value="<?php echo $Children; ?>" <?php } ?> autocomplete="off" class="form-control">
-
-                                    <span>
-
-                                        <i class="la la-child"></i>
-
-                                    </span>
-
-                                </div>
-
-                            </div>
-
-                        </div>
-
-                        <div class="col-md-6">
-
-                            <div class="form-group">
-
-                                <label>Infant</label>
-
-                                <div class="input-icon">
-
-                                    <input <?php if(current_url() == base_url('Booking/Update')) { echo 'disabled'; } ?> type="text" id="Infant" <?php if(current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) { ?> value="<?php echo $Infant; ?>" <?php } ?> autocomplete="off" class="form-control">
-
-                                    <span>
-
-                                        <i class="la la-baby-carriage"></i>
-
-                                    </span>
-
-                                </div>
-
-                            </div>
-
-                        </div>
-
-                        <div class="col-md-6">
-
-                            <div class="form-group">
-
-                                <label>Remark</label>
-
-                                <div class="input-icon">
-
-                                    <input type="text" id="BookingRemark" <?php if(current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) { ?> value="<?php echo $BookingRemark; ?>" <?php } ?> autocomplete="off" class="form-control">
-
-                                    <span>
-
-                                        <i class="la la-pencil-alt"></i>
-
-                                    </span>
-
-                                </div>
-
-                            </div>
-
-                        </div>
-
-                        <div class="col-md-6">
-
-                            <div class="form-group">
-
-                                <label>Source
-
-                                    <span style="color:red;">*</span>
-
-                                </label>
-
-                                <select id="Source" data-live-search="true" class="form-control selectpicker">
-
-                                    <option selected disabled data-icon="la la-clipboard-list font-size-lg bs-icon" value="">--SELECT SOURCE--</option>
-
-                                    <?php foreach($sources as $source) { ?>
-
-                                        <option <?php if((current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) && $source->SourceID == $Source) { echo 'selected'; } ?> data-icon="<?php if($source->Name == 'WHATSAPP') { echo 'la la-whatsapp'; } else if($source->Name == 'WECHAT') { echo 'la la-wechat'; } else if($source->Name == 'EMAIL') { echo 'la la-envelope'; } else if($source->Name == 'CALL') { echo 'la la-phone-volume'; } else if($source->Name == 'TELEGRAM') { echo 'la la-telegram'; } else if($source->Name == 'FACEBOOK') { echo 'la la-facebook'; } else { echo 'la la-clipboard-list'; } ?> font-size-lg bs-icon" value="<?php echo $source->SourceID; ?>"><?php echo $source->Name; ?></option>
-
-                                    <?php } ?>
-
-                                </select>
-
-                            </div>
-
-                        </div>
-
-                        <div class="col-md-6">
-
-                            <div class="form-group">
-
-                                <label>Chat Language
-
-                                    <span style="color:red;">*</span>
-
-                                </label>
-
-                                <select id="ChatLanguage" class="form-control selectpicker">
-
-                                    <option selected disabled data-icon="la la-language font-size-lg bs-icon" value="">--SELECT CHAT LANGUAGE--</option>
-
-                                    <?php foreach(unserialize(CHAT_LANGUAGE) as $key => $value) { ?>
-
-                                        <option <?php if((current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) && $key == $ChatLanguage) { echo 'selected'; } ?> data-icon="la la-language font-size-lg bs-icon" value="<?php echo $key; ?>"><?php echo $value; ?></option>
-
-                                    <?php } ?>
-
-                                </select>
-
-                            </div>
-
-                        </div>
-
-                        <div class="col-md-6">
-
-                            <div class="form-group">
-
-                                <label>BC Title
-
-                                    <span style="color:red;">*</span>
-
-                                </label>
-
-                                <select id="BookingConfirmationTitle" class="form-control selectpicker">
-
-                                    <option selected disabled data-icon="la la-heading font-size-lg bs-icon" value="">--SELECT BC TITLE--</option>
-
-                                    <?php foreach(unserialize(BC_TITLE) as $key => $value) { ?>
-
-                                        <option <?php if((current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) && $key == $BookingConfirmationTitle) { echo 'selected'; } ?> data-icon="la la-heading font-size-lg bs-icon" value="<?php echo $key; ?>"><?php echo $value; ?></option>
-
-                                    <?php } ?>
-
-                                </select>
-
-                            </div>
-
-                        </div>
-
-                        <div class="col-md-6">
-
-                            <div class="form-group">
-
-                                <label>BC Tag
-
-                                    <a onclick="Reset_Tag()" class="btn btn-icon btn-light-warning btn-xs">
-
-                                        <i class="la la-undo"></i>
-
-                                    </a>
-
-                                </label>
-
-                                <select title="--SELECT BC TAG--" id="Tag" multiple data-live-search="true" class="form-control selectpicker">
-
-                                    <?php foreach($tags as $tag) { ?>
-
-                                        <option <?php if((current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) && in_array($tag->TagID, $Tag)) { echo 'selected'; } ?> data-icon="la la-tags font-size-lg bs-icon" value="<?php echo $tag->TagID; ?>"><?php echo $tag->Name; ?></option>
-
-                                    <?php } ?>
-
-                                </select>
-
-                            </div>
-
-                        </div>
-
-                        <?php if(current_url() == base_url('Booking/Create')) { ?>
-                            <div class="col-lg-6 col-md-12">
-                                <?php print_allow_review($AllowReview); ?>
-                            </div>
-                        <?php } ?>
-
-                    </div>
-
-                    <div class="d-flex justify-content-between border-top pt-5"></div>
-
-                    <strong>Payment Deadline :</strong>
-
-                    <br><br>
-
-                    <div class="row">
-
-                        <div class="col-md-6">
 
                             <div class="form-group">
 
@@ -667,10 +531,6 @@
                                 </div>
 
                             </div>
-
-                        </div>
-
-                        <div class="col-md-6">
 
                             <div class="form-group">
 
@@ -717,6 +577,78 @@
                                     <span>
 
                                         <i class="la la-calendar"></i>
+
+                                    </span>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                        <?php if(current_url() == base_url('Booking/Create')) { ?>
+                            <div class="col-lg-6 col-md-12">
+                                <?php print_allow_review($AllowReview); ?>
+                            </div>
+                        <?php } ?>
+
+                        <div class="col-md-6 d-none">
+
+                            <div class="form-group">
+
+                                <label>Adult</label>
+
+                                <div class="input-icon">
+
+                                    <input <?php if(current_url() == base_url('Booking/Update')) { echo 'disabled'; } ?> type="text" id="Adult" <?php if(current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) { ?> value="<?php echo $Adult; ?>" <?php } ?> autocomplete="off" class="form-control">
+
+                                    <span>
+
+                                        <i class="la la-male"></i>
+
+                                    </span>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                        <div class="col-md-6 d-none">
+
+                            <div class="form-group">
+
+                                <label>Children</label>
+
+                                <div class="input-icon">
+
+                                    <input <?php if(current_url() == base_url('Booking/Update')) { echo 'disabled'; } ?> type="text" id="Children" <?php if(current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) { ?> value="<?php echo $Children; ?>" <?php } ?> autocomplete="off" class="form-control">
+
+                                    <span>
+
+                                        <i class="la la-child"></i>
+
+                                    </span>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                        <div class="col-md-6 d-none">
+
+                            <div class="form-group">
+
+                                <label>Infant</label>
+
+                                <div class="input-icon">
+
+                                    <input <?php if(current_url() == base_url('Booking/Update')) { echo 'disabled'; } ?> type="text" id="Infant" <?php if(current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) { ?> value="<?php echo $Infant; ?>" <?php } ?> autocomplete="off" class="form-control">
+
+                                    <span>
+
+                                        <i class="la la-baby-carriage"></i>
 
                                     </span>
 
@@ -1114,18 +1046,8 @@
 
                                     <!-- Add New Comment Form -->
                                     <div class="border-top pt-2">
-                                        <div class="form-group mb-2">
-                                            <textarea id="new-comment-content" class="form-control" rows="2" placeholder="Enter your comment here..." style="font-size: 0.8125rem;"></textarea>
-                                        </div>
-                                        <div class="form-group mb-2">
-                                            <label class="font-weight-bold" style="font-size: 0.8125rem;">Also Notify</label>
-                                            <select id="comment-notify-users" multiple="multiple" data-live-search="true" data-actions-box="true" class="form-control selectpicker" title="--Select additional users to notify--">
-                                                <?php foreach($notify_admins as $admin) { ?>
-                                                    <?php if($admin->Status == 'Y') { ?>
-                                                        <option data-icon="la la-user-alt font-size-lg bs-icon" value="<?php echo $admin->AdminID; ?>"><?php echo $admin->Name; ?></option>
-                                                    <?php } ?>
-                                                <?php } ?>
-                                            </select>
+                                        <div class="form-group mb-2 mention-wrapper" style="position: relative;">
+                                            <textarea id="new-comment-content" class="form-control" rows="2" placeholder="Enter your comment here... Type @ to mention a user" style="font-size: 0.8125rem;"></textarea>
                                         </div>
                                         <button type="button" id="add-comment-btn" class="btn btn-primary btn-sm font-weight-bold mt-2 mb-2">
                                             <i class="la la-comment"></i> Add Comment
@@ -2787,12 +2709,6 @@
                     );
                 } else {
 
-                    if(adult == '' && children == '' && infant == '') {
-
-                        Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', 'Please Insert Pax Number', null);
-
-                    } else {
-
                         if((booking_confirmation_footer != '' && tinyMCE.editors[0].getContent() == '') || (travel_voucher_footer != '' && tinyMCE.editors[1].getContent() == '')) {
 
                             Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', 'Please Insert Footer Content Upon Selection', null);
@@ -3567,8 +3483,6 @@
 
                         }
 
-                    }
-
                 }
 
             }
@@ -4288,7 +4202,7 @@ $(document).ready(function() {
                             '<strong class="mr-2" style="font-size: 0.8125rem; color: #050505; cursor: pointer;">' + escapeHtml(remark.commenter_name) + '</strong>' +
                             '<span class="text-muted" style="font-size: 0.75rem; color: #65676b;">' + remark.created_at + (remark.created_at_relative ? ' <span style="margin: 0 4px;">•</span> ' + remark.created_at_relative : '') + '</span>' +
                             '</div>' +
-                            '<div class="comment-text" style="font-size: 0.8125rem; color: #050505; line-height: 1.3; white-space: pre-wrap; word-wrap: break-word;">' + escapeHtml(remark.content) + '</div>' +
+                            '<div class="comment-text" style="font-size: 0.8125rem; color: #050505; line-height: 1.3; white-space: pre-wrap; word-wrap: break-word;">' + renderMentionedContent(remark.content) + '</div>' +
                             notifiedHtml +
                             '</div>' +
                             // Delete button (only show if user is the owner)
@@ -4326,8 +4240,7 @@ $(document).ready(function() {
             type: 'post',
             data: {
                 booking_id: bookingId,
-                content: content,
-                notify_user_ids: $('#comment-notify-users').val()
+                content: content
             },
             dataType: 'json',
             success: function(response) {
@@ -4335,7 +4248,6 @@ $(document).ready(function() {
 
                 if (response.success) {
                     $('#new-comment-content').val('');
-                    $('#comment-notify-users').selectpicker('deselectAll');
                     loadComments(); // Reload comments to show the new one
                     // Don't redirect, just show success message
                     Swal.fire({
@@ -4441,6 +4353,138 @@ $(document).ready(function() {
         return text.replace(/[&<>"']/g, function(m) { return map[m]; });
     }
 
+    window.ADMIN_HANDLE_MAP = <?php
+        $__map = array();
+        if (!empty($notify_admins)) {
+            foreach ($notify_admins as $__a) {
+                if ($__a->Status === 'Y' && !empty($__a->handle)) {
+                    $__map[] = array(
+                        'AdminID' => (int)$__a->AdminID,
+                        'Name' => $__a->Name,
+                        'handle' => $__a->handle,
+                    );
+                }
+            }
+        }
+        echo json_encode($__map);
+    ?>;
+
+    function renderMentionedContent(text) {
+        if (text == null) return '';
+        var safe = escapeHtml(String(text));
+        var nameByHandle = {};
+        (window.ADMIN_HANDLE_MAP || []).forEach(function(a) { nameByHandle[a.handle] = a.Name; });
+        return safe.replace(/@([a-z0-9]+)/g, function(full, handle) {
+            if (nameByHandle[handle]) {
+                return '<span class="mention" style="color:#1877f2;font-weight:600;background:#e7f3ff;padding:1px 4px;border-radius:3px;">@' + escapeHtml(nameByHandle[handle]) + '</span>';
+            }
+            return full;
+        });
+    }
+
+    function initMentionAutocomplete(textareaSelector) {
+        var $ta = $(textareaSelector);
+        if (!$ta.length || $ta.data('mention-init')) return;
+        $ta.data('mention-init', true);
+
+        var admins = (window.ADMIN_HANDLE_MAP || []).slice();
+        var $dd = $('<ul class="mention-dropdown"></ul>').css({
+            position: 'absolute', zIndex: 1070, background: '#fff',
+            border: '1px solid #d0d7de', borderRadius: '4px', padding: '4px 0',
+            margin: 0, listStyle: 'none', maxHeight: '180px', overflowY: 'auto',
+            minWidth: '180px', boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
+            display: 'none', fontSize: '0.8125rem'
+        });
+        $ta.closest('.mention-wrapper').append($dd);
+
+        var activeIdx = 0;
+        var queryStart = -1;
+
+        function hide() { $dd.hide().empty(); queryStart = -1; }
+
+        function filter(q) {
+            q = q.toLowerCase();
+            return admins.filter(function(a) {
+                return a.handle.indexOf(q) === 0 || a.Name.toLowerCase().indexOf(q) !== -1;
+            }).slice(0, 8);
+        }
+
+        function render(list) {
+            $dd.empty();
+            if (!list.length) { hide(); return; }
+            list.forEach(function(a, i) {
+                var $li = $('<li></li>').css({
+                    padding: '6px 10px', cursor: 'pointer',
+                    background: i === activeIdx ? '#e7f3ff' : 'transparent'
+                }).attr('data-handle', a.handle);
+                $li.html('<strong>' + escapeHtml(a.Name) + '</strong> <span style="color:#65676b;font-size:0.75rem;">@' + escapeHtml(a.handle) + '</span>');
+                $li.on('mousedown', function(e) { e.preventDefault(); pick(a.handle); });
+                $li.on('mouseenter', function() { activeIdx = i; render(list); });
+                $dd.append($li);
+            });
+            $dd.show();
+        }
+
+        function currentMatch() {
+            var val = $ta.val();
+            var pos = $ta[0].selectionStart;
+            var before = val.slice(0, pos);
+            var m = before.match(/(?:^|\s)@([a-z0-9]*)$/i);
+            if (!m) return null;
+            return { query: m[1].toLowerCase(), start: pos - m[1].length - 1, end: pos };
+        }
+
+        function pick(handle) {
+            var match = currentMatch();
+            if (!match) { hide(); return; }
+            var val = $ta.val();
+            var newVal = val.slice(0, match.start) + '@' + handle + ' ' + val.slice(match.end);
+            var newPos = match.start + handle.length + 2;
+            $ta.val(newVal);
+            $ta[0].setSelectionRange(newPos, newPos);
+            $ta.trigger('focus');
+            hide();
+        }
+
+        $ta.on('input click keyup', function(e) {
+            if (e.type === 'keyup' && (e.keyCode === 38 || e.keyCode === 40 || e.keyCode === 13 || e.keyCode === 27 || e.keyCode === 9)) return;
+            var match = currentMatch();
+            if (!match) { hide(); return; }
+            queryStart = match.start;
+            activeIdx = 0;
+            var list = filter(match.query);
+            if (!list.length) { hide(); return; }
+            $dd.css({ top: ($ta.outerHeight() + 2) + 'px', left: '0px', right: 'auto' });
+            render(list);
+            $dd.data('current-list', list);
+        });
+
+        $ta.on('keydown', function(e) {
+            if (!$dd.is(':visible')) return;
+            var list = $dd.data('current-list') || [];
+            if (e.keyCode === 38) { // up
+                e.preventDefault();
+                activeIdx = (activeIdx - 1 + list.length) % list.length;
+                render(list);
+            } else if (e.keyCode === 40) { // down
+                e.preventDefault();
+                activeIdx = (activeIdx + 1) % list.length;
+                render(list);
+            } else if (e.keyCode === 13 || e.keyCode === 9) { // enter/tab
+                if (list[activeIdx]) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    pick(list[activeIdx].handle);
+                }
+            } else if (e.keyCode === 27) { // esc
+                e.preventDefault();
+                hide();
+            }
+        });
+
+        $ta.on('blur', function() { setTimeout(hide, 150); });
+    }
+
     // Add admin remark (internal remark in response to customer)
     $('#add-admin-remark-btn').on('click', function() {
         var content = $('#new-admin-remark-content').val().trim();
@@ -4501,6 +4545,7 @@ $(document).ready(function() {
     // Load comments when page is ready
     loadComments();
     loadCustomerRemarks();
+    initMentionAutocomplete('#new-comment-content');
     <?php } ?>
     
     // Booking Checklist functionality

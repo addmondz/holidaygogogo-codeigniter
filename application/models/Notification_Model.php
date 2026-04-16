@@ -340,6 +340,74 @@ class Notification_Model extends CI_Model
 	}
 
 	/**
+	 * Enrich an array of admin rows with a unique single-token "handle"
+	 * derived from admin.Name (used for @mention autocomplete).
+	 *
+	 * Rule: lowercase [a-z0-9] only. Empty -> "user{AdminID}". On collision,
+	 * append AdminID to every colliding admin so each one stays unique.
+	 *
+	 * @param array $admins Rows with at least {AdminID, Name}
+	 * @return array Same rows with an added "handle" property
+	 */
+	function Build_Admin_Handles($admins)
+	{
+		if (empty($admins)) {
+			return $admins;
+		}
+
+		$base_counts = array();
+		foreach ($admins as $a) {
+			$base = strtolower(preg_replace('/[^a-z0-9]/i', '', $a->Name));
+			if ($base === '') {
+				$base = 'user' . intval($a->AdminID);
+			}
+			$a->_handle_base = $base;
+			$base_counts[$base] = isset($base_counts[$base]) ? $base_counts[$base] + 1 : 1;
+		}
+
+		foreach ($admins as $a) {
+			if ($base_counts[$a->_handle_base] > 1) {
+				$a->handle = $a->_handle_base . intval($a->AdminID);
+			} else {
+				$a->handle = $a->_handle_base;
+			}
+			unset($a->_handle_base);
+		}
+
+		return $admins;
+	}
+
+	/**
+	 * Resolve parsed @handles back to AdminIDs of active admins.
+	 * Deduped. Unknown or inactive handles are silently dropped.
+	 *
+	 * @param array $handles Handle strings parsed from remark content
+	 * @return array Array of AdminIDs
+	 */
+	function Resolve_Handles_To_User_Ids($handles)
+	{
+		if (empty($handles)) {
+			return array();
+		}
+
+		$wanted = array_unique(array_map('strtolower', $handles));
+
+		$this->db->select('AdminID, Name');
+		$this->db->where('Status', 'Y');
+		$admins = $this->db->get('admin')->result();
+
+		$admins = $this->Build_Admin_Handles($admins);
+
+		$ids = array();
+		foreach ($admins as $a) {
+			if (in_array($a->handle, $wanted, true)) {
+				$ids[] = intval($a->AdminID);
+			}
+		}
+		return array_values(array_unique($ids));
+	}
+
+	/**
 	 * Create notification for Sales Agent and BookingOP when customer adds a remark
 	 *
 	 * @param int $booking_id Booking ID

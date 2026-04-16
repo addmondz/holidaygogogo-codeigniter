@@ -1266,18 +1266,8 @@ function escapeHtml(text) {
                     <div class="text-center py-3"><div class="spinner spinner-primary spinner-lg"></div></div>
                 </div>
                 <div class="border-top pt-2 mt-2">
-                    <div class="form-group mb-2">
-                        <textarea id="modal-new-comment-content" class="form-control" rows="2" placeholder="Enter your comment here..." style="font-size: 0.8125rem;"></textarea>
-                    </div>
-                    <div class="form-group mb-2">
-                        <label class="font-weight-bold" style="font-size: 0.8125rem;">Also Notify</label>
-                        <select id="modal-comment-notify-users" multiple="multiple" data-live-search="true" data-actions-box="true" class="form-control selectpicker" title="--Select additional users to notify--">
-                            <?php foreach($notify_admins as $admin) { ?>
-                                <?php if($admin->Status == 'Y') { ?>
-                                    <option data-admin-level="<?php echo $admin->Level; ?>" data-icon="la la-user-alt font-size-lg bs-icon" value="<?php echo $admin->AdminID; ?>"><?php echo $admin->Name; ?></option>
-                                <?php } ?>
-                            <?php } ?>
-                        </select>
+                    <div class="form-group mb-2 mention-wrapper" style="position: relative;">
+                        <textarea id="modal-new-comment-content" class="form-control" rows="2" placeholder="Enter your comment here... Type @ to mention a user" style="font-size: 0.8125rem;"></textarea>
                     </div>
                     <button type="button" id="modal-add-comment-btn" class="btn btn-primary btn-sm font-weight-bold mt-2 mb-2">
                         <i class="la la-comment"></i> Add Comment
@@ -1309,6 +1299,136 @@ var remarksModalBookingId = null;
 var remarksModalSalesAgentId = null;
 var remarksModalBookingOpId = null;
 
+window.ADMIN_HANDLE_MAP = <?php
+    $__map = array();
+    if (!empty($notify_admins)) {
+        foreach ($notify_admins as $__a) {
+            if ($__a->Status === 'Y' && !empty($__a->handle)) {
+                $__map[] = array(
+                    'AdminID' => (int)$__a->AdminID,
+                    'Name' => $__a->Name,
+                    'handle' => $__a->handle,
+                );
+            }
+        }
+    }
+    echo json_encode($__map);
+?>;
+
+function renderMentionedContent(text) {
+    if (text == null) return '';
+    var safe = escapeHtml(String(text));
+    var nameByHandle = {};
+    (window.ADMIN_HANDLE_MAP || []).forEach(function(a) { nameByHandle[a.handle] = a.Name; });
+    return safe.replace(/@([a-z0-9]+)/g, function(full, handle) {
+        if (nameByHandle[handle]) {
+            return '<span class="mention" style="color:#1877f2;font-weight:600;background:#e7f3ff;padding:1px 4px;border-radius:3px;">@' + escapeHtml(nameByHandle[handle]) + '</span>';
+        }
+        return full;
+    });
+}
+
+function initMentionAutocomplete(textareaSelector) {
+    var $ta = $(textareaSelector);
+    if (!$ta.length || $ta.data('mention-init')) return;
+    $ta.data('mention-init', true);
+
+    var admins = (window.ADMIN_HANDLE_MAP || []).slice();
+    var $dd = $('<ul class="mention-dropdown"></ul>').css({
+        position: 'absolute', zIndex: 1070, background: '#fff',
+        border: '1px solid #d0d7de', borderRadius: '4px', padding: '4px 0',
+        margin: 0, listStyle: 'none', maxHeight: '180px', overflowY: 'auto',
+        minWidth: '180px', boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
+        display: 'none', fontSize: '0.8125rem'
+    });
+    $ta.closest('.mention-wrapper').append($dd);
+
+    var activeIdx = 0;
+
+    function hide() { $dd.hide().empty(); }
+
+    function filter(q) {
+        q = q.toLowerCase();
+        return admins.filter(function(a) {
+            return a.handle.indexOf(q) === 0 || a.Name.toLowerCase().indexOf(q) !== -1;
+        }).slice(0, 8);
+    }
+
+    function render(list) {
+        $dd.empty();
+        if (!list.length) { hide(); return; }
+        list.forEach(function(a, i) {
+            var $li = $('<li></li>').css({
+                padding: '6px 10px', cursor: 'pointer',
+                background: i === activeIdx ? '#e7f3ff' : 'transparent'
+            }).attr('data-handle', a.handle);
+            $li.html('<strong>' + escapeHtml(a.Name) + '</strong> <span style="color:#65676b;font-size:0.75rem;">@' + escapeHtml(a.handle) + '</span>');
+            $li.on('mousedown', function(e) { e.preventDefault(); pick(a.handle); });
+            $li.on('mouseenter', function() { activeIdx = i; render(list); });
+            $dd.append($li);
+        });
+        $dd.show();
+    }
+
+    function currentMatch() {
+        var val = $ta.val();
+        var pos = $ta[0].selectionStart;
+        var before = val.slice(0, pos);
+        var m = before.match(/(?:^|\s)@([a-z0-9]*)$/i);
+        if (!m) return null;
+        return { query: m[1].toLowerCase(), start: pos - m[1].length - 1, end: pos };
+    }
+
+    function pick(handle) {
+        var match = currentMatch();
+        if (!match) { hide(); return; }
+        var val = $ta.val();
+        var newVal = val.slice(0, match.start) + '@' + handle + ' ' + val.slice(match.end);
+        var newPos = match.start + handle.length + 2;
+        $ta.val(newVal);
+        $ta[0].setSelectionRange(newPos, newPos);
+        $ta.trigger('focus');
+        hide();
+    }
+
+    $ta.on('input click keyup', function(e) {
+        if (e.type === 'keyup' && (e.keyCode === 38 || e.keyCode === 40 || e.keyCode === 13 || e.keyCode === 27 || e.keyCode === 9)) return;
+        var match = currentMatch();
+        if (!match) { hide(); return; }
+        activeIdx = 0;
+        var list = filter(match.query);
+        if (!list.length) { hide(); return; }
+        $dd.css({ top: ($ta.outerHeight() + 2) + 'px', left: '0px', right: 'auto' });
+        render(list);
+        $dd.data('current-list', list);
+    });
+
+    $ta.on('keydown', function(e) {
+        if (!$dd.is(':visible')) return;
+        var list = $dd.data('current-list') || [];
+        if (e.keyCode === 38) {
+            e.preventDefault();
+            activeIdx = (activeIdx - 1 + list.length) % list.length;
+            render(list);
+        } else if (e.keyCode === 40) {
+            e.preventDefault();
+            activeIdx = (activeIdx + 1) % list.length;
+            render(list);
+        } else if (e.keyCode === 13 || e.keyCode === 9) {
+            if (list[activeIdx]) {
+                e.preventDefault();
+                e.stopPropagation();
+                pick(list[activeIdx].handle);
+            }
+        } else if (e.keyCode === 27) {
+            e.preventDefault();
+            hide();
+        }
+    });
+
+    $ta.on('blur', function() { setTimeout(hide, 150); });
+}
+
 function renderRemarkItem(remark) {
     var avatarColor = ['primary', 'success', 'info', 'warning', 'danger'][remark.commenter_name.charCodeAt(0) % 5];
     var notifiedHtml = '';
@@ -1327,7 +1447,7 @@ function renderRemarkItem(remark) {
         '<strong class="mr-2" style="font-size: 0.8125rem; color: #050505;">' + escapeHtml(remark.commenter_name) + '</strong>' +
         '<span class="text-muted" style="font-size: 0.75rem; color: #65676b;">' + remark.created_at + '</span>' +
         '</div>' +
-        '<div class="comment-text" style="font-size: 0.8125rem; color: #050505; line-height: 1.3; white-space: pre-wrap; word-wrap: break-word;">' + escapeHtml(remark.content) + '</div>' +
+        '<div class="comment-text" style="font-size: 0.8125rem; color: #050505; line-height: 1.3; white-space: pre-wrap; word-wrap: break-word;">' + renderMentionedContent(remark.content) + '</div>' +
         notifiedHtml +
         '</div>' +
         '</div>';
@@ -1396,9 +1516,6 @@ function openRemarksModal(bookingId, bookingNumber, salesAgentId, bookingOpId) {
     $('#modal-new-comment-content').val('');
     $('#modal-new-customer-remark-content').val('');
 
-    // Clear notify users selection (these are for additional recipients only)
-    $('#modal-comment-notify-users').selectpicker('deselectAll');
-
     $('#remarksModal').modal('show');
 
     loadModalInternalComments();
@@ -1429,15 +1546,13 @@ $('#modal-add-comment-btn').on('click', function() {
         type: 'post',
         data: {
             booking_id: remarksModalBookingId,
-            content: content,
-            notify_user_ids: $('#modal-comment-notify-users').val()
+            content: content
         },
         dataType: 'json',
         success: function(response) {
             $btn.prop('disabled', false).html(originalText);
             if (response.success) {
                 $('#modal-new-comment-content').val('');
-                $('#modal-comment-notify-users').selectpicker('deselectAll');
                 loadModalInternalComments();
                 Swal.fire({
                     width: 550,
@@ -1553,8 +1668,10 @@ $('#modal-new-customer-remark-content').on('keydown', function(e) {
     }
 });
 
-// Initialize selectpicker when modal is shown
+// Initialize @mention autocomplete on the modal textarea when modal opens
 $('#remarksModal').on('shown.bs.modal', function() {
-    $('#modal-comment-notify-users').selectpicker('refresh');
+    if (typeof initMentionAutocomplete === 'function') {
+        initMentionAutocomplete('#modal-new-comment-content');
+    }
 });
 </script>

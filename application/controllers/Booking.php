@@ -15,6 +15,7 @@ class Booking extends MY_Controller
 		$this->load->model('Universal_Model');
 		$this->load->model('Customer_Model');
 		$this->load->model('Remark_Model');
+		$this->load->model('Notification_Model');
 		$this->load->model('Booking_Checklist_Completion_Model');
 		$this->load->model('Product_Package_Checklist_Model');
 		$this->load->model('Package_Checklist_Model');
@@ -32,7 +33,7 @@ class Booking extends MY_Controller
 
 			// Load filter dropdowns data
 			$array['admins'] = $this->Booking_Model->Read_Admins();
-			$array['notify_admins'] = $this->Booking_Model->Read_Notify_Admins();
+			$array['notify_admins'] = $this->Notification_Model->Build_Admin_Handles($this->Booking_Model->Read_Notify_Admins());
 			$array['booking_op_admins'] = $this->Booking_Model->Read_Booking_OP_Admins();
 			$array['categories'] = $this->Booking_Model->Read_Categories();
 			$array['tags'] = $this->Booking_Model->Read_Tags();
@@ -656,7 +657,7 @@ class Booking extends MY_Controller
 				$titles = array('tab_title' => 'HolidayGoGoGo | Booking', 'breadcrumb_title' => 'Booking >> Create');
 					$array = array('BookingID' => 'NA', 'BookingConfirmationFooterID' => 'NA', 'TravelVoucherFooterID' => 'NA', 'BookingNumber' => 'NA', 'Tag' => array(), 'Discount' => 'NA', 'NetTotal' => 'NA', 'ProductSequence' => array(), 'BookingProductID' => ($this->Booking_Product_Model->Read_Last_Booking_Product_ID()) + 1, 'AllowReview' => 1, 'ic_passport_no' => '');
 					$array['admins'] = $this->Booking_Model->Read_Admins();
-					$array['notify_admins'] = $this->Booking_Model->Read_Notify_Admins();
+					$array['notify_admins'] = $this->Notification_Model->Build_Admin_Handles($this->Booking_Model->Read_Notify_Admins());
 					$array['booking_op_admins'] = $this->Booking_Model->Read_Booking_OP_Admins();
 					$array['booking_products'][0] = (object) array('BookingProductID' => 'NA');
 				$array['categories'] = $this->Booking_Model->Read_Categories();
@@ -1188,7 +1189,7 @@ class Booking extends MY_Controller
 					}
 						$array['DepositPaidDisplay'] = $deposit_paid_display;
 						$array['admins'] = $this->Booking_Model->Read_Admins();
-						$array['notify_admins'] = $this->Booking_Model->Read_Notify_Admins();
+						$array['notify_admins'] = $this->Notification_Model->Build_Admin_Handles($this->Booking_Model->Read_Notify_Admins());
 						$array['booking_op_admins'] = $this->Booking_Model->Read_Booking_OP_Admins();
 
 					if(empty($array['ProductSequence'])) {
@@ -1371,7 +1372,7 @@ class Booking extends MY_Controller
 				}
 					$array['DepositPaidDisplay'] = $deposit_paid_display;
 					$array['admins'] = $this->Booking_Model->Read_Admins();
-					$array['notify_admins'] = $this->Booking_Model->Read_Notify_Admins();
+					$array['notify_admins'] = $this->Notification_Model->Build_Admin_Handles($this->Booking_Model->Read_Notify_Admins());
 					$array['booking_op_admins'] = $this->Booking_Model->Read_Booking_OP_Admins();
 
 				if(empty($array['ProductSequence'])) {
@@ -3239,12 +3240,15 @@ class Booking extends MY_Controller
 		// Check if notifications should be skipped (when adding from Customer Remarks section)
 		$skip_notifications = $this->input->post('skip_notifications') == '1' ? true : false;
 
-		// Get selected users to notify (for internal comments)
-		$notify_user_ids = $this->input->post('notify_user_ids');
-		if (!empty($notify_user_ids) && is_array($notify_user_ids)) {
-			$notify_user_ids = array_map('intval', $notify_user_ids);
-		} else {
-			$notify_user_ids = null;
+		// Parse @mention handles from the comment content (internal remarks only)
+		$notify_user_ids = null;
+		if ($remark_type == REMARK_TYPE::INTERNAL && !$skip_notifications) {
+			if (preg_match_all('/@([a-z0-9]+)/', $content, $matches) && !empty($matches[1])) {
+				$ids = $this->Notification_Model->Resolve_Handles_To_User_Ids($matches[1]);
+				if (!empty($ids)) {
+					$notify_user_ids = $ids;
+				}
+			}
 		}
 
 		$remark_data = array(
