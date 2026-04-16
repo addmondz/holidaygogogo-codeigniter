@@ -121,13 +121,14 @@ class Remark_Model extends CI_Model
 			$this->db->where('remark.commenter_id !=', intval($user_id));
 		}
 
-		// Sales agents (level 20) only see remarks from their bookings
+		// Sales agents (20) / BookingOP (40): their own bookings OR remarks they were tagged on
 		if ($user_level == 20 && $user_id) {
-			$this->db->where('booking.SalesAgent', $user_id);
+			$uid = intval($user_id);
+			$this->db->where("(booking.SalesAgent = $uid OR EXISTS (SELECT 1 FROM notification n WHERE n.remark_id = remark.RemarkID AND n.user_id = $uid))", null, false);
 		}
-		// BookingOP (level 40) only see remarks from their bookings
 		elseif ($user_level == 40 && $user_id) {
-			$this->db->where('booking.BookingOP', $user_id);
+			$uid = intval($user_id);
+			$this->db->where("(booking.BookingOP = $uid OR EXISTS (SELECT 1 FROM notification n WHERE n.remark_id = remark.RemarkID AND n.user_id = $uid))", null, false);
 		}
 
 		$this->db->order_by('remark.created_at', 'DESC');
@@ -151,10 +152,12 @@ class Remark_Model extends CI_Model
 		}
 
 		if ($user_level == 20 && $user_id) {
-			$this->db->where('booking.SalesAgent', $user_id);
+			$uid = intval($user_id);
+			$this->db->where("(booking.SalesAgent = $uid OR EXISTS (SELECT 1 FROM notification n WHERE n.remark_id = remark.RemarkID AND n.user_id = $uid))", null, false);
 		}
 		elseif ($user_level == 40 && $user_id) {
-			$this->db->where('booking.BookingOP', $user_id);
+			$uid = intval($user_id);
+			$this->db->where("(booking.BookingOP = $uid OR EXISTS (SELECT 1 FROM notification n WHERE n.remark_id = remark.RemarkID AND n.user_id = $uid))", null, false);
 		}
 
 		return $this->db->count_all_results('remark');
@@ -176,10 +179,12 @@ class Remark_Model extends CI_Model
 		$this->db->where('remark.commenter_id !=', intval($user_id));
 
 		if ($user_level == 20 && $user_id) {
-			$this->db->where('booking.SalesAgent', $user_id);
+			$uid = intval($user_id);
+			$this->db->where("(booking.SalesAgent = $uid OR EXISTS (SELECT 1 FROM notification n WHERE n.remark_id = remark.RemarkID AND n.user_id = $uid))", null, false);
 		}
 		elseif ($user_level == 40 && $user_id) {
-			$this->db->where('booking.BookingOP', $user_id);
+			$uid = intval($user_id);
+			$this->db->where("(booking.BookingOP = $uid OR EXISTS (SELECT 1 FROM notification n WHERE n.remark_id = remark.RemarkID AND n.user_id = $uid))", null, false);
 		}
 
 		return $this->db->count_all_results('remark');
@@ -213,10 +218,12 @@ class Remark_Model extends CI_Model
 		$this->db->where('rur.id IS NULL', null, false);
 
 		if ($user_level == 20 && $user_id) {
-			$this->db->where('booking.SalesAgent', $user_id);
+			$uid = intval($user_id);
+			$this->db->where("(booking.SalesAgent = $uid OR EXISTS (SELECT 1 FROM notification n WHERE n.remark_id = remark.RemarkID AND n.user_id = $uid))", null, false);
 		}
 		elseif ($user_level == 40 && $user_id) {
-			$this->db->where('booking.BookingOP', $user_id);
+			$uid = intval($user_id);
+			$this->db->where("(booking.BookingOP = $uid OR EXISTS (SELECT 1 FROM notification n WHERE n.remark_id = remark.RemarkID AND n.user_id = $uid))", null, false);
 		}
 
 		$unread_remarks = $this->db->get('remark')->result();

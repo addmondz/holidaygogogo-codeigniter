@@ -296,7 +296,7 @@ if (!function_exists('get_booking_status_info')) {
 }
 
 if (!function_exists('display_booking_status')) {
-    function display_booking_status($booking, $return_all_statuses = false, $CI = null)
+    function display_booking_status($booking, $return_all_statuses = false)
     {
         // Convert array to object if needed
         if (is_array($booking)) {
@@ -318,12 +318,38 @@ if (!function_exists('display_booking_status')) {
         if ($booking->AfterSalesService == 'PENDING' && $booking->Status == 'Y') {
             $display_status = 'PR';
         }
-        if (empty($booking->DepositDeadline)) {
-            if (date('Y-m-d') > $booking->FullPaymentDeadline && ($booking->Status == 'P' || $booking->Status == 'PP')) {
-                $display_status = 'PO';
+        if (($booking->Status == 'P' || $booking->Status == 'PP')
+            && isset($booking->balance_due) && isset($booking->deposit_complete)) {
+            $today = date('Y-m-d');
+            // Prefer raw Y-m-d copies when callers have pre-formatted the display fields
+            // (e.g. Booking::Update reformats DepositDeadline to d/m/Y for display).
+            $deposit_deadline_raw = !empty($booking->DepositDeadlineRaw)
+                ? $booking->DepositDeadlineRaw
+                : (!empty($booking->DepositDeadline) ? $booking->DepositDeadline : '');
+            $full_payment_deadline_raw = !empty($booking->FullPaymentDeadlineRaw)
+                ? $booking->FullPaymentDeadlineRaw
+                : (!empty($booking->FullPaymentDeadline) ? $booking->FullPaymentDeadline : '');
+
+            $balance_due = floatval($booking->balance_due);
+            $deposit_complete = (bool)$booking->deposit_complete;
+
+            $is_payment_overdue = false;
+
+            if (!empty($deposit_deadline_raw) && !$deposit_complete && $booking->Status == 'P') {
+                $deposit_deadline = date('Y-m-d', strtotime($deposit_deadline_raw));
+                if ($today > $deposit_deadline && $balance_due > 0) {
+                    $is_payment_overdue = true;
+                }
             }
-        } else {
-            if ((date('Y-m-d') > $booking->DepositDeadline && $booking->Status == 'P') || (date('Y-m-d') > $booking->FullPaymentDeadline && ($booking->Status == 'P' || $booking->Status == 'PP'))) {
+
+            if (!$is_payment_overdue && !empty($full_payment_deadline_raw) && $balance_due > 0) {
+                $full_payment_deadline = date('Y-m-d', strtotime($full_payment_deadline_raw));
+                if ($today > $full_payment_deadline) {
+                    $is_payment_overdue = true;
+                }
+            }
+
+            if ($is_payment_overdue) {
                 $display_status = 'PO';
             }
         }

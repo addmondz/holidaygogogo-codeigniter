@@ -138,29 +138,7 @@ class Cron extends CI_Controller
 			}
 		}
 
-		// Notify all OPs about products missing checklists
-		$no_checklist_count = 0;
-		$this->db->select('ID');
-		$this->db->where('is_required', 1);
-		$required_rows = $this->db->get('package_checklist')->result();
-		$required_ids = array_map(function($r){ return (int)$r->ID; }, $required_rows);
-
-		$this->db->select('ProductID, Name');
-		$this->db->where('Status', 'Y');
-		$products = $this->db->get('product')->result();
-		foreach($products as $product) {
-			$assigned = $this->Product_Package_Checklist_Model->Get_Checklists_For_Product($product->ProductID);
-			$assigned = array_map('intval', $assigned);
-			$non_required = array_diff($assigned, $required_ids);
-			if(empty($non_required)) {
-				$no_checklist_count += $this->Cronjob_Model->create_product_no_checklist_notifications(
-					$product->ProductID,
-					$product->Name
-				);
-			}
-		}
-
-		echo "DONE! Reminder notifications: $reminder_count, No-checklist notifications: $no_checklist_count";
+		echo "DONE! Reminder notifications: $reminder_count";
 	}
 
 	/**

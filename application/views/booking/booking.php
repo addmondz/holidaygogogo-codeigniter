@@ -2611,10 +2611,7 @@
         if (deposit_paid_value > 0) {
             deposit_paid_display = deposit_paid_value.toLocaleString('en-US', {minimumFractionDigits: 2});
 
-            if (deposit_difference > 0.01) {
-                deposit_paid_display += ' (Overpaid: RM ' + Math.abs(deposit_difference).toLocaleString('en-US', {minimumFractionDigits: 2}) + ')';
-                deposit_paid_color = '#FF6B6B';
-            } else if (deposit_difference < -0.01) {
+            if (deposit_difference < -0.01) {
                 deposit_paid_display += ' (Underpaid: RM ' + Math.abs(deposit_difference).toLocaleString('en-US', {minimumFractionDigits: 2}) + ')';
                 deposit_paid_color = '#FFA500';
             } else {
@@ -4271,7 +4268,13 @@ $(document).ready(function() {
                     response.remarks.forEach(function(remark) {
                         // Get first letter for avatar color
                         var avatarColor = ['primary', 'success', 'info', 'warning', 'danger'][remark.commenter_name.charCodeAt(0) % 5];
-                        
+
+                        var notifiedHtml = '';
+                        if (remark.notified_users && remark.notified_users.length) {
+                            var notifiedNames = remark.notified_users.map(function(u) { return escapeHtml(u.Name); }).join(', ');
+                            notifiedHtml = '<div class="mt-1" style="font-size: 0.7rem; color: #65676b;"><i class="la la-bell"></i> Notified: ' + notifiedNames + '</div>';
+                        }
+
                         var commentHtml = '<div class="comment-item d-flex mb-2 mx-2 pb-2 pl-1" style="border-bottom: 1px solid #e4e6eb; position: relative;">' +
                             // Avatar
                             '<div class="flex-shrink-0 mr-2">' +
@@ -4286,6 +4289,7 @@ $(document).ready(function() {
                             '<span class="text-muted" style="font-size: 0.75rem; color: #65676b;">' + remark.created_at + (remark.created_at_relative ? ' <span style="margin: 0 4px;">•</span> ' + remark.created_at_relative : '') + '</span>' +
                             '</div>' +
                             '<div class="comment-text" style="font-size: 0.8125rem; color: #050505; line-height: 1.3; white-space: pre-wrap; word-wrap: break-word;">' + escapeHtml(remark.content) + '</div>' +
+                            notifiedHtml +
                             '</div>' +
                             // Delete button (only show if user is the owner)
                             (remark.is_owner ? '<button type="button" class="btn btn-sm btn-link text-muted delete-comment-btn comment-delete-btn" data-remark-id="' + remark.RemarkID + '" style="position: absolute; top: 0; right: 0; opacity: 1; padding: 2px 6px; font-size: 0.75rem; background: transparent !important;" title="Delete comment">' +

@@ -206,6 +206,31 @@ class Guest_List_Model extends CI_Model
 			return false;
 		}
 
+		// Expected pax: room management is primary; fall back to booking PDF pax
+		// counts only when no rooms are configured.
+		$this->load->model('Guest_List_Room_Model');
+		$rooms = $this->Guest_List_Room_Model->Read_Rooms_By_Booking_ID($booking_id);
+		$expected = 0;
+		if (!empty($rooms)) {
+			foreach ($rooms as $room) {
+				$expected += (int)$room->adult_count + (int)$room->child_count + (int)$room->infant_count;
+			}
+		} else {
+			$this->db->select('Adult, Children, Infant');
+			$this->db->where('BookingID', $booking_id);
+			$booking = $this->db->get('booking')->row();
+			if (!empty($booking)) {
+				$expected = (int)$booking->Adult + (int)$booking->Children + (int)$booking->Infant;
+			}
+		}
+
+		if ($expected <= 0) {
+			return false;
+		}
+		if (count($guests) < $expected) {
+			return false;
+		}
+
 		foreach ($guests as $guest) {
 			if (empty($guest->Name) || empty($guest->LastName) || empty($guest->Gender) ||
 				empty($guest->DateOfBirth) ||

@@ -701,7 +701,7 @@ return $query->result_array(); // instead of result()
 
 		// Supplier filter
 		if(!empty($this->input->get('supplier'))) {
-			$this->db->where('payment.SupplierID', $this->input->get('supplier'));
+			$this->db->where_in('payment.SupplierID', explode(',', $this->input->get('supplier')));
 		}
 
 		// Transaction date range filter
@@ -715,14 +715,17 @@ return $query->result_array(); // instead of result()
 
 		// Payment type filter
 		if(!empty($this->input->get('payment_type'))) {
-			$this->db->where('Type', $this->input->get('payment_type'));
+			$this->db->where_in('Type', explode(',', $this->input->get('payment_type')));
 		}
 
 		// Transaction type filter (PAYMENT IN vs OUT)
 		if(!empty($this->input->get('transaction_type'))) {
-			if($this->input->get('transaction_type') == 'PAYMENT IN') {
+			$transaction_types = array_map('trim', explode(',', $this->input->get('transaction_type')));
+			$has_in = in_array('PAYMENT IN', $transaction_types);
+			$has_out = in_array('PAYMENT OUT', $transaction_types);
+			if($has_in && !$has_out) {
 				$this->db->where('Credit !=', 0.00);
-			} else {
+			} else if($has_out && !$has_in) {
 				$this->db->where('Credit', 0.00);
 			}
 		}
@@ -788,7 +791,7 @@ return $query->result_array(); // instead of result()
 
 		// Sales agent filter
 		if(!empty($this->input->get('sales_agent'))) {
-			$this->db->where('SalesAgent', $this->input->get('sales_agent'));
+			$this->db->where_in('SalesAgent', explode(',', $this->input->get('sales_agent')));
 		}
 
 		// Autocount reference filter
@@ -798,7 +801,7 @@ return $query->result_array(); // instead of result()
 
 		// Autocount status filter
 		if(!empty($this->input->get('autocount_status'))) {
-			$this->db->where('payment.AutocountSyncStatus', $this->input->get('autocount_status'));
+			$this->db->where_in('payment.AutocountSyncStatus', explode(',', $this->input->get('autocount_status')));
 		}
 
 		// Exclude deleted payments

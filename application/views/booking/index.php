@@ -235,12 +235,13 @@
                                         <div class="col-md-3">
                                             <div class="form-group">
                                                 <label>Destination</label>
-                                                <select name="destination" data-live-search="true" class="form-control selectpicker">
-                                                    <option selected data-icon="la la-map-pin font-size-lg bs-icon" value="">--SELECT DESTINATION--</option>
+                                                <?php $selected_destinations = !empty($this->input->get('destination')) ? explode(',', $this->input->get('destination')) : []; ?>
+                                                <select id="destination_select" data-live-search="true" class="form-control selectpicker" multiple data-actions-box="true" title="--SELECT DESTINATION--">
                                                     <?php foreach($categories as $category) { ?>
-                                                        <option data-icon="la la-map-pin font-size-lg bs-icon" value="<?php echo $category->CategoryID; ?>" <?php if(!empty($this->input->get('destination')) && $this->input->get('destination') == $category->CategoryID) { echo 'selected'; } ?>><?php echo $category->Name; ?></option>
+                                                        <option data-icon="la la-map-pin font-size-lg bs-icon" value="<?php echo $category->CategoryID; ?>" <?php if(in_array($category->CategoryID, $selected_destinations)) { echo 'selected'; } ?>><?php echo $category->Name; ?></option>
                                                     <?php } ?>
                                                 </select>
+                                                <input type="hidden" name="destination" id="destination_hidden" value="<?php echo $this->input->get('destination'); ?>">
                                             </div>
                                         </div>
                                         <div class="col-md-3">
@@ -276,12 +277,13 @@
                                         <div class="col-md-3">
                                             <div class="form-group">
                                                 <label>Source</label>
-                                                <select name="source" data-live-search="true" class="form-control selectpicker">
-                                                    <option selected data-icon="la la-clipboard-list font-size-lg bs-icon" value="">--SELECT SOURCE--</option>
+                                                <?php $selected_sources = !empty($this->input->get('source')) ? explode(',', $this->input->get('source')) : []; ?>
+                                                <select id="source_select" data-live-search="true" class="form-control selectpicker" multiple data-actions-box="true" title="--SELECT SOURCE--">
                                                     <?php foreach($sources as $source) { ?>
-                                                        <option data-icon="<?php if($source->Name == 'WHATSAPP') { echo 'la la-whatsapp'; } else if($source->Name == 'WECHAT') { echo 'la la-wechat'; } else if($source->Name == 'EMAIL') { echo 'la la-envelope'; } else if($source->Name == 'CALL') { echo 'la la-phone-volume'; } else if($source->Name == 'TELEGRAM') { echo 'la la-telegram'; } else if($source->Name == 'FACEBOOK') { echo 'la la-facebook'; } else { echo 'la la-clipboard-list'; } ?> font-size-lg bs-icon" value="<?php echo $source->SourceID; ?>" <?php if(!empty($this->input->get('source')) && $this->input->get('source') == $source->SourceID) { echo 'selected'; } ?>><?php echo $source->Name; ?></option>
+                                                        <option data-icon="<?php if($source->Name == 'WHATSAPP') { echo 'la la-whatsapp'; } else if($source->Name == 'WECHAT') { echo 'la la-wechat'; } else if($source->Name == 'EMAIL') { echo 'la la-envelope'; } else if($source->Name == 'CALL') { echo 'la la-phone-volume'; } else if($source->Name == 'TELEGRAM') { echo 'la la-telegram'; } else if($source->Name == 'FACEBOOK') { echo 'la la-facebook'; } else { echo 'la la-clipboard-list'; } ?> font-size-lg bs-icon" value="<?php echo $source->SourceID; ?>" <?php if(in_array($source->SourceID, $selected_sources)) { echo 'selected'; } ?>><?php echo $source->Name; ?></option>
                                                     <?php } ?>
                                                 </select>
+                                                <input type="hidden" name="source" id="source_hidden" value="<?php echo $this->input->get('source'); ?>">
                                             </div>
                                         </div>
                                     </div>
@@ -289,12 +291,13 @@
                                         <div class="col-md-3">
                                             <div class="form-group">
                                                 <label>Chat Language</label>
-                                                <select name="chat_language" class="form-control selectpicker">
-                                                    <option selected data-icon="la la-language font-size-lg bs-icon" value="">--SELECT CHAT LANGUAGE--</option>
+                                                <?php $selected_chat_languages = !empty($this->input->get('chat_language')) ? explode(',', $this->input->get('chat_language')) : []; ?>
+                                                <select id="chat_language_select" class="form-control selectpicker" multiple data-actions-box="true" title="--SELECT CHAT LANGUAGE--">
                                                     <?php foreach(unserialize(CHAT_LANGUAGE) as $key => $value) { ?>
-                                                        <option data-icon="la la-language font-size-lg bs-icon" value="<?php echo $key; ?>" <?php if(!empty($this->input->get('chat_language')) && $this->input->get('chat_language') == $key) { echo 'selected'; } ?>><?php echo $value; ?></option>
+                                                        <option data-icon="la la-language font-size-lg bs-icon" value="<?php echo $key; ?>" <?php if(in_array($key, $selected_chat_languages)) { echo 'selected'; } ?>><?php echo $value; ?></option>
                                                     <?php } ?>
                                                 </select>
+                                                <input type="hidden" name="chat_language" id="chat_language_hidden" value="<?php echo $this->input->get('chat_language'); ?>">
                                             </div>
                                         </div>
                                         <div class="col-md-3">
@@ -328,12 +331,13 @@
                                         <div class="col-md-3">
                                             <div class="form-group">
                                                 <label>BC Title</label>
-                                                <select name="booking_confirmation_title" class="form-control selectpicker">
-                                                    <option selected data-icon="la la-heading font-size-lg bs-icon" value="">--SELECT BC TITLE--</option>
+                                                <?php $selected_bc_titles = !empty($this->input->get('booking_confirmation_title')) ? explode(',', $this->input->get('booking_confirmation_title')) : []; ?>
+                                                <select id="booking_confirmation_title_select" class="form-control selectpicker" multiple data-actions-box="true" title="--SELECT BC TITLE--">
                                                     <?php foreach(unserialize(BC_TITLE) as $key => $value) { ?>
-                                                        <option data-icon="la la-heading font-size-lg bs-icon" value="<?php echo $key; ?>" <?php if(!empty($this->input->get('booking_confirmation_title')) && $this->input->get('booking_confirmation_title') == $key) { echo 'selected'; } ?>><?php echo $value; ?></option>
+                                                        <option data-icon="la la-heading font-size-lg bs-icon" value="<?php echo $key; ?>" <?php if(in_array($key, $selected_bc_titles)) { echo 'selected'; } ?>><?php echo $value; ?></option>
                                                     <?php } ?>
                                                 </select>
+                                                <input type="hidden" name="booking_confirmation_title" id="booking_confirmation_title_hidden" value="<?php echo $this->input->get('booking_confirmation_title'); ?>">
                                             </div>
                                         </div>
                                     </div>
@@ -341,116 +345,125 @@
                                         <div class="col-md-3">
                                             <div class="form-group">
                                                 <label>BC Tag</label>
-                                                <select name="tag" data-live-search="true" class="form-control selectpicker">
-                                                    <option selected data-icon="la la-tags font-size-lg bs-icon" value="">--SELECT BC TAG--</option>
+                                                <?php $selected_tags = !empty($this->input->get('tag')) ? explode(',', $this->input->get('tag')) : []; ?>
+                                                <select id="tag_select" data-live-search="true" class="form-control selectpicker" multiple data-actions-box="true" title="--SELECT BC TAG--">
                                                     <?php foreach($tags as $tag) { ?>
-                                                        <option data-icon="la la-tags font-size-lg bs-icon" value="<?php echo $tag->TagID; ?>" <?php if(!empty($this->input->get('tag')) && $this->input->get('tag') == $tag->TagID) { echo 'selected'; } ?>><?php echo $tag->Name; ?></option>
+                                                        <option data-icon="la la-tags font-size-lg bs-icon" value="<?php echo $tag->TagID; ?>" <?php if(in_array($tag->TagID, $selected_tags)) { echo 'selected'; } ?>><?php echo $tag->Name; ?></option>
                                                     <?php } ?>
                                                 </select>
+                                                <input type="hidden" name="tag" id="tag_hidden" value="<?php echo $this->input->get('tag'); ?>">
                                             </div>
                                         </div>
                                         <?php if($this->session->userdata('level') != 20) { ?>
                                             <div class="col-md-3">
                                                 <div class="form-group">
                                                     <label>Sales Agent</label>
-                                                    <select name="sales_agent" data-live-search="true" class="form-control selectpicker">
-                                                        <option selected data-icon="la la-user-alt font-size-lg bs-icon" value="">--SELECT SALES AGENT--</option>
+                                                    <?php $selected_sales_agents = !empty($this->input->get('sales_agent')) ? explode(',', $this->input->get('sales_agent')) : []; ?>
+                                                    <select id="sales_agent_select" data-live-search="true" class="form-control selectpicker" multiple data-actions-box="true" title="--SELECT SALES AGENT--">
                                                         <optgroup label="Active">
                                                         <?php foreach($admins as $admin) { if($admin->Status == 'Y') { ?>
-                                                            <option data-icon="la la-user-alt font-size-lg bs-icon" value="<?php echo $admin->AdminID; ?>" <?php if(!empty($this->input->get('sales_agent')) && $this->input->get('sales_agent') == $admin->AdminID) { echo 'selected'; } ?>><?php echo $admin->Name; ?></option>
+                                                            <option data-icon="la la-user-alt font-size-lg bs-icon" value="<?php echo $admin->AdminID; ?>" <?php if(in_array($admin->AdminID, $selected_sales_agents)) { echo 'selected'; } ?>><?php echo $admin->Name; ?></option>
                                                         <?php } } ?>
                                                         </optgroup>
                                                         <optgroup label="Deactivated">
                                                         <?php foreach($admins as $admin) { if($admin->Status == 'D') { ?>
-                                                            <option data-icon="la la-user-alt font-size-lg bs-icon" value="<?php echo $admin->AdminID; ?>" <?php if(!empty($this->input->get('sales_agent')) && $this->input->get('sales_agent') == $admin->AdminID) { echo 'selected'; } ?>><?php echo $admin->Name; ?></option>
+                                                            <option data-icon="la la-user-alt font-size-lg bs-icon" value="<?php echo $admin->AdminID; ?>" <?php if(in_array($admin->AdminID, $selected_sales_agents)) { echo 'selected'; } ?>><?php echo $admin->Name; ?></option>
                                                         <?php } } ?>
                                                         </optgroup>
                                                     </select>
+                                                    <input type="hidden" name="sales_agent" id="sales_agent_hidden" value="<?php echo $this->input->get('sales_agent'); ?>">
                                                 </div>
                                             </div>
                                             <div class="col-md-3">
                                                 <div class="form-group">
                                                     <label>Sales Agent 2</label>
-                                                    <select name="sales_agent_2" data-live-search="true" class="form-control selectpicker">
-                                                        <option selected data-icon="la la-user-alt font-size-lg bs-icon" value="">--SELECT SALES AGENT 2--</option>
+                                                    <?php $selected_sales_agents_2 = !empty($this->input->get('sales_agent_2')) ? explode(',', $this->input->get('sales_agent_2')) : []; ?>
+                                                    <select id="sales_agent_2_select" data-live-search="true" class="form-control selectpicker" multiple data-actions-box="true" title="--SELECT SALES AGENT 2--">
                                                         <optgroup label="Active">
                                                         <?php foreach($admins as $admin) { if($admin->Status == 'Y') { ?>
-                                                            <option data-icon="la la-user-alt font-size-lg bs-icon" value="<?php echo $admin->AdminID; ?>" <?php if(!empty($this->input->get('sales_agent_2')) && $this->input->get('sales_agent_2') == $admin->AdminID) { echo 'selected'; } ?>><?php echo $admin->Name; ?></option>
+                                                            <option data-icon="la la-user-alt font-size-lg bs-icon" value="<?php echo $admin->AdminID; ?>" <?php if(in_array($admin->AdminID, $selected_sales_agents_2)) { echo 'selected'; } ?>><?php echo $admin->Name; ?></option>
                                                         <?php } } ?>
                                                         </optgroup>
                                                         <optgroup label="Deactivated">
                                                         <?php foreach($admins as $admin) { if($admin->Status == 'D') { ?>
-                                                            <option data-icon="la la-user-alt font-size-lg bs-icon" value="<?php echo $admin->AdminID; ?>" <?php if(!empty($this->input->get('sales_agent_2')) && $this->input->get('sales_agent_2') == $admin->AdminID) { echo 'selected'; } ?>><?php echo $admin->Name; ?></option>
+                                                            <option data-icon="la la-user-alt font-size-lg bs-icon" value="<?php echo $admin->AdminID; ?>" <?php if(in_array($admin->AdminID, $selected_sales_agents_2)) { echo 'selected'; } ?>><?php echo $admin->Name; ?></option>
                                                         <?php } } ?>
                                                         </optgroup>
                                                     </select>
+                                                    <input type="hidden" name="sales_agent_2" id="sales_agent_2_hidden" value="<?php echo $this->input->get('sales_agent_2'); ?>">
                                                 </div>
                                             </div>
                                             <div class="col-md-3">
                                                 <div class="form-group">
                                                     <label>OP</label>
-                                                    <select name="booking_op" data-live-search="true" class="form-control selectpicker">
-                                                        <option selected data-icon="la la-user-alt font-size-lg bs-icon" value="">--SELECT OP--</option>
+                                                    <?php $selected_booking_ops = !empty($this->input->get('booking_op')) ? explode(',', $this->input->get('booking_op')) : []; ?>
+                                                    <select id="booking_op_select" data-live-search="true" class="form-control selectpicker" multiple data-actions-box="true" title="--SELECT OP--">
                                                         <?php foreach($booking_op_admins as $op_admin) { ?>
-                                                            <option data-icon="la la-user-alt font-size-lg bs-icon" value="<?php echo $op_admin->AdminID; ?>" <?php if(!empty($this->input->get('booking_op')) && $this->input->get('booking_op') == $op_admin->AdminID) { echo 'selected'; } ?>><?php echo $op_admin->Name; ?></option>
+                                                            <option data-icon="la la-user-alt font-size-lg bs-icon" value="<?php echo $op_admin->AdminID; ?>" <?php if(in_array($op_admin->AdminID, $selected_booking_ops)) { echo 'selected'; } ?>><?php echo $op_admin->Name; ?></option>
                                                         <?php } ?>
                                                     </select>
+                                                    <input type="hidden" name="booking_op" id="booking_op_hidden" value="<?php echo $this->input->get('booking_op'); ?>">
                                                 </div>
                                             </div>
                                         <?php } ?>
                                         <div class="col-md-3">
                                             <div class="form-group">
                                                 <label>Autocount Status</label>
-                                                <select name="autocount_status" class="form-control selectpicker">
-                                                    <option selected data-icon="la la-sync font-size-lg bs-icon" value="">--SELECT AUTOCOUNT STATUS--</option>
-                                                    <option data-icon="la la-clock font-size-lg bs-icon" value="P" <?php if($this->input->get('autocount_status') == 'P') echo 'selected'; ?>>Pending</option>
-                                                    <option data-icon="la la-check-circle font-size-lg bs-icon" value="S" <?php if($this->input->get('autocount_status') == 'S') echo 'selected'; ?>>Synced</option>
-                                                    <option data-icon="la la-times-circle font-size-lg bs-icon" value="F" <?php if($this->input->get('autocount_status') == 'F') echo 'selected'; ?>>Failed</option>
+                                                <?php $selected_autocount_statuses = !empty($this->input->get('autocount_status')) ? explode(',', $this->input->get('autocount_status')) : []; ?>
+                                                <select id="autocount_status_select" class="form-control selectpicker" multiple data-actions-box="true" title="--SELECT AUTOCOUNT STATUS--">
+                                                    <option data-icon="la la-clock font-size-lg bs-icon" value="P" <?php if(in_array('P', $selected_autocount_statuses)) echo 'selected'; ?>>Pending</option>
+                                                    <option data-icon="la la-check-circle font-size-lg bs-icon" value="S" <?php if(in_array('S', $selected_autocount_statuses)) echo 'selected'; ?>>Synced</option>
+                                                    <option data-icon="la la-times-circle font-size-lg bs-icon" value="F" <?php if(in_array('F', $selected_autocount_statuses)) echo 'selected'; ?>>Failed</option>
                                                 </select>
+                                                <input type="hidden" name="autocount_status" id="autocount_status_hidden" value="<?php echo $this->input->get('autocount_status'); ?>">
                                             </div>
                                         </div>
                                         <div class="col-md-3">
                                             <div class="form-group">
                                                 <label>Guest List Status</label>
-                                                <select name="guest_list_status" class="form-control selectpicker">
-                                                    <option selected data-icon="la la-user-friends font-size-lg bs-icon" value="">--SELECT GL STATUS--</option>
-                                                    <option data-icon="la la-spinner font-size-lg bs-icon" value="in_progress" <?php if($this->input->get('guest_list_status') == 'in_progress') echo 'selected'; ?>>In Progress</option>
-                                                    <option data-icon="la la-lock font-size-lg bs-icon" value="locked" <?php if($this->input->get('guest_list_status') == 'locked') echo 'selected'; ?>>Locked</option>
-                                                    <option data-icon="la la-check-circle font-size-lg bs-icon" value="submitted" <?php if($this->input->get('guest_list_status') == 'submitted') echo 'selected'; ?>>Submitted</option>
-                                                    <option data-icon="la la-times-circle font-size-lg bs-icon" value="not_submitted" <?php if($this->input->get('guest_list_status') == 'not_submitted') echo 'selected'; ?>>Not Submitted</option>
+                                                <?php $selected_guest_list_statuses = !empty($this->input->get('guest_list_status')) ? explode(',', $this->input->get('guest_list_status')) : []; ?>
+                                                <select id="guest_list_status_select" class="form-control selectpicker" multiple data-actions-box="true" title="--SELECT GL STATUS--">
+                                                    <option data-icon="la la-spinner font-size-lg bs-icon" value="in_progress" <?php if(in_array('in_progress', $selected_guest_list_statuses)) echo 'selected'; ?>>In Progress</option>
+                                                    <option data-icon="la la-lock font-size-lg bs-icon" value="locked" <?php if(in_array('locked', $selected_guest_list_statuses)) echo 'selected'; ?>>Locked</option>
+                                                    <option data-icon="la la-check-circle font-size-lg bs-icon" value="submitted" <?php if(in_array('submitted', $selected_guest_list_statuses)) echo 'selected'; ?>>Submitted</option>
+                                                    <option data-icon="la la-times-circle font-size-lg bs-icon" value="not_submitted" <?php if(in_array('not_submitted', $selected_guest_list_statuses)) echo 'selected'; ?>>Not Submitted</option>
                                                 </select>
+                                                <input type="hidden" name="guest_list_status" id="guest_list_status_hidden" value="<?php echo $this->input->get('guest_list_status'); ?>">
                                             </div>
                                         </div>
                                         <div class="col-md-3">
                                             <div class="form-group">
                                                 <label>Checklist</label>
-                                                <select name="checklist_filter" class="form-control selectpicker" data-live-search="true">
-                                                    <option selected value="">--SELECT CHECKLIST--</option>
+                                                <?php $selected_checklist_filters = !empty($this->input->get('checklist_filter')) ? explode(',', $this->input->get('checklist_filter')) : []; ?>
+                                                <select id="checklist_filter_select" class="form-control selectpicker" data-live-search="true" multiple data-actions-box="true" title="--SELECT CHECKLIST--">
                                                     <?php if(isset($filter_checklists)) { foreach($filter_checklists as $checklist) { ?>
-                                                        <option value="<?php echo $checklist->ID; ?>" <?php if($this->input->get('checklist_filter') == $checklist->ID) echo 'selected'; ?>><?php echo htmlspecialchars($checklist->name); ?></option>
+                                                        <option value="<?php echo $checklist->ID; ?>" <?php if(in_array($checklist->ID, $selected_checklist_filters)) echo 'selected'; ?>><?php echo htmlspecialchars($checklist->name); ?></option>
                                                     <?php } } ?>
                                                 </select>
+                                                <input type="hidden" name="checklist_filter" id="checklist_filter_hidden" value="<?php echo $this->input->get('checklist_filter'); ?>">
                                             </div>
                                         </div>
                                         <div class="col-md-3">
                                             <div class="form-group">
                                                 <label>Cancellation Reason</label>
-                                                <select name="cancellation_reason" data-live-search="true" class="form-control selectpicker">
-                                                    <option selected data-icon="la la-times-circle font-size-lg bs-icon" value="">--SELECT CANCELLATION REASON--</option>
+                                                <?php $selected_cancellation_reasons = !empty($this->input->get('cancellation_reason')) ? explode(',', $this->input->get('cancellation_reason')) : []; ?>
+                                                <select id="cancellation_reason_select" data-live-search="true" class="form-control selectpicker" multiple data-actions-box="true" title="--SELECT CANCELLATION REASON--">
                                                     <?php if(isset($cancellation_reasons)) { foreach($cancellation_reasons as $reason) { ?>
-                                                        <option data-icon="la la-times-circle font-size-lg bs-icon" value="<?php echo $reason->CancellationReasonID; ?>" <?php if(!empty($this->input->get('cancellation_reason')) && $this->input->get('cancellation_reason') == $reason->CancellationReasonID) { echo 'selected'; } ?>><?php echo $reason->Name; ?></option>
+                                                        <option data-icon="la la-times-circle font-size-lg bs-icon" value="<?php echo $reason->CancellationReasonID; ?>" <?php if(in_array($reason->CancellationReasonID, $selected_cancellation_reasons)) { echo 'selected'; } ?>><?php echo $reason->Name; ?></option>
                                                     <?php } } ?>
                                                 </select>
+                                                <input type="hidden" name="cancellation_reason" id="cancellation_reason_hidden" value="<?php echo $this->input->get('cancellation_reason'); ?>">
                                             </div>
                                         </div>
                                         <div class="col-md-3">
                                             <div class="form-group">
                                                 <label>E-Invoice Status</label>
-                                                <select name="einvoice_status" class="form-control selectpicker">
-                                                    <option selected value="">--SELECT E-INVOICE STATUS--</option>
-                                                    <option value="yes" <?php if($this->input->get('einvoice_status') == 'yes') echo 'selected'; ?>>Has E-Invoice</option>
-                                                    <option value="no" <?php if($this->input->get('einvoice_status') == 'no') echo 'selected'; ?>>No E-Invoice</option>
+                                                <?php $selected_einvoice_statuses = !empty($this->input->get('einvoice_status')) ? explode(',', $this->input->get('einvoice_status')) : []; ?>
+                                                <select id="einvoice_status_select" class="form-control selectpicker" multiple data-actions-box="true" title="--SELECT E-INVOICE STATUS--">
+                                                    <option value="yes" <?php if(in_array('yes', $selected_einvoice_statuses)) echo 'selected'; ?>>Has E-Invoice</option>
+                                                    <option value="no" <?php if(in_array('no', $selected_einvoice_statuses)) echo 'selected'; ?>>No E-Invoice</option>
                                                 </select>
+                                                <input type="hidden" name="einvoice_status" id="einvoice_status_hidden" value="<?php echo $this->input->get('einvoice_status'); ?>">
                                             </div>
                                         </div>
                                     </div>
@@ -485,11 +498,9 @@
                                 <th class="booking_checkbox" style="text-align:center;">
                                     <input class="booking_checkbox" type="checkbox" id="check_all">
                                 </th>
-                                <?php if($this->session->userdata('level') != 20) { ?>
-                                    <th style="text-align:center;">TC</th>
-                                    <th style="text-align:center;">TC 2</th>
-                                    <th style="text-align:center;">OP</th>
-                                <?php } ?>
+                                <th style="text-align:center;">TC</th>
+                                <th style="text-align:center;">TC 2</th>
+                                <th style="text-align:center;">OP</th>
                                 <th class="bc_date" style="text-align:center;">Creation Date</th>
                                 <th style="text-align:center;">BC Number</th>
                                 <th style="text-align:center;">BC</th>
@@ -501,10 +512,8 @@
                                 <th class="end_date" style="text-align:center;">End</th>
                                 <th style="text-align:center;">Destination</th>
                                 <th class="subtotal" style="text-align:center;">Net Sales (RM)</th>
-                                <?php if(!$is_sales_agent) { ?>
-                                    <th class="profit" style="text-align:center;">Net Profit (RM)</th>
-                                    <th style="text-align:center;">Net Profit Margin (%)</th>
-                                <?php } ?>
+                                <th class="profit" style="text-align:center;">Net Profit (RM)</th>
+                                <th style="text-align:center;">Net Profit Margin (%)</th>
                                 <th style="text-align:center;">BC Status</th>
                                 <th class="gl_status" style="text-align:center;">GL Status</th>
                                 <th class="autocount_sync_status" style="text-align:center;">Booking Autocount Status</th>
@@ -528,7 +537,6 @@
                                     </span>
                                 </div>
                             </div>
-                            <?php if(!$is_sales_agent) { ?>
                             <div class="col-md-6">
                                 <label style="color:#FFC000;">Total Net Profit (RM)</label>
                                 <div class="input-icon">
@@ -538,7 +546,6 @@
                                     </span>
                                 </div>
                             </div>
-                            <?php } ?>
                         </div>
                     </div>
                 </div>
@@ -590,15 +597,24 @@
         $('#booking_header').click();
     <?php } ?>
     
-    // Sync multi-select status to hidden input on change and form submit
-    $('#status_select').on('changed.bs.select', function() {
-        var selected = $(this).val();
-        $('#status_hidden').val(selected ? selected.join(',') : '');
-    });
+    // Sync multi-select filters to their hidden inputs on change and form submit
+    var multi_filters = ['status','destination','source','chat_language',
+        'booking_confirmation_title','tag','sales_agent','sales_agent_2',
+        'booking_op','autocount_status','guest_list_status','checklist_filter',
+        'cancellation_reason','einvoice_status'];
 
+    function syncMultiSelect(name) {
+        var $sel = $('#' + name + '_select');
+        var $hid = $('#' + name + '_hidden');
+        if(!$sel.length || !$hid.length) return;
+        var v = $sel.val();
+        $hid.val(v ? v.join(',') : '');
+    }
+    multi_filters.forEach(function(name) {
+        $('#' + name + '_select').on('changed.bs.select', function() { syncMultiSelect(name); });
+    });
     $('#form').on('submit', function() {
-        var selected = $('#status_select').val();
-        $('#status_hidden').val(selected ? selected.join(',') : '');
+        multi_filters.forEach(syncMultiSelect);
     });
 
     $('#reset').click(function() {
@@ -777,11 +793,9 @@ $(document).ready(function() {
         // Checkbox column - always show (only populated for Failed status)
         columns.push({ data: 'checkbox', orderable: false, searchable: false, className: 'text-center', responsivePriority: 2 });
 
-        if (!is_sales_agent) {
-            columns.push({ data: 'sales_agent', className: 'text-center', responsivePriority: 10000 });
-            columns.push({ data: 'sales_agent_2', className: 'text-center', responsivePriority: 10000 });
-            columns.push({ data: 'booking_op', className: 'text-center', responsivePriority: 10000 });
-        }
+        columns.push({ data: 'sales_agent', className: 'text-center', responsivePriority: 10000 });
+        columns.push({ data: 'sales_agent_2', className: 'text-center', responsivePriority: 10000 });
+        columns.push({ data: 'booking_op', className: 'text-center', responsivePriority: 10000 });
 
         columns = columns.concat([
             { data: 'insert_date', className: 'text-center', responsivePriority: 10001 },
@@ -797,10 +811,8 @@ $(document).ready(function() {
             { data: 'net_total', className: 'text-center', responsivePriority: 6 }
         ]);
 
-        if (!is_sales_agent) {
-            columns.push({ data: 'profit', className: 'text-center', responsivePriority: 10007 });
-            columns.push({ data: 'profit_margin', className: 'text-center', responsivePriority: 10008 });
-        }
+        columns.push({ data: 'profit', className: 'text-center', responsivePriority: 10007 });
+        columns.push({ data: 'profit_margin', className: 'text-center', responsivePriority: 10008 });
 
         columns = columns.concat([
             { data: 'status', className: 'text-center', responsivePriority: 7 },
@@ -838,7 +850,7 @@ $(document).ready(function() {
                 }
             },
             columns: columns,
-            order: [[is_sales_agent ? 2 : 5, 'desc']], // Order by Insert Date (creation date) descending
+            order: [[5, 'desc']], // Order by Insert Date (creation date) descending
             pageLength: 100,
             lengthMenu: [[50, 100, 200, 500], [50, 100, 200, 500]],
             searchDelay: 300, // 300ms debounce on search
@@ -899,9 +911,7 @@ function loadSummaryTotals() {
         dataType: 'json',
         success: function(data) {
             $('#total_sales_display').val(data.total_sales);
-            if (!data.is_sales_agent) {
-                $('#total_net_profit_display').val(data.total_net_profit);
-            }
+            $('#total_net_profit_display').val(data.total_net_profit);
         },
         error: function() {
             $('#total_sales_display').val('Error loading');
@@ -1301,6 +1311,11 @@ var remarksModalBookingOpId = null;
 
 function renderRemarkItem(remark) {
     var avatarColor = ['primary', 'success', 'info', 'warning', 'danger'][remark.commenter_name.charCodeAt(0) % 5];
+    var notifiedHtml = '';
+    if (remark.notified_users && remark.notified_users.length) {
+        var names = remark.notified_users.map(function(u) { return escapeHtml(u.Name); }).join(', ');
+        notifiedHtml = '<div class="mt-1" style="font-size: 0.7rem; color: #65676b;"><i class="la la-bell"></i> Notified: ' + names + '</div>';
+    }
     return '<div class="comment-item d-flex mb-2 mx-2 pb-2 pl-1" style="border-bottom: 1px solid #e4e6eb;">' +
         '<div class="flex-shrink-0 mr-2">' +
         '<div class="symbol symbol-32 symbol-circle symbol-light-' + avatarColor + '">' +
@@ -1313,6 +1328,7 @@ function renderRemarkItem(remark) {
         '<span class="text-muted" style="font-size: 0.75rem; color: #65676b;">' + remark.created_at + '</span>' +
         '</div>' +
         '<div class="comment-text" style="font-size: 0.8125rem; color: #050505; line-height: 1.3; white-space: pre-wrap; word-wrap: break-word;">' + escapeHtml(remark.content) + '</div>' +
+        notifiedHtml +
         '</div>' +
         '</div>';
 }

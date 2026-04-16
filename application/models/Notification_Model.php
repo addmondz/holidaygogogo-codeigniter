@@ -47,7 +47,9 @@ class Notification_Model extends CI_Model
 
 		$this->db->where('notification.user_id', $user_id);
 		$this->db->where('notification.is_read', 0);
-		
+		// Remarks surface in the Messages dropdown, not the bell
+		$this->db->where('notification.type !=', 'remark');
+
 		// For Sales Agents (level 20), only count booking notifications for their bookings
 		// (non-booking notifications, e.g. owner_type='product', are always shown)
 		if ($user_level == 20) {
@@ -84,7 +86,9 @@ class Notification_Model extends CI_Model
 		$this->db->join('remark', 'remark.RemarkID = notification.remark_id', 'left');
 		$this->db->join('admin', 'admin.AdminID = remark.commenter_id', 'left');
 		$this->db->where('notification.user_id', $user_id);
-		
+		// Remarks surface in the Messages dropdown, not the bell
+		$this->db->where('notification.type !=', 'remark');
+
 		// For Sales Agents (level 20), only show booking notifications for their bookings
 		// (non-booking notifications, e.g. owner_type='product', are always shown)
 		if ($user_level == 20) {
@@ -179,39 +183,8 @@ class Notification_Model extends CI_Model
 		// Prepare notification message - simple format: "XXX added a remark"
 		$message = $commenter_name . ' added a remark';
 
-		// Get all admin users (Level 10 only - exclude Sales Agents Level 20 and Finance Level 30)
-		// Note: Level is stored as ENUM('10','20','30') so we need to use string '10'
-		$this->db->select('AdminID');
-		$this->db->where('Status', 'Y');
-		$this->db->where('level', '10'); // Only Level 10 (Admin/Owner) - exclude Level 20 (Sales Agent) and Level 30 (Finance)
-		$admins = $this->db->get('admin')->result();
-
 		$notifications_created = 0;
 		$notified_user_ids = array(); // Track users who already received notification to prevent duplicates
-
-		// Create notifications for all Level 10 admins (except the commenter)
-		foreach ($admins as $admin) {
-			if ($admin->AdminID != $commenter_id) {
-				// Check if notification already exists (prevent duplicates)
-				$this->db->where('user_id', $admin->AdminID);
-				$this->db->where('remark_id', $remark_id);
-				$existing = $this->db->get('notification')->row();
-				
-				if (empty($existing)) {
-					$notification_data = array(
-						'user_id' => $admin->AdminID,
-						'type' => 'remark',
-						'owner_type' => 'booking',
-						'owner_id' => $booking_id,
-						'remark_id' => $remark_id,
-						'message' => $message
-					);
-					$this->Create($notification_data);
-					$notifications_created++;
-					$notified_user_ids[] = $admin->AdminID;
-				}
-			}
-		}
 
 		// Create notification for the Sales Agent of this specific booking (if they exist and are not the commenter)
 		// The SalesAgent should receive notification regardless of their level, as long as they are the SA for this booking
@@ -333,6 +306,37 @@ class Notification_Model extends CI_Model
 		}
 
 		return $notifications_created;
+	}
+
+	/**
+	 * Get list of admins who were explicitly tagged (via "Also Notify") on a remark.
+	 * Excludes auto-recipients (e.g. the booking's SalesAgent / BookingOP) so the
+	 * returned set represents only the "extra" users selected by the commenter.
+	 *
+	 * @param int $remark_id
+	 * @param array $exclude_user_ids AdminIDs to exclude (typically SalesAgent + BookingOP of the booking)
+	 * @return array Rows of {AdminID, Name} ordered by Name
+	 */
+	function Get_Tagged_Users_For_Remark($remark_id, $exclude_user_ids = array())
+	{
+		$this->db->select('admin.AdminID, admin.Name');
+		$this->db->from('notification');
+		$this->db->join('admin', 'admin.AdminID = notification.user_id', 'inner');
+		$this->db->where('notification.remark_id', intval($remark_id));
+		$this->db->where('notification.type', 'remark');
+
+		$exclude_ids = array();
+		foreach ($exclude_user_ids as $uid) {
+			if (!empty($uid)) {
+				$exclude_ids[] = intval($uid);
+			}
+		}
+		if (!empty($exclude_ids)) {
+			$this->db->where_not_in('notification.user_id', $exclude_ids);
+		}
+
+		$this->db->order_by('admin.Name', 'ASC');
+		return $this->db->get()->result();
 	}
 
 	/**

@@ -13,6 +13,7 @@ class Product extends MY_Controller
 		$this->load->model('Universal_Model');
 		$this->load->model('Product_Package_Checklist_Model');
 		$this->load->model('Package_Checklist_Model');
+		$this->load->model('Cronjob_Model');
 	}
 
 	function index()
@@ -50,6 +51,7 @@ class Product extends MY_Controller
 				
 				// Save checklists for the new product (required ones will be auto-added by the model)
 				$this->Product_Package_Checklist_Model->Bulk_Update_Product_Checklists($product_id, $checklist_ids);
+				$this->Cronjob_Model->check_and_notify_no_checklist($product_id);
 			}
 		} else {
 			$titles = array('tab_title' => 'HolidayGoGoGo | Product', 'breadcrumb_title' => 'Product >> Create');
@@ -145,8 +147,9 @@ class Product extends MY_Controller
 			log_message('debug', 'UpdateChecklists - Product ID: ' . $product_id . ', Order: ' . json_encode($checklist_ids));
 			
 			$result = $this->Product_Package_Checklist_Model->Bulk_Update_Product_Checklists($product_id, $checklist_ids);
-			
+
 			if($result) {
+				$this->Cronjob_Model->check_and_notify_no_checklist($product_id);
 				$this->output
 					->set_content_type('application/json')
 					->set_output(json_encode(['success' => true, 'message' => 'Product checklists updated successfully', 'order' => $checklist_ids]));
@@ -198,6 +201,7 @@ class Product extends MY_Controller
 				$result = $this->Product_Package_Checklist_Model->Bulk_Update_Product_Checklists($product_id, $current_ids);
 				if($result) {
 					$success_count++;
+					$this->Cronjob_Model->check_and_notify_no_checklist($product_id);
 				} else {
 					$fail_count++;
 				}

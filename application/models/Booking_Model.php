@@ -3,27 +3,34 @@ class Booking_Model extends CI_Model
 {
 	private function apply_checklist_filter()
 	{
-		$checklist_id = $this->input->get('checklist_filter');
-		if(empty($checklist_id)) {
+		$raw = $this->input->get('checklist_filter');
+		if(empty($raw)) {
 			return false;
 		}
-		$checklist_id = (int)$checklist_id;
+		$ids = array_filter(array_map('intval', explode(',', $raw)), function($v){ return $v > 0; });
+		if(empty($ids)) {
+			return false;
+		}
+		$ids_list = implode(',', $ids);
+		$json_contains_or = implode(' OR ', array_map(function($id) {
+			return "JSON_CONTAINS(ppc.package_checklist_json, '{$id}')";
+		}, $ids));
 
-		// Find bookings that have a non-child/infant product with this checklist assigned
-		// but NO completion record for that checklist on any such product
+		// Find bookings that have a non-child/infant product with at least one of the selected
+		// checklists assigned, but no completion record for any of those checklists on such a product
 		$subquery = "booking.BookingID IN (
 			SELECT DISTINCT bp.BookingID
 			FROM booking_product bp
 			JOIN product p ON p.ProductID = bp.ProductID AND p.is_child_or_infant = 0
 			JOIN product_package_checklist ppc ON ppc.product_id = bp.ProductID
-				AND JSON_CONTAINS(ppc.package_checklist_json, '{$checklist_id}')
+				AND ({$json_contains_or})
 			WHERE bp.Status = 'Y'
 			AND bp.disable_checklist_payment_out = 0
 			AND NOT EXISTS (
 				SELECT 1 FROM booking_checklist_completion bcc
 				WHERE bcc.booking_id = bp.BookingID
 				AND bcc.product_id = bp.ProductID
-				AND bcc.package_checklist_id = {$checklist_id}
+				AND bcc.package_checklist_id IN ({$ids_list})
 			)
 		)";
 		$this->db->where($subquery, null, false);
@@ -32,8 +39,13 @@ class Booking_Model extends CI_Model
 
 	private function apply_guest_list_status_filter()
 	{
-		$guest_list_status = $this->input->get('guest_list_status');
-		if(empty($guest_list_status)) {
+		$raw = $this->input->get('guest_list_status');
+		if(empty($raw)) {
+			return false;
+		}
+		$valid = ['locked','in_progress','submitted','not_submitted'];
+		$statuses = array_values(array_intersect($valid, array_map('trim', explode(',', $raw))));
+		if(empty($statuses)) {
 			return false;
 		}
 
@@ -45,33 +57,34 @@ class Booking_Model extends CI_Model
 
 		$active_soft_lock_sql = "(booking.Token IS NOT NULL AND EXISTS (SELECT 1 FROM guest_list_locks gll WHERE gll.guest_list_hash = booking.Token AND gll.lock_expires_at > NOW() AND gll.last_heartbeat_at IS NOT NULL AND gll.last_heartbeat_at >= DATE_SUB(NOW(), INTERVAL " . $timeout . " SECOND)))";
 
-		if($guest_list_status == 'locked') {
-			$this->db->where('booking.LockStatus', 'Y');
-			return true;
-		}
+		$this->db->group_start();
+		foreach($statuses as $i => $status) {
+			if($i == 0) {
+				$this->db->group_start();
+			} else {
+				$this->db->or_group_start();
+			}
 
-		if($guest_list_status == 'in_progress') {
-			$this->db->where('booking.LockStatus', 'N');
-			$this->db->where($active_soft_lock_sql, null, false);
-			return true;
-		}
+			if($status == 'locked') {
+				$this->db->where('booking.LockStatus', 'Y');
+			} else if($status == 'in_progress') {
+				$this->db->where('booking.LockStatus', 'N');
+				$this->db->where($active_soft_lock_sql, null, false);
+			} else if($status == 'submitted') {
+				$this->db->where('booking.LockStatus', 'N');
+				$this->db->where('booking.is_submitted', 1);
+			} else if($status == 'not_submitted') {
+				$this->db->where('booking.LockStatus', 'N');
+				$this->db->group_start();
+				$this->db->where('booking.is_submitted', 0);
+				$this->db->or_where('booking.is_submitted IS NULL', null, false);
+				$this->db->group_end();
+			}
 
-		if($guest_list_status == 'submitted') {
-			$this->db->where('booking.LockStatus', 'N');
-			$this->db->where('booking.is_submitted', 1);
-			return true;
-		}
-
-		if($guest_list_status == 'not_submitted') {
-			$this->db->where('booking.LockStatus', 'N');
-			$this->db->group_start();
-			$this->db->where('booking.is_submitted', 0);
-			$this->db->or_where('booking.is_submitted IS NULL', null, false);
 			$this->db->group_end();
-			return true;
 		}
-
-		return false;
+		$this->db->group_end();
+		return true;
 	}
 
 	function Read_Booking()
@@ -174,39 +187,49 @@ class Booking_Model extends CI_Model
 				$level2Ignore = 1;
 			}
 			if(!empty($this->input->get('destination'))) {
-				$this->db->where('Destination', $this->input->get('destination'));
+				$this->db->where_in('Destination', explode(',', $this->input->get('destination')));
 				$level2Ignore = 1;
 			}
 			if(!empty($this->input->get('sales_agent'))) {
-				$this->db->where('SalesAgent', $this->input->get('sales_agent'));
+				$this->db->where_in('SalesAgent', explode(',', $this->input->get('sales_agent')));
 				$level2Ignore = 1;
 			}
 			if(!empty($this->input->get('booking_op'))) {
-				$this->db->where('BookingOP', $this->input->get('booking_op'));
+				$this->db->where_in('BookingOP', explode(',', $this->input->get('booking_op')));
 				$level2Ignore = 1;
 			}
 			if(!empty($this->input->get('sales_agent_2'))) {
-				$this->db->where('SalesAgent2', $this->input->get('sales_agent_2'));
+				$this->db->where_in('SalesAgent2', explode(',', $this->input->get('sales_agent_2')));
 				$level2Ignore = 1;
 			}
 			if(!empty($this->input->get('tag'))) {
-				$this->db->where("FIND_IN_SET('".$this->input->get('tag')."', Tag)");
+				$tags = explode(',', $this->input->get('tag'));
+				$this->db->group_start();
+				foreach($tags as $i => $t) {
+					$t = (int)$t;
+					if($i == 0) {
+						$this->db->where("FIND_IN_SET($t, Tag)", null, false);
+					} else {
+						$this->db->or_where("FIND_IN_SET($t, Tag)", null, false);
+					}
+				}
+				$this->db->group_end();
 				$level2Ignore = 1;
 			}
 			if(!empty($this->input->get('chat_language'))) {
-				$this->db->where('booking.ChatLanguage', $this->input->get('chat_language'));
+				$this->db->where_in('booking.ChatLanguage', explode(',', $this->input->get('chat_language')));
 				$level2Ignore = 1;
 			}
 			if(!empty($this->input->get('source'))) {
-				$this->db->where('Source', $this->input->get('source'));
+				$this->db->where_in('Source', explode(',', $this->input->get('source')));
 				$level2Ignore = 1;
 			}
 			if(!empty($this->input->get('booking_confirmation_title'))) {
-				$this->db->where('booking.BookingConfirmationTitle', $this->input->get('booking_confirmation_title'));
+				$this->db->where_in('booking.BookingConfirmationTitle', explode(',', $this->input->get('booking_confirmation_title')));
 				$level2Ignore = 1;
 			}
 			if(!empty($this->input->get('autocount_status'))) {
-				$this->db->where('booking.AutocountSyncStatus', $this->input->get('autocount_status'));
+				$this->db->where_in('booking.AutocountSyncStatus', explode(',', $this->input->get('autocount_status')));
 				$level2Ignore = 1;
 			}
 			if($this->apply_guest_list_status_filter()) {
@@ -216,14 +239,17 @@ class Booking_Model extends CI_Model
 				$level2Ignore = 1;
 			}
 			if(!empty($this->input->get('cancellation_reason'))) {
-				$this->db->where('booking.CancellationReasonID', $this->input->get('cancellation_reason'));
+				$this->db->where_in('booking.CancellationReasonID', explode(',', $this->input->get('cancellation_reason')));
 				$this->db->where('CancelStatus', 'Y');
 				$level2Ignore = 1;
 			}
 			if(!empty($this->input->get('einvoice_status'))) {
-				if($this->input->get('einvoice_status') == 'yes') {
+				$einvoice_values = array_map('trim', explode(',', $this->input->get('einvoice_status')));
+				$has_yes = in_array('yes', $einvoice_values);
+				$has_no = in_array('no', $einvoice_values);
+				if($has_yes && !$has_no) {
 					$this->db->where("(SELECT COUNT(*) FROM invoice_split_pax WHERE invoice_split_pax.BookingID = booking.BookingID AND invoice_split_pax.Status = 'Y') > 0");
-				} else if($this->input->get('einvoice_status') == 'no') {
+				} else if($has_no && !$has_yes) {
 					$this->db->where("(SELECT COUNT(*) FROM invoice_split_pax WHERE invoice_split_pax.BookingID = booking.BookingID AND invoice_split_pax.Status = 'Y') = 0");
 				}
 				$level2Ignore = 1;
@@ -1678,39 +1704,49 @@ class Booking_Model extends CI_Model
 				$level2Ignore = 1;
 			}
 			if(!empty($this->input->get('destination'))) {
-				$this->db->where('Destination', $this->input->get('destination'));
+				$this->db->where_in('Destination', explode(',', $this->input->get('destination')));
 				$level2Ignore = 1;
 			}
 			if(!empty($this->input->get('sales_agent'))) {
-				$this->db->where('SalesAgent', $this->input->get('sales_agent'));
+				$this->db->where_in('SalesAgent', explode(',', $this->input->get('sales_agent')));
 				$level2Ignore = 1;
 			}
 			if(!empty($this->input->get('booking_op'))) {
-				$this->db->where('BookingOP', $this->input->get('booking_op'));
+				$this->db->where_in('BookingOP', explode(',', $this->input->get('booking_op')));
 				$level2Ignore = 1;
 			}
 			if(!empty($this->input->get('sales_agent_2'))) {
-				$this->db->where('SalesAgent2', $this->input->get('sales_agent_2'));
+				$this->db->where_in('SalesAgent2', explode(',', $this->input->get('sales_agent_2')));
 				$level2Ignore = 1;
 			}
 			if(!empty($this->input->get('tag'))) {
-				$this->db->where("FIND_IN_SET('".$this->input->get('tag')."', Tag)");
+				$tags = explode(',', $this->input->get('tag'));
+				$this->db->group_start();
+				foreach($tags as $i => $t) {
+					$t = (int)$t;
+					if($i == 0) {
+						$this->db->where("FIND_IN_SET($t, Tag)", null, false);
+					} else {
+						$this->db->or_where("FIND_IN_SET($t, Tag)", null, false);
+					}
+				}
+				$this->db->group_end();
 				$level2Ignore = 1;
 			}
 			if(!empty($this->input->get('chat_language'))) {
-				$this->db->where('booking.ChatLanguage', $this->input->get('chat_language'));
+				$this->db->where_in('booking.ChatLanguage', explode(',', $this->input->get('chat_language')));
 				$level2Ignore = 1;
 			}
 			if(!empty($this->input->get('source'))) {
-				$this->db->where('Source', $this->input->get('source'));
+				$this->db->where_in('Source', explode(',', $this->input->get('source')));
 				$level2Ignore = 1;
 			}
 			if(!empty($this->input->get('booking_confirmation_title'))) {
-				$this->db->where('booking.BookingConfirmationTitle', $this->input->get('booking_confirmation_title'));
+				$this->db->where_in('booking.BookingConfirmationTitle', explode(',', $this->input->get('booking_confirmation_title')));
 				$level2Ignore = 1;
 			}
 			if(!empty($this->input->get('autocount_status'))) {
-				$this->db->where('booking.AutocountSyncStatus', $this->input->get('autocount_status'));
+				$this->db->where_in('booking.AutocountSyncStatus', explode(',', $this->input->get('autocount_status')));
 				$level2Ignore = 1;
 			}
 			if($this->apply_guest_list_status_filter()) {
@@ -1720,14 +1756,17 @@ class Booking_Model extends CI_Model
 				$level2Ignore = 1;
 			}
 			if(!empty($this->input->get('cancellation_reason'))) {
-				$this->db->where('booking.CancellationReasonID', $this->input->get('cancellation_reason'));
+				$this->db->where_in('booking.CancellationReasonID', explode(',', $this->input->get('cancellation_reason')));
 				$this->db->where('CancelStatus', 'Y');
 				$level2Ignore = 1;
 			}
 			if(!empty($this->input->get('einvoice_status'))) {
-				if($this->input->get('einvoice_status') == 'yes') {
+				$einvoice_values = array_map('trim', explode(',', $this->input->get('einvoice_status')));
+				$has_yes = in_array('yes', $einvoice_values);
+				$has_no = in_array('no', $einvoice_values);
+				if($has_yes && !$has_no) {
 					$this->db->where("(SELECT COUNT(*) FROM invoice_split_pax WHERE invoice_split_pax.BookingID = booking.BookingID AND invoice_split_pax.Status = 'Y') > 0");
-				} else if($this->input->get('einvoice_status') == 'no') {
+				} else if($has_no && !$has_yes) {
 					$this->db->where("(SELECT COUNT(*) FROM invoice_split_pax WHERE invoice_split_pax.BookingID = booking.BookingID AND invoice_split_pax.Status = 'Y') = 0");
 				}
 				$level2Ignore = 1;

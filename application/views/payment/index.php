@@ -104,19 +104,20 @@
                                             <div class="col-md-3">
                                                 <div class="form-group">
                                                     <label>Sales Agent</label>
-                                                    <select name="sales_agent" data-live-search="true" class="form-control selectpicker">
-                                                        <option selected data-icon="la la-user-alt font-size-lg bs-icon" value="">--SELECT SALES AGENT--</option>
+                                                    <?php $selected_sales_agents = !empty($this->input->get('sales_agent')) ? explode(',', $this->input->get('sales_agent')) : []; ?>
+                                                    <select id="sales_agent_select" data-live-search="true" class="form-control selectpicker" multiple data-actions-box="true" title="--SELECT SALES AGENT--">
                                                         <optgroup label="Active">
                                                         <?php foreach($admins as $admin) { if($admin->Status == 'Y') { ?>
-                                                            <option data-icon="la la-user-alt font-size-lg bs-icon" value="<?php echo $admin->AdminID; ?>" <?php if(!empty($this->input->get('sales_agent')) && $this->input->get('sales_agent') == $admin->AdminID) { echo 'selected'; } ?>><?php echo $admin->Name; ?></option>
+                                                            <option data-icon="la la-user-alt font-size-lg bs-icon" value="<?php echo $admin->AdminID; ?>" <?php if(in_array($admin->AdminID, $selected_sales_agents)) { echo 'selected'; } ?>><?php echo $admin->Name; ?></option>
                                                         <?php } } ?>
                                                         </optgroup>
                                                         <optgroup label="Deactivated">
                                                         <?php foreach($admins as $admin) { if($admin->Status == 'D') { ?>
-                                                            <option data-icon="la la-user-alt font-size-lg bs-icon" value="<?php echo $admin->AdminID; ?>" <?php if(!empty($this->input->get('sales_agent')) && $this->input->get('sales_agent') == $admin->AdminID) { echo 'selected'; } ?>><?php echo $admin->Name; ?></option>
+                                                            <option data-icon="la la-user-alt font-size-lg bs-icon" value="<?php echo $admin->AdminID; ?>" <?php if(in_array($admin->AdminID, $selected_sales_agents)) { echo 'selected'; } ?>><?php echo $admin->Name; ?></option>
                                                         <?php } } ?>
                                                         </optgroup>
                                                     </select>
+                                                    <input type="hidden" name="sales_agent" id="sales_agent_hidden" value="<?php echo $this->input->get('sales_agent'); ?>">
                                                 </div>
                                             </div>
                                         <?php } ?>
@@ -169,12 +170,13 @@
                                         <div class="col-md-3">
                                             <div class="form-group">
                                                 <label>Payment Type</label>
-                                                <select name="payment_type" class="form-control selectpicker">
-                                                    <option selected data-icon="la la-dollar font-size-lg bs-icon" value="">--SELECT PAYMENT TYPE--</option>
+                                                <?php $selected_payment_types = !empty($this->input->get('payment_type')) ? explode(',', $this->input->get('payment_type')) : []; ?>
+                                                <select id="payment_type_select" class="form-control selectpicker" multiple data-actions-box="true" title="--SELECT PAYMENT TYPE--">
                                                     <?php foreach(unserialize(PAYMENT_TYPE) as $key => $value) { ?>
-                                                        <option data-icon="la la-dollar font-size-lg bs-icon" value="<?php echo $key; ?>" <?php if(!empty($this->input->get('payment_type')) && $this->input->get('payment_type') == $key) { echo 'selected'; } ?>><?php echo $value; ?></option>
+                                                        <option data-icon="la la-dollar font-size-lg bs-icon" value="<?php echo $key; ?>" <?php if(in_array($key, $selected_payment_types)) { echo 'selected'; } ?>><?php echo $value; ?></option>
                                                     <?php } ?>
                                                 </select>
+                                                <input type="hidden" name="payment_type" id="payment_type_hidden" value="<?php echo $this->input->get('payment_type'); ?>">
                                             </div>
                                         </div>
                                     </div>
@@ -182,12 +184,13 @@
                                         <div class="col-md-3">
                                             <div class="form-group">
                                                 <label>Transaction Type</label>
-                                                <select name="transaction_type" class="form-control selectpicker">
-                                                    <option selected data-icon="la la-dollar font-size-lg bs-icon" value="">--SELECT TRANSACTION TYPE--</option>
+                                                <?php $selected_transaction_types = !empty($this->input->get('transaction_type')) ? explode(',', $this->input->get('transaction_type')) : []; ?>
+                                                <select id="transaction_type_select" class="form-control selectpicker" multiple data-actions-box="true" title="--SELECT TRANSACTION TYPE--">
                                                     <?php foreach(unserialize(TRANSACTION_TYPE) as $key => $value) { ?>
-                                                        <option data-icon="<?php if($key == 'PAYMENT IN') { echo 'la la-receipt'; } else { echo 'la la-file-invoice-dollar'; } ?> font-size-lg bs-icon" value="<?php echo $key; ?>" <?php if(!empty($this->input->get('transaction_type')) && $this->input->get('transaction_type') == $key) { echo 'selected'; } ?>><?php echo $value; ?></option>
+                                                        <option data-icon="<?php if($key == 'PAYMENT IN') { echo 'la la-receipt'; } else { echo 'la la-file-invoice-dollar'; } ?> font-size-lg bs-icon" value="<?php echo $key; ?>" <?php if(in_array($key, $selected_transaction_types)) { echo 'selected'; } ?>><?php echo $value; ?></option>
                                                     <?php } ?>
                                                 </select>
+                                                <input type="hidden" name="transaction_type" id="transaction_type_hidden" value="<?php echo $this->input->get('transaction_type'); ?>">
                                             </div>
                                         </div>
                                         <div class="col-md-3">
@@ -204,12 +207,13 @@
                                         <div class="col-md-3">
                                             <div class="form-group">
                                                 <label>Supplier</label>
-                                                <select name="supplier" data-live-search="true" class="form-control selectpicker">
-                                                    <option selected data-icon="la la-user-alt font-size-lg bs-icon" value="">--SELECT SUPPLIER--</option>
+                                                <?php $selected_suppliers = !empty($this->input->get('supplier')) ? explode(',', $this->input->get('supplier')) : []; ?>
+                                                <select id="supplier_select" data-live-search="true" class="form-control selectpicker" multiple data-actions-box="true" title="--SELECT SUPPLIER--">
                                                     <?php foreach($suppliers as $supplier) { ?>
-                                                        <option data-icon="la la-user-alt font-size-lg bs-icon" value="<?php echo $supplier->SupplierID; ?>" <?php if(!empty($this->input->get('supplier')) && $this->input->get('supplier') == $supplier->SupplierID) { echo 'selected'; } ?>><?php echo $supplier->Name; ?></option>
+                                                        <option data-icon="la la-user-alt font-size-lg bs-icon" value="<?php echo $supplier->SupplierID; ?>" <?php if(in_array($supplier->SupplierID, $selected_suppliers)) { echo 'selected'; } ?>><?php echo $supplier->Name; ?></option>
                                                     <?php } ?>
                                                 </select>
+                                                <input type="hidden" name="supplier" id="supplier_hidden" value="<?php echo $this->input->get('supplier'); ?>">
                                             </div>
                                         </div>
                                         <div class="col-md-3">
@@ -283,12 +287,13 @@
                                         <div class="col-md-3">
                                             <div class="form-group">
                                                 <label>Autocount Status</label>
-                                                <select name="autocount_status" class="form-control selectpicker">
-                                                    <option value="">--SELECT AUTOCOUNT STATUS--</option>
-                                                    <option data-icon="la la-clock font-size-lg bs-icon" value="P" <?php if($this->input->get('autocount_status') == 'P') echo 'selected'; ?>>Pending</option>
-                                                    <option data-icon="la la-check-circle font-size-lg bs-icon" value="S" <?php if($this->input->get('autocount_status') == 'S') echo 'selected'; ?>>Synced</option>
-                                                    <option data-icon="la la-times-circle font-size-lg bs-icon" value="F" <?php if($this->input->get('autocount_status') == 'F') echo 'selected'; ?>>Failed</option>
+                                                <?php $selected_autocount_statuses = !empty($this->input->get('autocount_status')) ? explode(',', $this->input->get('autocount_status')) : []; ?>
+                                                <select id="autocount_status_select" class="form-control selectpicker" multiple data-actions-box="true" title="--SELECT AUTOCOUNT STATUS--">
+                                                    <option data-icon="la la-clock font-size-lg bs-icon" value="P" <?php if(in_array('P', $selected_autocount_statuses)) echo 'selected'; ?>>Pending</option>
+                                                    <option data-icon="la la-check-circle font-size-lg bs-icon" value="S" <?php if(in_array('S', $selected_autocount_statuses)) echo 'selected'; ?>>Synced</option>
+                                                    <option data-icon="la la-times-circle font-size-lg bs-icon" value="F" <?php if(in_array('F', $selected_autocount_statuses)) echo 'selected'; ?>>Failed</option>
                                                 </select>
+                                                <input type="hidden" name="autocount_status" id="autocount_status_hidden" value="<?php echo $this->input->get('autocount_status'); ?>">
                                             </div>
                                         </div>
                                     </div>
@@ -611,14 +616,20 @@
         $('#payment_header').click();
     <?php } ?>
 
-    $('#status_select').on('changed.bs.select', function() {
-        var selected = $(this).val();
-        $('#status_hidden').val(selected ? selected.join(',') : '');
-    });
+    var multi_filters = ['status','sales_agent','payment_type','transaction_type','supplier','autocount_status'];
 
+    function syncMultiSelect(name) {
+        var $sel = $('#' + name + '_select');
+        var $hid = $('#' + name + '_hidden');
+        if(!$sel.length || !$hid.length) return;
+        var v = $sel.val();
+        $hid.val(v ? v.join(',') : '');
+    }
+    multi_filters.forEach(function(name) {
+        $('#' + name + '_select').on('changed.bs.select', function() { syncMultiSelect(name); });
+    });
     $('#form1').on('submit', function() {
-        var selected = $('#status_select').val();
-        $('#status_hidden').val(selected ? selected.join(',') : '');
+        multi_filters.forEach(syncMultiSelect);
     });
 
     $('#filter').click(function() {

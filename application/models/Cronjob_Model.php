@@ -156,6 +156,34 @@ class Cronjob_Model extends CI_Model
 	}
 
 	/**
+	 * Run the "no checklist" check for a single product and alert OPs if it fails.
+	 * Called on product save paths (replaces the nightly scan).
+	 */
+	function check_and_notify_no_checklist($product_id) {
+		$product_id = (int)$product_id;
+		if($product_id <= 0) return 0;
+
+		$this->db->select('ID');
+		$this->db->where('is_required', 1);
+		$required_rows = $this->db->get('package_checklist')->result();
+		$required_ids = array_map(function($r){ return (int)$r->ID; }, $required_rows);
+
+		$this->load->model('Product_Package_Checklist_Model');
+		$assigned = $this->Product_Package_Checklist_Model->Get_Checklists_For_Product($product_id);
+		$assigned = array_map('intval', $assigned);
+		$non_required = array_diff($assigned, $required_ids);
+
+		if(!empty($non_required)) return 0;
+
+		$this->db->select('Name');
+		$this->db->where('ProductID', $product_id);
+		$product = $this->db->get('product')->row();
+		if(!$product) return 0;
+
+		return $this->create_product_no_checklist_notifications($product_id, $product->Name);
+	}
+
+	/**
 	 * Check if a notification of the given type already exists for today
 	 */
 	private function has_today_notification($user_id, $type, $owner_id) {

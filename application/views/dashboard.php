@@ -1235,21 +1235,28 @@
                 selectedAgents = selectedAgents.map(String);
             }
             var count = 0;
-            
+
+            // Collect every AdminID that owns a rendered card, including deactivated
+            // agents who are absent from the dropdown but still present in the data.
+            var allAgentIds = new Set();
+            [upcoming_travels, profit_margins_less_than_10_percent, overdue_payments,
+             negative_profit_margins, pending_travel_vouchers, pending_reviews,
+             pending_credit_payments, pending_debit_payments].forEach(function(arr) {
+                arr.forEach(function(row) { allAgentIds.add(String(row.AdminID)); });
+            });
+
             // Show/hide elements based on selected agents
-            for(var i = 0; i < sales_agents.length; i++) {
+            allAgentIds.forEach(function(adminId) {
                 if(selectedAgents && selectedAgents.length > 0) {
-                    // Check if this agent is in the selected agents array
-                    if(selectedAgents.includes(String(sales_agents[i].AdminID))) {
-                        $('.' + sales_agents[i].AdminID).removeAttr('style');
+                    if(selectedAgents.includes(adminId)) {
+                        $('.' + adminId).removeAttr('style');
                     } else {
-                        $('.' + sales_agents[i].AdminID).attr('style', 'display: none !important');
+                        $('.' + adminId).attr('style', 'display: none !important');
                     }
                 } else {
-                    // No selection, show all
-                    $('.' + sales_agents[i].AdminID).removeAttr('style');
+                    $('.' + adminId).removeAttr('style');
                 }
-            }
+            });
 
             // Update counts based on selected agents
             if(selectedAgents && selectedAgents.length > 0) {

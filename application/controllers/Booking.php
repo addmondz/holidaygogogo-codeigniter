@@ -162,19 +162,6 @@ class Booking extends MY_Controller
 			21 => 'booking.BookingID'             // action
 		);
 
-		// Adjust column index for sales agents
-		// Sales agents don't see: sales_agent (index 2), sales_agent_2 (index 3), OP (index 4), profit (index 16), profit_margin (index 17)
-		// So their column indices need to be mapped back to the full column array
-		if($is_sales_agent) {
-			if($order_column_index >= 2 && $order_column_index <= 12) {
-				// Columns 2-12: add 3 for missing sales_agent + sales_agent_2 + OP columns
-				$order_column_index += 3;
-			} else if($order_column_index >= 13) {
-				// Columns 13+: add 5 for missing sales_agent + sales_agent_2 + OP + profit + profit_margin
-				$order_column_index += 5;
-			}
-		}
-
 		$order_column = isset($columns[$order_column_index]) ? $columns[$order_column_index] : 'booking.BookingID';
 
 		// Get counts
@@ -213,6 +200,7 @@ class Booking extends MY_Controller
 			$total_debit = 0;
 			$net_profit = 0;
 			$profit_margin = 0;
+			$total_credit_approved = 0;
 			if(!empty($payments)) {
 				foreach($payments as $payment) {
 					if($payment->Status == 'Y' || $payment->Status == 'P') {
@@ -222,6 +210,10 @@ class Booking extends MY_Controller
 							$total_debit += $payment->Debit;
 						}
 					}
+					if($payment->Status == 'Y' && !empty($payment->Credit) && $payment->Credit > 0
+						&& (!isset($payment->Type) || $payment->Type != 'AGENT COMMISSION FROM SUPPLIER')) {
+						$total_credit_approved += floatval($payment->Credit);
+					}
 				}
 				$net_profit = $total_credit - $total_debit;
 				if($net_profit != 0 && $booking->NetTotal != 0) {
@@ -229,37 +221,22 @@ class Booking extends MY_Controller
 				}
 			}
 
-			// Determine display status
-			$display_status = $booking->Status;
-			if($booking->LockStatus == 'N' && $booking->Status == 'PTV') {
-				$display_status = 'PGL';
-			}
-			if($booking->AfterSalesService == 'PENDING' && $booking->Status == 'Y') {
-				$display_status = 'PR';
-			}
-			if(empty($booking->DepositDeadline)) {
-				if(date('Y-m-d') > $booking->FullPaymentDeadline && ($booking->Status == 'P' || $booking->Status == 'PP')) {
-					$display_status = 'PO';
-				}
+			// Determine display status via shared helper (honours paid/deposit guards)
+			$deposit_mode_row = !empty($booking->DepositMode) ? $booking->DepositMode : 'percentage';
+			if($deposit_mode_row == 'fixed') {
+				$deposit_required_row = isset($booking->DepositFixedAmount) ? floatval($booking->DepositFixedAmount) : 0;
 			} else {
-				if((date('Y-m-d') > $booking->DepositDeadline && $booking->Status == 'P') || (date('Y-m-d') > $booking->FullPaymentDeadline && ($booking->Status == 'P' || $booking->Status == 'PP'))) {
-					$display_status = 'PO';
-				}
+				$deposit_pct_row = isset($booking->DepositPercentage) ? floatval($booking->DepositPercentage) : 0;
+				$deposit_required_row = ceil((floatval($booking->NetTotal) * $deposit_pct_row) / 100);
 			}
+			$booking->balance_due = floatval($booking->NetTotal) - $total_credit_approved;
+			$booking->deposit_complete = ($deposit_required_row > 0 && $total_credit_approved >= $deposit_required_row);
 
-			// Status color and text
-			$status_colors = array(
-				'Y' => '#50C878', 'PR' => '#C3B1E1', 'P' => '#DC143C', 'PP' => '#A7C7E7',
-				'PTV' => '#F89880', 'PGL' => '#FAC898', 'PT' => '#F8C8DC', 'OG' => '#CCCCFF', 'PO' => '#DA70D6',
-				'PBC' => '#FFD700', 'PBO' => '#87CEEB'
-			);
-			$status_texts = array(
-				'Y' => 'COMPLETED', 'PR' => 'PENDING REVIEW', 'P' => 'PENDING PAYMENT', 'PP' => 'PARTIAL PAYMENT',
-				'PTV' => 'PENDING TRAVEL VOUCHER', 'PGL' => 'PENDING GUEST LIST', 'PT' => 'PENDING TRAVEL', 'OG' => 'ON-GOING', 'PO' => 'PAYMENT OVERDUE',
-				'PBC' => 'PENDING BC CONFIRMATION', 'PBO' => 'PENDING BOOKING OPERATION'
-			);
-			$status_color = $booking->CancelStatus == 'Y' ? '#FF69B4' : (isset($status_colors[$display_status]) ? $status_colors[$display_status] : '#DA70D6');
-			$status_text = $booking->CancelStatus == 'Y' ? 'CANCELLED' : (isset($status_texts[$display_status]) ? $status_texts[$display_status] : 'UNKNOWN');
+			$this->load->helper('booking_flow');
+			$status_info_row = display_booking_status($booking);
+			$display_status = $status_info_row['status_code'];
+			$status_color = $status_info_row['status_color'];
+			$status_text = $status_info_row['status_text'];
 
 			// Profit color
 			$profit_color = $net_profit < 0 ? '#FF2400' : ($net_profit == 0 ? '#F4BB44' : '#00A36C');
@@ -299,12 +276,10 @@ class Booking extends MY_Controller
 			// Row number
 			$row['row_number'] = $count;
 
-			// Sales agent, Sales agent 2 and OP (only for non-sales agents)
-			if(!$is_sales_agent) {
-				$row['sales_agent'] = $booking->SalesAgentName;
-				$row['sales_agent_2'] = $booking->SalesAgent2Name;
-				$row['booking_op'] = $booking->BookingOPName;
-			}
+			// Sales agent, Sales agent 2 and OP
+			$row['sales_agent'] = $booking->SalesAgentName;
+			$row['sales_agent_2'] = $booking->SalesAgent2Name;
+			$row['booking_op'] = $booking->BookingOPName;
 
 			// Insert date
 			$row['insert_date'] = $insert_date_formatted;
@@ -346,11 +321,9 @@ class Booking extends MY_Controller
 			// Net Total
 			$row['net_total'] = number_format($booking->NetTotal, 2, '.', ',');
 
-			// Profit (only for non-sales agents)
-			if(!$is_sales_agent) {
-				$row['profit'] = '<span style="color:' . $profit_color . '">' . number_format($net_profit, 2, '.', ',') . '</span>';
-				$row['profit_margin'] = '<span style="color:' . $profit_color . '">' . $profit_margin . '</span>';
-			}
+			// Profit
+			$row['profit'] = '<span style="color:' . $profit_color . '">' . number_format($net_profit, 2, '.', ',') . '</span>';
+			$row['profit_margin'] = '<span style="color:' . $profit_color . '">' . $profit_margin . '</span>';
 
 			// Status
 			if($booking->CancelStatus == 'Y' && !empty($booking->CancellationReasonName)) {
@@ -1112,6 +1085,11 @@ class Booking extends MY_Controller
 						$array['LockStatus'] = 'N';
 					}
 
+					// Preserve raw Y-m-d deadlines before display formatting so downstream
+					// logic (e.g. display_booking_status) can still parse them reliably.
+					$array['DepositDeadlineRaw'] = !empty($array['DepositDeadline']) ? $array['DepositDeadline'] : '';
+					$array['FullPaymentDeadlineRaw'] = !empty($array['FullPaymentDeadline']) ? $array['FullPaymentDeadline'] : '';
+
 					if(!empty($array['DepositDeadline'])) {
 						$array['DepositDeadline'] = date('d/m/Y', strtotime($array['DepositDeadline']));
 					}
@@ -1178,6 +1156,7 @@ class Booking extends MY_Controller
 					$array['DepositTotal'] = $deposit_total;
 					// Calculate deposit paid from payments
 					$deposit_paid = 0;
+					$total_credit_approved = 0;
 					if (isset($array['BookingID'])) {
 						$payments = $this->Booking_Model->Read_Payments($array['BookingID']);
 						if (!empty($payments)) {
@@ -1185,30 +1164,27 @@ class Booking extends MY_Controller
 								if (($payment->Status == 'Y' || $payment->Status == 'P') && $payment->Credit > 0) {
 									$deposit_paid += $payment->Credit;
 								}
+								if ($payment->Status == 'Y' && !empty($payment->Credit) && $payment->Credit > 0
+									&& (!isset($payment->Type) || $payment->Type != 'AGENT COMMISSION FROM SUPPLIER')) {
+									$total_credit_approved += floatval($payment->Credit);
+								}
 							}
 						}
 					}
 					$array['DepositPaid'] = $deposit_paid;
+					$array['balance_due'] = $net_total_raw - $total_credit_approved;
+					$array['deposit_complete'] = ($deposit_total > 0 && $total_credit_approved >= $deposit_total);
 					// Calculate deposit status and format Deposit Paid display
 					$deposit_difference = $deposit_paid - $deposit_total;
 					if ($deposit_paid > 0) {
 						$deposit_paid_display = number_format($deposit_paid, 2, '.', ',');
-						
-						if ($deposit_difference > 0.01) {
-							// Overpaid - apply red color
-							$deposit_paid_display .= ' (Overpaid: RM ' . number_format($deposit_difference, 2, '.', ',') . ')';
-							$array['DepositPaidColor'] = '#FF6B6B'; // Red
-						} elseif ($deposit_difference < -0.01) {
-							// Underpaid - apply orange color
+
+						if ($deposit_difference < -0.01) {
 							$deposit_paid_display .= ' (Underpaid: RM ' . number_format(abs($deposit_difference), 2, '.', ',') . ')';
-							$array['DepositPaidColor'] = '#FFA500'; // Orange
-						} else {
-							// Paid - no special color (normal/default)
-							// Don't set DepositPaidColor for normal paid status
+							$array['DepositPaidColor'] = '#FFA500';
 						}
 					} else {
 						$deposit_paid_display = '0.00';
-						// Don't set DepositPaidColor for no payment
 					}
 						$array['DepositPaidDisplay'] = $deposit_paid_display;
 						$array['admins'] = $this->Booking_Model->Read_Admins();
@@ -1385,22 +1361,13 @@ class Booking extends MY_Controller
 				$deposit_difference = $deposit_paid - $deposit_total;
 				if ($deposit_paid > 0) {
 					$deposit_paid_display = number_format($deposit_paid, 2, '.', ',');
-					
-					if ($deposit_difference > 0.01) {
-						// Overpaid - apply red color
-						$deposit_paid_display .= ' (Overpaid: RM ' . number_format($deposit_difference, 2, '.', ',') . ')';
-						$array['DepositPaidColor'] = '#FF6B6B'; // Red
-					} elseif ($deposit_difference < -0.01) {
-						// Underpaid - apply orange color
+
+					if ($deposit_difference < -0.01) {
 						$deposit_paid_display .= ' (Underpaid: RM ' . number_format(abs($deposit_difference), 2, '.', ',') . ')';
-						$array['DepositPaidColor'] = '#FFA500'; // Orange
-					} else {
-						// Paid - no special color (normal/default)
-						// Don't set DepositPaidColor for normal paid status
+						$array['DepositPaidColor'] = '#FFA500';
 					}
 				} else {
 					$deposit_paid_display = '0.00';
-					// Don't set DepositPaidColor for no payment
 				}
 					$array['DepositPaidDisplay'] = $deposit_paid_display;
 					$array['admins'] = $this->Booking_Model->Read_Admins();
@@ -3045,7 +3012,17 @@ class Booking extends MY_Controller
 
         // Get internal remarks (type 1) only
         $remarks = $this->Remark_Model->Read_Remarks('booking', $booking_id, REMARK_TYPE::INTERNAL);
-		
+
+		// Auto-recipients (SalesAgent / BookingOP) aren't "extra tagged" users — exclude them
+		// from the notified-users display so only explicit "Also Notify" picks show up.
+		$booking_row = $this->Booking_Model->getBookingById($booking_id);
+		$exclude_user_ids = array();
+		if (!empty($booking_row)) {
+			if (!empty($booking_row->SalesAgent)) $exclude_user_ids[] = $booking_row->SalesAgent;
+			if (!empty($booking_row->BookingOP))  $exclude_user_ids[] = $booking_row->BookingOP;
+		}
+		$this->load->model('Notification_Model');
+
 		// Format remarks for JSON response
 		$formatted_remarks = array();
 		foreach ($remarks as $remark) {
@@ -3059,13 +3036,19 @@ class Booking extends MY_Controller
 					$initials = strtoupper(substr($remark->CommenterName, 0, 2));
 				}
 			}
-			
+
 			$current_user_id = $this->session->userdata('admin_id');
-			
+
 			// Get remark type label from REMARK_TYPE class
 			$remark_type = isset($remark->type) ? $remark->type : REMARK_TYPE::INTERNAL;
 			$remark_type_label = REMARK_TYPE::getLabel($remark_type) ?: 'INTERNAL';
-			
+
+			$tagged = $this->Notification_Model->Get_Tagged_Users_For_Remark($remark->RemarkID, $exclude_user_ids);
+			$notified_users = array();
+			foreach ($tagged as $t) {
+				$notified_users[] = array('AdminID' => $t->AdminID, 'Name' => $t->Name);
+			}
+
 			$formatted_remarks[] = array(
 				'RemarkID' => $remark->RemarkID,
 				'content' => $remark->content,
@@ -3076,7 +3059,8 @@ class Booking extends MY_Controller
 				'type' => isset($remark->type) ? $remark->type : 1,
 				'type_label' => $remark_type_label,
 				'created_at' => return_timestamp_output($remark->created_at),
-				'created_at_raw' => $remark->created_at
+				'created_at_raw' => $remark->created_at,
+				'notified_users' => $notified_users
 			);
 		}
 

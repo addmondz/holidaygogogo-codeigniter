@@ -2037,23 +2037,23 @@
                                             $line_discount = isset($prod['DiscountAmount']) ? floatval($prod['DiscountAmount']) : 0;
                                             $line_net = floatval($prod['Amount']) - $line_discount;
                                         ?>
-                                            <tr style="border-bottom: 1px solid #e8e8e8;<?php echo $line_discount > 0 ? ' background:#fff8e1;' : ''; ?>">
+                                            <tr style="<?php echo $line_discount > 0 ? 'background:#fff8e1;' : 'border-bottom: 1px solid #e8e8e8;'; ?>">
                                                 <td style="padding: 8px;">
                                                     <?php echo htmlspecialchars($prod['ProductName']); ?>
-                                                    <?php if ($line_discount > 0): ?>
-                                                        <span style="display:inline-block; margin-left:6px; font-size:10px; background:#f0ad4e; color:#fff; padding:2px 6px; border-radius:3px;">BC Discount Applied</span>
-                                                    <?php endif; ?>
                                                 </td>
                                                 <td style="padding: 8px; text-align: center;"><?php echo rtrim(rtrim(number_format($prod['Quantity'], 2), '0'), '.'); ?></td>
                                                 <td style="padding: 8px; text-align: right;">RM <?php echo number_format($prod['UnitPrice'], 2); ?></td>
-                                                <td style="padding: 8px; text-align: right;">
-                                                    RM <?php echo number_format($prod['Amount'], 2); ?>
-                                                    <?php if ($line_discount > 0): ?>
-                                                        <div style="color:#dc3545; font-size:11px;">- RM <?php echo number_format($line_discount, 2); ?> discount</div>
-                                                        <div style="font-size:11px;">Net: RM <?php echo number_format($line_net, 2); ?></div>
-                                                    <?php endif; ?>
-                                                </td>
+                                                <td style="padding: 8px; text-align: right;">RM <?php echo number_format($prod['Amount'], 2); ?></td>
                                             </tr>
+                                            <?php if ($line_discount > 0): ?>
+                                                <tr style="background:#fff8e1; border-bottom: 1px solid #e8e8e8;">
+                                                    <td colspan="4" style="padding: 4px 8px 8px;">
+                                                        <span style="display:inline-block; font-size:10px; background:#f0ad4e; color:#fff; padding:2px 6px; border-radius:3px; margin-right:8px;">BC Discount Applied</span>
+                                                        <span style="color:#dc3545; font-size:11px; margin-right:8px;">- RM <?php echo number_format($line_discount, 2); ?> discount</span>
+                                                        <span style="font-size:11px;">Net: RM <?php echo number_format($line_net, 2); ?></span>
+                                                    </td>
+                                                </tr>
+                                            <?php endif; ?>
                                         <?php endforeach; ?>
                                     </tbody>
                                 </table>
@@ -2583,9 +2583,9 @@
 
                 var html = '<tr class="product-row" data-pax="' + paxIdx + '">';
                 html += '<td><select class="split-product-select" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:4px;font-size:13px;">' + getProductOptions(bpId) + '</select></td>';
-                html += '<td><input type="number" class="split-qty" value="' + qty + '" min="0.01" step="0.01" style="width:80px;padding:6px;border:1px solid #ddd;border-radius:4px;text-align:center;font-size:13px;"></td>';
+                html += '<td><input type="number" class="split-qty" value="' + qty + '" min="0.1" step="0.1" style="width:80px;padding:6px;border:1px solid #ddd;border-radius:4px;text-align:center;font-size:13px;"></td>';
                 html += '<td class="split-price" style="text-align:right;font-size:13px;">RM ' + price + '</td>';
-                html += '<td class="split-amount-cell" style="text-align:right;font-size:13px;"><div class="split-amount">RM ' + amount + '</div><div class="split-product-discount" style="display:none;"></div></td>';
+                html += '<td class="split-amount-cell" style="text-align:right;font-size:13px;"><div class="split-amount">RM ' + amount + '</div></td>';
                 html += '<td><button type="button" class="remove-product-row" style="background:#dc3545;color:white;border:none;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:12px;"><i class="la la-trash"></i></button></td>';
                 html += '</tr>';
                 return html;
@@ -2657,7 +2657,7 @@
                         $row.find('.split-price').text('RM ' + price.toFixed(2));
                         $row.find('.split-amount').text('RM ' + amount.toFixed(2));
                         $row.css('background', '');
-                        $row.find('.split-product-discount').hide().empty();
+                        $row.next('.split-discount-row').remove();
 
                         if (bpId > 0) {
                             aggregate[bpId] = Math.round(((aggregate[bpId] || 0) + amount) * 100) / 100;
@@ -2683,13 +2683,15 @@
                                 var amt = rowsInOrder[i].amount;
                                 var net = Math.round((amt - bookingDiscount) * 100) / 100;
                                 rowsInOrder[i].$row.css('background', '#fff8e1');
-                                rowsInOrder[i].$row.find('.split-product-discount')
-                                    .show()
-                                    .html(
-                                        '<div style="display:inline-block;margin-top:4px;font-size:10px;background:#f0ad4e;color:#fff;padding:2px 6px;border-radius:3px;">BC Discount Applied</div>' +
-                                        '<div style="color:#dc3545;font-size:11px;">- ' + formatCurrency(bookingDiscount) + ' discount</div>' +
-                                        '<div style="font-size:11px;">Net: ' + formatCurrency(net) + '</div>'
-                                    );
+                                rowsInOrder[i].$row.after(
+                                    '<tr class="split-discount-row" style="background:#fff8e1;">' +
+                                        '<td colspan="5" style="padding:4px 8px 8px;">' +
+                                            '<span style="display:inline-block;font-size:10px;background:#f0ad4e;color:#fff;padding:2px 6px;border-radius:3px;margin-right:8px;">BC Discount Applied</span>' +
+                                            '<span style="color:#dc3545;font-size:11px;margin-right:8px;">- ' + formatCurrency(bookingDiscount) + ' discount</span>' +
+                                            '<span style="font-size:11px;">Net: ' + formatCurrency(net) + '</span>' +
+                                        '</td>' +
+                                    '</tr>'
+                                );
                                 break;
                             }
                         }
