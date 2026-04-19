@@ -21,15 +21,15 @@
 	- Process leads with a custom batch size: `php index.php Cron process_ghl_leads 250`
 
 6. Default Commands & order 
-	- php index.php Cron syncGhlUsers
-	- php index.php Cron syncGhlContacts --full
-	- php index.php Cron syncGhlConversations --full
-	- php index.php Cron syncGhlMessages --full
-	- php index.php Cron process_ghl_leads
+	php index.php Cron syncGhlUsers
+	php index.php Cron syncGhlContacts --full
+	php index.php Cron syncGhlConversations --full
+	php index.php Cron syncGhlMessages --full
+	php index.php Cron process_ghl_leads
 
 6. Default Daily & order 
-	- php index.php Cron syncGhlUsers
-	- php index.php Cron syncGhlContacts
-	- php index.php Cron syncGhlConversations
-	- php index.php Cron syncGhlMessages
-	- php index.php Cron process_ghl_leads
+	php index.php Cron syncGhlUsers
+	php index.php Cron syncGhlContacts
+	php index.php Cron syncGhlConversations
+	php index.php Cron syncGhlMessages
+	php index.php Cron process_ghl_leads
