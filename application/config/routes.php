@@ -77,6 +77,7 @@ $route['translate_uri_dashes'] = FALSE;
 $route['customer/search'] = 'customer/search';
 
 
+
 /*
 |--------------------------------------------------------------------------
 | Customer Portal

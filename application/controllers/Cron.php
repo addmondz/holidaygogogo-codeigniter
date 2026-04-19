@@ -353,6 +353,313 @@ class Cron extends CI_Controller
 		$this->syncBookings();
 		$this->syncPayments();
 		$this->syncDeletedPayments();
+
+		// TODO-edmond: Uncomment this after the initial sync is done
+		// run this hourly at 10 minutes past the hour
+		// if ($this->shouldRunHourly(10)) {
+		// 	$this->syncGhlUsers();
+		// 	$this->syncGhlContacts();
+		// 	$this->syncGhlConversations();
+		// 	$this->syncGhlMessages();
+		// }
+
+		// TODO-edmond: Uncomment this after the initial sync is done
+		// process the leads every hour at 40 minutes past the hour, let it have 30 minutes to finish syncing the messages
+		// if ($this->shouldRunHourly(40)) {
+		// 	$this->process_ghl_leads();
+		// }
+
+		
+		
+		// just a sample code to show
+		// run this daily at 00:00
+		// if ($this->shouldRunDaily(0, 0)) {
+		// }
+	}
+
+	private function shouldRunHourly($minute = 0)
+	{
+		return (int) date('i') === (int) $minute;
+	}
+
+	private function shouldRunDaily($hour, $minute = 0)
+	{
+		return (int) date('G') === (int) $hour
+			&& (int) date('i') === (int) $minute;
+	}
+
+	public function process_ghl_leads($chunkSize = 100)
+	{
+		if (!$this->input->is_cli_request()) {
+			show_error('This script can only be run from the command line.', 403);
+			return;
+		}
+
+		$this->load->model('Ghl_Processed_Leads_Model');
+
+		$chunkSize = (int) $chunkSize;
+		if ($chunkSize <= 0) {
+			$chunkSize = 100;
+		}
+
+		$summary = array(
+			'conversations_processed' => 0,
+			'leads_rebuilt' => 0,
+			'batches' => 0,
+		);
+
+		echo "=== GHL Lead Processing Start ===" . PHP_EOL;
+		echo "Chunk size: {$chunkSize}" . PHP_EOL;
+
+		if (!$this->Ghl_Processed_Leads_Model->acquire_processor_lock('ghl_leads_processor', 0)) {
+			echo "Another ghl lead processor run is already active." . PHP_EOL;
+			return;
+		}
+
+		try {
+			while (true) {
+				$batch = $this->Ghl_Processed_Leads_Model->get_next_conversation_batch('ghl_leads_processor', $chunkSize);
+
+				if (empty($batch['conversations'])) {
+					break;
+				}
+
+				$summary['batches']++;
+				echo "Processing batch {$summary['batches']} with " . count($batch['conversations']) . " conversation(s)" . PHP_EOL;
+
+				foreach ($batch['conversations'] as $conversationMeta) {
+					$leadCount = $this->process_single_ghl_conversation(
+						$conversationMeta['conversation_id'],
+						(int) $conversationMeta['first_new_message_row_id']
+					);
+					$summary['conversations_processed']++;
+					$summary['leads_rebuilt'] += $leadCount;
+
+					echo " - {$conversationMeta['conversation_id']}: {$leadCount} lead(s)" . PHP_EOL;
+				}
+
+				$this->Ghl_Processed_Leads_Model->save_processor_state(
+					'ghl_leads_processor',
+					$batch['cursor']['last_processed_message_row_id']
+				);
+			}
+		} finally {
+			$this->Ghl_Processed_Leads_Model->release_processor_lock('ghl_leads_processor');
+		}
+
+		echo "Processed conversations: {$summary['conversations_processed']}" . PHP_EOL;
+		echo "Rebuilt leads: {$summary['leads_rebuilt']}" . PHP_EOL;
+		echo "Batches: {$summary['batches']}" . PHP_EOL;
+		echo "=== GHL Lead Processing End ===" . PHP_EOL;
+	}
+
+	private function process_single_ghl_conversation($conversationId, $firstNewMessageRowId = 0)
+	{
+		$messages = $this->Ghl_Processed_Leads_Model->get_conversation_messages($conversationId);
+		$existingConversions = $this->Ghl_Processed_Leads_Model->get_existing_conversion_map($conversationId);
+		$existingLeadStarts = $this->Ghl_Processed_Leads_Model->get_existing_lead_starts($conversationId);
+		$currentAssignedTo = $this->Ghl_Processed_Leads_Model->get_conversation_assigned_to($conversationId);
+
+		if (empty($messages)) {
+			$replaced = $this->Ghl_Processed_Leads_Model->replace_conversation_leads($conversationId, array());
+			if (!$replaced) {
+				show_error('Failed clearing processed leads for conversation: ' . $conversationId, 500);
+			}
+			return 0;
+		}
+
+		$existingLeadStartMap = array();
+		foreach ($existingLeadStarts as $existingLeadStart) {
+			$existingLeadStartMap[(string) $existingLeadStart['first_customer_message_id']] = array(
+				'lead_started_at' => $existingLeadStart['lead_started_at'],
+				'assigned_to_user_id' => $existingLeadStart['assigned_to_user_id'],
+			);
+		}
+
+		$leads = array();
+		$currentLead = null;
+		$fallbackContactId = null;
+		$now = date('Y-m-d H:i:s');
+
+		foreach ($messages as $message) {
+			$messageTimestamp = strtotime($message['message_timestamp']);
+
+			if ($messageTimestamp === false) {
+				continue;
+			}
+
+			if ($fallbackContactId === null && !empty($message['contact_id'])) {
+				$fallbackContactId = $message['contact_id'];
+			}
+
+			if ($message['direction'] === 'inbound') {
+				$existingBoundary = isset($existingLeadStartMap[(string) $message['message_id']])
+					? $existingLeadStartMap[(string) $message['message_id']]
+					: null;
+				$startsNewLead = ($currentLead === null);
+
+				if (!$startsNewLead && $existingBoundary !== null) {
+					$startsNewLead = true;
+				}
+
+				if (
+					!$startsNewLead &&
+					$firstNewMessageRowId > 0 &&
+					(int) $message['id'] >= $firstNewMessageRowId &&
+					$currentLead['assigned_to_user_id'] !== $currentAssignedTo
+				) {
+					$startsNewLead = true;
+				}
+
+				if ($startsNewLead) {
+					if ($currentLead !== null) {
+						$currentLead['lead_ended_at'] = $message['message_timestamp'];
+						$this->finalize_ghl_processed_lead($currentLead);
+						$leads[] = $currentLead;
+					}
+
+					$currentLead = array(
+						'conversation_id' => $conversationId,
+						'contact_id' => !empty($message['contact_id']) ? $message['contact_id'] : $fallbackContactId,
+						'assigned_to_user_id' => $existingBoundary !== null
+							? $existingBoundary['assigned_to_user_id']
+							: $currentAssignedTo,
+						'lead_started_at' => $message['message_timestamp'],
+						'lead_ended_at' => null,
+						'first_customer_message_id' => $message['message_id'],
+						'tracked_message_count' => 0,
+						'responded_message_count' => 0,
+						'avg_first_5_response_seconds' => null,
+						'is_converted' => 0,
+						'converted_at' => null,
+						'created_at' => $now,
+						'updated_at' => $now,
+						'_pending_response_slots' => array(),
+						'_open_response_slot' => null,
+					);
+					$this->initialize_ghl_processed_lead_response_slots($currentLead);
+				}
+
+				if ($currentLead !== null) {
+					if ($currentLead['_open_response_slot'] !== null) {
+						$slotNumber = (int) $currentLead['_open_response_slot'];
+						$currentLead['response_' . $slotNumber . '_customer_message_id'] = $message['message_id'];
+						$currentLead['response_' . $slotNumber . '_customer_message_at'] = $message['message_timestamp'];
+					} elseif ((int) $currentLead['tracked_message_count'] < 5) {
+						$slotNumber = ((int) $currentLead['tracked_message_count']) + 1;
+						$currentLead['tracked_message_count'] = $slotNumber;
+						$currentLead['response_' . $slotNumber . '_customer_message_id'] = $message['message_id'];
+						$currentLead['response_' . $slotNumber . '_customer_message_at'] = $message['message_timestamp'];
+						$currentLead['response_' . $slotNumber . '_agent_message_id'] = null;
+						$currentLead['response_' . $slotNumber . '_agent_message_at'] = null;
+						$currentLead['response_' . $slotNumber . '_seconds'] = null;
+						$currentLead['_pending_response_slots'][] = $slotNumber;
+						$currentLead['_open_response_slot'] = $slotNumber;
+					}
+				}
+			} elseif ($message['direction'] === 'outbound' && $currentLead !== null && !empty($currentLead['_pending_response_slots'])) {
+				$slotNumber = (int) $currentLead['_pending_response_slots'][0];
+				$customerTimestamp = strtotime((string) $currentLead['response_' . $slotNumber . '_customer_message_at']);
+
+				if ($customerTimestamp !== false && $messageTimestamp >= $customerTimestamp) {
+					array_shift($currentLead['_pending_response_slots']);
+					$currentLead['response_' . $slotNumber . '_agent_message_id'] = $message['message_id'];
+					$currentLead['response_' . $slotNumber . '_agent_message_at'] = $message['message_timestamp'];
+					$currentLead['response_' . $slotNumber . '_seconds'] = $messageTimestamp - $customerTimestamp;
+					if ((int) $currentLead['_open_response_slot'] === $slotNumber) {
+						$currentLead['_open_response_slot'] = null;
+					}
+				}
+			}
+		}
+
+		if ($currentLead !== null) {
+			$this->finalize_ghl_processed_lead($currentLead);
+			$leads[] = $currentLead;
+		}
+
+		foreach ($leads as &$lead) {
+			$conversionKey = $lead['lead_started_at'] . '|' . $lead['first_customer_message_id'];
+
+			if (isset($existingConversions[$conversionKey])) {
+				if (empty($lead['assigned_to_user_id']) && !empty($existingConversions[$conversionKey]['assigned_to_user_id'])) {
+					$lead['assigned_to_user_id'] = $existingConversions[$conversionKey]['assigned_to_user_id'];
+				}
+				$lead['is_converted'] = (int) $existingConversions[$conversionKey]['is_converted'];
+				$lead['converted_at'] = $existingConversions[$conversionKey]['converted_at'];
+			}
+
+			unset($lead['_pending_response_slots'], $lead['_open_response_slot']);
+		}
+		unset($lead);
+
+		$leads = $this->filter_ghl_processed_leads_for_current_assignment($leads, $currentAssignedTo);
+
+		$replaced = $this->Ghl_Processed_Leads_Model->replace_conversation_leads($conversationId, $leads);
+		if (!$replaced) {
+			show_error('Failed rebuilding processed leads for conversation: ' . $conversationId, 500);
+		}
+
+		return count($leads);
+	}
+
+	private function finalize_ghl_processed_lead(&$lead)
+	{
+		$responseTotal = 0;
+		$responseCount = 0;
+
+		for ($slotNumber = 1; $slotNumber <= 5; $slotNumber++) {
+			$key = 'response_' . $slotNumber . '_seconds';
+			if (isset($lead[$key]) && $lead[$key] !== null) {
+				$responseTotal += (int) $lead[$key];
+				$responseCount++;
+			}
+		}
+
+		$lead['responded_message_count'] = $responseCount;
+		$lead['avg_first_5_response_seconds'] = $responseCount > 0
+			? (int) round($responseTotal / $responseCount)
+			: null;
+		$lead['updated_at'] = date('Y-m-d H:i:s');
+	}
+
+	private function initialize_ghl_processed_lead_response_slots(&$lead)
+	{
+		for ($slotNumber = 1; $slotNumber <= 5; $slotNumber++) {
+			$lead['response_' . $slotNumber . '_customer_message_id'] = null;
+			$lead['response_' . $slotNumber . '_customer_message_at'] = null;
+			$lead['response_' . $slotNumber . '_agent_message_id'] = null;
+			$lead['response_' . $slotNumber . '_agent_message_at'] = null;
+			$lead['response_' . $slotNumber . '_seconds'] = null;
+		}
+	}
+
+	private function filter_ghl_processed_leads_for_current_assignment($leads, $currentAssignedTo)
+	{
+		if (empty($leads)) {
+			return $leads;
+		}
+
+		$currentAssignedTo = !empty($currentAssignedTo) ? (string) $currentAssignedTo : null;
+
+		// Once a conversation has a newer assignee, drop legacy assignee-owned leads so
+		// the dashboard only reflects the current owner from the point their lead begins.
+		if ($currentAssignedTo !== null) {
+			$filteredLeads = array();
+
+			foreach ($leads as $lead) {
+				$leadAssignedTo = !empty($lead['assigned_to_user_id']) ? (string) $lead['assigned_to_user_id'] : null;
+				if ($leadAssignedTo === $currentAssignedTo) {
+					$filteredLeads[] = $lead;
+				}
+			}
+
+			if (!empty($filteredLeads)) {
+				return array_values($filteredLeads);
+			}
+		}
+
+		return array_values($leads);
 	}
 
 	/**
@@ -1212,7 +1519,106 @@ class Cron extends CI_Controller
 			'customer_matched'        => $customerUpdates,
 		]));
 	}
-	
+
+	/**
+	 * GHL users sync. CLI only: php index.php Cron syncGhlUsers
+	 */
+	public function syncGhlUsers()
+	{
+		if (!$this->input->is_cli_request()) {
+			show_error('Not allowed', 403);
+			return;
+		}
+
+		$this->load->library('GhlUsersSyncService');
+		$result = $this->ghluserssyncservice->sync();
+
+		$this->output
+			->set_content_type('application/json')
+			->set_output(json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+	}
+
+	/**
+	 * GHL contacts sync. CLI only: php index.php Cron syncGhlContacts
+	 */
+	public function syncGhlContacts()
+	{
+		if (!$this->input->is_cli_request()) {
+			show_error('Not allowed', 403);
+			return;
+		}
+
+		$args = isset($_SERVER['argv']) ? $_SERVER['argv'] : array();
+		$uriSegments = $this->uri->segment_array();
+		$flags = array_merge(
+			array_slice($args, 3),
+			$uriSegments ? array_slice($uriSegments, 2) : array()
+		);
+
+		$this->load->library('GhlContactsSyncService');
+		$result = $this->ghlcontactssyncservice->sync(array(
+			'mode' => in_array('--full', $flags, true) ? 'full' : 'recent',
+		));
+
+		$this->output
+			->set_content_type('application/json')
+			->set_output(json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+	}
+
+	/**
+	 * GHL conversations sync. CLI only: php index.php Cron syncGhlConversations
+	 */
+	public function syncGhlConversations()
+	{
+		if (!$this->input->is_cli_request()) {
+			show_error('Not allowed', 403);
+			return;
+		}
+
+		$args = isset($_SERVER['argv']) ? $_SERVER['argv'] : array();
+		$uriSegments = $this->uri->segment_array();
+		$flags = array_merge(
+			array_slice($args, 3),
+			$uriSegments ? array_slice($uriSegments, 2) : array()
+		);
+
+		$this->load->library('GhlConversationsSyncService');
+		$result = $this->ghlconversationssyncservice->sync(array(
+			'mode' => in_array('--full', $flags, true) ? 'full' : 'recent',
+		));
+
+		$this->output
+			->set_content_type('application/json')
+			->set_output(json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+	}
+
+	/**
+	 * GHL messages sync. CLI only: php index.php Cron syncGhlMessages
+	 */
+	public function syncGhlMessages()
+	{
+		if (!$this->input->is_cli_request()) {
+			show_error('Not allowed', 403);
+			return;
+		}
+
+		$args = isset($_SERVER['argv']) ? $_SERVER['argv'] : array();
+		$uriSegments = $this->uri->segment_array();
+		$flags = array_merge(
+			array_slice($args, 3),
+			$uriSegments ? array_slice($uriSegments, 2) : array()
+		);
+
+		$this->load->library('GhlMessagesSyncService');
+		$result = $this->ghlmessagessyncservice->sync(array(
+			'mode' => in_array('--full', $flags, true) ? 'full' : 'recent',
+		));
+
+		$this->output
+			->set_content_type('application/json')
+			->set_output(json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+	}
+
 	public function AddCustomerFromAutoCount()
 	{
 		$this->load->helper('autocount');

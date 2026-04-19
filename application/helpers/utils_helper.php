@@ -105,6 +105,42 @@ if (!function_exists('arr_get')) {
     }
 }
 
+if (!function_exists('logInFile')) {
+    /**
+     * Append a structured log entry to application/logs/{channel}.log
+     *
+     * @param string $channel Log channel / file prefix
+     * @param string $message Message to write
+     * @param array $meta Additional structured context
+     * @return bool
+     */
+    function logInFile($channel, $message, $meta = array())
+    {
+        $channel = trim((string) $channel);
+        if ($channel === '') {
+            $channel = 'application';
+        }
+
+        $safeChannel = preg_replace('/[^A-Za-z0-9_\-]/', '_', $channel);
+        $logPath = APPPATH . 'logs/';
+
+        if (!is_dir($logPath) && !@mkdir($logPath, 0755, true) && !is_dir($logPath)) {
+            return false;
+        }
+
+        $entry = '[' . date('Y-m-d H:i:s') . '] ' . (string) $message;
+
+        if (!empty($meta)) {
+            $json = json_encode($meta, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            $entry .= ' | meta=' . ($json !== false ? $json : print_r($meta, true));
+        }
+
+        $entry .= PHP_EOL;
+
+        return file_put_contents($logPath . $safeChannel . '.log', $entry, FILE_APPEND | LOCK_EX) !== false;
+    }
+}
+
 /**
  * Convert a hex string to base36 (0-9, a-z)
  * Uses chunk-based conversion for large numbers

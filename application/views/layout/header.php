@@ -257,6 +257,22 @@ $is_dev_env = ($app_env !== 'prod');
 														<span class="menu-text">Guest By Country</span>
 													</a>
 												</li>
+												<li class="menu-item <?php if($this->router->method == 'Lead_Dashboard') { echo 'menu-item-active'; } ?>">
+													<a href="<?php echo base_url('Report/Lead_Dashboard'); ?>" class="menu-link">
+														<i class="menu-bullet menu-bullet-dot">
+															<span></span>
+														</i>
+														<span class="menu-text">Lead Dashboard</span>
+													</a>
+												</li>
+												<li class="menu-item <?php if($this->router->method == 'Lead_Data') { echo 'menu-item-active'; } ?>">
+													<a href="<?php echo base_url('Report/Lead_Data'); ?>" class="menu-link">
+														<i class="menu-bullet menu-bullet-dot">
+															<span></span>
+														</i>
+														<span class="menu-text">Lead Data</span>
+													</a>
+												</li>
 											</ul>
 										</div>
 									</li>
