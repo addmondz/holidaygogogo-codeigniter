@@ -22,9 +22,9 @@
                 <div class="accordion accordion-solid accordion-toggle-plus">
                     <div class="card">
                         <div class="card-header">
-                            <div id="lead_dashboard_header" data-toggle="collapse" data-target="#lead_dashboard_filters" class="card-title collapsed" style="font-size:13px;">Filter Lead Activity</div>
+                            <div id="lead_dashboard_header" data-toggle="collapse" data-target="#lead_dashboard_filters" class="card-title" style="font-size:13px;">Filter Lead Activity</div>
                         </div>
-                        <div id="lead_dashboard_filters" class="collapse">
+                        <div id="lead_dashboard_filters" class="collapse show">
                             <div class="card-body">
                                 <form id="lead-dashboard-form" action="<?php echo base_url('Report/Lead_Dashboard'); ?>" method="get" class="form">
                                     <div class="row">
@@ -287,10 +287,6 @@
     $('#lead-dashboard-refresh-interval').on('changed.bs.select', function() {
         restartLeadDashboardTimer();
     });
-
-    <?php if(!empty($lead_dashboard_filters['sales_agent'])) { ?>
-        $('#lead_dashboard_header').click();
-    <?php } ?>
 
     restartLeadDashboardTimer();
 </script>

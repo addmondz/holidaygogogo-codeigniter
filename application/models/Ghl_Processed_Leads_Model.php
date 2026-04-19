@@ -196,6 +196,18 @@ class Ghl_Processed_Leads_Model extends CI_Model
         return $this->db->trans_status();
     }
 
+    public function reset_processing_data()
+    {
+        $this->db->trans_start();
+
+        $this->db->empty_table('ghl_processed_leads');
+        $this->db->empty_table('ghl_processing_state');
+
+        $this->db->trans_complete();
+
+        return $this->db->trans_status();
+    }
+
     public function get_processor_state($processorName)
     {
         $row = $this->db
