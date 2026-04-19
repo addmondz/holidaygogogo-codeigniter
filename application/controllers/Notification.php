@@ -92,10 +92,6 @@ class Notification extends MY_Controller
 			);
 		}
 
-		// Mark all notifications as read AFTER formatting (so response has original is_read status)
-		// This way frontend can show unread styling initially, but on next fetch they're already read
-		$this->Notification_Model->Mark_All_As_Read($user_id);
-
 		$this->output
 			->set_content_type('application/json')
 			->set_output(json_encode([
@@ -139,6 +135,44 @@ class Notification extends MY_Controller
 			->set_output(json_encode([
 				'success' => $success,
 				'message' => $success ? 'Notification marked as read' : 'Failed to mark notification as read'
+			]));
+	}
+
+	/**
+	 * Mark notification as unread (AJAX)
+	 */
+	function Mark_As_Unread()
+	{
+		if (empty($this->session->userdata('admin_id'))) {
+			$this->output
+				->set_content_type('application/json')
+				->set_output(json_encode([
+					'success' => false,
+					'message' => 'Not authenticated'
+				]));
+			return;
+		}
+
+		$notification_id = intval($this->input->post('notification_id'));
+		$user_id = $this->session->userdata('admin_id');
+
+		if (empty($notification_id)) {
+			$this->output
+				->set_content_type('application/json')
+				->set_output(json_encode([
+					'success' => false,
+					'message' => 'Notification ID is required'
+				]));
+			return;
+		}
+
+		$success = $this->Notification_Model->Mark_As_Unread($notification_id, $user_id);
+
+		$this->output
+			->set_content_type('application/json')
+			->set_output(json_encode([
+				'success' => $success,
+				'message' => $success ? 'Notification marked as unread' : 'Failed to mark notification as unread'
 			]));
 	}
 
@@ -193,7 +227,8 @@ class Notification extends MY_Controller
 				'BookingNumber' => $remark->BookingNumber,
 				'BookingID' => $remark->BookingID,
 				'created_at' => date('d/m/Y H:i:s', $created_timestamp),
-				'time_ago' => $time_ago
+				'time_ago' => $time_ago,
+				'is_read' => $remark->is_read == 1
 			);
 		}
 
@@ -203,6 +238,154 @@ class Notification extends MY_Controller
 				'success' => true,
 				'remarks' => $formatted_remarks,
 				'total' => $total
+			]));
+	}
+
+	/**
+	 * Get unread remarks count (AJAX)
+	 */
+	function Get_Remarks_Unread_Count()
+	{
+		if (empty($this->session->userdata('admin_id'))) {
+			$this->output
+				->set_content_type('application/json')
+				->set_output(json_encode([
+					'success' => false,
+					'count' => 0
+				]));
+			return;
+		}
+
+		$user_id = $this->session->userdata('admin_id');
+		$user_level = $this->session->userdata('level');
+
+		$this->load->model('Remark_Model');
+		$internal_count = $this->Remark_Model->Get_Unread_Count(1, $user_id, $user_level);
+		$customer_count = $this->Remark_Model->Get_Unread_Count(2, $user_id, $user_level);
+
+		$this->output
+			->set_content_type('application/json')
+			->set_output(json_encode([
+				'success' => true,
+				'count' => $internal_count + $customer_count,
+				'internal_count' => $internal_count,
+				'customer_count' => $customer_count
+			]));
+	}
+
+	/**
+	 * Mark remarks as read (AJAX)
+	 */
+	function Mark_Remarks_As_Read()
+	{
+		if (empty($this->session->userdata('admin_id'))) {
+			$this->output
+				->set_content_type('application/json')
+				->set_output(json_encode([
+					'success' => false,
+					'message' => 'Not authenticated'
+				]));
+			return;
+		}
+
+		$user_id = $this->session->userdata('admin_id');
+		$type = intval($this->input->post('type'));
+
+		if (empty($type) || !in_array($type, [1, 2])) {
+			$this->output
+				->set_content_type('application/json')
+				->set_output(json_encode([
+					'success' => false,
+					'message' => 'Invalid remark type'
+				]));
+			return;
+		}
+
+		$user_level = $this->session->userdata('level');
+
+		$this->load->model('Remark_Model');
+		$success = $this->Remark_Model->Mark_Remarks_As_Read($user_id, $type, $user_level);
+
+		$this->output
+			->set_content_type('application/json')
+			->set_output(json_encode([
+				'success' => $success
+			]));
+	}
+
+	/**
+	 * Mark a single remark as read (AJAX)
+	 */
+	function Mark_Remark_As_Read()
+	{
+		if (empty($this->session->userdata('admin_id'))) {
+			$this->output
+				->set_content_type('application/json')
+				->set_output(json_encode([
+					'success' => false,
+					'message' => 'Not authenticated'
+				]));
+			return;
+		}
+
+		$remark_id = intval($this->input->post('remark_id'));
+		$user_id = $this->session->userdata('admin_id');
+
+		if (empty($remark_id)) {
+			$this->output
+				->set_content_type('application/json')
+				->set_output(json_encode([
+					'success' => false,
+					'message' => 'Remark ID is required'
+				]));
+			return;
+		}
+
+		$this->load->model('Remark_Model');
+		$success = $this->Remark_Model->Mark_Remark_As_Read($remark_id, $user_id);
+
+		$this->output
+			->set_content_type('application/json')
+			->set_output(json_encode([
+				'success' => $success
+			]));
+	}
+
+	/**
+	 * Mark a single remark as unread (AJAX)
+	 */
+	function Mark_Remark_As_Unread()
+	{
+		if (empty($this->session->userdata('admin_id'))) {
+			$this->output
+				->set_content_type('application/json')
+				->set_output(json_encode([
+					'success' => false,
+					'message' => 'Not authenticated'
+				]));
+			return;
+		}
+
+		$remark_id = intval($this->input->post('remark_id'));
+		$user_id = $this->session->userdata('admin_id');
+
+		if (empty($remark_id)) {
+			$this->output
+				->set_content_type('application/json')
+				->set_output(json_encode([
+					'success' => false,
+					'message' => 'Remark ID is required'
+				]));
+			return;
+		}
+
+		$this->load->model('Remark_Model');
+		$success = $this->Remark_Model->Mark_Remark_As_Unread($remark_id, $user_id);
+
+		$this->output
+			->set_content_type('application/json')
+			->set_output(json_encode([
+				'success' => $success
 			]));
 	}
 

@@ -93,9 +93,14 @@ class Remark_Model extends CI_Model
 	 */
 	function Get_All_Remarks($type, $limit = 10, $offset = 0, $user_id = null, $user_level = null)
 	{
-		$this->db->select('remark.RemarkID, remark.content, remark.created_at, admin.Name AS CommenterName, booking.BookingNumber, booking.BookingID');
+		$this->db->select('remark.RemarkID, remark.content, remark.created_at, admin.Name AS CommenterName, booking.BookingNumber, booking.BookingID, IF(rur.id IS NOT NULL, 1, 0) AS is_read');
 		$this->db->join('admin', 'admin.AdminID = remark.commenter_id', 'left');
 		$this->db->join('booking', 'booking.BookingID = remark.owner_id AND remark.owner_type = "booking"', 'inner');
+		if ($user_id) {
+			$this->db->join('remark_user_read rur', 'rur.remark_id = remark.RemarkID AND rur.user_id = ' . intval($user_id), 'left');
+		} else {
+			$this->db->join('remark_user_read rur', 'rur.remark_id = remark.RemarkID AND 1=0', 'left');
+		}
 		$this->db->where('remark.type', $type);
 
 		// Sales agents (level 20) only see remarks from their bookings
@@ -125,6 +130,102 @@ class Remark_Model extends CI_Model
 		}
 
 		return $this->db->count_all_results('remark');
+	}
+
+	/**
+	 * Get unread count for a specific remark type
+	 * @param int $type Remark type (1=INTERNAL, 2=CUSTOMER)
+	 * @param int $user_id Current admin user ID
+	 * @param int $user_level Current admin level
+	 * @return int Unread count
+	 */
+	function Get_Unread_Count($type, $user_id, $user_level = null)
+	{
+		$this->db->join('booking', 'booking.BookingID = remark.owner_id AND remark.owner_type = "booking"', 'inner');
+		$this->db->join('remark_user_read rur', 'rur.remark_id = remark.RemarkID AND rur.user_id = ' . intval($user_id), 'left');
+		$this->db->where('remark.type', $type);
+		$this->db->where('rur.id IS NULL', null, false);
+
+		if ($user_level == 20 && $user_id) {
+			$this->db->where('booking.SalesAgentID', $user_id);
+		}
+
+		return $this->db->count_all_results('remark');
+	}
+
+	/**
+	 * Get total unread count across all remark types (for badge)
+	 * @param int $user_id Current admin user ID
+	 * @param int $user_level Current admin level
+	 * @return int Total unread count
+	 */
+	function Get_Total_Unread_Count($user_id, $user_level = null)
+	{
+		return $this->Get_Unread_Count(1, $user_id, $user_level)
+			 + $this->Get_Unread_Count(2, $user_id, $user_level);
+	}
+
+	/**
+	 * Mark remarks of a specific type as read for a user (upsert)
+	 * @param int $user_id Current admin user ID
+	 * @param int $remark_type Remark type (1=INTERNAL, 2=CUSTOMER)
+	 * @return bool Success status
+	 */
+	function Mark_Remarks_As_Read($user_id, $remark_type, $user_level = null)
+	{
+		// Get all unread remark IDs of this type for this user
+		$this->db->select('remark.RemarkID');
+		$this->db->join('booking', 'booking.BookingID = remark.owner_id AND remark.owner_type = "booking"', 'inner');
+		$this->db->join('remark_user_read rur', 'rur.remark_id = remark.RemarkID AND rur.user_id = ' . intval($user_id), 'left');
+		$this->db->where('remark.type', $remark_type);
+		$this->db->where('rur.id IS NULL', null, false);
+
+		if ($user_level == 20 && $user_id) {
+			$this->db->where('booking.SalesAgentID', $user_id);
+		}
+
+		$unread_remarks = $this->db->get('remark')->result();
+
+		if (empty($unread_remarks)) {
+			return true;
+		}
+
+		$batch = array();
+		foreach ($unread_remarks as $remark) {
+			$batch[] = array(
+				'remark_id' => $remark->RemarkID,
+				'user_id' => $user_id
+			);
+		}
+
+		return $this->db->insert_batch('remark_user_read', $batch);
+	}
+
+	/**
+	 * Mark a single remark as read for a user
+	 * @param int $remark_id Remark ID
+	 * @param int $user_id User ID
+	 * @return bool Success status
+	 */
+	function Mark_Remark_As_Read($remark_id, $user_id)
+	{
+		// Use INSERT IGNORE to avoid duplicate key errors
+		$sql = 'INSERT IGNORE INTO remark_user_read (remark_id, user_id) VALUES (?, ?)';
+		$this->db->query($sql, array(intval($remark_id), intval($user_id)));
+		return true;
+	}
+
+	/**
+	 * Mark a single remark as unread for a user
+	 * @param int $remark_id Remark ID
+	 * @param int $user_id User ID
+	 * @return bool Success status
+	 */
+	function Mark_Remark_As_Unread($remark_id, $user_id)
+	{
+		$this->db->where('remark_id', intval($remark_id));
+		$this->db->where('user_id', intval($user_id));
+		return $this->db->delete('remark_user_read');
 	}
 
 	/**

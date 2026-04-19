@@ -3,7 +3,7 @@ class Product_Model extends CI_Model
 {
 	function Read_Product()
 	{
-		$this->db->select('ProductID, product.SupplierID, ProductCode, product.Name As Product, RetailPrice, SupplierPrice, category.Name As Category');
+		$this->db->select('ProductID, product.SupplierID, ProductCode, product.Name As Product, RetailPrice, SupplierPrice, is_child_or_infant, has_supplier_deposit, category.Name As Category');
 		$this->db->join('category', 'category.CategoryID = product.CategoryID', 'left');
 		$this->db->where('ProductID', $this->input->get('product_id'));
 		return $this->db->get('product')->row_array();

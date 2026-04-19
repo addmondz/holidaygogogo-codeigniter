@@ -107,9 +107,9 @@ $is_dev_env = ($app_env !== 'prod');
 	<div class="d-flex flex-column flex-root">
 		<div class="d-flex flex-row flex-column-fluid page">
 			<div id="kt_aside" class="aside aside-left aside-fixed d-flex flex-column flex-row-auto">
-				<div class="brand flex-column-auto">
+				<div class="brand flex-column-auto mt-6">
 					<a href="<?php echo base_url('Dashboard'); ?>" class="brand-logo">
-						<img src="<?php echo base_url('assets/image/logo.png'); ?>" class="w-100">
+						<img src="<?php echo base_url('assets/image/logo.png'); ?>" style="width: 100%;">
 					</a>
 					<button id="kt_aside_toggle" class="brand-toggle btn btn-sm px-0">
 						<span class="svg-icon svg-icon-xl">
@@ -261,7 +261,7 @@ $is_dev_env = ($app_env !== 'prod');
 										</div>
 									</li>
 								<?php } ?>
-								<li class="menu-item menu-item-submenu <?php if($this->router->class == 'Category_Code' || $this->router->class == 'Category' || $this->router->class == 'Supplier' || $this->router->class == 'Product' || $this->router->class == 'Footer' || $this->router->class == 'Country_Code' || $this->router->class == 'Tag' || $this->router->class == 'Source' || $this->router->class == 'Package_Checklist' || $this->router->class == 'Product_Package_Checklist') { echo 'menu-item-active menu-item-open'; } ?>">
+								<li class="menu-item menu-item-submenu <?php if($this->router->class == 'Category_Code' || $this->router->class == 'Category' || $this->router->class == 'Supplier' || $this->router->class == 'Product' || $this->router->class == 'Footer' || $this->router->class == 'Country_Code' || $this->router->class == 'Tag' || $this->router->class == 'Source' || $this->router->class == 'Package_Checklist' || $this->router->class == 'Product_Package_Checklist' || $this->router->class == 'Cancellation_Reason') { echo 'menu-item-active menu-item-open'; } ?>">
 									<a href="javascript:;" class="menu-link menu-toggle">
 										<span class="svg-icon menu-icon">
 											<svg>
@@ -359,6 +359,14 @@ $is_dev_env = ($app_env !== 'prod');
 													<span class="menu-text">Package Checklist</span>
 												</a>
 											</li>
+											<li class="menu-item <?php if($this->router->class == 'Cancellation_Reason') { echo 'menu-item-active'; } ?>">
+												<a href="<?php echo base_url('Cancellation_Reason'); ?>" class="menu-link">
+													<i class="menu-bullet menu-bullet-dot">
+														<span></span>
+													</i>
+													<span class="menu-text">Cancellation Reason</span>
+												</a>
+											</li>
 										</ul>
 									</div>
 								</li>
@@ -379,6 +387,7 @@ $is_dev_env = ($app_env !== 'prod');
 						<div class="topbar-item position-relative">
 							<div class="btn btn-icon btn-clean btn-lg mr-1 position-relative" id="kt_remarks_toggle" data-toggle="dropdown" data-offset="10px,10px">
 								<i class="la la-comment-dots la-2x text-primary"></i>
+								<span class="label label-lg label-light-danger label-inline label-rounded position-absolute" id="remarks-badge" style="top: -5px; right: -5px; display: none; min-width: 20px; padding: 2px 6px;">0</span>
 							</div>
 							<div class="dropdown-menu dropdown-menu-right p-0 m-0 dropdown-menu-anim-up dropdown-menu-lg" id="remarks-dropdown" style="width: 420px; right: 0; left: auto;">
 								<div class="d-flex align-items-center justify-content-between p-5 border-bottom">
@@ -400,6 +409,9 @@ $is_dev_env = ($app_env !== 'prod');
 												<div class="mt-3">Loading...</div>
 											</div>
 										</div>
+										<div class="text-center py-2 d-none" id="mark-read-internal">
+											<a href="javascript:;" class="mark-tab-remarks-read text-primary font-weight-bold font-size-sm" data-type="1">Mark all as read</a>
+										</div>
 										<div class="text-center py-3 border-top d-none" id="load-more-internal">
 											<a href="javascript:;" class="btn btn-sm btn-light-primary font-weight-bold load-more-remarks" data-type="1">Load More</a>
 										</div>
@@ -410,6 +422,9 @@ $is_dev_env = ($app_env !== 'prod');
 												<div class="spinner spinner-primary spinner-lg"></div>
 												<div class="mt-3">Loading...</div>
 											</div>
+										</div>
+										<div class="text-center py-2 d-none" id="mark-read-customer">
+											<a href="javascript:;" class="mark-tab-remarks-read text-primary font-weight-bold font-size-sm" data-type="2">Mark all as read</a>
 										</div>
 										<div class="text-center py-3 border-top d-none" id="load-more-customer">
 											<a href="javascript:;" class="btn btn-sm btn-light-primary font-weight-bold load-more-remarks" data-type="2">Load More</a>

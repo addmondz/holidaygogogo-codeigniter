@@ -76,31 +76,28 @@ class Receipt extends CI_Controller
         }
         $this->db->order_by('Date', 'ASC');
         $approved_payments = $this->db->get('payment')->result();
-        
-        $total_received = 0;
-        foreach($approved_payments as $payment) {
-            $total_received += $payment->Credit;
+
+        // Guard: no approved payments
+        if(empty($approved_payments)) {
+            $this->load->view('errors/access_denied');
+            return;
         }
-        
-        $array['approved_payments'] = $approved_payments;
-        $array['total_received'] = $total_received;
-        $array['balance_due'] = $array['NetTotal'] - $total_received;
-        
+
         // Get booking products
         $_GET['booking_id'] = $array['BookingID'];
         $array['booking_products'] = $this->Booking_Product_Model->Read();
-        
+
         // Format dates
         $array['DepositDeadline'] = empty($array['DepositDeadline']) ? '-' : strtoupper(date('j M Y', strtotime($array['DepositDeadline'])));
         $array['FullPaymentDeadline'] = strtoupper(date('j M Y', strtotime($array['FullPaymentDeadline'])));
         $array['CustomerMobile'] = $array['CountryCode'] . $array['CustomerMobile'];
-        
+
         if(!empty($array['StartDate']) && !empty($array['EndDate'])) {
             $array['TravelDate'] = strtoupper(date('j M', strtotime($array['StartDate'])) . ' - ' . date('j M Y', strtotime($array['EndDate'])));
         } else {
             $array['TravelDate'] = '-';
         }
-        
+
         // Format guest numbers
         if(!empty($array['Adult'])) {
             $array['Adult'] = $array['Adult'] == 1 ? $array['Adult'] . ' ADULT ' : $array['Adult'] . ' ADULTS ';
@@ -111,7 +108,7 @@ class Receipt extends CI_Controller
         if(!empty($array['Infant'])) {
             $array['Infant'] = $array['Infant'] == 1 ? $array['Infant'] . ' INFANT ' : $array['Infant'] . ' INFANTS ';
         }
-        
+
         // Combine guest numbers
         if(!empty($array['Adult']) && !empty($array['Children']) && !empty($array['Infant'])) {
             $array['PaxNumber'] = $array['Adult'] . '& ' . $array['Children'] . '& ' . $array['Infant'];
@@ -138,15 +135,12 @@ class Receipt extends CI_Controller
                 }
             }
         }
-        
-        // Keep numeric values - view will format them
-        // No formatting needed here as the view template handles it
-        
+
         // Format product names
         foreach($array['booking_products'] as $booking_product) {
             $booking_product->Name = (explode(' (' . $booking_product->ProductCode . ')', $booking_product->Name))[0];
         }
-        
+
         // Get company information
         $company = $this->Company_Model->Read();
         $array['CompanyName'] = $company['Name'];
@@ -154,64 +148,80 @@ class Receipt extends CI_Controller
         $array['CompanyLicenseNumber'] = $company['LicenseNumber'];
         $array['CompanyAddress'] = $company['Address'];
         $array['CompanyWebsite'] = $company['Website'];
-        
+
         // Set Text variable for footer
         $array['Text'] = !empty($array['BookingConfirmationFooter']) ? $array['BookingConfirmationFooter'] : 'Thank you for your payment. Please keep this receipt for your records.';
 
-        // Variables for receipt_simple2 view
+        // Shared view variables
         $array['ReceivedFrom'] = $array['Customer'];
-        // Use AutoCount reference number from first payment if available
-        $array['VoucherNo'] = !empty($approved_payments) && !empty($approved_payments[0]->AutocountReferenceNumber)
-            ? $approved_payments[0]->AutocountReferenceNumber
-            : 'OR-' . date('ym') . '-' . str_pad($array['BookingID'], 4, '0', STR_PAD_LEFT);
-        $array['ReceiptDate'] = !empty($approved_payments)
-            ? date('d/m/Y', strtotime($approved_payments[0]->Date))
-            : date('d/m/Y');
         $array['RefNo'] = $array['BookingNumber'];
 
-        // Generate Amount In Words
-        $amount_parts = explode('.', $total_received);
-        $ringgit = $this->Convert_Subtotal($amount_parts[0]);
-        if(isset($amount_parts[1]) && $amount_parts[1] != 0) {
-            $sen = 'AND CENTS ' . $this->Convert_Subtotal($amount_parts[1]);
-        } else {
-            $sen = '';
-        }
-        $array['ReceiveSumOf'] = 'RINGGIT MALAYSIA ' . strtoupper($ringgit) . ' ' . strtoupper($sen) . ' ONLY.';
-
-        // Format payments for view
-        $payments = [];
+        // Loop through each payment and render a separate receipt page
+        $html_pages = [];
         foreach($approved_payments as $payment) {
+            // VoucherNo from this payment's AutocountReferenceNumber
+            $array['VoucherNo'] = !empty($payment->AutocountReferenceNumber)
+                ? $payment->AutocountReferenceNumber
+                : 'OR-' . date('ym') . '-' . str_pad($array['BookingID'], 4, '0', STR_PAD_LEFT);
+
+            // ReceiptDate from this payment's Date
+            $array['ReceiptDate'] = date('d/m/Y', strtotime($payment->Date));
+
+            // Amount in words for this payment
+            $amount_parts = explode('.', $payment->Credit);
+            $ringgit = $this->Convert_Subtotal($amount_parts[0]);
+            if(isset($amount_parts[1]) && $amount_parts[1] != 0) {
+                $sen = 'AND CENTS ' . $this->Convert_Subtotal($amount_parts[1]);
+            } else {
+                $sen = '';
+            }
+            $array['ReceiveSumOf'] = 'RINGGIT MALAYSIA ' . strtoupper($ringgit) . ' ' . strtoupper($sen) . ' ONLY.';
+
+            // Single payment entry
             $pay = new stdClass();
             $pay->PaymentBy = $payment->Type;
             $pay->ChequeNo = $payment->ReferenceNumber;
             $pay->Amount = $payment->Credit;
-            $payments[] = $pay;
+            $array['payments'] = [$pay];
+
+            // Single paid item entry
+            $item = new stdClass();
+            $item->AccNo = $array['CustomerCode'];
+            $item->Description = $array['Customer'] . '     ' . $array['TravelDate'];
+            $item->TaxAmount = $payment->Credit;
+            $item->Amount = $payment->Credit;
+            $array['paid_items'] = [$item];
+
+            // Total for this payment
+            $array['Total'] = $payment->Credit;
+
+            // Render this receipt page to HTML
+            $html_pages[] = $this->load->view('receipt/receipt_simple2', $array, true);
         }
-        $array['payments'] = $payments;
 
-        // Format paid items for view
-        $paid_items = [];
-        $item = new stdClass();
-        $item->AccNo = $array['CustomerCode'];
-        $item->Description = $array['Customer'] . '     ' . $array['TravelDate'];
-        $item->TaxAmount = $total_received;
-        $item->Amount = $total_received;
-        $paid_items[] = $item;
-        $array['paid_items'] = $paid_items;
-
-        // Total
-        $array['Total'] = $total_received;
+        // Concatenate pages with CSS page breaks
+        if(count($html_pages) === 1) {
+            $final_html = $html_pages[0];
+        } else {
+            $final_html = $html_pages[0];
+            for($i = 1; $i < count($html_pages); $i++) {
+                // Extract body content from subsequent pages
+                if(preg_match('/<body[^>]*>(.*)<\/body>/is', $html_pages[$i], $matches)) {
+                    $page_body = $matches[1];
+                    $separator = '<div style="page-break-before: always;"></div>';
+                    $final_html = str_replace('</body></html>', $separator . $page_body . '</body></html>', $final_html);
+                }
+            }
+        }
 
         // Generate PDF
         $this->load->library('pdf');
 
-        // Generate single-page receipt
-        $this->dompdf->loadHtml($this->load->view('receipt/receipt_simple2', $array, true));
+        $this->dompdf->loadHtml($final_html);
         $this->dompdf->set_option('isRemoteEnabled', true);
         $this->dompdf->setPaper(array(0, 0, 850, 550));
         $this->dompdf->render();
-        
+
         $pdf_output = $this->dompdf->output();
 
         // Output the PDF directly to the browser

@@ -19,6 +19,7 @@ class Booking extends MY_Controller
 		$this->load->model('Product_Package_Checklist_Model');
 		$this->load->model('Package_Checklist_Model');
 		$this->load->model('Guest_list_lock_model');
+		$this->load->model('Cancellation_Reason_Model');
 		$this->config->load('autocount'); // load config/autocount.php
 	}
 
@@ -35,6 +36,8 @@ class Booking extends MY_Controller
 			$array['categories'] = $this->Booking_Model->Read_Categories();
 			$array['tags'] = $this->Booking_Model->Read_Tags();
 			$array['sources'] = $this->Booking_Model->Read_Sources();
+			$array['filter_checklists'] = $this->Package_Checklist_Model->Read_Booking_Filter_Checklists();
+			$array['cancellation_reasons'] = $this->Cancellation_Reason_Model->Read_Cancellation_Reasons();
 
 			$this->load->helper('autocount');
 			$config = get_autocount_config();
@@ -118,6 +121,8 @@ class Booking extends MY_Controller
 
 			$is_sales_agent = $this->session->userdata('level') == 20;
 
+		$this->load->helper('booking_flow');
+
 		// DataTables parameters
 		$draw = intval($this->input->get('draw'));
 		$start = intval($this->input->get('start'));
@@ -140,29 +145,30 @@ class Booking extends MY_Controller
 			5 => 'BookingNumber',                 // BC number
 			6 => 'booking.BookingConfirmationTitle', // BC title
 			7 => 'Customer',                      // customer
-			8 => 'booking.ChatLanguage',          // chat
-			9 => 'booking.Mobile',                // mobile
-			10 => 'StartDate',                    // start
-			11 => 'EndDate',                      // end
-			12 => 'category.Name',                // destination
-			13 => 'NetTotal',                     // net sales
-			14 => 'NetTotal',                     // profit
-			15 => 'NetTotal',                     // profit margin
-			16 => 'booking.Status',               // BC status
-			17 => 'LockStatus',                   // GL status
-			18 => 'booking.AutocountSyncStatus',  // autocount status
-			19 => 'booking.BookingID'             // action
+			8 => 'source.Name',                   // source
+			9 => 'booking.ChatLanguage',          // chat
+			10 => 'booking.Mobile',               // mobile
+			11 => 'StartDate',                    // start
+			12 => 'EndDate',                      // end
+			13 => 'category.Name',                // destination
+			14 => 'NetTotal',                     // net sales
+			15 => 'NetTotal',                     // profit
+			16 => 'NetTotal',                     // profit margin
+			17 => "status_sort_priority",          // BC status
+			18 => 'LockStatus',                   // GL status
+			19 => 'booking.AutocountSyncStatus',  // autocount status
+			20 => 'booking.BookingID'             // action
 		);
 
 		// Adjust column index for sales agents
-		// Sales agents don't see: sales_agent (index 2), OP (index 3), profit (index 14), profit_margin (index 15)
+		// Sales agents don't see: sales_agent (index 2), OP (index 3), profit (index 15), profit_margin (index 16)
 		// So their column indices need to be mapped back to the full column array
 		if($is_sales_agent) {
-			if($order_column_index >= 2 && $order_column_index <= 11) {
-				// Columns 2-11: add 2 for missing sales_agent + OP columns
+			if($order_column_index >= 2 && $order_column_index <= 12) {
+				// Columns 2-12: add 2 for missing sales_agent + OP columns
 				$order_column_index += 2;
-			} else if($order_column_index >= 12) {
-				// Columns 12+: add 4 for missing sales_agent + OP + profit + profit_margin
+			} else if($order_column_index >= 13) {
+				// Columns 13+: add 4 for missing sales_agent + OP + profit + profit_margin
 				$order_column_index += 4;
 			}
 		}
@@ -308,6 +314,10 @@ class Booking extends MY_Controller
 
 			// Customer
 			$row['customer'] = $booking->Customer;
+			$row['has_einvoice'] = $booking->has_einvoice > 0;
+
+			// Source
+			$row['source'] = $booking->SourceName ?? '-';
 
 			// Customer Code
 			$row['customer_code'] = $booking->CustomerCode;
@@ -337,7 +347,11 @@ class Booking extends MY_Controller
 			}
 
 			// Status
-			$row['status'] = '<span class="font-weight-bold" style="color:' . $status_color . ';">' . $status_text . '</span>';
+			if($booking->CancelStatus == 'Y' && !empty($booking->CancellationReasonName)) {
+				$row['status'] = '<span class="font-weight-bold" style="color:' . $status_color . ';" data-toggle="tooltip" data-placement="top" title="Reason: ' . htmlspecialchars($booking->CancellationReasonName) . '">' . $status_text . '</span>';
+			} else {
+				$row['status'] = '<span class="font-weight-bold" style="color:' . $status_color . ';">' . $status_text . '</span>';
+			}
 
 			// GL Status rules:
 			// 1. If hard-locked (LockStatus = 'Y') -> locked icon (red)
@@ -430,7 +444,7 @@ class Booking extends MY_Controller
 				if($booking->CancelStatus == 'Y') {
 					$html .= '<a href="' . base_url('Booking/Update_Cancel_Status?booking_id=') . $booking->BookingID . '&current_cancel_status=' . $booking->CancelStatus . '&new_cancel_status=N&param=' . urlencode($current_url) . '" class="dropdown-item" style="color:#93C572; font-size:11px;">Activate Booking</a>';
 				} else {
-					$html .= '<a href="' . base_url('Booking/Update_Cancel_Status?booking_id=') . $booking->BookingID . '&current_cancel_status=' . $booking->CancelStatus . '&new_cancel_status=Y&param=' . urlencode($current_url) . '" class="dropdown-item" style="color:#E0115F; font-size:11px;">Cancel Booking</a>';
+					$html .= '<button onclick="Cancel_Booking(\'' . base_url('assets/image/sweetalert.jpg') . '\', \'' . $booking->BookingNumber . '\', ' . $booking->BookingID . ', \'' . urlencode($current_url) . '\')" class="dropdown-item" style="color:#E0115F; font-size:11px;">Cancel Booking</button>';
 				}
 				// Approve BC - only show when BC is not approved
 				if(empty($booking->bc_approved) || $booking->bc_approved == 0) {
@@ -442,6 +456,18 @@ class Booking extends MY_Controller
 						$html .= '<a href="' . base_url('Booking/Update_Status?booking_id=') . $booking->BookingID . '&current_status=' . $booking->Status . '&new_status=PT&param=' . urlencode($current_url) . '" class="dropdown-item" style="color:#6082B6; font-size:11px;">Approve Travel Voucher ?</a>';
 					} else {
 						$html .= '<a href="' . base_url('Booking/Update_Status?booking_id=') . $booking->BookingID . '&current_status=' . $booking->Status . '&new_status=PTV&param=' . urlencode($current_url) . '" class="dropdown-item" style="color:#F4BB44; font-size:11px;">Revert Pending Travel Voucher</a>';
+					}
+				}
+				// Generic Revert Status button
+				if($booking->CancelStatus != 'Y') {
+					$prev_status = get_previous_status_in_flow($booking->Status);
+					if($prev_status !== null) {
+						$status_info = get_booking_status_info();
+						$display_status = display_booking_status($booking);
+						$from_text = $display_status['status_text'];
+						$to_text = isset($status_info['texts'][$prev_status]) ? $status_info['texts'][$prev_status] : $prev_status;
+						$revert_url = base_url('Booking/Update_Status?booking_id=') . $booking->BookingID . '&current_status=' . $booking->Status . '&new_status=' . $prev_status . '&param=' . urlencode($current_url);
+						$html .= '<button onclick="Revert_Booking_Status(\'' . base_url('assets/image/sweetalert.jpg') . '\', \'' . $booking->BookingNumber . '\', \'' . $revert_url . '\', \'' . $from_text . '\', \'' . $to_text . '\')" class="dropdown-item" style="color:#F4BB44; font-size:11px;">Revert Status</button>';
 					}
 				}
 				$html .= '<a href="' . (strpos($current_url, '?') ? base_url('Booking/Update?booking_id=') . $booking->BookingID . '&' . explode('?', $current_url)[1] : base_url('Booking/Update?booking_id=') . $booking->BookingID) . '" class="dropdown-item" style="font-size:11px;">Update Booking</a>';
@@ -659,6 +685,33 @@ class Booking extends MY_Controller
 		}
 	}
 
+	function View_Snapshot()
+	{
+		if (!$this->session->has_userdata('admin_id')) {
+			$this->load->view('errors/access_denied');
+			return;
+		}
+
+		$file = $this->input->get('file');
+		if (!preg_match('/^[a-zA-Z0-9_\-\.]+\.pdf$/', $file)) {
+			show_404();
+			return;
+		}
+
+		$path = FCPATH . 'assets/upload/booking_snapshots/' . $file;
+		if (!file_exists($path)) {
+			show_404();
+			return;
+		}
+
+		header('Content-Type: application/pdf');
+		header('Content-Disposition: inline; filename="' . $file . '"');
+		header('Cache-Control: no-cache, no-store, must-revalidate');
+		header('Pragma: no-cache');
+		header('Expires: 0');
+		readfile($path);
+	}
+
 	function Update()
 	{
 		if($this->session->userdata('level') == 20) {
@@ -744,6 +797,9 @@ class Booking extends MY_Controller
 					}
 					// Check if price changed due to product deletion (will be checked when booking NetTotal is updated)
 				}
+
+				// Cleanup invalid supplier dates on booking products
+				$this->Booking_Product_Model->Cleanup_Supplier_Dates($this->input->post('booking_id'));
 
 				// Auto-enable insurance if any product belongs to an insurance category
 				$booking_id = $this->input->post('booking_id');
@@ -1019,18 +1075,6 @@ class Booking extends MY_Controller
 					if(!empty($array['AdditionalPaymentDeadline'])) {
 						$array['AdditionalPaymentDeadline'] = date('d/m/Y', strtotime($array['AdditionalPaymentDeadline']));
 					}
-					if(!isset($array['PaymentOutSupplierFull'])) {
-						$array['PaymentOutSupplierFull'] = '';
-					}
-					if(!isset($array['PaymentOutSupplierDeposit'])) {
-						$array['PaymentOutSupplierDeposit'] = '';
-					}
-					if(!empty($array['PaymentOutSupplierFull'])) {
-						$array['PaymentOutSupplierFull'] = date('d/m/Y', strtotime($array['PaymentOutSupplierFull']));
-					}
-					if(!empty($array['PaymentOutSupplierDeposit'])) {
-						$array['PaymentOutSupplierDeposit'] = date('d/m/Y', strtotime($array['PaymentOutSupplierDeposit']));
-					}
 					if(!empty($array['StartDate']) && !empty($array['EndDate'])) {
 						$array['TravelDate'] = date('d/m/Y', strtotime($array['StartDate'])) . ' - ' . date('d/m/Y', strtotime($array['EndDate']));
 					} else {
@@ -1126,10 +1170,12 @@ class Booking extends MY_Controller
 					$array['footers'] = $this->Booking_Model->Read_Footers();
 					$array['country_codes'] = $this->Booking_Model->Read_Country_Codes();
 					$array['tags'] = $this->Booking_Model->Read_Tags();
-					$array['sources'] = $this->Booking_Model->Read_Sources();
+					$array['sources'] = $this->Booking_Model->Read_Sources_With_Inactive($array['Source']);
 					foreach($array['booking_products'] as $booking_product) {
 						$booking_product->Price = number_format($booking_product->Price, 2, '.', ',');
 						$booking_product->Total = number_format($booking_product->Total, 2, '.', ',');
+						$booking_product->PaymentOutSupplierFull = !empty($booking_product->PaymentOutSupplierFull) ? date('d/m/Y', strtotime($booking_product->PaymentOutSupplierFull)) : '';
+						$booking_product->PaymentOutSupplierDeposit = !empty($booking_product->PaymentOutSupplierDeposit) ? date('d/m/Y', strtotime($booking_product->PaymentOutSupplierDeposit)) : '';
 					}
 
 					// Get booking checklists
@@ -1147,6 +1193,9 @@ class Booking extends MY_Controller
 					// Get booking status log timeline
 					$this->load->model('Booking_Status_Log_Model');
 					$array['status_logs'] = $this->Booking_Status_Log_Model->get_timeline_data($array['BookingID'], false);
+
+					// Get booking audit logs
+					$array['booking_logs'] = $this->Booking_Model->Read_Booking_Logs($array['BookingID']);
 
 					// Calculate and get display status for the booking
 					$this->load->helper('booking_flow');
@@ -1202,12 +1251,6 @@ class Booking extends MY_Controller
 				$array['FullPaymentDeadline'] = date('d/m/Y', strtotime($array['FullPaymentDeadline']));
 				if(!empty($array['AdditionalPaymentDeadline'])) {
 					$array['AdditionalPaymentDeadline'] = date('d/m/Y', strtotime($array['AdditionalPaymentDeadline']));
-				}
-				if(!empty($array['PaymentOutSupplierFull'])) {
-					$array['PaymentOutSupplierFull'] = date('d/m/Y', strtotime($array['PaymentOutSupplierFull']));
-				}
-				if(!empty($array['PaymentOutSupplierDeposit'])) {
-					$array['PaymentOutSupplierDeposit'] = date('d/m/Y', strtotime($array['PaymentOutSupplierDeposit']));
 				}
 				if(!empty($array['StartDate']) && !empty($array['EndDate'])) {
 					$array['TravelDate'] = date('d/m/Y', strtotime($array['StartDate'])) . ' - ' . date('d/m/Y', strtotime($array['EndDate']));
@@ -1296,8 +1339,8 @@ class Booking extends MY_Controller
 				$array['footers'] = $this->Booking_Model->Read_Footers();
 				$array['country_codes'] = $this->Booking_Model->Read_Country_Codes();
 				$array['tags'] = $this->Booking_Model->Read_Tags();
-				$array['sources'] = $this->Booking_Model->Read_Sources();
-				
+				$array['sources'] = $this->Booking_Model->Read_Sources_With_Inactive($array['Source']);
+
 				// Get Destination Name
 				foreach($array['categories'] as $category) {
 					if($category->CategoryID == $array['Destination']) {
@@ -1317,6 +1360,8 @@ class Booking extends MY_Controller
 				foreach($array['booking_products'] as $booking_product) {
 					$booking_product->Price = number_format((float)($booking_product->Price ?? 0), 2, '.', ',');
 					$booking_product->Total = number_format((float)($booking_product->Total ?? 0), 2, '.', ',');
+					$booking_product->PaymentOutSupplierFull = !empty($booking_product->PaymentOutSupplierFull) ? date('d/m/Y', strtotime($booking_product->PaymentOutSupplierFull)) : '';
+					$booking_product->PaymentOutSupplierDeposit = !empty($booking_product->PaymentOutSupplierDeposit) ? date('d/m/Y', strtotime($booking_product->PaymentOutSupplierDeposit)) : '';
 				}
 
 				// Get booking checklists
@@ -1346,15 +1391,21 @@ class Booking extends MY_Controller
 		}
 	}
 	
-	function Update_Cancel_Status() 
+	function Update_Cancel_Status()
 	{
 		if(in_array('AB', $this->session->access_control)) {
-			$this->Booking_Model->Update_Cancel_Status();
-			$this->Booking_Model->Create_Booking_Log();
-			if(strpos($this->input->get('param'), '?') == true) {
-				redirect('Booking?' . explode('?', $this->input->get('param'))[1]);
+			if($this->input->is_ajax_request()) {
+				$this->Booking_Model->Update_Cancel_Status_With_Reason();
+				$this->Booking_Model->Create_Booking_Log_Cancel();
+				echo json_encode(true);
 			} else {
-				redirect('Booking');
+				$this->Booking_Model->Update_Cancel_Status();
+				$this->Booking_Model->Create_Booking_Log();
+				if(strpos($this->input->get('param'), '?') == true) {
+					redirect('Booking?' . explode('?', $this->input->get('param'))[1]);
+				} else {
+					redirect('Booking');
+				}
 			}
 		} else {
 			redirect('Dashboard');
@@ -3286,7 +3337,7 @@ class Booking extends MY_Controller
 		}
 
 		// Get booking products (need ProductID and Name for checklist grouping)
-		$this->db->select('bp.BookingProductID, bp.ProductID, p.Name');
+		$this->db->select('bp.BookingProductID, bp.ProductID, p.Name, bp.PaymentOutSupplierFull, bp.PaymentOutSupplierDeposit, bp.disable_checklist_payment_out');
 		$this->db->from('booking_product bp');
 		$this->db->join('product p', 'p.ProductID = bp.ProductID', 'left');
 		$this->db->where('bp.BookingID', $booking_id);
@@ -3324,7 +3375,9 @@ class Booking extends MY_Controller
 			$groups[] = array(
 				'product_name' => $group['product_name'],
 				'product_id' => $group['product_id'],
-				'checklists' => $checklists
+				'checklists' => $checklists,
+				'PaymentOutSupplierFull' => !empty($group['PaymentOutSupplierFull']) ? date('d/m/Y', strtotime($group['PaymentOutSupplierFull'])) : null,
+				'PaymentOutSupplierDeposit' => !empty($group['PaymentOutSupplierDeposit']) ? date('d/m/Y', strtotime($group['PaymentOutSupplierDeposit'])) : null
 			);
 		}
 
@@ -3359,6 +3412,15 @@ class Booking extends MY_Controller
 			}
 		}
 
+		// Get deposit checklist ID
+		$deposit_checklist_id = null;
+		foreach($package_checklists as $pc) {
+			if(strpos($pc->name, 'Payment Out To Supplier (deposit)') !== false) {
+				$deposit_checklist_id = $pc->ID;
+				break;
+			}
+		}
+
 		// Group booking products by ProductID (collapse duplicates)
 		$product_groups = array();
 		foreach($booking_products as $booking_product) {
@@ -3373,6 +3435,17 @@ class Booking extends MY_Controller
 		$total_count = 0;
 
 		foreach($product_groups as $product_id => $booking_product) {
+			// Skip products with disable_checklist_payment_out enabled
+			if(isset($booking_product->disable_checklist_payment_out) && $booking_product->disable_checklist_payment_out == 1) {
+				continue;
+			}
+
+			// Skip child/infant products — they don't require checklists
+			$product_row = $this->db->select('is_child_or_infant, has_supplier_deposit')->where('ProductID', $product_id)->get('product')->row();
+			if($product_row && $product_row->is_child_or_infant == 1) {
+				continue;
+			}
+
 			// Get checklists for this product
 			$product_checklist_ids = $this->Product_Package_Checklist_Model->Get_Checklists_For_Product($product_id);
 
@@ -3380,6 +3453,14 @@ class Booking extends MY_Controller
 			if(empty($product_checklist_ids)) {
 				$product_checklist_ids = $required_ids;
 				$this->Product_Package_Checklist_Model->Bulk_Update_Product_Checklists($product_id, $required_ids);
+			}
+
+			// Auto-add deposit checklist if product has supplier deposit
+			if($deposit_checklist_id && $product_row && $product_row->has_supplier_deposit == 1) {
+				if(!in_array($deposit_checklist_id, $product_checklist_ids)) {
+					$product_checklist_ids[] = $deposit_checklist_id;
+					$this->Product_Package_Checklist_Model->Bulk_Update_Product_Checklists($product_id, $product_checklist_ids);
+				}
 			}
 
 			// Build checklist list for this group
@@ -3395,7 +3476,9 @@ class Booking extends MY_Controller
 				$groups[] = array(
 					'product_name' => isset($booking_product->Name) ? $booking_product->Name : 'Product #' . $product_id,
 					'product_id' => $product_id,
-					'checklists' => $group_checklists
+					'checklists' => $group_checklists,
+					'PaymentOutSupplierFull' => isset($booking_product->PaymentOutSupplierFull) ? $booking_product->PaymentOutSupplierFull : null,
+					'PaymentOutSupplierDeposit' => isset($booking_product->PaymentOutSupplierDeposit) ? $booking_product->PaymentOutSupplierDeposit : null
 				);
 			}
 		}

@@ -3,7 +3,7 @@ class Booking_Product_Model extends CI_Model
 {
 	function Read()
 	{
-		$this->db->select('BookingProductID, ProductID, ProductCode, Name, Description, Quantity, Price, Total');
+		$this->db->select('BookingProductID, ProductID, ProductCode, Name, Description, Quantity, Price, Total, booking_product.PaymentOutSupplierFull, booking_product.PaymentOutSupplierDeposit, booking_product.disable_checklist_payment_out');
 		$this->db->join('booking_product', 'booking_product.BookingID = booking.BookingID', 'left');
         if(!empty($this->input->get('booking_id'))) {
 			$this->db->where('booking.BookingID', $this->input->get('booking_id'));
@@ -51,6 +51,19 @@ class Booking_Product_Model extends CI_Model
 		$this->db->set('Description', null);
 		$this->db->where('BookingID', $booking_id);
 		$this->db->where('Description', '');
+		$this->db->update('booking_product');
+	}
+
+	function Cleanup_Supplier_Dates($booking_id)
+	{
+		$this->db->set('PaymentOutSupplierFull', null);
+		$this->db->where('BookingID', $booking_id);
+		$this->db->where("CAST(`PaymentOutSupplierFull` AS CHAR) = '0000-00-00'", null, false);
+		$this->db->update('booking_product');
+
+		$this->db->set('PaymentOutSupplierDeposit', null);
+		$this->db->where('BookingID', $booking_id);
+		$this->db->where("CAST(`PaymentOutSupplierDeposit` AS CHAR) = '0000-00-00'", null, false);
 		$this->db->update('booking_product');
 	}
 }

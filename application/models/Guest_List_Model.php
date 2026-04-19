@@ -179,6 +179,30 @@ class Guest_List_Model extends CI_Model
 		$this->db->update('guest_list', $array);
 	}
 
+	function Are_All_Guests_Complete($booking_id)
+	{
+		$this->db->where('BookingID', $booking_id);
+		$this->db->where('Status', 'Y');
+		$guests = $this->db->get('guest_list')->result();
+
+		if (empty($guests)) {
+			return false;
+		}
+
+		foreach ($guests as $guest) {
+			if (empty($guest->Name) || empty($guest->LastName) || empty($guest->Gender) ||
+				empty($guest->DateOfBirth) ||
+				empty($guest->Email) || empty($guest->Mobile) || empty($guest->CountryCodeID)) {
+				return false;
+			}
+			if (strtolower($guest->Nationality) == 'malaysian' && empty($guest->IdentificationNumber)) {
+				return false;
+			}
+		}
+
+		return true;
+	}
+
 	function Auto_Assign_Rooms($booking_id)
 	{
 		$this->load->model('Guest_List_Room_Model');

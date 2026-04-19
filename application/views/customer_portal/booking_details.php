@@ -1250,6 +1250,23 @@
             }
             $additional_payment_complete = $has_additional_payment && ($total_paid >= $net_total && $net_total > 0);
 
+            // Check for customer refund payments
+            $has_customer_refund = false;
+            $customer_refund_approved = false;
+            $customer_refund_date = null;
+            $customer_refund_amount = 0;
+            if (!empty($booking['payments'])) {
+                foreach ($booking['payments'] as $payment) {
+                    $type = strtoupper(trim($payment['Type'] ?? ''));
+                    if ($type == 'CUSTOMER REFUND') {
+                        $has_customer_refund = true;
+                        $customer_refund_approved = ($payment['Status'] == 'Y');
+                        $customer_refund_date = !empty($payment['DateRaw']) ? $payment['DateRaw'] : (!empty($payment['Deadline']) ? $payment['Deadline'] : null);
+                        $customer_refund_amount = !empty($payment['Debit']) ? floatval($payment['Debit']) : 0;
+                    }
+                }
+            }
+
             // Check checklist completion
             $checklists_completed = false;
             if (function_exists('are_all_checklists_completed')) {
@@ -1553,6 +1570,47 @@
                     'cta_icon' => null,
                     'cta_enabled' => false
                 ];
+            }
+
+            // Insert refund step at correct chronological position
+            if ($has_customer_refund) {
+                $refund_step = [
+                    'step' => 0, // will be re-numbered below
+                    'title' => $customer_refund_approved ? 'Refund Processed' : 'Refund Pending',
+                    'description' => $customer_refund_approved
+                        ? 'Refund of RM ' . number_format($customer_refund_amount, 2) . ' has been processed'
+                        : 'Refund of RM ' . number_format($customer_refund_amount, 2) . ' is being processed',
+                    'event_date' => $customer_refund_date,
+                    'relative_time' => $customer_refund_date ? get_relative_time($customer_refund_date) : '',
+                    'expected_date' => null,
+                    'status' => $customer_refund_approved ? 'completed' : 'current',
+                    'icon' => 'dollar-sign',
+                    'cta_text' => null,
+                    'cta_url' => null,
+                    'cta_icon' => null,
+                    'cta_enabled' => false
+                ];
+
+                // Find insertion position by comparing event_date
+                $insert_pos = count($timeline_steps); // default: end
+                if ($customer_refund_date) {
+                    $refund_ts = strtotime($customer_refund_date);
+                    for ($i = 0; $i < count($timeline_steps); $i++) {
+                        $step_date = $timeline_steps[$i]['event_date'] ?? $timeline_steps[$i]['expected_date'] ?? null;
+                        if ($step_date && strtotime($step_date) > $refund_ts) {
+                            $insert_pos = $i;
+                            break;
+                        }
+                    }
+                }
+
+                array_splice($timeline_steps, $insert_pos, 0, [$refund_step]);
+
+                // Re-number all steps
+                foreach ($timeline_steps as $i => &$step) {
+                    $step['step'] = $i + 1;
+                }
+                unset($step);
             }
             ?>
 
@@ -1977,6 +2035,7 @@
             </div>
 
             <!-- Documents -->
+            <?php if ($booking['CancelStatus'] != 'Y'): ?>
             <div class="documents-card">
                 <div class="card-title">
                     Documents
@@ -2037,6 +2096,7 @@
                     </div>
                 <?php endif; ?>
             </div>
+            <?php endif; ?>
 
             <!-- Customer Comments Section -->
             <div class="details-card">

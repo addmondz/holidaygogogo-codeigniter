@@ -560,32 +560,6 @@
 
                             </div>
 
-                            <div class="form-group">
-
-                                <label>Payment Out to Supplier (Deposit)
-
-                                    <a onclick="Reset_PaymentOutSupplierDeposit()" class="btn btn-icon btn-light-warning btn-xs">
-
-                                        <i class="la la-undo"></i>
-
-                                    </a>
-
-                                </label>
-
-                                <div class="input-icon">
-
-                                    <input readonly type="text" name="PaymentOutSupplierDeposit" id="kt_datepicker_7" <?php if(current_url() == base_url('Booking/Update')) { ?> value="<?php echo $PaymentOutSupplierDeposit; ?>" <?php } ?> autocomplete="off" class="form-control">
-
-                                    <span>
-
-                                        <i class="la la-calendar"></i>
-
-                                    </span>
-
-                                </div>
-
-                            </div>
-
                         </div>
 
                         <div class="col-md-6">
@@ -631,28 +605,6 @@
                                 <div class="input-icon">
 
                                     <input <?php if(current_url() == base_url('Booking/Create') || current_url() == base_url('Booking/Duplicate')) { echo 'disabled'; } else { echo 'readonly'; } ?> type="text" name="AdditionalPaymentDeadline" id="kt_datepicker_5" <?php if(current_url() == base_url('Booking/Update')) { ?> value="<?php echo $AdditionalPaymentDeadline; ?>" <?php } ?> autocomplete="off" class="form-control">
-
-                                    <span>
-
-                                        <i class="la la-calendar"></i>
-
-                                    </span>
-
-                                </div>
-
-                            </div>
-
-                            <div class="form-group">
-
-                                <label>Payment Out to Supplier (Full)
-
-                                    <span style="color:red;">*</span>
-
-                                </label>
-
-                                <div class="input-icon">
-
-                                    <input readonly type="text" name="PaymentOutSupplierFull" id="kt_datepicker_6" <?php if(current_url() == base_url('Booking/Update')) { ?> value="<?php echo $PaymentOutSupplierFull; ?>" <?php } ?> autocomplete="off" class="form-control">
 
                                     <span>
 
@@ -1213,6 +1165,20 @@
                                                     <h6 class="font-weight-bold mb-3" style="color:#6082B6;">
                                                         <?php echo htmlspecialchars($group['product_name']); ?>
                                                     </h6>
+                                                    <?php if(!empty($group['PaymentOutSupplierDeposit']) || !empty($group['PaymentOutSupplierFull'])) { ?>
+                                                        <div class="mb-3" style="margin-top:-0.5rem;">
+                                                            <?php if(!empty($group['PaymentOutSupplierDeposit'])) { ?>
+                                                                <span class="label label-inline label-light-warning font-weight-bold mr-2">
+                                                                    <i class="la la-calendar-check-o mr-1" style="font-size:14px;"></i>Supplier Deposit: <?php echo $group['PaymentOutSupplierDeposit']; ?>
+                                                                </span>
+                                                            <?php } ?>
+                                                            <?php if(!empty($group['PaymentOutSupplierFull'])) { ?>
+                                                                <span class="label label-inline label-light-primary font-weight-bold">
+                                                                    <i class="la la-calendar-check-o mr-1" style="font-size:14px;"></i>Supplier Full: <?php echo $group['PaymentOutSupplierFull']; ?>
+                                                                </span>
+                                                            <?php } ?>
+                                                        </div>
+                                                    <?php } ?>
                                                     <div class="checklist-container">
                                                         <?php foreach($group['checklists'] as $checklist) {
                                                             $is_checked = isset($completion_map[$group['product_id']][$checklist->ID]);
@@ -1409,6 +1375,58 @@
                                     </div>
                                 </div>
                             <?php } ?>
+
+                            <?php if(!empty($booking_logs)) { ?>
+                                <div class="row mt-5">
+                                    <div class="col-12">
+                                        <div class="card card-custom">
+                                        <div class="card-header flex-wrap py-2" style="background-color:#D7E2F2;">
+                                            <div class="card-title">
+                                                <h4 class="card-label mb-0" style="color:#6082B6; font-size: 1.1rem;">
+                                                    <i class="la la-file-alt"></i> <strong>Audit Log</strong>
+                                                </h4>
+                                            </div>
+                                        </div>
+                                        <div class="card-body p-0">
+                                            <div style="max-height: 500px; overflow-y: auto;">
+                                                <table class="table table-striped table-bordered mb-0" style="font-size: 0.85rem;">
+                                                    <thead style="position: sticky; top: 0; background: #f8f9fa; z-index: 1;">
+                                                        <tr>
+                                                            <th style="min-width: 140px;">Date/Time</th>
+                                                            <th style="min-width: 120px;">Changed By</th>
+                                                            <th style="min-width: 120px;">Field</th>
+                                                            <th>Old Value</th>
+                                                            <th>New Value</th>
+                                                            <th style="min-width: 90px;">Snapshot</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        <?php foreach($booking_logs as $log): ?>
+                                                        <tr>
+                                                            <td><?php echo date('d M Y H:i', strtotime($log['InsertDate'])); ?></td>
+                                                            <td><?php echo htmlspecialchars($log['AdminName'] ?? '-'); ?></td>
+                                                            <td><?php echo audit_log_field_label($log['Column']); ?></td>
+                                                            <td><?php echo audit_log_value($log['Column'], $log['CurrentData']); ?></td>
+                                                            <td><?php echo audit_log_value($log['Column'], $log['NewData']); ?></td>
+                                                            <td>
+                                                                <?php if (!empty($log['SnapshotPDF'])): ?>
+                                                                    <a href="<?php echo base_url('Booking/View_Snapshot?file=' . basename($log['SnapshotPDF'])); ?>" target="_blank" title="View previous booking confirmation">
+                                                                        <i class="la la-file-pdf" style="font-size: 1.2rem;"></i> View PDF
+                                                                    </a>
+                                                                <?php else: ?>
+                                                                    -
+                                                                <?php endif; ?>
+                                                            </td>
+                                                        </tr>
+                                                        <?php endforeach; ?>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            <?php } ?>
                         </div>
                     </div>
                 </div>
@@ -1427,6 +1445,50 @@
         </select>
     </div>
 <?php }?>
+
+<?php function audit_log_field_label($column) {
+    $labels = array(
+        'Status' => 'Status',
+        'NetTotal' => 'Net Total',
+        'GrossProfit' => 'Gross Profit',
+        'StartDate' => 'Start Date',
+        'EndDate' => 'End Date',
+        'BookingConfirmationFooter' => 'Booking Confirmation Footer',
+        'TravelVoucherFooter' => 'Travel Voucher Footer',
+        'KeyContacts' => 'Key Contacts',
+        'SpecialRemarks' => 'Special Remarks',
+        'PaymentDueDate' => 'Payment Due Date',
+        'CustomerID' => 'Customer',
+        'SalesInCharge' => 'Sales In Charge',
+        'OverallStatus' => 'Overall Status',
+        'AllowReview' => 'Allow Customer Review',
+        'CancellationReasonID' => 'Cancellation Reason',
+    );
+    return isset($labels[$column]) ? $labels[$column] : ucwords(str_replace('_', ' ', preg_replace('/([a-z])([A-Z])/', '$1 $2', $column)));
+} ?>
+
+<?php function audit_log_value($column, $value) {
+    if ($value === null || $value === '') return '-';
+
+    $html_fields = array('BookingConfirmationFooter', 'TravelVoucherFooter', 'KeyContacts', 'SpecialRemarks');
+
+    if (in_array($column, $html_fields)) {
+        $plain = trim(strip_tags($value));
+        if ($plain === '') return '-';
+        if (strlen($plain) > 80) {
+            $id = 'audit_' . uniqid();
+            return '<span id="' . $id . '_short">' . htmlspecialchars(substr($plain, 0, 80)) . '... <a href="javascript:void(0)" onclick="document.getElementById(\'' . $id . '_short\').style.display=\'none\';document.getElementById(\'' . $id . '_full\').style.display=\'inline\';">show more</a></span>'
+                 . '<span id="' . $id . '_full" style="display:none;">' . htmlspecialchars($plain) . ' <a href="javascript:void(0)" onclick="document.getElementById(\'' . $id . '_full\').style.display=\'none\';document.getElementById(\'' . $id . '_short\').style.display=\'inline\';">show less</a></span>';
+        }
+        return htmlspecialchars($plain);
+    }
+
+    $escaped = htmlspecialchars($value);
+    if (strlen($value) > 100) {
+        return htmlspecialchars(substr($value, 0, 100)) . '...';
+    }
+    return $escaped;
+} ?>
 
 <script>
 
@@ -1567,9 +1629,27 @@
 
     }
 
-    function Reset_PaymentOutSupplierDeposit() {
+    function Reset_ProductSupplierDeposit(booking_product_id) {
 
-        $('input[name="PaymentOutSupplierDeposit"]').val('');
+        $(`#PaymentOutSupplierDeposit-${booking_product_id}`).val('');
+
+    }
+
+    function Toggle_PaymentOutFields(booking_product_id) {
+
+        if($(`#DisableChecklistPaymentOut-${booking_product_id}`).is(':checked')) {
+
+            $(`#PaymentOutSection-${booking_product_id}`).hide();
+
+            $(`#PaymentOutSupplierFull-${booking_product_id}`).val('');
+
+            $(`#PaymentOutSupplierDeposit-${booking_product_id}`).val('');
+
+        } else {
+
+            $(`#PaymentOutSection-${booking_product_id}`).show();
+
+        }
 
     }
 
@@ -1876,6 +1956,80 @@
 
                 '</div>' +
 
+                '<br>' +
+
+                '<div class="row">' +
+
+                    '<div class="col-md-12">' +
+
+                        '<label class="checkbox checkbox-outline checkbox-primary">' +
+
+                            '<input disabled type="checkbox" id="DisableChecklistPaymentOut-'+ booking_product_id +'" onchange="Toggle_PaymentOutFields('+ booking_product_id +')">' +
+
+                            '<span></span>' +
+
+                            '&nbsp;Disable Checklist & Payment Out' +
+
+                        '</label>' +
+
+                    '</div>' +
+
+                '</div>' +
+
+                '<div id="PaymentOutSection-'+ booking_product_id +'">' +
+
+                '<br>' +
+
+                '<div class="row">' +
+
+                    '<div class="col-md-6 mb-7 mb-md-0">' +
+
+                        '<label>Payment Out to Supplier (Deposit)' +
+
+                            '<a onclick="Reset_ProductSupplierDeposit('+ booking_product_id +')" class="btn btn-icon btn-light-warning btn-xs">' +
+
+                                '<i class="la la-undo"></i>' +
+
+                            '</a>' +
+
+                        '</label>' +
+
+                        '<div class="input-icon">' +
+
+                            '<input disabled readonly type="text" id="PaymentOutSupplierDeposit-'+ booking_product_id +'" autocomplete="off" class="form-control">' +
+
+                            '<span>' +
+
+                                '<i class="la la-calendar"></i>' +
+
+                            '</span>' +
+
+                        '</div>' +
+
+                    '</div>' +
+
+                    '<div class="col-md-6">' +
+
+                        '<label>Payment Out to Supplier (Full) <span style="color:red;">*</span></label>' +
+
+                        '<div class="input-icon">' +
+
+                            '<input disabled readonly type="text" id="PaymentOutSupplierFull-'+ booking_product_id +'" autocomplete="off" class="form-control">' +
+
+                            '<span>' +
+
+                                '<i class="la la-calendar"></i>' +
+
+                            '</span>' +
+
+                        '</div>' +
+
+                    '</div>' +
+
+                '</div>' +
+
+                '</div>' +
+
             '</div>' +
 
         '</div>');
@@ -1883,6 +2037,10 @@
         if(window.location.href == '<?php echo base_url('Booking/Create'); ?>' || window.location.href.split('?')[0] == '<?php echo base_url('Booking/Create'); ?>' || (window.location.href.split('?')[0] == '<?php echo base_url('Booking/Update'); ?>' || window.location.href.split('?')[0] == '<?php echo base_url('Booking/Duplicate'); ?>') && count > booking_products.length) {
 
             $(`#ProductID-${booking_product_id}`).selectpicker();
+
+            $(`#PaymentOutSupplierFull-${booking_product_id}`).datepicker({format: 'dd/mm/yyyy', autoclose: true, todayHighlight: true});
+
+            $(`#PaymentOutSupplierDeposit-${booking_product_id}`).datepicker({format: 'dd/mm/yyyy', autoclose: true, todayHighlight: true});
 
         }
 
@@ -1930,9 +2088,29 @@
 
             var total = quantity * price;
 
+            var disable_checklist = $(`#DisableChecklistPaymentOut-${product_sequence[i]}`).is(':checked') ? 1 : 0;
+            var supplier_full = null;
+            var supplier_deposit = null;
+            if(!disable_checklist) {
+                supplier_full = $(`#PaymentOutSupplierFull-${product_sequence[i]}`).val();
+                supplier_deposit = $(`#PaymentOutSupplierDeposit-${product_sequence[i]}`).val();
+                if(supplier_full && supplier_full != '') {
+                    var parts = supplier_full.split('/');
+                    supplier_full = `${parts[2]}-${parts[1]}-${parts[0]}`;
+                } else {
+                    supplier_full = null;
+                }
+                if(supplier_deposit && supplier_deposit != '') {
+                    var parts = supplier_deposit.split('/');
+                    supplier_deposit = `${parts[2]}-${parts[1]}-${parts[0]}`;
+                } else {
+                    supplier_deposit = null;
+                }
+            }
+
             if(window.location.href == '<?php echo base_url('Booking/Create'); ?>' || window.location.href.split('?')[0] == '<?php echo base_url('Booking/Create'); ?>' || window.location.href.split('?')[0] == '<?php echo base_url('Booking/Duplicate'); ?>' || (window.location.href.split('?')[0] == '<?php echo base_url('Booking/Update'); ?>' && jQuery.inArray(product_sequence[i], array) == -1)) {
 
-                booking_products.push({ProductID:product_id, ProductCode:product_code, Name:name, Description:description, Quantity:quantity, Price:price, Total:total, InsertBy:<?php echo $this->session->userdata('admin_id') ?>, InsertDate:'<?php echo date('Y-m-d H:i:s') ?>'});
+                booking_products.push({ProductID:product_id, ProductCode:product_code, Name:name, Description:description, Quantity:quantity, Price:price, Total:total, PaymentOutSupplierFull:supplier_full, PaymentOutSupplierDeposit:supplier_deposit, disable_checklist_payment_out:disable_checklist, InsertBy:<?php echo $this->session->userdata('admin_id') ?>, InsertDate:'<?php echo date('Y-m-d H:i:s') ?>'});
 
             }
 
@@ -1955,6 +2133,12 @@
             $(`#Quantity-${booking_product_id}`).removeAttr('disabled');
 
             $(`#Price-${booking_product_id}`).removeAttr('disabled');
+
+            $(`#PaymentOutSupplierFull-${booking_product_id}`).removeAttr('disabled');
+
+            $(`#PaymentOutSupplierDeposit-${booking_product_id}`).removeAttr('disabled');
+
+            $(`#DisableChecklistPaymentOut-${booking_product_id}`).removeAttr('disabled');
 
         }
 
@@ -2316,13 +2500,10 @@
                 validateLength('ReservationNumber', 'ReservationNumberError', 20);
                 validateLength('Mobile', 'MobileError', 25, true);
 
-                var payment_out_supplier_full = $('input[name="PaymentOutSupplierFull"]').val();
-
                 const fields = {
                     'Country code': country_code,
                     'Reservation number': reservation_number,
                     'Full payment deadline': full_payment_deadline,
-                    'Payment out to supplier (full)': payment_out_supplier_full,
                     'Customer': customer,
                     'Mobile': mobile,
                     'Travel date': travel_date,
@@ -2371,6 +2552,18 @@
                                         Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', 'Please Insert All Required Product Information', null);
 
                                         return;
+
+                                    }
+
+                                    if(!$(`#DisableChecklistPaymentOut-${booking_product_ids[i]}`).is(':checked')) {
+
+                                        if($(`#PaymentOutSupplierFull-${booking_product_ids[i]}`).val() == null || $(`#PaymentOutSupplierFull-${booking_product_ids[i]}`).val() == '') {
+
+                                            Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', 'Please Insert Payment Out to Supplier (Full) For All Products', null);
+
+                                            return;
+
+                                        }
 
                                     }
 
@@ -2431,26 +2624,6 @@
                                         deposit_deadline = deposit_deadline.split('/');
 
                                         booking[0]['DepositDeadline'] = `${deposit_deadline[2]}-${deposit_deadline[1]}-${deposit_deadline[0]}`;
-
-                                    }
-
-                                    var payment_out_supplier_full = $('input[name="PaymentOutSupplierFull"]').val();
-
-                                    if(payment_out_supplier_full != '') {
-
-                                        payment_out_supplier_full = payment_out_supplier_full.split('/');
-
-                                        booking[0]['PaymentOutSupplierFull'] = `${payment_out_supplier_full[2]}-${payment_out_supplier_full[1]}-${payment_out_supplier_full[0]}`;
-
-                                    }
-
-                                    var payment_out_supplier_deposit = $('input[name="PaymentOutSupplierDeposit"]').val();
-
-                                    if(payment_out_supplier_deposit != '') {
-
-                                        payment_out_supplier_deposit = payment_out_supplier_deposit.split('/');
-
-                                        booking[0]['PaymentOutSupplierDeposit'] = `${payment_out_supplier_deposit[2]}-${payment_out_supplier_deposit[1]}-${payment_out_supplier_deposit[0]}`;
 
                                     }
 
@@ -2590,21 +2763,15 @@
 
                                             if(dirty_fields[i].localName == 'select' || Object.values(dirty_fields[i])[0].hasOwnProperty('dirtyInitialValue')) {
 
-                                                var key = dirty_fields[i].id == 'kt_datepicker_4_3' || dirty_fields[i].id == 'kt_datepicker_4_4' || dirty_fields[i].id == 'kt_datepicker_5' || dirty_fields[i].id == 'kt_datepicker_6' || dirty_fields[i].id == 'kt_datepicker_7' ? dirty_fields[i].name : dirty_fields[i].id;
+                                                var key = dirty_fields[i].id == 'kt_datepicker_4_3' || dirty_fields[i].id == 'kt_datepicker_4_4' || dirty_fields[i].id == 'kt_datepicker_5' ? dirty_fields[i].name : dirty_fields[i].id;
 
-                                                var value = dirty_fields[i].id == 'kt_datepicker_4_3' || dirty_fields[i].id == 'kt_datepicker_4_4' || dirty_fields[i].id == 'kt_datepicker_5' || dirty_fields[i].id == 'kt_datepicker_6' || dirty_fields[i].id == 'kt_datepicker_7' ? `${((dirty_fields[i].value).split('/'))[2]}-${((dirty_fields[i].value).split('/'))[1]}-${((dirty_fields[i].value).split('/'))[0]}` : (dirty_fields[i].value).toUpperCase();
+                                                var value = dirty_fields[i].id == 'kt_datepicker_4_3' || dirty_fields[i].id == 'kt_datepicker_4_4' || dirty_fields[i].id == 'kt_datepicker_5' ? `${((dirty_fields[i].value).split('/'))[2]}-${((dirty_fields[i].value).split('/'))[1]}-${((dirty_fields[i].value).split('/'))[0]}` : (dirty_fields[i].value).toUpperCase();
 
                                                 // Booking
 
                                                 // Action : Update
 
-                                                if(key == 'CountryCodeID' && Object.values(dirty_fields[i])[country_codes.length + 1].hasOwnProperty('dirtyInitialValue') || key == 'ReservationNumber' || key == 'DepositDeadline' || key == 'FullPaymentDeadline' || key == 'AdditionalPaymentDeadline' || key == 'PaymentOutSupplierFull' || key == 'PaymentOutSupplierDeposit' || key == 'Customer' || key == 'Mobile' || key == 'Destination' && Object.values(dirty_fields[i])[categories.length + 1].hasOwnProperty('dirtyInitialValue') || key == 'SalesAgent' && Object.values(dirty_fields[i])[admins.length + 1].hasOwnProperty('dirtyInitialValue') || key == 'BookingRemark' || key == 'Subtotal' || key == 'ChatLanguage' && Object.values(dirty_fields[i])[4].hasOwnProperty('dirtyInitialValue') || key == 'Source' && Object.values(dirty_fields[i])[sources.length + 1].hasOwnProperty('dirtyInitialValue') || key == 'BookingConfirmationTitle' && Object.values(dirty_fields[i])[4].hasOwnProperty('dirtyInitialValue')) {
-
-                                                    if(key == 'Subtotal') {
-
-                                                        value = value.replace(/,/g, '');
-
-                                                    }
+                                                if(key == 'CountryCodeID' && Object.values(dirty_fields[i])[country_codes.length + 1].hasOwnProperty('dirtyInitialValue') || key == 'ReservationNumber' || key == 'DepositDeadline' || key == 'FullPaymentDeadline' || key == 'AdditionalPaymentDeadline' || key == 'Customer' || key == 'Mobile' || key == 'Destination' && Object.values(dirty_fields[i])[categories.length + 1].hasOwnProperty('dirtyInitialValue') || key == 'SalesAgent' && Object.values(dirty_fields[i])[admins.length + 1].hasOwnProperty('dirtyInitialValue') || key == 'BookingRemark' || key == 'ChatLanguage' && Object.values(dirty_fields[i])[4].hasOwnProperty('dirtyInitialValue') || key == 'Source' && Object.values(dirty_fields[i])[sources.length + 1].hasOwnProperty('dirtyInitialValue') || key == 'BookingConfirmationTitle' && Object.values(dirty_fields[i])[4].hasOwnProperty('dirtyInitialValue')) {
 
                                                     if(key == 'BookingOP' && value == '') {
 
@@ -2666,7 +2833,7 @@
 
                                                         default:
 
-                                                            if(key == 'DepositDeadline' || key == 'FullPaymentDeadline' || key == 'AdditionalPaymentDeadline' || key == 'PaymentOutSupplierFull' || key == 'PaymentOutSupplierDeposit') {
+                                                            if(key == 'DepositDeadline' || key == 'FullPaymentDeadline' || key == 'AdditionalPaymentDeadline') {
 
                                                                 var date = ((Object.values(dirty_fields[i])[0]).dirtyInitialValue).split('/');
 
@@ -2744,12 +2911,21 @@
 
                                                         key = key.split('-');
 
-                                                        if(key[0] == 'ProductID' && Object.values(dirty_fields[i])[products.length + 1].hasOwnProperty('dirtyInitialValue') || key[0] == 'ProductCode' || key[0] == 'Description' || key[0] == 'Quantity' || key[0] == 'Price' || key[0] == 'Total') {
+                                                        if(key[0] == 'ProductID' && Object.values(dirty_fields[i])[products.length + 1].hasOwnProperty('dirtyInitialValue') || key[0] == 'ProductCode' || key[0] == 'Description' || key[0] == 'Quantity' || key[0] == 'Price' || key[0] == 'Total' || key[0] == 'PaymentOutSupplierFull' || key[0] == 'PaymentOutSupplierDeposit') {
 
                                                             if(key[0] == 'Price' || key[0] == 'Total') {
 
                                                                 value = value.replace(/,/g, '');
 
+                                                            }
+
+                                                            if(key[0] == 'PaymentOutSupplierFull' || key[0] == 'PaymentOutSupplierDeposit') {
+                                                                if(value && value != '') {
+                                                                    var date_parts = value.split('/');
+                                                                    value = `${date_parts[2]}-${date_parts[1]}-${date_parts[0]}`;
+                                                                } else {
+                                                                    value = null;
+                                                                }
                                                             }
 
                                                             booking_products[1].push({BookingProductID:key[1], [key[0]]:value, UpdateBy:<?php echo $this->session->userdata('admin_id') ?>, UpdateDate:'<?php echo date('Y-m-d H:i:s') ?>'});
@@ -2774,6 +2950,14 @@
 
                                     }
 
+
+                                    // Collect disable_checklist_payment_out checkbox state for all existing booking products
+                                    var existing_bp_ids = <?php echo json_encode(array_map(function($bp) { return $bp->BookingProductID; }, $booking_products ?? [])); ?>;
+                                    for(var bp = 0; bp < existing_bp_ids.length; bp++) {
+                                        var bp_id = existing_bp_ids[bp];
+                                        var is_disabled = $(`#DisableChecklistPaymentOut-${bp_id}`).is(':checked') ? 1 : 0;
+                                        booking_products[1].push({BookingProductID:bp_id, disable_checklist_payment_out:is_disabled, UpdateBy:<?php echo $this->session->userdata('admin_id') ?>, UpdateDate:'<?php echo date('Y-m-d H:i:s') ?>'});
+                                    }
 
                                     var CustomerID = $('input[name="CustomerID"]').val();
 
@@ -3158,6 +3342,24 @@
 
                 $(`#Total-${booking_products[i].BookingProductID}`).val(total);
 
+                // Set disable checklist checkbox state
+                $(`#DisableChecklistPaymentOut-${booking_products[i].BookingProductID}`).removeAttr('disabled');
+                if(booking_products[i].disable_checklist_payment_out == 1) {
+                    $(`#DisableChecklistPaymentOut-${booking_products[i].BookingProductID}`).prop('checked', true);
+                    $(`#PaymentOutSection-${booking_products[i].BookingProductID}`).hide();
+                }
+
+                if(booking_products[i].PaymentOutSupplierFull) {
+                    $(`#PaymentOutSupplierFull-${booking_products[i].BookingProductID}`).val(booking_products[i].PaymentOutSupplierFull);
+                }
+                if(booking_products[i].PaymentOutSupplierDeposit) {
+                    $(`#PaymentOutSupplierDeposit-${booking_products[i].BookingProductID}`).val(booking_products[i].PaymentOutSupplierDeposit);
+                }
+                $(`#PaymentOutSupplierFull-${booking_products[i].BookingProductID}`).removeAttr('disabled');
+                $(`#PaymentOutSupplierDeposit-${booking_products[i].BookingProductID}`).removeAttr('disabled');
+                $(`#PaymentOutSupplierFull-${booking_products[i].BookingProductID}`).datepicker({format: 'dd/mm/yyyy', autoclose: true, todayHighlight: true});
+                $(`#PaymentOutSupplierDeposit-${booking_products[i].BookingProductID}`).datepicker({format: 'dd/mm/yyyy', autoclose: true, todayHighlight: true});
+
                 if((i + 1) < booking_products.length) {
 
                     booking_product_id = parseInt(booking_products[i + 1].BookingProductID);
@@ -3187,6 +3389,24 @@
                 $(`#Price-${booking_product_id - 1}`).removeAttr('disabled');
 
                 $(`#Total-${booking_product_id - 1}`).val(total);
+
+                // Set disable checklist checkbox state for Duplicate
+                $(`#DisableChecklistPaymentOut-${booking_product_id - 1}`).removeAttr('disabled');
+                if(booking_products[i].disable_checklist_payment_out == 1) {
+                    $(`#DisableChecklistPaymentOut-${booking_product_id - 1}`).prop('checked', true);
+                    $(`#PaymentOutSection-${booking_product_id - 1}`).hide();
+                }
+
+                if(booking_products[i].PaymentOutSupplierFull) {
+                    $(`#PaymentOutSupplierFull-${booking_product_id - 1}`).val(booking_products[i].PaymentOutSupplierFull);
+                }
+                if(booking_products[i].PaymentOutSupplierDeposit) {
+                    $(`#PaymentOutSupplierDeposit-${booking_product_id - 1}`).val(booking_products[i].PaymentOutSupplierDeposit);
+                }
+                $(`#PaymentOutSupplierFull-${booking_product_id - 1}`).removeAttr('disabled');
+                $(`#PaymentOutSupplierDeposit-${booking_product_id - 1}`).removeAttr('disabled');
+                $(`#PaymentOutSupplierFull-${booking_product_id - 1}`).datepicker({format: 'dd/mm/yyyy', autoclose: true, todayHighlight: true});
+                $(`#PaymentOutSupplierDeposit-${booking_product_id - 1}`).datepicker({format: 'dd/mm/yyyy', autoclose: true, todayHighlight: true});
 
             }
 
@@ -4461,7 +4681,7 @@ $(document).ready(function() {
     <?php if(current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Create') || current_url() == base_url('Booking/Duplicate')) { ?>
     // Room Management Functions
     var roomsList = [];
-    var roomBookingId = <?php echo isset($BookingID) ? $BookingID : 'null'; ?>;
+    var roomBookingId = <?php echo (isset($BookingID) && $BookingID !== 'NA') ? $BookingID : 'null'; ?>;
     var tempRoomCounter = 0;
 
     function getBookingPax() {

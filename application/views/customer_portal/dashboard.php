@@ -1041,6 +1041,12 @@
                         (<?php echo count($completed_bookings); ?>)
                     </span>
                 </button>
+                <button class="tab-button" data-tab="cancelled">
+                    Cancel Bookings
+                    <span class="bookings-count" id="count-cancelled">
+                        (<?php echo count($cancelled_bookings); ?>)
+                    </span>
+                </button>
             </div>
 
             <!-- Upcoming Bookings Tab -->
@@ -1188,6 +1194,71 @@
                     <div class="pagination-container" id="pagination-completed"></div>
                 <?php endif; ?>
             </div>
+
+            <!-- Cancelled Bookings Tab -->
+            <div class="tab-content" id="tab-cancelled">
+                <?php if (empty($cancelled_bookings)): ?>
+                    <div class="empty-state" id="empty-cancelled-default">
+                        <i class="la la-ban"></i>
+                        <h3>No Cancelled Bookings</h3>
+                        <p>You don't have any cancelled bookings.</p>
+                    </div>
+                <?php else: ?>
+                    <div class="bookings-grid" id="bookings-cancelled" data-original-count="<?php echo count($cancelled_bookings); ?>">
+                        <?php foreach ($cancelled_bookings as $booking): ?>
+                            <div class="booking-card" data-booking-id="<?php echo htmlspecialchars($booking['BookingID'] ?? 'N/A'); ?>">
+                                <div class="booking-header">
+                                    <div class="booking-number">
+                                        <?php echo htmlspecialchars($booking['BookingNumber'] ?? 'N/A'); ?>
+                                    </div>
+                                    <span class="booking-status <?php echo $booking['status_display']['class']; ?>">
+                                        <?php echo $booking['status_display']['text']; ?>
+                                    </span>
+                                </div>
+                                <div class="booking-details">
+                                    <div class="detail-row">
+                                        <span class="detail-label">Destination</span>
+                                        <span class="detail-value"><?php echo htmlspecialchars($booking['DestinationName'] ?? 'N/A'); ?></span>
+                                    </div>
+                                    <?php if (!empty($booking['StartDate'])): ?>
+                                    <div class="detail-row">
+                                        <span class="detail-label">Travel Date</span>
+                                        <span class="detail-value">
+                                            <?php echo date('M d, Y', strtotime($booking['StartDate'])); ?>
+                                            <?php if (!empty($booking['EndDate'])): ?>
+                                                - <?php echo date('M d, Y', strtotime($booking['EndDate'])); ?>
+                                            <?php endif; ?>
+                                        </span>
+                                    </div>
+                                    <?php endif; ?>
+                                    <?php if (!empty($booking['PaxInfo'])): ?>
+                                    <div class="detail-row">
+                                        <span class="detail-label">Travel Pax</span>
+                                        <span class="detail-value">
+                                            <?php echo htmlspecialchars($booking['PaxInfo']); ?>
+                                        </span>
+                                    </div>
+                                    <?php endif; ?>
+                                    <?php if (!empty($booking['NetTotal'])): ?>
+                                    <div class="detail-row">
+                                        <span class="detail-label">Total Amount</span>
+                                        <span class="detail-value amount">
+                                            <?php echo number_format($booking['NetTotal'], 2); ?>
+                                        </span>
+                                    </div>
+                                    <?php endif; ?>
+                                </div>
+                                <a href="<?php echo base_url('customer/booking/' . urlencode($booking['Token'] ?? '')); ?>" class="booking-card-cta">
+                                    <i class="la la-eye"></i> View Details
+                                </a>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+
+                    <!-- Pagination -->
+                    <div class="pagination-container" id="pagination-cancelled"></div>
+                <?php endif; ?>
+            </div>
         </div>
     </div>
 
@@ -1226,6 +1297,7 @@
             // Initialize pagination and search for both tabs
             initializeTab('upcoming');
             initializeTab('completed');
+            initializeTab('cancelled');
 
             // Setup global search
             const globalSearchInput = document.getElementById('global-search');
@@ -1327,6 +1399,7 @@
             // Apply search to both tabs but only show results for active tab
             filterAndPaginate('upcoming', activeTabName === 'upcoming');
             filterAndPaginate('completed', activeTabName === 'completed');
+            filterAndPaginate('cancelled', activeTabName === 'cancelled');
             
             // Update tab counts
             updateTabCounts();
@@ -1446,6 +1519,15 @@
             if (completedContainer) {
                 const filteredCount = completedContainer.dataset.filteredCount || completedContainer.dataset.originalCount || 0;
                 const countElement = document.getElementById('count-completed');
+                if (countElement) {
+                    countElement.textContent = `(${filteredCount})`;
+                }
+            }
+
+            const cancelledContainer = document.getElementById('bookings-cancelled');
+            if (cancelledContainer) {
+                const filteredCount = cancelledContainer.dataset.filteredCount || cancelledContainer.dataset.originalCount || 0;
+                const countElement = document.getElementById('count-cancelled');
                 if (countElement) {
                     countElement.textContent = `(${filteredCount})`;
                 }

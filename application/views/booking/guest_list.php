@@ -308,8 +308,8 @@
 										<thead>
 											<tr style="background-color:#f5c518; color:#333;">
 												<th style="font-weight:bold; padding:12px; width:35%;">Name on the Passport / Identification Card</th>
-												<th style="font-weight:bold; padding:12px; width:32.5%;">First / Given Name</th>
-												<th style="font-weight:bold; padding:12px; width:32.5%;">Family Name / Surname</th>
+												<th style="font-weight:bold; padding:12px; width:32.5%;">First Name</th>
+												<th style="font-weight:bold; padding:12px; width:32.5%;">Last Name</th>
 											</tr>
 										</thead>
 										<tbody>
@@ -320,35 +320,12 @@
 											<tr><td>Juan M. Dela Cruz</td><td>Juan M</td><td>Dela Cruz</td></tr>
 											<tr><td>Chalita Sakornchan</td><td>Chalita</td><td>Sakornchan</td></tr>
 											<tr><td>Nguyen Ho Minh Lam</td><td>Ho Minh Lam</td><td>Nguyen</td></tr>
+											<tr><td>John Smith</td><td>John</td><td>Smith</td></tr>
 										</tbody>
 									</table>
 								</div>
 
-								<h5 style="color:#d4a017; font-weight:bold;">Multiple names formatting</h5>
-								<p>Our system does not accept symbols, special characters and has a limit on the length of our guest's names.</p>
-
-								<h6><strong>1. Names with alias '@', 'A/P' or 'A/L'</strong></h6>
-								<p style="margin-left:20px;">If your name is spelled with a '@' or second name in your Identification Card, remove the '@', insert a space between the two names.</p>
-								<p style="margin-left:20px;">If your name contains 'A/P' or 'A/L' remove it unless it appears in the 'Name' section of your passport.</p>
-								<p><strong>Examples:</strong></p>
-								<div class="table-responsive mb-4">
-									<table class="table table-bordered text-center" style="border:1px solid #ddd;">
-										<thead>
-											<tr style="background-color:#f5c518; color:#333;">
-												<th style="font-weight:bold; padding:12px; width:35%;">Name on the Passport / Identification Card</th>
-												<th style="font-weight:bold; padding:12px; width:32.5%;">First / Given Name</th>
-												<th style="font-weight:bold; padding:12px; width:32.5%;">Family Name / Surname</th>
-											</tr>
-										</thead>
-										<tbody>
-											<tr><td>Aliff@Imran Bin Ahmad</td><td>Aliff Imran</td><td>Bin Ahmad</td></tr>
-											<tr><td>Lim Swee Teng @ Lim Swee Tin</td><td>Lim Swee Teng</td><td>Lim Swee Tin</td></tr>
-											<tr><td>Manimala A/P Murthy Muthu</td><td>Manimala</td><td>AP Murthy Muthu</td></tr>
-										</tbody>
-									</table>
-								</div>
-
-								<p class="mt-3 mb-0"><strong style="color: red;">* Providing wrong name not according to guideline will be denied from check in hotel / flight.</strong></p>
+								<p class="mt-3 mb-0"><strong style="color: red;">* Providing wrong name not according to guideline and wrong information will be denied from check in hotel / flight</strong></p>
 
 							</div>
 						</div>
@@ -356,7 +333,7 @@
 				</div>
 				<!-- End Name Formatting Guidelines -->
 
-	                <form id="form" action="<?php if($_SERVER['SERVER_NAME'] != 'gl.holidaygogogo.com') { echo base_url('Guest_List?gl=') . $this->input->get('gl'); } else { echo 'https://gl.holidaygogogo.com/?gl=' . $this->input->get('gl'); } ?>" method="post" enctype="multipart/form-data">
+	                <form id="form" action="<?php if($_SERVER['SERVER_NAME'] != 'gl.holidaygogogo.com') { echo base_url('Guest_List?gl=') . $this->input->get('gl'); } else { echo 'https://gl.holidaygogogo.com/?gl=' . $this->input->get('gl'); } ?>" method="post" enctype="multipart/form-data" novalidate>
 					<div id="benchmark" class="row">
 						<?php $counter = 1;
 							$adult = 0;
@@ -427,8 +404,8 @@
 											<br>
 											<div class="row">
 												<div class="col-md-6 mb-7 mb-md-0">
-													<label id="<?php echo 'nationality_label-' . $guest->GuestListID; ?>">Nationality <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>
-													<select <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> name="nationalities[]" id="<?php echo 'nationality-' . $guest->GuestListID; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" class="form-control">
+													<label id="<?php echo 'nationality_label-' . $guest->GuestListID; ?>">Nationality</label>
+													<select <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> name="nationalities[]" id="<?php echo 'nationality-' . $guest->GuestListID; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" class="form-control">
 														<option selected disabled value="">--SELECT NATIONALITY--</option>
 														<?php 
 															$malaysia_id = null;
@@ -487,21 +464,21 @@
 													</div>
 													<div class="col-md-6">
 														<label id="<?php echo 'passport_issue_date_label-' . $guest->GuestListID; ?>">Passport Issue Date <?php if($is_passport_required) { echo '<span style="color:red;">*</span>'; } ?></label>
-														<input <?php if($is_passport_required) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="passport_issue_dates[]" id="<?php echo 'passport_issue_date-' . $guest->GuestListID; ?>" value="<?php echo !empty($guest->PassportIssueDate) ? date('d/m/Y', strtotime($guest->PassportIssueDate)) : ''; ?>" autocomplete="off" class="form-control kt_datepicker_4_3">
+														<input <?php if($is_passport_required) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="passport_issue_dates[]" id="<?php echo 'passport_issue_date-' . $guest->GuestListID; ?>" value="<?php echo !empty($guest->PassportIssueDate) ? date('d/m/Y', strtotime($guest->PassportIssueDate)) : ''; ?>" autocomplete="off" class="form-control passport_issue_datepicker">
 													</div>
 												</div>
 												<br>
 												<div class="row">
 													<div class="col-md-6 mb-7 mb-md-0">
 														<label id="<?php echo 'passport_expiry_date_label-' . $guest->GuestListID; ?>">Passport Expiry Date <?php if($is_passport_required) { echo '<span style="color:red;">*</span>'; } ?></label>
-														<input <?php if($is_passport_required) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="passport_expiry_dates[]" id="<?php echo 'passport_expiry_date-' . $guest->GuestListID; ?>" value="<?php echo !empty($guest->PassportExpiryDate) ? date('d/m/Y', strtotime($guest->PassportExpiryDate)) : ''; ?>" autocomplete="off" class="form-control kt_datepicker_4_3">
+														<input <?php if($is_passport_required) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="passport_expiry_dates[]" id="<?php echo 'passport_expiry_date-' . $guest->GuestListID; ?>" value="<?php echo !empty($guest->PassportExpiryDate) ? date('d/m/Y', strtotime($guest->PassportExpiryDate)) : ''; ?>" autocomplete="off" class="form-control kt_datepicker_passport_expiry">
 													</div>
 													<div class="col-md-6">
 														<label id="<?php echo 'passport_copy_label-' . $guest->GuestListID; ?>">Passport Copy <?php if($is_passport_required) { echo '<span style="color:red;">*</span>'; } ?></label>
 														<div class="d-flex align-items-center">
 															<div class="custom-file flex-grow-1">
 																<input type="file" name="passport_copies[]" id="<?php echo 'passport_copy-' . $guest->GuestListID; ?>" <?php if($is_passport_required) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> class="custom-file-input passport-copy-upload" accept=".pdf,.jpg,.jpeg,.png,.gif" data-guest-id="<?php echo $guest->GuestListID; ?>">
-																<label class="custom-file-label" for="<?php echo 'passport_copy-' . $guest->GuestListID; ?>">Choose file</label>
+																<label class="custom-file-label" for="<?php echo 'passport_copy-' . $guest->GuestListID; ?>"><?php echo !empty($guest->PassportCopy) ? 'File uploaded' : 'Choose file'; ?></label>
 															</div>
 															<?php if(!empty($guest->PassportCopy)) { ?>
 																<button type="button" class="btn btn-sm btn-light-primary ml-2" onclick="viewPassportCopy('<?php echo base_url($guest->PassportCopy); ?>', '<?php echo basename($guest->PassportCopy); ?>', '<?php echo $counter; ?>')" style="flex-shrink: 0;" title="View Uploaded Passport">
@@ -953,7 +930,7 @@
 			var relationship = $(`#relationship-${guest_list_id}`).val();
 			var nominee_contact = $(`#nominee_contact-${guest_list_id}`).val();
 
-			if(name != '' || last_name != '' || gender != null || date_of_birth != '' || nationality != null || identification_number != '' || passport_number != '' || country_code != null || mobile != '' || email != '' || marital_status != null || employment != '' || address != '' || postcode != '' || city != '' || state != '' || country != null || nominee_name != '' || nominee_identification_number != '' || relationship != '' || nominee_contact != '') {
+			if(name != '' || last_name != '' || gender != '' || date_of_birth != '' || identification_number != '' || passport_number != '' || mobile != '' || email != '' || marital_status != '' || employment != '' || address != '' || postcode != '' || city != '' || state != '' || country != '' || nominee_name != '' || nominee_identification_number != '' || relationship != '' || nominee_contact != '') {
 				$(`#name_label-${guest_list_id}`).html('First Name <span style="color:red;">*</span>');
 				$(`#name-${guest_list_id}`).prop('required', 'true');
 				$(`#last_name_label-${guest_list_id}`).html('Last Name <span style="color:red;">*</span>');
@@ -962,8 +939,6 @@
 				$(`#gender-${guest_list_id}`).prop('required', 'true');
 				$(`#date_of_birth_label-${guest_list_id}`).html('Date Of Birth <span style="color:red;">*</span>');
 				$(`#date_of_birth-${guest_list_id}`).prop('required', 'true');
-				$(`#nationality_label-${guest_list_id}`).html('Nationality <span style="color:red;">*</span>');
-				$(`#nationality-${guest_list_id}`).prop('required', 'true');
 				$(`#email_label-${guest_list_id}`).html('Email <span style="color:red;">*</span>');
 				$(`#email-${guest_list_id}`).prop('required', 'true');
 				$(`#country_code_label-${guest_list_id}`).html('Country Code <span style="color:red;">*</span>');
@@ -1083,8 +1058,6 @@
 				$(`#gender-${guest_list_id}`).removeAttr('required');
 				$(`#date_of_birth_label-${guest_list_id}`).html('Date Of Birth');
 				$(`#date_of_birth-${guest_list_id}`).removeAttr('required');
-				$(`#nationality_label-${guest_list_id}`).html('Nationality');
-				$(`#nationality-${guest_list_id}`).removeAttr('required');
 				$(`#email_label-${guest_list_id}`).html('Email');
 				$(`#email-${guest_list_id}`).removeAttr('required');
 				$(`#country_code_label-${guest_list_id}`).html('Country Code');
@@ -1205,14 +1178,14 @@
 									'</div>' +
 									'<div class="col-md-6">' +
 										'<label id="passport_issue_date_label-'+ guest_list_id +'">Passport Issue Date</label>' +
-										'<input type="text" name="new_passport_issue_dates[]" id="passport_issue_date-'+ guest_list_id +'" autocomplete="off" class="form-control kt_datepicker_4_3">' +
+										'<input type="text" name="new_passport_issue_dates[]" id="passport_issue_date-'+ guest_list_id +'" autocomplete="off" class="form-control passport_issue_datepicker">' +
 									'</div>' +
 								'</div>' +
 								'<br>' +
 								'<div class="row">' +
 									'<div class="col-md-6 mb-7 mb-md-0">' +
 										'<label id="passport_expiry_date_label-'+ guest_list_id +'">Passport Expiry Date</label>' +
-										'<input type="text" name="new_passport_expiry_dates[]" id="passport_expiry_date-'+ guest_list_id +'" autocomplete="off" class="form-control kt_datepicker_4_3">' +
+										'<input type="text" name="new_passport_expiry_dates[]" id="passport_expiry_date-'+ guest_list_id +'" autocomplete="off" class="form-control kt_datepicker_passport_expiry">' +
 									'</div>' +
 									'<div class="col-md-6">' +
 										'<label id="passport_copy_label-'+ guest_list_id +'">Passport Copy</label>' +
@@ -1374,8 +1347,7 @@
 			});
 			// Handle file input label - always show "Choose file"
 			$(`#passport_copy-${guest_list_id}`).on('change', function() {
-				// Keep label as "Choose file" - don't show filename
-				$(this).next('.custom-file-label').html('Choose file');
+				$(this).next('.custom-file-label').html('File uploaded');
 			});
 			// Initialize phone input for new guest with Malaysia as default
 			var malaysiaCountry = null;
@@ -1509,7 +1481,7 @@
 		}
 
 		$('input[type="submit"]').click(function() {
-			$('#form').submit(function(event) {
+			$('#form').off('submit').on('submit', function(event) {
 				event.preventDefault();
 				const swalWithBootstrapButtons = Swal.mixin({
 					customClass: {
@@ -1597,6 +1569,117 @@
 								$(`#relationship-${value.GuestListID}`).val(value.Relationship);
 							}
 						});
+
+						// Validate: if any field has a value for a guest, all required fields must be filled
+						var validation_errors = [];
+						var guest_counter = 1;
+
+						// Validate existing guests
+						$('input[name="guests[]"]').each(function() {
+							var gid = $(this).val();
+							if ($(`#guest-${gid}`).length == 0) return; // skip deleted existing guests
+							var name = $(`#name-${gid}`).val();
+							var last_name = $(`#last-name-${gid}`).val();
+							var gender = $(`#gender-${gid}`).val();
+							var dob = $(`#date_of_birth-${gid}`).val();
+							var email = $(`#email-${gid}`).val();
+							var country_code = $(`#country_code-${gid}`).val();
+							var mobile = $(`#mobile-${gid}`).val();
+							var identification_number = $(`#identification_number-${gid}`).val();
+							var nationality_text = $(`#nationality-${gid} option:selected`).text().toUpperCase();
+
+							var has_any = (name != '' || last_name != '' || (gender != '' && gender != null) || dob != '' || email != '' || mobile != '');
+
+							if (has_any) {
+								var missing = [];
+								if (name == '') missing.push('First Name');
+								if (last_name == '') missing.push('Last Name');
+								if (gender == '' || gender == null) missing.push('Gender');
+								if (dob == '') missing.push('Date Of Birth');
+								if (email == '') missing.push('Email');
+								if (country_code == '' || country_code == null) missing.push('Country Code');
+								if (mobile == '') missing.push('Mobile');
+								if (nationality_text == 'MALAYSIA' && (identification_number == '' || identification_number == null)) missing.push('Identification Number');
+								<?php if($guest_lists[0]->TravelInsuranceStatus == 'Y') { ?>
+								if ($(`#marital_status-${gid}`).val() == '' || $(`#marital_status-${gid}`).val() == null) missing.push('Marital Status');
+								if ($(`#employment-${gid}`).val() == '') missing.push('Employment');
+								if ($(`#address-${gid}`).val() == '') missing.push('Address');
+								if ($(`#postcode-${gid}`).val() == '') missing.push('Postcode');
+								if ($(`#city-${gid}`).val() == '') missing.push('City');
+								if ($(`#state-${gid}`).val() == '') missing.push('State');
+								if ($(`#country-${gid}`).val() == '' || $(`#country-${gid}`).val() == null) missing.push('Country');
+								if ($(`#nominee_name-${gid}`).val() == '') missing.push('Nominee Name');
+								if ($(`#nominee_contact-${gid}`).val() == '') missing.push('Nominee Contact');
+								if ($(`#nominee_identification_number-${gid}`).val() == '') missing.push('Nominee Identification Number');
+								if ($(`#relationship-${gid}`).val() == '') missing.push('Relationship');
+								<?php } ?>
+
+								if (missing.length > 0) {
+									validation_errors.push('Guest ' + guest_counter + ': ' + missing.join(', '));
+								}
+							}
+							guest_counter++;
+						});
+
+						// Validate new guests
+						$.each(new_guests, function(index, gid) {
+							if ($(`#guest-${gid}`).length == 0) return; // skip deleted new guests
+							var name = $(`#name-${gid}`).val();
+							var last_name = $(`#last-name-${gid}`).val();
+							var gender = $(`#gender-${gid}`).val();
+							var dob = $(`#date_of_birth-${gid}`).val();
+							var email = $(`#email-${gid}`).val();
+							var country_code = $(`#country_code-${gid}`).val();
+							var mobile = $(`#mobile-${gid}`).val();
+							var identification_number = $(`#identification_number-${gid}`).val();
+							var nationality_text = $(`#nationality-${gid} option:selected`).text().toUpperCase();
+
+							var has_any = (name != '' || last_name != '' || (gender != '' && gender != null) || dob != '' || email != '' || mobile != '');
+
+							if (has_any) {
+								var missing = [];
+								if (name == '') missing.push('First Name');
+								if (last_name == '') missing.push('Last Name');
+								if (gender == '' || gender == null) missing.push('Gender');
+								if (dob == '') missing.push('Date Of Birth');
+								if (email == '') missing.push('Email');
+								if (country_code == '' || country_code == null) missing.push('Country Code');
+								if (mobile == '') missing.push('Mobile');
+								if (nationality_text == 'MALAYSIA' && (identification_number == '' || identification_number == null)) missing.push('Identification Number');
+								<?php if($guest_lists[0]->TravelInsuranceStatus == 'Y') { ?>
+								if ($(`#marital_status-${gid}`).val() == '' || $(`#marital_status-${gid}`).val() == null) missing.push('Marital Status');
+								if ($(`#employment-${gid}`).val() == '') missing.push('Employment');
+								if ($(`#address-${gid}`).val() == '') missing.push('Address');
+								if ($(`#postcode-${gid}`).val() == '') missing.push('Postcode');
+								if ($(`#city-${gid}`).val() == '') missing.push('City');
+								if ($(`#state-${gid}`).val() == '') missing.push('State');
+								if ($(`#country-${gid}`).val() == '' || $(`#country-${gid}`).val() == null) missing.push('Country');
+								if ($(`#nominee_name-${gid}`).val() == '') missing.push('Nominee Name');
+								if ($(`#nominee_contact-${gid}`).val() == '') missing.push('Nominee Contact');
+								if ($(`#nominee_identification_number-${gid}`).val() == '') missing.push('Nominee Identification Number');
+								if ($(`#relationship-${gid}`).val() == '') missing.push('Relationship');
+								<?php } ?>
+
+								if (missing.length > 0) {
+									validation_errors.push('Guest ' + guest_counter + ': ' + missing.join(', '));
+								}
+							}
+							guest_counter++;
+						});
+
+						if (validation_errors.length > 0) {
+							Swal.fire({
+								width: 550,
+								background: 'url(<?php echo base_url('assets/image/sweetalert.jpg') ?>)',
+								icon: 'error',
+								title: 'Please complete all required fields',
+								html: validation_errors.join('<br>'),
+								showConfirmButton: true
+							});
+							$('#form').off('submit');
+							return;
+						}
+
 						swalWithBootstrapButtons.fire({
 							width: 550,
 							background: 'url(<?php echo base_url('assets/image/sweetalert.jpg') ?>)',
@@ -2157,7 +2240,7 @@
 
 			// Initialize date pickers for existing passport date fields
 			$('input[id^="passport_issue_date-"]').each(function() {
-				if ($(this).hasClass('kt_datepicker_4_3')) {
+				if ($(this).hasClass('passport_issue_datepicker')) {
 					$(this).datepicker({
 						orientation: 'bottom left',
 						todayHighlight: true,
@@ -2168,7 +2251,7 @@
 			});
 			
 			$('input[id^="passport_expiry_date-"]').each(function() {
-				if ($(this).hasClass('kt_datepicker_4_3')) {
+				if ($(this).hasClass('kt_datepicker_passport_expiry')) {
 					$(this).datepicker({
 						orientation: 'bottom left',
 						todayHighlight: true,
@@ -2180,8 +2263,7 @@
 			
 			// Handle file input labels for existing passport copy fields - always show "Choose file"
 			$('.passport-copy-upload').on('change', function() {
-				// Keep label as "Choose file" - don't show filename
-				$(this).next('.custom-file-label').html('Choose file');
+				$(this).next('.custom-file-label').html('File uploaded');
 			});
 			
 			// Trigger Set_Required_Field for all existing guests to ensure proper initial state

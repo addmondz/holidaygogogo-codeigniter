@@ -1,6 +1,33 @@
 <?php
 class Booking_Model extends CI_Model
 {
+	private function apply_checklist_filter()
+	{
+		$checklist_id = $this->input->get('checklist_filter');
+		if(empty($checklist_id)) {
+			return false;
+		}
+		$checklist_id = (int)$checklist_id;
+
+		// Find bookings that have a non-child/infant product with this checklist assigned
+		// but NO completion record for that checklist on any such product
+		$subquery = "booking.BookingID IN (
+			SELECT DISTINCT bp.BookingID
+			FROM booking_product bp
+			JOIN product p ON p.ProductID = bp.ProductID AND p.is_child_or_infant = 0
+			JOIN product_package_checklist ppc ON ppc.product_id = bp.ProductID
+				AND JSON_CONTAINS(ppc.package_checklist_json, '{$checklist_id}')
+			WHERE NOT EXISTS (
+				SELECT 1 FROM booking_checklist_completion bcc
+				WHERE bcc.booking_id = bp.BookingID
+				AND bcc.product_id = bp.ProductID
+				AND bcc.package_checklist_id = {$checklist_id}
+			)
+		)";
+		$this->db->where($subquery, null, false);
+		return true;
+	}
+
 	private function apply_guest_list_status_filter()
 	{
 		$guest_list_status = $this->input->get('guest_list_status');
@@ -47,7 +74,7 @@ class Booking_Model extends CI_Model
 
 	function Read_Booking()
 	{
-		$this->db->select('booking.BookingID, booking.AllowReview, booking.CustomerReview, booking.CustomerReviewTimestamp, BookingConfirmationFooterID, TravelVoucherFooterID, booking.CountryCodeID AS CustomerCountryCode, BookingNumber, ReservationNumber, DepositDeadline, FullPaymentDeadline, AdditionalPaymentDeadline, PaymentOutSupplierFull, PaymentOutSupplierDeposit, Customer, booking.Mobile AS CustomerMobile, StartDate, EndDate, Adult, Children, Infant, Destination, SalesAgent, Tag, BookingRemark, Subtotal, Discount, NetTotal, DepositPercentage, booking.ChatLanguage, Source, Token, booking.BookingConfirmationTitle, BookingConfirmationFooter, TravelVoucherFooter, booking.KeyContacts, booking.SpecialRemarks, ProductSequence, booking.Status, booking.CancelStatus, booking.LockStatus, booking.AfterSalesService, booking.bc_approved, booking.bc_approval_admin_id, booking.bc_approval_date, admin.Name AS SalesAgentName, booking.AutocountSyncStatus, booking.AutocountSyncMessage, booking.AutocountSyncAction, booking.CustomerAutocountSyncStatus, booking.CustomerAutocountSyncMessage, booking.CustomerAutocountSyncAction, customer.CustomerCode AS CustomerCode, booking.CustomerID, booking.BookingOP');
+		$this->db->select('booking.BookingID, booking.AllowReview, booking.CustomerReview, booking.CustomerReviewTimestamp, BookingConfirmationFooterID, TravelVoucherFooterID, booking.CountryCodeID AS CustomerCountryCode, BookingNumber, ReservationNumber, DepositDeadline, FullPaymentDeadline, AdditionalPaymentDeadline, Customer, booking.Mobile AS CustomerMobile, StartDate, EndDate, Adult, Children, Infant, Destination, SalesAgent, Tag, BookingRemark, Subtotal, Discount, NetTotal, DepositPercentage, booking.ChatLanguage, Source, Token, booking.BookingConfirmationTitle, BookingConfirmationFooter, TravelVoucherFooter, booking.KeyContacts, booking.SpecialRemarks, ProductSequence, booking.Status, booking.CancelStatus, booking.LockStatus, booking.AfterSalesService, booking.bc_approved, booking.bc_approval_admin_id, booking.bc_approval_date, admin.Name AS SalesAgentName, booking.AutocountSyncStatus, booking.AutocountSyncMessage, booking.AutocountSyncAction, booking.CustomerAutocountSyncStatus, booking.CustomerAutocountSyncMessage, booking.CustomerAutocountSyncAction, customer.CustomerCode AS CustomerCode, booking.CustomerID, booking.BookingOP');
 		$this->db->join('admin', 'admin.AdminID = booking.SalesAgent', 'left');
 		$this->db->join('customer', 'customer.CustomerID = booking.CustomerID', 'left');
 		$this->db->where('booking.BookingID', $this->input->get('booking_id'));
@@ -160,6 +187,14 @@ class Booking_Model extends CI_Model
 				$level2Ignore = 1;
 			}
 			if($this->apply_guest_list_status_filter()) {
+				$level2Ignore = 1;
+			}
+			if($this->apply_checklist_filter()) {
+				$level2Ignore = 1;
+			}
+			if(!empty($this->input->get('cancellation_reason'))) {
+				$this->db->where('booking.CancellationReasonID', $this->input->get('cancellation_reason'));
+				$this->db->where('CancelStatus', 'Y');
 				$level2Ignore = 1;
 			}
 			if(!empty($this->input->get('status'))) {
@@ -300,6 +335,11 @@ class Booking_Model extends CI_Model
 			$this->db->where('booking.BookingConfirmationTitle', $this->input->get('booking_confirmation_title'));
 		}
 		$this->apply_guest_list_status_filter();
+		$this->apply_checklist_filter();
+		if(!empty($this->input->get('cancellation_reason'))) {
+			$this->db->where('booking.CancellationReasonID', $this->input->get('cancellation_reason'));
+			$this->db->where('CancelStatus', 'Y');
+		}
 		if(!empty($this->input->get('status'))) {
 			if($this->input->get('status') == 'A') {
 				$this->db->where('CancelStatus', 'N');
@@ -335,6 +375,10 @@ class Booking_Model extends CI_Model
 			if($this->input->get('status') == 'PBC') {
 				$this->db->where('CancelStatus', 'N');
 				$this->db->where('booking.Status', 'PBC');
+			}
+			if($this->input->get('status') == 'PBO') {
+				$this->db->where('CancelStatus', 'N');
+				$this->db->where('booking.Status', 'PBO');
 			}
 			if($this->input->get('status') == 'P') {
 				$this->db->where('CancelStatus', 'N');
@@ -386,10 +430,11 @@ class Booking_Model extends CI_Model
 	
 	function Read_Admins()
 	{
-		$this->db->select('AdminID, Name');
+		$this->db->select('AdminID, Name, Status');
 		$this->db->where('AdminID !=', 8);
 		$this->db->where('Level !=', '30');
-		$this->db->where('Status', 'Y');
+		$this->db->where_in('Status', array('Y', 'D'));
+		$this->db->order_by('Status', 'ASC');
 		$this->db->order_by('Name', 'ASC');
 		return $this->db->get('admin')->result();
 	}
@@ -452,6 +497,18 @@ class Booking_Model extends CI_Model
 	{
 		$this->db->select('SourceID, Name');
 		$this->db->where('Status', 'Y');
+		$this->db->order_by('Name', 'ASC');
+		return $this->db->get('source')->result();
+	}
+
+	function Read_Sources_With_Inactive($source_id)
+	{
+		$this->db->select('SourceID, Name');
+		if(!empty($source_id)) {
+			$this->db->where("(Status = 'Y' OR SourceID = " . intval($source_id) . ")", NULL, FALSE);
+		} else {
+			$this->db->where('Status', 'Y');
+		}
 		$this->db->order_by('Name', 'ASC');
 		return $this->db->get('source')->result();
 	}
@@ -723,7 +780,25 @@ class Booking_Model extends CI_Model
 	function Create_Booking_Log()
 	{
 		if(current_url() == base_url('Booking/Update')) {
-			$this->db->insert_batch('booking_log', json_decode(json_encode($this->input->post('booking_log'))));
+			$log_data = json_decode(json_encode($this->input->post('booking_log')));
+			// Filter out Subtotal entries - Subtotal is a calculated field and should not be in audit log
+			if (!empty($log_data)) {
+				$log_data = array_values(array_filter($log_data, function($entry) {
+					return !isset($entry->Column) || $entry->Column !== 'Subtotal';
+				}));
+			}
+			if (!empty($this->_snapshot_pdf_path) && !empty($log_data)) {
+				$snapshot_columns = array('NetTotal', 'StartDate', 'EndDate');
+				foreach ($log_data as &$entry) {
+					if (isset($entry->Column) && in_array($entry->Column, $snapshot_columns)) {
+						$entry->SnapshotPDF = $this->_snapshot_pdf_path;
+					} else {
+						$entry->SnapshotPDF = null;
+					}
+				}
+				unset($entry);
+			}
+			$this->db->insert_batch('booking_log', $log_data);
 		} else {
 			if(current_url() == base_url('Booking/Update_Cancel_Status')) {
 				$array = array(
@@ -802,6 +877,30 @@ class Booking_Model extends CI_Model
 		$this->load->helper('booking_status_log');
 		$created_by = !empty($this->session->admin_id) ? $this->session->admin_id : 0;
 		log_booking_status_update($booking_id, $current_status, $new_status, $created_by, null, true);
+	}
+
+	protected $_snapshot_pdf_path = null;
+
+	function generate_booking_snapshot($token, $booking_id)
+	{
+		$CI =& get_instance();
+		$CI->load->library('Booking_PDF_Generator');
+
+		$snapshot_dir = FCPATH . 'assets/upload/booking_snapshots/';
+		if (!is_dir($snapshot_dir)) {
+			mkdir($snapshot_dir, 0755, true);
+		}
+
+		$filename = $booking_id . '_' . date('Ymd_His') . '.pdf';
+		$filepath = $snapshot_dir . $filename;
+
+		$success = $CI->booking_pdf_generator->generate_to_file($token, $filepath);
+
+		if ($success) {
+			$this->_snapshot_pdf_path = 'booking_snapshots/' . $filename;
+			return $this->_snapshot_pdf_path;
+		}
+		return null;
 	}
 
 	function Update()
@@ -912,10 +1011,19 @@ class Booking_Model extends CI_Model
 					);
 				}
 			}
+
+			// Generate PDF snapshot before update when travel date or total value changed
+			if ($needs_revert && !empty($current_booking->Token)) {
+				try {
+					$this->generate_booking_snapshot($current_booking->Token, $booking_id);
+				} catch (\Throwable $e) {
+					log_message('error', 'Failed to generate booking snapshot for BookingID ' . $booking_id . ': ' . $e->getMessage());
+				}
+			}
 		}
-		
+
 		$this->db->update_batch('booking', json_decode(json_encode($booking_data)), 'BookingID');
-		
+
 		$data = [];
 		$booking = $this->input->post('booking');
 		if (!empty($booking) && isset($booking[0])) {
@@ -1015,16 +1123,6 @@ class Booking_Model extends CI_Model
 		$this->db->where("CAST(`AdditionalPaymentDeadline` AS CHAR) = '0000-00-00'", null, false);
 		$this->db->update('booking');
 
-		$this->db->set('PaymentOutSupplierFull', null);
-		$this->db->where('BookingID', $this->input->post('booking_id'));
-		$this->db->where("CAST(`PaymentOutSupplierFull` AS CHAR) = '0000-00-00'", null, false);
-		$this->db->update('booking');
-
-		$this->db->set('PaymentOutSupplierDeposit', null);
-		$this->db->where('BookingID', $this->input->post('booking_id'));
-		$this->db->where("CAST(`PaymentOutSupplierDeposit` AS CHAR) = '0000-00-00'", null, false);
-		$this->db->update('booking');
-
 		$this->db->set('StartDate', null);
 		$this->db->where('BookingID', $this->input->post('booking_id'));
 		$this->db->where("CAST(`StartDate` AS CHAR) = '0000-00-00'", null, false);
@@ -1078,11 +1176,37 @@ class Booking_Model extends CI_Model
 	{
 		$array = array(
 			'CancelStatus' => $this->input->get('new_cancel_status'),
+			'CancellationReasonID' => NULL,
 			'UpdateBy' => $this->session->userdata('admin_id'),
 			'UpdateDate' => date('Y-m-d H:i:s')
 		);
 		$this->db->where('BookingID', $this->input->get('booking_id'));
 		$this->db->update('booking', $array);
+	}
+
+	function Update_Cancel_Status_With_Reason()
+	{
+		$array = array(
+			'CancelStatus' => 'Y',
+			'CancellationReasonID' => $this->input->post('cancellation_reason_id'),
+			'UpdateBy' => $this->session->userdata('admin_id'),
+			'UpdateDate' => date('Y-m-d H:i:s')
+		);
+		$this->db->where('BookingID', $this->input->post('booking_id'));
+		$this->db->update('booking', $array);
+	}
+
+	function Create_Booking_Log_Cancel()
+	{
+		$array = array(
+			'BookingID' => $this->input->post('booking_id'),
+			'Column' => 'CancelStatus',
+			'CurrentData' => 'N',
+			'NewData' => 'Y',
+			'InsertBy' => $this->session->admin_id,
+			'InsertDate' => date('Y-m-d H:i:s')
+		);
+		$this->db->insert('booking_log', $array);
 	}
 
 	function Update_Lock_Status()
@@ -1219,6 +1343,17 @@ class Booking_Model extends CI_Model
 		$this->db->join('footer', 'footer.FooterID = booking.TravelVoucherFooterID', 'left');
 		$this->db->join('country_code', 'country_code.CountryCodeID = booking.CountryCodeID', 'left');
 		$this->db->where('Token', $this->input->get('token'));
+		return $this->db->get('booking')->row_array();
+	}
+
+	function Booking_Document_By_Token($token)
+	{
+		$this->db->select('BookingID, BookingNumber, ReservationNumber, DepositDeadline, FullPaymentDeadline, Customer, booking.Mobile As CustomerMobile, StartDate, EndDate, Adult, Children, Infant, Subtotal, Discount, NetTotal, DepositPercentage, booking.BookingConfirmationTitle, BookingConfirmationFooter, TravelVoucherFooter, AfterSalesService, ProductSequence, booking.Status, booking.InsertDate, admin.CountryCodeID As SalesAgentCountryCode, admin.Name As SalesAgentName, admin.Mobile As SalesAgentMobile, category.Name As DestinationName, TravelVoucherTitle, booking.KeyContacts As TravelVoucherKeyContacts, booking.SpecialRemarks As TravelVoucherSpecialRemarks, CountryCode');
+		$this->db->join('admin', 'admin.AdminID = booking.SalesAgent', 'left');
+		$this->db->join('category', 'category.CategoryID = booking.Destination', 'left');
+		$this->db->join('footer', 'footer.FooterID = booking.TravelVoucherFooterID', 'left');
+		$this->db->join('country_code', 'country_code.CountryCodeID = booking.CountryCodeID', 'left');
+		$this->db->where('Token', $token);
 		return $this->db->get('booking')->row_array();
 	}
 
@@ -1565,6 +1700,14 @@ class Booking_Model extends CI_Model
 			if($this->apply_guest_list_status_filter()) {
 				$level2Ignore = 1;
 			}
+			if($this->apply_checklist_filter()) {
+				$level2Ignore = 1;
+			}
+			if(!empty($this->input->get('cancellation_reason'))) {
+				$this->db->where('booking.CancellationReasonID', $this->input->get('cancellation_reason'));
+				$this->db->where('CancelStatus', 'Y');
+				$level2Ignore = 1;
+			}
 			if(!empty($this->input->get('status'))) {
 				if($this->input->get('status') == 'A') {
 					$this->db->where('CancelStatus', 'N');
@@ -1620,6 +1763,10 @@ class Booking_Model extends CI_Model
 					$this->db->where('LockStatus', 'Y');
 					$this->db->where('booking.Status', 'PTV');
 				}
+				if($this->input->get('status') == 'PBO') {
+					$this->db->where('CancelStatus', 'N');
+					$this->db->where('booking.Status', 'PBO');
+				}
 
 				$level2Ignore = 1;
 			} else {
@@ -1649,17 +1796,21 @@ class Booking_Model extends CI_Model
 	 */
 	function Read_Bookings_Paginated($start, $length, $order_column, $order_dir)
 	{
-		$this->db->select('booking.BookingID, BookingNumber, DepositDeadline, FullPaymentDeadline, Customer, booking.Mobile As CustomerMobile, StartDate, EndDate, NetTotal, booking.ChatLanguage, Token, booking.BookingConfirmationTitle, CancelStatus, LockStatus, booking.is_submitted, AfterSalesService, booking.Status, booking.bc_approved, booking.bc_approval_admin_id, booking.bc_approval_date, booking.InsertDate, admin.Name As SalesAgentName, admin.AdminID AS SalesAgentID, op_admin.Name As BookingOPName, category.Name As DestinationName, CountryCode, booking.AutocountSyncStatus, booking.AutocountSyncMessage, booking.AutocountSyncAction, booking.CustomerAutocountSyncStatus, booking.CustomerAutocountSyncMessage, booking.CustomerAutocountSyncAction, customer.CustomerCode, booking.CustomerID');
+		$this->db->select('booking.BookingID, BookingNumber, DepositDeadline, FullPaymentDeadline, Customer, booking.Mobile As CustomerMobile, StartDate, EndDate, NetTotal, booking.ChatLanguage, Token, booking.BookingConfirmationTitle, CancelStatus, LockStatus, booking.is_submitted, AfterSalesService, booking.Status, booking.bc_approved, booking.bc_approval_admin_id, booking.bc_approval_date, booking.InsertDate, admin.Name As SalesAgentName, admin.AdminID AS SalesAgentID, op_admin.Name As BookingOPName, category.Name As DestinationName, CountryCode, booking.AutocountSyncStatus, booking.AutocountSyncMessage, booking.AutocountSyncAction, booking.CustomerAutocountSyncStatus, booking.CustomerAutocountSyncMessage, booking.CustomerAutocountSyncAction, customer.CustomerCode, booking.CustomerID, source.Name AS SourceName, cancellation_reason.Name AS CancellationReasonName');
+		$this->db->select("(SELECT COUNT(*) FROM invoice_split_pax WHERE invoice_split_pax.BookingID = booking.BookingID AND invoice_split_pax.Status = 'Y') AS has_einvoice", FALSE);
+		$this->db->select("(CASE WHEN booking.CancelStatus = 'Y' THEN 10 WHEN booking.DepositDeadline IS NOT NULL AND ((booking.DepositDeadline < CURDATE() AND booking.Status = 'P') OR (booking.FullPaymentDeadline < CURDATE() AND booking.Status IN ('P','PP'))) THEN 1 WHEN booking.DepositDeadline IS NULL AND booking.FullPaymentDeadline < CURDATE() AND booking.Status IN ('P','PP') THEN 1 WHEN booking.Status = 'P' THEN 2 WHEN booking.Status = 'PP' THEN 3 WHEN booking.Status = 'PBC' THEN 4 WHEN booking.Status = 'PBO' THEN 5 WHEN booking.LockStatus = 'N' AND booking.Status = 'PTV' THEN 6 WHEN booking.LockStatus = 'Y' AND booking.Status = 'PTV' THEN 7 WHEN booking.Status = 'PT' THEN 8 WHEN booking.Status = 'OG' THEN 9 WHEN booking.AfterSalesService = 'PENDING' AND booking.Status = 'Y' THEN 11 WHEN booking.Status = 'Y' THEN 12 ELSE 99 END) AS status_sort_priority", FALSE);
 		$this->db->join('admin', 'admin.AdminID = booking.SalesAgent', 'left');
 		$this->db->join('admin AS op_admin', 'op_admin.AdminID = booking.BookingOP', 'left');
 		$this->db->join('category', 'category.CategoryID = booking.Destination', 'left');
 		$this->db->join('country_code', 'country_code.CountryCodeID = booking.CountryCodeID', 'left');
 		$this->db->join('customer', 'customer.CustomerID = booking.CustomerID', 'left');
+		$this->db->join('source', 'source.SourceID = booking.Source', 'left');
+		$this->db->join('cancellation_reason', 'cancellation_reason.CancellationReasonID = booking.CancellationReasonID', 'left');
 
 		$this->apply_booking_filters();
 
 		// Order by
-		$this->db->order_by($order_column, $order_dir);
+		$this->db->order_by($order_column, $order_dir, FALSE);
 
 		// Pagination
 		$this->db->limit($length, $start);
@@ -1694,6 +1845,8 @@ class Booking_Model extends CI_Model
 		$this->db->join('category', 'category.CategoryID = booking.Destination', 'left');
 		$this->db->join('country_code', 'country_code.CountryCodeID = booking.CountryCodeID', 'left');
 		$this->db->join('customer', 'customer.CustomerID = booking.CustomerID', 'left');
+		$this->db->join('source', 'source.SourceID = booking.Source', 'left');
+		$this->db->join('cancellation_reason', 'cancellation_reason.CancellationReasonID = booking.CancellationReasonID', 'left');
 
 		$this->apply_booking_filters();
 
@@ -1713,6 +1866,8 @@ class Booking_Model extends CI_Model
 		$this->db->join('category', 'category.CategoryID = booking.Destination', 'left');
 		$this->db->join('country_code', 'country_code.CountryCodeID = booking.CountryCodeID', 'left');
 		$this->db->join('customer', 'customer.CustomerID = booking.CustomerID', 'left');
+		$this->db->join('source', 'source.SourceID = booking.Source', 'left');
+		$this->db->join('cancellation_reason', 'cancellation_reason.CancellationReasonID = booking.CancellationReasonID', 'left');
 
 		$this->apply_booking_filters();
 
@@ -1797,6 +1952,16 @@ class Booking_Model extends CI_Model
 		}
 
 		return true;
+	}
+
+	function Read_Booking_Logs($booking_id)
+	{
+		$this->db->select('booking_log.Column, booking_log.CurrentData, booking_log.NewData, booking_log.InsertDate, booking_log.SnapshotPDF, admin.Name As AdminName');
+		$this->db->from('booking_log');
+		$this->db->join('admin', 'admin.AdminID = booking_log.InsertBy', 'left');
+		$this->db->where('booking_log.BookingID', $booking_id);
+		$this->db->order_by('booking_log.InsertDate', 'DESC');
+		return $this->db->get()->result_array();
 	}
 
 }

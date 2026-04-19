@@ -41,7 +41,7 @@ class Package_Checklist extends MY_Controller
 			}
 		} else {
 			$titles = array('tab_title' => 'HolidayGoGoGo | Package Checklist', 'breadcrumb_title' => 'Package Checklist >> Create');
-			$array = array('ID' => 'NA', 'name' => 'NA', 'is_required' => 0);
+			$array = array('ID' => 'NA', 'name' => 'NA', 'is_required' => 0, 'include_booking_filter' => 0);
 			$this->load->view('layout/header', $titles);
 			$this->load->view('package_checklist/package_checklist', $array);
 			$this->load->view('layout/footer');

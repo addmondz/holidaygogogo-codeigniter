@@ -84,6 +84,8 @@
                             var payment_ids = [];
                             var booking_auto_selected = false;
                             var outstanding_balance = 0;
+                            var booking_products = [];
+                            window.productOptionsHtml = '';
 
                             <?php if(!empty($this->input->get('booking_number'))) { ?>
                                 Select_Booking();
@@ -113,6 +115,12 @@
                                     },
                                     dataType: 'json',
                                     success: function(array) {
+                                        booking_products = array.booking_products || [];
+                                        var productOptions = '<option selected disabled value="">--SELECT PRODUCT--</option>';
+                                        $.each(booking_products, function(key, bp) {
+                                            productOptions += '<option data-icon="la la-box font-size-lg bs-icon" value="' + bp.BookingProductID + '" data-product-id="' + bp.ProductID + '">' + bp.ProductCode + ' - ' + bp.Name + '</option>';
+                                        });
+                                        window.productOptionsHtml = productOptions;
                                         reservation_number = array.ReservationNumber;
                                         var count = 0;
                                         var credit_payments = [];
@@ -373,7 +381,9 @@
                                         format: 'dd/mm/yyyy',
                                         autoclose: true
                                     });
-                                    $(`select[name="credit_type-${payment_id}"]`).selectpicker();
+                                    $(`select[name="credit_type-${payment_id}"]`).selectpicker().on('changed.bs.select', function() {
+                                        Calculate_Subtotal();
+                                    });
                                 } else {
                                     $('<div id="payment_out-'+ payment_id +'" class="p-3" style="background-color:#FAA0A030;">' +
                                         '<div class="row">' +
@@ -517,8 +527,19 @@
                                                 '</div>' +
                                             '</div>' +
                                         '</div>' +
+                                        '<br>' +
+                                        '<div class="row">' +
+                                            '<div class="col-md-12">' +
+                                                '<label>Product</label>' +
+                                                '<select name="booking_product-'+ payment_id +'" data-live-search="true" onchange="Select_Product('+ payment_id +')" class="form-control selectpicker">' +
+                                                    window.productOptionsHtml +
+                                                '</select>' +
+                                            '</div>' +
+                                        '</div>' +
+                                        '<div id="checklist-container-'+ payment_id +'" class="mt-3"></div>' +
                                     '</div>').insertBefore('#benchmark-' + payment_id);
                                     $(`select[name="supplier-${payment_id}"]`).selectpicker();
+                                    $(`select[name="booking_product-${payment_id}"]`).selectpicker();
                                 } else {
                                     $('<div id="debit-'+ payment_id +'" class="p-3" style="background-color:#D7004010;">' +
                                         '<div class="row">' +
@@ -566,6 +587,63 @@
                                 }
                             }
 
+                            function Select_Product(payment_id) {
+                                var booking_id = $('select[name="booking"]').val();
+                                var $select = $(`select[name="booking_product-${payment_id}"]`);
+                                var product_id = $select.find(':selected').data('product-id');
+                                var container = $(`#checklist-container-${payment_id}`);
+                                if(!product_id) {
+                                    container.html('');
+                                    return;
+                                }
+                                $.ajax({
+                                    url: '<?php echo base_url("Payment/Get_Product_Checklist") ?>',
+                                    type: 'get',
+                                    data: { booking_id: booking_id, product_id: product_id },
+                                    dataType: 'json',
+                                    success: function(res) {
+                                        if(!res.success) return;
+                                        var html = '<div class="p-3" style="background-color:#f0f0f0; border-radius:5px;">';
+                                        html += '<h6 class="font-weight-bold mb-3">Package Checklist</h6>';
+                                        $.each(res.checklists, function(i, cl) {
+                                            var checked = res.completions[cl.ID] ? 'checked' : '';
+                                            var info = '';
+                                            if(res.completions[cl.ID]) {
+                                                info = '<small class="text-muted ml-2">' + res.completions[cl.ID].created_by_name + ' - ' + res.completions[cl.ID].created_at + '</small>';
+                                            }
+                                            html += '<div class="checkbox-inline mb-2"><label class="checkbox"><input type="checkbox" name="checklist_item" value="' + cl.ID + '" ' + checked + '><span></span> ' + cl.name + '</label>' + info + '</div>';
+                                        });
+                                        html += '<button type="button" onclick="Save_Payment_Checklist(' + payment_id + ')" class="btn btn-sm btn-primary mt-3">Save Checklist</button>';
+                                        html += '</div>';
+                                        container.html(html);
+                                    }
+                                });
+                            }
+
+                            function Save_Payment_Checklist(payment_id) {
+                                var booking_id = $('select[name="booking"]').val();
+                                var $select = $(`select[name="booking_product-${payment_id}"]`);
+                                var product_id = $select.find(':selected').data('product-id');
+                                var completions = [];
+                                $(`#checklist-container-${payment_id} input[name="checklist_item"]:checked`).each(function() {
+                                    completions.push($(this).val());
+                                });
+                                $.ajax({
+                                    url: '<?php echo base_url("Payment/Save_Checklist") ?>',
+                                    type: 'post',
+                                    data: { booking_id: booking_id, product_id: product_id, completions: completions },
+                                    dataType: 'json',
+                                    success: function(res) {
+                                        if(res.success) {
+                                            toastr.success('Checklist saved successfully');
+                                            Select_Product(payment_id);
+                                        } else {
+                                            toastr.error(res.message || 'Failed to save checklist');
+                                        }
+                                    }
+                                });
+                            }
+
                             function Delete_Payment(payment_id)
                             {
                                 payment_ids = payment_ids.filter(function(value) {
@@ -582,6 +660,9 @@
                                 if(payment_ids.length > 0) {
                                     for(var i = 0; i < payment_ids.length; i++) {
                                         if($(`#transaction_type-${payment_ids[i]}`).val() == 'PAYMENT IN') {
+                                            if($(`select[name="credit_type-${payment_ids[i]}"]`).val() == 'AGENT COMMISSION FROM SUPPLIER') {
+                                                continue;
+                                            }
                                             if($(`input[name="credit-${payment_ids[i]}"]`).val() != '') {
                                                 total_credit += parseFloat(($(`input[name="credit-${payment_ids[i]}"]`).val()).replace(/,/g, ''));
                                             } else {
@@ -936,6 +1017,20 @@
                                         <?php } ?>
                                     </div>
                                 </div>
+                                <div class="supplier_payment col-md-6" <?php if($Type != 'SUPPLIER PAYMENT') { echo 'style="display:none;"'; } ?>>
+                                    <div class="form-group">
+                                        <label>Product</label>
+                                        <select <?php if(current_url() == base_url('Payment/View')) { echo 'disabled'; } ?> name="booking_product" data-live-search="true" onchange="Select_Product_Update()" class="form-control selectpicker">
+                                            <option selected data-icon="la la-box font-size-lg bs-icon" value="">--SELECT PRODUCT--</option>
+                                            <?php if(isset($booking_products)) { foreach($booking_products as $bp) { ?>
+                                                <option <?php if(isset($BookingProductID) && $bp->BookingProductID == $BookingProductID) { echo 'selected'; } ?> data-icon="la la-box font-size-lg bs-icon" value="<?php echo $bp->BookingProductID; ?>" data-product-id="<?php echo $bp->ProductID; ?>"><?php echo $bp->ProductCode . ' - ' . $bp->Name; ?></option>
+                                            <?php } } ?>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="supplier_payment col-md-12" <?php if($Type != 'SUPPLIER PAYMENT') { echo 'style="display:none;"'; } ?>>
+                                    <div id="checklist-container-update"></div>
+                                </div>
                                 <div class="customer_refund_one_time_payment col-md-6" <?php if($Type != 'CUSTOMER REFUND' && $Type != 'ONE-TIME PAYMENT' && $Type != 'AGENT COMMISSION' && $Type != 'BANK CHARGES') { echo 'style="display:none;"'; } ?>>
                                     <div class="form-group">
                                         <label>Bank
@@ -1153,6 +1248,76 @@
                                         }
                                     }
                                 });
+                            });
+                        </script>
+                        <script>
+                            function Select_Product_Update() {
+                                var booking_id = <?php echo $BookingID ?>;
+                                var $select = $('select[name="booking_product"]');
+                                var product_id = $select.find(':selected').data('product-id');
+                                var container = $('#checklist-container-update');
+                                if(!product_id) {
+                                    container.html('');
+                                    return;
+                                }
+                                $.ajax({
+                                    url: '<?php echo base_url("Payment/Get_Product_Checklist") ?>',
+                                    type: 'get',
+                                    data: { booking_id: booking_id, product_id: product_id },
+                                    dataType: 'json',
+                                    success: function(res) {
+                                        if(!res.success) return;
+                                        var isView = <?php echo current_url() == base_url('Payment/View') ? 'true' : 'false'; ?>;
+                                        var html = '<div class="p-3" style="background-color:#f0f0f0; border-radius:5px;">';
+                                        html += '<h6 class="font-weight-bold mb-3">Package Checklist</h6>';
+                                        $.each(res.checklists, function(i, cl) {
+                                            var checked = res.completions[cl.ID] ? 'checked' : '';
+                                            var disabled = isView ? 'disabled' : '';
+                                            var info = '';
+                                            if(res.completions[cl.ID]) {
+                                                info = '<small class="text-muted ml-2">' + res.completions[cl.ID].created_by_name + ' - ' + res.completions[cl.ID].created_at + '</small>';
+                                            }
+                                            html += '<div class="checkbox-inline mb-2"><label class="checkbox"><input type="checkbox" name="checklist_item_update" value="' + cl.ID + '" ' + checked + ' ' + disabled + '><span></span> ' + cl.name + '</label>' + info + '</div>';
+                                        });
+                                        if(!isView) {
+                                            html += '<button type="button" onclick="Save_Payment_Checklist_Update()" class="btn btn-sm btn-primary mt-3">Save Checklist</button>';
+                                        }
+                                        html += '</div>';
+                                        container.html(html);
+                                    }
+                                });
+                            }
+
+                            function Save_Payment_Checklist_Update() {
+                                var booking_id = <?php echo $BookingID ?>;
+                                var $select = $('select[name="booking_product"]');
+                                var product_id = $select.find(':selected').data('product-id');
+                                var completions = [];
+                                $('#checklist-container-update input[name="checklist_item_update"]:checked').each(function() {
+                                    completions.push($(this).val());
+                                });
+                                $.ajax({
+                                    url: '<?php echo base_url("Payment/Save_Checklist") ?>',
+                                    type: 'post',
+                                    data: { booking_id: booking_id, product_id: product_id, completions: completions },
+                                    dataType: 'json',
+                                    success: function(res) {
+                                        if(res.success) {
+                                            toastr.success('Checklist saved successfully');
+                                            Select_Product_Update();
+                                        } else {
+                                            toastr.error(res.message || 'Failed to save checklist');
+                                        }
+                                    }
+                                });
+                            }
+
+                            // Auto-load checklist if product is already selected
+                            $(document).ready(function() {
+                                var selectedProduct = $('select[name="booking_product"]').val();
+                                if(selectedProduct) {
+                                    Select_Product_Update();
+                                }
                             });
                         </script>
                     <?php } ?>

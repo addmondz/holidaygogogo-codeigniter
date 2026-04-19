@@ -25,12 +25,16 @@ class Cronjob_Model extends CI_Model
 			return array();
 		}
 
-		$this->db->select('BookingID, BookingNumber, ' . $date_column);
-		$this->db->where($date_column . ' IS NOT NULL');
-		$this->db->where($date_column . ' >', '1000-01-01');
-		$this->db->where($date_column . ' <=', date('Y-m-d', strtotime('+3 days')));
-		$this->db->where_in('Status', array('PT', 'OG'));
-		return $this->db->get('booking')->result();
+		$this->db->select('booking.BookingID, booking.BookingNumber, booking_product.ProductID, booking_product.' . $date_column);
+		$this->db->from('booking_product');
+		$this->db->join('booking', 'booking.BookingID = booking_product.BookingID');
+		$this->db->where('booking_product.' . $date_column . ' IS NOT NULL');
+		$this->db->where('booking_product.' . $date_column . ' >', '1000-01-01');
+		$this->db->where('booking_product.' . $date_column . ' <=', date('Y-m-d', strtotime('+3 days')));
+		$this->db->where('booking_product.Status', 'Y');
+		$this->db->where('booking_product.disable_checklist_payment_out', 0);
+		$this->db->where_in('booking.Status', array('PT', 'OG'));
+		return $this->db->get()->result();
 	}
 
 	/**

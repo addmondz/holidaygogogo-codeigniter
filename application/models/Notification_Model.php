@@ -107,6 +107,23 @@ class Notification_Model extends CI_Model
 	}
 
 	/**
+	 * Mark notification as unread
+	 *
+	 * @param int $notification_id Notification ID
+	 * @param int $user_id User ID (for security check)
+	 * @return bool Success status
+	 */
+	function Mark_As_Unread($notification_id, $user_id)
+	{
+		$this->db->where('NotificationID', $notification_id);
+		$this->db->where('user_id', $user_id);
+		$this->db->set('is_read', 0);
+		$this->db->set('read_at', NULL);
+		$this->db->update('notification');
+		return $this->db->affected_rows() > 0;
+	}
+
+	/**
 	 * Mark all notifications as read for a user
 	 * 
 	 * @param int $user_id Admin ID
