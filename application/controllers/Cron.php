@@ -397,10 +397,36 @@ class Cron extends CI_Controller
 
 		$this->load->model('Ghl_Processed_Leads_Model');
 
+		$args = isset($_SERVER['argv']) ? $_SERVER['argv'] : array();
+		$uriSegments = $this->uri->segment_array();
+		$cliArgs = array_merge(
+			array_slice($args, 3),
+			$uriSegments ? array_slice($uriSegments, 2) : array()
+		);
+
+		$flags = array();
+		foreach ($cliArgs as $arg) {
+			if (strncmp((string) $arg, '--', 2) === 0) {
+				$flags[] = (string) $arg;
+				continue;
+			}
+
+			if (!is_numeric($arg)) {
+				continue;
+			}
+
+			$chunkSize = (int) $arg;
+			break;
+		}
+
 		$chunkSize = (int) $chunkSize;
 		if ($chunkSize <= 0) {
 			$chunkSize = 100;
 		}
+
+		$shouldRebuild = in_array('--rebuild', $flags, true)
+			|| in_array('--restart', $flags, true)
+			|| in_array('--reset', $flags, true);
 
 		$summary = array(
 			'conversations_processed' => 0,
@@ -417,6 +443,14 @@ class Cron extends CI_Controller
 		}
 
 		try {
+			if ($shouldRebuild) {
+				echo "Rebuild mode: clearing ghl_processed_leads and ghl_processing_state before processing." . PHP_EOL;
+
+				if (!$this->Ghl_Processed_Leads_Model->reset_processing_data()) {
+					show_error('Failed resetting ghl lead processing data.', 500);
+				}
+			}
+
 			while (true) {
 				$batch = $this->Ghl_Processed_Leads_Model->get_next_conversation_batch('ghl_leads_processor', $chunkSize);
 
@@ -457,7 +491,6 @@ class Cron extends CI_Controller
 	{
 		$messages = $this->Ghl_Processed_Leads_Model->get_conversation_messages($conversationId);
 		$existingConversions = $this->Ghl_Processed_Leads_Model->get_existing_conversion_map($conversationId);
-		$existingLeadStarts = $this->Ghl_Processed_Leads_Model->get_existing_lead_starts($conversationId);
 		$currentAssignedTo = $this->Ghl_Processed_Leads_Model->get_conversation_assigned_to($conversationId);
 
 		if (empty($messages)) {
@@ -466,14 +499,6 @@ class Cron extends CI_Controller
 				show_error('Failed clearing processed leads for conversation: ' . $conversationId, 500);
 			}
 			return 0;
-		}
-
-		$existingLeadStartMap = array();
-		foreach ($existingLeadStarts as $existingLeadStart) {
-			$existingLeadStartMap[(string) $existingLeadStart['first_customer_message_id']] = array(
-				'lead_started_at' => $existingLeadStart['lead_started_at'],
-				'assigned_to_user_id' => $existingLeadStart['assigned_to_user_id'],
-			);
 		}
 
 		$leads = array();
@@ -493,23 +518,7 @@ class Cron extends CI_Controller
 			}
 
 			if ($message['direction'] === 'inbound') {
-				$existingBoundary = isset($existingLeadStartMap[(string) $message['message_id']])
-					? $existingLeadStartMap[(string) $message['message_id']]
-					: null;
 				$startsNewLead = ($currentLead === null);
-
-				if (!$startsNewLead && $existingBoundary !== null) {
-					$startsNewLead = true;
-				}
-
-				if (
-					!$startsNewLead &&
-					$firstNewMessageRowId > 0 &&
-					(int) $message['id'] >= $firstNewMessageRowId &&
-					$currentLead['assigned_to_user_id'] !== $currentAssignedTo
-				) {
-					$startsNewLead = true;
-				}
 
 				if ($startsNewLead) {
 					if ($currentLead !== null) {
@@ -521,9 +530,9 @@ class Cron extends CI_Controller
 					$currentLead = array(
 						'conversation_id' => $conversationId,
 						'contact_id' => !empty($message['contact_id']) ? $message['contact_id'] : $fallbackContactId,
-						'assigned_to_user_id' => $existingBoundary !== null
-							? $existingBoundary['assigned_to_user_id']
-							: $currentAssignedTo,
+						// Rebuild from the canonical message stream only. Persisted processed leads are
+						// derived data and must not become future split boundaries.
+						'assigned_to_user_id' => $currentAssignedTo,
 						'lead_started_at' => $message['message_timestamp'],
 						'lead_ended_at' => null,
 						'first_customer_message_id' => $message['message_id'],
