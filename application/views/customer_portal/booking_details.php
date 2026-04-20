@@ -2574,7 +2574,7 @@
             var splitSaveUrl = '<?php echo base_url('customer/booking/' . $booking['Token'] . '/invoice-split/save'); ?>';
             var splitSubmitUrl = '<?php echo base_url('customer/booking/' . $booking['Token'] . '/invoice-split/submit'); ?>';
             var paxCounter = 0;
-            var maxPax = <?php echo (int)($booking['Adult'] ?? 0) + (int)($booking['Children'] ?? 0) + (int)($booking['Infant'] ?? 0); ?>;
+            var maxPax = <?php echo (int)($booking['ComputedPaxTotal'] ?? 0); ?>;
 
             function updateAddPaxBtnState() {
                 var current = $('.pax-card').length;

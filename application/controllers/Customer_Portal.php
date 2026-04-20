@@ -475,6 +475,7 @@ class Customer_Portal extends CI_Controller
         $booking['CustomerMobile'] = $booking['CountryCode'] . $booking['CustomerMobile'];
         $pax = $this->Booking_Model->Compute_Pax_Counts($booking['BookingID']);
         $booking['PaxInfo'] = $this->format_pax_info($pax['adult'], $pax['child'], $pax['infant']);
+        $booking['ComputedPaxTotal'] = (int)$pax['adult'] + (int)$pax['child'] + (int)$pax['infant'];
 
         // Get booking products
         $this->db->select('*');
@@ -1192,7 +1193,7 @@ class Customer_Portal extends CI_Controller
         }
 
         // Verify booking
-        $this->db->select('BookingID, Subtotal, Discount, NetTotal, Adult, Children, Infant');
+        $this->db->select('BookingID, Subtotal, Discount, NetTotal');
         $this->db->where('Token', $hashed_bc);
         $this->db->where('Status !=', 'N');
         $booking = $this->db->get('booking')->row_array();
@@ -1211,7 +1212,8 @@ class Customer_Portal extends CI_Controller
             return;
         }
 
-        $max_pax = (int)$booking['Adult'] + (int)$booking['Children'] + (int)$booking['Infant'];
+        $pax_counts = $this->Booking_Model->Compute_Pax_Counts($booking['BookingID']);
+        $max_pax = (int)$pax_counts['adult'] + (int)$pax_counts['child'] + (int)$pax_counts['infant'];
         if (count($data['pax']) > $max_pax) {
             $this->output->set_output(json_encode([
                 'success' => false,
