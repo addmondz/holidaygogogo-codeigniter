@@ -265,33 +265,57 @@ class Guest_List_Model extends CI_Model
 		$types = array('ADULT' => 'adult_count', 'CHILD' => 'child_count', 'INFANT' => 'infant_count');
 
 		foreach ($types as $type => $count_field) {
-			$this->db->select('GuestListID');
+			// Per-room remaining capacity for this type, keyed by room id.
+			$remaining = array();
+			foreach ($rooms as $room) {
+				$remaining[$room->id] = (int)$room->$count_field;
+			}
+
+			$this->db->select('GuestListID, guest_list_room_id');
 			$this->db->where('BookingID', $booking_id);
 			$this->db->where('Type', $type);
 			$this->db->where('Status', 'Y');
 			$this->db->order_by('GuestListID', 'ASC');
 			$guests = $this->db->get('guest_list')->result();
 
-			$room_index = 0;
-			$slot = 0;
-
+			// Pass 1: honor existing assignments when the room still has capacity.
+			// Leaves $pending holding guests that need a fresh room.
+			$pending = array();
+			$keep = array();
 			foreach ($guests as $guest) {
-				$assigned_room_id = null;
-
-				while ($room_index < count($rooms)) {
-					$capacity = (int)$rooms[$room_index]->$count_field;
-					if ($slot < $capacity) {
-						$assigned_room_id = $rooms[$room_index]->id;
-						$slot++;
-						break;
-					} else {
-						$room_index++;
-						$slot = 0;
-					}
+				$current = $guest->guest_list_room_id;
+				if ($current !== null && isset($remaining[$current]) && $remaining[$current] > 0) {
+					$remaining[$current]--;
+					$keep[$guest->GuestListID] = $current;
+				} else {
+					$pending[] = $guest;
 				}
+			}
 
-				$this->db->where('GuestListID', $guest->GuestListID);
-				$this->db->update('guest_list', array('guest_list_room_id' => $assigned_room_id));
+			// Pass 2: fill pending guests into rooms in natural-sort order.
+			$assignments = $keep;
+			$room_index = 0;
+			foreach ($pending as $guest) {
+				$assigned_room_id = null;
+				while ($room_index < count($rooms)) {
+					$rid = $rooms[$room_index]->id;
+					if ($remaining[$rid] > 0) {
+						$assigned_room_id = $rid;
+						$remaining[$rid]--;
+						break;
+					}
+					$room_index++;
+				}
+				$assignments[$guest->GuestListID] = $assigned_room_id;
+			}
+
+			// Write only rows where assignment actually changed.
+			foreach ($guests as $guest) {
+				$new_room_id = isset($assignments[$guest->GuestListID]) ? $assignments[$guest->GuestListID] : null;
+				if ($new_room_id != $guest->guest_list_room_id) {
+					$this->db->where('GuestListID', $guest->GuestListID);
+					$this->db->update('guest_list', array('guest_list_room_id' => $new_room_id));
+				}
 			}
 		}
 	}
