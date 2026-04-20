@@ -1969,17 +1969,27 @@
             </div>
 
             <!-- E-Invoice Request by Pax Section -->
+            <?php $einvoice_submit_status = isset($booking['einvoice_submit_status']) ? $booking['einvoice_submit_status'] : null; ?>
             <div class="details-card" id="invoice-split-section">
-                <div class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
-                    <span>E-Invoice Request by Pax</span>
-                    <?php if (!empty($booking['invoice_split'])): ?>
-                        <button type="button" id="toggle-split-form" class="btn-toggle-split" style="background: #162447; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;">
-                            <i class="la la-edit"></i> Edit E-Invoice Request
-                        </button>
-                    <?php else: ?>
-                        <button type="button" id="toggle-split-form" class="btn-toggle-split" style="background: #162447; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;">
-                            <i class="la la-plus"></i> E-Invoice Request
-                        </button>
+                <div class="card-title" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                    <span style="display: flex; align-items: center; gap: 10px;">
+                        <span>E-Invoice Request by Pax</span>
+                        <?php if ($einvoice_submit_status === 'S'): ?>
+                            <span style="display:inline-block; font-size: 11px; font-weight: 700; background: #28a745; color: #fff; padding: 3px 10px; border-radius: 12px; letter-spacing: 0.3px;">SUBMITTED</span>
+                        <?php elseif ($einvoice_submit_status === 'D'): ?>
+                            <span style="display:inline-block; font-size: 11px; font-weight: 700; background: #6c757d; color: #fff; padding: 3px 10px; border-radius: 12px; letter-spacing: 0.3px;">DRAFT</span>
+                        <?php endif; ?>
+                    </span>
+                    <?php if ($einvoice_submit_status !== 'S'): ?>
+                        <?php if (!empty($booking['invoice_split'])): ?>
+                            <button type="button" id="toggle-split-form" class="btn-toggle-split" style="background: #162447; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;">
+                                <i class="la la-edit"></i> Edit E-Invoice Request
+                            </button>
+                        <?php else: ?>
+                            <button type="button" id="toggle-split-form" class="btn-toggle-split" style="background: #162447; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;">
+                                <i class="la la-plus"></i> E-Invoice Request
+                            </button>
+                        <?php endif; ?>
                     <?php endif; ?>
                 </div>
 
@@ -2094,10 +2104,13 @@
                         <button type="button" id="add-pax-btn" style="background: #28a745; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;">
                             <i class="la la-plus"></i> Add Pax
                         </button>
-                        <button type="button" id="save-split-btn" style="background: #162447; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;">
-                            <i class="la la-save"></i> <?php echo !empty($booking['invoice_split']) ? 'Update' : 'Save'; ?> E-Invoice Request
+                        <button type="button" id="save-split-draft-btn" style="background: #6c757d; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;">
+                            <i class="la la-save"></i> Save as Draft
                         </button>
-                        <button type="button" id="cancel-split-btn" style="background: #6c757d; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;">
+                        <button type="button" id="submit-split-btn" style="background: #162447; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;">
+                            <i class="la la-paper-plane"></i> Submit E-Invoice Request
+                        </button>
+                        <button type="button" id="cancel-split-btn" style="background: #adb5bd; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;">
                             Cancel
                         </button>
                     </div>
@@ -2559,7 +2572,23 @@
             var bookingNetTotal = parseFloat('<?php echo $booking['NetTotal']; ?>') || 0;
             var existingSplit = <?php echo json_encode($booking['invoice_split']); ?>;
             var splitSaveUrl = '<?php echo base_url('customer/booking/' . $booking['Token'] . '/invoice-split/save'); ?>';
+            var splitSubmitUrl = '<?php echo base_url('customer/booking/' . $booking['Token'] . '/invoice-split/submit'); ?>';
             var paxCounter = 0;
+            var maxPax = <?php echo (int)($booking['Adult'] ?? 0) + (int)($booking['Children'] ?? 0) + (int)($booking['Infant'] ?? 0); ?>;
+
+            function updateAddPaxBtnState() {
+                var current = $('.pax-card').length;
+                var $btn = $('#add-pax-btn');
+                if (current >= maxPax) {
+                    $btn.prop('disabled', true)
+                        .css({ 'opacity': '0.5', 'cursor': 'not-allowed' })
+                        .attr('title', 'Maximum ' + maxPax + ' pax reached for this booking');
+                } else {
+                    $btn.prop('disabled', false)
+                        .css({ 'opacity': '', 'cursor': 'pointer' })
+                        .removeAttr('title');
+                }
+            }
 
             function formatCurrency(val) {
                 return 'RM ' + parseFloat(val).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
@@ -2636,6 +2665,7 @@
 
                 $('#pax-cards-container').append(html);
                 recalculate();
+                updateAddPaxBtnState();
             }
 
             function recalculate() {
@@ -2757,6 +2787,7 @@
                 if ($('.pax-card').length > 1) {
                     $(this).closest('.pax-card').remove();
                     recalculate();
+                    updateAddPaxBtnState();
                 }
             });
 
@@ -2770,14 +2801,16 @@
                 // If form is empty, populate from existing data or add one blank pax
                 if ($('#pax-cards-container').children().length === 0) {
                     if (existingSplit && existingSplit.length > 0) {
-                        for (var i = 0; i < existingSplit.length; i++) {
+                        var limit = Math.min(existingSplit.length, maxPax);
+                        for (var i = 0; i < limit; i++) {
                             addPaxCard(existingSplit[i]);
                         }
-                    } else {
+                    } else if (maxPax > 0) {
                         addPaxCard(null);
                     }
                 }
                 recalculate();
+                updateAddPaxBtnState();
             });
 
             $('#cancel-split-btn').on('click', function() {
@@ -2788,11 +2821,17 @@
             });
 
             $('#add-pax-btn').on('click', function() {
+                if ($('.pax-card').length >= maxPax) {
+                    Swal.fire('Limit reached', 'This booking has ' + maxPax + ' pax. You cannot add more.', 'info');
+                    return;
+                }
                 addPaxCard(null);
             });
 
-            // Save
-            $('#save-split-btn').on('click', function() {
+            // Collect + validate the form. Returns the paxList on success, or null
+            // after showing a Swal error. Pass checkAllocation=false to allow
+            // partial allocation (used by the Save-as-Draft flow).
+            function collectAndValidatePayload(checkAllocation) {
                 var paxList = [];
                 var hasError = false;
 
@@ -2851,41 +2890,45 @@
                     paxList.push({ PaxName: paxName, TIN: paxTin, Email: paxEmail, Address: paxAddress, PhoneNumber: paxPhone, products: products });
                 });
 
-                if (hasError) return;
+                if (hasError) return null;
 
-                // Validate full allocation per product
-                var productQtyMap = {};
-                for (var i = 0; i < bookingProducts.length; i++) {
-                    productQtyMap[bookingProducts[i].BookingProductID] = {
-                        name: bookingProducts[i].Name,
-                        expected: parseFloat(bookingProducts[i].Quantity),
-                        allocated: 0
-                    };
-                }
+                if (checkAllocation) {
+                    // Validate full allocation per product
+                    var productQtyMap = {};
+                    for (var i = 0; i < bookingProducts.length; i++) {
+                        productQtyMap[bookingProducts[i].BookingProductID] = {
+                            name: bookingProducts[i].Name,
+                            expected: parseFloat(bookingProducts[i].Quantity),
+                            allocated: 0
+                        };
+                    }
 
-                for (var p = 0; p < paxList.length; p++) {
-                    for (var pr = 0; pr < paxList[p].products.length; pr++) {
-                        var bpId = paxList[p].products[pr].BookingProductID;
-                        if (productQtyMap[bpId]) {
-                            productQtyMap[bpId].allocated += paxList[p].products[pr].Quantity;
+                    for (var p = 0; p < paxList.length; p++) {
+                        for (var pr = 0; pr < paxList[p].products.length; pr++) {
+                            var bpId = paxList[p].products[pr].BookingProductID;
+                            if (productQtyMap[bpId]) {
+                                productQtyMap[bpId].allocated += paxList[p].products[pr].Quantity;
+                            }
+                        }
+                    }
+
+                    for (var key in productQtyMap) {
+                        var prod = productQtyMap[key];
+                        if (Math.abs(prod.expected - prod.allocated) > 0.01) {
+                            Swal.fire('Allocation Error', 'Product "' + prod.name + '" requires total quantity of ' + prod.expected + ' but ' + prod.allocated.toFixed(2) + ' was allocated.', 'error');
+                            return null;
                         }
                     }
                 }
 
-                for (var key in productQtyMap) {
-                    var prod = productQtyMap[key];
-                    if (Math.abs(prod.expected - prod.allocated) > 0.01) {
-                        Swal.fire('Allocation Error', 'Product "' + prod.name + '" requires total quantity of ' + prod.expected + ' but ' + prod.allocated.toFixed(2) + ' was allocated.', 'error');
-                        return;
-                    }
-                }
+                return paxList;
+            }
 
-                // Submit
-                var $btn = $('#save-split-btn');
-                $btn.prop('disabled', true).html('<i class="la la-spinner la-spin"></i> Saving...');
+            function postInvoiceSplit(url, paxList, $btn, originalHtml, busyHtml) {
+                $btn.prop('disabled', true).html(busyHtml);
 
                 $.ajax({
-                    url: splitSaveUrl,
+                    url: url,
                     type: 'POST',
                     contentType: 'application/json',
                     data: JSON.stringify({ pax: paxList }),
@@ -2897,13 +2940,53 @@
                             });
                         } else {
                             Swal.fire('Error', response.message || 'Failed to save.', 'error');
-                            $btn.prop('disabled', false).html('<i class="la la-save"></i> Save E-Invoice Request');
+                            $btn.prop('disabled', false).html(originalHtml);
                         }
                     },
                     error: function() {
                         Swal.fire('Error', 'An unexpected error occurred.', 'error');
-                        $btn.prop('disabled', false).html('<i class="la la-save"></i> Save E-Invoice Request');
+                        $btn.prop('disabled', false).html(originalHtml);
                     }
+                });
+            }
+
+            // Save as Draft (skip allocation check — drafts may be partial)
+            $('#save-split-draft-btn').on('click', function() {
+                var paxList = collectAndValidatePayload(false);
+                if (!paxList) return;
+                var $btn = $(this);
+                postInvoiceSplit(
+                    splitSaveUrl,
+                    paxList,
+                    $btn,
+                    '<i class="la la-save"></i> Save as Draft',
+                    '<i class="la la-spinner la-spin"></i> Saving...'
+                );
+            });
+
+            // Submit (final) — confirm first because it locks the form
+            $('#submit-split-btn').on('click', function() {
+                var paxList = collectAndValidatePayload(true);
+                if (!paxList) return;
+                var $btn = $(this);
+
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Submit e-invoice request?',
+                    text: 'Once submitted, you will not be able to edit this request anymore.',
+                    showCancelButton: true,
+                    confirmButtonText: 'Yes, submit',
+                    cancelButtonText: 'Cancel',
+                    confirmButtonColor: '#162447'
+                }).then(function(result) {
+                    if (!result.value) return;
+                    postInvoiceSplit(
+                        splitSubmitUrl,
+                        paxList,
+                        $btn,
+                        '<i class="la la-paper-plane"></i> Submit E-Invoice Request',
+                        '<i class="la la-spinner la-spin"></i> Submitting...'
+                    );
                 });
             });
         });

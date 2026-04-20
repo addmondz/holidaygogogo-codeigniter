@@ -88,6 +88,38 @@ class Guest_List_Room extends MY_Controller
 		}
 	}
 
+	function Subtract_Count()
+	{
+		if($this->input->post()) {
+			$room_id = $this->input->post('room_id');
+			$type = $this->input->post('type');
+			$allowed = array('adult_count', 'child_count', 'infant_count');
+			if(!in_array($type, $allowed)) {
+				echo json_encode(array('success' => false, 'message' => 'Invalid type'));
+				return;
+			}
+			$room = $this->_get_room_by_id($room_id);
+			if(!$room) {
+				echo json_encode(array('success' => false, 'message' => 'Room not found'));
+				return;
+			}
+			if($this->_is_gl_locked($room['booking_id'])) {
+				echo json_encode(array('success' => false, 'message' => 'Room management is locked because Guest List has been locked'));
+				return;
+			}
+			$this->db->set($type, $type . ' - 1', FALSE);
+			$this->db->where('id', $room_id);
+			$this->db->where($type . ' > ', 0);
+			$this->db->update('guest_list_room');
+			if($this->db->affected_rows() > 0) {
+				$this->Booking_Model->Sync_GL_From_Rooms($room['booking_id']);
+			}
+			echo json_encode(array('success' => true, 'message' => 'Count decreased'));
+		} else {
+			echo json_encode(array('success' => false, 'message' => 'Invalid request'));
+		}
+	}
+
 	function Read_Guests()
 	{
 		$this->load->model('Guest_List_Model');
@@ -128,6 +160,10 @@ class Guest_List_Room extends MY_Controller
 		}
 
 		$this->Guest_List_Model->Auto_Assign_Rooms($guest->BookingID);
+
+		$is_submitted = $this->Guest_List_Model->Are_All_Guests_Complete($guest->BookingID) ? 1 : 0;
+		$this->Booking_Model->update_by_id($guest->BookingID, array('is_submitted' => $is_submitted));
+
 		echo json_encode(array('success' => true, 'message' => 'Guest successfully deleted'));
 	}
 

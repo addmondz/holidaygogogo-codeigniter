@@ -121,19 +121,33 @@ class Remark_Model extends CI_Model
 			$this->db->where('remark.commenter_id !=', intval($user_id));
 		}
 
-		// Sales agents (20) / BookingOP (40): their own bookings OR remarks they were tagged on
-		if ($user_level == 20 && $user_id) {
-			$uid = intval($user_id);
-			$this->db->where("(booking.SalesAgent = $uid OR EXISTS (SELECT 1 FROM notification n WHERE n.remark_id = remark.RemarkID AND n.user_id = $uid))", null, false);
-		}
-		elseif ($user_level == 40 && $user_id) {
-			$uid = intval($user_id);
-			$this->db->where("(booking.BookingOP = $uid OR EXISTS (SELECT 1 FROM notification n WHERE n.remark_id = remark.RemarkID AND n.user_id = $uid))", null, false);
-		}
+		$this->_Apply_Visibility_Filter($user_id, $user_level);
 
 		$this->db->order_by('remark.created_at', 'DESC');
 		$this->db->limit($limit, $offset);
 		return $this->db->get('remark')->result();
+	}
+
+	/**
+	 * Restrict remark visibility to bookings the user owns (SA/OP) or remarks
+	 * they were tagged on via the notification table. Applied to every level
+	 * so the global Messages dropdown doesn't leak unrelated remarks.
+	 */
+	private function _Apply_Visibility_Filter($user_id, $user_level)
+	{
+		if (empty($user_id)) {
+			return;
+		}
+		$uid = intval($user_id);
+		$tagged = "EXISTS (SELECT 1 FROM notification n WHERE n.remark_id = remark.RemarkID AND n.user_id = $uid)";
+
+		if ($user_level == 20) {
+			$this->db->where("(booking.SalesAgent = $uid OR $tagged)", null, false);
+		} elseif ($user_level == 40) {
+			$this->db->where("(booking.BookingOP = $uid OR $tagged)", null, false);
+		} else {
+			$this->db->where("(booking.SalesAgent = $uid OR booking.BookingOP = $uid OR $tagged)", null, false);
+		}
 	}
 
 	/**
@@ -151,14 +165,7 @@ class Remark_Model extends CI_Model
 			$this->db->where('remark.commenter_id !=', intval($user_id));
 		}
 
-		if ($user_level == 20 && $user_id) {
-			$uid = intval($user_id);
-			$this->db->where("(booking.SalesAgent = $uid OR EXISTS (SELECT 1 FROM notification n WHERE n.remark_id = remark.RemarkID AND n.user_id = $uid))", null, false);
-		}
-		elseif ($user_level == 40 && $user_id) {
-			$uid = intval($user_id);
-			$this->db->where("(booking.BookingOP = $uid OR EXISTS (SELECT 1 FROM notification n WHERE n.remark_id = remark.RemarkID AND n.user_id = $uid))", null, false);
-		}
+		$this->_Apply_Visibility_Filter($user_id, $user_level);
 
 		return $this->db->count_all_results('remark');
 	}
@@ -178,14 +185,7 @@ class Remark_Model extends CI_Model
 		$this->db->where('rur.id IS NULL', null, false);
 		$this->db->where('remark.commenter_id !=', intval($user_id));
 
-		if ($user_level == 20 && $user_id) {
-			$uid = intval($user_id);
-			$this->db->where("(booking.SalesAgent = $uid OR EXISTS (SELECT 1 FROM notification n WHERE n.remark_id = remark.RemarkID AND n.user_id = $uid))", null, false);
-		}
-		elseif ($user_level == 40 && $user_id) {
-			$uid = intval($user_id);
-			$this->db->where("(booking.BookingOP = $uid OR EXISTS (SELECT 1 FROM notification n WHERE n.remark_id = remark.RemarkID AND n.user_id = $uid))", null, false);
-		}
+		$this->_Apply_Visibility_Filter($user_id, $user_level);
 
 		return $this->db->count_all_results('remark');
 	}

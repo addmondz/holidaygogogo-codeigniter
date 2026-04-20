@@ -77,6 +77,32 @@ $is_view_mode = true;
                                 </div>
                             </div>
                         </div>
+                        <?php if (!empty($Customer2)): ?>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Customer 2</label>
+                                <div class="input-icon">
+                                    <input type="text" disabled value="<?php echo htmlspecialchars($Customer2, ENT_QUOTES); ?>" autocomplete="off" class="form-control">
+                                    <span>
+                                        <i class="la la-user"></i>
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        <?php endif; ?>
+                        <?php if (!empty($CustomerMobile2)): ?>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Mobile 2</label>
+                                <div class="input-icon">
+                                    <input type="text" disabled value="<?php echo htmlspecialchars($CustomerMobile2, ENT_QUOTES); ?>" autocomplete="off" class="form-control">
+                                    <span>
+                                        <i class="la la-mobile"></i>
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        <?php endif; ?>
                         <div class="col-md-6">
                             <div class="form-group">
                                 <label>Destination</label>

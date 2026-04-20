@@ -56,17 +56,22 @@ class Customer_Portal extends CI_Controller
         // Get customer bookings separated into upcoming and completed
         $bookings_data = $this->get_customer_bookings_by_category($customer['CustomerID']);
 
-        // Format pax information and status display for each booking
+        // Format pax information and status display for each booking. Pax is sourced
+        // from room totals (via Booking_Model->Compute_Pax_Counts) so the portal matches
+        // the BC / Travel Voucher the customer receives.
         foreach ($bookings_data['upcoming'] as &$booking) {
-            $booking['PaxInfo'] = $this->format_pax_info($booking['Adult'] ?? 0, $booking['Children'] ?? 0, $booking['Infant'] ?? 0);
+            $pax = $this->Booking_Model->Compute_Pax_Counts($booking['BookingID']);
+            $booking['PaxInfo'] = $this->format_pax_info($pax['adult'], $pax['child'], $pax['infant']);
             $booking['status_display'] = $this->get_booking_status_display_for_list($booking);
         }
         foreach ($bookings_data['completed'] as &$booking) {
-            $booking['PaxInfo'] = $this->format_pax_info($booking['Adult'] ?? 0, $booking['Children'] ?? 0, $booking['Infant'] ?? 0);
+            $pax = $this->Booking_Model->Compute_Pax_Counts($booking['BookingID']);
+            $booking['PaxInfo'] = $this->format_pax_info($pax['adult'], $pax['child'], $pax['infant']);
             $booking['status_display'] = $this->get_booking_status_display_for_list($booking);
         }
         foreach ($bookings_data['cancelled'] as &$booking) {
-            $booking['PaxInfo'] = $this->format_pax_info($booking['Adult'] ?? 0, $booking['Children'] ?? 0, $booking['Infant'] ?? 0);
+            $pax = $this->Booking_Model->Compute_Pax_Counts($booking['BookingID']);
+            $booking['PaxInfo'] = $this->format_pax_info($pax['adult'], $pax['child'], $pax['infant']);
             $booking['status_display'] = $this->get_booking_status_display_for_list($booking);
         }
 
@@ -468,7 +473,8 @@ class Customer_Portal extends CI_Controller
         $booking['EndDate'] = !empty($booking['EndDate']) ? date('d M Y', strtotime($booking['EndDate'])) : null;
         $booking['InsertDate'] = !empty($booking['InsertDate']) ? date('d M Y', strtotime($booking['InsertDate'])) : null;
         $booking['CustomerMobile'] = $booking['CountryCode'] . $booking['CustomerMobile'];
-        $booking['PaxInfo'] = $this->format_pax_info($booking['Adult'] ?? 0, $booking['Children'] ?? 0, $booking['Infant'] ?? 0);
+        $pax = $this->Booking_Model->Compute_Pax_Counts($booking['BookingID']);
+        $booking['PaxInfo'] = $this->format_pax_info($pax['adult'], $pax['child'], $pax['infant']);
 
         // Get booking products
         $this->db->select('*');
@@ -480,6 +486,7 @@ class Customer_Portal extends CI_Controller
         // Get invoice split data
         $this->load->model('Invoice_Split_Model');
         $booking['invoice_split'] = $this->Invoice_Split_Model->Get_Pax_By_Booking($booking['BookingID']);
+        $booking['einvoice_submit_status'] = $this->Invoice_Split_Model->Get_Submit_Status($booking['BookingID']);
 
         // Get payment history (exclude SUPPLIER PAYMENT)
         $this->db->select('payment.PaymentID, Date, Type, Credit, ReferenceNumber, Debit, Deadline, payment.Status, PaymentRemark, DebitRemark, payment.Bank, payment.BankAccount, payment.BankHolder, supplier.Name As SupplierName');
@@ -1135,9 +1142,47 @@ class Customer_Portal extends CI_Controller
     }
 
     /**
-     * Save invoice split data (AJAX)
+     * Save invoice split data as a DRAFT (AJAX).
+     * Customer can continue to edit after save.
      */
     public function save_invoice_split($hashed_bc = null)
+    {
+        $this->_persist_invoice_split($hashed_bc, 'D');
+    }
+
+    /**
+     * Submit invoice split data (AJAX). Rejects if already submitted.
+     * Once submitted, the customer-portal form is locked.
+     */
+    public function submit_invoice_split($hashed_bc = null)
+    {
+        $this->output->set_content_type('application/json');
+
+        if (!empty($hashed_bc)) {
+            $this->db->select('BookingID');
+            $this->db->where('Token', $hashed_bc);
+            $this->db->where('Status !=', 'N');
+            $existing = $this->db->get('booking')->row_array();
+            if (!empty($existing)) {
+                $this->load->model('Invoice_Split_Model');
+                if ($this->Invoice_Split_Model->Get_Submit_Status($existing['BookingID']) === 'S') {
+                    $this->output->set_output(json_encode([
+                        'success' => false,
+                        'message' => 'This e-invoice request has already been submitted and cannot be changed.'
+                    ]));
+                    return;
+                }
+            }
+        }
+
+        $this->_persist_invoice_split($hashed_bc, 'S');
+    }
+
+    /**
+     * Shared implementation for save_invoice_split (draft) and submit_invoice_split.
+     * Applies the same validation rules regardless of submit status.
+     */
+    private function _persist_invoice_split($hashed_bc, $submit_status)
     {
         $this->output->set_content_type('application/json');
 
@@ -1147,7 +1192,7 @@ class Customer_Portal extends CI_Controller
         }
 
         // Verify booking
-        $this->db->select('BookingID, Subtotal, Discount, NetTotal');
+        $this->db->select('BookingID, Subtotal, Discount, NetTotal, Adult, Children, Infant');
         $this->db->where('Token', $hashed_bc);
         $this->db->where('Status !=', 'N');
         $booking = $this->db->get('booking')->row_array();
@@ -1163,6 +1208,15 @@ class Customer_Portal extends CI_Controller
 
         if (empty($data) || empty($data['pax'])) {
             $this->output->set_output(json_encode(['success' => false, 'message' => 'No pax data provided']));
+            return;
+        }
+
+        $max_pax = (int)$booking['Adult'] + (int)$booking['Children'] + (int)$booking['Infant'];
+        if (count($data['pax']) > $max_pax) {
+            $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => 'Pax count (' . count($data['pax']) . ') exceeds booking pax (' . $max_pax . ')'
+            ]));
             return;
         }
 
@@ -1279,17 +1333,21 @@ class Customer_Portal extends CI_Controller
             ];
         }
 
-        // Validate all product quantities are fully allocated
-        foreach ($booking_products as $bp) {
-            $bp_id = $bp['BookingProductID'];
-            $expected = floatval($bp['Quantity']);
-            $actual = $qty_allocated[$bp_id];
-            if (abs($expected - $actual) > 0.01) {
-                $this->output->set_output(json_encode([
-                    'success' => false,
-                    'message' => 'Product "' . htmlspecialchars($bp['ProductName']) . '" requires total quantity of ' . $expected . ' but ' . $actual . ' was allocated'
-                ]));
-                return;
+        // Validate all product quantities are fully allocated — only enforced on
+        // Submit. Drafts are allowed to have partial allocations so the customer
+        // can save progress mid-way.
+        if ($submit_status === 'S') {
+            foreach ($booking_products as $bp) {
+                $bp_id = $bp['BookingProductID'];
+                $expected = floatval($bp['Quantity']);
+                $actual = $qty_allocated[$bp_id];
+                if (abs($expected - $actual) > 0.01) {
+                    $this->output->set_output(json_encode([
+                        'success' => false,
+                        'message' => 'Product "' . htmlspecialchars($bp['ProductName']) . '" requires total quantity of ' . $expected . ' but ' . $actual . ' was allocated'
+                    ]));
+                    return;
+                }
             }
         }
 
@@ -1302,14 +1360,19 @@ class Customer_Portal extends CI_Controller
             $booking['BookingID'],
             $pax_data,
             $booking_subtotal,
-            $booking_discount
+            $booking_discount,
+            $submit_status
         );
 
         if ($result) {
             $pax = $this->Invoice_Split_Model->Get_Pax_By_Booking($booking['BookingID']);
+            $message = ($submit_status === 'S')
+                ? 'E-Invoice request submitted successfully'
+                : 'E-Invoice request saved as draft';
             $this->output->set_output(json_encode([
                 'success' => true,
-                'message' => 'Invoice split saved successfully',
+                'message' => $message,
+                'submit_status' => $submit_status,
                 'pax' => $pax
             ]));
         } else {

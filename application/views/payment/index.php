@@ -1065,4 +1065,440 @@ function loadPaymentSummary() {
         }
     });
 }
+
+function escapeHtml(text) {
+    if(!text) return '';
+    var div = document.createElement('div');
+    div.appendChild(document.createTextNode(text));
+    return div.innerHTML;
+}
+</script>
+
+<!-- Remarks Modal -->
+<div class="modal fade" id="remarksModal" tabindex="-1" role="dialog" aria-labelledby="remarksModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header" style="background-color:#D7E2F2;">
+                <h5 class="modal-title" id="remarksModalLabel" style="color:#6082B6;">
+                    <strong>Remarks</strong>
+                </h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body" id="remarksModalBody">
+                <!-- Internal Comments Section -->
+                <h6 class="font-weight-bold mb-2" style="color:#6082B6;">Internal Comments</h6>
+                <div id="remarks-internal-list" style="max-height:250px; overflow-y:auto;">
+                    <div class="text-center py-3"><div class="spinner spinner-primary spinner-lg"></div></div>
+                </div>
+                <div class="border-top pt-2 mt-2">
+                    <div class="form-group mb-2 mention-wrapper" style="position: relative;">
+                        <textarea id="modal-new-comment-content" class="form-control" rows="2" placeholder="Enter your comment here... Type @ to mention a user" style="font-size: 0.8125rem;"></textarea>
+                    </div>
+                    <button type="button" id="modal-add-comment-btn" class="btn btn-primary btn-sm font-weight-bold mt-2 mb-2">
+                        <i class="la la-comment"></i> Add Comment
+                    </button>
+                </div>
+
+                <hr>
+
+                <!-- Customer Remarks Section -->
+                <h6 class="font-weight-bold mb-2" style="color:#388E3C;">Customer Remarks</h6>
+                <div id="remarks-customer-list" style="max-height:250px; overflow-y:auto;">
+                    <div class="text-center py-3"><div class="spinner spinner-primary spinner-lg"></div></div>
+                </div>
+                <div class="border-top pt-2 mt-2">
+                    <div class="form-group mb-2">
+                        <textarea id="modal-new-customer-remark-content" class="form-control" rows="2" placeholder="Add your response or remark here..." style="font-size: 0.8125rem;"></textarea>
+                    </div>
+                    <button type="button" id="modal-add-customer-remark-btn" class="btn btn-primary btn-sm font-weight-bold mt-2 mb-2">
+                        <i class="la la-comment"></i> Add Remark
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+var remarksModalBookingId = null;
+var remarksModalSalesAgentId = null;
+var remarksModalBookingOpId = null;
+
+window.ADMIN_HANDLE_MAP = <?php
+    $__map = array();
+    if (!empty($notify_admins)) {
+        foreach ($notify_admins as $__a) {
+            if ($__a->Status === 'Y' && !empty($__a->handle)) {
+                $__map[] = array(
+                    'AdminID' => (int)$__a->AdminID,
+                    'Name' => $__a->Name,
+                    'handle' => $__a->handle,
+                );
+            }
+        }
+    }
+    echo json_encode($__map);
+?>;
+
+function renderMentionedContent(text) {
+    if (text == null) return '';
+    var safe = escapeHtml(String(text));
+    var nameByHandle = {};
+    (window.ADMIN_HANDLE_MAP || []).forEach(function(a) { nameByHandle[a.handle] = a.Name; });
+    return safe.replace(/@([a-z0-9]+)/g, function(full, handle) {
+        if (nameByHandle[handle]) {
+            return '<span class="mention" style="color:#1877f2;font-weight:600;background:#e7f3ff;padding:1px 4px;border-radius:3px;">@' + escapeHtml(nameByHandle[handle]) + '</span>';
+        }
+        return full;
+    });
+}
+
+function initMentionAutocomplete(textareaSelector) {
+    var $ta = $(textareaSelector);
+    if (!$ta.length || $ta.data('mention-init')) return;
+    $ta.data('mention-init', true);
+
+    var admins = (window.ADMIN_HANDLE_MAP || []).slice();
+    var $dd = $('<ul class="mention-dropdown"></ul>').css({
+        position: 'absolute', zIndex: 1070, background: '#fff',
+        border: '1px solid #d0d7de', borderRadius: '4px', padding: '4px 0',
+        margin: 0, listStyle: 'none', maxHeight: '180px', overflowY: 'auto',
+        minWidth: '180px', boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
+        display: 'none', fontSize: '0.8125rem'
+    });
+    $ta.closest('.mention-wrapper').append($dd);
+
+    var activeIdx = 0;
+
+    function hide() { $dd.hide().empty(); }
+
+    function filter(q) {
+        q = q.toLowerCase();
+        return admins.filter(function(a) {
+            return a.handle.indexOf(q) === 0 || a.Name.toLowerCase().indexOf(q) !== -1;
+        }).slice(0, 8);
+    }
+
+    function render(list) {
+        $dd.empty();
+        if (!list.length) { hide(); return; }
+        list.forEach(function(a, i) {
+            var $li = $('<li></li>').css({
+                padding: '6px 10px', cursor: 'pointer',
+                background: i === activeIdx ? '#e7f3ff' : 'transparent'
+            }).attr('data-handle', a.handle);
+            $li.html('<strong>' + escapeHtml(a.Name) + '</strong> <span style="color:#65676b;font-size:0.75rem;">@' + escapeHtml(a.handle) + '</span>');
+            $li.on('mousedown', function(e) { e.preventDefault(); pick(a.handle); });
+            $li.on('mouseenter', function() { activeIdx = i; render(list); });
+            $dd.append($li);
+        });
+        $dd.show();
+    }
+
+    function currentMatch() {
+        var val = $ta.val();
+        var pos = $ta[0].selectionStart;
+        var before = val.slice(0, pos);
+        var m = before.match(/(?:^|\s)@([a-z0-9]*)$/i);
+        if (!m) return null;
+        return { query: m[1].toLowerCase(), start: pos - m[1].length - 1, end: pos };
+    }
+
+    function pick(handle) {
+        var match = currentMatch();
+        if (!match) { hide(); return; }
+        var val = $ta.val();
+        var newVal = val.slice(0, match.start) + '@' + handle + ' ' + val.slice(match.end);
+        var newPos = match.start + handle.length + 2;
+        $ta.val(newVal);
+        $ta[0].setSelectionRange(newPos, newPos);
+        $ta.trigger('focus');
+        hide();
+    }
+
+    $ta.on('input click keyup', function(e) {
+        if (e.type === 'keyup' && (e.keyCode === 38 || e.keyCode === 40 || e.keyCode === 13 || e.keyCode === 27 || e.keyCode === 9)) return;
+        var match = currentMatch();
+        if (!match) { hide(); return; }
+        activeIdx = 0;
+        var list = filter(match.query);
+        if (!list.length) { hide(); return; }
+        $dd.css({ top: ($ta.outerHeight() + 2) + 'px', left: '0px', right: 'auto' });
+        render(list);
+        $dd.data('current-list', list);
+    });
+
+    $ta.on('keydown', function(e) {
+        if (!$dd.is(':visible')) return;
+        var list = $dd.data('current-list') || [];
+        if (e.keyCode === 38) {
+            e.preventDefault();
+            activeIdx = (activeIdx - 1 + list.length) % list.length;
+            render(list);
+        } else if (e.keyCode === 40) {
+            e.preventDefault();
+            activeIdx = (activeIdx + 1) % list.length;
+            render(list);
+        } else if (e.keyCode === 13 || e.keyCode === 9) {
+            if (list[activeIdx]) {
+                e.preventDefault();
+                e.stopPropagation();
+                pick(list[activeIdx].handle);
+            }
+        } else if (e.keyCode === 27) {
+            e.preventDefault();
+            hide();
+        }
+    });
+
+    $ta.on('blur', function() { setTimeout(hide, 150); });
+}
+
+function renderRemarkItem(remark) {
+    var avatarColor = ['primary', 'success', 'info', 'warning', 'danger'][remark.commenter_name.charCodeAt(0) % 5];
+    var notifiedHtml = '';
+    if (remark.notified_users && remark.notified_users.length) {
+        var names = remark.notified_users.map(function(u) { return escapeHtml(u.Name); }).join(', ');
+        notifiedHtml = '<div class="mt-1" style="font-size: 0.7rem; color: #65676b;"><i class="la la-bell"></i> Notified: ' + names + '</div>';
+    }
+    return '<div class="comment-item d-flex mb-2 mx-2 pb-2 pl-1" style="border-bottom: 1px solid #e4e6eb;">' +
+        '<div class="flex-shrink-0 mr-2">' +
+        '<div class="symbol symbol-32 symbol-circle symbol-light-' + avatarColor + '">' +
+        '<span class="symbol-label font-weight-bold" style="font-size: 0.75rem;">' + (remark.commenter_initials || remark.commenter_name.substring(0, 2).toUpperCase()) + '</span>' +
+        '</div>' +
+        '</div>' +
+        '<div class="flex-grow-1" style="min-width: 0;">' +
+        '<div class="d-flex align-items-baseline mb-1">' +
+        '<strong class="mr-2" style="font-size: 0.8125rem; color: #050505;">' + escapeHtml(remark.commenter_name) + '</strong>' +
+        '<span class="text-muted" style="font-size: 0.75rem; color: #65676b;">' + remark.created_at + '</span>' +
+        '</div>' +
+        '<div class="comment-text" style="font-size: 0.8125rem; color: #050505; line-height: 1.3; white-space: pre-wrap; word-wrap: break-word;">' + renderMentionedContent(remark.content) + '</div>' +
+        notifiedHtml +
+        '</div>' +
+        '</div>';
+}
+
+function loadModalInternalComments() {
+    $.ajax({
+        url: '<?php echo base_url("Booking/Get_Remarks"); ?>',
+        type: 'get',
+        data: { booking_id: remarksModalBookingId },
+        dataType: 'json',
+        success: function(response) {
+            var list = $('#remarks-internal-list');
+            list.empty();
+            if (response.success && response.remarks && response.remarks.length > 0) {
+                response.remarks.forEach(function(remark) {
+                    list.append(renderRemarkItem(remark));
+                });
+                // Scroll to bottom
+                list.scrollTop(list[0].scrollHeight);
+            } else {
+                list.html('<div class="text-center text-muted py-3" style="font-size: 0.8125rem;">No internal comments yet.</div>');
+            }
+        },
+        error: function() {
+            $('#remarks-internal-list').html('<div class="text-center text-danger py-3" style="font-size: 0.8125rem;">Error loading comments.</div>');
+        }
+    });
+}
+
+function loadModalCustomerRemarks() {
+    $.ajax({
+        url: '<?php echo base_url("Booking/Get_Customer_Remarks"); ?>',
+        type: 'get',
+        data: { booking_id: remarksModalBookingId },
+        dataType: 'json',
+        success: function(response) {
+            var list = $('#remarks-customer-list');
+            list.empty();
+            if (response.success && response.remarks && response.remarks.length > 0) {
+                response.remarks.forEach(function(remark) {
+                    list.append(renderRemarkItem(remark));
+                });
+                list.scrollTop(list[0].scrollHeight);
+            } else {
+                list.html('<div class="text-center text-muted py-3" style="font-size: 0.8125rem;">No customer remarks yet.</div>');
+            }
+        },
+        error: function() {
+            $('#remarks-customer-list').html('<div class="text-center text-danger py-3" style="font-size: 0.8125rem;">Error loading remarks.</div>');
+        }
+    });
+}
+
+function openRemarksModal(bookingId, bookingNumber, salesAgentId, bookingOpId) {
+    remarksModalBookingId = bookingId;
+    remarksModalSalesAgentId = salesAgentId;
+    remarksModalBookingOpId = bookingOpId;
+
+    $('#remarksModalLabel').html('<strong>Remarks &mdash; ' + escapeHtml(bookingNumber) + '</strong>');
+    var spinnerHtml = '<div class="text-center py-3"><div class="spinner spinner-primary spinner-lg"></div></div>';
+    $('#remarks-internal-list').html(spinnerHtml);
+    $('#remarks-customer-list').html(spinnerHtml);
+
+    // Clear form fields
+    $('#modal-new-comment-content').val('');
+    $('#modal-new-customer-remark-content').val('');
+
+    $('#remarksModal').modal('show');
+
+    loadModalInternalComments();
+    loadModalCustomerRemarks();
+}
+
+// Add internal comment from modal
+$('#modal-add-comment-btn').on('click', function() {
+    var content = $('#modal-new-comment-content').val().trim();
+    if (!content) {
+        Swal.fire({
+            width: 550,
+            background: 'url(<?php echo base_url("assets/image/sweetalert.jpg"); ?>)',
+            icon: 'warning',
+            title: 'Please enter a comment',
+            showConfirmButton: false,
+            timer: 2000
+        });
+        return;
+    }
+
+    var $btn = $(this);
+    var originalText = $btn.html();
+    $btn.prop('disabled', true).html('<i class="la la-spinner la-spin"></i> Adding...');
+
+    $.ajax({
+        url: '<?php echo base_url("Booking/Add_Remark"); ?>',
+        type: 'post',
+        data: {
+            booking_id: remarksModalBookingId,
+            content: content
+        },
+        dataType: 'json',
+        success: function(response) {
+            $btn.prop('disabled', false).html(originalText);
+            if (response.success) {
+                $('#modal-new-comment-content').val('');
+                loadModalInternalComments();
+                Swal.fire({
+                    width: 550,
+                    background: 'url(<?php echo base_url("assets/image/sweetalert.jpg"); ?>)',
+                    icon: 'success',
+                    title: 'Comment added Successfully',
+                    showConfirmButton: false,
+                    timer: 2200
+                });
+            } else {
+                Swal.fire({
+                    width: 550,
+                    background: 'url(<?php echo base_url("assets/image/sweetalert.jpg"); ?>)',
+                    icon: 'error',
+                    title: response.message || 'Failed to add comment',
+                    showConfirmButton: false,
+                    timer: 3000
+                });
+            }
+        },
+        error: function() {
+            $btn.prop('disabled', false).html(originalText);
+            Swal.fire({
+                width: 550,
+                background: 'url(<?php echo base_url("assets/image/sweetalert.jpg"); ?>)',
+                icon: 'error',
+                title: 'Error adding comment. Please try again.',
+                showConfirmButton: false,
+                timer: 3000
+            });
+        }
+    });
+});
+
+// Add customer remark from modal
+$('#modal-add-customer-remark-btn').on('click', function() {
+    var content = $('#modal-new-customer-remark-content').val().trim();
+    if (!content) {
+        Swal.fire({
+            width: 550,
+            background: 'url(<?php echo base_url("assets/image/sweetalert.jpg"); ?>)',
+            icon: 'warning',
+            title: 'Please enter a remark',
+            showConfirmButton: false,
+            timer: 2000
+        });
+        return;
+    }
+
+    var $btn = $(this);
+    var originalText = $btn.html();
+    $btn.prop('disabled', true).html('<i class="la la-spinner la-spin"></i> Adding...');
+
+    $.ajax({
+        url: '<?php echo base_url("Booking/Add_Remark"); ?>',
+        type: 'post',
+        data: {
+            booking_id: remarksModalBookingId,
+            content: content,
+            remark_type: '2',
+            skip_notifications: '1'
+        },
+        dataType: 'json',
+        success: function(response) {
+            $btn.prop('disabled', false).html(originalText);
+            if (response.success) {
+                $('#modal-new-customer-remark-content').val('');
+                loadModalCustomerRemarks();
+                Swal.fire({
+                    width: 550,
+                    background: 'url(<?php echo base_url("assets/image/sweetalert.jpg"); ?>)',
+                    icon: 'success',
+                    title: 'Remark added Successfully',
+                    showConfirmButton: false,
+                    timer: 2200
+                });
+            } else {
+                Swal.fire({
+                    width: 550,
+                    background: 'url(<?php echo base_url("assets/image/sweetalert.jpg"); ?>)',
+                    icon: 'error',
+                    title: response.message || 'Failed to add remark',
+                    showConfirmButton: false,
+                    timer: 3000
+                });
+            }
+        },
+        error: function() {
+            $btn.prop('disabled', false).html(originalText);
+            Swal.fire({
+                width: 550,
+                background: 'url(<?php echo base_url("assets/image/sweetalert.jpg"); ?>)',
+                icon: 'error',
+                title: 'Error adding remark. Please try again.',
+                showConfirmButton: false,
+                timer: 3000
+            });
+        }
+    });
+});
+
+// Allow Ctrl+Enter / Shift+Enter to submit in modal textareas
+$('#modal-new-comment-content').on('keydown', function(e) {
+    if ((e.ctrlKey || e.shiftKey) && e.keyCode === 13) {
+        e.preventDefault();
+        $('#modal-add-comment-btn').click();
+    }
+});
+$('#modal-new-customer-remark-content').on('keydown', function(e) {
+    if ((e.ctrlKey || e.shiftKey) && e.keyCode === 13) {
+        e.preventDefault();
+        $('#modal-add-customer-remark-btn').click();
+    }
+});
+
+// Initialize @mention autocomplete on the modal textarea when modal opens
+$('#remarksModal').on('shown.bs.modal', function() {
+    if (typeof initMentionAutocomplete === 'function') {
+        initMentionAutocomplete('#modal-new-comment-content');
+    }
+});
 </script>

@@ -1506,10 +1506,14 @@ class Booking extends MY_Controller
 			}
 		}
 		
-		redirect('Guest_List?gl=' . $this->input->get('gl'));
+		if ($this->input->get('return_to') === 'booking') {
+			redirect('Booking/Update?booking_id=' . $booking_id);
+		} else {
+			redirect('Guest_List?gl=' . $this->input->get('gl'));
+		}
 	}
 
-	function Update_Travel_Insurance_Status() 
+	function Update_Travel_Insurance_Status()
 	{
 		$this->Booking_Model->Update_Travel_Insurance_Status();
 		$this->Booking_Model->Create_Booking_Log();
@@ -3644,6 +3648,46 @@ class Booking extends MY_Controller
 			$this->db->insert_batch('booking_log', $booking_logs);
 			log_message('debug', 'Booking Checklist Logs: ' . count($booking_logs) . ' entries inserted for BookingID: ' . $booking_id);
 		}
+	}
+
+	// TEMP one-shot sweep: recompute is_submitted for bookings where the flag
+	// may have gone stale (room edits used to skip recalc). Remove after running.
+	// Pass ?dry_run=1 to preview affected BookingIDs without writing.
+	function Recompute_All_Is_Submitted()
+	{
+		if(!$this->session->userdata('admin_id') || empty($this->session->access_control) || !in_array('VB', $this->session->access_control)) {
+			show_error('Unauthorized', 403);
+			return;
+		}
+
+		$this->load->model('Guest_List_Model');
+		$dry_run = !empty($this->input->get('dry_run'));
+
+		$this->db->select('BookingID');
+		$this->db->where('is_submitted', 1);
+		$this->db->where('LockStatus', 'N');
+		$candidates = $this->db->get('booking')->result();
+
+		$affected = array();
+		foreach($candidates as $row) {
+			if(!$this->Guest_List_Model->Are_All_Guests_Complete($row->BookingID)) {
+				if(!$dry_run) {
+					$this->db->where('BookingID', $row->BookingID);
+					$this->db->update('booking', array('is_submitted' => 0));
+				}
+				$affected[] = $row->BookingID;
+			}
+		}
+
+		$verb = $dry_run ? 'would correct' : 'corrected';
+		log_message('info', 'Recompute_All_Is_Submitted (' . ($dry_run ? 'dry-run' : 'apply') . '): scanned ' . count($candidates) . ', ' . $verb . ' ' . count($affected) . ' -> ' . implode(',', $affected));
+		echo json_encode(array(
+			'success' => true,
+			'dry_run' => $dry_run,
+			'scanned' => count($candidates),
+			'affected_count' => count($affected),
+			'affected_booking_ids' => $affected
+		));
 	}
 
 }

@@ -137,6 +137,26 @@
 				<td> : </td>
 				<td><?php echo $ReservationNumber; ?></td>
 			</tr>
+			<?php if (!empty($Customer2)): ?>
+			<tr>
+				<td>Customer 2</td>
+				<td> : </td>
+				<td><b><?php echo $Customer2; ?></b></td>
+				<td></td>
+				<td></td>
+				<td></td>
+			</tr>
+			<?php endif; ?>
+			<?php if (!empty($CustomerMobile2)): ?>
+			<tr>
+				<td>Contact No. 2</td>
+				<td> : </td>
+				<td><?php echo $CustomerMobile2; ?></td>
+				<td></td>
+				<td></td>
+				<td></td>
+			</tr>
+			<?php endif; ?>
 			<tr>
 				<td>Travel Date</td>
 				<td> : </td>

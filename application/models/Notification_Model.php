@@ -45,21 +45,24 @@ class Notification_Model extends CI_Model
 		$user = $this->db->get('admin')->row();
 		$user_level = !empty($user) ? $user->level : null;
 
+		$uid = (int)$user_id;
+
 		$this->db->where('notification.user_id', $user_id);
 		$this->db->where('notification.is_read', 0);
-		// Remarks surface in the Messages dropdown, not the bell
-		$this->db->where('notification.type !=', 'remark');
+
+		$this->db->join('booking', 'booking.BookingID = notification.owner_id AND notification.owner_type = "booking"', 'left');
+		// Bell shows remark notifications only to the booking's SalesAgent / BookingOP.
+		// @mention rows (recipient is neither) stay in the Messages dropdown.
+		$this->db->where("(notification.type != 'remark' OR booking.SalesAgent = $uid OR booking.BookingOP = $uid)", NULL, FALSE);
 
 		// For Sales Agents (level 20), only count booking notifications for their bookings
 		// (non-booking notifications, e.g. owner_type='product', are always shown)
 		if ($user_level == 20) {
-			$this->db->join('booking', 'booking.BookingID = notification.owner_id AND notification.owner_type = "booking"', 'left');
-			$this->db->where('(notification.owner_type != "booking" OR booking.SalesAgent = ' . (int)$user_id . ')', NULL, FALSE);
+			$this->db->where("(notification.owner_type != 'booking' OR booking.SalesAgent = $uid)", NULL, FALSE);
 		}
 		// For BookingOP (level 40), only count booking notifications for their bookings
 		elseif ($user_level == 40) {
-			$this->db->join('booking', 'booking.BookingID = notification.owner_id AND notification.owner_type = "booking"', 'left');
-			$this->db->where('(notification.owner_type != "booking" OR booking.BookingOP = ' . (int)$user_id . ')', NULL, FALSE);
+			$this->db->where("(notification.owner_type != 'booking' OR booking.BookingOP = $uid)", NULL, FALSE);
 		}
 
 		return $this->db->count_all_results('notification');
@@ -81,24 +84,27 @@ class Notification_Model extends CI_Model
 		$user = $this->db->get('admin')->row();
 		$user_level = !empty($user) ? $user->level : null;
 
+		$uid = (int)$user_id;
+
 		$this->db->select('notification.*, booking.BookingNumber, booking.BookingID, booking.Customer, admin.Name AS CommenterName');
 		$this->db->join('booking', 'booking.BookingID = notification.owner_id AND notification.owner_type = "booking"', 'left');
 		$this->db->join('remark', 'remark.RemarkID = notification.remark_id', 'left');
 		$this->db->join('admin', 'admin.AdminID = remark.commenter_id', 'left');
 		$this->db->where('notification.user_id', $user_id);
-		// Remarks surface in the Messages dropdown, not the bell
-		$this->db->where('notification.type !=', 'remark');
+		// Bell shows remark notifications only to the booking's SalesAgent / BookingOP.
+		// @mention rows (recipient is neither) stay in the Messages dropdown.
+		$this->db->where("(notification.type != 'remark' OR booking.SalesAgent = $uid OR booking.BookingOP = $uid)", NULL, FALSE);
 
 		// For Sales Agents (level 20), only show booking notifications for their bookings
 		// (non-booking notifications, e.g. owner_type='product', are always shown)
 		if ($user_level == 20) {
-			$this->db->where('(notification.owner_type != "booking" OR booking.SalesAgent = ' . (int)$user_id . ')', NULL, FALSE);
+			$this->db->where("(notification.owner_type != 'booking' OR booking.SalesAgent = $uid)", NULL, FALSE);
 		}
 		// For BookingOP (level 40), only show booking notifications for their bookings
 		elseif ($user_level == 40) {
-			$this->db->where('(notification.owner_type != "booking" OR booking.BookingOP = ' . (int)$user_id . ')', NULL, FALSE);
+			$this->db->where("(notification.owner_type != 'booking' OR booking.BookingOP = $uid)", NULL, FALSE);
 		}
-		
+
 		$this->db->order_by('notification.created_at', 'DESC');
 		$this->db->limit($limit, $offset);
 		return $this->db->get('notification')->result();

@@ -358,7 +358,10 @@
                         <div class="col-md-6">
 
                             <div class="form-group">
-                                <label>Customer <span style="color:red;">*</span></label>
+                                <label>
+                                    Customer <span style="color:red;">*</span>
+                                    <small id="customerInfo" class="text-muted ml-2">&laquo; New Customer &raquo;</small>
+                                </label>
 
                                 <div class="input-icon position-relative">
                                     <input type="text"
@@ -370,7 +373,6 @@
                                         autocomplete="off"
                                         class="form-control"
                                         placeholder="Search or select customer">
-                                    <small id="customerInfo" class="form-text text-muted">&laquo; New Customer &raquo;</small>
 
                                     <!-- Hidden field to detect existing customer -->
                                     <?php
@@ -457,6 +459,92 @@
                                 $(document).ready(function() {
                                     var selectedCountry = <?php echo !empty($selected_booking_country_code) ? json_encode(['CountryCodeID' => $selected_booking_country_code->CountryCodeID, 'Country' => $selected_booking_country_code->Country, 'CountryCode' => $selected_booking_country_code->CountryCode]) : 'null'; ?>;
                                     initPhoneInputMain(selectedCountry);
+                                });
+                                </script>
+
+                            </div>
+
+                            <div class="form-group">
+                                <label>
+                                    Customer 2
+                                    <small id="customerInfo2" class="text-muted ml-2">&laquo; New Customer &raquo;</small>
+                                </label>
+
+                                <div class="input-icon position-relative">
+                                    <input type="text"
+                                        id="Customer2"
+                                        name="Customer2"
+                                        <?php if (current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) { ?>
+                                            value="<?php echo isset($Customer2) ? htmlspecialchars($Customer2, ENT_QUOTES) : ''; ?>"
+                                        <?php } ?>
+                                        autocomplete="off"
+                                        class="form-control"
+                                        placeholder="Optional — search or type a second contact">
+
+                                    <?php
+                                    $customer_id_2_value = ($is_edit_page && !empty($CustomerID2)) ? $CustomerID2 : '';
+                                    ?>
+                                    <input type="hidden" id="CustomerID2" name="CustomerID2" value="<?= htmlspecialchars($customer_id_2_value, ENT_QUOTES) ?>">
+
+                                    <span><i class="la la-user"></i></span>
+
+                                    <div id="customerResults2"
+                                        class="list-group position-absolute w-100 shadow-sm"
+                                        style="z-index:1000; display:none; top:100%; left:0; max-height:200px; overflow-y:auto;">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+
+                                <label>Mobile 2</label>
+
+                                <?php
+                                    $selected_booking_country_code_2 = null;
+                                    $existing_booking_country_2 = ((current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) && !empty($CustomerCountryCode2)) ? $CustomerCountryCode2 : null;
+                                    $default_booking_country_2 = $existing_booking_country_2 ? $existing_booking_country_2 : $malaysia_booking_phone_id;
+                                ?>
+
+                                <div class="phone-input-wrapper" id="phone-wrapper-second">
+                                    <div class="phone-country-selector" id="phone-selector-second">
+                                        <span class="phone-country-flag" id="phone-flag-second">🌐</span>
+                                        <span class="phone-country-code" id="phone-code-second">--</span>
+                                        <span class="phone-country-arrow">▼</span>
+                                    </div>
+                                    <input type="text" id="Mobile2" name="Mobile2" <?php if(current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) { ?> value="<?php echo isset($CustomerMobile2) ? htmlspecialchars($CustomerMobile2, ENT_QUOTES) : ''; ?>" <?php } ?> autocomplete="off" class="phone-input-field" placeholder="Optional — enter second phone number">
+                                    <select id="CountryCodeID2" name="CountryCodeID2" class="phone-hidden-field" onchange="updatePhoneFromSelectSecond();">
+                                        <option value="">--SELECT COUNTRY CODE--</option>
+                                        <?php foreach($country_codes as $country_code) {
+                                            $selected = '';
+                                            if($country_code->CountryCodeID == $default_booking_country_2) {
+                                                $selected = 'selected';
+                                                $selected_booking_country_code_2 = $country_code;
+                                            }
+                                        ?>
+                                            <option <?php echo $selected; ?> value="<?php echo $country_code->CountryCodeID; ?>" data-country="<?php echo htmlspecialchars($country_code->Country); ?>" data-code="<?php echo htmlspecialchars($country_code->CountryCode); ?>"><?php echo $country_code->Country . ' ' . $country_code->CountryCode; ?></option>
+                                        <?php } ?>
+                                    </select>
+                                    <div class="phone-dropdown" id="phone-dropdown-second">
+                                        <div class="phone-dropdown-search">
+                                            <input type="text" placeholder="Search country..." id="phone-search-second">
+                                        </div>
+                                        <div class="phone-dropdown-list" id="phone-list-second">
+                                            <?php foreach($country_codes as $country_code) { ?>
+                                                <div class="phone-dropdown-item" data-country-id="<?php echo $country_code->CountryCodeID; ?>" data-country="<?php echo htmlspecialchars(strtolower($country_code->Country)); ?>" data-code="<?php echo htmlspecialchars($country_code->CountryCode); ?>" data-country-name="<?php echo htmlspecialchars($country_code->Country); ?>">
+                                                    <span class="phone-dropdown-item-flag">🌐</span>
+                                                    <span class="phone-dropdown-item-name"><?php echo $country_code->Country; ?></span>
+                                                    <span class="phone-dropdown-item-code"><?php echo $country_code->CountryCode; ?></span>
+                                                </div>
+                                            <?php } ?>
+                                        </div>
+                                    </div>
+                                </div>
+                                <small id="Mobile2Error" class="text-danger"></small>
+
+                                <script>
+                                $(document).ready(function() {
+                                    var selectedCountry2 = <?php echo !empty($selected_booking_country_code_2) ? json_encode(['CountryCodeID' => $selected_booking_country_code_2->CountryCodeID, 'Country' => $selected_booking_country_code_2->Country, 'CountryCode' => $selected_booking_country_code_2->CountryCode]) : 'null'; ?>;
+                                    initPhoneInputSecond(selectedCountry2);
                                 });
                                 </script>
 
@@ -855,9 +943,29 @@
                                         </h3>
                                     </div>
                                     <div class="card-toolbar">
+                                        <?php
+                                        $show_gl_toggle = (current_url() == base_url('Booking/Update'))
+                                            && !empty($this->session->userdata('admin_id'))
+                                            && !empty($BookingID) && $BookingID !== 'NA'
+                                            && !empty($Token);
+                                        ?>
                                         <?php if(isset($LockStatus) && $LockStatus == 'Y') { ?>
-                                            <span class="badge badge-danger font-weight-bold"><i class="la la-lock"></i> GL Locked</span>
+                                            <span class="badge badge-danger font-weight-bold mr-2"><i class="la la-lock"></i> GL Locked</span>
+                                            <?php if($show_gl_toggle) { ?>
+                                                <a href="<?php echo base_url('Booking/Update_Lock_Status?booking_id=') . $BookingID . '&current_lock_status=Y&new_lock_status=N&gl=' . $Token . '&return_to=booking'; ?>"
+                                                   class="btn btn-sm btn-light-success font-weight-bold"
+                                                   onclick="return confirm('Unlock Guest List for this booking?');">
+                                                    <i class="la la-unlock"></i> Unlock GL
+                                                </a>
+                                            <?php } ?>
                                         <?php } else { ?>
+                                            <?php if($show_gl_toggle) { ?>
+                                                <a href="<?php echo base_url('Booking/Update_Lock_Status?booking_id=') . $BookingID . '&current_lock_status=N&new_lock_status=Y&gl=' . $Token . '&return_to=booking'; ?>"
+                                                   class="btn btn-sm btn-light-danger font-weight-bold mr-2"
+                                                   onclick="return confirm('Lock Guest List? If conditions are met, status will auto-advance to PTV.');">
+                                                    <i class="la la-lock"></i> Lock GL
+                                                </a>
+                                            <?php } ?>
                                             <button type="button" id="create_room_btn" class="btn btn-sm btn-light-success font-weight-bold">
                                                 <i class="la la-plus"></i> Add Room
                                             </button>
@@ -2655,6 +2763,14 @@
 
                 var mobile = $('#Mobile').val();
 
+                var customer_2 = ($('#Customer2').val() || '').toUpperCase();
+
+                var CustomerID2 = $('input[name="CustomerID2"]').val();
+
+                var mobile_2 = $('#Mobile2').val();
+
+                var country_code_2 = $('#CountryCodeID2').val();
+
                 var travel_date = $('#TravelDate').val();
 
                 var adult = $('#Adult').val();
@@ -2680,6 +2796,9 @@
                  // Apply validation
                 validateLength('ReservationNumber', 'ReservationNumberError', 20);
                 validateLength('Mobile', 'MobileError', 25, true);
+                if (mobile_2 && mobile_2 !== '') {
+                    validateLength('Mobile2', 'Mobile2Error', 25, true);
+                }
 
                 const fields = {
                     'Country code': country_code,
@@ -2790,6 +2909,11 @@
                                         booking[0]['SalesAgent2'] = sales_agent_2;
 
                                     }
+
+                                    if(customer_2 !== '') { booking[0]['Customer2'] = customer_2; }
+                                    if(CustomerID2) { booking[0]['CustomerID2'] = CustomerID2; }
+                                    if(mobile_2 !== '') { booking[0]['Mobile2'] = mobile_2; }
+                                    if(country_code_2) { booking[0]['CountryCodeID2'] = country_code_2; }
 
                                     if(booking_confirmation_footer != '') {
 
@@ -3201,6 +3325,34 @@
                                     }
 
                                     var CustomerID = $('input[name="CustomerID"]').val();
+
+                                    // Secondary contact (Customer 2 / Mobile 2) — hidden/select fields the
+                                    // jQuery Dirty plugin doesn't reliably track, so diff against initial here.
+                                    var initial_customer_2 = '<?php echo isset($Customer2) ? addslashes(strtoupper($Customer2)) : ''; ?>';
+                                    var initial_customer_id_2 = '<?php echo isset($CustomerID2) ? $CustomerID2 : ''; ?>';
+                                    var initial_mobile_2 = '<?php echo isset($CustomerMobile2) ? addslashes($CustomerMobile2) : ''; ?>';
+                                    var initial_country_code_id_2 = '<?php echo isset($CustomerCountryCode2) ? $CustomerCountryCode2 : ''; ?>';
+
+                                    var current_customer_2 = ($('#Customer2').val() || '').toUpperCase();
+                                    var current_customer_id_2 = $('#CustomerID2').val() || '';
+                                    var current_mobile_2 = $('#Mobile2').val() || '';
+                                    var current_country_code_id_2 = $('#CountryCodeID2').val() || '';
+
+                                    if (current_customer_2 !== initial_customer_2) {
+                                        booking[0]['Customer2'] = current_customer_2 === '' ? null : current_customer_2;
+                                        booking_log.push({BookingID:<?php echo $BookingID ?>, Column:'Customer2', CurrentData:initial_customer_2, NewData:current_customer_2, InsertBy:<?php echo $this->session->userdata('admin_id') ?>, InsertDate:'<?php echo date('Y-m-d H:i:s') ?>'});
+                                    }
+                                    if (current_customer_id_2 !== initial_customer_id_2) {
+                                        booking[0]['CustomerID2'] = current_customer_id_2 === '' ? null : current_customer_id_2;
+                                    }
+                                    if (current_mobile_2 !== initial_mobile_2) {
+                                        booking[0]['Mobile2'] = current_mobile_2 === '' ? null : current_mobile_2;
+                                        booking_log.push({BookingID:<?php echo $BookingID ?>, Column:'Mobile2', CurrentData:initial_mobile_2, NewData:current_mobile_2, InsertBy:<?php echo $this->session->userdata('admin_id') ?>, InsertDate:'<?php echo date('Y-m-d H:i:s') ?>'});
+                                    }
+                                    if (current_country_code_id_2 !== initial_country_code_id_2) {
+                                        booking[0]['CountryCodeID2'] = current_country_code_id_2 === '' ? null : current_country_code_id_2;
+                                        booking_log.push({BookingID:<?php echo $BookingID ?>, Column:'CountryCodeID2', CurrentData:initial_country_code_id_2, NewData:current_country_code_id_2, InsertBy:<?php echo $this->session->userdata('admin_id') ?>, InsertDate:'<?php echo date('Y-m-d H:i:s') ?>'});
+                                    }
 
                                     // Booking
 
@@ -4036,6 +4188,92 @@ $(document).ready(function() {
         });
     } else {
         updateInfo(false);
+    }
+
+    // --- Customer 2 autocomplete (optional secondary contact) ---
+    const container2 = $('#customerResults2');
+    const hiddenCustomerId2 = $('#CustomerID2');
+    const infoSpan2 = $('#customerInfo2');
+
+    function showResults2(customers) {
+        container2.empty();
+        if (customers.length === 0) { container2.hide(); return; }
+        const fragment = $(document.createDocumentFragment());
+        customers.forEach(c => {
+            fragment.append(`
+                <button type="button"
+                    class="list-group-item list-group-item-action"
+                    data-id="${c.CustomerID}"
+                    data-name="${c.name}"
+                    data-phone="${c.phone_number}"
+                    data-code="${c.CustomerCode ?? ''}">
+                    ${c.name} (${c.phone_number})
+                </button>
+            `);
+        });
+        container2.append(fragment);
+        container2.show();
+        const itemHeight = container2.find('button').first().outerHeight() || 40;
+        container2.css({ 'max-height': itemHeight * MAX_DISPLAY + 'px', 'overflow-y': 'auto' });
+    }
+
+    function fetchCustomers2(query = '') {
+        $.ajax({
+            url: "<?= base_url('customer/search'); ?>",
+            type: "GET",
+            data: { q: query, limit: MAX_CUSTOMER },
+            dataType: "json",
+            success: function(data) { showResults2(data); }
+        });
+    }
+
+    $('#Customer2').on('focus click', function() { fetchCustomers2(''); });
+
+    $('#Customer2').on('input', function() {
+        const query = $(this).val();
+        hiddenCustomerId2.val('');
+        fetchCustomers2(query);
+        updateInfo2(false);
+    });
+
+    $(document).on('click', '#customerResults2 button', function() {
+        const name = $(this).data('name');
+        const id = $(this).data('id');
+        const code = $(this).data('code');
+        const phone = $(this).data('phone');
+        $('#Customer2').val(name);
+        hiddenCustomerId2.val(id);
+        container2.hide();
+        updateInfo2(true, { code, phone });
+    });
+
+    $(document).click(function(e) {
+        if (!$(e.target).closest('#Customer2, #customerResults2').length) {
+            container2.hide();
+        }
+    });
+
+    function updateInfo2(isExisting, data = {}) {
+        if (isExisting) {
+            infoSpan2
+                .removeClass('text-muted text-primary')
+                .addClass('text-success')
+                .html(`<i class="la la-check-circle"></i> Existing Customer — <strong>${data.code || 'Empty Customer Code '}</strong> (${data.phone || 'No phone number'})`);
+        } else {
+            infoSpan2
+                .removeClass('text-success')
+                .addClass('text-muted')
+                .html('&laquo; New Customer &raquo;');
+        }
+    }
+
+    if (hiddenCustomerId2.val()) {
+        updateInfo2(true, {
+            code: "<?= isset($CustomerCode2) ? $CustomerCode2 : 'N/A'; ?>",
+            phone: "<?= isset($CustomerMobile2) ? $CustomerMobile2 : 'N/A'; ?>"
+        });
+    } else {
+        updateInfo2(false);
     }
 
     // Quick Update Allow Review Button
@@ -5228,12 +5466,15 @@ $(document).ready(function() {
                 var addBtn = function(roomId, type) {
                     return glLocked ? '' : ' &nbsp;<button type="button" class="btn btn-xs btn-icon btn-light-success add-count-btn ml-2" data-room-id="' + roomId + '" data-type="' + type + '" title="Add 1"><i class="la la-plus"></i></button>';
                 };
+                var subBtn = function(roomId, type) {
+                    return glLocked ? '' : ' <button type="button" class="btn btn-xs btn-icon btn-light-danger subtract-count-btn ml-1" data-room-id="' + roomId + '" data-type="' + type + '" title="Subtract 1"><i class="la la-minus"></i></button>';
+                };
                 tbody.append(
                     '<tr data-room-id="' + room.id + '">' +
                     '<td class="font-weight-bold">' + $('<span>').text(room.room_name).html() + '</td>' +
-                    '<td class="text-center" style="padding:8px 12px;">' + (room.adult_count || 0) + addBtn(room.id, 'adult_count') + '</td>' +
-                    '<td class="text-center" style="padding:8px 12px;">' + (room.child_count || 0) + addBtn(room.id, 'child_count') + '</td>' +
-                    '<td class="text-center" style="padding:8px 12px;">' + (room.infant_count || 0) + addBtn(room.id, 'infant_count') + '</td>' +
+                    '<td class="text-center" style="padding:8px 12px;">' + (room.adult_count || 0) + subBtn(room.id, 'adult_count') + addBtn(room.id, 'adult_count') + '</td>' +
+                    '<td class="text-center" style="padding:8px 12px;">' + (room.child_count || 0) + subBtn(room.id, 'child_count') + addBtn(room.id, 'child_count') + '</td>' +
+                    '<td class="text-center" style="padding:8px 12px;">' + (room.infant_count || 0) + subBtn(room.id, 'infant_count') + addBtn(room.id, 'infant_count') + '</td>' +
                     actionsTd +
                     '</tr>' +
                     renderGuestRows(room.id)
@@ -5338,6 +5579,35 @@ $(document).ready(function() {
                 var room = roomsList.find(function(r) { return r.id == roomId; });
                 if (room) {
                     room[type] = (parseInt(room[type]) || 0) + 1;
+                    renderRoomsTable();
+                }
+            }
+        });
+
+        $('.subtract-count-btn').off('click').on('click', function() {
+            var roomId = $(this).data('room-id');
+            var type = $(this).data('type');
+            if (roomBookingId) {
+                $.ajax({
+                    url: '<?php echo base_url("Guest_List_Room/Subtract_Count"); ?>',
+                    type: 'post',
+                    data: { room_id: roomId, type: type },
+                    dataType: 'json',
+                    success: function(response) {
+                        if (response.success) {
+                            loadRooms();
+                        } else {
+                            Swal.fire('Error!', response.message, 'error');
+                        }
+                    },
+                    error: function() {
+                        Swal.fire('Error!', 'Failed to subtract count', 'error');
+                    }
+                });
+            } else {
+                var room = roomsList.find(function(r) { return r.id == roomId; });
+                if (room) {
+                    room[type] = Math.max(0, (parseInt(room[type]) || 0) - 1);
                     renderRoomsTable();
                 }
             }
@@ -5738,6 +6008,81 @@ $(document).ready(function() {
 
             $(document).on('click', function(e) {
                 if(!$(e.target).closest('#phone-wrapper-main').length) {
+                    dropdown.removeClass('show');
+                }
+            });
+        };
+
+        function updatePhoneDisplaySecond(country, code, countryId) {
+            $('#phone-flag-second').text(getCountryFlagMain(country));
+            $('#phone-code-second').text(code || '--');
+            $('#phone-selector-second').removeClass('open');
+            $('#phone-list-second .phone-dropdown-item').removeClass('selected');
+            $('#phone-list-second .phone-dropdown-item[data-country-id="' + countryId + '"]').addClass('selected');
+        }
+
+        window.updatePhoneFromSelectSecond = function() {
+            var select = $('#CountryCodeID2');
+            var selectedOption = select.find('option:selected');
+            if(selectedOption.length && selectedOption.val()) {
+                var country = selectedOption.data('country') || selectedOption.text().split(' ')[0];
+                var code = selectedOption.data('code') || selectedOption.text().split(' ').pop();
+                updatePhoneDisplaySecond(country, code, selectedOption.val());
+            } else {
+                $('#phone-flag-second').text('🌐');
+                $('#phone-code-second').text('--');
+            }
+        };
+
+        window.initPhoneInputSecond = function(selectedCountry) {
+            var selector = $('#phone-selector-second');
+            var dropdown = $('#phone-dropdown-second');
+            var searchInput = $('#phone-search-second');
+            var countrySelect = $('#CountryCodeID2');
+
+            $('#phone-list-second .phone-dropdown-item').each(function() {
+                var countryName = $(this).data('country-name') || $(this).find('.phone-dropdown-item-name').text();
+                $(this).find('.phone-dropdown-item-flag').text(getCountryFlagMain(countryName));
+            });
+
+            if(selectedCountry) {
+                updatePhoneDisplaySecond(selectedCountry.Country, selectedCountry.CountryCode, selectedCountry.CountryCodeID);
+            }
+
+            selector.on('click', function(e) {
+                if(selector.hasClass('disabled')) return;
+                e.stopPropagation();
+                dropdown.toggleClass('show');
+                if(dropdown.hasClass('show')) { searchInput.focus(); }
+            });
+
+            searchInput.on('input', function() {
+                var searchTerm = $(this).val().toLowerCase();
+                $('#phone-list-second .phone-dropdown-item').each(function() {
+                    var country = $(this).data('country') || '';
+                    var code = ($(this).data('code') || '').toString();
+                    var name = $(this).find('.phone-dropdown-item-name').text().toLowerCase();
+                    if(name.indexOf(searchTerm) !== -1 || code.indexOf(searchTerm) !== -1 || country.indexOf(searchTerm) !== -1) {
+                        $(this).show();
+                    } else {
+                        $(this).hide();
+                    }
+                });
+            });
+
+            $(document).on('click', '#phone-list-second .phone-dropdown-item', function() {
+                var countryId = $(this).data('country-id');
+                var country = $(this).find('.phone-dropdown-item-name').text();
+                var code = $(this).data('code');
+                updatePhoneDisplaySecond(country, code, countryId);
+                countrySelect.val(countryId).trigger('change');
+                dropdown.removeClass('show');
+                searchInput.val('');
+                $('#phone-list-second .phone-dropdown-item').show();
+            });
+
+            $(document).on('click', function(e) {
+                if(!$(e.target).closest('#phone-wrapper-second').length) {
                     dropdown.removeClass('show');
                 }
             });

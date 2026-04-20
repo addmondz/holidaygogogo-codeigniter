@@ -33,7 +33,7 @@ class Cronjob_Model extends CI_Model
 		$this->db->where('booking_product.' . $date_column . ' <=', date('Y-m-d', strtotime('+3 days')));
 		$this->db->where('booking_product.Status', 'Y');
 		$this->db->where('booking_product.disable_checklist_payment_out', 0);
-		$this->db->where_in('booking.Status', array('P', 'PBO', 'PTV', 'PT', 'OG'));
+		$this->db->where_in('booking.Status', array('PBC', 'P', 'PP', 'PBO', 'PTV', 'PT', 'OG'));
 		return $this->db->get()->result();
 	}
 
