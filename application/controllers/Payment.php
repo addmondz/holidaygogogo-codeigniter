@@ -371,6 +371,11 @@ class Payment extends MY_Controller
 			case 'F': $statusColor = '#FF4500'; $statusText = 'Failed'; break;
 		}
 
+		if ($payment->Type === 'AGENT COMMISSION FROM SUPPLIER') {
+			$statusColor = '#50C878';
+			$statusText = 'Synced';
+		}
+
 		$tooltipAttr = '';
 		if (!empty($payment->AutocountSyncMessage)) {
 			$decoded = json_decode($payment->AutocountSyncMessage, true);
