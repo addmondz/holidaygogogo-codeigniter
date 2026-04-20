@@ -610,8 +610,37 @@
         var v = $sel.val();
         $hid.val(v ? v.join(',') : '');
     }
+    function moveSelectedToTop(name) {
+        var $sel = $('#' + name + '_select');
+        if(!$sel.length) return;
+        var $groups = $sel.children('optgroup');
+        var changed = false;
+        if($groups.length) {
+            $groups.each(function() {
+                var $grp = $(this);
+                var $opts = $grp.children('option');
+                var $selected = $opts.filter(':selected');
+                if(!$selected.length || $selected.length === $opts.length) return;
+                var $unselected = $opts.not(':selected');
+                $grp.empty().append($selected).append($unselected);
+                changed = true;
+            });
+        } else {
+            var $opts = $sel.children('option');
+            var $selected = $opts.filter(':selected');
+            if($selected.length && $selected.length < $opts.length) {
+                var $unselected = $opts.not(':selected');
+                $sel.empty().append($selected).append($unselected);
+                changed = true;
+            }
+        }
+        if(changed) $sel.selectpicker('refresh');
+    }
     multi_filters.forEach(function(name) {
-        $('#' + name + '_select').on('changed.bs.select', function() { syncMultiSelect(name); });
+        var $s = $('#' + name + '_select');
+        $s.on('changed.bs.select', function() { syncMultiSelect(name); });
+        $s.on('hidden.bs.select', function() { moveSelectedToTop(name); });
+        moveSelectedToTop(name);
     });
     $('#form').on('submit', function() {
         multi_filters.forEach(syncMultiSelect);
