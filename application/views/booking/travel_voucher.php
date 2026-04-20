@@ -165,32 +165,22 @@
 		</tr>
 	</table>
 	<br>
-	<table style="page-break-inside:avoid;">
-		<tr>
-			<td><?php echo $TravelVoucherTitle; ?></td>
-		</tr>
-		<?php if(!empty($TravelVoucherKeyContacts)) { ?>
-		<tr>
-			<td style="padding-bottom: 10px;">
-				<div style="background: #f5f8fc; border-left: 3px solid #4a90d9; padding: 10px 12px; font-size: 13px;">
-					<strong>Key Contacts:</strong> <?php echo $TravelVoucherKeyContacts; ?>
-				</div>
-			</td>
-		</tr>
-		<?php } ?>
-		<tr>
-			<td><?php echo $TravelVoucherFooter; ?></td>
-		</tr>
-		<?php if(!empty($TravelVoucherSpecialRemarks)) { ?>
-		<tr>
-			<td style="padding-top: 8px;">
-				<div style="background: #f5f8fc; border-left: 3px solid #4a90d9; padding: 10px 12px; font-size: 13px;">
-					<strong>Special Remarks:</strong> <?php echo $TravelVoucherSpecialRemarks; ?>
-				</div>
-			</td>
-		</tr>
-		<?php } ?>
-	</table>
+	<div><?php echo $TravelVoucherTitle; ?></div>
+	<?php if(!empty($TravelVoucherKeyContacts)) { ?>
+	<div style="padding-bottom: 10px;">
+		<div style="background: #f5f8fc; border-left: 3px solid #4a90d9; padding: 10px 12px; font-size: 13px; page-break-inside: avoid;">
+			<strong>Key Contacts:</strong> <?php echo $TravelVoucherKeyContacts; ?>
+		</div>
+	</div>
+	<?php } ?>
+	<div><?php echo $TravelVoucherFooter; ?></div>
+	<?php if(!empty($TravelVoucherSpecialRemarks)) { ?>
+	<div style="padding-top: 8px;">
+		<div style="background: #f5f8fc; border-left: 3px solid #4a90d9; padding: 10px 12px; font-size: 13px; page-break-inside: avoid;">
+			<strong>Special Remarks:</strong> <?php echo $TravelVoucherSpecialRemarks; ?>
+		</div>
+	</div>
+	<?php } ?>
 	
 	<div style="border-top:1px dotted #999; margin-top:10px;">&nbsp;</div>
 	<p style="font-size:12px; margin-top:0; margin-bottom:2px;">Check your booking status and request E Invoice - <?php echo $CustomerProfileURL; ?></p>
@@ -207,7 +197,7 @@
 	}
 	if($has_filled_guests) { ?>
 	<br>
-	<div style="page-break-inside: avoid;">
+	<div>
 		<table style="width:100%; margin-bottom: 8px; border-collapse: collapse;">
 			<tr>
 				<td style="padding: 0; margin: 0;">
@@ -219,7 +209,7 @@
 		
 		<table style="width:100%; font-size:11px; border-collapse: collapse; margin-top: 0;">
 			<thead>
-				<tr style="background-color: #f8f8f8;">
+				<tr style="background-color: #f8f8f8; page-break-inside: avoid;">
 					<th style="padding: 10px 6px; text-align: center; font-weight: 700; width: 4%; border-bottom: 2px solid #000;">#</th>
 					<th style="padding: 10px 6px; text-align: left; font-weight: 700; width: 9%; border-bottom: 2px solid #000;">Type</th>
 					<th style="padding: 10px 6px; text-align: left; font-weight: 700; width: 20%; border-bottom: 2px solid #000;">Full Name</th>
@@ -244,7 +234,7 @@
 					// Subtle alternating rows
 					$row_bg = ($guest_count % 2 == 0) ? '#fafafa' : '#ffffff';
 				?>
-				<tr style="background-color: <?php echo $row_bg; ?>;">
+				<tr style="background-color: <?php echo $row_bg; ?>; page-break-inside: avoid;">
 					<td style="padding: 12px 6px; text-align: center; color: #888; font-weight: 600; border-bottom: 1px solid #e8e8e8;"><?php echo $guest_count; ?></td>
 					<td style="padding: 12px 6px; font-weight: 600; border-bottom: 1px solid #e8e8e8;"><?php echo $guest->Type; ?></td>
 					<td style="padding: 12px 6px; font-weight: 600; border-bottom: 1px solid #e8e8e8;"><?php echo strtoupper($full_name); ?></td>
@@ -260,7 +250,7 @@
 				?>
 			</tbody>
 			<tfoot>
-				<tr style="background-color: #f8f8f8;">
+				<tr style="background-color: #f8f8f8; page-break-inside: avoid;">
 					<td colspan="8" style="padding: 12px 6px; text-align: right; border-top: 2px solid #000;">
 						<?php 
 						$adults = 0; $children = 0; $infants = 0;
