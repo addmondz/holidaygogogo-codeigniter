@@ -167,6 +167,69 @@ class Guest_List_Room extends MY_Controller
 		echo json_encode(array('success' => true, 'message' => 'Guest successfully deleted'));
 	}
 
+	function Update_Guest_Type()
+	{
+		if(!$this->input->post()) {
+			echo json_encode(array('success' => false, 'message' => 'Invalid request'));
+			return;
+		}
+
+		$guest_list_id = $this->input->post('guest_list_id');
+		$type = $this->input->post('type');
+
+		$allowed = array('ADULT', 'CHILD', 'INFANT');
+		if(!in_array($type, $allowed)) {
+			echo json_encode(array('success' => false, 'message' => 'Invalid type'));
+			return;
+		}
+
+		$this->db->select('BookingID, Type, guest_list_room_id');
+		$this->db->where('GuestListID', $guest_list_id);
+		$guest = $this->db->get('guest_list')->row();
+
+		if(!$guest) {
+			echo json_encode(array('success' => false, 'message' => 'Guest not found'));
+			return;
+		}
+
+		if($this->_is_gl_locked($guest->BookingID)) {
+			echo json_encode(array('success' => false, 'message' => 'Guest List is locked'));
+			return;
+		}
+
+		if($guest->Type === $type) {
+			echo json_encode(array('success' => true, 'message' => 'No change'));
+			return;
+		}
+
+		$type_map = array('ADULT' => 'adult_count', 'CHILD' => 'child_count', 'INFANT' => 'infant_count');
+
+		if(!empty($guest->guest_list_room_id) && isset($type_map[$guest->Type]) && isset($type_map[$type])) {
+			$old_col = $type_map[$guest->Type];
+			$new_col = $type_map[$type];
+
+			$this->db->set($old_col, $old_col . ' - 1', FALSE);
+			$this->db->where('id', $guest->guest_list_room_id);
+			$this->db->where($old_col . ' > ', 0);
+			$this->db->update('guest_list_room');
+
+			$this->db->set($new_col, $new_col . ' + 1', FALSE);
+			$this->db->where('id', $guest->guest_list_room_id);
+			$this->db->update('guest_list_room');
+		}
+
+		$this->db->where('GuestListID', $guest_list_id);
+		$this->db->update('guest_list', array('Type' => $type));
+
+		$this->load->model('Guest_List_Model');
+		$this->Guest_List_Model->Auto_Assign_Rooms($guest->BookingID);
+
+		$is_submitted = $this->Guest_List_Model->Are_All_Guests_Complete($guest->BookingID) ? 1 : 0;
+		$this->Booking_Model->update_by_id($guest->BookingID, array('is_submitted' => $is_submitted));
+
+		echo json_encode(array('success' => true, 'message' => 'Guest type updated'));
+	}
+
 	private function _get_room_by_id($room_id)
 	{
 		$this->db->select('id, booking_id');

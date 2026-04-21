@@ -5436,10 +5436,23 @@ $(document).ready(function() {
             var guestName = $('<span>').text((guest.Name || '') + ' ' + (guest.LastName || '')).html().trim() || '<em class="text-muted">No Name</em>';
             var deleteBtn = glLocked ? '' :
                 '<button type="button" class="btn btn-xs btn-icon btn-light-danger delete-guest-btn ml-2" data-guest-id="' + guest.GuestListID + '" title="Delete Guest"><i class="la la-trash"></i></button>';
+            var typeControl;
+            if (glLocked) {
+                typeControl = getGuestTypeBadge(guest.Type);
+            } else {
+                typeControl = '<select class="form-control form-control-sm d-inline-block guest-type-select ml-2"' +
+                    ' style="width:auto;padding:2px 6px;height:auto;font-size:0.85rem;"' +
+                    ' data-guest-id="' + guest.GuestListID + '"' +
+                    ' data-current-type="' + guest.Type + '">' +
+                    ['ADULT', 'CHILD', 'INFANT'].map(function(t) {
+                        return '<option value="' + t + '"' + (t === guest.Type ? ' selected' : '') + '>' + t + '</option>';
+                    }).join('') +
+                    '</select>';
+            }
             html += '<tr>' +
                 '<td style="padding:4px 12px;">' +
                 '<i class="la la-user text-muted mr-1"></i>' + guestName +
-                ' ' + getGuestTypeBadge(guest.Type) +
+                ' ' + typeControl +
                 deleteBtn +
                 '</td>' +
                 '</tr>';
@@ -5809,6 +5822,32 @@ $(document).ready(function() {
                             Swal.fire('Error!', 'Failed to delete guest', 'error');
                         }
                     });
+                }
+            });
+        });
+
+        $('.guest-type-select').off('change').on('change', function() {
+            var $sel = $(this);
+            var guestId = $sel.data('guest-id');
+            var newType = $sel.val();
+            var prevType = $sel.data('current-type');
+            if (newType === prevType) return;
+            $.ajax({
+                url: '<?php echo base_url("Guest_List_Room/Update_Guest_Type"); ?>',
+                type: 'post',
+                data: { guest_list_id: guestId, type: newType },
+                dataType: 'json',
+                success: function(response) {
+                    if (response.success) {
+                        loadRooms();
+                    } else {
+                        Swal.fire('Error!', response.message, 'error');
+                        $sel.val(prevType);
+                    }
+                },
+                error: function() {
+                    Swal.fire('Error!', 'Failed to update guest type', 'error');
+                    $sel.val(prevType);
                 }
             });
         });
