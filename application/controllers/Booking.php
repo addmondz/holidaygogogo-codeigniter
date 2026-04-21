@@ -694,12 +694,27 @@ class Booking extends MY_Controller
 			return;
 		}
 
+		$v = $this->input->get('v');
+		$vFresh = !empty($v) && ctype_digit((string)$v) && (time() - intval($v)) <= 5;
+
+		if (!$vFresh) {
+			header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0, private');
+			header('Pragma: no-cache');
+			header('Expires: 0');
+			header('Location: ' . base_url('Booking/View_Snapshot?file=' . urlencode($file) . '&v=' . time()), true, 302);
+			exit;
+		}
+
+		if (ob_get_length()) { ob_end_clean(); }
+
 		header('Content-Type: application/pdf');
 		header('Content-Disposition: inline; filename="' . $file . '"');
-		header('Cache-Control: no-cache, no-store, must-revalidate');
+		header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0, private');
 		header('Pragma: no-cache');
 		header('Expires: 0');
+		header('Content-Length: ' . filesize($path));
 		readfile($path);
+		exit;
 	}
 
 	function Update()

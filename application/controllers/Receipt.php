@@ -25,14 +25,29 @@ class Receipt extends CI_Controller
     }
 
     function index()
-    {  
+    {
         $token = $this->input->get('token');
-        
+        $v = $this->input->get('v');
+        $vFresh = !empty($v) && ctype_digit((string)$v) && (time() - intval($v)) <= 5;
+
+        if (!empty($token) && !$vFresh) {
+            $extra = '';
+            $payment_id = $this->input->get('payment_id');
+            if (!empty($payment_id)) { $extra .= '&payment_id=' . urlencode($payment_id); }
+            $payment_type = $this->input->get('payment_type');
+            if (!empty($payment_type)) { $extra .= '&payment_type=' . urlencode($payment_type); }
+            header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0, private');
+            header('Pragma: no-cache');
+            header('Expires: 0');
+            header('Location: ' . base_url('Receipt?token=' . urlencode($token) . $extra . '&v=' . time()), true, 302);
+            exit;
+        }
+
         if(empty($token)) {
             $this->load->view('errors/access_denied');
             return;
         }
-        
+
         // Get booking data by token
         $this->db->where('Token', $token);
         $booking = $this->db->get('booking')->row();
@@ -248,10 +263,17 @@ class Receipt extends CI_Controller
 
         $pdf_output = $this->dompdf->output();
 
+        if (ob_get_length()) { ob_end_clean(); }
+
         // Output the PDF directly to the browser
         header('Content-Type: application/pdf');
         header('Content-Disposition: inline; filename="' . $array['BookingNumber'] . '_receipt.pdf"');
+        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0, private');
+        header('Pragma: no-cache');
+        header('Expires: 0');
+        header('Content-Length: ' . strlen($pdf_output));
         echo $pdf_output;
+        exit;
     }
 
     function Convert_Subtotal($subtotal)

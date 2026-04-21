@@ -40,8 +40,10 @@ class Booking_Confirmation extends CI_Controller
 	{
 
         $token = $this->input->get('token');
+        $v = $this->input->get('v');
+        $vFresh = !empty($v) && ctype_digit((string)$v) && (time() - intval($v)) <= 5;
 
-        if (!empty($token) && empty($this->input->get('v')) && empty($_GET['nick'])) {
+        if (!empty($token) && !$vFresh && empty($_GET['nick'])) {
             header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0, private');
             header('Pragma: no-cache');
             header('Expires: 0');

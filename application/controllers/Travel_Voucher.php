@@ -14,6 +14,18 @@ class Travel_Voucher extends CI_Controller
     
 	function index()
 	{
+        $token = $this->input->get('token');
+        $v = $this->input->get('v');
+        $vFresh = !empty($v) && ctype_digit((string)$v) && (time() - intval($v)) <= 5;
+
+        if (!empty($token) && !$vFresh) {
+            header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0, private');
+            header('Pragma: no-cache');
+            header('Expires: 0');
+            header('Location: ' . base_url('Travel_Voucher?token=' . urlencode($token) . '&v=' . time()), true, 302);
+            exit;
+        }
+
         $array = $this->Booking_Model->Booking_Document();
 		if(empty($array)) {
 			$this->load->view('errors/access_denied');
@@ -84,10 +96,18 @@ class Travel_Voucher extends CI_Controller
                 $this->dompdf->set_option('isRemoteEnabled', true);
                 $this->dompdf->setPaper('A4', 'potrait');
                 $this->dompdf->render();
-                header('Cache-Control: no-cache, no-store, must-revalidate');
+                $pdfOutput = $this->dompdf->output();
+
+                if (ob_get_length()) { ob_end_clean(); }
+
+                header('Content-Type: application/pdf');
+                header('Content-Disposition: inline; filename="' . $array['Title'] . '.pdf"');
+                header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0, private');
                 header('Pragma: no-cache');
                 header('Expires: 0');
-                $this->dompdf->stream($array['Title'] . '.pdf', array('Attachment' => 0));
+                header('Content-Length: ' . strlen($pdfOutput));
+                echo $pdfOutput;
+                exit;
             } else {
                 $array = array('type' => 'Travel Voucher');
                 $this->load->view('errors/bc_complete', $array);
