@@ -979,7 +979,7 @@ class Report extends MY_Controller
     private function format_duration_label($seconds)
     {
         if ($seconds === null || $seconds === '') {
-            return 'No response yet';
+            return '-';
         }
 
         $seconds = (int) $seconds;
