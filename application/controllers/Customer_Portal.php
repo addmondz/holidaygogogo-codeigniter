@@ -311,7 +311,7 @@ class Customer_Portal extends CI_Controller
             }
             $booking['total_paid'] = $total_paid;
             $booking['balance_due'] = $net_total - $total_paid;
-            $booking['deposit_complete'] = ($deposit_total > 0 && $total_paid >= $deposit_total);
+            $booking['deposit_complete'] = ($deposit_total <= 0 || $total_paid >= $deposit_total);
 
             if ($booking['CancelStatus'] == 'Y') {
                 $cancelled[] = $booking;
@@ -536,7 +536,7 @@ class Customer_Portal extends CI_Controller
             $deposit_percentage = isset($booking['DepositPercentage']) ? floatval($booking['DepositPercentage']) : 0;
             $deposit_total_required = ceil((floatval($booking['NetTotal']) * $deposit_percentage) / 100);
         }
-        $booking['deposit_complete'] = ($deposit_total_required > 0 && $total_credit >= $deposit_total_required);
+        $booking['deposit_complete'] = ($deposit_total_required <= 0 || $total_credit >= $deposit_total_required);
 
         // Prepare document URLs
         $base_url = base_url();

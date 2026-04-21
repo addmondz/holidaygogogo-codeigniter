@@ -231,7 +231,7 @@ class Booking extends MY_Controller
 				$deposit_required_row = ceil((floatval($booking->NetTotal) * $deposit_pct_row) / 100);
 			}
 			$booking->balance_due = floatval($booking->NetTotal) - $total_credit_approved;
-			$booking->deposit_complete = ($deposit_required_row > 0 && $total_credit_approved >= $deposit_required_row);
+			$booking->deposit_complete = ($deposit_required_row <= 0 || $total_credit_approved >= $deposit_required_row);
 
 			$this->load->helper('booking_flow');
 			$status_info_row = display_booking_status($booking);
@@ -1189,7 +1189,7 @@ class Booking extends MY_Controller
 					}
 					$array['DepositPaid'] = $deposit_paid;
 					$array['balance_due'] = $net_total_raw - $total_credit_approved;
-					$array['deposit_complete'] = ($deposit_total > 0 && $total_credit_approved >= $deposit_total);
+					$array['deposit_complete'] = ($deposit_total <= 0 || $total_credit_approved >= $deposit_total);
 					// Calculate deposit status and format Deposit Paid display
 					$deposit_difference = $deposit_paid - $deposit_total;
 					if ($deposit_paid > 0) {
