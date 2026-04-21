@@ -354,27 +354,30 @@ class Cron extends CI_Controller
 		$this->syncPayments();
 		$this->syncDeletedPayments();
 
-		// TODO-edmond: Uncomment this after the initial sync is done
-		// run this hourly at 10 minutes past the hour
-		// if ($this->shouldRunHourly(10)) {
-		// 	$this->syncGhlUsers();
-		// 	$this->syncGhlContacts();
-		// 	$this->syncGhlConversations();
-		// 	$this->syncGhlMessages();
-		// }
+		// $this->syncGhlModules();
+	}
 
-		// TODO-edmond: Uncomment this after the initial sync is done
+	public function syncGhlModules()
+	{
+		// run this hourly at 10 minutes past the hour
+		if ($this->shouldRunHourly(10)) {
+			$this->syncGhlUsers();
+			$this->syncGhlContacts();
+			$this->syncGhlConversations();
+			$this->syncGhlMessages();
+		}
+
 		// process the leads every hour at 40 minutes past the hour, let it have 30 minutes to finish syncing the messages
-		// if ($this->shouldRunHourly(40)) {
-		// 	$this->process_ghl_leads();
-		// }
+		if ($this->shouldRunHourly(40)) {
+			$this->process_ghl_leads();
+		}
 
 		
 		
 		// just a sample code to show
 		// run this daily at 00:00
 		// if ($this->shouldRunDaily(0, 0)) {
-		// }
+		// }	
 	}
 
 	private function shouldRunHourly($minute = 0)
