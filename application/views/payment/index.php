@@ -37,7 +37,7 @@
                         <i class="las la-arrow-circle-down"></i>Payment Records
                     </a>
                     <?php if(!empty($this->input->get('booking_number'))) { ?>
-                        <a href="<?php if(!empty($payments)) { echo base_url('Booking_Confirmation?token=') . $payments[0]->Token . '&v=' . time(); } else { echo base_url('Booking_Confirmation?token=') . $token . '&v=' . time(); } ?>" target="_blank" class="btn btn-light-info font-weight-bold mr-1 mb-2" style="width:180px;">
+                        <a href="<?php if(!empty($payments)) { echo base_url('Booking_Confirmation?token=') . $payments[0]->Token; } else { echo base_url('Booking_Confirmation?token=') . $token; } ?>" target="_blank" class="btn btn-light-info font-weight-bold mr-1 mb-2" style="width:180px;">
                             <i class="la la-suitcase"></i>BC
                         </a>
                         <a href="<?php if(!empty($payments)) { echo base_url('Guest_List?gl=') . $payments[0]->Token; } else { echo base_url('Guest_List?gl=') . $token; } ?>" class="btn btn-light-primary font-weight-bold mr-1 mb-2" style="width:180px;">

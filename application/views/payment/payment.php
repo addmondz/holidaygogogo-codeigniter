@@ -159,9 +159,8 @@
                                         }
                                         $('.card-toolbar').remove();
                                         var url = '<?php echo base_url('Booking_Confirmation?token=') ?>';
-                                        var bcCacheBust = '<?php echo time(); ?>';
                                         $('<div class="card-toolbar">' +
-                                            '<a href="'+ url + array.Token + '&v=' + bcCacheBust +'" target="_blank" class="btn btn-light-info font-weight-bold" style="width:180px;">' +
+                                            '<a href="'+ url + array.Token +'" target="_blank" class="btn btn-light-info font-weight-bold" style="width:180px;">' +
                                                 '<i class="la la-suitcase"></i>BC' +
                                             '</a>' +
                                         '</div>').insertAfter('.card-title');
