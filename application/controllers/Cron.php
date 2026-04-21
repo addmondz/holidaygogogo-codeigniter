@@ -393,10 +393,10 @@ class Cron extends CI_Controller
 
 	public function process_ghl_leads($chunkSize = 100)
 	{
-		if (!$this->input->is_cli_request()) {
-			show_error('This script can only be run from the command line.', 403);
-			return;
-		}
+		// if (!$this->input->is_cli_request()) {
+		// 	show_error('This script can only be run from the command line.', 403);
+		// 	return;
+		// }
 
 		$this->load->model('Ghl_Processed_Leads_Model');
 
@@ -1537,10 +1537,10 @@ class Cron extends CI_Controller
 	 */
 	public function syncGhlUsers()
 	{
-		if (!$this->input->is_cli_request()) {
-			show_error('Not allowed', 403);
-			return;
-		}
+		// if (!$this->input->is_cli_request()) {
+		// 	show_error('Not allowed', 403);
+		// 	return;
+		// }
 
 		$this->load->library('GhlUsersSyncService');
 		$result = $this->ghluserssyncservice->sync();
@@ -1555,10 +1555,10 @@ class Cron extends CI_Controller
 	 */
 	public function syncGhlContacts()
 	{
-		if (!$this->input->is_cli_request()) {
-			show_error('Not allowed', 403);
-			return;
-		}
+		// if (!$this->input->is_cli_request()) {
+		// 	show_error('Not allowed', 403);
+		// 	return;
+		// }
 
 		$args = isset($_SERVER['argv']) ? $_SERVER['argv'] : array();
 		$uriSegments = $this->uri->segment_array();
@@ -1582,10 +1582,10 @@ class Cron extends CI_Controller
 	 */
 	public function syncGhlConversations()
 	{
-		if (!$this->input->is_cli_request()) {
-			show_error('Not allowed', 403);
-			return;
-		}
+		// if (!$this->input->is_cli_request()) {
+		// 	show_error('Not allowed', 403);
+		// 	return;
+		// }
 
 		$args = isset($_SERVER['argv']) ? $_SERVER['argv'] : array();
 		$uriSegments = $this->uri->segment_array();
@@ -1609,10 +1609,10 @@ class Cron extends CI_Controller
 	 */
 	public function syncGhlMessages()
 	{
-		if (!$this->input->is_cli_request()) {
-			show_error('Not allowed', 403);
-			return;
-		}
+		// if (!$this->input->is_cli_request()) {
+		// 	show_error('Not allowed', 403);
+		// 	return;
+		// }
 
 		$args = isset($_SERVER['argv']) ? $_SERVER['argv'] : array();
 		$uriSegments = $this->uri->segment_array();
