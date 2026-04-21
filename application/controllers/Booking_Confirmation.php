@@ -236,10 +236,6 @@ class Booking_Confirmation extends CI_Controller
 
                 file_put_contents('assets/upload/2_'.$identifier.'.pdf', $output2);
 
-                header('Cache-Control: no-cache, no-store, must-revalidate');
-                header('Pragma: no-cache');
-                header('Expires: 0');
-
                 $merger = new \setasign\Fpdi\Fpdi();
 
                 $pageCount1 = $merger->setSourceFile('assets/upload/1_'.$identifier.'.pdf');
@@ -258,11 +254,23 @@ class Booking_Confirmation extends CI_Controller
                     $merger->useTemplate($tpl);
                 }
 
-                $merger->Output('I', $array['Title'].'3.pdf');
+                $pdfBuffer = $merger->Output('S', $array['Title'].'3.pdf');
 
                 unlink('assets/upload/1_'.$identifier.'.pdf');
 
                 unlink('assets/upload/2_'.$identifier.'.pdf');
+
+                if (ob_get_length()) { ob_end_clean(); }
+
+                header('Content-Type: application/pdf');
+                header('Content-Disposition: inline; filename="'.$array['Title'].'3.pdf"');
+                header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0, private');
+                header('Pragma: no-cache');
+                header('Expires: 0');
+                header('Content-Length: '.strlen($pdfBuffer));
+
+                echo $pdfBuffer;
+                exit;
 
                 
 

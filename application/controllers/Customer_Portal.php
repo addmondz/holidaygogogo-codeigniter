@@ -543,7 +543,7 @@ class Customer_Portal extends CI_Controller
         $booking['documents'] = [
             'bc' => [
                 'name' => 'Booking Confirmation',
-                'url' => $base_url . 'Booking_Confirmation?token=' . $hashed_bc,
+                'url' => $base_url . 'Booking_Confirmation?token=' . $hashed_bc . '&v=' . time(),
                 'icon' => 'file-text',
                 'available' => true
             ],

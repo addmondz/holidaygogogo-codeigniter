@@ -488,8 +488,9 @@ class Booking extends MY_Controller
 		$booking_op_id = isset($booking->BookingOP) ? $booking->BookingOP : '';
 		$html .= '<button onclick="openRemarksModal(' . $booking->BookingID . ', \'' . addslashes($booking->BookingNumber) . '\', \'' . $sales_agent_id . '\', \'' . $booking_op_id . '\')" class="dropdown-item" style="font-size:11px;">View Remarks</button>';
 		$html .= '<div class="dropdown-divider"></div>';
-		$html .= '<a href="' . base_url('Booking_Confirmation?token=') . $booking->Token . '" target="_blank" class="dropdown-item" style="font-size:11px;">Booking Confirmation</a>';
-		$html .= '<button id="bc_url-' . $booking->BookingID . '" value="' . base_url('Booking_Confirmation?token=') . $booking->Token . '" onclick="Copy_URL(\'BC URL\', ' . $booking->BookingID . ')" class="dropdown-item" style="font-size:11px;">Copy BC Link</button>';
+		$bc_cache_bust = time();
+		$html .= '<a href="' . base_url('Booking_Confirmation?token=') . $booking->Token . '&v=' . $bc_cache_bust . '" target="_blank" class="dropdown-item" style="font-size:11px;">Booking Confirmation</a>';
+		$html .= '<button id="bc_url-' . $booking->BookingID . '" value="' . base_url('Booking_Confirmation?token=') . $booking->Token . '&v=' . $bc_cache_bust . '" onclick="Copy_URL(\'BC URL\', ' . $booking->BookingID . ')" class="dropdown-item" style="font-size:11px;">Copy BC Link</button>';
 		$html .= '<div class="dropdown-divider"></div>';
 		if($booking->Status != 'Y' || (!$is_sales_agent && $booking->Status == 'Y')) {
 			$html .= '<a href="' . base_url('Guest_List?gl=') . $booking->Token . '" target="_blank" class="dropdown-item" style="font-size:11px;">Guest List</a>';

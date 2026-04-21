@@ -1372,7 +1372,7 @@
 
             // Build timeline steps
             // Prepare document URLs for CTAs
-            $bc_url = base_url('Booking_Confirmation?token=' . $booking['Token']);
+            $bc_url = base_url('Booking_Confirmation?token=' . $booking['Token'] . '&v=' . time());
             $receipt_url = base_url('Receipt?token=' . $booking['Token']);
             $gl_url = base_url('Guest_List?gl=' . $booking['Token']);
             $tv_url = base_url('Travel_Voucher?token=' . $booking['Token']);
