@@ -37,7 +37,17 @@ class Booking_Confirmation extends CI_Controller
 
     function index()
 
-	{  
+	{
+
+        $token = $this->input->get('token');
+
+        if (!empty($token) && empty($this->input->get('v')) && empty($_GET['nick'])) {
+            header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0, private');
+            header('Pragma: no-cache');
+            header('Expires: 0');
+            header('Location: ' . base_url('Booking_Confirmation?token=' . urlencode($token) . '&v=' . time()), true, 302);
+            exit;
+        }
 
         $identifier = floor(microtime(true) * 1000);
 
