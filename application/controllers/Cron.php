@@ -6,6 +6,10 @@ use PhpOffice\PhpSpreadsheet\Writer\Xlxs;
 
 class Cron extends CI_Controller
 {
+	public $allowGhlModuleSync = true;
+	public $allowGhlModuleLog = true;
+	public $ghlModuleLogFile = 'GHL_MODULES_SYNC.log';
+
 	function __construct()
 	{
 		parent::__construct();
@@ -359,17 +363,25 @@ class Cron extends CI_Controller
 
 	public function syncGhlModules()
 	{
+		$this->customCronLogging('[CRON] syncGhlModules');
+		
 		// run this hourly at 10 minutes past the hour
 		if ($this->shouldRunHourly(10)) {
-			$this->syncGhlUsers();
-			$this->syncGhlContacts();
-			$this->syncGhlConversations();
-			$this->syncGhlMessages();
+			if($this->allowGhlModuleSync) {
+				$this->customCronLogging('[CRON-10] syncGhlModules');
+				$this->syncGhlUsers();
+				$this->syncGhlContacts();
+				$this->syncGhlConversations();
+				$this->syncGhlMessages();
+			}
 		}
 
 		// process the leads every hour at 40 minutes past the hour, let it have 30 minutes to finish syncing the messages
 		if ($this->shouldRunHourly(40)) {
-			$this->process_ghl_leads();
+			if($this->allowGhlModuleSync) {
+				$this->customCronLogging('[CRON-40] syncGhlModules');
+				$this->process_ghl_leads();
+			}
 		}
 
 		
@@ -1723,6 +1735,13 @@ class Cron extends CI_Controller
 			'inserted'            => $inserted,
 			'ignored_existing'    => $ignored,
 		], JSON_PRETTY_PRINT);
+	}
+
+	public function customCronLogging($message, $meta = array())
+	{
+		if ($this->allowGhlModuleLog) {
+			logInFile('GHL_MODULES_SYNC', $message, $meta);
+		}
 	}
 
 }
