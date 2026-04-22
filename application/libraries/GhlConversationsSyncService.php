@@ -318,7 +318,7 @@ class GhlConversationsSyncService
 
     protected function normalizeTimestampMs($value)
     {
-        $date = $this->timestampMsToDateTimeImmutable($value, new DateTimeZone('UTC'));
+        $date = $this->timestampMsToDateTimeImmutable($value, new DateTimeZone(date_default_timezone_get()));
         return $date ? $date->format('Y-m-d H:i:s') : null;
     }
 
