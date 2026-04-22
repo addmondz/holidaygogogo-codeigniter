@@ -409,9 +409,9 @@
                                 <label>Customer Type <span style="color:red;">*</span></label>
                                 <select id="customer_type" name="customer_type" class="form-control selectpicker" required>
                                     <option selected disabled data-icon="la la-users font-size-lg bs-icon" value="">--SELECT CUSTOMER TYPE--</option>
-                                    <?php foreach(unserialize(CUSTOMER_TYPE) as $key => $value) { ?>
-                                        <option <?php if((current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) && isset($customer_type) && $key == $customer_type) { echo 'selected'; } ?> data-icon="la la-user-tag font-size-lg bs-icon" value="<?php echo $key; ?>"><?php echo $value; ?></option>
-                                    <?php } ?>
+                                    <?php if(!empty($customer_types)) { foreach($customer_types as $ct) { ?>
+                                        <option <?php if((current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) && isset($customer_type) && $ct->Name == $customer_type) { echo 'selected'; } ?> data-icon="la la-user-tag font-size-lg bs-icon" value="<?php echo $ct->Name; ?>"><?php echo $ct->Name; ?></option>
+                                    <?php } } ?>
                                 </select>
                             </div>
 

@@ -117,9 +117,9 @@ div.kt-datatable__pager-container {
                                                 <label>Customer Type</label>
                                                 <select name="customer_type" class="form-control selectpicker">
                                                     <option selected data-icon="la la-users font-size-lg bs-icon" value="">--SELECT CUSTOMER TYPE--</option>
-                                                    <?php foreach(unserialize(CUSTOMER_TYPE) as $key => $value) { ?>
-                                                        <option data-icon="la la-user-tag font-size-lg bs-icon" value="<?php echo $key; ?>" <?php if($this->input->get('customer_type') == $key) echo 'selected'; ?>><?php echo $value; ?></option>
-                                                    <?php } ?>
+                                                    <?php if(!empty($customer_types)) { foreach($customer_types as $ct) { ?>
+                                                        <option data-icon="la la-user-tag font-size-lg bs-icon" value="<?php echo $ct->Name; ?>" <?php if($this->input->get('customer_type') == $ct->Name) echo 'selected'; ?>><?php echo $ct->Name; ?></option>
+                                                    <?php } } ?>
                                                 </select>
                                             </div>
                                         </div>

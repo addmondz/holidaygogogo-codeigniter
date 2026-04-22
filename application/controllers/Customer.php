@@ -11,6 +11,7 @@ class Customer extends MY_Controller
 		parent::__construct();
 		$this->load->model('Customer_Model');
 		$this->load->model('Universal_Model');
+		$this->load->model('Customer_Type_Model');
 	}
 
 	function index()
@@ -23,6 +24,7 @@ class Customer extends MY_Controller
 		$data['total']     = $this->Customer_Model->Count_Customers();
 		$data['page']      = $page;
 		$data['limit']     = $limit;
+		$data['customer_types'] = $this->Customer_Type_Model->Read_Customer_Types();
 
 		$titles = [
 			'tab_title' => 'HolidayGoGoGo | Customer',

@@ -21,6 +21,7 @@ class Booking extends MY_Controller
 		$this->load->model('Package_Checklist_Model');
 		$this->load->model('Guest_list_lock_model');
 		$this->load->model('Cancellation_Reason_Model');
+		$this->load->model('Customer_Type_Model');
 		$this->config->load('autocount'); // load config/autocount.php
 	}
 
@@ -666,6 +667,7 @@ class Booking extends MY_Controller
 				$array['country_codes'] = $this->Booking_Model->Read_Country_Codes();
 				$array['tags'] = $this->Booking_Model->Read_Tags();
 				$array['sources'] = $this->Booking_Model->Read_Sources();
+				$array['customer_types'] = $this->Customer_Type_Model->Read_Customer_Types();
 				$this->load->view('layout/header', $titles);
 				$this->load->view('booking/booking', $array);
 				$this->load->view('layout/footer');
@@ -1276,6 +1278,7 @@ class Booking extends MY_Controller
 					$array['display_status'] = display_booking_status($array, true); // true = return all applicable statuses
 
 					if(isset($_GET['nick'])) { echo "<pre>"; print_r($array); exit; }
+					$array['customer_types'] = $this->Customer_Type_Model->Read_Customer_Types();
 					$this->load->view('layout/header', $titles);
 					$this->load->view('booking/booking', $array);
 					$this->load->view('layout/footer');
