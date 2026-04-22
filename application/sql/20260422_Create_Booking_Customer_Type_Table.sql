@@ -12,5 +12,7 @@ INSERT IGNORE INTO `booking_customer_type` (`BookingID`, `CustomerTypeID`)
 SELECT b.`BookingID`, ct.`CustomerTypeID`
 FROM `booking` b
 JOIN `customer` c       ON c.`CustomerID`   = b.`CustomerID`
-JOIN `customer_type` ct ON ct.`Name` COLLATE utf8mb4_unicode_ci = c.`customer_type` COLLATE utf8mb4_unicode_ci
+JOIN `customer_type` ct
+  ON CONVERT(ct.`Name` USING utf8mb4) COLLATE utf8mb4_unicode_ci
+   = CONVERT(c.`customer_type` USING utf8mb4) COLLATE utf8mb4_unicode_ci
 WHERE c.`customer_type` IS NOT NULL AND c.`customer_type` <> '';
