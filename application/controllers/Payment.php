@@ -90,6 +90,16 @@ class Payment extends MY_Controller
 				$total_credit = ($array['booking_id'] != 'NA') ? $this->Calculate_Total_Credit($array['booking_id']) : 0;
 				$outstanding = $net_total - $total_credit;
 				$array['outstanding_balance_by_customer'] = number_format($outstanding, 2, '.', ',');
+
+				// Fetch assigned staff for the View Remark toolbar button's @mention wiring
+				$this->db->select('SalesAgent, BookingOP');
+				$this->db->where('BookingNumber', $this->input->get('booking_number'));
+				$booking_context = $this->db->get('booking')->row_array();
+				$array['sales_agent_id'] = !empty($booking_context['SalesAgent']) ? $booking_context['SalesAgent'] : '';
+				$array['booking_op_id'] = !empty($booking_context['BookingOP']) ? $booking_context['BookingOP'] : '';
+			} else {
+				$array['sales_agent_id'] = '';
+				$array['booking_op_id'] = '';
 			}
 
 			if(isset($_GET['nick'])) {

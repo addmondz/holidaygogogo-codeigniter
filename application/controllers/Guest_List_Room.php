@@ -230,6 +230,72 @@ class Guest_List_Room extends MY_Controller
 		echo json_encode(array('success' => true, 'message' => 'Guest type updated'));
 	}
 
+	function Update_Guest_Room()
+	{
+		if(!$this->input->post()) {
+			echo json_encode(array('success' => false, 'message' => 'Invalid request'));
+			return;
+		}
+
+		$guest_list_id = $this->input->post('guest_list_id');
+		$room_id = $this->input->post('room_id');
+		$room_id = ($room_id === '' || $room_id === null) ? null : $room_id;
+
+		$this->db->select('BookingID, Type, guest_list_room_id');
+		$this->db->where('GuestListID', $guest_list_id);
+		$guest = $this->db->get('guest_list')->row();
+
+		if(!$guest) {
+			echo json_encode(array('success' => false, 'message' => 'Guest not found'));
+			return;
+		}
+
+		if($this->_is_gl_locked($guest->BookingID)) {
+			echo json_encode(array('success' => false, 'message' => 'Guest List is locked'));
+			return;
+		}
+
+		if($room_id !== null) {
+			$target = $this->_get_room_by_id($room_id);
+			if(!$target || $target['booking_id'] != $guest->BookingID) {
+				echo json_encode(array('success' => false, 'message' => 'Invalid target room'));
+				return;
+			}
+		}
+
+		$current = $guest->guest_list_room_id !== null ? (string)$guest->guest_list_room_id : '';
+		$incoming = $room_id !== null ? (string)$room_id : '';
+		if($current === $incoming) {
+			echo json_encode(array('success' => true, 'message' => 'No change'));
+			return;
+		}
+
+		$type_map = array('ADULT' => 'adult_count', 'CHILD' => 'child_count', 'INFANT' => 'infant_count');
+		$col = isset($type_map[$guest->Type]) ? $type_map[$guest->Type] : null;
+
+		if($col !== null && !empty($guest->guest_list_room_id)) {
+			$this->db->set($col, $col . ' - 1', FALSE);
+			$this->db->where('id', $guest->guest_list_room_id);
+			$this->db->where($col . ' > ', 0);
+			$this->db->update('guest_list_room');
+		}
+
+		if($col !== null && $room_id !== null) {
+			$this->db->set($col, $col . ' + 1', FALSE);
+			$this->db->where('id', $room_id);
+			$this->db->update('guest_list_room');
+		}
+
+		$this->db->where('GuestListID', $guest_list_id);
+		$this->db->update('guest_list', array('guest_list_room_id' => $room_id));
+
+		$this->load->model('Guest_List_Model');
+		$is_submitted = $this->Guest_List_Model->Are_All_Guests_Complete($guest->BookingID) ? 1 : 0;
+		$this->Booking_Model->update_by_id($guest->BookingID, array('is_submitted' => $is_submitted));
+
+		echo json_encode(array('success' => true, 'message' => 'Guest room updated'));
+	}
+
 	private function _get_room_by_id($room_id)
 	{
 		$this->db->select('id, booking_id');

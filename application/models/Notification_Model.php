@@ -430,31 +430,6 @@ class Notification_Model extends CI_Model
 		$notified = false;
 		$notified_user_ids = array();
 
-		// Notify all Level 10 (Owner) admins
-		$this->db->select('AdminID');
-		$this->db->where('Status', 'Y');
-		$this->db->where('level', '10');
-		$admins = $this->db->get('admin')->result();
-
-		foreach ($admins as $admin) {
-			$this->db->where('user_id', $admin->AdminID);
-			$this->db->where('remark_id', $remark_id);
-			$existing = $this->db->get('notification')->row();
-
-			if (empty($existing)) {
-				$this->Create(array(
-					'user_id' => $admin->AdminID,
-					'type' => 'remark',
-					'owner_type' => 'booking',
-					'owner_id' => $booking_id,
-					'remark_id' => $remark_id,
-					'message' => $message
-				));
-				$notified = true;
-			}
-			$notified_user_ids[] = $admin->AdminID;
-		}
-
 		// Notify Sales Agent
 		if (!empty($sales_agent_id) && !in_array($sales_agent_id, $notified_user_ids)) {
 			$this->db->select('AdminID');
@@ -570,28 +545,6 @@ class Notification_Model extends CI_Model
 		$message = $updater_name . ' updated a booking';
 		$notifications_created = 0;
 		$notified_user_ids = array();
-
-		// Notify Level 10 (Owner) admins
-		$this->db->select('AdminID');
-		$this->db->where('Status', 'Y');
-		$this->db->where('level', '10');
-		$admins = $this->db->get('admin')->result();
-
-		foreach ($admins as $admin) {
-			if ($admin->AdminID != $updater_id) {
-				$notification_data = array(
-					'user_id' => $admin->AdminID,
-					'type' => 'booking_updated',
-					'owner_type' => 'booking',
-					'owner_id' => $booking_id,
-					'remark_id' => null,
-					'message' => $message
-				);
-				$this->Create($notification_data);
-				$notifications_created++;
-				$notified_user_ids[] = $admin->AdminID;
-			}
-		}
 
 		// Notify SalesAgent (TC)
 		if (!empty($booking->SalesAgent) && $booking->SalesAgent != $updater_id && !in_array($booking->SalesAgent, $notified_user_ids)) {

@@ -114,6 +114,17 @@ div.kt-datatable__pager-container {
                                         </div>
                                         <div class="col-md-3">
                                             <div class="form-group">
+                                                <label>Customer Type</label>
+                                                <select name="customer_type" class="form-control selectpicker">
+                                                    <option selected data-icon="la la-users font-size-lg bs-icon" value="">--SELECT CUSTOMER TYPE--</option>
+                                                    <?php foreach(unserialize(CUSTOMER_TYPE) as $key => $value) { ?>
+                                                        <option data-icon="la la-user-tag font-size-lg bs-icon" value="<?php echo $key; ?>" <?php if($this->input->get('customer_type') == $key) echo 'selected'; ?>><?php echo $value; ?></option>
+                                                    <?php } ?>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="form-group">
                                                 <label>Created Date
                                                     <a onclick="Reset_Created_Date()" class="btn btn-icon btn-light-warning btn-xs">
                                                         <i class="la la-undo"></i>
@@ -308,7 +319,7 @@ div.kt-datatable__pager-container {
 </div>
 
 <script>
-    <?php if(!empty($this->input->get('name')) || !empty($this->input->get('phone_number')) || !empty($this->input->get('CustomerCode')) || !empty($this->input->get('ChatLanguage')) || !empty($this->input->get('autocount_status')) || !empty($this->input->get('created_date'))) { ?>
+    <?php if(!empty($this->input->get('name')) || !empty($this->input->get('phone_number')) || !empty($this->input->get('CustomerCode')) || !empty($this->input->get('ChatLanguage')) || !empty($this->input->get('autocount_status')) || !empty($this->input->get('customer_type')) || !empty($this->input->get('created_date'))) { ?>
         $('#customer_header').click();
     <?php } ?>
 

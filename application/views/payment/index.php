@@ -44,9 +44,14 @@
                             <i class="la la-user-friends"></i>GL
                         </a>
                         <?php if(in_array('AB', $this->session->access_control)) { ?>
-                            <a href="<?php if(!empty($payments)) { echo base_url('Booking/Update?booking_id=') . $payments[0]->BookingID; } else { echo base_url('Booking/Update?booking_id=') . $booking_id; } ?>" class="btn btn-light-success font-weight-bold mb-2" style="width:180px;">
+                            <a href="<?php if(!empty($payments)) { echo base_url('Booking/Update?booking_id=') . $payments[0]->BookingID; } else { echo base_url('Booking/Update?booking_id=') . $booking_id; } ?>" class="btn btn-light-success font-weight-bold mr-1 mb-2" style="width:180px;">
                                 <i class="la la-suitcase"></i>Booking
                             </a>
+                        <?php } ?>
+                        <?php if((in_array('AB', $this->session->access_control) || $this->session->userdata('level') == 20) && !empty($booking_id) && $booking_id != 'NA') { ?>
+                            <button type="button" onclick="openRemarksModal(<?php echo $booking_id; ?>, '<?php echo addslashes(strtoupper($this->input->get('booking_number'))); ?>', '<?php echo $sales_agent_id; ?>', '<?php echo $booking_op_id; ?>')" class="btn btn-light-dark font-weight-bold mb-2" style="width:180px;">
+                                <i class="la la-comment"></i>View Remark
+                            </button>
                         <?php } ?>
                     <?php } ?>
                 </div>

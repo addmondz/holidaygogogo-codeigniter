@@ -655,7 +655,7 @@ class Booking extends MY_Controller
 				// }
         } else {
 				$titles = array('tab_title' => 'HolidayGoGoGo | Booking', 'breadcrumb_title' => 'Booking >> Create');
-					$array = array('BookingID' => 'NA', 'BookingConfirmationFooterID' => 'NA', 'TravelVoucherFooterID' => 'NA', 'BookingNumber' => 'NA', 'Tag' => array(), 'Discount' => 'NA', 'NetTotal' => 'NA', 'ProductSequence' => array(), 'BookingProductID' => ($this->Booking_Product_Model->Read_Last_Booking_Product_ID()) + 1, 'AllowReview' => 1, 'ic_passport_no' => '');
+					$array = array('BookingID' => 'NA', 'BookingConfirmationFooterID' => 'NA', 'TravelVoucherFooterID' => 'NA', 'BookingNumber' => 'NA', 'Tag' => array(), 'Discount' => 'NA', 'NetTotal' => 'NA', 'ProductSequence' => array(), 'BookingProductID' => ($this->Booking_Product_Model->Read_Last_Booking_Product_ID()) + 1, 'AllowReview' => 1, 'ic_passport_no' => '', 'tin_no' => '', 'customer_type' => '');
 					$array['admins'] = $this->Booking_Model->Read_Admins();
 					$array['notify_admins'] = $this->Notification_Model->Build_Admin_Handles($this->Booking_Model->Read_Notify_Admins());
 					$array['booking_op_admins'] = $this->Booking_Model->Read_Booking_OP_Admins();
@@ -753,15 +753,24 @@ class Booking extends MY_Controller
 		
 		if(in_array('AB', $this->session->access_control)) {
 			if($this->input->is_ajax_request()) {
-				// Always persist IC/Passport No. on the linked customer when posted,
+				// Always persist IC/Passport No. and TIN No. on the linked customer when posted,
 				// independent of whether other booking fields changed.
 				$posted_ic = $this->input->post('ic_passport_no');
+				$posted_tin = $this->input->post('tin_no');
+				$posted_customer_type = $this->input->post('customer_type');
 				$posted_customer_id = $this->input->post('CustomerID');
-				if (!empty($posted_ic) && !empty($posted_customer_id) && is_numeric($posted_customer_id)) {
-					$this->Customer_Model->update_by_id($posted_customer_id, [
-						'ic_passport_no' => strtoupper($posted_ic),
-						'updated_at'     => date('Y-m-d H:i:s'),
-					]);
+				if (!empty($posted_customer_id) && is_numeric($posted_customer_id) && (!empty($posted_ic) || $posted_tin !== null || $posted_customer_type !== null)) {
+					$update = ['updated_at' => date('Y-m-d H:i:s')];
+					if (!empty($posted_ic)) {
+						$update['ic_passport_no'] = strtoupper($posted_ic);
+					}
+					if ($posted_tin !== null) {
+						$update['tin_no'] = strtoupper(trim($posted_tin));
+					}
+					if ($posted_customer_type !== null) {
+						$update['customer_type'] = $posted_customer_type;
+					}
+					$this->Customer_Model->update_by_id($posted_customer_id, $update);
 				}
 
 				// Booking

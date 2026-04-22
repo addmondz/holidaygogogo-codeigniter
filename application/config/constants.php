@@ -111,6 +111,7 @@ defined('BOOKING_STATUS')      or define('BOOKING_STATUS', serialize(array(
 )));
 defined('BC_TITLE')            or define('BC_TITLE', serialize(array('BOOKING CONFIRMATION' => 'BOOKING CONFIRMATION', 'QUOTATION' => 'QUOTATION', 'PROFORMA INVOICE' => 'PROFORMA INVOICE')));
 defined('CHAT_LANGUAGE')       or define('CHAT_LANGUAGE', serialize(array('CN' => 'CN', 'EN' => 'EN', 'ML' => 'ML')));
+defined('CUSTOMER_TYPE')       or define('CUSTOMER_TYPE', serialize(array('Company' => 'Company', 'Chinese' => 'Chinese', 'Malay' => 'Malay', 'Indian' => 'Indian', 'Foreigner' => 'Foreigner')));
 
 //Payment
 defined('PAYMENT_STATUS')      or define('PAYMENT_STATUS', serialize(array('Y' => 'APPROVED', 'P' => 'PENDING', 'R' => 'REJECTED')));

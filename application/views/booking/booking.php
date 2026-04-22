@@ -406,6 +406,30 @@
                             </div>
 
                             <div class="form-group">
+                                <label>Customer Type <span style="color:red;">*</span></label>
+                                <select id="customer_type" name="customer_type" class="form-control selectpicker" required>
+                                    <option selected disabled data-icon="la la-users font-size-lg bs-icon" value="">--SELECT CUSTOMER TYPE--</option>
+                                    <?php foreach(unserialize(CUSTOMER_TYPE) as $key => $value) { ?>
+                                        <option <?php if((current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) && isset($customer_type) && $key == $customer_type) { echo 'selected'; } ?> data-icon="la la-user-tag font-size-lg bs-icon" value="<?php echo $key; ?>"><?php echo $value; ?></option>
+                                    <?php } ?>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label>TIN No.</label>
+                                <div class="input-icon">
+                                    <input type="text"
+                                        id="tin_no"
+                                        name="tin_no"
+                                        value="<?php echo isset($tin_no) ? htmlspecialchars($tin_no, ENT_QUOTES) : ''; ?>"
+                                        autocomplete="off"
+                                        class="form-control"
+                                        placeholder="Enter Tax Identification Number">
+                                    <span><i class="la la-file-invoice"></i></span>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
 
                                 <label>Mobile <span style="color:red;">*</span></label>
 
@@ -2759,6 +2783,8 @@
 
                 var ic_passport_no = ($('#ic_passport_no').val() || '').toUpperCase();
 
+                var customer_type = $('#customer_type').val();
+
                 var CustomerID = $('input[name="CustomerID"]').val();
 
                 var mobile = $('#Mobile').val();
@@ -2806,6 +2832,7 @@
                     'Full payment deadline': full_payment_deadline,
                     'Customer': customer,
                     'IC / Passport No.': ic_passport_no,
+                    'Customer Type': customer_type,
                     'Mobile': mobile,
                     'Travel date': travel_date,
                     'Destination': destination,
@@ -3664,6 +3691,10 @@
                 CustomerID: CustomerID,
 
                 ic_passport_no: ($('#ic_passport_no').val() || '').toUpperCase(),
+
+                tin_no: ($('#tin_no').val() || '').toUpperCase(),
+
+                customer_type: $('#customer_type').val(),
 
             };
 
@@ -5449,10 +5480,36 @@ $(document).ready(function() {
                     }).join('') +
                     '</select>';
             }
+            var currentRoomVal = guest.guest_list_room_id ? String(guest.guest_list_room_id) : '';
+            var roomControl;
+            if (glLocked) {
+                var currentRoomName = '';
+                if (guest.guest_list_room_id) {
+                    var assignedRoom = roomsList.find(function(r) { return String(r.id) === currentRoomVal; });
+                    currentRoomName = assignedRoom ? assignedRoom.room_name : '';
+                }
+                roomControl = currentRoomName
+                    ? '<span class="label label-inline label-light-secondary ml-2">' + $('<span>').text(currentRoomName).html() + '</span>'
+                    : '';
+            } else {
+                var optionsHtml = '<option value="">— Unassigned —</option>';
+                roomsList.forEach(function(r) {
+                    var rid = String(r.id);
+                    var name = $('<span>').text(r.room_name).html();
+                    optionsHtml += '<option value="' + rid + '"' + (rid === currentRoomVal ? ' selected' : '') + '>' + name + '</option>';
+                });
+                roomControl = '<select class="form-control form-control-sm d-inline-block guest-room-select ml-2"' +
+                    ' style="width:auto;padding:2px 6px;height:auto;font-size:0.85rem;"' +
+                    ' data-guest-id="' + guest.GuestListID + '"' +
+                    ' data-current-room="' + currentRoomVal + '">' +
+                    optionsHtml +
+                    '</select>';
+            }
             html += '<tr>' +
                 '<td style="padding:4px 12px;">' +
                 '<i class="la la-user text-muted mr-1"></i>' + guestName +
                 ' ' + typeControl +
+                ' ' + roomControl +
                 deleteBtn +
                 '</td>' +
                 '</tr>';
@@ -5848,6 +5905,32 @@ $(document).ready(function() {
                 error: function() {
                     Swal.fire('Error!', 'Failed to update guest type', 'error');
                     $sel.val(prevType);
+                }
+            });
+        });
+
+        $('.guest-room-select').off('change').on('change', function() {
+            var $sel = $(this);
+            var guestId = $sel.data('guest-id');
+            var newRoomId = $sel.val();
+            var currentRoomId = String($sel.data('current-room') || '');
+            if (String(newRoomId) === currentRoomId) return;
+            $.ajax({
+                url: '<?php echo base_url("Guest_List_Room/Update_Guest_Room"); ?>',
+                type: 'post',
+                data: { guest_list_id: guestId, room_id: newRoomId },
+                dataType: 'json',
+                success: function(response) {
+                    if (response.success) {
+                        loadRooms();
+                    } else {
+                        Swal.fire('Error!', response.message, 'error');
+                        $sel.val(currentRoomId);
+                    }
+                },
+                error: function() {
+                    Swal.fire('Error!', 'Failed to move guest', 'error');
+                    $sel.val(currentRoomId);
                 }
             });
         });

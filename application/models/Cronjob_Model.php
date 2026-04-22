@@ -39,44 +39,18 @@ class Cronjob_Model extends CI_Model
 	}
 
 	/**
-	 * Create supplier payment reminder notifications for all Level 10 admins
-	 * Returns count of notifications created
+	 * Create supplier payment reminder notifications for the booking's TC (SalesAgent) and OP (BookingOP).
+	 * Returns count of notifications created.
 	 */
 	function create_supplier_reminder_notifications($booking_id, $booking_number, $type, $date) {
-		// Get all active Level 10 admins
-		$this->db->select('AdminID');
-		$this->db->where('Status', 'Y');
-		$this->db->where('level', '10');
-		$admins = $this->db->get('admin')->result();
-
 		$label = ($type == 'supplier_reminder_full') ? 'full' : 'deposit';
 		$formatted_date = date('d/m/Y', strtotime($date));
 		$message = "Reminder: Payment Out To Supplier ($label) for $booking_number is due on $formatted_date - checklist not completed";
 
 		$count = 0;
 		$notified = array();
-		foreach($admins as $admin) {
-			// Check if notification already exists for today
-			if($this->has_today_notification($admin->AdminID, $type, $booking_id)) {
-				$notified[] = $admin->AdminID;
-				continue;
-			}
 
-			$this->db->insert('notification', array(
-				'user_id' => $admin->AdminID,
-				'type' => $type,
-				'owner_type' => 'booking',
-				'owner_id' => $booking_id,
-				'remark_id' => null,
-				'message' => $message,
-				'is_read' => 0,
-				'created_at' => date('Y-m-d H:i:s')
-			));
-			$count++;
-			$notified[] = $admin->AdminID;
-		}
-
-		// Also notify the booking's TC (SalesAgent) and OP (BookingOP)
+		// Notify the booking's TC (SalesAgent) and OP (BookingOP)
 		$this->db->select('SalesAgent, BookingOP');
 		$this->db->where('BookingID', $booking_id);
 		$booking = $this->db->get('booking')->row();
