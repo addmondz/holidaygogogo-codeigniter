@@ -148,7 +148,7 @@ class Ghl_Processed_Leads_Model extends CI_Model
     public function get_existing_conversion_map($conversationId)
     {
         $rows = $this->db
-            ->select('lead_started_at, first_customer_message_id, is_converted, converted_at, assigned_to_user_id')
+            ->select('lead_started_at, first_customer_message_id, is_converted, booking_id, converted_at, assigned_to_user_id')
             ->from('ghl_processed_leads')
             ->where('conversation_id', (string) $conversationId)
             ->order_by('lead_started_at', 'ASC')
@@ -161,6 +161,7 @@ class Ghl_Processed_Leads_Model extends CI_Model
             $map[$key] = array(
                 'assigned_to_user_id' => $row['assigned_to_user_id'],
                 'is_converted' => (int) $row['is_converted'],
+                'booking_id' => !empty($row['booking_id']) ? (int) $row['booking_id'] : null,
                 'converted_at' => $row['converted_at'],
             );
         }
@@ -212,6 +213,7 @@ class Ghl_Processed_Leads_Model extends CI_Model
     {
         return $this->db
             ->set('is_converted', 0)
+            ->set('booking_id', null)
             ->set('converted_at', null)
             ->update('ghl_processed_leads');
     }
@@ -298,7 +300,7 @@ class Ghl_Processed_Leads_Model extends CI_Model
         return !empty($row) ? $row : null;
     }
 
-    public function mark_lead_as_converted($leadId, $convertedAt)
+    public function mark_lead_as_converted($leadId, $bookingId, $convertedAt)
     {
         return $this->db
             ->where('id', (int) $leadId)
@@ -306,6 +308,7 @@ class Ghl_Processed_Leads_Model extends CI_Model
                 'ghl_processed_leads',
                 array(
                     'is_converted' => 1,
+                    'booking_id' => (int) $bookingId > 0 ? (int) $bookingId : null,
                     'converted_at' => $convertedAt,
                     'updated_at' => date('Y-m-d H:i:s'),
                 )

@@ -647,6 +647,7 @@ class Cron extends CI_Controller
 
 					$updated = $this->Ghl_Processed_Leads_Model->mark_lead_as_converted(
 						(int) $lead['id'],
+						(int) $conversion['BookingID'],
 						$conversion['converted_at']
 					);
 
@@ -792,6 +793,7 @@ class Cron extends CI_Controller
 						'responded_message_count' => 0,
 						'avg_first_5_response_seconds' => null,
 						'is_converted' => 0,
+						'booking_id' => null,
 						'converted_at' => null,
 						'created_at' => $now,
 						'updated_at' => $now,
@@ -847,6 +849,7 @@ class Cron extends CI_Controller
 					$lead['assigned_to_user_id'] = $existingConversions[$conversionKey]['assigned_to_user_id'];
 				}
 				$lead['is_converted'] = (int) $existingConversions[$conversionKey]['is_converted'];
+				$lead['booking_id'] = $existingConversions[$conversionKey]['booking_id'];
 				$lead['converted_at'] = $existingConversions[$conversionKey]['converted_at'];
 			}
 

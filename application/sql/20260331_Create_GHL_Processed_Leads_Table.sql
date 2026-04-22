@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS `ghl_processed_leads` (
   `response_5_agent_message_at` DATETIME NULL DEFAULT NULL,
   `response_5_seconds` INT NULL DEFAULT NULL,
   `is_converted` TINYINT(1) NOT NULL DEFAULT 0,
+  `booking_id` INT(11) NULL DEFAULT NULL,
   `converted_at` DATETIME NULL DEFAULT NULL,
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -45,5 +46,6 @@ CREATE TABLE IF NOT EXISTS `ghl_processed_leads` (
   KEY `idx_conversation_started_at` (`conversation_id`, `lead_started_at`),
   KEY `idx_contact_started_at` (`contact_id`, `lead_started_at`),
   KEY `idx_assigned_to_user_id` (`assigned_to_user_id`),
-  KEY `idx_conversion_status` (`is_converted`, `converted_at`)
+  KEY `idx_conversion_status` (`is_converted`, `converted_at`),
+  KEY `idx_booking_id` (`booking_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

@@ -429,6 +429,13 @@ $leadSortIcon = function($column) use ($leadCurrentSortBy, $leadCurrentSortDir) 
                                         <td class="text-center align-middle">
                                             <?php if((int) $row['is_converted'] === 1) { ?>
                                                 <span class="label label-light-success label-inline font-weight-bold">Converted</span>
+                                                <?php if(!empty($row['booking_id'])) { ?>
+                                                    <div class="mt-2">
+                                                        <a href="<?php echo html_escape($row['booking_url']); ?>" class="font-size-sm" target="_blank">
+                                                            <?php echo !empty($row['booking_number']) ? html_escape($row['booking_number']) : 'Booking #' . html_escape($row['booking_id']); ?>
+                                                        </a>
+                                                    </div>
+                                                <?php } ?>
                                             <?php } else { ?>
                                                 <span class="label label-light-warning label-inline font-weight-bold">Open</span>
                                             <?php } ?>

@@ -27,6 +27,7 @@
 	- Re-Process convertion: `process_ghl_lead_conversions --rebuild`
 
 I. Default Commands & order 
+	php index.php run_sql_patches
 	php index.php Cron syncGhlUsers
 	php index.php Cron syncGhlContacts --full
 	php index.php Cron syncGhlConversations --full
