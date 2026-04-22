@@ -629,7 +629,9 @@ class Report_Model extends CI_Model
                 pl.response_4_seconds,
                 pl.response_5_seconds,
                 pl.is_converted,
+                pl.booking_id,
                 pl.converted_at,
+                b.BookingNumber,
                 (
                     SELECT COUNT(*)
                     FROM ghl_messages gm_count
@@ -643,6 +645,7 @@ class Report_Model extends CI_Model
             FROM ghl_processed_leads pl
             LEFT JOIN ghl_conversations gc ON gc.conversation_id = pl.conversation_id
             LEFT JOIN ghl_users gu ON gu.UserID = NULLIF(pl.assigned_to_user_id, '')
+            LEFT JOIN booking b ON b.BookingID = pl.booking_id
             {$where['sql']}
             {$order}
         ";
