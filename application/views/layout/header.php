@@ -55,6 +55,12 @@ $is_dev_env = ($app_env !== 'prod');
 		display: none; /* Chrome, Safari, Opera */
 	}
 
+	/* Notification dropdown: flex layout so header + "Mark all as read" footer stay pinned while only the list scrolls. Scoped to .show so Bootstrap's default display:none keeps the dropdown hidden on page load. */
+	#notification-dropdown.show {
+		display: flex !important;
+		flex-direction: column;
+	}
+
 	<?php if ($is_dev_env) { ?>
 	/* Adjust header position when dev banner is visible */
 	#dev-env-banner {
@@ -448,15 +454,18 @@ $is_dev_env = ($app_env !== 'prod');
 								<span class="label label-lg label-light-danger label-inline label-rounded position-absolute" id="notification-badge" style="top: -5px; right: -5px; display: none; min-width: 20px; padding: 2px 6px;">0</span>
 							</div>
 							<!-- Notification Dropdown -->
-							<div class="dropdown-menu dropdown-menu-right p-0 m-0 dropdown-menu-anim-up dropdown-menu-lg" id="notification-dropdown" style="width: 400px; max-height: 500px; overflow-y: auto;">
-								<div class="d-flex align-items-center justify-content-between p-5 border-bottom">
+							<div class="dropdown-menu dropdown-menu-right p-0 m-0 dropdown-menu-anim-up dropdown-menu-lg" id="notification-dropdown" style="width: 400px; max-height: 500px; overflow: hidden;">
+								<div class="d-flex align-items-center justify-content-between p-5 border-bottom" style="flex-shrink: 0;">
 									<h5 class="mb-0">Notifications</h5>
 								</div>
-								<div class="notification-list" id="notification-list">
+								<div class="notification-list" id="notification-list" style="flex: 1 1 auto; overflow-y: auto; min-height: 0;">
 									<div class="text-center p-10">
 										<div class="spinner spinner-primary spinner-lg"></div>
 										<div class="mt-3">Loading notifications...</div>
 									</div>
+								</div>
+								<div class="text-center py-2 border-top d-none" id="mark-read-notifications" style="flex-shrink: 0; background-color: #fff;">
+									<a href="javascript:;" class="mark-all-notifications-read text-primary font-weight-bold font-size-sm">Mark all as read</a>
 								</div>
 							</div>
 						</div>
