@@ -208,6 +208,110 @@ class Ghl_Processed_Leads_Model extends CI_Model
         return $this->db->trans_status();
     }
 
+    public function reset_conversion_data()
+    {
+        return $this->db
+            ->set('is_converted', 0)
+            ->set('converted_at', null)
+            ->update('ghl_processed_leads');
+    }
+
+    public function get_open_lead_conversion_batch($limit = null, $lastLeadId = 0, $leadId = null, $conversationId = null)
+    {
+        $limit = $limit !== null ? max(1, (int) $limit) : null;
+        $lastLeadId = max(0, (int) $lastLeadId);
+
+        $clauses = array('pl.is_converted = 0');
+        $params = array();
+
+        if ($leadId !== null) {
+            $clauses[] = 'pl.id = ?';
+            $params[] = (int) $leadId;
+        } elseif ($conversationId !== null && $conversationId !== '') {
+            $clauses[] = 'pl.conversation_id = ?';
+            $params[] = (string) $conversationId;
+        } else {
+            $clauses[] = 'pl.id > ?';
+            $params[] = $lastLeadId;
+        }
+
+        $limitSql = '';
+        if ($limit !== null) {
+            $limitSql = ' LIMIT ?';
+            $params[] = $limit;
+        }
+
+        return $this->db->query(
+            "
+            SELECT
+                pl.id,
+                pl.conversation_id,
+                pl.contact_id,
+                pl.lead_started_at,
+                COALESCE(NULLIF(gc.phone, ''), NULLIF(gcv.phone, '')) AS lead_phone
+            FROM ghl_processed_leads pl
+            LEFT JOIN ghl_contacts gc ON gc.contact_id = pl.contact_id
+            LEFT JOIN ghl_conversations gcv ON gcv.conversation_id = pl.conversation_id
+            WHERE " . implode(' AND ', $clauses) . "
+            ORDER BY pl.id ASC" . $limitSql . "
+            ",
+            $params
+        )->result_array();
+    }
+
+    public function find_first_booking_conversion($phoneVariants, $leadStartedAt)
+    {
+        $phoneVariants = array_values(array_filter(array_unique(array_map('strval', (array) $phoneVariants))));
+        $leadStartedAt = trim((string) $leadStartedAt);
+
+        if (empty($phoneVariants) || $leadStartedAt === '') {
+            return null;
+        }
+
+        $placeholders = implode(',', array_fill(0, count($phoneVariants), '?'));
+        $params = array($leadStartedAt);
+        $params = array_merge($params, $phoneVariants, $phoneVariants, $phoneVariants);
+
+        $row = $this->db->query(
+            "
+            SELECT
+                b.BookingID,
+                b.BookingNumber,
+                b.Customer,
+                b.Mobile,
+                b.Mobile2,
+                b.InsertDate AS converted_at
+            FROM booking b
+            LEFT JOIN customer c ON c.CustomerID = b.CustomerID
+            WHERE b.InsertDate >= ?
+              AND (
+                  b.Mobile IN ({$placeholders})
+                  OR b.Mobile2 IN ({$placeholders})
+                  OR c.phone_number IN ({$placeholders})
+              )
+            ORDER BY b.InsertDate ASC, b.BookingID ASC
+            LIMIT 1
+            ",
+            $params
+        )->row_array();
+
+        return !empty($row) ? $row : null;
+    }
+
+    public function mark_lead_as_converted($leadId, $convertedAt)
+    {
+        return $this->db
+            ->where('id', (int) $leadId)
+            ->update(
+                'ghl_processed_leads',
+                array(
+                    'is_converted' => 1,
+                    'converted_at' => $convertedAt,
+                    'updated_at' => date('Y-m-d H:i:s'),
+                )
+            );
+    }
+
     public function get_processor_state($processorName)
     {
         $row = $this->db

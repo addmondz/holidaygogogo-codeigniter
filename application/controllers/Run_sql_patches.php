@@ -42,6 +42,8 @@ class Run_sql_patches extends CI_Controller
 
 		$executed_count = 0;
 		$skipped_count = 0;
+		$failed_count = 0;
+		$warning_count = 0;
 
 		foreach ($files as $file) {
 			$filename = basename($file);
@@ -65,32 +67,48 @@ class Run_sql_patches extends CI_Controller
 			// Split multiple queries by semicolon (basic split)
 			$queries = array_filter(array_map('trim', explode(';', $sql_content)));
 
-			$this->db->trans_start();
-
 			$has_error = false;
+			$has_warning = false;
+			$warning_messages = [];
+
 			foreach ($queries as $query) {
 				if (!empty($query)) {
-					try {
-						$this->db->query($query);
-					} catch (Exception $e) {
-						echo "❌ Error in {$filename}: " . $e->getMessage() . PHP_EOL;
-						$has_error = true;
+					$result = $this->execute_query_safely($query);
+
+					if (!$result['success']) {
+						if ($this->is_non_fatal_schema_warning($result)) {
+							$warning_messages[] = $result['message'];
+							echo "⚠️ Schema warning handled for {$filename}: " . $result['message'] . PHP_EOL;
+							$has_warning = true;
+							continue;
+						} else {
+							echo "❌ Error in {$filename}: " . $result['message'] . PHP_EOL;
+							$has_error = true;
+						}
+
 						break;
 					}
 				}
 			}
 
-			$this->db->trans_complete();
-
-			if ($this->db->trans_status() === FALSE || $has_error) {
-				echo "❌ Transaction failed for: {$filename}" . PHP_EOL;
+			if ($has_error) {
+				echo "❌ Migration failed for: {$filename}" . PHP_EOL;
+				$failed_count++;
 				echo str_repeat('-', 50) . PHP_EOL;
 				continue;
 			}
 
 			// Record successful migration (skip for the migration table creation file)
 			if ($filename !== '20250100_Create_Migration_Table.sql') {
-				$this->record_migration($filename);
+				$this->record_migration($filename, [
+					'has_duplicate_field_error' => $has_warning ? 1 : 0,
+					'error_message' => $has_warning ? implode("\n\n", $warning_messages) : null
+				]);
+			}
+
+			if ($has_warning) {
+				echo "⚠️ Recorded schema warning for: {$filename}" . PHP_EOL;
+				$warning_count++;
 			}
 
 			echo "✅ Completed: {$filename}" . PHP_EOL;
@@ -102,7 +120,91 @@ class Run_sql_patches extends CI_Controller
 		echo "📊 Summary:" . PHP_EOL;
 		echo "   ✅ Executed: {$executed_count} file(s)" . PHP_EOL;
 		echo "   ⏭️  Skipped: {$skipped_count} file(s)" . PHP_EOL;
+		echo "   ⚠️ Warnings handled: {$warning_count} file(s)" . PHP_EOL;
+		echo "   ❌ Failed: {$failed_count} file(s)" . PHP_EOL;
 		echo "🎉 SQL patch execution completed." . PHP_EOL;
+	}
+
+	/**
+	 * Execute a query with db_debug disabled so CLI can inspect database errors.
+	 *
+	 * @param string $query
+	 * @return array
+	 */
+	private function execute_query_safely($query)
+	{
+		$original_db_debug = $this->db->db_debug;
+		$this->db->db_debug = false;
+
+		try {
+			$result = $this->db->query($query);
+		} catch (Exception $e) {
+			$this->db->db_debug = $original_db_debug;
+
+			return [
+				'success' => false,
+				'code' => 0,
+				'message' => $e->getMessage()
+			];
+		}
+
+		$this->db->db_debug = $original_db_debug;
+
+		if ($result !== false) {
+			return [
+				'success' => true,
+				'code' => 0,
+				'message' => null
+			];
+		}
+
+		$error = $this->db->error();
+
+		return [
+			'success' => false,
+			'code' => isset($error['code']) ? (int) $error['code'] : 0,
+			'message' => $this->format_db_error($error)
+		];
+	}
+
+	/**
+	 * Format a database error into the same shape CodeIgniter normally shows.
+	 *
+	 * @param array $error
+	 * @return string
+	 */
+	private function format_db_error($error)
+	{
+		$code = isset($error['code']) ? $error['code'] : 0;
+		$message = isset($error['message']) && $error['message'] !== ''
+			? $error['message']
+			: 'Unknown database error';
+
+		return "Error Number: {$code}\n{$message}";
+	}
+
+	/**
+	 * Check whether the query failure is a non-fatal schema warning.
+	 *
+	 * @param array $result
+	 * @return bool
+	 */
+	private function is_non_fatal_schema_warning($result)
+	{
+		$code = isset($result['code']) ? (int) $result['code'] : 0;
+		$message = isset($result['message']) ? $result['message'] : '';
+
+		// These cases mean the schema change is already effectively present or absent,
+		// so the migration can continue and be recorded as completed with a warning.
+		$non_fatal_codes = [1060, 1061, 1091, 1826];
+		if (in_array($code, $non_fatal_codes, true)) {
+			return true;
+		}
+
+		return stripos($message, 'Duplicate column name') !== false
+			|| stripos($message, 'Duplicate key name') !== false
+			|| stripos($message, 'Duplicate FOREIGN KEY constraint name') !== false
+			|| stripos($message, "Can't DROP INDEX") !== false;
 	}
 
 	/**
@@ -135,11 +237,12 @@ class Run_sql_patches extends CI_Controller
 	}
 
 	/**
-	 * Record a successful migration in the migrations table
-	 * 
-	 * @param string $filename The SQL filename that was executed
+	 * Record or update a migration row.
+	 *
+	 * @param string $filename
+	 * @param array $extra_data
 	 */
-	private function record_migration($filename)
+	private function record_migration($filename, $extra_data = [])
 	{
 		// Check if migrations table exists
 		if (!$this->migrations_table_exists()) {
@@ -147,15 +250,46 @@ class Run_sql_patches extends CI_Controller
 			return;
 		}
 
-		// Check if already recorded (shouldn't happen, but safety check)
-		$this->db->where('migration', $filename);
-		$exists = $this->db->get('migrations')->num_rows() > 0;
+		$data = array_merge(
+			['migration' => $filename],
+			$this->filter_supported_migration_fields($extra_data)
+		);
 
-		if (!$exists) {
-			$data = [
-				'migration' => $filename
-			];
-			$this->db->insert('migrations', $data);
+		// Check if already recorded
+		$this->db->where('migration', $filename);
+		$existing = $this->db->get('migrations')->row_array();
+
+		if ($existing) {
+			$update_data = $data;
+			unset($update_data['migration']);
+
+			if (!empty($update_data)) {
+				$this->db->where('id', $existing['id']);
+				$this->db->update('migrations', $update_data);
+			}
+
+			return;
 		}
+
+		$this->db->insert('migrations', $data);
+	}
+
+	/**
+	 * Only include fields that already exist on the migrations table.
+	 *
+	 * @param array $data
+	 * @return array
+	 */
+	private function filter_supported_migration_fields($data)
+	{
+		$filtered = [];
+
+		foreach ($data as $field => $value) {
+			if ($this->db->field_exists($field, 'migrations')) {
+				$filtered[$field] = $value;
+			}
+		}
+
+		return $filtered;
 	}
 }
