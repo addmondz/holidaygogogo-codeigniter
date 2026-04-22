@@ -8,6 +8,7 @@ class Cron extends CI_Controller
 {
 	public $allowGhlModuleSync = true;
 	public $allowGhlModuleLog = true;
+	public $allowConvertionProcessing = true;
 	public $ghlModuleLogFile = 'GHL_MODULES_SYNC.log';
 
 	function __construct()
@@ -306,8 +307,13 @@ class Cron extends CI_Controller
 		// process the leads every hour at 40 minutes past the hour, let it have 30 minutes to finish syncing the messages
 		if ($this->shouldRunHourly(40)) {
 			if($this->allowGhlModuleSync) {
-				$this->customCronLogging('[CRON-40] syncGhlModules');
+				$this->customCronLogging('[CRON-40] allowGhlModuleSync - process_ghl_leads');
 				$this->process_ghl_leads();
+			}
+
+			if($this->allowConvertionProcessing) {
+				$this->customCronLogging('[CRON-40] allowConvertionProcessing - process_ghl_lead_conversions');
+				$this->process_ghl_lead_conversions();
 			}
 		}
 
@@ -427,6 +433,237 @@ class Cron extends CI_Controller
 		echo "Rebuilt leads: {$summary['leads_rebuilt']}" . PHP_EOL;
 		echo "Batches: {$summary['batches']}" . PHP_EOL;
 		echo "=== GHL Lead Processing End ===" . PHP_EOL;
+	}
+
+	public function process_ghl_lead_conversions($chunkSize = null)
+	{
+		if (!$this->input->is_cli_request()) {
+			show_error('This script can only be run from the command line.', 403);
+			return;
+		}
+
+		$this->load->model('Ghl_Processed_Leads_Model');
+
+		$args = isset($_SERVER['argv']) ? $_SERVER['argv'] : array();
+		$uriSegments = $this->uri->segment_array();
+		$cliArgs = array_merge(
+			array_slice($args, 3),
+			$uriSegments ? array_slice($uriSegments, 2) : array()
+		);
+
+		$flags = array();
+		$targetLeadId = null;
+		$targetConversationId = null;
+		$chunkSizeResolved = false;
+		foreach ($cliArgs as $arg) {
+			if (strncmp((string) $arg, '--', 2) === 0) {
+				if (strpos((string) $arg, '--lead-id=') === 0) {
+					$targetLeadId = (int) substr((string) $arg, strlen('--lead-id='));
+				} elseif (strpos((string) $arg, '--conversation-id=') === 0) {
+					$targetConversationId = (string) substr((string) $arg, strlen('--conversation-id='));
+				}
+				$flags[] = (string) $arg;
+				continue;
+			}
+
+			if (is_numeric($arg)) {
+				if (!$chunkSizeResolved) {
+					$chunkSize = (int) $arg;
+					$chunkSizeResolved = true;
+					continue;
+				}
+
+				if ($targetLeadId === null) {
+					$targetLeadId = (int) $arg;
+				}
+
+				continue;
+			}
+
+			if ($targetConversationId === null) {
+				$targetConversationId = (string) $arg;
+			}
+
+			if (!$chunkSizeResolved) {
+				continue;
+			}
+		}
+
+		if ($chunkSize !== null) {
+			$chunkSize = (int) $chunkSize;
+			if ($chunkSize <= 0) {
+				$chunkSize = null;
+			}
+		}
+
+		$shouldRebuild = in_array('--rebuild', $flags, true)
+			|| in_array('--restart', $flags, true)
+			|| in_array('--reset', $flags, true);
+
+		$summary = array(
+			'leads_scanned' => 0,
+			'leads_converted' => 0,
+			'batches' => 0,
+		);
+		$runId = $this->start_ghl_processor_run_log(
+			'process_ghl_lead_conversions',
+			array(
+				'full_sync' => $shouldRebuild ? 1 : 0,
+			)
+		);
+
+		echo "=== GHL Lead Conversion Processing Start ===" . PHP_EOL;
+		echo 'Chunk size: ' . ($chunkSize === null ? 'ALL' : $chunkSize) . PHP_EOL;
+
+		if (!$this->Ghl_Processed_Leads_Model->acquire_processor_lock('ghl_lead_conversion_processor', 0)) {
+			$this->finish_ghl_processor_run_log(
+				$runId,
+				'failed',
+				array(
+					'total_page' => $summary['batches'],
+					'total_data' => $summary['leads_scanned'],
+					'updated_count' => $summary['leads_converted'],
+				)
+			);
+			echo "Another ghl lead conversion processor run is already active." . PHP_EOL;
+			return;
+		}
+
+		try {
+			if ($shouldRebuild) {
+				echo "Rebuild mode: resetting conversion flags before processing." . PHP_EOL;
+
+				if (!$this->Ghl_Processed_Leads_Model->reset_conversion_data()) {
+					show_error('Failed resetting ghl lead conversion data.', 500);
+				}
+			}
+
+			$lastLeadId = 0;
+
+			while (true) {
+				$batch = $this->Ghl_Processed_Leads_Model->get_open_lead_conversion_batch(
+					$chunkSize,
+					$lastLeadId,
+					$targetLeadId,
+					$targetConversationId
+				);
+				if (empty($batch)) {
+					break;
+				}
+
+				$summary['batches']++;
+				echo "Processing conversion batch {$summary['batches']} with " . count($batch) . " lead(s)" . PHP_EOL;
+
+				foreach ($batch as $lead) {
+					$lastLeadId = (int) $lead['id'];
+					$summary['leads_scanned']++;
+
+					$phoneVariants = $this->build_ghl_lead_phone_variants(isset($lead['lead_phone']) ? $lead['lead_phone'] : null);
+					if (empty($phoneVariants)) {
+						continue;
+					}
+
+					$conversion = $this->Ghl_Processed_Leads_Model->find_first_booking_conversion(
+						$phoneVariants,
+						$lead['lead_started_at']
+					);
+
+					if (empty($conversion)) {
+						continue;
+					}
+
+					$updated = $this->Ghl_Processed_Leads_Model->mark_lead_as_converted(
+						(int) $lead['id'],
+						$conversion['converted_at']
+					);
+
+					if (!$updated) {
+						show_error('Failed updating ghl processed lead conversion: ' . $lead['id'], 500);
+					}
+
+					$summary['leads_converted']++;
+					echo " - lead {$lead['id']} converted by booking {$conversion['BookingNumber']} at {$conversion['converted_at']}" . PHP_EOL;
+				}
+
+				if ($targetLeadId !== null || $targetConversationId !== null) {
+					break;
+				}
+			}
+
+			$this->finish_ghl_processor_run_log(
+				$runId,
+				'completed',
+				array(
+					'total_page' => $summary['batches'],
+					'total_data' => $summary['leads_scanned'],
+					'updated_count' => $summary['leads_converted'],
+				)
+			);
+		} catch (Throwable $e) {
+			$this->finish_ghl_processor_run_log(
+				$runId,
+				'failed',
+				array(
+					'total_page' => $summary['batches'],
+					'total_data' => $summary['leads_scanned'],
+					'updated_count' => $summary['leads_converted'],
+				)
+			);
+
+			throw $e;
+		} finally {
+			$this->Ghl_Processed_Leads_Model->release_processor_lock('ghl_lead_conversion_processor');
+		}
+
+		echo "Leads scanned: {$summary['leads_scanned']}" . PHP_EOL;
+		echo "Leads converted: {$summary['leads_converted']}" . PHP_EOL;
+		echo "Batches: {$summary['batches']}" . PHP_EOL;
+		echo "=== GHL Lead Conversion Processing End ===" . PHP_EOL;
+	}
+
+	protected function start_ghl_processor_run_log($moduleName, $data = array())
+	{
+		$this->load->model('Ghl_Sync_Model');
+
+		$moduleName = trim((string) $moduleName);
+		if ($moduleName === '') {
+			return '';
+		}
+
+		$runId = $this->Ghl_Sync_Model->generate_run_id($moduleName);
+		$payload = array_merge(
+			array(
+				'RunID' => $runId,
+				'module_name' => $moduleName,
+				'status' => 'running',
+			),
+			$data
+		);
+
+		$this->Ghl_Sync_Model->create_log($payload);
+
+		return $runId;
+	}
+
+	protected function finish_ghl_processor_run_log($runId, $status, $data = array())
+	{
+		$runId = trim((string) $runId);
+		if ($runId === '') {
+			return;
+		}
+
+		$this->load->model('Ghl_Sync_Model');
+		$payload = array_merge(
+			array(
+				'RunID' => $runId,
+				'module_name' => 'process_ghl_lead_conversions',
+				'status' => $status,
+				'completed_at' => date('Y-m-d H:i:s'),
+			),
+			$data
+		);
+
+		$this->Ghl_Sync_Model->create_log($payload);
 	}
 
 	private function process_single_ghl_conversation($conversationId, $firstNewMessageRowId = 0)
@@ -611,6 +848,38 @@ class Cron extends CI_Controller
 		}
 
 		return array_values($leads);
+	}
+
+	private function build_ghl_lead_phone_variants($phone)
+	{
+		$phone = trim((string) $phone);
+		if ($phone === '') {
+			return array();
+		}
+
+		$digits = preg_replace('/\D+/', '', $phone);
+		if ($digits === '') {
+			return array();
+		}
+
+		$localDigits = $digits;
+		if (strpos($localDigits, '60') === 0) {
+			$localDigits = substr($localDigits, 2);
+		}
+
+		if (strpos($localDigits, '0') === 0) {
+			$localDigits = substr($localDigits, 1);
+		}
+
+		$variants = array($phone, $digits, $localDigits);
+
+		if ($localDigits !== '') {
+			$variants[] = '0' . $localDigits;
+			$variants[] = '60' . $localDigits;
+			$variants[] = '+60' . $localDigits;
+		}
+
+		return array_values(array_filter(array_unique($variants)));
 	}
 
 	/**

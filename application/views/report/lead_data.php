@@ -390,11 +390,10 @@ $leadSortIcon = function($column) use ($leadCurrentSortBy, $leadCurrentSortDir) 
                                         </td>
                                         <td class="align-middle">
                                             <div class="font-weight-bold"><?php echo html_escape($row['agent_name']); ?></div>
-                                            <div class="text-muted font-size-sm"><?php echo $row['agent_id'] !== '__unassigned__' ? html_escape($row['agent_id']) : 'Unassigned'; ?></div>
+                                            <!-- <div class="text-muted font-size-sm"><?php echo $row['agent_id'] !== '__unassigned__' ? html_escape($row['agent_id']) : 'Unassigned'; ?></div> -->
                                         </td>
                                         <td class="align-middle">
                                             <div class="font-weight-bold"><?php echo html_escape($row['conversation_id']); ?></div>
-                                            <div class="text-muted font-size-sm">First customer msg: <?php echo html_escape($row['first_customer_message_id']); ?></div>
                                         </td>
                                         <td class="align-middle">
                                             <div class="font-weight-bold"><?php echo html_escape($row['lead_started_at_label']); ?></div>

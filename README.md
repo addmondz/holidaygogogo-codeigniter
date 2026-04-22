@@ -19,17 +19,25 @@
 5. Process the GoHighLevel data and create leads 
 	- Process leads from synced GHL messages: `php index.php Cron process_ghl_leads`
 	- Process leads with a custom batch size: `php index.php Cron process_ghl_leads 250`
+	- Re-Process leads: `php index.php Cron process_ghl_leads --rebuild`
 
-6. Default Commands & order 
+6. Process the GoHighLevel leads and check for convertion
+	- Process Convertion: `process_ghl_lead_conversions`
+	- Process Convertion with a custom batch size: `process_ghl_lead_conversions 200`
+	- Re-Process convertion: `process_ghl_lead_conversions --rebuild`
+
+I. Default Commands & order 
 	php index.php Cron syncGhlUsers
 	php index.php Cron syncGhlContacts --full
 	php index.php Cron syncGhlConversations --full
 	php index.php Cron syncGhlMessages --full
 	php index.php Cron process_ghl_leads
+	php index.php Cron process_ghl_lead_conversions
 
-6. Default Daily & order 
+II. Default Daily & order 
 	php index.php Cron syncGhlUsers
 	php index.php Cron syncGhlContacts
 	php index.php Cron syncGhlConversations
 	php index.php Cron syncGhlMessages
 	php index.php Cron process_ghl_leads
+	php index.php Cron process_ghl_lead_conversions
