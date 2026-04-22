@@ -392,7 +392,7 @@
                             </div>
 
                             <div class="form-group">
-                                <label>IC / Passport No. <span style="color:red;">*</span></label>
+                                <label>IC / Passport / SSM No. <span style="color:red;">*</span></label>
                                 <div class="input-icon">
                                     <input type="text"
                                         id="ic_passport_no"
@@ -407,10 +407,11 @@
 
                             <div class="form-group">
                                 <label>Customer Type <span style="color:red;">*</span></label>
-                                <select id="customer_type" name="customer_type" class="form-control selectpicker" required>
-                                    <option selected disabled data-icon="la la-users font-size-lg bs-icon" value="">--SELECT CUSTOMER TYPE--</option>
-                                    <?php if(!empty($customer_types)) { foreach($customer_types as $ct) { ?>
-                                        <option <?php if((current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) && isset($customer_type) && $ct->Name == $customer_type) { echo 'selected'; } ?> data-icon="la la-user-tag font-size-lg bs-icon" value="<?php echo $ct->Name; ?>"><?php echo $ct->Name; ?></option>
+                                <select id="customer_type" name="customer_type[]" class="form-control selectpicker" multiple data-actions-box="true" data-live-search="true" title="--SELECT CUSTOMER TYPE--" required>
+                                    <?php
+                                        $selected_customer_types = isset($customer_types_selected) && is_array($customer_types_selected) ? $customer_types_selected : array();
+                                        if(!empty($customer_types)) { foreach($customer_types as $ct) { ?>
+                                        <option <?php if(in_array($ct->Name, $selected_customer_types, true)) { echo 'selected'; } ?> data-icon="la la-user-tag font-size-lg bs-icon" value="<?php echo $ct->CustomerTypeID; ?>"><?php echo $ct->Name; ?></option>
                                     <?php } } ?>
                                 </select>
                             </div>
@@ -2783,7 +2784,9 @@
 
                 var ic_passport_no = ($('#ic_passport_no').val() || '').toUpperCase();
 
-                var customer_type = $('#customer_type').val();
+                var customer_type_ids = $('#customer_type').val() || [];
+                var customer_type_names = $('#customer_type option:selected').map(function() { return $(this).text().trim(); }).get();
+                var customer_type = customer_type_names.join(', ');
 
                 var CustomerID = $('input[name="CustomerID"]').val();
 
@@ -2831,7 +2834,7 @@
                     'Reservation number': reservation_number,
                     'Full payment deadline': full_payment_deadline,
                     'Customer': customer,
-                    'IC / Passport No.': ic_passport_no,
+                    'IC / Passport / SSM No.': ic_passport_no,
                     'Customer Type': customer_type,
                     'Mobile': mobile,
                     'Travel date': travel_date,
@@ -3694,7 +3697,7 @@
 
                 tin_no: ($('#tin_no').val() || '').toUpperCase(),
 
-                customer_type: $('#customer_type').val(),
+                customer_type: $('#customer_type').val() || [],
 
             };
 

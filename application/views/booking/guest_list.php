@@ -336,6 +336,14 @@
 							$adult = 0;
 							$child = 0;
 							$infant = 0;
+							$nominee_relations = [
+								'Husband', 'Wife', 'Son', 'Daughter', 'Father', 'Mother',
+								'Brother', 'Sister', 'Cousin', 'Uncle', 'Aunt',
+								'Grandfather', 'Grandmother', 'Grandson', 'Granddaughter',
+								'Nephew', 'Niece',
+								'Mother in law', 'Father in law', 'Brother in law', 'Sister in law',
+								'Daughter in law', 'Son in law',
+							];
 						?>
 						<input type="hidden" name="new_guests">
 						<input type="hidden" name="deleted_guests">
@@ -667,8 +675,22 @@
 																<div class="row">
 																	<div class="col-md-6 mb-7 mb-md-0">
 																		<label id="<?php echo 'relationship_label-' . $guest->GuestListID; ?>">Relationship <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>
-																		<input <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="relationships[]" id="<?php echo 'relationship-' . $guest->GuestListID; ?>" value="<?php echo $guest->Relationship; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="form-control">
-																		<p style="color:#FAA0A0; font-size:10px; margin-top:5px;">(must be relative and not in the trip, eg cousin, uncle, sister, brother, father, mother & etc)</p>
+																		<select <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> name="relationships[]" id="<?php echo 'relationship-' . $guest->GuestListID; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" class="form-control">
+																			<option value="" <?php if(empty($guest->Relationship)) { echo 'selected'; } ?>>--SELECT RELATIONSHIP--</option>
+																			<?php
+																				$current_rel = trim((string)$guest->Relationship);
+																				$matched = false;
+																				foreach($nominee_relations as $rel) {
+																					$is_match = (strcasecmp($current_rel, $rel) === 0);
+																					if($is_match) { $matched = true; }
+																			?>
+																				<option value="<?php echo $rel; ?>" <?php if($is_match) { echo 'selected'; } ?>><?php echo $rel; ?></option>
+																			<?php } ?>
+																			<?php if(!$matched && $current_rel !== '') { ?>
+																				<option value="<?php echo htmlspecialchars($current_rel, ENT_QUOTES); ?>" selected><?php echo htmlspecialchars($current_rel); ?> (existing)</option>
+																			<?php } ?>
+																		</select>
+																		<p style="color:#FAA0A0; font-size:10px; margin-top:5px;">(must be relative and not in the trip)</p>
 																	</div>
 																</div>
 															</div>

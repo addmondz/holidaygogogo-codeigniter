@@ -94,11 +94,16 @@ class Booking_Model extends CI_Model
 		$this->db->join('customer', 'customer.CustomerID = booking.CustomerID', 'left');
 		$this->db->where('booking.BookingID', $this->input->get('booking_id'));
 
-		return $this->db->get('booking')->row_array();
+		$row = $this->db->get('booking')->row_array();
+		if ($row && !empty($row['BookingID'])) {
+			$this->load->model('Booking_Customer_Type_Model');
+			$row['customer_types_selected'] = $this->Booking_Customer_Type_Model->Read_Names_By_Booking($row['BookingID']);
+		}
+		return $row;
 	}
 
 
-	function Read_All_Bookings() 
+	function Read_All_Bookings()
 	{
 
 		$this->db->select('booking.BookingID, BookingNumber, DepositDeadline, FullPaymentDeadline, Customer, booking.Mobile As CustomerMobile, StartDate, EndDate, NetTotal, booking.ChatLanguage, Token, booking.BookingConfirmationTitle, CancelStatus, LockStatus, booking.is_submitted, AfterSalesService, booking.Status, booking.bc_approved, booking.bc_approval_admin_id, booking.bc_approval_date, booking.InsertDate, admin.Name As SalesAgentName, category.Name As DestinationName, CountryCode, booking.AutocountSyncStatus, booking.AutocountSyncMessage, booking.AutocountSyncAction, booking.CustomerAutocountSyncStatus, booking.CustomerAutocountSyncMessage, booking.CustomerAutocountSyncAction, customer.CustomerCode, booking.CustomerID');
@@ -646,7 +651,13 @@ class Booking_Model extends CI_Model
 		
 		$this->db->insert_batch('booking', json_decode(json_encode($booking_data)));
 		$booking_id = $this->db->insert_id();
-		
+
+		if ($booking_id) {
+			$posted_customer_types = $this->input->post('customer_type');
+			$this->load->model('Booking_Customer_Type_Model');
+			$this->Booking_Customer_Type_Model->Sync($booking_id, is_array($posted_customer_types) ? $posted_customer_types : []);
+		}
+
 		// Log booking creation with initial status
 		if ($booking_id) {
 			$this->load->helper('booking_status_log');
@@ -672,9 +683,6 @@ class Booking_Model extends CI_Model
 		}
 		if ($this->input->post('tin_no') !== null) {
 			$data['tin_no'] = strtoupper(trim($this->input->post('tin_no')));
-		}
-		if ($this->input->post('customer_type') !== null) {
-			$data['customer_type'] = $this->input->post('customer_type');
 		}
 		$customerId = $this->input->post('CustomerID');
 		if (!empty($customerId) && $customerId != 'undefined' && $customerId != 'null' && is_numeric($customerId)) {
@@ -1090,7 +1098,6 @@ class Booking_Model extends CI_Model
 			if (!empty($booking['ChatLanguage'])) { $data['ChatLanguage'] = $booking['ChatLanguage'];}
 			if (!empty($this->input->post('ic_passport_no'))) { $data['ic_passport_no'] = strtoupper($this->input->post('ic_passport_no')); }
 			if ($this->input->post('tin_no') !== null) { $data['tin_no'] = strtoupper(trim($this->input->post('tin_no'))); }
-			if ($this->input->post('customer_type') !== null) { $data['customer_type'] = $this->input->post('customer_type'); }
 			if ($data) { $data['updated_at'] = date('Y-m-d H:i:s'); }
 		}
 
