@@ -376,8 +376,8 @@ class GhlContactsSyncService
         }
 
         try {
-            $date = new DateTime((string) $value);
-            $date->setTimezone(new DateTimeZone('UTC'));
+            $date = new DateTimeImmutable((string) $value, new DateTimeZone('UTC'));
+            $date = $date->setTimezone(new DateTimeZone(date_default_timezone_get()));
             return $date->format('Y-m-d H:i:s');
         } catch (Exception $e) {
             return null;

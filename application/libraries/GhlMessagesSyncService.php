@@ -300,7 +300,7 @@ class GhlMessagesSyncService
 
     protected function normalizeUtcDateTime($value)
     {
-        $date = $this->parseUtcDateTime($value, new DateTimeZone('UTC'));
+        $date = $this->parseUtcDateTime($value, new DateTimeZone(date_default_timezone_get()));
         return $date ? $date->format('Y-m-d H:i:s') : null;
     }
 
