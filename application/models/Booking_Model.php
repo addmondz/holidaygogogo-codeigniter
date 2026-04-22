@@ -1217,6 +1217,31 @@ class Booking_Model extends CI_Model
 		$this->db->where('BookingID', $this->input->post('booking_id'));
 		$this->db->where('TravelVoucherFooter', '');
 		$this->db->update('booking');
+
+		$this->Sync_Customer_From_Booking($this->input->post('booking_id'));
+	}
+
+	/**
+	 * Sync the linked customer's name / phone_number from the booking row.
+	 *
+	 * Called on every booking update so customer contact info stays aligned with the
+	 * booking even on partial AJAX saves that don't round-trip Customer/Mobile via POST.
+	 * generate_customer_portal_slug() needs both fields to build the portal URL.
+	 */
+	public function Sync_Customer_From_Booking($booking_id)
+	{
+		if (empty($booking_id)) {
+			return;
+		}
+		$this->db->query(
+			"UPDATE customer c
+			 JOIN booking b ON b.CustomerID = c.CustomerID
+			 SET c.name = COALESCE(NULLIF(TRIM(b.Customer), ''), c.name),
+			     c.phone_number = COALESCE(NULLIF(TRIM(b.Mobile), ''), c.phone_number),
+			     c.updated_at = NOW()
+			 WHERE b.BookingID = ?",
+			[$booking_id]
+		);
 	}
 
 	function Update_Cancel_Status()

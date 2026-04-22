@@ -787,6 +787,11 @@ class Booking extends MY_Controller
 						$this->session->userdata('admin_id'),
 						$updater_name
 					);
+				} else {
+					// Partial booking updates skip Booking_Model::Update() above, but the
+					// linked customer's name/phone_number should still stay in sync with the
+					// booking row (needed for the customer portal slug).
+					$this->Booking_Model->Sync_Customer_From_Booking($this->input->post('booking_id'));
 				}
 
 				// Booking Product
