@@ -80,7 +80,7 @@ $is_view_mode = true;
                         <?php if (!empty($Customer2)): ?>
                         <div class="col-md-6">
                             <div class="form-group">
-                                <label>Customer 2</label>
+                                <label>Alternate contact person</label>
                                 <div class="input-icon">
                                     <input type="text" disabled value="<?php echo htmlspecialchars($Customer2, ENT_QUOTES); ?>" autocomplete="off" class="form-control">
                                     <span>
@@ -93,7 +93,7 @@ $is_view_mode = true;
                         <?php if (!empty($CustomerMobile2)): ?>
                         <div class="col-md-6">
                             <div class="form-group">
-                                <label>Mobile 2</label>
+                                <label>Alternate mobile</label>
                                 <div class="input-icon">
                                     <input type="text" disabled value="<?php echo htmlspecialchars($CustomerMobile2, ENT_QUOTES); ?>" autocomplete="off" class="form-control">
                                     <span>

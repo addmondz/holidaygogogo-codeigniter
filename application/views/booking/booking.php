@@ -165,7 +165,7 @@
 
                             <div class="form-group">
 
-                                <label>Sales Agent
+                                <label>Sales Agent 1 (After Sales)
 
                                     <?php if($this->session->userdata('level') != 20 && current_url() == base_url('Booking/Create')) { ?><span style="color:red;">*</span><?php } ?>
 
@@ -175,7 +175,7 @@
 
                                     <select id="SalesAgent" data-live-search="true" class="form-control selectpicker">
 
-                                        <option selected disabled data-icon="la la-user-alt font-size-lg bs-icon" value="">--SELECT SALES AGENT--</option>
+                                        <option selected disabled data-icon="la la-user-alt font-size-lg bs-icon" value="">--SELECT SALES AGENT 1 (AFTER SALES)--</option>
 
                                         <?php foreach($admins as $admin) {
                                             $isSelected = (current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) && $admin->AdminID == $SalesAgent;
@@ -208,11 +208,11 @@
 
                             <div class="form-group">
 
-                                <label>Sales Agent 2</label>
+                                <label>Sales Agent 2 (Pre Sales)</label>
 
                                 <select id="SalesAgent2" data-live-search="true" class="form-control selectpicker">
 
-                                    <option data-icon="la la-user-alt font-size-lg bs-icon" value="">--SELECT SALES AGENT 2--</option>
+                                    <option data-icon="la la-user-alt font-size-lg bs-icon" value="">--SELECT SALES AGENT 2 (PRE SALES)--</option>
 
                                     <?php foreach($admins as $admin) {
                                         $isSelected2 = (current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) && $admin->AdminID == $SalesAgent2;
@@ -392,45 +392,6 @@
                             </div>
 
                             <div class="form-group">
-                                <label>IC / Passport / SSM No. <span style="color:red;">*</span></label>
-                                <div class="input-icon">
-                                    <input type="text"
-                                        id="ic_passport_no"
-                                        name="ic_passport_no"
-                                        value="<?php echo isset($ic_passport_no) ? htmlspecialchars($ic_passport_no, ENT_QUOTES) : ''; ?>"
-                                        autocomplete="off"
-                                        class="form-control"
-                                        placeholder="Enter IC or Passport number">
-                                    <span><i class="la la-id-card"></i></span>
-                                </div>
-                            </div>
-
-                            <div class="form-group">
-                                <label>Customer Type <span style="color:red;">*</span></label>
-                                <select id="customer_type" name="customer_type[]" class="form-control selectpicker" multiple data-actions-box="true" data-live-search="true" title="--SELECT CUSTOMER TYPE--" required>
-                                    <?php
-                                        $selected_customer_types = isset($customer_types_selected) && is_array($customer_types_selected) ? $customer_types_selected : array();
-                                        if(!empty($customer_types)) { foreach($customer_types as $ct) { ?>
-                                        <option <?php if(in_array($ct->Name, $selected_customer_types, true)) { echo 'selected'; } ?> data-icon="la la-user-tag font-size-lg bs-icon" value="<?php echo $ct->CustomerTypeID; ?>"><?php echo $ct->Name; ?></option>
-                                    <?php } } ?>
-                                </select>
-                            </div>
-
-                            <div class="form-group">
-                                <label>TIN No.</label>
-                                <div class="input-icon">
-                                    <input type="text"
-                                        id="tin_no"
-                                        name="tin_no"
-                                        value="<?php echo isset($tin_no) ? htmlspecialchars($tin_no, ENT_QUOTES) : ''; ?>"
-                                        autocomplete="off"
-                                        class="form-control"
-                                        placeholder="Enter Tax Identification Number">
-                                    <span><i class="la la-file-invoice"></i></span>
-                                </div>
-                            </div>
-
-                            <div class="form-group">
 
                                 <label>Mobile <span style="color:red;">*</span></label>
 
@@ -490,8 +451,47 @@
                             </div>
 
                             <div class="form-group">
+                                <label>IC / Passport / SSM No. <span style="color:red;">*</span></label>
+                                <div class="input-icon">
+                                    <input type="text"
+                                        id="ic_passport_no"
+                                        name="ic_passport_no"
+                                        value="<?php echo isset($ic_passport_no) ? htmlspecialchars($ic_passport_no, ENT_QUOTES) : ''; ?>"
+                                        autocomplete="off"
+                                        class="form-control"
+                                        placeholder="Enter IC or Passport number">
+                                    <span><i class="la la-id-card"></i></span>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label>TIN No.</label>
+                                <div class="input-icon">
+                                    <input type="text"
+                                        id="tin_no"
+                                        name="tin_no"
+                                        value="<?php echo isset($tin_no) ? htmlspecialchars($tin_no, ENT_QUOTES) : ''; ?>"
+                                        autocomplete="off"
+                                        class="form-control"
+                                        placeholder="Enter Tax Identification Number">
+                                    <span><i class="la la-file-invoice"></i></span>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Customer Type <span style="color:red;">*</span></label>
+                                <select id="customer_type" name="customer_type[]" class="form-control selectpicker" multiple data-actions-box="true" data-live-search="true" title="--SELECT CUSTOMER TYPE--" required>
+                                    <?php
+                                        $selected_customer_types = isset($customer_types_selected) && is_array($customer_types_selected) ? $customer_types_selected : array();
+                                        if(!empty($customer_types)) { foreach($customer_types as $ct) { ?>
+                                        <option <?php if(in_array($ct->Name, $selected_customer_types, true)) { echo 'selected'; } ?> data-icon="la la-user-tag font-size-lg bs-icon" value="<?php echo $ct->CustomerTypeID; ?>"><?php echo $ct->Name; ?></option>
+                                    <?php } } ?>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
                                 <label>
-                                    Customer 2
+                                    Alternate contact person
                                     <small id="customerInfo2" class="text-muted ml-2">&laquo; New Customer &raquo;</small>
                                 </label>
 
@@ -522,7 +522,7 @@
 
                             <div class="form-group">
 
-                                <label>Mobile 2</label>
+                                <label>Alternate mobile</label>
 
                                 <?php
                                     $selected_booking_country_code_2 = null;
@@ -656,36 +656,6 @@
                                 <div class="input-icon">
 
                                     <input readonly type="text" name="FullPaymentDeadline" id="kt_datepicker_4_4" <?php if(current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) { ?> value="<?php echo $FullPaymentDeadline; ?>" <?php } ?> autocomplete="off" class="form-control">
-
-                                    <span>
-
-                                        <i class="la la-calendar"></i>
-
-                                    </span>
-
-                                </div>
-
-                            </div>
-
-                            <div class="form-group">
-
-                                <label>Additional Payment Deadline
-
-                                    <?php if(current_url() == base_url('Booking/Update')) { ?>
-
-                                        <a onclick="Reset_Additional_Payment_Deadline()" class="btn btn-icon btn-light-warning btn-xs">
-
-                                            <i class="la la-undo"></i>
-
-                                        </a>
-
-                                    <?php } ?>
-
-                                </label>
-
-                                <div class="input-icon">
-
-                                    <input <?php if(current_url() == base_url('Booking/Create') || current_url() == base_url('Booking/Duplicate')) { echo 'disabled'; } else { echo 'readonly'; } ?> type="text" name="AdditionalPaymentDeadline" id="kt_datepicker_5" <?php if(current_url() == base_url('Booking/Update')) { ?> value="<?php echo $AdditionalPaymentDeadline; ?>" <?php } ?> autocomplete="off" class="form-control">
 
                                     <span>
 
@@ -1922,12 +1892,6 @@
 
 
 
-    function Reset_Additional_Payment_Deadline() {
-
-        $('input[name="AdditionalPaymentDeadline"]').val('');
-
-    }
-
     function Reset_ProductSupplierDeposit(booking_product_id) {
 
         $(`#PaymentOutSupplierDeposit-${booking_product_id}`).val('');
@@ -3141,15 +3105,15 @@
 
                                             if(dirty_fields[i].localName == 'select' || hasDirtyInitial(dirty_fields[i])) {
 
-                                                var key = dirty_fields[i].id == 'kt_datepicker_4_3' || dirty_fields[i].id == 'kt_datepicker_4_4' || dirty_fields[i].id == 'kt_datepicker_5' ? dirty_fields[i].name : dirty_fields[i].id;
+                                                var key = dirty_fields[i].id == 'kt_datepicker_4_3' || dirty_fields[i].id == 'kt_datepicker_4_4' ? dirty_fields[i].name : dirty_fields[i].id;
 
-                                                var value = dirty_fields[i].id == 'kt_datepicker_4_3' || dirty_fields[i].id == 'kt_datepicker_4_4' || dirty_fields[i].id == 'kt_datepicker_5' ? `${((dirty_fields[i].value).split('/'))[2]}-${((dirty_fields[i].value).split('/'))[1]}-${((dirty_fields[i].value).split('/'))[0]}` : (dirty_fields[i].value).toUpperCase();
+                                                var value = dirty_fields[i].id == 'kt_datepicker_4_3' || dirty_fields[i].id == 'kt_datepicker_4_4' ? `${((dirty_fields[i].value).split('/'))[2]}-${((dirty_fields[i].value).split('/'))[1]}-${((dirty_fields[i].value).split('/'))[0]}` : (dirty_fields[i].value).toUpperCase();
 
                                                 // Booking
 
                                                 // Action : Update
 
-                                                if(key == 'CountryCodeID' || key == 'ReservationNumber' || key == 'DepositDeadline' || key == 'FullPaymentDeadline' || key == 'AdditionalPaymentDeadline' || key == 'Customer' || key == 'Mobile' || key == 'Destination' || key == 'SalesAgent' || key == 'SalesAgent2' || key == 'BookingRemark' || key == 'ChatLanguage' || key == 'Source' || key == 'BookingConfirmationTitle' || key == 'BookingOP') {
+                                                if(key == 'CountryCodeID' || key == 'ReservationNumber' || key == 'DepositDeadline' || key == 'FullPaymentDeadline' || key == 'Customer' || key == 'Mobile' || key == 'Destination' || key == 'SalesAgent' || key == 'SalesAgent2' || key == 'BookingRemark' || key == 'ChatLanguage' || key == 'Source' || key == 'BookingConfirmationTitle' || key == 'BookingOP') {
 
                                                     if(key == 'BookingOP' && value == '') {
 
@@ -3223,7 +3187,7 @@
 
                                                         default:
 
-                                                            if(key == 'DepositDeadline' || key == 'FullPaymentDeadline' || key == 'AdditionalPaymentDeadline') {
+                                                            if(key == 'DepositDeadline' || key == 'FullPaymentDeadline') {
 
                                                                 var initial_raw = getDirtyInitial(dirty_fields[i]);
                                                                 if(initial_raw) {

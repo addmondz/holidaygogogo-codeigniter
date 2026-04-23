@@ -354,6 +354,18 @@
                                                 <input type="hidden" name="tag" id="tag_hidden" value="<?php echo $this->input->get('tag'); ?>">
                                             </div>
                                         </div>
+                                        <div class="col-md-3">
+                                            <div class="form-group">
+                                                <label>Customer Type</label>
+                                                <?php $selected_customer_types_filter = !empty($this->input->get('customer_type')) ? explode(',', $this->input->get('customer_type')) : []; ?>
+                                                <select id="customer_type_select" data-live-search="true" class="form-control selectpicker" multiple data-actions-box="true" title="--SELECT CUSTOMER TYPE--">
+                                                    <?php if(!empty($customer_types)) { foreach($customer_types as $ct) { ?>
+                                                        <option data-icon="la la-user-tag font-size-lg bs-icon" value="<?php echo $ct->CustomerTypeID; ?>" <?php if(in_array($ct->CustomerTypeID, $selected_customer_types_filter)) { echo 'selected'; } ?>><?php echo $ct->Name; ?></option>
+                                                    <?php } } ?>
+                                                </select>
+                                                <input type="hidden" name="customer_type" id="customer_type_hidden" value="<?php echo $this->input->get('customer_type'); ?>">
+                                            </div>
+                                        </div>
                                         <?php if($this->session->userdata('level') != 20) { ?>
                                             <div class="col-md-3">
                                                 <div class="form-group">
@@ -593,7 +605,7 @@
         $('input[name="booking_date"]').val('');
     }
 
-    <?php if(!empty($this->input->get('booking_number')) || !empty($this->input->get('reservation_number')) || !empty($this->input->get('deadline')) || !empty($this->input->get('customer')) || !empty($this->input->get('mobile')) || !empty($this->input->get('travel_date')) || !empty($this->input->get('destination')) || !empty($this->input->get('sales_agent')) || !empty($this->input->get('tag')) || !empty($this->input->get('chat_language')) || !empty($this->input->get('source')) || !empty($this->input->get('booking_confirmation_title')) || !empty($this->input->get('status')) || !empty($this->input->get('booking_date')) || !empty($this->input->get('autocount_status')) || !empty($this->input->get('guest_list_status')) || !empty($this->input->get('cancellation_reason'))) { ?>
+    <?php if(!empty($this->input->get('booking_number')) || !empty($this->input->get('reservation_number')) || !empty($this->input->get('deadline')) || !empty($this->input->get('customer')) || !empty($this->input->get('mobile')) || !empty($this->input->get('travel_date')) || !empty($this->input->get('destination')) || !empty($this->input->get('sales_agent')) || !empty($this->input->get('tag')) || !empty($this->input->get('chat_language')) || !empty($this->input->get('source')) || !empty($this->input->get('booking_confirmation_title')) || !empty($this->input->get('status')) || !empty($this->input->get('booking_date')) || !empty($this->input->get('autocount_status')) || !empty($this->input->get('guest_list_status')) || !empty($this->input->get('cancellation_reason')) || !empty($this->input->get('customer_type'))) { ?>
         $('#booking_header').click();
     <?php } ?>
     
@@ -601,7 +613,7 @@
     var multi_filters = ['status','destination','source','chat_language',
         'booking_confirmation_title','tag','sales_agent','sales_agent_2',
         'booking_op','autocount_status','guest_list_status','checklist_filter',
-        'cancellation_reason','einvoice_status'];
+        'cancellation_reason','einvoice_status','customer_type'];
 
     function syncMultiSelect(name) {
         var $sel = $('#' + name + '_select');
@@ -855,7 +867,7 @@ $(document).ready(function() {
         var filterParams = {};
         ['customer', 'booking_number', 'reservation_number', 'mobile', 'destination', 'travel_date',
          'deadline', 'source', 'chat_language', 'booking_date', 'status', 'booking_confirmation_title',
-         'tag', 'sales_agent', 'sales_agent_2', 'booking_op', 'autocount_status', 'guest_list_status', 'checklist_filter', 'cancellation_reason', 'einvoice_status'].forEach(function(param) {
+         'tag', 'sales_agent', 'sales_agent_2', 'booking_op', 'autocount_status', 'guest_list_status', 'checklist_filter', 'cancellation_reason', 'einvoice_status', 'customer_type'].forEach(function(param) {
             if (urlParams.has(param)) {
                 filterParams[param] = urlParams.get(param);
             }
@@ -926,7 +938,7 @@ function loadSummaryTotals() {
     var params = [];
     ['customer', 'booking_number', 'reservation_number', 'mobile', 'destination', 'travel_date',
      'deadline', 'source', 'chat_language', 'booking_date', 'status', 'booking_confirmation_title',
-     'tag', 'sales_agent', 'booking_op', 'autocount_status', 'guest_list_status', 'checklist_filter', 'cancellation_reason', 'einvoice_status'].forEach(function(param) {
+     'tag', 'sales_agent', 'booking_op', 'autocount_status', 'guest_list_status', 'checklist_filter', 'cancellation_reason', 'einvoice_status', 'customer_type'].forEach(function(param) {
         if (urlParams.has(param)) {
             params.push(param + '=' + encodeURIComponent(urlParams.get(param)));
         }

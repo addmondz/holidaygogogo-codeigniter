@@ -39,6 +39,7 @@ class Booking extends MY_Controller
 			$array['categories'] = $this->Booking_Model->Read_Categories();
 			$array['tags'] = $this->Booking_Model->Read_Tags();
 			$array['sources'] = $this->Booking_Model->Read_Sources();
+			$array['customer_types'] = $this->Customer_Type_Model->Read_Customer_Types();
 			$array['filter_checklists'] = $this->Package_Checklist_Model->Read_Booking_Filter_Checklists();
 			$array['cancellation_reasons'] = $this->Cancellation_Reason_Model->Read_Cancellation_Reasons();
 

@@ -229,6 +229,14 @@ class Booking_Model extends CI_Model
 				$this->db->where_in('Source', explode(',', $this->input->get('source')));
 				$level2Ignore = 1;
 			}
+			if(!empty($this->input->get('customer_type'))) {
+				$customer_type_ids = array_filter(array_map('intval', explode(',', $this->input->get('customer_type'))));
+				if(!empty($customer_type_ids)) {
+					$in = implode(',', $customer_type_ids);
+					$this->db->where("EXISTS (SELECT 1 FROM booking_customer_type bct WHERE bct.BookingID = booking.BookingID AND bct.CustomerTypeID IN ($in))", null, false);
+				}
+				$level2Ignore = 1;
+			}
 			if(!empty($this->input->get('booking_confirmation_title'))) {
 				$this->db->where_in('booking.BookingConfirmationTitle', explode(',', $this->input->get('booking_confirmation_title')));
 				$level2Ignore = 1;
@@ -1814,6 +1822,14 @@ class Booking_Model extends CI_Model
 			}
 			if(!empty($this->input->get('source'))) {
 				$this->db->where_in('Source', explode(',', $this->input->get('source')));
+				$level2Ignore = 1;
+			}
+			if(!empty($this->input->get('customer_type'))) {
+				$customer_type_ids = array_filter(array_map('intval', explode(',', $this->input->get('customer_type'))));
+				if(!empty($customer_type_ids)) {
+					$in = implode(',', $customer_type_ids);
+					$this->db->where("EXISTS (SELECT 1 FROM booking_customer_type bct WHERE bct.BookingID = booking.BookingID AND bct.CustomerTypeID IN ($in))", null, false);
+				}
 				$level2Ignore = 1;
 			}
 			if(!empty($this->input->get('booking_confirmation_title'))) {
