@@ -2776,19 +2776,14 @@
             });
 
             $(document).on('click', '.remove-product-row', function() {
-                var $card = $(this).closest('.pax-card');
-                if ($card.find('.product-row').length > 1) {
-                    $(this).closest('.product-row').remove();
-                    recalculate();
-                }
+                $(this).closest('.product-row').remove();
+                recalculate();
             });
 
             $(document).on('click', '.remove-pax-btn', function() {
-                if ($('.pax-card').length > 1) {
-                    $(this).closest('.pax-card').remove();
-                    recalculate();
-                    updateAddPaxBtnState();
-                }
+                $(this).closest('.pax-card').remove();
+                recalculate();
+                updateAddPaxBtnState();
             });
 
             // Toggle form
