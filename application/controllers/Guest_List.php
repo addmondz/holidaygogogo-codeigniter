@@ -193,21 +193,6 @@ class Guest_List extends CI_Controller
 							$this->db->where('booking_product.Status', 'Y');
 							$array['booking_products'] = $this->db->get()->result();
 
-							// Auto-enable insurance if any product belongs to an insurance category
-							$this->db->from('booking_product');
-							$this->db->join('product', 'product.ProductID = booking_product.ProductID', 'left');
-							$this->db->join('category', 'category.CategoryID = product.CategoryID', 'left');
-							$this->db->where('booking_product.BookingID', $array['guest_lists'][0]->BookingID);
-							$this->db->where('booking_product.Status', 'Y');
-							$this->db->like('category.Name', 'Insurance', 'both');
-							$insurance_count = $this->db->count_all_results();
-
-							if($insurance_count > 0 && $array['guest_lists'][0]->TravelInsuranceStatus == 'N') {
-								$this->Booking_Model->update_by_id($array['guest_lists'][0]->BookingID, ['TravelInsuranceStatus' => 'Y']);
-								$array['guest_lists'] = $this->Guest_List_Model->Read_Guest_Lists1();
-							}
-
-							// Compute TravelDate and PaxNumber after potential re-fetch
 							if(!empty($array['guest_lists'][0]->StartDate) && !empty($array['guest_lists'][0]->EndDate)) {
 								$array['guest_lists'][0]->TravelDate = strtoupper(date('j M', strtotime($array['guest_lists'][0]->StartDate)) . ' - ' . date('j M Y', strtotime($array['guest_lists'][0]->EndDate)));
 							} else {

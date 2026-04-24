@@ -2604,15 +2604,63 @@
                 return html;
             }
 
+            function getMaxQtyForBp(bpId) {
+                for (var i = 0; i < bookingProducts.length; i++) {
+                    if (bookingProducts[i].BookingProductID == bpId) {
+                        return parseFloat(bookingProducts[i].Quantity) || 0;
+                    }
+                }
+                return 0;
+            }
+
+            // Remaining capacity for a row, accounting for what OTHER rows
+            // with the same BookingProductID have already allocated. This is
+            // what lets the cap work across multiple pax.
+            function computeRowRemaining($row) {
+                var bpId = parseInt($row.find('.split-product-select').val(), 10) || 0;
+                if (bpId <= 0) return null;
+                var bookingQty = getMaxQtyForBp(bpId);
+                var otherSum = 0;
+                $('.product-row').each(function() {
+                    if (this === $row[0]) return;
+                    var otherBp = parseInt($(this).find('.split-product-select').val(), 10) || 0;
+                    if (otherBp === bpId) {
+                        otherSum += parseFloat($(this).find('.split-qty').val()) || 0;
+                    }
+                });
+                var remaining = bookingQty - otherSum;
+                remaining = Math.round(remaining * 100) / 100;
+                return Math.max(0, remaining);
+            }
+
+            function applyRowCap($row) {
+                var remaining = computeRowRemaining($row);
+                var $qty = $row.find('.split-qty');
+                if (remaining === null) {
+                    $qty.removeAttr('max');
+                    return;
+                }
+                $qty.attr('max', remaining);
+                var val = parseFloat($qty.val());
+                if (!isNaN(val) && val > remaining) {
+                    $qty.val(remaining);
+                }
+            }
+
             function addProductRow(paxIdx, product) {
                 var bpId = product ? product.BookingProductID : '';
                 var qty = product ? product.Quantity : '';
                 var price = product ? parseFloat(product.UnitPrice).toFixed(2) : '0.00';
                 var amount = product ? parseFloat(product.Amount).toFixed(2) : '0.00';
+                var maxAttr = '';
+                if (bpId) {
+                    var maxQty = getMaxQtyForBp(bpId);
+                    if (maxQty > 0) maxAttr = ' max="' + maxQty + '"';
+                }
 
                 var html = '<tr class="product-row" data-pax="' + paxIdx + '">';
                 html += '<td><select class="split-product-select" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:4px;font-size:13px;">' + getProductOptions(bpId) + '</select></td>';
-                html += '<td><input type="number" class="split-qty" value="' + qty + '" min="0.1" step="0.1" style="width:80px;padding:6px;border:1px solid #ddd;border-radius:4px;text-align:center;font-size:13px;"></td>';
+                html += '<td><input type="number" class="split-qty" value="' + qty + '" min="0.1" step="0.1"' + maxAttr + ' style="width:80px;padding:6px;border:1px solid #ddd;border-radius:4px;text-align:center;font-size:13px;"></td>';
                 html += '<td class="split-price" style="text-align:right;font-size:13px;">RM ' + price + '</td>';
                 html += '<td class="split-amount-cell" style="text-align:right;font-size:13px;"><div class="split-amount">RM ' + amount + '</div></td>';
                 html += '<td><button type="button" class="remove-product-row" style="background:#dc3545;color:white;border:none;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:12px;"><i class="la la-trash"></i></button></td>';
@@ -2740,14 +2788,29 @@
                     $bar.css('border-color', '#dc3545');
                     $bar.css('background', '#f8d7da');
                 }
+
+                // Refresh each row's max attr so removing or editing one row
+                // updates the cap displayed on the rest.
+                $('.product-row').each(function() {
+                    var $row = $(this);
+                    var rowRemaining = computeRowRemaining($row);
+                    var $qty = $row.find('.split-qty');
+                    if (rowRemaining === null) {
+                        $qty.removeAttr('max');
+                    } else {
+                        $qty.attr('max', rowRemaining);
+                    }
+                });
             }
 
             // Event handlers
             $(document).on('change', '.split-product-select', function() {
+                applyRowCap($(this).closest('.product-row'));
                 recalculate();
             });
 
             $(document).on('input change', '.split-qty', function() {
+                applyRowCap($(this).closest('.product-row'));
                 recalculate();
             });
 

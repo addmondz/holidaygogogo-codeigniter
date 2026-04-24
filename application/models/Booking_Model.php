@@ -1938,7 +1938,7 @@ class Booking_Model extends CI_Model
 					if($status == 'PGL') {
 						$this->db->where('CancelStatus', 'N');
 						$this->db->where('LockStatus', 'N');
-						$this->db->where('booking.Status', 'PTV');
+						$this->db->where_in('booking.Status', array('PGL', 'PTV'));
 					}
 					if($status == 'PBC') {
 						$this->db->where('CancelStatus', 'N');
@@ -1961,7 +1961,7 @@ class Booking_Model extends CI_Model
 					if($status == 'PTV') {
 						$this->db->where('CancelStatus', 'N');
 						$this->db->where('LockStatus', 'Y');
-						$this->db->where('booking.Status', 'PTV');
+						$this->db->where_in('booking.Status', array('PGL', 'PTV'));
 					}
 					if($status == 'PBO') {
 						$this->db->where('CancelStatus', 'N');

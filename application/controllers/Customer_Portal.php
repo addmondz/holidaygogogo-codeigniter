@@ -1322,6 +1322,15 @@ class Customer_Portal extends CI_Controller
                     return;
                 }
 
+                $max_qty = floatval($product_lookup[$bp_id]['Quantity']);
+                if ($qty > $max_qty + 0.01) {
+                    $this->output->set_output(json_encode([
+                        'success' => false,
+                        'message' => 'Quantity ' . $qty . ' exceeds booking quantity ' . $max_qty . ' for product "' . htmlspecialchars($product_lookup[$bp_id]['ProductName']) . '" in pax "' . htmlspecialchars($pax_name) . '"'
+                    ]));
+                    return;
+                }
+
                 $qty_allocated[$bp_id] += $qty;
                 $validated_products[] = [
                     'BookingProductID' => $bp_id,
@@ -1374,6 +1383,22 @@ class Customer_Portal extends CI_Controller
                 'PhoneNumber' => $phone_number,
                 'products' => $validated_products
             ];
+        }
+
+        // Upper-bound check across all pax — total allocated for any product
+        // cannot exceed the booking quantity. Enforced for both draft and
+        // submit so a draft cannot over-allocate silently.
+        foreach ($booking_products as $bp) {
+            $bp_id = $bp['BookingProductID'];
+            $expected = floatval($bp['Quantity']);
+            $actual = $qty_allocated[$bp_id];
+            if ($actual > $expected + 0.01) {
+                $this->output->set_output(json_encode([
+                    'success' => false,
+                    'message' => 'Product "' . htmlspecialchars($bp['ProductName']) . '" total allocated quantity (' . $actual . ') exceeds booking quantity (' . $expected . ') across all pax'
+                ]));
+                return;
+            }
         }
 
         // Validate all product quantities are fully allocated — only enforced on
