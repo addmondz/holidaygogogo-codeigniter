@@ -1238,9 +1238,16 @@ class Customer_Portal extends CI_Controller
         $json = $this->input->raw_input_stream;
         $data = json_decode($json, true);
 
-        if (empty($data) || empty($data['pax'])) {
+        if (empty($data)) {
             $this->output->set_output(json_encode(['success' => false, 'message' => 'No pax data provided']));
             return;
+        }
+        if (empty($data['pax'])) {
+            if ($submit_status === 'S') {
+                $this->output->set_output(json_encode(['success' => false, 'message' => 'No pax data provided']));
+                return;
+            }
+            $data['pax'] = [];
         }
 
         $pax_counts = $this->Booking_Model->Compute_Pax_Counts($booking['BookingID']);
@@ -1284,11 +1291,14 @@ class Customer_Portal extends CI_Controller
             }
 
             if (empty($pax['products']) || !is_array($pax['products'])) {
-                $this->output->set_output(json_encode([
-                    'success' => false,
-                    'message' => 'Pax "' . htmlspecialchars($pax_name) . '" must have at least one product'
-                ]));
-                return;
+                if ($submit_status === 'S') {
+                    $this->output->set_output(json_encode([
+                        'success' => false,
+                        'message' => 'Pax "' . htmlspecialchars($pax_name) . '" must have at least one product'
+                    ]));
+                    return;
+                }
+                $pax['products'] = [];
             }
 
             $validated_products = [];

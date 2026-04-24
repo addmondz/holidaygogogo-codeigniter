@@ -2876,7 +2876,7 @@
                         }
                     });
 
-                    if (products.length === 0) {
+                    if (checkAllocation && products.length === 0) {
                         hasError = true;
                         Swal.fire('Error', 'Pax "' + paxName + '" must have at least one product.', 'error');
                         return false;
