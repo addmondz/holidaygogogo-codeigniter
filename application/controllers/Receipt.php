@@ -2,6 +2,22 @@
 
 require FCPATH.'vendor/autoload.php';
 
+// chillerlan/php-qrcode lives under application/libraries/ (outside composer's
+// vendor/) so it doesn't get pruned when vendor/ is resynced. Register a PSR-4
+// autoloader for its two namespaces.
+spl_autoload_register(function($class) {
+    static $prefixes = [
+        'chillerlan\\QRCode\\'   => 'application/libraries/chillerlan/php-qrcode/src/',
+        'chillerlan\\Settings\\' => 'application/libraries/chillerlan/php-settings-container/src/',
+    ];
+    foreach ($prefixes as $prefix => $base) {
+        if (strpos($class, $prefix) !== 0) continue;
+        $file = FCPATH . $base . str_replace('\\', '/', substr($class, strlen($prefix))) . '.php';
+        if (is_file($file)) require $file;
+        return;
+    }
+});
+
 class Receipt extends CI_Controller
 {
     public $Booking_Model;
@@ -60,22 +76,41 @@ class Receipt extends CI_Controller
         // Generate receipt on demand
         $this->generate_receipt($booking);
     }
-    
+
     private function generate_receipt($booking)
     {
         // Get booking data
         $array = $this->Booking_Model->Booking_Document_for_receipt();
-        
+
         if(empty($array)) {
             $this->load->view('errors/access_denied');
             return;
         }
-        
+
         // Set receipt title and data
         $array['BookingConfirmationTitle'] = 'PAYMENT RECEIPT';
         $array['Title'] = 'Receipt_' . $array['BookingNumber'];
         $array['InsertDate'] = strtoupper(date('j M Y'));
         $array['CustomerProfileURL'] = base_url('customer/' . generate_customer_portal_slug($booking->CustomerID));
+
+        // E-Invoice submission URL + QR (scanned from the printed receipt).
+        // QR routes through the customer portal's mobile-verification page so the
+        // customer confirms identity first, then lands on the booking page scrolled
+        // to the E-Invoice section. The `next` param preserves the final target
+        // (with its hash fragment) across the verify POST-redirect.
+        if (!empty($booking->Token) && !empty($booking->CustomerID)) {
+            $customer_slug = generate_customer_portal_slug($booking->CustomerID);
+            $next_path = '/customer/booking/' . $booking->Token . '#invoice-split-section';
+            $array['EInvoiceURL'] = base_url('customer/' . $customer_slug . '/verify') . '?next=' . urlencode($next_path);
+            $qr_options = new \chillerlan\QRCode\QROptions([
+                'outputType'  => \chillerlan\QRCode\QRCode::OUTPUT_IMAGE_PNG,
+                'imageBase64' => true,
+                'scale'       => 5,
+                'eccLevel'    => \chillerlan\QRCode\QRCode::ECC_M,
+                'imageTransparent' => false,
+            ]);
+            $array['EInvoiceQRDataURI'] = (new \chillerlan\QRCode\QRCode($qr_options))->render($array['EInvoiceURL']);
+        }
         
         // Get payment_id filter from URL (for single payment receipt)
         $payment_id = $this->input->get('payment_id');

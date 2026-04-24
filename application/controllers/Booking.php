@@ -22,6 +22,7 @@ class Booking extends MY_Controller
 		$this->load->model('Guest_list_lock_model');
 		$this->load->model('Cancellation_Reason_Model');
 		$this->load->model('Customer_Type_Model');
+		$this->load->model('Quick_Filter_Model');
 		$this->config->load('autocount'); // load config/autocount.php
 	}
 
@@ -42,6 +43,22 @@ class Booking extends MY_Controller
 			$array['customer_types'] = $this->Customer_Type_Model->Read_Customer_Types();
 			$array['filter_checklists'] = $this->Package_Checklist_Model->Read_Booking_Filter_Checklists();
 			$array['cancellation_reasons'] = $this->Cancellation_Reason_Model->Read_Cancellation_Reasons();
+			$array['quick_filters'] = $this->Quick_Filter_Model->Read_Quick_Filters();
+
+			// Hydrate filter values from query string for the shared filter partial
+			$filter_field_names = [
+				'customer', 'booking_number', 'reservation_number', 'mobile',
+				'destination', 'travel_date', 'deadline', 'source',
+				'chat_language', 'booking_date', 'status', 'booking_confirmation_title',
+				'tag', 'customer_type', 'sales_agent', 'sales_agent_2', 'booking_op',
+				'autocount_status', 'guest_list_status', 'checklist_filter',
+				'cancellation_reason', 'einvoice_status',
+			];
+			$filter_values = [];
+			foreach($filter_field_names as $fname) {
+				$filter_values[$fname] = $this->input->get($fname);
+			}
+			$array['filter_values'] = $filter_values;
 
 			$this->load->helper('autocount');
 			$config = get_autocount_config();
@@ -427,6 +444,11 @@ class Booking extends MY_Controller
 					$html .= '<a href="' . base_url('Booking/Update_Cancel_Status?booking_id=') . $booking->BookingID . '&current_cancel_status=' . $booking->CancelStatus . '&new_cancel_status=N&param=' . urlencode($current_url) . '" class="dropdown-item" style="color:#93C572; font-size:11px;">Activate Booking</a>';
 				} else {
 					$html .= '<button onclick="Cancel_Booking(\'' . base_url('assets/image/sweetalert.jpg') . '\', \'' . $booking->BookingNumber . '\', ' . $booking->BookingID . ', \'' . urlencode($current_url) . '\')" class="dropdown-item" style="color:#E0115F; font-size:11px;">Cancel Booking</button>';
+					if(!empty($booking->PartialRefund) && $booking->PartialRefund == 'Y') {
+						$html .= '<a href="' . base_url('Booking/Update_Partial_Refund_Status?booking_id=') . $booking->BookingID . '&new_partial_refund_status=N&param=' . urlencode($current_url) . '" class="dropdown-item" style="color:#93C572; font-size:11px;">Undo Partial Refund</a>';
+					} else {
+						$html .= '<button onclick="Cancel_With_Partial_Refund(\'' . base_url('assets/image/sweetalert.jpg') . '\', \'' . $booking->BookingNumber . '\', ' . $booking->BookingID . ', \'' . urlencode($current_url) . '\')" class="dropdown-item" style="color:#E0115F; font-size:11px;">Cancel With Partial Refund</button>';
+					}
 				}
 				// Approve BC - only show when BC is not approved
 				if(empty($booking->bc_approved) || $booking->bc_approved == 0) {
@@ -1493,6 +1515,27 @@ class Booking extends MY_Controller
 				echo json_encode(true);
 			} else {
 				$this->Booking_Model->Update_Cancel_Status();
+				$this->Booking_Model->Create_Booking_Log();
+				if(strpos($this->input->get('param'), '?') == true) {
+					redirect('Booking?' . explode('?', $this->input->get('param'))[1]);
+				} else {
+					redirect('Booking');
+				}
+			}
+		} else {
+			redirect('Dashboard');
+		}
+	}
+
+	function Update_Partial_Refund_Status()
+	{
+		if(in_array('AB', $this->session->access_control)) {
+			if($this->input->is_ajax_request()) {
+				$this->Booking_Model->Update_Partial_Refund_Status_With_Reason();
+				$this->Booking_Model->Create_Booking_Log_Partial_Refund();
+				echo json_encode(true);
+			} else {
+				$this->Booking_Model->Update_Partial_Refund_Status();
 				$this->Booking_Model->Create_Booking_Log();
 				if(strpos($this->input->get('param'), '?') == true) {
 					redirect('Booking?' . explode('?', $this->input->get('param'))[1]);

@@ -61,6 +61,26 @@ $is_dev_env = ($app_env !== 'prod');
 		flex-direction: column;
 	}
 
+	/* Mobile: pin remarks + notification dropdowns to the viewport with equal gutters so they sit centered instead of overflowing at their fixed 400–420px widths or hugging one edge. position: fixed + transform: none overrides Popper.js's inline absolute placement. */
+	@media (max-width: 576px) {
+		#remarks-dropdown,
+		#notification-dropdown {
+			position: fixed !important;
+			top: 60px !important;
+			left: 10px !important;
+			right: 10px !important;
+			width: auto !important;
+			max-width: none !important;
+			transform: none !important;
+		}
+		#notification-dropdown {
+			max-height: calc(100vh - 80px) !important;
+		}
+		#remarks-dropdown .tab-content {
+			max-height: calc(100vh - 200px) !important;
+		}
+	}
+
 	<?php if ($is_dev_env) { ?>
 	/* Adjust header position when dev banner is visible */
 	#dev-env-banner {
@@ -267,7 +287,7 @@ $is_dev_env = ($app_env !== 'prod');
 										</div>
 									</li>
 								<?php } ?>
-								<li class="menu-item menu-item-submenu <?php if($this->router->class == 'Category_Code' || $this->router->class == 'Category' || $this->router->class == 'Supplier' || $this->router->class == 'Product' || $this->router->class == 'Footer' || $this->router->class == 'Country_Code' || $this->router->class == 'Tag' || $this->router->class == 'Source' || $this->router->class == 'Package_Checklist' || $this->router->class == 'Product_Package_Checklist' || $this->router->class == 'Cancellation_Reason' || $this->router->class == 'Customer_Type') { echo 'menu-item-active menu-item-open'; } ?>">
+								<li class="menu-item menu-item-submenu <?php if($this->router->class == 'Category_Code' || $this->router->class == 'Category' || $this->router->class == 'Supplier' || $this->router->class == 'Product' || $this->router->class == 'Footer' || $this->router->class == 'Country_Code' || $this->router->class == 'Tag' || $this->router->class == 'Source' || $this->router->class == 'Package_Checklist' || $this->router->class == 'Product_Package_Checklist' || $this->router->class == 'Cancellation_Reason' || $this->router->class == 'Customer_Type' || $this->router->class == 'Quick_Filter') { echo 'menu-item-active menu-item-open'; } ?>">
 									<a href="javascript:;" class="menu-link menu-toggle">
 										<span class="svg-icon menu-icon">
 											<svg>
@@ -381,6 +401,14 @@ $is_dev_env = ($app_env !== 'prod');
 													<span class="menu-text">Customer Type</span>
 												</a>
 											</li>
+											<li class="menu-item <?php if($this->router->class == 'Quick_Filter') { echo 'menu-item-active'; } ?>">
+												<a href="<?php echo base_url('Quick_Filter'); ?>" class="menu-link">
+													<i class="menu-bullet menu-bullet-dot">
+														<span></span>
+													</i>
+													<span class="menu-text">Quick Filter</span>
+												</a>
+											</li>
 										</ul>
 									</div>
 								</li>
@@ -406,6 +434,9 @@ $is_dev_env = ($app_env !== 'prod');
 							<div class="dropdown-menu dropdown-menu-right p-0 m-0 dropdown-menu-anim-up dropdown-menu-lg" id="remarks-dropdown" style="width: 420px; right: 0; left: auto;">
 								<div class="d-flex align-items-center justify-content-between p-5 border-bottom">
 									<h5 class="mb-0">Messages</h5>
+									<a href="javascript:;" class="btn btn-xs btn-icon btn-light btn-hover-primary" id="kt_remarks_close">
+										<i class="ki ki-close icon-xs text-muted"></i>
+									</a>
 								</div>
 								<ul class="nav nav-tabs nav-tabs-line nav-tabs-bold px-5 pt-2 mb-0" role="tablist">
 									<li class="nav-item">
@@ -457,6 +488,9 @@ $is_dev_env = ($app_env !== 'prod');
 							<div class="dropdown-menu dropdown-menu-right p-0 m-0 dropdown-menu-anim-up dropdown-menu-lg" id="notification-dropdown" style="width: 400px; max-height: 500px; overflow: hidden;">
 								<div class="d-flex align-items-center justify-content-between p-5 border-bottom" style="flex-shrink: 0;">
 									<h5 class="mb-0">Notifications</h5>
+									<a href="javascript:;" class="btn btn-xs btn-icon btn-light btn-hover-primary" id="kt_notification_close">
+										<i class="ki ki-close icon-xs text-muted"></i>
+									</a>
 								</div>
 								<div class="notification-list" id="notification-list" style="flex: 1 1 auto; overflow-y: auto; min-height: 0;">
 									<div class="text-center p-10">

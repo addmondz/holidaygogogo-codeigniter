@@ -41,6 +41,13 @@
             }
         });
 
+        // Close button in header
+        $('#kt_notification_close').on('click', function(e) {
+            e.stopPropagation();
+            $('#notification-dropdown').removeClass('show');
+            isDropdownOpen = false;
+        });
+
         // "Mark all as read" click handler (pinned footer)
         $(document).on('click', '.mark-all-notifications-read', function(e) {
             e.stopPropagation();

@@ -99,6 +99,19 @@ class Admin_Model extends CI_Model
 		return $this->db->get('admin')->result();
 	}
 
+	// Active finance admins with a usable email address. Used to fan out
+	// e-invoice notification emails to the finance team.
+	function get_finance_admins()
+	{
+		$this->db->select('AdminID, Name, Email');
+		$this->db->where('Level', '30');
+		$this->db->where('Status', 'Y');
+		$this->db->where('Email IS NOT NULL', null, false);
+		$this->db->where('Email !=', '');
+		$this->db->order_by('Name', 'ASC');
+		return $this->db->get('admin')->result_array();
+	}
+
 	function Create()
 	{
 		$this->db->insert_batch('admin', json_decode(json_encode($this->input->post('admin'))));

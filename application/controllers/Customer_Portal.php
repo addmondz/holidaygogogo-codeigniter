@@ -118,15 +118,25 @@ class Customer_Portal extends CI_Controller
             return;
         }
 
-        // If phone verification is disabled, skip straight to dashboard
+        // Post-verification destination. Accepts `next` from GET (initial landing
+        // e.g. scanned QR) or POST (hidden field, survives form submission).
+        // Sanitised to prevent open-redirect abuse.
+        $next = $this->input->post('next');
+        if (empty($next)) {
+            $next = $this->input->get('next');
+        }
+        $next = $this->sanitize_portal_next($next);
+        $post_verify_redirect = $next !== null ? $next : base_url('customer/' . $hash);
+
+        // If phone verification is disabled, skip straight to destination
         if (!$this->config->item('enable_phone_verification')) {
-            redirect('customer/' . $hash);
+            redirect($post_verify_redirect);
             return;
         }
 
-        // No phone number on file or already verified — skip straight to dashboard
+        // No phone number on file or already verified — skip straight to destination
         if (empty($customer['phone_number']) || $this->is_customer_verified($customer['CustomerID'])) {
-            redirect('customer/' . $hash);
+            redirect($post_verify_redirect);
             return;
         }
 
@@ -135,6 +145,7 @@ class Customer_Portal extends CI_Controller
             'hash' => $hash,
             'error' => null,
             'customer_name' => $customer['name'],
+            'next' => $next,
         ];
 
         // Handle POST submission
@@ -146,7 +157,7 @@ class Customer_Portal extends CI_Controller
             $internal_code = $this->config->item('internal_access_code');
             if ($input_digits === $last4 || ($internal_code && $input_digits === $internal_code)) {
                 $this->session->set_userdata('customer_verified_' . $customer['CustomerID'], true);
-                redirect('customer/' . $hash);
+                redirect($post_verify_redirect);
                 return;
             } else {
                 $data['error'] = 'Incorrect digits. Please try again.';
@@ -154,6 +165,17 @@ class Customer_Portal extends CI_Controller
         }
 
         $this->load->view('customer_portal/verify_phone', $data);
+    }
+
+    // Only accept portal-internal paths as post-verify redirects. Guards against
+    // attackers crafting verify links with off-site `next` URLs.
+    private function sanitize_portal_next($next)
+    {
+        if (empty($next) || !is_string($next)) return null;
+        if (strpos($next, '//') === 0) return null;            // protocol-relative
+        if (stripos($next, 'javascript:') !== false) return null;
+        if (strpos($next, '/customer/') !== 0) return null;    // portal-internal only
+        return $next;
     }
 
     /**
@@ -256,6 +278,7 @@ class Customer_Portal extends CI_Controller
         $this->db->select('booking.BookingID, BookingNumber, DepositDeadline, FullPaymentDeadline,
                           Customer, booking.Mobile As CustomerMobile, StartDate, EndDate, NetTotal,
                           booking.ChatLanguage, Token, booking.BookingConfirmationTitle, CancelStatus,
+                          booking.PartialRefund,
                           LockStatus, AfterSalesService, booking.Status, booking.InsertDate,
                           booking.Adult, booking.Children, booking.Infant,
                           booking.DepositMode, booking.DepositPercentage, booking.DepositFixedAmount,
@@ -313,7 +336,7 @@ class Customer_Portal extends CI_Controller
             $booking['balance_due'] = $net_total - $total_paid;
             $booking['deposit_complete'] = ($deposit_total <= 0 || $total_paid >= $deposit_total);
 
-            if ($booking['CancelStatus'] == 'Y') {
+            if ($booking['CancelStatus'] == 'Y' || (isset($booking['PartialRefund']) && $booking['PartialRefund'] == 'Y')) {
                 $cancelled[] = $booking;
                 continue;
             }
@@ -489,14 +512,13 @@ class Customer_Portal extends CI_Controller
         $booking['invoice_split'] = $this->Invoice_Split_Model->Get_Pax_By_Booking($booking['BookingID']);
         $booking['einvoice_submit_status'] = $this->Invoice_Split_Model->Get_Submit_Status($booking['BookingID']);
 
-        // Get payment history (exclude SUPPLIER PAYMENT)
+        // Get payment history (customer-facing Types only)
         $this->db->select('payment.PaymentID, Date, Type, Credit, ReferenceNumber, Debit, Deadline, payment.Status, PaymentRemark, DebitRemark, payment.Bank, payment.BankAccount, payment.BankHolder, supplier.Name As SupplierName');
         $this->db->from('payment');
         $this->db->join('supplier', 'supplier.SupplierID = payment.SupplierID', 'left');
         $this->db->where('payment.BookingID', $booking['BookingID']);
         $this->db->where('payment.Status !=', 'N');
-        $this->db->where_not_in('payment.Type', array('SUPPLIER PAYMENT (DEPOSIT)', 'SUPPLIER PAYMENT (FULL)', 'SUPPLIER PAYMENT (ADDITIONAL)'));
-        $this->db->where('payment.Type !=', 'AGENT COMMISSION FROM SUPPLIER');
+        $this->db->where_in('payment.Type', array('DEPOSIT', 'FULL', 'ADDITIONAL PAYMENT', 'CUSTOMER REFUND'));
         $this->db->order_by('Date', 'ASC');
         $this->db->order_by('PaymentID', 'ASC');
         $payments = $this->db->get()->result_array();
@@ -759,12 +781,21 @@ class Customer_Portal extends CI_Controller
     {
         $status = $booking['Status'];
         $cancel_status = $booking['CancelStatus'] ?? 'N';
+        $partial_refund = $booking['PartialRefund'] ?? 'N';
         $after_sales = $booking['AfterSalesService'] ?? '';
         $today = date('Y-m-d');
 
         if ($cancel_status == 'Y') {
             return [
                 'text' => 'Cancelled',
+                'class' => 'status-cancelled',
+                'color' => '#E0115F'
+            ];
+        }
+
+        if ($partial_refund == 'Y') {
+            return [
+                'text' => 'Partial Refund',
                 'class' => 'status-cancelled',
                 'color' => '#E0115F'
             ];
@@ -1371,6 +1402,14 @@ class Customer_Portal extends CI_Controller
             $message = ($submit_status === 'S')
                 ? 'E-Invoice request submitted successfully'
                 : 'E-Invoice request saved as draft';
+
+            // Notify finance only on Submit, not on Draft. Send is best-effort:
+            // failures are logged but never surfaced to the customer, so a
+            // mail-provider outage cannot break the submission flow.
+            if ($submit_status === 'S') {
+                $this->_send_einvoice_finance_emails($booking['BookingID']);
+            }
+
             $this->output->set_output(json_encode([
                 'success' => true,
                 'message' => $message,
@@ -1383,5 +1422,160 @@ class Customer_Portal extends CI_Controller
                 'message' => 'Failed to save invoice split'
             ]));
         }
+    }
+
+    /**
+     * Send an "e-invoice submitted" notification to every active finance admin
+     * via the Resend HTTP API. Best-effort: any failure (missing API key,
+     * network error, non-2xx response) is logged but never surfaced to the
+     * customer.
+     */
+    private function _send_einvoice_finance_emails($booking_id)
+    {
+        try {
+            // Feature flag — default enabled; set EINVOICE_NOTIFY_FINANCE=false
+            // in .env to suppress all finance notifications without code changes.
+            $flag = get_env('EINVOICE_NOTIFY_FINANCE');
+            if ($flag !== null && strtolower(trim($flag)) === 'false') {
+                log_message('info', 'E-invoice submit: finance notifications disabled by EINVOICE_NOTIFY_FINANCE=false (booking ' . $booking_id . ')');
+                return;
+            }
+
+            $this->load->model('Admin_Model');
+            $this->load->model('Invoice_Split_Model');
+
+            $finance = $this->Admin_Model->get_finance_admins();
+            if (empty($finance)) {
+                log_message('info', 'E-invoice submit: no active finance admins to notify (booking ' . $booking_id . ')');
+                return;
+            }
+
+            $api_key = get_env('RESEND_API_KEY');
+            if (empty($api_key)) {
+                log_message('error', 'E-invoice submit: RESEND_API_KEY not configured (booking ' . $booking_id . ')');
+                return;
+            }
+
+            $this->db->select('BookingID, BookingNumber, Customer, NetTotal');
+            $this->db->where('BookingID', $booking_id);
+            $booking = $this->db->get('booking')->row_array();
+            if (empty($booking)) {
+                log_message('error', 'E-invoice submit: booking ' . $booking_id . ' not found when sending finance emails');
+                return;
+            }
+
+            $pax_rows = $this->Invoice_Split_Model->Get_Pax_By_Booking($booking_id);
+            $pax_count = is_array($pax_rows) ? count($pax_rows) : 0;
+
+            $booking_url = base_url('Booking/View?booking_id=' . $booking_id);
+            $submitted_at = date('Y-m-d H:i:s');
+            $subject = 'E-Invoice Request Submitted — Booking ' . $booking['BookingNumber'];
+
+            $from_addr = get_env('MAIL_FROM_ADDRESS') ?: 'no-reply@holidaygogogo.com';
+            $from_name = get_env('MAIL_FROM_NAME') ?: 'HolidayGoGoGo';
+            $from_field = $from_name ? sprintf('%s <%s>', $from_name, $from_addr) : $from_addr;
+
+            $messages = [];
+            foreach ($finance as $admin) {
+                $body = $this->load->view('emails/einvoice_submitted', [
+                    'admin_name'     => $admin['Name'],
+                    'booking_id'     => $booking_id,
+                    'booking_number' => $booking['BookingNumber'],
+                    'customer_name'  => $booking['Customer'],
+                    'pax_count'      => $pax_count,
+                    'net_total'      => number_format((float)$booking['NetTotal'], 2),
+                    'submitted_at'   => $submitted_at,
+                    'booking_url'    => $booking_url,
+                ], true);
+
+                $messages[] = [
+                    'from'    => $from_field,
+                    'to'      => [$admin['Email']],
+                    'subject' => $subject,
+                    'html'    => $body,
+                ];
+            }
+
+            // One batch API call per customer submit, regardless of recipient
+            // count. Cuts per-submit Resend traffic from N requests to 1.
+            list($ok, $err) = $this->_resend_send_batch($api_key, $messages);
+            if (!$ok) {
+                log_message('error', 'E-invoice email send failed for booking ' . $booking_id . ': ' . $err);
+            }
+        } catch (\Exception $e) {
+            log_message('error', 'E-invoice email send failed for booking ' . $booking_id . ': ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * POST a batch of emails to https://api.resend.com/emails/batch.
+     *
+     * Rate-limit handling: on HTTP 429 we honor the Retry-After header
+     * (capped at 3s) plus 0-500ms jitter to desynchronize concurrent
+     * customers submitting at the same instant, then retry once. Total
+     * worst-case added latency on the customer's submit is ~3.5s; if
+     * the second attempt also rate-limits, we give up and log. For
+     * sustained high concurrency, a queue + cron worker would be the
+     * proper fix.
+     *
+     * Returns [bool $ok, string|null $error_message].
+     */
+    private function _resend_send_batch($api_key, array $messages, $attempt = 1)
+    {
+        if (empty($messages)) return [true, null];
+
+        $max_attempts = 2;
+
+        $ch = curl_init('https://api.resend.com/emails/batch');
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($messages));
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_HEADER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Authorization: Bearer ' . $api_key,
+            'Content-Type: application/json',
+            'Accept: application/json',
+        ]);
+
+        $response = curl_exec($ch);
+        if ($response === false) {
+            $err = 'cURL error: ' . curl_error($ch);
+            curl_close($ch);
+            return [false, $err];
+        }
+        $http_code   = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $header_size = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
+        $headers_raw = substr($response, 0, $header_size);
+        $body        = substr($response, $header_size);
+        curl_close($ch);
+
+        if ($http_code >= 200 && $http_code < 300) {
+            return [true, null];
+        }
+
+        if ($http_code === 429 && $attempt < $max_attempts) {
+            $retry_after = $this->_parse_retry_after_seconds($headers_raw, 1);
+            // Cap to keep customer-facing latency bounded.
+            $retry_after = min($retry_after, 3);
+            $sleep_us = ($retry_after * 1000000) + mt_rand(0, 500000);
+            usleep($sleep_us);
+            return $this->_resend_send_batch($api_key, $messages, $attempt + 1);
+        }
+
+        $decoded = json_decode($body, true);
+        $msg = is_array($decoded) && !empty($decoded['message'])
+            ? $decoded['message']
+            : substr((string)$body, 0, 500);
+        return [false, "HTTP {$http_code}: {$msg}"];
+    }
+
+    private function _parse_retry_after_seconds($headers_raw, $default)
+    {
+        if (preg_match('/^Retry-After:\s*(\d+)/im', $headers_raw, $m)) {
+            return max(0, (int)$m[1]);
+        }
+        return $default;
     }
 }

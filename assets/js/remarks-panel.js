@@ -74,6 +74,13 @@
             e.stopPropagation();
         });
 
+        // Close button in header
+        $('#kt_remarks_close').on('click', function(e) {
+            e.stopPropagation();
+            $('#remarks-dropdown').removeClass('show');
+            isDropdownOpen = false;
+        });
+
         // Sync isDropdownOpen state with Bootstrap dropdown events
         $('#kt_remarks_toggle').parent().on('hide.bs.dropdown', function() {
             isDropdownOpen = false;
