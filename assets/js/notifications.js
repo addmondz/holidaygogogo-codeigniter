@@ -317,6 +317,20 @@
             const customerName = escapeHtml(notification.Customer || '');
             const isReadAttr = (isUnread ? 'false' : 'true');
 
+            // For booking_updated notifications the server stores
+            //   "<Name> updated a booking: <change summary>"
+            // Render the prefix as the title and the summary as a sub-line under the booking number.
+            let titleText = notification.message || '';
+            let changeSummary = '';
+            if (notification.type === 'booking_updated' && titleText) {
+                const marker = ' updated a booking: ';
+                const idx = titleText.indexOf(marker);
+                if (idx !== -1) {
+                    changeSummary = titleText.substring(idx + marker.length);
+                    titleText = titleText.substring(0, idx + ' updated a booking'.length);
+                }
+            }
+
             const toggleDot = isUnread
                 ? '<span class="notification-toggle-read" data-notification-id="' + notificationId + '" title="Mark as read" style="font-size: 11px; cursor: pointer; background: none; border: none; padding: 4px 0; flex-shrink: 0; text-decoration: none; color: #3699FF;">Read</span>'
                 : '<span class="notification-toggle-read" data-notification-id="' + notificationId + '" title="Mark as unread" style="font-size: 11px; cursor: pointer; background: none; border: none; padding: 4px 0; flex-shrink: 0; text-decoration: none; color: #F5A623;">Unread</span>';
@@ -337,12 +351,16 @@
                             '<div class="d-flex align-items-start justify-content-between mb-1">' +
                                 '<div class="flex-grow-1">' +
                                     '<div class="notification-text mb-1" style="' + textStyleString + '">' +
-                                        escapeHtml(notification.message) +
+                                        escapeHtml(titleText) +
                                     '</div>' +
                                     (notification.BookingNumber ?
                                         '<div class="text-primary font-size-sm mb-1">' +
                                             '<i class="la la-file-text"></i> ' + escapeHtml(notification.BookingNumber) +
                                             (customerName ? ' — ' + customerName : '') +
+                                        '</div>' : '') +
+                                    (changeSummary ?
+                                        '<div class="text-muted mb-1" style="font-size: 0.75rem; line-height: 1.35; font-weight: 400; white-space: normal; word-break: break-word;">' +
+                                            escapeHtml(changeSummary) +
                                         '</div>' : '') +
                                 '</div>' +
                                 '<div class="d-flex align-items-center ml-2" style="white-space: nowrap;">' +

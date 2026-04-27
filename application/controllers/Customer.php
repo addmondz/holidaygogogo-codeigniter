@@ -78,9 +78,9 @@ class Customer extends MY_Controller
 			}
 		} else {
 			$valid_customer_id = $this->Universal_Model->Validate_Id('CustomerID', $this->input->get('customer_id'), 'customer');
-			if($valid_customer_id) {
+			$array = $valid_customer_id ? $this->Customer_Model->Read_Customer() : null;
+			if($valid_customer_id && !empty($array) && (isset($array['Status']) ? $array['Status'] : 'Y') === 'Y') {
 				$titles = array('tab_title' => 'HolidayGoGoGo | Customer', 'breadcrumb_title' => 'Customer >> Update');
-				$array = $this->Customer_Model->Read_Customer();
 				$this->load->view('layout/header', $titles);
 				$this->load->view('customer/customer', $array);
 				$this->load->view('layout/footer');

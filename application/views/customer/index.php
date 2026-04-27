@@ -209,12 +209,11 @@ div.kt-datatable__pager-container {
                                             <div class="btn-group">
                                                 <button type="button" data-toggle="dropdown" class="btn btn-light-primary btn-sm dropdown-toggle" style="padding-left:3px;"></button>
                                                 <div class="dropdown-menu">
-                                                    <!-- delete disable -- controller, model, autocount all done QA, if need just add button -->
                                                     <a href="<?php echo base_url('Customer/Update?customer_id=') . $customer->CustomerID; ?>" class="dropdown-item" style="font-size:11px;">Update Customer</a>
                                                     <a href="#" class="dropdown-item copy-customer-link" data-customer-id="<?php echo $customer->CustomerID; ?>" style="font-size:11px;">
                                                         Copy Customer Link
                                                     </a>
-                                                    <?php 
+                                                    <?php
                                                         // Generate portal hash for direct link
                                                         $this->load->helper('utils');
                                                         $portal_hash = generate_customer_portal_slug($customer->CustomerID);
@@ -225,6 +224,13 @@ div.kt-datatable__pager-container {
                                                         Customer Portal
                                                     </a>
                                                     <?php endif; ?>
+                                                    <div class="dropdown-divider"></div>
+                                                    <a href="#" class="dropdown-item delete-customer text-danger"
+                                                       data-customer-id="<?php echo $customer->CustomerID; ?>"
+                                                       data-customer-name="<?php echo htmlspecialchars($customer->name, ENT_QUOTES); ?>"
+                                                       style="font-size:11px;">
+                                                        Delete Customer
+                                                    </a>
                                                 </div>
                                             </div>
                                         </td>
@@ -372,7 +378,47 @@ div.kt-datatable__pager-container {
             }
         });
     });
-    
+
+    // Soft-delete customer (Status='N') via existing Customer/Delete endpoint
+    $(document).on('click', '.delete-customer', function(e) {
+        e.preventDefault();
+        var $link = $(this);
+        var customerId = $link.data('customer-id');
+        var customerName = $link.data('customer-name');
+
+        Swal.fire({
+            title: 'Delete this customer?',
+            html: 'You are about to delete <strong>' + $('<div>').text(customerName).html() + '</strong>.<br>The record will be hidden from all lists.',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'Yes, delete',
+            cancelButtonText: 'Cancel',
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6'
+        }).then(function(result) {
+            if (!result.isConfirmed) return;
+
+            $.ajax({
+                url: '<?php echo base_url('Customer/Delete'); ?>',
+                method: 'GET',
+                data: { customer_id: customerId },
+                success: function() {
+                    if (typeof toastr !== 'undefined') {
+                        toastr.success('Customer deleted.');
+                    }
+                    window.location.reload();
+                },
+                error: function() {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Delete failed',
+                        text: 'Could not delete the customer. Please try again.'
+                    });
+                }
+            });
+        });
+    });
+
     // Fallback copy function for older browsers
     function fallbackCopy(text, $button, originalText) {
         var tempInput = $('<input>');

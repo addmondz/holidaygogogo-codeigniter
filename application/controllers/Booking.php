@@ -799,8 +799,11 @@ class Booking extends MY_Controller
 				// stub BookingID/UpdateBy/UpdateDate fields).
 				$posted_booking_id = $this->input->post('booking_id');
 				$posted_customer_types = $this->input->post('customer_type');
+				$old_customer_types = [];
 				if (!empty($posted_booking_id) && is_numeric($posted_booking_id) && is_array($posted_customer_types)) {
 					$this->load->model('Booking_Customer_Type_Model');
+					// Capture pre-Sync customer types so the update notification can diff them.
+					$old_customer_types = $this->Booking_Customer_Type_Model->Read_By_Booking($posted_booking_id);
 					$this->Booking_Customer_Type_Model->Sync($posted_booking_id, $posted_customer_types);
 				}
 
@@ -810,13 +813,26 @@ class Booking extends MY_Controller
 					$this->Booking_Model->Update();
 					$this->Booking_Model->Create_Booking_Log();
 
+					// Build a short "what changed" summary for the notification message.
+					$this->load->helper('booking_change_summary');
+					$products_post = $this->input->post('booking_products');
+					$change_summary = build_booking_change_summary(
+						$this->input->post('booking_log') ?: [],
+						(is_array($products_post) && !empty($products_post[0])) ? $products_post[0] : [],
+						(is_array($products_post) && !empty($products_post[1])) ? $products_post[1] : [],
+						(is_array($products_post) && !empty($products_post[2])) ? $products_post[2] : [],
+						$old_customer_types,
+						is_array($posted_customer_types) ? $posted_customer_types : []
+					);
+
 					// Notify TC (SalesAgent), TC 2 (SalesAgent2), and Owners on booking update
 					$this->load->model('Notification_Model');
 					$updater_name = $this->session->userdata('name') ?: 'Someone';
 					$this->Notification_Model->Create_Booking_Updated_Notification(
 						$this->input->post('booking_id'),
 						$this->session->userdata('admin_id'),
-						$updater_name
+						$updater_name,
+						$change_summary
 					);
 				} else {
 					// Partial booking updates skip Booking_Model::Update() above, but the

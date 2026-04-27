@@ -529,9 +529,10 @@ class Notification_Model extends CI_Model
 	 * @param int $booking_id Booking ID
 	 * @param int $updater_id Admin ID who updated the booking
 	 * @param string $updater_name Name of the user who updated the booking
+	 * @param string $change_summary Optional short summary of what changed
 	 * @return int Number of notifications created
 	 */
-	function Create_Booking_Updated_Notification($booking_id, $updater_id, $updater_name)
+	function Create_Booking_Updated_Notification($booking_id, $updater_id, $updater_name, $change_summary = '')
 	{
 		// Get booking details
 		$this->db->select('BookingID, BookingNumber, SalesAgent, BookingOP');
@@ -543,6 +544,9 @@ class Notification_Model extends CI_Model
 		}
 
 		$message = $updater_name . ' updated a booking';
+		if (!empty($change_summary)) {
+			$message .= ': ' . $change_summary;
+		}
 		$notifications_created = 0;
 		$notified_user_ids = array();
 
