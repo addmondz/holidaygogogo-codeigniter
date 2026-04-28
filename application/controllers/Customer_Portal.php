@@ -892,7 +892,7 @@ class Customer_Portal extends CI_Controller
         }
 
         // Verify booking exists
-        $this->db->select('BookingID, Token, AllowReview, Status');
+        $this->db->select('BookingID, Token, AllowReview, CustomerReview, Status, Customer, SalesAgent, BookingOP');
         $this->db->where('Token', $hashed_bc);
         $this->db->where('Status !=', 'N');
         $booking = $this->db->get('booking')->row_array();
@@ -910,6 +910,15 @@ class Customer_Portal extends CI_Controller
             $this->output->set_output(json_encode([
                 'success' => false,
                 'message' => 'Review submission is not allowed for this booking'
+            ]));
+            return;
+        }
+
+        // Reviews are view-only after submission
+        if (!empty($booking['CustomerReview'])) {
+            $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => 'A review has already been submitted for this booking'
             ]));
             return;
         }
@@ -935,6 +944,14 @@ class Customer_Portal extends CI_Controller
         $result = $this->db->update('booking', $update_data);
 
         if ($result) {
+            // Notify SalesAgent (TC) and BookingOP that a review was submitted
+            if (!empty($booking['SalesAgent']) || !empty($booking['BookingOP'])) {
+                $this->Notification_Model->Create_Review_Submitted_Notification(
+                    $booking['BookingID'],
+                    $booking['Customer']
+                );
+            }
+
             $this->output->set_output(json_encode([
                 'success' => true,
                 'message' => 'Review submitted successfully'

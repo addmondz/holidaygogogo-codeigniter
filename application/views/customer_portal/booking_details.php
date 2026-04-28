@@ -1003,6 +1003,20 @@
                     </button>
                 </div>
             </div>
+        <?php elseif ($has_review): ?>
+            <div class="details-card" style="margin-bottom: 20px;">
+                <div class="card-title">
+                    <i class="la la-star" style="color: #f5a623;"></i> Your Review
+                </div>
+                <div style="white-space: pre-wrap; line-height: 1.6; margin: 12px 0;">
+                    <?php echo nl2br(htmlspecialchars($booking['CustomerReview'])); ?>
+                </div>
+                <?php if (!empty($booking['CustomerReviewTimestamp'])): ?>
+                    <div style="font-size: 13px; color: #6c757d; margin-top: 12px;">
+                        Submitted on <?php echo return_timestamp_output($booking['CustomerReviewTimestamp'], true, false); ?>
+                    </div>
+                <?php endif; ?>
+            </div>
         <?php endif; ?>
 
         <!-- Main Content Grid -->
@@ -1888,6 +1902,9 @@
                 <div class="card-title">
                     Payment History
                 </div>
+                <div class="mb-3 p-3 rounded" style="background: #f0f7ff; border: 1px solid #cce5ff; font-size: 13px; color: #004085;">
+                    <strong>Note:</strong> Please kindly note the payment receipt will be ready 1&ndash;2 working days after payment is made.
+                </div>
                 <?php if (empty($booking['payments'])): ?>
                     <div class="empty-state">
                         <i class="la la-wallet"></i>
@@ -2248,18 +2265,12 @@
                             class="form-control review-textarea"
                             placeholder="Tell us about your travel experience..."
                             required
-                            rows="6"><?php echo !empty($booking['CustomerReview']) ? htmlspecialchars($booking['CustomerReview']) : ''; ?></textarea>
+                            rows="6"></textarea>
                     </div>
-                    <?php if (!empty($booking['CustomerReviewTimestamp'])): ?>
-                        <div class="review-date-info">
-                            <small>Review submitted on <?php echo return_timestamp_output($booking['CustomerReviewTimestamp'], true, false); ?></small>
-                        </div>
-                    <?php endif; ?>
                     <div class="review-modal-actions">
                         <button type="button" class="btn btn-secondary" id="reviewModalCancel">Cancel</button>
-                        <button type="button" class="btn btn-info" id="reviewEditBtn" style="display: none;">Edit Review</button>
                         <button type="submit" class="btn btn-primary" id="reviewSubmitBtn">
-                            <span id="reviewSubmitText"><?php echo !empty($booking['CustomerReview']) ? 'Update Review' : 'Submit Review'; ?></span>
+                            <span id="reviewSubmitText">Submit Review</span>
                         </button>
                     </div>
                 </form>
@@ -2271,31 +2282,11 @@
     <script src="<?php echo base_url('assets/js/plugins-bundle.js'); ?>"></script>
     <script>
         $(document).ready(function() {
-            var hasReview = <?php echo !empty($booking['CustomerReview']) ? 'true' : 'false'; ?>;
-            var bookingToken = '<?php echo htmlspecialchars($booking['Token']); ?>';
-            var reviewText = <?php echo !empty($booking['CustomerReview']) ? json_encode($booking['CustomerReview']) : 'null'; ?>;
-
             // Function to open submit review modal
             function openSubmitReviewModal() {
                 $('#reviewModalTitle').text('Submit Your Review');
-                $('#reviewText').val('').prop('disabled', false);
-                $('#reviewSubmitText').text('Submit Review');
-                $('#reviewSubmitBtn').show();
-                $('#reviewEditBtn').hide();
+                $('#reviewText').val('');
                 $('#reviewModalMessage').hide();
-                $('.review-date-info').hide();
-                $('#reviewModal').addClass('active');
-            }
-
-            // Function to open view review modal
-            function openViewReviewModal() {
-                $('#reviewModalTitle').text('View Your Review');
-                $('#reviewText').val(reviewText).prop('disabled', true);
-                $('#reviewSubmitText').text('Update Review');
-                $('#reviewSubmitBtn').hide();
-                $('#reviewEditBtn').show();
-                $('#reviewModalMessage').hide();
-                $('.review-date-info').show();
                 $('#reviewModal').addClass('active');
             }
 
@@ -2306,20 +2297,6 @@
                 openSubmitReviewModal();
             });
 
-            // Handle view review link click (fallback if clicked directly)
-            $(document).on('click', '.view-review-link', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                openViewReviewModal();
-            });
-
-            // Edit review button
-            $('#reviewEditBtn').on('click', function() {
-                $('#reviewText').prop('disabled', false);
-                $('#reviewModalTitle').text('Update Your Review');
-                $('#reviewEditBtn').hide();
-                $('#reviewSubmitBtn').show();
-            });
 
             // Close modal
             function closeModal() {

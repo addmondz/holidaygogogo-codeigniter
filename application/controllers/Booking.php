@@ -892,6 +892,15 @@ class Booking extends MY_Controller
 				// Recompute Subtotal from booking_product totals to keep booking.Subtotal authoritative
 				$this->Booking_Product_Model->Recompute_Subtotal($this->input->post('booking_id'));
 
+				// If any booking_product was added, edited, or deleted, auto-unlock the
+				// E-Invoice Request session so the customer can review the revised
+				// figures and resubmit (pax data is preserved).
+				$bp_post = $this->input->post('booking_products');
+				if (!empty($bp_post[0]) || !empty($bp_post[1]) || !empty($bp_post[2])) {
+					$this->load->model('Invoice_Split_Model');
+					$this->Invoice_Split_Model->Unlock_Submitted($this->input->post('booking_id'));
+				}
+
 				// Auto-enable insurance if any product belongs to an insurance category
 				$booking_id = $this->input->post('booking_id');
 				$this->db->from('booking_product');

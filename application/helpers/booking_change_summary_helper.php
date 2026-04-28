@@ -47,8 +47,29 @@ if (!function_exists('_bcs_field_label')) {
             'TravelInsuranceStatus'     => 'Travel Insurance',
             'KeyContacts'               => 'Key Contacts',
             'SpecialRemarks'            => 'Special Remarks',
+            'BookingConfirmationFooter' => 'Booking Confirmation Footer',
+            'BookingConfirmationHeader' => 'Booking Confirmation Header',
+            'BookingConfirmationTitle'  => 'Booking Confirmation Title',
+            'TravelVoucherFooter'       => 'Travel Voucher Footer',
+            'ProductSequence'           => 'Product Order',
         ];
         return isset($map[$column]) ? $map[$column] : $column;
+    }
+}
+
+if (!function_exists('_bcs_is_rich_text_column')) {
+    function _bcs_is_rich_text_column($column)
+    {
+        static $cols = [
+            'BookingConfirmationFooter',
+            'BookingConfirmationHeader',
+            'BookingConfirmationTitle',
+            'TravelVoucherFooter',
+            'KeyContacts',
+            'SpecialRemarks',
+            'BookingRemark',
+        ];
+        return in_array($column, $cols, true);
     }
 }
 
@@ -70,6 +91,10 @@ if (!function_exists('_bcs_format_value')) {
             }
         }
         $str = (string)$value;
+        if (strpos($str, '<') !== false) {
+            $str = trim(preg_replace('/\s+/', ' ', strip_tags($str)));
+            $str = html_entity_decode($str, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        }
         if (strlen($str) > 40) {
             $str = substr($str, 0, 37) . '...';
         }
@@ -162,6 +187,10 @@ if (!function_exists('build_booking_change_summary')) {
                 $cur = isset($arr['CurrentData']) ? $arr['CurrentData'] : null;
                 $new = isset($arr['NewData']) ? $arr['NewData'] : null;
                 if ((string)$cur === (string)$new) {
+                    continue;
+                }
+                if (_bcs_is_rich_text_column($col)) {
+                    $entries[] = _bcs_field_label($col) . ' updated';
                     continue;
                 }
                 $entries[] = _bcs_field_label($col) . ' '

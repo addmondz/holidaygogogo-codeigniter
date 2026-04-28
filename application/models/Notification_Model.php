@@ -596,5 +596,73 @@ class Notification_Model extends CI_Model
 
 		return $notifications_created;
 	}
+
+	/**
+	 * Create notifications for SalesAgent (TC) and BookingOP when a customer submits a review
+	 * Message format: "{Customer} submitted a review"
+	 *
+	 * @param int $booking_id Booking ID
+	 * @param string $customer_name Customer name from booking
+	 * @return int Number of notifications created
+	 */
+	function Create_Review_Submitted_Notification($booking_id, $customer_name)
+	{
+		$this->db->select('BookingID, BookingNumber, SalesAgent, BookingOP');
+		$this->db->where('BookingID', $booking_id);
+		$booking = $this->db->get('booking')->row();
+
+		if (empty($booking)) {
+			return 0;
+		}
+
+		$actor = !empty($customer_name) ? $customer_name : 'Customer';
+		$message = $actor . ' submitted a review';
+		$notifications_created = 0;
+		$notified_user_ids = array();
+
+		// Notify SalesAgent (TC)
+		if (!empty($booking->SalesAgent) && !in_array($booking->SalesAgent, $notified_user_ids)) {
+			$this->db->select('AdminID');
+			$this->db->where('AdminID', $booking->SalesAgent);
+			$this->db->where('Status', 'Y');
+			$sa = $this->db->get('admin')->row();
+
+			if (!empty($sa)) {
+				$this->Create(array(
+					'user_id' => $booking->SalesAgent,
+					'type' => 'review_submitted',
+					'owner_type' => 'booking',
+					'owner_id' => $booking_id,
+					'remark_id' => null,
+					'message' => $message
+				));
+				$notifications_created++;
+				$notified_user_ids[] = $booking->SalesAgent;
+			}
+		}
+
+		// Notify BookingOP
+		if (!empty($booking->BookingOP) && !in_array($booking->BookingOP, $notified_user_ids)) {
+			$this->db->select('AdminID');
+			$this->db->where('AdminID', $booking->BookingOP);
+			$this->db->where('Status', 'Y');
+			$op = $this->db->get('admin')->row();
+
+			if (!empty($op)) {
+				$this->Create(array(
+					'user_id' => $booking->BookingOP,
+					'type' => 'review_submitted',
+					'owner_type' => 'booking',
+					'owner_id' => $booking_id,
+					'remark_id' => null,
+					'message' => $message
+				));
+				$notifications_created++;
+				$notified_user_ids[] = $booking->BookingOP;
+			}
+		}
+
+		return $notifications_created;
+	}
 }
 

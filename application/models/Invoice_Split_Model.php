@@ -227,4 +227,23 @@ class Invoice_Split_Model extends CI_Model
 
         return true;
     }
+
+    /**
+     * Revert any submitted pax rows back to draft for this booking. Called
+     * when a booking_product is added/edited/deleted so the customer can
+     * review the revised figures and resubmit; pax data is preserved.
+     * Returns the number of rows reverted (0 if none were submitted).
+     */
+    function Unlock_Submitted($booking_id)
+    {
+        $this->db->where('BookingID', $booking_id);
+        $this->db->where('Status', 'Y');
+        $this->db->where('SubmitStatus', 'S');
+        $this->db->update('invoice_split_pax', [
+            'SubmitStatus' => 'D',
+            'SubmittedDate' => null,
+            'UpdateDate' => date('Y-m-d H:i:s'),
+        ]);
+        return $this->db->affected_rows();
+    }
 }

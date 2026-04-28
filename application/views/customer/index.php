@@ -224,6 +224,7 @@ div.kt-datatable__pager-container {
                                                         Customer Portal
                                                     </a>
                                                     <?php endif; ?>
+                                                    <?php if ($this->session->userdata('level') == 10): ?>
                                                     <div class="dropdown-divider"></div>
                                                     <a href="#" class="dropdown-item delete-customer text-danger"
                                                        data-customer-id="<?php echo $customer->CustomerID; ?>"
@@ -231,6 +232,7 @@ div.kt-datatable__pager-container {
                                                        style="font-size:11px;">
                                                         Delete Customer
                                                     </a>
+                                                    <?php endif; ?>
                                                 </div>
                                             </div>
                                         </td>

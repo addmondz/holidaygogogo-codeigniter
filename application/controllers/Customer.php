@@ -90,8 +90,12 @@ class Customer extends MY_Controller
 		}
 	}
 	
-	function Delete() 
+	function Delete()
 	{
+		if ($this->session->userdata('level') != 10) {
+			show_error('Only owner level can delete customer.', 403);
+			return;
+		}
 		//$this->Universal_Model->Delete('CustomerID', $this->input->get('customer_id'), 'customer');
 		$this->Customer_Model->update_by_id($this->input->get('customer_id'), [
 			'Status'  => 'N',

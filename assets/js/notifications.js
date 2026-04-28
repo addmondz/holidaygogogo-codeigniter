@@ -136,16 +136,16 @@
         // Delegated hover styling
         $(document).on('mouseenter', '#notification-list .notification-item', function() {
             const isRead = $(this).attr('data-is-read') === 'true';
-            const hoverColor = isRead ? '#F3F6F9' : '#E8F3FF';
+            const colors = getNotificationColors($(this).attr('data-notification-type') || '', !isRead);
             const currentStyle = $(this).attr('style') || '';
-            const newStyle = currentStyle.replace(/background-color:[^;]*;?/gi, '') + ' background-color: ' + hoverColor + ' !important;';
+            const newStyle = currentStyle.replace(/background-color:[^;]*;?/gi, '') + ' background-color: ' + colors.hoverBg + ' !important;';
             $(this).attr('style', newStyle.trim());
         });
         $(document).on('mouseleave', '#notification-list .notification-item', function() {
             const isRead = $(this).attr('data-is-read') === 'true';
-            const originalColor = isRead ? '#FFFFFF' : '#F0F7FF';
+            const colors = getNotificationColors($(this).attr('data-notification-type') || '', !isRead);
             const currentStyle = $(this).attr('style') || '';
-            const newStyle = currentStyle.replace(/background-color:[^;]*;?/gi, '') + ' background-color: ' + originalColor + ' !important;';
+            const newStyle = currentStyle.replace(/background-color:[^;]*;?/gi, '') + ' background-color: ' + colors.bg + ' !important;';
             $(this).attr('style', newStyle.trim());
         });
 
@@ -303,13 +303,13 @@
                               isReadValue === null ||
                               isReadValue === undefined);
 
-            const bgColor = isUnread ? '#F0F7FF' : '#FFFFFF';
-            const textColor = '#000000';
+            const notifType = notification.type || '';
+            const colors = getNotificationColors(notifType, isUnread);
             const fontWeight = isUnread ? '700' : '400';
-            const borderLeft = isUnread ? '4px solid #3699FF' : 'none';
+            const borderLeft = isUnread ? '4px solid ' + colors.accent : 'none';
 
-            const styleString = 'background-color: ' + bgColor + ' !important; border-left: ' + borderLeft + ' !important; transition: background-color 0.2s; cursor: pointer;';
-            const textStyleString = 'font-size: 0.95rem; line-height: 1.3; color: ' + textColor + ' !important; font-weight: ' + fontWeight + ' !important;';
+            const styleString = 'background-color: ' + colors.bg + ' !important; border-left: ' + borderLeft + ' !important; transition: background-color 0.2s; cursor: pointer;';
+            const textStyleString = 'font-size: 0.95rem; line-height: 1.3; color: ' + colors.text + ' !important; font-weight: ' + fontWeight + ' !important;';
 
             const notificationId = notification.NotificationID || '';
             const bookingId = notification.BookingID || '';
@@ -340,6 +340,7 @@
                      'data-booking-id="' + bookingId + '" ' +
                      'data-booking-number="' + bookingNumber + '" ' +
                      'data-is-read="' + isReadAttr + '" ' +
+                     'data-notification-type="' + escapeHtml(notifType) + '" ' +
                      'style="' + styleString + '">' +
                     '<div class="d-flex align-items-start">' +
                         '<div class="flex-shrink-0 mr-3">' +
@@ -392,33 +393,61 @@
      * @param {boolean} isUnread Whether to apply unread styling
      */
     function applyNotificationStyle($item, isUnread) {
+        const notifType = $item.attr('data-notification-type') || '';
+        const colors = getNotificationColors(notifType, isUnread);
+
         if (isUnread) {
             $item.attr('data-is-read', 'false');
             let style = ($item.attr('style') || '')
                 .replace(/background-color:[^;]*;?/gi, '')
                 .replace(/border-left:[^;]*;?/gi, '');
-            $item.attr('style', (style + ' background-color: #F0F7FF !important; border-left: 4px solid #3699FF !important;').trim());
+            $item.attr('style', (style + ' background-color: ' + colors.bg + ' !important; border-left: 4px solid ' + colors.accent + ' !important;').trim());
 
             const $textDiv = $item.find('.notification-text').first();
             if ($textDiv.length) {
                 let textStyle = ($textDiv.attr('style') || '')
-                    .replace(/font-weight:[^;]*;?/gi, '');
-                $textDiv.attr('style', (textStyle + ' font-weight: 700 !important;').trim());
+                    .replace(/font-weight:[^;]*;?/gi, '')
+                    .replace(/(^|;)\s*color:[^;]*;?/gi, '$1');
+                $textDiv.attr('style', (textStyle + ' color: ' + colors.text + ' !important; font-weight: 700 !important;').trim());
             }
         } else {
             $item.attr('data-is-read', 'true');
             let style = ($item.attr('style') || '')
                 .replace(/background-color:[^;]*;?/gi, '')
                 .replace(/border-left:[^;]*;?/gi, '');
-            $item.attr('style', (style + ' background-color: #FFFFFF !important; border-left: none !important;').trim());
+            $item.attr('style', (style + ' background-color: ' + colors.bg + ' !important; border-left: none !important;').trim());
 
             const $textDiv = $item.find('.notification-text').first();
             if ($textDiv.length) {
                 let textStyle = ($textDiv.attr('style') || '')
-                    .replace(/font-weight:[^;]*;?/gi, '');
-                $textDiv.attr('style', (textStyle + ' font-weight: 400 !important;').trim());
+                    .replace(/font-weight:[^;]*;?/gi, '')
+                    .replace(/(^|;)\s*color:[^;]*;?/gi, '$1');
+                $textDiv.attr('style', (textStyle + ' color: ' + colors.text + ' !important; font-weight: 400 !important;').trim());
             }
         }
+    }
+
+    /**
+     * Resolve background / hover / accent / text colors for a notification.
+     * Payout-overdue notifications render in red so finance can spot them at a glance;
+     * everything else uses the default blue scheme.
+     */
+    function getNotificationColors(type, isUnread) {
+        const isPayoutOverdue = (type === 'payout_overdue_full' || type === 'payout_overdue_deposit');
+        if (isPayoutOverdue && isUnread) {
+            return {
+                bg: '#FFE5E7',
+                hoverBg: '#FFD1D5',
+                accent: '#F64E60',
+                text: '#D9214E'
+            };
+        }
+        return {
+            bg: isUnread ? '#F0F7FF' : '#FFFFFF',
+            hoverBg: isUnread ? '#E8F3FF' : '#F3F6F9',
+            accent: '#3699FF',
+            text: '#000000'
+        };
     }
 
     /**
