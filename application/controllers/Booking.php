@@ -455,8 +455,10 @@ class Booking extends MY_Controller
 					$html .= '<a href="' . base_url('Booking/Approve_BC?booking_id=') . $booking->BookingID . '&param=' . urlencode($current_url) . '" class="dropdown-item" style="color:#50C878; font-size:11px;">Approve BC</a>';
 					$shown_approve_bc = true;
 				}
-				if($booking->Status == 'PBO' || $booking->Status == 'PTV' || $booking->Status == 'PT') {
-					if($booking->Status == 'PBO' || $booking->Status == 'PTV') {
+				// PGL with LockStatus=Y is displayed as PTV (see display_booking_status); treat it the same here.
+				$effective_status = ($booking->Status == 'PGL' && $booking->LockStatus == 'Y') ? 'PTV' : $booking->Status;
+				if($effective_status == 'PBO' || $effective_status == 'PTV' || $effective_status == 'PT') {
+					if($effective_status == 'PBO' || $effective_status == 'PTV') {
 						$html .= '<a href="' . base_url('Booking/Update_Status?booking_id=') . $booking->BookingID . '&current_status=' . $booking->Status . '&new_status=PT&param=' . urlencode($current_url) . '" class="dropdown-item" style="color:#6082B6; font-size:11px;">Approve Travel Voucher ?</a>';
 					} else {
 						$html .= '<a href="' . base_url('Booking/Update_Status?booking_id=') . $booking->BookingID . '&current_status=' . $booking->Status . '&new_status=PTV&param=' . urlencode($current_url) . '" class="dropdown-item" style="color:#F4BB44; font-size:11px;">Revert Pending Travel Voucher</a>';
