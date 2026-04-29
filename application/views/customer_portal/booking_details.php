@@ -1267,7 +1267,7 @@
                 $deposit_percentage = isset($booking['DepositPercentage']) ? floatval($booking['DepositPercentage']) : 0;
                 $deposit_total = ceil(($net_total * $deposit_percentage) / 100);
             }
-            $deposit_complete = $has_deposit_deadline ? (($deposit_total <= 0) || ($total_paid >= $deposit_total) || $full_paid) : false;
+            $deposit_complete = compute_deposit_complete($deposit_total, $total_paid, $has_deposit_deadline, $full_paid);
 
             // Build deposit-only payment list (approved deposits only) and track latest deposit date
             $deposit_payments = [];

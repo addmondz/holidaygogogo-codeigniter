@@ -841,22 +841,12 @@
 
                                 <div class="col-12">
                                     <?php
-                                        // Legacy bookings created on/before 2026-04-06 don't have deposit fields (Update page only)
-                                        $is_legacy_deposit_booking = (
-                                            current_url() == base_url('Booking/Update')
-                                            && !empty($InsertDate)
-                                            && strtotime($InsertDate) <= strtotime('2026-04-06 23:59:59')
-                                        );
-
                                         $hide_deposit_container = false;
                                         if(current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) {
                                             $deposit_deadline_value = isset($DepositDeadline) ? $DepositDeadline : '';
                                             if(empty($deposit_deadline_value)) {
                                                 $hide_deposit_container = true;
                                             }
-                                        }
-                                        if($is_legacy_deposit_booking) {
-                                            $hide_deposit_container = true;
                                         }
                                     ?>
                                     <div class="row" id="deposit_container" <?php if($hide_deposit_container) { echo 'style="display: none;"'; } ?>>

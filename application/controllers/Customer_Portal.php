@@ -20,6 +20,7 @@ class Customer_Portal extends CI_Controller
         $this->load->model('Remark_Model');
         $this->load->model('Notification_Model');
         $this->load->helper('utils');
+        $this->load->helper('booking_flow');
         $this->load->library('session');
         $this->config->load('features');
     }
@@ -334,7 +335,8 @@ class Customer_Portal extends CI_Controller
             }
             $booking['total_paid'] = $total_paid;
             $booking['balance_due'] = $net_total - $total_paid;
-            $booking['deposit_complete'] = ($deposit_total <= 0 || $total_paid >= $deposit_total);
+            $has_deposit_deadline = !empty($booking['DepositDeadline']);
+            $booking['deposit_complete'] = compute_deposit_complete($deposit_total, $total_paid, $has_deposit_deadline);
 
             if ($booking['CancelStatus'] == 'Y' || (isset($booking['PartialRefund']) && $booking['PartialRefund'] == 'Y')) {
                 $cancelled[] = $booking;
@@ -558,7 +560,8 @@ class Customer_Portal extends CI_Controller
             $deposit_percentage = isset($booking['DepositPercentage']) ? floatval($booking['DepositPercentage']) : 0;
             $deposit_total_required = ceil((floatval($booking['NetTotal']) * $deposit_percentage) / 100);
         }
-        $booking['deposit_complete'] = ($deposit_total_required <= 0 || $total_credit >= $deposit_total_required);
+        $has_deposit_deadline_detail = !empty($booking['DepositDeadline']);
+        $booking['deposit_complete'] = compute_deposit_complete($deposit_total_required, $total_credit, $has_deposit_deadline_detail);
 
         // Prepare document URLs
         $base_url = base_url();

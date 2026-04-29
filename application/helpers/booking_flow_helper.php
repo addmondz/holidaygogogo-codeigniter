@@ -12,7 +12,7 @@ defined('BASEPATH') or exit('No direct script access allowed');
 if (!function_exists('get_booking_flow')) {
     /**
      * Get the booking status flow sequence
-     * 
+     *
      * @return array Ordered array of status codes in flow sequence
      */
     function get_booking_flow()
@@ -25,6 +25,31 @@ if (!function_exists('get_booking_flow')) {
             'PT',   // PENDING TRAVEL
             'Y'     // COMPLETED
         ];
+    }
+}
+
+if (!function_exists('compute_deposit_complete')) {
+    /**
+     * Whether a booking's deposit step is satisfied.
+     *
+     * A deposit-flow booking (DepositDeadline set) is complete only when an
+     * actual deposit amount is configured (>0) AND that amount has been paid,
+     * OR a full payment has been recorded. A non-deposit-flow booking has no
+     * deposit step, so it is reported complete (the consumers gate on
+     * has_deposit_deadline before rendering anything deposit-specific).
+     *
+     * deposit_total = 0 with a DepositDeadline means "not configured yet" — it
+     * must NOT short-circuit to "received" (BC-2601-0153 regression).
+     */
+    function compute_deposit_complete($deposit_total, $total_paid, $has_deposit_deadline, $full_paid = false)
+    {
+        if (!$has_deposit_deadline) {
+            return true;
+        }
+        if ($full_paid) {
+            return true;
+        }
+        return floatval($deposit_total) > 0 && floatval($total_paid) >= floatval($deposit_total);
     }
 }
 
