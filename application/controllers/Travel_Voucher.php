@@ -14,6 +14,18 @@ class Travel_Voucher extends CI_Controller
     
 	function index()
 	{
+        $token = $this->input->get('token');
+        $v = $this->input->get('v');
+        $vFresh = !empty($v) && ctype_digit((string)$v) && (time() - intval($v)) <= 5;
+
+        if (!empty($token) && !$vFresh) {
+            header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0, private');
+            header('Pragma: no-cache');
+            header('Expires: 0');
+            header('Location: ' . base_url('Travel_Voucher?token=' . urlencode($token) . '&v=' . time()), true, 302);
+            exit;
+        }
+
         $array = $this->Booking_Model->Booking_Document();
 		if(empty($array)) {
 			$this->load->view('errors/access_denied');
@@ -22,28 +34,16 @@ class Travel_Voucher extends CI_Controller
                 $array['DepositDeadline'] = empty($array['DepositDeadline']) ? '-' : strtoupper(date('j M Y', strtotime($array['DepositDeadline'])));
                 $array['FullPaymentDeadline'] = strtoupper(date('j M Y', strtotime($array['FullPaymentDeadline'])));
                 $array['CustomerMobile'] = $array['CountryCode'] . $array['CustomerMobile'];
+                if (!empty($array['CustomerMobile2'])) {
+                    $array['CustomerMobile2'] = (!empty($array['CountryCode2']) ? $array['CountryCode2'] : '') . $array['CustomerMobile2'];
+                }
                 if(!empty($array['StartDate']) && !empty($array['EndDate'])) {
                     $array['TravelDate'] = strtoupper(date('j M', strtotime($array['StartDate'])) . ' - ' . date('j M Y', strtotime($array['EndDate'])));
                 } else {
                     $array['TravelDate'] = '-';
                 }
-                $rooms = $this->Guest_List_Room_Model->Read_Rooms_By_Booking_ID($array['BookingID']);
-                if(!empty($rooms)) {
-                    $pax_adult = 0; $pax_child = 0; $pax_infant = 0;
-                    foreach($rooms as $r) {
-                        $pax_adult  += (int)$r->adult_count;
-                        $pax_child  += (int)$r->child_count;
-                        $pax_infant += (int)$r->infant_count;
-                    }
-                } else {
-                    $pax_adult = 0; $pax_child = 0; $pax_infant = 0;
-                    $guests = $this->Guest_List_Model->Read_Guests_By_Booking_ID($array['BookingID']);
-                    foreach($guests as $g) {
-                        if     ($g->Type == 'ADULT')  { $pax_adult++; }
-                        elseif ($g->Type == 'CHILD')  { $pax_child++; }
-                        elseif ($g->Type == 'INFANT') { $pax_infant++; }
-                    }
-                }
+                $pax = $this->Booking_Model->Compute_Pax_Counts($array['BookingID']);
+                $pax_adult = $pax['adult']; $pax_child = $pax['child']; $pax_infant = $pax['infant'];
                 $adult_str  = $pax_adult  > 0 ? ($pax_adult  == 1 ? $pax_adult  . ' ADULT '  : $pax_adult  . ' ADULTS '  ) : '';
                 $child_str  = $pax_child  > 0 ? ($pax_child  == 1 ? $pax_child  . ' CHILD '  : $pax_child  . ' CHILDREN ') : '';
                 $infant_str = $pax_infant > 0 ? ($pax_infant == 1 ? $pax_infant . ' INFANT ' : $pax_infant . ' INFANTS ' ) : '';
@@ -96,10 +96,18 @@ class Travel_Voucher extends CI_Controller
                 $this->dompdf->set_option('isRemoteEnabled', true);
                 $this->dompdf->setPaper('A4', 'potrait');
                 $this->dompdf->render();
-                header('Cache-Control: no-cache, no-store, must-revalidate');
+                $pdfOutput = $this->dompdf->output();
+
+                if (ob_get_length()) { ob_end_clean(); }
+
+                header('Content-Type: application/pdf');
+                header('Content-Disposition: inline; filename="' . $array['Title'] . '.pdf"');
+                header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0, private');
                 header('Pragma: no-cache');
                 header('Expires: 0');
-                $this->dompdf->stream($array['Title'] . '.pdf', array('Attachment' => 0));
+                header('Content-Length: ' . strlen($pdfOutput));
+                echo $pdfOutput;
+                exit;
             } else {
                 $array = array('type' => 'Travel Voucher');
                 $this->load->view('errors/bc_complete', $array);

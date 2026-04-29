@@ -6,6 +6,7 @@ class Guest_List_Room_Model extends CI_Model
 		$this->db->select('id, booking_id, room_name, adult_count, child_count, infant_count, Status');
 		$this->db->where('booking_id', $this->input->get('booking_id'));
 		$this->db->where('Status', 'Y');
+		$this->db->order_by('LENGTH(room_name)', 'ASC', FALSE);
 		$this->db->order_by('room_name', 'ASC');
 		return $this->db->get('guest_list_room')->result();
 	}
@@ -15,6 +16,7 @@ class Guest_List_Room_Model extends CI_Model
 		$this->db->select('id, booking_id, room_name, adult_count, child_count, infant_count, Status');
 		$this->db->where('booking_id', $booking_id);
 		$this->db->where('Status', 'Y');
+		$this->db->order_by('LENGTH(room_name)', 'ASC', FALSE);
 		$this->db->order_by('room_name', 'ASC');
 		return $this->db->get('guest_list_room')->result();
 	}

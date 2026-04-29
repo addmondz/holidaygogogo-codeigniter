@@ -197,6 +197,9 @@
         <p class="instruction">Enter the last 4 digits of your phone number to continue.</p>
 
         <form method="POST" action="<?php echo site_url('customer/' . $hash . '/verify'); ?>">
+            <?php if (!empty($next)): ?>
+            <input type="hidden" name="next" value="<?php echo htmlspecialchars($next, ENT_QUOTES); ?>">
+            <?php endif; ?>
             <input
                 type="text"
                 name="phone_last4"

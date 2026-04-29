@@ -33,6 +33,8 @@ class Invoice_Split_Model extends CI_Model
                     'DiscountAmount' => $row['DiscountAmount'],
                     'NetAmount' => $row['NetAmount'],
                     'SortOrder' => $row['SortOrder'],
+                    'SubmitStatus' => isset($row['SubmitStatus']) ? $row['SubmitStatus'] : 'D',
+                    'SubmittedDate' => isset($row['SubmittedDate']) ? $row['SubmittedDate'] : null,
                     'products' => []
                 ];
             }
@@ -63,15 +65,35 @@ class Invoice_Split_Model extends CI_Model
     }
 
     /**
+     * Get the submit status for a booking's invoice split request.
+     * Returns 'S' if any active pax row is submitted, 'D' if only drafts exist,
+     * or null if no active rows. Save_Split writes all pax with the same status
+     * in a single transaction, so checking for any 'S' row is sufficient.
+     */
+    function Get_Submit_Status($booking_id)
+    {
+        $this->db->select("MAX(CASE WHEN SubmitStatus = 'S' THEN 1 ELSE 0 END) AS has_submitted, COUNT(*) AS total");
+        $this->db->where('BookingID', $booking_id);
+        $this->db->where('Status', 'Y');
+        $row = $this->db->get('invoice_split_pax')->row_array();
+        if (empty($row) || intval($row['total']) === 0) {
+            return null;
+        }
+        return intval($row['has_submitted']) === 1 ? 'S' : 'D';
+    }
+
+    /**
      * Save invoice split data (replace-all pattern)
      *
      * @param int $booking_id
      * @param array $pax_data Array of pax, each with: PaxName, TIN, products[]
      * @param float $booking_subtotal The booking subtotal (before discount)
      * @param float $booking_discount The total booking discount
+     * @param string $submit_status 'D' = draft (default), 'S' = submitted
      */
-    function Save_Split($booking_id, $pax_data, $booking_subtotal, $booking_discount)
+    function Save_Split($booking_id, $pax_data, $booking_subtotal, $booking_discount, $submit_status = 'D')
     {
+        $submit_status = ($submit_status === 'S') ? 'S' : 'D';
         $this->db->trans_start();
 
         // Soft-delete existing records
@@ -127,6 +149,8 @@ class Invoice_Split_Model extends CI_Model
                 'NetAmount' => $pax_subtotal,
                 'SortOrder' => $sort_order,
                 'Status' => 'Y',
+                'SubmitStatus' => $submit_status,
+                'SubmittedDate' => ($submit_status === 'S') ? $now : null,
                 'InsertDate' => $now,
                 'UpdateDate' => $now
             ]);
@@ -202,5 +226,24 @@ class Invoice_Split_Model extends CI_Model
         }
 
         return true;
+    }
+
+    /**
+     * Revert any submitted pax rows back to draft for this booking. Called
+     * when a booking_product is added/edited/deleted so the customer can
+     * review the revised figures and resubmit; pax data is preserved.
+     * Returns the number of rows reverted (0 if none were submitted).
+     */
+    function Unlock_Submitted($booking_id)
+    {
+        $this->db->where('BookingID', $booking_id);
+        $this->db->where('Status', 'Y');
+        $this->db->where('SubmitStatus', 'S');
+        $this->db->update('invoice_split_pax', [
+            'SubmitStatus' => 'D',
+            'SubmittedDate' => null,
+            'UpdateDate' => date('Y-m-d H:i:s'),
+        ]);
+        return $this->db->affected_rows();
     }
 }

@@ -11,6 +11,7 @@ class Customer extends MY_Controller
 		parent::__construct();
 		$this->load->model('Customer_Model');
 		$this->load->model('Universal_Model');
+		$this->load->model('Customer_Type_Model');
 	}
 
 	function index()
@@ -23,6 +24,7 @@ class Customer extends MY_Controller
 		$data['total']     = $this->Customer_Model->Count_Customers();
 		$data['page']      = $page;
 		$data['limit']     = $limit;
+		$data['customer_types'] = $this->Customer_Type_Model->Read_Customer_Types();
 
 		$titles = [
 			'tab_title' => 'HolidayGoGoGo | Customer',
@@ -76,9 +78,9 @@ class Customer extends MY_Controller
 			}
 		} else {
 			$valid_customer_id = $this->Universal_Model->Validate_Id('CustomerID', $this->input->get('customer_id'), 'customer');
-			if($valid_customer_id) {
+			$array = $valid_customer_id ? $this->Customer_Model->Read_Customer() : null;
+			if($valid_customer_id && !empty($array) && (isset($array['Status']) ? $array['Status'] : 'Y') === 'Y') {
 				$titles = array('tab_title' => 'HolidayGoGoGo | Customer', 'breadcrumb_title' => 'Customer >> Update');
-				$array = $this->Customer_Model->Read_Customer();
 				$this->load->view('layout/header', $titles);
 				$this->load->view('customer/customer', $array);
 				$this->load->view('layout/footer');
@@ -88,8 +90,12 @@ class Customer extends MY_Controller
 		}
 	}
 	
-	function Delete() 
+	function Delete()
 	{
+		if ($this->session->userdata('level') != 10) {
+			show_error('Only owner level can delete customer.', 403);
+			return;
+		}
 		//$this->Universal_Model->Delete('CustomerID', $this->input->get('customer_id'), 'customer');
 		$this->Customer_Model->update_by_id($this->input->get('customer_id'), [
 			'Status'  => 'N',

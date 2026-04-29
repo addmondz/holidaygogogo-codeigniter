@@ -224,16 +224,26 @@
 	</table>
 
 	<!-- Footer -->
-	<div style="margin-top:30px;">
-		<p><strong>N.B.</strong></p>
-		<?php if (!empty($DepositShortfallRemark)): ?>
-			<p style="font-weight:bold;"><?php echo htmlspecialchars($DepositShortfallRemark); ?></p>
-		<?php endif; ?>
-		<p style="font-size:12px; margin-bottom:5px;">Check your booking status and request E Invoice - <?php echo $CustomerProfileURL; ?></p>
-		<p style="font-size:12px; margin-bottom:5px;">E Invoice request must be submitted on/before end of trip.*</p>
-		<p>Validity of This Receipt</p>
-		<p>Subject to Clearing of Cheque</p>
-	</div>
+	<table style="width:100%; margin-top:30px;">
+		<tr>
+			<td style="vertical-align:top;">
+				<p><strong>N.B.</strong></p>
+				<?php if (!empty($DepositShortfallRemark)): ?>
+					<p style="font-weight:bold;"><?php echo htmlspecialchars($DepositShortfallRemark); ?></p>
+				<?php endif; ?>
+				<p style="font-size:12px; margin-bottom:5px;">Check your booking status and request E Invoice - <?php echo $CustomerProfileURL; ?></p>
+				<p style="font-size:12px; margin-bottom:5px;">E Invoice request must be submitted on/before end of trip.*</p>
+				<p>Validity of This Receipt</p>
+				<p>Subject to Clearing of Cheque</p>
+			</td>
+			<?php if (!empty($EInvoiceQRDataURI)): ?>
+			<td style="width:130px; vertical-align:top; text-align:center;">
+				<img src="<?php echo $EInvoiceQRDataURI; ?>" style="width:110px; height:110px;" alt="E-Invoice QR">
+				<p style="font-size:10px; margin:4px 0 0 0;">Scan to submit E-Invoice</p>
+			</td>
+			<?php endif; ?>
+		</tr>
+	</table>
 
 	<!-- Signature -->
 	<div class="signature-line">

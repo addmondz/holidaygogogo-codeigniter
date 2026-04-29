@@ -82,6 +82,10 @@ class Customer_Model extends CI_Model
 			$this->db->where('AutocountSyncStatus', $this->input->get('autocount_status'));
 		}
 
+		if ($this->input->get('customer_type')) {
+			$this->db->where('customer_type', $this->input->get('customer_type'));
+		}
+
 		if ($this->input->get('created_date')) {
 			$dates = explode(' - ', $this->input->get('created_date'));
 			if (count($dates) == 2) {
@@ -128,6 +132,10 @@ class Customer_Model extends CI_Model
 
 		if ($this->input->get('autocount_status')) {
 			$this->db->where('AutocountSyncStatus', $this->input->get('autocount_status'));
+		}
+
+		if ($this->input->get('customer_type')) {
+			$this->db->where('customer_type', $this->input->get('customer_type'));
 		}
 
 		if ($this->input->get('created_date')) {

@@ -114,6 +114,17 @@ div.kt-datatable__pager-container {
                                         </div>
                                         <div class="col-md-3">
                                             <div class="form-group">
+                                                <label>Customer Type</label>
+                                                <select name="customer_type" class="form-control selectpicker">
+                                                    <option selected data-icon="la la-users font-size-lg bs-icon" value="">--SELECT CUSTOMER TYPE--</option>
+                                                    <?php if(!empty($customer_types)) { foreach($customer_types as $ct) { ?>
+                                                        <option data-icon="la la-user-tag font-size-lg bs-icon" value="<?php echo $ct->Name; ?>" <?php if($this->input->get('customer_type') == $ct->Name) echo 'selected'; ?>><?php echo $ct->Name; ?></option>
+                                                    <?php } } ?>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="form-group">
                                                 <label>Created Date
                                                     <a onclick="Reset_Created_Date()" class="btn btn-icon btn-light-warning btn-xs">
                                                         <i class="la la-undo"></i>
@@ -198,12 +209,11 @@ div.kt-datatable__pager-container {
                                             <div class="btn-group">
                                                 <button type="button" data-toggle="dropdown" class="btn btn-light-primary btn-sm dropdown-toggle" style="padding-left:3px;"></button>
                                                 <div class="dropdown-menu">
-                                                    <!-- delete disable -- controller, model, autocount all done QA, if need just add button -->
                                                     <a href="<?php echo base_url('Customer/Update?customer_id=') . $customer->CustomerID; ?>" class="dropdown-item" style="font-size:11px;">Update Customer</a>
                                                     <a href="#" class="dropdown-item copy-customer-link" data-customer-id="<?php echo $customer->CustomerID; ?>" style="font-size:11px;">
                                                         Copy Customer Link
                                                     </a>
-                                                    <?php 
+                                                    <?php
                                                         // Generate portal hash for direct link
                                                         $this->load->helper('utils');
                                                         $portal_hash = generate_customer_portal_slug($customer->CustomerID);
@@ -212,6 +222,15 @@ div.kt-datatable__pager-container {
                                                     ?>
                                                     <a href="<?php echo base_url('customer/' . urlencode($portal_hash)); ?>" target="_blank" class="dropdown-item" style="font-size:11px;">
                                                         Customer Portal
+                                                    </a>
+                                                    <?php endif; ?>
+                                                    <?php if ($this->session->userdata('level') == 10): ?>
+                                                    <div class="dropdown-divider"></div>
+                                                    <a href="#" class="dropdown-item delete-customer text-danger"
+                                                       data-customer-id="<?php echo $customer->CustomerID; ?>"
+                                                       data-customer-name="<?php echo htmlspecialchars($customer->name, ENT_QUOTES); ?>"
+                                                       style="font-size:11px;">
+                                                        Delete Customer
                                                     </a>
                                                     <?php endif; ?>
                                                 </div>
@@ -308,7 +327,7 @@ div.kt-datatable__pager-container {
 </div>
 
 <script>
-    <?php if(!empty($this->input->get('name')) || !empty($this->input->get('phone_number')) || !empty($this->input->get('CustomerCode')) || !empty($this->input->get('ChatLanguage')) || !empty($this->input->get('autocount_status')) || !empty($this->input->get('created_date'))) { ?>
+    <?php if(!empty($this->input->get('name')) || !empty($this->input->get('phone_number')) || !empty($this->input->get('CustomerCode')) || !empty($this->input->get('ChatLanguage')) || !empty($this->input->get('autocount_status')) || !empty($this->input->get('customer_type')) || !empty($this->input->get('created_date'))) { ?>
         $('#customer_header').click();
     <?php } ?>
 
@@ -361,7 +380,47 @@ div.kt-datatable__pager-container {
             }
         });
     });
-    
+
+    // Soft-delete customer (Status='N') via existing Customer/Delete endpoint
+    $(document).on('click', '.delete-customer', function(e) {
+        e.preventDefault();
+        var $link = $(this);
+        var customerId = $link.data('customer-id');
+        var customerName = $link.data('customer-name');
+
+        Swal.fire({
+            title: 'Delete this customer?',
+            html: 'You are about to delete <strong>' + $('<div>').text(customerName).html() + '</strong>.<br>The record will be hidden from all lists.',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'Yes, delete',
+            cancelButtonText: 'Cancel',
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6'
+        }).then(function(result) {
+            if (!result.isConfirmed) return;
+
+            $.ajax({
+                url: '<?php echo base_url('Customer/Delete'); ?>',
+                method: 'GET',
+                data: { customer_id: customerId },
+                success: function() {
+                    if (typeof toastr !== 'undefined') {
+                        toastr.success('Customer deleted.');
+                    }
+                    window.location.reload();
+                },
+                error: function() {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Delete failed',
+                        text: 'Could not delete the customer. Please try again.'
+                    });
+                }
+            });
+        });
+    });
+
     // Fallback copy function for older browsers
     function fallbackCopy(text, $button, originalText) {
         var tempInput = $('<input>');

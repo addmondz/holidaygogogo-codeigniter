@@ -184,289 +184,29 @@
                         </div>
                         <div id="booking_info" class="collapse">
                             <div class="card-body">
-                                <form id="form" action="<?php echo base_url('Booking') ?>" method="get" class="form">
+                                <?php if(!empty($quick_filters)) { ?>
                                     <div class="row">
-                                        <div class="col-md-3">
+                                        <div class="col-md-6">
                                             <div class="form-group">
-                                                <label>Customer</label>
-                                                <div class="input-icon">
-                                                    <input type="text" name="customer" value="<?php if(!empty($this->input->get('customer'))) { echo strtoupper($this->input->get('customer')); } ?>" autocomplete="off" class="form-control">
-                                                    <span>
-                                                        <i class="la la-user"></i>
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-3">
-                                            <div class="form-group">
-                                                <label>Booking Number</label>
-                                                <div class="input-icon">
-                                                    <input type="text" name="booking_number" value="<?php if(!empty($this->input->get('booking_number'))) { echo strtoupper($this->input->get('booking_number')); } ?>" autocomplete="off" class="form-control">
-                                                    <span>
-                                                        <i class="la la-suitcase"></i>
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-3">
-                                            <div class="form-group">
-                                                <label>Reservation Number</label>
-                                                <div class="input-icon">
-                                                    <input type="text" name="reservation_number" value="<?php if(!empty($this->input->get('reservation_number'))) { echo strtoupper($this->input->get('reservation_number')); } ?>" autocomplete="off" class="form-control">
-                                                    <span>
-                                                        <i class="la la-suitcase"></i>
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-3">
-                                            <div class="form-group">
-                                                <label>Mobile</label>
-                                                <div class="input-icon">
-                                                    <input type="text" name="mobile" value="<?php if(!empty($this->input->get('mobile'))) { echo $this->input->get('mobile'); } ?>" autocomplete="off" class="form-control">
-                                                    <span>
-                                                        <i class="la la-mobile"></i>
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="row">
-                                        <div class="col-md-3">
-                                            <div class="form-group">
-                                                <label>Destination</label>
-                                                <?php $selected_destinations = !empty($this->input->get('destination')) ? explode(',', $this->input->get('destination')) : []; ?>
-                                                <select id="destination_select" data-live-search="true" class="form-control selectpicker" multiple data-actions-box="true" title="--SELECT DESTINATION--">
-                                                    <?php foreach($categories as $category) { ?>
-                                                        <option data-icon="la la-map-pin font-size-lg bs-icon" value="<?php echo $category->CategoryID; ?>" <?php if(in_array($category->CategoryID, $selected_destinations)) { echo 'selected'; } ?>><?php echo $category->Name; ?></option>
-                                                    <?php } ?>
-                                                </select>
-                                                <input type="hidden" name="destination" id="destination_hidden" value="<?php echo $this->input->get('destination'); ?>">
-                                            </div>
-                                        </div>
-                                        <div class="col-md-3">
-                                            <div class="form-group">
-                                                <label>Travel Date
-                                                    <a onclick="Reset_Travel_Date()" class="btn btn-icon btn-light-warning btn-xs">
-                                                        <i class="la la-undo"></i>
-                                                    </a>
-                                                </label>
-                                                <div id="kt_daterangepicker_4" class="input-icon">
-                                                    <input readonly type="text" name="travel_date" value="<?php if(!empty($this->input->get('travel_date'))) { echo $this->input->get('travel_date'); } ?>" autocomplete="off" class="form-control">
-                                                    <span>
-                                                        <i class="la la-calendar"></i>
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-3">
-                                            <div class="form-group">
-                                                <label>Deadline
-                                                    <a onclick="Reset_Deadline()" class="btn btn-icon btn-light-warning btn-xs">
-                                                        <i class="la la-undo"></i>
-                                                    </a>
-                                                </label>
-                                                <div id="kt_daterangepicker_1" class="input-icon">
-                                                    <input readonly type="text" name="deadline" value="<?php if(!empty($this->input->get('deadline'))) { echo $this->input->get('deadline'); } ?>" autocomplete="off" class="form-control">
-                                                    <span>
-                                                        <i class="la la-calendar"></i>
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-3">
-                                            <div class="form-group">
-                                                <label>Source</label>
-                                                <?php $selected_sources = !empty($this->input->get('source')) ? explode(',', $this->input->get('source')) : []; ?>
-                                                <select id="source_select" data-live-search="true" class="form-control selectpicker" multiple data-actions-box="true" title="--SELECT SOURCE--">
-                                                    <?php foreach($sources as $source) { ?>
-                                                        <option data-icon="<?php if($source->Name == 'WHATSAPP') { echo 'la la-whatsapp'; } else if($source->Name == 'WECHAT') { echo 'la la-wechat'; } else if($source->Name == 'EMAIL') { echo 'la la-envelope'; } else if($source->Name == 'CALL') { echo 'la la-phone-volume'; } else if($source->Name == 'TELEGRAM') { echo 'la la-telegram'; } else if($source->Name == 'FACEBOOK') { echo 'la la-facebook'; } else { echo 'la la-clipboard-list'; } ?> font-size-lg bs-icon" value="<?php echo $source->SourceID; ?>" <?php if(in_array($source->SourceID, $selected_sources)) { echo 'selected'; } ?>><?php echo $source->Name; ?></option>
-                                                    <?php } ?>
-                                                </select>
-                                                <input type="hidden" name="source" id="source_hidden" value="<?php echo $this->input->get('source'); ?>">
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="row">
-                                        <div class="col-md-3">
-                                            <div class="form-group">
-                                                <label>Chat Language</label>
-                                                <?php $selected_chat_languages = !empty($this->input->get('chat_language')) ? explode(',', $this->input->get('chat_language')) : []; ?>
-                                                <select id="chat_language_select" class="form-control selectpicker" multiple data-actions-box="true" title="--SELECT CHAT LANGUAGE--">
-                                                    <?php foreach(unserialize(CHAT_LANGUAGE) as $key => $value) { ?>
-                                                        <option data-icon="la la-language font-size-lg bs-icon" value="<?php echo $key; ?>" <?php if(in_array($key, $selected_chat_languages)) { echo 'selected'; } ?>><?php echo $value; ?></option>
-                                                    <?php } ?>
-                                                </select>
-                                                <input type="hidden" name="chat_language" id="chat_language_hidden" value="<?php echo $this->input->get('chat_language'); ?>">
-                                            </div>
-                                        </div>
-                                        <div class="col-md-3">
-                                            <div class="form-group">
-                                                <label>Booking Date
-                                                    <a onclick="Reset_Booking_Date()" class="btn btn-icon btn-light-warning btn-xs">
-                                                        <i class="la la-undo"></i>
-                                                    </a>
-                                                </label>
-                                                <div id="kt_daterangepicker_5" class="input-icon">
-                                                    <input readonly type="text" name="booking_date" value="<?php if(!empty($this->input->get('booking_date'))) { echo $this->input->get('booking_date'); } ?>" autocomplete="off" class="form-control">
-                                                    <span>
-                                                        <i class="la la-calendar"></i>
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-3">
-                                            <div class="form-group">
-                                                <label>Status</a>
-                                                </label>
-                                                <?php $selected_statuses = !empty($this->input->get('status')) ? explode(',', $this->input->get('status')) : []; ?>
-                                                <select id="status_select" class="form-control selectpicker" multiple data-actions-box="true" title="--SELECT STATUS--">
-                                                    <?php foreach(unserialize(BOOKING_STATUS) as $key => $value) { ?>
-                                                        <option data-icon="<?php if($key == 'A') { echo 'la la-font'; } else if($key == 'Y') { echo 'la la-check-circle'; } else if($key == 'PR') { echo 'la la-user-edit'; } else if($key == 'P') { echo 'la la-exclamation-circle'; } else if($key == 'PP') { echo 'la la-dollar'; } else if($key == 'PTV') { echo 'la la-file-alt'; } else if($key == 'PGL') { echo 'la la-user-friends'; } else if($key == 'PT') { echo 'la la-suitcase'; } else if($key == 'OG') { echo 'la la-luggage-cart'; } else if($key == 'PO') { echo 'la la-exclamation-triangle'; } else { echo 'la la-times-circle'; } ?> font-size-lg bs-icon" value="<?php echo $key; ?>" <?php if(in_array($key, $selected_statuses)) { echo 'selected'; } ?>><?php echo $value; ?></option>
-                                                    <?php } ?>
-                                                </select>
-                                                <input type="hidden" name="status" id="status_hidden" value="<?php echo $this->input->get('status'); ?>">
-                                            </div>
-                                        </div>
-                                        <div class="col-md-3">
-                                            <div class="form-group">
-                                                <label>BC Title</label>
-                                                <?php $selected_bc_titles = !empty($this->input->get('booking_confirmation_title')) ? explode(',', $this->input->get('booking_confirmation_title')) : []; ?>
-                                                <select id="booking_confirmation_title_select" class="form-control selectpicker" multiple data-actions-box="true" title="--SELECT BC TITLE--">
-                                                    <?php foreach(unserialize(BC_TITLE) as $key => $value) { ?>
-                                                        <option data-icon="la la-heading font-size-lg bs-icon" value="<?php echo $key; ?>" <?php if(in_array($key, $selected_bc_titles)) { echo 'selected'; } ?>><?php echo $value; ?></option>
-                                                    <?php } ?>
-                                                </select>
-                                                <input type="hidden" name="booking_confirmation_title" id="booking_confirmation_title_hidden" value="<?php echo $this->input->get('booking_confirmation_title'); ?>">
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="row">
-                                        <div class="col-md-3">
-                                            <div class="form-group">
-                                                <label>BC Tag</label>
-                                                <?php $selected_tags = !empty($this->input->get('tag')) ? explode(',', $this->input->get('tag')) : []; ?>
-                                                <select id="tag_select" data-live-search="true" class="form-control selectpicker" multiple data-actions-box="true" title="--SELECT BC TAG--">
-                                                    <?php foreach($tags as $tag) { ?>
-                                                        <option data-icon="la la-tags font-size-lg bs-icon" value="<?php echo $tag->TagID; ?>" <?php if(in_array($tag->TagID, $selected_tags)) { echo 'selected'; } ?>><?php echo $tag->Name; ?></option>
-                                                    <?php } ?>
-                                                </select>
-                                                <input type="hidden" name="tag" id="tag_hidden" value="<?php echo $this->input->get('tag'); ?>">
-                                            </div>
-                                        </div>
-                                        <?php if($this->session->userdata('level') != 20) { ?>
-                                            <div class="col-md-3">
-                                                <div class="form-group">
-                                                    <label>Sales Agent</label>
-                                                    <?php $selected_sales_agents = !empty($this->input->get('sales_agent')) ? explode(',', $this->input->get('sales_agent')) : []; ?>
-                                                    <select id="sales_agent_select" data-live-search="true" class="form-control selectpicker" multiple data-actions-box="true" title="--SELECT SALES AGENT--">
-                                                        <optgroup label="Active">
-                                                        <?php foreach($admins as $admin) { if($admin->Status == 'Y') { ?>
-                                                            <option data-icon="la la-user-alt font-size-lg bs-icon" value="<?php echo $admin->AdminID; ?>" <?php if(in_array($admin->AdminID, $selected_sales_agents)) { echo 'selected'; } ?>><?php echo $admin->Name; ?></option>
-                                                        <?php } } ?>
-                                                        </optgroup>
-                                                        <optgroup label="Deactivated">
-                                                        <?php foreach($admins as $admin) { if($admin->Status == 'D') { ?>
-                                                            <option data-icon="la la-user-alt font-size-lg bs-icon" value="<?php echo $admin->AdminID; ?>" <?php if(in_array($admin->AdminID, $selected_sales_agents)) { echo 'selected'; } ?>><?php echo $admin->Name; ?></option>
-                                                        <?php } } ?>
-                                                        </optgroup>
-                                                    </select>
-                                                    <input type="hidden" name="sales_agent" id="sales_agent_hidden" value="<?php echo $this->input->get('sales_agent'); ?>">
-                                                </div>
-                                            </div>
-                                            <div class="col-md-3">
-                                                <div class="form-group">
-                                                    <label>Sales Agent 2</label>
-                                                    <?php $selected_sales_agents_2 = !empty($this->input->get('sales_agent_2')) ? explode(',', $this->input->get('sales_agent_2')) : []; ?>
-                                                    <select id="sales_agent_2_select" data-live-search="true" class="form-control selectpicker" multiple data-actions-box="true" title="--SELECT SALES AGENT 2--">
-                                                        <optgroup label="Active">
-                                                        <?php foreach($admins as $admin) { if($admin->Status == 'Y') { ?>
-                                                            <option data-icon="la la-user-alt font-size-lg bs-icon" value="<?php echo $admin->AdminID; ?>" <?php if(in_array($admin->AdminID, $selected_sales_agents_2)) { echo 'selected'; } ?>><?php echo $admin->Name; ?></option>
-                                                        <?php } } ?>
-                                                        </optgroup>
-                                                        <optgroup label="Deactivated">
-                                                        <?php foreach($admins as $admin) { if($admin->Status == 'D') { ?>
-                                                            <option data-icon="la la-user-alt font-size-lg bs-icon" value="<?php echo $admin->AdminID; ?>" <?php if(in_array($admin->AdminID, $selected_sales_agents_2)) { echo 'selected'; } ?>><?php echo $admin->Name; ?></option>
-                                                        <?php } } ?>
-                                                        </optgroup>
-                                                    </select>
-                                                    <input type="hidden" name="sales_agent_2" id="sales_agent_2_hidden" value="<?php echo $this->input->get('sales_agent_2'); ?>">
-                                                </div>
-                                            </div>
-                                            <div class="col-md-3">
-                                                <div class="form-group">
-                                                    <label>OP</label>
-                                                    <?php $selected_booking_ops = !empty($this->input->get('booking_op')) ? explode(',', $this->input->get('booking_op')) : []; ?>
-                                                    <select id="booking_op_select" data-live-search="true" class="form-control selectpicker" multiple data-actions-box="true" title="--SELECT OP--">
-                                                        <?php foreach($booking_op_admins as $op_admin) { ?>
-                                                            <option data-icon="la la-user-alt font-size-lg bs-icon" value="<?php echo $op_admin->AdminID; ?>" <?php if(in_array($op_admin->AdminID, $selected_booking_ops)) { echo 'selected'; } ?>><?php echo $op_admin->Name; ?></option>
+                                                <label>Apply Quick Filter</label>
+                                                <div class="d-flex align-items-center">
+                                                    <select id="quick_filter_select" class="form-control selectpicker" data-live-search="true" data-actions-box="false" title="--SELECT QUICK FILTER--" style="flex:1;">
+                                                        <?php foreach($quick_filters as $qf) { ?>
+                                                            <option value="<?php echo $qf->QuickFilterID; ?>"><?php echo htmlspecialchars($qf->Name); ?></option>
                                                         <?php } ?>
                                                     </select>
-                                                    <input type="hidden" name="booking_op" id="booking_op_hidden" value="<?php echo $this->input->get('booking_op'); ?>">
+                                                    <a href="<?php echo base_url('Quick_Filter'); ?>" class="btn btn-light-primary font-weight-bold ml-2" style="white-space:nowrap;">Manage</a>
                                                 </div>
-                                            </div>
-                                        <?php } ?>
-                                        <div class="col-md-3">
-                                            <div class="form-group">
-                                                <label>Autocount Status</label>
-                                                <?php $selected_autocount_statuses = !empty($this->input->get('autocount_status')) ? explode(',', $this->input->get('autocount_status')) : []; ?>
-                                                <select id="autocount_status_select" class="form-control selectpicker" multiple data-actions-box="true" title="--SELECT AUTOCOUNT STATUS--">
-                                                    <option data-icon="la la-clock font-size-lg bs-icon" value="P" <?php if(in_array('P', $selected_autocount_statuses)) echo 'selected'; ?>>Pending</option>
-                                                    <option data-icon="la la-check-circle font-size-lg bs-icon" value="S" <?php if(in_array('S', $selected_autocount_statuses)) echo 'selected'; ?>>Synced</option>
-                                                    <option data-icon="la la-times-circle font-size-lg bs-icon" value="F" <?php if(in_array('F', $selected_autocount_statuses)) echo 'selected'; ?>>Failed</option>
-                                                </select>
-                                                <input type="hidden" name="autocount_status" id="autocount_status_hidden" value="<?php echo $this->input->get('autocount_status'); ?>">
-                                            </div>
-                                        </div>
-                                        <div class="col-md-3">
-                                            <div class="form-group">
-                                                <label>Guest List Status</label>
-                                                <?php $selected_guest_list_statuses = !empty($this->input->get('guest_list_status')) ? explode(',', $this->input->get('guest_list_status')) : []; ?>
-                                                <select id="guest_list_status_select" class="form-control selectpicker" multiple data-actions-box="true" title="--SELECT GL STATUS--">
-                                                    <option data-icon="la la-spinner font-size-lg bs-icon" value="in_progress" <?php if(in_array('in_progress', $selected_guest_list_statuses)) echo 'selected'; ?>>In Progress</option>
-                                                    <option data-icon="la la-lock font-size-lg bs-icon" value="locked" <?php if(in_array('locked', $selected_guest_list_statuses)) echo 'selected'; ?>>Locked</option>
-                                                    <option data-icon="la la-check-circle font-size-lg bs-icon" value="submitted" <?php if(in_array('submitted', $selected_guest_list_statuses)) echo 'selected'; ?>>Submitted</option>
-                                                    <option data-icon="la la-times-circle font-size-lg bs-icon" value="not_submitted" <?php if(in_array('not_submitted', $selected_guest_list_statuses)) echo 'selected'; ?>>Not Submitted</option>
-                                                </select>
-                                                <input type="hidden" name="guest_list_status" id="guest_list_status_hidden" value="<?php echo $this->input->get('guest_list_status'); ?>">
-                                            </div>
-                                        </div>
-                                        <div class="col-md-3">
-                                            <div class="form-group">
-                                                <label>Checklist</label>
-                                                <?php $selected_checklist_filters = !empty($this->input->get('checklist_filter')) ? explode(',', $this->input->get('checklist_filter')) : []; ?>
-                                                <select id="checklist_filter_select" class="form-control selectpicker" data-live-search="true" multiple data-actions-box="true" title="--SELECT CHECKLIST--">
-                                                    <?php if(isset($filter_checklists)) { foreach($filter_checklists as $checklist) { ?>
-                                                        <option value="<?php echo $checklist->ID; ?>" <?php if(in_array($checklist->ID, $selected_checklist_filters)) echo 'selected'; ?>><?php echo htmlspecialchars($checklist->name); ?></option>
-                                                    <?php } } ?>
-                                                </select>
-                                                <input type="hidden" name="checklist_filter" id="checklist_filter_hidden" value="<?php echo $this->input->get('checklist_filter'); ?>">
-                                            </div>
-                                        </div>
-                                        <div class="col-md-3">
-                                            <div class="form-group">
-                                                <label>Cancellation Reason</label>
-                                                <?php $selected_cancellation_reasons = !empty($this->input->get('cancellation_reason')) ? explode(',', $this->input->get('cancellation_reason')) : []; ?>
-                                                <select id="cancellation_reason_select" data-live-search="true" class="form-control selectpicker" multiple data-actions-box="true" title="--SELECT CANCELLATION REASON--">
-                                                    <?php if(isset($cancellation_reasons)) { foreach($cancellation_reasons as $reason) { ?>
-                                                        <option data-icon="la la-times-circle font-size-lg bs-icon" value="<?php echo $reason->CancellationReasonID; ?>" <?php if(in_array($reason->CancellationReasonID, $selected_cancellation_reasons)) { echo 'selected'; } ?>><?php echo $reason->Name; ?></option>
-                                                    <?php } } ?>
-                                                </select>
-                                                <input type="hidden" name="cancellation_reason" id="cancellation_reason_hidden" value="<?php echo $this->input->get('cancellation_reason'); ?>">
-                                            </div>
-                                        </div>
-                                        <div class="col-md-3">
-                                            <div class="form-group">
-                                                <label>E-Invoice Status</label>
-                                                <?php $selected_einvoice_statuses = !empty($this->input->get('einvoice_status')) ? explode(',', $this->input->get('einvoice_status')) : []; ?>
-                                                <select id="einvoice_status_select" class="form-control selectpicker" multiple data-actions-box="true" title="--SELECT E-INVOICE STATUS--">
-                                                    <option value="yes" <?php if(in_array('yes', $selected_einvoice_statuses)) echo 'selected'; ?>>Has E-Invoice</option>
-                                                    <option value="no" <?php if(in_array('no', $selected_einvoice_statuses)) echo 'selected'; ?>>No E-Invoice</option>
-                                                </select>
-                                                <input type="hidden" name="einvoice_status" id="einvoice_status_hidden" value="<?php echo $this->input->get('einvoice_status'); ?>">
                                             </div>
                                         </div>
                                     </div>
+                                <?php } else { ?>
+                                    <div class="mb-3">
+                                        <a href="<?php echo base_url('Quick_Filter'); ?>" class="btn btn-light-primary font-weight-bold">Manage Quick Filters</a>
+                                    </div>
+                                <?php } ?>
+                                <form id="form" action="<?php echo base_url('Booking') ?>" method="get" class="form">
+                                    <?php $this->load->view('booking/_filter_fields', ['filter_values' => $filter_values]); ?>
                                     <input type="submit" value="Filter" class="btn btn-light-success font-weight-bold" style="width:80px;">
                                     <input type="button" id="reset" value="Reset" class="btn btn-light-primary font-weight-bold" style="width:80px;">
                                 </form>
@@ -593,7 +333,7 @@
         $('input[name="booking_date"]').val('');
     }
 
-    <?php if(!empty($this->input->get('booking_number')) || !empty($this->input->get('reservation_number')) || !empty($this->input->get('deadline')) || !empty($this->input->get('customer')) || !empty($this->input->get('mobile')) || !empty($this->input->get('travel_date')) || !empty($this->input->get('destination')) || !empty($this->input->get('sales_agent')) || !empty($this->input->get('tag')) || !empty($this->input->get('chat_language')) || !empty($this->input->get('source')) || !empty($this->input->get('booking_confirmation_title')) || !empty($this->input->get('status')) || !empty($this->input->get('booking_date')) || !empty($this->input->get('autocount_status')) || !empty($this->input->get('guest_list_status')) || !empty($this->input->get('cancellation_reason'))) { ?>
+    <?php if(!empty($this->input->get('booking_number')) || !empty($this->input->get('reservation_number')) || !empty($this->input->get('deadline')) || !empty($this->input->get('customer')) || !empty($this->input->get('mobile')) || !empty($this->input->get('travel_date')) || !empty($this->input->get('destination')) || !empty($this->input->get('sales_agent')) || !empty($this->input->get('tag')) || !empty($this->input->get('chat_language')) || !empty($this->input->get('source')) || !empty($this->input->get('booking_confirmation_title')) || !empty($this->input->get('status')) || !empty($this->input->get('booking_date')) || !empty($this->input->get('autocount_status')) || !empty($this->input->get('guest_list_status')) || !empty($this->input->get('cancellation_reason')) || !empty($this->input->get('customer_type'))) { ?>
         $('#booking_header').click();
     <?php } ?>
     
@@ -601,7 +341,7 @@
     var multi_filters = ['status','destination','source','chat_language',
         'booking_confirmation_title','tag','sales_agent','sales_agent_2',
         'booking_op','autocount_status','guest_list_status','checklist_filter',
-        'cancellation_reason','einvoice_status'];
+        'cancellation_reason','einvoice_status','customer_type'];
 
     function syncMultiSelect(name) {
         var $sel = $('#' + name + '_select');
@@ -610,8 +350,37 @@
         var v = $sel.val();
         $hid.val(v ? v.join(',') : '');
     }
+    function moveSelectedToTop(name) {
+        var $sel = $('#' + name + '_select');
+        if(!$sel.length) return;
+        var $groups = $sel.children('optgroup');
+        var changed = false;
+        if($groups.length) {
+            $groups.each(function() {
+                var $grp = $(this);
+                var $opts = $grp.children('option');
+                var $selected = $opts.filter(':selected');
+                if(!$selected.length || $selected.length === $opts.length) return;
+                var $unselected = $opts.not(':selected');
+                $grp.empty().append($selected).append($unselected);
+                changed = true;
+            });
+        } else {
+            var $opts = $sel.children('option');
+            var $selected = $opts.filter(':selected');
+            if($selected.length && $selected.length < $opts.length) {
+                var $unselected = $opts.not(':selected');
+                $sel.empty().append($selected).append($unselected);
+                changed = true;
+            }
+        }
+        if(changed) $sel.selectpicker('refresh');
+    }
     multi_filters.forEach(function(name) {
-        $('#' + name + '_select').on('changed.bs.select', function() { syncMultiSelect(name); });
+        var $s = $('#' + name + '_select');
+        $s.on('changed.bs.select', function() { syncMultiSelect(name); });
+        $s.on('hidden.bs.select', function() { moveSelectedToTop(name); });
+        moveSelectedToTop(name);
     });
     $('#form').on('submit', function() {
         multi_filters.forEach(syncMultiSelect);
@@ -619,6 +388,14 @@
 
     $('#reset').click(function() {
         Reset('<?php echo base_url('Booking'); ?>');
+    });
+
+    // Apply a saved Quick Filter by redirecting to its preset query string
+    $('#quick_filter_select').on('changed.bs.select', function() {
+        var id = $(this).val();
+        if(id) {
+            window.location = '<?php echo base_url('Quick_Filter/Apply'); ?>/' + id;
+        }
     });
 
     $('#checkbox').change(function() {
@@ -759,6 +536,62 @@
             }
         });
     }
+
+    function Cancel_With_Partial_Refund(background, bookingNumber, bookingId, param)
+    {
+        var reasonOptions = '';
+        <?php if(isset($cancellation_reasons)) { foreach($cancellation_reasons as $reason) { ?>
+            reasonOptions += '<option value="<?php echo $reason->CancellationReasonID; ?>"><?php echo str_replace("'", "\\'", $reason->Name); ?></option>';
+        <?php } } ?>
+
+        const swalWithBootstrapButtons = Swal.mixin({
+            customClass: {
+                confirmButton: 'btn btn-light-success m-2',
+                cancelButton: 'btn btn-danger m-2'
+            },
+            buttonsStyling: true
+        });
+        swalWithBootstrapButtons.fire({
+            width: 550,
+            background: 'url(' + background + ')',
+            icon: 'warning',
+            title: 'Cancel With Partial Refund ?',
+            html: '<b>' + bookingNumber + '</b><br>' +
+                  '<small style="color:#555;">The BC will remain active, but this booking will appear in the customer\'s Cancelled tab.</small><br><br>' +
+                  '<select id="swal_partial_refund_reason" class="form-control" style="text-align:center;">' +
+                  '<option value="">-- SELECT CANCELLATION REASON --</option>' +
+                  reasonOptions +
+                  '</select>',
+            confirmButtonText: 'Confirm',
+            cancelButtonText: 'Cancel',
+            showCancelButton: true,
+            preConfirm: () => {
+                var reason = document.getElementById('swal_partial_refund_reason').value;
+                if(!reason) {
+                    Swal.showValidationMessage('Please select a cancellation reason');
+                    return false;
+                }
+                return reason;
+            }
+        }).then((action) => {
+            if(action.isConfirmed) {
+                $.ajax({
+                    url: '<?php echo base_url('Booking/Update_Partial_Refund_Status'); ?>',
+                    type: 'post',
+                    data: {
+                        booking_id: bookingId,
+                        cancellation_reason_id: action.value
+                    },
+                    success: function() {
+                        Display_Message(background, 'Booking ' + bookingNumber + ' Marked As Partial Refund', window.location.href);
+                    },
+                    error: function() {
+                        Display_Message(background, 'Booking ' + bookingNumber + ' Could Not Be Marked As Partial Refund', null);
+                    }
+                });
+            }
+        });
+    }
 </script>
 
 <script>
@@ -826,7 +659,7 @@ $(document).ready(function() {
         var filterParams = {};
         ['customer', 'booking_number', 'reservation_number', 'mobile', 'destination', 'travel_date',
          'deadline', 'source', 'chat_language', 'booking_date', 'status', 'booking_confirmation_title',
-         'tag', 'sales_agent', 'sales_agent_2', 'booking_op', 'autocount_status', 'guest_list_status', 'checklist_filter', 'cancellation_reason', 'einvoice_status'].forEach(function(param) {
+         'tag', 'sales_agent', 'sales_agent_2', 'booking_op', 'autocount_status', 'guest_list_status', 'checklist_filter', 'cancellation_reason', 'einvoice_status', 'customer_type'].forEach(function(param) {
             if (urlParams.has(param)) {
                 filterParams[param] = urlParams.get(param);
             }
@@ -897,7 +730,7 @@ function loadSummaryTotals() {
     var params = [];
     ['customer', 'booking_number', 'reservation_number', 'mobile', 'destination', 'travel_date',
      'deadline', 'source', 'chat_language', 'booking_date', 'status', 'booking_confirmation_title',
-     'tag', 'sales_agent', 'booking_op', 'autocount_status', 'guest_list_status', 'checklist_filter', 'cancellation_reason', 'einvoice_status'].forEach(function(param) {
+     'tag', 'sales_agent', 'booking_op', 'autocount_status', 'guest_list_status', 'checklist_filter', 'cancellation_reason', 'einvoice_status', 'customer_type'].forEach(function(param) {
         if (urlParams.has(param)) {
             params.push(param + '=' + encodeURIComponent(urlParams.get(param)));
         }

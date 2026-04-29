@@ -20,6 +20,7 @@ class Customer_Portal extends CI_Controller
         $this->load->model('Remark_Model');
         $this->load->model('Notification_Model');
         $this->load->helper('utils');
+        $this->load->helper('booking_flow');
         $this->load->library('session');
         $this->config->load('features');
     }
@@ -56,17 +57,22 @@ class Customer_Portal extends CI_Controller
         // Get customer bookings separated into upcoming and completed
         $bookings_data = $this->get_customer_bookings_by_category($customer['CustomerID']);
 
-        // Format pax information and status display for each booking
+        // Format pax information and status display for each booking. Pax is sourced
+        // from room totals (via Booking_Model->Compute_Pax_Counts) so the portal matches
+        // the BC / Travel Voucher the customer receives.
         foreach ($bookings_data['upcoming'] as &$booking) {
-            $booking['PaxInfo'] = $this->format_pax_info($booking['Adult'] ?? 0, $booking['Children'] ?? 0, $booking['Infant'] ?? 0);
+            $pax = $this->Booking_Model->Compute_Pax_Counts($booking['BookingID']);
+            $booking['PaxInfo'] = $this->format_pax_info($pax['adult'], $pax['child'], $pax['infant']);
             $booking['status_display'] = $this->get_booking_status_display_for_list($booking);
         }
         foreach ($bookings_data['completed'] as &$booking) {
-            $booking['PaxInfo'] = $this->format_pax_info($booking['Adult'] ?? 0, $booking['Children'] ?? 0, $booking['Infant'] ?? 0);
+            $pax = $this->Booking_Model->Compute_Pax_Counts($booking['BookingID']);
+            $booking['PaxInfo'] = $this->format_pax_info($pax['adult'], $pax['child'], $pax['infant']);
             $booking['status_display'] = $this->get_booking_status_display_for_list($booking);
         }
         foreach ($bookings_data['cancelled'] as &$booking) {
-            $booking['PaxInfo'] = $this->format_pax_info($booking['Adult'] ?? 0, $booking['Children'] ?? 0, $booking['Infant'] ?? 0);
+            $pax = $this->Booking_Model->Compute_Pax_Counts($booking['BookingID']);
+            $booking['PaxInfo'] = $this->format_pax_info($pax['adult'], $pax['child'], $pax['infant']);
             $booking['status_display'] = $this->get_booking_status_display_for_list($booking);
         }
 
@@ -113,15 +119,25 @@ class Customer_Portal extends CI_Controller
             return;
         }
 
-        // If phone verification is disabled, skip straight to dashboard
+        // Post-verification destination. Accepts `next` from GET (initial landing
+        // e.g. scanned QR) or POST (hidden field, survives form submission).
+        // Sanitised to prevent open-redirect abuse.
+        $next = $this->input->post('next');
+        if (empty($next)) {
+            $next = $this->input->get('next');
+        }
+        $next = $this->sanitize_portal_next($next);
+        $post_verify_redirect = $next !== null ? $next : base_url('customer/' . $hash);
+
+        // If phone verification is disabled, skip straight to destination
         if (!$this->config->item('enable_phone_verification')) {
-            redirect('customer/' . $hash);
+            redirect($post_verify_redirect);
             return;
         }
 
-        // No phone number on file or already verified — skip straight to dashboard
+        // No phone number on file or already verified — skip straight to destination
         if (empty($customer['phone_number']) || $this->is_customer_verified($customer['CustomerID'])) {
-            redirect('customer/' . $hash);
+            redirect($post_verify_redirect);
             return;
         }
 
@@ -130,6 +146,7 @@ class Customer_Portal extends CI_Controller
             'hash' => $hash,
             'error' => null,
             'customer_name' => $customer['name'],
+            'next' => $next,
         ];
 
         // Handle POST submission
@@ -141,7 +158,7 @@ class Customer_Portal extends CI_Controller
             $internal_code = $this->config->item('internal_access_code');
             if ($input_digits === $last4 || ($internal_code && $input_digits === $internal_code)) {
                 $this->session->set_userdata('customer_verified_' . $customer['CustomerID'], true);
-                redirect('customer/' . $hash);
+                redirect($post_verify_redirect);
                 return;
             } else {
                 $data['error'] = 'Incorrect digits. Please try again.';
@@ -149,6 +166,17 @@ class Customer_Portal extends CI_Controller
         }
 
         $this->load->view('customer_portal/verify_phone', $data);
+    }
+
+    // Only accept portal-internal paths as post-verify redirects. Guards against
+    // attackers crafting verify links with off-site `next` URLs.
+    private function sanitize_portal_next($next)
+    {
+        if (empty($next) || !is_string($next)) return null;
+        if (strpos($next, '//') === 0) return null;            // protocol-relative
+        if (stripos($next, 'javascript:') !== false) return null;
+        if (strpos($next, '/customer/') !== 0) return null;    // portal-internal only
+        return $next;
     }
 
     /**
@@ -251,6 +279,7 @@ class Customer_Portal extends CI_Controller
         $this->db->select('booking.BookingID, BookingNumber, DepositDeadline, FullPaymentDeadline,
                           Customer, booking.Mobile As CustomerMobile, StartDate, EndDate, NetTotal,
                           booking.ChatLanguage, Token, booking.BookingConfirmationTitle, CancelStatus,
+                          booking.PartialRefund,
                           LockStatus, AfterSalesService, booking.Status, booking.InsertDate,
                           booking.Adult, booking.Children, booking.Infant,
                           booking.DepositMode, booking.DepositPercentage, booking.DepositFixedAmount,
@@ -306,9 +335,10 @@ class Customer_Portal extends CI_Controller
             }
             $booking['total_paid'] = $total_paid;
             $booking['balance_due'] = $net_total - $total_paid;
-            $booking['deposit_complete'] = ($deposit_total > 0 && $total_paid >= $deposit_total);
+            $has_deposit_deadline = !empty($booking['DepositDeadline']);
+            $booking['deposit_complete'] = compute_deposit_complete($deposit_total, $total_paid, $has_deposit_deadline);
 
-            if ($booking['CancelStatus'] == 'Y') {
+            if ($booking['CancelStatus'] == 'Y' || (isset($booking['PartialRefund']) && $booking['PartialRefund'] == 'Y')) {
                 $cancelled[] = $booking;
                 continue;
             }
@@ -468,7 +498,9 @@ class Customer_Portal extends CI_Controller
         $booking['EndDate'] = !empty($booking['EndDate']) ? date('d M Y', strtotime($booking['EndDate'])) : null;
         $booking['InsertDate'] = !empty($booking['InsertDate']) ? date('d M Y', strtotime($booking['InsertDate'])) : null;
         $booking['CustomerMobile'] = $booking['CountryCode'] . $booking['CustomerMobile'];
-        $booking['PaxInfo'] = $this->format_pax_info($booking['Adult'] ?? 0, $booking['Children'] ?? 0, $booking['Infant'] ?? 0);
+        $pax = $this->Booking_Model->Compute_Pax_Counts($booking['BookingID']);
+        $booking['PaxInfo'] = $this->format_pax_info($pax['adult'], $pax['child'], $pax['infant']);
+        $booking['ComputedPaxTotal'] = (int)$pax['adult'] + (int)$pax['child'] + (int)$pax['infant'];
 
         // Get booking products
         $this->db->select('*');
@@ -480,15 +512,15 @@ class Customer_Portal extends CI_Controller
         // Get invoice split data
         $this->load->model('Invoice_Split_Model');
         $booking['invoice_split'] = $this->Invoice_Split_Model->Get_Pax_By_Booking($booking['BookingID']);
+        $booking['einvoice_submit_status'] = $this->Invoice_Split_Model->Get_Submit_Status($booking['BookingID']);
 
-        // Get payment history (exclude SUPPLIER PAYMENT)
+        // Get payment history (customer-facing Types only)
         $this->db->select('payment.PaymentID, Date, Type, Credit, ReferenceNumber, Debit, Deadline, payment.Status, PaymentRemark, DebitRemark, payment.Bank, payment.BankAccount, payment.BankHolder, supplier.Name As SupplierName');
         $this->db->from('payment');
         $this->db->join('supplier', 'supplier.SupplierID = payment.SupplierID', 'left');
         $this->db->where('payment.BookingID', $booking['BookingID']);
         $this->db->where('payment.Status !=', 'N');
-        $this->db->where_not_in('payment.Type', array('SUPPLIER PAYMENT (DEPOSIT)', 'SUPPLIER PAYMENT (FULL)', 'SUPPLIER PAYMENT (ADDITIONAL)'));
-        $this->db->where('payment.Type !=', 'AGENT COMMISSION FROM SUPPLIER');
+        $this->db->where_in('payment.Type', array('DEPOSIT', 'FULL', 'ADDITIONAL PAYMENT', 'CUSTOMER REFUND'));
         $this->db->order_by('Date', 'ASC');
         $this->db->order_by('PaymentID', 'ASC');
         $payments = $this->db->get()->result_array();
@@ -528,7 +560,8 @@ class Customer_Portal extends CI_Controller
             $deposit_percentage = isset($booking['DepositPercentage']) ? floatval($booking['DepositPercentage']) : 0;
             $deposit_total_required = ceil((floatval($booking['NetTotal']) * $deposit_percentage) / 100);
         }
-        $booking['deposit_complete'] = ($deposit_total_required > 0 && $total_credit >= $deposit_total_required);
+        $has_deposit_deadline_detail = !empty($booking['DepositDeadline']);
+        $booking['deposit_complete'] = compute_deposit_complete($deposit_total_required, $total_credit, $has_deposit_deadline_detail);
 
         // Prepare document URLs
         $base_url = base_url();
@@ -751,12 +784,21 @@ class Customer_Portal extends CI_Controller
     {
         $status = $booking['Status'];
         $cancel_status = $booking['CancelStatus'] ?? 'N';
+        $partial_refund = $booking['PartialRefund'] ?? 'N';
         $after_sales = $booking['AfterSalesService'] ?? '';
         $today = date('Y-m-d');
 
         if ($cancel_status == 'Y') {
             return [
                 'text' => 'Cancelled',
+                'class' => 'status-cancelled',
+                'color' => '#E0115F'
+            ];
+        }
+
+        if ($partial_refund == 'Y') {
+            return [
+                'text' => 'Partial Refund',
                 'class' => 'status-cancelled',
                 'color' => '#E0115F'
             ];
@@ -853,7 +895,7 @@ class Customer_Portal extends CI_Controller
         }
 
         // Verify booking exists
-        $this->db->select('BookingID, Token, AllowReview, Status');
+        $this->db->select('BookingID, Token, AllowReview, CustomerReview, Status, Customer, SalesAgent, BookingOP');
         $this->db->where('Token', $hashed_bc);
         $this->db->where('Status !=', 'N');
         $booking = $this->db->get('booking')->row_array();
@@ -871,6 +913,15 @@ class Customer_Portal extends CI_Controller
             $this->output->set_output(json_encode([
                 'success' => false,
                 'message' => 'Review submission is not allowed for this booking'
+            ]));
+            return;
+        }
+
+        // Reviews are view-only after submission
+        if (!empty($booking['CustomerReview'])) {
+            $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => 'A review has already been submitted for this booking'
             ]));
             return;
         }
@@ -896,6 +947,14 @@ class Customer_Portal extends CI_Controller
         $result = $this->db->update('booking', $update_data);
 
         if ($result) {
+            // Notify SalesAgent (TC) and BookingOP that a review was submitted
+            if (!empty($booking['SalesAgent']) || !empty($booking['BookingOP'])) {
+                $this->Notification_Model->Create_Review_Submitted_Notification(
+                    $booking['BookingID'],
+                    $booking['Customer']
+                );
+            }
+
             $this->output->set_output(json_encode([
                 'success' => true,
                 'message' => 'Review submitted successfully'
@@ -1135,9 +1194,47 @@ class Customer_Portal extends CI_Controller
     }
 
     /**
-     * Save invoice split data (AJAX)
+     * Save invoice split data as a DRAFT (AJAX).
+     * Customer can continue to edit after save.
      */
     public function save_invoice_split($hashed_bc = null)
+    {
+        $this->_persist_invoice_split($hashed_bc, 'D');
+    }
+
+    /**
+     * Submit invoice split data (AJAX). Rejects if already submitted.
+     * Once submitted, the customer-portal form is locked.
+     */
+    public function submit_invoice_split($hashed_bc = null)
+    {
+        $this->output->set_content_type('application/json');
+
+        if (!empty($hashed_bc)) {
+            $this->db->select('BookingID');
+            $this->db->where('Token', $hashed_bc);
+            $this->db->where('Status !=', 'N');
+            $existing = $this->db->get('booking')->row_array();
+            if (!empty($existing)) {
+                $this->load->model('Invoice_Split_Model');
+                if ($this->Invoice_Split_Model->Get_Submit_Status($existing['BookingID']) === 'S') {
+                    $this->output->set_output(json_encode([
+                        'success' => false,
+                        'message' => 'This e-invoice request has already been submitted and cannot be changed.'
+                    ]));
+                    return;
+                }
+            }
+        }
+
+        $this->_persist_invoice_split($hashed_bc, 'S');
+    }
+
+    /**
+     * Shared implementation for save_invoice_split (draft) and submit_invoice_split.
+     * Applies the same validation rules regardless of submit status.
+     */
+    private function _persist_invoice_split($hashed_bc, $submit_status)
     {
         $this->output->set_content_type('application/json');
 
@@ -1161,8 +1258,25 @@ class Customer_Portal extends CI_Controller
         $json = $this->input->raw_input_stream;
         $data = json_decode($json, true);
 
-        if (empty($data) || empty($data['pax'])) {
+        if (empty($data)) {
             $this->output->set_output(json_encode(['success' => false, 'message' => 'No pax data provided']));
+            return;
+        }
+        if (empty($data['pax'])) {
+            if ($submit_status === 'S') {
+                $this->output->set_output(json_encode(['success' => false, 'message' => 'No pax data provided']));
+                return;
+            }
+            $data['pax'] = [];
+        }
+
+        $pax_counts = $this->Booking_Model->Compute_Pax_Counts($booking['BookingID']);
+        $max_pax = (int)$pax_counts['adult'] + (int)$pax_counts['child'] + (int)$pax_counts['infant'];
+        if (count($data['pax']) > $max_pax) {
+            $this->output->set_output(json_encode([
+                'success' => false,
+                'message' => 'Pax count (' . count($data['pax']) . ') exceeds booking pax (' . $max_pax . ')'
+            ]));
             return;
         }
 
@@ -1197,11 +1311,14 @@ class Customer_Portal extends CI_Controller
             }
 
             if (empty($pax['products']) || !is_array($pax['products'])) {
-                $this->output->set_output(json_encode([
-                    'success' => false,
-                    'message' => 'Pax "' . htmlspecialchars($pax_name) . '" must have at least one product'
-                ]));
-                return;
+                if ($submit_status === 'S') {
+                    $this->output->set_output(json_encode([
+                        'success' => false,
+                        'message' => 'Pax "' . htmlspecialchars($pax_name) . '" must have at least one product'
+                    ]));
+                    return;
+                }
+                $pax['products'] = [];
             }
 
             $validated_products = [];
@@ -1221,6 +1338,15 @@ class Customer_Portal extends CI_Controller
                     $this->output->set_output(json_encode([
                         'success' => false,
                         'message' => 'Quantity must be greater than 0 for pax "' . htmlspecialchars($pax_name) . '"'
+                    ]));
+                    return;
+                }
+
+                $max_qty = floatval($product_lookup[$bp_id]['Quantity']);
+                if ($qty > $max_qty + 0.01) {
+                    $this->output->set_output(json_encode([
+                        'success' => false,
+                        'message' => 'Quantity ' . $qty . ' exceeds booking quantity ' . $max_qty . ' for product "' . htmlspecialchars($product_lookup[$bp_id]['ProductName']) . '" in pax "' . htmlspecialchars($pax_name) . '"'
                     ]));
                     return;
                 }
@@ -1279,17 +1405,37 @@ class Customer_Portal extends CI_Controller
             ];
         }
 
-        // Validate all product quantities are fully allocated
+        // Upper-bound check across all pax — total allocated for any product
+        // cannot exceed the booking quantity. Enforced for both draft and
+        // submit so a draft cannot over-allocate silently.
         foreach ($booking_products as $bp) {
             $bp_id = $bp['BookingProductID'];
             $expected = floatval($bp['Quantity']);
             $actual = $qty_allocated[$bp_id];
-            if (abs($expected - $actual) > 0.01) {
+            if ($actual > $expected + 0.01) {
                 $this->output->set_output(json_encode([
                     'success' => false,
-                    'message' => 'Product "' . htmlspecialchars($bp['ProductName']) . '" requires total quantity of ' . $expected . ' but ' . $actual . ' was allocated'
+                    'message' => 'Product "' . htmlspecialchars($bp['ProductName']) . '" total allocated quantity (' . $actual . ') exceeds booking quantity (' . $expected . ') across all pax'
                 ]));
                 return;
+            }
+        }
+
+        // Validate all product quantities are fully allocated — only enforced on
+        // Submit. Drafts are allowed to have partial allocations so the customer
+        // can save progress mid-way.
+        if ($submit_status === 'S') {
+            foreach ($booking_products as $bp) {
+                $bp_id = $bp['BookingProductID'];
+                $expected = floatval($bp['Quantity']);
+                $actual = $qty_allocated[$bp_id];
+                if (abs($expected - $actual) > 0.01) {
+                    $this->output->set_output(json_encode([
+                        'success' => false,
+                        'message' => 'Product "' . htmlspecialchars($bp['ProductName']) . '" requires total quantity of ' . $expected . ' but ' . $actual . ' was allocated'
+                    ]));
+                    return;
+                }
             }
         }
 
@@ -1302,14 +1448,27 @@ class Customer_Portal extends CI_Controller
             $booking['BookingID'],
             $pax_data,
             $booking_subtotal,
-            $booking_discount
+            $booking_discount,
+            $submit_status
         );
 
         if ($result) {
             $pax = $this->Invoice_Split_Model->Get_Pax_By_Booking($booking['BookingID']);
+            $message = ($submit_status === 'S')
+                ? 'E-Invoice request submitted successfully'
+                : 'E-Invoice request saved as draft';
+
+            // Notify finance only on Submit, not on Draft. Send is best-effort:
+            // failures are logged but never surfaced to the customer, so a
+            // mail-provider outage cannot break the submission flow.
+            if ($submit_status === 'S') {
+                $this->_send_einvoice_finance_emails($booking['BookingID']);
+            }
+
             $this->output->set_output(json_encode([
                 'success' => true,
-                'message' => 'Invoice split saved successfully',
+                'message' => $message,
+                'submit_status' => $submit_status,
                 'pax' => $pax
             ]));
         } else {
@@ -1318,5 +1477,160 @@ class Customer_Portal extends CI_Controller
                 'message' => 'Failed to save invoice split'
             ]));
         }
+    }
+
+    /**
+     * Send an "e-invoice submitted" notification to every active finance admin
+     * via the Resend HTTP API. Best-effort: any failure (missing API key,
+     * network error, non-2xx response) is logged but never surfaced to the
+     * customer.
+     */
+    private function _send_einvoice_finance_emails($booking_id)
+    {
+        try {
+            // Feature flag — default enabled; set EINVOICE_NOTIFY_FINANCE=false
+            // in .env to suppress all finance notifications without code changes.
+            $flag = get_env('EINVOICE_NOTIFY_FINANCE');
+            if ($flag !== null && strtolower(trim($flag)) === 'false') {
+                log_message('info', 'E-invoice submit: finance notifications disabled by EINVOICE_NOTIFY_FINANCE=false (booking ' . $booking_id . ')');
+                return;
+            }
+
+            $this->load->model('Admin_Model');
+            $this->load->model('Invoice_Split_Model');
+
+            $finance = $this->Admin_Model->get_finance_admins();
+            if (empty($finance)) {
+                log_message('info', 'E-invoice submit: no active finance admins to notify (booking ' . $booking_id . ')');
+                return;
+            }
+
+            $api_key = get_env('RESEND_API_KEY');
+            if (empty($api_key)) {
+                log_message('error', 'E-invoice submit: RESEND_API_KEY not configured (booking ' . $booking_id . ')');
+                return;
+            }
+
+            $this->db->select('BookingID, BookingNumber, Customer, NetTotal');
+            $this->db->where('BookingID', $booking_id);
+            $booking = $this->db->get('booking')->row_array();
+            if (empty($booking)) {
+                log_message('error', 'E-invoice submit: booking ' . $booking_id . ' not found when sending finance emails');
+                return;
+            }
+
+            $pax_rows = $this->Invoice_Split_Model->Get_Pax_By_Booking($booking_id);
+            $pax_count = is_array($pax_rows) ? count($pax_rows) : 0;
+
+            $booking_url = base_url('Booking/View?booking_id=' . $booking_id);
+            $submitted_at = date('Y-m-d H:i:s');
+            $subject = 'E-Invoice Request Submitted — Booking ' . $booking['BookingNumber'];
+
+            $from_addr = get_env('MAIL_FROM_ADDRESS') ?: 'no-reply@holidaygogogo.com';
+            $from_name = get_env('MAIL_FROM_NAME') ?: 'HolidayGoGoGo';
+            $from_field = $from_name ? sprintf('%s <%s>', $from_name, $from_addr) : $from_addr;
+
+            $messages = [];
+            foreach ($finance as $admin) {
+                $body = $this->load->view('emails/einvoice_submitted', [
+                    'admin_name'     => $admin['Name'],
+                    'booking_id'     => $booking_id,
+                    'booking_number' => $booking['BookingNumber'],
+                    'customer_name'  => $booking['Customer'],
+                    'pax_count'      => $pax_count,
+                    'net_total'      => number_format((float)$booking['NetTotal'], 2),
+                    'submitted_at'   => $submitted_at,
+                    'booking_url'    => $booking_url,
+                ], true);
+
+                $messages[] = [
+                    'from'    => $from_field,
+                    'to'      => [$admin['Email']],
+                    'subject' => $subject,
+                    'html'    => $body,
+                ];
+            }
+
+            // One batch API call per customer submit, regardless of recipient
+            // count. Cuts per-submit Resend traffic from N requests to 1.
+            list($ok, $err) = $this->_resend_send_batch($api_key, $messages);
+            if (!$ok) {
+                log_message('error', 'E-invoice email send failed for booking ' . $booking_id . ': ' . $err);
+            }
+        } catch (\Exception $e) {
+            log_message('error', 'E-invoice email send failed for booking ' . $booking_id . ': ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * POST a batch of emails to https://api.resend.com/emails/batch.
+     *
+     * Rate-limit handling: on HTTP 429 we honor the Retry-After header
+     * (capped at 3s) plus 0-500ms jitter to desynchronize concurrent
+     * customers submitting at the same instant, then retry once. Total
+     * worst-case added latency on the customer's submit is ~3.5s; if
+     * the second attempt also rate-limits, we give up and log. For
+     * sustained high concurrency, a queue + cron worker would be the
+     * proper fix.
+     *
+     * Returns [bool $ok, string|null $error_message].
+     */
+    private function _resend_send_batch($api_key, array $messages, $attempt = 1)
+    {
+        if (empty($messages)) return [true, null];
+
+        $max_attempts = 2;
+
+        $ch = curl_init('https://api.resend.com/emails/batch');
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($messages));
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_HEADER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Authorization: Bearer ' . $api_key,
+            'Content-Type: application/json',
+            'Accept: application/json',
+        ]);
+
+        $response = curl_exec($ch);
+        if ($response === false) {
+            $err = 'cURL error: ' . curl_error($ch);
+            curl_close($ch);
+            return [false, $err];
+        }
+        $http_code   = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $header_size = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
+        $headers_raw = substr($response, 0, $header_size);
+        $body        = substr($response, $header_size);
+        curl_close($ch);
+
+        if ($http_code >= 200 && $http_code < 300) {
+            return [true, null];
+        }
+
+        if ($http_code === 429 && $attempt < $max_attempts) {
+            $retry_after = $this->_parse_retry_after_seconds($headers_raw, 1);
+            // Cap to keep customer-facing latency bounded.
+            $retry_after = min($retry_after, 3);
+            $sleep_us = ($retry_after * 1000000) + mt_rand(0, 500000);
+            usleep($sleep_us);
+            return $this->_resend_send_batch($api_key, $messages, $attempt + 1);
+        }
+
+        $decoded = json_decode($body, true);
+        $msg = is_array($decoded) && !empty($decoded['message'])
+            ? $decoded['message']
+            : substr((string)$body, 0, 500);
+        return [false, "HTTP {$http_code}: {$msg}"];
+    }
+
+    private function _parse_retry_after_seconds($headers_raw, $default)
+    {
+        if (preg_match('/^Retry-After:\s*(\d+)/im', $headers_raw, $m)) {
+            return max(0, (int)$m[1]);
+        }
+        return $default;
     }
 }

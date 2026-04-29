@@ -21,6 +21,8 @@ class Booking extends MY_Controller
 		$this->load->model('Package_Checklist_Model');
 		$this->load->model('Guest_list_lock_model');
 		$this->load->model('Cancellation_Reason_Model');
+		$this->load->model('Customer_Type_Model');
+		$this->load->model('Quick_Filter_Model');
 		$this->config->load('autocount'); // load config/autocount.php
 	}
 
@@ -38,8 +40,25 @@ class Booking extends MY_Controller
 			$array['categories'] = $this->Booking_Model->Read_Categories();
 			$array['tags'] = $this->Booking_Model->Read_Tags();
 			$array['sources'] = $this->Booking_Model->Read_Sources();
+			$array['customer_types'] = $this->Customer_Type_Model->Read_Customer_Types();
 			$array['filter_checklists'] = $this->Package_Checklist_Model->Read_Booking_Filter_Checklists();
 			$array['cancellation_reasons'] = $this->Cancellation_Reason_Model->Read_Cancellation_Reasons();
+			$array['quick_filters'] = $this->Quick_Filter_Model->Read_Quick_Filters();
+
+			// Hydrate filter values from query string for the shared filter partial
+			$filter_field_names = [
+				'customer', 'booking_number', 'reservation_number', 'mobile',
+				'destination', 'travel_date', 'deadline', 'source',
+				'chat_language', 'booking_date', 'status', 'booking_confirmation_title',
+				'tag', 'customer_type', 'sales_agent', 'sales_agent_2', 'booking_op',
+				'autocount_status', 'guest_list_status', 'checklist_filter',
+				'cancellation_reason', 'einvoice_status',
+			];
+			$filter_values = [];
+			foreach($filter_field_names as $fname) {
+				$filter_values[$fname] = $this->input->get($fname);
+			}
+			$array['filter_values'] = $filter_values;
 
 			$this->load->helper('autocount');
 			$config = get_autocount_config();
@@ -231,9 +250,9 @@ class Booking extends MY_Controller
 				$deposit_required_row = ceil((floatval($booking->NetTotal) * $deposit_pct_row) / 100);
 			}
 			$booking->balance_due = floatval($booking->NetTotal) - $total_credit_approved;
-			$booking->deposit_complete = ($deposit_required_row > 0 && $total_credit_approved >= $deposit_required_row);
-
 			$this->load->helper('booking_flow');
+			$has_deposit_deadline_row = !empty($booking->DepositDeadline);
+			$booking->deposit_complete = compute_deposit_complete($deposit_required_row, $total_credit_approved, $has_deposit_deadline_row);
 			$status_info_row = display_booking_status($booking);
 			$display_status = $status_info_row['status_code'];
 			$status_color = $status_info_row['status_color'];
@@ -425,14 +444,21 @@ class Booking extends MY_Controller
 					$html .= '<a href="' . base_url('Booking/Update_Cancel_Status?booking_id=') . $booking->BookingID . '&current_cancel_status=' . $booking->CancelStatus . '&new_cancel_status=N&param=' . urlencode($current_url) . '" class="dropdown-item" style="color:#93C572; font-size:11px;">Activate Booking</a>';
 				} else {
 					$html .= '<button onclick="Cancel_Booking(\'' . base_url('assets/image/sweetalert.jpg') . '\', \'' . $booking->BookingNumber . '\', ' . $booking->BookingID . ', \'' . urlencode($current_url) . '\')" class="dropdown-item" style="color:#E0115F; font-size:11px;">Cancel Booking</button>';
+					if(!empty($booking->PartialRefund) && $booking->PartialRefund == 'Y') {
+						$html .= '<a href="' . base_url('Booking/Update_Partial_Refund_Status?booking_id=') . $booking->BookingID . '&new_partial_refund_status=N&param=' . urlencode($current_url) . '" class="dropdown-item" style="color:#93C572; font-size:11px;">Undo Partial Refund</a>';
+					} else {
+						$html .= '<button onclick="Cancel_With_Partial_Refund(\'' . base_url('assets/image/sweetalert.jpg') . '\', \'' . $booking->BookingNumber . '\', ' . $booking->BookingID . ', \'' . urlencode($current_url) . '\')" class="dropdown-item" style="color:#E0115F; font-size:11px;">Cancel With Partial Refund</button>';
+					}
 				}
 				// Approve BC - only show when BC is not approved
 				if(empty($booking->bc_approved) || $booking->bc_approved == 0) {
 					$html .= '<a href="' . base_url('Booking/Approve_BC?booking_id=') . $booking->BookingID . '&param=' . urlencode($current_url) . '" class="dropdown-item" style="color:#50C878; font-size:11px;">Approve BC</a>';
 					$shown_approve_bc = true;
 				}
-				if($booking->Status == 'PBO' || $booking->Status == 'PTV' || $booking->Status == 'PT') {
-					if($booking->Status == 'PBO' || $booking->Status == 'PTV') {
+				// PGL with LockStatus=Y is displayed as PTV (see display_booking_status); treat it the same here.
+				$effective_status = ($booking->Status == 'PGL' && $booking->LockStatus == 'Y') ? 'PTV' : $booking->Status;
+				if($effective_status == 'PBO' || $effective_status == 'PTV' || $effective_status == 'PT') {
+					if($effective_status == 'PBO' || $effective_status == 'PTV') {
 						$html .= '<a href="' . base_url('Booking/Update_Status?booking_id=') . $booking->BookingID . '&current_status=' . $booking->Status . '&new_status=PT&param=' . urlencode($current_url) . '" class="dropdown-item" style="color:#6082B6; font-size:11px;">Approve Travel Voucher ?</a>';
 					} else {
 						$html .= '<a href="' . base_url('Booking/Update_Status?booking_id=') . $booking->BookingID . '&current_status=' . $booking->Status . '&new_status=PTV&param=' . urlencode($current_url) . '" class="dropdown-item" style="color:#F4BB44; font-size:11px;">Revert Pending Travel Voucher</a>';
@@ -655,7 +681,7 @@ class Booking extends MY_Controller
 				// }
         } else {
 				$titles = array('tab_title' => 'HolidayGoGoGo | Booking', 'breadcrumb_title' => 'Booking >> Create');
-					$array = array('BookingID' => 'NA', 'BookingConfirmationFooterID' => 'NA', 'TravelVoucherFooterID' => 'NA', 'BookingNumber' => 'NA', 'Tag' => array(), 'Discount' => 'NA', 'NetTotal' => 'NA', 'ProductSequence' => array(), 'BookingProductID' => ($this->Booking_Product_Model->Read_Last_Booking_Product_ID()) + 1, 'AllowReview' => 1, 'ic_passport_no' => '');
+					$array = array('BookingID' => 'NA', 'BookingConfirmationFooterID' => 'NA', 'TravelVoucherFooterID' => 'NA', 'BookingNumber' => 'NA', 'Tag' => array(), 'Discount' => 'NA', 'NetTotal' => 'NA', 'ProductSequence' => array(), 'BookingProductID' => ($this->Booking_Product_Model->Read_Last_Booking_Product_ID()) + 1, 'AllowReview' => 1, 'ic_passport_no' => '', 'tin_no' => '', 'customer_types_selected' => array());
 					$array['admins'] = $this->Booking_Model->Read_Admins();
 					$array['notify_admins'] = $this->Notification_Model->Build_Admin_Handles($this->Booking_Model->Read_Notify_Admins());
 					$array['booking_op_admins'] = $this->Booking_Model->Read_Booking_OP_Admins();
@@ -666,6 +692,7 @@ class Booking extends MY_Controller
 				$array['country_codes'] = $this->Booking_Model->Read_Country_Codes();
 				$array['tags'] = $this->Booking_Model->Read_Tags();
 				$array['sources'] = $this->Booking_Model->Read_Sources();
+				$array['customer_types'] = $this->Customer_Type_Model->Read_Customer_Types();
 				$this->load->view('layout/header', $titles);
 				$this->load->view('booking/booking', $array);
 				$this->load->view('layout/footer');
@@ -694,12 +721,27 @@ class Booking extends MY_Controller
 			return;
 		}
 
+		$v = $this->input->get('v');
+		$vFresh = !empty($v) && ctype_digit((string)$v) && (time() - intval($v)) <= 5;
+
+		if (!$vFresh) {
+			header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0, private');
+			header('Pragma: no-cache');
+			header('Expires: 0');
+			header('Location: ' . base_url('Booking/View_Snapshot?file=' . urlencode($file) . '&v=' . time()), true, 302);
+			exit;
+		}
+
+		if (ob_get_length()) { ob_end_clean(); }
+
 		header('Content-Type: application/pdf');
 		header('Content-Disposition: inline; filename="' . $file . '"');
-		header('Cache-Control: no-cache, no-store, must-revalidate');
+		header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0, private');
 		header('Pragma: no-cache');
 		header('Expires: 0');
+		header('Content-Length: ' . filesize($path));
 		readfile($path);
+		exit;
 	}
 
 	function Update()
@@ -738,15 +780,33 @@ class Booking extends MY_Controller
 		
 		if(in_array('AB', $this->session->access_control)) {
 			if($this->input->is_ajax_request()) {
-				// Always persist IC/Passport No. on the linked customer when posted,
+				// Always persist IC/Passport No. and TIN No. on the linked customer when posted,
 				// independent of whether other booking fields changed.
 				$posted_ic = $this->input->post('ic_passport_no');
+				$posted_tin = $this->input->post('tin_no');
 				$posted_customer_id = $this->input->post('CustomerID');
-				if (!empty($posted_ic) && !empty($posted_customer_id) && is_numeric($posted_customer_id)) {
-					$this->Customer_Model->update_by_id($posted_customer_id, [
-						'ic_passport_no' => strtoupper($posted_ic),
-						'updated_at'     => date('Y-m-d H:i:s'),
-					]);
+				if (!empty($posted_customer_id) && is_numeric($posted_customer_id) && (!empty($posted_ic) || $posted_tin !== null)) {
+					$update = ['updated_at' => date('Y-m-d H:i:s')];
+					if (!empty($posted_ic)) {
+						$update['ic_passport_no'] = strtoupper($posted_ic);
+					}
+					if ($posted_tin !== null) {
+						$update['tin_no'] = strtoupper(trim($posted_tin));
+					}
+					$this->Customer_Model->update_by_id($posted_customer_id, $update);
+				}
+
+				// Always sync per-booking customer types when posted, independent of
+				// whether any booking field changed (booking[0] may have only the
+				// stub BookingID/UpdateBy/UpdateDate fields).
+				$posted_booking_id = $this->input->post('booking_id');
+				$posted_customer_types = $this->input->post('customer_type');
+				$old_customer_types = [];
+				if (!empty($posted_booking_id) && is_numeric($posted_booking_id) && is_array($posted_customer_types)) {
+					$this->load->model('Booking_Customer_Type_Model');
+					// Capture pre-Sync customer types so the update notification can diff them.
+					$old_customer_types = $this->Booking_Customer_Type_Model->Read_By_Booking($posted_booking_id);
+					$this->Booking_Customer_Type_Model->Sync($posted_booking_id, $posted_customer_types);
 				}
 
 				// Booking
@@ -755,14 +815,32 @@ class Booking extends MY_Controller
 					$this->Booking_Model->Update();
 					$this->Booking_Model->Create_Booking_Log();
 
+					// Build a short "what changed" summary for the notification message.
+					$this->load->helper('booking_change_summary');
+					$products_post = $this->input->post('booking_products');
+					$change_summary = build_booking_change_summary(
+						$this->input->post('booking_log') ?: [],
+						(is_array($products_post) && !empty($products_post[0])) ? $products_post[0] : [],
+						(is_array($products_post) && !empty($products_post[1])) ? $products_post[1] : [],
+						(is_array($products_post) && !empty($products_post[2])) ? $products_post[2] : [],
+						$old_customer_types,
+						is_array($posted_customer_types) ? $posted_customer_types : []
+					);
+
 					// Notify TC (SalesAgent), TC 2 (SalesAgent2), and Owners on booking update
 					$this->load->model('Notification_Model');
 					$updater_name = $this->session->userdata('name') ?: 'Someone';
 					$this->Notification_Model->Create_Booking_Updated_Notification(
 						$this->input->post('booking_id'),
 						$this->session->userdata('admin_id'),
-						$updater_name
+						$updater_name,
+						$change_summary
 					);
+				} else {
+					// Partial booking updates skip Booking_Model::Update() above, but the
+					// linked customer's name/phone_number should still stay in sync with the
+					// booking row (needed for the customer portal slug).
+					$this->Booking_Model->Sync_Customer_From_Booking($this->input->post('booking_id'));
 				}
 
 				// Booking Product
@@ -813,6 +891,15 @@ class Booking extends MY_Controller
 
 				// Recompute Subtotal from booking_product totals to keep booking.Subtotal authoritative
 				$this->Booking_Product_Model->Recompute_Subtotal($this->input->post('booking_id'));
+
+				// If any booking_product was added, edited, or deleted, auto-unlock the
+				// E-Invoice Request session so the customer can review the revised
+				// figures and resubmit (pax data is preserved).
+				$bp_post = $this->input->post('booking_products');
+				if (!empty($bp_post[0]) || !empty($bp_post[1]) || !empty($bp_post[2])) {
+					$this->load->model('Invoice_Split_Model');
+					$this->Invoice_Split_Model->Unlock_Submitted($this->input->post('booking_id'));
+				}
 
 				// Auto-enable insurance if any product belongs to an insurance category
 				$booking_id = $this->input->post('booking_id');
@@ -1174,7 +1261,9 @@ class Booking extends MY_Controller
 					}
 					$array['DepositPaid'] = $deposit_paid;
 					$array['balance_due'] = $net_total_raw - $total_credit_approved;
-					$array['deposit_complete'] = ($deposit_total > 0 && $total_credit_approved >= $deposit_total);
+					$this->load->helper('booking_flow');
+					$has_deposit_deadline_detail = !empty($array['DepositDeadline']);
+					$array['deposit_complete'] = compute_deposit_complete($deposit_total, $total_credit_approved, $has_deposit_deadline_detail);
 					// Calculate deposit status and format Deposit Paid display
 					$deposit_difference = $deposit_paid - $deposit_total;
 					if ($deposit_paid > 0) {
@@ -1247,6 +1336,7 @@ class Booking extends MY_Controller
 					$array['display_status'] = display_booking_status($array, true); // true = return all applicable statuses
 
 					if(isset($_GET['nick'])) { echo "<pre>"; print_r($array); exit; }
+					$array['customer_types'] = $this->Customer_Type_Model->Read_Customer_Types();
 					$this->load->view('layout/header', $titles);
 					$this->load->view('booking/booking', $array);
 					$this->load->view('layout/footer');
@@ -1466,6 +1556,27 @@ class Booking extends MY_Controller
 		}
 	}
 
+	function Update_Partial_Refund_Status()
+	{
+		if(in_array('AB', $this->session->access_control)) {
+			if($this->input->is_ajax_request()) {
+				$this->Booking_Model->Update_Partial_Refund_Status_With_Reason();
+				$this->Booking_Model->Create_Booking_Log_Partial_Refund();
+				echo json_encode(true);
+			} else {
+				$this->Booking_Model->Update_Partial_Refund_Status();
+				$this->Booking_Model->Create_Booking_Log();
+				if(strpos($this->input->get('param'), '?') == true) {
+					redirect('Booking?' . explode('?', $this->input->get('param'))[1]);
+				} else {
+					redirect('Booking');
+				}
+			}
+		} else {
+			redirect('Dashboard');
+		}
+	}
+
 	function Update_Lock_Status() 
 	{
 		$booking_id = $this->input->get('booking_id');
@@ -1506,10 +1617,14 @@ class Booking extends MY_Controller
 			}
 		}
 		
-		redirect('Guest_List?gl=' . $this->input->get('gl'));
+		if ($this->input->get('return_to') === 'booking') {
+			redirect('Booking/Update?booking_id=' . $booking_id);
+		} else {
+			redirect('Guest_List?gl=' . $this->input->get('gl'));
+		}
 	}
 
-	function Update_Travel_Insurance_Status() 
+	function Update_Travel_Insurance_Status()
 	{
 		$this->Booking_Model->Update_Travel_Insurance_Status();
 		$this->Booking_Model->Create_Booking_Log();
@@ -3644,6 +3759,46 @@ class Booking extends MY_Controller
 			$this->db->insert_batch('booking_log', $booking_logs);
 			log_message('debug', 'Booking Checklist Logs: ' . count($booking_logs) . ' entries inserted for BookingID: ' . $booking_id);
 		}
+	}
+
+	// TEMP one-shot sweep: recompute is_submitted for bookings where the flag
+	// may have gone stale (room edits used to skip recalc). Remove after running.
+	// Pass ?dry_run=1 to preview affected BookingIDs without writing.
+	function Recompute_All_Is_Submitted()
+	{
+		if(!$this->session->userdata('admin_id') || empty($this->session->access_control) || !in_array('VB', $this->session->access_control)) {
+			show_error('Unauthorized', 403);
+			return;
+		}
+
+		$this->load->model('Guest_List_Model');
+		$dry_run = !empty($this->input->get('dry_run'));
+
+		$this->db->select('BookingID');
+		$this->db->where('is_submitted', 1);
+		$this->db->where('LockStatus', 'N');
+		$candidates = $this->db->get('booking')->result();
+
+		$affected = array();
+		foreach($candidates as $row) {
+			if(!$this->Guest_List_Model->Are_All_Guests_Complete($row->BookingID)) {
+				if(!$dry_run) {
+					$this->db->where('BookingID', $row->BookingID);
+					$this->db->update('booking', array('is_submitted' => 0));
+				}
+				$affected[] = $row->BookingID;
+			}
+		}
+
+		$verb = $dry_run ? 'would correct' : 'corrected';
+		log_message('info', 'Recompute_All_Is_Submitted (' . ($dry_run ? 'dry-run' : 'apply') . '): scanned ' . count($candidates) . ', ' . $verb . ' ' . count($affected) . ' -> ' . implode(',', $affected));
+		echo json_encode(array(
+			'success' => true,
+			'dry_run' => $dry_run,
+			'scanned' => count($candidates),
+			'affected_count' => count($affected),
+			'affected_booking_ids' => $affected
+		));
 	}
 
 }

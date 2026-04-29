@@ -336,6 +336,14 @@
 							$adult = 0;
 							$child = 0;
 							$infant = 0;
+							$nominee_relations = [
+								'Husband', 'Wife', 'Son', 'Daughter', 'Father', 'Mother',
+								'Brother', 'Sister', 'Cousin', 'Uncle', 'Aunt',
+								'Grandfather', 'Grandmother', 'Grandson', 'Granddaughter',
+								'Nephew', 'Niece',
+								'Mother in law', 'Father in law', 'Brother in law', 'Sister in law',
+								'Daughter in law', 'Son in law',
+							];
 						?>
 						<input type="hidden" name="new_guests">
 						<input type="hidden" name="deleted_guests">
@@ -388,7 +396,7 @@
 												<div class="col-md-6">
 													<label id="<?php echo 'gender_label-' . $guest->GuestListID; ?>">Gender <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>
 													<select <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> name="genders[]" id="<?php echo 'gender-' . $guest->GuestListID; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" class="form-control">
-														<option selected disabled value="">--SELECT GENDER--</option>
+														<option <?php if(empty($guest->Gender)) { echo 'selected'; } ?> disabled value="">--SELECT GENDER--</option>
 														<option value="F" <?php if($guest->Gender == 'F') { echo 'selected'; } ?>>FEMALE</option>
 														<option value="M" <?php if($guest->Gender == 'M') { echo 'selected'; } ?>>MALE</option>
 													</select>
@@ -602,7 +610,7 @@
 																	<div class="col-md-6 mb-7 mb-md-0">
 																		<label id="<?php echo 'marital_status_label-' . $guest->GuestListID; ?>">Marital Status <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>
 																		<select <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> name="marital_statuses[]" id="<?php echo 'marital_status-' . $guest->GuestListID; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" class="form-control">
-																			<option selected disabled value="">--SELECT MARITAL STATUS--</option>
+																			<option <?php if(empty($guest->MaritalStatus)) { echo 'selected'; } ?> disabled value="">--SELECT MARITAL STATUS--</option>
 																			<option value="DIVORCED" <?php if($guest->MaritalStatus == 'DIVORCED') { echo 'selected'; } ?>>DIVORCED</option>
 																			<option value="MARRIED" <?php if($guest->MaritalStatus == 'MARRIED') { echo 'selected'; } ?>>MARRIED</option>
 																			<option value="SINGLE" <?php if($guest->MaritalStatus == 'SINGLE') { echo 'selected'; } ?>>SINGLE</option>
@@ -641,7 +649,7 @@
 																	<div class="col-md-6 mb-7 mb-md-0">
 																		<label id="<?php echo 'country_label-' . $guest->GuestListID; ?>">Country <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>
 																		<select <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> name="countries[]" id="<?php echo 'country-' . $guest->GuestListID; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" class="form-control">
-																			<option selected disabled value="">--SELECT COUNTRY--</option>
+																			<option <?php if(empty($guest->Country)) { echo 'selected'; } ?> disabled value="">--SELECT COUNTRY--</option>
 																			<?php foreach($country_codes as $country) { ?>
 																				<option <?php if(!empty($guest->Country) && $country->CountryCodeID == $guest->Country) { echo 'selected'; } ?> value="<?php echo $country->CountryCodeID; ?>"><?php echo $country->Country; ?></option>
 																			<?php } ?>
@@ -667,8 +675,22 @@
 																<div class="row">
 																	<div class="col-md-6 mb-7 mb-md-0">
 																		<label id="<?php echo 'relationship_label-' . $guest->GuestListID; ?>">Relationship <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>
-																		<input <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="relationships[]" id="<?php echo 'relationship-' . $guest->GuestListID; ?>" value="<?php echo $guest->Relationship; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="form-control">
-																		<p style="color:#FAA0A0; font-size:10px; margin-top:5px;">(must be relative and not in the trip, eg cousin, uncle, sister, brother, father, mother & etc)</p>
+																		<select <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> name="relationships[]" id="<?php echo 'relationship-' . $guest->GuestListID; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" class="form-control">
+																			<option value="" <?php if(empty($guest->Relationship)) { echo 'selected'; } ?>>--SELECT RELATIONSHIP--</option>
+																			<?php
+																				$current_rel = trim((string)$guest->Relationship);
+																				$matched = false;
+																				foreach($nominee_relations as $rel) {
+																					$is_match = (strcasecmp($current_rel, $rel) === 0);
+																					if($is_match) { $matched = true; }
+																			?>
+																				<option value="<?php echo $rel; ?>" <?php if($is_match) { echo 'selected'; } ?>><?php echo $rel; ?></option>
+																			<?php } ?>
+																			<?php if(!$matched && $current_rel !== '') { ?>
+																				<option value="<?php echo htmlspecialchars($current_rel, ENT_QUOTES); ?>" selected><?php echo htmlspecialchars($current_rel); ?> (existing)</option>
+																			<?php } ?>
+																		</select>
+																		<p style="color:#FAA0A0; font-size:10px; margin-top:5px;">(must be relative and not in the trip)</p>
 																	</div>
 																</div>
 															</div>
@@ -1141,6 +1163,14 @@
 			$(`#guest-${guest_list_id}`).remove();
 		}
 
+		// Read a select's actually-chosen value, ignoring the disabled placeholder option.
+		// Some browsers (notably mobile WebKit) leave .val() pointing at the placeholder
+		// even when a real option is the displayed/selected one.
+		function selectedOptionValue(sel) {
+			var $opt = $(sel).find('option:selected').not(':disabled');
+			return $opt.length ? $opt.val() : '';
+		}
+
 		$('input[type="submit"]').click(function() {
 			$('#form').off('submit').on('submit', function(event) {
 				event.preventDefault();
@@ -1168,13 +1198,13 @@
 							if(value.GuestLastName != null && $(`#last-name-${value.GuestListID}`).val() == '') {
 								$(`#last-name-${value.GuestListID}`).val(value.GuestLastName);
 							}
-							if(value.Gender != null && $(`#gender-${value.GuestListID}`).val() == null) {
+							if(value.Gender != null && $(`#gender-${value.GuestListID}`).val() == '') {
 								$(`#gender-${value.GuestListID}`).val(value.Gender).change();
 							}
 							if(value.DateOfBirth != null && $(`#date_of_birth-${value.GuestListID}`).val() == '') {
 								$(`#date_of_birth-${value.GuestListID}`).val(value.DateOfBirth);
 							}
-							if(value.Nationality != null && $(`#nationality-${value.GuestListID}`).val() == null) {
+							if(value.Nationality != null && $(`#nationality-${value.GuestListID}`).val() == '') {
 								$(`#nationality-${value.GuestListID}`).val(value.Nationality).change();
 							}
 							if(value.IdentificationNumber != null && $(`#identification_number-${value.GuestListID}`).val() == '') {
@@ -1183,7 +1213,7 @@
 							if(value.PassportNumber != null && $(`#passport_number-${value.GuestListID}`).val() == '') {
 								$(`#passport_number-${value.GuestListID}`).val(value.PassportNumber);
 							}
-							if(value.GuestCountryCode != null && $(`#country_code-${value.GuestListID}`).val() == null) {
+							if(value.GuestCountryCode != null && $(`#country_code-${value.GuestListID}`).val() == '') {
 								$(`#country_code-${value.GuestListID}`).val(value.GuestCountryCode).change();
 								// Update phone input display
 								var selectedOption = $(`#country_code-${value.GuestListID} option:selected`);
@@ -1199,7 +1229,7 @@
 							if(value.Email != null && $(`#email-${value.GuestListID}`).val() == '') {
 								$(`#email-${value.GuestListID}`).val(value.Email);
 							}
-							if(value.MaritalStatus != null && $(`#marital_status-${value.GuestListID}`).val() == null) {
+							if(value.MaritalStatus != null && $(`#marital_status-${value.GuestListID}`).val() == '') {
 								$(`#marital_status-${value.GuestListID}`).val(value.MaritalStatus).change();
 							}
 							if(value.Employment != null && $(`#employment-${value.GuestListID}`).val() == '') {
@@ -1217,7 +1247,7 @@
 							if(value.State != null && $(`#state-${value.GuestListID}`).val() == '') {
 								$(`#state-${value.GuestListID}`).val(value.State);
 							}
-							if(value.Country != null && $(`#country-${value.GuestListID}`).val() == null) {
+							if(value.Country != null && $(`#country-${value.GuestListID}`).val() == '') {
 								$(`#country-${value.GuestListID}`).val(value.Country).change();
 							}
 							if(value.Nominee != null && $(`#nominee_name-${value.GuestListID}`).val() == '') {
@@ -1244,7 +1274,7 @@
 							if ($(`#guest-${gid}`).length == 0) return; // skip deleted existing guests
 							var name = $(`#name-${gid}`).val();
 							var last_name = $(`#last-name-${gid}`).val();
-							var gender = $(`#gender-${gid}`).val();
+							var gender = selectedOptionValue(`#gender-${gid}`);
 							var dob = $(`#date_of_birth-${gid}`).val();
 							var email = $(`#email-${gid}`).val();
 							var country_code = $(`#country_code-${gid}`).val();
@@ -1265,13 +1295,13 @@
 								if (mobile == '') missing.push('Mobile');
 								if (nationality_text == 'MALAYSIA' && (identification_number == '' || identification_number == null)) missing.push('Identification Number');
 								<?php if($guest_lists[0]->TravelInsuranceStatus == 'Y') { ?>
-								if ($(`#marital_status-${gid}`).val() == '' || $(`#marital_status-${gid}`).val() == null) missing.push('Marital Status');
+								if (selectedOptionValue(`#marital_status-${gid}`) == '') missing.push('Marital Status');
 								if ($(`#employment-${gid}`).val() == '') missing.push('Employment');
 								if ($(`#address-${gid}`).val() == '') missing.push('Address');
 								if ($(`#postcode-${gid}`).val() == '') missing.push('Postcode');
 								if ($(`#city-${gid}`).val() == '') missing.push('City');
 								if ($(`#state-${gid}`).val() == '') missing.push('State');
-								if ($(`#country-${gid}`).val() == '' || $(`#country-${gid}`).val() == null) missing.push('Country');
+								if (selectedOptionValue(`#country-${gid}`) == '') missing.push('Country');
 								if ($(`#nominee_name-${gid}`).val() == '') missing.push('Nominee Name');
 								if ($(`#nominee_contact_number-${gid}`).val() == '') missing.push('Nominee Contact Number');
 								if ($(`#nominee_identification_number-${gid}`).val() == '') missing.push('Nominee Identification Number');
@@ -1290,7 +1320,7 @@
 							if ($(`#guest-${gid}`).length == 0) return; // skip deleted new guests
 							var name = $(`#name-${gid}`).val();
 							var last_name = $(`#last-name-${gid}`).val();
-							var gender = $(`#gender-${gid}`).val();
+							var gender = selectedOptionValue(`#gender-${gid}`);
 							var dob = $(`#date_of_birth-${gid}`).val();
 							var email = $(`#email-${gid}`).val();
 							var country_code = $(`#country_code-${gid}`).val();
@@ -1311,13 +1341,13 @@
 								if (mobile == '') missing.push('Mobile');
 								if (nationality_text == 'MALAYSIA' && (identification_number == '' || identification_number == null)) missing.push('Identification Number');
 								<?php if($guest_lists[0]->TravelInsuranceStatus == 'Y') { ?>
-								if ($(`#marital_status-${gid}`).val() == '' || $(`#marital_status-${gid}`).val() == null) missing.push('Marital Status');
+								if (selectedOptionValue(`#marital_status-${gid}`) == '') missing.push('Marital Status');
 								if ($(`#employment-${gid}`).val() == '') missing.push('Employment');
 								if ($(`#address-${gid}`).val() == '') missing.push('Address');
 								if ($(`#postcode-${gid}`).val() == '') missing.push('Postcode');
 								if ($(`#city-${gid}`).val() == '') missing.push('City');
 								if ($(`#state-${gid}`).val() == '') missing.push('State');
-								if ($(`#country-${gid}`).val() == '' || $(`#country-${gid}`).val() == null) missing.push('Country');
+								if (selectedOptionValue(`#country-${gid}`) == '') missing.push('Country');
 								if ($(`#nominee_name-${gid}`).val() == '') missing.push('Nominee Name');
 								if ($(`#nominee_contact_number-${gid}`).val() == '') missing.push('Nominee Contact Number');
 								if ($(`#nominee_identification_number-${gid}`).val() == '') missing.push('Nominee Identification Number');

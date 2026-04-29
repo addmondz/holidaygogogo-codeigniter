@@ -1003,6 +1003,20 @@
                     </button>
                 </div>
             </div>
+        <?php elseif ($has_review): ?>
+            <div class="details-card" style="margin-bottom: 20px;">
+                <div class="card-title">
+                    <i class="la la-star" style="color: #f5a623;"></i> Your Review
+                </div>
+                <div style="white-space: pre-wrap; line-height: 1.6; margin: 12px 0;">
+                    <?php echo nl2br(htmlspecialchars($booking['CustomerReview'])); ?>
+                </div>
+                <?php if (!empty($booking['CustomerReviewTimestamp'])): ?>
+                    <div style="font-size: 13px; color: #6c757d; margin-top: 12px;">
+                        Submitted on <?php echo return_timestamp_output($booking['CustomerReviewTimestamp'], true, false); ?>
+                    </div>
+                <?php endif; ?>
+            </div>
         <?php endif; ?>
 
         <!-- Main Content Grid -->
@@ -1253,7 +1267,7 @@
                 $deposit_percentage = isset($booking['DepositPercentage']) ? floatval($booking['DepositPercentage']) : 0;
                 $deposit_total = ceil(($net_total * $deposit_percentage) / 100);
             }
-            $deposit_complete = $has_deposit_deadline ? (($total_paid >= $deposit_total && $deposit_total > 0) || $full_paid) : false;
+            $deposit_complete = compute_deposit_complete($deposit_total, $total_paid, $has_deposit_deadline, $full_paid);
 
             // Build deposit-only payment list (approved deposits only) and track latest deposit date
             $deposit_payments = [];
@@ -1888,6 +1902,9 @@
                 <div class="card-title">
                     Payment History
                 </div>
+                <div class="mb-3 p-3 rounded" style="background: #f0f7ff; border: 1px solid #cce5ff; font-size: 13px; color: #004085;">
+                    <strong>Note:</strong> Please kindly note the payment receipt will be ready 1&ndash;2 working days after payment is made.
+                </div>
                 <?php if (empty($booking['payments'])): ?>
                     <div class="empty-state">
                         <i class="la la-wallet"></i>
@@ -1969,17 +1986,27 @@
             </div>
 
             <!-- E-Invoice Request by Pax Section -->
+            <?php $einvoice_submit_status = isset($booking['einvoice_submit_status']) ? $booking['einvoice_submit_status'] : null; ?>
             <div class="details-card" id="invoice-split-section">
-                <div class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
-                    <span>E-Invoice Request by Pax</span>
-                    <?php if (!empty($booking['invoice_split'])): ?>
-                        <button type="button" id="toggle-split-form" class="btn-toggle-split" style="background: #162447; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;">
-                            <i class="la la-edit"></i> Edit E-Invoice Request
-                        </button>
-                    <?php else: ?>
-                        <button type="button" id="toggle-split-form" class="btn-toggle-split" style="background: #162447; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;">
-                            <i class="la la-plus"></i> E-Invoice Request
-                        </button>
+                <div class="card-title" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                    <span style="display: flex; align-items: center; gap: 10px;">
+                        <span>E-Invoice Request by Pax</span>
+                        <?php if ($einvoice_submit_status === 'S'): ?>
+                            <span style="display:inline-block; font-size: 11px; font-weight: 700; background: #28a745; color: #fff; padding: 3px 10px; border-radius: 12px; letter-spacing: 0.3px;">SUBMITTED</span>
+                        <?php elseif ($einvoice_submit_status === 'D'): ?>
+                            <span style="display:inline-block; font-size: 11px; font-weight: 700; background: #6c757d; color: #fff; padding: 3px 10px; border-radius: 12px; letter-spacing: 0.3px;">DRAFT</span>
+                        <?php endif; ?>
+                    </span>
+                    <?php if ($einvoice_submit_status !== 'S'): ?>
+                        <?php if (!empty($booking['invoice_split'])): ?>
+                            <button type="button" id="toggle-split-form" class="btn-toggle-split" style="background: #162447; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;">
+                                <i class="la la-edit"></i> Edit E-Invoice Request
+                            </button>
+                        <?php else: ?>
+                            <button type="button" id="toggle-split-form" class="btn-toggle-split" style="background: #162447; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;">
+                                <i class="la la-plus"></i> E-Invoice Request
+                            </button>
+                        <?php endif; ?>
                     <?php endif; ?>
                 </div>
 
@@ -2094,10 +2121,13 @@
                         <button type="button" id="add-pax-btn" style="background: #28a745; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;">
                             <i class="la la-plus"></i> Add Pax
                         </button>
-                        <button type="button" id="save-split-btn" style="background: #162447; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;">
-                            <i class="la la-save"></i> <?php echo !empty($booking['invoice_split']) ? 'Update' : 'Save'; ?> E-Invoice Request
+                        <button type="button" id="save-split-draft-btn" style="background: #6c757d; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;">
+                            <i class="la la-save"></i> Save as Draft
                         </button>
-                        <button type="button" id="cancel-split-btn" style="background: #6c757d; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;">
+                        <button type="button" id="submit-split-btn" style="background: #162447; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;">
+                            <i class="la la-paper-plane"></i> Submit E-Invoice Request
+                        </button>
+                        <button type="button" id="cancel-split-btn" style="background: #adb5bd; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;">
                             Cancel
                         </button>
                     </div>
@@ -2235,18 +2265,12 @@
                             class="form-control review-textarea"
                             placeholder="Tell us about your travel experience..."
                             required
-                            rows="6"><?php echo !empty($booking['CustomerReview']) ? htmlspecialchars($booking['CustomerReview']) : ''; ?></textarea>
+                            rows="6"></textarea>
                     </div>
-                    <?php if (!empty($booking['CustomerReviewTimestamp'])): ?>
-                        <div class="review-date-info">
-                            <small>Review submitted on <?php echo return_timestamp_output($booking['CustomerReviewTimestamp'], true, false); ?></small>
-                        </div>
-                    <?php endif; ?>
                     <div class="review-modal-actions">
                         <button type="button" class="btn btn-secondary" id="reviewModalCancel">Cancel</button>
-                        <button type="button" class="btn btn-info" id="reviewEditBtn" style="display: none;">Edit Review</button>
                         <button type="submit" class="btn btn-primary" id="reviewSubmitBtn">
-                            <span id="reviewSubmitText"><?php echo !empty($booking['CustomerReview']) ? 'Update Review' : 'Submit Review'; ?></span>
+                            <span id="reviewSubmitText">Submit Review</span>
                         </button>
                     </div>
                 </form>
@@ -2258,31 +2282,11 @@
     <script src="<?php echo base_url('assets/js/plugins-bundle.js'); ?>"></script>
     <script>
         $(document).ready(function() {
-            var hasReview = <?php echo !empty($booking['CustomerReview']) ? 'true' : 'false'; ?>;
-            var bookingToken = '<?php echo htmlspecialchars($booking['Token']); ?>';
-            var reviewText = <?php echo !empty($booking['CustomerReview']) ? json_encode($booking['CustomerReview']) : 'null'; ?>;
-
             // Function to open submit review modal
             function openSubmitReviewModal() {
                 $('#reviewModalTitle').text('Submit Your Review');
-                $('#reviewText').val('').prop('disabled', false);
-                $('#reviewSubmitText').text('Submit Review');
-                $('#reviewSubmitBtn').show();
-                $('#reviewEditBtn').hide();
+                $('#reviewText').val('');
                 $('#reviewModalMessage').hide();
-                $('.review-date-info').hide();
-                $('#reviewModal').addClass('active');
-            }
-
-            // Function to open view review modal
-            function openViewReviewModal() {
-                $('#reviewModalTitle').text('View Your Review');
-                $('#reviewText').val(reviewText).prop('disabled', true);
-                $('#reviewSubmitText').text('Update Review');
-                $('#reviewSubmitBtn').hide();
-                $('#reviewEditBtn').show();
-                $('#reviewModalMessage').hide();
-                $('.review-date-info').show();
                 $('#reviewModal').addClass('active');
             }
 
@@ -2293,20 +2297,6 @@
                 openSubmitReviewModal();
             });
 
-            // Handle view review link click (fallback if clicked directly)
-            $(document).on('click', '.view-review-link', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                openViewReviewModal();
-            });
-
-            // Edit review button
-            $('#reviewEditBtn').on('click', function() {
-                $('#reviewText').prop('disabled', false);
-                $('#reviewModalTitle').text('Update Your Review');
-                $('#reviewEditBtn').hide();
-                $('#reviewSubmitBtn').show();
-            });
 
             // Close modal
             function closeModal() {
@@ -2559,7 +2549,23 @@
             var bookingNetTotal = parseFloat('<?php echo $booking['NetTotal']; ?>') || 0;
             var existingSplit = <?php echo json_encode($booking['invoice_split']); ?>;
             var splitSaveUrl = '<?php echo base_url('customer/booking/' . $booking['Token'] . '/invoice-split/save'); ?>';
+            var splitSubmitUrl = '<?php echo base_url('customer/booking/' . $booking['Token'] . '/invoice-split/submit'); ?>';
             var paxCounter = 0;
+            var maxPax = <?php echo (int)($booking['ComputedPaxTotal'] ?? 0); ?>;
+
+            function updateAddPaxBtnState() {
+                var current = $('.pax-card').length;
+                var $btn = $('#add-pax-btn');
+                if (current >= maxPax) {
+                    $btn.prop('disabled', true)
+                        .css({ 'opacity': '0.5', 'cursor': 'not-allowed' })
+                        .attr('title', 'Maximum ' + maxPax + ' pax reached for this booking');
+                } else {
+                    $btn.prop('disabled', false)
+                        .css({ 'opacity': '', 'cursor': 'pointer' })
+                        .removeAttr('title');
+                }
+            }
 
             function formatCurrency(val) {
                 return 'RM ' + parseFloat(val).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
@@ -2575,15 +2581,63 @@
                 return html;
             }
 
+            function getMaxQtyForBp(bpId) {
+                for (var i = 0; i < bookingProducts.length; i++) {
+                    if (bookingProducts[i].BookingProductID == bpId) {
+                        return parseFloat(bookingProducts[i].Quantity) || 0;
+                    }
+                }
+                return 0;
+            }
+
+            // Remaining capacity for a row, accounting for what OTHER rows
+            // with the same BookingProductID have already allocated. This is
+            // what lets the cap work across multiple pax.
+            function computeRowRemaining($row) {
+                var bpId = parseInt($row.find('.split-product-select').val(), 10) || 0;
+                if (bpId <= 0) return null;
+                var bookingQty = getMaxQtyForBp(bpId);
+                var otherSum = 0;
+                $('.product-row').each(function() {
+                    if (this === $row[0]) return;
+                    var otherBp = parseInt($(this).find('.split-product-select').val(), 10) || 0;
+                    if (otherBp === bpId) {
+                        otherSum += parseFloat($(this).find('.split-qty').val()) || 0;
+                    }
+                });
+                var remaining = bookingQty - otherSum;
+                remaining = Math.round(remaining * 100) / 100;
+                return Math.max(0, remaining);
+            }
+
+            function applyRowCap($row) {
+                var remaining = computeRowRemaining($row);
+                var $qty = $row.find('.split-qty');
+                if (remaining === null) {
+                    $qty.removeAttr('max');
+                    return;
+                }
+                $qty.attr('max', remaining);
+                var val = parseFloat($qty.val());
+                if (!isNaN(val) && val > remaining) {
+                    $qty.val(remaining);
+                }
+            }
+
             function addProductRow(paxIdx, product) {
                 var bpId = product ? product.BookingProductID : '';
                 var qty = product ? product.Quantity : '';
                 var price = product ? parseFloat(product.UnitPrice).toFixed(2) : '0.00';
                 var amount = product ? parseFloat(product.Amount).toFixed(2) : '0.00';
+                var maxAttr = '';
+                if (bpId) {
+                    var maxQty = getMaxQtyForBp(bpId);
+                    if (maxQty > 0) maxAttr = ' max="' + maxQty + '"';
+                }
 
                 var html = '<tr class="product-row" data-pax="' + paxIdx + '">';
                 html += '<td><select class="split-product-select" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:4px;font-size:13px;">' + getProductOptions(bpId) + '</select></td>';
-                html += '<td><input type="number" class="split-qty" value="' + qty + '" min="0.1" step="0.1" style="width:80px;padding:6px;border:1px solid #ddd;border-radius:4px;text-align:center;font-size:13px;"></td>';
+                html += '<td><input type="number" class="split-qty" value="' + qty + '" min="0.1" step="0.1"' + maxAttr + ' style="width:80px;padding:6px;border:1px solid #ddd;border-radius:4px;text-align:center;font-size:13px;"></td>';
                 html += '<td class="split-price" style="text-align:right;font-size:13px;">RM ' + price + '</td>';
                 html += '<td class="split-amount-cell" style="text-align:right;font-size:13px;"><div class="split-amount">RM ' + amount + '</div></td>';
                 html += '<td><button type="button" class="remove-product-row" style="background:#dc3545;color:white;border:none;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:12px;"><i class="la la-trash"></i></button></td>';
@@ -2636,6 +2690,7 @@
 
                 $('#pax-cards-container').append(html);
                 recalculate();
+                updateAddPaxBtnState();
             }
 
             function recalculate() {
@@ -2710,14 +2765,29 @@
                     $bar.css('border-color', '#dc3545');
                     $bar.css('background', '#f8d7da');
                 }
+
+                // Refresh each row's max attr so removing or editing one row
+                // updates the cap displayed on the rest.
+                $('.product-row').each(function() {
+                    var $row = $(this);
+                    var rowRemaining = computeRowRemaining($row);
+                    var $qty = $row.find('.split-qty');
+                    if (rowRemaining === null) {
+                        $qty.removeAttr('max');
+                    } else {
+                        $qty.attr('max', rowRemaining);
+                    }
+                });
             }
 
             // Event handlers
             $(document).on('change', '.split-product-select', function() {
+                applyRowCap($(this).closest('.product-row'));
                 recalculate();
             });
 
             $(document).on('input change', '.split-qty', function() {
+                applyRowCap($(this).closest('.product-row'));
                 recalculate();
             });
 
@@ -2746,18 +2816,14 @@
             });
 
             $(document).on('click', '.remove-product-row', function() {
-                var $card = $(this).closest('.pax-card');
-                if ($card.find('.product-row').length > 1) {
-                    $(this).closest('.product-row').remove();
-                    recalculate();
-                }
+                $(this).closest('.product-row').remove();
+                recalculate();
             });
 
             $(document).on('click', '.remove-pax-btn', function() {
-                if ($('.pax-card').length > 1) {
-                    $(this).closest('.pax-card').remove();
-                    recalculate();
-                }
+                $(this).closest('.pax-card').remove();
+                recalculate();
+                updateAddPaxBtnState();
             });
 
             // Toggle form
@@ -2770,14 +2836,16 @@
                 // If form is empty, populate from existing data or add one blank pax
                 if ($('#pax-cards-container').children().length === 0) {
                     if (existingSplit && existingSplit.length > 0) {
-                        for (var i = 0; i < existingSplit.length; i++) {
+                        var limit = Math.min(existingSplit.length, maxPax);
+                        for (var i = 0; i < limit; i++) {
                             addPaxCard(existingSplit[i]);
                         }
-                    } else {
+                    } else if (maxPax > 0) {
                         addPaxCard(null);
                     }
                 }
                 recalculate();
+                updateAddPaxBtnState();
             });
 
             $('#cancel-split-btn').on('click', function() {
@@ -2788,11 +2856,17 @@
             });
 
             $('#add-pax-btn').on('click', function() {
+                if ($('.pax-card').length >= maxPax) {
+                    Swal.fire('Limit reached', 'This booking has ' + maxPax + ' pax. You cannot add more.', 'info');
+                    return;
+                }
                 addPaxCard(null);
             });
 
-            // Save
-            $('#save-split-btn').on('click', function() {
+            // Collect + validate the form. Returns the paxList on success, or null
+            // after showing a Swal error. Pass checkAllocation=false to allow
+            // partial allocation (used by the Save-as-Draft flow).
+            function collectAndValidatePayload(checkAllocation) {
                 var paxList = [];
                 var hasError = false;
 
@@ -2842,7 +2916,7 @@
                         }
                     });
 
-                    if (products.length === 0) {
+                    if (checkAllocation && products.length === 0) {
                         hasError = true;
                         Swal.fire('Error', 'Pax "' + paxName + '" must have at least one product.', 'error');
                         return false;
@@ -2851,41 +2925,45 @@
                     paxList.push({ PaxName: paxName, TIN: paxTin, Email: paxEmail, Address: paxAddress, PhoneNumber: paxPhone, products: products });
                 });
 
-                if (hasError) return;
+                if (hasError) return null;
 
-                // Validate full allocation per product
-                var productQtyMap = {};
-                for (var i = 0; i < bookingProducts.length; i++) {
-                    productQtyMap[bookingProducts[i].BookingProductID] = {
-                        name: bookingProducts[i].Name,
-                        expected: parseFloat(bookingProducts[i].Quantity),
-                        allocated: 0
-                    };
-                }
+                if (checkAllocation) {
+                    // Validate full allocation per product
+                    var productQtyMap = {};
+                    for (var i = 0; i < bookingProducts.length; i++) {
+                        productQtyMap[bookingProducts[i].BookingProductID] = {
+                            name: bookingProducts[i].Name,
+                            expected: parseFloat(bookingProducts[i].Quantity),
+                            allocated: 0
+                        };
+                    }
 
-                for (var p = 0; p < paxList.length; p++) {
-                    for (var pr = 0; pr < paxList[p].products.length; pr++) {
-                        var bpId = paxList[p].products[pr].BookingProductID;
-                        if (productQtyMap[bpId]) {
-                            productQtyMap[bpId].allocated += paxList[p].products[pr].Quantity;
+                    for (var p = 0; p < paxList.length; p++) {
+                        for (var pr = 0; pr < paxList[p].products.length; pr++) {
+                            var bpId = paxList[p].products[pr].BookingProductID;
+                            if (productQtyMap[bpId]) {
+                                productQtyMap[bpId].allocated += paxList[p].products[pr].Quantity;
+                            }
+                        }
+                    }
+
+                    for (var key in productQtyMap) {
+                        var prod = productQtyMap[key];
+                        if (Math.abs(prod.expected - prod.allocated) > 0.01) {
+                            Swal.fire('Allocation Error', 'Product "' + prod.name + '" requires total quantity of ' + prod.expected + ' but ' + prod.allocated.toFixed(2) + ' was allocated.', 'error');
+                            return null;
                         }
                     }
                 }
 
-                for (var key in productQtyMap) {
-                    var prod = productQtyMap[key];
-                    if (Math.abs(prod.expected - prod.allocated) > 0.01) {
-                        Swal.fire('Allocation Error', 'Product "' + prod.name + '" requires total quantity of ' + prod.expected + ' but ' + prod.allocated.toFixed(2) + ' was allocated.', 'error');
-                        return;
-                    }
-                }
+                return paxList;
+            }
 
-                // Submit
-                var $btn = $('#save-split-btn');
-                $btn.prop('disabled', true).html('<i class="la la-spinner la-spin"></i> Saving...');
+            function postInvoiceSplit(url, paxList, $btn, originalHtml, busyHtml) {
+                $btn.prop('disabled', true).html(busyHtml);
 
                 $.ajax({
-                    url: splitSaveUrl,
+                    url: url,
                     type: 'POST',
                     contentType: 'application/json',
                     data: JSON.stringify({ pax: paxList }),
@@ -2897,13 +2975,53 @@
                             });
                         } else {
                             Swal.fire('Error', response.message || 'Failed to save.', 'error');
-                            $btn.prop('disabled', false).html('<i class="la la-save"></i> Save E-Invoice Request');
+                            $btn.prop('disabled', false).html(originalHtml);
                         }
                     },
                     error: function() {
                         Swal.fire('Error', 'An unexpected error occurred.', 'error');
-                        $btn.prop('disabled', false).html('<i class="la la-save"></i> Save E-Invoice Request');
+                        $btn.prop('disabled', false).html(originalHtml);
                     }
+                });
+            }
+
+            // Save as Draft (skip allocation check — drafts may be partial)
+            $('#save-split-draft-btn').on('click', function() {
+                var paxList = collectAndValidatePayload(false);
+                if (!paxList) return;
+                var $btn = $(this);
+                postInvoiceSplit(
+                    splitSaveUrl,
+                    paxList,
+                    $btn,
+                    '<i class="la la-save"></i> Save as Draft',
+                    '<i class="la la-spinner la-spin"></i> Saving...'
+                );
+            });
+
+            // Submit (final) — confirm first because it locks the form
+            $('#submit-split-btn').on('click', function() {
+                var paxList = collectAndValidatePayload(true);
+                if (!paxList) return;
+                var $btn = $(this);
+
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Submit e-invoice request?',
+                    text: 'Once submitted, you will not be able to edit this request anymore.',
+                    showCancelButton: true,
+                    confirmButtonText: 'Yes, submit',
+                    cancelButtonText: 'Cancel',
+                    confirmButtonColor: '#162447'
+                }).then(function(result) {
+                    if (!result.value) return;
+                    postInvoiceSplit(
+                        splitSubmitUrl,
+                        paxList,
+                        $btn,
+                        '<i class="la la-paper-plane"></i> Submit E-Invoice Request',
+                        '<i class="la la-spinner la-spin"></i> Submitting...'
+                    );
                 });
             });
         });

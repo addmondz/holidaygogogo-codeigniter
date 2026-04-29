@@ -365,7 +365,8 @@ class Payment_Model extends CI_Model
 		$this->load->helper('utils');
 		$app_env = get_app_env();
 		if ($app_env === 'prod') {
-			file_get_contents('https://api.telegram.org/bot7521016286:AAEMDyjd789UEHBH5LK4xfBzIzY9TZ80tCg/sendMessage?chat_id=-1002546036574&text=' . $text);
+			$telegram_ctx = stream_context_create(['http' => ['timeout' => 5, 'ignore_errors' => true]]);
+			@file_get_contents('https://api.telegram.org/bot7521016286:AAEMDyjd789UEHBH5LK4xfBzIzY9TZ80tCg/sendMessage?chat_id=-1002546036574&text=' . $text, false, $telegram_ctx);
 		}
 
 		return $payment_id;
@@ -822,7 +823,7 @@ return $query->result_array(); // instead of result()
 
 	function Read_Payments_Paginated($start, $length, $order_column, $order_dir)
 	{
-		$this->db->select('PaymentID, payment.BookingID, payment.SupplierID, Date, Type, Credit, ReferenceNumber, Debit, Deadline, payment.BankHolder, payment.Status, BookingNumber, ReservationNumber, Customer, StartDate, EndDate, NetTotal, Token, admin.Name As SalesAgent, supplier.Name As Supplier, payment.AutocountSyncStatus, payment.AutocountSyncMessage, payment.AutocountSyncAction, payment.AutocountReferenceNumber');
+		$this->db->select('PaymentID, payment.BookingID, payment.SupplierID, Date, Type, Credit, ReferenceNumber, Debit, Deadline, payment.BankHolder, payment.Status, BookingNumber, ReservationNumber, Customer, StartDate, EndDate, NetTotal, Token, admin.Name As SalesAgent, booking.SalesAgent AS SalesAgentID, booking.BookingOP, supplier.Name As Supplier, payment.AutocountSyncStatus, payment.AutocountSyncMessage, payment.AutocountSyncAction, payment.AutocountReferenceNumber');
 		$this->db->from('booking');
 		$this->db->join('payment', 'payment.BookingID = booking.BookingID', 'left');
 		$this->db->join('admin', 'admin.AdminID = booking.SalesAgent', 'left');
@@ -871,6 +872,7 @@ return $query->result_array(); // instead of result()
 		$this->db->join('supplier', 'supplier.SupplierID = payment.SupplierID', 'left');
 
 		$this->apply_payment_filters();
+		$this->db->where('payment.Status !=', 'R');
 
 		$result = $this->db->get()->row();
 
@@ -886,6 +888,7 @@ return $query->result_array(); // instead of result()
 		$this->db->join('supplier', 'supplier.SupplierID = payment.SupplierID', 'left');
 
 		$this->apply_payment_filters();
+		$this->db->where('payment.Status !=', 'R');
 
 		$sales_result = $this->db->get()->row();
 		$total_sales = $sales_result->total_sales ?? 0;

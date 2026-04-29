@@ -46,6 +46,10 @@ class Payment extends MY_Controller
 			$array['admins'] = $this->Payment_Model->Read_Admins();
 			$array['suppliers'] = $this->Payment_Model->Read_Suppliers();
 
+			// Data for @mention autocomplete inside the View Remarks modal
+			$this->load->model('Notification_Model');
+			$array['notify_admins'] = $this->Notification_Model->Build_Admin_Handles($this->Booking_Model->Read_Notify_Admins());
+
 			// Get supplier payments breakdown
 			$supplier_breakdown = $this->Payment_Model->Read_Supplier_Payments_Breakdown();
 			$supplier_payments = [];
@@ -86,6 +90,16 @@ class Payment extends MY_Controller
 				$total_credit = ($array['booking_id'] != 'NA') ? $this->Calculate_Total_Credit($array['booking_id']) : 0;
 				$outstanding = $net_total - $total_credit;
 				$array['outstanding_balance_by_customer'] = number_format($outstanding, 2, '.', ',');
+
+				// Fetch assigned staff for the View Remark toolbar button's @mention wiring
+				$this->db->select('SalesAgent, BookingOP');
+				$this->db->where('BookingNumber', $this->input->get('booking_number'));
+				$booking_context = $this->db->get('booking')->row_array();
+				$array['sales_agent_id'] = !empty($booking_context['SalesAgent']) ? $booking_context['SalesAgent'] : '';
+				$array['booking_op_id'] = !empty($booking_context['BookingOP']) ? $booking_context['BookingOP'] : '';
+			} else {
+				$array['sales_agent_id'] = '';
+				$array['booking_op_id'] = '';
 			}
 
 			if(isset($_GET['nick'])) {
@@ -420,6 +434,13 @@ class Payment extends MY_Controller
 				? base_url('Payment/Update?payment_id=' . $payment->PaymentID . '&' . explode('?', $current_url)[1])
 				: base_url('Payment/Update?payment_id=' . $payment->PaymentID);
 			$html .= '<a href="' . $update_url . '" class="dropdown-item" style="font-size:11px;">Update Payment</a>';
+		}
+
+		// View Remarks option (reuses booking remark stream)
+		if(!empty($payment->BookingID) && (in_array('AB', $this->session->access_control) || $this->session->userdata('level') == 20)) {
+			$sales_agent_id = isset($payment->SalesAgentID) ? $payment->SalesAgentID : '';
+			$booking_op_id = isset($payment->BookingOP) ? $payment->BookingOP : '';
+			$html .= '<button onclick="openRemarksModal(' . $payment->BookingID . ', \'' . addslashes($payment->BookingNumber) . '\', \'' . $sales_agent_id . '\', \'' . $booking_op_id . '\')" class="dropdown-item" style="font-size:11px;">View Remarks</button>';
 		}
 
 		$html .= '</div></div>';

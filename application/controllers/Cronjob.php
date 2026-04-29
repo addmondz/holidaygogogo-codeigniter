@@ -67,6 +67,56 @@ class Cronjob extends CI_Controller
 		exit("Done. Notifications created: $count");
 	}
 
+	function PaymentOutOverdueNotification(){
+		$this->load->model('Notification_Model');
+		$this->load->model('Product_Package_Checklist_Model');
+
+		// Look up checklist IDs by name
+		$this->db->select('ID');
+		$this->db->like('name', 'Payment Out To Supplier (full)');
+		$full_checklist = $this->db->get('package_checklist')->row();
+		$full_checklist_id = $full_checklist ? (int)$full_checklist->ID : null;
+
+		$this->db->select('ID');
+		$this->db->like('name', 'Payment Out To Supplier (deposit)');
+		$deposit_checklist = $this->db->get('package_checklist')->row();
+		$deposit_checklist_id = $deposit_checklist ? (int)$deposit_checklist->ID : null;
+
+		$count = 0;
+
+		// Process overdue full-payment notifications
+		if($full_checklist_id) {
+			$booking_products = $this->Cronjob_Model->get_bookings_past_payout_deadline('PaymentOutSupplierFull');
+			foreach($booking_products as $bp) {
+				if($this->is_checklist_incomplete_for_product($bp->BookingID, $bp->ProductID, $full_checklist_id)) {
+					$count += $this->Cronjob_Model->create_payout_overdue_notifications(
+						$bp->BookingID,
+						$bp->BookingNumber,
+						'payout_overdue_full',
+						$bp->PaymentOutSupplierFull
+					);
+				}
+			}
+		}
+
+		// Process overdue deposit-payment notifications
+		if($deposit_checklist_id) {
+			$booking_products = $this->Cronjob_Model->get_bookings_past_payout_deadline('PaymentOutSupplierDeposit');
+			foreach($booking_products as $bp) {
+				if($this->is_checklist_incomplete_for_product($bp->BookingID, $bp->ProductID, $deposit_checklist_id)) {
+					$count += $this->Cronjob_Model->create_payout_overdue_notifications(
+						$bp->BookingID,
+						$bp->BookingNumber,
+						'payout_overdue_deposit',
+						$bp->PaymentOutSupplierDeposit
+					);
+				}
+			}
+		}
+
+		exit("Done. Overdue notifications created: $count");
+	}
+
 	/**
 	 * Check if a specific product in a booking has the given checklist assigned but not completed
 	 */

@@ -82,6 +82,7 @@ class Notification extends MY_Controller
 
 			$formatted_notifications[] = array(
 				'NotificationID' => $notification->NotificationID,
+				'type' => $notification->type,
 				'message' => $notification->message,
 				'is_read' => $notification->is_read == 1,
 				'created_at' => date('d/m/Y H:i:s', $created_timestamp),

@@ -17,6 +17,8 @@ class MY_Controller extends CI_Controller
 					case 'Country_Code':
 					case 'Tag':
 					case 'Source':
+					case 'Customer_Type':
+					case 'Quick_Filter':
 						redirect('Dashboard');
 						break;
 					default:

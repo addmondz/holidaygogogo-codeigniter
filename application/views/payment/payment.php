@@ -133,12 +133,13 @@
                                         outstanding_balance = parseFloat((array.NetTotal).replace(/[RM,]/g, ''));
                                         var debit_payments = [];
                                         var total_debit = 0;
+                                        var customerInTypes = ['DEPOSIT', 'FULL', 'ADDITIONAL PAYMENT'];
                                         if(array.credit_payments.length > 0) {
                                             $.each(array.credit_payments, function(key, value) {
                                                 count++;
                                                 credit_payments.push('<tr><td>' + count + '</td><td>' + value.Date + '</td><td>' + value.Type + '</td><td style="color:#F64E60;">' + value.Status + '</td><td>Reference Number : ' + value.ReferenceNumber + '<br>Remark : ' + value.PaymentRemark + '</td><td style="color:#2AAA8A; text-align:right;">' + value.Credit + '</td><td>' + value.Debit + '</td></tr>');
                                                 total_credit = total_credit + parseFloat((value.Credit).replace(/[RM,]/g, ''));
-                                                if(value.Status == '<i class="la la-check-circle text-success"></i>') {
+                                                if(value.Status == '<i class="la la-check-circle text-success"></i>' && customerInTypes.indexOf(value.Type) !== -1) {
                                                     outstanding_balance = outstanding_balance - parseFloat((value.Credit).replace(/[RM,]/g, ''));
                                                 }
                                             });

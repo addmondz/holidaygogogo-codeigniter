@@ -45,21 +45,24 @@ class Notification_Model extends CI_Model
 		$user = $this->db->get('admin')->row();
 		$user_level = !empty($user) ? $user->level : null;
 
+		$uid = (int)$user_id;
+
 		$this->db->where('notification.user_id', $user_id);
 		$this->db->where('notification.is_read', 0);
-		// Remarks surface in the Messages dropdown, not the bell
-		$this->db->where('notification.type !=', 'remark');
+
+		$this->db->join('booking', 'booking.BookingID = notification.owner_id AND notification.owner_type = "booking"', 'left');
+		// Bell shows remark notifications only to the booking's SalesAgent / BookingOP.
+		// @mention rows (recipient is neither) stay in the Messages dropdown.
+		$this->db->where("(notification.type != 'remark' OR booking.SalesAgent = $uid OR booking.BookingOP = $uid)", NULL, FALSE);
 
 		// For Sales Agents (level 20), only count booking notifications for their bookings
 		// (non-booking notifications, e.g. owner_type='product', are always shown)
 		if ($user_level == 20) {
-			$this->db->join('booking', 'booking.BookingID = notification.owner_id AND notification.owner_type = "booking"', 'left');
-			$this->db->where('(notification.owner_type != "booking" OR booking.SalesAgent = ' . (int)$user_id . ')', NULL, FALSE);
+			$this->db->where("(notification.owner_type != 'booking' OR booking.SalesAgent = $uid)", NULL, FALSE);
 		}
 		// For BookingOP (level 40), only count booking notifications for their bookings
 		elseif ($user_level == 40) {
-			$this->db->join('booking', 'booking.BookingID = notification.owner_id AND notification.owner_type = "booking"', 'left');
-			$this->db->where('(notification.owner_type != "booking" OR booking.BookingOP = ' . (int)$user_id . ')', NULL, FALSE);
+			$this->db->where("(notification.owner_type != 'booking' OR booking.BookingOP = $uid)", NULL, FALSE);
 		}
 
 		return $this->db->count_all_results('notification');
@@ -81,24 +84,27 @@ class Notification_Model extends CI_Model
 		$user = $this->db->get('admin')->row();
 		$user_level = !empty($user) ? $user->level : null;
 
+		$uid = (int)$user_id;
+
 		$this->db->select('notification.*, booking.BookingNumber, booking.BookingID, booking.Customer, admin.Name AS CommenterName');
 		$this->db->join('booking', 'booking.BookingID = notification.owner_id AND notification.owner_type = "booking"', 'left');
 		$this->db->join('remark', 'remark.RemarkID = notification.remark_id', 'left');
 		$this->db->join('admin', 'admin.AdminID = remark.commenter_id', 'left');
 		$this->db->where('notification.user_id', $user_id);
-		// Remarks surface in the Messages dropdown, not the bell
-		$this->db->where('notification.type !=', 'remark');
+		// Bell shows remark notifications only to the booking's SalesAgent / BookingOP.
+		// @mention rows (recipient is neither) stay in the Messages dropdown.
+		$this->db->where("(notification.type != 'remark' OR booking.SalesAgent = $uid OR booking.BookingOP = $uid)", NULL, FALSE);
 
 		// For Sales Agents (level 20), only show booking notifications for their bookings
 		// (non-booking notifications, e.g. owner_type='product', are always shown)
 		if ($user_level == 20) {
-			$this->db->where('(notification.owner_type != "booking" OR booking.SalesAgent = ' . (int)$user_id . ')', NULL, FALSE);
+			$this->db->where("(notification.owner_type != 'booking' OR booking.SalesAgent = $uid)", NULL, FALSE);
 		}
 		// For BookingOP (level 40), only show booking notifications for their bookings
 		elseif ($user_level == 40) {
-			$this->db->where('(notification.owner_type != "booking" OR booking.BookingOP = ' . (int)$user_id . ')', NULL, FALSE);
+			$this->db->where("(notification.owner_type != 'booking' OR booking.BookingOP = $uid)", NULL, FALSE);
 		}
-		
+
 		$this->db->order_by('notification.created_at', 'DESC');
 		$this->db->limit($limit, $offset);
 		return $this->db->get('notification')->result();
@@ -424,31 +430,6 @@ class Notification_Model extends CI_Model
 		$notified = false;
 		$notified_user_ids = array();
 
-		// Notify all Level 10 (Owner) admins
-		$this->db->select('AdminID');
-		$this->db->where('Status', 'Y');
-		$this->db->where('level', '10');
-		$admins = $this->db->get('admin')->result();
-
-		foreach ($admins as $admin) {
-			$this->db->where('user_id', $admin->AdminID);
-			$this->db->where('remark_id', $remark_id);
-			$existing = $this->db->get('notification')->row();
-
-			if (empty($existing)) {
-				$this->Create(array(
-					'user_id' => $admin->AdminID,
-					'type' => 'remark',
-					'owner_type' => 'booking',
-					'owner_id' => $booking_id,
-					'remark_id' => $remark_id,
-					'message' => $message
-				));
-				$notified = true;
-			}
-			$notified_user_ids[] = $admin->AdminID;
-		}
-
 		// Notify Sales Agent
 		if (!empty($sales_agent_id) && !in_array($sales_agent_id, $notified_user_ids)) {
 			$this->db->select('AdminID');
@@ -548,9 +529,10 @@ class Notification_Model extends CI_Model
 	 * @param int $booking_id Booking ID
 	 * @param int $updater_id Admin ID who updated the booking
 	 * @param string $updater_name Name of the user who updated the booking
+	 * @param string $change_summary Optional short summary of what changed
 	 * @return int Number of notifications created
 	 */
-	function Create_Booking_Updated_Notification($booking_id, $updater_id, $updater_name)
+	function Create_Booking_Updated_Notification($booking_id, $updater_id, $updater_name, $change_summary = '')
 	{
 		// Get booking details
 		$this->db->select('BookingID, BookingNumber, SalesAgent, BookingOP');
@@ -562,30 +544,11 @@ class Notification_Model extends CI_Model
 		}
 
 		$message = $updater_name . ' updated a booking';
+		if (!empty($change_summary)) {
+			$message .= ': ' . $change_summary;
+		}
 		$notifications_created = 0;
 		$notified_user_ids = array();
-
-		// Notify Level 10 (Owner) admins
-		$this->db->select('AdminID');
-		$this->db->where('Status', 'Y');
-		$this->db->where('level', '10');
-		$admins = $this->db->get('admin')->result();
-
-		foreach ($admins as $admin) {
-			if ($admin->AdminID != $updater_id) {
-				$notification_data = array(
-					'user_id' => $admin->AdminID,
-					'type' => 'booking_updated',
-					'owner_type' => 'booking',
-					'owner_id' => $booking_id,
-					'remark_id' => null,
-					'message' => $message
-				);
-				$this->Create($notification_data);
-				$notifications_created++;
-				$notified_user_ids[] = $admin->AdminID;
-			}
-		}
 
 		// Notify SalesAgent (TC)
 		if (!empty($booking->SalesAgent) && $booking->SalesAgent != $updater_id && !in_array($booking->SalesAgent, $notified_user_ids)) {
@@ -626,6 +589,74 @@ class Notification_Model extends CI_Model
 					'message' => $message
 				);
 				$this->Create($notification_data);
+				$notifications_created++;
+				$notified_user_ids[] = $booking->BookingOP;
+			}
+		}
+
+		return $notifications_created;
+	}
+
+	/**
+	 * Create notifications for SalesAgent (TC) and BookingOP when a customer submits a review
+	 * Message format: "{Customer} submitted a review"
+	 *
+	 * @param int $booking_id Booking ID
+	 * @param string $customer_name Customer name from booking
+	 * @return int Number of notifications created
+	 */
+	function Create_Review_Submitted_Notification($booking_id, $customer_name)
+	{
+		$this->db->select('BookingID, BookingNumber, SalesAgent, BookingOP');
+		$this->db->where('BookingID', $booking_id);
+		$booking = $this->db->get('booking')->row();
+
+		if (empty($booking)) {
+			return 0;
+		}
+
+		$actor = !empty($customer_name) ? $customer_name : 'Customer';
+		$message = $actor . ' submitted a review';
+		$notifications_created = 0;
+		$notified_user_ids = array();
+
+		// Notify SalesAgent (TC)
+		if (!empty($booking->SalesAgent) && !in_array($booking->SalesAgent, $notified_user_ids)) {
+			$this->db->select('AdminID');
+			$this->db->where('AdminID', $booking->SalesAgent);
+			$this->db->where('Status', 'Y');
+			$sa = $this->db->get('admin')->row();
+
+			if (!empty($sa)) {
+				$this->Create(array(
+					'user_id' => $booking->SalesAgent,
+					'type' => 'review_submitted',
+					'owner_type' => 'booking',
+					'owner_id' => $booking_id,
+					'remark_id' => null,
+					'message' => $message
+				));
+				$notifications_created++;
+				$notified_user_ids[] = $booking->SalesAgent;
+			}
+		}
+
+		// Notify BookingOP
+		if (!empty($booking->BookingOP) && !in_array($booking->BookingOP, $notified_user_ids)) {
+			$this->db->select('AdminID');
+			$this->db->where('AdminID', $booking->BookingOP);
+			$this->db->where('Status', 'Y');
+			$op = $this->db->get('admin')->row();
+
+			if (!empty($op)) {
+				$this->Create(array(
+					'user_id' => $booking->BookingOP,
+					'type' => 'review_submitted',
+					'owner_type' => 'booking',
+					'owner_id' => $booking_id,
+					'remark_id' => null,
+					'message' => $message
+				));
 				$notifications_created++;
 				$notified_user_ids[] = $booking->BookingOP;
 			}
