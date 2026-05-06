@@ -5383,7 +5383,12 @@ $(document).ready(function() {
     // Room Management Functions
     var roomsList = [];
     var guestsList = [];
-    var roomBookingId = <?php echo (isset($BookingID) && $BookingID !== 'NA') ? $BookingID : 'null'; ?>;
+    // On Duplicate: keep roomBookingId null so all room/guest mutations stay client-side
+    // (temp rooms) and don't touch the SOURCE booking's rows. Source rooms are seeded
+    // once into roomsList by loadRooms() via sourceBookingId below.
+    var isDuplicate = <?php echo current_url() == base_url('Booking/Duplicate') ? 'true' : 'false'; ?>;
+    var sourceBookingId = <?php echo (current_url() == base_url('Booking/Duplicate') && isset($BookingID) && $BookingID !== 'NA') ? (int)$BookingID : 'null'; ?>;
+    var roomBookingId = <?php echo (isset($BookingID) && $BookingID !== 'NA' && current_url() != base_url('Booking/Duplicate')) ? (int)$BookingID : 'null'; ?>;
     var glLocked = <?php echo (isset($LockStatus) && $LockStatus == 'Y') ? 'true' : 'false'; ?>;
     var tempRoomCounter = 0;
 
@@ -5544,6 +5549,52 @@ $(document).ready(function() {
                             renderRoomsTable();
                         }
                     });
+                }
+            });
+        } else if (isDuplicate && sourceBookingId) {
+            // Seed roomsList from the SOURCE booking's rooms once, but as temp client-side
+            // rows. Subsequent edits stay in roomsList; on submit they are POSTed as
+            // booking_rooms and inserted under the new booking_id by Booking::Create.
+            // Source guests are intentionally NOT pre-loaded — Create_GL_From_Rooms
+            // regenerates blank guest rows from room counts after creation.
+            $.ajax({
+                url: '<?php echo base_url("Guest_List_Room/Read"); ?>',
+                type: 'get',
+                data: { booking_id: sourceBookingId },
+                dataType: 'json',
+                success: function(data) {
+                    roomsList = (data || []).map(function(r) {
+                        tempRoomCounter++;
+                        return {
+                            id: 'temp_' + tempRoomCounter,
+                            room_name: r.room_name,
+                            adult_count: parseInt(r.adult_count) || 0,
+                            child_count: parseInt(r.child_count) || 0,
+                            infant_count: parseInt(r.infant_count) || 0
+                        };
+                    });
+                    if (roomsList.length === 0) {
+                        tempRoomCounter++;
+                        roomsList.push({
+                            id: 'temp_' + tempRoomCounter,
+                            room_name: 'ROOM 1',
+                            adult_count: 0,
+                            child_count: 0,
+                            infant_count: 0
+                        });
+                    }
+                    renderRoomsTable();
+                },
+                error: function() {
+                    tempRoomCounter++;
+                    roomsList.push({
+                        id: 'temp_' + tempRoomCounter,
+                        room_name: 'ROOM 1',
+                        adult_count: 0,
+                        child_count: 0,
+                        infant_count: 0
+                    });
+                    renderRoomsTable();
                 }
             });
         } else {
