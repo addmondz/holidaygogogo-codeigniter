@@ -31,9 +31,19 @@ class Guest_List extends CI_Controller
 		$this->load->model('Guest_List_Room_Model');
 	}
 
-	function index() 
+	function index()
 	{
 		if($this->input->post()) {
+			$truncation_error = $this->detect_truncated_post();
+			if ($truncation_error !== null) {
+				log_message('error', 'Guest_List submit truncated: ' . $truncation_error
+					. ' | content_length=' . (isset($_SERVER['CONTENT_LENGTH']) ? $_SERVER['CONTENT_LENGTH'] : '?')
+					. ' | post_count=' . count($_POST, COUNT_RECURSIVE)
+					. ' | max_input_vars=' . ini_get('max_input_vars'));
+				$this->session->set_flashdata('error', $truncation_error);
+				redirect(base_url($_SERVER['REQUEST_URI']));
+				return;
+			}
 			$booking_id = $this->Guest_List_Model->Read_Booking_ID();
 			// Handle passport copy file uploads for existing guests
 			$passport_copy_paths = $this->handle_passport_uploads('passport_copies', $booking_id);
@@ -750,6 +760,13 @@ class Guest_List extends CI_Controller
 			return;
 		}
 
+		$truncation_error = $this->detect_truncated_post();
+		if ($truncation_error !== null) {
+			log_message('error', 'Guest_List auto_save truncated: ' . $truncation_error);
+			echo json_encode(array('status' => 'truncated', 'message' => $truncation_error));
+			return;
+		}
+
 		try {
 			$booking_id = $this->Guest_List_Model->Read_Booking_ID();
 
@@ -824,6 +841,55 @@ class Guest_List extends CI_Controller
 		// / normal submit will pick it up.
 
 		echo json_encode(array('status' => 'ok', 'filename' => $filename));
+	}
+
+	/**
+	 * Detect a POST that PHP truncated due to max_input_vars / post_max_size.
+	 * Returns null when the payload looks intact, or a user-facing error string.
+	 *
+	 * Catches three failure modes:
+	 *   (a) Content-Length received but $_POST empty (post_max_size exceeded).
+	 *   (b) Parallel guest arrays of unequal length (max_input_vars cut mid-list).
+	 *   (c) Total $_POST var count at or above the configured ceiling.
+	 */
+	private function detect_truncated_post() {
+		$content_length = isset($_SERVER['CONTENT_LENGTH']) ? (int) $_SERVER['CONTENT_LENGTH'] : 0;
+		if ($content_length > 0 && empty($_POST)) {
+			return 'Your submission was too large to be received by the server (post_max_size exceeded). Please contact admin.';
+		}
+
+		if (!isset($_POST['guests'])) {
+			return null;
+		}
+		$expected = count($_POST['guests']);
+
+		$parallel_keys = array(
+			'names', 'last_names', 'genders', 'date_of_births',
+			'nationalities', 'identification_numbers',
+			'passport_numbers', 'passport_issue_dates',
+			'passport_expiry_dates', 'dietary_requirements',
+			'mobiles', 'country_codes', 'emails',
+			'marital_statuses', 'employments', 'addresses',
+			'postcodes', 'cities', 'states', 'countries',
+			'nominee_names', 'nominee_identification_numbers',
+			'nominee_contact_numbers', 'relationships'
+		);
+		foreach ($parallel_keys as $key) {
+			$actual = isset($_POST[$key]) ? count($_POST[$key]) : 0;
+			if ($actual !== $expected) {
+				return 'Your form was truncated by PHP (max_input_vars limit). Expected ' . $expected
+					. ' entries for "' . $key . '" but received ' . $actual
+					. '. Please contact admin to raise max_input_vars.';
+			}
+		}
+
+		$max_vars = (int) ini_get('max_input_vars');
+		if ($max_vars > 0 && count($_POST, COUNT_RECURSIVE) >= $max_vars - 5) {
+			return 'Your form is at the PHP input-variable ceiling (' . $max_vars
+				. '). Please contact admin to raise max_input_vars.';
+		}
+
+		return null;
 	}
 
 	/**

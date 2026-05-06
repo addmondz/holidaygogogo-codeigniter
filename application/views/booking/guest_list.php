@@ -331,6 +331,12 @@
 				<!-- End Name Formatting Guidelines -->
 
 	                <form id="form" action="<?php if($_SERVER['SERVER_NAME'] != 'gl.holidaygogogo.com') { echo base_url('Guest_List?gl=') . $this->input->get('gl'); } else { echo 'https://gl.holidaygogogo.com/?gl=' . $this->input->get('gl'); } ?>" method="post" enctype="multipart/form-data" novalidate>
+					<?php if ($this->session->flashdata('error')) : ?>
+						<div class="alert alert-danger" role="alert" style="margin: 16px;">
+							<strong>Submission failed:</strong>
+							<?php echo htmlspecialchars($this->session->flashdata('error')); ?>
+						</div>
+					<?php endif; ?>
 					<div id="benchmark" class="row">
 						<?php $counter = 1;
 							$adult = 0;

@@ -105,8 +105,9 @@
             }
         });
 
-        // Load more button
-        $(document).on('click', '.load-more-remarks', function() {
+        // Load more button — delegated on #remarks-dropdown because the
+        // dropdown's stopPropagation handler blocks bubbling to document.
+        $('#remarks-dropdown').on('click', '.load-more-remarks', function() {
             var type = parseInt($(this).data('type'));
             loadRemarks(type, remarksState[type].offset);
         });
@@ -379,8 +380,10 @@
     $(document).ready(function() {
         initRemarksPanel();
 
-        // Per-tab "Mark all as read" click handler
-        $(document).on('click', '.mark-tab-remarks-read', function() {
+        // Per-tab "Mark all as read" click handler — delegated on
+        // #remarks-dropdown because the dropdown's stopPropagation
+        // handler blocks bubbling to document.
+        $('#remarks-dropdown').on('click', '.mark-tab-remarks-read', function() {
             var $link = $(this);
             var type = parseInt($link.data('type'));
             $link.css('pointer-events', 'none');
