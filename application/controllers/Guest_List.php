@@ -31,9 +31,19 @@ class Guest_List extends CI_Controller
 		$this->load->model('Guest_List_Room_Model');
 	}
 
-	function index() 
+	function index()
 	{
 		if($this->input->post()) {
+			$truncation_error = $this->detect_truncated_post();
+			if ($truncation_error !== null) {
+				log_message('error', 'Guest_List submit truncated: ' . $truncation_error
+					. ' | content_length=' . (isset($_SERVER['CONTENT_LENGTH']) ? $_SERVER['CONTENT_LENGTH'] : '?')
+					. ' | post_count=' . count($_POST, COUNT_RECURSIVE)
+					. ' | max_input_vars=' . ini_get('max_input_vars'));
+				$this->session->set_flashdata('error', $truncation_error);
+				redirect(base_url($_SERVER['REQUEST_URI']));
+				return;
+			}
 			$booking_id = $this->Guest_List_Model->Read_Booking_ID();
 			// Handle passport copy file uploads for existing guests
 			$passport_copy_paths = $this->handle_passport_uploads('passport_copies', $booking_id);
@@ -750,6 +760,13 @@ class Guest_List extends CI_Controller
 			return;
 		}
 
+		$truncation_error = $this->detect_truncated_post();
+		if ($truncation_error !== null) {
+			log_message('error', 'Guest_List auto_save truncated: ' . $truncation_error);
+			echo json_encode(array('status' => 'truncated', 'message' => $truncation_error));
+			return;
+		}
+
 		try {
 			$booking_id = $this->Guest_List_Model->Read_Booking_ID();
 
@@ -824,6 +841,26 @@ class Guest_List extends CI_Controller
 		// / normal submit will pick it up.
 
 		echo json_encode(array('status' => 'ok', 'filename' => $filename));
+	}
+
+	/**
+	 * Detect a POST that the server rejected outright due to post_max_size.
+	 * Only catches the unambiguous case where the request body arrived
+	 * (Content-Length > 0) but PHP couldn't parse it ($_POST empty).
+	 *
+	 * The earlier max_input_vars parallel-array check was removed because
+	 * disabled inputs, JS-driven form states, and conditional template
+	 * blocks all legitimately produce zero-count arrays that can't be
+	 * distinguished from truncation. With max_input_vars raised to 10000
+	 * via .user.ini, real truncation requires 350+ guests and is not a
+	 * realistic concern. Returns null when the payload looks intact.
+	 */
+	private function detect_truncated_post() {
+		$content_length = isset($_SERVER['CONTENT_LENGTH']) ? (int) $_SERVER['CONTENT_LENGTH'] : 0;
+		if ($content_length > 0 && empty($_POST)) {
+			return 'Your submission was too large to be received by the server (post_max_size exceeded). Please contact admin.';
+		}
+		return null;
 	}
 
 	/**

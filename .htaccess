@@ -4,3 +4,28 @@
   RewriteCond %{REQUEST_FILENAME} !-d
   RewriteRule ^(.*)$ index.php/$1 [L]
 </IfModule>
+
+# PHP runtime limits — only applied under mod_php.
+# On PHP-FPM/CGI/FastCGI these IfModule guards skip the block;
+# .user.ini in document root covers those SAPIs instead.
+<IfModule mod_php.c>
+  php_value max_input_vars 10000
+  php_value post_max_size 64M
+  php_value upload_max_filesize 32M
+  php_value max_execution_time 300
+  php_value memory_limit 256M
+</IfModule>
+<IfModule mod_php7.c>
+  php_value max_input_vars 10000
+  php_value post_max_size 64M
+  php_value upload_max_filesize 32M
+  php_value max_execution_time 300
+  php_value memory_limit 256M
+</IfModule>
+<IfModule mod_php8.c>
+  php_value max_input_vars 10000
+  php_value post_max_size 64M
+  php_value upload_max_filesize 32M
+  php_value max_execution_time 300
+  php_value memory_limit 256M
+</IfModule>
