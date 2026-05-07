@@ -844,51 +844,22 @@ class Guest_List extends CI_Controller
 	}
 
 	/**
-	 * Detect a POST that PHP truncated due to max_input_vars / post_max_size.
-	 * Returns null when the payload looks intact, or a user-facing error string.
+	 * Detect a POST that the server rejected outright due to post_max_size.
+	 * Only catches the unambiguous case where the request body arrived
+	 * (Content-Length > 0) but PHP couldn't parse it ($_POST empty).
 	 *
-	 * Catches three failure modes:
-	 *   (a) Content-Length received but $_POST empty (post_max_size exceeded).
-	 *   (b) Parallel guest arrays of unequal length (max_input_vars cut mid-list).
-	 *   (c) Total $_POST var count at or above the configured ceiling.
+	 * The earlier max_input_vars parallel-array check was removed because
+	 * disabled inputs, JS-driven form states, and conditional template
+	 * blocks all legitimately produce zero-count arrays that can't be
+	 * distinguished from truncation. With max_input_vars raised to 10000
+	 * via .user.ini, real truncation requires 350+ guests and is not a
+	 * realistic concern. Returns null when the payload looks intact.
 	 */
 	private function detect_truncated_post() {
 		$content_length = isset($_SERVER['CONTENT_LENGTH']) ? (int) $_SERVER['CONTENT_LENGTH'] : 0;
 		if ($content_length > 0 && empty($_POST)) {
 			return 'Your submission was too large to be received by the server (post_max_size exceeded). Please contact admin.';
 		}
-
-		if (!isset($_POST['guests'])) {
-			return null;
-		}
-		$expected = count($_POST['guests']);
-
-		$parallel_keys = array(
-			'names', 'last_names', 'genders', 'date_of_births',
-			'nationalities', 'identification_numbers',
-			'passport_numbers', 'passport_issue_dates',
-			'passport_expiry_dates', 'dietary_requirements',
-			'mobiles', 'country_codes', 'emails',
-			'marital_statuses', 'employments', 'addresses',
-			'postcodes', 'cities', 'states', 'countries',
-			'nominee_names', 'nominee_identification_numbers',
-			'nominee_contact_numbers', 'relationships'
-		);
-		foreach ($parallel_keys as $key) {
-			$actual = isset($_POST[$key]) ? count($_POST[$key]) : 0;
-			if ($actual !== $expected) {
-				return 'Your form was truncated by PHP (max_input_vars limit). Expected ' . $expected
-					. ' entries for "' . $key . '" but received ' . $actual
-					. '. Please contact admin to raise max_input_vars.';
-			}
-		}
-
-		$max_vars = (int) ini_get('max_input_vars');
-		if ($max_vars > 0 && count($_POST, COUNT_RECURSIVE) >= $max_vars - 5) {
-			return 'Your form is at the PHP input-variable ceiling (' . $max_vars
-				. '). Please contact admin to raise max_input_vars.';
-		}
-
 		return null;
 	}
 
