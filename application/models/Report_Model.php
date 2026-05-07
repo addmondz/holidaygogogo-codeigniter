@@ -508,6 +508,7 @@ class Report_Model extends CI_Model
     {
         $where = $this->build_lead_dashboard_where_clause($filters);
 
+        $extraJoins = isset($where['extra_joins']) ? $where['extra_joins'] : '';
         $sql = "
             SELECT
                 COUNT(*) AS total_leads,
@@ -518,6 +519,7 @@ class Report_Model extends CI_Model
                 COUNT(DISTINCT NULLIF(pl.assigned_to_user_id, '')) AS active_agents
             FROM ghl_processed_leads pl
             LEFT JOIN ghl_conversations gc ON gc.conversation_id = pl.conversation_id
+            {$extraJoins}
             {$where['sql']}
         ";
 
@@ -556,6 +558,7 @@ class Report_Model extends CI_Model
         $clauses[] = "NULLIF(pl.assigned_to_user_id, '') IS NOT NULL";
         $agentWhereSql = !empty($clauses) ? 'WHERE ' . implode(' AND ', $clauses) : '';
 
+        $extraJoins = isset($where['extra_joins']) ? $where['extra_joins'] : '';
         $sql = "
             SELECT
                 COALESCE(NULLIF(pl.assigned_to_user_id, ''), '__unassigned__') AS agent_id,
@@ -569,6 +572,7 @@ class Report_Model extends CI_Model
             FROM ghl_processed_leads pl
             LEFT JOIN ghl_conversations gc ON gc.conversation_id = pl.conversation_id
             LEFT JOIN ghl_users gu ON gu.UserID = NULLIF(pl.assigned_to_user_id, '')
+            {$extraJoins}
             {$agentWhereSql}
             GROUP BY agent_id, agent_name
             ORDER BY total_leads DESC, agent_name ASC
@@ -627,11 +631,13 @@ class Report_Model extends CI_Model
     function Lead_Data_Total_Count($filters = array())
     {
         $where = $this->build_lead_dashboard_where_clause($filters);
+        $extraJoins = isset($where['extra_joins']) ? $where['extra_joins'] : '';
 
         $sql = "
             SELECT COUNT(*) AS total_rows
             FROM ghl_processed_leads pl
             LEFT JOIN ghl_conversations gc ON gc.conversation_id = pl.conversation_id
+            {$extraJoins}
             {$where['sql']}
         ";
 
@@ -643,6 +649,7 @@ class Report_Model extends CI_Model
     {
         $messageTimeColumn = $this->escape_identifier($this->get_message_time_column());
         $where = $this->build_lead_dashboard_where_clause($filters);
+        $extraJoins = isset($where['extra_joins']) ? $where['extra_joins'] : '';
         $limit = $limit !== null ? max(1, (int) $limit) : null;
         $offset = $offset !== null ? max(0, (int) $offset) : null;
         $order = $this->build_lead_data_order_clause($filters);
@@ -685,6 +692,7 @@ class Report_Model extends CI_Model
             LEFT JOIN ghl_conversations gc ON gc.conversation_id = pl.conversation_id
             LEFT JOIN ghl_users gu ON gu.UserID = NULLIF(pl.assigned_to_user_id, '')
             LEFT JOIN booking b ON b.BookingID = pl.booking_id
+            {$extraJoins}
             {$where['sql']}
             {$order}
         ";
@@ -920,6 +928,7 @@ class Report_Model extends CI_Model
     {
         $clauses = array();
         $params = array();
+        $extraJoins = '';
 
         if (!empty($filters['start_date'])) {
             $clauses[] = 'pl.lead_started_at >= ?';
@@ -932,11 +941,31 @@ class Report_Model extends CI_Model
         }
 
         if (!empty($filters['agent_id'])) {
-            if ($filters['agent_id'] === '__unassigned__') {
-                $clauses[] = "(NULLIF(pl.assigned_to_user_id, '') IS NULL)";
-            } else {
-                $clauses[] = "NULLIF(pl.assigned_to_user_id, '') = ?";
-                $params[] = $filters['agent_id'];
+            $agentIds = is_array($filters['agent_id']) ? $filters['agent_id'] : array($filters['agent_id']);
+            $agentIds = array_values(array_filter($agentIds, function($v) { return $v !== '' && $v !== null; }));
+
+            if (!empty($agentIds)) {
+                if (count($agentIds) === 1 && $agentIds[0] === '__unassigned__') {
+                    $clauses[] = "(NULLIF(pl.assigned_to_user_id, '') IS NULL)";
+                } else {
+                    $placeholders = implode(',', array_fill(0, count($agentIds), '?'));
+                    $clauses[] = "NULLIF(pl.assigned_to_user_id, '') IN ({$placeholders})";
+                    foreach ($agentIds as $id) { $params[] = $id; }
+                }
+            }
+        }
+
+        if (!empty($filters['team_lead'])) {
+            $teamLeadIds = is_array($filters['team_lead']) ? $filters['team_lead'] : array($filters['team_lead']);
+            $teamLeadIds = array_values(array_filter($teamLeadIds, function($v) { return $v !== '' && $v !== null; }));
+
+            if (!empty($teamLeadIds)) {
+                $extraJoins  = " LEFT JOIN ghl_users tl_gu ON tl_gu.UserID = NULLIF(pl.assigned_to_user_id, '') ";
+                $extraJoins .= " LEFT JOIN admin tl_admin ON LOWER(TRIM(tl_admin.Email)) = LOWER(TRIM(tl_gu.Email)) AND tl_admin.Status = 'Y' ";
+
+                $placeholders = implode(',', array_fill(0, count($teamLeadIds), '?'));
+                $clauses[] = "tl_admin.TeamLeadID IN ({$placeholders})";
+                foreach ($teamLeadIds as $id) { $params[] = $id; }
             }
         }
 
@@ -981,6 +1010,16 @@ class Report_Model extends CI_Model
         return array(
             'sql' => $sql,
             'params' => $params,
+            'extra_joins' => $extraJoins,
         );
+    }
+
+    function Lead_Dashboard_Team_Leads()
+    {
+        $this->db->select('AdminID, Name');
+        $this->db->where('Level', '25');
+        $this->db->where('Status', 'Y');
+        $this->db->order_by('Name', 'ASC');
+        return $this->db->get('admin')->result();
     }
 }
