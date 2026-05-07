@@ -195,8 +195,8 @@ $is_dev_env = ($app_env !== 'prod');
 								</li>
 							<?php } ?>
 							<?php if(in_array('VP', $this->session->access_control)) { ?>
-								<li class="menu-item <?php if($this->router->class == 'Payment') { echo 'menu-item-active'; } ?>">
-									<a href="<?php echo base_url('Payment'); ?>" class="menu-link">
+								<li class="menu-item menu-item-submenu <?php if($this->router->class == 'Payment') { echo 'menu-item-active menu-item-open'; } ?>">
+									<a href="javascript:;" class="menu-link menu-toggle">
 										<span class="svg-icon menu-icon">
 											<svg>
 												<g>
@@ -206,7 +206,41 @@ $is_dev_env = ($app_env !== 'prod');
 											</svg>
 										</span>
 										<span class="menu-text">Payment</span>
+										<i class="menu-arrow"></i>
 									</a>
+									<div class="menu-submenu">
+										<i class="menu-arrow"></i>
+										<ul class="menu-subnav">
+											<li class="menu-item <?php if($this->router->class == 'Payment' && $this->input->get('view_mode') != 'upcoming_due') { echo 'menu-item-active'; } ?>">
+												<a href="<?php echo base_url('Payment'); ?>" class="menu-link">
+													<i class="menu-bullet menu-bullet-dot">
+														<span></span>
+													</i>
+													<span class="menu-text">Payment Listing</span>
+												</a>
+											</li>
+											<?php if($this->session->level == 10 || $this->session->level == 30) { ?>
+												<?php
+													$CI =& get_instance();
+													$CI->load->model('Payment_Model');
+													$upcoming_due_count = $CI->Payment_Model->Count_Upcoming_Due();
+												?>
+												<li class="menu-item <?php if($this->router->class == 'Payment' && $this->input->get('view_mode') == 'upcoming_due') { echo 'menu-item-active'; } ?>">
+													<a href="<?php echo base_url('Payment/upcoming_due'); ?>" class="menu-link">
+														<i class="menu-bullet menu-bullet-dot">
+															<span></span>
+														</i>
+														<span class="menu-text">Pending Due Soon</span>
+														<?php if($upcoming_due_count > 0) { ?>
+															<span class="menu-label ml-auto">
+																<span class="label label-light-danger label-rounded"><?php echo $upcoming_due_count; ?></span>
+															</span>
+														<?php } ?>
+													</a>
+												</li>
+											<?php } ?>
+										</ul>
+									</div>
 								</li>
 							<?php } ?>
 							<?php if($this->session->level != 20) { ?>
@@ -498,8 +532,9 @@ $is_dev_env = ($app_env !== 'prod');
 										<div class="mt-3">Loading notifications...</div>
 									</div>
 								</div>
-								<div class="text-center py-2 border-top d-none" id="mark-read-notifications" style="flex-shrink: 0; background-color: #fff;">
-									<a href="javascript:;" class="mark-all-notifications-read text-primary font-weight-bold font-size-sm">Mark all as read</a>
+								<div class="d-flex align-items-center justify-content-between px-5 py-2 border-top" id="notification-dropdown-footer" style="flex-shrink: 0; background-color: #fff;">
+									<a href="<?php echo base_url('Notification'); ?>" class="text-primary font-weight-bold font-size-sm">View all notifications</a>
+									<a href="javascript:;" class="mark-all-notifications-read text-primary font-weight-bold font-size-sm d-none" id="mark-read-notifications">Mark all as read</a>
 								</div>
 							</div>
 						</div>

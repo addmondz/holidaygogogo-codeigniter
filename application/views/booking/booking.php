@@ -1,5 +1,11 @@
 
 <script>
+    // Endpoint for TinyMCE inline image upload in the voucher editors
+    // (#kt-tinymce-4..7). Set before tinymce.js runs so the init can read it.
+    window.TINYMCE_IMAGE_UPLOAD_URL = '<?php echo base_url("Booking/Upload_Voucher_Image"); ?>';
+</script>
+
+<script>
     // Install error suppressors at capture phase before any other script runs, so the
     // known Shopify draggable.bundle.js MutationObserver flush race cannot surface as
     // an unhandled rejection / uncaught error that blocks unrelated logic.

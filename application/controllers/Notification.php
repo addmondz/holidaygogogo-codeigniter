@@ -7,6 +7,48 @@ class Notification extends MY_Controller
 	{
 		parent::__construct();
 		$this->load->model('Notification_Model');
+		$this->load->helper('notification_category');
+	}
+
+	/**
+	 * Render the full-page notification list (tabbed by category).
+	 */
+	function index()
+	{
+		$user_id = $this->session->userdata('admin_id');
+		if (empty($user_id)) {
+			redirect('Login');
+			return;
+		}
+
+		$titles = array(
+			'tab_title' => 'HolidayGoGoGo | Notifications',
+			'breadcrumb_title' => 'Notifications'
+		);
+
+		$category_counts = $this->Notification_Model->Get_Category_Counts($user_id);
+
+		$valid_tabs = array_merge(array('all'), notification_category_keys());
+		$initial_tab = $this->input->get('tab');
+		if (!in_array($initial_tab, $valid_tabs, true)) {
+			$initial_tab = 'all';
+		}
+
+		$initial_filter = $this->input->get('filter');
+		if (!in_array($initial_filter, array('all', 'unread', 'read'), true)) {
+			$initial_filter = 'all';
+		}
+
+		$data = array(
+			'category_counts' => $category_counts,
+			'category_keys'   => notification_category_keys(),
+			'initial_tab'     => $initial_tab,
+			'initial_filter'  => $initial_filter,
+		);
+
+		$this->load->view('layout/header', $titles);
+		$this->load->view('notification/index', $data);
+		$this->load->view('layout/footer');
 	}
 
 	/**
@@ -56,8 +98,21 @@ class Notification extends MY_Controller
 		$limit = intval($this->input->get('limit')) ?: 20;
 		$offset = intval($this->input->get('offset')) ?: 0;
 
-		// Get notifications first (with original is_read status)
-		$notifications = $this->Notification_Model->Get_Notifications($user_id, $limit, $offset);
+		$category = $this->input->get('category');
+		if (!empty($category) && $category !== 'all'
+			&& !in_array($category, notification_category_keys(), true)) {
+			$category = null;
+		}
+
+		$read_filter = $this->input->get('read_filter');
+		$is_read = null;
+		if ($read_filter === 'unread') {
+			$is_read = 0;
+		} elseif ($read_filter === 'read') {
+			$is_read = 1;
+		}
+
+		$notifications = $this->Notification_Model->Get_Notifications($user_id, $limit, $offset, $category, $is_read);
 
 		// Format notifications for JSON response (using original is_read status)
 		$formatted_notifications = array();
@@ -415,6 +470,71 @@ class Notification extends MY_Controller
 			->set_output(json_encode([
 				'success' => $success,
 				'message' => $success ? 'All notifications marked as read' : 'Failed to mark notifications as read'
+			]));
+	}
+
+	/**
+	 * Get unread notification counts grouped by user-facing category (AJAX).
+	 */
+	function Get_Category_Counts()
+	{
+		if (empty($this->session->userdata('admin_id'))) {
+			$this->output
+				->set_content_type('application/json')
+				->set_output(json_encode([
+					'success' => false,
+					'message' => 'Not authenticated',
+					'counts' => (object)[]
+				]));
+			return;
+		}
+
+		$user_id = $this->session->userdata('admin_id');
+		$counts = $this->Notification_Model->Get_Category_Counts($user_id);
+
+		$this->output
+			->set_content_type('application/json')
+			->set_output(json_encode([
+				'success' => true,
+				'counts' => $counts
+			]));
+	}
+
+	/**
+	 * Mark all notifications in a single category as read (AJAX).
+	 */
+	function Mark_Category_As_Read()
+	{
+		if (empty($this->session->userdata('admin_id'))) {
+			$this->output
+				->set_content_type('application/json')
+				->set_output(json_encode([
+					'success' => false,
+					'message' => 'Not authenticated'
+				]));
+			return;
+		}
+
+		$user_id = $this->session->userdata('admin_id');
+		$category = $this->input->post('category');
+
+		if (empty($category) || !in_array($category, notification_category_keys(), true)) {
+			$this->output
+				->set_content_type('application/json')
+				->set_output(json_encode([
+					'success' => false,
+					'message' => 'Invalid category'
+				]));
+			return;
+		}
+
+		$success = $this->Notification_Model->Mark_Category_As_Read($user_id, $category);
+
+		$this->output
+			->set_content_type('application/json')
+			->set_output(json_encode([
+				'success' => $success,
+				'message' => $success ? 'Category marked as read' : 'Failed to mark category as read'
 			]));
 	}
 }

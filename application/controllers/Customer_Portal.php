@@ -46,8 +46,11 @@ class Customer_Portal extends CI_Controller
             return;
         }
 
-        // Check phone verification (skip if no phone number on file)
-        if ($this->config->item('enable_phone_verification')) {
+        // Check phone verification (skip if no phone number on file).
+        // Staff (admin_id in session) bypass — they preview from the admin listing
+        // and shouldn't need the customer's mobile digits.
+        $is_staff = !empty($this->session->userdata('admin_id'));
+        if ($this->config->item('enable_phone_verification') && !$is_staff) {
             if (!empty($customer['phone_number']) && !$this->is_customer_verified($customer['CustomerID'])) {
                 redirect('customer/' . $hash . '/verify');
                 return;
@@ -453,11 +456,16 @@ class Customer_Portal extends CI_Controller
         $this->db->join('admin', 'admin.AdminID = booking.SalesAgent', 'left');
         $this->db->where('booking.Token', $hashed_bc);
         $this->db->where('booking.Status !=', 'N');
-        // Show booking if BC is currently approved OR was approved at least once before
-        $this->db->group_start();
-        $this->db->where('booking.bc_approved', 1);
-        $this->db->or_where('booking.customer_portal_visible', 1);
-        $this->db->group_end();
+        // Customer-facing visibility: only show approved bookings to customers.
+        // Logged-in staff (admin_id in session) can preview any booking regardless
+        // of approval state — used by the admin booking listing's "Go to Booking Page" link.
+        $is_staff = !empty($this->session->userdata('admin_id'));
+        if (!$is_staff) {
+            $this->db->group_start();
+            $this->db->where('booking.bc_approved', 1);
+            $this->db->or_where('booking.customer_portal_visible', 1);
+            $this->db->group_end();
+        }
         $booking = $this->db->get()->row_array();
 
         if (empty($booking)) {
@@ -473,11 +481,15 @@ class Customer_Portal extends CI_Controller
             $customer = $this->db->get('customer')->row_array();
         }
 
-        // Check phone verification for booking details (skip if no phone number on file)
-        if ($this->config->item('enable_phone_verification')) {
+        // Check phone verification for booking details (skip if no phone number on file).
+        // Pass the booking URL as `next` so the user returns here after verifying
+        // instead of landing on the customer dashboard. Staff (admin_id in session)
+        // bypass verification — they don't need the customer's mobile digits to preview.
+        if ($this->config->item('enable_phone_verification') && !$is_staff) {
             if ($customer && !empty($customer['phone_number']) && !$this->is_customer_verified($customer['CustomerID'])) {
                 $customer_hash = generate_customer_portal_slug($customer['CustomerID']);
-                redirect('customer/' . $customer_hash . '/verify');
+                $next_url = '/customer/booking/' . $hashed_bc;
+                redirect('customer/' . $customer_hash . '/verify?next=' . urlencode($next_url));
                 return;
             }
         }

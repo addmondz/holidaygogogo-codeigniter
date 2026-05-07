@@ -115,6 +115,22 @@ class Payment extends MY_Controller
 		}
 	}
 
+	function upcoming_due()
+	{
+		if(!in_array('VP', $this->session->access_control)) {
+			redirect('Dashboard');
+			return;
+		}
+		if($this->session->level != 10 && $this->session->level != 30) {
+			redirect('Dashboard');
+			return;
+		}
+
+		$target = date('d/m/Y', strtotime('+7 days'));
+		$deadline = $target . ' - ' . $target;
+		redirect('Payment?status=P&payment_deadline=' . urlencode($deadline) . '&view_mode=upcoming_due');
+	}
+
 	function Calculate_Total_Credit($booking_id) {
 		$payments = $this->Payment_Model->Read_Received_Payments($booking_id);
 		$total_credit = 0;

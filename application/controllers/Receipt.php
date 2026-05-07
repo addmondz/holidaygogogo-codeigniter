@@ -214,6 +214,13 @@ class Receipt extends CI_Controller
         $array['CompanyAddress'] = $company['Address'];
         $array['CompanyWebsite'] = $company['Website'];
 
+        // Inline locally-uploaded TinyMCE footer images so DomPDF doesn't
+        // need to loop back over HTTP to fetch them.
+        $this->load->helper('voucher_image');
+        if (!empty($array['BookingConfirmationFooter'])) {
+            $array['BookingConfirmationFooter'] = inline_voucher_images_html($array['BookingConfirmationFooter']);
+        }
+
         // Set Text variable for footer
         $array['Text'] = !empty($array['BookingConfirmationFooter']) ? $array['BookingConfirmationFooter'] : 'Thank you for your payment. Please keep this receipt for your records.';
 

@@ -672,12 +672,6 @@ class Booking_Model extends CI_Model
 			$initial_status = !empty($booking_data[0]['Status']) ? $booking_data[0]['Status'] : 'PBC';
 			$creator_id = $this->session->userdata('admin_id');
 			log_booking_creation($booking_id, $initial_status, "Booking Created", $creator_id);
-
-			// Notify Sales Agent when a booking is created under them by someone else
-			$sales_agent = isset($booking_data[0]['SalesAgent']) ? $booking_data[0]['SalesAgent'] : null;
-			$creator_name = $this->session->userdata('name') ?: 'Someone';
-			$this->load->model('Notification_Model');
-			$this->Notification_Model->Create_Booking_Created_Notification($booking_id, $creator_id, $creator_name, $sales_agent);
 		}
 
 		$data = [
