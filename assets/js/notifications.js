@@ -54,7 +54,7 @@
             const $link = $(this);
             $link.css('pointer-events', 'none');
             markAllNotificationsAsRead(function() {
-                $('#notification-list').find('.notification-item').each(function() {
+                $('#notification-list, .notification-list-page').find('.notification-item').each(function() {
                     const $item = $(this);
                     if ($item.attr('data-is-read') !== 'true') {
                         applyNotificationStyle($item, false);
@@ -77,7 +77,7 @@
         });
 
         // Delegated notification-item click → navigate to booking
-        $(document).on('click', '#notification-list .notification-item', function(e) {
+        $(document).on('click', '#notification-list .notification-item, .notification-list-page .notification-item', function(e) {
             if ($(e.target).closest('.notification-toggle-read').length) return;
 
             const $item = $(this);
@@ -102,7 +102,7 @@
         });
 
         // Delegated toggle read/unread
-        $(document).on('click', '#notification-list .notification-toggle-read', function(e) {
+        $(document).on('click', '#notification-list .notification-toggle-read, .notification-list-page .notification-toggle-read', function(e) {
             e.stopPropagation();
 
             const $btn = $(this);
@@ -134,14 +134,14 @@
         });
 
         // Delegated hover styling
-        $(document).on('mouseenter', '#notification-list .notification-item', function() {
+        $(document).on('mouseenter', '#notification-list .notification-item, .notification-list-page .notification-item', function() {
             const isRead = $(this).attr('data-is-read') === 'true';
             const colors = getNotificationColors($(this).attr('data-notification-type') || '', !isRead);
             const currentStyle = $(this).attr('style') || '';
             const newStyle = currentStyle.replace(/background-color:[^;]*;?/gi, '') + ' background-color: ' + colors.hoverBg + ' !important;';
             $(this).attr('style', newStyle.trim());
         });
-        $(document).on('mouseleave', '#notification-list .notification-item', function() {
+        $(document).on('mouseleave', '#notification-list .notification-item, .notification-list-page .notification-item', function() {
             const isRead = $(this).attr('data-is-read') === 'true';
             const colors = getNotificationColors($(this).attr('data-notification-type') || '', !isRead);
             const currentStyle = $(this).attr('style') || '';
@@ -463,6 +463,14 @@
         };
         return text ? text.replace(/[&<>"']/g, function(m) { return map[m]; }) : '';
     }
+
+    // Expose reusable rendering helpers for the full-page notification view.
+    window.NotificationsCore = {
+        buildNotificationsHtml: buildNotificationsHtml,
+        getNotificationColors:  getNotificationColors,
+        applyNotificationStyle: applyNotificationStyle,
+        escapeHtml:             escapeHtml
+    };
 
     // Initialize when document is ready
     $(document).ready(function() {

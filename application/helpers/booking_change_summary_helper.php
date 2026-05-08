@@ -151,6 +151,69 @@ if (!function_exists('_bcs_meaningful_update_keys')) {
     }
 }
 
+if (!function_exists('booking_products_have_changes')) {
+    /**
+     * True if any booking_products POST array represents a real change.
+     * Mirrors the sweep-row rule in build_booking_change_summary() so the
+     * notification trigger and message formatting cannot drift apart.
+     */
+    function booking_products_have_changes($products_create, $products_update, $products_delete)
+    {
+        if (is_array($products_create) && !empty($products_create)) {
+            return true;
+        }
+        if (is_array($products_delete) && !empty($products_delete)) {
+            return true;
+        }
+        if (is_array($products_update) && !empty($products_update)) {
+            foreach ($products_update as $row) {
+                $arr = is_object($row) ? get_object_vars($row) : (array)$row;
+                $keys = _bcs_meaningful_update_keys($arr);
+                if (empty($keys) || $keys === ['disable_checklist_payment_out']) {
+                    continue;
+                }
+                return true;
+            }
+        }
+        return false;
+    }
+}
+
+if (!function_exists('build_booking_update_notification_summary')) {
+    /**
+     * Scoped summary for the booking-updated bell notification: only travel-date
+     * (StartDate / EndDate) booking-log entries plus product create/update/delete.
+     * Other field diffs and customer-type changes are intentionally excluded.
+     */
+    function build_booking_update_notification_summary(
+        $log_rows,
+        $products_create,
+        $products_update,
+        $products_delete,
+        $max_len = 240
+    ) {
+        $travel_only = [];
+        if (is_array($log_rows)) {
+            foreach ($log_rows as $row) {
+                $arr = is_object($row) ? get_object_vars($row) : (array)$row;
+                $col = isset($arr['Column']) ? $arr['Column'] : null;
+                if ($col === 'StartDate' || $col === 'EndDate') {
+                    $travel_only[] = $arr;
+                }
+            }
+        }
+        return build_booking_change_summary(
+            $travel_only,
+            $products_create,
+            $products_update,
+            $products_delete,
+            [],
+            [],
+            $max_len
+        );
+    }
+}
+
 if (!function_exists('build_booking_change_summary')) {
     /**
      * Build a short summary like:

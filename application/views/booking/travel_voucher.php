@@ -14,6 +14,11 @@
 		padding-left: 10px;
 		padding-right: 10px;
 	}
+
+	img {
+		max-width: 100%;
+		height: auto;
+	}
 	
 	h1 {
 		font-size: 24px;

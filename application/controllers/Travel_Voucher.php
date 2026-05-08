@@ -91,6 +91,13 @@ class Travel_Voucher extends CI_Controller
                 
                 $array['CustomerProfileURL'] = base_url('customer/' . generate_customer_portal_slug($array['CustomerID']));
 
+                // Inline locally-uploaded images so DomPDF doesn't have to fetch
+                // them back over HTTP (loopback often fails on Herd / self-signed).
+                $this->load->helper('voucher_image');
+                $array['TravelVoucherFooter']         = inline_voucher_images_html(isset($array['TravelVoucherFooter']) ? $array['TravelVoucherFooter'] : '');
+                $array['TravelVoucherKeyContacts']    = inline_voucher_images_html(isset($array['TravelVoucherKeyContacts']) ? $array['TravelVoucherKeyContacts'] : '');
+                $array['TravelVoucherSpecialRemarks'] = inline_voucher_images_html(isset($array['TravelVoucherSpecialRemarks']) ? $array['TravelVoucherSpecialRemarks'] : '');
+
                 $this->load->library('pdf');
                 $this->dompdf->loadHtml($this->load->view('booking/travel_voucher', $array, true));
                 $this->dompdf->set_option('isRemoteEnabled', true);

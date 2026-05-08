@@ -1,6 +1,16 @@
 <?php
 class Payment_Model extends CI_Model
 {
+	function Count_Upcoming_Due()
+	{
+		if(intval(date('H')) < 14) {
+			return 0;
+		}
+		$this->db->where('Status', 'P');
+		$this->db->where('Deadline', date('Y-m-d'));
+		return $this->db->count_all_results('payment');
+	}
+
 	function Read_Payment()
 	{
 		$this->db->select('PaymentID, payment.BookingID, payment.SupplierID, payment.BookingProductID, Date, Type, Currency, ForeignCurrency, Credit, ReferenceNumber, BankSlip, Debit, Deadline, QuotationNumber, Quotation, InvoiceNumber, Invoice, payment.Bank, payment.BankAccount, payment.BankHolder, DebitRemark, PaymentRemark, payment.Status, Remark, BookingNumber, ReservationNumber, Customer, payment.AutocountSyncAction, payment.AutocountSyncStatus, payment.AutocountSyncMessage, payment.AutocountReferenceNumber');

@@ -214,6 +214,15 @@ class Booking_Confirmation extends CI_Controller
 
                 }
 
+                // Inline locally-uploaded TinyMCE images so DomPDF doesn't have
+                // to fetch them back over HTTP (loopback often fails on Herd /
+                // self-signed HTTPS).
+                $this->load->helper('voucher_image');
+                $array['BookingConfirmationFooter']   = inline_voucher_images_html(isset($array['BookingConfirmationFooter']) ? $array['BookingConfirmationFooter'] : '');
+                $array['TravelVoucherFooter']         = inline_voucher_images_html(isset($array['TravelVoucherFooter']) ? $array['TravelVoucherFooter'] : '');
+                $array['TravelVoucherKeyContacts']    = inline_voucher_images_html(isset($array['TravelVoucherKeyContacts']) ? $array['TravelVoucherKeyContacts'] : '');
+                $array['TravelVoucherSpecialRemarks'] = inline_voucher_images_html(isset($array['TravelVoucherSpecialRemarks']) ? $array['TravelVoucherSpecialRemarks'] : '');
+
                 $pdf1 = new Dompdf();
 
                 $pdf1->loadHtml($this->load->view('booking/booking_confirmation', $array, true), 'UTF-8');

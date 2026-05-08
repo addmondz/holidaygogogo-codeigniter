@@ -32,82 +32,133 @@ class Notification_Model extends CI_Model
 	}
 
 	/**
+	 * Apply role-based visibility WHERE clauses to the current $this->db builder.
+	 * Caller must have already joined `booking` so booking.SalesAgent / BookingOP
+	 * are reachable. Mutates the builder; returns nothing.
+	 *
+	 * @param int $user_id
+	 */
+	private function _apply_visibility_filter($user_id)
+	{
+		// Fetch the level via a raw query so we don't pollute the AR state
+		// that the caller has already configured on the notification builder.
+		$row = $this->db->query(
+			'SELECT level FROM admin WHERE AdminID = ? LIMIT 1',
+			array((int)$user_id)
+		)->row();
+		$user_level = !empty($row) ? $row->level : null;
+
+		$uid = (int)$user_id;
+
+		// Bell/page shows remark notifications only to the booking's SalesAgent / BookingOP.
+		// @mention rows (recipient is neither) stay in the Messages dropdown.
+		$this->db->where("(notification.type != 'remark' OR booking.SalesAgent = $uid OR booking.BookingOP = $uid)", NULL, FALSE);
+
+		if ($user_level == 20) {
+			$this->db->where("(notification.owner_type != 'booking' OR booking.SalesAgent = $uid)", NULL, FALSE);
+		} elseif ($user_level == 40) {
+			$this->db->where("(notification.owner_type != 'booking' OR booking.BookingOP = $uid)", NULL, FALSE);
+		}
+	}
+
+	/**
 	 * Get unread notifications count for a user
-	 * 
+	 *
 	 * @param int $user_id Admin ID
 	 * @return int Count of unread notifications
 	 */
 	function Get_Unread_Count($user_id)
 	{
-		// Get user level to determine filtering
-		$this->db->select('level');
-		$this->db->where('AdminID', $user_id);
-		$user = $this->db->get('admin')->row();
-		$user_level = !empty($user) ? $user->level : null;
-
-		$uid = (int)$user_id;
-
 		$this->db->where('notification.user_id', $user_id);
 		$this->db->where('notification.is_read', 0);
-
 		$this->db->join('booking', 'booking.BookingID = notification.owner_id AND notification.owner_type = "booking"', 'left');
-		// Bell shows remark notifications only to the booking's SalesAgent / BookingOP.
-		// @mention rows (recipient is neither) stay in the Messages dropdown.
-		$this->db->where("(notification.type != 'remark' OR booking.SalesAgent = $uid OR booking.BookingOP = $uid)", NULL, FALSE);
-
-		// For Sales Agents (level 20), only count booking notifications for their bookings
-		// (non-booking notifications, e.g. owner_type='product', are always shown)
-		if ($user_level == 20) {
-			$this->db->where("(notification.owner_type != 'booking' OR booking.SalesAgent = $uid)", NULL, FALSE);
-		}
-		// For BookingOP (level 40), only count booking notifications for their bookings
-		elseif ($user_level == 40) {
-			$this->db->where("(notification.owner_type != 'booking' OR booking.BookingOP = $uid)", NULL, FALSE);
-		}
-
+		$this->_apply_visibility_filter($user_id);
 		return $this->db->count_all_results('notification');
 	}
 
 	/**
-	 * Get notifications for a user
-	 * 
-	 * @param int $user_id Admin ID
-	 * @param int $limit Limit number of notifications
-	 * @param int $offset Offset for pagination
-	 * @return array Array of notification objects
+	 * Get notifications for a user, optionally filtered by category and read state.
+	 *
+	 * @param int    $user_id  Admin ID
+	 * @param int    $limit    Pagination limit
+	 * @param int    $offset   Pagination offset
+	 * @param string $category Optional category key (see notification_category_helper)
+	 * @param mixed  $is_read  null = all; 0 = unread only; 1 = read only
+	 * @return array Notification objects
 	 */
-	function Get_Notifications($user_id, $limit = 20, $offset = 0)
+	function Get_Notifications($user_id, $limit = 20, $offset = 0, $category = null, $is_read = null)
 	{
-		// Get user level to determine filtering
-		$this->db->select('level');
-		$this->db->where('AdminID', $user_id);
-		$user = $this->db->get('admin')->row();
-		$user_level = !empty($user) ? $user->level : null;
-
-		$uid = (int)$user_id;
-
 		$this->db->select('notification.*, booking.BookingNumber, booking.BookingID, booking.Customer, admin.Name AS CommenterName');
 		$this->db->join('booking', 'booking.BookingID = notification.owner_id AND notification.owner_type = "booking"', 'left');
 		$this->db->join('remark', 'remark.RemarkID = notification.remark_id', 'left');
 		$this->db->join('admin', 'admin.AdminID = remark.commenter_id', 'left');
 		$this->db->where('notification.user_id', $user_id);
-		// Bell shows remark notifications only to the booking's SalesAgent / BookingOP.
-		// @mention rows (recipient is neither) stay in the Messages dropdown.
-		$this->db->where("(notification.type != 'remark' OR booking.SalesAgent = $uid OR booking.BookingOP = $uid)", NULL, FALSE);
+		$this->_apply_visibility_filter($user_id);
 
-		// For Sales Agents (level 20), only show booking notifications for their bookings
-		// (non-booking notifications, e.g. owner_type='product', are always shown)
-		if ($user_level == 20) {
-			$this->db->where("(notification.owner_type != 'booking' OR booking.SalesAgent = $uid)", NULL, FALSE);
+		if (!empty($category) && $category !== 'all') {
+			$this->load->helper('notification_category');
+			$types = notification_category_to_types($category);
+			if (!empty($types)) {
+				$this->db->where_in('notification.type', $types);
+			}
 		}
-		// For BookingOP (level 40), only show booking notifications for their bookings
-		elseif ($user_level == 40) {
-			$this->db->where("(notification.owner_type != 'booking' OR booking.BookingOP = $uid)", NULL, FALSE);
+
+		if ($is_read === 0 || $is_read === '0' || $is_read === 1 || $is_read === '1') {
+			$this->db->where('notification.is_read', (int)$is_read);
 		}
 
 		$this->db->order_by('notification.created_at', 'DESC');
 		$this->db->limit($limit, $offset);
 		return $this->db->get('notification')->result();
+	}
+
+	/**
+	 * Get unread notification counts grouped by user-facing category.
+	 * Returns associative array keyed by category, plus a 'total' key.
+	 *
+	 * @param int $user_id Admin ID
+	 * @return array
+	 */
+	function Get_Category_Counts($user_id)
+	{
+		$this->load->helper('notification_category');
+
+		$this->db->select('notification.type, COUNT(*) AS cnt', FALSE);
+		$this->db->join('booking', 'booking.BookingID = notification.owner_id AND notification.owner_type = "booking"', 'left');
+		$this->db->where('notification.user_id', $user_id);
+		$this->db->where('notification.is_read', 0);
+		$this->_apply_visibility_filter($user_id);
+		$this->db->group_by('notification.type');
+		$rows = $this->db->get('notification')->result();
+
+		$by_type = array();
+		foreach ($rows as $r) {
+			$by_type[$r->type] = (int)$r->cnt;
+		}
+		return fold_category_counts($by_type);
+	}
+
+	/**
+	 * Mark all notifications in a single category as read for a user.
+	 *
+	 * @param int    $user_id  Admin ID
+	 * @param string $category Category key (see notification_category_helper)
+	 * @return bool
+	 */
+	function Mark_Category_As_Read($user_id, $category)
+	{
+		$this->load->helper('notification_category');
+		$types = notification_category_to_types($category);
+		if (empty($types)) {
+			return false;
+		}
+		$this->db->where('user_id', $user_id);
+		$this->db->where('is_read', 0);
+		$this->db->where_in('type', $types);
+		$this->db->set('is_read', 1);
+		$this->db->set('read_at', date('Y-m-d H:i:s'));
+		$this->db->update('notification');
+		return $this->db->affected_rows() >= 0;
 	}
 
 	/**
@@ -484,43 +535,6 @@ class Notification_Model extends CI_Model
 		}
 
 		return $notified;
-	}
-
-	/**
-	 * Create notification for Sales Agent when a booking is created under them by someone else
-	 * Message format: "XXX has created an order"
-	 *
-	 * @param int $booking_id Booking ID
-	 * @param int $creator_id Admin ID who created the booking
-	 * @param string $creator_name Name of the user who created the booking
-	 * @param int|null $sales_agent_id Sales Agent (Admin ID) assigned to the booking
-	 * @return int 1 if notification created, 0 otherwise
-	 */
-	function Create_Booking_Created_Notification($booking_id, $creator_id, $creator_name, $sales_agent_id)
-	{
-		if (empty($sales_agent_id) || (int) $sales_agent_id === (int) $creator_id) {
-			return 0;
-		}
-
-		$this->db->select('AdminID');
-		$this->db->where('AdminID', $sales_agent_id);
-		$this->db->where('Status', 'Y');
-		$sa = $this->db->get('admin')->row();
-		if (empty($sa)) {
-			return 0;
-		}
-
-		$message = $creator_name . ' has created an order';
-		$data = array(
-			'user_id'     => $sales_agent_id,
-			'type'        => 'booking_created',
-			'owner_type'  => 'booking',
-			'owner_id'    => $booking_id,
-			'remark_id'   => null,
-			'message'     => $message
-		);
-
-		return $this->Create($data) ? 1 : 0;
 	}
 
 	/**

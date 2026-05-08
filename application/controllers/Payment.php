@@ -115,6 +115,22 @@ class Payment extends MY_Controller
 		}
 	}
 
+	function upcoming_due()
+	{
+		if(!in_array('VP', $this->session->access_control)) {
+			redirect('Dashboard');
+			return;
+		}
+		if($this->session->level != 10 && $this->session->level != 30) {
+			redirect('Dashboard');
+			return;
+		}
+
+		$target = date('d/m/Y');
+		$deadline = $target . ' - ' . $target;
+		redirect('Payment?status=P&payment_deadline=' . urlencode($deadline) . '&view_mode=upcoming_due');
+	}
+
 	function Calculate_Total_Credit($booking_id) {
 		$payments = $this->Payment_Model->Read_Received_Payments($booking_id);
 		$total_credit = 0;
@@ -144,6 +160,18 @@ class Payment extends MY_Controller
 		if($this->is_completed_booking_blocked()) {
 			header('Content-Type: application/json');
 			echo json_encode(array('error' => 'Access denied'));
+			return;
+		}
+
+		// Pending Due Soon view: empty until 2pm cutoff
+		if($this->input->get('view_mode') == 'upcoming_due' && intval(date('H')) < 14) {
+			header('Content-Type: application/json');
+			echo json_encode(array(
+				'draw' => intval($this->input->get('draw')),
+				'recordsTotal' => 0,
+				'recordsFiltered' => 0,
+				'data' => array(),
+			));
 			return;
 		}
 
@@ -337,6 +365,17 @@ class Payment extends MY_Controller
 		if($this->is_completed_booking_blocked()) {
 			header('Content-Type: application/json');
 			echo json_encode(array('error' => 'Access denied'));
+			return;
+		}
+
+		// Pending Due Soon view: zero totals until 2pm cutoff
+		if($this->input->get('view_mode') == 'upcoming_due' && intval(date('H')) < 14) {
+			header('Content-Type: application/json');
+			echo json_encode(array(
+				'total_credit' => '0.00',
+				'total_debit' => '0.00',
+				'total_net_profit' => '0.00 (0%)',
+			));
 			return;
 		}
 

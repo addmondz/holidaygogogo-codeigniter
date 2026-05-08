@@ -1018,7 +1018,7 @@ $(document).ready(function() {
         var filterParams = {};
         var filterKeys = ['booking_number', 'customer', 'travel_date', 'transaction_date', 'payment_deadline',
             'status', 'payment_type', 'transaction_type', 'reference_number', 'supplier',
-            'quotation_number', 'invoice_number', 'bank', 'bank_account', 'bank_holder', 'sales_agent', 'autocount_reference', 'autocount_status'];
+            'quotation_number', 'invoice_number', 'bank', 'bank_account', 'bank_holder', 'sales_agent', 'autocount_reference', 'autocount_status', 'view_mode'];
 
         filterKeys.forEach(function(param) {
             if (urlParams.has(param)) {
@@ -1072,7 +1072,7 @@ function loadPaymentSummary() {
     var params = [];
     var filterKeys = ['booking_number', 'customer', 'travel_date', 'transaction_date', 'payment_deadline',
         'status', 'payment_type', 'transaction_type', 'reference_number', 'supplier',
-        'quotation_number', 'invoice_number', 'bank', 'bank_account', 'bank_holder', 'sales_agent', 'autocount_reference'];
+        'quotation_number', 'invoice_number', 'bank', 'bank_account', 'bank_holder', 'sales_agent', 'autocount_reference', 'view_mode'];
 
     filterKeys.forEach(function(param) {
         if (urlParams.has(param)) {

@@ -543,6 +543,11 @@ class Booking extends MY_Controller
 		else {
 			$html .= '<a href="#" class="dropdown-item" style="font-size:11px; cursor:not-allowed; color:#6c757d;" disabled>Customer ID not found</a>';
 		}
+		if(!empty($booking->Token)) {
+			$booking_page_url = base_url('customer/booking/' . $booking->Token);
+			$html .= '<a href="' . $booking_page_url . '" target="_blank" class="dropdown-item" style="font-size:11px;">Go to Booking Page</a>';
+			$html .= '<button id="booking_page_url-' . $booking->BookingID . '" value="' . $booking_page_url . '" onclick="Copy_URL(\'BOOKING PAGE LINK\', ' . $booking->BookingID . ')" class="dropdown-item" style="font-size:11px;">Copy Booking Page Link</button>';
+		}
 		$html .= '</div></div>';
 
 		return $html;
@@ -801,11 +806,8 @@ class Booking extends MY_Controller
 				// stub BookingID/UpdateBy/UpdateDate fields).
 				$posted_booking_id = $this->input->post('booking_id');
 				$posted_customer_types = $this->input->post('customer_type');
-				$old_customer_types = [];
 				if (!empty($posted_booking_id) && is_numeric($posted_booking_id) && is_array($posted_customer_types)) {
 					$this->load->model('Booking_Customer_Type_Model');
-					// Capture pre-Sync customer types so the update notification can diff them.
-					$old_customer_types = $this->Booking_Customer_Type_Model->Read_By_Booking($posted_booking_id);
 					$this->Booking_Customer_Type_Model->Sync($posted_booking_id, $posted_customer_types);
 				}
 
@@ -814,28 +816,6 @@ class Booking extends MY_Controller
 				if(!empty($this->input->post('booking')) && count($this->input->post('booking')[0]) > 3) {
 					$this->Booking_Model->Update();
 					$this->Booking_Model->Create_Booking_Log();
-
-					// Build a short "what changed" summary for the notification message.
-					$this->load->helper('booking_change_summary');
-					$products_post = $this->input->post('booking_products');
-					$change_summary = build_booking_change_summary(
-						$this->input->post('booking_log') ?: [],
-						(is_array($products_post) && !empty($products_post[0])) ? $products_post[0] : [],
-						(is_array($products_post) && !empty($products_post[1])) ? $products_post[1] : [],
-						(is_array($products_post) && !empty($products_post[2])) ? $products_post[2] : [],
-						$old_customer_types,
-						is_array($posted_customer_types) ? $posted_customer_types : []
-					);
-
-					// Notify TC (SalesAgent), TC 2 (SalesAgent2), and Owners on booking update
-					$this->load->model('Notification_Model');
-					$updater_name = $this->session->userdata('name') ?: 'Someone';
-					$this->Notification_Model->Create_Booking_Updated_Notification(
-						$this->input->post('booking_id'),
-						$this->session->userdata('admin_id'),
-						$updater_name,
-						$change_summary
-					);
 				} else {
 					// Partial booking updates skip Booking_Model::Update() above, but the
 					// linked customer's name/phone_number should still stay in sync with the
@@ -884,6 +864,41 @@ class Booking extends MY_Controller
 						$this->Booking_Model->Update_Product_Sequence(implode(',', $booking['ProductSequence']));
 					}
 					// Check if price changed due to product deletion (will be checked when booking NetTotal is updated)
+				}
+
+				// Bell notification for booking-update fires only when the travel
+				// window (StartDate / EndDate) or booking products changed.
+				$this->load->helper('booking_change_summary');
+				$log_rows = $this->input->post('booking_log') ?: [];
+				$bp_for_notify = $this->input->post('booking_products');
+				$products_create = (is_array($bp_for_notify) && !empty($bp_for_notify[0])) ? $bp_for_notify[0] : [];
+				$products_update = (is_array($bp_for_notify) && !empty($bp_for_notify[1])) ? $bp_for_notify[1] : [];
+				$products_delete = (is_array($bp_for_notify) && !empty($bp_for_notify[2])) ? $bp_for_notify[2] : [];
+
+				$travel_date_changed = false;
+				foreach ($log_rows as $row) {
+					$arr = is_object($row) ? get_object_vars($row) : (array)$row;
+					$col = isset($arr['Column']) ? $arr['Column'] : null;
+					if (($col === 'StartDate' || $col === 'EndDate')
+						&& (string)(isset($arr['CurrentData']) ? $arr['CurrentData'] : '') !== (string)(isset($arr['NewData']) ? $arr['NewData'] : '')) {
+						$travel_date_changed = true;
+						break;
+					}
+				}
+				$products_changed = booking_products_have_changes($products_create, $products_update, $products_delete);
+
+				if ($travel_date_changed || $products_changed) {
+					$change_summary = build_booking_update_notification_summary(
+						$log_rows, $products_create, $products_update, $products_delete
+					);
+					$this->load->model('Notification_Model');
+					$updater_name = $this->session->userdata('name') ?: 'Someone';
+					$this->Notification_Model->Create_Booking_Updated_Notification(
+						$this->input->post('booking_id'),
+						$this->session->userdata('admin_id'),
+						$updater_name,
+						$change_summary
+					);
 				}
 
 				// Cleanup invalid supplier dates on booking products
@@ -3032,6 +3047,91 @@ class Booking extends MY_Controller
 					'created_at' => $created_at_formatted
 				]
 			]));
+	}
+
+	/**
+	 * Upload an inline image from the booking voucher TinyMCE editors.
+	 *
+	 * TinyMCE 5 posts the file as multipart field `file` to images_upload_url
+	 * and expects a JSON body of {"location": "<url>"} on success or
+	 * {"error": {"message": "...", "remove": true}} on failure.
+	 */
+	function Upload_Voucher_Image()
+	{
+		$this->output->set_content_type('application/json');
+
+		if (!in_array('AB', $this->session->access_control)) {
+			$this->output
+				->set_status_header(403)
+				->set_output(json_encode([
+					'error' => ['message' => 'Access denied', 'remove' => true]
+				]));
+			return;
+		}
+
+		if (!$this->input->is_ajax_request()) {
+			$this->output
+				->set_status_header(400)
+				->set_output(json_encode([
+					'error' => ['message' => 'Invalid request', 'remove' => true]
+				]));
+			return;
+		}
+
+		$this->load->helper('voucher_image');
+
+		$file_meta = isset($_FILES['file']) ? $_FILES['file'] : [];
+		$max_kb = 5120;
+		$validation = validate_voucher_image_upload($file_meta, $max_kb);
+		if (!$validation['ok']) {
+			$this->output
+				->set_status_header(400)
+				->set_output(json_encode([
+					'error' => ['message' => $validation['error'], 'remove' => true]
+				]));
+			return;
+		}
+
+		$config['upload_path']   = FCPATH . 'assets/upload/voucher/';
+		$config['allowed_types'] = 'jpg|jpeg|png|gif|webp';
+		$config['max_size']      = $max_kb;
+		$config['encrypt_name']  = true;
+
+		if (!is_dir($config['upload_path'])) {
+			mkdir($config['upload_path'], 0755, true);
+		}
+
+		$this->load->library('upload', $config);
+
+		if (!$this->upload->do_upload('file')) {
+			$error = $this->upload->display_errors('', '');
+			$this->output
+				->set_status_header(400)
+				->set_output(json_encode([
+					'error' => ['message' => 'Upload failed: ' . trim(strip_tags($error)), 'remove' => true]
+				]));
+			return;
+		}
+
+		$upload_data = $this->upload->data();
+		$full_path = $upload_data['full_path'];
+
+		// Defence-in-depth: reject anything getimagesize() can't recognise as a raster.
+		$image_info = @getimagesize($full_path);
+		if ($image_info === false || empty($image_info[0]) || empty($image_info[1])) {
+			@unlink($full_path);
+			$this->output
+				->set_status_header(400)
+				->set_output(json_encode([
+					'error' => ['message' => 'Uploaded file is not a valid image', 'remove' => true]
+				]));
+			return;
+		}
+
+		$file_path = 'assets/upload/voucher/' . $upload_data['file_name'];
+		$this->output->set_output(json_encode([
+			'location' => base_url($file_path),
+		]));
 	}
 
 	/**
