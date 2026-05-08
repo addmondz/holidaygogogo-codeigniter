@@ -496,19 +496,25 @@
 													<div class="col-md-6">
 														<label id="<?php echo 'passport_copy_label-' . $guest->GuestListID; ?>">Passport Copy <?php if($is_passport_details_required) { echo '<span style="color:red;">*</span>'; } ?></label>
 														<div class="d-flex align-items-center">
+															<?php $passport_copy_exists = !empty($guest->PassportCopy) && file_exists(FCPATH . $guest->PassportCopy); ?>
 															<div class="custom-file flex-grow-1">
 																<input type="file" name="passport_copies[]" id="<?php echo 'passport_copy-' . $guest->GuestListID; ?>" <?php if($is_passport_details_required) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> class="custom-file-input passport-copy-upload" accept=".pdf,.jpg,.jpeg,.png,.gif" data-guest-id="<?php echo $guest->GuestListID; ?>">
-																<label class="custom-file-label" for="<?php echo 'passport_copy-' . $guest->GuestListID; ?>"><?php echo !empty($guest->PassportCopy) ? 'File uploaded' : 'Choose file'; ?></label>
+																<label class="custom-file-label" for="<?php echo 'passport_copy-' . $guest->GuestListID; ?>"><?php echo $passport_copy_exists ? 'File uploaded' : 'Choose file'; ?></label>
 															</div>
-															<?php if(!empty($guest->PassportCopy)) { ?>
+															<?php if($passport_copy_exists) { ?>
 																<button type="button" class="btn btn-sm btn-light-primary ml-2" onclick="viewPassportCopy('<?php echo base_url($guest->PassportCopy); ?>', '<?php echo basename($guest->PassportCopy); ?>', '<?php echo $counter; ?>')" style="flex-shrink: 0;" title="View Uploaded Passport">
 																	<i class="la la-eye" style="font-size: 1.2rem;"></i>
 																</button>
-																<input type="hidden" name="existing_passport_copies[]" value="<?php echo $guest->PassportCopy; ?>">
-															<?php } else { ?>
-																<input type="hidden" name="existing_passport_copies[]" value="">
 															<?php } ?>
 														</div>
+														<?php if($passport_copy_exists) { ?>
+															<input type="hidden" name="existing_passport_copies[]" value="<?php echo $guest->PassportCopy; ?>">
+														<?php } elseif(!empty($guest->PassportCopy)) { ?>
+															<small class="text-muted d-block mt-2"><?php echo PASSPORT_DELETED_MESSAGE; ?></small>
+															<input type="hidden" name="existing_passport_copies[]" value="">
+														<?php } else { ?>
+															<input type="hidden" name="existing_passport_copies[]" value="">
+														<?php } ?>
 													</div>
 												</div>
 											</div>

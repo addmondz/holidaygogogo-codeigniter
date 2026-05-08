@@ -3,8 +3,11 @@ class Payment_Model extends CI_Model
 {
 	function Count_Upcoming_Due()
 	{
+		if(intval(date('H')) < 14) {
+			return 0;
+		}
 		$this->db->where('Status', 'P');
-		$this->db->where('Deadline', date('Y-m-d', strtotime('+7 days')));
+		$this->db->where('Deadline', date('Y-m-d'));
 		return $this->db->count_all_results('payment');
 	}
 

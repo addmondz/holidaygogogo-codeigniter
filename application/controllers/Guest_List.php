@@ -386,7 +386,7 @@ class Guest_List extends CI_Controller
 			$spreadsheet->getActiveSheet()->setCellValueExplicit('R' . $row, $guest->PassportExpiryDate, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 			
 			// Passport Copy as clickable link
-			if(!empty($guest->PassportCopy)) {
+			if(!empty($guest->PassportCopy) && file_exists(FCPATH . $guest->PassportCopy)) {
 				$passport_copy_url = base_url($guest->PassportCopy);
 				$passport_copy_filename = basename($guest->PassportCopy);
 				$spreadsheet->getActiveSheet()->setCellValue('S' . $row, $passport_copy_filename);
@@ -395,6 +395,8 @@ class Guest_List extends CI_Controller
 				$spreadsheet->getActiveSheet()->getStyle('S' . $row)->getFont()->getColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_BLUE);
 				$spreadsheet->getActiveSheet()->getStyle('S' . $row)->getFont()->setUnderline(true);
 				$spreadsheet->getActiveSheet()->getStyle('S' . $row)->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_LEFT);
+			} elseif(!empty($guest->PassportCopy)) {
+				$spreadsheet->getActiveSheet()->setCellValueExplicit('S' . $row, PASSPORT_DELETED_MESSAGE, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 			} else {
 				$spreadsheet->getActiveSheet()->setCellValueExplicit('S' . $row, '', \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 			}
@@ -620,7 +622,7 @@ class Guest_List extends CI_Controller
 						$spreadsheet->getActiveSheet()->setCellValueExplicit('S' . $row, $passport_copy_filename . ' (copy failed)', \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 					}
 				} else {
-					$spreadsheet->getActiveSheet()->setCellValueExplicit('S' . $row, $passport_copy_filename . ' (file not found)', \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+					$spreadsheet->getActiveSheet()->setCellValueExplicit('S' . $row, PASSPORT_DELETED_MESSAGE, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 				}
 			} else {
 				$spreadsheet->getActiveSheet()->setCellValueExplicit('S' . $row, '', \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
