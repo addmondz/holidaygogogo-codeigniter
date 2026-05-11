@@ -188,7 +188,7 @@ class Dashboard_Model extends CI_Model
 
 	{
 
-		$this->db->select('BookingNumber, Customer, StartDate, EndDate, Name');
+		$this->db->select('BookingNumber, Customer, StartDate, EndDate, Name, booking.Status');
 
 		$this->db->join('category', 'category.CategoryID = booking.Destination', 'left');
 
@@ -211,7 +211,7 @@ class Dashboard_Model extends CI_Model
 
 		$this->db->where('CancelStatus', 'N');
 
-		$this->db->where('booking.Status', 'PTV');
+		$this->db->where_in('booking.Status', ['PTV', 'PBO']);
 
 		$this->db->order_by('StartDate', 'ASC');
 
@@ -770,7 +770,7 @@ class Dashboard_Model extends CI_Model
 
 	{
 
-		$this->db->select('BookingNumber, Customer, StartDate, EndDate, AdminID, admin.Name As SalesAgent, category.Name As Destination');
+		$this->db->select('BookingNumber, Customer, StartDate, EndDate, AdminID, admin.Name As SalesAgent, category.Name As Destination, booking.Status');
 
 		$this->db->join('admin', 'admin.AdminID = booking.SalesAgent', 'left');
 
@@ -793,7 +793,7 @@ class Dashboard_Model extends CI_Model
 
 		$this->db->where('CancelStatus', 'N');
 
-		$this->db->where('booking.Status', 'PTV');
+		$this->db->where_in('booking.Status', ['PTV', 'PBO']);
 
 		$this->db->order_by('SalesAgent', 'ASC');
 

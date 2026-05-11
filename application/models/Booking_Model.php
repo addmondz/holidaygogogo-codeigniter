@@ -1781,7 +1781,21 @@ class Booking_Model extends CI_Model
 		$ignore = 0;
 
 		if(!empty($this->input->get('customer'))) {
-			$this->db->like('Customer', $this->input->get('customer'));
+			$q = $this->input->get('customer');
+			$like = $this->db->escape_like_str($q);
+			$this->db->group_start();
+				$this->db->like('booking.Customer', $q);
+				$this->db->or_like('customer.name', $q);
+				$this->db->or_where(
+					"EXISTS (SELECT 1 FROM guest_list gl
+						WHERE gl.BookingID = booking.BookingID
+						  AND gl.Status = 'Y'
+						  AND (gl.Name LIKE '%{$like}%'
+							OR gl.LastName LIKE '%{$like}%'
+							OR CONCAT_WS(' ', gl.Name, gl.LastName) LIKE '%{$like}%'))",
+					null, false
+				);
+			$this->db->group_end();
 			$ignore = 1;
 		}
 

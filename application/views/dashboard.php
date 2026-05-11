@@ -92,17 +92,17 @@
                             <div class="card card-custom card-stretch gutter-b">
                                 <div class="card-header border-0" style="background-color:#FFFAA030;">
                                     <h3 class="card-title font-weight-bold text-dark" style="font-size:14px;">
-                                        <?php 
+                                        <?php
                                             $start_date = $this->input->get('start_date');
                                             $end_date = $this->input->get('end_date');
                                             if ($start_date && $end_date) {
-                                                echo 'Pending Travel Voucher: ' . date('j M', strtotime($start_date)) . ' - ' . date('j M Y', strtotime($end_date));
+                                                echo 'Pending Travel Voucher / Operation: ' . date('j M', strtotime($start_date)) . ' - ' . date('j M Y', strtotime($end_date));
                                             } elseif ($start_date) {
-                                                echo 'Pending Travel Voucher From: ' . date('j M Y', strtotime($start_date));
+                                                echo 'Pending Travel Voucher / Operation From: ' . date('j M Y', strtotime($start_date));
                                             } elseif ($end_date) {
-                                                echo 'Pending Travel Voucher Until: ' . date('j M Y', strtotime($end_date));
+                                                echo 'Pending Travel Voucher / Operation Until: ' . date('j M Y', strtotime($end_date));
                                             } else {
-                                                echo 'Upcoming Travel In 7 Days - Pending Travel Voucher';
+                                                echo 'Upcoming Travel In 7 Days - Pending Travel Voucher / Operation';
                                             }
                                         ?>
                                     </h3>
@@ -124,7 +124,10 @@
                                                                     <span></span>
                                                                 </label>
                                                                 <div class="d-flex flex-column flex-grow-1">
-                                                                    <a href="<?php echo base_url('Booking?booking_number=') . $sales_agent_pending_travel_voucher->BookingNumber; ?>" target="_blank" class="text-dark-75 text-hover-primary font-weight-bold font-size-xs"><?php echo $sales_agent_pending_travel_voucher->BookingNumber; ?></a>
+                                                                    <div class="d-flex align-items-center">
+                                                                        <a href="<?php echo base_url('Booking?booking_number=') . $sales_agent_pending_travel_voucher->BookingNumber; ?>" target="_blank" class="text-dark-75 text-hover-primary font-weight-bold font-size-xs"><?php echo $sales_agent_pending_travel_voucher->BookingNumber; ?></a>
+                                                                        <span class="label label-inline label-light-warning font-weight-bold ml-2" style="font-size:9px;"><?php echo $sales_agent_pending_travel_voucher->Status; ?></span>
+                                                                    </div>
                                                                     <span class="text-muted font-weight-bold" style="color:#FAC898 !important; font-size:10px;"><?php echo strtoupper(date('j M', strtotime($sales_agent_pending_travel_voucher->StartDate)) . ' - ' . date('j M Y', strtotime($sales_agent_pending_travel_voucher->EndDate))); ?></span>
                                                                     <span class="text-muted font-weight-bold" style="font-size:10px;"><?php echo $sales_agent_pending_travel_voucher->Name; ?></span>
                                                                     <span class="text-muted font-weight-bold" style="font-size:10px;"><?php echo $sales_agent_pending_travel_voucher->Customer; ?></span>
@@ -471,17 +474,17 @@
                             <div class="card card-custom card-stretch gutter-b">
                                 <div class="card-header border-0" style="background-color:#FFFAA030;">
                                     <h3 class="card-title font-weight-bold text-dark" style="font-size:14px;">
-                                        <?php 
+                                        <?php
                                             $start_date = $this->input->get('start_date');
                                             $end_date = $this->input->get('end_date');
                                             if ($start_date && $end_date) {
-                                                echo 'Pending Travel Voucher: ' . date('j M', strtotime($start_date)) . ' - ' . date('j M Y', strtotime($end_date));
+                                                echo 'Pending Travel Voucher / Operation: ' . date('j M', strtotime($start_date)) . ' - ' . date('j M Y', strtotime($end_date));
                                             } elseif ($start_date) {
-                                                echo 'Pending Travel Voucher From: ' . date('j M Y', strtotime($start_date));
+                                                echo 'Pending Travel Voucher / Operation From: ' . date('j M Y', strtotime($start_date));
                                             } elseif ($end_date) {
-                                                echo 'Pending Travel Voucher Until: ' . date('j M Y', strtotime($end_date));
+                                                echo 'Pending Travel Voucher / Operation Until: ' . date('j M Y', strtotime($end_date));
                                             } else {
-                                                echo 'Upcoming Travel In 7 Days - Pending Travel Voucher';
+                                                echo 'Upcoming Travel In 7 Days - Pending Travel Voucher / Operation';
                                             }
                                         ?>
                                     </h3>
@@ -504,7 +507,10 @@
                                                                 </label>
                                                                 <div class="d-flex flex-column flex-grow-1">
                                                                     <span class="font-weight-bold" style="color:#C3B1E1; font-size:11px;"><?php echo $pending_travel_voucher->SalesAgent; ?></span>
-                                                                    <a href="<?php echo base_url('Booking?booking_number=') . $pending_travel_voucher->BookingNumber; ?>" target="_blank" class="text-dark-75 text-hover-primary font-weight-bold font-size-xs"><?php echo $pending_travel_voucher->BookingNumber; ?></a>
+                                                                    <div class="d-flex align-items-center">
+                                                                        <a href="<?php echo base_url('Booking?booking_number=') . $pending_travel_voucher->BookingNumber; ?>" target="_blank" class="text-dark-75 text-hover-primary font-weight-bold font-size-xs"><?php echo $pending_travel_voucher->BookingNumber; ?></a>
+                                                                        <span class="label label-inline label-light-warning font-weight-bold ml-2" style="font-size:9px;"><?php echo $pending_travel_voucher->Status; ?></span>
+                                                                    </div>
                                                                     <span class="text-muted font-weight-bold" style="color:#FAC898 !important; font-size:10px;"><?php echo strtoupper(date('j M', strtotime($pending_travel_voucher->StartDate)) . ' - ' . date('j M Y', strtotime($pending_travel_voucher->EndDate))); ?></span>
                                                                     <span class="text-muted font-weight-bold" style="font-size:10px;"><?php echo $pending_travel_voucher->Destination; ?></span>
                                                                     <span class="text-muted font-weight-bold" style="font-size:10px;"><?php echo $pending_travel_voucher->Customer; ?></span>

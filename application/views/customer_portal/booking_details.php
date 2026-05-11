@@ -1052,7 +1052,16 @@
                 </div>
                 <div class="detail-item">
                     <span class="detail-label">Customer Mobile</span>
-                    <span class="detail-value"><?php echo htmlspecialchars($booking['CustomerMobile']); ?></span>
+                    <span class="detail-value">
+                        <?php if (!empty($booking['CustomerMobile'])): ?>
+                            <a href="https://wa.me/<?php echo preg_replace('/[^0-9]/', '', $booking['CustomerMobile']); ?>" target="_blank" rel="noopener" style="color: #25D366; text-decoration: none; display: inline-flex; align-items: center; gap: 5px;" title="Open WhatsApp chat">
+                                <i class="la la-whatsapp" style="font-size: 18px;"></i>
+                                <?php echo htmlspecialchars($booking['CustomerMobile']); ?>
+                            </a>
+                        <?php else: ?>
+                            N/A
+                        <?php endif; ?>
+                    </span>
                 </div>
                 <?php if (!empty($booking['InsertDate'])): ?>
                     <div class="detail-item">
