@@ -222,6 +222,14 @@ class Booking extends MY_Controller
 		$current_url = base_url($_SERVER['REQUEST_URI']);
 
 		foreach($bookings as $booking) {
+			// SA-as-TC2 gating: when current SA is only the TC2 (SalesAgent2) of this
+			// booking, hide BC link, GL actions, and Customer actions in the row.
+			$sa_as_tc2 = is_sa_acting_as_tc2(
+				$this->session->userdata('level'),
+				$this->session->userdata('admin_id'),
+				$booking->SalesAgent2
+			);
+
 			// Format mobile
 			$booking->CustomerMobile = $booking->CountryCode . str_replace([' ', '-'], '', $booking->CustomerMobile);
 
@@ -329,8 +337,12 @@ class Booking extends MY_Controller
 			// Insert date
 			$row['insert_date'] = $insert_date_formatted;
 
-			// BC Number with link
-			$row['booking_number'] = '<a href="' . base_url('Payment?booking_number=') . $booking->BookingNumber . '&customer=' . str_replace('&', '%26', $booking->Customer) . '" target="_blank">' . $booking->BookingNumber . '</a>';
+			// BC Number with link (plain text when SA is only the TC2 of this booking)
+			if($sa_as_tc2) {
+				$row['booking_number'] = $booking->BookingNumber;
+			} else {
+				$row['booking_number'] = '<a href="' . base_url('Payment?booking_number=') . $booking->BookingNumber . '&customer=' . str_replace('&', '%26', $booking->Customer) . '" target="_blank">' . $booking->BookingNumber . '</a>';
+			}
 
 			// BC Title
 			$row['bc_title'] = $bc_title;
@@ -420,7 +432,7 @@ class Booking extends MY_Controller
 			$row['autocount_status'] = '<span class="font-weight-bold" style="color:' . $autocount_info['color'] . '"' . $tooltip_attr . '>' . $autocount_info['text'] . '</span>';
 
 			// Action dropdown - simplified for AJAX response
-			$row['action'] = $this->build_action_dropdown($booking, $current_url, $is_sales_agent);
+			$row['action'] = $this->build_action_dropdown($booking, $current_url, $is_sales_agent, $sa_as_tc2);
 
 			$data[] = $row;
 			$count++;
@@ -453,7 +465,7 @@ class Booking extends MY_Controller
 	/**
 	 * Build action dropdown HTML for a booking row
 	 */
-	private function build_action_dropdown($booking, $current_url, $is_sales_agent)
+	private function build_action_dropdown($booking, $current_url, $is_sales_agent, $sa_as_tc2 = false)
 	{
 		$shown_approve_bc = false;
 		$shown_update_booking = false;
@@ -543,35 +555,39 @@ class Booking extends MY_Controller
 		$html .= '<div class="dropdown-divider"></div>';
 		$html .= '<a href="' . base_url('Booking_Confirmation?token=') . $booking->Token . '" target="_blank" class="dropdown-item" style="font-size:11px;">Booking Confirmation</a>';
 		$html .= '<button id="bc_url-' . $booking->BookingID . '" value="' . base_url('Booking_Confirmation?token=') . $booking->Token . '" onclick="Copy_URL(\'BC URL\', ' . $booking->BookingID . ')" class="dropdown-item" style="font-size:11px;">Copy BC Link</button>';
-		$html .= '<div class="dropdown-divider"></div>';
-		$sa_blocked_from_gl = is_sa_blocked_from_completed_booking($this->session->userdata('level'), $booking->Status, $booking->AfterSalesService);
-		if($booking->Status != 'Y' || (!$is_sales_agent && $booking->Status == 'Y')) {
-			$html .= '<a href="' . base_url('Guest_List?gl=') . $booking->Token . '" target="_blank" class="dropdown-item" style="font-size:11px;">Guest List</a>';
-		}
-		if(!$sa_blocked_from_gl) {
-			$html .= '<a href="' . base_url('Guest_List/Download?booking_id=') . $booking->BookingID . '" class="dropdown-item" style="font-size:11px;">Download Guest List</a>';
-			$html .= '<a href="' . base_url('Guest_List/Download_ZIP?booking_id=') . $booking->BookingID . '" class="dropdown-item" style="font-size:11px;">Download Guestlist ZIP</a>';
-			$html .= '<button id="gl_url-' . $booking->BookingID . '" value="' . base_url('Guest_List?gl=') . $booking->Token . '" onclick="Copy_URL(\'GL URL\', ' . $booking->BookingID . ')" class="dropdown-item" style="font-size:11px;">Copy GL Link</button>';
+		if(!$sa_as_tc2) {
+			$html .= '<div class="dropdown-divider"></div>';
+			$sa_blocked_from_gl = is_sa_blocked_from_completed_booking($this->session->userdata('level'), $booking->Status, $booking->AfterSalesService);
+			if($booking->Status != 'Y' || (!$is_sales_agent && $booking->Status == 'Y')) {
+				$html .= '<a href="' . base_url('Guest_List?gl=') . $booking->Token . '" target="_blank" class="dropdown-item" style="font-size:11px;">Guest List</a>';
+			}
+			if(!$sa_blocked_from_gl) {
+				$html .= '<a href="' . base_url('Guest_List/Download?booking_id=') . $booking->BookingID . '" class="dropdown-item" style="font-size:11px;">Download Guest List</a>';
+				$html .= '<a href="' . base_url('Guest_List/Download_ZIP?booking_id=') . $booking->BookingID . '" class="dropdown-item" style="font-size:11px;">Download Guestlist ZIP</a>';
+				$html .= '<button id="gl_url-' . $booking->BookingID . '" value="' . base_url('Guest_List?gl=') . $booking->Token . '" onclick="Copy_URL(\'GL URL\', ' . $booking->BookingID . ')" class="dropdown-item" style="font-size:11px;">Copy GL Link</button>';
+			}
 		}
 		$html .= '<div class="dropdown-divider"></div>';
 		$html .= '<a href="' . base_url('Travel_Voucher?token=') . $booking->Token . '" target="_blank" class="dropdown-item" style="font-size:11px;">Travel Voucher</a>';
 		$html .= '<button id="tv_url-' . $booking->BookingID . '" value="' . base_url('Travel_Voucher?token=') . $booking->Token . '" onclick="Copy_URL(\'TV URL\', ' . $booking->BookingID . ')" class="dropdown-item" style="font-size:11px;">Copy TV Link</button>';
-		$html .= '<div class="dropdown-divider"></div>';
-		$html .= '<button id="customer_name-' . $booking->BookingID . '" value="' . $booking->Customer . '" onclick="Copy_URL(\'CUSTOMER NAME\', ' . $booking->BookingID . ')" class="dropdown-item" style="font-size:11px;">Copy Customer Name</button>';
-		$html .= '<button id="customer_mobile-' . $booking->BookingID . '" value="' . $booking->CustomerMobile . '" onclick="Copy_URL(\'CUSTOMER MOBILE\', ' . $booking->BookingID . ')" class="dropdown-item" style="font-size:11px;">Copy Customer Mobile</button>';
-		$html .= '<div class="dropdown-divider"></div>';
-		if($booking->CustomerID != null) {
-			// Load helper for generating portal hash
-			$this->load->helper('utils');
-			$customer_hash = generate_customer_portal_slug($booking->CustomerID);
-			if (!empty($customer_hash)) {
-				$portal_url = base_url('customer/' . urlencode($customer_hash));
-				$html .= '<a href="' . $portal_url . '" target="_blank" class="dropdown-item" style="font-size:11px;">Go to Customer Portal</a>';
-				$html .= '<button id="portal_url-' . $booking->BookingID . '" value="' . $portal_url . '" onclick="Copy_URL(\'CUSTOMER PORTAL LINK\', ' . $booking->BookingID . ')" class="dropdown-item" style="font-size:11px;">Copy Customer Portal Link</button>';
+		if(!$sa_as_tc2) {
+			$html .= '<div class="dropdown-divider"></div>';
+			$html .= '<button id="customer_name-' . $booking->BookingID . '" value="' . $booking->Customer . '" onclick="Copy_URL(\'CUSTOMER NAME\', ' . $booking->BookingID . ')" class="dropdown-item" style="font-size:11px;">Copy Customer Name</button>';
+			$html .= '<button id="customer_mobile-' . $booking->BookingID . '" value="' . $booking->CustomerMobile . '" onclick="Copy_URL(\'CUSTOMER MOBILE\', ' . $booking->BookingID . ')" class="dropdown-item" style="font-size:11px;">Copy Customer Mobile</button>';
+			$html .= '<div class="dropdown-divider"></div>';
+			if($booking->CustomerID != null) {
+				// Load helper for generating portal hash
+				$this->load->helper('utils');
+				$customer_hash = generate_customer_portal_slug($booking->CustomerID);
+				if (!empty($customer_hash)) {
+					$portal_url = base_url('customer/' . urlencode($customer_hash));
+					$html .= '<a href="' . $portal_url . '" target="_blank" class="dropdown-item" style="font-size:11px;">Go to Customer Portal</a>';
+					$html .= '<button id="portal_url-' . $booking->BookingID . '" value="' . $portal_url . '" onclick="Copy_URL(\'CUSTOMER PORTAL LINK\', ' . $booking->BookingID . ')" class="dropdown-item" style="font-size:11px;">Copy Customer Portal Link</button>';
+				}
 			}
-		}
-		else {
-			$html .= '<a href="#" class="dropdown-item" style="font-size:11px; cursor:not-allowed; color:#6c757d;" disabled>Customer ID not found</a>';
+			else {
+				$html .= '<a href="#" class="dropdown-item" style="font-size:11px; cursor:not-allowed; color:#6c757d;" disabled>Customer ID not found</a>';
+			}
 		}
 		if(!empty($booking->Token)) {
 			$booking_page_url = base_url('customer/booking/' . $booking->Token);

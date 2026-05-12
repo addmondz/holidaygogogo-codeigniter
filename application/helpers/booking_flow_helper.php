@@ -954,6 +954,21 @@ if (!function_exists('is_sa_blocked_from_completed_booking')) {
     }
 }
 
+if (!function_exists('is_sa_acting_as_tc2')) {
+    /**
+     * True when a level-20 Sales Agent matches the booking's SalesAgent2 (TC2)
+     * slot. Used in the booking listing to hide the BC link, GL actions, and
+     * Customer actions for rows where the SA is only the secondary consultant
+     * — those belong to TC1.
+     */
+    function is_sa_acting_as_tc2($user_level, $user_id, $booking_sales_agent_2)
+    {
+        return (int)$user_level === 20
+            && !empty($booking_sales_agent_2)
+            && (int)$booking_sales_agent_2 === (int)$user_id;
+    }
+}
+
 if (!function_exists('can_user_modify_booking_checklist')) {
     /**
      * Mirrors Notification_Model::_apply_visibility_filter scoping so that the
