@@ -286,7 +286,7 @@ class Cron extends CI_Controller
 		$this->syncPayments();
 		$this->syncDeletedPayments();
 
-		// $this->syncGhlModules();
+		$this->syncGhlModules();
 	}
 
 	public function syncGhlModules()
