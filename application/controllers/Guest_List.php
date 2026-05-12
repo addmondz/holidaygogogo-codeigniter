@@ -29,6 +29,7 @@ class Guest_List extends CI_Controller
 		$this->load->model('Universal_Model');
 		$this->load->model('Guest_list_lock_model');
 		$this->load->model('Guest_List_Room_Model');
+		$this->load->helper('booking_flow');
 	}
 
 	function index()
@@ -171,6 +172,10 @@ class Guest_List extends CI_Controller
 
 	    		$array['guest_lists'] = $this->Guest_List_Model->Read_Guest_Lists1();
 	    		if(!empty($array['guest_lists'])) {
+					if (is_sa_blocked_from_completed_booking($this->session->userdata('level'), $array['guest_lists'][0]->Status, $array['guest_lists'][0]->AfterSalesService)) {
+						$this->load->view('errors/bc_complete', array('type' => 'Guest List'));
+						return;
+					}
 					if(($this->session->has_userdata('admin_id') && $this->session->has_userdata('level')) || ($array['guest_lists'][0]->Status != 'Y' && $array['guest_lists'][0]->AfterSalesService != 'COMPLETE' || $array['guest_lists'][0]->Status == 'Y' && $array['guest_lists'][0]->AfterSalesService == 'PENDING')) {
 						if(true) {
 						//if(($array['guest_lists'][0]->GLSessionLock == 'N' && empty($array['guest_lists'][0]->GLSessionExpiration)) || ($array['guest_lists'][0]->GLSessionLock == 'Y' && date('Y-m-d H:i:s') > $array['guest_lists'][0]->GLSessionExpiration)) {
@@ -292,6 +297,14 @@ class Guest_List extends CI_Controller
 	}
 	
 	function Download() {
+		$booking_id = $this->input->get('booking_id');
+		if (!empty($booking_id)) {
+			$booking_row = $this->Booking_Model->find($booking_id);
+			if ($booking_row && is_sa_blocked_from_completed_booking($this->session->userdata('level'), $booking_row->Status, $booking_row->AfterSalesService)) {
+				$this->load->view('errors/access_denied');
+				return;
+			}
+		}
 		$spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
 		$spreadsheet->getActiveSheet()->setTitle('Guest Lists');
 		$spreadsheet->getProperties()->setCreator('HolidayGoGoGo');
@@ -468,7 +481,13 @@ class Guest_List extends CI_Controller
 		if(empty($booking_id)) {
 			show_error('Booking ID is required');
 		}
-		
+
+		$booking_row = $this->Booking_Model->find($booking_id);
+		if ($booking_row && is_sa_blocked_from_completed_booking($this->session->userdata('level'), $booking_row->Status, $booking_row->AfterSalesService)) {
+			$this->load->view('errors/access_denied');
+			return;
+		}
+
 		// Get guest lists data
 		$guest_lists = $this->Guest_List_Model->Read_Guest_Lists1();
 		if(empty($guest_lists)) {

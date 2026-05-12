@@ -1756,11 +1756,15 @@ class Booking_Model extends CI_Model
 	private function apply_booking_filters()
 	{
 		if(in_array($this->session->userdata('level'), [20, 50])) {
-			$this->db->where('SalesAgent', $this->session->userdata('admin_id'));
+			$admin_id = $this->session->userdata('admin_id');
+			$this->db->group_start();
+			$this->db->where('SalesAgent', $admin_id);
+			$this->db->or_where('SalesAgent2', $admin_id);
+			$this->db->group_end();
 		}
 
-		// Hide completed bookings from SA and TC
-		if(in_array($this->session->userdata('level'), [20, 50])) {
+		// Hide completed bookings from TC only (SA can view in listing; detail page still blocks via Booking::View / Payment guards)
+		if($this->session->userdata('level') == 50) {
 			$this->db->where("NOT (booking.Status = 'Y' AND booking.AfterSalesService = 'COMPLETE')");
 		}
 
@@ -2032,10 +2036,14 @@ class Booking_Model extends CI_Model
 	{
 		$this->db->from('booking');
 		if(in_array($this->session->userdata('level'), [20, 50])) {
-			$this->db->where('SalesAgent', $this->session->userdata('admin_id'));
+			$admin_id = $this->session->userdata('admin_id');
+			$this->db->group_start();
+			$this->db->where('SalesAgent', $admin_id);
+			$this->db->or_where('SalesAgent2', $admin_id);
+			$this->db->group_end();
 		}
-		// Hide completed bookings from SA and TC
-		if(in_array($this->session->userdata('level'), [20, 50])) {
+		// Hide completed bookings from TC only (SA can view in listing; detail page still blocks via Booking::View / Payment guards)
+		if($this->session->userdata('level') == 50) {
 			$this->db->where("NOT (booking.Status = 'Y' AND booking.AfterSalesService = 'COMPLETE')");
 		}
 		$this->db->where('booking.Status !=', 'N');

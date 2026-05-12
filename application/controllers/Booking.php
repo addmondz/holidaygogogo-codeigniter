@@ -154,33 +154,58 @@ class Booking extends MY_Controller
 		$order_dir = $this->input->get('order[0][dir]') == 'asc' ? 'ASC' : 'DESC';
 
 		// Map column index to database column
-		// Note: Column indices must match the frontend DataTables columns array
-		// For non-sales agents: row_number(0), checkbox(1), sales_agent(2), sales_agent_2(3), OP(4), insert_date(5), booking_number(6), ...
-		// For sales agents: row_number(0), checkbox(1), insert_date(2), booking_number(3), ...
-		$columns = array(
-			0 => 'booking.BookingID',             // row number
-			1 => 'booking.BookingID',             // checkbox (placeholder)
-			2 => 'admin.Name',                    // sales agent
-			3 => 'sa2_admin.Name',                // sales agent 2
-			4 => 'op_admin.Name',                 // OP
-			5 => 'booking.InsertDate',            // creation date
-			6 => 'BookingNumber',                 // BC number
-			7 => 'booking.BookingConfirmationTitle', // BC title
-			8 => 'Customer',                      // customer
-			9 => 'source.Name',                   // source
-			10 => 'booking.ChatLanguage',          // chat
-			11 => 'booking.Mobile',               // mobile
-			12 => 'StartDate',                    // start
-			13 => 'EndDate',                      // end
-			14 => 'category.Name',                // destination
-			15 => 'NetTotal',                     // net sales
-			16 => 'NetTotal',                     // profit
-			17 => 'NetTotal',                     // profit margin
-			18 => "status_sort_priority",          // BC status
-			19 => 'LockStatus',                   // GL status
-			20 => 'booking.AutocountSyncStatus',  // autocount status
-			21 => 'booking.BookingID'             // action
-		);
+		// Note: Column indices must match the frontend DataTables columns array.
+		// Sales agents (level 20) do NOT see the Net Profit / Net Profit Margin columns,
+		// so the indices for BC Status onwards shift left by 2 for them.
+		if($is_sales_agent) {
+			$columns = array(
+				0 => 'booking.BookingID',             // row number
+				1 => 'booking.BookingID',             // checkbox (placeholder)
+				2 => 'admin.Name',                    // sales agent
+				3 => 'sa2_admin.Name',                // sales agent 2
+				4 => 'op_admin.Name',                 // OP
+				5 => 'booking.InsertDate',            // creation date
+				6 => 'BookingNumber',                 // BC number
+				7 => 'booking.BookingConfirmationTitle', // BC title
+				8 => 'Customer',                      // customer
+				9 => 'source.Name',                   // source
+				10 => 'booking.ChatLanguage',          // chat
+				11 => 'booking.Mobile',               // mobile
+				12 => 'StartDate',                    // start
+				13 => 'EndDate',                      // end
+				14 => 'category.Name',                // destination
+				15 => 'NetTotal',                     // net sales
+				16 => "status_sort_priority",          // BC status
+				17 => 'LockStatus',                   // GL status
+				18 => 'booking.AutocountSyncStatus',  // autocount status
+				19 => 'booking.BookingID'             // action
+			);
+		} else {
+			$columns = array(
+				0 => 'booking.BookingID',             // row number
+				1 => 'booking.BookingID',             // checkbox (placeholder)
+				2 => 'admin.Name',                    // sales agent
+				3 => 'sa2_admin.Name',                // sales agent 2
+				4 => 'op_admin.Name',                 // OP
+				5 => 'booking.InsertDate',            // creation date
+				6 => 'BookingNumber',                 // BC number
+				7 => 'booking.BookingConfirmationTitle', // BC title
+				8 => 'Customer',                      // customer
+				9 => 'source.Name',                   // source
+				10 => 'booking.ChatLanguage',          // chat
+				11 => 'booking.Mobile',               // mobile
+				12 => 'StartDate',                    // start
+				13 => 'EndDate',                      // end
+				14 => 'category.Name',                // destination
+				15 => 'NetTotal',                     // net sales
+				16 => 'NetTotal',                     // profit
+				17 => 'NetTotal',                     // profit margin
+				18 => "status_sort_priority",          // BC status
+				19 => 'LockStatus',                   // GL status
+				20 => 'booking.AutocountSyncStatus',  // autocount status
+				21 => 'booking.BookingID'             // action
+			);
+		}
 
 		$order_column = isset($columns[$order_column_index]) ? $columns[$order_column_index] : 'booking.BookingID';
 
@@ -341,9 +366,11 @@ class Booking extends MY_Controller
 			// Net Total
 			$row['net_total'] = number_format($booking->NetTotal, 2, '.', ',');
 
-			// Profit
-			$row['profit'] = '<span style="color:' . $profit_color . '">' . number_format($net_profit, 2, '.', ',') . '</span>';
-			$row['profit_margin'] = '<span style="color:' . $profit_color . '">' . $profit_margin . '</span>';
+			// Profit (hidden from sales agents)
+			if(!$is_sales_agent) {
+				$row['profit'] = '<span style="color:' . $profit_color . '">' . number_format($net_profit, 2, '.', ',') . '</span>';
+				$row['profit_margin'] = '<span style="color:' . $profit_color . '">' . $profit_margin . '</span>';
+			}
 
 			// Status
 			if($booking->CancelStatus == 'Y' && !empty($booking->CancellationReasonName)) {
@@ -517,12 +544,15 @@ class Booking extends MY_Controller
 		$html .= '<a href="' . base_url('Booking_Confirmation?token=') . $booking->Token . '" target="_blank" class="dropdown-item" style="font-size:11px;">Booking Confirmation</a>';
 		$html .= '<button id="bc_url-' . $booking->BookingID . '" value="' . base_url('Booking_Confirmation?token=') . $booking->Token . '" onclick="Copy_URL(\'BC URL\', ' . $booking->BookingID . ')" class="dropdown-item" style="font-size:11px;">Copy BC Link</button>';
 		$html .= '<div class="dropdown-divider"></div>';
+		$sa_blocked_from_gl = is_sa_blocked_from_completed_booking($this->session->userdata('level'), $booking->Status, $booking->AfterSalesService);
 		if($booking->Status != 'Y' || (!$is_sales_agent && $booking->Status == 'Y')) {
 			$html .= '<a href="' . base_url('Guest_List?gl=') . $booking->Token . '" target="_blank" class="dropdown-item" style="font-size:11px;">Guest List</a>';
 		}
-		$html .= '<a href="' . base_url('Guest_List/Download?booking_id=') . $booking->BookingID . '" class="dropdown-item" style="font-size:11px;">Download Guest List</a>';
-		$html .= '<a href="' . base_url('Guest_List/Download_ZIP?booking_id=') . $booking->BookingID . '" class="dropdown-item" style="font-size:11px;">Download Guestlist ZIP</a>';
-		$html .= '<button id="gl_url-' . $booking->BookingID . '" value="' . base_url('Guest_List?gl=') . $booking->Token . '" onclick="Copy_URL(\'GL URL\', ' . $booking->BookingID . ')" class="dropdown-item" style="font-size:11px;">Copy GL Link</button>';
+		if(!$sa_blocked_from_gl) {
+			$html .= '<a href="' . base_url('Guest_List/Download?booking_id=') . $booking->BookingID . '" class="dropdown-item" style="font-size:11px;">Download Guest List</a>';
+			$html .= '<a href="' . base_url('Guest_List/Download_ZIP?booking_id=') . $booking->BookingID . '" class="dropdown-item" style="font-size:11px;">Download Guestlist ZIP</a>';
+			$html .= '<button id="gl_url-' . $booking->BookingID . '" value="' . base_url('Guest_List?gl=') . $booking->Token . '" onclick="Copy_URL(\'GL URL\', ' . $booking->BookingID . ')" class="dropdown-item" style="font-size:11px;">Copy GL Link</button>';
+		}
 		$html .= '<div class="dropdown-divider"></div>';
 		$html .= '<a href="' . base_url('Travel_Voucher?token=') . $booking->Token . '" target="_blank" class="dropdown-item" style="font-size:11px;">Travel Voucher</a>';
 		$html .= '<button id="tv_url-' . $booking->BookingID . '" value="' . base_url('Travel_Voucher?token=') . $booking->Token . '" onclick="Copy_URL(\'TV URL\', ' . $booking->BookingID . ')" class="dropdown-item" style="font-size:11px;">Copy TV Link</button>';
@@ -569,23 +599,26 @@ class Booking extends MY_Controller
 		$summary = $this->Booking_Model->Calculate_Summary();
 
 		$total_sales = $summary['total_sales'];
-		$total_net_profit = $summary['total_net_profit'];
 
 		// Format output
 		$total_sales_formatted = number_format($total_sales, 2, '.', ',');
 
-		if($total_net_profit != 0 && $total_sales != 0) {
-			$profit_percentage = round(($total_net_profit / $total_sales) * 100);
-			$total_net_profit_formatted = number_format($total_net_profit, 2, '.', ',') . ' (' . $profit_percentage . '%)';
-		} else {
-			$total_net_profit_formatted = number_format($total_net_profit, 2, '.', ',') . ' (0%)';
-		}
-
 		$output = array(
 			'total_sales' => $total_sales_formatted,
-			'total_net_profit' => $total_net_profit_formatted,
 			'is_sales_agent' => $is_sales_agent
 		);
+
+		// Net profit is restricted to non-sales-agents
+		if(!$is_sales_agent) {
+			$total_net_profit = $summary['total_net_profit'];
+			if($total_net_profit != 0 && $total_sales != 0) {
+				$profit_percentage = round(($total_net_profit / $total_sales) * 100);
+				$total_net_profit_formatted = number_format($total_net_profit, 2, '.', ',') . ' (' . $profit_percentage . '%)';
+			} else {
+				$total_net_profit_formatted = number_format($total_net_profit, 2, '.', ',') . ' (0%)';
+			}
+			$output['total_net_profit'] = $total_net_profit_formatted;
+		}
 
 		header('Content-Type: application/json');
 		echo json_encode($output);
@@ -1103,6 +1136,7 @@ class Booking extends MY_Controller
 					if(!empty($created_by)) {
 						// Get previous completions for logging (before updating)
 						$previous_keys = array();
+						$checklist_allowed = false;
 						if($this->db->table_exists('booking_checklist_completion')) {
 							// Get previous completions (nested map: product_id => checklist_id => info)
 							$previous_map = $this->Booking_Checklist_Completion_Model->Read_Completion_Map($booking_id);
@@ -1117,7 +1151,20 @@ class Booking extends MY_Controller
 							$this->load->helper('booking_flow');
 							$booking = $this->Booking_Model->getBookingById($booking_id);
 
-							if($booking) {
+							// Same scoping as the booking-update notification bell
+							// (Notification_Model::_apply_visibility_filter): only TC1
+							// (level 20 = SalesAgent) and OP (level 40 = BookingOP) for
+							// THIS booking may tick its checklist. Other levels bypass.
+							$checklist_allowed = $booking && can_user_modify_booking_checklist(
+								$booking,
+								$created_by,
+								$this->session->userdata('level')
+							);
+							if($booking && !$checklist_allowed) {
+								log_message('info', 'Checklist save blocked: admin_id=' . $created_by . ' is not TC1/OP for booking ' . $booking_id);
+							}
+
+							if($checklist_allowed) {
 								// Check if checklist was unchecked (going from all completed to not all completed)
 								$was_all_completed = are_all_checklists_completed($booking_id, $this);
 
@@ -1164,12 +1211,15 @@ class Booking extends MY_Controller
 							log_message('error', 'booking_checklist_completion table does not exist. Please run migration.');
 						}
 
-						// Create activity logs for changes
-						$new_keys = array();
-						foreach($completion_pairs as $pair) {
-							$new_keys[] = $pair[0] . '_' . $pair[1];
+						// Create activity logs for changes — only when the user was
+						// actually permitted to mutate the checklist.
+						if (!empty($checklist_allowed)) {
+							$new_keys = array();
+							foreach($completion_pairs as $pair) {
+								$new_keys[] = $pair[0] . '_' . $pair[1];
+							}
+							$this->log_checklist_changes($booking_id, $previous_keys, $new_keys, $created_by);
 						}
-						$this->log_checklist_changes($booking_id, $previous_keys, $new_keys, $created_by);
 					}
 				}
 			} else {
@@ -1279,6 +1329,11 @@ class Booking extends MY_Controller
 					$this->load->helper('booking_flow');
 					$has_deposit_deadline_detail = !empty($array['DepositDeadline']);
 					$array['deposit_complete'] = compute_deposit_complete($deposit_total, $total_credit_approved, $has_deposit_deadline_detail);
+					$array['can_modify_checklist'] = can_user_modify_booking_checklist(
+						$array,
+						$this->session->userdata('admin_id'),
+						$this->session->userdata('level')
+					);
 					// Calculate deposit status and format Deposit Paid display
 					$deposit_difference = $deposit_paid - $deposit_total;
 					if ($deposit_paid > 0) {
@@ -3639,6 +3694,16 @@ class Booking extends MY_Controller
 			}
 		}
 
+		// Mirror notification scoping: only TC1 (booking SalesAgent) and OP
+		// (BookingOP) may mutate the checklist for this specific booking. The
+		// modal can still load read-only for everyone else with AB access.
+		$this->load->helper('booking_flow');
+		$can_modify = can_user_modify_booking_checklist(
+			$booking,
+			$this->session->userdata('admin_id'),
+			$this->session->userdata('level')
+		);
+
 		// Get booking products (need ProductID and Name for checklist grouping)
 		$this->db->select('bp.BookingProductID, bp.ProductID, p.Name, bp.PaymentOutSupplierFull, bp.PaymentOutSupplierDeposit, bp.disable_checklist_payment_out');
 		$this->db->from('booking_product bp');
@@ -3690,7 +3755,8 @@ class Booking extends MY_Controller
 			'is_multi_product' => $booking_checklists['is_multi_product'],
 			'groups' => $groups,
 			'total_count' => $booking_checklists['total_count'],
-			'completion_map' => $formatted_completion
+			'completion_map' => $formatted_completion,
+			'can_modify' => $can_modify
 		));
 	}
 
