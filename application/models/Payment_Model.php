@@ -999,8 +999,35 @@ return $query->result_array(); // instead of result()
 		$this->db->join('payment', 'payment.PaymentID = payment_log.PaymentID', 'left');
 		$this->db->join('admin', 'admin.AdminID = payment_log.InsertBy', 'left');
 		$this->db->where('payment.BookingID', $booking_id);
-		$this->db->order_by('payment_log.InsertDate', 'DESC');
-		return $this->db->get()->result_array();
+		$logs = $this->db->get()->result_array();
+
+		// Synthesize a "Created" row per payment so the audit trail shows who
+		// created each pay-out / pay-in. payment_log only records updates, but
+		// the payment row itself carries InsertBy / InsertDate.
+		$this->db->select('payment.PaymentID, payment.Type as PaymentType, payment.InsertDate, admin.Name as AdminName');
+		$this->db->from('payment');
+		$this->db->join('admin', 'admin.AdminID = payment.InsertBy', 'left');
+		$this->db->where('payment.BookingID', $booking_id);
+		$payments = $this->db->get()->result_array();
+
+		foreach ($payments as $p) {
+			if (empty($p['InsertDate'])) continue;
+			$logs[] = array(
+				'Column'      => 'Created',
+				'CurrentData' => null,
+				'NewData'     => null,
+				'InsertDate'  => $p['InsertDate'],
+				'PaymentType' => $p['PaymentType'],
+				'PaymentID'   => $p['PaymentID'],
+				'AdminName'   => $p['AdminName'],
+			);
+		}
+
+		usort($logs, function ($a, $b) {
+			return strcmp($b['InsertDate'], $a['InsertDate']);
+		});
+
+		return $logs;
 	}
 
 }

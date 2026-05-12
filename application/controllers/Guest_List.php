@@ -40,14 +40,14 @@ class Guest_List extends CI_Controller
 					. ' | content_length=' . (isset($_SERVER['CONTENT_LENGTH']) ? $_SERVER['CONTENT_LENGTH'] : '?')
 					. ' | post_count=' . count($_POST, COUNT_RECURSIVE)
 					. ' | max_input_vars=' . ini_get('max_input_vars'));
-				$this->session->set_flashdata('error', $truncation_error);
+			$this->session->set_flashdata('error', $truncation_error);
 				redirect(base_url($_SERVER['REQUEST_URI']));
 				return;
 			}
 			$booking_id = $this->Guest_List_Model->Read_Booking_ID();
 			// Handle passport copy file uploads for existing guests
 			$passport_copy_paths = $this->handle_passport_uploads('passport_copies', $booking_id);
-			
+
 			// Handle passport copy file uploads for new guests
 			$new_passport_copy_paths = $this->handle_passport_uploads('new_passport_copies', $booking_id);
 			

@@ -1723,6 +1723,7 @@
 
 <?php function payment_log_field_label($column) {
     $labels = array(
+        'Created' => '(Record Created)',
         'Status' => 'Status',
         'Credit' => 'Credit (RM)',
         'Debit' => 'Debit (RM)',
