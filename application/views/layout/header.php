@@ -387,19 +387,35 @@ $is_dev_env = ($app_env !== 'prod');
 													</a>
 												</li>
 											<?php } ?>
-											<li class="menu-item <?php if($this->router->class == 'Product') { echo 'menu-item-active'; } ?>">
-												<a href="<?php echo base_url('Product'); ?>" class="menu-link">
-													<i class="menu-bullet menu-bullet-dot">
-														<span></span>
-													</i>
-													<span class="menu-text">Product</span>
-												</a>
-											</li>
-											<li class="menu-item <?php if($this->router->class == 'Footer') { echo 'menu-item-active'; } ?>">
-												<a href="<?php echo base_url('Footer'); ?>" class="menu-link">
-													<i class="menu-bullet menu-bullet-dot">
-														<span></span>
-													</i>
+												<li class="menu-item <?php if($this->router->class == 'Product') { echo 'menu-item-active'; } ?>">
+													<a href="<?php echo base_url('Product'); ?>" class="menu-link">
+														<i class="menu-bullet menu-bullet-dot">
+															<span></span>
+														</i>
+														<span class="menu-text">Product</span>
+													</a>
+												</li>
+												<li class="menu-item <?php if($this->router->class == 'Costing' && $this->router->method != 'Currency') { echo 'menu-item-active'; } ?>">
+													<a href="<?php echo base_url('Costing'); ?>" class="menu-link">
+														<i class="menu-bullet menu-bullet-dot">
+															<span></span>
+														</i>
+														<span class="menu-text">Costing Packages</span>
+													</a>
+												</li>
+												<li class="menu-item <?php if($this->router->class == 'Costing' && $this->router->method == 'Currency') { echo 'menu-item-active'; } ?>">
+													<a href="<?php echo base_url('Costing/Currency'); ?>" class="menu-link">
+														<i class="menu-bullet menu-bullet-dot">
+															<span></span>
+														</i>
+														<span class="menu-text">Costing Currency</span>
+													</a>
+												</li>
+												<li class="menu-item <?php if($this->router->class == 'Footer') { echo 'menu-item-active'; } ?>">
+													<a href="<?php echo base_url('Footer'); ?>" class="menu-link">
+														<i class="menu-bullet menu-bullet-dot">
+															<span></span>
+														</i>
 													<span class="menu-text">Footer</span>
 												</a>
 											</li>

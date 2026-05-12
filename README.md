@@ -32,8 +32,8 @@ I. Default Commands & order
 	php index.php Cron syncGhlContacts --full
 	php index.php Cron syncGhlConversations --full
 	php index.php Cron syncGhlMessages --full
-	php index.php Cron process_ghl_leads
-	php index.php Cron process_ghl_lead_conversions
+	php index.php Cron process_ghl_leads --full
+	php index.php Cron process_ghl_lead_conversions --full
 
 II. Default Daily & order 
 	php index.php Cron syncGhlUsers
