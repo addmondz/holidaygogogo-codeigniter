@@ -402,7 +402,7 @@
 												<div class="col-md-6">
 													<label id="<?php echo 'gender_label-' . $guest->GuestListID; ?>">Gender <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>
 													<select <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> name="genders[]" id="<?php echo 'gender-' . $guest->GuestListID; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" class="form-control">
-														<option <?php if(empty($guest->Gender)) { echo 'selected'; } ?> disabled value="">--SELECT GENDER--</option>
+														<option <?php if(empty($guest->Gender)) { echo 'selected'; } ?> value="">--SELECT GENDER--</option><?php // no disabled: keeps genders[] index aligned with guests[] for rows with no selection ?>
 														<option value="F" <?php if($guest->Gender == 'F') { echo 'selected'; } ?>>FEMALE</option>
 														<option value="M" <?php if($guest->Gender == 'M') { echo 'selected'; } ?>>MALE</option>
 													</select>
@@ -622,7 +622,7 @@
 																	<div class="col-md-6 mb-7 mb-md-0">
 																		<label id="<?php echo 'marital_status_label-' . $guest->GuestListID; ?>">Marital Status <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>
 																		<select <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> name="marital_statuses[]" id="<?php echo 'marital_status-' . $guest->GuestListID; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" class="form-control">
-																			<option <?php if(empty($guest->MaritalStatus)) { echo 'selected'; } ?> disabled value="">--SELECT MARITAL STATUS--</option>
+																			<option <?php if(empty($guest->MaritalStatus)) { echo 'selected'; } ?> value="">--SELECT MARITAL STATUS--</option><?php // no disabled: keeps marital_statuses[] index aligned with guests[] ?>
 																			<option value="DIVORCED" <?php if($guest->MaritalStatus == 'DIVORCED') { echo 'selected'; } ?>>DIVORCED</option>
 																			<option value="MARRIED" <?php if($guest->MaritalStatus == 'MARRIED') { echo 'selected'; } ?>>MARRIED</option>
 																			<option value="SINGLE" <?php if($guest->MaritalStatus == 'SINGLE') { echo 'selected'; } ?>>SINGLE</option>
@@ -661,7 +661,7 @@
 																	<div class="col-md-6 mb-7 mb-md-0">
 																		<label id="<?php echo 'country_label-' . $guest->GuestListID; ?>">Country <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>
 																		<select <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> name="countries[]" id="<?php echo 'country-' . $guest->GuestListID; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" class="form-control">
-																			<option <?php if(empty($guest->Country)) { echo 'selected'; } ?> disabled value="">--SELECT COUNTRY--</option>
+																			<option <?php if(empty($guest->Country)) { echo 'selected'; } ?> value="">--SELECT COUNTRY--</option><?php // no disabled: keeps countries[] index aligned with guests[] ?>
 																			<?php foreach($country_codes as $country) { ?>
 																				<option <?php if(!empty($guest->Country) && $country->CountryCodeID == $guest->Country) { echo 'selected'; } ?> value="<?php echo $country->CountryCodeID; ?>"><?php echo $country->Country; ?></option>
 																			<?php } ?>
