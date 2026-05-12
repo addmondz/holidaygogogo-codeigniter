@@ -20,12 +20,15 @@ class Admin extends MY_Controller
 					case 20:
 						$admin->Level = 'SALES AGENT';
 						break;
+					case 25:
+						$admin->Level = 'TEAM LEAD';
+						break;
 					case 30:
 						$admin->Level = 'FINANCE';
 						break;
 					default:
 				}
-				
+
 				switch($admin->Status) {
 					case 'Y':
 						$admin->StatusIcon = '<i class="la la-check-circle text-success"></i>';
@@ -49,8 +52,9 @@ class Admin extends MY_Controller
 			echo json_encode($status);
 		} else {
 			$titles = array('tab_title' => 'HolidayGoGoGo | Admin', 'breadcrumb_title' => 'Admin >> Create');
-			$array = array('Action' => 'C', 'AdminID' => 0, 'Name' => 'NA', 'AccessControl' => array());
+			$array = array('Action' => 'C', 'AdminID' => 0, 'Name' => 'NA', 'AccessControl' => array(), 'TeamLeadID' => '');
 			$array['country_codes'] = $this->Admin_Model->Read_Country_Codes();
+			$array['team_leads'] = $this->Admin_Model->Read_Team_Leads();
 			$this->load->view('layout/header', $titles);
 			$this->load->view('admin/admin', $array);
 			$this->load->view('layout/footer');
@@ -69,6 +73,7 @@ class Admin extends MY_Controller
 				$array['AccessControl'] = explode(',', $array['AccessControl']);
 				$array['Action'] = 'U';
 				$array['country_codes'] = $this->Admin_Model->Read_Country_Codes();
+				$array['team_leads'] = $this->Admin_Model->Read_Team_Leads();
 				$this->load->view('layout/header', $titles);
 				$this->load->view('admin/admin', $array);
 				$this->load->view('layout/footer');
@@ -87,7 +92,7 @@ class Admin extends MY_Controller
 			$this->load->view('errors/access_denied');
 		}
 	}
-	
+
 	function Update_Status_To_N()
 	{
 		if($this->input->is_ajax_request()) {

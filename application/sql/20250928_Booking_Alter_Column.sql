@@ -3,20 +3,20 @@
 
 -- 2. Add new column AutocountSyncAction
 ALTER TABLE booking
-  ADD COLUMN AutocountSyncAction CHAR(1) NULL
+  ADD COLUMN IF NOT EXISTS AutocountSyncAction CHAR(1) NULL
   COMMENT 'C: Create, U: Update, D: Delete, V: Void, S: Update_Status'
   AFTER Status;
 
 -- 3. Add new column AutocountSyncStatus
 ALTER TABLE booking
-  ADD COLUMN AutocountSyncStatus CHAR(1) NOT NULL DEFAULT 'P'
+  ADD COLUMN IF NOT EXISTS AutocountSyncStatus CHAR(1) NOT NULL DEFAULT 'P'
   COMMENT 'P: Pending, S: Synced, F: Failed'
   AFTER AutocountSyncAction;
 
 -- 4. Add new column AutocountSyncMessage
 ALTER TABLE booking
-  ADD COLUMN AutocountSyncMessage TEXT AFTER AutocountSyncStatus;
+  ADD COLUMN IF NOT EXISTS AutocountSyncMessage TEXT AFTER AutocountSyncStatus;
 
 -- 5. Create indexes
-CREATE INDEX IX_booking_AutocountSyncAction ON booking (AutocountSyncAction);
-CREATE INDEX IX_booking_AutocountSyncStatus ON booking (AutocountSyncStatus);
+CREATE INDEX IF NOT EXISTS IX_booking_AutocountSyncAction ON booking (AutocountSyncAction);
+CREATE INDEX IF NOT EXISTS IX_booking_AutocountSyncStatus ON booking (AutocountSyncStatus);

@@ -1,3 +1,8 @@
+<?php 
+$this->load->helper('utils');
+$app_env = get_app_env();
+$is_dev_env = ($app_env !== 'prod');
+?>
 <!DOCTYPE html>
 <html lang="en">
 
@@ -28,9 +33,57 @@
 	input[type=number] {
 		-moz-appearance: textfield;
 	}
+
+	/* Fix left menu scrolling */
+	.aside-menu-wrapper {
+		height: calc(100vh - 60px);
+		overflow: hidden;
+		display: flex;
+		flex-direction: column;
+	}
+
+	#kt_aside_menu {
+		overflow-y: auto !important;
+		overflow-x: hidden !important;
+		flex: 1;
+		height: 100%;
+		scrollbar-width: none; /* Firefox */
+		-ms-overflow-style: none; /* IE and Edge */
+	}
+
+	#kt_aside_menu::-webkit-scrollbar {
+		display: none; /* Chrome, Safari, Opera */
+	}
+
+	<?php if ($is_dev_env) { ?>
+	/* Adjust header position when dev banner is visible */
+	#dev-env-banner {
+		height: auto;
+		min-height: 40px;
+	}
+	.header.header-fixed {
+		top: 40px !important;
+	}
+	.header-mobile.header-mobile-fixed {
+		top: 40px !important;
+	}
+	/* Adjust aside menu height to account for banner */
+	.aside-menu-wrapper {
+		height: calc(100vh - 100px) !important;
+	}
+	/* Adjust wrapper to account for banner */
+	.wrapper {
+		margin-top: 0 !important;
+	}
+	<?php } ?>
 </style>
 
 <body class="header-fixed header-mobile-fixed subheader-enabled subheader-fixed aside-enabled aside-fixed aside-minimize-hoverable page-loading">
+	<?php if ($is_dev_env) { ?>
+	<div id="dev-env-banner" style="background-color: #FFA500; color: #000; text-align: center; padding: 10px; font-size: 14px; position: fixed; top: 0; left: 0; right: 0; z-index: 9999; box-shadow: 0 2px 4px rgba(0,0,0,0.2); line-height: 1.4;">
+		This is a development environment. It is safe to make any changes here.
+	</div>
+	<?php } ?>
 	<div class="header-mobile align-items-center header-mobile-fixed" style="background-color:black;">
 		<a href="<?php echo base_url('Dashboard'); ?>">
 			<img src="">
@@ -56,7 +109,7 @@
 			<div id="kt_aside" class="aside aside-left aside-fixed d-flex flex-column flex-row-auto">
 				<div class="brand flex-column-auto mt-6">
 					<a href="<?php echo base_url('Dashboard'); ?>" class="brand-logo">
-						<img src="<?php echo base_url('assets/image/logo.png'); ?>" class="w-100">
+						<img src="<?php echo base_url('assets/image/logo.png'); ?>" style="width: 100%;">
 					</a>
 					<button id="kt_aside_toggle" class="brand-toggle btn btn-sm px-0">
 						<span class="svg-icon svg-icon-xl">
@@ -204,11 +257,29 @@
 														<span class="menu-text">Guest By Country</span>
 													</a>
 												</li>
+												<?php if($this->session->level == 10) { ?>
+													<li class="menu-item <?php if($this->router->method == 'Lead_Dashboard') { echo 'menu-item-active'; } ?>">
+														<a href="<?php echo base_url('Report/Lead_Dashboard'); ?>" class="menu-link">
+															<i class="menu-bullet menu-bullet-dot">
+																<span></span>
+															</i>
+															<span class="menu-text">Lead Dashboard</span>
+														</a>
+													</li>
+													<li class="menu-item <?php if($this->router->method == 'Lead_Data') { echo 'menu-item-active'; } ?>">
+														<a href="<?php echo base_url('Report/Lead_Data'); ?>" class="menu-link">
+															<i class="menu-bullet menu-bullet-dot">
+																<span></span>
+															</i>
+															<span class="menu-text">Lead Data</span>
+														</a>
+													</li>
+												<?php } ?>
 											</ul>
 										</div>
 									</li>
 								<?php } ?>
-								<li class="menu-item menu-item-submenu <?php if($this->router->class == 'Category_Code' || $this->router->class == 'Category' || $this->router->class == 'Supplier' || $this->router->class == 'Product' || $this->router->class == 'Footer' || $this->router->class == 'Country_Code' || $this->router->class == 'Tag' || $this->router->class == 'Source') { echo 'menu-item-active menu-item-open'; } ?>">
+								<li class="menu-item menu-item-submenu <?php if($this->router->class == 'Category_Code' || $this->router->class == 'Category' || $this->router->class == 'Supplier' || $this->router->class == 'Product' || $this->router->class == 'Footer' || $this->router->class == 'Country_Code' || $this->router->class == 'Tag' || $this->router->class == 'Source' || $this->router->class == 'Package_Checklist' || $this->router->class == 'Product_Package_Checklist' || $this->router->class == 'Cancellation_Reason') { echo 'menu-item-active menu-item-open'; } ?>">
 									<a href="javascript:;" class="menu-link menu-toggle">
 										<span class="svg-icon menu-icon">
 											<svg>
@@ -258,19 +329,37 @@
 													</a>
 												</li>
 											<?php } ?>
-											<li class="menu-item <?php if($this->router->class == 'Product') { echo 'menu-item-active'; } ?>">
-												<a href="<?php echo base_url('Product'); ?>" class="menu-link">
-													<i class="menu-bullet menu-bullet-dot">
-														<span></span>
-													</i>
-													<span class="menu-text">Product</span>
-												</a>
-											</li>
-											<li class="menu-item <?php if($this->router->class == 'Footer') { echo 'menu-item-active'; } ?>">
-												<a href="<?php echo base_url('Footer'); ?>" class="menu-link">
-													<i class="menu-bullet menu-bullet-dot">
-														<span></span>
-													</i>
+												<li class="menu-item <?php if($this->router->class == 'Product') { echo 'menu-item-active'; } ?>">
+													<a href="<?php echo base_url('Product'); ?>" class="menu-link">
+														<i class="menu-bullet menu-bullet-dot">
+															<span></span>
+														</i>
+														<span class="menu-text">Product</span>
+													</a>
+												</li>
+												<?php if($this->session->level == 10) { ?>
+													<li class="menu-item <?php if($this->router->class == 'Costing' && $this->router->method != 'Currency') { echo 'menu-item-active'; } ?>">
+														<a href="<?php echo base_url('Costing'); ?>" class="menu-link">
+															<i class="menu-bullet menu-bullet-dot">
+																<span></span>
+															</i>
+															<span class="menu-text">Costing Packages</span>
+														</a>
+													</li>
+													<li class="menu-item <?php if($this->router->class == 'Costing' && $this->router->method == 'Currency') { echo 'menu-item-active'; } ?>">
+														<a href="<?php echo base_url('Costing/Currency'); ?>" class="menu-link">
+															<i class="menu-bullet menu-bullet-dot">
+																<span></span>
+															</i>
+															<span class="menu-text">Costing Currency</span>
+														</a>
+													</li>
+												<?php } ?>
+												<li class="menu-item <?php if($this->router->class == 'Footer') { echo 'menu-item-active'; } ?>">
+													<a href="<?php echo base_url('Footer'); ?>" class="menu-link">
+														<i class="menu-bullet menu-bullet-dot">
+															<span></span>
+														</i>
 													<span class="menu-text">Footer</span>
 												</a>
 											</li>
@@ -298,6 +387,22 @@
 													<span class="menu-text">Source</span>
 												</a>
 											</li>
+											<li class="menu-item <?php if($this->router->class == 'Package_Checklist') { echo 'menu-item-active'; } ?>">
+												<a href="<?php echo base_url('Package_Checklist'); ?>" class="menu-link">
+													<i class="menu-bullet menu-bullet-dot">
+														<span></span>
+													</i>
+													<span class="menu-text">Package Checklist</span>
+												</a>
+											</li>
+											<li class="menu-item <?php if($this->router->class == 'Cancellation_Reason') { echo 'menu-item-active'; } ?>">
+												<a href="<?php echo base_url('Cancellation_Reason'); ?>" class="menu-link">
+													<i class="menu-bullet menu-bullet-dot">
+														<span></span>
+													</i>
+													<span class="menu-text">Cancellation Reason</span>
+												</a>
+											</li>
 										</ul>
 									</div>
 								</li>
@@ -314,6 +419,75 @@
 						<div class="header-menu header-menu-mobile header-menu-layout-default"></div>
 					</div>
 					<div class="topbar">
+						<!-- Remarks/Messages Dropdown -->
+						<div class="topbar-item position-relative">
+							<div class="btn btn-icon btn-clean btn-lg mr-1 position-relative" id="kt_remarks_toggle" data-toggle="dropdown" data-offset="10px,10px">
+								<i class="la la-comment-dots la-2x text-primary"></i>
+								<span class="label label-lg label-light-danger label-inline label-rounded position-absolute" id="remarks-badge" style="top: -5px; right: -5px; display: none; min-width: 20px; padding: 2px 6px;">0</span>
+							</div>
+							<div class="dropdown-menu dropdown-menu-right p-0 m-0 dropdown-menu-anim-up dropdown-menu-lg" id="remarks-dropdown" style="width: 420px; right: 0; left: auto;">
+								<div class="d-flex align-items-center justify-content-between p-5 border-bottom">
+									<h5 class="mb-0">Messages</h5>
+								</div>
+								<ul class="nav nav-tabs nav-tabs-line nav-tabs-bold px-5 pt-2 mb-0" role="tablist">
+									<li class="nav-item">
+										<a class="nav-link active" data-toggle="tab" href="#remarks-tab-internal" role="tab" data-type="1">Internal Comments</a>
+									</li>
+									<li class="nav-item">
+										<a class="nav-link" data-toggle="tab" href="#remarks-tab-customer" role="tab" data-type="2">Customer Remarks</a>
+									</li>
+								</ul>
+								<div class="tab-content" style="max-height: 400px; overflow-y: auto;">
+									<div class="tab-pane fade show active" id="remarks-tab-internal" role="tabpanel">
+										<div class="remarks-list" data-type="1">
+											<div class="text-center p-10">
+												<div class="spinner spinner-primary spinner-lg"></div>
+												<div class="mt-3">Loading...</div>
+											</div>
+										</div>
+										<div class="text-center py-2 d-none" id="mark-read-internal">
+											<a href="javascript:;" class="mark-tab-remarks-read text-primary font-weight-bold font-size-sm" data-type="1">Mark all as read</a>
+										</div>
+										<div class="text-center py-3 border-top d-none" id="load-more-internal">
+											<a href="javascript:;" class="btn btn-sm btn-light-primary font-weight-bold load-more-remarks" data-type="1">Load More</a>
+										</div>
+									</div>
+									<div class="tab-pane fade" id="remarks-tab-customer" role="tabpanel">
+										<div class="remarks-list" data-type="2">
+											<div class="text-center p-10">
+												<div class="spinner spinner-primary spinner-lg"></div>
+												<div class="mt-3">Loading...</div>
+											</div>
+										</div>
+										<div class="text-center py-2 d-none" id="mark-read-customer">
+											<a href="javascript:;" class="mark-tab-remarks-read text-primary font-weight-bold font-size-sm" data-type="2">Mark all as read</a>
+										</div>
+										<div class="text-center py-3 border-top d-none" id="load-more-customer">
+											<a href="javascript:;" class="btn btn-sm btn-light-primary font-weight-bold load-more-remarks" data-type="2">Load More</a>
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+						<!-- Notifications Dropdown -->
+						<div class="topbar-item position-relative">
+							<div class="btn btn-icon btn-clean btn-lg mr-1 position-relative" id="kt_notification_toggle" data-toggle="dropdown" data-offset="10px,10px">
+								<i class="la la-bell la-2x text-primary"></i>
+								<span class="label label-lg label-light-danger label-inline label-rounded position-absolute" id="notification-badge" style="top: -5px; right: -5px; display: none; min-width: 20px; padding: 2px 6px;">0</span>
+							</div>
+							<!-- Notification Dropdown -->
+							<div class="dropdown-menu dropdown-menu-right p-0 m-0 dropdown-menu-anim-up dropdown-menu-lg" id="notification-dropdown" style="width: 400px; max-height: 500px; overflow-y: auto;">
+								<div class="d-flex align-items-center justify-content-between p-5 border-bottom">
+									<h5 class="mb-0">Notifications</h5>
+								</div>
+								<div class="notification-list" id="notification-list">
+									<div class="text-center p-10">
+										<div class="spinner spinner-primary spinner-lg"></div>
+										<div class="mt-3">Loading notifications...</div>
+									</div>
+								</div>
+							</div>
+						</div>
 						<div class="topbar-item">
 							<div id="kt_quick_user_toggle" class="btn btn-icon btn-icon-mobile w-auto btn-clean d-flex align-items-center btn-lg px-2">
 								<span class="text-muted font-weight-bold font-size-base d-md-inline mr-1">Welcome,</span>

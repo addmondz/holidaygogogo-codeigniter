@@ -55,6 +55,18 @@
                                 <textarea name="travel_voucher_content" id="kt-tinymce-5" autocomplete="off" class="tox-target"><?php if(current_url() == base_url('Footer/Update')) { echo $TravelVoucherContent; } ?></textarea>
                             </div>
                         </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Key Contacts</label>
+                                <textarea name="key_contacts" id="kt-tinymce-6" autocomplete="off" class="tox-target"><?php echo isset($KeyContacts) ? $KeyContacts : ''; ?></textarea>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Special Remarks</label>
+                                <textarea name="special_remarks" id="kt-tinymce-7" autocomplete="off" class="tox-target"><?php echo isset($SpecialRemarks) ? $SpecialRemarks : ''; ?></textarea>
+                            </div>
+                        </div>
                     </div>
                     <div class="d-flex justify-content-between border-top pt-5">
                         <input type="submit" value="<?php if(current_url() == base_url('Footer/Create')) { echo 'Create Footer'; } else { echo 'Update Footer'; } ?>" class="btn btn-success font-weight-bold px-9 py-4" style="width:180px; margin-left:auto;">
@@ -118,13 +130,18 @@
             if(action.isConfirmed) {
                 var booking_confirmation_title = $('input[name="booking_confirmation_title"]').val();
                 var travel_voucher_title = $('input[name="travel_voucher_title"]').val();
-                var insufficient_footer_information = 0;
+                var booking_confirmation_content = '';
+                var travel_voucher_content = '';
+                // Get content from specific TinyMCE editors (kt-tinymce-4 and kt-tinymce-5 are required)
                 for(i = 0; i < tinyMCE.editors.length; i++) {
-                    if(tinyMCE.editors[i].getContent() == '') {
-                        insufficient_footer_information++;
+                    if(tinyMCE.editors[i].id == 'kt-tinymce-4') {
+                        booking_confirmation_content = tinyMCE.editors[i].getContent();
+                    }
+                    if(tinyMCE.editors[i].id == 'kt-tinymce-5') {
+                        travel_voucher_content = tinyMCE.editors[i].getContent();
                     }
                 }
-                if(booking_confirmation_title == '' || travel_voucher_title == '' || insufficient_footer_information > 0) {
+                if(booking_confirmation_title == '' || travel_voucher_title == '' || booking_confirmation_content == '' || travel_voucher_content == '') {
                     Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', 'Please Insert All Required Footer Information', null);
                 } else {
                     $('#form').submit();

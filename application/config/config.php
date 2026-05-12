@@ -550,3 +550,17 @@ $config['rewrite_short_tags'] = FALSE;
 | Array:		array('10.0.1.200', '192.168.5.0/24')
 */
 $config['proxy_ips'] = '';
+
+/*
+|--------------------------------------------------------------------------
+| Customer Portal HMAC Secret
+|--------------------------------------------------------------------------
+|
+| Secret key used for generating and verifying HMAC hashes for customer
+| portal URLs. This should be a long, random string stored securely.
+| You can also set this via .env file as CUSTOMER_PORTAL_HMAC_SECRET
+|
+*/
+$config['customer_portal_hmac_secret'] = isset($env['CUSTOMER_PORTAL_HMAC_SECRET']) && !empty($env['CUSTOMER_PORTAL_HMAC_SECRET']) 
+    ? $env['CUSTOMER_PORTAL_HMAC_SECRET'] 
+    : 'change-this-to-a-secure-random-string-in-production';

@@ -1,3 +1,4 @@
 .env
 application/cache/sessions/*
 assets/upload/
+assets/upload/*

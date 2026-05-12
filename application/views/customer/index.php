@@ -200,6 +200,20 @@ div.kt-datatable__pager-container {
                                                 <div class="dropdown-menu">
                                                     <!-- delete disable -- controller, model, autocount all done QA, if need just add button -->
                                                     <a href="<?php echo base_url('Customer/Update?customer_id=') . $customer->CustomerID; ?>" class="dropdown-item" style="font-size:11px;">Update Customer</a>
+                                                    <a href="#" class="dropdown-item copy-customer-link" data-customer-id="<?php echo $customer->CustomerID; ?>" style="font-size:11px;">
+                                                        Copy Customer Link
+                                                    </a>
+                                                    <?php 
+                                                        // Generate portal hash for direct link
+                                                        $this->load->helper('utils');
+                                                        $portal_hash = generate_customer_portal_hash($customer->CustomerID);
+                                                        // Only show link if hash was generated successfully
+                                                        if (!empty($portal_hash) && $portal_hash !== false):
+                                                    ?>
+                                                    <a href="<?php echo base_url('customer/' . urlencode($portal_hash)); ?>" target="_blank" class="dropdown-item" style="font-size:11px;">
+                                                        Customer Portal
+                                                    </a>
+                                                    <?php endif; ?>
                                                 </div>
                                             </div>
                                         </td>
@@ -302,6 +316,89 @@ div.kt-datatable__pager-container {
         Reset('<?php echo base_url('Customer'); ?>');
     });
 
+    // Copy Customer Portal Link functionality
+    $(document).on('click', '.copy-customer-link', function(e) {
+        e.preventDefault();
+        var $button = $(this);
+        var customerId = $button.data('customer-id');
+        var originalText = $button.html();
+        
+        // Disable button and show loading
+        $button.prop('disabled', true).html('<i class="la la-spinner la-spin"></i> Generating...');
+        
+        // Fetch portal URL
+        $.ajax({
+            url: '<?php echo base_url('Customer/GeneratePortalUrl'); ?>',
+            method: 'GET',
+            data: { customer_id: customerId },
+            dataType: 'json',
+            success: function(response) {
+                if (response.success && response.portal_url) {
+                    // Copy to clipboard using modern API with fallback
+                    var urlToCopy = response.portal_url;
+                    
+                    if (navigator.clipboard && window.isSecureContext) {
+                        // Use modern Clipboard API
+                        navigator.clipboard.writeText(urlToCopy).then(function() {
+                            showCopySuccess($button, originalText);
+                        }).catch(function(err) {
+                            console.error('Failed to copy:', err);
+                            fallbackCopy(urlToCopy, $button, originalText);
+                        });
+                    } else {
+                        // Fallback for older browsers
+                        fallbackCopy(urlToCopy, $button, originalText);
+                    }
+                } else {
+                    alert('Failed to generate portal link: ' + (response.message || 'Unknown error'));
+                    $button.prop('disabled', false).html(originalText);
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('Error generating portal URL:', error);
+                alert('Error generating portal link. Please try again.');
+                $button.prop('disabled', false).html(originalText);
+            }
+        });
+    });
+    
+    // Fallback copy function for older browsers
+    function fallbackCopy(text, $button, originalText) {
+        var tempInput = $('<input>');
+        $('body').append(tempInput);
+        tempInput.val(text).select();
+        try {
+            document.execCommand('copy');
+            showCopySuccess($button, originalText);
+        } catch (err) {
+            console.error('Fallback copy failed:', err);
+            alert('Failed to copy. Please copy manually: ' + text);
+            $button.prop('disabled', false).html(originalText);
+        }
+        tempInput.remove();
+    }
+    
+    // Show success feedback
+    function showCopySuccess($button, originalText) {
+        $button.html('<i class="la la-check"></i> Copied!');
+        setTimeout(function() {
+            $button.prop('disabled', false).html(originalText);
+        }, 2000);
+        
+        // Show toast notification if available
+        if (typeof toastr !== 'undefined') {
+            toastr.success('Customer portal link copied to clipboard!');
+        } else if (typeof Swal !== 'undefined') {
+            Swal.fire({
+                icon: 'success',
+                title: 'Copied!',
+                text: 'Customer portal link copied to clipboard',
+                timer: 2000,
+                showConfirmButton: false
+            });
+        }
+    }
+    
     function Reset_Created_Date() {
         $('#kt_daterangepicker_customer input').val('');
     }

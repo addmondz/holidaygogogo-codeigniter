@@ -11,6 +11,7 @@ class Product extends MY_Controller
 		parent::__construct();
 		$this->load->model('Product_Model');
 		$this->load->model('Universal_Model');
+		$this->load->model('Product_Package_Checklist_Model');
 	}
 
 	function index()
@@ -31,12 +32,34 @@ class Product extends MY_Controller
 	function Create()
 	{
 		if($this->input->is_ajax_request()) {
-			$this->Product_Model->Create();
+			$product_id = $this->Product_Model->Create();
+			
+			// Only proceed with checklists if product was created successfully
+			if($product_id && $product_id > 0) {
+				// Get checklist IDs from POST
+				$checklist_ids = $this->input->post('checklist_ids');
+				if(!empty($checklist_ids) && is_array($checklist_ids)) {
+					// Normalize to integers
+					$checklist_ids = array_map('intval', $checklist_ids);
+					$checklist_ids = array_values(array_filter($checklist_ids, function($id) { return $id > 0; }));
+				} else {
+					$checklist_ids = array();
+				}
+				
+				// Save checklists for the new product (required ones will be auto-added by the model)
+				$this->Product_Package_Checklist_Model->Bulk_Update_Product_Checklists($product_id, $checklist_ids);
+			}
 		} else {
 			$titles = array('tab_title' => 'HolidayGoGoGo | Product', 'breadcrumb_title' => 'Product >> Create');
-			$array = array('ProductID' => 'NA', 'ProductCode' => 'NA');
+			$array = array('ProductID' => 'NA', 'ProductCode' => 'NA', 'is_child_or_infant' => 0, 'has_supplier_deposit' => 0);
 			$array['categories'] = $this->Product_Model->Read_Categories();
 			$array['suppliers'] = $this->Product_Model->Read_Suppliers();
+			
+			// Get package checklists for create page
+			$this->load->model('Product_Package_Checklist_Model');
+			$array['package_checklists'] = $this->Product_Package_Checklist_Model->Read_Package_Checklists();
+			$array['selected_checklist_ids'] = array(); // Empty for new product
+			
 			$this->load->view('layout/header', $titles);
 			$this->load->view('product/product', $array);
 			$this->load->view('layout/footer');
@@ -56,9 +79,29 @@ class Product extends MY_Controller
 				$array = $this->Product_Model->Read_Product();
 				$array['RetailPrice'] = $array['RetailPrice'] == 0.00 ? null : number_format($array['RetailPrice'], 2, '.', ',');
             	$array['SupplierPrice'] = $array['SupplierPrice'] == 0.00 ? null : number_format($array['SupplierPrice'], 2, '.', ',');
+				$array['is_child_or_infant'] = $array['is_child_or_infant'] ?? 0;
+			$array['has_supplier_deposit'] = $array['has_supplier_deposit'] ?? 0;
 				$array['categories'] = $this->Product_Model->Read_Categories();
 				$array['suppliers'] = $this->Product_Model->Read_Suppliers();
             	$array['maxNameLength'] = 99 - strlen($array['ProductCode']) - 3;
+				
+				// Get package checklists for this product
+				$array['package_checklists'] = $this->Product_Package_Checklist_Model->Read_Package_Checklists();
+				$array['selected_checklist_ids'] = $this->Product_Package_Checklist_Model->Get_Checklists_For_Product($array['ProductID']);
+				
+				// Ensure required checklists are always included
+				$required_ids = array();
+				foreach($array['package_checklists'] as $checklist) {
+					if(isset($checklist->is_required) && $checklist->is_required == 1) {
+						$required_ids[] = $checklist->ID;
+					}
+				}
+				foreach($required_ids as $req_id) {
+					if(!in_array($req_id, $array['selected_checklist_ids'])) {
+						$array['selected_checklist_ids'][] = $req_id;
+					}
+				}
+				
 				$this->load->view('layout/header', $titles);
 				$this->load->view('product/product', $array);
 				$this->load->view('layout/footer');
@@ -71,6 +114,50 @@ class Product extends MY_Controller
 	function Delete() 
 	{
 		$this->Universal_Model->Delete('ProductID', $this->input->get('product_id'), 'product');
+	}
+
+	function UpdateChecklists()
+	{
+		if($this->input->is_ajax_request()) {
+			$product_id = $this->input->post('product_id');
+			$checklist_ids = $this->input->post('checklist_ids');
+			
+			if(empty($product_id)) {
+				$this->output
+					->set_content_type('application/json')
+					->set_output(json_encode(['success' => false, 'message' => 'Product ID is required']));
+				return;
+			}
+			
+			// Ensure checklist_ids is an array
+			if(!is_array($checklist_ids)) {
+				$checklist_ids = array();
+			}
+			
+			// Convert string IDs to integers (preserve order!)
+			$checklist_ids = array_map('intval', $checklist_ids);
+			$checklist_ids = array_filter($checklist_ids, function($id) { return $id > 0; }); // Remove zeros/negatives
+			$checklist_ids = array_values($checklist_ids); // Re-index array to preserve order
+			
+			// Log the order being saved
+			log_message('debug', 'UpdateChecklists - Product ID: ' . $product_id . ', Order: ' . json_encode($checklist_ids));
+			
+			$result = $this->Product_Package_Checklist_Model->Bulk_Update_Product_Checklists($product_id, $checklist_ids);
+			
+			if($result) {
+				$this->output
+					->set_content_type('application/json')
+					->set_output(json_encode(['success' => true, 'message' => 'Product checklists updated successfully', 'order' => $checklist_ids]));
+			} else {
+				$this->output
+					->set_content_type('application/json')
+					->set_output(json_encode(['success' => false, 'message' => 'Failed to update product checklists']));
+			}
+		} else {
+			$this->output
+				->set_content_type('application/json')
+				->set_output(json_encode(['success' => false, 'message' => 'Invalid request']));
+		}
 	}
 	
 	function Download() {

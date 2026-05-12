@@ -62,6 +62,8 @@ class Footer extends MY_Controller
 				$booking_confirmation_content = $this->input->post('booking_confirmation_content');
 				$travel_voucher_title = strtoupper($this->input->post('travel_voucher_title'));
 				$travel_voucher_content = $this->input->post('travel_voucher_content');
+				$key_contacts = $this->input->post('key_contacts');
+				$special_remarks = $this->input->post('special_remarks');
 				if($booking_confirmation_title != $footer['BookingConfirmationTitle']) {
 					$array['footer'][0]['BookingConfirmationTitle'] = $booking_confirmation_title;
 				}
@@ -73,6 +75,16 @@ class Footer extends MY_Controller
 				}
 				if($travel_voucher_content != $footer['TravelVoucherContent']) {
 					$array['footer'][0]['TravelVoucherContent'] = $travel_voucher_content;
+				}
+				if(isset($footer['KeyContacts']) && $key_contacts != $footer['KeyContacts']) {
+					$array['footer'][0]['KeyContacts'] = $key_contacts;
+				} elseif(!isset($footer['KeyContacts']) && !empty($key_contacts)) {
+					$array['footer'][0]['KeyContacts'] = $key_contacts;
+				}
+				if(isset($footer['SpecialRemarks']) && $special_remarks != $footer['SpecialRemarks']) {
+					$array['footer'][0]['SpecialRemarks'] = $special_remarks;
+				} elseif(!isset($footer['SpecialRemarks']) && !empty($special_remarks)) {
+					$array['footer'][0]['SpecialRemarks'] = $special_remarks;
 				}
 				if(count($array['footer'][0]) > 3) {
 					$this->Footer_Model->Update($array['footer']);
@@ -113,28 +125,34 @@ class Footer extends MY_Controller
 		$spreadsheet->getActiveSheet()->setCellValue('B1', 'BC CONTENT');
 		$spreadsheet->getActiveSheet()->setCellValue('C1', 'TV TITLE');
 		$spreadsheet->getActiveSheet()->setCellValue('D1', 'TV CONTENT');
+		$spreadsheet->getActiveSheet()->setCellValue('E1', 'KEY CONTACTS');
+		$spreadsheet->getActiveSheet()->setCellValue('F1', 'SPECIAL REMARKS');
 		$row = 2;
 		$footers = $this->Footer_Model->Read_Footers2();
-		$spreadsheet->getActiveSheet()->getStyle('A1:D1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_BLACK);
-		$spreadsheet->getActiveSheet()->getStyle('A1:D1')->getFont()->getColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_WHITE);
-		$spreadsheet->getActiveSheet()->getStyle('A1:D1')->getFont()->setBold(true);
+		$spreadsheet->getActiveSheet()->getStyle('A1:F1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_BLACK);
+		$spreadsheet->getActiveSheet()->getStyle('A1:F1')->getFont()->getColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_WHITE);
+		$spreadsheet->getActiveSheet()->getStyle('A1:F1')->getFont()->setBold(true);
 		if(!empty($footers)) {
 			foreach($footers as $footer) {
 				$spreadsheet->getActiveSheet()->setCellValueExplicit('A' . $row, $footer->BookingConfirmationTitle, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 				$spreadsheet->getActiveSheet()->setCellValueExplicit('B' . $row, strip_tags(htmlspecialchars_decode(str_replace('&nbsp;', '', $footer->BookingConfirmationContent))), \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 				$spreadsheet->getActiveSheet()->setCellValueExplicit('C' . $row, $footer->TravelVoucherTitle, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 				$spreadsheet->getActiveSheet()->setCellValueExplicit('D' . $row, strip_tags(htmlspecialchars_decode(str_replace('&nbsp;', '', $footer->TravelVoucherContent))), \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+				$spreadsheet->getActiveSheet()->setCellValueExplicit('E' . $row, strip_tags(htmlspecialchars_decode(str_replace('&nbsp;', '', $footer->KeyContacts ?? ''))), \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+				$spreadsheet->getActiveSheet()->setCellValueExplicit('F' . $row, strip_tags(htmlspecialchars_decode(str_replace('&nbsp;', '', $footer->SpecialRemarks ?? ''))), \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 				$row++;
 			}
 		} else {
-			$spreadsheet->getActiveSheet()->mergeCells('A2:D2');
+			$spreadsheet->getActiveSheet()->mergeCells('A2:F2');
 			$spreadsheet->getActiveSheet()->getCell('A2')->setValue('Footer Records Not Found');
-			$spreadsheet->getActiveSheet()->getStyle('A:D')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
+			$spreadsheet->getActiveSheet()->getStyle('A:F')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
 		}
 		$spreadsheet->getActiveSheet()->getColumnDimension('A')->setWidth(35);
 		$spreadsheet->getActiveSheet()->getColumnDimension('B')->setWidth(35);
 		$spreadsheet->getActiveSheet()->getColumnDimension('C')->setWidth(35);
 		$spreadsheet->getActiveSheet()->getColumnDimension('D')->setWidth(35);
+		$spreadsheet->getActiveSheet()->getColumnDimension('E')->setWidth(35);
+		$spreadsheet->getActiveSheet()->getColumnDimension('F')->setWidth(35);
 		$footer_records = 'FOOTER_RECORDS_' . date('Ymd') . '.xlsx';
 		header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 		header('Content-Disposition: attachment;filename="' . $footer_records . '"');

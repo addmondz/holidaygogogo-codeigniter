@@ -1,20 +1,21 @@
-<?php
-
-require_once APPPATH.'libraries/dompdf/autoload.inc.php';
-require FCPATH.'vendor/autoload.php';  
-use Clegginabox\PDFMerger\PDFMerger;
-use Dompdf\Dompdf;
-
-class Booking_Confirmation extends CI_Controller
+<?php
+
+require_once APPPATH.'libraries/dompdf/autoload.inc.php';
+require FCPATH.'vendor/autoload.php';
+use Clegginabox\PDFMerger\PDFMerger;
+use Dompdf\Dompdf;
+
+class Booking_Confirmation extends CI_Controller
 {
 	function __construct()
 	{
 		parent::__construct();
-		$this->load->model('Booking_Model');
-        $this->load->model('Universal_Model');
-		$this->load->model('Booking_Product_Model');
-		$this->load->model('Company_Model');
-	}
+		$this->load->model('Booking_Model');
+        $this->load->model('Universal_Model');
+		$this->load->model('Booking_Product_Model');
+		$this->load->model('Company_Model');
+		$this->load->model('Payment_Model');
+	}
 
     function index()
 	{  
@@ -25,11 +26,13 @@ class Booking_Confirmation extends CI_Controller
 		if(empty($array)) {
 			$this->load->view('errors/access_denied');
 		} else {
-            if(($this->session->has_userdata('admin_id') && $this->session->has_userdata('level')) || ($array['Status'] != 'Y' && $array['AfterSalesService'] != 'COMPLETE' || $array['Status'] == 'Y' && $array['AfterSalesService'] == 'PENDING')) {
-                $array['DepositDeadline'] = empty($array['DepositDeadline']) ? '-' : strtoupper(date('j M Y', strtotime($array['DepositDeadline'])));
-                $array['FullPaymentDeadline'] = strtoupper(date('j M Y', strtotime($array['FullPaymentDeadline'])));
-                $array['CustomerMobile'] = $array['CountryCode'] . $array['CustomerMobile'];
-                if(!empty($array['StartDate']) && !empty($array['EndDate'])) {
+            if(($this->session->has_userdata('admin_id') && $this->session->has_userdata('level')) || ($array['Status'] != 'Y' && $array['AfterSalesService'] != 'COMPLETE' || $array['Status'] == 'Y' && $array['AfterSalesService'] == 'PENDING')) {
+                $array['DepositDeadline'] = empty($array['DepositDeadline']) ? '-' : strtoupper(date('j M Y', strtotime($array['DepositDeadline'])));
+                $deposit_percentage = isset($array['DepositPercentage']) ? $array['DepositPercentage'] : 0;
+                $array['DepositAmount'] = ceil($array['NetTotal'] * $deposit_percentage / 100);
+                $array['FullPaymentDeadline'] = strtoupper(date('j M Y', strtotime($array['FullPaymentDeadline'])));
+                $array['CustomerMobile'] = $array['CountryCode'] . $array['CustomerMobile'];
+                if(!empty($array['StartDate']) && !empty($array['EndDate'])) {
                     $array['TravelDate'] = strtoupper(date('j M', strtotime($array['StartDate'])) . ' - ' . date('j M Y', strtotime($array['EndDate'])));
                 } else {
                     $array['TravelDate'] = '-';
@@ -108,13 +111,25 @@ class Booking_Confirmation extends CI_Controller
                 $array['num'] = count($array['booking_products']);
                 $company = $this->Company_Model->Read();
                 $array['CompanyName'] = $company['Name'];
-                $array['CompanyRegistrationNumber'] = $company['RegistrationNumber'];
-                $array['CompanyLicenseNumber'] = $company['LicenseNumber'];
-                $array['CompanyAddress'] = $company['Address'];
-                $array['CompanyWebsite'] = $company['Website'];
-
-                if(isset($_GET['nick'])) {
-                    $this->load->view('booking/booking_confirmation', $array); exit;
+                $array['CompanyRegistrationNumber'] = $company['RegistrationNumber'];
+                $array['CompanyLicenseNumber'] = $company['LicenseNumber'];
+                $array['CompanyAddress'] = $company['Address'];
+                $array['CompanyWebsite'] = $company['Website'];
+
+                $total_paid = 0;
+                $payments = $this->Payment_Model->Read_Approved_Payments($array['BookingID']);
+                if(!empty($payments)) {
+                    foreach($payments as $payment) {
+                        if($payment->Type != 'SUPPLIER REFUND' && $payment->Credit > 0) {
+                            $total_paid += $payment->Credit;
+                        }
+                    }
+                }
+                $array['TotalPaid'] = $total_paid;
+                $array['OutstandingBalance'] = $array['NetTotal'] - $total_paid;
+
+                if(isset($_GET['nick'])) {
+                    $this->load->view('booking/booking_confirmation', $array); exit;
                 }
                 $pdf1 = new Dompdf();
                 $pdf1->loadHtml($this->load->view('booking/booking_confirmation', $array, true), 'UTF-8');
@@ -129,32 +144,32 @@ class Booking_Confirmation extends CI_Controller
                 $pdf2->loadHtml($this->load->view('booking/booking_footer', $array, true), 'UTF-8');
                 $pdf2->set_option('isRemoteEnabled', true);
                 $pdf2->set_option('enable_html5_parser', true);
-                $pdf2->setPaper('A4', 'potrait');
-                $pdf2->render();
-                $output2 = $pdf2->output();
-                file_put_contents('assets/upload/2_'.$identifier.'.pdf', $output2);
-
-                $pdf = new \Clegginabox\PDFMerger\PDFMerger;
-
-                $pdf->addPDF('assets/upload/1_'.$identifier.'.pdf', 'all');
-                $pdf->addPDF('assets/upload/2_'.$identifier.'.pdf', 'all');
-                $pdfContent = $pdf->merge('string', $array['Title'].'3.pdf', 'P');
-
-                header('Content-Type: application/pdf');
-                header('Content-Disposition: inline; filename="'.$array['Title'].'3.pdf"');
-                header('Content-Length: '.strlen($pdfContent));
-                header('Cache-Control: no-cache, no-store, must-revalidate');
+                $pdf2->setPaper('A4', 'potrait');
+                $pdf2->render();
+                $output2 = $pdf2->output();
+                file_put_contents('assets/upload/2_'.$identifier.'.pdf', $output2);
+
+                $pdf = new \Clegginabox\PDFMerger\PDFMerger;
+
+                $pdf->addPDF('assets/upload/1_'.$identifier.'.pdf', 'all');
+                $pdf->addPDF('assets/upload/2_'.$identifier.'.pdf', 'all');
+                $pdfContent = $pdf->merge('string', $array['Title'].'3.pdf', 'P');
+
+                header('Content-Type: application/pdf');
+                header('Content-Disposition: inline; filename="'.$array['Title'].'3.pdf"');
+                header('Content-Length: '.strlen($pdfContent));
+                header('Cache-Control: no-cache, no-store, must-revalidate');
                 header('Pragma: no-cache');
                 header('Expires: 0');
                 echo $pdfContent;
                 unlink('assets/upload/1_'.$identifier.'.pdf');
                 unlink('assets/upload/2_'.$identifier.'.pdf');
                 
-                // $this->dompdf->stream('assets/upload/booking/'.$array['Title'] . '.pdf', array('Attachment' => 0));
-            } else {
-                $array = array('type' => 'Booking Confirmation');
-                $this->load->view('errors/bc_complete', $array);
-            }
+                // $this->dompdf->stream('assets/upload/booking/'.$array['Title'] . '.pdf', array('Attachment' => 0));
+            } else {
+                $array = array('type' => 'Booking Confirmation');
+                $this->load->view('errors/bc_complete', $array);
+            }
 		}
     }
     
@@ -205,7 +220,7 @@ class Booking_Confirmation extends CI_Controller
         }
         if(empty($value)) {
             $value = 'Zero';
-        }
-        return $value;
-    }
+        }
+        return $value;
+    }
 }

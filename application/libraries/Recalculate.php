@@ -53,32 +53,37 @@ class Recalculate {
                 }
                 if($total_approved_credit != 0) {
                     if(strval($total_approved_credit) >= $booking->NetTotal) {
-                        $full_payment_existed = $this->CI->Payment_Model->Read_Type($booking->BookingID);
-                        if($full_payment_existed) {
-                            if($booking->Status == 'P' || $booking->Status == 'PP') {
-                                $this->CI->Booking_Model->Update_Status('PTV', $booking->BookingID);
-                                $this->CI->Booking_Model->Create_Booking_Log2($booking->Status, 'PTV', $booking->BookingID);
-                            }
-                        } else {
-                            if($booking->Status == 'P') {
-                                $this->CI->Booking_Model->Update_Status('PP', $booking->BookingID);
-                                $this->CI->Booking_Model->Create_Booking_Log2($booking->Status, 'PP', $booking->BookingID);
+                        // Full payment received - move to PBO (Pending Booking Operation)
+                        if($booking->Status == 'P' || $booking->Status == 'PP') {
+                            $this->CI->Booking_Model->Update_Status('PBO', $booking->BookingID);
+                            $this->CI->Booking_Model->Create_Booking_Log2($booking->Status, 'PBO', $booking->BookingID);
+
+                            // After moving to PBO, check if checklists are completed to advance further
+                            $this->CI->load->helper('booking_flow');
+                            $updated_booking = $this->CI->Booking_Model->getBookingById($booking->BookingID);
+                            if($updated_booking) {
+                                check_and_advance_status_if_no_checklist_or_all_completed($booking->BookingID, $updated_booking, null, $this->CI);
                             }
                         }
                     } else {
-                        if($booking->Status != 'PP') {
+                        // Partial payment - move to PP
+                        if($booking->Status == 'P') {
                             $this->CI->Booking_Model->Update_Status('PP', $booking->BookingID);
                             $this->CI->Booking_Model->Create_Booking_Log2($booking->Status, 'PP', $booking->BookingID);
                         }
                     }
                 } else {
-                    if($booking->Status != 'P') {
+                    // No payments in the payments array, but payments exist
+                    // Do NOT change PBC to P - PBC requires SA approval first
+                    if($booking->Status != 'P' && $booking->Status != 'PBC') {
                         $this->CI->Booking_Model->Update_Status('P', $booking->BookingID);
                         $this->CI->Booking_Model->Create_Booking_Log2($booking->Status, 'P', $booking->BookingID);
                     }
                 }
             } else {
-                if($booking->Status != 'P') {
+                // No payments at all
+                // Do NOT change PBC to P - PBC requires SA approval first
+                if($booking->Status != 'P' && $booking->Status != 'PBC') {
                     $this->CI->Booking_Model->Update_Status('P', $booking->BookingID);
                     $this->CI->Booking_Model->Create_Booking_Log2($booking->Status, 'P', $booking->BookingID);
                 }

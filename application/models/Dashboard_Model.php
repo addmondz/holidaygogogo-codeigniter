@@ -405,6 +405,8 @@ class Dashboard_Model extends CI_Model
 
 		$this->db->where('Level !=', 30);
 
+		$this->db->where('admin.Status', 'Y');
+
 		$this->db->group_by('SalesAgent');
 
 		$this->db->group_by('Date');
@@ -436,6 +438,8 @@ class Dashboard_Model extends CI_Model
 		$this->db->where('YEAR(booking.InsertDate)', date('Y'));
 
 		$this->db->where('Level !=', 30);
+
+		$this->db->where('admin.Status', 'Y');
 
 		$this->db->group_by('SalesAgent');
 
@@ -959,6 +963,8 @@ class Dashboard_Model extends CI_Model
 
 		$this->db->where('Level !=', 30);
 
+		$this->db->where('admin.Status', 'Y');
+
 		$this->db->group_by('SalesAgent');
 
 		$this->db->order_by('Sales', 'DESC');
@@ -991,6 +997,8 @@ class Dashboard_Model extends CI_Model
 
 		$this->db->where('Level !=', 30);
 
+		$this->db->where('admin.Status', 'Y');
+
 		$this->db->group_by('SalesAgent');
 
 		$this->db->order_by('Sales', 'DESC');
@@ -1001,7 +1009,7 @@ class Dashboard_Model extends CI_Model
 
 	}
 
-	
+
 
 	function Annual_Top_SA()
 
@@ -1022,6 +1030,8 @@ class Dashboard_Model extends CI_Model
 		$this->db->where('CAST(booking.InsertDate AS DATE) <=', date('Y-m-d', strtotime('Last Day Of December This Year')));
 
 		$this->db->where('Level !=', 30);
+
+		$this->db->where('admin.Status', 'Y');
 
 		$this->db->group_by('SalesAgent');
 
