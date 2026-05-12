@@ -90,6 +90,9 @@
                             var booking_auto_selected = false;
                             var outstanding_balance = 0;
                             var booking_products = [];
+                            var booking_net_total = 0;
+                            var existing_total_credit = 0;
+                            var existing_total_debit = 0;
                             window.productOptionsHtml = '';
 
                             <?php if(!empty($this->input->get('booking_number'))) { ?>
@@ -256,6 +259,9 @@
                                         '</div>').insertAfter('#summary');
                                         $('#total_credit').val(total_credit.toLocaleString('en-US', {minimumFractionDigits: 2}));
                                         $('#total_debit').val(total_debit.toLocaleString('en-US', {minimumFractionDigits: 2}));
+                                        booking_net_total = parseFloat((array.NetTotal).replace(/[RM,]/g, '')) || 0;
+                                        existing_total_credit = total_credit;
+                                        existing_total_debit = total_debit;
                                     }
                                 });
                                 for(var i = 0; i < payment_ids.length; i++) {
@@ -717,7 +723,33 @@
                                     }
                                 }
                             }
-                            
+
+                            function Has_New_Payment_Out() {
+                                for(var i = 0; i < payment_ids.length; i++) {
+                                    if($(`#transaction_type-${payment_ids[i]}`).val() == 'PAYMENT OUT') {
+                                        return true;
+                                    }
+                                }
+                                return false;
+                            }
+
+                            function Projected_Margin_Pct() {
+                                if(!booking_net_total || booking_net_total <= 0) return null;
+                                var new_credit = 0, new_debit = 0;
+                                for(var i = 0; i < payment_ids.length; i++) {
+                                    var type = $(`#transaction_type-${payment_ids[i]}`).val();
+                                    if(type == 'PAYMENT IN') {
+                                        var v = $(`input[name="credit-${payment_ids[i]}"]`).val();
+                                        if(v) new_credit += parseFloat(v.replace(/,/g, '')) || 0;
+                                    } else if(type == 'PAYMENT OUT') {
+                                        var v = $(`input[name="debit-${payment_ids[i]}"]`).val();
+                                        if(v) new_debit += parseFloat(v.replace(/,/g, '')) || 0;
+                                    }
+                                }
+                                var projected_profit = (existing_total_credit + new_credit) - (existing_total_debit + new_debit);
+                                return (projected_profit / booking_net_total) * 100;
+                            }
+
                             $('input[type="submit"]').click(function(event) {
                                 event.preventDefault();
                                 const swalWithBootstrapButtons = Swal.mixin({
@@ -812,7 +844,28 @@
                                                             var base_url = '<?php echo base_url('Payment') ?>';
                                                             $('input[name="url"]').val(base_url + '?booking_number=' + $('input[name="booking_number"]').val());
                                                         <?php } ?>
-                                                        $('#form').submit();
+                                                        var doSubmit = function() { $('#form').submit(); };
+                                                        if(Has_New_Payment_Out()) {
+                                                            var margin = Projected_Margin_Pct();
+                                                            if(margin !== null && margin < 5) {
+                                                                swalWithBootstrapButtons.fire({
+                                                                    width: 550,
+                                                                    background: 'url(<?php echo base_url('assets/image/sweetalert.jpg') ?>)',
+                                                                    icon: 'warning',
+                                                                    title: 'The net profit is less than 5%, continue?',
+                                                                    html: 'Projected margin: <strong>' + margin.toFixed(2) + '%</strong>',
+                                                                    confirmButtonText: 'Continue',
+                                                                    cancelButtonText: 'Cancel',
+                                                                    showCancelButton: true
+                                                                }).then(function(action) {
+                                                                    if(action.isConfirmed) doSubmit();
+                                                                });
+                                                            } else {
+                                                                doSubmit();
+                                                            }
+                                                        } else {
+                                                            doSubmit();
+                                                        }
                                                     }
                                                 }
                                             }

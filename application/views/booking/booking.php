@@ -1103,7 +1103,13 @@
 
                         <?php if(current_url() == base_url('Booking/Update')) { ?>
 
-                            <a href="<?php echo base_url('Guest_List?gl=') . $Token; ?>" class="btn btn-light-primary font-weight-bold px-9 py-4 ml-1" style="width:180px;">GL</a>
+                            <?php
+                                $this->load->helper('booking_flow');
+                                $sa_blocked_gl = isset($Status, $AfterSalesService) && is_sa_blocked_from_completed_booking($this->session->userdata('level'), $Status, $AfterSalesService);
+                            ?>
+                            <?php if(!$sa_blocked_gl) { ?>
+                                <a href="<?php echo base_url('Guest_List?gl=') . $Token; ?>" class="btn btn-light-primary font-weight-bold px-9 py-4 ml-1" style="width:180px;">GL</a>
+                            <?php } ?>
 
                             <?php if(in_array('VP', $this->session->access_control)) { ?>
 
@@ -1366,7 +1372,8 @@
                                                                         <input class="form-check-input checklist-checkbox" type="checkbox"
                                                                             id="checklist_<?php echo $group['product_id']; ?>_<?php echo $checklist->ID; ?>"
                                                                             value="<?php echo $group['product_id'] . '_' . $checklist->ID; ?>"
-                                                                            <?php echo $is_checked ? 'checked' : ''; ?>>
+                                                                            <?php echo $is_checked ? 'checked' : ''; ?>
+                                                                            <?php echo empty($can_modify_checklist) ? 'disabled' : ''; ?>>
                                                                         <label class="checklist-checkbox-label" for="checklist_<?php echo $group['product_id']; ?>_<?php echo $checklist->ID; ?>"></label>
                                                                     </div>
                                                                     <div class="checklist-details">
@@ -1411,9 +1418,15 @@
                                                             </div>
                                                         </div>
                                                     </div>
+                                                    <?php if(!empty($can_modify_checklist)) { ?>
                                                     <button type="button" id="update_checklist_btn" class="btn btn-primary btn-sm font-weight-bold">
                                                         <i class="la la-save"></i> Save Changes
                                                     </button>
+                                                    <?php } else { ?>
+                                                    <div class="text-muted small mt-2">
+                                                        <i class="la la-lock"></i> Only this booking's TC1 and OP can update the checklist.
+                                                    </div>
+                                                    <?php } ?>
                                                 </div>
                                             </div>
                                         </div>

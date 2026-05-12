@@ -252,8 +252,10 @@
                                 <th class="end_date" style="text-align:center;">End</th>
                                 <th style="text-align:center;">Destination</th>
                                 <th class="subtotal" style="text-align:center;">Net Sales (RM)</th>
+                                <?php if(!$is_sales_agent) { ?>
                                 <th class="profit" style="text-align:center;">Net Profit (RM)</th>
                                 <th style="text-align:center;">Net Profit Margin (%)</th>
+                                <?php } ?>
                                 <th style="text-align:center;">BC Status</th>
                                 <th class="gl_status" style="text-align:center;">GL Status</th>
                                 <th class="autocount_sync_status" style="text-align:center;">Booking Autocount Status</th>
@@ -268,7 +270,7 @@
                 <div class="row" id="summary_section">
                     <div class="col-md-12 pt-3 pb-3" style="background-color:white; border:3px solid #D7E2F2; border-radius:8px;">
                         <div class="row">
-                            <div class="col-md-6 mb-7 mb-md-0">
+                            <div class="<?php echo $is_sales_agent ? 'col-md-12' : 'col-md-6 mb-7 mb-md-0'; ?>">
                                 <label style="color:#C4B454;">Total Net Sales (RM)</label>
                                 <div class="input-icon">
                                     <input disabled type="text" id="total_sales_display" value="Loading..." class="form-control" style="text-align:right;">
@@ -277,6 +279,7 @@
                                     </span>
                                 </div>
                             </div>
+                            <?php if(!$is_sales_agent) { ?>
                             <div class="col-md-6">
                                 <label style="color:#FFC000;">Total Net Profit (RM)</label>
                                 <div class="input-icon">
@@ -286,6 +289,7 @@
                                     </span>
                                 </div>
                             </div>
+                            <?php } ?>
                         </div>
                     </div>
                 </div>
@@ -646,8 +650,10 @@ $(document).ready(function() {
             { data: 'net_total', className: 'text-center', responsivePriority: 6 }
         ]);
 
-        columns.push({ data: 'profit', className: 'text-center', responsivePriority: 10007 });
-        columns.push({ data: 'profit_margin', className: 'text-center', responsivePriority: 10008 });
+        if (!is_sales_agent) {
+            columns.push({ data: 'profit', className: 'text-center', responsivePriority: 10007 });
+            columns.push({ data: 'profit_margin', className: 'text-center', responsivePriority: 10008 });
+        }
 
         columns = columns.concat([
             { data: 'status', className: 'text-center', responsivePriority: 7 },
@@ -746,11 +752,15 @@ function loadSummaryTotals() {
         dataType: 'json',
         success: function(data) {
             $('#total_sales_display').val(data.total_sales);
-            $('#total_net_profit_display').val(data.total_net_profit);
+            if (!is_sales_agent) {
+                $('#total_net_profit_display').val(data.total_net_profit);
+            }
         },
         error: function() {
             $('#total_sales_display').val('Error loading');
-            $('#total_net_profit_display').val('Error loading');
+            if (!is_sales_agent) {
+                $('#total_net_profit_display').val('Error loading');
+            }
         }
     });
 }
@@ -907,6 +917,7 @@ if (changeAutocountBtn) {
 <script>
 var modalBookingId = null;
 var modalTotalItems = 0;
+var modalCanModify = false;
 
 function openChecklistModal(bookingId) {
     modalBookingId = bookingId;
@@ -930,6 +941,8 @@ function openChecklistModal(bookingId) {
 
             $('#checklistModalLabel').html('<strong>Booking Checklist &mdash; ' + escapeHtml(data.booking_number) + '</strong>');
             modalTotalItems = data.total_count;
+            modalCanModify = !!data.can_modify;
+            var disabledAttr = modalCanModify ? '' : ' disabled';
 
             // Build checklist HTML
             var html = '';
@@ -966,7 +979,7 @@ function openChecklistModal(bookingId) {
                     html += '<div class="checklist-item ' + (isChecked ? 'checked' : '') + '">';
                     html += '<div class="checklist-item-content">';
                     html += '<div class="checklist-checkbox-wrapper">';
-                    html += '<input class="form-check-input checklist-checkbox modal-checklist-cb" type="checkbox" id="' + inputId + '" value="' + value + '"' + (isChecked ? ' checked' : '') + '>';
+                    html += '<input class="form-check-input checklist-checkbox modal-checklist-cb" type="checkbox" id="' + inputId + '" value="' + value + '"' + (isChecked ? ' checked' : '') + disabledAttr + '>';
                     html += '<label class="checklist-checkbox-label" for="' + inputId + '"></label>';
                     html += '</div>';
                     html += '<div class="checklist-details">';
@@ -986,8 +999,12 @@ function openChecklistModal(bookingId) {
                 html += '</div>';
             }
 
+            if(!modalCanModify) {
+                html += '<div class="text-muted small mt-3"><i class="la la-lock"></i> Only this booking\'s TC1 and OP can update the checklist.</div>';
+            }
+
             $('#checklistModalBody').html(html);
-            $('#checklistModalFooter').show();
+            $('#checklistModalFooter').toggle(modalCanModify);
             updateModalProgress();
         },
         error: function() {
@@ -1020,6 +1037,9 @@ function updateModalProgress() {
 
 // Save handler
 $('#modal_save_checklist_btn').on('click', function() {
+    if(!modalCanModify) {
+        return;
+    }
     var $btn = $(this);
     var originalText = $btn.html();
     $btn.prop('disabled', true).html('<i class="la la-spinner la-spin"></i> Saving...');

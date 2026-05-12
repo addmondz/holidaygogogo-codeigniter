@@ -935,3 +935,54 @@ if (!function_exists('determine_status_after_bc_approval')) {
         return $result;
     }
 }
+
+if (!function_exists('is_sa_blocked_from_completed_booking')) {
+    /**
+     * Whether a Sales Agent (level=20) must be denied access to Guest List
+     * surfaces (page + downloads + entry buttons) for the given booking.
+     *
+     * Completed = Status='Y' AND AfterSalesService='COMPLETE' (matches the
+     * existing SA/TC denial pattern at Booking.php:805/1412 and Payment.php:1861).
+     * Higher-level roles (TC, manager, super admin) keep access for any
+     * after-sales corrections they still need to make.
+     */
+    function is_sa_blocked_from_completed_booking($level, $status, $after_sales_service)
+    {
+        return (int)$level === 20
+            && $status === 'Y'
+            && $after_sales_service === 'COMPLETE';
+    }
+}
+
+if (!function_exists('can_user_modify_booking_checklist')) {
+    /**
+     * Mirrors Notification_Model::_apply_visibility_filter scoping so that the
+     * set of users who can tick a booking's checklist equals the set who get
+     * the booking-update notification: level 20 must be the booking's
+     * SalesAgent (TC1); level 40 must be the BookingOP. All other levels
+     * (admins, managers, TC2/level 50) bypass.
+     *
+     * $booking accepts either the object returned by getBookingById() or an
+     * array with SalesAgent / BookingOP keys.
+     */
+    function can_user_modify_booking_checklist($booking, $user_id, $user_level)
+    {
+        if (empty($booking)) {
+            return false;
+        }
+        $sales_agent = is_object($booking)
+            ? (isset($booking->SalesAgent) ? $booking->SalesAgent : null)
+            : (isset($booking['SalesAgent']) ? $booking['SalesAgent'] : null);
+        $booking_op = is_object($booking)
+            ? (isset($booking->BookingOP) ? $booking->BookingOP : null)
+            : (isset($booking['BookingOP']) ? $booking['BookingOP'] : null);
+
+        if ((int)$user_level === 20) {
+            return (int)$sales_agent === (int)$user_id;
+        }
+        if ((int)$user_level === 40) {
+            return (int)$booking_op === (int)$user_id;
+        }
+        return true;
+    }
+}
