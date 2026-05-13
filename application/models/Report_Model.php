@@ -1,6 +1,8 @@
 <?php
 class Report_Model extends CI_Model
 {
+    protected $messageTimeColumn = null;
+
 	function Destination_Profits()
 	{
 		$this->db->select('EndDate As Month, SUM(Credit) - SUM(Debit) As Profit, category.Name As Destination');
@@ -501,6 +503,302 @@ class Report_Model extends CI_Model
         $this->db->where('payment.Status !=', 'N');
         return $this->db->get('payment')->result();
 	}
+
+    function Lead_Dashboard_Summary($filters = array())
+    {
+        $where = $this->build_lead_dashboard_where_clause($filters);
+
+        $sql = "
+            SELECT
+                COUNT(*) AS total_leads,
+                SUM(CASE WHEN pl.responded_message_count > 0 THEN 1 ELSE 0 END) AS responded_leads,
+                AVG(pl.avg_first_5_response_seconds) AS avg_response_time_seconds,
+                AVG(pl.responded_message_count) AS avg_responded_messages,
+                SUM(CASE WHEN pl.is_converted = 1 THEN 1 ELSE 0 END) AS converted_leads,
+                COUNT(DISTINCT NULLIF(pl.assigned_to_user_id, '')) AS active_agents
+            FROM ghl_processed_leads pl
+            LEFT JOIN ghl_conversations gc ON gc.conversation_id = pl.conversation_id
+            {$where['sql']}
+        ";
+
+        $row = $this->db->query($sql, $where['params'])->row_array();
+        $totalLeads = !empty($row['total_leads']) ? (int) $row['total_leads'] : 0;
+        $respondedLeads = !empty($row['responded_leads']) ? (int) $row['responded_leads'] : 0;
+        $convertedLeads = !empty($row['converted_leads']) ? (int) $row['converted_leads'] : 0;
+        $avgResponseSeconds = isset($row['avg_response_time_seconds']) && $row['avg_response_time_seconds'] !== null
+            ? (int) round($row['avg_response_time_seconds'])
+            : null;
+        $avgRespondedMessages = isset($row['avg_responded_messages']) && $row['avg_responded_messages'] !== null
+            ? round((float) $row['avg_responded_messages'], 1)
+            : 0.0;
+
+        return array(
+            'total_leads' => $totalLeads,
+            'responded_leads' => $respondedLeads,
+            'avg_response_time_seconds' => $avgResponseSeconds,
+            'avg_responded_messages' => $avgRespondedMessages,
+            'converted_leads' => $convertedLeads,
+            'active_agents' => !empty($row['active_agents']) ? (int) $row['active_agents'] : 0,
+            'response_rate' => $totalLeads > 0 ? round(($respondedLeads / $totalLeads) * 100, 1) : 0.0,
+            'conversion_rate' => $totalLeads > 0 ? round(($convertedLeads / $totalLeads) * 100, 1) : 0.0,
+        );
+    }
+
+    function Lead_Dashboard_By_Agent($filters = array())
+    {
+        $where = $this->build_lead_dashboard_where_clause($filters);
+        $clauses = array();
+
+        if (!empty($where['sql'])) {
+            $clauses[] = preg_replace('/^\s*WHERE\s+/i', '', $where['sql']);
+        }
+
+        $clauses[] = "NULLIF(pl.assigned_to_user_id, '') IS NOT NULL";
+        $agentWhereSql = !empty($clauses) ? 'WHERE ' . implode(' AND ', $clauses) : '';
+
+        $sql = "
+            SELECT
+                COALESCE(NULLIF(pl.assigned_to_user_id, ''), '__unassigned__') AS agent_id,
+                COALESCE(NULLIF(gu.Name, ''), NULLIF(pl.assigned_to_user_id, ''), 'Unassigned') AS agent_name,
+                COUNT(*) AS total_leads,
+                SUM(CASE WHEN pl.responded_message_count > 0 THEN 1 ELSE 0 END) AS responded_leads,
+                AVG(pl.avg_first_5_response_seconds) AS avg_response_time_seconds,
+                AVG(pl.responded_message_count) AS avg_responded_messages,
+                SUM(CASE WHEN pl.is_converted = 1 THEN 1 ELSE 0 END) AS converted_leads,
+                MAX(pl.updated_at) AS last_updated_at
+            FROM ghl_processed_leads pl
+            LEFT JOIN ghl_conversations gc ON gc.conversation_id = pl.conversation_id
+            LEFT JOIN ghl_users gu ON gu.UserID = NULLIF(pl.assigned_to_user_id, '')
+            {$agentWhereSql}
+            GROUP BY agent_id, agent_name
+            ORDER BY total_leads DESC, agent_name ASC
+        ";
+
+        $rows = $this->db->query($sql, $where['params'])->result_array();
+        $results = array();
+
+        foreach ($rows as $row) {
+            $totalLeads = (int) $row['total_leads'];
+            $respondedLeads = (int) $row['responded_leads'];
+            $convertedLeads = (int) $row['converted_leads'];
+            $avgResponseSeconds = $row['avg_response_time_seconds'] !== null
+                ? (int) round($row['avg_response_time_seconds'])
+                : null;
+            $avgRespondedMessages = $row['avg_responded_messages'] !== null
+                ? round((float) $row['avg_responded_messages'], 1)
+                : 0.0;
+
+            $results[] = array(
+                'agent_id' => $row['agent_id'],
+                'agent_name' => $row['agent_name'],
+                'total_leads' => $totalLeads,
+                'responded_leads' => $respondedLeads,
+                'avg_response_time_seconds' => $avgResponseSeconds,
+                'avg_responded_messages' => $avgRespondedMessages,
+                'converted_leads' => $convertedLeads,
+                'response_rate' => $totalLeads > 0 ? round(($respondedLeads / $totalLeads) * 100, 1) : 0.0,
+                'conversion_rate' => $totalLeads > 0 ? round(($convertedLeads / $totalLeads) * 100, 1) : 0.0,
+                'last_updated_at' => $row['last_updated_at'],
+            );
+        }
+
+        return $results;
+    }
+
+    function Lead_Dashboard_Agents()
+    {
+        $sql = "
+            SELECT DISTINCT
+                user_ref.agent_id,
+                COALESCE(NULLIF(gu.Name, ''), user_ref.agent_id) AS agent_name
+            FROM (
+                SELECT NULLIF(assigned_to_user_id, '') AS agent_id
+                FROM ghl_processed_leads
+                WHERE assigned_to_user_id IS NOT NULL AND assigned_to_user_id <> ''
+            ) user_ref
+            LEFT JOIN ghl_users gu ON gu.UserID = user_ref.agent_id
+            WHERE user_ref.agent_id IS NOT NULL AND user_ref.agent_id <> ''
+            ORDER BY agent_name ASC
+        ";
+
+        return $this->db->query($sql)->result();
+    }
+
+    function Lead_Data_Total_Count($filters = array())
+    {
+        $where = $this->build_lead_dashboard_where_clause($filters);
+
+        $sql = "
+            SELECT COUNT(*) AS total_rows
+            FROM ghl_processed_leads pl
+            LEFT JOIN ghl_conversations gc ON gc.conversation_id = pl.conversation_id
+            {$where['sql']}
+        ";
+
+        $row = $this->db->query($sql, $where['params'])->row_array();
+        return !empty($row['total_rows']) ? (int) $row['total_rows'] : 0;
+    }
+
+    function Lead_Data_Rows($filters = array(), $limit = null, $offset = null)
+    {
+        $messageTimeColumn = $this->escape_identifier($this->get_message_time_column());
+        $where = $this->build_lead_dashboard_where_clause($filters);
+        $limit = $limit !== null ? max(1, (int) $limit) : null;
+        $offset = $offset !== null ? max(0, (int) $offset) : null;
+        $order = $this->build_lead_data_order_clause($filters);
+
+        $sql = "
+            SELECT
+                pl.id,
+                pl.conversation_id,
+                pl.contact_id,
+                COALESCE(NULLIF(gc.contact_name, ''), NULLIF(gc.full_name, ''), 'Unknown Contact') AS contact_name,
+                gc.phone,
+                COALESCE(NULLIF(pl.assigned_to_user_id, ''), '__unassigned__') AS agent_id,
+                COALESCE(NULLIF(gu.Name, ''), NULLIF(pl.assigned_to_user_id, ''), 'Unassigned') AS agent_name,
+                pl.lead_started_at,
+                pl.lead_ended_at,
+                pl.first_customer_message_id,
+                pl.tracked_message_count,
+                pl.responded_message_count,
+                pl.avg_first_5_response_seconds,
+                pl.response_1_seconds,
+                pl.response_2_seconds,
+                pl.response_3_seconds,
+                pl.response_4_seconds,
+                pl.response_5_seconds,
+                pl.is_converted,
+                pl.booking_id,
+                pl.converted_at,
+                b.BookingNumber,
+                (
+                    SELECT COUNT(*)
+                    FROM ghl_messages gm_count
+                    WHERE gm_count.conversation_id = pl.conversation_id
+                      AND gm_count.{$messageTimeColumn} >= pl.lead_started_at
+                      AND (
+                          pl.lead_ended_at IS NULL
+                          OR gm_count.{$messageTimeColumn} < pl.lead_ended_at
+                      )
+                ) AS message_count
+            FROM ghl_processed_leads pl
+            LEFT JOIN ghl_conversations gc ON gc.conversation_id = pl.conversation_id
+            LEFT JOIN ghl_users gu ON gu.UserID = NULLIF(pl.assigned_to_user_id, '')
+            LEFT JOIN booking b ON b.BookingID = pl.booking_id
+            {$where['sql']}
+            {$order}
+        ";
+
+        $params = $where['params'];
+
+        if ($limit !== null) {
+            $sql .= " LIMIT ?";
+            $params[] = $limit;
+
+            if ($offset !== null) {
+                $sql .= " OFFSET ?";
+                $params[] = $offset;
+            }
+        }
+
+        return $this->db->query($sql, $params)->result_array();
+    }
+
+    function Lead_Data_Messages($conversationId, $leadStartedAt, $nextLeadStartedAt = null)
+    {
+        $messageTimeColumn = $this->escape_identifier($this->get_message_time_column());
+        $params = array(
+            (string) $conversationId,
+            (string) $leadStartedAt,
+        );
+
+        $sql = "
+            SELECT
+                gm.message_id,
+                gm.direction,
+                COALESCE(NULLIF(gu.Name, ''), NULLIF(gm.user_id, ''), '') AS user_name,
+                gm.message_type,
+                gm.body,
+                gm.attachments_json,
+                gm.{$messageTimeColumn} AS message_timestamp
+            FROM ghl_messages gm
+            LEFT JOIN ghl_users gu ON gu.UserID = gm.user_id
+            WHERE gm.conversation_id = ?
+              AND gm.{$messageTimeColumn} >= ?
+        ";
+
+        if ($nextLeadStartedAt !== null && $nextLeadStartedAt !== '') {
+            $sql .= " AND gm.{$messageTimeColumn} < ?";
+            $params[] = (string) $nextLeadStartedAt;
+        }
+
+        $sql .= " ORDER BY gm.{$messageTimeColumn} ASC, gm.id ASC";
+
+        return $this->db->query($sql, $params)->result_array();
+    }
+
+    function Lead_Data_Last_Synced_At()
+    {
+        $row = $this->db
+            ->select('MAX(updated_at) AS updated_at', false)
+            ->from('ghl_processed_leads')
+            ->get()
+            ->row_array();
+
+        return !empty($row['updated_at']) ? $row['updated_at'] : null;
+    }
+
+    private function build_lead_data_order_clause($filters = array())
+    {
+        $sortBy = isset($filters['sort_by']) ? (string) $filters['sort_by'] : 'lead_started_at';
+        $sortDir = isset($filters['sort_dir']) && strtolower((string) $filters['sort_dir']) === 'asc' ? 'ASC' : 'DESC';
+
+        switch ($sortBy) {
+            case 'contact_name':
+                return "ORDER BY contact_name {$sortDir}, pl.id DESC";
+            case 'agent_name':
+                return "ORDER BY agent_name {$sortDir}, pl.id DESC";
+            case 'conversation_id':
+                return "ORDER BY pl.conversation_id {$sortDir}, pl.id DESC";
+            case 'response_status':
+                return "ORDER BY (CASE WHEN pl.responded_message_count > 0 THEN 1 ELSE 0 END) {$sortDir}, pl.id DESC";
+            case 'response_time':
+                return "ORDER BY (CASE WHEN pl.avg_first_5_response_seconds IS NULL THEN 1 ELSE 0 END) ASC, pl.avg_first_5_response_seconds {$sortDir}, pl.id DESC";
+            case 'conversion_status':
+                return "ORDER BY pl.is_converted {$sortDir}, pl.converted_at {$sortDir}, pl.id DESC";
+            case 'message_count':
+                return "ORDER BY message_count {$sortDir}, pl.id DESC";
+            case 'lead_started_at':
+            default:
+                return "ORDER BY pl.lead_started_at {$sortDir}, pl.id DESC";
+        }
+    }
+
+    protected function get_message_time_column()
+    {
+        if ($this->messageTimeColumn !== null) {
+            return $this->messageTimeColumn;
+        }
+
+        $fields = $this->db->list_fields('ghl_messages');
+
+        if (in_array('timestamp', $fields, true)) {
+            $this->messageTimeColumn = 'timestamp';
+            return $this->messageTimeColumn;
+        }
+
+        if (in_array('date_added', $fields, true)) {
+            $this->messageTimeColumn = 'date_added';
+            return $this->messageTimeColumn;
+        }
+
+        show_error('Unable to detect message timestamp column on ghl_messages.', 500);
+    }
+
+    protected function escape_identifier($identifier)
+    {
+        return '`' . str_replace('`', '', (string) $identifier) . '`';
+    }
     
     function Destinations()
 	{
@@ -616,5 +914,73 @@ class Report_Model extends CI_Model
         $this->db->order_by('BookingNumber', 'ASC');
         $report = $this->db->get('booking');
         return $report->result();
+    }
+
+    private function build_lead_dashboard_where_clause($filters = array())
+    {
+        $clauses = array();
+        $params = array();
+
+        if (!empty($filters['start_date'])) {
+            $clauses[] = 'pl.lead_started_at >= ?';
+            $params[] = $filters['start_date'] . ' 00:00:00';
+        }
+
+        if (!empty($filters['end_date'])) {
+            $clauses[] = 'pl.lead_started_at <= ?';
+            $params[] = $filters['end_date'] . ' 23:59:59';
+        }
+
+        if (!empty($filters['agent_id'])) {
+            if ($filters['agent_id'] === '__unassigned__') {
+                $clauses[] = "(NULLIF(pl.assigned_to_user_id, '') IS NULL)";
+            } else {
+                $clauses[] = "NULLIF(pl.assigned_to_user_id, '') = ?";
+                $params[] = $filters['agent_id'];
+            }
+        }
+
+        if (!empty($filters['conversation_id'])) {
+            $clauses[] = 'pl.conversation_id = ?';
+            $params[] = $filters['conversation_id'];
+        }
+
+        if (!empty($filters['contact_name'])) {
+            $clauses[] = "(gc.contact_name LIKE ? ESCAPE '!' OR gc.full_name LIKE ? ESCAPE '!')";
+            $escapedKeyword = '%' . $this->db->escape_like_str($filters['contact_name']) . '%';
+            $params[] = $escapedKeyword;
+            $params[] = $escapedKeyword;
+        }
+
+        if (!empty($filters['phone'])) {
+            $clauses[] = "gc.phone LIKE ? ESCAPE '!'";
+            $params[] = '%' . $this->db->escape_like_str($filters['phone']) . '%';
+        }
+
+        if (isset($filters['response_status']) && $filters['response_status'] !== '') {
+            if ($filters['response_status'] === 'responded') {
+                $clauses[] = "pl.responded_message_count > 0";
+            } elseif ($filters['response_status'] === 'pending') {
+                $clauses[] = "pl.responded_message_count = 0";
+            }
+        }
+
+        if (isset($filters['conversion_status']) && $filters['conversion_status'] !== '') {
+            if ($filters['conversion_status'] === 'converted') {
+                $clauses[] = 'pl.is_converted = 1';
+            } elseif ($filters['conversion_status'] === 'open') {
+                $clauses[] = 'pl.is_converted = 0';
+            }
+        }
+
+        $sql = '';
+        if (!empty($clauses)) {
+            $sql = 'WHERE ' . implode(' AND ', $clauses);
+        }
+
+        return array(
+            'sql' => $sql,
+            'params' => $params,
+        );
     }
 }
