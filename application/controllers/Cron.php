@@ -793,28 +793,18 @@ class Cron extends CI_Controller
 
 	private function process_single_ghl_conversation($conversationId, $firstNewMessageRowId = 0)
 	{
-		$messages = $this->Ghl_Processed_Leads_Model->get_conversation_messages($conversationId);
 		$existingConversions = $this->Ghl_Processed_Leads_Model->get_existing_conversion_map($conversationId);
 		$currentAssignedTo = $this->Ghl_Processed_Leads_Model->get_conversation_assigned_to($conversationId);
-
-		if (empty($messages)) {
-			$replaced = $this->Ghl_Processed_Leads_Model->replace_conversation_leads($conversationId, array());
-			if (!$replaced) {
-				show_error('Failed clearing processed leads for conversation: ' . $conversationId, 500);
-			}
-			return 0;
-		}
 
 		$leads = array();
 		$currentLead = null;
 		$fallbackContactId = null;
 		$now = date('Y-m-d H:i:s');
-
-		foreach ($messages as $message) {
+		$hasMessages = $this->Ghl_Processed_Leads_Model->walk_conversation_messages($conversationId, function ($message) use (&$leads, &$currentLead, &$fallbackContactId, $conversationId, $currentAssignedTo, $now) {
 			$messageTimestamp = strtotime($message['message_timestamp']);
 
 			if ($messageTimestamp === false) {
-				continue;
+				return;
 			}
 
 			if ($fallbackContactId === null && !empty($message['contact_id'])) {
@@ -887,6 +877,14 @@ class Cron extends CI_Controller
 					}
 				}
 			}
+		});
+
+		if (!$hasMessages) {
+			$replaced = $this->Ghl_Processed_Leads_Model->replace_conversation_leads($conversationId, array());
+			if (!$replaced) {
+				show_error('Failed clearing processed leads for conversation: ' . $conversationId, 500);
+			}
+			return 0;
 		}
 
 		if ($currentLead !== null) {

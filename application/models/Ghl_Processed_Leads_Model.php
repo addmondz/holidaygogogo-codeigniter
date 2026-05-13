@@ -132,6 +132,38 @@ class Ghl_Processed_Leads_Model extends CI_Model
         )->result_array();
     }
 
+    public function walk_conversation_messages($conversationId, callable $callback)
+    {
+        $timeColumn = $this->escape_identifier($this->get_message_time_column());
+        $query = $this->db->query(
+            "
+            SELECT
+                id,
+                message_id,
+                conversation_id,
+                contact_id,
+                direction,
+                user_id,
+                {$timeColumn} AS message_timestamp
+            FROM ghl_messages
+            WHERE conversation_id = ?
+            ORDER BY {$timeColumn} ASC, id ASC
+            ",
+            array((string) $conversationId)
+        );
+
+        $hasRows = false;
+
+        while ($row = $query->unbuffered_row('array')) {
+            $hasRows = true;
+            $callback($row);
+        }
+
+        $query->free_result();
+
+        return $hasRows;
+    }
+
     public function get_conversation_assigned_to($conversationId)
     {
         $row = $this->db
