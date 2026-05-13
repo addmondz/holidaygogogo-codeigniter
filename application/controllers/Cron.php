@@ -500,6 +500,11 @@ class Cron extends CI_Controller
 			|| in_array('--restart', $flags, true)
 			|| in_array('--reset', $flags, true);
 
+		if ($shouldRebuild) {
+			echo "Rebuild mode: refreshing processed leads before conversion matching." . PHP_EOL;
+			$this->process_ghl_leads($chunkSize !== null ? $chunkSize : 100);
+		}
+
 		$summary = array(
 			'leads_scanned' => 0,
 			'leads_converted' => 0,
@@ -622,6 +627,52 @@ class Cron extends CI_Controller
 		echo "=== GHL Lead Conversion Processing End ===" . PHP_EOL;
 	}
 
+	public function rebuild_ghl_conversations()
+	{
+		if (!$this->input->is_cli_request()) {
+			show_error('This script can only be run from the command line.', 403);
+			return;
+		}
+
+		$this->load->model('Ghl_Processed_Leads_Model');
+
+		$args = isset($_SERVER['argv']) ? $_SERVER['argv'] : array();
+		$uriSegments = $this->uri->segment_array();
+		$conversationIds = array();
+
+		$cliArgs = array_merge(
+			array_slice($args, 3),
+			$uriSegments ? array_slice($uriSegments, 2) : array()
+		);
+
+		foreach ($cliArgs as $arg) {
+			$conversationId = trim((string) $arg);
+			if ($conversationId === ''
+				|| strncmp($conversationId, '--', 2) === 0
+				|| $conversationId === 'rebuild_ghl_conversations') {
+				continue;
+			}
+
+			$conversationIds[] = $conversationId;
+		}
+
+		$conversationIds = array_values(array_unique($conversationIds));
+
+		if (empty($conversationIds)) {
+			show_error('At least one conversation id is required.', 400);
+			return;
+		}
+
+		echo "=== GHL Conversation Rebuild Start ===" . PHP_EOL;
+
+		foreach ($conversationIds as $conversationId) {
+			$leadCount = $this->process_single_ghl_conversation($conversationId, 0);
+			echo " - {$conversationId}: {$leadCount} lead(s)" . PHP_EOL;
+		}
+
+		echo "=== GHL Conversation Rebuild End ===" . PHP_EOL;
+	}
+
 	protected function start_ghl_processor_run_log($moduleName, $data = array())
 	{
 		$this->load->model('Ghl_Sync_Model');
@@ -719,45 +770,47 @@ class Cron extends CI_Controller
 						'tracked_message_count' => 0,
 						'responded_message_count' => 0,
 						'avg_first_5_response_seconds' => null,
+						'recent_tracked_message_count' => 0,
+						'recent_responded_message_count' => 0,
+						'avg_recent_5_response_seconds' => null,
 						'is_converted' => 0,
 						'booking_id' => null,
 						'converted_at' => null,
 						'created_at' => $now,
 						'updated_at' => $now,
-						'_pending_response_slots' => array(),
-						'_open_response_slot' => null,
+						'_response_history' => array(),
+						'_pending_response_indexes' => array(),
 					);
 					$this->initialize_ghl_processed_lead_response_slots($currentLead);
 				}
 
 				if ($currentLead !== null) {
-					if ($currentLead['_open_response_slot'] !== null) {
-						$slotNumber = (int) $currentLead['_open_response_slot'];
-						$currentLead['response_' . $slotNumber . '_customer_message_id'] = $message['message_id'];
-						$currentLead['response_' . $slotNumber . '_customer_message_at'] = $message['message_timestamp'];
-					} elseif ((int) $currentLead['tracked_message_count'] < 5) {
-						$slotNumber = ((int) $currentLead['tracked_message_count']) + 1;
-						$currentLead['tracked_message_count'] = $slotNumber;
-						$currentLead['response_' . $slotNumber . '_customer_message_id'] = $message['message_id'];
-						$currentLead['response_' . $slotNumber . '_customer_message_at'] = $message['message_timestamp'];
-						$currentLead['response_' . $slotNumber . '_agent_message_id'] = null;
-						$currentLead['response_' . $slotNumber . '_agent_message_at'] = null;
-						$currentLead['response_' . $slotNumber . '_seconds'] = null;
-						$currentLead['_pending_response_slots'][] = $slotNumber;
-						$currentLead['_open_response_slot'] = $slotNumber;
+					if (empty($currentLead['_pending_response_indexes'])) {
+						$currentLead['_response_history'][] = array(
+							'customer_message_id' => $message['message_id'],
+							'customer_message_at' => $message['message_timestamp'],
+							'agent_message_id' => null,
+							'agent_message_at' => null,
+							'seconds' => null,
+						);
+						$currentLead['_pending_response_indexes'][] = count($currentLead['_response_history']) - 1;
 					}
 				}
-			} elseif ($message['direction'] === 'outbound' && $currentLead !== null && !empty($currentLead['_pending_response_slots'])) {
-				$slotNumber = (int) $currentLead['_pending_response_slots'][0];
-				$customerTimestamp = strtotime((string) $currentLead['response_' . $slotNumber . '_customer_message_at']);
+			} elseif ($message['direction'] === 'outbound' && $currentLead !== null && !empty($currentLead['_pending_response_indexes'])) {
+				$historyIndex = (int) $currentLead['_pending_response_indexes'][0];
+				$customerMessage = isset($currentLead['_response_history'][$historyIndex])
+					? $currentLead['_response_history'][$historyIndex]
+					: null;
+				$customerTimestamp = !empty($customerMessage['customer_message_at'])
+					? strtotime((string) $customerMessage['customer_message_at'])
+					: false;
 
 				if ($customerTimestamp !== false && $messageTimestamp >= $customerTimestamp) {
-					array_shift($currentLead['_pending_response_slots']);
-					$currentLead['response_' . $slotNumber . '_agent_message_id'] = $message['message_id'];
-					$currentLead['response_' . $slotNumber . '_agent_message_at'] = $message['message_timestamp'];
-					$currentLead['response_' . $slotNumber . '_seconds'] = $messageTimestamp - $customerTimestamp;
-					if ((int) $currentLead['_open_response_slot'] === $slotNumber) {
-						$currentLead['_open_response_slot'] = null;
+					array_shift($currentLead['_pending_response_indexes']);
+					if (isset($currentLead['_response_history'][$historyIndex])) {
+						$currentLead['_response_history'][$historyIndex]['agent_message_id'] = $message['message_id'];
+						$currentLead['_response_history'][$historyIndex]['agent_message_at'] = $message['message_timestamp'];
+						$currentLead['_response_history'][$historyIndex]['seconds'] = $messageTimestamp - $customerTimestamp;
 					}
 				}
 			}
@@ -780,7 +833,7 @@ class Cron extends CI_Controller
 				$lead['converted_at'] = $existingConversions[$conversionKey]['converted_at'];
 			}
 
-			unset($lead['_pending_response_slots'], $lead['_open_response_slot']);
+			unset($lead['_response_history'], $lead['_pending_response_indexes']);
 		}
 		unset($lead);
 
@@ -796,22 +849,48 @@ class Cron extends CI_Controller
 
 	private function finalize_ghl_processed_lead(&$lead)
 	{
-		$responseTotal = 0;
-		$responseCount = 0;
+		$this->initialize_ghl_processed_lead_response_slots($lead);
+		$this->initialize_ghl_processed_lead_recent_response_slots($lead);
 
-		for ($slotNumber = 1; $slotNumber <= 5; $slotNumber++) {
-			$key = 'response_' . $slotNumber . '_seconds';
-			if (isset($lead[$key]) && $lead[$key] !== null) {
-				$responseTotal += (int) $lead[$key];
-				$responseCount++;
+		$responseHistory = !empty($lead['_response_history']) && is_array($lead['_response_history'])
+			? $lead['_response_history']
+			: array();
+
+		$firstResponses = !empty($responseHistory)
+			? array_slice($responseHistory, 0, 5)
+			: array();
+		$recentResponses = $this->build_recent_replied_response_history($responseHistory);
+
+		$firstResponseStats = $this->assign_ghl_processed_lead_response_slots($lead, $firstResponses, 'response_');
+		$recentResponseStats = $this->assign_ghl_processed_lead_response_slots($lead, $recentResponses, 'recent_response_');
+
+		$lead['tracked_message_count'] = $firstResponseStats['tracked_count'];
+		$lead['responded_message_count'] = $firstResponseStats['responded_count'];
+		$lead['avg_first_5_response_seconds'] = $firstResponseStats['avg_seconds'];
+		$lead['recent_tracked_message_count'] = $recentResponseStats['tracked_count'];
+		$lead['recent_responded_message_count'] = $recentResponseStats['responded_count'];
+		$lead['avg_recent_5_response_seconds'] = $recentResponseStats['avg_seconds'];
+		$lead['updated_at'] = date('Y-m-d H:i:s');
+	}
+
+	private function build_recent_replied_response_history($responseHistory)
+	{
+		$respondedResponses = array();
+
+		foreach ((array) $responseHistory as $response) {
+			if (!isset($response['seconds']) || $response['seconds'] === null) {
+				continue;
 			}
+
+			$respondedResponses[] = $response;
 		}
 
-		$lead['responded_message_count'] = $responseCount;
-		$lead['avg_first_5_response_seconds'] = $responseCount > 0
-			? (int) round($responseTotal / $responseCount)
-			: null;
-		$lead['updated_at'] = date('Y-m-d H:i:s');
+		if (empty($respondedResponses)) {
+			return array();
+		}
+
+		$recentResponses = array_slice($respondedResponses, -5);
+		return array_reverse(array_values($recentResponses));
 	}
 
 	private function initialize_ghl_processed_lead_response_slots(&$lead)
@@ -823,6 +902,46 @@ class Cron extends CI_Controller
 			$lead['response_' . $slotNumber . '_agent_message_at'] = null;
 			$lead['response_' . $slotNumber . '_seconds'] = null;
 		}
+	}
+
+	private function initialize_ghl_processed_lead_recent_response_slots(&$lead)
+	{
+		for ($slotNumber = 1; $slotNumber <= 5; $slotNumber++) {
+			$lead['recent_response_' . $slotNumber . '_customer_message_id'] = null;
+			$lead['recent_response_' . $slotNumber . '_customer_message_at'] = null;
+			$lead['recent_response_' . $slotNumber . '_agent_message_id'] = null;
+			$lead['recent_response_' . $slotNumber . '_agent_message_at'] = null;
+			$lead['recent_response_' . $slotNumber . '_seconds'] = null;
+		}
+	}
+
+	private function assign_ghl_processed_lead_response_slots(&$lead, $responses, $prefix)
+	{
+		$responseTotal = 0;
+		$responseCount = 0;
+		$trackedCount = is_array($responses) ? count($responses) : 0;
+
+		foreach ((array) $responses as $index => $response) {
+			$slotNumber = $index + 1;
+			$lead[$prefix . $slotNumber . '_customer_message_id'] = isset($response['customer_message_id']) ? $response['customer_message_id'] : null;
+			$lead[$prefix . $slotNumber . '_customer_message_at'] = isset($response['customer_message_at']) ? $response['customer_message_at'] : null;
+			$lead[$prefix . $slotNumber . '_agent_message_id'] = isset($response['agent_message_id']) ? $response['agent_message_id'] : null;
+			$lead[$prefix . $slotNumber . '_agent_message_at'] = isset($response['agent_message_at']) ? $response['agent_message_at'] : null;
+			$lead[$prefix . $slotNumber . '_seconds'] = isset($response['seconds']) ? $response['seconds'] : null;
+
+			if (isset($response['seconds']) && $response['seconds'] !== null) {
+				$responseTotal += (int) $response['seconds'];
+				$responseCount++;
+			}
+		}
+
+		return array(
+			'tracked_count' => $trackedCount,
+			'responded_count' => $responseCount,
+			'avg_seconds' => $responseCount > 0
+				? (int) round($responseTotal / $responseCount)
+				: null,
+		);
 	}
 
 	private function filter_ghl_processed_leads_for_current_assignment($leads, $currentAssignedTo)
