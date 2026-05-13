@@ -923,7 +923,10 @@ class Report extends MY_Controller
             'conversion_rate' => number_format((float) $summary['conversion_rate'], 1),
             'avg_response_time_seconds' => $summary['avg_response_time_seconds'],
             'avg_response_time_label' => $this->format_duration_label($summary['avg_response_time_seconds']),
+            'avg_recent_response_time_seconds' => $summary['avg_recent_response_time_seconds'],
+            'avg_recent_response_time_label' => $this->format_duration_label($summary['avg_recent_response_time_seconds']),
             'avg_responded_messages' => number_format((float) $summary['avg_responded_messages'], 1),
+            'avg_recent_responded_messages' => number_format((float) $summary['avg_recent_responded_messages'], 1),
         );
     }
 
@@ -942,7 +945,10 @@ class Report extends MY_Controller
                 'conversion_rate' => number_format((float) $row['conversion_rate'], 1),
                 'avg_response_time_seconds' => $row['avg_response_time_seconds'],
                 'avg_response_time_label' => $this->format_duration_label($row['avg_response_time_seconds']),
+                'avg_recent_response_time_seconds' => $row['avg_recent_response_time_seconds'],
+                'avg_recent_response_time_label' => $this->format_duration_label($row['avg_recent_response_time_seconds']),
                 'avg_responded_messages' => number_format((float) $row['avg_responded_messages'], 1),
+                'avg_recent_responded_messages' => number_format((float) $row['avg_recent_responded_messages'], 1),
                 'last_updated_at' => $row['last_updated_at'],
             );
         }
@@ -973,16 +979,41 @@ class Report extends MY_Controller
                 'response_progress_label' => (isset($row['responded_message_count']) ? (int) $row['responded_message_count'] : 0) . ' / ' . (isset($row['tracked_message_count']) ? (int) $row['tracked_message_count'] : 0),
                 'avg_first_5_response_seconds' => $row['avg_first_5_response_seconds'] !== null ? (int) $row['avg_first_5_response_seconds'] : null,
                 'avg_first_5_response_label' => $this->format_duration_label($row['avg_first_5_response_seconds']),
+                'recent_tracked_message_count' => isset($row['recent_tracked_message_count']) ? (int) $row['recent_tracked_message_count'] : 0,
+                'recent_responded_message_count' => isset($row['recent_responded_message_count']) ? (int) $row['recent_responded_message_count'] : 0,
+                'recent_response_progress_label' => (isset($row['recent_responded_message_count']) ? (int) $row['recent_responded_message_count'] : 0) . ' / ' . (isset($row['recent_tracked_message_count']) ? (int) $row['recent_tracked_message_count'] : 0),
+                'avg_recent_5_response_seconds' => $row['avg_recent_5_response_seconds'] !== null ? (int) $row['avg_recent_5_response_seconds'] : null,
+                'avg_recent_5_response_label' => $this->format_duration_label($row['avg_recent_5_response_seconds']),
+                'response_1_pair_label' => $this->format_response_pair_label(isset($row['response_1_agent_message_at']) ? $row['response_1_agent_message_at'] : null, isset($row['response_1_customer_message_at']) ? $row['response_1_customer_message_at'] : null),
+                'response_2_pair_label' => $this->format_response_pair_label(isset($row['response_2_agent_message_at']) ? $row['response_2_agent_message_at'] : null, isset($row['response_2_customer_message_at']) ? $row['response_2_customer_message_at'] : null),
+                'response_3_pair_label' => $this->format_response_pair_label(isset($row['response_3_agent_message_at']) ? $row['response_3_agent_message_at'] : null, isset($row['response_3_customer_message_at']) ? $row['response_3_customer_message_at'] : null),
+                'response_4_pair_label' => $this->format_response_pair_label(isset($row['response_4_agent_message_at']) ? $row['response_4_agent_message_at'] : null, isset($row['response_4_customer_message_at']) ? $row['response_4_customer_message_at'] : null),
+                'response_5_pair_label' => $this->format_response_pair_label(isset($row['response_5_agent_message_at']) ? $row['response_5_agent_message_at'] : null, isset($row['response_5_customer_message_at']) ? $row['response_5_customer_message_at'] : null),
+                'recent_response_1_pair_label' => $this->format_response_pair_label(isset($row['recent_response_1_agent_message_at']) ? $row['recent_response_1_agent_message_at'] : null, isset($row['recent_response_1_customer_message_at']) ? $row['recent_response_1_customer_message_at'] : null),
+                'recent_response_2_pair_label' => $this->format_response_pair_label(isset($row['recent_response_2_agent_message_at']) ? $row['recent_response_2_agent_message_at'] : null, isset($row['recent_response_2_customer_message_at']) ? $row['recent_response_2_customer_message_at'] : null),
+                'recent_response_3_pair_label' => $this->format_response_pair_label(isset($row['recent_response_3_agent_message_at']) ? $row['recent_response_3_agent_message_at'] : null, isset($row['recent_response_3_customer_message_at']) ? $row['recent_response_3_customer_message_at'] : null),
+                'recent_response_4_pair_label' => $this->format_response_pair_label(isset($row['recent_response_4_agent_message_at']) ? $row['recent_response_4_agent_message_at'] : null, isset($row['recent_response_4_customer_message_at']) ? $row['recent_response_4_customer_message_at'] : null),
+                'recent_response_5_pair_label' => $this->format_response_pair_label(isset($row['recent_response_5_agent_message_at']) ? $row['recent_response_5_agent_message_at'] : null, isset($row['recent_response_5_customer_message_at']) ? $row['recent_response_5_customer_message_at'] : null),
                 'response_1_seconds' => $row['response_1_seconds'] !== null ? (int) $row['response_1_seconds'] : null,
                 'response_2_seconds' => $row['response_2_seconds'] !== null ? (int) $row['response_2_seconds'] : null,
                 'response_3_seconds' => $row['response_3_seconds'] !== null ? (int) $row['response_3_seconds'] : null,
                 'response_4_seconds' => $row['response_4_seconds'] !== null ? (int) $row['response_4_seconds'] : null,
                 'response_5_seconds' => $row['response_5_seconds'] !== null ? (int) $row['response_5_seconds'] : null,
+                'recent_response_1_seconds' => $row['recent_response_1_seconds'] !== null ? (int) $row['recent_response_1_seconds'] : null,
+                'recent_response_2_seconds' => $row['recent_response_2_seconds'] !== null ? (int) $row['recent_response_2_seconds'] : null,
+                'recent_response_3_seconds' => $row['recent_response_3_seconds'] !== null ? (int) $row['recent_response_3_seconds'] : null,
+                'recent_response_4_seconds' => $row['recent_response_4_seconds'] !== null ? (int) $row['recent_response_4_seconds'] : null,
+                'recent_response_5_seconds' => $row['recent_response_5_seconds'] !== null ? (int) $row['recent_response_5_seconds'] : null,
                 'response_1_label' => $this->format_duration_label($row['response_1_seconds']),
                 'response_2_label' => $this->format_duration_label($row['response_2_seconds']),
                 'response_3_label' => $this->format_duration_label($row['response_3_seconds']),
                 'response_4_label' => $this->format_duration_label($row['response_4_seconds']),
                 'response_5_label' => $this->format_duration_label($row['response_5_seconds']),
+                'recent_response_1_label' => $this->format_duration_label($row['recent_response_1_seconds']),
+                'recent_response_2_label' => $this->format_duration_label($row['recent_response_2_seconds']),
+                'recent_response_3_label' => $this->format_duration_label($row['recent_response_3_seconds']),
+                'recent_response_4_label' => $this->format_duration_label($row['recent_response_4_seconds']),
+                'recent_response_5_label' => $this->format_duration_label($row['recent_response_5_seconds']),
                 'is_converted' => (int) $row['is_converted'],
                 'conversion_status_label' => (int) $row['is_converted'] === 1 ? 'Converted' : 'Open',
                 'booking_id' => !empty($row['booking_id']) ? (int) $row['booking_id'] : null,
@@ -1032,5 +1063,17 @@ class Report extends MY_Controller
         }
 
         return $days . ' day ' . $hours . ' hr';
+    }
+
+    private function format_response_pair_label($agentAt, $customerAt)
+    {
+        if (empty($agentAt) && empty($customerAt)) {
+            return '-';
+        }
+
+        $agentLabel = !empty($agentAt) ? date('d M Y h:i A', strtotime($agentAt)) : '-';
+        $customerLabel = !empty($customerAt) ? date('d M Y h:i A', strtotime($customerAt)) : '-';
+
+        return 'Agent ' . $agentLabel . ' - Customer ' . $customerLabel;
     }
 }

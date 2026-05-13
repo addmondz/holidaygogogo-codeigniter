@@ -514,7 +514,9 @@ class Report_Model extends CI_Model
                 COUNT(*) AS total_leads,
                 SUM(CASE WHEN pl.responded_message_count > 0 THEN 1 ELSE 0 END) AS responded_leads,
                 AVG(pl.avg_first_5_response_seconds) AS avg_response_time_seconds,
+                AVG(pl.avg_recent_5_response_seconds) AS avg_recent_response_time_seconds,
                 AVG(pl.responded_message_count) AS avg_responded_messages,
+                AVG(pl.recent_responded_message_count) AS avg_recent_responded_messages,
                 SUM(CASE WHEN pl.is_converted = 1 THEN 1 ELSE 0 END) AS converted_leads,
                 COUNT(DISTINCT NULLIF(pl.assigned_to_user_id, '')) AS active_agents
             FROM ghl_processed_leads pl
@@ -530,15 +532,23 @@ class Report_Model extends CI_Model
         $avgResponseSeconds = isset($row['avg_response_time_seconds']) && $row['avg_response_time_seconds'] !== null
             ? (int) round($row['avg_response_time_seconds'])
             : null;
+        $avgRecentResponseSeconds = isset($row['avg_recent_response_time_seconds']) && $row['avg_recent_response_time_seconds'] !== null
+            ? (int) round($row['avg_recent_response_time_seconds'])
+            : null;
         $avgRespondedMessages = isset($row['avg_responded_messages']) && $row['avg_responded_messages'] !== null
             ? round((float) $row['avg_responded_messages'], 1)
+            : 0.0;
+        $avgRecentRespondedMessages = isset($row['avg_recent_responded_messages']) && $row['avg_recent_responded_messages'] !== null
+            ? round((float) $row['avg_recent_responded_messages'], 1)
             : 0.0;
 
         return array(
             'total_leads' => $totalLeads,
             'responded_leads' => $respondedLeads,
             'avg_response_time_seconds' => $avgResponseSeconds,
+            'avg_recent_response_time_seconds' => $avgRecentResponseSeconds,
             'avg_responded_messages' => $avgRespondedMessages,
+            'avg_recent_responded_messages' => $avgRecentRespondedMessages,
             'converted_leads' => $convertedLeads,
             'active_agents' => !empty($row['active_agents']) ? (int) $row['active_agents'] : 0,
             'response_rate' => $totalLeads > 0 ? round(($respondedLeads / $totalLeads) * 100, 1) : 0.0,
@@ -566,7 +576,9 @@ class Report_Model extends CI_Model
                 COUNT(*) AS total_leads,
                 SUM(CASE WHEN pl.responded_message_count > 0 THEN 1 ELSE 0 END) AS responded_leads,
                 AVG(pl.avg_first_5_response_seconds) AS avg_response_time_seconds,
+                AVG(pl.avg_recent_5_response_seconds) AS avg_recent_response_time_seconds,
                 AVG(pl.responded_message_count) AS avg_responded_messages,
+                AVG(pl.recent_responded_message_count) AS avg_recent_responded_messages,
                 SUM(CASE WHEN pl.is_converted = 1 THEN 1 ELSE 0 END) AS converted_leads,
                 MAX(pl.updated_at) AS last_updated_at
             FROM ghl_processed_leads pl
@@ -588,8 +600,14 @@ class Report_Model extends CI_Model
             $avgResponseSeconds = $row['avg_response_time_seconds'] !== null
                 ? (int) round($row['avg_response_time_seconds'])
                 : null;
+            $avgRecentResponseSeconds = $row['avg_recent_response_time_seconds'] !== null
+                ? (int) round($row['avg_recent_response_time_seconds'])
+                : null;
             $avgRespondedMessages = $row['avg_responded_messages'] !== null
                 ? round((float) $row['avg_responded_messages'], 1)
+                : 0.0;
+            $avgRecentRespondedMessages = $row['avg_recent_responded_messages'] !== null
+                ? round((float) $row['avg_recent_responded_messages'], 1)
                 : 0.0;
 
             $results[] = array(
@@ -598,7 +616,9 @@ class Report_Model extends CI_Model
                 'total_leads' => $totalLeads,
                 'responded_leads' => $respondedLeads,
                 'avg_response_time_seconds' => $avgResponseSeconds,
+                'avg_recent_response_time_seconds' => $avgRecentResponseSeconds,
                 'avg_responded_messages' => $avgRespondedMessages,
+                'avg_recent_responded_messages' => $avgRecentRespondedMessages,
                 'converted_leads' => $convertedLeads,
                 'response_rate' => $totalLeads > 0 ? round(($respondedLeads / $totalLeads) * 100, 1) : 0.0,
                 'conversion_rate' => $totalLeads > 0 ? round(($convertedLeads / $totalLeads) * 100, 1) : 0.0,
@@ -669,11 +689,39 @@ class Report_Model extends CI_Model
                 pl.tracked_message_count,
                 pl.responded_message_count,
                 pl.avg_first_5_response_seconds,
+                pl.recent_tracked_message_count,
+                pl.recent_responded_message_count,
+                pl.avg_recent_5_response_seconds,
+                pl.response_1_customer_message_at,
+                pl.response_1_agent_message_at,
+                pl.response_2_customer_message_at,
+                pl.response_2_agent_message_at,
+                pl.response_3_customer_message_at,
+                pl.response_3_agent_message_at,
+                pl.response_4_customer_message_at,
+                pl.response_4_agent_message_at,
+                pl.response_5_customer_message_at,
+                pl.response_5_agent_message_at,
                 pl.response_1_seconds,
                 pl.response_2_seconds,
                 pl.response_3_seconds,
                 pl.response_4_seconds,
                 pl.response_5_seconds,
+                pl.recent_response_1_customer_message_at,
+                pl.recent_response_1_agent_message_at,
+                pl.recent_response_2_customer_message_at,
+                pl.recent_response_2_agent_message_at,
+                pl.recent_response_3_customer_message_at,
+                pl.recent_response_3_agent_message_at,
+                pl.recent_response_4_customer_message_at,
+                pl.recent_response_4_agent_message_at,
+                pl.recent_response_5_customer_message_at,
+                pl.recent_response_5_agent_message_at,
+                pl.recent_response_1_seconds,
+                pl.recent_response_2_seconds,
+                pl.recent_response_3_seconds,
+                pl.recent_response_4_seconds,
+                pl.recent_response_5_seconds,
                 pl.is_converted,
                 pl.booking_id,
                 pl.converted_at,
