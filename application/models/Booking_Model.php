@@ -1835,6 +1835,7 @@ class Booking_Model extends CI_Model
 	 */
 	function Count_Bookings_Filtered()
 	{
+		$this->db->from('booking');
 		$this->db->join('admin', 'admin.AdminID = booking.SalesAgent', 'left');
 		$this->db->join('category', 'category.CategoryID = booking.Destination', 'left');
 		$this->db->join('country_code', 'country_code.CountryCodeID = booking.CountryCodeID', 'left');
