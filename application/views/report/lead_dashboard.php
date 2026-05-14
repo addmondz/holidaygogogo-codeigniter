@@ -28,7 +28,7 @@
                             <div class="card-body">
                                 <form id="lead-dashboard-form" action="<?php echo base_url('Report/Lead_Dashboard'); ?>" method="get" class="form">
                                     <div class="row">
-                                        <div class="col-md-4">
+                                        <div class="col-md-3">
                                             <div class="form-group">
                                                 <label>Lead Date Range
                                                     <a onclick="resetLeadDate()" class="btn btn-icon btn-light-warning btn-xs">
@@ -43,20 +43,33 @@
                                                 </div>
                                             </div>
                                         </div>
-                                        <div class="col-md-4">
+                                        <div class="col-md-3">
                                             <div class="form-group">
-                                                <label>Sales Agent</label>
-                                                <select name="sales_agent" data-live-search="true" class="form-control selectpicker">
-                                                    <option selected data-icon="la la-user font-size-lg bs-icon" value="">--ALL SALES AGENTS--</option>
+                                                <label>TC</label>
+                                                <select name="sales_agent[]" data-live-search="true" class="form-control selectpicker"
+                                                        multiple data-actions-box="true" title="--ALL TCs--">
                                                     <?php foreach($lead_dashboard_agents as $agent) { ?>
-                                                        <option data-icon="la la-user font-size-lg bs-icon" value="<?php echo html_escape($agent->agent_id); ?>" <?php if($lead_dashboard_filters['sales_agent'] === $agent->agent_id) { echo 'selected'; } ?>>
+                                                        <option data-icon="la la-user font-size-lg bs-icon" value="<?php echo html_escape($agent->agent_id); ?>" <?php if(in_array((string) $agent->agent_id, $lead_dashboard_filters['sales_agent'], true)) { echo 'selected'; } ?>>
                                                             <?php echo html_escape($agent->agent_name); ?>
                                                         </option>
                                                     <?php } ?>
                                                 </select>
                                             </div>
                                         </div>
-                                        <div class="col-md-4">
+                                        <div class="col-md-3">
+                                            <div class="form-group">
+                                                <label>Team Leader</label>
+                                                <select name="team_lead[]" data-live-search="true" class="form-control selectpicker"
+                                                        multiple data-actions-box="true" title="--ALL TEAM LEADERS--">
+                                                    <?php foreach($lead_dashboard_team_leads as $tl) { ?>
+                                                        <option data-icon="la la-user-tie font-size-lg bs-icon" value="<?php echo html_escape($tl->AdminID); ?>" <?php if(in_array((string) $tl->AdminID, $lead_dashboard_filters['team_lead'], true)) { echo 'selected'; } ?>>
+                                                            <?php echo html_escape($tl->Name); ?>
+                                                        </option>
+                                                    <?php } ?>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
                                             <div class="form-group">
                                                 <label>Auto Refresh</label>
                                                 <select id="lead-dashboard-refresh-interval" class="form-control selectpicker">

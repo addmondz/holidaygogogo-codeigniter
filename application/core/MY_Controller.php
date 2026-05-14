@@ -18,6 +18,7 @@ class MY_Controller extends CI_Controller
 					case 'Tag':
 					case 'Source':
 					case 'Customer_Type':
+					case 'Guests':
 					case 'Quick_Filter':
 						redirect('Dashboard');
 						break;

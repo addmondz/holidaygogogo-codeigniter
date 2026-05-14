@@ -435,8 +435,8 @@ if (!function_exists('check_and_revert_status_if_price_or_date_changed')) {
         $CI->load->model('Booking_Model');
         $current_booking = $CI->Booking_Model->getBookingById($booking_id);
 
-        if (!$current_booking || $current_booking->Status == 'PBC') {
-            return false; // Already PBC or booking not found
+        if (!$current_booking || $current_booking->Status !== 'PT') {
+            return false; // Only revert when status is PT (Pending Travel)
         }
 
         $needs_revert = false;
@@ -484,36 +484,21 @@ if (!function_exists('check_and_revert_status_if_price_or_date_changed')) {
             }
         }
 
-        // If revert is needed, revert status
+        // PT → PTV: TC must re-approve the Travel Voucher
         if ($needs_revert) {
             $CI->load->helper('booking_status_log');
             $admin_id = $CI->session->userdata('admin_id') ?: 0;
 
-            // Special case: Completed bookings with price increase → revert to P (Pending Payment)
-            if ($current_booking->Status == 'Y' && $price_increased) {
-                $CI->Booking_Model->Update_Status('P', $booking_id);
+            $CI->Booking_Model->Update_Status('PTV', $booking_id);
 
-                log_booking_status_change(
-                    $booking_id,
-                    'P',
-                    $current_booking->Status,
-                    $admin_id,
-                    'Status changed to PENDING PAYMENT - Additional payment required: ' . $revert_reason,
-                    true
-                );
-            } else {
-                // All other cases: revert to PBC
-                $CI->Booking_Model->Update_Status('PBC', $booking_id);
-
-                log_booking_status_change(
-                    $booking_id,
-                    'PBC',
-                    $current_booking->Status,
-                    $admin_id,
-                    'Status reverted to PENDING BC CONFIRMATION - ' . $revert_reason,
-                    true
-                );
-            }
+            log_booking_status_change(
+                $booking_id,
+                'PTV',
+                $current_booking->Status,
+                $admin_id,
+                'Status reverted to PENDING TRAVEL VOUCHER - TC must re-approve voucher: ' . $revert_reason,
+                true
+            );
 
             return true;
         }

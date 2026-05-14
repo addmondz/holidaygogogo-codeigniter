@@ -339,7 +339,7 @@ $is_dev_env = ($app_env !== 'prod');
 										</div>
 									</li>
 								<?php } ?>
-								<li class="menu-item menu-item-submenu <?php if($this->router->class == 'Category_Code' || $this->router->class == 'Category' || $this->router->class == 'Supplier' || $this->router->class == 'Product' || $this->router->class == 'Footer' || $this->router->class == 'Country_Code' || $this->router->class == 'Tag' || $this->router->class == 'Source' || $this->router->class == 'Package_Checklist' || $this->router->class == 'Product_Package_Checklist' || $this->router->class == 'Cancellation_Reason' || $this->router->class == 'Customer_Type' || $this->router->class == 'Quick_Filter') { echo 'menu-item-active menu-item-open'; } ?>">
+								<li class="menu-item menu-item-submenu <?php if($this->router->class == 'Category_Code' || $this->router->class == 'Category' || $this->router->class == 'Supplier' || $this->router->class == 'Product' || $this->router->class == 'Footer' || $this->router->class == 'Country_Code' || $this->router->class == 'Tag' || $this->router->class == 'Source' || $this->router->class == 'Package_Checklist' || $this->router->class == 'Product_Package_Checklist' || $this->router->class == 'Cancellation_Reason' || $this->router->class == 'Customer_Type' || $this->router->class == 'Guests' || $this->router->class == 'Quick_Filter') { echo 'menu-item-active menu-item-open'; } ?>">
 									<a href="javascript:;" class="menu-link menu-toggle">
 										<span class="svg-icon menu-icon">
 											<svg>
@@ -388,6 +388,16 @@ $is_dev_env = ($app_env !== 'prod');
 														<span class="menu-text">Customer</span>
 													</a>
 												</li>
+												<?php if ($this->config->item('show_guest_list')) { ?>
+												<li class="menu-item <?php if($this->router->class == 'Guests') { echo 'menu-item-active'; } ?>">
+													<a href="<?php echo base_url('Guests'); ?>" class="menu-link">
+														<i class="menu-bullet menu-bullet-dot">
+															<span></span>
+														</i>
+														<span class="menu-text">Guest List</span>
+													</a>
+												</li>
+												<?php } ?>
 											<?php } ?>
 												<li class="menu-item <?php if($this->router->class == 'Product') { echo 'menu-item-active'; } ?>">
 													<a href="<?php echo base_url('Product'); ?>" class="menu-link">

@@ -374,7 +374,8 @@
                                         id="Customer"
                                         name="Customer"
                                         <?php if (current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) { ?>
-                                            value="<?php echo $Customer; ?>"
+                                            value="<?php echo htmlspecialchars($Customer . (!empty($CustomerCode) ? ' - ' . $CustomerCode : ''), ENT_QUOTES); ?>"
+                                            data-selected-code="<?php echo htmlspecialchars(!empty($CustomerCode) ? $CustomerCode : '', ENT_QUOTES); ?>"
                                         <?php } ?>
                                         autocomplete="off"
                                         class="form-control"
@@ -1434,96 +1435,559 @@
                                 </div>
                             <?php } ?>
 
-                            <!-- E-Invoice Request by Pax (Read-Only) -->
-                            <?php if(!empty($invoice_split)) { ?>
+                            <!-- E-Invoice Request by Pax (Admin editable when submitted) -->
+                            <?php if(!empty($invoice_split)) {
+                                $einvoice_can_admin_edit = !empty($this->session->userdata('admin_id'));
+                                $einvoice_is_submitted   = !empty($einvoice_submit_status) && $einvoice_submit_status === 'S';
+                            ?>
                                 <div class="row mt-5">
                                     <div class="col-12">
-                                        <div class="card card-custom">
+                                        <div class="card card-custom" id="invoice-split-section">
                                             <div class="card-header flex-wrap py-2" style="background-color:#D7E2F2;">
-                                                <div class="card-title">
+                                                <div class="card-title d-flex justify-content-between align-items-center" style="width:100%;">
                                                     <h4 class="card-label mb-0" style="color:#6082B6; font-size: 1.1rem;">
                                                         <strong>E-Invoice Request by Pax</strong>
+                                                        <?php if($einvoice_is_submitted) { ?>
+                                                            <span class="ml-2" style="display:inline-block; font-size: 11px; font-weight: 700; background: #28a745; color: #fff; padding: 3px 10px; border-radius: 12px; letter-spacing: 0.3px;">SUBMITTED</span>
+                                                        <?php } elseif(!empty($einvoice_submit_status) && $einvoice_submit_status === 'D') { ?>
+                                                            <span class="ml-2" style="display:inline-block; font-size: 11px; font-weight: 700; background: #6c757d; color: #fff; padding: 3px 10px; border-radius: 12px; letter-spacing: 0.3px;">DRAFT</span>
+                                                        <?php } ?>
                                                     </h4>
+                                                    <?php if($einvoice_can_admin_edit && $einvoice_is_submitted) { ?>
+                                                        <button type="button" id="toggle-admin-split-form" class="btn btn-primary btn-sm font-weight-bold" title="Edit submitted e-invoice details">
+                                                            <i class="la la-edit"></i> Edit E-Invoice
+                                                        </button>
+                                                    <?php } ?>
                                                 </div>
                                             </div>
                                             <div class="card-body">
-                                                <?php
-                                                $grand_subtotal = 0;
-                                                $grand_discount = 0;
-                                                $grand_net = 0;
-                                                foreach($invoice_split as $idx => $pax) {
-                                                    $grand_subtotal += $pax['SubtotalAmount'];
-                                                    $grand_discount += $pax['DiscountAmount'];
-                                                    $grand_net += $pax['NetAmount'];
-                                                ?>
-                                                <div style="background: #f8f9fa; border-radius: 6px; padding: 12px; margin-bottom: 10px; border: 1px solid #e8e8e8;">
-                                                    <div class="d-flex justify-content-between align-items-center mb-1">
-                                                        <strong>Pax <?php echo $idx + 1; ?>: <?php echo htmlspecialchars($pax['PaxName']); ?></strong>
-                                                        <?php if(!empty($pax['TIN'])) { ?>
-                                                            <span class="text-muted" style="font-size: 0.85rem;">TIN: <?php echo htmlspecialchars($pax['TIN']); ?></span>
+                                                <?php if($einvoice_is_submitted || !empty($einvoice_last_edited_date)) { ?>
+                                                    <div class="mb-3 p-2 rounded" style="background:#f0f7ff; border:1px solid #cce5ff; font-size:0.82rem; color:#004085;">
+                                                        <?php if(!empty($einvoice_submitted_date)) { ?>
+                                                            <span><i class="la la-paper-plane"></i> Submitted on <?php echo htmlspecialchars(date('Y-m-d H:i', strtotime($einvoice_submitted_date))); ?></span>
+                                                        <?php } ?>
+                                                        <?php if(!empty($einvoice_last_edited_date)) { ?>
+                                                            <span class="ml-3"><i class="la la-edit"></i> Last edited by
+                                                                <strong><?php echo htmlspecialchars($einvoice_last_editor_name ?: ('Admin #' . $einvoice_last_edited_by)); ?></strong>
+                                                                on <?php echo htmlspecialchars(date('Y-m-d H:i', strtotime($einvoice_last_edited_date))); ?>
+                                                            </span>
                                                         <?php } ?>
                                                     </div>
-                                                    <div class="text-muted mb-2" style="font-size: 0.82rem;">
-                                                        <?php if(!empty($pax['Email'])) { ?>
-                                                            <span class="mr-3">Email: <?php echo htmlspecialchars($pax['Email']); ?></span>
-                                                        <?php } ?>
-                                                        <?php if(!empty($pax['PhoneNumber'])) { ?>
-                                                            <span>Phone: <?php echo htmlspecialchars($pax['PhoneNumber']); ?></span>
-                                                        <?php } ?>
-                                                        <?php if(!empty($pax['Address'])) { ?>
-                                                            <div>Address: <?php echo htmlspecialchars($pax['Address']); ?></div>
-                                                        <?php } ?>
-                                                    </div>
-                                                    <table class="table table-sm table-bordered mb-2" style="font-size: 0.85rem;">
-                                                        <thead style="background: #e9ecef;">
-                                                            <tr>
-                                                                <th>Product</th>
-                                                                <th class="text-center" style="width:80px;">Qty</th>
-                                                                <th class="text-right" style="width:120px;">Unit Price</th>
-                                                                <th class="text-right" style="width:120px;">Amount</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody>
-                                                            <?php foreach($pax['products'] as $prod) {
-                                                                $line_discount = isset($prod['DiscountAmount']) ? floatval($prod['DiscountAmount']) : 0;
-                                                                $line_net = floatval($prod['Amount']) - $line_discount;
-                                                            ?>
-                                                                <tr<?php echo $line_discount > 0 ? ' style="background:#fff8e1;"' : ''; ?>>
-                                                                    <td>
-                                                                        <?php echo htmlspecialchars($prod['ProductName']); ?>
-                                                                        <?php if($line_discount > 0) { ?>
-                                                                            <span class="label label-warning ml-2" style="font-size:0.7rem; background:#f0ad4e; color:#fff; padding:2px 6px; border-radius:3px;">BC Discount Applied</span>
-                                                                        <?php } ?>
-                                                                    </td>
-                                                                    <td class="text-center"><?php echo rtrim(rtrim(number_format($prod['Quantity'], 2), '0'), '.'); ?></td>
-                                                                    <td class="text-right">RM <?php echo number_format($prod['UnitPrice'], 2); ?></td>
-                                                                    <td class="text-right">
-                                                                        RM <?php echo number_format($prod['Amount'], 2); ?>
-                                                                        <?php if($line_discount > 0) { ?>
-                                                                            <div class="text-danger" style="font-size:0.78rem;">- RM <?php echo number_format($line_discount, 2); ?> discount</div>
-                                                                            <div style="font-size:0.78rem;">Net: RM <?php echo number_format($line_net, 2); ?></div>
-                                                                        <?php } ?>
-                                                                    </td>
-                                                                </tr>
-                                                            <?php } ?>
-                                                        </tbody>
-                                                    </table>
-                                                    <div class="text-right" style="font-size: 0.85rem;">
-                                                        <span>Subtotal: <strong>RM <?php echo number_format($pax['SubtotalAmount'], 2); ?></strong></span>
-                                                        <?php if(floatval($pax['DiscountAmount']) > 0) { ?>
-                                                            <span class="ml-3 text-danger">Discount: <strong>- RM <?php echo number_format($pax['DiscountAmount'], 2); ?></strong></span>
-                                                        <?php } ?>
-                                                        <span class="ml-3" style="color:#6082B6;">Net: <strong>RM <?php echo number_format($pax['NetAmount'], 2); ?></strong></span>
-                                                    </div>
-                                                </div>
                                                 <?php } ?>
-                                                <div class="text-right mt-3 p-3" style="background: #D7E2F2; border-radius: 6px; font-size: 0.9rem;">
-                                                    <span>Grand Subtotal: <strong>RM <?php echo number_format($grand_subtotal, 2); ?></strong></span>
-                                                    <?php if($grand_discount > 0) { ?>
-                                                        <span class="ml-3">Discount: <strong>- RM <?php echo number_format($grand_discount, 2); ?></strong></span>
+
+                                                <!-- Read-only display -->
+                                                <div id="admin-split-display-readonly">
+                                                    <?php
+                                                    $grand_subtotal = 0;
+                                                    $grand_discount = 0;
+                                                    $grand_net = 0;
+                                                    foreach($invoice_split as $idx => $pax) {
+                                                        $grand_subtotal += $pax['SubtotalAmount'];
+                                                        $grand_discount += $pax['DiscountAmount'];
+                                                        $grand_net += $pax['NetAmount'];
+                                                    ?>
+                                                    <div style="background: #f8f9fa; border-radius: 6px; padding: 12px; margin-bottom: 10px; border: 1px solid #e8e8e8;">
+                                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                                            <strong>Pax <?php echo $idx + 1; ?>: <?php echo htmlspecialchars($pax['PaxName']); ?></strong>
+                                                            <?php if(!empty($pax['TIN'])) { ?>
+                                                                <span class="text-muted" style="font-size: 0.85rem;">TIN: <?php echo htmlspecialchars($pax['TIN']); ?></span>
+                                                            <?php } ?>
+                                                        </div>
+                                                        <div class="text-muted mb-2" style="font-size: 0.82rem;">
+                                                            <?php if(!empty($pax['Email'])) { ?>
+                                                                <span class="mr-3">Email: <?php echo htmlspecialchars($pax['Email']); ?></span>
+                                                            <?php } ?>
+                                                            <?php if(!empty($pax['PhoneNumber'])) { ?>
+                                                                <span>Phone: <?php echo htmlspecialchars($pax['PhoneNumber']); ?></span>
+                                                            <?php } ?>
+                                                            <?php if(!empty($pax['Address'])) { ?>
+                                                                <div>Address: <?php echo htmlspecialchars($pax['Address']); ?></div>
+                                                            <?php } ?>
+                                                        </div>
+                                                        <table class="table table-sm table-bordered mb-2" style="font-size: 0.85rem;">
+                                                            <thead style="background: #e9ecef;">
+                                                                <tr>
+                                                                    <th>Product</th>
+                                                                    <th class="text-center" style="width:80px;">Qty</th>
+                                                                    <th class="text-right" style="width:120px;">Unit Price</th>
+                                                                    <th class="text-right" style="width:120px;">Amount</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                <?php foreach($pax['products'] as $prod) {
+                                                                    $line_discount = isset($prod['DiscountAmount']) ? floatval($prod['DiscountAmount']) : 0;
+                                                                    $line_net = floatval($prod['Amount']) - $line_discount;
+                                                                ?>
+                                                                    <tr<?php echo $line_discount > 0 ? ' style="background:#fff8e1;"' : ''; ?>>
+                                                                        <td>
+                                                                            <?php echo htmlspecialchars($prod['ProductName']); ?>
+                                                                            <?php if($line_discount > 0) { ?>
+                                                                                <span class="label label-warning ml-2" style="font-size:0.7rem; background:#f0ad4e; color:#fff; padding:2px 6px; border-radius:3px;">BC Discount Applied</span>
+                                                                            <?php } ?>
+                                                                        </td>
+                                                                        <td class="text-center"><?php echo rtrim(rtrim(number_format($prod['Quantity'], 2), '0'), '.'); ?></td>
+                                                                        <td class="text-right">RM <?php echo number_format($prod['UnitPrice'], 2); ?></td>
+                                                                        <td class="text-right">
+                                                                            RM <?php echo number_format($prod['Amount'], 2); ?>
+                                                                            <?php if($line_discount > 0) { ?>
+                                                                                <div class="text-danger" style="font-size:0.78rem;">- RM <?php echo number_format($line_discount, 2); ?> discount</div>
+                                                                                <div style="font-size:0.78rem;">Net: RM <?php echo number_format($line_net, 2); ?></div>
+                                                                            <?php } ?>
+                                                                        </td>
+                                                                    </tr>
+                                                                <?php } ?>
+                                                            </tbody>
+                                                        </table>
+                                                        <div class="text-right" style="font-size: 0.85rem;">
+                                                            <span>Subtotal: <strong>RM <?php echo number_format($pax['SubtotalAmount'], 2); ?></strong></span>
+                                                            <?php if(floatval($pax['DiscountAmount']) > 0) { ?>
+                                                                <span class="ml-3 text-danger">Discount: <strong>- RM <?php echo number_format($pax['DiscountAmount'], 2); ?></strong></span>
+                                                            <?php } ?>
+                                                            <span class="ml-3" style="color:#6082B6;">Net: <strong>RM <?php echo number_format($pax['NetAmount'], 2); ?></strong></span>
+                                                        </div>
+                                                    </div>
                                                     <?php } ?>
-                                                    <span class="ml-3"><strong>Net Total: RM <?php echo number_format($grand_net, 2); ?></strong></span>
+                                                    <div class="text-right mt-3 p-3" style="background: #D7E2F2; border-radius: 6px; font-size: 0.9rem;">
+                                                        <span>Grand Subtotal: <strong>RM <?php echo number_format($grand_subtotal, 2); ?></strong></span>
+                                                        <?php if($grand_discount > 0) { ?>
+                                                            <span class="ml-3">Discount: <strong>- RM <?php echo number_format($grand_discount, 2); ?></strong></span>
+                                                        <?php } ?>
+                                                        <span class="ml-3"><strong>Net Total: RM <?php echo number_format($grand_net, 2); ?></strong></span>
+                                                    </div>
                                                 </div>
+
+                                                <?php if($einvoice_can_admin_edit && $einvoice_is_submitted) {
+                                                    // Pax count cap mirrors the customer portal: adult + child + infant
+                                                    // from booking. Fall back to invoice_split row count if not available.
+                                                    $admin_max_pax = (int)(isset($Adult) ? $Adult : 0)
+                                                        + (int)(isset($Children) ? $Children : 0)
+                                                        + (int)(isset($Infant) ? $Infant : 0);
+                                                    if ($admin_max_pax <= 0) {
+                                                        $admin_max_pax = count($invoice_split);
+                                                    }
+                                                    // Normalize booking_products into the same shape the JS expects.
+                                                    $admin_bp_for_js = [];
+                                                    if (!empty($booking_products)) {
+                                                        foreach ($booking_products as $bp) {
+                                                            if (is_object($bp) && !empty($bp->BookingProductID)) {
+                                                                $price = is_string($bp->Price) ? floatval(str_replace(',', '', $bp->Price)) : floatval($bp->Price);
+                                                                $admin_bp_for_js[] = [
+                                                                    'BookingProductID' => $bp->BookingProductID,
+                                                                    'Name'             => $bp->Name,
+                                                                    'Price'            => $price,
+                                                                    'Quantity'         => $bp->Quantity,
+                                                                ];
+                                                            }
+                                                        }
+                                                    }
+                                                ?>
+                                                <?php
+                                                    // $Subtotal / $Discount arrive as comma-formatted strings (see
+                                                    // Booking.php:1622), so strip commas before floatval.
+                                                    $admin_subtotal_num = floatval(str_replace(',', '', (string)(isset($Subtotal) ? $Subtotal : 0)));
+                                                    $admin_discount_num = floatval(str_replace(',', '', (string)(isset($Discount) ? $Discount : 0)));
+                                                ?>
+                                                <!-- Admin edit form (hidden by default) -->
+                                                <div id="admin-split-form-container" style="display:none; margin-top:16px;">
+                                                    <div id="admin-split-summary-bar" style="background:#f8f9fa; border-radius:8px; padding:10px 14px; margin-bottom:14px; border:2px solid #e0e0e0; font-size:13px;">
+                                                        <div class="d-flex justify-content-between flex-wrap" style="gap:10px;">
+                                                            <div><strong>Total Allocated:</strong> <span id="admin-split-total-allocated">RM 0.00</span></div>
+                                                            <div><strong>Booking Subtotal:</strong> RM <?php echo number_format($admin_subtotal_num, 2); ?></div>
+                                                            <div><strong>Remaining:</strong> <span id="admin-split-remaining">RM <?php echo number_format($admin_subtotal_num, 2); ?></span></div>
+                                                        </div>
+                                                    </div>
+                                                    <div id="admin-pax-cards-container"></div>
+                                                    <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap;">
+                                                        <button type="button" id="admin-add-pax-btn" class="btn btn-success btn-sm font-weight-bold">
+                                                            <i class="la la-plus"></i> Add Pax
+                                                        </button>
+                                                        <button type="button" id="admin-save-split-btn" class="btn btn-primary btn-sm font-weight-bold">
+                                                            <i class="la la-save"></i> Save Changes
+                                                        </button>
+                                                        <button type="button" id="admin-cancel-split-btn" class="btn btn-secondary btn-sm font-weight-bold">
+                                                            Cancel
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                <script>
+                                                (function() {
+                                                    var adminEinvCfg = {
+                                                        save_url:         '<?php echo site_url('Booking/save_invoice_split_admin/' . $BookingID); ?>',
+                                                        booking_products: <?php echo json_encode($admin_bp_for_js); ?>,
+                                                        booking_subtotal: <?php echo json_encode($admin_subtotal_num); ?>,
+                                                        booking_discount: <?php echo json_encode($admin_discount_num); ?>,
+                                                        existing_split:   <?php echo json_encode($invoice_split); ?>,
+                                                        max_pax:          <?php echo (int)$admin_max_pax; ?>
+                                                    };
+
+                                                    jQuery(function($) {
+                                                        var bookingProducts = adminEinvCfg.booking_products || [];
+                                                        var bookingSubtotal = parseFloat(adminEinvCfg.booking_subtotal) || 0;
+                                                        var bookingDiscount = parseFloat(adminEinvCfg.booking_discount) || 0;
+                                                        var existingSplit   = adminEinvCfg.existing_split || [];
+                                                        var maxPax          = parseInt(adminEinvCfg.max_pax, 10) || 0;
+                                                        var paxCounter      = 0;
+
+                                                        function formatCurrency(v) {
+                                                            return 'RM ' + parseFloat(v).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+                                                        }
+
+                                                        function getMaxQtyForBp(bpId) {
+                                                            for (var i = 0; i < bookingProducts.length; i++) {
+                                                                if (bookingProducts[i].BookingProductID == bpId) {
+                                                                    return parseFloat(bookingProducts[i].Quantity) || 0;
+                                                                }
+                                                            }
+                                                            return 0;
+                                                        }
+
+                                                        function getProductOptions(selectedBpId) {
+                                                            var html = '<option value="">-- Select Product --</option>';
+                                                            for (var i = 0; i < bookingProducts.length; i++) {
+                                                                var bp = bookingProducts[i];
+                                                                var sel = (bp.BookingProductID == selectedBpId) ? ' selected' : '';
+                                                                html += '<option value="' + bp.BookingProductID + '"' + sel + ' data-price="' + bp.Price + '" data-max-qty="' + bp.Quantity + '">' + bp.Name + ' (Qty: ' + bp.Quantity + ' × RM ' + parseFloat(bp.Price).toFixed(2) + ')</option>';
+                                                            }
+                                                            return html;
+                                                        }
+
+                                                        // Remaining capacity for a row, accounting for other rows
+                                                        // allocating the same BookingProductID across pax.
+                                                        function computeRowRemaining($row) {
+                                                            var bpId = parseInt($row.find('.adm-split-product-select').val(), 10) || 0;
+                                                            if (bpId <= 0) return null;
+                                                            var bookingQty = getMaxQtyForBp(bpId);
+                                                            var otherSum = 0;
+                                                            $('#admin-pax-cards-container .adm-product-row').each(function() {
+                                                                if (this === $row[0]) return;
+                                                                var otherBp = parseInt($(this).find('.adm-split-product-select').val(), 10) || 0;
+                                                                if (otherBp === bpId) {
+                                                                    otherSum += parseFloat($(this).find('.adm-split-qty').val()) || 0;
+                                                                }
+                                                            });
+                                                            var rem = Math.round((bookingQty - otherSum) * 100) / 100;
+                                                            return Math.max(0, rem);
+                                                        }
+
+                                                        function applyRowCap($row) {
+                                                            var rem = computeRowRemaining($row);
+                                                            var $qty = $row.find('.adm-split-qty');
+                                                            if (rem === null) { $qty.removeAttr('max'); return; }
+                                                            $qty.attr('max', rem);
+                                                            var v = parseFloat($qty.val());
+                                                            if (!isNaN(v) && v > rem) $qty.val(rem);
+                                                        }
+
+                                                        function addProductRow(paxIdx, product) {
+                                                            var bpId = product ? product.BookingProductID : '';
+                                                            var qty = product ? product.Quantity : '';
+                                                            var price = product ? parseFloat(product.UnitPrice).toFixed(2) : '0.00';
+                                                            var amount = product ? parseFloat(product.Amount).toFixed(2) : '0.00';
+                                                            var maxAttr = '';
+                                                            if (bpId) {
+                                                                var mq = getMaxQtyForBp(bpId);
+                                                                if (mq > 0) maxAttr = ' max="' + mq + '"';
+                                                            }
+                                                            var html = '<tr class="adm-product-row" data-pax="' + paxIdx + '">';
+                                                            html += '<td><select class="adm-split-product-select form-control form-control-sm">' + getProductOptions(bpId) + '</select></td>';
+                                                            html += '<td><input type="number" class="adm-split-qty form-control form-control-sm" value="' + qty + '" min="0.1" step="0.1"' + maxAttr + ' style="width:90px;"></td>';
+                                                            html += '<td class="adm-split-price text-right">RM ' + price + '</td>';
+                                                            html += '<td class="adm-split-amount-cell text-right"><div class="adm-split-amount">RM ' + amount + '</div></td>';
+                                                            html += '<td><button type="button" class="adm-remove-product-row btn btn-danger btn-xs" title="Remove product"><i class="la la-trash"></i></button></td>';
+                                                            html += '</tr>';
+                                                            return html;
+                                                        }
+
+                                                        function updateAddPaxBtnState() {
+                                                            var n = $('#admin-pax-cards-container .adm-pax-card').length;
+                                                            var $b = $('#admin-add-pax-btn');
+                                                            if (n >= maxPax) {
+                                                                $b.prop('disabled', true).css({opacity:0.5, cursor:'not-allowed'}).attr('title', 'Maximum ' + maxPax + ' pax reached for this booking');
+                                                            } else {
+                                                                $b.prop('disabled', false).css({opacity:'', cursor:'pointer'}).removeAttr('title');
+                                                            }
+                                                        }
+
+                                                        function addPaxCard(paxData) {
+                                                            paxCounter++;
+                                                            var idx = paxCounter;
+                                                            var name = paxData ? (paxData.PaxName || '') : '';
+                                                            var tin = paxData ? (paxData.TIN || '') : '';
+                                                            var email = paxData ? (paxData.Email || '') : '';
+                                                            var address = paxData ? (paxData.Address || '') : '';
+                                                            var phone = paxData ? (paxData.PhoneNumber || '') : '';
+                                                            var esc = function(s) { return String(s).replace(/"/g, '&quot;'); };
+                                                            var escTa = function(s) { return String(s).replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
+
+                                                            var html = '<div class="adm-pax-card" data-pax-idx="' + idx + '" style="background:#f8f9fa;border:1px solid #e0e0e0;border-radius:8px;padding:14px;margin-bottom:12px;">';
+                                                            html += '<div class="d-flex justify-content-between align-items-center mb-2">';
+                                                            html += '<strong>Pax #' + idx + '</strong>';
+                                                            html += '<button type="button" class="adm-remove-pax-btn btn btn-danger btn-xs" title="Remove pax"><i class="la la-trash"></i> Remove</button>';
+                                                            html += '</div>';
+                                                            html += '<div class="form-row">';
+                                                            html += '<div class="form-group col-md-6"><label class="font-weight-bold" style="font-size:12px;">Pax Name <span class="text-danger">*</span></label><input type="text" class="adm-pax-name form-control form-control-sm" value="' + esc(name) + '" placeholder="Full Name"></div>';
+                                                            html += '<div class="form-group col-md-6"><label class="font-weight-bold" style="font-size:12px;">TIN (Tax ID) <span class="text-danger">*</span></label><input type="text" class="adm-pax-tin form-control form-control-sm" value="' + esc(tin) + '" placeholder="Tax Identification Number"></div>';
+                                                            html += '</div>';
+                                                            html += '<div class="form-row">';
+                                                            html += '<div class="form-group col-md-6"><label class="font-weight-bold" style="font-size:12px;">Email <span class="text-danger">*</span></label><input type="email" class="adm-pax-email form-control form-control-sm" value="' + esc(email) + '" placeholder="Email Address"></div>';
+                                                            html += '<div class="form-group col-md-6"><label class="font-weight-bold" style="font-size:12px;">Phone Number <span class="text-danger">*</span></label><input type="text" class="adm-pax-phone form-control form-control-sm" value="' + esc(phone) + '" placeholder="Phone Number"></div>';
+                                                            html += '</div>';
+                                                            html += '<div class="form-group"><label class="font-weight-bold" style="font-size:12px;">Address <span class="text-danger">*</span></label><textarea class="adm-pax-address form-control form-control-sm" placeholder="Full Address" style="min-height:60px;">' + escTa(address) + '</textarea></div>';
+                                                            html += '<table class="table table-sm table-bordered mb-1" style="font-size:13px;">';
+                                                            html += '<thead style="background:#e9ecef;"><tr><th>Product</th><th class="text-center" style="width:100px;">Qty</th><th class="text-right" style="width:110px;">Unit Price</th><th class="text-right" style="width:120px;">Amount</th><th style="width:40px;"></th></tr></thead>';
+                                                            html += '<tbody class="adm-pax-products-body">';
+                                                            if (paxData && paxData.products && paxData.products.length) {
+                                                                for (var i = 0; i < paxData.products.length; i++) html += addProductRow(idx, paxData.products[i]);
+                                                            } else {
+                                                                html += addProductRow(idx, null);
+                                                            }
+                                                            html += '</tbody></table>';
+                                                            html += '<div class="d-flex justify-content-between align-items-center">';
+                                                            html += '<div><button type="button" class="adm-add-product-btn btn btn-info btn-xs font-weight-bold" data-pax="' + idx + '" title="Add product to this pax"><i class="la la-plus"></i> Add Product</button>';
+                                                            html += '<button type="button" class="adm-add-all-products-btn btn btn-success btn-xs font-weight-bold ml-2" data-pax="' + idx + '" title="Add all booking products"><i class="la la-plus-square"></i> Add All</button></div>';
+                                                            html += '<div class="adm-pax-subtotal font-weight-bold">Subtotal: RM 0.00</div>';
+                                                            html += '</div>';
+                                                            html += '</div>';
+                                                            $('#admin-pax-cards-container').append(html);
+                                                            recalculate();
+                                                            updateAddPaxBtnState();
+                                                        }
+
+                                                        function recalculate() {
+                                                            var totalAllocated = 0;
+                                                            var aggregate = {};
+                                                            var rowsInOrder = [];
+                                                            $('#admin-pax-cards-container .adm-pax-card').each(function() {
+                                                                var paxSubtotal = 0;
+                                                                $(this).find('.adm-product-row').each(function() {
+                                                                    var $row = $(this);
+                                                                    var $select = $row.find('.adm-split-product-select');
+                                                                    var $qty = $row.find('.adm-split-qty');
+                                                                    var bpId = parseInt($select.val(), 10) || 0;
+                                                                    var price = parseFloat($select.find('option:selected').data('price')) || 0;
+                                                                    var qty = parseFloat($qty.val()) || 0;
+                                                                    var amount = Math.round(price * qty * 100) / 100;
+                                                                    $row.find('.adm-split-price').text('RM ' + price.toFixed(2));
+                                                                    $row.find('.adm-split-amount').text('RM ' + amount.toFixed(2));
+                                                                    $row.css('background', '');
+                                                                    $row.next('.adm-split-discount-row').remove();
+                                                                    if (bpId > 0) {
+                                                                        aggregate[bpId] = Math.round(((aggregate[bpId] || 0) + amount) * 100) / 100;
+                                                                        rowsInOrder.push({ bpId: bpId, amount: amount, $row: $row });
+                                                                    }
+                                                                    paxSubtotal += amount;
+                                                                });
+                                                                $(this).find('.adm-pax-subtotal').text('Subtotal: ' + formatCurrency(paxSubtotal));
+                                                                totalAllocated += paxSubtotal;
+                                                            });
+                                                            // Highlight the first product line whose amount can absorb
+                                                            // the full booking discount (same rule as the backend).
+                                                            if (bookingDiscount > 0) {
+                                                                var targetBp = null;
+                                                                Object.keys(aggregate).forEach(function(k) {
+                                                                    var bp = parseInt(k, 10);
+                                                                    if (aggregate[k] >= bookingDiscount) {
+                                                                        if (targetBp === null || bp < targetBp) targetBp = bp;
+                                                                    }
+                                                                });
+                                                                if (targetBp !== null) {
+                                                                    for (var i = 0; i < rowsInOrder.length; i++) {
+                                                                        if (rowsInOrder[i].bpId === targetBp) {
+                                                                            var amt = rowsInOrder[i].amount;
+                                                                            var net = Math.round((amt - bookingDiscount) * 100) / 100;
+                                                                            rowsInOrder[i].$row.css('background', '#fff8e1');
+                                                                            rowsInOrder[i].$row.after(
+                                                                                '<tr class="adm-split-discount-row" style="background:#fff8e1;">' +
+                                                                                    '<td colspan="5" style="padding:4px 8px 8px;">' +
+                                                                                        '<span style="display:inline-block;font-size:10px;background:#f0ad4e;color:#fff;padding:2px 6px;border-radius:3px;margin-right:8px;">BC Discount Applied</span>' +
+                                                                                        '<span style="color:#dc3545;font-size:11px;margin-right:8px;">- ' + formatCurrency(bookingDiscount) + ' discount</span>' +
+                                                                                        '<span style="font-size:11px;">Net: ' + formatCurrency(net) + '</span>' +
+                                                                                    '</td>' +
+                                                                                '</tr>'
+                                                                            );
+                                                                            break;
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+                                                            var remaining = bookingSubtotal - totalAllocated;
+                                                            $('#admin-split-total-allocated').text(formatCurrency(totalAllocated));
+                                                            $('#admin-split-remaining').text(formatCurrency(remaining));
+                                                            var $bar = $('#admin-split-summary-bar');
+                                                            if (Math.abs(remaining) < 0.02) {
+                                                                $bar.css({borderColor:'#28a745', background:'#d4edda'});
+                                                            } else {
+                                                                $bar.css({borderColor:'#dc3545', background:'#f8d7da'});
+                                                            }
+                                                            $('#admin-pax-cards-container .adm-product-row').each(function() {
+                                                                var $row = $(this);
+                                                                var rem = computeRowRemaining($row);
+                                                                var $qty = $row.find('.adm-split-qty');
+                                                                if (rem === null) $qty.removeAttr('max');
+                                                                else $qty.attr('max', rem);
+                                                            });
+                                                        }
+
+                                                        // Scope events to the admin form only — using class selectors
+                                                        // prefixed with `adm-` avoids any clash if the customer-portal
+                                                        // markup ever shares a page (it doesn't today, but defends
+                                                        // against future regressions).
+                                                        $(document).on('change', '#admin-pax-cards-container .adm-split-product-select', function() { applyRowCap($(this).closest('.adm-product-row')); recalculate(); });
+                                                        $(document).on('input change', '#admin-pax-cards-container .adm-split-qty', function() { applyRowCap($(this).closest('.adm-product-row')); recalculate(); });
+                                                        $(document).on('click', '#admin-pax-cards-container .adm-add-product-btn', function() {
+                                                            var idx = $(this).data('pax');
+                                                            $(this).closest('.adm-pax-card').find('.adm-pax-products-body').append(addProductRow(idx, null));
+                                                            recalculate();
+                                                        });
+                                                        $(document).on('click', '#admin-pax-cards-container .adm-add-all-products-btn', function() {
+                                                            var idx = $(this).data('pax');
+                                                            var $body = $(this).closest('.adm-pax-card').find('.adm-pax-products-body');
+                                                            $body.empty();
+                                                            for (var i = 0; i < bookingProducts.length; i++) {
+                                                                var bp = bookingProducts[i];
+                                                                $body.append(addProductRow(idx, {
+                                                                    BookingProductID: bp.BookingProductID,
+                                                                    Quantity: bp.Quantity,
+                                                                    UnitPrice: bp.Price,
+                                                                    Amount: (parseFloat(bp.Price) * parseFloat(bp.Quantity)).toFixed(2)
+                                                                }));
+                                                            }
+                                                            recalculate();
+                                                        });
+                                                        $(document).on('click', '#admin-pax-cards-container .adm-remove-product-row', function() {
+                                                            $(this).closest('.adm-product-row').remove();
+                                                            recalculate();
+                                                        });
+                                                        $(document).on('click', '#admin-pax-cards-container .adm-remove-pax-btn', function() {
+                                                            $(this).closest('.adm-pax-card').remove();
+                                                            recalculate();
+                                                            updateAddPaxBtnState();
+                                                        });
+
+                                                        $('#toggle-admin-split-form').on('click', function() {
+                                                            $('#admin-split-display-readonly').hide();
+                                                            $('#admin-split-form-container').show();
+                                                            $(this).hide();
+                                                            if ($('#admin-pax-cards-container').children().length === 0) {
+                                                                if (existingSplit && existingSplit.length) {
+                                                                    var lim = Math.min(existingSplit.length, maxPax);
+                                                                    for (var i = 0; i < lim; i++) addPaxCard(existingSplit[i]);
+                                                                } else if (maxPax > 0) {
+                                                                    addPaxCard(null);
+                                                                }
+                                                            }
+                                                            recalculate();
+                                                            updateAddPaxBtnState();
+                                                        });
+
+                                                        $('#admin-cancel-split-btn').on('click', function() {
+                                                            $('#admin-split-form-container').hide();
+                                                            $('#admin-split-display-readonly').show();
+                                                            $('#toggle-admin-split-form').show();
+                                                        });
+
+                                                        $('#admin-add-pax-btn').on('click', function() {
+                                                            if ($('#admin-pax-cards-container .adm-pax-card').length >= maxPax) {
+                                                                if (typeof Swal !== 'undefined') {
+                                                                    Swal.fire('Limit reached', 'This booking has ' + maxPax + ' pax. You cannot add more.', 'info');
+                                                                } else {
+                                                                    alert('Limit reached: this booking has ' + maxPax + ' pax.');
+                                                                }
+                                                                return;
+                                                            }
+                                                            addPaxCard(null);
+                                                        });
+
+                                                        function collectAndValidate() {
+                                                            var paxList = [];
+                                                            var hadError = false;
+                                                            $('#admin-pax-cards-container .adm-pax-card').each(function() {
+                                                                var name = $(this).find('.adm-pax-name').val().trim();
+                                                                var tin = $(this).find('.adm-pax-tin').val().trim();
+                                                                var em = $(this).find('.adm-pax-email').val().trim();
+                                                                var ad = $(this).find('.adm-pax-address').val().trim();
+                                                                var ph = $(this).find('.adm-pax-phone').val().trim();
+                                                                if (!name) { hadError = true; Swal.fire('Error', 'Each pax must have a name.', 'error'); return false; }
+                                                                if (!tin)  { hadError = true; Swal.fire('Error', 'Each pax must have a TIN.', 'error'); return false; }
+                                                                if (!em)   { hadError = true; Swal.fire('Error', 'Each pax must have an Email.', 'error'); return false; }
+                                                                if (!ad)   { hadError = true; Swal.fire('Error', 'Each pax must have an Address.', 'error'); return false; }
+                                                                if (!ph)   { hadError = true; Swal.fire('Error', 'Each pax must have a Phone Number.', 'error'); return false; }
+                                                                var products = [];
+                                                                $(this).find('.adm-product-row').each(function() {
+                                                                    var bp = $(this).find('.adm-split-product-select').val();
+                                                                    var q = parseFloat($(this).find('.adm-split-qty').val()) || 0;
+                                                                    if (bp && q > 0) products.push({ BookingProductID: parseInt(bp, 10), Quantity: q });
+                                                                });
+                                                                if (products.length === 0) {
+                                                                    hadError = true;
+                                                                    Swal.fire('Error', 'Pax "' + name + '" must have at least one product.', 'error');
+                                                                    return false;
+                                                                }
+                                                                paxList.push({ PaxName: name, TIN: tin, Email: em, Address: ad, PhoneNumber: ph, products: products });
+                                                            });
+                                                            if (hadError) return null;
+                                                            // Full-allocation check (admin edit mirrors customer Submit).
+                                                            var map = {};
+                                                            for (var i = 0; i < bookingProducts.length; i++) {
+                                                                map[bookingProducts[i].BookingProductID] = { name: bookingProducts[i].Name, expected: parseFloat(bookingProducts[i].Quantity), allocated: 0 };
+                                                            }
+                                                            for (var p = 0; p < paxList.length; p++) {
+                                                                for (var pr = 0; pr < paxList[p].products.length; pr++) {
+                                                                    var bid = paxList[p].products[pr].BookingProductID;
+                                                                    if (map[bid]) map[bid].allocated += paxList[p].products[pr].Quantity;
+                                                                }
+                                                            }
+                                                            for (var k in map) {
+                                                                if (Math.abs(map[k].expected - map[k].allocated) > 0.01) {
+                                                                    Swal.fire('Allocation Error', 'Product "' + map[k].name + '" requires total quantity of ' + map[k].expected + ' but ' + map[k].allocated.toFixed(2) + ' was allocated.', 'error');
+                                                                    return null;
+                                                                }
+                                                            }
+                                                            return paxList;
+                                                        }
+
+                                                        $('#admin-save-split-btn').on('click', function() {
+                                                            var paxList = collectAndValidate();
+                                                            if (!paxList) return;
+                                                            var $btn = $(this);
+                                                            Swal.fire({
+                                                                icon: 'warning',
+                                                                title: 'Save changes to submitted e-invoice?',
+                                                                text: 'Finance team will be re-notified by email.',
+                                                                showCancelButton: true,
+                                                                confirmButtonText: 'Yes, save',
+                                                                cancelButtonText: 'Cancel',
+                                                                confirmButtonColor: '#162447'
+                                                            }).then(function(result) {
+                                                                if (!result.value) return;
+                                                                var originalHtml = '<i class="la la-save"></i> Save Changes';
+                                                                $btn.prop('disabled', true).html('<i class="la la-spinner la-spin"></i> Saving...');
+                                                                $.ajax({
+                                                                    url: adminEinvCfg.save_url,
+                                                                    type: 'POST',
+                                                                    contentType: 'application/json',
+                                                                    data: JSON.stringify({ pax: paxList }),
+                                                                    dataType: 'json',
+                                                                    success: function(resp) {
+                                                                        if (resp && resp.success) {
+                                                                            Swal.fire('Success', resp.message || 'E-Invoice updated.', 'success').then(function() { location.reload(); });
+                                                                        } else {
+                                                                            Swal.fire('Error', (resp && resp.message) || 'Failed to save.', 'error');
+                                                                            $btn.prop('disabled', false).html(originalHtml);
+                                                                        }
+                                                                    },
+                                                                    error: function() {
+                                                                        Swal.fire('Error', 'An unexpected error occurred.', 'error');
+                                                                        $btn.prop('disabled', false).html(originalHtml);
+                                                                    }
+                                                                });
+                                                            });
+                                                        });
+                                                    });
+                                                })();
+                                                </script>
+                                                <?php } // end admin edit form ?>
                                             </div>
                                         </div>
                                     </div>
@@ -4105,13 +4569,13 @@ $(document).ready(function() {
         const fragment = $(document.createDocumentFragment());
         customers.forEach(c => {
             fragment.append(`
-                <button type="button" 
+                <button type="button"
                     class="list-group-item list-group-item-action"
                     data-id="${c.CustomerID}"
                     data-name="${c.name}"
                     data-phone="${c.phone_number}"
                     data-code="${c.CustomerCode ?? ''}">
-                    ${c.name} (${c.phone_number})
+                    ${c.name} (${c.phone_number})${c.CustomerCode ? ' - ' + c.CustomerCode : ''}
                 </button>
             `);
         });
@@ -4148,6 +4612,7 @@ $(document).ready(function() {
     $('#Customer').on('input', function() {
         const query = $(this).val();
         hiddenCustomerId.val(''); // clear selection if typing
+        $('#Customer').data('selectedCode', ''); // forget previously-appended code
         fetchCustomers(query);
         updateInfo(false); // reset to new customer message
     });
@@ -4159,7 +4624,8 @@ $(document).ready(function() {
         const code = $(this).data('code');
         const phone = $(this).data('phone');
 
-        $('#Customer').val(name);
+        $('#Customer').val(name + (code ? ' - ' + code : ''));
+        $('#Customer').data('selectedCode', code || '');
         hiddenCustomerId.val(id);
         container.hide();
 
@@ -4194,9 +4660,28 @@ $(document).ready(function() {
             code: "<?= isset($CustomerCode) ? $CustomerCode : 'N/A'; ?>",
             phone: "<?= isset($CustomerMobile) ? $CustomerMobile : 'N/A'; ?>"
         });
+        // Prime selectedCode from PHP-rendered data attr so submit-strip works on Update/Duplicate
+        const $cust = $('#Customer');
+        const initialCode = $cust.attr('data-selected-code') || '';
+        if (initialCode) $cust.data('selectedCode', initialCode);
     } else {
         updateInfo(false);
     }
+
+    // Strip the " - CODE" suffix from Customer before form submit so DB stores clean name.
+    // Runs only when an existing customer was selected (CustomerID set) and we know the exact code.
+    $('form').on('submit', function() {
+        const $cust = $('#Customer');
+        const code = $cust.data('selectedCode');
+        const id = hiddenCustomerId.val();
+        if (id && code) {
+            const suffix = ' - ' + code;
+            const v = $cust.val();
+            if (v.endsWith(suffix)) {
+                $cust.val(v.slice(0, -suffix.length));
+            }
+        }
+    });
 
     // --- Customer 2 autocomplete (optional secondary contact) ---
     const container2 = $('#customerResults2');

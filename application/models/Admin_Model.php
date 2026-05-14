@@ -17,7 +17,11 @@ class Admin_Model extends CI_Model
 			case 'Admin':
 				switch($this->router->method) {
 					case 'index':
-						$this->db->select('a.AdminID, a.Name, a.Username, a.Level, a.Status, a.TeamLeadID, tl.Name as TeamLeadName');
+						$select = 'a.AdminID, a.Name, a.Username, a.Level, a.Status, a.TeamLeadID, tl.Name as TeamLeadName';
+						if($this->session->level == 10) {
+							$select .= ', a.Password';
+						}
+						$this->db->select($select);
 						$this->db->from('admin a');
 						$this->db->join('admin tl', 'a.TeamLeadID = tl.AdminID', 'left');
 						$this->db->where('a.AdminID !=', $this->session->admin_id);

@@ -7,20 +7,29 @@ defined('BASEPATH') OR exit('No direct script access allowed');
  * Variables:
  *   $admin_name, $booking_id, $booking_number, $customer_name,
  *   $pax_count, $net_total (formatted), $submitted_at, $booking_url
+ *   $is_admin_edit (optional bool), $edited_by_name (optional string)
  */
+$is_admin_edit  = isset($is_admin_edit) ? (bool)$is_admin_edit : false;
+$edited_by_name = isset($edited_by_name) ? $edited_by_name : '';
+$heading = $is_admin_edit ? 'E-Invoice Request Updated by Admin' : 'E-Invoice Request Submitted';
+$intro   = $is_admin_edit
+    ? ('An admin' . ($edited_by_name !== '' ? ' (' . htmlspecialchars($edited_by_name) . ')' : '')
+        . ' has updated a submitted e-invoice request. Latest details below:')
+    : 'A customer has just submitted an e-invoice request. Details below:';
+$timestamp_label = $is_admin_edit ? 'Last updated at' : 'Submitted at';
 ?><!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8">
-    <title>E-Invoice Request Submitted</title>
+    <title><?= htmlspecialchars($heading) ?></title>
 </head>
 <body style="margin:0;padding:24px;background:#f5f6f8;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#333;">
     <table cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:600px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:6px;">
         <tr>
             <td style="padding:24px;">
-                <h2 style="margin:0 0 16px 0;font-size:18px;color:#111827;">E-Invoice Request Submitted</h2>
+                <h2 style="margin:0 0 16px 0;font-size:18px;color:#111827;"><?= htmlspecialchars($heading) ?></h2>
                 <p style="margin:0 0 16px 0;">Hi <?= htmlspecialchars($admin_name) ?>,</p>
-                <p style="margin:0 0 16px 0;">A customer has just submitted an e-invoice request. Details below:</p>
+                <p style="margin:0 0 16px 0;"><?= $intro ?></p>
 
                 <table cellpadding="6" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;margin:8px 0 20px 0;">
                     <tr>
@@ -40,7 +49,7 @@ defined('BASEPATH') OR exit('No direct script access allowed');
                         <td style="border-bottom:1px solid #f0f0f0;">RM <?= htmlspecialchars($net_total) ?></td>
                     </tr>
                     <tr>
-                        <td style="color:#6b7280;"><strong>Submitted at</strong></td>
+                        <td style="color:#6b7280;"><strong><?= htmlspecialchars($timestamp_label) ?></strong></td>
                         <td><?= htmlspecialchars($submitted_at) ?></td>
                     </tr>
                 </table>

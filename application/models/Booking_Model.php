@@ -164,7 +164,7 @@ class Booking_Model extends CI_Model
 		}
 
 		if(!empty($this->input->get('reservation_number'))) {
-			$this->db->where('ReservationNumber', $this->input->get('reservation_number'));
+			$this->db->like('ReservationNumber', $this->input->get('reservation_number'));
 			$ignore = 1;
 		}
 
@@ -291,8 +291,19 @@ class Booking_Model extends CI_Model
 					$this->db->where('booking.Status', 'PP');
 				}
 				if($this->input->get('status') == 'PO') {
+					$today = date('Y-m-d');
+					// Match display_booking_status(): a P/PP row only renders as PO when
+					// there is still an outstanding balance (NetTotal > approved credits).
+					$approved_credit_sql = "COALESCE((SELECT SUM(p.Credit) FROM payment p"
+						. " WHERE p.BookingID = booking.BookingID"
+						. " AND p.Status = 'Y' AND p.Credit > 0"
+						. " AND (p.Type IS NULL OR p.Type != 'AGENT COMMISSION FROM SUPPLIER')), 0)";
 					$this->db->where('CancelStatus', 'N');
-					$this->db->where("((`FullPaymentDeadline` < '".date('Y-m-d')."' AND `booking`.`Status` IN ('P','PP')) OR ((`DepositDeadline` < '".date('Y-m-d')."' AND `booking`.`Status` = 'P') OR (`FullPaymentDeadline` < '".date('Y-m-d')."' AND `booking`.`Status` IN ('P','PP'))))");
+					$this->db->where(
+						"(((`booking`.`FullPaymentDeadline` < '".$today."' AND `booking`.`Status` IN ('P','PP'))"
+						. " OR (`booking`.`DepositDeadline` < '".$today."' AND `booking`.`Status` = 'P'))"
+						. " AND (`booking`.`NetTotal` - ".$approved_credit_sql.") > 0)"
+					);
 				}
 				if($this->input->get('status') == 'PGL') {
 					$this->db->where('CancelStatus', 'N');
@@ -365,7 +376,7 @@ class Booking_Model extends CI_Model
 			$this->db->where('BookingNumber', $this->input->get('booking_number'));
 		}
 		if(!empty($this->input->get('reservation_number'))) {
-			$this->db->where('ReservationNumber', $this->input->get('reservation_number'));
+			$this->db->like('ReservationNumber', $this->input->get('reservation_number'));
 		}
 		if(!empty($this->input->get('deadline'))) {
 			$deadline = explode(' - ', $this->input->get('deadline'));
@@ -1042,45 +1053,29 @@ class Booking_Model extends CI_Model
 				$revert_reason = $revert_reason ? $revert_reason . '; ' . $date_change_desc : $date_change_desc;
 			}
 			
-			// If revert is needed and current status is not PBC, revert status
-			if ($needs_revert && $current_booking->Status != 'PBC') {
+			// Only revert when current status is PT — TC must re-approve the Travel Voucher.
+			// For every other status, price/date edits are persisted without status change.
+			$did_revert = false;
+			if ($needs_revert && $current_booking->Status === 'PT') {
 				$this->load->model('Booking_Status_Log_Model');
 				$this->load->helper('booking_status_log');
 				$admin_id = $this->session->userdata('admin_id') ?: 0;
 
-				// Special case: Completed bookings with price increase → revert to P (Pending Payment)
-				if ($current_booking->Status == 'Y' && $price_increased) {
-					$booking_data[0]['Status'] = 'P';
-					// Do NOT reset BC approval — booking was already fully approved
+				$booking_data[0]['Status'] = 'PTV';
 
-					log_booking_status_change(
-						$booking_id,
-						'P',
-						$current_booking->Status,
-						$admin_id,
-						'Status changed to PENDING PAYMENT - Additional payment required: ' . $revert_reason,
-						true
-					);
-				} else {
-					// All other cases: revert to PBC and reset BC approval
-					$booking_data[0]['Status'] = 'PBC';
-					$booking_data[0]['bc_approved'] = 0;
-					$booking_data[0]['bc_approval_admin_id'] = null;
-					$booking_data[0]['bc_approval_date'] = null;
-
-					log_booking_status_change(
-						$booking_id,
-						'PBC',
-						$current_booking->Status,
-						$admin_id,
-						'Status reverted to PENDING BC CONFIRMATION - ' . $revert_reason,
-						true
-					);
-				}
+				log_booking_status_change(
+					$booking_id,
+					'PTV',
+					$current_booking->Status,
+					$admin_id,
+					'Status reverted to PENDING TRAVEL VOUCHER - TC must re-approve voucher: ' . $revert_reason,
+					true
+				);
+				$did_revert = true;
 			}
 
-			// Generate PDF snapshot before update when travel date or total value changed
-			if ($needs_revert && !empty($current_booking->Token)) {
+			// Generate PDF snapshot only when we actually revert
+			if ($did_revert && !empty($current_booking->Token)) {
 				try {
 					$this->generate_booking_snapshot($current_booking->Token, $booking_id);
 				} catch (\Throwable $e) {
@@ -1809,7 +1804,7 @@ class Booking_Model extends CI_Model
 		}
 
 		if(!empty($this->input->get('reservation_number'))) {
-			$this->db->where('ReservationNumber', $this->input->get('reservation_number'));
+			$this->db->like('ReservationNumber', $this->input->get('reservation_number'));
 			$ignore = 1;
 		}
 
@@ -1944,8 +1939,21 @@ class Booking_Model extends CI_Model
 						$this->db->where('booking.Status', 'PP');
 					}
 					if($status == 'PO') {
+						$today = date('Y-m-d');
+						// Match display_booking_status(): a P/PP row only renders as PO when
+						// there is still an outstanding balance (NetTotal > approved credits).
+						// Without this, fully-paid PP rows past their deadline display as
+						// "PARTIAL PAYMENT" but still appear under the PO filter.
+						$approved_credit_sql = "COALESCE((SELECT SUM(p.Credit) FROM payment p"
+							. " WHERE p.BookingID = booking.BookingID"
+							. " AND p.Status = 'Y' AND p.Credit > 0"
+							. " AND (p.Type IS NULL OR p.Type != 'AGENT COMMISSION FROM SUPPLIER')), 0)";
 						$this->db->where('CancelStatus', 'N');
-						$this->db->where("((`FullPaymentDeadline` < '".date('Y-m-d')."' AND `booking`.`Status` IN ('P','PP')) OR ((`DepositDeadline` < '".date('Y-m-d')."' AND `booking`.`Status` = 'P') OR (`FullPaymentDeadline` < '".date('Y-m-d')."' AND `booking`.`Status` IN ('P','PP'))))");
+						$this->db->where(
+							"(((`booking`.`FullPaymentDeadline` < '".$today."' AND `booking`.`Status` IN ('P','PP'))"
+							. " OR (`booking`.`DepositDeadline` < '".$today."' AND `booking`.`Status` = 'P'))"
+							. " AND (`booking`.`NetTotal` - ".$approved_credit_sql.") > 0)"
+						);
 					}
 					if($status == 'PGL') {
 						$this->db->where('CancelStatus', 'N');

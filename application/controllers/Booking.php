@@ -644,6 +644,341 @@ class Booking extends MY_Controller
 		echo json_encode($output);
 	}
 
+	/**
+	 * AJAX endpoint for role-based summary cards rendered above the booking listing.
+	 * Returns counts/values/links keyed per card; the view partial fills placeholders.
+	 */
+	function ajax_summary_cards()
+	{
+		if(!in_array('VB', $this->session->access_control)) {
+			header('Content-Type: application/json');
+			echo json_encode(array('error' => 'Access denied'));
+			return;
+		}
+
+		$level    = (int) $this->session->userdata('level');
+		$admin_id = (int) $this->session->userdata('admin_id');
+
+		$today        = date('Y-m-d');
+		$month_start  = date('Y-m-01');
+		$month_end    = date('Y-m-t');
+		$week_start   = date('Y-m-d', strtotime('monday this week'));
+		$week_end     = date('Y-m-d', strtotime('sunday this week'));
+		$next7_start  = date('Y-m-d', strtotime('+1 day'));
+		$next7_end    = date('Y-m-d', strtotime('+7 days'));
+
+		$base = base_url('Booking');
+		$fmt_dmy = function($d) { return date('d/m/Y', strtotime($d)); };
+		$money = function($v) { return 'RM ' . number_format((float)$v, 2, '.', ','); };
+		$qs = function($params) { return '?' . http_build_query($params); };
+
+		$cards  = array();
+		$tables = array();
+
+		$is_tc      = ($level == 20 || $level == 50);
+		$is_tclead  = ($level == 25);
+		$is_op      = ($level == 40);
+		$is_finance = ($level == 30);
+		$is_owner   = ($level == 10);
+
+		// ---------- TC / TC2 (own bookings) ----------
+		if($is_tc) {
+			$row = $this->db->query(
+				"SELECT COUNT(*) AS cnt FROM booking
+				 WHERE (SalesAgent=? OR SalesAgent2=?)
+				   AND BookingConfirmationTitle='BOOKING CONFIRMATION'
+				   AND CancelStatus='N' AND Status!='N'
+				   AND CAST(InsertDate AS DATE) BETWEEN ? AND ?",
+				array($admin_id, $admin_id, $month_start, $month_end)
+			)->row();
+			$cards['bc_month'] = array(
+				'count' => (int)$row->cnt,
+				'link'  => $base . $qs(array('booking_date' => $fmt_dmy($month_start) . ' - ' . $fmt_dmy($month_end))),
+			);
+
+			$row = $this->db->query(
+				"SELECT COALESCE(SUM(NetTotal),0) AS total FROM booking
+				 WHERE (SalesAgent=? OR SalesAgent2=?)
+				   AND BookingConfirmationTitle='BOOKING CONFIRMATION'
+				   AND CancelStatus='N' AND Status!='N'
+				   AND CAST(InsertDate AS DATE) BETWEEN ? AND ?",
+				array($admin_id, $admin_id, $month_start, $month_end)
+			)->row();
+			$cards['sales_month'] = array('value' => $money($row->total));
+
+			$row = $this->db->query(
+				"SELECT COUNT(*) AS total,
+				        SUM(CASE WHEN CancelStatus='Y' THEN 1 ELSE 0 END) AS cancelled
+				 FROM booking
+				 WHERE (SalesAgent=? OR SalesAgent2=?)
+				   AND BookingConfirmationTitle='BOOKING CONFIRMATION'
+				   AND Status!='N'
+				   AND CAST(InsertDate AS DATE) BETWEEN ? AND ?",
+				array($admin_id, $admin_id, $month_start, $month_end)
+			)->row();
+			$rate = (int)$row->total > 0 ? round(((int)$row->cancelled / (int)$row->total) * 100, 1) : 0;
+			$cards['cancellation_rate'] = array(
+				'value'  => $rate . '%',
+				'detail' => (int)$row->cancelled . ' / ' . (int)$row->total,
+				'link'   => $base . $qs(array('status' => 'C', 'booking_date' => $fmt_dmy($month_start) . ' - ' . $fmt_dmy($month_end))),
+			);
+
+			$row = $this->db->query(
+				"SELECT COUNT(*) AS cnt FROM booking
+				 WHERE (SalesAgent=? OR SalesAgent2=?)
+				   AND BookingConfirmationTitle='BOOKING CONFIRMATION'
+				   AND CancelStatus='N'
+				   AND (
+				        (FullPaymentDeadline < ? AND Status IN ('P','PP'))
+				     OR (DepositDeadline < ? AND Status='P')
+				   )",
+				array($admin_id, $admin_id, $today, $today)
+			)->row();
+			$cards['payment_overdue'] = array(
+				'count' => (int)$row->cnt,
+				'link'  => $base . $qs(array('status' => 'PO')),
+			);
+
+			$row = $this->db->query(
+				"SELECT COUNT(*) AS cnt FROM booking
+				 WHERE (SalesAgent=? OR SalesAgent2=?)
+				   AND BookingConfirmationTitle='BOOKING CONFIRMATION'
+				   AND CancelStatus='N' AND Status='PT'
+				   AND StartDate BETWEEN ? AND ?",
+				array($admin_id, $admin_id, $next7_start, $next7_end)
+			)->row();
+			$cards['upcoming_travel_pt'] = array(
+				'count' => (int)$row->cnt,
+				'link'  => $base . $qs(array('status' => 'PT', 'travel_date' => $fmt_dmy($next7_start) . ' - ' . $fmt_dmy($next7_end))),
+			);
+		}
+
+		// ---------- TC LEAD / Owner (team-wide lead + booking metrics) ----------
+		if($is_tclead || $is_owner) {
+			$row = $this->db->query(
+				"SELECT
+				   SUM(CASE WHEN CAST(InsertDate AS DATE) BETWEEN ? AND ? THEN 1 ELSE 0 END) AS month_cnt,
+				   SUM(CASE WHEN CAST(InsertDate AS DATE) BETWEEN ? AND ? THEN 1 ELSE 0 END) AS week_cnt
+				 FROM booking
+				 WHERE BookingConfirmationTitle='BOOKING CONFIRMATION'
+				   AND CancelStatus='N' AND Status!='N'",
+				array($month_start, $month_end, $week_start, $week_end)
+			)->row();
+			$cards['bc_week_month'] = array(
+				'week'       => (int)$row->week_cnt,
+				'month'      => (int)$row->month_cnt,
+				'link_month' => $base . $qs(array('booking_date' => $fmt_dmy($month_start) . ' - ' . $fmt_dmy($month_end))),
+				'link_week'  => $base . $qs(array('booking_date' => $fmt_dmy($week_start) . ' - ' . $fmt_dmy($week_end))),
+			);
+
+			$row = $this->db->query(
+				"SELECT COUNT(*) AS total,
+				        SUM(CASE WHEN CancelStatus='Y' THEN 1 ELSE 0 END) AS cancelled
+				 FROM booking
+				 WHERE BookingConfirmationTitle='BOOKING CONFIRMATION' AND Status!='N'
+				   AND CAST(InsertDate AS DATE) BETWEEN ? AND ?",
+				array($month_start, $month_end)
+			)->row();
+			$rate = (int)$row->total > 0 ? round(((int)$row->cancelled / (int)$row->total) * 100, 1) : 0;
+			$cards['cancellation_rate'] = array(
+				'value'  => $rate . '%',
+				'detail' => (int)$row->cancelled . ' / ' . (int)$row->total,
+				'link'   => $base . $qs(array('status' => 'C', 'booking_date' => $fmt_dmy($month_start) . ' - ' . $fmt_dmy($month_end))),
+			);
+
+			$this->load->model('Report_Model');
+			$lead_month = $this->Report_Model->Lead_Dashboard_Summary(array('start_date' => $month_start, 'end_date' => $month_end));
+			$lead_week  = $this->Report_Model->Lead_Dashboard_Summary(array('start_date' => $week_start,  'end_date' => $week_end));
+			$lead_day   = $this->Report_Model->Lead_Dashboard_Summary(array('start_date' => $today,       'end_date' => $today));
+
+			$secs = $lead_month['avg_response_time_seconds'];
+			if($secs === null) {
+				$resp_label = '-';
+			} elseif($secs >= 3600) {
+				$resp_label = round($secs / 3600, 1) . 'h';
+			} elseif($secs >= 60) {
+				$resp_label = round($secs / 60, 1) . 'm';
+			} else {
+				$resp_label = $secs . 's';
+			}
+
+			$cards['leads_dwm'] = array(
+				'day'               => (int)$lead_day['total_leads'],
+				'week'              => (int)$lead_week['total_leads'],
+				'month'             => (int)$lead_month['total_leads'],
+				'conversion_rate'   => $lead_month['conversion_rate'] . '%',
+				'response_rate'     => $lead_month['response_rate'] . '%',
+				'avg_response_time' => $resp_label,
+			);
+
+			$by_agent = $this->Report_Model->Lead_Dashboard_By_Agent(array('start_date' => $month_start, 'end_date' => $month_end));
+			$top_agents = array();
+			foreach(array_slice($by_agent, 0, 10) as $a) {
+				$top_agents[] = array(
+					'agent_name'      => $a['agent_name'],
+					'total_leads'     => (int)$a['total_leads'],
+					'converted_leads' => (int)$a['converted_leads'],
+					'conversion_rate' => $a['conversion_rate'] . '%',
+				);
+			}
+			$tables['agent_conversion'] = $top_agents;
+		}
+
+		// ---------- OP / Owner ----------
+		if($is_op || $is_owner) {
+			if(!isset($cards['bc_week_month'])) {
+				$row = $this->db->query(
+					"SELECT
+					   SUM(CASE WHEN CAST(InsertDate AS DATE) BETWEEN ? AND ? THEN 1 ELSE 0 END) AS month_cnt,
+					   SUM(CASE WHEN CAST(InsertDate AS DATE) BETWEEN ? AND ? THEN 1 ELSE 0 END) AS week_cnt
+					 FROM booking
+					 WHERE BookingConfirmationTitle='BOOKING CONFIRMATION'
+					   AND CancelStatus='N' AND Status!='N'",
+					array($month_start, $month_end, $week_start, $week_end)
+				)->row();
+				$cards['bc_week_month'] = array(
+					'week'       => (int)$row->week_cnt,
+					'month'      => (int)$row->month_cnt,
+					'link_month' => $base . $qs(array('booking_date' => $fmt_dmy($month_start) . ' - ' . $fmt_dmy($month_end))),
+					'link_week'  => $base . $qs(array('booking_date' => $fmt_dmy($week_start) . ' - ' . $fmt_dmy($week_end))),
+				);
+			}
+
+			$row = $this->db->query(
+				"SELECT COUNT(*) AS cnt FROM booking
+				 WHERE BookingConfirmationTitle='BOOKING CONFIRMATION'
+				   AND CancelStatus='N' AND Status='PT'
+				   AND StartDate BETWEEN ? AND ?",
+				array($next7_start, $next7_end)
+			)->row();
+			$cards['upcoming_travel_pt'] = array(
+				'count' => (int)$row->cnt,
+				'link'  => $base . $qs(array('status' => 'PT', 'travel_date' => $fmt_dmy($next7_start) . ' - ' . $fmt_dmy($next7_end))),
+			);
+
+			$row = $this->db->query(
+				"SELECT COUNT(*) AS cnt FROM booking
+				 WHERE BookingConfirmationTitle='BOOKING CONFIRMATION'
+				   AND CancelStatus='N' AND Status!='N'
+				   AND is_submitted=1 AND LockStatus='N'"
+			)->row();
+			$cards['gl_submitted'] = array(
+				'count' => (int)$row->cnt,
+				'link'  => $base . $qs(array('guest_list_status' => 'submitted')),
+			);
+
+			$dest_rows = $this->db->query(
+				"SELECT category.Name AS destination, category.CategoryID AS id,
+				        COUNT(BookingID) AS cnt, COALESCE(SUM(NetTotal),0) AS total
+				 FROM booking
+				 LEFT JOIN category ON category.CategoryID = booking.Destination
+				 WHERE booking.BookingConfirmationTitle='BOOKING CONFIRMATION'
+				   AND CancelStatus='N' AND booking.Status!='N'
+				   AND CAST(booking.InsertDate AS DATE) BETWEEN ? AND ?
+				 GROUP BY category.Name, category.CategoryID
+				 ORDER BY cnt DESC
+				 LIMIT 5",
+				array($month_start, $month_end)
+			)->result();
+			$dest_out = array();
+			foreach($dest_rows as $r) {
+				$dest_out[] = array(
+					'destination' => $r->destination,
+					'count'       => (int)$r->cnt,
+					'total'       => $money($r->total),
+					'link'        => $base . $qs(array(
+						'destination'  => $r->id,
+						'booking_date' => $fmt_dmy($month_start) . ' - ' . $fmt_dmy($month_end),
+					)),
+				);
+			}
+			$tables['destination_sales'] = $dest_out;
+		}
+
+		// ---------- Finance / Owner ----------
+		if($is_finance || $is_owner) {
+			$row = $this->db->query(
+				"SELECT
+				   COALESCE(SUM(CASE WHEN Date BETWEEN ? AND ? THEN Credit ELSE 0 END),0) AS day_total,
+				   COALESCE(SUM(CASE WHEN Date BETWEEN ? AND ? THEN Credit ELSE 0 END),0) AS week_total,
+				   COALESCE(SUM(CASE WHEN Date BETWEEN ? AND ? THEN Credit ELSE 0 END),0) AS month_total
+				 FROM payment
+				 WHERE Status='Y' AND Credit > 0
+				   AND (Type IS NULL OR Type != 'AGENT COMMISSION FROM SUPPLIER')",
+				array($today, $today, $week_start, $week_end, $month_start, $month_end)
+			)->row();
+			$cards['payment_in_dwm'] = array(
+				'day'   => $money($row->day_total),
+				'week'  => $money($row->week_total),
+				'month' => $money($row->month_total),
+			);
+
+			if(!isset($tables['destination_sales'])) {
+				$dest_rows = $this->db->query(
+					"SELECT category.Name AS destination, category.CategoryID AS id,
+					        COUNT(BookingID) AS cnt, COALESCE(SUM(NetTotal),0) AS total
+					 FROM booking
+					 LEFT JOIN category ON category.CategoryID = booking.Destination
+					 WHERE booking.BookingConfirmationTitle='BOOKING CONFIRMATION'
+					   AND CancelStatus='N' AND booking.Status!='N'
+					   AND CAST(booking.InsertDate AS DATE) BETWEEN ? AND ?
+					 GROUP BY category.Name, category.CategoryID
+					 ORDER BY total DESC
+					 LIMIT 5",
+					array($month_start, $month_end)
+				)->result();
+				$dest_out = array();
+				foreach($dest_rows as $r) {
+					$dest_out[] = array(
+						'destination' => $r->destination,
+						'count'       => (int)$r->cnt,
+						'total'       => $money($r->total),
+						'link'        => $base . $qs(array(
+							'destination'  => $r->id,
+							'booking_date' => $fmt_dmy($month_start) . ' - ' . $fmt_dmy($month_end),
+						)),
+					);
+				}
+				$tables['destination_sales'] = $dest_out;
+			}
+
+			$prod_rows = $this->db->query(
+				"SELECT product.ProductCode AS code, product.Name AS name,
+				        COALESCE(SUM(booking_product.Total),0) AS total,
+				        COALESCE(SUM(booking_product.Quantity),0) AS qty
+				 FROM booking
+				 LEFT JOIN booking_product ON booking_product.BookingID = booking.BookingID
+				 LEFT JOIN product ON product.ProductID = booking_product.ProductID
+				 WHERE booking.BookingConfirmationTitle='BOOKING CONFIRMATION'
+				   AND booking.CancelStatus='N' AND booking.Status!='N'
+				   AND booking_product.Status='Y'
+				   AND CAST(booking.InsertDate AS DATE) BETWEEN ? AND ?
+				   AND product.ProductID IS NOT NULL
+				 GROUP BY product.ProductID, product.ProductCode, product.Name
+				 ORDER BY total DESC
+				 LIMIT 5",
+				array($month_start, $month_end)
+			)->result();
+			$prod_out = array();
+			foreach($prod_rows as $r) {
+				$prod_out[] = array(
+					'code'  => $r->code,
+					'name'  => $r->name,
+					'qty'   => (int)$r->qty,
+					'total' => $money($r->total),
+				);
+			}
+			$tables['product_sales'] = $prod_out;
+		}
+
+		header('Content-Type: application/json');
+		echo json_encode(array(
+			'level'  => $level,
+			'cards'  => $cards,
+			'tables' => $tables,
+		));
+	}
+
 	function Create()
 	{
 		if(in_array('GB', $this->session->access_control)) {
@@ -1407,6 +1742,29 @@ class Booking extends MY_Controller
 					$this->load->model('Invoice_Split_Model');
 					$array['invoice_split'] = $this->Invoice_Split_Model->Get_Pax_By_Booking($array['BookingID']);
 
+					// Surface audit info (status + last admin editor) for the admin
+					// E-Invoice card. Reads the first pax row because Save_Split writes
+					// these fields uniformly across every pax in the same transaction.
+					$array['einvoice_submit_status']    = null;
+					$array['einvoice_submitted_date']   = null;
+					$array['einvoice_last_edited_by']   = null;
+					$array['einvoice_last_edited_date'] = null;
+					$array['einvoice_last_editor_name'] = null;
+					if (!empty($array['invoice_split'])) {
+						$first = $array['invoice_split'][0];
+						$array['einvoice_submit_status']    = $first['SubmitStatus'];
+						$array['einvoice_submitted_date']   = $first['SubmittedDate'];
+						$array['einvoice_last_edited_by']   = $first['LastEditedByAdmin'];
+						$array['einvoice_last_edited_date'] = $first['LastEditedDate'];
+						if (!empty($first['LastEditedByAdmin'])) {
+							$this->load->model('Admin_Model');
+							$editor = $this->Admin_Model->find($first['LastEditedByAdmin']);
+							if (!empty($editor)) {
+								$array['einvoice_last_editor_name'] = $editor->Name;
+							}
+						}
+					}
+
 					// Get custom uploads
 					$this->load->model('Custom_Upload_Model');
 					$array['custom_uploads'] = $this->Custom_Upload_Model->Read($array['BookingID']);
@@ -1437,6 +1795,82 @@ class Booking extends MY_Controller
 		} else {
 			redirect('Dashboard');
 		}
+	}
+
+	/**
+	 * Admin endpoint: edit a submitted e-invoice request from the admin booking
+	 * detail page. Reuses the same validator as the customer-portal submit flow
+	 * (full allocation required), preserves the original SubmittedDate, and
+	 * stamps LastEditedByAdmin / LastEditedDate so the audit strip can render.
+	 * Finance is re-notified by email so they always work off the latest copy.
+	 *
+	 * Any authenticated admin (any admin_id in session) may use this endpoint.
+	 */
+	public function save_invoice_split_admin($booking_id = null)
+	{
+		$this->output->set_content_type('application/json');
+
+		$admin_id = $this->session->userdata('admin_id');
+		if (empty($admin_id)) {
+			$this->output->set_output(json_encode(['success' => false, 'message' => 'Unauthorized']));
+			return;
+		}
+
+		$booking_id = (int)$booking_id;
+		if ($booking_id <= 0) {
+			$this->output->set_output(json_encode(['success' => false, 'message' => 'Invalid booking']));
+			return;
+		}
+
+		$this->db->select('BookingID, Subtotal, Discount, NetTotal');
+		$this->db->where('BookingID', $booking_id);
+		$this->db->where('Status !=', 'N');
+		$booking = $this->db->get('booking')->row_array();
+		if (empty($booking)) {
+			$this->output->set_output(json_encode(['success' => false, 'message' => 'Booking not found']));
+			return;
+		}
+
+		$json = $this->input->raw_input_stream;
+		$data = json_decode($json, true);
+
+		$this->load->model('Invoice_Split_Model');
+		// Admin edits always enforce full allocation, same as a customer Submit.
+		$validation = $this->Invoice_Split_Model->Validate_Pax_Input($data, $booking['BookingID'], true);
+		if (!$validation['ok']) {
+			$this->output->set_output(json_encode(['success' => false, 'message' => $validation['message']]));
+			return;
+		}
+
+		$result = $this->Invoice_Split_Model->Save_Split(
+			$booking['BookingID'],
+			$validation['pax_data'],
+			floatval($booking['Subtotal']),
+			floatval($booking['Discount']),
+			'S',
+			true,        // preserve_submitted_date
+			$admin_id    // admin_editor_id
+		);
+
+		if (!$result) {
+			$this->output->set_output(json_encode(['success' => false, 'message' => 'Failed to save invoice split']));
+			return;
+		}
+
+		// Best-effort finance re-notification. Look up the editor's display
+		// name once so the email body can name them.
+		$this->load->model('Admin_Model');
+		$editor = $this->Admin_Model->find($admin_id);
+		$editor_name = !empty($editor) ? $editor->Name : '';
+		$this->Invoice_Split_Model->Send_Finance_Notification($booking['BookingID'], true, $editor_name);
+
+		$pax = $this->Invoice_Split_Model->Get_Pax_By_Booking($booking['BookingID']);
+		$this->output->set_output(json_encode([
+			'success' => true,
+			'message' => 'E-Invoice request updated successfully',
+			'submit_status' => 'S',
+			'pax' => $pax,
+		]));
 	}
 
 	function View()

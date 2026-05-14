@@ -144,6 +144,9 @@
                                 <th style="text-align:center;">No.</th>
                                 <th style="text-align:center;">Name</th>
                                 <th style="text-align:center;">Username</th>
+                                <?php if($this->session->level == 10) { ?>
+                                    <th style="text-align:center;">Password</th>
+                                <?php } ?>
                                 <th style="text-align:center;">Level</th>
                                 <th style="text-align:center;">Team Lead</th>
                                 <th class="status" style="text-align:center;">Status</th>
@@ -152,7 +155,7 @@
                         </thead>
                         <tbody>
                             <?php if(empty($admins)) { ?>
-                                <td colspan="7" style="text-align:center; padding-top:10px; padding-bottom:10px;">Admin Records Not Found</td>
+                                <td colspan="<?php echo $this->session->level == 10 ? 8 : 7; ?>" style="text-align:center; padding-top:10px; padding-bottom:10px;">Admin Records Not Found</td>
                             <?php } else {
                                 $count = 1;
                                 foreach($admins as $admin) { ?>
@@ -160,6 +163,15 @@
                                         <td style="text-align:center; padding-top:15px; padding-bottom:15px;"><?php echo $count; ?></td>
                                         <td style="text-align:center;"><?php echo $admin->Name; ?></td>
                                         <td style="text-align:center;"><?php echo $admin->Username; ?></td>
+                                        <?php if($this->session->level == 10) { ?>
+                                            <td style="text-align:center;">
+                                                <span class="password-mask" id="password_mask_<?php echo $admin->AdminID; ?>">••••••••</span>
+                                                <span class="password-value" id="password_value_<?php echo $admin->AdminID; ?>" style="display:none;"><?php echo htmlspecialchars($admin->Password, ENT_QUOTES, 'UTF-8'); ?></span>
+                                                <button type="button" class="btn btn-icon btn-light-primary btn-sm" style="width:24px; height:24px; margin-left:5px;" onclick="Toggle_Password(<?php echo $admin->AdminID; ?>, this)" data-toggle="tooltip" title="Show/Hide Password">
+                                                    <i class="la la-eye" id="password_icon_<?php echo $admin->AdminID; ?>" style="font-size:14px;"></i>
+                                                </button>
+                                            </td>
+                                        <?php } ?>
                                         <td style="text-align:center;"><?php echo $admin->Level; ?></td>
                                         <td style="text-align:center;"><?php echo !empty($admin->TeamLeadName) ? $admin->TeamLeadName : ''; ?></td>
                                         <td style="text-align:center;"><?php echo $admin->StatusIcon; ?></td>
@@ -199,6 +211,28 @@
     $('#reset').click(function() {
         Reset('<?php echo base_url('Admin'); ?>');
     });
+
+    $(function() {
+        $('[data-toggle="tooltip"]').tooltip();
+    });
+
+    function Toggle_Password(admin_id, btn)
+    {
+        var mask = document.getElementById('password_mask_' + admin_id);
+        var value = document.getElementById('password_value_' + admin_id);
+        var icon = document.getElementById('password_icon_' + admin_id);
+        if(value.style.display === 'none') {
+            value.style.display = 'inline';
+            mask.style.display = 'none';
+            icon.classList.remove('la-eye');
+            icon.classList.add('la-eye-slash');
+        } else {
+            value.style.display = 'none';
+            mask.style.display = 'inline';
+            icon.classList.remove('la-eye-slash');
+            icon.classList.add('la-eye');
+        }
+    }
 
     function Deactivate_Or_Activate_Admin(title, admin_id, current_status, new_status)
     {

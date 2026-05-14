@@ -32,6 +32,7 @@ class Report extends MY_Controller
         $array = array(
             'dashboard_summary' => $payload['summary'],
             'lead_dashboard_agents' => $payload['agents'],
+            'lead_dashboard_team_leads' => $payload['team_leads'],
             'lead_dashboard_rows' => $payload['rows'],
             'lead_dashboard_filters' => $filters,
             'lead_dashboard_updated_at' => $payload['updated_at'],
@@ -670,6 +671,7 @@ class Report extends MY_Controller
             'summary' => $this->format_lead_dashboard_summary($this->Report_Model->Lead_Dashboard_Summary($filters)),
             'rows' => $this->format_lead_dashboard_rows($this->Report_Model->Lead_Dashboard_By_Agent($filters)),
             'agents' => $this->Report_Model->Lead_Dashboard_Agents(),
+            'team_leads' => $this->Report_Model->Lead_Dashboard_Team_Leads(),
             'updated_at' => date('Y-m-d H:i:s'),
         );
     }
@@ -694,16 +696,32 @@ class Report extends MY_Controller
     private function lead_dashboard_filters()
     {
         $leadDate = trim((string) $this->input->get('lead_date'));
-        $agentId = trim((string) $this->input->get('sales_agent'));
+        $salesAgents = $this->normalize_id_array($this->input->get('sales_agent'));
+        $teamLeads = $this->normalize_id_array($this->input->get('team_lead'));
         $parsedDates = $this->parse_report_date_range($leadDate, true);
 
         return array(
             'lead_date' => $leadDate !== '' ? $leadDate : $parsedDates['display'],
             'start_date' => $parsedDates['start_date'],
             'end_date' => $parsedDates['end_date'],
-            'sales_agent' => $agentId,
-            'agent_id' => $agentId,
+            'sales_agent' => $salesAgents,
+            'agent_id' => $salesAgents,
+            'team_lead' => $teamLeads,
         );
+    }
+
+    private function normalize_id_array($value)
+    {
+        if (is_array($value)) {
+            $out = array();
+            foreach ($value as $v) {
+                $v = trim((string) $v);
+                if ($v !== '') { $out[] = $v; }
+            }
+            return $out;
+        }
+        $value = trim((string) $value);
+        return $value !== '' ? array($value) : array();
     }
 
     private function lead_data_filters()

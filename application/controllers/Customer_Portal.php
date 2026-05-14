@@ -1266,193 +1266,24 @@ class Customer_Portal extends CI_Controller
             return;
         }
 
-        // Get POST data
+        // Parse POST body and run the shared validator. Draft saves allow
+        // partial allocation; full submits require every booking_product to
+        // be fully allocated across pax.
         $json = $this->input->raw_input_stream;
         $data = json_decode($json, true);
 
-        if (empty($data)) {
-            $this->output->set_output(json_encode(['success' => false, 'message' => 'No pax data provided']));
-            return;
-        }
-        if (empty($data['pax'])) {
-            if ($submit_status === 'S') {
-                $this->output->set_output(json_encode(['success' => false, 'message' => 'No pax data provided']));
-                return;
-            }
-            $data['pax'] = [];
-        }
-
-        $pax_counts = $this->Booking_Model->Compute_Pax_Counts($booking['BookingID']);
-        $max_pax = (int)$pax_counts['adult'] + (int)$pax_counts['child'] + (int)$pax_counts['infant'];
-        if (count($data['pax']) > $max_pax) {
-            $this->output->set_output(json_encode([
-                'success' => false,
-                'message' => 'Pax count (' . count($data['pax']) . ') exceeds booking pax (' . $max_pax . ')'
-            ]));
-            return;
-        }
-
-        // Get booking products for validation
-        $this->db->select('BookingProductID, Name as ProductName, Quantity, Price');
-        $this->db->where('BookingID', $booking['BookingID']);
-        $this->db->where('Status', 'Y');
-        $booking_products = $this->db->get('booking_product')->result_array();
-
-        // Build product lookup
-        $product_lookup = [];
-        foreach ($booking_products as $bp) {
-            $product_lookup[$bp['BookingProductID']] = $bp;
-        }
-
-        // Track quantity allocation per product
-        $qty_allocated = [];
-        foreach ($booking_products as $bp) {
-            $qty_allocated[$bp['BookingProductID']] = 0;
-        }
-
-        // Validate pax data
-        $pax_data = [];
-        foreach ($data['pax'] as $index => $pax) {
-            $pax_name = isset($pax['PaxName']) ? trim($pax['PaxName']) : '';
-            if (empty($pax_name)) {
-                $this->output->set_output(json_encode([
-                    'success' => false,
-                    'message' => 'Pax #' . ($index + 1) . ' must have a name'
-                ]));
-                return;
-            }
-
-            if (empty($pax['products']) || !is_array($pax['products'])) {
-                if ($submit_status === 'S') {
-                    $this->output->set_output(json_encode([
-                        'success' => false,
-                        'message' => 'Pax "' . htmlspecialchars($pax_name) . '" must have at least one product'
-                    ]));
-                    return;
-                }
-                $pax['products'] = [];
-            }
-
-            $validated_products = [];
-            foreach ($pax['products'] as $product) {
-                $bp_id = isset($product['BookingProductID']) ? intval($product['BookingProductID']) : 0;
-                $qty = isset($product['Quantity']) ? floatval($product['Quantity']) : 0;
-
-                if (!isset($product_lookup[$bp_id])) {
-                    $this->output->set_output(json_encode([
-                        'success' => false,
-                        'message' => 'Invalid product selected for pax "' . htmlspecialchars($pax_name) . '"'
-                    ]));
-                    return;
-                }
-
-                if ($qty <= 0) {
-                    $this->output->set_output(json_encode([
-                        'success' => false,
-                        'message' => 'Quantity must be greater than 0 for pax "' . htmlspecialchars($pax_name) . '"'
-                    ]));
-                    return;
-                }
-
-                $max_qty = floatval($product_lookup[$bp_id]['Quantity']);
-                if ($qty > $max_qty + 0.01) {
-                    $this->output->set_output(json_encode([
-                        'success' => false,
-                        'message' => 'Quantity ' . $qty . ' exceeds booking quantity ' . $max_qty . ' for product "' . htmlspecialchars($product_lookup[$bp_id]['ProductName']) . '" in pax "' . htmlspecialchars($pax_name) . '"'
-                    ]));
-                    return;
-                }
-
-                $qty_allocated[$bp_id] += $qty;
-                $validated_products[] = [
-                    'BookingProductID' => $bp_id,
-                    'Quantity' => $qty,
-                    'UnitPrice' => floatval($product_lookup[$bp_id]['Price'])
-                ];
-            }
-
-            $tin = isset($pax['TIN']) ? trim($pax['TIN']) : '';
-            if (empty($tin)) {
-                $this->output->set_output(json_encode([
-                    'success' => false,
-                    'message' => 'TIN (Tax Identification Number) is required for pax "' . htmlspecialchars($pax_name) . '"'
-                ]));
-                return;
-            }
-
-            $email = isset($pax['Email']) ? trim($pax['Email']) : '';
-            if (empty($email)) {
-                $this->output->set_output(json_encode([
-                    'success' => false,
-                    'message' => 'Email is required for pax "' . htmlspecialchars($pax_name) . '"'
-                ]));
-                return;
-            }
-
-            $address = isset($pax['Address']) ? trim($pax['Address']) : '';
-            if (empty($address)) {
-                $this->output->set_output(json_encode([
-                    'success' => false,
-                    'message' => 'Address is required for pax "' . htmlspecialchars($pax_name) . '"'
-                ]));
-                return;
-            }
-
-            $phone_number = isset($pax['PhoneNumber']) ? trim($pax['PhoneNumber']) : '';
-            if (empty($phone_number)) {
-                $this->output->set_output(json_encode([
-                    'success' => false,
-                    'message' => 'Phone Number is required for pax "' . htmlspecialchars($pax_name) . '"'
-                ]));
-                return;
-            }
-
-            $pax_data[] = [
-                'PaxName' => $pax_name,
-                'TIN' => $tin,
-                'Email' => $email,
-                'Address' => $address,
-                'PhoneNumber' => $phone_number,
-                'products' => $validated_products
-            ];
-        }
-
-        // Upper-bound check across all pax — total allocated for any product
-        // cannot exceed the booking quantity. Enforced for both draft and
-        // submit so a draft cannot over-allocate silently.
-        foreach ($booking_products as $bp) {
-            $bp_id = $bp['BookingProductID'];
-            $expected = floatval($bp['Quantity']);
-            $actual = $qty_allocated[$bp_id];
-            if ($actual > $expected + 0.01) {
-                $this->output->set_output(json_encode([
-                    'success' => false,
-                    'message' => 'Product "' . htmlspecialchars($bp['ProductName']) . '" total allocated quantity (' . $actual . ') exceeds booking quantity (' . $expected . ') across all pax'
-                ]));
-                return;
-            }
-        }
-
-        // Validate all product quantities are fully allocated — only enforced on
-        // Submit. Drafts are allowed to have partial allocations so the customer
-        // can save progress mid-way.
-        if ($submit_status === 'S') {
-            foreach ($booking_products as $bp) {
-                $bp_id = $bp['BookingProductID'];
-                $expected = floatval($bp['Quantity']);
-                $actual = $qty_allocated[$bp_id];
-                if (abs($expected - $actual) > 0.01) {
-                    $this->output->set_output(json_encode([
-                        'success' => false,
-                        'message' => 'Product "' . htmlspecialchars($bp['ProductName']) . '" requires total quantity of ' . $expected . ' but ' . $actual . ' was allocated'
-                    ]));
-                    return;
-                }
-            }
-        }
-
-        // Save
         $this->load->model('Invoice_Split_Model');
+        $validation = $this->Invoice_Split_Model->Validate_Pax_Input(
+            $data,
+            $booking['BookingID'],
+            $submit_status === 'S'
+        );
+        if (!$validation['ok']) {
+            $this->output->set_output(json_encode(['success' => false, 'message' => $validation['message']]));
+            return;
+        }
+        $pax_data = $validation['pax_data'];
+
         $booking_subtotal = floatval($booking['Subtotal']);
         $booking_discount = floatval($booking['Discount']);
 
@@ -1474,7 +1305,7 @@ class Customer_Portal extends CI_Controller
             // failures are logged but never surfaced to the customer, so a
             // mail-provider outage cannot break the submission flow.
             if ($submit_status === 'S') {
-                $this->_send_einvoice_finance_emails($booking['BookingID']);
+                $this->Invoice_Split_Model->Send_Finance_Notification($booking['BookingID']);
             }
 
             $this->output->set_output(json_encode([
@@ -1491,158 +1322,4 @@ class Customer_Portal extends CI_Controller
         }
     }
 
-    /**
-     * Send an "e-invoice submitted" notification to every active finance admin
-     * via the Resend HTTP API. Best-effort: any failure (missing API key,
-     * network error, non-2xx response) is logged but never surfaced to the
-     * customer.
-     */
-    private function _send_einvoice_finance_emails($booking_id)
-    {
-        try {
-            // Feature flag — default enabled; set EINVOICE_NOTIFY_FINANCE=false
-            // in .env to suppress all finance notifications without code changes.
-            $flag = get_env('EINVOICE_NOTIFY_FINANCE');
-            if ($flag !== null && strtolower(trim($flag)) === 'false') {
-                log_message('info', 'E-invoice submit: finance notifications disabled by EINVOICE_NOTIFY_FINANCE=false (booking ' . $booking_id . ')');
-                return;
-            }
-
-            $this->load->model('Admin_Model');
-            $this->load->model('Invoice_Split_Model');
-
-            $finance = $this->Admin_Model->get_finance_admins();
-            if (empty($finance)) {
-                log_message('info', 'E-invoice submit: no active finance admins to notify (booking ' . $booking_id . ')');
-                return;
-            }
-
-            $api_key = get_env('RESEND_API_KEY');
-            if (empty($api_key)) {
-                log_message('error', 'E-invoice submit: RESEND_API_KEY not configured (booking ' . $booking_id . ')');
-                return;
-            }
-
-            $this->db->select('BookingID, BookingNumber, Customer, NetTotal');
-            $this->db->where('BookingID', $booking_id);
-            $booking = $this->db->get('booking')->row_array();
-            if (empty($booking)) {
-                log_message('error', 'E-invoice submit: booking ' . $booking_id . ' not found when sending finance emails');
-                return;
-            }
-
-            $pax_rows = $this->Invoice_Split_Model->Get_Pax_By_Booking($booking_id);
-            $pax_count = is_array($pax_rows) ? count($pax_rows) : 0;
-
-            $booking_url = base_url('Booking/View?booking_id=' . $booking_id);
-            $submitted_at = date('Y-m-d H:i:s');
-            $subject = 'E-Invoice Request Submitted — Booking ' . $booking['BookingNumber'];
-
-            $from_addr = get_env('MAIL_FROM_ADDRESS') ?: 'no-reply@holidaygogogo.com';
-            $from_name = get_env('MAIL_FROM_NAME') ?: 'HolidayGoGoGo';
-            $from_field = $from_name ? sprintf('%s <%s>', $from_name, $from_addr) : $from_addr;
-
-            $messages = [];
-            foreach ($finance as $admin) {
-                $body = $this->load->view('emails/einvoice_submitted', [
-                    'admin_name'     => $admin['Name'],
-                    'booking_id'     => $booking_id,
-                    'booking_number' => $booking['BookingNumber'],
-                    'customer_name'  => $booking['Customer'],
-                    'pax_count'      => $pax_count,
-                    'net_total'      => number_format((float)$booking['NetTotal'], 2),
-                    'submitted_at'   => $submitted_at,
-                    'booking_url'    => $booking_url,
-                ], true);
-
-                $messages[] = [
-                    'from'    => $from_field,
-                    'to'      => [$admin['Email']],
-                    'subject' => $subject,
-                    'html'    => $body,
-                ];
-            }
-
-            // One batch API call per customer submit, regardless of recipient
-            // count. Cuts per-submit Resend traffic from N requests to 1.
-            list($ok, $err) = $this->_resend_send_batch($api_key, $messages);
-            if (!$ok) {
-                log_message('error', 'E-invoice email send failed for booking ' . $booking_id . ': ' . $err);
-            }
-        } catch (\Exception $e) {
-            log_message('error', 'E-invoice email send failed for booking ' . $booking_id . ': ' . $e->getMessage());
-        }
-    }
-
-    /**
-     * POST a batch of emails to https://api.resend.com/emails/batch.
-     *
-     * Rate-limit handling: on HTTP 429 we honor the Retry-After header
-     * (capped at 3s) plus 0-500ms jitter to desynchronize concurrent
-     * customers submitting at the same instant, then retry once. Total
-     * worst-case added latency on the customer's submit is ~3.5s; if
-     * the second attempt also rate-limits, we give up and log. For
-     * sustained high concurrency, a queue + cron worker would be the
-     * proper fix.
-     *
-     * Returns [bool $ok, string|null $error_message].
-     */
-    private function _resend_send_batch($api_key, array $messages, $attempt = 1)
-    {
-        if (empty($messages)) return [true, null];
-
-        $max_attempts = 2;
-
-        $ch = curl_init('https://api.resend.com/emails/batch');
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($messages));
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_HEADER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 15);
-        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            'Authorization: Bearer ' . $api_key,
-            'Content-Type: application/json',
-            'Accept: application/json',
-        ]);
-
-        $response = curl_exec($ch);
-        if ($response === false) {
-            $err = 'cURL error: ' . curl_error($ch);
-            curl_close($ch);
-            return [false, $err];
-        }
-        $http_code   = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $header_size = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
-        $headers_raw = substr($response, 0, $header_size);
-        $body        = substr($response, $header_size);
-        curl_close($ch);
-
-        if ($http_code >= 200 && $http_code < 300) {
-            return [true, null];
-        }
-
-        if ($http_code === 429 && $attempt < $max_attempts) {
-            $retry_after = $this->_parse_retry_after_seconds($headers_raw, 1);
-            // Cap to keep customer-facing latency bounded.
-            $retry_after = min($retry_after, 3);
-            $sleep_us = ($retry_after * 1000000) + mt_rand(0, 500000);
-            usleep($sleep_us);
-            return $this->_resend_send_batch($api_key, $messages, $attempt + 1);
-        }
-
-        $decoded = json_decode($body, true);
-        $msg = is_array($decoded) && !empty($decoded['message'])
-            ? $decoded['message']
-            : substr((string)$body, 0, 500);
-        return [false, "HTTP {$http_code}: {$msg}"];
-    }
-
-    private function _parse_retry_after_seconds($headers_raw, $default)
-    {
-        if (preg_match('/^Retry-After:\s*(\d+)/im', $headers_raw, $m)) {
-            return max(0, (int)$m[1]);
-        }
-        return $default;
-    }
 }
