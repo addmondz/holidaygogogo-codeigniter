@@ -171,7 +171,7 @@ $leadSortIcon = function($column) use ($leadCurrentSortBy, $leadCurrentSortDir) 
                             <strong>Lead Data</strong>
                         </h3>
                         <div class="text-muted font-size-sm">
-                            Review every lead, filter by conversation or agent, and inspect the first five response timings.
+                            Review every lead, filter by conversation or agent, and inspect both the first five and last five response timings.
                         </div>
                     </div>
                 </div>
@@ -310,7 +310,8 @@ $leadSortIcon = function($column) use ($leadCurrentSortBy, $leadCurrentSortDir) 
                             <div class="card-body">
                                 <div class="text-muted text-uppercase font-size-sm font-weight-bold mb-2">Average Response</div>
                                 <div class="font-weight-bolder font-size-h2 text-primary"><?php echo html_escape($lead_data_summary['avg_response_time_label']); ?></div>
-                                <div class="text-muted mt-2">Average of tracked replied messages</div>
+                                <div class="text-muted mt-2">First 5 avg of tracked replied messages</div>
+                                <div class="text-muted mt-1">Last 5 avg: <?php echo html_escape($lead_data_summary['avg_recent_response_time_label']); ?></div>
                             </div>
                         </div>
                     </div>
@@ -357,6 +358,7 @@ $leadSortIcon = function($column) use ($leadCurrentSortBy, $leadCurrentSortDir) 
                                         <i class="<?php echo $leadSortIcon('response_time'); ?>"></i>
                                     </a>
                                 </th>
+                                <th style="text-align:center;">Avg Last 5 Response</th>
                                 <th style="text-align:center;">
                                     <a href="<?php echo html_escape($lead_data_sorting['links']['conversion_status']); ?>" class="lead-sort-link justify-content-center">
                                         Conversion
@@ -375,7 +377,7 @@ $leadSortIcon = function($column) use ($leadCurrentSortBy, $leadCurrentSortDir) 
                         <tbody>
                             <?php if(empty($lead_data_rows)) { ?>
                                 <tr>
-                                    <td colspan="10" class="text-center py-10">No lead records found for the selected filters.</td>
+                                    <td colspan="11" class="text-center py-10">No lead records found for the selected filters.</td>
                                 </tr>
                             <?php } else { ?>
                                 <?php $count = $lead_data_pagination['start_row']; ?>
@@ -421,6 +423,20 @@ $leadSortIcon = function($column) use ($leadCurrentSortBy, $leadCurrentSortDir) 
                                                     R3 <?php echo html_escape($row['response_3_label']); ?> |
                                                     R4 <?php echo html_escape($row['response_4_label']); ?> |
                                                     R5 <?php echo html_escape($row['response_5_label']); ?>
+                                                </div>
+                                            <?php } else { ?>
+                                                <div class="font-size-sm text-muted">No reply yet</div>
+                                            <?php } ?>
+                                        </td>
+                                        <td class="text-center align-middle">
+                                            <?php if((int) $row['recent_responded_message_count'] > 0) { ?>
+                                                <div class="font-weight-bold text-dark"><?php echo html_escape($row['avg_recent_5_response_label']); ?></div>
+                                                <div class="text-muted font-size-sm mt-2">
+                                                    R1 <?php echo html_escape($row['recent_response_1_label']); ?> |
+                                                    R2 <?php echo html_escape($row['recent_response_2_label']); ?> |
+                                                    R3 <?php echo html_escape($row['recent_response_3_label']); ?> |
+                                                    R4 <?php echo html_escape($row['recent_response_4_label']); ?> |
+                                                    R5 <?php echo html_escape($row['recent_response_5_label']); ?>
                                                 </div>
                                             <?php } else { ?>
                                                 <div class="font-size-sm text-muted">No reply yet</div>

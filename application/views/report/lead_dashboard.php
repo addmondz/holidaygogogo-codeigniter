@@ -3,14 +3,14 @@
         <div class="card card-custom mb-5">
             <div class="card-header flex-wrap py-4" style="background:linear-gradient(135deg, #d7e2f2 0%, #eef4fb 100%);">
                 <div class="card-title">
-                    <div>
-                        <h3 class="card-label mb-1" style="color:#355c7d;">
-                            <strong>Real-Time Lead Dashboard</strong>
-                        </h3>
-                        <div class="text-muted font-size-sm">
-                            Live lead volume, average first-5 response time, and conversion rate by sales agent.
+                        <div>
+                            <h3 class="card-label mb-1" style="color:#355c7d;">
+                                <strong>Real-Time Lead Dashboard</strong>
+                            </h3>
+                            <div class="text-muted font-size-sm">
+                            Live lead volume, average first-5 and recent-5 response time, and conversion rate by sales agent.
+                            </div>
                         </div>
-                    </div>
                 </div>
                 <div class="card-toolbar">
                     <span class="label label-light-primary label-inline font-weight-bold" id="lead-dashboard-last-updated">
@@ -93,6 +93,7 @@
                                 <div class="text-muted text-uppercase font-size-sm font-weight-bold mb-2">Average Response</div>
                                 <div class="font-weight-bolder font-size-h2 text-info" data-summary="avg_response_time_label"><?php echo html_escape($dashboard_summary['avg_response_time_label']); ?></div>
                                 <div class="text-muted mt-2">Avg replied msgs: <span data-summary="avg_responded_messages"><?php echo html_escape($dashboard_summary['avg_responded_messages']); ?></span> / 5</div>
+                                <div class="text-muted mt-1">Last 5 avg: <span data-summary="avg_recent_response_time_label"><?php echo html_escape($dashboard_summary['avg_recent_response_time_label']); ?></span> (<span data-summary="avg_recent_responded_messages"><?php echo html_escape($dashboard_summary['avg_recent_responded_messages']); ?></span> / 5 replied)</div>
                             </div>
                         </div>
                     </div>
@@ -126,6 +127,7 @@
                                 <th style="text-align:center;">Responded Leads</th>
                                 <th style="text-align:center;">Response Rate</th>
                                 <th style="text-align:center;">Avg First 5 Response</th>
+                                <th style="text-align:center;">Avg Last 5 Response</th>
                                 <th style="text-align:center;">Converted Leads</th>
                                 <th style="text-align:center;">Conversion Rate</th>
                                 <th style="text-align:center;">Last Lead Update</th>
@@ -135,7 +137,7 @@
                         <tbody id="lead-dashboard-table-body">
                             <?php if(empty($lead_dashboard_rows)) { ?>
                                 <tr>
-                                    <td colspan="10" class="text-center py-10">Lead activity not found for the selected filters.</td>
+                                    <td colspan="11" class="text-center py-10">Lead activity not found for the selected filters.</td>
                                 </tr>
                             <?php } else { ?>
                                 <?php $count = 1; ?>
@@ -149,6 +151,10 @@
                                         <td class="text-center">
                                             <div class="font-weight-bold"><?php echo html_escape($row['avg_response_time_label']); ?></div>
                                             <div class="text-muted font-size-sm"><?php echo html_escape($row['avg_responded_messages']); ?> / 5 replied</div>
+                                        </td>
+                                        <td class="text-center">
+                                            <div class="font-weight-bold"><?php echo html_escape($row['avg_recent_response_time_label']); ?></div>
+                                            <div class="text-muted font-size-sm"><?php echo html_escape($row['avg_recent_responded_messages']); ?> / 5 replied</div>
                                         </td>
                                         <td class="text-center"><?php echo number_format($row['converted_leads']); ?></td>
                                         <td class="text-center"><?php echo html_escape($row['conversion_rate']); ?>%</td>
@@ -206,7 +212,7 @@
         var html = '';
 
         if (!rows || rows.length === 0) {
-            html = '<tr><td colspan="10" class="text-center py-10">Lead activity not found for the selected filters.</td></tr>';
+            html = '<tr><td colspan="11" class="text-center py-10">Lead activity not found for the selected filters.</td></tr>';
             $('#lead-dashboard-table-body').html(html);
             return;
         }
@@ -219,6 +225,7 @@
             html += '<td class="text-center">' + row.responded_leads + '</td>';
             html += '<td class="text-center">' + row.response_rate + '%</td>';
             html += '<td class="text-center"><div class="font-weight-bold">' + escapeHtml(row.avg_response_time_label) + '</div><div class="text-muted font-size-sm">' + escapeHtml(row.avg_responded_messages) + ' / 5 replied</div></td>';
+            html += '<td class="text-center"><div class="font-weight-bold">' + escapeHtml(row.avg_recent_response_time_label) + '</div><div class="text-muted font-size-sm">' + escapeHtml(row.avg_recent_responded_messages) + ' / 5 replied</div></td>';
             html += '<td class="text-center">' + row.converted_leads + '</td>';
             html += '<td class="text-center">' + row.conversion_rate + '%</td>';
             html += '<td class="text-center">' + escapeHtml(row.last_updated_at || '-') + '</td>';
@@ -250,6 +257,8 @@
         $('[data-summary="responded_leads"]').text(summary.responded_leads);
         $('[data-summary="avg_response_time_label"]').text(summary.avg_response_time_label);
         $('[data-summary="avg_responded_messages"]').text(summary.avg_responded_messages);
+        $('[data-summary="avg_recent_response_time_label"]').text(summary.avg_recent_response_time_label);
+        $('[data-summary="avg_recent_responded_messages"]').text(summary.avg_recent_responded_messages);
         $('[data-summary="converted_leads"]').text(summary.converted_leads);
         $('[data-summary="conversion_rate"]').text(summary.conversion_rate);
         $('[data-summary="active_agents"]').text(summary.active_agents);
