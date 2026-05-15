@@ -363,7 +363,11 @@ class Booking_Model extends CI_Model
 
 	function Read_Bookings_With_Guest_Lists($group_by_booking_id)
 	{
-		$this->db->select('booking.BookingID, BookingNumber, ReservationNumber, DepositDeadline, FullPaymentDeadline, Customer, booking.Mobile As CustomerMobile, StartDate, EndDate, Adult, Children, Infant, BookingRemark, Subtotal, Discount, NetTotal, ChatLanguage, CancelStatus, booking.PartialRefund, LockStatus, booking.is_submitted, AfterSalesService, booking.Status, booking.InsertDate, guest_list.CountryCodeID As GuestCountryCode, Type, guest_list.Name As GuestName, guest_list.Gender, DateOfBirth, Nationality, guest_list.IdentificationNumber, guest_list.PassportNumber, guest_list.Mobile As GuestMobile, guest_list.Email, MaritalStatus, Employment, Address, Postcode, guest_list.City, guest_list.State, guest_list.Country, Nominee, NomineeIdentificationNumber, Relationship, admin.Name As SalesAgentName, category.Name As DestinationName, CountryCode, source.Name As SourceName');
+		if($group_by_booking_id == 'Y') {
+			$this->db->select('booking.BookingID, BookingNumber, ReservationNumber, DepositDeadline, FullPaymentDeadline, Customer, booking.Mobile As CustomerMobile, StartDate, EndDate, Adult, Children, Infant, BookingRemark, Subtotal, Discount, NetTotal, ChatLanguage, CancelStatus, booking.PartialRefund, LockStatus, booking.is_submitted, AfterSalesService, booking.Status, booking.InsertDate, ANY_VALUE(guest_list.CountryCodeID) As GuestCountryCode, ANY_VALUE(Type) As Type, ANY_VALUE(guest_list.Name) As GuestName, ANY_VALUE(guest_list.Gender) As Gender, ANY_VALUE(DateOfBirth) As DateOfBirth, ANY_VALUE(Nationality) As Nationality, ANY_VALUE(guest_list.IdentificationNumber) As IdentificationNumber, ANY_VALUE(guest_list.PassportNumber) As PassportNumber, ANY_VALUE(guest_list.Mobile) As GuestMobile, ANY_VALUE(guest_list.Email) As Email, ANY_VALUE(MaritalStatus) As MaritalStatus, ANY_VALUE(Employment) As Employment, ANY_VALUE(Address) As Address, ANY_VALUE(Postcode) As Postcode, ANY_VALUE(guest_list.City) As City, ANY_VALUE(guest_list.State) As State, ANY_VALUE(guest_list.Country) As Country, ANY_VALUE(Nominee) As Nominee, ANY_VALUE(NomineeIdentificationNumber) As NomineeIdentificationNumber, ANY_VALUE(Relationship) As Relationship, admin.Name As SalesAgentName, category.Name As DestinationName, CountryCode, source.Name As SourceName', FALSE);
+		} else {
+			$this->db->select('booking.BookingID, BookingNumber, ReservationNumber, DepositDeadline, FullPaymentDeadline, Customer, booking.Mobile As CustomerMobile, StartDate, EndDate, Adult, Children, Infant, BookingRemark, Subtotal, Discount, NetTotal, ChatLanguage, CancelStatus, booking.PartialRefund, LockStatus, booking.is_submitted, AfterSalesService, booking.Status, booking.InsertDate, guest_list.CountryCodeID As GuestCountryCode, Type, guest_list.Name As GuestName, guest_list.Gender, DateOfBirth, Nationality, guest_list.IdentificationNumber, guest_list.PassportNumber, guest_list.Mobile As GuestMobile, guest_list.Email, MaritalStatus, Employment, Address, Postcode, guest_list.City, guest_list.State, guest_list.Country, Nominee, NomineeIdentificationNumber, Relationship, admin.Name As SalesAgentName, category.Name As DestinationName, CountryCode, source.Name As SourceName');
+		}
 		$this->db->join('guest_list', 'guest_list.BookingID = booking.BookingID', 'left');
 		$this->db->join('admin', 'admin.AdminID = booking.SalesAgent', 'left');
 		$this->db->join('category', 'category.CategoryID = booking.Destination', 'left');
@@ -401,7 +405,7 @@ class Booking_Model extends CI_Model
 			$this->db->where('Destination', $this->input->get('destination'));
 		}
 		if(!empty($this->input->get('sales_agent'))) {
-			$this->db->where('SalesAgent', $this->input->get('sales_agent'));
+			$this->db->where_in('SalesAgent', explode(',', $this->input->get('sales_agent')));
 		}
 		if(!empty($this->input->get('tag'))) {
 			$this->db->where("FIND_IN_SET('".$this->input->get('tag')."', Tag)");
@@ -492,9 +496,10 @@ class Booking_Model extends CI_Model
 			$this->db->where('CAST(booking.InsertDate AS DATE) <=', $end_date);
 		}
 		$this->db->where('booking.Status !=', 'N');
-		$this->db->where('guest_list.Status', 'Y');
 		if($group_by_booking_id == 'Y') {
 			$this->db->group_by('booking.BookingID');
+		} else {
+			$this->db->where('guest_list.Status', 'Y');
 		}
 		$this->db->order_by('booking.BookingID', 'DESC');
 		$this->db->order_by('Type', 'ASC');

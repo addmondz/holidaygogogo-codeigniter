@@ -57,6 +57,22 @@ class Booking_Confirmation extends CI_Controller
 
         $array = $this->Booking_Model->Booking_Document();
 
+        // Defensive: strip any " - <CustomerCode>" suffix that may have leaked into booking.Customer
+        // (the booking form appends it visually; a JS pre-submit handler normally trims it before save,
+        // but the BC PDF must never expose the code regardless).
+        if (!empty($array) && !empty($array['CustomerID']) && !empty($array['Customer'])) {
+            $code_row = $this->db->select('CustomerCode')
+                ->where('CustomerID', $array['CustomerID'])
+                ->get('customer')
+                ->row_array();
+            if (!empty($code_row['CustomerCode'])) {
+                $suffix = ' - ' . $code_row['CustomerCode'];
+                $cust   = $array['Customer'];
+                if (substr($cust, -strlen($suffix)) === $suffix) {
+                    $array['Customer'] = substr($cust, 0, -strlen($suffix));
+                }
+            }
+        }
 
 
 		if(empty($array)) {
