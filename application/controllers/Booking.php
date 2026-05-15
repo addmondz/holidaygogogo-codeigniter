@@ -3738,16 +3738,6 @@ class Booking extends MY_Controller
         // Get internal remarks (type 1) only
         $remarks = $this->Remark_Model->Read_Remarks('booking', $booking_id, REMARK_TYPE::INTERNAL);
 
-		// Auto-recipients (SalesAgent / BookingOP) aren't "extra tagged" users — exclude them
-		// from the notified-users display so only explicit "Also Notify" picks show up.
-		$booking_row = $this->Booking_Model->getBookingById($booking_id);
-		$exclude_user_ids = array();
-		if (!empty($booking_row)) {
-			if (!empty($booking_row->SalesAgent)) $exclude_user_ids[] = $booking_row->SalesAgent;
-			if (!empty($booking_row->BookingOP))  $exclude_user_ids[] = $booking_row->BookingOP;
-		}
-		$this->load->model('Notification_Model');
-
 		// Format remarks for JSON response
 		$formatted_remarks = array();
 		foreach ($remarks as $remark) {
@@ -3768,12 +3758,6 @@ class Booking extends MY_Controller
 			$remark_type = isset($remark->type) ? $remark->type : REMARK_TYPE::INTERNAL;
 			$remark_type_label = REMARK_TYPE::getLabel($remark_type) ?: 'INTERNAL';
 
-			$tagged = $this->Notification_Model->Get_Tagged_Users_For_Remark($remark->RemarkID, $exclude_user_ids);
-			$notified_users = array();
-			foreach ($tagged as $t) {
-				$notified_users[] = array('AdminID' => $t->AdminID, 'Name' => $t->Name);
-			}
-
 			$formatted_remarks[] = array(
 				'RemarkID' => $remark->RemarkID,
 				'content' => $remark->content,
@@ -3785,7 +3769,6 @@ class Booking extends MY_Controller
 				'type_label' => $remark_type_label,
 				'created_at' => return_timestamp_output($remark->created_at),
 				'created_at_raw' => $remark->created_at,
-				'notified_users' => $notified_users
 			);
 		}
 
@@ -3960,20 +3943,6 @@ class Booking extends MY_Controller
 
 		// Check if this is from Customer Remarks section (type 2) or Internal Comments (type 1)
 		$remark_type = $this->input->post('remark_type') == '2' ? REMARK_TYPE::CUSTOMER : REMARK_TYPE::INTERNAL;
-		
-		// Check if notifications should be skipped (when adding from Customer Remarks section)
-		$skip_notifications = $this->input->post('skip_notifications') == '1' ? true : false;
-
-		// Parse @mention handles from the comment content (internal remarks only)
-		$notify_user_ids = null;
-		if ($remark_type == REMARK_TYPE::INTERNAL && !$skip_notifications) {
-			if (preg_match_all('/@([a-z0-9]+)/', $content, $matches) && !empty($matches[1])) {
-				$ids = $this->Notification_Model->Resolve_Handles_To_User_Ids($matches[1]);
-				if (!empty($ids)) {
-					$notify_user_ids = $ids;
-				}
-			}
-		}
 
 		$remark_data = array(
 			'owner_type' => 'booking',
@@ -3981,8 +3950,6 @@ class Booking extends MY_Controller
 			'commenter_id' => $this->session->userdata('admin_id'),
 			'content' => $content,
 			'type' => $remark_type,
-			'skip_notifications' => $skip_notifications,
-			'notify_user_ids' => $notify_user_ids
 		);
 
 		$remark_id = $this->Remark_Model->Create($remark_data);

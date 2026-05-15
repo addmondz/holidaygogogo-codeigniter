@@ -326,6 +326,36 @@
         }
     });
 
+    $(window).on('load', function() {
+        $('#kt_daterangepicker_4').daterangepicker({
+            buttonClasses: ' btn',
+            applyClass: 'btn-primary',
+            cancelClass: 'btn-secondary',
+            autoApply: true,
+            ranges: {
+                'Next 7 Days':  [moment(), moment().add(6, 'days')],
+                'Next 14 Days': [moment(), moment().add(13, 'days')],
+                'Next 30 Days': [moment(), moment().add(29, 'days')]
+            }
+        }, function(start, end, label) {
+            $('#kt_daterangepicker_4 .form-control').val(start.format('DD/MM/YYYY') + ' - ' + end.format('DD/MM/YYYY'));
+        });
+
+        $('#kt_daterangepicker_5').daterangepicker({
+            buttonClasses: ' btn',
+            applyClass: 'btn-primary',
+            cancelClass: 'btn-secondary',
+            autoApply: true,
+            ranges: {
+                'Last 7 Days':  [moment().subtract(6, 'days'),  moment()],
+                'Last 14 Days': [moment().subtract(13, 'days'), moment()],
+                'Last 30 Days': [moment().subtract(29, 'days'), moment()]
+            }
+        }, function(start, end, label) {
+            $('#kt_daterangepicker_5 .form-control').val(start.format('DD/MM/YYYY') + ' - ' + end.format('DD/MM/YYYY'));
+        });
+    });
+
     function Reset_Deadline() {
         $('input[name="deadline"]').val('');
     }
@@ -1287,11 +1317,6 @@ function initMentionAutocomplete(textareaSelector) {
 
 function renderRemarkItem(remark) {
     var avatarColor = ['primary', 'success', 'info', 'warning', 'danger'][remark.commenter_name.charCodeAt(0) % 5];
-    var notifiedHtml = '';
-    if (remark.notified_users && remark.notified_users.length) {
-        var names = remark.notified_users.map(function(u) { return escapeHtml(u.Name); }).join(', ');
-        notifiedHtml = '<div class="mt-1" style="font-size: 0.7rem; color: #65676b;"><i class="la la-bell"></i> Notified: ' + names + '</div>';
-    }
     return '<div class="comment-item d-flex mb-2 mx-2 pb-2 pl-1" style="border-bottom: 1px solid #e4e6eb;">' +
         '<div class="flex-shrink-0 mr-2">' +
         '<div class="symbol symbol-32 symbol-circle symbol-light-' + avatarColor + '">' +
@@ -1304,7 +1329,6 @@ function renderRemarkItem(remark) {
         '<span class="text-muted" style="font-size: 0.75rem; color: #65676b;">' + remark.created_at + '</span>' +
         '</div>' +
         '<div class="comment-text" style="font-size: 0.8125rem; color: #050505; line-height: 1.3; white-space: pre-wrap; word-wrap: break-word;">' + renderMentionedContent(remark.content) + '</div>' +
-        notifiedHtml +
         '</div>' +
         '</div>';
 }
@@ -1468,8 +1492,7 @@ $('#modal-add-customer-remark-btn').on('click', function() {
         data: {
             booking_id: remarksModalBookingId,
             content: content,
-            remark_type: '2',
-            skip_notifications: '1'
+            remark_type: '2'
         },
         dataType: 'json',
         success: function(response) {

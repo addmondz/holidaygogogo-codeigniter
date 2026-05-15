@@ -458,8 +458,7 @@ $is_view_mode = true;
             data: {
                 booking_id: bookingId,
                 content: content,
-                remark_type: '2', // CUSTOMER type when adding from Customer Remarks section
-                skip_notifications: '1' // Skip notifications when adding from Customer Remarks section
+                remark_type: '2' // CUSTOMER type when adding from Customer Remarks section
             },
             dataType: 'json',
             success: function(response) {

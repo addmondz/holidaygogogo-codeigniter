@@ -374,7 +374,7 @@
                                         id="Customer"
                                         name="Customer"
                                         <?php if (current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) { ?>
-                                            value="<?php echo htmlspecialchars($Customer . (!empty($CustomerCode) ? ' - ' . $CustomerCode : ''), ENT_QUOTES); ?>"
+                                            value="<?php echo htmlspecialchars($Customer, ENT_QUOTES); ?>"
                                             data-selected-code="<?php echo htmlspecialchars(!empty($CustomerCode) ? $CustomerCode : '', ENT_QUOTES); ?>"
                                         <?php } ?>
                                         autocomplete="off"
@@ -4624,7 +4624,7 @@ $(document).ready(function() {
         const code = $(this).data('code');
         const phone = $(this).data('phone');
 
-        $('#Customer').val(name + (code ? ' - ' + code : ''));
+        $('#Customer').val(name);
         $('#Customer').data('selectedCode', code || '');
         hiddenCustomerId.val(id);
         container.hide();
@@ -4914,12 +4914,6 @@ $(document).ready(function() {
                         // Get first letter for avatar color
                         var avatarColor = ['primary', 'success', 'info', 'warning', 'danger'][remark.commenter_name.charCodeAt(0) % 5];
 
-                        var notifiedHtml = '';
-                        if (remark.notified_users && remark.notified_users.length) {
-                            var notifiedNames = remark.notified_users.map(function(u) { return escapeHtml(u.Name); }).join(', ');
-                            notifiedHtml = '<div class="mt-1" style="font-size: 0.7rem; color: #65676b;"><i class="la la-bell"></i> Notified: ' + notifiedNames + '</div>';
-                        }
-
                         var commentHtml = '<div class="comment-item d-flex mb-2 mx-2 pb-2 pl-1" style="border-bottom: 1px solid #e4e6eb; position: relative;">' +
                             // Avatar
                             '<div class="flex-shrink-0 mr-2">' +
@@ -4934,7 +4928,6 @@ $(document).ready(function() {
                             '<span class="text-muted" style="font-size: 0.75rem; color: #65676b;">' + remark.created_at + (remark.created_at_relative ? ' <span style="margin: 0 4px;">•</span> ' + remark.created_at_relative : '') + '</span>' +
                             '</div>' +
                             '<div class="comment-text" style="font-size: 0.8125rem; color: #050505; line-height: 1.3; white-space: pre-wrap; word-wrap: break-word;">' + renderMentionedContent(remark.content) + '</div>' +
-                            notifiedHtml +
                             '</div>' +
                             // Delete button (only show if user is the owner)
                             (remark.is_owner ? '<button type="button" class="btn btn-sm btn-link text-muted delete-comment-btn comment-delete-btn" data-remark-id="' + remark.RemarkID + '" style="position: absolute; top: 0; right: 0; opacity: 1; padding: 2px 6px; font-size: 0.75rem; background: transparent !important;" title="Delete comment">' +
@@ -5235,8 +5228,7 @@ $(document).ready(function() {
             data: {
                 booking_id: bookingId,
                 content: content,
-                remark_type: '2', // CUSTOMER type when adding from Customer Remarks section
-                skip_notifications: '1' // Skip notifications when adding from Customer Remarks section
+                remark_type: '2' // CUSTOMER type when adding from Customer Remarks section
             },
             dataType: 'json',
             success: function(response) {

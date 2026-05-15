@@ -27,12 +27,8 @@ class Remark_Model extends CI_Model
 	 */
 	function Create($data)
 	{
-		// Default to INTERNAL type if not specified
 		$remark_type = isset($data['type']) ? $data['type'] : REMARK_TYPE::INTERNAL;
-		
-		// Check if notifications should be skipped
-		$skip_notifications = isset($data['skip_notifications']) ? $data['skip_notifications'] : false;
-		
+
 		$remark_data = array(
 			'owner_type' => $data['owner_type'],
 			'owner_id' => $data['owner_id'],
@@ -42,36 +38,7 @@ class Remark_Model extends CI_Model
 			'created_at' => date('Y-m-d H:i:s')
 		);
 		$this->db->insert('remark', $remark_data);
-		$remark_id = $this->db->insert_id();
-
-		// Create notifications for relevant users (only for internal remarks, not customer remarks)
-		// Customer remarks have their own notification logic handled separately
-		// Skip notifications if flag is set
-		if ($remark_id && $data['owner_type'] == 'booking' && $remark_type == REMARK_TYPE::INTERNAL && !$skip_notifications) {
-			$this->load->model('Notification_Model');
-
-			// Always send automatic notifications to Owners, SalesAgent, BookingOP
-			$this->Notification_Model->Create_Remark_Notifications(
-				$data['owner_id'],
-				$remark_id,
-				$data['commenter_id'],
-				$data['content']
-			);
-
-			// Also notify any additional users selected via checkbox
-			$notify_user_ids = isset($data['notify_user_ids']) ? $data['notify_user_ids'] : null;
-			if (!empty($notify_user_ids)) {
-				$this->Notification_Model->Create_Remark_Notifications_For_Users(
-					$data['owner_id'],
-					$remark_id,
-					$data['commenter_id'],
-					$data['content'],
-					$notify_user_ids
-				);
-			}
-		}
-		
-		return $remark_id;
+		return $this->db->insert_id();
 	}
 
 	/**
