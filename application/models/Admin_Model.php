@@ -103,6 +103,57 @@ class Admin_Model extends CI_Model
 		return $this->db->get('admin')->result();
 	}
 
+	// GHL agent list shown in the admin's "Lead Dashboard Agents" multi-select.
+	// One row per UserID — ghl_users may have duplicates across LocationIDs.
+	function Read_GHL_Users()
+	{
+		$sql = "
+			SELECT UserID, MAX(Name) AS Name, MAX(Email) AS Email
+			FROM ghl_users
+			WHERE Deleted = 0 AND Name IS NOT NULL AND Name != ''
+			GROUP BY UserID
+			ORDER BY Name ASC
+		";
+		return $this->db->query($sql)->result();
+	}
+
+	function Read_Lead_Dashboard_Agents_For_Admin($admin_id)
+	{
+		$admin_id = (int) $admin_id;
+		if ($admin_id <= 0) return array();
+		$this->db->select('GhlUserID');
+		$this->db->where('AdminID', $admin_id);
+		$rows = $this->db->get('admin_lead_dashboard_agents')->result();
+		return array_map(function($r) { return $r->GhlUserID; }, $rows);
+	}
+
+	private function _Sync_Lead_Dashboard_Agents($admin_id, array $ghl_user_ids)
+	{
+		$admin_id = (int) $admin_id;
+		if ($admin_id <= 0) return;
+
+		$this->db->where('AdminID', $admin_id)->delete('admin_lead_dashboard_agents');
+
+		$ghl_user_ids = array_values(array_unique(array_filter(
+			array_map('strval', $ghl_user_ids),
+			'strlen'
+		)));
+		if (empty($ghl_user_ids)) return;
+
+		$now = date('Y-m-d H:i:s');
+		$insertBy = (int) $this->session->admin_id ?: null;
+		$rows = array();
+		foreach ($ghl_user_ids as $uid) {
+			$rows[] = array(
+				'AdminID'    => $admin_id,
+				'GhlUserID'  => $uid,
+				'InsertBy'   => $insertBy,
+				'InsertDate' => $now,
+			);
+		}
+		$this->db->insert_batch('admin_lead_dashboard_agents', $rows);
+	}
+
 	// Active finance admins with a usable email address. Used to fan out
 	// e-invoice notification emails to the finance team.
 	function get_finance_admins()
@@ -118,9 +169,19 @@ class Admin_Model extends CI_Model
 
 	function Create()
 	{
-		$this->db->insert_batch('admin', json_decode(json_encode($this->input->post('admin'))));
-		$this->db->limit(1);
+		$payload = json_decode(json_encode($this->input->post('admin')), true);
+		if (empty($payload) || empty($payload[0])) {
+			return false;
+		}
+		$row = $payload[0];
+
+		$this->db->insert('admin', $row);
 		if($this->db->affected_rows() == 1) {
+			$newAdminId = (int) $this->db->insert_id();
+			$this->_Sync_Lead_Dashboard_Agents(
+				$newAdminId,
+				(array) $this->input->post('lead_dashboard_agents')
+			);
 			return true;
 		} else {
 			return false;
@@ -144,11 +205,30 @@ class Admin_Model extends CI_Model
 			case 'Admin':
 				switch($this->router->method) {
 					case 'Update':
-						$this->db->update_batch('admin', json_decode(json_encode($this->input->post('admin'))), 'AdminID');
-						$this->db->limit(1);
+						$adminPayload = json_decode(json_encode($this->input->post('admin')), true);
+						$adminId = (!empty($adminPayload[0]['AdminID'])) ? (int) $adminPayload[0]['AdminID'] : 0;
+						$ldaDirty = ($this->input->post('lead_dashboard_agents_dirty') === '1');
 
-						if($this->db->affected_rows() == 1) {
-							$this->db->insert_batch('admin_log', json_decode(json_encode($this->input->post('admin_log'))));
+						// update_batch returns int (>=0) on success, FALSE on input error.
+						// 0 means "row matched but values already equal" — still a success for the user.
+						$updateResult = $this->db->update_batch('admin', json_decode(json_encode($this->input->post('admin'))), 'AdminID');
+						$adminOk = ($updateResult !== FALSE);
+
+						if($adminOk || $ldaDirty) {
+							$adminLog = $this->input->post('admin_log');
+							if(!empty($adminLog)) {
+								$this->db->insert_batch('admin_log', json_decode(json_encode($adminLog)));
+							}
+							if($ldaDirty && $adminId > 0) {
+								try {
+									$this->_Sync_Lead_Dashboard_Agents(
+										$adminId,
+										(array) $this->input->post('lead_dashboard_agents')
+									);
+								} catch (Exception $e) {
+									log_message('error', 'Lead dashboard agents sync failed for AdminID '.$adminId.': '.$e->getMessage());
+								}
+							}
 							return true;
 						} else {
 							return false;

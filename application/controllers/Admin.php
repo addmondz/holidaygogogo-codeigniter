@@ -61,6 +61,8 @@ class Admin extends MY_Controller
 			$array = array('Action' => 'C', 'AdminID' => 0, 'Name' => 'NA', 'AccessControl' => array(), 'TeamLeadID' => '');
 			$array['country_codes'] = $this->Admin_Model->Read_Country_Codes();
 			$array['team_leads'] = $this->Admin_Model->Read_Team_Leads();
+			$array['ghl_users'] = $this->Admin_Model->Read_GHL_Users();
+			$array['lead_dashboard_agents'] = array();
 			$this->load->view('layout/header', $titles);
 			$this->load->view('admin/admin', $array);
 			$this->load->view('layout/footer');
@@ -80,6 +82,8 @@ class Admin extends MY_Controller
 				$array['Action'] = 'U';
 				$array['country_codes'] = $this->Admin_Model->Read_Country_Codes();
 				$array['team_leads'] = $this->Admin_Model->Read_Team_Leads();
+				$array['ghl_users'] = $this->Admin_Model->Read_GHL_Users();
+				$array['lead_dashboard_agents'] = $this->Admin_Model->Read_Lead_Dashboard_Agents_For_Admin($this->input->get('admin_id'));
 				$this->load->view('layout/header', $titles);
 				$this->load->view('admin/admin', $array);
 				$this->load->view('layout/footer');

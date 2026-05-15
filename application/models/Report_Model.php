@@ -629,8 +629,19 @@ class Report_Model extends CI_Model
         return $results;
     }
 
-    function Lead_Dashboard_Agents()
+    function Lead_Dashboard_Agents($restrict_agent_ids = null)
     {
+        $params = array();
+        $extra = '';
+        if (is_array($restrict_agent_ids)) {
+            if (empty($restrict_agent_ids)) {
+                return array();
+            }
+            $placeholders = implode(',', array_fill(0, count($restrict_agent_ids), '?'));
+            $extra = " AND user_ref.agent_id IN ({$placeholders}) ";
+            $params = array_values(array_map('strval', $restrict_agent_ids));
+        }
+
         $sql = "
             SELECT DISTINCT
                 user_ref.agent_id,
@@ -641,11 +652,21 @@ class Report_Model extends CI_Model
                 WHERE assigned_to_user_id IS NOT NULL AND assigned_to_user_id <> ''
             ) user_ref
             LEFT JOIN ghl_users gu ON gu.UserID = user_ref.agent_id
-            WHERE user_ref.agent_id IS NOT NULL AND user_ref.agent_id <> ''
+            WHERE user_ref.agent_id IS NOT NULL AND user_ref.agent_id <> '' {$extra}
             ORDER BY agent_name ASC
         ";
 
-        return $this->db->query($sql)->result();
+        return $this->db->query($sql, $params)->result();
+    }
+
+    function Get_Allowed_Lead_Dashboard_Agents($admin_id)
+    {
+        $admin_id = (int) $admin_id;
+        if ($admin_id <= 0) return array();
+        $this->db->select('GhlUserID');
+        $this->db->where('AdminID', $admin_id);
+        $rows = $this->db->get('admin_lead_dashboard_agents')->result();
+        return array_map(function($r) { return $r->GhlUserID; }, $rows);
     }
 
     function Lead_Data_Total_Count($filters = array())
@@ -977,6 +998,21 @@ class Report_Model extends CI_Model
         $clauses = array();
         $params = array();
         $extraJoins = '';
+
+        // Server-only restriction set by the controller for non-OWNER users.
+        // Empty list => zero rows. Never sourced from request input.
+        if (array_key_exists('_restrict_agent_ids', $filters)) {
+            $allowed = array_values(array_filter(
+                array_map('strval', (array) $filters['_restrict_agent_ids']),
+                'strlen'
+            ));
+            if (empty($allowed)) {
+                return array('sql' => 'WHERE 1=0', 'params' => array(), 'extra_joins' => '');
+            }
+            $placeholders = implode(',', array_fill(0, count($allowed), '?'));
+            $clauses[] = "NULLIF(pl.assigned_to_user_id, '') IN ({$placeholders})";
+            foreach ($allowed as $id) { $params[] = $id; }
+        }
 
         if (!empty($filters['start_date'])) {
             $clauses[] = 'pl.lead_started_at >= ?';

@@ -178,6 +178,20 @@
                                 </select>
                             </div>
                         </div>
+                        <div class="col-md-12">
+                            <div class="form-group">
+                                <label>Lead Dashboard Agents
+                                    <small class="text-muted d-block">Restricts which GHL agents this user can see on Lead Dashboard / Lead Data. Leave empty to block all leads (OWNER bypasses).</small>
+                                </label>
+                                <select id="LeadDashboardAgents" multiple data-live-search="true" data-actions-box="true" title="--SELECT GHL AGENTS--" class="form-control selectpicker">
+                                    <?php if(!empty($ghl_users)) {
+                                        foreach($ghl_users as $ghl_user) { ?>
+                                            <option <?php if(in_array($ghl_user->UserID, $lead_dashboard_agents)) { echo 'selected'; } ?> data-icon="la la-headset font-size-lg bs-icon" value="<?php echo html_escape($ghl_user->UserID); ?>"><?php echo html_escape($ghl_user->Name . (!empty($ghl_user->Email) ? ' (' . $ghl_user->Email . ')' : '')); ?></option>
+                                        <?php }
+                                    } ?>
+                                </select>
+                            </div>
+                        </div>
                     </div>
                     <div class="d-flex justify-content-between border-top pt-5">
                         <input type="button" value="<?php if($Action == 'C') { echo 'Create Admin'; } else { echo 'Update Admin'; } ?>" class="btn btn-success font-weight-bold px-9 py-4" style="width:180px; margin-left:auto;">
@@ -230,6 +244,10 @@
                 var level = $('#Level').val();
                 var access_control = ($('#AccessControl').val()).toString();
                 var team_lead_id = $('#TeamLeadID').val();
+                var lead_dashboard_agents = $('#LeadDashboardAgents').val() || [];
+                var lda_initial_str = '<?php echo implode(",", $lead_dashboard_agents); ?>'.split(',').filter(Boolean).sort().join(',');
+                var lda_current_str = lead_dashboard_agents.slice().sort().join(',');
+                var lda_dirty = (lda_current_str !== lda_initial_str);
                 if(country_code == null || name == '' || (action == 'C' && gender == null) || mobile == '' || email == '' || (action == 'C' && username == '') || (action == 'C' && password == '') || (action == 'C' && level == null) || access_control == '') {
                     Display_Message(background, 'Please Insert All Required Admin Information', null);
                 } else {
@@ -237,7 +255,7 @@
                         var admin = [];
                         var url = '<?php echo base_url('Admin/Create') ?>';
                         admin.push({CountryCodeID:country_code, Name:name, Gender:gender, IdentificationNumber:identification_number, PassportNumber:passport_number, Mobile:mobile, Email:email, Username:username, Password:password, Level:level, AccessControl:access_control, TeamLeadID:team_lead_id ? team_lead_id : null, InsertBy:session_id, InsertDate:current_datetime});
-                        Submit_Admin(url, admin, null);
+                        Submit_Admin(url, admin, null, lead_dashboard_agents, true);
                     } else {
                         var dirty_fields = $('#form').dirty('showDirtyFields');
                         var admin_id = <?php echo $AdminID ?>;
@@ -246,6 +264,11 @@
                         var url = '<?php echo base_url('Admin/Update') ?>';
                         for(var i = 0; i < dirty_fields.length; i++) {
                             var key = dirty_fields[i].id;
+                            // Skip plugin-injected inputs without an id (e.g. bootstrap-select's live-search box)
+                            // — they're not admin columns and would generate invalid SQL like `SET 0 = '...'`.
+                            if(!key || key == 'LeadDashboardAgents') {
+                                continue;
+                            }
                             if(key != 'AccessControl') {
                                 var value = key == 'Name' || key == 'PassportNumber' || key == 'Email' || key == 'Password' ? (dirty_fields[i].value).toUpperCase() : dirty_fields[i].value;
 
@@ -294,11 +317,11 @@
                         $.each(admin[0], function() {
                             count++;
                         });
-                        if(count == 3) {
+                        if(count == 3 && !lda_dirty) {
                             var url = '<?php echo base_url('Admin') ?>';
                             Display_Message(background, '<?php echo 'No Changes Detected In Admin Record : ' . $Name; ?>', url);
                         } else {
-                            Submit_Admin(url, admin, admin_log);
+                            Submit_Admin(url, admin, admin_log, lead_dashboard_agents, lda_dirty);
                         }
                     }
                 }
@@ -306,14 +329,16 @@
         });
     });
 
-    function Submit_Admin(url, admin, admin_log)
+    function Submit_Admin(url, admin, admin_log, lead_dashboard_agents, lda_dirty)
     {
         $.ajax({
             url: url,
             type: 'post',
             data: {
                 admin: admin,
-                admin_log: admin_log
+                admin_log: admin_log,
+                lead_dashboard_agents: lead_dashboard_agents || [],
+                lead_dashboard_agents_dirty: lda_dirty ? '1' : '0'
             },
             dataType: 'json',
             success: function(status) {

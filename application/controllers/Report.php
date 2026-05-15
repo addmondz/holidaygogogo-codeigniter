@@ -667,10 +667,11 @@ class Report extends MY_Controller
 
     private function lead_dashboard_payload($filters)
     {
+        $restrict = isset($filters['_restrict_agent_ids']) ? $filters['_restrict_agent_ids'] : null;
         return array(
             'summary' => $this->format_lead_dashboard_summary($this->Report_Model->Lead_Dashboard_Summary($filters)),
             'rows' => $this->format_lead_dashboard_rows($this->Report_Model->Lead_Dashboard_By_Agent($filters)),
-            'agents' => $this->Report_Model->Lead_Dashboard_Agents(),
+            'agents' => $this->Report_Model->Lead_Dashboard_Agents($restrict),
             'team_leads' => $this->Report_Model->Lead_Dashboard_Team_Leads(),
             'updated_at' => date('Y-m-d H:i:s'),
         );
@@ -682,11 +683,12 @@ class Report extends MY_Controller
         $currentPage = isset($filters['page']) ? max(1, (int) $filters['page']) : 1;
         $offset = ($currentPage - 1) * $perPage;
         $totalRows = (int) $this->Report_Model->Lead_Data_Total_Count($filters);
+        $restrict = isset($filters['_restrict_agent_ids']) ? $filters['_restrict_agent_ids'] : null;
 
         return array(
             'summary' => $this->format_lead_dashboard_summary($this->Report_Model->Lead_Dashboard_Summary($filters)),
             'rows' => $this->format_lead_data_rows($this->Report_Model->Lead_Data_Rows($filters, $perPage, $offset)),
-            'agents' => $this->Report_Model->Lead_Dashboard_Agents(),
+            'agents' => $this->Report_Model->Lead_Dashboard_Agents($restrict),
             'pagination' => $this->build_lead_data_pagination($filters, $currentPage, $perPage, $totalRows),
             'updated_at' => $this->Report_Model->Lead_Data_Last_Synced_At(),
             'sorting' => $this->build_lead_data_sorting($filters),
@@ -700,7 +702,13 @@ class Report extends MY_Controller
         $teamLeads = $this->normalize_id_array($this->input->get('team_lead'));
         $parsedDates = $this->parse_report_date_range($leadDate, true);
 
-        return array(
+        $restriction = $this->get_lead_dashboard_agent_restriction();
+        if ($restriction !== null && !empty($salesAgents)) {
+            $allowedSet = array_map('strval', $restriction);
+            $salesAgents = array_values(array_intersect(array_map('strval', $salesAgents), $allowedSet));
+        }
+
+        $filters = array(
             'lead_date' => $leadDate !== '' ? $leadDate : $parsedDates['display'],
             'start_date' => $parsedDates['start_date'],
             'end_date' => $parsedDates['end_date'],
@@ -708,6 +716,20 @@ class Report extends MY_Controller
             'agent_id' => $salesAgents,
             'team_lead' => $teamLeads,
         );
+
+        if ($restriction !== null) {
+            $filters['_restrict_agent_ids'] = $restriction;
+        }
+
+        return $filters;
+    }
+
+    private function get_lead_dashboard_agent_restriction()
+    {
+        if ((string) $this->session->level === '10') {
+            return null;
+        }
+        return $this->Report_Model->Get_Allowed_Lead_Dashboard_Agents($this->session->admin_id);
     }
 
     private function normalize_id_array($value)
@@ -735,7 +757,12 @@ class Report extends MY_Controller
         $conversionStatus = trim((string) $this->input->get('conversion_status'));
         $parsedDates = $this->parse_report_date_range($leadDate, false);
 
-        return array(
+        $restriction = $this->get_lead_dashboard_agent_restriction();
+        if ($restriction !== null && $agentId !== '' && !in_array($agentId, array_map('strval', $restriction), true)) {
+            $agentId = '';
+        }
+
+        $filters = array(
             'lead_date' => $leadDate,
             'start_date' => $parsedDates['start_date'],
             'end_date' => $parsedDates['end_date'],
@@ -751,6 +778,12 @@ class Report extends MY_Controller
             'sort_by' => $this->normalize_lead_data_sort_by($this->input->get('sort_by')),
             'sort_dir' => $this->normalize_lead_data_sort_dir($this->input->get('sort_dir')),
         );
+
+        if ($restriction !== null) {
+            $filters['_restrict_agent_ids'] = $restriction;
+        }
+
+        return $filters;
     }
 
     private function build_lead_data_sorting($filters)
