@@ -1057,7 +1057,23 @@ class Booking_Model extends CI_Model
 				}
 				$revert_reason = $revert_reason ? $revert_reason . '; ' . $date_change_desc : $date_change_desc;
 			}
-			
+
+			// Check if pax counts changed (Adult/Children/Infant)
+			$pax_change_desc = '';
+			foreach (['Adult', 'Children', 'Infant'] as $pax_field) {
+				if (!isset($booking_data[0][$pax_field])) continue;
+				$new_pax = intval($booking_data[0][$pax_field]);
+				$old_pax = intval(isset($current_booking->$pax_field) ? $current_booking->$pax_field : 0);
+				if ($new_pax !== $old_pax) {
+					if ($pax_change_desc) $pax_change_desc .= '; ';
+					$pax_change_desc .= $pax_field . ' changed from ' . $old_pax . ' to ' . $new_pax;
+				}
+			}
+			if ($pax_change_desc) {
+				$needs_revert = true;
+				$revert_reason = $revert_reason ? $revert_reason . '; ' . $pax_change_desc : $pax_change_desc;
+			}
+
 			// Only revert when current status is PT — TC must re-approve the Travel Voucher.
 			// For every other status, price/date edits are persisted without status change.
 			$did_revert = false;
