@@ -184,12 +184,14 @@ div.kt-datatable__pager-container {
 								<th style="text-align:center;">Gender</th>
 								<th style="text-align:center;">DOB</th>
 								<th style="text-align:center;">Type</th>
+								<th style="text-align:center;">Num of Pax</th>
+								<th style="text-align:center;">Total Sales (RM)</th>
 								<th class="action" style="text-align:center;">Action</th>
 							</tr>
 						</thead>
 						<tbody>
 							<?php if(empty($guests)) { ?>
-								<tr><td colspan="13" style="text-align:center; padding-top:10px; padding-bottom:10px;">Guest Records Not Found</td></tr>
+								<tr><td colspan="15" style="text-align:center; padding-top:10px; padding-bottom:10px;">Guest Records Not Found</td></tr>
 							<?php } else { ?>
 								<?php $count = 1; foreach($guests as $g) { ?>
 									<tr>
@@ -220,6 +222,8 @@ div.kt-datatable__pager-container {
 												<?php echo $txt; ?>
 											</span>
 										</td>
+										<td style="text-align:center;"><?php echo (int) $g->TotalPax; ?></td>
+										<td style="text-align:right;"><?php echo number_format((float) $g->TotalSales, 2); ?></td>
 										<td style="text-align:center;">
 											<?php if(!$is_ghl) { ?>
 												<a href="<?php echo base_url('Guests/View?key=') . urlencode($g->dedup_key); ?>" class="btn btn-light-primary btn-sm" data-toggle="tooltip" title="View trip history">

@@ -2034,6 +2034,100 @@ class Cron extends CI_Controller
 			->set_output(json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
 	}
 
+	/**
+	 * Background worker for campaign → GHL workflow enrolment. CLI only:
+	 *   php index.php Cron syncGhlCampaigns
+	 *
+	 * Drains pending campaign sync runs one at a time. Each run is processed
+	 * in small chunks under a per-run time budget so a single cron tick can
+	 * dispatch multiple runs and so a crash mid-chunk only loses progress for
+	 * that one chunk (the next tick reclaims via stale-ClaimedAt). Suggested
+	 * crontab: every minute.
+	 */
+	public function syncGhlCampaigns()
+	{
+		if (!$this->input->is_cli_request()) {
+			show_error('Not allowed', 403);
+			return;
+		}
+
+		$this->load->model('Campaign_Ghl_Sync_Model');
+		$this->load->library('GhlCampaignSyncService');
+
+		// Overall wall budget for one tick. Each cron invocation gets ~50s of
+		// real work; the cron runs every minute so this leaves headroom.
+		$tick_budget       = 50;
+		$per_run_budget    = 45;
+		$chunk_size        = 10;
+		$tick_started      = microtime(true);
+		$runs_handled      = 0;
+		$summary           = array();
+
+		$this->customCronLogging('[CRON] syncGhlCampaigns start');
+
+		while ((microtime(true) - $tick_started) < $tick_budget) {
+			$claimed = $this->Campaign_Ghl_Sync_Model->claim_next_pending_run();
+			if (!$claimed) {
+				if ($runs_handled === 0) {
+					$this->customCronLogging('[CRON] syncGhlCampaigns no pending runs');
+				}
+				break;
+			}
+
+			$runs_handled++;
+			$this->customCronLogging(sprintf(
+				'[CRON] syncGhlCampaigns claimed run=%s campaign=%d offset=%d/%d',
+				$claimed->RunID, (int) $claimed->CampaignID, (int) $claimed->CurrentOffset, (int) $claimed->TotalGuests
+			));
+
+			$drain = $this->ghlcampaignsyncservice->run_to_completion(
+				(int) $claimed->CampaignID,
+				(string) $claimed->RunID,
+				(int) $claimed->InsertBy,
+				$per_run_budget,
+				$chunk_size
+			);
+
+			if (!empty($drain['done'])) {
+				$final = $this->ghlcampaignsyncservice->complete_run((string) $claimed->RunID, (int) $claimed->InsertBy);
+				$this->customCronLogging(sprintf(
+					'[CRON] syncGhlCampaigns finished run=%s status=%s enrolled=%d failed=%d',
+					$claimed->RunID,
+					$final ? $final->Status : 'unknown',
+					$final ? (int) $final->EnrolledCount : 0,
+					$final ? (int) $final->FailedCount : 0
+				));
+				$summary[] = array(
+					'run_id' => (string) $claimed->RunID,
+					'done'   => true,
+				);
+			} else {
+				// Time budget hit — leave the run in 'running' state with the
+				// updated CurrentOffset so the next tick resumes from there.
+				$this->customCronLogging(sprintf(
+					'[CRON] syncGhlCampaigns yielded run=%s next_offset=%d',
+					$claimed->RunID, isset($drain['next_offset']) ? (int) $drain['next_offset'] : -1
+				));
+				$summary[] = array(
+					'run_id'      => (string) $claimed->RunID,
+					'done'        => false,
+					'next_offset' => isset($drain['next_offset']) ? (int) $drain['next_offset'] : null,
+				);
+				break; // Don't claim another run when this one didn't finish.
+			}
+		}
+
+		$this->customCronLogging('[CRON] syncGhlCampaigns end runs_handled=' . $runs_handled);
+
+		$this->output
+			->set_content_type('application/json')
+			->set_output(json_encode(array(
+				'ok'           => true,
+				'runs_handled' => $runs_handled,
+				'runs'         => $summary,
+			), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+	}
+
 	public function AddCustomerFromAutoCount()
 	{
 		$this->load->helper('autocount');

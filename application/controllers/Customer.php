@@ -240,6 +240,27 @@ class Customer extends MY_Controller
 		echo json_encode($this->db->get('customer')->result());
 	}
 
+	public function check_duplicate()
+	{
+		$name  = trim((string)$this->input->get('name'));
+		$phone = trim((string)$this->input->get('phone'));
+
+		if ($name === '' || $phone === '') {
+			echo json_encode([]);
+			return;
+		}
+
+		// LOWER() comparison is explicit so the match does not depend on the
+		// column's collation. Both sides are bound parameters via escape().
+		$this->db->select('CustomerID, name, phone_number, CustomerCode');
+		$this->db->where('Status', 'Y');
+		$this->db->where('LOWER(name) = ' . $this->db->escape(strtolower($name)), null, false);
+		$this->db->where('phone_number', $phone);
+		$this->db->limit(5);
+
+		echo json_encode($this->db->get('customer')->result());
+	}
+
 	/**
 	 * Generate customer portal URL
 	 * 

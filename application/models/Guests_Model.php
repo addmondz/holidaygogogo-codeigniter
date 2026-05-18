@@ -133,6 +133,8 @@ SELECT
 	CONVERT(MAX(CASE WHEN rn = 1 THEN Nationality    END) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Nationality,
 	CONVERT(MAX(CASE WHEN rn = 1 THEN Gender         END) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Gender,
 	MAX(CASE WHEN rn = 1 THEN DateOfBirth END) AS DOB,
+	COALESCE(SUM(CASE WHEN booking_rn = 1 THEN BookingPax      END), 0) AS TotalPax,
+	COALESCE(SUM(CASE WHEN booking_rn = 1 THEN BookingNetTotal END), 0) AS TotalSales,
 	CAST('Booking Guest' AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS Type
 FROM (
 	SELECT
@@ -147,10 +149,16 @@ FROM (
 		cn.Country       AS Nationality,
 		gl.Gender,
 		gl.DateOfBirth,
+		(COALESCE(b.Adult, 0) + COALESCE(b.Children, 0) + COALESCE(b.Infant, 0)) AS BookingPax,
+		COALESCE(b.NetTotal, 0) AS BookingNetTotal,
 		ROW_NUMBER() OVER (
 			PARTITION BY {$dedup}
 			ORDER BY b.InsertDate DESC, b.BookingID DESC
-		) AS rn
+		) AS rn,
+		ROW_NUMBER() OVER (
+			PARTITION BY {$dedup}, b.BookingID
+			ORDER BY gl.GuestListID
+		) AS booking_rn
 	FROM booking b
 	JOIN guest_list gl ON gl.BookingID = b.BookingID AND gl.Status = 'Y'
 	LEFT JOIN customer     c  ON c.CustomerID    = b.CustomerID
@@ -188,6 +196,8 @@ SELECT
 	NULL AS Nationality,
 	NULL AS Gender,
 	NULL AS DOB,
+	0    AS TotalPax,
+	0    AS TotalSales,
 	CAST('GHL' AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS Type
 FROM ghl_contacts gc
 LEFT JOIN (

@@ -364,7 +364,7 @@ class Booking_Model extends CI_Model
 	function Read_Bookings_With_Guest_Lists($group_by_booking_id)
 	{
 		if($group_by_booking_id == 'Y') {
-			$this->db->select('booking.BookingID, BookingNumber, ReservationNumber, DepositDeadline, FullPaymentDeadline, Customer, booking.Mobile As CustomerMobile, StartDate, EndDate, Adult, Children, Infant, BookingRemark, Subtotal, Discount, NetTotal, ChatLanguage, CancelStatus, booking.PartialRefund, LockStatus, booking.is_submitted, AfterSalesService, booking.Status, booking.InsertDate, ANY_VALUE(guest_list.CountryCodeID) As GuestCountryCode, ANY_VALUE(Type) As Type, ANY_VALUE(guest_list.Name) As GuestName, ANY_VALUE(guest_list.Gender) As Gender, ANY_VALUE(DateOfBirth) As DateOfBirth, ANY_VALUE(Nationality) As Nationality, ANY_VALUE(guest_list.IdentificationNumber) As IdentificationNumber, ANY_VALUE(guest_list.PassportNumber) As PassportNumber, ANY_VALUE(guest_list.Mobile) As GuestMobile, ANY_VALUE(guest_list.Email) As Email, ANY_VALUE(MaritalStatus) As MaritalStatus, ANY_VALUE(Employment) As Employment, ANY_VALUE(Address) As Address, ANY_VALUE(Postcode) As Postcode, ANY_VALUE(guest_list.City) As City, ANY_VALUE(guest_list.State) As State, ANY_VALUE(guest_list.Country) As Country, ANY_VALUE(Nominee) As Nominee, ANY_VALUE(NomineeIdentificationNumber) As NomineeIdentificationNumber, ANY_VALUE(Relationship) As Relationship, admin.Name As SalesAgentName, category.Name As DestinationName, CountryCode, source.Name As SourceName', FALSE);
+			$this->db->select('booking.BookingID, BookingNumber, ReservationNumber, DepositDeadline, FullPaymentDeadline, Customer, booking.Mobile As CustomerMobile, StartDate, EndDate, Adult, Children, Infant, BookingRemark, Subtotal, Discount, NetTotal, ChatLanguage, CancelStatus, booking.PartialRefund, LockStatus, booking.is_submitted, AfterSalesService, booking.Status, booking.InsertDate, MAX(guest_list.CountryCodeID) As GuestCountryCode, MAX(Type) As Type, MAX(guest_list.Name) As GuestName, MAX(guest_list.Gender) As Gender, MAX(DateOfBirth) As DateOfBirth, MAX(Nationality) As Nationality, MAX(guest_list.IdentificationNumber) As IdentificationNumber, MAX(guest_list.PassportNumber) As PassportNumber, MAX(guest_list.Mobile) As GuestMobile, MAX(guest_list.Email) As Email, MAX(MaritalStatus) As MaritalStatus, MAX(Employment) As Employment, MAX(Address) As Address, MAX(Postcode) As Postcode, MAX(guest_list.City) As City, MAX(guest_list.State) As State, MAX(guest_list.Country) As Country, MAX(Nominee) As Nominee, MAX(NomineeIdentificationNumber) As NomineeIdentificationNumber, MAX(Relationship) As Relationship, admin.Name As SalesAgentName, category.Name As DestinationName, CountryCode, source.Name As SourceName', FALSE);
 		} else {
 			$this->db->select('booking.BookingID, BookingNumber, ReservationNumber, DepositDeadline, FullPaymentDeadline, Customer, booking.Mobile As CustomerMobile, StartDate, EndDate, Adult, Children, Infant, BookingRemark, Subtotal, Discount, NetTotal, ChatLanguage, CancelStatus, booking.PartialRefund, LockStatus, booking.is_submitted, AfterSalesService, booking.Status, booking.InsertDate, guest_list.CountryCodeID As GuestCountryCode, Type, guest_list.Name As GuestName, guest_list.Gender, DateOfBirth, Nationality, guest_list.IdentificationNumber, guest_list.PassportNumber, guest_list.Mobile As GuestMobile, guest_list.Email, MaritalStatus, Employment, Address, Postcode, guest_list.City, guest_list.State, guest_list.Country, Nominee, NomineeIdentificationNumber, Relationship, admin.Name As SalesAgentName, category.Name As DestinationName, CountryCode, source.Name As SourceName');
 		}
@@ -1074,22 +1074,29 @@ class Booking_Model extends CI_Model
 				$revert_reason = $revert_reason ? $revert_reason . '; ' . $pax_change_desc : $pax_change_desc;
 			}
 
-			// Only revert when current status is PT — TC must re-approve the Travel Voucher.
-			// For every other status, price/date edits are persisted without status change.
+			// Revert to PBC whenever BC has already approved and a material field changed.
+			// BC must re-approve from scratch; the booking re-walks PBC -> P -> PBO -> PTV -> PT,
+			// so TC re-approval falls out naturally when status reaches PTV again.
+			$cancel = isset($current_booking->CancelStatus) ? $current_booking->CancelStatus : null;
+			$bc_already_approved = intval(isset($current_booking->bc_approved) ? $current_booking->bc_approved : 0) === 1;
+			$is_cancelled = ($cancel === 'Y' || $cancel === 'C');
 			$did_revert = false;
-			if ($needs_revert && $current_booking->Status === 'PT') {
+			if ($needs_revert && $bc_already_approved && !$is_cancelled) {
 				$this->load->model('Booking_Status_Log_Model');
 				$this->load->helper('booking_status_log');
 				$admin_id = $this->session->userdata('admin_id') ?: 0;
 
-				$booking_data[0]['Status'] = 'PTV';
+				$booking_data[0]['Status'] = 'PBC';
+				$booking_data[0]['bc_approved'] = 0;
+				$booking_data[0]['bc_approval_admin_id'] = null;
+				$booking_data[0]['bc_approval_date'] = null;
 
 				log_booking_status_change(
 					$booking_id,
-					'PTV',
+					'PBC',
 					$current_booking->Status,
 					$admin_id,
-					'Status reverted to PENDING TRAVEL VOUCHER - TC must re-approve voucher: ' . $revert_reason,
+					'Status reverted to PENDING BC CONFIRMATION - BC must re-approve booking: ' . $revert_reason,
 					true
 				);
 				$did_revert = true;
@@ -1448,6 +1455,57 @@ class Booking_Model extends CI_Model
 			$created_by = !empty($this->session->userdata('admin_id')) ? $this->session->userdata('admin_id') : 0;
 			log_booking_status_update($booking_id, $current_status, $status, $created_by, null, true);
 		}
+	}
+
+	/**
+	 * Revert booking to PBC when its product list changes after BC approval.
+	 * Idempotent: no-op if BC has not yet approved, or booking is cancelled.
+	 * Called from the controller after booking_product rows are written, so
+	 * quantity-only / $0-product edits that leave NetTotal untouched still
+	 * force BC re-approval.
+	 */
+	function Revert_To_PBC_For_Product_Change($booking_id)
+	{
+		$this->db->select('Status, bc_approved, Token, CancelStatus');
+		$this->db->where('BookingID', $booking_id);
+		$row = $this->db->get('booking')->row();
+
+		if (!$row) return false;
+		if (intval($row->bc_approved) !== 1) return false;
+		if ($row->CancelStatus === 'Y' || $row->CancelStatus === 'C') return false;
+
+		$admin_id = $this->session->userdata('admin_id') ?: 0;
+		$old_status = $row->Status;
+
+		$this->db->where('BookingID', $booking_id);
+		$this->db->update('booking', array(
+			'Status' => 'PBC',
+			'bc_approved' => 0,
+			'bc_approval_admin_id' => null,
+			'bc_approval_date' => null,
+			'UpdateBy' => $this->session->userdata('admin_id'),
+			'UpdateDate' => date('Y-m-d H:i:s'),
+		));
+
+		$this->load->helper('booking_status_log');
+		log_booking_status_change(
+			$booking_id,
+			'PBC',
+			$old_status,
+			$admin_id,
+			'Status reverted to PENDING BC CONFIRMATION - BC must re-approve booking: Booking products changed',
+			true
+		);
+
+		if (!empty($row->Token)) {
+			try {
+				$this->generate_booking_snapshot($row->Token, $booking_id);
+			} catch (\Throwable $e) {
+				log_message('error', 'Failed to generate booking snapshot for BookingID ' . $booking_id . ': ' . $e->getMessage());
+			}
+		}
+
+		return true;
 	}
 
 	function Update_BC_Approval($booking_id, $bc_approved, $admin_id = null)

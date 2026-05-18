@@ -22,7 +22,6 @@ class Customer_Portal extends CI_Controller
         $this->load->helper('utils');
         $this->load->helper('booking_flow');
         $this->load->library('session');
-        $this->config->load('features');
     }
 
     /**

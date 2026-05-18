@@ -1275,6 +1275,12 @@ class Booking extends MY_Controller
 				}
 				$products_changed = booking_products_have_changes($products_create, $products_update, $products_delete);
 
+				if ($products_changed) {
+					$this->Booking_Model->Revert_To_PBC_For_Product_Change(
+						$this->input->post('booking_id')
+					);
+				}
+
 				if ($travel_date_changed || $products_changed) {
 					$change_summary = build_booking_update_notification_summary(
 						$log_rows, $products_create, $products_update, $products_delete
