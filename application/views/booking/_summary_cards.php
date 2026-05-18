@@ -94,14 +94,14 @@
                 </a>
             </div>
             <div class="col-md-3">
-                <a class="summary-card" id="sc-upcoming-travel-pt-link" href="#">
+                <a class="summary-card" id="sc-upcoming-not-ready-link" href="#">
                     <div class="card card-custom">
                         <div class="card-header border-0 summary-card-header" style="background-color:#FFFAA030;">
-                            <h3>Travel in 7 Days – Pending Travel</h3>
+                            <h3>Travel in 7 Days – Not Yet Ready</h3>
                         </div>
                         <div class="card-body summary-card-body">
-                            <div class="summary-value" id="sc-upcoming-travel-pt-count">...</div>
-                            <div class="summary-sub">Your BCs starting travel within 7 days but still flagged "Pending Travel". Click to view and confirm readiness.</div>
+                            <div class="summary-value" id="sc-upcoming-not-ready-count">...</div>
+                            <div class="summary-sub">Your BCs starting travel within 7 days that are still upstream (Payment / Booking Op / Guest List / Travel Voucher) and not yet flagged "Pending Travel". Click to chase readiness.</div>
                         </div>
                     </div>
                 </a>
@@ -365,11 +365,13 @@ $(function() {
             setText('sc-payment-overdue-count', c.payment_overdue.count);
             setLink('sc-payment-overdue-link', c.payment_overdue.link);
         }
+        if(c.upcoming_travel_not_ready) {
+            setText('sc-upcoming-not-ready-count', c.upcoming_travel_not_ready.count);
+            setLink('sc-upcoming-not-ready-link',  c.upcoming_travel_not_ready.link);
+        }
         if(c.upcoming_travel_pt) {
-            setText('sc-upcoming-travel-pt-count', c.upcoming_travel_pt.count);
-            setLink('sc-upcoming-travel-pt-link', c.upcoming_travel_pt.link);
             setText('sc-upcoming-travel-pt-op-count', c.upcoming_travel_pt.count);
-            setLink('sc-upcoming-travel-pt-op-link', c.upcoming_travel_pt.link);
+            setLink('sc-upcoming-travel-pt-op-link',  c.upcoming_travel_pt.link);
         }
 
         // TC LEAD / OP / Owner BC week+month

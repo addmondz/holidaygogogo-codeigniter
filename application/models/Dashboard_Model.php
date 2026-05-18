@@ -192,18 +192,12 @@ class Dashboard_Model extends CI_Model
 
 		$this->db->join('category', 'category.CategoryID = booking.Destination', 'left');
 
-		// Use custom date range if provided, otherwise default to next 7 days
-		if ($start_date && $end_date) {
-			$this->db->where('StartDate >=', $start_date);
-			$this->db->where('StartDate <=', $end_date);
-		} elseif ($start_date) {
-			$this->db->where('StartDate >=', $start_date);
-		} elseif ($end_date) {
-			$this->db->where('StartDate <=', $end_date);
-		} else {
-			$this->db->where('StartDate >=', date('Y-m-d', strtotime('+ 1 day')));
-			$this->db->where('StartDate <=', date('Y-m-d', strtotime('+ 7 days')));
-		}
+		// Overlap window: include any booking whose travel dates intersect the range.
+		// Defaults to today..+7 days so ongoing trips ending in the window are counted.
+		$range_start = $start_date ?: date('Y-m-d');
+		$range_end   = $end_date   ?: date('Y-m-d', strtotime('+ 7 days'));
+		$this->db->where('StartDate <=', $range_end);
+		$this->db->where('EndDate >=', $range_start);
 
 		$this->db->where('SalesAgent', $this->session->admin_id);
 
@@ -211,7 +205,7 @@ class Dashboard_Model extends CI_Model
 
 		$this->db->where('CancelStatus', 'N');
 
-		$this->db->where_in('booking.Status', ['PTV', 'PBO']);
+		$this->db->where_in('booking.Status', ['PTV', 'PBO', 'PT', 'OG']);
 
 		$this->db->order_by('StartDate', 'ASC');
 
@@ -776,24 +770,18 @@ class Dashboard_Model extends CI_Model
 
 		$this->db->join('category', 'category.CategoryID = booking.Destination', 'left');
 
-		// Use custom date range if provided, otherwise default to next 7 days
-		if ($start_date && $end_date) {
-			$this->db->where('StartDate >=', $start_date);
-			$this->db->where('StartDate <=', $end_date);
-		} elseif ($start_date) {
-			$this->db->where('StartDate >=', $start_date);
-		} elseif ($end_date) {
-			$this->db->where('StartDate <=', $end_date);
-		} else {
-			$this->db->where('StartDate >=', date('Y-m-d', strtotime('+ 1 day')));
-			$this->db->where('StartDate <=', date('Y-m-d', strtotime('+ 7 days')));
-		}
+		// Overlap window: include any booking whose travel dates intersect the range.
+		// Defaults to today..+7 days so ongoing trips ending in the window are counted.
+		$range_start = $start_date ?: date('Y-m-d');
+		$range_end   = $end_date   ?: date('Y-m-d', strtotime('+ 7 days'));
+		$this->db->where('StartDate <=', $range_end);
+		$this->db->where('EndDate >=', $range_start);
 
 		$this->db->where('BookingConfirmationTitle', 'BOOKING CONFIRMATION');
 
 		$this->db->where('CancelStatus', 'N');
 
-		$this->db->where_in('booking.Status', ['PTV', 'PBO']);
+		$this->db->where_in('booking.Status', ['PTV', 'PBO', 'PT', 'OG']);
 
 		$this->db->order_by('SalesAgent', 'ASC');
 

@@ -267,6 +267,11 @@ class Booking_Model extends CI_Model
 				}
 				$level2Ignore = 1;
 			}
+			if(!empty($this->input->get('upcoming_not_ready'))) {
+				$this->db->where('CancelStatus', 'N');
+				$this->db->where_in('booking.Status', array('P','PBO','PGL','PTV'));
+				$level2Ignore = 1;
+			}
 			if(!empty($this->input->get('status'))) {
 				if($this->input->get('status') == 'A') {
 					$this->db->where('CancelStatus', 'N');

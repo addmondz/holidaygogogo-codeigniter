@@ -99,13 +99,13 @@
                                             $start_date = $this->input->get('start_date');
                                             $end_date = $this->input->get('end_date');
                                             if ($start_date && $end_date) {
-                                                echo 'Pending Travel Voucher / Operation: ' . date('j M', strtotime($start_date)) . ' - ' . date('j M Y', strtotime($end_date));
+                                                echo 'Travels (Upcoming / Ongoing): ' . date('j M', strtotime($start_date)) . ' - ' . date('j M Y', strtotime($end_date));
                                             } elseif ($start_date) {
-                                                echo 'Pending Travel Voucher / Operation From: ' . date('j M Y', strtotime($start_date));
+                                                echo 'Travels (Upcoming / Ongoing) From: ' . date('j M Y', strtotime($start_date));
                                             } elseif ($end_date) {
-                                                echo 'Pending Travel Voucher / Operation Until: ' . date('j M Y', strtotime($end_date));
+                                                echo 'Travels (Upcoming / Ongoing) Until: ' . date('j M Y', strtotime($end_date));
                                             } else {
-                                                echo 'Upcoming Travel In 7 Days - Pending Travel Voucher / Operation';
+                                                echo 'Travels In Next 7 Days (Upcoming / Ongoing)';
                                             }
                                         ?>
                                     </h3>
@@ -481,13 +481,13 @@
                                             $start_date = $this->input->get('start_date');
                                             $end_date = $this->input->get('end_date');
                                             if ($start_date && $end_date) {
-                                                echo 'Pending Travel Voucher / Operation: ' . date('j M', strtotime($start_date)) . ' - ' . date('j M Y', strtotime($end_date));
+                                                echo 'Travels (Upcoming / Ongoing): ' . date('j M', strtotime($start_date)) . ' - ' . date('j M Y', strtotime($end_date));
                                             } elseif ($start_date) {
-                                                echo 'Pending Travel Voucher / Operation From: ' . date('j M Y', strtotime($start_date));
+                                                echo 'Travels (Upcoming / Ongoing) From: ' . date('j M Y', strtotime($start_date));
                                             } elseif ($end_date) {
-                                                echo 'Pending Travel Voucher / Operation Until: ' . date('j M Y', strtotime($end_date));
+                                                echo 'Travels (Upcoming / Ongoing) Until: ' . date('j M Y', strtotime($end_date));
                                             } else {
-                                                echo 'Upcoming Travel In 7 Days - Pending Travel Voucher / Operation';
+                                                echo 'Travels In Next 7 Days (Upcoming / Ongoing)';
                                             }
                                         ?>
                                     </h3>

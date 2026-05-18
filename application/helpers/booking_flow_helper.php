@@ -954,6 +954,26 @@ if (!function_exists('is_sa_acting_as_tc2')) {
     }
 }
 
+if (!function_exists('is_upcoming_travel_not_ready')) {
+    /**
+     * Whether a booking should appear in the TC "Travel in 7 Days – Not Yet
+     * Ready" dashboard card: travel starts inside the window but the booking
+     * is still upstream of PT (PENDING TRAVEL). PT itself is the target state,
+     * so it's excluded. Window boundaries are inclusive — matches the SQL
+     * BETWEEN used by the count query in Booking::ajax_summary_cards.
+     */
+    function is_upcoming_travel_not_ready($status, $cancelStatus, $startDate, $window_start, $window_end)
+    {
+        if ($cancelStatus !== 'N') {
+            return false;
+        }
+        if (!in_array($status, array('P', 'PBO', 'PGL', 'PTV'), true)) {
+            return false;
+        }
+        return ($startDate >= $window_start && $startDate <= $window_end);
+    }
+}
+
 if (!function_exists('can_user_modify_booking_checklist')) {
     /**
      * Mirrors Notification_Model::_apply_visibility_filter scoping so that the
