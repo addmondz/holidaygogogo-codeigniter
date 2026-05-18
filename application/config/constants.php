@@ -87,6 +87,10 @@ defined('EXIT__AUTO_MAX')      or define('EXIT__AUTO_MAX', 125); // highest auto
 //Admin
 defined('GENDER')              or define('GENDER', serialize(array('F' => 'FEMALE', 'M' => 'MALE')));
 defined('LEVEL')               or define('LEVEL', serialize(array(10 => 'OWNER', 20 => 'SALES AGENT', 25 => 'TEAM LEAD', 30 => 'FINANCE', 40 => 'OP', 50 => 'TC')));
+
+// Bookings created on/after this date credit a lead-to-booking conversion to TC2
+// (booking.SalesAgent2); earlier bookings stay with TC1 (booking.SalesAgent).
+defined('LEAD_CONVERSION_TC2_CUTOFF_DATE') or define('LEAD_CONVERSION_TC2_CUTOFF_DATE', '2026-06-01');
 defined('ADMIN_STATUS')        or define('ADMIN_STATUS', serialize(array('Y' => 'ACTIVE', 'D' => 'DEACTIVATED')));
 defined('ACCESS_CONTROL')      or define('ACCESS_CONTROL', serialize(array('GB' => 'GENERATE BOOKING', 'VB' => 'VIEW BOOKING', 'AB' => 'AMEND BOOKING', 'RB' => 'REMOVE BOOKING', 'GP' => 'GENERATE PAYMENT', 'VP' => 'VIEW PAYMENT', 'AP' => 'AMEND PAYMENT', 'RP' => 'REMOVE PAYMENT', 'VR' => 'VIEW REPORT')));
 

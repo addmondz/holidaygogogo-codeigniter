@@ -506,9 +506,11 @@ class Report_Model extends CI_Model
 
     function Lead_Dashboard_Summary($filters = array())
     {
+        $this->load->helper('lead_conversion_credit');
         $where = $this->build_lead_dashboard_where_clause($filters);
 
         $extraJoins = isset($where['extra_joins']) ? $where['extra_joins'] : '';
+        $creditFragment = lead_conversion_credit_sql_fragment();
         $sql = "
             SELECT
                 COUNT(*) AS total_leads,
@@ -517,7 +519,7 @@ class Report_Model extends CI_Model
                 AVG(pl.avg_recent_5_response_seconds) AS avg_recent_response_time_seconds,
                 AVG(pl.responded_message_count) AS avg_responded_messages,
                 AVG(pl.recent_responded_message_count) AS avg_recent_responded_messages,
-                SUM(CASE WHEN pl.is_converted = 1 THEN 1 ELSE 0 END) AS converted_leads,
+                SUM(CASE WHEN pl.is_converted = 1 AND pl.booking_id IS NOT NULL AND {$creditFragment} THEN 1 ELSE 0 END) AS converted_leads,
                 COUNT(DISTINCT NULLIF(pl.assigned_to_user_id, '')) AS active_agents
             FROM ghl_processed_leads pl
             LEFT JOIN ghl_conversations gc ON gc.conversation_id = pl.conversation_id
@@ -558,6 +560,7 @@ class Report_Model extends CI_Model
 
     function Lead_Dashboard_By_Agent($filters = array())
     {
+        $this->load->helper('lead_conversion_credit');
         $where = $this->build_lead_dashboard_where_clause($filters);
         $clauses = array();
 
@@ -569,6 +572,7 @@ class Report_Model extends CI_Model
         $agentWhereSql = !empty($clauses) ? 'WHERE ' . implode(' AND ', $clauses) : '';
 
         $extraJoins = isset($where['extra_joins']) ? $where['extra_joins'] : '';
+        $creditFragment = lead_conversion_credit_sql_fragment();
         $sql = "
             SELECT
                 COALESCE(NULLIF(pl.assigned_to_user_id, ''), '__unassigned__') AS agent_id,
@@ -579,7 +583,7 @@ class Report_Model extends CI_Model
                 AVG(pl.avg_recent_5_response_seconds) AS avg_recent_response_time_seconds,
                 AVG(pl.responded_message_count) AS avg_responded_messages,
                 AVG(pl.recent_responded_message_count) AS avg_recent_responded_messages,
-                SUM(CASE WHEN pl.is_converted = 1 THEN 1 ELSE 0 END) AS converted_leads,
+                SUM(CASE WHEN pl.is_converted = 1 AND pl.booking_id IS NOT NULL AND {$creditFragment} THEN 1 ELSE 0 END) AS converted_leads,
                 MAX(pl.updated_at) AS last_updated_at
             FROM ghl_processed_leads pl
             LEFT JOIN ghl_conversations gc ON gc.conversation_id = pl.conversation_id
@@ -1079,6 +1083,8 @@ class Report_Model extends CI_Model
         }
 
         if (isset($filters['conversion_status']) && $filters['conversion_status'] !== '') {
+            // Row-level fact: did this lead become a booking? Independent of the
+            // TC1/TC2 credit rule applied to per-TC conversion-rate aggregates.
             if ($filters['conversion_status'] === 'converted') {
                 $clauses[] = 'pl.is_converted = 1';
             } elseif ($filters['conversion_status'] === 'open') {
