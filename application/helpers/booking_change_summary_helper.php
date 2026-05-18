@@ -151,11 +151,27 @@ if (!function_exists('_bcs_meaningful_update_keys')) {
     }
 }
 
+if (!function_exists('_bcs_operational_only_keys')) {
+    /**
+     * booking_product keys that are internal ops state, not customer-facing
+     * booking terms. A row touching only these keys must not count as a real
+     * product change (otherwise it would force BC re-approval).
+     */
+    function _bcs_operational_only_keys()
+    {
+        return [
+            'disable_checklist_payment_out',
+            'PaymentOutSupplierFull',
+            'PaymentOutSupplierDeposit',
+        ];
+    }
+}
+
 if (!function_exists('booking_products_have_changes')) {
     /**
      * True if any booking_products POST array represents a real change.
-     * Mirrors the sweep-row rule in build_booking_change_summary() so the
-     * notification trigger and message formatting cannot drift apart.
+     * Mirrors the operational-only rule in build_booking_change_summary() so
+     * the notification trigger and message formatting cannot drift apart.
      */
     function booking_products_have_changes($products_create, $products_update, $products_delete)
     {
@@ -166,10 +182,11 @@ if (!function_exists('booking_products_have_changes')) {
             return true;
         }
         if (is_array($products_update) && !empty($products_update)) {
+            $operational_only = _bcs_operational_only_keys();
             foreach ($products_update as $row) {
                 $arr = is_object($row) ? get_object_vars($row) : (array)$row;
                 $keys = _bcs_meaningful_update_keys($arr);
-                if (empty($keys) || $keys === ['disable_checklist_payment_out']) {
+                if (empty($keys) || empty(array_diff($keys, $operational_only))) {
                     continue;
                 }
                 return true;
@@ -271,14 +288,16 @@ if (!function_exists('build_booking_change_summary')) {
 
         // Products updated. The client posts ONE row per dirty field, plus a sweep
         // row carrying disable_checklist_payment_out for every existing product on
-        // every save (booking.php:3315-3319). Skip rows whose only meaningful key
-        // is that sweep field, then dedupe by BookingProductID.
+        // every save (booking.php:3315-3319). Skip rows whose meaningful keys are
+        // entirely operational-only (sweep field or supplier payout deadlines —
+        // see _bcs_operational_only_keys()), then dedupe by BookingProductID.
         $update_ids = [];
         if (is_array($products_update) && !empty($products_update)) {
+            $operational_only = _bcs_operational_only_keys();
             foreach ($products_update as $row) {
                 $arr = is_object($row) ? get_object_vars($row) : (array)$row;
                 $keys = _bcs_meaningful_update_keys($arr);
-                if ($keys === ['disable_checklist_payment_out'] || empty($keys)) {
+                if (empty($keys) || empty(array_diff($keys, $operational_only))) {
                     continue;
                 }
                 if (!empty($arr['BookingProductID'])) {

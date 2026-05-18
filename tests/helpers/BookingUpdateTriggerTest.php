@@ -47,6 +47,27 @@ $assertions['update mixed sweep + real -> true'] =
         ['BookingProductID' => 8, 'Price' => 100],
     ], []) === true;
 
+$assertions['update PaymentOutSupplierFull-only -> false'] =
+    booking_products_have_changes([], [
+        ['BookingProductID' => 7, 'PaymentOutSupplierFull' => '2026-06-01'],
+    ], []) === false;
+
+$assertions['update PaymentOutSupplierDeposit-only -> false'] =
+    booking_products_have_changes([], [
+        ['BookingProductID' => 7, 'PaymentOutSupplierDeposit' => '2026-05-15'],
+    ], []) === false;
+
+$assertions['update PaymentOutSupplierFull + Quantity same row -> true'] =
+    booking_products_have_changes([], [
+        ['BookingProductID' => 7, 'PaymentOutSupplierFull' => '2026-06-01', 'Quantity' => 3],
+    ], []) === true;
+
+$assertions['update PaymentOutSupplierFull row + separate Price row -> true'] =
+    booking_products_have_changes([], [
+        ['BookingProductID' => 7, 'PaymentOutSupplierFull' => '2026-06-01'],
+        ['BookingProductID' => 8, 'Price' => 250],
+    ], []) === true;
+
 // --- build_booking_update_notification_summary() --------------------------
 
 $start_only = build_booking_update_notification_summary(
