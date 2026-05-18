@@ -851,13 +851,17 @@ class Booking extends MY_Controller
 			$row = $this->db->query(
 				"SELECT COUNT(*) AS cnt FROM booking
 				 WHERE BookingConfirmationTitle='BOOKING CONFIRMATION'
-				   AND CancelStatus='N' AND Status='PT'
+				   AND CancelStatus='N'
+				   AND Status IN ('P','PBO','PGL','PTV')
 				   AND StartDate BETWEEN ? AND ?",
 				array($next7_start, $next7_end)
 			)->row();
-			$cards['upcoming_travel_pt'] = array(
+			$cards['upcoming_travel_not_ready_op'] = array(
 				'count' => (int)$row->cnt,
-				'link'  => $base . $qs(array('status' => 'PT', 'travel_date' => $fmt_dmy($next7_start) . ' - ' . $fmt_dmy($next7_end))),
+				'link'  => $base . $qs(array(
+					'upcoming_not_ready' => 1,
+					'travel_date'        => $fmt_dmy($next7_start) . ' - ' . $fmt_dmy($next7_end),
+				)),
 			);
 
 			$row = $this->db->query(
