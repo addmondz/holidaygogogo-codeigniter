@@ -682,10 +682,17 @@ class Booking extends MY_Controller
 		$is_owner   = ($level == 10);
 
 		// ---------- TC / TC2 (own bookings) ----------
+		// Credited-slot rule: a booking counts for this TC only when they hold
+		// the credited slot for InsertDate (TC1 pre-2026-06-01, TC2 on/after).
+		// Mirrors lead_conversion_credit_sql_fragment() so summary cards agree
+		// with the Lead Dashboard's converted-leads attribution.
 		if($is_tc) {
+			$this->load->helper('lead_conversion_credit');
+			$credit_clause = lead_conversion_credit_booking_clause();
+
 			$row = $this->db->query(
 				"SELECT COUNT(*) AS cnt FROM booking
-				 WHERE (SalesAgent=? OR SalesAgent2=?)
+				 WHERE {$credit_clause}
 				   AND BookingConfirmationTitle='BOOKING CONFIRMATION'
 				   AND CancelStatus='N' AND Status!='N'
 				   AND CAST(InsertDate AS DATE) BETWEEN ? AND ?",
@@ -698,7 +705,7 @@ class Booking extends MY_Controller
 
 			$row = $this->db->query(
 				"SELECT COALESCE(SUM(NetTotal),0) AS total FROM booking
-				 WHERE (SalesAgent=? OR SalesAgent2=?)
+				 WHERE {$credit_clause}
 				   AND BookingConfirmationTitle='BOOKING CONFIRMATION'
 				   AND CancelStatus='N' AND Status!='N'
 				   AND CAST(InsertDate AS DATE) BETWEEN ? AND ?",
@@ -710,7 +717,7 @@ class Booking extends MY_Controller
 				"SELECT COUNT(*) AS total,
 				        SUM(CASE WHEN CancelStatus='Y' THEN 1 ELSE 0 END) AS cancelled
 				 FROM booking
-				 WHERE (SalesAgent=? OR SalesAgent2=?)
+				 WHERE {$credit_clause}
 				   AND BookingConfirmationTitle='BOOKING CONFIRMATION'
 				   AND Status!='N'
 				   AND CAST(InsertDate AS DATE) BETWEEN ? AND ?",
@@ -725,7 +732,7 @@ class Booking extends MY_Controller
 
 			$row = $this->db->query(
 				"SELECT COUNT(*) AS cnt FROM booking
-				 WHERE (SalesAgent=? OR SalesAgent2=?)
+				 WHERE {$credit_clause}
 				   AND BookingConfirmationTitle='BOOKING CONFIRMATION'
 				   AND CancelStatus='N'
 				   AND (
@@ -741,7 +748,7 @@ class Booking extends MY_Controller
 
 			$row = $this->db->query(
 				"SELECT COUNT(*) AS cnt FROM booking
-				 WHERE (SalesAgent=? OR SalesAgent2=?)
+				 WHERE {$credit_clause}
 				   AND BookingConfirmationTitle='BOOKING CONFIRMATION'
 				   AND CancelStatus='N'
 				   AND Status IN ('P','PBO','PGL','PTV')

@@ -64,3 +64,25 @@ function lead_conversion_credit_sql_fragment()
           )
     )";
 }
+
+/**
+ * WHERE-clause fragment for filtering `booking` rows down to the ones credited
+ * to a specific admin under the TC1/TC2 cutoff rule. Returns two `?`
+ * placeholders that the caller must bind to the same admin_id (in order). Use
+ * unqualified column names — intended for queries with FROM booking and no
+ * conflicting joins.
+ *
+ * Pre-cutoff (InsertDate < 2026-06-01): the admin must hold SalesAgent (TC1).
+ * On/after cutoff: the admin must hold SalesAgent2 (TC2). Mirrors the
+ * attribution used by lead_conversion_credit_sql_fragment() so the booking
+ * summary cards agree with the Lead Dashboard.
+ */
+function lead_conversion_credit_booking_clause()
+{
+    $cutoff = LEAD_CONVERSION_TC2_CUTOFF_DATE;
+    return "(
+        (booking.InsertDate <  '{$cutoff}' AND booking.SalesAgent  = ?)
+        OR
+        (booking.InsertDate >= '{$cutoff}' AND booking.SalesAgent2 = ?)
+    )";
+}

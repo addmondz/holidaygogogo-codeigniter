@@ -54,7 +54,7 @@
                     <div class="card card-custom">
                         <div class="card-header border-0 summary-card-header" style="background-color:#A7C7E730;">
                             <h3>BC Created (Month)</h3>
-                            <i class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>Formula:</strong> Total count of confirmations you created this month.<br><br><strong>Counted when:</strong><ul><li>You are the primary or secondary sales person on the BC</li><li>It's a booking confirmation (not a quotation)</li><li>Not cancelled, not draft</li><li>Created date is in this month</li></ul>"></i>
+                            <i class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>Formula:</strong> Total count of confirmations credited to you this month.<br><br><strong>Counted when you hold the credited sales slot for the BC:</strong><ul><li>BCs created before 1 Jun 2026: you are the primary sales person (TC1)</li><li>BCs created from 1 Jun 2026: you are the secondary sales person (TC2)</li><li>It's a booking confirmation (not a quotation)</li><li>Not cancelled, not draft</li><li>Created date is in this month</li></ul>"></i>
                         </div>
                         <div class="card-body summary-card-body">
                             <div class="summary-value" id="sc-bc-month-count">...</div>
