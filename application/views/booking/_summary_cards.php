@@ -14,8 +14,14 @@
     #booking_summary_cards a.summary-card .card { transition: box-shadow 0.15s ease, transform 0.15s ease; cursor:pointer; }
     #booking_summary_cards a.summary-card:hover .card { box-shadow: 0 4px 10px rgba(96,130,182,0.18); transform: translateY(-1px); }
     #booking_summary_cards .card-custom { margin-bottom: 12px; }
-    #booking_summary_cards .summary-card-header { min-height:38px; padding:8px 14px; }
+    #booking_summary_cards .summary-card-header { min-height:38px; padding:8px 14px; display:flex; justify-content:space-between; align-items:center; }
     #booking_summary_cards .summary-card-header h3 { margin:0; font-size:13px; color:#3F4254; }
+    #booking_summary_cards .summary-info-icon { color:#8B95A7; font-size:14px; cursor:pointer; padding:2px 4px; line-height:1; }
+    #booking_summary_cards .summary-info-icon:hover { color:#6082B6; }
+    .summary-popover { max-width:320px; font-size:12px; }
+    .summary-popover .popover-body { font-size:12px; line-height:1.5; color:#3F4254; }
+    .summary-popover .popover-body strong { color:#6082B6; }
+    .summary-popover .popover-body ul { padding-left:18px; margin:4px 0; }
     #booking_summary_cards .summary-card-body { padding:10px 14px 12px; }
     #booking_summary_cards .summary-value { font-size:24px; font-weight:700; color:#3F4254; line-height:1.1; }
     #booking_summary_cards .summary-value-sm { font-size:18px; font-weight:700; color:#3F4254; line-height:1.1; }
@@ -48,6 +54,7 @@
                     <div class="card card-custom">
                         <div class="card-header border-0 summary-card-header" style="background-color:#A7C7E730;">
                             <h3>BC Created (Month)</h3>
+                            <i class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>Formula:</strong> Total count of confirmations you created this month.<br><br><strong>Counted when:</strong><ul><li>You are the primary or secondary sales person on the BC</li><li>It's a booking confirmation (not a quotation)</li><li>Not cancelled, not draft</li><li>Created date is in this month</li></ul>"></i>
                         </div>
                         <div class="card-body summary-card-body">
                             <div class="summary-value" id="sc-bc-month-count">...</div>
@@ -60,10 +67,11 @@
                 <div class="card card-custom">
                     <div class="card-header border-0 summary-card-header" style="background-color:#C4B45420;">
                         <h3>Total Sales (Month)</h3>
+                        <i class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>Formula:</strong> Sum of the BC totals for your confirmations this month.<br><br><strong>BC total:</strong> Each BC's price after discount, before any later refunds.<br><br><strong>Same filters as BC Created (Month).</strong><br><br><strong>Excludes:</strong> Cancelled BCs and drafts. Refunds or adjustments made later are not subtracted here."></i>
                     </div>
                     <div class="card-body summary-card-body">
                         <div class="summary-value-sm" id="sc-sales-month-value">...</div>
-                        <div class="summary-sub">Sum of NetTotal across BCs you created this month (excludes cancelled).</div>
+                        <div class="summary-sub">Total sales across BCs you created this month (excludes cancelled).</div>
                     </div>
                 </div>
             </div>
@@ -72,6 +80,7 @@
                     <div class="card card-custom">
                         <div class="card-header border-0 summary-card-header" style="background-color:#FFFAA030;">
                             <h3>Cancellation Rate (Month)</h3>
+                            <i class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>Formula:</strong> Cancelled &divide; Total &times; 100<br><br><strong>Top number:</strong> BCs created this month that were cancelled.<br><strong>Bottom number:</strong> All BCs created this month (cancelled ones included).<br><br><strong>Filters:</strong> Drafts excluded. TC view counts only your BCs; team view counts everyone's.<br><br><strong>Example:</strong> 20 BCs, 5 cancelled &rarr; 25%.<br><br><strong>Note:</strong> Based on creation date, not cancellation date. A BC cancelled this month but created last month is NOT counted here."></i>
                         </div>
                         <div class="card-body summary-card-body">
                             <div class="summary-value" id="sc-cancel-rate-value">...</div>
@@ -85,6 +94,7 @@
                     <div class="card card-custom">
                         <div class="card-header border-0 summary-card-header" style="background-color:#FAA0A030;">
                             <h3>Payment Overdue</h3>
+                            <i class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>Counted when EITHER:</strong><ul><li>Full payment deadline has passed AND the BC is still waiting for full payment (deposit unpaid, or deposit paid but balance still owing)</li><li>Deposit deadline has passed AND the deposit is still unpaid</li></ul><strong>Filters:</strong> Your BCs only; not cancelled.<br><br><strong>Excludes:</strong> BCs already fully paid.<br><br><strong>No period filter</strong> — checks each BC's own deadlines against today."></i>
                         </div>
                         <div class="card-body summary-card-body">
                             <div class="summary-value" id="sc-payment-overdue-count">...</div>
@@ -98,6 +108,7 @@
                     <div class="card card-custom">
                         <div class="card-header border-0 summary-card-header" style="background-color:#FFFAA030;">
                             <h3>Travel in 7 Days – Not Yet Ready</h3>
+                            <i class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>&quot;Not yet ready&quot; means the BC is still waiting on:</strong><ul><li>Payment</li><li>Booking operations</li><li>Guest list submission</li><li>Travel voucher</li></ul>&quot;Ready&quot; means the BC has moved to Pending Travel (or beyond).<br><br><strong>Filters:</strong><ul><li>Travel start date between <strong>tomorrow</strong> and today + 7 days</li><li>Still at one of the upstream stages above</li><li>Not cancelled</li></ul>TC view shows your BCs only; OP/Owner view is team-wide.<br><br><strong>Why it matters:</strong> Urgent — guests travel within a week."></i>
                         </div>
                         <div class="card-body summary-card-body">
                             <div class="summary-value" id="sc-upcoming-not-ready-count">...</div>
@@ -114,6 +125,7 @@
                 <div class="card card-custom">
                     <div class="card-header border-0 summary-card-header" style="background-color:#A7C7E730;">
                         <h3>Leads</h3>
+                        <i class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>From:</strong> Lead conversations synced from GHL.<br><br><strong>Counts by creation date:</strong><ul><li><strong>Today:</strong> leads created today</li><li><strong>Week:</strong> leads created Monday &rarr; Sunday of this week</li><li><strong>Month:</strong> leads created 1st &rarr; last day of this month</li></ul>Each conversation counts as one lead — re-entries to the same conversation don't double-count."></i>
                     </div>
                     <div class="card-body summary-card-body">
                         <div class="summary-row-3">
@@ -129,6 +141,7 @@
                 <div class="card card-custom">
                     <div class="card-header border-0 summary-card-header" style="background-color:#F0FFFF;">
                         <h3>Conversion & Response (Month)</h3>
+                        <i class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>Conv. %</strong> = Converted &divide; Total &times; 100<br>A lead is converted when it's linked to a BC AND the TC has sales credit on that BC (TC1 credit before 1 Jun 2026; TC2 credit from 1 Jun 2026 onward).<br><br><strong>Resp. %</strong> = Leads with at least one TC reply &divide; Total &times; 100.<br><br><strong>Avg Time</strong> = Average time-to-respond across the TC's first 5 replies on each lead. Shown as seconds / minutes / hours.<br><br><strong>Scope:</strong> All leads created this month, all agents."></i>
                     </div>
                     <div class="card-body summary-card-body">
                         <div class="summary-row-3">
@@ -145,6 +158,7 @@
                     <div class="card card-custom">
                         <div class="card-header border-0 summary-card-header" style="background-color:#A7C7E730;">
                             <h3>BC Created</h3>
+                            <i class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>Formula:</strong> Total count of booking confirmations across all sales agents.<br><br><strong>Filters:</strong><ul><li>Booking confirmations only (not quotations)</li><li>Not cancelled, not draft</li></ul><strong>Periods (by creation date):</strong><ul><li><strong>Week:</strong> Monday &rarr; Sunday of this week</li><li><strong>Month:</strong> 1st &rarr; last day of this month</li></ul>"></i>
                         </div>
                         <div class="card-body summary-card-body">
                             <div class="summary-row-3">
@@ -161,6 +175,7 @@
                     <div class="card card-custom">
                         <div class="card-header border-0 summary-card-header" style="background-color:#FFFAA030;">
                             <h3>Cancellation Rate (Month)</h3>
+                            <i class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>Formula:</strong> Cancelled &divide; Total &times; 100<br><br><strong>Top number:</strong> BCs created this month that were cancelled.<br><strong>Bottom number:</strong> All BCs created this month (cancelled ones included).<br><br><strong>Filters:</strong> Drafts excluded. TC view counts only your BCs; team view counts everyone's.<br><br><strong>Example:</strong> 20 BCs, 5 cancelled &rarr; 25%.<br><br><strong>Note:</strong> Based on creation date, not cancellation date. A BC cancelled this month but created last month is NOT counted here."></i>
                         </div>
                         <div class="card-body summary-card-body">
                             <div class="summary-value" id="sc-cancel-rate-tl-value">...</div>
@@ -173,6 +188,7 @@
                 <div class="card card-custom">
                     <div class="card-header border-0 summary-card-header" style="background-color:#A7C7E730;">
                         <h3>Top Agents – Conversion (Month)</h3>
+                        <i class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>Per agent:</strong><ul><li><strong>Leads:</strong> Total leads assigned this month</li><li><strong>Converted:</strong> Leads with a linked BC where the agent has sales credit (TC1 before 1 Jun 2026; TC2 from 1 Jun 2026)</li><li><strong>Rate:</strong> Converted &divide; Leads &times; 100</li></ul><strong>Sort:</strong> By total leads (highest first), then agent name. Top 10.<br><br><strong>Excludes:</strong> Unassigned leads."></i>
                     </div>
                     <div class="card-body summary-card-body">
                         <div class="summary-sub mb-2">Top 10 agents this month ranked by lead volume, with their conversion rate to booking.</div>
@@ -193,6 +209,7 @@
                     <div class="card card-custom">
                         <div class="card-header border-0 summary-card-header" style="background-color:#A7C7E730;">
                             <h3>BC Created</h3>
+                            <i class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>Formula:</strong> Total count of booking confirmations across all sales agents.<br><br><strong>Filters:</strong><ul><li>Booking confirmations only (not quotations)</li><li>Not cancelled, not draft</li></ul><strong>Periods (by creation date):</strong><ul><li><strong>Week:</strong> Monday &rarr; Sunday of this week</li><li><strong>Month:</strong> 1st &rarr; last day of this month</li></ul>"></i>
                         </div>
                         <div class="card-body summary-card-body">
                             <div class="summary-row-3">
@@ -210,6 +227,7 @@
                     <div class="card card-custom">
                         <div class="card-header border-0 summary-card-header" style="background-color:#FFFAA030;">
                             <h3>Travel in 7 Days – Not Yet Ready</h3>
+                            <i class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>&quot;Not yet ready&quot; means the BC is still waiting on:</strong><ul><li>Payment</li><li>Booking operations</li><li>Guest list submission</li><li>Travel voucher</li></ul>&quot;Ready&quot; means the BC has moved to Pending Travel (or beyond).<br><br><strong>Filters:</strong><ul><li>Travel start date between <strong>tomorrow</strong> and today + 7 days</li><li>Still at one of the upstream stages above</li><li>Not cancelled</li></ul>TC view shows your BCs only; OP/Owner view is team-wide.<br><br><strong>Why it matters:</strong> Urgent — guests travel within a week."></i>
                         </div>
                         <div class="card-body summary-card-body">
                             <div class="summary-value" id="sc-upcoming-not-ready-op-count">...</div>
@@ -223,6 +241,7 @@
                     <div class="card card-custom">
                         <div class="card-header border-0 summary-card-header" style="background-color:#F0FFFF;">
                             <h3>Guest List Submitted</h3>
+                            <i class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>Counted when:</strong><ul><li>Customer has submitted their guest list</li><li>OP has not yet locked it</li><li>It's a booking confirmation</li><li>Not cancelled, not draft</li></ul><strong>No date filter</strong> — this is a live work queue.<br><br><strong>Action:</strong> Review for completeness, then lock to finalize and stop further customer edits."></i>
                         </div>
                         <div class="card-body summary-card-body">
                             <div class="summary-value" id="sc-gl-submitted-count">...</div>
@@ -235,6 +254,7 @@
                 <div class="card card-custom">
                     <div class="card-header border-0 summary-card-header" style="background-color:#A7C7E730;">
                         <h3>Top Destinations (Month)</h3>
+                        <i class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>Per destination this month:</strong><ul><li><strong>BC:</strong> How many bookings</li><li><strong>Sales:</strong> Total sales</li></ul><strong>Sort (OP view):</strong> By booking count (highest first). Top 5.<br><br><strong>Filters:</strong> Booking confirmations only; not cancelled; not draft; created this month.<br><br><strong>Tip:</strong> Click a row to filter the booking list by destination."></i>
                     </div>
                     <div class="card-body summary-card-body">
                         <div class="summary-sub mb-2">Top 5 destinations this month by booking volume and total sales. Click a row to filter the list by that destination.</div>
@@ -253,6 +273,7 @@
                 <div class="card card-custom">
                     <div class="card-header border-0 summary-card-header" style="background-color:#C4B45420;">
                         <h3>Total Payment In</h3>
+                        <i class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>Formula:</strong> Sum of approved incoming customer payments.<br><br><strong>Filters:</strong><ul><li>Payment is approved</li><li>Money in only (refunds and outgoing entries excluded)</li><li>Excludes agent commission received from suppliers</li></ul><strong>Periods (by payment date):</strong><ul><li><strong>Today:</strong> today only</li><li><strong>Week:</strong> Monday &rarr; Sunday of this week</li><li><strong>Month:</strong> 1st &rarr; last day of this month</li></ul>"></i>
                     </div>
                     <div class="card-body summary-card-body">
                         <div class="summary-row-3">
@@ -269,6 +290,7 @@
                 <div class="card card-custom">
                     <div class="card-header border-0 summary-card-header" style="background-color:#A7C7E730;">
                         <h3>Top Destinations (Month)</h3>
+                        <i class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>Per destination this month:</strong><ul><li><strong>BC:</strong> How many bookings</li><li><strong>Sales:</strong> Total sales</li></ul><strong>Sort (Finance view):</strong> By total sales (highest first). Top 5.<br><br><strong>Filters:</strong> Booking confirmations only; not cancelled; not draft; created this month.<br><br><strong>Tip:</strong> Click a row to filter the booking list by destination."></i>
                     </div>
                     <div class="card-body summary-card-body">
                         <div class="summary-sub mb-2">Top 5 destinations this month by booking volume and total sales. Click a row to filter the list by that destination.</div>
@@ -284,6 +306,7 @@
                 <div class="card card-custom">
                     <div class="card-header border-0 summary-card-header" style="background-color:#A7C7E730;">
                         <h3>Top Products (Month)</h3>
+                        <i class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>Per product (grouped by item code):</strong><ul><li><strong>Qty:</strong> Total quantity sold</li><li><strong>Sales:</strong> Total sales</li></ul><strong>Filters:</strong><ul><li>Booking confirmations only</li><li>Not cancelled, not draft</li><li>Active line items only</li><li>Booking created this month</li></ul><strong>Sort:</strong> By total sales (highest first). Top 5."></i>
                     </div>
                     <div class="card-body summary-card-body">
                         <div class="summary-sub mb-2">Top 5 products this month by total sales, grouped by product item code.</div>
@@ -324,6 +347,11 @@ $(function() {
     });
     $body.on('hidden.bs.collapse', function() {
         try { localStorage.setItem(KEY, '1'); } catch(e) {}
+    });
+    $('#booking_summary_cards [data-toggle="popover"]').popover({
+        customClass: 'summary-popover',
+        container: 'body',
+        boundary: 'window'
     });
 });
 (function() {

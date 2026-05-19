@@ -39,11 +39,11 @@ function lead_conversion_credited_admin_id($insert_date, $sales_agent, $sales_ag
  * conversion under the TC1/TC2 cutoff rule. Expects the caller's FROM clause to
  * alias ghl_processed_leads as `pl`.
  *
- * The rule is intentionally a slot-presence check on the matched booking, not
- * an identity match against the lead's GHL owner: the existing dashboard scope
- * (assigned_to_user_id IN _restrict_agent_ids) already narrows leads to the
- * viewing admin's allowed set, so a conversion is "theirs" iff their scoped
- * lead converted to a booking whose credited TC slot is set per the cutoff.
+ * Identity match: the credited TC slot on the booking (SalesAgent pre-cutoff,
+ * SalesAgent2 on/after cutoff) must equal the AdminID resolved from
+ * pl.assigned_to_user_id via ghl_users.Email = admin.Email. A lead assigned to
+ * agent X only counts as X's conversion when X actually holds the credited slot
+ * for the booking's InsertDate window.
  */
 function lead_conversion_credit_sql_fragment()
 {
@@ -51,11 +51,16 @@ function lead_conversion_credit_sql_fragment()
     return "EXISTS (
         SELECT 1
         FROM booking b
+        INNER JOIN ghl_users gu_credit
+            ON gu_credit.UserID = NULLIF(pl.assigned_to_user_id, '')
+        INNER JOIN admin a_credit
+            ON LOWER(TRIM(a_credit.Email)) = LOWER(TRIM(gu_credit.Email))
+            AND a_credit.Status = 'Y'
         WHERE b.BookingID = pl.booking_id
           AND (
-              (b.InsertDate <  '{$cutoff}' AND b.SalesAgent  IS NOT NULL AND b.SalesAgent  > 0)
+              (b.InsertDate <  '{$cutoff}' AND b.SalesAgent  = a_credit.AdminID)
               OR
-              (b.InsertDate >= '{$cutoff}' AND b.SalesAgent2 IS NOT NULL AND b.SalesAgent2 > 0)
+              (b.InsertDate >= '{$cutoff}' AND b.SalesAgent2 = a_credit.AdminID)
           )
     )";
 }
