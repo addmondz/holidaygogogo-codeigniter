@@ -87,6 +87,13 @@ class Booking_Model extends CI_Model
 		return true;
 	}
 
+	private function apply_status_filter()
+	{
+		$this->load->helper('booking_status_filter');
+		$where = booking_status_filter_full_where($this->input->get('status'), date('Y-m-d'));
+		$this->db->where($where, null, false);
+	}
+
 	function Read_Booking()
 	{
 		$this->db->select('booking.BookingID, booking.AllowReview, booking.CustomerReview, booking.CustomerReviewTimestamp, BookingConfirmationFooterID, TravelVoucherFooterID, booking.CountryCodeID AS CustomerCountryCode, booking.CountryCodeID2 AS CustomerCountryCode2, BookingNumber, ReservationNumber, DepositDeadline, FullPaymentDeadline, AdditionalPaymentDeadline, Customer, booking.Customer2, booking.Mobile AS CustomerMobile, booking.Mobile2 AS CustomerMobile2, StartDate, EndDate, Adult, Children, Infant, Destination, SalesAgent, Tag, BookingRemark, Subtotal, Discount, NetTotal, DepositPercentage, DepositMode, DepositFixedAmount, booking.ChatLanguage, Source, Token, booking.BookingConfirmationTitle, BookingConfirmationFooter, TravelVoucherFooter, booking.KeyContacts, booking.SpecialRemarks, ProductSequence, booking.Status, booking.CancelStatus, booking.PartialRefund, booking.LockStatus, booking.AfterSalesService, booking.bc_approved, booking.bc_approval_admin_id, booking.bc_approval_date, admin.Name AS SalesAgentName, booking.AutocountSyncStatus, booking.AutocountSyncMessage, booking.AutocountSyncAction, booking.CustomerAutocountSyncStatus, booking.CustomerAutocountSyncMessage, booking.CustomerAutocountSyncAction, customer.CustomerCode AS CustomerCode, customer.ic_passport_no AS ic_passport_no, customer.tin_no AS tin_no, customer.customer_type AS customer_type, booking.CustomerID, booking.CustomerID2, booking.BookingOP, booking.SalesAgent2, booking.InsertDate');
@@ -430,69 +437,7 @@ class Booking_Model extends CI_Model
 			$this->db->where('booking.CancellationReasonID', $this->input->get('cancellation_reason'));
 			$this->db->where('CancelStatus', 'Y');
 		}
-		if(!empty($this->input->get('status'))) {
-			if($this->input->get('status') == 'A') {
-				$this->db->where('CancelStatus', 'N');
-				$this->db->where('booking.Status !=', 'N');
-			}
-			if($this->input->get('status') == 'C') {
-				$this->db->where('CancelStatus', 'Y');
-				$this->db->where('booking.Status !=', 'N');
-			}
-			if($this->input->get('status') == 'Y') {
-				$this->db->where('CancelStatus', 'N');
-				$this->db->where('AfterSalesService', 'COMPLETE');
-				$this->db->where('booking.Status', 'Y');
-			}
-			if($this->input->get('status') == 'OG') {
-				$this->db->where('CancelStatus', 'N');
-				$this->db->where('booking.Status', 'OG');
-			}
-			if($this->input->get('status') == 'PP') {
-				$this->db->where('CancelStatus', 'N');
-				$this->db->where('FullPaymentDeadline >=', date('Y-m-d'));
-				$this->db->where('booking.Status', 'PP');
-			}
-			if($this->input->get('status') == 'PO') {
-				$this->db->where('CancelStatus', 'N');
-				$this->db->where("((`FullPaymentDeadline` < '".date('Y-m-d')."' AND `booking`.`Status` IN ('P','PP')) OR ((`DepositDeadline` < '".date('Y-m-d')."' AND `booking`.`Status` = 'P') OR (`FullPaymentDeadline` < '".date('Y-m-d')."' AND `booking`.`Status` IN ('P','PP'))))");
-			}
-			if($this->input->get('status') == 'PGL') {
-				$this->db->where('CancelStatus', 'N');
-				$this->db->where('LockStatus', 'N');
-				$this->db->where('booking.Status', 'PTV');
-			}
-			if($this->input->get('status') == 'PBC') {
-				$this->db->where('CancelStatus', 'N');
-				$this->db->where('booking.Status', 'PBC');
-			}
-			if($this->input->get('status') == 'PBO') {
-				$this->db->where('CancelStatus', 'N');
-				$this->db->where('booking.Status', 'PBO');
-			}
-			if($this->input->get('status') == 'P') {
-				$this->db->where('CancelStatus', 'N');
-				$this->db->where("(`DepositDeadline` >= '".date('Y-m-d')."' OR (`DepositDeadline` IS NULL AND `FullPaymentDeadline` >= '".date('Y-m-d')."'))");
-				$this->db->where('booking.Status', 'P');
-			}
-			if($this->input->get('status') == 'PR') {
-				$this->db->where('CancelStatus', 'N');
-				$this->db->where('AfterSalesService', 'PENDING');
-				$this->db->where('booking.Status', 'Y');
-			}
-			if($this->input->get('status') == 'PT') {
-				$this->db->where('CancelStatus', 'N');
-				$this->db->where('booking.Status', 'PT');
-			}
-			if($this->input->get('status') == 'PTV') {
-				$this->db->where('CancelStatus', 'N');
-				$this->db->where('LockStatus', 'Y');
-				$this->db->where('booking.Status', 'PTV');
-			}
-		} else {
-			$this->db->where('CancelStatus', 'N');
-			$this->db->where('AfterSalesService', 'PENDING');
-		}
+		$this->apply_status_filter();
 		if(!empty($this->input->get('booking_date'))) {
 			$booking_date = explode(' - ', $this->input->get('booking_date'));
 			$start_date = date('Y-m-d', strtotime(str_replace('/', '-', $booking_date[0])));
@@ -1995,95 +1940,9 @@ class Booking_Model extends CI_Model
 				$this->db->where_in('booking.Status', array('P','PBO','PGL','PTV'));
 				$level2Ignore = 1;
 			}
+			$this->apply_status_filter();
 			if(!empty($this->input->get('status'))) {
-				$statuses = explode(',', $this->input->get('status'));
-				$this->db->group_start();
-				foreach($statuses as $i => $status) {
-					$status = trim($status);
-					if($i == 0) {
-						$this->db->group_start();
-					} else {
-						$this->db->or_group_start();
-					}
-					if($status == 'A') {
-						$this->db->where('CancelStatus', 'N');
-						$this->db->where('booking.Status !=', 'N');
-					}
-					if($status == 'C') {
-						$this->db->where('CancelStatus', 'Y');
-						$this->db->where('booking.Status !=', 'N');
-					}
-					if($status == 'Y') {
-						$this->db->where('CancelStatus', 'N');
-						$this->db->where('AfterSalesService', 'COMPLETE');
-						$this->db->where('booking.Status', 'Y');
-					}
-					if($status == 'OG') {
-						$this->db->where('CancelStatus', 'N');
-						$this->db->where('booking.Status', 'OG');
-					}
-					if($status == 'PP') {
-						$this->db->where('CancelStatus', 'N');
-						$this->db->where('FullPaymentDeadline >=', date('Y-m-d'));
-						$this->db->where('booking.Status', 'PP');
-					}
-					if($status == 'PO') {
-						$today = date('Y-m-d');
-						// Match display_booking_status(): a P/PP row only renders as PO when
-						// there is still an outstanding balance (NetTotal > approved credits).
-						// Without this, fully-paid PP rows past their deadline display as
-						// "PARTIAL PAYMENT" but still appear under the PO filter.
-						$approved_credit_sql = "COALESCE((SELECT SUM(p.Credit) FROM payment p"
-							. " WHERE p.BookingID = booking.BookingID"
-							. " AND p.Status = 'Y' AND p.Credit > 0"
-							. " AND (p.Type IS NULL OR p.Type != 'AGENT COMMISSION FROM SUPPLIER')), 0)";
-						$this->db->where('CancelStatus', 'N');
-						$this->db->where(
-							"(((`booking`.`FullPaymentDeadline` < '".$today."' AND `booking`.`Status` IN ('P','PP'))"
-							. " OR (`booking`.`DepositDeadline` < '".$today."' AND `booking`.`Status` = 'P'))"
-							. " AND (`booking`.`NetTotal` - ".$approved_credit_sql.") > 0)"
-						);
-					}
-					if($status == 'PGL') {
-						$this->db->where('CancelStatus', 'N');
-						$this->db->where('LockStatus', 'N');
-						$this->db->where_in('booking.Status', array('PGL', 'PTV'));
-					}
-					if($status == 'PBC') {
-						$this->db->where('CancelStatus', 'N');
-						$this->db->where('booking.Status', 'PBC');
-					}
-					if($status == 'P') {
-						$this->db->where('CancelStatus', 'N');
-						$this->db->where("(`DepositDeadline` >= '".date('Y-m-d')."' OR (`DepositDeadline` IS NULL AND `FullPaymentDeadline` >= '".date('Y-m-d')."'))");
-						$this->db->where('booking.Status', 'P');
-					}
-					if($status == 'PR') {
-						$this->db->where('CancelStatus', 'N');
-						$this->db->where('AfterSalesService', 'PENDING');
-						$this->db->where('booking.Status', 'Y');
-					}
-					if($status == 'PT') {
-						$this->db->where('CancelStatus', 'N');
-						$this->db->where('booking.Status', 'PT');
-					}
-					if($status == 'PTV') {
-						$this->db->where('CancelStatus', 'N');
-						$this->db->where('LockStatus', 'Y');
-						$this->db->where_in('booking.Status', array('PGL', 'PTV'));
-					}
-					if($status == 'PBO') {
-						$this->db->where('CancelStatus', 'N');
-						$this->db->where('booking.Status', 'PBO');
-					}
-					$this->db->group_end();
-				}
-				$this->db->group_end();
-
 				$level2Ignore = 1;
-			} else {
-				$this->db->where('CancelStatus', 'N');
-				$this->db->where('AfterSalesService', 'PENDING');
 			}
 		}
 
