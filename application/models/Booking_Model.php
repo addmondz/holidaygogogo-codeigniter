@@ -1808,19 +1808,24 @@ class Booking_Model extends CI_Model
 		// These filters can ignore others
 		$ignore = 0;
 
-		if(!empty($this->input->get('customer'))) {
-			$q = $this->input->get('customer');
-			$like = $this->db->escape_like_str($q);
+		// TRIM() both sides so leading/trailing whitespace in either the
+		// stored customer / booking.Customer / guest_list name, or in the
+		// user's input, does not hide bookings. Mirrors the customer-list
+		// filter via customer_name_search_helper.
+		$customer_raw = $this->input->get('customer');
+		$customer_q = trim((string) $customer_raw);
+		if ($customer_q !== '') {
+			$like = $this->db->escape_like_str($customer_q);
 			$this->db->group_start();
-				$this->db->like('booking.Customer', $q);
-				$this->db->or_like('customer.name', $q);
+				$this->db->where(customer_name_trim_like_fragment('booking.Customer', $like, 'both'), null, false);
+				$this->db->or_where(customer_name_trim_like_fragment('customer.name', $like, 'both'), null, false);
 				$this->db->or_where(
 					"EXISTS (SELECT 1 FROM guest_list gl
 						WHERE gl.BookingID = booking.BookingID
 						  AND gl.Status = 'Y'
-						  AND (gl.Name LIKE '%{$like}%'
-							OR gl.LastName LIKE '%{$like}%'
-							OR CONCAT_WS(' ', gl.Name, gl.LastName) LIKE '%{$like}%'))",
+						  AND (TRIM(gl.Name) LIKE '%{$like}%'
+							OR TRIM(gl.LastName) LIKE '%{$like}%'
+							OR TRIM(CONCAT_WS(' ', gl.Name, gl.LastName)) LIKE '%{$like}%'))",
 					null, false
 				);
 			$this->db->group_end();

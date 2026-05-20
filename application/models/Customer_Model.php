@@ -62,9 +62,9 @@ class Customer_Model extends CI_Model
 	{
 		$this->db->select('*');
 
-		if ($this->input->get('name')) {
-			$this->db->like('name', $this->input->get('name'), 'after'); // index-safe
-		}
+		// TRIM() both sides so leading/trailing whitespace on either the
+		// stored name or the user's input does not hide a row.
+		customer_name_apply_trim_like($this->db, 'name', $this->input->get('name'), 'after');
 
 		if ($this->input->get('phone_number')) {
 			$this->db->like('phone_number', $this->input->get('phone_number'), 'after');
@@ -117,9 +117,7 @@ class Customer_Model extends CI_Model
 	{
 		$this->db->select('*');
 
-		if ($this->input->get('name')) {
-			$this->db->like('name', $this->input->get('name'), 'after');
-		}
+		customer_name_apply_trim_like($this->db, 'name', $this->input->get('name'), 'after');
 
 		if ($this->input->get('phone_number')) {
 			$this->db->like('phone_number', $this->input->get('phone_number'), 'after');
@@ -162,9 +160,7 @@ class Customer_Model extends CI_Model
 
 	function Count_Customers()
 	{
-		if ($this->input->get('name')) {
-			$this->db->like('name', $this->input->get('name'), 'after'); // index-safe
-		}
+		customer_name_apply_trim_like($this->db, 'name', $this->input->get('name'), 'after');
 
 		if ($this->input->get('phone_number')) {
 			$this->db->like('phone_number', $this->input->get('phone_number'), 'after');
