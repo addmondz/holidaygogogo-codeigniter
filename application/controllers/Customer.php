@@ -139,7 +139,7 @@ class Customer extends MY_Controller
 		$spreadsheet->getActiveSheet()->setCellValue('H1', 'CREATED AT');
 		$spreadsheet->getActiveSheet()->setCellValue('I1', 'UPDATED AT');
 		$row = 2;
-		$customers = $this->Customer_Model->Read_Customers2();
+		$customers = $this->Customer_Model->Read_Customers_For_Export();
 		$spreadsheet->getActiveSheet()->getStyle('A1:I1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_BLACK);
 		$spreadsheet->getActiveSheet()->getStyle('A1:I1')->getFont()->getColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_WHITE);
 		$spreadsheet->getActiveSheet()->getStyle('A1:I1')->getFont()->setBold(true);

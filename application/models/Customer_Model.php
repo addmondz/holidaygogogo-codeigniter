@@ -112,6 +112,54 @@ class Customer_Model extends CI_Model
 
 		return $this->db->get('customer')->result();
 	}
+
+	function Read_Customers_For_Export()
+	{
+		$this->db->select('*');
+
+		if ($this->input->get('name')) {
+			$this->db->like('name', $this->input->get('name'), 'after');
+		}
+
+		if ($this->input->get('phone_number')) {
+			$this->db->like('phone_number', $this->input->get('phone_number'), 'after');
+		}
+
+		if ($this->input->get('CustomerCode')) {
+			$this->db->like('CustomerCode', $this->input->get('CustomerCode'), 'after');
+		}
+
+		if ($this->input->get('ChatLanguage')) {
+			$this->db->where('ChatLanguage', $this->input->get('ChatLanguage'));
+		}
+
+		if ($this->input->get('autocount_status')) {
+			$this->db->where('AutocountSyncStatus', $this->input->get('autocount_status'));
+		}
+
+		if ($this->input->get('customer_type')) {
+			$this->db->where('customer_type', $this->input->get('customer_type'));
+		}
+
+		if ($this->input->get('created_date')) {
+			$dates = explode(' - ', $this->input->get('created_date'));
+			if (count($dates) == 2) {
+				$start_date = date('Y-m-d', strtotime(str_replace('/', '-', $dates[0])));
+				$end_date = date('Y-m-d', strtotime(str_replace('/', '-', $dates[1])));
+				$this->db->where('DATE(created_at) >=', $start_date);
+				$this->db->where('DATE(created_at) <=', $end_date);
+			}
+		}
+
+		$this->db->where('Status', 'Y');
+		$this->db->where('name IS NOT NULL', null, false);
+		$this->db->where('phone_number IS NOT NULL', null, false);
+
+		$this->db->order_by('name', 'ASC');
+
+		return $this->db->get('customer')->result();
+	}
+
 	function Count_Customers()
 	{
 		if ($this->input->get('name')) {
