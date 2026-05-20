@@ -27,6 +27,8 @@ class Cron extends CI_Controller
 
 	function index()
 	{
+		$this->load->helper('booking_flow');
+		$this->load->helper('booking_status_log');
 
 		// 1. Get only bookings with statuses that can transition
 		$bookings = $this->Booking_Model->Read_Actionable_Bookings();
@@ -69,8 +71,34 @@ class Cron extends CI_Controller
 						$full_payment_existed = $this->Payment_Model->Read_Type($booking->BookingID);
 						if($full_payment_existed) {
 							if($booking->Status == 'P' || $booking->Status == 'PP') {
-								$this->Booking_Model->Update_Status('PTV', $booking->BookingID);
-								$this->Booking_Model->Create_Booking_Log2($booking->Status, 'PTV', $booking->BookingID);
+								// Full payment received — advance to PBO (PENDING BOOKING
+								// OPERATION) and let the booking-flow helper decide whether
+								// further auto-advance is allowed (only when no checklists
+								// are configured or all are complete AND the guest list is
+								// locked). Previously this jumped straight to PTV, leaving
+								// bookings stuck at "PENDING TRAVEL VOUCHER" with unticked
+								// checklists.
+								$previous_status = $booking->Status;
+								$this->Booking_Model->Update_Status('PBO', $booking->BookingID);
+								$this->Booking_Model->Create_Booking_Log2($previous_status, 'PBO', $booking->BookingID);
+								log_booking_status_change(
+									$booking->BookingID,
+									'PBO',
+									$previous_status,
+									0,
+									'Full Payment Received - Ready for Booking Operation',
+									true
+								);
+
+								$updated_booking = $this->Booking_Model->getBookingById($booking->BookingID);
+								if($updated_booking) {
+									check_and_advance_status_if_no_checklist_or_all_completed(
+										$booking->BookingID,
+										$updated_booking,
+										0,
+										$this
+									);
+								}
 							}
 						} else {
 							if($booking->Status == 'P') {
@@ -166,6 +194,8 @@ class Cron extends CI_Controller
 
 	function old_index()
 	{
+		$this->load->helper('booking_flow');
+		$this->load->helper('booking_status_log');
 		$startTime = date("Y-m-d H:i:s.u");
 		if(in_array('VB', $this->session->access_control)) {
 			$titles = array('tab_title' => 'HolidayGoGoGo | Booking', 'breadcrumb_title' => 'Booking');
@@ -215,8 +245,33 @@ class Cron extends CI_Controller
 								$full_payment_existed = $this->Payment_Model->Read_Type($booking->BookingID);
 								if($full_payment_existed) {
 									if($booking->Status == 'P' || $booking->Status == 'PP') {
-										$this->Booking_Model->Update_Status('PTV', $booking->BookingID);
-										$this->Booking_Model->Create_Booking_Log2($booking->Status, 'PTV', $booking->BookingID);
+										// Full payment received — advance to PBO and let the
+										// booking-flow helper gate any further auto-advance
+										// behind the checklist + guest-list-lock checks.
+										// Previously this jumped straight to PTV and left
+										// bookings stuck at "PENDING TRAVEL VOUCHER" with
+										// unticked checklists.
+										$previous_status = $booking->Status;
+										$this->Booking_Model->Update_Status('PBO', $booking->BookingID);
+										$this->Booking_Model->Create_Booking_Log2($previous_status, 'PBO', $booking->BookingID);
+										log_booking_status_change(
+											$booking->BookingID,
+											'PBO',
+											$previous_status,
+											0,
+											'Full Payment Received - Ready for Booking Operation',
+											true
+										);
+
+										$updated_booking = $this->Booking_Model->getBookingById($booking->BookingID);
+										if($updated_booking) {
+											check_and_advance_status_if_no_checklist_or_all_completed(
+												$booking->BookingID,
+												$updated_booking,
+												0,
+												$this
+											);
+										}
 									}
 								} else {
 									if($booking->Status == 'P') {
