@@ -61,10 +61,10 @@
 </style>
 
 <body>
-	<table>
+	<table style="width:100%;">
 		<tr>
-			<td style="width: 15%"><img src="<?php echo base_url('assets/image/pdflogo-new.jpeg'); ?>" style="width:160px;"></td>
-			<td style="width: 85%">
+			<td style="width: 25%"><img src="<?php echo base_url('assets/image/pdflogo-new.jpeg'); ?>" style="width:180px; max-width:none;"></td>
+			<td style="width: 75%">
 				<h1><?php echo $CompanyName; ?></h1>
 				<p class="text-center small-font">
 					<small>(Co. Reg. No. - <?php echo $CompanyRegistrationNumber; ?> | Travel Agent License No. - <?php echo $CompanyLicenseNumber; ?>)</small>

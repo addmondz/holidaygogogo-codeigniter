@@ -235,6 +235,94 @@ if (!function_exists('validate_booking_status_flow')) {
     }
 }
 
+if (!function_exists('advance_booking_status_from_payment_change')) {
+    /**
+     * Forward-only booking-status advance after a payment.Status change.
+     *
+     * Re-runs determine_booking_status_from_state() and applies the result
+     * iff it represents forward motion along the canonical flow:
+     *   PBC < P < PP < PBO < PGL < PTV < PT < OG < Y
+     * Never regresses; never touches CANCELLED bookings.
+     *
+     * Used by both Payment::Update() (single approval) and
+     * Payment::Bulk_Update() (bulk approval) so the booking lands on its
+     * correct terminal status immediately, including skipping PBO when a
+     * booking has no required checklists, guest list locked, etc. Before
+     * centralising this, Bulk_Update's whitelisted guard rejected anything
+     * past PBO and left bookings stuck at PENDING PAYMENT until a Dashboard
+     * visit (or cron) ran Recalculate (regression: BC-2605-0184).
+     *
+     * @param int $booking_id Booking ID
+     * @param int $created_by Admin ID making the change (0 for system)
+     * @param CI_Controller $CI CodeIgniter instance
+     * @return array {advanced: bool, status: string|null, from: string|null}
+     */
+    function advance_booking_status_from_payment_change($booking_id, $created_by, $CI)
+    {
+        static $rank = array(
+            'PBC' => 1,
+            'P'   => 2,
+            'PP'  => 3,
+            'PBO' => 4,
+            'PGL' => 5,
+            'PTV' => 6,
+            'PT'  => 7,
+            'OG'  => 8,
+            'Y'   => 9,
+        );
+
+        $CI->load->model('Booking_Model');
+        $booking = $CI->Booking_Model->getBookingById($booking_id);
+        if (!$booking) {
+            return array('advanced' => false, 'status' => null, 'from' => null);
+        }
+        if (isset($booking->CancelStatus) && $booking->CancelStatus == 'Y') {
+            return array('advanced' => false, 'status' => $booking->Status, 'from' => $booking->Status);
+        }
+
+        $status_info = determine_booking_status_from_state($booking_id, $booking, $CI);
+        $new_status = $status_info['status'];
+        $current_status = $booking->Status;
+
+        if ($new_status === $current_status
+            || !isset($rank[$new_status])
+            || !isset($rank[$current_status])
+            || $rank[$new_status] <= $rank[$current_status]) {
+            return array('advanced' => false, 'status' => $current_status, 'from' => $current_status);
+        }
+
+        $status_labels = array(
+            'PP'  => 'PARTIAL PAYMENT',
+            'PBO' => 'PENDING BOOKING OPERATION',
+            'PGL' => 'PENDING GUEST LIST',
+            'PTV' => 'PENDING TRAVEL VOUCHER',
+            'PT'  => 'PENDING TRAVEL',
+            'OG'  => 'ON-GOING',
+            'Y'   => 'COMPLETED',
+        );
+        if ($new_status === 'PP') {
+            $description = 'Partial payment received';
+        } else {
+            $label = isset($status_labels[$new_status]) ? $status_labels[$new_status] : $new_status;
+            $description = 'Full Payment Received - Ready for ' . $label;
+        }
+
+        $CI->load->helper('booking_status_log');
+        $CI->Booking_Model->Update_Status($new_status, $booking_id);
+        $CI->Booking_Model->Create_Booking_Log2($current_status, $new_status, $booking_id);
+        log_booking_status_change(
+            $booking_id,
+            $new_status,
+            $current_status,
+            $created_by,
+            $description,
+            true
+        );
+
+        return array('advanced' => true, 'status' => $new_status, 'from' => $current_status);
+    }
+}
+
 if (!function_exists('check_and_advance_status_if_no_checklist_or_all_completed')) {
     /**
      * Check if booking has no checklists or all checklists are completed
