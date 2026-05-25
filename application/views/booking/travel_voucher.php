@@ -128,26 +128,24 @@
 		</tr>
 	</table>
 	<hr style="margin-bottom:0px;">
-	<table style="width:100%; font-size:13px;">
-		<tr style="font-weight:700;">
-			<td style="width:10%;">Item</td>
-			<td style="width:80%;">Description</td>
-			<td class="text-center" style="width:10%;">Quantity</td>
-		</tr>
-	</table>
-	<hr style="margin-top:0px;">
-	<table style="width:100%; font-size:13px; border-spacing:15px;">
-		<?php $count = 1;
-		foreach($booking_products as $booking_product) { ?>
-			<tr style="vertical-align:baseline;">
-				<td style="width:10%;"><?php echo $count . '.'; ?></td>
-				<td style="width:80%;"><?php if(empty($booking_product->Description)) { echo $booking_product->Name; } else { echo '<u><strong>' . $booking_product->Description . '</strong></u><br>' . $booking_product->Name; } ?></td>
-				<td class="text-center" style="width:10%;"><?php if(empty($booking_product->Description)) { echo $booking_product->Quantity; } else { echo '<br>' . $booking_product->Quantity; } ?></td>
+	<table style="width:100%; font-size:13px; border-collapse:collapse;">
+		<thead>
+			<tr style="font-weight:700;">
+				<td style="width:10%; padding:4px 0; border-bottom:1px solid #000;">Item</td>
+				<td style="width:80%; padding:4px 0; border-bottom:1px solid #000;">Description</td>
+				<td style="width:10%; padding:4px 0; border-bottom:1px solid #000; text-align:center;">Quantity</td>
 			</tr>
-		<?php $count++; } ?>
-		<tr>
-			<td>&nbsp;</td>
-		</tr>
+		</thead>
+		<tbody>
+			<?php $count = 1;
+			foreach($booking_products as $booking_product) { ?>
+				<tr style="vertical-align:baseline;">
+					<td style="width:10%; padding:10px 0 0 0;"><?php echo $count . '.'; ?></td>
+					<td style="width:80%; padding:10px 0 0 0;"><?php if(empty($booking_product->Description)) { echo $booking_product->Name; } else { echo '<u><strong>' . $booking_product->Description . '</strong></u><br>' . $booking_product->Name; } ?></td>
+					<td style="width:10%; padding:10px 0 0 0; text-align:center;"><?php if(empty($booking_product->Description)) { echo $booking_product->Quantity; } else { echo '<br>' . $booking_product->Quantity; } ?></td>
+				</tr>
+			<?php $count++; } ?>
+		</tbody>
 	</table>
 	<br>
 	<div><?php echo $TravelVoucherTitle; ?></div>
