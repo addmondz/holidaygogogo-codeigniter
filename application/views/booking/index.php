@@ -1093,24 +1093,37 @@ $('#modal_save_checklist_btn').on('click', function() {
     });
 
     $.ajax({
-        url: '<?php echo base_url("Booking/Update"); ?>',
+        url: '<?php echo base_url("Booking/Save_Checklist"); ?>',
         type: 'POST',
         data: postData,
         contentType: 'application/x-www-form-urlencoded; charset=UTF-8',
-        success: function() {
+        dataType: 'json',
+        success: function(response) {
             $btn.prop('disabled', false).html(originalText);
-            $('#checklistModal').modal('hide');
-            Swal.fire({
-                width: 550,
-                background: 'url(<?php echo base_url("assets/image/sweetalert.jpg"); ?>)',
-                icon: 'success',
-                title: 'Booking Checklist Updated',
-                showConfirmButton: false,
-                timer: 1500
-            });
-            // Refresh DataTable to reflect any status changes
-            if(typeof bookingTable !== 'undefined') {
-                bookingTable.ajax.reload(null, false);
+            if(response && response.success) {
+                $('#checklistModal').modal('hide');
+                Swal.fire({
+                    width: 550,
+                    background: 'url(<?php echo base_url("assets/image/sweetalert.jpg"); ?>)',
+                    icon: 'success',
+                    title: 'Booking Checklist Updated',
+                    showConfirmButton: false,
+                    timer: 1500
+                });
+                // Refresh DataTable to reflect any status changes
+                if(typeof bookingTable !== 'undefined') {
+                    bookingTable.ajax.reload(null, false);
+                }
+            } else {
+                Swal.fire({
+                    width: 550,
+                    background: 'url(<?php echo base_url("assets/image/sweetalert.jpg"); ?>)',
+                    icon: 'error',
+                    title: 'Failed to Update Checklist',
+                    text: (response && response.message) ? response.message : '',
+                    showConfirmButton: false,
+                    timer: 3000
+                });
             }
         },
         error: function() {

@@ -1579,7 +1579,7 @@
                                                     </button>
                                                     <?php } else { ?>
                                                     <div class="text-muted small mt-2">
-                                                        <i class="la la-lock"></i> Only this booking's TC1 and OP can update the checklist.
+                                                        <i class="la la-lock"></i> Only this booking's TC1, OP, and their Team Lead can update the checklist.
                                                     </div>
                                                     <?php } ?>
                                                 </div>

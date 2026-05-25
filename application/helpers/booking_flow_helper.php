@@ -1068,17 +1068,24 @@ if (!function_exists('is_upcoming_travel_not_ready')) {
 
 if (!function_exists('can_user_modify_booking_checklist')) {
     /**
-     * Mirrors Notification_Model::_apply_visibility_filter scoping so that the
-     * set of users who can tick a booking's checklist equals the set who get
-     * the booking-update notification: level 20 must be the booking's
-     * SalesAgent (TC1); level 40 must be the BookingOP. All other levels
-     * (admins, managers, TC2/level 50) bypass.
+     * Strict whitelist for ticking a booking's checklist:
+     *   - level 20 (TC1)  iff user_id === booking.SalesAgent
+     *   - level 40 (OP)   iff user_id === booking.BookingOP
+     *   - level 25 (TL)   iff user_id is the TeamLeadID of the booking's
+     *                     SalesAgent OR BookingOP (callers pre-resolve and
+     *                     pass these in as $tc1_team_lead_id / $op_team_lead_id)
+     * All other levels (Owner/Finance/TC2/etc.) are blocked.
      *
      * $booking accepts either the object returned by getBookingById() or an
      * array with SalesAgent / BookingOP keys.
      */
-    function can_user_modify_booking_checklist($booking, $user_id, $user_level)
-    {
+    function can_user_modify_booking_checklist(
+        $booking,
+        $user_id,
+        $user_level,
+        $tc1_team_lead_id = null,
+        $op_team_lead_id = null
+    ) {
         if (empty($booking)) {
             return false;
         }
@@ -1089,12 +1096,65 @@ if (!function_exists('can_user_modify_booking_checklist')) {
             ? (isset($booking->BookingOP) ? $booking->BookingOP : null)
             : (isset($booking['BookingOP']) ? $booking['BookingOP'] : null);
 
-        if ((int)$user_level === 20) {
-            return (int)$sales_agent === (int)$user_id;
+        $uid = (int)$user_id;
+        $lvl = (int)$user_level;
+
+        if ($lvl === 20) {
+            return (int)$sales_agent > 0 && (int)$sales_agent === $uid;
         }
-        if ((int)$user_level === 40) {
-            return (int)$booking_op === (int)$user_id;
+        if ($lvl === 40) {
+            return (int)$booking_op > 0 && (int)$booking_op === $uid;
         }
-        return true;
+        if ($lvl === 25) {
+            $tc1_tl = (int)$tc1_team_lead_id;
+            $op_tl  = (int)$op_team_lead_id;
+            if ($tc1_tl > 0 && $tc1_tl === $uid) {
+                return true;
+            }
+            if ($op_tl > 0 && $op_tl === $uid) {
+                return true;
+            }
+            return false;
+        }
+        return false;
+    }
+}
+
+if (!function_exists('resolve_booking_checklist_team_leads')) {
+    /**
+     * Looks up admin.TeamLeadID for the booking's SalesAgent and BookingOP in
+     * a single query. Returns ['tc1_tl' => int|null, 'op_tl' => int|null]
+     * suitable for passing into can_user_modify_booking_checklist().
+     */
+    function resolve_booking_checklist_team_leads($booking)
+    {
+        $out = array('tc1_tl' => null, 'op_tl' => null);
+        if (empty($booking)) {
+            return $out;
+        }
+        $sales_agent = (int)(is_object($booking)
+            ? (isset($booking->SalesAgent) ? $booking->SalesAgent : 0)
+            : (isset($booking['SalesAgent']) ? $booking['SalesAgent'] : 0));
+        $booking_op = (int)(is_object($booking)
+            ? (isset($booking->BookingOP) ? $booking->BookingOP : 0)
+            : (isset($booking['BookingOP']) ? $booking['BookingOP'] : 0));
+
+        $ids = array_values(array_unique(array_filter(array($sales_agent, $booking_op))));
+        if (empty($ids)) {
+            return $out;
+        }
+
+        $CI =& get_instance();
+        $CI->db->select('AdminID, TeamLeadID');
+        $CI->db->where_in('AdminID', $ids);
+        foreach ($CI->db->get('admin')->result() as $row) {
+            if ((int)$row->AdminID === $sales_agent) {
+                $out['tc1_tl'] = (int)$row->TeamLeadID;
+            }
+            if ((int)$row->AdminID === $booking_op) {
+                $out['op_tl'] = (int)$row->TeamLeadID;
+            }
+        }
+        return $out;
     }
 }

@@ -569,8 +569,12 @@ class Booking extends MY_Controller
 			if(in_array('GB', $this->session->access_control)) {
 				$html .= '<a href="' . (strpos($current_url, '?') ? base_url('Booking/Duplicate?booking_id=') . $booking->BookingID . '&' . explode('?', $current_url)[1] : base_url('Booking/Duplicate?booking_id=') . $booking->BookingID) . '" class="dropdown-item" style="font-size:11px;">Duplicate Booking</a>';
 			}
-			// Edit Checklist - AB users or SA viewing own booking
-			if(in_array('AB', $access_control) || ($is_sales_agent && !empty($booking->SalesAgentID) && $booking->SalesAgentID == $this->session->userdata('admin_id'))) {
+			// Edit Checklist - AB users, SA viewing own booking, or any Team Lead
+			// (level 25). The modal/save flow further scopes Team Leads via
+			// can_user_modify_booking_checklist() so only the matching TC1/OP TL
+			// can actually tick; non-matching TLs see a read-only modal.
+			$is_team_lead_user = (int)$this->session->userdata('level') === 25;
+			if(in_array('AB', $access_control) || ($is_sales_agent && !empty($booking->SalesAgentID) && $booking->SalesAgentID == $this->session->userdata('admin_id')) || $is_team_lead_user) {
 				$html .= '<button onclick="openChecklistModal(' . $booking->BookingID . ')" class="dropdown-item" style="font-size:11px;">Edit Checklist</button>';
 			}
 		}
@@ -2744,121 +2748,13 @@ class Booking extends MY_Controller
 				// 	}
 				// }
 				
-				// Booking Checklist Completion
-				$booking_id = $this->input->post('booking_id');
-				$checklist_completions = $this->input->post('checklist_completions');
-
-				// Always process checklist completions if booking_id and checklist_completions are provided
-				if(!empty($booking_id) && $checklist_completions !== null) {
-					// Ensure it's an array
-					if(!is_array($checklist_completions)) {
-						if(!empty($checklist_completions)) {
-							$checklist_completions = array($checklist_completions);
-						} else {
-							$checklist_completions = array();
-						}
-					}
-
-					// Parse "productId_checklistId" pairs
-					$completion_pairs = array(); // [[product_id, checklist_id], ...]
-					foreach($checklist_completions as $value) {
-						$parts = explode('_', $value, 2);
-						if(count($parts) == 2) {
-							$completion_pairs[] = array(intval($parts[0]), intval($parts[1]));
-						}
-					}
-
-					$created_by = $this->session->userdata('admin_id');
-
-					if(!empty($created_by)) {
-						// Get previous completions for logging (before updating)
-						$previous_keys = array();
-						$checklist_allowed = false;
-						if($this->db->table_exists('booking_checklist_completion')) {
-							// Get previous completions (nested map: product_id => checklist_id => info)
-							$previous_map = $this->Booking_Checklist_Completion_Model->Read_Completion_Map($booking_id);
-							// Flatten to "productId_checklistId" strings for comparison
-							foreach($previous_map as $pid => $checklists) {
-								foreach($checklists as $cid => $info) {
-									$previous_keys[] = $pid . '_' . $cid;
-								}
-							}
-
-							// Get booking to check current status
-							$this->load->helper('booking_flow');
-							$booking = $this->Booking_Model->getBookingById($booking_id);
-
-							// Same scoping as the booking-update notification bell
-							// (Notification_Model::_apply_visibility_filter): only TC1
-							// (level 20 = SalesAgent) and OP (level 40 = BookingOP) for
-							// THIS booking may tick its checklist. Other levels bypass.
-							$checklist_allowed = $booking && can_user_modify_booking_checklist(
-								$booking,
-								$created_by,
-								$this->session->userdata('level')
-							);
-							if($booking && !$checklist_allowed) {
-								log_message('info', 'Checklist save blocked: admin_id=' . $created_by . ' is not TC1/OP for booking ' . $booking_id);
-							}
-
-							if($checklist_allowed) {
-								// Check if checklist was unchecked (going from all completed to not all completed)
-								$was_all_completed = are_all_checklists_completed($booking_id, $this);
-
-								// Update checklist completions with product-aware pairs
-								$this->Booking_Checklist_Completion_Model->Create($booking_id, $completion_pairs, $created_by);
-
-								// Check if now all completed
-								$is_now_all_completed = are_all_checklists_completed($booking_id, $this);
-
-								// If was all completed but now not all completed, revert to PBO
-								if ($was_all_completed && !$is_now_all_completed) {
-									$this->load->helper('booking_status_log');
-
-									// Only revert if status is beyond PBO
-									if ($booking->Status != 'PBO' && in_array($booking->Status, ['PTV', 'PT'])) {
-										$this->Booking_Model->Update_Status('PBO', $booking_id);
-										log_booking_status_change(
-											$booking_id,
-											'PBO',
-											$booking->Status,
-											$created_by,
-											'Status reverted to PENDING BOOKING OPERATION - Checklist unchecked',
-											true
-										);
-									}
-								} else if ($booking->Status == 'PBO' && $is_now_all_completed) {
-									// All checklists are now completed, advance status
-									$status_info = determine_booking_status_from_state($booking_id, $booking, $this);
-									if ($status_info['status'] != 'PBO') {
-										$this->load->helper('booking_status_log');
-										$this->Booking_Model->Update_Status($status_info['status'], $booking_id);
-										log_booking_status_change(
-											$booking_id,
-											$status_info['status'],
-											'PBO',
-											$created_by,
-											'All Booking Checklists Completed - Status changed to ' . $status_info['status'],
-											true
-										);
-									}
-								}
-							}
-						} else {
-							log_message('error', 'booking_checklist_completion table does not exist. Please run migration.');
-						}
-
-						// Create activity logs for changes — only when the user was
-						// actually permitted to mutate the checklist.
-						if (!empty($checklist_allowed)) {
-							$new_keys = array();
-							foreach($completion_pairs as $pair) {
-								$new_keys[] = $pair[0] . '_' . $pair[1];
-							}
-							$this->log_checklist_changes($booking_id, $previous_keys, $new_keys, $created_by);
-						}
-					}
-				}
+				// Booking Checklist Completion (delegated so the Save_Checklist
+				// endpoint can reuse the same write path for users without AB).
+				$this->_persist_checklist_completions(
+					$this->input->post('booking_id'),
+					$this->input->post('checklist_completions'),
+					$this->session->userdata('admin_id')
+				);
 
 				// Customer-intake draft: staff saving a PCI booking is the
 				// "BC created" event — advance to PBC and log it so the
@@ -2983,10 +2879,13 @@ class Booking extends MY_Controller
 					$this->load->helper('booking_flow');
 					$has_deposit_deadline_detail = !empty($array['DepositDeadline']);
 					$array['deposit_complete'] = compute_deposit_complete($deposit_total, $total_credit_approved, $has_deposit_deadline_detail);
+					$checklist_tl_ids = resolve_booking_checklist_team_leads($array);
 					$array['can_modify_checklist'] = can_user_modify_booking_checklist(
 						$array,
 						$this->session->userdata('admin_id'),
-						$this->session->userdata('level')
+						$this->session->userdata('level'),
+						$checklist_tl_ids['tc1_tl'],
+						$checklist_tl_ids['op_tl']
 					);
 					// Calculate deposit status and format Deposit Paid display
 					$deposit_difference = $deposit_paid - $deposit_total;
@@ -5457,7 +5356,8 @@ class Booking extends MY_Controller
 		// Check access
 		$access_control = $this->session->access_control ?? array();
 		$is_sales_agent = $this->session->userdata('level') == 20;
-		if(!in_array('AB', $access_control) && !$is_sales_agent) {
+		$is_team_lead = (int)$this->session->userdata('level') === 25;
+		if(!in_array('AB', $access_control) && !$is_sales_agent && !$is_team_lead) {
 			echo json_encode(array('success' => false, 'message' => 'Access denied'));
 			return;
 		}
@@ -5477,14 +5377,18 @@ class Booking extends MY_Controller
 			}
 		}
 
-		// Mirror notification scoping: only TC1 (booking SalesAgent) and OP
-		// (BookingOP) may mutate the checklist for this specific booking. The
-		// modal can still load read-only for everyone else with AB access.
+		// Strict whitelist: only TC1 (booking SalesAgent), OP (BookingOP), and
+		// the Team Lead (level 25) of either may mutate this booking's
+		// checklist. The modal can still load read-only for everyone else
+		// with AB access.
 		$this->load->helper('booking_flow');
+		$tl_ids = resolve_booking_checklist_team_leads($booking);
 		$can_modify = can_user_modify_booking_checklist(
 			$booking,
 			$this->session->userdata('admin_id'),
-			$this->session->userdata('level')
+			$this->session->userdata('level'),
+			$tl_ids['tc1_tl'],
+			$tl_ids['op_tl']
 		);
 
 		// Get booking products (need ProductID and Name for checklist grouping)
@@ -5708,6 +5612,158 @@ class Booking extends MY_Controller
 			$this->db->insert_batch('booking_log', $booking_logs);
 			log_message('debug', 'Booking Checklist Logs: ' . count($booking_logs) . ' entries inserted for BookingID: ' . $booking_id);
 		}
+	}
+
+	/**
+	 * Shared checklist-write path used by both the full Booking/Update AJAX
+	 * handler (AB users editing the form) and the dedicated Save_Checklist
+	 * endpoint (Team Leads without AB ticking via the list-page modal).
+	 *
+	 * Returns ['allowed' => bool, 'success' => bool, 'message' => string].
+	 */
+	private function _persist_checklist_completions($booking_id, $checklist_completions_raw, $admin_id)
+	{
+		$result = array('allowed' => false, 'success' => false, 'message' => '');
+
+		if (empty($booking_id) || $checklist_completions_raw === null) {
+			$result['message'] = 'Missing booking_id or checklist payload';
+			return $result;
+		}
+		if (empty($admin_id)) {
+			$result['message'] = 'No admin session';
+			return $result;
+		}
+
+		// Normalise to array
+		if (!is_array($checklist_completions_raw)) {
+			$checklist_completions_raw = !empty($checklist_completions_raw)
+				? array($checklist_completions_raw)
+				: array();
+		}
+
+		// Parse "productId_checklistId" pairs
+		$completion_pairs = array();
+		foreach ($checklist_completions_raw as $value) {
+			$parts = explode('_', $value, 2);
+			if (count($parts) == 2) {
+				$completion_pairs[] = array(intval($parts[0]), intval($parts[1]));
+			}
+		}
+
+		if (!$this->db->table_exists('booking_checklist_completion')) {
+			log_message('error', 'booking_checklist_completion table does not exist. Please run migration.');
+			$result['message'] = 'Checklist storage not provisioned';
+			return $result;
+		}
+
+		// Snapshot previous completions for diff logging
+		$previous_map = $this->Booking_Checklist_Completion_Model->Read_Completion_Map($booking_id);
+		$previous_keys = array();
+		foreach ($previous_map as $pid => $checklists) {
+			foreach ($checklists as $cid => $info) {
+				$previous_keys[] = $pid . '_' . $cid;
+			}
+		}
+
+		$this->load->helper('booking_flow');
+		$booking = $this->Booking_Model->getBookingById($booking_id);
+
+		$tl_ids = $booking
+			? resolve_booking_checklist_team_leads($booking)
+			: array('tc1_tl' => null, 'op_tl' => null);
+		$allowed = $booking && can_user_modify_booking_checklist(
+			$booking,
+			$admin_id,
+			$this->session->userdata('level'),
+			$tl_ids['tc1_tl'],
+			$tl_ids['op_tl']
+		);
+
+		if (!$allowed) {
+			if ($booking) {
+				log_message('info', 'Checklist save blocked: admin_id=' . $admin_id . ' is not TC1/OP/Team Lead for booking ' . $booking_id);
+			}
+			$result['message'] = 'Access denied';
+			return $result;
+		}
+
+		$result['allowed'] = true;
+
+		$was_all_completed = are_all_checklists_completed($booking_id, $this);
+		$this->Booking_Checklist_Completion_Model->Create($booking_id, $completion_pairs, $admin_id);
+		$is_now_all_completed = are_all_checklists_completed($booking_id, $this);
+
+		if ($was_all_completed && !$is_now_all_completed) {
+			$this->load->helper('booking_status_log');
+			if ($booking->Status != 'PBO' && in_array($booking->Status, ['PTV', 'PT'])) {
+				$this->Booking_Model->Update_Status('PBO', $booking_id);
+				log_booking_status_change(
+					$booking_id,
+					'PBO',
+					$booking->Status,
+					$admin_id,
+					'Status reverted to PENDING BOOKING OPERATION - Checklist unchecked',
+					true
+				);
+			}
+		} else if ($booking->Status == 'PBO' && $is_now_all_completed) {
+			$status_info = determine_booking_status_from_state($booking_id, $booking, $this);
+			if ($status_info['status'] != 'PBO') {
+				$this->load->helper('booking_status_log');
+				$this->Booking_Model->Update_Status($status_info['status'], $booking_id);
+				log_booking_status_change(
+					$booking_id,
+					$status_info['status'],
+					'PBO',
+					$admin_id,
+					'All Booking Checklists Completed - Status changed to ' . $status_info['status'],
+					true
+				);
+			}
+		}
+
+		$new_keys = array();
+		foreach ($completion_pairs as $pair) {
+			$new_keys[] = $pair[0] . '_' . $pair[1];
+		}
+		$this->log_checklist_changes($booking_id, $previous_keys, $new_keys, $admin_id);
+
+		$result['success'] = true;
+		return $result;
+	}
+
+	/**
+	 * AJAX endpoint to save checklist completions from the list-page modal.
+	 * Intentionally decoupled from the AB-gated Booking/Update handler so that
+	 * level-25 Team Leads (who typically lack AB) can still tick their team's
+	 * bookings. Authorisation is delegated to can_user_modify_booking_checklist()
+	 * inside _persist_checklist_completions().
+	 */
+	public function Save_Checklist()
+	{
+		header('Content-Type: application/json');
+
+		$access_control = $this->session->access_control ?? array();
+		if (!in_array('VB', $access_control)) {
+			echo json_encode(array('success' => false, 'message' => 'Access denied'));
+			return;
+		}
+
+		$booking_id = $this->input->post('booking_id');
+		$raw_completions = $this->input->post('checklist_completions');
+		$admin_id = $this->session->userdata('admin_id');
+
+		$result = $this->_persist_checklist_completions($booking_id, $raw_completions, $admin_id);
+
+		if (!$result['allowed']) {
+			echo json_encode(array('success' => false, 'message' => $result['message'] ?: 'Access denied'));
+			return;
+		}
+		if (!$result['success']) {
+			echo json_encode(array('success' => false, 'message' => $result['message'] ?: 'Failed to save checklist'));
+			return;
+		}
+		echo json_encode(array('success' => true));
 	}
 
 	// TEMP one-shot sweep: recompute is_submitted for bookings where the flag
