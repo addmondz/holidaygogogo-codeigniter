@@ -250,6 +250,163 @@ class Notification_Model extends CI_Model
 	}
 
 	/**
+	 * Resolve parsed @handles back to AdminIDs of active admins.
+	 * Lowercased + deduped. Unknown or inactive handles silently dropped.
+	 *
+	 * @param array $handles Handle strings parsed from remark content
+	 * @return array Array of AdminIDs (order follows admin row order)
+	 */
+	function Resolve_Handles_To_User_Ids($handles)
+	{
+		if (empty($handles)) {
+			return array();
+		}
+
+		$wanted = array_unique(array_map('strtolower', $handles));
+
+		$this->db->select('AdminID, Name');
+		$this->db->where('Status', 'Y');
+		$admins = $this->db->get('admin')->result();
+
+		$admins = $this->Build_Admin_Handles($admins);
+
+		$ids = array();
+		foreach ($admins as $a) {
+			if (in_array($a->handle, $wanted, true)) {
+				$ids[] = intval($a->AdminID);
+			}
+		}
+		return array_values(array_unique($ids));
+	}
+
+	/**
+	 * Create one 'remark' notification per active tagged admin. The commenter
+	 * is never notified (even if listed in $user_ids). Idempotent on
+	 * (user_id, remark_id) — re-running inserts no duplicate row.
+	 *
+	 * @param int    $booking_id
+	 * @param int    $remark_id
+	 * @param int    $commenter_id    Admin who created the remark
+	 * @param string $remark_content  (unused; reserved for future message variants)
+	 * @param array  $user_ids        Tagged AdminIDs to notify
+	 * @return int   Number of notification rows actually inserted
+	 */
+	function Create_Remark_Notifications_For_Users($booking_id, $remark_id, $commenter_id, $remark_content, $user_ids)
+	{
+		$this->db->select('Name');
+		$this->db->where('AdminID', $commenter_id);
+		$commenter = $this->db->get('admin')->row();
+		$commenter_name = !empty($commenter) ? $commenter->Name : 'Unknown';
+
+		$message = $commenter_name . ' added a remark';
+
+		// Never self-notify
+		$user_ids = array_diff($user_ids, array($commenter_id));
+
+		$notifications_created = 0;
+
+		foreach ($user_ids as $user_id) {
+			$this->db->select('AdminID');
+			$this->db->where('AdminID', $user_id);
+			$this->db->where('Status', 'Y');
+			$admin = $this->db->get('admin')->row();
+
+			if (empty($admin)) {
+				continue;
+			}
+
+			$this->db->where('user_id', $user_id);
+			$this->db->where('remark_id', $remark_id);
+			$existing = $this->db->get('notification')->row();
+
+			if (empty($existing)) {
+				$this->Create(array(
+					'user_id'    => $user_id,
+					'type'       => 'remark',
+					'owner_type' => 'booking',
+					'owner_id'   => $booking_id,
+					'remark_id'  => $remark_id,
+					'message'    => $message,
+				));
+				$notifications_created++;
+			}
+		}
+
+		return $notifications_created;
+	}
+
+	/**
+	 * Auto-notify the booking's SalesAgent and BookingOP for every internal
+	 * remark. Skips inactive admins, skips the commenter, collapses SA==OP to
+	 * a single row, and is idempotent on (user_id, remark_id).
+	 *
+	 * @param int    $booking_id
+	 * @param int    $remark_id
+	 * @param int    $commenter_id
+	 * @param string $remark_content  (unused; reserved for future message variants)
+	 * @return int   Number of notification rows inserted
+	 */
+	function Create_Remark_Notifications($booking_id, $remark_id, $commenter_id, $remark_content)
+	{
+		$this->db->select('BookingID, SalesAgent, BookingOP');
+		$this->db->where('BookingID', $booking_id);
+		$booking = $this->db->get('booking')->row();
+
+		if (empty($booking)) {
+			return 0;
+		}
+
+		$this->db->select('Name');
+		$this->db->where('AdminID', $commenter_id);
+		$commenter = $this->db->get('admin')->row();
+		$commenter_name = !empty($commenter) ? $commenter->Name : 'Unknown';
+
+		$message = $commenter_name . ' added a remark';
+
+		$notifications_created = 0;
+		$notified_user_ids = array();
+
+		$targets = array();
+		if (!empty($booking->SalesAgent)) { $targets[] = $booking->SalesAgent; }
+		if (!empty($booking->BookingOP))  { $targets[] = $booking->BookingOP; }
+
+		foreach ($targets as $uid) {
+			if ($uid == $commenter_id || in_array($uid, $notified_user_ids)) {
+				continue;
+			}
+
+			$this->db->select('AdminID');
+			$this->db->where('AdminID', $uid);
+			$this->db->where('Status', 'Y');
+			$admin = $this->db->get('admin')->row();
+
+			if (empty($admin)) {
+				$notified_user_ids[] = $uid;
+				continue;
+			}
+
+			$this->db->where('user_id', $uid);
+			$this->db->where('remark_id', $remark_id);
+			$existing = $this->db->get('notification')->row();
+
+			if (empty($existing)) {
+				$this->Create(array(
+					'user_id'    => $uid,
+					'type'       => 'remark',
+					'owner_type' => 'booking',
+					'owner_id'   => $booking_id,
+					'remark_id'  => $remark_id,
+					'message'    => $message,
+				));
+				$notifications_created++;
+			}
+			$notified_user_ids[] = $uid;
+		}
+
+		return $notifications_created;
+	}
+
+	/**
 	 * Create notification for Sales Agent and BookingOP when customer adds a remark
 	 *
 	 * @param int $booking_id Booking ID

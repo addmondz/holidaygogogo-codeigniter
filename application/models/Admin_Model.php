@@ -127,6 +127,39 @@ class Admin_Model extends CI_Model
 		return array_map(function($r) { return $r->GhlUserID; }, $rows);
 	}
 
+	function Read_Sales_Targets_For_Admin($admin_id)
+	{
+		$admin_id = (int) $admin_id;
+		if ($admin_id <= 0) return array();
+		$this->db->select('target_year, target_month, target_amount');
+		$this->db->where('AdminID', $admin_id);
+		$rows = $this->db->get('sales_target')->result();
+		$out = array();
+		foreach ($rows as $r) {
+			$key = sprintf('%04d-%02d', (int)$r->target_year, (int)$r->target_month);
+			$out[$key] = (float) $r->target_amount;
+		}
+		return $out;
+	}
+
+	private function _Sync_Sales_Targets($admin_id, array $period_amount_map)
+	{
+		$admin_id = (int) $admin_id;
+		if ($admin_id <= 0) return;
+
+		$this->load->model('Sales_Target_Model');
+		foreach ($period_amount_map as $ym => $amount) {
+			if (!is_string($ym) || !preg_match('/^(\d{4})-(\d{2})$/', $ym, $m)) {
+				continue;
+			}
+			$year  = (int) $m[1];
+			$month = (int) $m[2];
+			if ($year < 2000 || $year > 2100 || $month < 1 || $month > 12) continue;
+			$amt = max(0.0, (float) $amount);
+			$this->Sales_Target_Model->upsert($admin_id, $year, $month, $amt);
+		}
+	}
+
 	private function _Sync_Lead_Dashboard_Agents($admin_id, array $ghl_user_ids)
 	{
 		$admin_id = (int) $admin_id;
@@ -208,13 +241,14 @@ class Admin_Model extends CI_Model
 						$adminPayload = json_decode(json_encode($this->input->post('admin')), true);
 						$adminId = (!empty($adminPayload[0]['AdminID'])) ? (int) $adminPayload[0]['AdminID'] : 0;
 						$ldaDirty = ($this->input->post('lead_dashboard_agents_dirty') === '1');
+						$stDirty  = ($this->input->post('sales_targets_dirty') === '1');
 
 						// update_batch returns int (>=0) on success, FALSE on input error.
 						// 0 means "row matched but values already equal" — still a success for the user.
 						$updateResult = $this->db->update_batch('admin', json_decode(json_encode($this->input->post('admin'))), 'AdminID');
 						$adminOk = ($updateResult !== FALSE);
 
-						if($adminOk || $ldaDirty) {
+						if($adminOk || $ldaDirty || $stDirty) {
 							$adminLog = $this->input->post('admin_log');
 							if(!empty($adminLog)) {
 								$this->db->insert_batch('admin_log', json_decode(json_encode($adminLog)));
@@ -227,6 +261,16 @@ class Admin_Model extends CI_Model
 									);
 								} catch (Exception $e) {
 									log_message('error', 'Lead dashboard agents sync failed for AdminID '.$adminId.': '.$e->getMessage());
+								}
+							}
+							if($stDirty && $adminId > 0) {
+								try {
+									$this->_Sync_Sales_Targets(
+										$adminId,
+										(array) $this->input->post('sales_targets')
+									);
+								} catch (Exception $e) {
+									log_message('error', 'Sales targets sync failed for AdminID '.$adminId.': '.$e->getMessage());
 								}
 							}
 							return true;

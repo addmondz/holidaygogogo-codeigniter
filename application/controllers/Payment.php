@@ -15,6 +15,7 @@ class Payment extends MY_Controller
 		$this->load->model('Booking_Checklist_Completion_Model');
 		$this->load->model('Product_Package_Checklist_Model');
 		$this->load->model('Package_Checklist_Model');
+		$this->load->model('Booking_Supplier_Invoice_Model');
 		$this->config->load('autocount'); // load config/autocount.php
 	}
 
@@ -63,6 +64,21 @@ class Payment extends MY_Controller
 			$array['supplier_payments'] = $supplier_payments;
 			$array['supplier_ids'] = $supplier_ids;
 			$array['total_supplier_payment'] = 'RM ' . number_format($total_supplier, 2, '.', ',');
+
+			// Supplier-invoice outstanding breakdown — mirrors the supplier filter
+			// already in use on the payment listing, so the summary stays in
+			// sync with whatever supplier the user has drilled into.
+			$invoice_filters = [];
+			if (!empty($this->input->get('supplier'))) {
+				$invoice_filters['supplier_id'] = (int) $this->input->get('supplier');
+			}
+			$array['supplier_invoice_summary']    = $this->Booking_Supplier_Invoice_Model->Read_Outstanding_Summary($invoice_filters);
+			$array['supplier_invoice_line_items'] = $this->Booking_Supplier_Invoice_Model->Read_Outstanding_Lines($invoice_filters);
+			$total_invoice_outstanding = 0;
+			foreach ($array['supplier_invoice_summary'] as $sup_row) {
+				$total_invoice_outstanding += (float) $sup_row->OutstandingTotal;
+			}
+			$array['total_supplier_invoice_outstanding'] = 'RM ' . number_format($total_invoice_outstanding, 2, '.', ',');
 
 			// Get customer refunds breakdown
 			$refunds_breakdown = $this->Payment_Model->Read_Customer_Refunds_Breakdown();
@@ -1258,6 +1274,106 @@ class Payment extends MY_Controller
 		header('Content-Disposition: attachment;filename="' . $payment_records . '"');
 		header('Cache-Control: max-age=0');
 		header('Cache-Control: max-age=1');
+		$writer = \PhpOffice\PhpSpreadsheet\IOFactory::createWriter($spreadsheet, 'Xlsx');
+		$writer->save('php://output');
+	}
+
+	function Download_Supplier_Invoices() {
+		if (!in_array('VP', $this->session->access_control)) {
+			redirect('Dashboard');
+			return;
+		}
+
+		$invoice_filters = [];
+		if (!empty($this->input->get('supplier'))) {
+			$invoice_filters['supplier_id'] = (int) $this->input->get('supplier');
+		}
+		$summary = $this->Booking_Supplier_Invoice_Model->Read_Outstanding_Summary($invoice_filters);
+		$lines   = $this->Booking_Supplier_Invoice_Model->Read_Outstanding_Lines($invoice_filters);
+
+		$spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+		$spreadsheet->getProperties()->setCreator('HolidayGoGoGo');
+
+		// Sheet 1: Summary (by supplier)
+		$summarySheet = $spreadsheet->getActiveSheet();
+		$summarySheet->setTitle('Summary');
+		$summarySheet->setCellValue('A1', 'SUPPLIER');
+		$summarySheet->setCellValue('B1', 'INVOICE COUNT');
+		$summarySheet->setCellValue('C1', 'OUTSTANDING (RM)');
+		$summarySheet->getStyle('A1:C1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_BLACK);
+		$summarySheet->getStyle('A1:C1')->getFont()->getColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_WHITE);
+		$summarySheet->getStyle('A1:C1')->getFont()->setBold(true);
+
+		$row = 2;
+		$total_outstanding = 0;
+		foreach ($summary as $sup) {
+			$summarySheet->setCellValueExplicit('A' . $row, $sup->SupplierName, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$summarySheet->setCellValue('B' . $row, (int) $sup->InvoiceCount);
+			$summarySheet->setCellValue('C' . $row, (float) $sup->OutstandingTotal);
+			$total_outstanding += (float) $sup->OutstandingTotal;
+			$row++;
+		}
+		if (!empty($summary)) {
+			$summarySheet->getCell('A' . ($row + 1))->setValue('Total');
+			$summarySheet->getCell('A' . ($row + 1))->getStyle()->getFont()->setBold(true);
+			$summarySheet->setCellValue('C' . ($row + 1), $total_outstanding);
+			$summarySheet->getStyle('C' . ($row + 1))->getFont()->setBold(true);
+			$summarySheet->getStyle('C' . ($row + 1))->getBorders()->getTop()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+			$summarySheet->getStyle('C' . ($row + 1))->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_DOUBLE);
+		} else {
+			$summarySheet->mergeCells('A2:C2');
+			$summarySheet->getCell('A2')->setValue('No outstanding supplier invoices.');
+			$summarySheet->getStyle('A2:C2')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
+		}
+		$summarySheet->getStyle('C')->getNumberFormat()->setFormatCode('#,##0.00_-');
+		$summarySheet->getColumnDimension('A')->setWidth(40);
+		$summarySheet->getColumnDimension('B')->setWidth(18);
+		$summarySheet->getColumnDimension('C')->setWidth(22);
+
+		// Sheet 2: Detail (per invoice)
+		$detailSheet = $spreadsheet->createSheet();
+		$detailSheet->setTitle('Detail');
+		$detailSheet->setCellValue('A1', 'BOOKING NUMBER');
+		$detailSheet->setCellValue('B1', 'SUPPLIER');
+		$detailSheet->setCellValue('C1', 'INVOICE #');
+		$detailSheet->setCellValue('D1', 'INVOICE AMOUNT (RM)');
+		$detailSheet->setCellValue('E1', 'PAID (RM)');
+		$detailSheet->setCellValue('F1', 'BALANCE (RM)');
+		$detailSheet->setCellValue('G1', 'PAYMENT DEADLINE');
+		$detailSheet->setCellValue('H1', 'REMARK');
+		$detailSheet->getStyle('A1:H1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_BLACK);
+		$detailSheet->getStyle('A1:H1')->getFont()->getColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_WHITE);
+		$detailSheet->getStyle('A1:H1')->getFont()->setBold(true);
+
+		$drow = 2;
+		foreach ($lines as $line) {
+			$deadline_str = !empty($line->PaymentDeadline) ? strtoupper(date('j M Y', strtotime($line->PaymentDeadline))) : '';
+			$detailSheet->setCellValueExplicit('A' . $drow, $line->BookingNumber,  \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$detailSheet->setCellValueExplicit('B' . $drow, $line->SupplierName,   \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$detailSheet->setCellValueExplicit('C' . $drow, $line->InvoiceNumber,  \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$detailSheet->setCellValue('D' . $drow, (float) $line->InvoiceAmount);
+			$detailSheet->setCellValue('E' . $drow, (float) $line->PaidAmount);
+			$detailSheet->setCellValue('F' . $drow, (float) $line->BalanceDue);
+			$detailSheet->setCellValueExplicit('G' . $drow, $deadline_str,         \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$detailSheet->setCellValueExplicit('H' . $drow, (string) $line->Remark, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$drow++;
+		}
+		if (empty($lines)) {
+			$detailSheet->mergeCells('A2:H2');
+			$detailSheet->getCell('A2')->setValue('No outstanding invoices.');
+			$detailSheet->getStyle('A2:H2')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
+		}
+		$detailSheet->getStyle('D:F')->getNumberFormat()->setFormatCode('#,##0.00_-');
+		foreach (range('A', 'H') as $col) {
+			$detailSheet->getColumnDimension($col)->setWidth(22);
+		}
+
+		$spreadsheet->setActiveSheetIndex(0);
+
+		$filename = 'SUPPLIER_INVOICES_OUTSTANDING_' . date('Ymd') . '.xlsx';
+		header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+		header('Content-Disposition: attachment;filename="' . $filename . '"');
+		header('Cache-Control: max-age=0');
 		$writer = \PhpOffice\PhpSpreadsheet\IOFactory::createWriter($spreadsheet, 'Xlsx');
 		$writer->save('php://output');
 	}

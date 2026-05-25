@@ -19,6 +19,110 @@
                 </div>
             </div>
         <?php } ?>
+        <?php
+            $invoice_download_url = base_url('Payment/Download_Supplier_Invoices');
+            if (!empty($this->input->get('supplier'))) {
+                $invoice_download_url .= '?supplier=' . urlencode($this->input->get('supplier'));
+            }
+        ?>
+        <div class="row mb-5">
+            <div class="col-12">
+                <div class="card" style="border:1px solid #FFCC80;">
+                    <div class="card-header" style="background-color:#FFF3E0; padding: 0.75rem 1.25rem;">
+                        <div class="d-flex align-items-center justify-content-between flex-wrap">
+                            <div style="font-size: 0.95rem; color: #E65100;">
+                                <strong>Supplier Invoices &mdash; Outstanding</strong>
+                                <span class="ml-3" style="color:#6c757d; font-size: 0.875rem;">
+                                    Total outstanding: <strong style="color:#C62828;"><?php echo $total_supplier_invoice_outstanding; ?></strong>
+                                </span>
+                            </div>
+                            <div>
+                                <a href="<?php echo $invoice_download_url; ?>" class="btn btn-success btn-sm font-weight-bold">
+                                    <i class="la la-file-excel-o"></i> Export to Excel
+                                </a>
+                                <button type="button"
+                                        class="btn btn-light btn-sm font-weight-bold ml-1"
+                                        data-toggle="collapse"
+                                        data-target="#supplier-invoice-summary-body">
+                                    Toggle
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="supplier-invoice-summary-body" class="collapse show">
+                        <div class="card-body p-3">
+                            <div class="row">
+                                <div class="col-md-5 mb-3 mb-md-0">
+                                    <div style="font-size:0.875rem; font-weight:600; color:#424242; margin-bottom:6px;">Outstanding by Supplier</div>
+                                    <?php if (!empty($supplier_invoice_summary)) { ?>
+                                        <table class="table table-sm table-bordered mb-0" style="font-size:0.875rem;">
+                                            <thead style="background-color:#F5F5F5;">
+                                                <tr>
+                                                    <th>Supplier</th>
+                                                    <th style="text-align:right; width:80px;">Invoices</th>
+                                                    <th style="text-align:right; width:130px;">Outstanding (RM)</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <?php foreach ($supplier_invoice_summary as $sup_row) {
+                                                    $supplier_drill_url = base_url('Payment?supplier=' . (int)$sup_row->SupplierID);
+                                                ?>
+                                                    <tr>
+                                                        <td><a href="<?php echo $supplier_drill_url; ?>"><?php echo htmlspecialchars($sup_row->SupplierName); ?></a></td>
+                                                        <td style="text-align:right;"><?php echo (int) $sup_row->InvoiceCount; ?></td>
+                                                        <td style="text-align:right; color:#C62828;"><strong><?php echo number_format((float)$sup_row->OutstandingTotal, 2, '.', ','); ?></strong></td>
+                                                    </tr>
+                                                <?php } ?>
+                                            </tbody>
+                                        </table>
+                                    <?php } else { ?>
+                                        <div class="text-muted" style="font-size:0.875rem;">No outstanding supplier invoices.</div>
+                                    <?php } ?>
+                                </div>
+                                <div class="col-md-7">
+                                    <div style="font-size:0.875rem; font-weight:600; color:#424242; margin-bottom:6px;">Invoice Detail</div>
+                                    <?php if (!empty($supplier_invoice_line_items)) { ?>
+                                        <div class="table-responsive" style="max-height: 340px; overflow-y: auto;">
+                                            <table class="table table-sm table-bordered mb-0" style="font-size:0.8125rem;">
+                                                <thead style="background-color:#F5F5F5; position: sticky; top: 0; z-index: 1;">
+                                                    <tr>
+                                                        <th>Booking</th>
+                                                        <th>Supplier</th>
+                                                        <th>Invoice #</th>
+                                                        <th style="text-align:right;">Invoice (RM)</th>
+                                                        <th style="text-align:right;">Paid (RM)</th>
+                                                        <th style="text-align:right;">Balance (RM)</th>
+                                                        <th>Deadline</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <?php foreach ($supplier_invoice_line_items as $line) {
+                                                        $booking_url = !empty($line->BookingID) ? base_url('Booking/Update?booking_id=' . (int)$line->BookingID) : '#';
+                                                        $deadline_disp = !empty($line->PaymentDeadline) ? date('d M Y', strtotime($line->PaymentDeadline)) : '';
+                                                    ?>
+                                                        <tr>
+                                                            <td><a href="<?php echo $booking_url; ?>" target="_blank"><?php echo htmlspecialchars((string)$line->BookingNumber); ?></a></td>
+                                                            <td><?php echo htmlspecialchars((string)$line->SupplierName); ?></td>
+                                                            <td><?php echo htmlspecialchars((string)$line->InvoiceNumber); ?></td>
+                                                            <td style="text-align:right;"><?php echo number_format((float)$line->InvoiceAmount, 2, '.', ','); ?></td>
+                                                            <td style="text-align:right; color:#388E3C;"><?php echo number_format((float)$line->PaidAmount, 2, '.', ','); ?></td>
+                                                            <td style="text-align:right; color:#C62828;"><strong><?php echo number_format((float)$line->BalanceDue, 2, '.', ','); ?></strong></td>
+                                                            <td><?php echo $deadline_disp; ?></td>
+                                                        </tr>
+                                                    <?php } ?>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    <?php } else { ?>
+                                        <div class="text-muted" style="font-size:0.875rem;">No outstanding invoices.</div>
+                                    <?php } ?>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
         <div class="card card-custom mb-5">
             <div class="card-header flex-wrap py-3" style="background-color:#D7E2F2;">
                 <div class="card-title">

@@ -120,6 +120,63 @@
 
                 <form id="form">
 
+                    <?php if (!empty($customer_intake) && !empty($customer_intake['intake'])):
+                        $ci_intake = $customer_intake['intake'];
+                        $ci_rooms  = $customer_intake['rooms'];
+                        $ci_when   = !empty($ci_intake->submitted_at) ? date('j M Y, g:i a', strtotime($ci_intake->submitted_at)) : '';
+                        $ci_resp   = isset($customer_intake_response_seconds) ? $customer_intake_response_seconds : null;
+                    ?>
+                    <div class="alert" style="border:1px solid #BFD4EF; background:#EDF4FC; border-radius:8px; padding:14px 16px; margin-bottom:16px;">
+                        <div class="d-flex justify-content-between align-items-start" style="gap:12px;">
+                            <div>
+                                <div style="font-weight:700; color:#1c3d5a;">Customer intake submitted</div>
+                                <div style="font-size:13px; color:#4a5266; margin-top:2px;">Received <?php echo htmlspecialchars($ci_when); ?>. Editable fields below are pre-populated where blank.</div>
+                            </div>
+                            <?php if ($ci_resp !== null): ?>
+                                <div style="text-align:right; font-size:12px; color:#4a5266;">
+                                    Response time<br><strong style="font-size:14px; color:#1c3d5a;"><?php echo htmlspecialchars(format_response_duration($ci_resp)); ?></strong>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                        <div style="margin-top:10px; font-size:13px; color:#28324a;">
+                            <strong>Name:</strong> <?php echo htmlspecialchars($ci_intake->booking_name); ?> &middot;
+                            <strong>Contact:</strong> <?php echo htmlspecialchars($ci_intake->contact_number); ?> &middot;
+                            <strong>IC/Passport:</strong> <?php echo htmlspecialchars($ci_intake->ic_passport_no); ?> &middot;
+                            <strong>Travel:</strong>
+                            <?php
+                                $ci_start_h = !empty($ci_intake->travel_start_date) ? date('d M Y', strtotime($ci_intake->travel_start_date)) : '';
+                                $ci_end_h   = !empty($ci_intake->travel_end_date)   ? date('d M Y', strtotime($ci_intake->travel_end_date))   : '';
+                                echo htmlspecialchars($ci_start_h . ($ci_end_h !== '' && $ci_end_h !== $ci_start_h ? ' → ' . $ci_end_h : ''));
+                            ?>
+                        </div>
+                        <?php if (!empty($ci_intake->special_remarks)): ?>
+                            <div style="margin-top:6px; font-size:13px; color:#28324a;">
+                                <strong>Remarks:</strong> <?php echo nl2br(htmlspecialchars($ci_intake->special_remarks)); ?>
+                            </div>
+                        <?php endif; ?>
+                        <?php if (!empty($ci_rooms)): ?>
+                            <div style="margin-top:8px; font-size:13px; color:#28324a;">
+                                <strong>Rooms:</strong>
+                                <ul style="margin:4px 0 0 18px; padding:0;">
+                                <?php foreach ($ci_rooms as $idx => $room):
+                                    $ages_child = !empty($room->child_ages) ? $room->child_ages : '';
+                                    $ages_baby  = !empty($room->baby_ages)  ? $room->baby_ages  : '';
+                                ?>
+                                    <li>
+                                        Room <?php echo ($idx + 1); ?>
+                                        <?php if (!empty($room->room_type)): ?>(<?php echo htmlspecialchars($room->room_type); ?>)<?php endif; ?>
+                                        &mdash;
+                                        <?php echo (int) $room->adult_count; ?> Adult<?php echo ((int) $room->adult_count !== 1 ? 's' : ''); ?>
+                                        <?php if ($ages_child !== ''): ?> + <?php echo count(explode(',', $ages_child)); ?> Child (age <?php echo htmlspecialchars($ages_child); ?>)<?php endif; ?>
+                                        <?php if ($ages_baby !== ''):  ?> + <?php echo count(explode(',', $ages_baby));  ?> Baby (age <?php echo htmlspecialchars($ages_baby);  ?>)<?php endif; ?>
+                                    </li>
+                                <?php endforeach; ?>
+                                </ul>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                    <?php endif; ?>
+
                     <strong>Booking Information :</strong>
 
                     <br><br>
@@ -1100,6 +1157,13 @@
 
                     <div class="d-flex justify-content-between border-top pt-5" style="overflow-x:auto;">
 
+                        <?php if(current_url() == base_url('Booking/Create')) { ?>
+                            <label class="d-flex align-items-center mr-3 mb-0" style="font-size:13px; color:#4a5266;" title="Park this booking as a draft awaiting customer-supplied details. A shareable intake link will appear in the booking list action menu.">
+                                <input type="checkbox" id="is_draft_intake_toggle" class="mr-2"> Save as customer intake draft
+                            </label>
+                            <input type="hidden" id="is_draft_intake" name="is_draft_intake" value="0">
+                        <?php } ?>
+
                         <input type="button" value="<?php if(current_url() == base_url('Booking/Create') || current_url() == base_url('Booking/Duplicate')) { echo 'Create Booking'; } else { echo 'Update Booking'; } ?>" class="btn btn-success font-weight-bold px-9 py-4" style="width:180px; margin-left:auto;">
 
                         <?php if(current_url() == base_url('Booking/Update')) { ?>
@@ -1129,6 +1193,96 @@
         </div>
 
         <?php if(current_url() == base_url('Booking/Update')) { ?>
+
+            <!-- Supplier Invoices Section -->
+            <div class="row mt-5 mb-5">
+                <div class="col">
+                    <div class="card card-custom" id="supplier-invoices">
+                        <div class="card-header flex-wrap py-2" style="background-color:#FFF3E0;">
+                            <div class="card-title">
+                                <h4 class="card-label mb-0" style="color:#E65100; font-size: 1.1rem;">
+                                    <strong>Supplier Invoices</strong>
+                                </h4>
+                            </div>
+                            <div class="card-toolbar">
+                                <button type="button" id="add-supplier-invoice-btn" class="btn btn-primary btn-sm font-weight-bold">
+                                    <i class="la la-plus"></i> Add Invoice
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body p-3">
+                            <div class="table-responsive">
+                                <table id="supplier-invoices-table" class="table table-sm table-bordered mb-0" style="font-size: 0.875rem;">
+                                    <thead style="background-color:#F5F5F5;">
+                                        <tr>
+                                            <th style="min-width:180px;">Supplier</th>
+                                            <th style="min-width:140px;">Invoice #</th>
+                                            <th style="min-width:120px; text-align:right;">Invoice Amount (RM)</th>
+                                            <th style="min-width:140px;">Payment Deadline</th>
+                                            <th style="min-width:160px;">Remark</th>
+                                            <th style="min-width:110px; text-align:right;">Paid (RM)</th>
+                                            <th style="min-width:110px; text-align:right;">Balance (RM)</th>
+                                            <th style="width:50px; text-align:center;">&nbsp;</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="supplier-invoices-tbody">
+                                        <?php if (!empty($supplier_invoices)) { foreach ($supplier_invoices as $inv) {
+                                            $deadline_display = !empty($inv->PaymentDeadline) ? date('d/m/Y', strtotime($inv->PaymentDeadline)) : '';
+                                        ?>
+                                            <tr class="supplier-invoice-row"
+                                                data-supplier-invoice-id="<?php echo (int)$inv->SupplierInvoiceID; ?>"
+                                                data-initial-supplier-id="<?php echo (int)$inv->SupplierID; ?>"
+                                                data-initial-invoice-number="<?php echo htmlspecialchars($inv->InvoiceNumber, ENT_QUOTES); ?>"
+                                                data-initial-invoice-amount="<?php echo htmlspecialchars($inv->InvoiceAmount, ENT_QUOTES); ?>"
+                                                data-initial-payment-deadline="<?php echo htmlspecialchars((string)$inv->PaymentDeadline, ENT_QUOTES); ?>"
+                                                data-initial-remark="<?php echo htmlspecialchars((string)$inv->Remark, ENT_QUOTES); ?>"
+                                                data-deleted="0">
+                                                <td>
+                                                    <select class="supplier-invoice-supplier form-control form-control-sm">
+                                                        <option value="">-- Select Supplier --</option>
+                                                        <?php foreach ($supplier_invoice_suppliers as $sup) { ?>
+                                                            <option value="<?php echo (int)$sup->SupplierID; ?>" <?php if ($sup->SupplierID == $inv->SupplierID) echo 'selected'; ?>>
+                                                                <?php echo htmlspecialchars($sup->Name); ?>
+                                                            </option>
+                                                        <?php } ?>
+                                                    </select>
+                                                </td>
+                                                <td>
+                                                    <input type="text" class="supplier-invoice-number form-control form-control-sm" value="<?php echo htmlspecialchars($inv->InvoiceNumber); ?>">
+                                                </td>
+                                                <td>
+                                                    <input type="number" step="0.01" min="0" class="supplier-invoice-amount form-control form-control-sm" style="text-align:right;" value="<?php echo htmlspecialchars($inv->InvoiceAmount); ?>">
+                                                </td>
+                                                <td>
+                                                    <input type="text" readonly class="supplier-invoice-deadline form-control form-control-sm" autocomplete="off" value="<?php echo $deadline_display; ?>">
+                                                </td>
+                                                <td>
+                                                    <input type="text" class="supplier-invoice-remark form-control form-control-sm" value="<?php echo htmlspecialchars((string)$inv->Remark); ?>">
+                                                </td>
+                                                <td style="text-align:right; vertical-align:middle; color:#388E3C;">
+                                                    <?php echo number_format((float)$inv->PaidAmount, 2, '.', ','); ?>
+                                                </td>
+                                                <td style="text-align:right; vertical-align:middle; color:<?php echo ((float)$inv->BalanceDue > 0 ? '#C62828' : '#9E9E9E'); ?>;">
+                                                    <strong><?php echo number_format((float)$inv->BalanceDue, 2, '.', ','); ?></strong>
+                                                </td>
+                                                <td style="text-align:center; vertical-align:middle;">
+                                                    <button type="button" class="supplier-invoice-remove btn btn-danger btn-xs" data-toggle="tooltip" title="Remove invoice">
+                                                        <i class="la la-trash"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        <?php } } ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <?php if (empty($supplier_invoices)) { ?>
+                                <div id="supplier-invoices-empty" class="text-center text-muted py-3" style="font-size:0.875rem;">No supplier invoices yet. Click "Add Invoice" above to enter one.</div>
+                            <?php } ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="row">
                 <!-- Internal Comments Section -->
                 <div class="col-lg-6 col-md-12">
@@ -2297,7 +2451,14 @@
 
     var booking_products = <?php echo json_encode($booking_products) ?>;
 
-    var booking_product_id = window.location.href.split('?')[0] == '<?php echo base_url('Booking/Update'); ?>' ? parseInt(booking_products[0].BookingProductID) : parseInt(<?php echo $BookingProductID; ?>);
+    // Guard against empty booking_products: PCI customer-intake drafts have no
+    // products yet, so booking_products[0] would be undefined and reading
+    // .BookingProductID on it throws a TypeError that halts the rest of this
+    // <script> block — leaving every later click handler (Insert Product,
+    // Update Booking, etc.) unbound. Fall back to $BookingProductID (the next
+    // available product id, populated by the controller for both Create and
+    // Update GET branches) when the array is empty.
+    var booking_product_id = (window.location.href.split('?')[0] == '<?php echo base_url('Booking/Update'); ?>' && booking_products.length > 0) ? parseInt(booking_products[0].BookingProductID) : parseInt(<?php echo $BookingProductID; ?>);
 
     var booking_product_ids = [];
 
@@ -4203,6 +4364,20 @@
 
         if (booking_rooms && booking_rooms.length > 0) {
             postData.booking_rooms = booking_rooms;
+        }
+
+        // Customer intake draft toggle (Create page only). Reads the checkbox
+        // beside the Create button so the controller can park the new booking
+        // in PCI status.
+        if ($('#is_draft_intake_toggle').length && $('#is_draft_intake_toggle').is(':checked')) {
+            postData.is_draft_intake = '1';
+        }
+
+        if (typeof Collect_Supplier_Invoices === 'function') {
+            var supplier_invoices_payload = Collect_Supplier_Invoices();
+            if (supplier_invoices_payload && (supplier_invoices_payload[0].length || supplier_invoices_payload[1].length || supplier_invoices_payload[2].length)) {
+                postData.booking_supplier_invoices = supplier_invoices_payload;
+            }
         }
 
         $.ajax({
@@ -6777,4 +6952,126 @@ $(document).ready(function() {
             });
         };
     })();
+
+    // ============================================================
+    // Supplier Invoices (per booking) — Update-mode section only.
+    // POSTed as booking_supplier_invoices = [create_rows, update_rows, delete_rows]
+    // ============================================================
+    (function() {
+        if ($('#supplier-invoices').length === 0) return;
+
+        var supplierOptionsHtml = '<option value="">-- Select Supplier --</option>';
+        <?php if (!empty($supplier_invoice_suppliers)) { foreach ($supplier_invoice_suppliers as $sup) { ?>
+            supplierOptionsHtml += '<option value="<?php echo (int)$sup->SupplierID; ?>"><?php echo addslashes(htmlspecialchars($sup->Name)); ?></option>';
+        <?php } } ?>
+
+        function initDeadlinePicker($input) {
+            $input.datepicker({format: 'dd/mm/yyyy', autoclose: true, todayHighlight: true});
+        }
+
+        function buildEmptyRowHtml() {
+            return '<tr class="supplier-invoice-row" data-supplier-invoice-id="" data-deleted="0">' +
+                '<td><select class="supplier-invoice-supplier form-control form-control-sm">' + supplierOptionsHtml + '</select></td>' +
+                '<td><input type="text" class="supplier-invoice-number form-control form-control-sm"></td>' +
+                '<td><input type="number" step="0.01" min="0" class="supplier-invoice-amount form-control form-control-sm" style="text-align:right;"></td>' +
+                '<td><input type="text" readonly class="supplier-invoice-deadline form-control form-control-sm" autocomplete="off"></td>' +
+                '<td><input type="text" class="supplier-invoice-remark form-control form-control-sm"></td>' +
+                '<td style="text-align:right; vertical-align:middle; color:#9E9E9E;">&mdash;</td>' +
+                '<td style="text-align:right; vertical-align:middle; color:#9E9E9E;">&mdash;</td>' +
+                '<td style="text-align:center; vertical-align:middle;">' +
+                    '<button type="button" class="supplier-invoice-remove btn btn-danger btn-xs" data-toggle="tooltip" title="Remove invoice">' +
+                        '<i class="la la-trash"></i>' +
+                    '</button>' +
+                '</td>' +
+            '</tr>';
+        }
+
+        $('#add-supplier-invoice-btn').on('click', function() {
+            $('#supplier-invoices-empty').remove();
+            var $row = $(buildEmptyRowHtml());
+            $('#supplier-invoices-tbody').append($row);
+            initDeadlinePicker($row.find('.supplier-invoice-deadline'));
+            $row.find('[data-toggle="tooltip"]').tooltip();
+        });
+
+        $('#supplier-invoices-tbody').on('click', '.supplier-invoice-remove', function() {
+            var $row = $(this).closest('tr');
+            if (!$row.data('supplier-invoice-id')) {
+                $row.remove();
+            } else {
+                $row.attr('data-deleted', '1').hide();
+            }
+        });
+
+        // Activate datepicker on any server-rendered rows.
+        $('#supplier-invoices-tbody .supplier-invoice-deadline').each(function() {
+            initDeadlinePicker($(this));
+        });
+        $('#supplier-invoices-tbody [data-toggle="tooltip"]').tooltip();
+    })();
+
+    function _supplierInvoiceFormatDeadline(displayValue) {
+        if (!displayValue) return null;
+        var parts = displayValue.split('/');
+        if (parts.length !== 3) return null;
+        return parts[2] + '-' + parts[1] + '-' + parts[0];
+    }
+
+    window.Collect_Supplier_Invoices = function() {
+        var createRows = [];
+        var updateRows = [];
+        var deleteRows = [];
+        $('#supplier-invoices-tbody tr.supplier-invoice-row').each(function() {
+            var $row = $(this);
+            var existingId = $row.data('supplier-invoice-id');
+            var isDeleted = $row.attr('data-deleted') === '1';
+
+            if (isDeleted) {
+                if (existingId) {
+                    deleteRows.push({SupplierInvoiceID: existingId, Status: 'N'});
+                }
+                return; // new row marked deleted -> just drop it
+            }
+
+            var supplier_id    = $row.find('.supplier-invoice-supplier').val();
+            var invoice_number = ($row.find('.supplier-invoice-number').val() || '').trim();
+            var invoice_amount = $row.find('.supplier-invoice-amount').val();
+            var deadline_disp  = $row.find('.supplier-invoice-deadline').val();
+            var remark         = $row.find('.supplier-invoice-remark').val() || '';
+
+            // Skip blank new rows (everything empty).
+            if (!existingId && !supplier_id && !invoice_number && !invoice_amount && !deadline_disp && !remark) {
+                return;
+            }
+
+            var payload = {
+                SupplierID: supplier_id ? parseInt(supplier_id, 10) : null,
+                InvoiceNumber: invoice_number,
+                InvoiceAmount: invoice_amount === '' ? 0 : parseFloat(invoice_amount),
+                PaymentDeadline: _supplierInvoiceFormatDeadline(deadline_disp),
+                Remark: remark
+            };
+
+            if (existingId) {
+                payload.SupplierInvoiceID = existingId;
+                var initialSupplier = String($row.data('initial-supplier-id') || '');
+                var initialNumber   = String($row.data('initial-invoice-number') || '');
+                var initialAmount   = String($row.data('initial-invoice-amount') || '');
+                var initialDeadline = String($row.data('initial-payment-deadline') || '');
+                var initialRemark   = String($row.data('initial-remark') || '');
+                var changed =
+                    String(payload.SupplierID || '')      !== initialSupplier
+                    || String(payload.InvoiceNumber)      !== initialNumber
+                    || String(payload.InvoiceAmount)      !== String(initialAmount === '' ? 0 : parseFloat(initialAmount))
+                    || String(payload.PaymentDeadline || '') !== initialDeadline
+                    || String(payload.Remark)             !== initialRemark;
+                if (changed) {
+                    updateRows.push(payload);
+                }
+            } else {
+                createRows.push(payload);
+            }
+        });
+        return [createRows, updateRows, deleteRows];
+    };
 </script>

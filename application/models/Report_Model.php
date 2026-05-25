@@ -531,8 +531,37 @@ class Report_Model extends CI_Model
         $totalLeads = !empty($row['total_leads']) ? (int) $row['total_leads'] : 0;
         $respondedLeads = !empty($row['responded_leads']) ? (int) $row['responded_leads'] : 0;
         $convertedLeads = !empty($row['converted_leads']) ? (int) $row['converted_leads'] : 0;
-        $avgResponseSeconds = isset($row['avg_response_time_seconds']) && $row['avg_response_time_seconds'] !== null
-            ? (int) round($row['avg_response_time_seconds'])
+
+        // Duty-hour-aware avg first-response time. Computed at query time from
+        // the per-slot agent reply timestamps so the duty-hour window can be
+        // changed (see duty_hours_helper.php) without re-running the cron.
+        $this->load->helper('duty_hours');
+        $slotSql = "
+            SELECT
+                pl.response_1_agent_message_at AS at1, pl.response_1_seconds AS s1,
+                pl.response_2_agent_message_at AS at2, pl.response_2_seconds AS s2,
+                pl.response_3_agent_message_at AS at3, pl.response_3_seconds AS s3,
+                pl.response_4_agent_message_at AS at4, pl.response_4_seconds AS s4,
+                pl.response_5_agent_message_at AS at5, pl.response_5_seconds AS s5
+            FROM ghl_processed_leads pl
+            LEFT JOIN ghl_conversations gc ON gc.conversation_id = pl.conversation_id
+            {$extraJoins}
+            {$where['sql']}
+        ";
+        $slotRows = $this->db->query($slotSql, $where['params'])->result_array();
+        $dutyTotal = 0;
+        $dutyCount = 0;
+        foreach ($slotRows as $sr) {
+            for ($i = 1; $i <= 5; $i++) {
+                $secs = $sr['s' . $i];
+                if ($secs === null || $secs === '') continue;
+                if (!is_within_duty_hours($sr['at' . $i])) continue;
+                $dutyTotal += (int) $secs;
+                $dutyCount++;
+            }
+        }
+        $avgResponseSeconds = $dutyCount > 0
+            ? (int) round($dutyTotal / $dutyCount)
             : null;
         $avgRecentResponseSeconds = isset($row['avg_recent_response_time_seconds']) && $row['avg_recent_response_time_seconds'] !== null
             ? (int) round($row['avg_recent_response_time_seconds'])
@@ -631,6 +660,34 @@ class Report_Model extends CI_Model
         }
 
         return $results;
+    }
+
+    /**
+     * Active (unconverted) leads grouped by allowlisted GHL tag, broken into
+     * destination / language / race buckets. Powers the TC LEAD card
+     * "Active Leads by Tag" — see ghl_tag_categories_helper.php for the
+     * allowlist and the bucketing rules.
+     *
+     * One SELECT fetches every unconverted lead + its raw tags_json; the
+     * PHP-side aggregator handles the per-tag bucketing. We deliberately
+     * avoid per-tag JSON_CONTAINS queries (one per allowlisted tag, ~100+
+     * round-trips) because JSON columns aren't indexed by content and the
+     * dashboard re-runs this card on every page load.
+     */
+    function Active_Leads_By_Tag($category_tags)
+    {
+        $this->load->helper('ghl_tag_categories');
+
+        $rows = $this->db->query(
+            "SELECT pl.id, gc.tags_json
+             FROM ghl_processed_leads pl
+             LEFT JOIN ghl_conversations gc ON gc.conversation_id = pl.conversation_id
+             WHERE pl.is_converted = 0
+               AND gc.tags_json IS NOT NULL
+               AND JSON_LENGTH(gc.tags_json) > 0"
+        )->result_array();
+
+        return ghl_aggregate_active_leads_by_tag($category_tags, $rows);
     }
 
     function Lead_Dashboard_Agents($restrict_agent_ids = null)

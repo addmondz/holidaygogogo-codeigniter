@@ -86,3 +86,20 @@ function lead_conversion_credit_booking_clause()
         (booking.InsertDate >= '{$cutoff}' AND booking.SalesAgent2 = ?)
     )";
 }
+
+/**
+ * SQL expression that resolves the credited AdminID for a booking row under
+ * the TC1/TC2 cutoff rule. Use this in a SELECT or GROUP BY to aggregate by
+ * the credited TC across the cutoff boundary in a single query — the
+ * "Compare the Best" sub-lines on the TC summary cards use this so the
+ * leaderboard universe matches the agent's own credited count.
+ *
+ * Pre-cutoff -> SalesAgent (TC1). On/after cutoff -> SalesAgent2 (TC2).
+ */
+function lead_conversion_credit_agent_expr($table_alias = 'booking')
+{
+    $cutoff = LEAD_CONVERSION_TC2_CUTOFF_DATE;
+    return "(CASE WHEN {$table_alias}.InsertDate < '{$cutoff}'"
+         . " THEN {$table_alias}.SalesAgent"
+         . " ELSE {$table_alias}.SalesAgent2 END)";
+}

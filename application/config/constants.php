@@ -91,6 +91,12 @@ defined('LEVEL')               or define('LEVEL', serialize(array(10 => 'OWNER',
 // Bookings created on/after this date credit a lead-to-booking conversion to TC2
 // (booking.SalesAgent2); earlier bookings stay with TC1 (booking.SalesAgent).
 defined('LEAD_CONVERSION_TC2_CUTOFF_DATE') or define('LEAD_CONVERSION_TC2_CUTOFF_DATE', '2026-06-01');
+
+// Source name marking a booking as self-generated (agent's own lead). Every
+// other source — or NULL — is treated as company-generated on the TC LEAD
+// "Self Gen vs Company" card. Update here if the team renames the row in the
+// source table.
+defined('SELF_GEN_SOURCE_NAME') or define('SELF_GEN_SOURCE_NAME', 'SELF GEN');
 defined('ADMIN_STATUS')        or define('ADMIN_STATUS', serialize(array('Y' => 'ACTIVE', 'D' => 'DEACTIVATED')));
 defined('ACCESS_CONTROL')      or define('ACCESS_CONTROL', serialize(array('GB' => 'GENERATE BOOKING', 'VB' => 'VIEW BOOKING', 'AB' => 'AMEND BOOKING', 'RB' => 'REMOVE BOOKING', 'GP' => 'GENERATE PAYMENT', 'VP' => 'VIEW PAYMENT', 'AP' => 'AMEND PAYMENT', 'RP' => 'REMOVE PAYMENT', 'VR' => 'VIEW REPORT')));
 
@@ -103,6 +109,7 @@ defined('BOOKING_STATUS')      or define('BOOKING_STATUS', serialize(array(
     'PR'    => 'PENDING REVIEW',
 
     // current booking flow
+    'PCI'   => 'PENDING CUSTOMER INFO',
     'PBC'   => 'PENDING BC CONFIRMATION',
     'P'     => 'PENDING PAYMENT',
     'PBO'   => 'PENDING BOOKING OPERATION',

@@ -94,3 +94,11 @@ $route['customer/booking/(:any)/remark'] = 'Customer_Portal/add_customer_remark/
 $route['customer/booking/(:any)'] = 'Customer_Portal/booking_details/$1';
 $route['customer/(:any)/verify'] = 'Customer_Portal/verify_phone/$1';
 $route['customer/(:any)'] = 'Customer_Portal/dashboard/$1';
+
+/*
+|--------------------------------------------------------------------------
+| Customer Intake (public, tokenised)
+|--------------------------------------------------------------------------
+*/
+$route['customer-intake/(:any)/submit'] = 'Customer_Intake/submit/$1';
+$route['customer-intake/(:any)']        = 'Customer_Intake/index/$1';
