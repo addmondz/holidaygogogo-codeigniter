@@ -90,6 +90,11 @@
                     <i class="la la-calendar"></i>
                 </span>
             </div>
+            <div class="booking-quick-range mt-2" data-target="travel_date">
+                <button type="button" class="btn btn-light-primary btn-sm font-weight-bold mr-1 mb-1" data-range="next7">Next 7 Days</button>
+                <button type="button" class="btn btn-light-primary btn-sm font-weight-bold mr-1 mb-1" data-range="next14">Next 14 Days</button>
+                <button type="button" class="btn btn-light-primary btn-sm font-weight-bold mr-1 mb-1" data-range="next30">Next 30 Days</button>
+            </div>
         </div>
     </div>
     <div class="col-md-3">
@@ -145,6 +150,11 @@
                 <span>
                     <i class="la la-calendar"></i>
                 </span>
+            </div>
+            <div class="booking-quick-range mt-2" data-target="booking_date">
+                <button type="button" class="btn btn-light-primary btn-sm font-weight-bold mr-1 mb-1" data-range="last7">Last 7 Days</button>
+                <button type="button" class="btn btn-light-primary btn-sm font-weight-bold mr-1 mb-1" data-range="last14">Last 14 Days</button>
+                <button type="button" class="btn btn-light-primary btn-sm font-weight-bold mr-1 mb-1" data-range="last30">Last 30 Days</button>
             </div>
         </div>
     </div>

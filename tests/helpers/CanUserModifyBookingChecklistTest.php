@@ -2,11 +2,12 @@
 /**
  * Run with: php tests/helpers/CanUserModifyBookingChecklistTest.php
  *
- * Verifies the strict whitelist that gates booking-checklist ticking:
- *   - level 20 (TC1) iff user_id === booking.SalesAgent
- *   - level 40 (OP)  iff user_id === booking.BookingOP
- *   - level 25 (TL)  iff user_id matches the booking's TC1- or OP-TeamLeadID
- *   - all other levels (10/30/50/etc.) are blocked
+ * Verifies the identity-based whitelist that gates booking-checklist ticking.
+ * The user's declared admin.Level is ignored — only the per-booking assignments
+ * matter. A user can tick iff their AdminID equals:
+ *   - booking.SalesAgent, OR
+ *   - booking.BookingOP, OR
+ *   - the TeamLeadID of either of the above (passed in by the caller)
  */
 
 if (!defined('BASEPATH')) {
@@ -25,82 +26,81 @@ $op_tl  = 13;
 
 $assertions = [];
 
-// Level 20 (TC1) — only the booking's SalesAgent may tick
-$assertions['Level 20 + matching SalesAgent (object) -> allowed'] =
+// SalesAgent identity — anyone whose AdminID matches the booking's SalesAgent
+// can tick, regardless of their declared level
+$assertions['matching SalesAgent (object), level 20 -> allowed'] =
     can_user_modify_booking_checklist($booking_obj, 7, 20, $tc1_tl, $op_tl) === true;
-$assertions['Level 20 + matching SalesAgent (array)  -> allowed'] =
+$assertions['matching SalesAgent (array), level 20 -> allowed'] =
     can_user_modify_booking_checklist($booking_arr, 7, 20, $tc1_tl, $op_tl) === true;
-$assertions['Level 20 + non-matching SalesAgent -> blocked'] =
+$assertions['matching SalesAgent but Owner-level (10) -> allowed'] =
+    can_user_modify_booking_checklist($booking_obj, 7, 10, $tc1_tl, $op_tl) === true;
+$assertions['matching SalesAgent but TC2-level (50) -> allowed'] =
+    can_user_modify_booking_checklist($booking_obj, 7, 50, $tc1_tl, $op_tl) === true;
+$assertions['matching SalesAgent + null level -> allowed (level not consulted)'] =
+    can_user_modify_booking_checklist($booking_obj, 7, null, $tc1_tl, $op_tl) === true;
+$assertions['non-matching SalesAgent, level 20 -> blocked'] =
     can_user_modify_booking_checklist($booking_obj, 8, 20, $tc1_tl, $op_tl) === false;
-$assertions['Level 20 + matches BookingOP (not SalesAgent) -> blocked'] =
-    can_user_modify_booking_checklist($booking_obj, 9, 20, $tc1_tl, $op_tl) === false;
 
-// Level 40 (OP) — only the booking's BookingOP may tick
-$assertions['Level 40 + matching BookingOP (object) -> allowed'] =
+// BookingOP identity
+$assertions['matching BookingOP (object), level 40 -> allowed'] =
     can_user_modify_booking_checklist($booking_obj, 9, 40, $tc1_tl, $op_tl) === true;
-$assertions['Level 40 + matching BookingOP (array)  -> allowed'] =
-    can_user_modify_booking_checklist($booking_arr, 9, 40, $tc1_tl, $op_tl) === true;
-$assertions['Level 40 + non-matching BookingOP -> blocked'] =
+$assertions['matching BookingOP, level 10 -> allowed'] =
+    can_user_modify_booking_checklist($booking_obj, 9, 10, $tc1_tl, $op_tl) === true;
+$assertions['non-matching BookingOP, level 40 -> blocked'] =
     can_user_modify_booking_checklist($booking_obj, 8, 40, $tc1_tl, $op_tl) === false;
-$assertions['Level 40 + matches SalesAgent (not BookingOP) -> blocked'] =
-    can_user_modify_booking_checklist($booking_obj, 7, 40, $tc1_tl, $op_tl) === false;
 
-// Level 25 (Team Lead) — must match the TL of the booking's TC1 or OP
-$assertions['Level 25 + matches TC1 team lead -> allowed'] =
+// Team Lead identity — also level-agnostic
+$assertions['matches TC1 team lead -> allowed'] =
     can_user_modify_booking_checklist($booking_obj, 11, 25, $tc1_tl, $op_tl) === true;
-$assertions['Level 25 + matches OP team lead -> allowed'] =
+$assertions['matches OP team lead -> allowed'] =
     can_user_modify_booking_checklist($booking_obj, 13, 25, $tc1_tl, $op_tl) === true;
-$assertions['Level 25 + matches NEITHER team lead -> blocked'] =
+$assertions['matches TC1 team lead, level 10 -> allowed (identity only)'] =
+    can_user_modify_booking_checklist($booking_obj, 11, 10, $tc1_tl, $op_tl) === true;
+$assertions['matches NEITHER team lead -> blocked'] =
     can_user_modify_booking_checklist($booking_obj, 99, 25, $tc1_tl, $op_tl) === false;
-$assertions['Level 25 + both team-lead args null -> blocked'] =
+$assertions['both team-lead args null + non-matching user -> blocked'] =
     can_user_modify_booking_checklist($booking_obj, 11, 25, null, null) === false;
-$assertions['Level 25 + only TC1 TL set, user matches TC1 TL -> allowed'] =
+$assertions['only TC1 TL set, user matches TC1 TL -> allowed'] =
     can_user_modify_booking_checklist($booking_obj, 11, 25, 11, null) === true;
-$assertions['Level 25 + only OP TL set, user matches OP TL -> allowed'] =
+$assertions['only OP TL set, user matches OP TL -> allowed'] =
     can_user_modify_booking_checklist($booking_obj, 13, 25, null, 13) === true;
 
-// Strict rule — Owner / Finance / TC2 are blocked (BEHAVIOR CHANGE)
-$assertions['Level 10 (Owner) -> blocked'] =
+// Non-matching identity, any level -> blocked
+$assertions['Owner-level + no identity match -> blocked'] =
     can_user_modify_booking_checklist($booking_obj, 99, 10, $tc1_tl, $op_tl) === false;
-$assertions['Level 30 (Finance) -> blocked'] =
+$assertions['Finance-level + no identity match -> blocked'] =
     can_user_modify_booking_checklist($booking_obj, 99, 30, $tc1_tl, $op_tl) === false;
-$assertions['Level 50 (TC2) -> blocked'] =
+$assertions['TC2-level + no identity match -> blocked'] =
     can_user_modify_booking_checklist($booking_obj, 99, 50, $tc1_tl, $op_tl) === false;
-$assertions['Unknown level 60 -> blocked'] =
+$assertions['Unknown level 60 + no identity match -> blocked'] =
     can_user_modify_booking_checklist($booking_obj, 99, 60, $tc1_tl, $op_tl) === false;
-$assertions['Null level -> blocked'] =
-    can_user_modify_booking_checklist($booking_obj, 99, null, $tc1_tl, $op_tl) === false;
 
 // CodeIgniter session sometimes returns numeric strings
-$assertions['Level "20" string + matching SalesAgent -> allowed'] =
+$assertions['string user "7" matches SalesAgent -> allowed'] =
     can_user_modify_booking_checklist($booking_obj, '7', '20', $tc1_tl, $op_tl) === true;
-$assertions['Level "40" string + non-matching BookingOP -> blocked'] =
+$assertions['string user "8" no match -> blocked'] =
     can_user_modify_booking_checklist($booking_obj, '8', '40', $tc1_tl, $op_tl) === false;
-$assertions['Level "25" string + matching string TL -> allowed'] =
+$assertions['string user "11" matches string TL "11" -> allowed'] =
     can_user_modify_booking_checklist($booking_obj, '11', '25', '11', '13') === true;
 
 // Defensive: empty / missing booking
 $assertions['Null booking -> blocked'] =
     can_user_modify_booking_checklist(null, 7, 20, $tc1_tl, $op_tl) === false;
-$assertions['Empty array booking + level 20 -> blocked (no SalesAgent to match)'] =
+$assertions['Empty array booking -> blocked'] =
     can_user_modify_booking_checklist([], 7, 20, $tc1_tl, $op_tl) === false;
-$assertions['Empty array booking + level 25 -> blocked'] =
-    can_user_modify_booking_checklist([], 11, 25, $tc1_tl, $op_tl) === false;
 
 // Unassigned booking — SalesAgent / BookingOP still NULL/0
 $unassigned = ['SalesAgent' => null, 'BookingOP' => null];
-$assertions['Level 20 + unassigned booking -> blocked'] =
+$assertions['unassigned booking + any user_id -> blocked'] =
     can_user_modify_booking_checklist($unassigned, 7, 20, null, null) === false;
-$assertions['Level 40 + unassigned booking -> blocked'] =
-    can_user_modify_booking_checklist($unassigned, 9, 40, null, null) === false;
-$assertions['Owner + unassigned booking -> blocked'] =
+$assertions['unassigned booking + Owner level -> blocked'] =
     can_user_modify_booking_checklist($unassigned, 99, 10, null, null) === false;
 
-// Defensive: zero team-lead IDs must NOT collide with user_id 0
-$assertions['Level 25 + user_id 0 + TL ids 0 -> blocked'] =
-    can_user_modify_booking_checklist($booking_obj, 0, 25, 0, 0) === false;
-$assertions['Level 20 + user_id 0 + SalesAgent 0 -> blocked'] =
-    can_user_modify_booking_checklist(['SalesAgent' => 0, 'BookingOP' => 0], 0, 20, null, null) === false;
+// Defensive: zero / non-positive user_id must NOT collide with zero fields
+$assertions['user_id 0 + zeroed SalesAgent -> blocked'] =
+    can_user_modify_booking_checklist(['SalesAgent' => 0, 'BookingOP' => 0], 0, 20, 0, 0) === false;
+$assertions['user_id -1 -> blocked'] =
+    can_user_modify_booking_checklist($booking_obj, -1, 20, $tc1_tl, $op_tl) === false;
 
 $failed = 0;
 foreach ($assertions as $label => $ok) {

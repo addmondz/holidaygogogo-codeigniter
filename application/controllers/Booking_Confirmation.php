@@ -119,6 +119,7 @@ class Booking_Confirmation extends CI_Controller
                 $pax_parts = array_filter(array($adult_str, $child_str, $infant_str));
                 $array['PaxNumber'] = !empty($pax_parts) ? implode('& ', $pax_parts) : '0 Pax';
 
+                $RawBookingInsertDate = $array['InsertDate'];
                 $array['InsertDate'] = strtoupper(date('j M Y', strtotime($array['InsertDate'])));
 
                 $country_code = $this->Universal_Model->Read_Country_Code($array['SalesAgentCountryCode']);
@@ -203,7 +204,7 @@ class Booking_Confirmation extends CI_Controller
 
                 $array['CompanyLicenseNumber'] = $company['LicenseNumber'];
 
-                $array['CompanyAddress'] = $company['Address'];
+                $array['CompanyAddress'] = pdf_company_address_for_date($RawBookingInsertDate);
 
                 $array['CompanyWebsite'] = $company['Website'];
 

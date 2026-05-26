@@ -77,6 +77,7 @@ class Booking_PDF_Generator {
 		$pax_parts = array_filter(array($adult_str, $child_str, $infant_str));
 		$array['PaxNumber'] = !empty($pax_parts) ? implode('& ', $pax_parts) : '0 Pax';
 
+		$raw_booking_insert_date = $array['InsertDate'];
 		$array['InsertDate'] = strtoupper(date('j M Y', strtotime($array['InsertDate'])));
 
 		$country_code = $this->CI->Universal_Model->Read_Country_Code($array['SalesAgentCountryCode']);
@@ -123,7 +124,7 @@ class Booking_PDF_Generator {
 		$array['CompanyName'] = $company['Name'];
 		$array['CompanyRegistrationNumber'] = $company['RegistrationNumber'];
 		$array['CompanyLicenseNumber'] = $company['LicenseNumber'];
-		$array['CompanyAddress'] = $company['Address'];
+		$array['CompanyAddress'] = pdf_company_address_for_date($raw_booking_insert_date);
 		$array['CompanyWebsite'] = $company['Website'];
 
 		// Generate customer portal profile URL

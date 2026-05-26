@@ -1068,13 +1068,17 @@ if (!function_exists('is_upcoming_travel_not_ready')) {
 
 if (!function_exists('can_user_modify_booking_checklist')) {
     /**
-     * Strict whitelist for ticking a booking's checklist:
-     *   - level 20 (TC1)  iff user_id === booking.SalesAgent
-     *   - level 40 (OP)   iff user_id === booking.BookingOP
-     *   - level 25 (TL)   iff user_id is the TeamLeadID of the booking's
-     *                     SalesAgent OR BookingOP (callers pre-resolve and
-     *                     pass these in as $tc1_team_lead_id / $op_team_lead_id)
-     * All other levels (Owner/Finance/TC2/etc.) are blocked.
+     * Identity-based whitelist for ticking a booking's checklist. The user's
+     * declared admin.Level is intentionally ignored — what matters is whether
+     * they are the booking's assigned TC1/OP or a team lead over either:
+     *   - user_id === booking.SalesAgent  (this booking's TC1)
+     *   - user_id === booking.BookingOP   (this booking's OP)
+     *   - user_id === TeamLeadID of the booking's SalesAgent OR BookingOP
+     *     (callers pre-resolve and pass these in via $tc1_team_lead_id /
+     *      $op_team_lead_id, typically using resolve_booking_checklist_team_leads()).
+     * Anyone else is blocked. This means an Owner (level 10) personally
+     * assigned as a booking's SalesAgent CAN tick that booking's checklist
+     * even though they aren't a level-20 SA in the role registry.
      *
      * $booking accepts either the object returned by getBookingById() or an
      * array with SalesAgent / BookingOP keys.
@@ -1082,10 +1086,13 @@ if (!function_exists('can_user_modify_booking_checklist')) {
     function can_user_modify_booking_checklist(
         $booking,
         $user_id,
-        $user_level,
+        $user_level = null,
         $tc1_team_lead_id = null,
         $op_team_lead_id = null
     ) {
+        // $user_level is retained for API compatibility but no longer consulted.
+        unset($user_level);
+
         if (empty($booking)) {
             return false;
         }
@@ -1097,24 +1104,23 @@ if (!function_exists('can_user_modify_booking_checklist')) {
             : (isset($booking['BookingOP']) ? $booking['BookingOP'] : null);
 
         $uid = (int)$user_id;
-        $lvl = (int)$user_level;
-
-        if ($lvl === 20) {
-            return (int)$sales_agent > 0 && (int)$sales_agent === $uid;
-        }
-        if ($lvl === 40) {
-            return (int)$booking_op > 0 && (int)$booking_op === $uid;
-        }
-        if ($lvl === 25) {
-            $tc1_tl = (int)$tc1_team_lead_id;
-            $op_tl  = (int)$op_team_lead_id;
-            if ($tc1_tl > 0 && $tc1_tl === $uid) {
-                return true;
-            }
-            if ($op_tl > 0 && $op_tl === $uid) {
-                return true;
-            }
+        if ($uid <= 0) {
             return false;
+        }
+
+        if ((int)$sales_agent === $uid) {
+            return true;
+        }
+        if ((int)$booking_op === $uid) {
+            return true;
+        }
+        $tc1_tl = (int)$tc1_team_lead_id;
+        if ($tc1_tl > 0 && $tc1_tl === $uid) {
+            return true;
+        }
+        $op_tl = (int)$op_team_lead_id;
+        if ($op_tl > 0 && $op_tl === $uid) {
+            return true;
         }
         return false;
     }

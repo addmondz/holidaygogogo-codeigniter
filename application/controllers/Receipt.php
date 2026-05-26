@@ -211,7 +211,6 @@ class Receipt extends CI_Controller
         $array['CompanyName'] = $company['Name'];
         $array['CompanyRegistrationNumber'] = $company['RegistrationNumber'];
         $array['CompanyLicenseNumber'] = $company['LicenseNumber'];
-        $array['CompanyAddress'] = $company['Address'];
         $array['CompanyWebsite'] = $company['Website'];
 
         // Inline locally-uploaded TinyMCE footer images so DomPDF doesn't
@@ -247,6 +246,10 @@ class Receipt extends CI_Controller
 
             // ReceiptDate from this payment's Date
             $array['ReceiptDate'] = date('d/m/Y', strtotime($payment->Date));
+
+            // Company address resolves against this payment's date so that
+            // receipts for pre-cutoff payments keep the legacy address.
+            $array['CompanyAddress'] = pdf_company_address_for_date($payment->Date);
 
             // Amount in words for this payment
             $amount_parts = explode('.', $payment->Credit);

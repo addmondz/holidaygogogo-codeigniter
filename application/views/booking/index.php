@@ -146,6 +146,10 @@
 #checklistModal .progress-bar-wrapper .progress-bar {
     transition: width 0.3s ease;
 }
+.booking-quick-range .btn {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+}
 </style>
 <div class="d-flex flex-column-fluid">
     <div class="container-fluid">
@@ -331,12 +335,7 @@
             buttonClasses: ' btn',
             applyClass: 'btn-primary',
             cancelClass: 'btn-secondary',
-            autoApply: true,
-            ranges: {
-                'Next 7 Days':  [moment(), moment().add(6, 'days')],
-                'Next 14 Days': [moment(), moment().add(13, 'days')],
-                'Next 30 Days': [moment(), moment().add(29, 'days')]
-            }
+            autoApply: true
         }, function(start, end, label) {
             $('#kt_daterangepicker_4 .form-control').val(start.format('DD/MM/YYYY') + ' - ' + end.format('DD/MM/YYYY'));
         });
@@ -345,15 +344,35 @@
             buttonClasses: ' btn',
             applyClass: 'btn-primary',
             cancelClass: 'btn-secondary',
-            autoApply: true,
-            ranges: {
-                'Last 7 Days':  [moment().subtract(6, 'days'),  moment()],
-                'Last 14 Days': [moment().subtract(13, 'days'), moment()],
-                'Last 30 Days': [moment().subtract(29, 'days'), moment()]
-            }
+            autoApply: true
         }, function(start, end, label) {
             $('#kt_daterangepicker_5 .form-control').val(start.format('DD/MM/YYYY') + ' - ' + end.format('DD/MM/YYYY'));
         });
+    });
+
+    $(document).on('click', '.booking-quick-range button', function() {
+        var $row     = $(this).closest('.booking-quick-range');
+        var target   = $row.data('target');
+        var range    = $(this).data('range');
+        var pickerId = target === 'travel_date' ? '#kt_daterangepicker_4' : '#kt_daterangepicker_5';
+
+        var start, end;
+        switch(range) {
+            case 'next7':  start = moment();                       end = moment().add(6, 'days');  break;
+            case 'next14': start = moment();                       end = moment().add(13, 'days'); break;
+            case 'next30': start = moment();                       end = moment().add(29, 'days'); break;
+            case 'last7':  start = moment().subtract(6, 'days');   end = moment();                 break;
+            case 'last14': start = moment().subtract(13, 'days');  end = moment();                 break;
+            case 'last30': start = moment().subtract(29, 'days');  end = moment();                 break;
+            default: return;
+        }
+
+        var picker = $(pickerId).data('daterangepicker');
+        if(picker) {
+            picker.setStartDate(start);
+            picker.setEndDate(end);
+        }
+        $('input[name="' + target + '"]').val(start.format('DD/MM/YYYY') + ' - ' + end.format('DD/MM/YYYY'));
     });
 
     function Reset_Deadline() {
