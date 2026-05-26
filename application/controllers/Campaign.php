@@ -58,7 +58,7 @@ class Campaign extends MY_Controller
 		$titles = array('tab_title' => 'HolidayGoGoGo | Campaign', 'breadcrumb_title' => 'Campaign >> Create');
 		$data = $this->Form_Filter_Data();
 		$data['mode']            = 'create';
-		$data['campaign']        = (object) array('CampaignID' => 0, 'Name' => '', 'CampaignDate' => '', 'Description' => '');
+		$data['campaign']        = (object) array('CampaignID' => 0, 'Name' => '', 'CampaignDate' => '', 'Description' => '', 'GhlWorkflowID' => '');
 		$data['campaign_guests'] = array();
 
 		$this->load->view('layout/header', $titles);

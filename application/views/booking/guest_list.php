@@ -519,13 +519,7 @@
 												</div>
 											</div>
 											<br>
-											<div class="row">
-												<div class="col-md-12">
-													<label>Dietary Requirement</label>
-													<textarea <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> name="dietary_requirements[]" id="<?php echo 'dietary_requirement-' . $guest->GuestListID; ?>" rows="2" class="form-control"><?php echo $guest->DietaryRequirement; ?></textarea>
-												</div>
-											</div>
-											<br>
+											<input type="hidden" name="dietary_requirements[]" value="<?php echo htmlspecialchars($guest->DietaryRequirement ?? '', ENT_QUOTES); ?>">
 											<div class="row">
 												<div class="col-md-12">
 													<label id="<?php echo 'mobile_label-' . $guest->GuestListID; ?>">Mobile <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>

@@ -127,7 +127,7 @@
 									</span>
 								</label>
 								<div class="input-icon">
-									<input type="text" name="GhlWorkflowID" value="<?php echo htmlspecialchars((string)$campaign->GhlWorkflowID, ENT_QUOTES); ?>" autocomplete="off" maxlength="64" class="form-control" placeholder="e.g. 7QnY8h2WlsAbcXyz">
+									<input type="text" name="GhlWorkflowID" value="<?php echo htmlspecialchars((string)(isset($campaign->GhlWorkflowID) ? $campaign->GhlWorkflowID : ''), ENT_QUOTES); ?>" autocomplete="off" maxlength="64" class="form-control" placeholder="e.g. 7QnY8h2WlsAbcXyz">
 									<span><i class="la la-share-alt"></i></span>
 								</div>
 								<small class="text-muted" style="font-size:11px;">Each guest will be enrolled into this GHL workflow when you click Sync. The workflow's WhatsApp action sends the message.</small>
