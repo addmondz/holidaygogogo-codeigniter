@@ -4,11 +4,12 @@
  *
  * End-to-end stress of the SQL fragment from lead_conversion_credit_helper.php:
  * seeds a SQLite :memory: schema mirroring booking / ghl_processed_leads /
- * ghl_users / admin, plugs the fragment into the same SUM(CASE WHEN ...) shape
- * used by Report_Model::Lead_Dashboard_Summary, and verifies the cutoff rule
- * plus the per-agent identity match — pre-2026-06-01 conversions require the
- * lead's assigned agent (resolved via ghl_users.Email = admin.Email) to be on
- * booking.SalesAgent (TC1); on/after, on booking.SalesAgent2 (TC2).
+ * admin_lead_dashboard_agents / admin, plugs the fragment into the same
+ * SUM(CASE WHEN ...) shape used by Report_Model::Lead_Dashboard_Summary, and
+ * verifies the cutoff rule plus the per-agent identity match — pre-2026-06-01
+ * conversions require the lead's assigned GHL agent (resolved via the
+ * admin_lead_dashboard_agents mapping table maintained from the Admin form)
+ * to be on booking.SalesAgent (TC1); on/after, on booking.SalesAgent2 (TC2).
  */
 
 if (!defined('BASEPATH')) {
@@ -32,14 +33,14 @@ $pdo->exec("CREATE TABLE ghl_processed_leads (
     is_converted INTEGER,
     booking_id INTEGER
 )");
-$pdo->exec("CREATE TABLE ghl_users (
-    UserID TEXT,
-    Email TEXT
-)");
 $pdo->exec("CREATE TABLE admin (
     AdminID INTEGER PRIMARY KEY,
     Email TEXT,
     Status TEXT
+)");
+$pdo->exec("CREATE TABLE admin_lead_dashboard_agents (
+    AdminID INTEGER,
+    GhlUserID TEXT
 )");
 
 // admin: three real users + one inactive (should never satisfy Status='Y')
@@ -50,12 +51,15 @@ $pdo->exec("INSERT INTO admin VALUES
     (77, 'gone@x',  'N')
 ");
 
-// ghl_users: mirror UserID -> Email (real-world: same Email may repeat across LocationIDs)
-$pdo->exec("INSERT INTO ghl_users VALUES
-    ('ghl-alice', 'alice@x'),
-    ('ghl-bob',   'bob@x'),
-    ('ghl-hccs',  'hccs@x'),
-    ('ghl-gone',  'gone@x')
+// admin_lead_dashboard_agents: explicit GHL UserID -> AdminID linkage maintained
+// from the Admin / Update form (Admin_Model::_Sync_Lead_Dashboard_Agents).
+// ghl-queue intentionally has no link to simulate a queue inbox that's not
+// owned by any admin yet.
+$pdo->exec("INSERT INTO admin_lead_dashboard_agents (AdminID, GhlUserID) VALUES
+    (10, 'ghl-alice'),
+    (20, 'ghl-bob'),
+    (99, 'ghl-hccs'),
+    (77, 'ghl-gone')
 ");
 
 // Bookings on both sides of the 2026-06-01 cutoff.
@@ -77,7 +81,9 @@ $pdo->exec("INSERT INTO booking VALUES
 //   alice (ghl-alice): leads where alice is or isn't the credited TC across cutoff
 //   hccs  (ghl-hccs):  TC2-only on bookings — must be 0 pre-cutoff
 //   bob   (ghl-bob):   used to prove pre-cutoff TC1 credit also gates by agent
-//   unknown: lead assigned to an agent with no admin mapping (queue acct)
+//   ghl-queue: lead assigned to an agent that has no admin_lead_dashboard_agents
+//              row (a queue/cold-lead inbox not owned by any admin)
+//   ghl-gone:  linked to admin 77 whose Status='N' (must be excluded)
 $pdo->exec("INSERT INTO ghl_processed_leads VALUES
     /* alice */
     (1,  'ghl-alice', 1, 1001),  /* pre,  alice=TC1                 -> COUNT */

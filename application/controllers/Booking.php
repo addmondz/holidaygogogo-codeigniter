@@ -881,6 +881,24 @@ class Booking extends MY_Controller
 				)),
 			);
 
+			// Travel Completed - Pending Review: BCs the TC owns where travel
+			// has ended (Status='Y') but after-sales review is still pending.
+			// Filter mirrors the PR status code in booking_status_filter_helper
+			// so the count and the linked listing return the same set.
+			$row = $this->db->query(
+				"SELECT COUNT(*) AS cnt FROM booking
+				 WHERE SalesAgent = ?
+				   AND BookingConfirmationTitle='BOOKING CONFIRMATION'
+				   AND CancelStatus='N'
+				   AND AfterSalesService='PENDING'
+				   AND Status='Y'",
+				array($admin_id)
+			)->row();
+			$cards['pending_review'] = array(
+				'count' => (int)$row->cnt,
+				'link'  => $base . $qs(array('status' => 'PR')),
+			);
+
 			// ---------- "Compare the Best" sub-lines for the TC KPI cards ----------
 			// Aggregate across every agent under the same TC1/TC2 credited-slot
 			// rule that the agent's own cards use, so the comparison universe is
@@ -985,31 +1003,49 @@ class Booking extends MY_Controller
 			$this->load->model('Report_Model');
 			$by_agent = $this->Report_Model->Lead_Dashboard_By_Agent(array('start_date' => $month_start, 'end_date' => $month_end));
 
-			$my_row = $this->db->query(
-				"SELECT gu.UserID
-				 FROM admin a
-				 INNER JOIN ghl_users gu
-				   ON LOWER(TRIM(gu.Email)) = LOWER(TRIM(a.Email))
-				 WHERE a.AdminID = ?",
-				array($admin_id)
-			)->row();
-			$my_ghl_uid = $my_row ? (string)$my_row->UserID : null;
+			// Resolve the logged-in admin to their GHL UserID(s). Canonical source
+			// is admin_lead_dashboard_agents (maintained from Admin / Update);
+			// email match is a fallback for admins whose mapping hasn't been
+			// configured yet. Team-inbox GHL users use shared Gmail addresses
+			// that don't match admin.Email, so an email-only lookup silently
+			// drops them — see lead_conversion_credit_helper.php.
+			$mapping_rows = $this->db->select('GhlUserID')
+				->where('AdminID', $admin_id)
+				->get('admin_lead_dashboard_agents')->result();
+			$my_ghl_uids = array_values(array_filter(array_map(function($r) {
+				return (string)$r->GhlUserID;
+			}, $mapping_rows), 'strlen'));
+			if(empty($my_ghl_uids)) {
+				$email_rows = $this->db->query(
+					"SELECT gu.UserID
+					 FROM admin a
+					 INNER JOIN ghl_users gu
+					   ON LOWER(TRIM(gu.Email)) = LOWER(TRIM(a.Email))
+					 WHERE a.AdminID = ?",
+					array($admin_id)
+				)->result();
+				$my_ghl_uids = array_values(array_filter(array_map(function($r) {
+					return (string)$r->UserID;
+				}, $email_rows), 'strlen'));
+			}
 
 			$own_rate        = null;
 			$own_total_leads = 0;
 			$own_converted   = 0;
-			if($my_ghl_uid !== null) {
+			if(!empty($my_ghl_uids)) {
+				$uid_set = array_flip($my_ghl_uids);
 				foreach($by_agent as $a) {
-					if((string)$a['agent_id'] === $my_ghl_uid) {
-						$own_rate        = (float)$a['conversion_rate'];
-						$own_total_leads = (int)$a['total_leads'];
-						$own_converted   = (int)$a['converted_leads'];
-						break;
+					if(isset($uid_set[(string)$a['agent_id']])) {
+						$own_total_leads += (int)$a['total_leads'];
+						$own_converted   += (int)$a['converted_leads'];
 					}
 				}
+				$own_rate = $own_total_leads > 0
+					? round(($own_converted / $own_total_leads) * 100, 1)
+					: null;
 			}
 			$best_conv = best_conversion_rate_agent($by_agent, 3);
-			if($best_conv && $my_ghl_uid !== null && (string)$best_conv['agent_id'] === $my_ghl_uid) {
+			if($best_conv && !empty($my_ghl_uids) && in_array((string)$best_conv['agent_id'], $my_ghl_uids, true)) {
 				$best_conv['agent_name'] = 'You';
 			}
 			$cards['conversion_rate_month'] = array(
@@ -1033,17 +1069,17 @@ class Booking extends MY_Controller
 				if($secs >= 60)   { return round($secs / 60,   1) . 'm'; }
 				return $secs . 's';
 			};
-			if($my_ghl_uid !== null && $my_ghl_uid !== '') {
+			if(!empty($my_ghl_uids)) {
 				$mine_day   = $this->Report_Model->Lead_Dashboard_Summary(array(
-					'agent_id'   => $my_ghl_uid,
+					'agent_id'   => $my_ghl_uids,
 					'start_date' => $today,       'end_date' => $today,
 				));
 				$mine_week  = $this->Report_Model->Lead_Dashboard_Summary(array(
-					'agent_id'   => $my_ghl_uid,
+					'agent_id'   => $my_ghl_uids,
 					'start_date' => $week_start,  'end_date' => $week_end,
 				));
 				$mine_month = $this->Report_Model->Lead_Dashboard_Summary(array(
-					'agent_id'   => $my_ghl_uid,
+					'agent_id'   => $my_ghl_uids,
 					'start_date' => $month_start, 'end_date' => $month_end,
 				));
 				$cards['tc_leads_dwm'] = array(

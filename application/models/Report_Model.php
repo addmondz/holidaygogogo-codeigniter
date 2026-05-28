@@ -1105,8 +1105,8 @@ class Report_Model extends CI_Model
             $teamLeadIds = array_values(array_filter($teamLeadIds, function($v) { return $v !== '' && $v !== null; }));
 
             if (!empty($teamLeadIds)) {
-                $extraJoins  = " LEFT JOIN ghl_users tl_gu ON tl_gu.UserID = NULLIF(pl.assigned_to_user_id, '') ";
-                $extraJoins .= " LEFT JOIN admin tl_admin ON LOWER(TRIM(tl_admin.Email)) = LOWER(TRIM(tl_gu.Email)) AND tl_admin.Status = 'Y' ";
+                $extraJoins  = " LEFT JOIN admin_lead_dashboard_agents tl_alda ON tl_alda.GhlUserID = NULLIF(pl.assigned_to_user_id, '') ";
+                $extraJoins .= " LEFT JOIN admin tl_admin ON tl_admin.AdminID = tl_alda.AdminID AND tl_admin.Status = 'Y' ";
 
                 $placeholders = implode(',', array_fill(0, count($teamLeadIds), '?'));
                 $clauses[] = "tl_admin.TeamLeadID IN ({$placeholders})";

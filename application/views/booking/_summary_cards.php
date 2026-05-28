@@ -136,6 +136,20 @@
                 </a>
             </div>
             <div class="col-md-3">
+                <a class="summary-card" id="sc-pending-review-link" href="#">
+                    <div class="card card-custom">
+                        <div class="card-header border-0 summary-card-header" style="background-color:#FFFAA030;">
+                            <h3>Travel Completed - Pending Review</h3>
+                            <i id="pop-pending-review" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>Counted when:</strong><ul><li>The BC is confirmed (Status = COMPLETED)</li><li>After-sales review is still pending (AfterSalesService = PENDING)</li><li>Not cancelled</li><li>You are the sales agent</li></ul><strong>Why it matters:</strong> Travel has ended — close the loop with the customer (review request / feedback) and mark the booking complete."></i>
+                        </div>
+                        <div class="card-body summary-card-body">
+                            <div class="summary-value" id="sc-pending-review-count">...</div>
+                            <div class="summary-sub">Your BCs whose travel has ended and after-sales review is still pending. Click to follow up.</div>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            <div class="col-md-3">
                 <div class="card card-custom">
                     <div class="card-header border-0 summary-card-header" style="background-color:#F0FFFF;">
                         <h3>Conversion Rate (Month)</h3>
@@ -720,6 +734,10 @@ $(function() {
         if(c.upcoming_travel_not_ready) {
             setText('sc-upcoming-not-ready-count', c.upcoming_travel_not_ready.count);
             setLink('sc-upcoming-not-ready-link',  c.upcoming_travel_not_ready.link);
+        }
+        if(c.pending_review) {
+            setText('sc-pending-review-count', c.pending_review.count);
+            setLink('sc-pending-review-link',  c.pending_review.link);
         }
         if(c.upcoming_travel_not_ready_op) {
             setText('sc-upcoming-not-ready-op-count', c.upcoming_travel_not_ready_op.count);

@@ -41,9 +41,14 @@ function lead_conversion_credited_admin_id($insert_date, $sales_agent, $sales_ag
  *
  * Identity match: the credited TC slot on the booking (SalesAgent pre-cutoff,
  * SalesAgent2 on/after cutoff) must equal the AdminID resolved from
- * pl.assigned_to_user_id via ghl_users.Email = admin.Email. A lead assigned to
- * agent X only counts as X's conversion when X actually holds the credited slot
- * for the booking's InsertDate window.
+ * pl.assigned_to_user_id via the admin_lead_dashboard_agents mapping table
+ * (maintained from the Admin / Update form). A lead assigned to agent X only
+ * counts as X's conversion when X actually holds the credited slot for the
+ * booking's InsertDate window.
+ *
+ * Team-inbox GHL users (e.g. "Nur TC Team") use shared Gmail addresses that
+ * differ from the corporate admin.Email, so the linkage is kept in an explicit
+ * mapping table rather than inferred from email.
  */
 function lead_conversion_credit_sql_fragment()
 {
@@ -51,10 +56,10 @@ function lead_conversion_credit_sql_fragment()
     return "EXISTS (
         SELECT 1
         FROM booking b
-        INNER JOIN ghl_users gu_credit
-            ON gu_credit.UserID = NULLIF(pl.assigned_to_user_id, '')
+        INNER JOIN admin_lead_dashboard_agents alda_credit
+            ON alda_credit.GhlUserID = NULLIF(pl.assigned_to_user_id, '')
         INNER JOIN admin a_credit
-            ON LOWER(TRIM(a_credit.Email)) = LOWER(TRIM(gu_credit.Email))
+            ON a_credit.AdminID = alda_credit.AdminID
             AND a_credit.Status = 'Y'
         WHERE b.BookingID = pl.booking_id
           AND (

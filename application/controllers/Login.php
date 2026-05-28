@@ -38,7 +38,7 @@ class Login extends CI_Controller
 				);
 				$this->activity_log('Login Success - Username:'.$_POST["username"].', Password:'.$_POST["password"], 'Y', $login->AdminID);
 				$this->session->set_userdata($session);
-				redirect('Dashboard');
+				redirect($login->Level == 20 ? 'Booking' : 'Dashboard');
 			} else {
 				$this->activity_log('Login Fail - Username:'.$_POST["username"].', Password:'.$_POST["password"], 'N', null);
 				$array = array('error_message' => 'Invalid Login');

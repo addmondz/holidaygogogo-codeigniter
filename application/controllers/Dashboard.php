@@ -11,11 +11,18 @@ class Dashboard extends MY_Controller
 		
 		parent::__construct();
 
+		// Sales agents (level 20) have no Dashboard access — they land on the
+		// booking listing instead. Guard every Dashboard action, not just
+		// index(), so direct URL hits to other methods are also blocked.
+		if($this->session->userdata('level') == 20) {
+			redirect('Booking');
+		}
+
 		$this->load->model('Dashboard_Model');
 
 		$this->load->library('recalculate');
 
-		
+
 
 	}
 
@@ -44,8 +51,6 @@ class Dashboard extends MY_Controller
 		$array['sales_agent_overdue_payments'] = $this->Dashboard_Model->Sales_Agent_Overdue_Payments();
 
 		$array['sales_agent_pending_travel_vouchers'] = $this->Dashboard_Model->Sales_Agent_Pending_Travel_Vouchers($start_date, $end_date);
-
-		$array['sales_agent_pending_reviews'] = $this->Dashboard_Model->Sales_Agent_Pending_Reviews();
 
 		$sales_agent_profit_margins = $this->Dashboard_Model->Sales_Agent_Profit_Margins();
 

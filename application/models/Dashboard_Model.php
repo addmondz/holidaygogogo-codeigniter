@@ -219,36 +219,6 @@ class Dashboard_Model extends CI_Model
 
 
 
-	function Sales_Agent_Pending_Reviews()
-
-	{
-
-		$this->db->select('BookingNumber, Customer, Name');
-
-		$this->db->join('category', 'category.CategoryID = booking.Destination', 'left');
-
-		$this->db->where('EndDate <', date('Y-m-d'));
-
-		$this->db->where('SalesAgent', $this->session->admin_id);
-
-		$this->db->where('BookingConfirmationTitle', 'BOOKING CONFIRMATION');
-
-		$this->db->where('CancelStatus', 'N');
-
-		$this->db->where('AfterSalesService', 'PENDING');
-
-		$this->db->where('booking.Status', 'Y');
-
-		$this->db->order_by('BookingNumber', 'ASC');
-
-		$pending_reviews = $this->db->get('booking');
-
-		return $pending_reviews->result();
-
-	}
-
-
-
 	function Sales_Agent_Profit_Margins()
 
 	{

@@ -376,76 +376,22 @@ class Booking_Model extends CI_Model
 	function Read_Bookings_With_Guest_Lists($group_by_booking_id)
 	{
 		if($group_by_booking_id == 'Y') {
-			$this->db->select('booking.BookingID, BookingNumber, ReservationNumber, DepositDeadline, FullPaymentDeadline, Customer, booking.Mobile As CustomerMobile, StartDate, EndDate, Adult, Children, Infant, BookingRemark, Subtotal, Discount, NetTotal, ChatLanguage, CancelStatus, booking.PartialRefund, LockStatus, booking.is_submitted, AfterSalesService, booking.Status, booking.InsertDate, MAX(guest_list.CountryCodeID) As GuestCountryCode, MAX(Type) As Type, MAX(guest_list.Name) As GuestName, MAX(guest_list.Gender) As Gender, MAX(DateOfBirth) As DateOfBirth, MAX(Nationality) As Nationality, MAX(guest_list.IdentificationNumber) As IdentificationNumber, MAX(guest_list.PassportNumber) As PassportNumber, MAX(guest_list.Mobile) As GuestMobile, MAX(guest_list.Email) As Email, MAX(MaritalStatus) As MaritalStatus, MAX(Employment) As Employment, MAX(Address) As Address, MAX(Postcode) As Postcode, MAX(guest_list.City) As City, MAX(guest_list.State) As State, MAX(guest_list.Country) As Country, MAX(Nominee) As Nominee, MAX(NomineeIdentificationNumber) As NomineeIdentificationNumber, MAX(Relationship) As Relationship, admin.Name As SalesAgentName, category.Name As DestinationName, CountryCode, source.Name As SourceName', FALSE);
+			$this->db->select('booking.BookingID, BookingNumber, ReservationNumber, DepositDeadline, FullPaymentDeadline, Customer, booking.Mobile As CustomerMobile, StartDate, EndDate, Adult, Children, Infant, BookingRemark, Subtotal, Discount, NetTotal, booking.ChatLanguage As ChatLanguage, CancelStatus, booking.PartialRefund, LockStatus, booking.is_submitted, AfterSalesService, booking.Status, booking.InsertDate, MAX(guest_list.CountryCodeID) As GuestCountryCode, MAX(Type) As Type, MAX(guest_list.Name) As GuestName, MAX(guest_list.Gender) As Gender, MAX(DateOfBirth) As DateOfBirth, MAX(Nationality) As Nationality, MAX(guest_list.IdentificationNumber) As IdentificationNumber, MAX(guest_list.PassportNumber) As PassportNumber, MAX(guest_list.Mobile) As GuestMobile, MAX(guest_list.Email) As Email, MAX(MaritalStatus) As MaritalStatus, MAX(Employment) As Employment, MAX(Address) As Address, MAX(Postcode) As Postcode, MAX(guest_list.City) As City, MAX(guest_list.State) As State, MAX(guest_list.Country) As Country, MAX(Nominee) As Nominee, MAX(NomineeIdentificationNumber) As NomineeIdentificationNumber, MAX(Relationship) As Relationship, admin.Name As SalesAgentName, category.Name As DestinationName, CountryCode, source.Name As SourceName', FALSE);
 		} else {
-			$this->db->select('booking.BookingID, BookingNumber, ReservationNumber, DepositDeadline, FullPaymentDeadline, Customer, booking.Mobile As CustomerMobile, StartDate, EndDate, Adult, Children, Infant, BookingRemark, Subtotal, Discount, NetTotal, ChatLanguage, CancelStatus, booking.PartialRefund, LockStatus, booking.is_submitted, AfterSalesService, booking.Status, booking.InsertDate, guest_list.CountryCodeID As GuestCountryCode, Type, guest_list.Name As GuestName, guest_list.Gender, DateOfBirth, Nationality, guest_list.IdentificationNumber, guest_list.PassportNumber, guest_list.Mobile As GuestMobile, guest_list.Email, MaritalStatus, Employment, Address, Postcode, guest_list.City, guest_list.State, guest_list.Country, Nominee, NomineeIdentificationNumber, Relationship, admin.Name As SalesAgentName, category.Name As DestinationName, CountryCode, source.Name As SourceName');
+			$this->db->select('booking.BookingID, BookingNumber, ReservationNumber, DepositDeadline, FullPaymentDeadline, Customer, booking.Mobile As CustomerMobile, StartDate, EndDate, Adult, Children, Infant, BookingRemark, Subtotal, Discount, NetTotal, booking.ChatLanguage As ChatLanguage, CancelStatus, booking.PartialRefund, LockStatus, booking.is_submitted, AfterSalesService, booking.Status, booking.InsertDate, guest_list.CountryCodeID As GuestCountryCode, Type, guest_list.Name As GuestName, guest_list.Gender, DateOfBirth, Nationality, guest_list.IdentificationNumber, guest_list.PassportNumber, guest_list.Mobile As GuestMobile, guest_list.Email, MaritalStatus, Employment, Address, Postcode, guest_list.City, guest_list.State, guest_list.Country, Nominee, NomineeIdentificationNumber, Relationship, admin.Name As SalesAgentName, category.Name As DestinationName, CountryCode, source.Name As SourceName');
 		}
 		$this->db->join('guest_list', 'guest_list.BookingID = booking.BookingID', 'left');
 		$this->db->join('admin', 'admin.AdminID = booking.SalesAgent', 'left');
 		$this->db->join('category', 'category.CategoryID = booking.Destination', 'left');
 		$this->db->join('country_code', 'country_code.CountryCodeID = booking.CountryCodeID', 'left');
 		$this->db->join('source', 'source.SourceID = booking.Source', 'left');
-		if(in_array($this->session->userdata('level'), [20, 50])) {
-			$this->db->where('SalesAgent', $this->session->userdata('admin_id'));
-		}
-		if(!empty($this->input->get('booking_number'))) {
-			$this->db->where('BookingNumber', $this->input->get('booking_number'));
-		}
-		if(!empty($this->input->get('reservation_number'))) {
-			$this->db->like('ReservationNumber', $this->input->get('reservation_number'));
-		}
-		if(!empty($this->input->get('deadline'))) {
-			$deadline = explode(' - ', $this->input->get('deadline'));
-			$start_date = date('Y-m-d', strtotime(str_replace('/', '-', $deadline[0])));
-			$end_date = date('Y-m-d', strtotime(str_replace('/', '-', $deadline[1])));
-			$this->db->where("((`DepositDeadline` >= '".$start_date."' AND `DepositDeadline` <= '".$end_date."') OR (`FullPaymentDeadline` >= '".$start_date."' AND `FullPaymentDeadline` <= '".$end_date."') OR (`AdditionalPaymentDeadline` >= '".$start_date."' AND `AdditionalPaymentDeadline` <= '".$end_date."')) AND `booking`.`Status` IN ('P','PP')");
-		}
-		if(!empty($this->input->get('customer'))) {
-			// $this->db->where('Customer', $this->input->get('customer'));
-			$this->db->like('Customer', $this->input->get('customer'));
-		}
-		if(!empty($this->input->get('mobile'))) {
-			$this->db->where('booking.Mobile', $this->input->get('mobile'));
-		}
-		if(!empty($this->input->get('travel_date'))) {
-			$travel_date = explode(' - ', $this->input->get('travel_date'));
-			$start_date = date('Y-m-d', strtotime(str_replace('/', '-', $travel_date[0])));
-			$end_date = date('Y-m-d', strtotime(str_replace('/', '-', $travel_date[1])));
-			$this->db->where("((`StartDate` <= '".$start_date."' AND `EndDate` >= '".$end_date."') OR (`StartDate` >= '".$start_date."' AND `StartDate` <= '".$end_date."') OR (`EndDate` >= '".$start_date."' AND `EndDate` <= '".$end_date."'))");
-		}
-		if(!empty($this->input->get('destination'))) {
-			$this->db->where('Destination', $this->input->get('destination'));
-		}
-		if(!empty($this->input->get('sales_agent'))) {
-			$this->db->where_in('SalesAgent', explode(',', $this->input->get('sales_agent')));
-		}
-		if(!empty($this->input->get('tag'))) {
-			$this->db->where("FIND_IN_SET('".$this->input->get('tag')."', Tag)");
-		}
-		if(!empty($this->input->get('chat_language'))) {
-			$this->db->where('ChatLanguage', $this->input->get('chat_language'));
-		}
-		if(!empty($this->input->get('source'))) {
-			$this->db->where('Source', $this->input->get('source'));
-		}
-		if(!empty($this->input->get('booking_confirmation_title'))) {
-			$this->db->where('booking.BookingConfirmationTitle', $this->input->get('booking_confirmation_title'));
-		}
-		$this->apply_guest_list_status_filter();
-		$this->apply_checklist_filter();
-		if(!empty($this->input->get('cancellation_reason'))) {
-			$this->db->where('booking.CancellationReasonID', $this->input->get('cancellation_reason'));
-			$this->db->where('CancelStatus', 'Y');
-		}
-		$this->apply_status_filter();
-		if(!empty($this->input->get('booking_date'))) {
-			$booking_date = explode(' - ', $this->input->get('booking_date'));
-			$start_date = date('Y-m-d', strtotime(str_replace('/', '-', $booking_date[0])));
-			$end_date = date('Y-m-d', strtotime(str_replace('/', '-', $booking_date[1])));
-			$this->db->where('CAST(booking.InsertDate AS DATE) >=', $start_date);
-			$this->db->where('CAST(booking.InsertDate AS DATE) <=', $end_date);
-		}
-		$this->db->where('booking.Status !=', 'N');
+		$this->db->join('customer', 'customer.CustomerID = booking.CustomerID', 'left');
+
+		// Route the spreadsheet through the same WHERE-builder the on-screen
+		// list uses, so any filter added to /Booking automatically applies to
+		// the Download / Mass_Generate_Guest_Lists exports.
+		$this->apply_booking_filters();
+
 		if($group_by_booking_id == 'Y') {
 			$this->db->group_by('booking.BookingID');
 		} else {

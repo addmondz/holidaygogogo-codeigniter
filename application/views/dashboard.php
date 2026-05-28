@@ -146,43 +146,6 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-4">
-                            <div class="card card-custom card-stretch gutter-b">
-                                <div class="card-header border-0" style="background-color:#FFFAA030;">
-                                    <h3 class="card-title font-weight-bold text-dark" style="font-size:14px;">Travel Completed - Pending Review</h3>
-                                </div>
-                                <div class="card-body">
-                                    <div class="accordion accordion-solid accordion-toggle-plus">
-                                        <div class="card">
-                                            <div class="card-header">
-                                                <div data-toggle="collapse" data-target="#sales_agent_pending_reviews" class="card-title collapsed" style="font-size:13px;"><?php echo '<strong>' . count($sales_agent_pending_reviews) . '</strong>&nbsp;BC(s)'; ?></div>
-                                            </div>
-                                            <div id="sales_agent_pending_reviews" class="collapse">
-                                                <div class="card-body">
-                                                    <?php if(!empty($sales_agent_pending_reviews)) {
-                                                        foreach($sales_agent_pending_reviews as $sales_agent_pending_review) { ?>
-                                                            <div class="d-flex align-items-center">
-                                                                <span class="bullet bullet-bar bg-warning align-self-stretch"></span>
-                                                                <label class="checkbox checkbox-lg checkbox-light-warning checkbox-inline flex-shrink-0 m-0 mx-4">
-                                                                    <input disabled type="checkbox">
-                                                                    <span></span>
-                                                                </label>
-                                                                <div class="d-flex flex-column flex-grow-1">
-                                                                    <a href="<?php echo base_url('Booking?booking_number=') . $sales_agent_pending_review->BookingNumber; ?>" target="_blank" class="text-dark-75 text-hover-primary font-weight-bold font-size-xs"><?php echo $sales_agent_pending_review->BookingNumber; ?></a>
-                                                                    <span class="text-muted font-weight-bold" style="font-size:10px;"><?php echo $sales_agent_pending_review->Name; ?></span>
-                                                                    <span class="text-muted font-weight-bold" style="font-size:10px;"><?php echo $sales_agent_pending_review->Customer; ?></span>
-                                                                </div>
-                                                            </div>
-                                                            <br>
-                                                        <?php }
-                                                    } ?>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
                         <div class="col-md-12">
                             <div class="card card-custom card-stretch gutter-b">
                                 <div class="card-header border-0" style="background-color:#FFFFF0;">
