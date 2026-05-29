@@ -234,50 +234,16 @@ div.kt-datatable__pager-container {
 				<div class="d-flex justify-content-between align-items-center mt-3">
 					<?php if(!empty($guests)) {
 						$start = ($page - 1) * $limit + 1;
-						$end   = min($page * $limit, $total);
+						$end   = $start + count($guests) - 1;
 					?>
 						<div class="text-left font-weight-bold" style="padding-left:15px;">
-							Showing <?= $start ?> to <?= $end ?> of <?= $total ?> entries
+							Showing <?= $start ?> to <?= $end ?> of <span id="guests_total" class="text-muted">…</span> entries
 						</div>
 					<?php } ?>
 
-					<div class="text-center">
-						<?php
-							$totalPages = ($total > 0) ? (int) ceil($total / $limit) : 0;
-							$query = $_GET;
-							unset($query['page']);
-
-							if($totalPages > 1):
-								$maxPagesToShow = 7;
-								$half = floor($maxPagesToShow / 2);
-								$startPage = max(1, $page - $half);
-								$endPage   = min($totalPages, $page + $half);
-								if($page <= $half) {
-									$endPage = min($totalPages, $maxPagesToShow);
-								}
-								if($page + $half > $totalPages) {
-									$startPage = max(1, $totalPages - $maxPagesToShow + 1);
-								}
-						?>
-							<?php $query['page'] = 1; ?>
-							<a href="?<?= http_build_query($query) ?>" class="btn btn-sm <?= ($page == 1 ? 'btn-primary disabled' : 'btn-light') ?>">&laquo; First</a>
-
-							<?php $query['page'] = max(1, $page - 1); ?>
-							<a href="?<?= http_build_query($query) ?>" class="btn btn-sm <?= ($page == 1 ? 'btn-primary disabled' : 'btn-light') ?>">&lsaquo; Prev</a>
-
-							<?php if($startPage > 1): ?><span class="btn btn-sm btn-light disabled">...</span><?php endif; ?>
-
-							<?php for($i = $startPage; $i <= $endPage; $i++): $query['page'] = $i; ?>
-								<a href="?<?= http_build_query($query) ?>" class="btn btn-sm <?= ($page == $i ? 'btn-primary' : 'btn-light') ?>"><?= $i ?></a>
-							<?php endfor; ?>
-
-							<?php if($endPage < $totalPages): ?><span class="btn btn-sm btn-light disabled">...</span><?php endif; ?>
-
-							<?php $query['page'] = min($totalPages, $page + 1); ?>
-							<a href="?<?= http_build_query($query) ?>" class="btn btn-sm <?= ($page == $totalPages ? 'btn-primary disabled' : 'btn-light') ?>">Next &rsaquo;</a>
-
-							<?php $query['page'] = $totalPages; ?>
-							<a href="?<?= http_build_query($query) ?>" class="btn btn-sm <?= ($page == $totalPages ? 'btn-primary disabled' : 'btn-light') ?>">Last &raquo;</a>
+					<div class="text-center" id="guests_pagination">
+						<?php if(!empty($guests)): ?>
+							<span class="text-muted small"><i class="la la-spinner la-spin"></i>&nbsp; Loading pagination…</span>
 						<?php endif; ?>
 					</div>
 				</div>
@@ -301,6 +267,28 @@ div.kt-datatable__pager-container {
 	$('#reset').click(function() {
 		Reset('<?php echo base_url('Guests'); ?>');
 	});
+
+	<?php if(!empty($guests)): ?>
+		$(function() {
+			$.ajax({
+				url: '<?php echo base_url('Guests/Count'); ?>' + (window.location.search || ''),
+				dataType: 'json',
+				timeout: 60000
+			}).done(function(data) {
+				if (data && typeof data.total !== 'undefined') {
+					$('#guests_total').text(Number(data.total).toLocaleString()).removeClass('text-muted');
+				}
+				if (data && typeof data.pagination_html === 'string') {
+					$('#guests_pagination').html(data.pagination_html);
+				} else {
+					$('#guests_pagination').empty();
+				}
+			}).fail(function() {
+				$('#guests_total').text('—').removeClass('text-muted');
+				$('#guests_pagination').html('<span class="text-danger small">Could not load total / pagination</span>');
+			});
+		});
+	<?php endif; ?>
 
 	function Reset_Booking_Date() {
 		$('#kt_daterangepicker_guests_booking input').val('');

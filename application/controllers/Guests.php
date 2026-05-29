@@ -20,7 +20,7 @@ class Guests extends MY_Controller
 		$offset = ($page - 1) * $limit;
 
 		$data['guests']         = $this->Guests_Model->Read_Guests($limit, $offset);
-		$data['total']          = $this->Guests_Model->Count_Guests();
+		$data['total']          = null;
 		$data['page']           = $page;
 		$data['limit']          = $limit;
 		$data['admins']         = $this->Booking_Model->Read_Admins();
@@ -31,6 +31,27 @@ class Guests extends MY_Controller
 		$this->load->view('layout/header', $titles);
 		$this->load->view('guests/index', $data);
 		$this->load->view('layout/footer');
+	}
+
+	function Count()
+	{
+		$page  = max(1, (int) $this->input->get('page'));
+		$limit = 30;
+		$total = (int) $this->Guests_Model->Count_Guests();
+
+		$pagination_html = $this->load->view('guests/_pagination', array(
+			'total' => $total,
+			'page'  => $page,
+			'limit' => $limit,
+			'query' => $this->input->get(),
+		), true);
+
+		$this->output
+			->set_content_type('application/json')
+			->set_output(json_encode(array(
+				'total'           => $total,
+				'pagination_html' => $pagination_html,
+			)));
 	}
 
 	function View()
