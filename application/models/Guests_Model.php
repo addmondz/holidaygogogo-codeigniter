@@ -19,7 +19,7 @@ class Guests_Model extends CI_Model
 			. ") USING utf8mb4) COLLATE utf8mb4_unicode_ci)";
 	}
 
-	private function Build_Merged_Sql_And_Params()
+	private function Build_Branches()
 	{
 		$dedup     = $this->Dedup_Key_Expr();
 		$gc_dedup  = $this->Ghl_Dedup_Key_Expr();
@@ -29,26 +29,12 @@ class Guests_Model extends CI_Model
 		$has_q     = $q_raw !== '';
 		$like      = $has_q ? '%' . $q_raw . '%' : null;
 
-		$booking_filter_set = (
-			!empty($this->input->get('booking_date'))  ||
-			!empty($this->input->get('travel_date'))   ||
-			!empty($this->input->get('sales_agent'))   ||
-			!empty($this->input->get('source'))        ||
-			!empty($this->input->get('customer_type')) ||
-			!empty($this->input->get('nationality'))   ||
-			!empty($this->input->get('gender'))        ||
-			!empty($this->input->get('language'))
-		);
-
 		$run_bookings = ($type !== 'ghl');
-		$run_ghl      = ($type === 'ghl') || ($type === '' || $type === null) && !$booking_filter_set;
-		if($type === 'guest') { $run_ghl = false; }
+		$run_ghl      = ($type === 'ghl');
 		$exclude_ghl_db = !empty($this->input->get('exclude_ghl'));
 		if($exclude_ghl_db) { $run_ghl = false; }
 
-		$parts  = array();
-		$params = array();
-
+		$booking = null;
 		if($run_bookings) {
 			$where = " WHERE b.Status != 'N' AND b.CancelStatus = 'N' ";
 			$b_params = array();
@@ -63,7 +49,7 @@ class Guests_Model extends CI_Model
 				if(count($range) == 2) {
 					$start = date('Y-m-d', strtotime(str_replace('/', '-', $range[0])));
 					$end   = date('Y-m-d', strtotime(str_replace('/', '-', $range[1])));
-					$where     .= " AND CAST(b.InsertDate AS DATE) >= ? AND CAST(b.InsertDate AS DATE) <= ? ";
+					$where     .= " AND b.InsertDate >= ? AND b.InsertDate < DATE_ADD(?, INTERVAL 1 DAY) ";
 					$b_params[] = $start;
 					$b_params[] = $end;
 				}
@@ -120,6 +106,66 @@ class Guests_Model extends CI_Model
 				$where .= " AND gh_keys.dk IS NULL ";
 			}
 
+			$from_joins_where = "
+	FROM booking b
+	JOIN guest_list gl ON gl.BookingID = b.BookingID AND gl.Status = 'Y'
+	LEFT JOIN customer     c  ON c.CustomerID    = b.CustomerID
+	LEFT JOIN admin        a  ON a.AdminID       = b.SalesAgent
+	LEFT JOIN source       s  ON s.SourceID      = b.Source
+	LEFT JOIN country_code cn ON cn.CountryCodeID = gl.Nationality
+	{$ghl_anti_join}
+	{$where}
+			";
+
+			$booking = array(
+				'dedup'  => $dedup,
+				'from'   => $from_joins_where,
+				'params' => $b_params,
+			);
+		}
+
+		$ghl = null;
+		if($run_ghl) {
+			$g_params = array();
+			$ghl_where = "";
+			if($has_q) {
+				$ghl_where .= " AND ( gc.first_name LIKE ? OR gc.last_name LIKE ? OR CONCAT_WS(' ', gc.first_name, gc.last_name) LIKE ? ) ";
+				$g_params[] = $like;
+				$g_params[] = $like;
+				$g_params[] = $like;
+			}
+
+			$from_joins_where = "
+FROM ghl_contacts gc
+LEFT JOIN (
+	SELECT DISTINCT {$dedup} AS dk
+	FROM guest_list gl
+	JOIN booking b ON b.BookingID = gl.BookingID
+	WHERE gl.Status = 'Y' AND b.Status != 'N' AND b.CancelStatus = 'N'
+) bg_keys ON bg_keys.dk = {$gc_dedup}
+WHERE bg_keys.dk IS NULL
+{$ghl_where}
+			";
+
+			$ghl = array(
+				'dedup'  => $gc_dedup,
+				'from'   => $from_joins_where,
+				'params' => $g_params,
+			);
+		}
+
+		return array($booking, $ghl);
+	}
+
+	private function Build_Merged_Sql_And_Params()
+	{
+		list($booking, $ghl) = $this->Build_Branches();
+
+		$parts  = array();
+		$params = array();
+
+		if($booking !== null) {
+			$dedup = $booking['dedup'];
 			$parts[] = "
 SELECT
 	dedup_key,
@@ -159,30 +205,15 @@ FROM (
 			PARTITION BY {$dedup}, b.BookingID
 			ORDER BY gl.GuestListID
 		) AS booking_rn
-	FROM booking b
-	JOIN guest_list gl ON gl.BookingID = b.BookingID AND gl.Status = 'Y'
-	LEFT JOIN customer     c  ON c.CustomerID    = b.CustomerID
-	LEFT JOIN admin        a  ON a.AdminID       = b.SalesAgent
-	LEFT JOIN source       s  ON s.SourceID      = b.Source
-	LEFT JOIN country_code cn ON cn.CountryCodeID = gl.Nationality
-	{$ghl_anti_join}
-	{$where}
+	{$booking['from']}
 ) t
 GROUP BY dedup_key
 			";
-			$params = array_merge($params, $b_params);
+			$params = array_merge($params, $booking['params']);
 		}
 
-		if($run_ghl) {
-			$g_params = array();
-			$ghl_where = "";
-			if($has_q) {
-				$ghl_where .= " AND ( gc.first_name LIKE ? OR gc.last_name LIKE ? OR CONCAT_WS(' ', gc.first_name, gc.last_name) LIKE ? ) ";
-				$g_params[] = $like;
-				$g_params[] = $like;
-				$g_params[] = $like;
-			}
-
+		if($ghl !== null) {
+			$gc_dedup = $ghl['dedup'];
 			$parts[] = "
 SELECT
 	{$gc_dedup} AS dedup_key,
@@ -199,17 +230,9 @@ SELECT
 	0    AS TotalPax,
 	0    AS TotalSales,
 	CAST('GHL' AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS Type
-FROM ghl_contacts gc
-LEFT JOIN (
-	SELECT DISTINCT {$dedup} AS dk
-	FROM guest_list gl
-	JOIN booking b ON b.BookingID = gl.BookingID
-	WHERE gl.Status = 'Y' AND b.Status != 'N' AND b.CancelStatus = 'N'
-) bg_keys ON bg_keys.dk = {$gc_dedup}
-WHERE bg_keys.dk IS NULL
-{$ghl_where}
+{$ghl['from']}
 			";
-			$params = array_merge($params, $g_params);
+			$params = array_merge($params, $ghl['params']);
 		}
 
 		if(empty($parts)) {
@@ -233,14 +256,23 @@ WHERE bg_keys.dk IS NULL
 
 	function Count_Guests()
 	{
-		list($inner, $params) = $this->Build_Merged_Sql_And_Params();
-		if($inner === null) {
-			return 0;
+		list($booking, $ghl) = $this->Build_Branches();
+
+		$total = 0;
+
+		if($booking !== null) {
+			$sql = "SELECT COUNT(DISTINCT {$booking['dedup']}) AS cnt {$booking['from']}";
+			$row = $this->db->query($sql, $booking['params'])->row();
+			if($row) { $total += (int)$row->cnt; }
 		}
 
-		$sql = "SELECT COUNT(*) AS cnt FROM (" . $inner . ") z";
-		$row = $this->db->query($sql, $params)->row();
-		return $row ? (int)$row->cnt : 0;
+		if($ghl !== null) {
+			$sql = "SELECT COUNT(DISTINCT {$ghl['dedup']}) AS cnt {$ghl['from']}";
+			$row = $this->db->query($sql, $ghl['params'])->row();
+			if($row) { $total += (int)$row->cnt; }
+		}
+
+		return $total;
 	}
 
 	function Read_Distinct($col)
