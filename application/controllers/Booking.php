@@ -5393,7 +5393,8 @@ class Booking extends MY_Controller
 		$access_control = $this->session->access_control ?? array();
 		$is_sales_agent = $this->session->userdata('level') == 20;
 		$is_team_lead = (int)$this->session->userdata('level') === 25;
-		if(!in_array('AB', $access_control) && !$is_sales_agent && !$is_team_lead) {
+		$is_op_team_lead = (int)$this->session->userdata('level') === 45;
+		if(!in_array('AB', $access_control) && !$is_sales_agent && !$is_team_lead && !$is_op_team_lead) {
 			echo json_encode(array('success' => false, 'message' => 'Access denied'));
 			return;
 		}
@@ -5413,10 +5414,10 @@ class Booking extends MY_Controller
 			}
 		}
 
-		// Strict whitelist: only TC1 (booking SalesAgent), OP (BookingOP), and
-		// the Team Lead (level 25) of either may mutate this booking's
-		// checklist. The modal can still load read-only for everyone else
-		// with AB access.
+		// Strict whitelist: only TC1 (booking SalesAgent), OP (BookingOP), the
+		// SalesAgent's sales Team Lead, and the BookingOP's OP TEAM LEAD may
+		// mutate this booking's checklist. The modal can still load read-only
+		// for everyone else with AB access.
 		$this->load->helper('booking_flow');
 		$tl_ids = resolve_booking_checklist_team_leads($booking);
 		$can_modify = can_user_modify_booking_checklist(

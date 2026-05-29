@@ -1,5 +1,7 @@
 <?php
     ini_set("memory_limit","512M");
+    // Autocount status is only relevant to Owner (10) and Finance (30)
+    $show_autocount_status = in_array((int)$this->session->userdata('level'), [10, 30]);
 ?>
 <style>
 .booking-quick-range .btn {
@@ -414,6 +416,7 @@
                                                 </div>
                                             </div>
                                         </div>
+                                        <?php if($show_autocount_status) { ?>
                                         <div class="col-md-3">
                                             <div class="form-group">
                                                 <label>Autocount Status</label>
@@ -426,6 +429,7 @@
                                                 <input type="hidden" name="autocount_status" id="autocount_status_hidden" value="<?php echo $this->input->get('autocount_status'); ?>">
                                             </div>
                                         </div>
+                                        <?php } ?>
                                     </div>
                                     <input type="button" id="filter" value="Filter" class="btn btn-light-success font-weight-bold" style="width:80px;">
                                     <input type="button" id="reset" value="Reset" class="btn btn-light-primary font-weight-bold" style="width:80px;">
@@ -557,7 +561,9 @@
                                 <th style="text-align:center;">Reference</th>
                                 <th style="text-align:center;">Autocount Reference</th>
                                 <th class="status" style="text-align:center;">Status</th>
+                                <?php if($show_autocount_status) { ?>
                                 <th class="autocount_sync_status" style="text-align:center;">Autocount Status</th>
+                                <?php } ?>
                                 <th class="action" style="text-align:center;">Action</th>
                             </tr>
                         </thead>
@@ -1177,7 +1183,9 @@ $(document).ready(function() {
             { data: 'reference', className: 'text-center' },
             { data: 'autocount_ref', className: 'text-center' },
             { data: 'status', orderable: false, className: 'text-center' },
+            <?php if($show_autocount_status) { ?>
             { data: 'autocount_status', orderable: false, className: 'text-center' },
+            <?php } ?>
             { data: 'action', orderable: false, searchable: false, className: 'text-center' }
         ]);
 

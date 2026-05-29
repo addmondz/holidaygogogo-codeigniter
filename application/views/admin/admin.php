@@ -178,6 +178,21 @@
                                 </select>
                             </div>
                         </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>OP Team Lead
+                                    <small class="text-muted d-block">The OP TEAM LEAD who may tick this OP's booking checklists. Used for OP-side staff.</small>
+                                </label>
+                                <select id="OpTeamLeadID" class="form-control selectpicker">
+                                    <option selected data-icon="la la-users font-size-lg bs-icon" value="">--SELECT OP TEAM LEAD--</option>
+                                    <?php if(!empty($op_team_leads)) {
+                                        foreach($op_team_leads as $op_team_lead) { ?>
+                                            <option <?php if($Action == 'U' && $OpTeamLeadID == $op_team_lead->AdminID) { echo 'selected'; } ?> data-icon="la la-user-tie font-size-lg bs-icon" value="<?php echo $op_team_lead->AdminID; ?>"><?php echo $op_team_lead->Name; ?></option>
+                                        <?php }
+                                    } ?>
+                                </select>
+                            </div>
+                        </div>
                         <div class="col-md-12">
                             <div class="form-group">
                                 <label>Lead Dashboard Agents
@@ -446,6 +461,7 @@
                 var level = $('#Level').val();
                 var access_control = ($('#AccessControl').val()).toString();
                 var team_lead_id = $('#TeamLeadID').val();
+                var op_team_lead_id = $('#OpTeamLeadID').val();
                 var lead_dashboard_agents = $('#LeadDashboardAgents').val() || [];
                 var lda_initial_str = '<?php echo implode(",", $lead_dashboard_agents); ?>'.split(',').filter(Boolean).sort().join(',');
                 var lda_current_str = lead_dashboard_agents.slice().sort().join(',');
@@ -460,7 +476,7 @@
                     if(action == 'C') {
                         var admin = [];
                         var url = '<?php echo base_url('Admin/Create') ?>';
-                        admin.push({CountryCodeID:country_code, Name:name, Gender:gender, IdentificationNumber:identification_number, PassportNumber:passport_number, Mobile:mobile, Email:email, Username:username, Password:password, Level:level, AccessControl:access_control, TeamLeadID:team_lead_id ? team_lead_id : null, InsertBy:session_id, InsertDate:current_datetime});
+                        admin.push({CountryCodeID:country_code, Name:name, Gender:gender, IdentificationNumber:identification_number, PassportNumber:passport_number, Mobile:mobile, Email:email, Username:username, Password:password, Level:level, AccessControl:access_control, TeamLeadID:team_lead_id ? team_lead_id : null, OpTeamLeadID:op_team_lead_id ? op_team_lead_id : null, InsertBy:session_id, InsertDate:current_datetime});
                         Submit_Admin(url, admin, null, lead_dashboard_agents, true, {}, false);
                     } else {
                         var dirty_fields = $('#form').dirty('showDirtyFields');
@@ -482,8 +498,8 @@
                             if(key != 'AccessControl') {
                                 var value = key == 'Name' || key == 'PassportNumber' || key == 'Email' || key == 'Password' ? (dirty_fields[i].value).toUpperCase() : dirty_fields[i].value;
 
-                                //Handle TeamLeadID empty value as null
-                                if(key == 'TeamLeadID' && value == '') {
+                                //Handle TeamLeadID / OpTeamLeadID empty value as null
+                                if((key == 'TeamLeadID' || key == 'OpTeamLeadID') && value == '') {
                                     value = null;
                                 }
 
@@ -506,6 +522,13 @@
                                     case 'TeamLeadID':
                                         <?php if(!empty($team_leads)) { ?>
                                             default_value = (Object.values(dirty_fields[i])[<?php echo count($team_leads) + 1; ?>]).dirtyInitialValue;
+                                        <?php } else { ?>
+                                            default_value = (Object.values(dirty_fields[i])[1]).dirtyInitialValue;
+                                        <?php } ?>
+                                        break;
+                                    case 'OpTeamLeadID':
+                                        <?php if(!empty($op_team_leads)) { ?>
+                                            default_value = (Object.values(dirty_fields[i])[<?php echo count($op_team_leads) + 1; ?>]).dirtyInitialValue;
                                         <?php } else { ?>
                                             default_value = (Object.values(dirty_fields[i])[1]).dirtyInitialValue;
                                         <?php } ?>

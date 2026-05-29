@@ -261,6 +261,7 @@
             </div>
         </div>
     <?php } ?>
+    <?php if(in_array((int)$this->session->userdata('level'), [10, 30])) { ?>
     <div class="col-md-3">
         <div class="form-group">
             <label>Autocount Status</label>
@@ -273,6 +274,7 @@
             <input type="hidden" name="autocount_status" id="autocount_status_hidden" value="<?php echo $filter_values['autocount_status'] ?? ''; ?>">
         </div>
     </div>
+    <?php } ?>
     <div class="col-md-3">
         <div class="form-group">
             <label>Guest List Status</label>

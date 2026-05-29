@@ -3,7 +3,7 @@ class Guests_Model extends CI_Model
 {
 	private function Dedup_Key_Expr()
 	{
-		return "(COALESCE(gl.dedup_key, CONCAT('row:', gl.GuestListID)) COLLATE utf8mb4_unicode_ci)";
+		return "gl.dedup_key";
 	}
 
 	private function Ghl_Dedup_Key_Expr()
@@ -27,6 +27,7 @@ class Guests_Model extends CI_Model
 		$booking = null;
 		if($run_bookings) {
 			$where = " WHERE b.Status != 'N' AND b.CancelStatus = 'N'
+				AND gl.dedup_key IS NOT NULL
 				AND (
 					NULLIF(TRIM(gl.Name), '')     IS NOT NULL
 					OR NULLIF(TRIM(gl.LastName), '') IS NOT NULL

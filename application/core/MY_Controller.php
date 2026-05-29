@@ -5,7 +5,7 @@ class MY_Controller extends CI_Controller
 	{
 		parent::__construct();
 		if($this->session->has_userdata('admin_id') && $this->session->has_userdata('level')) {
-			if(in_array($this->session->level, [20, 25])) {
+			if(in_array($this->session->level, [20, 25, 45])) {
 				switch($this->router->class) {
 					case 'Company':
 					case 'Admin':

@@ -71,7 +71,7 @@ class Admin_Model extends CI_Model
 							return false;
 						}
 					case 'Update':
-						$this->db->select('AdminID, CountryCodeID, Name, Gender, IdentificationNumber, PassportNumber, Mobile, Email, Username, Level, AccessControl, TeamLeadID');
+						$this->db->select('AdminID, CountryCodeID, Name, Gender, IdentificationNumber, PassportNumber, Mobile, Email, Username, Level, AccessControl, TeamLeadID, OpTeamLeadID');
 						$this->db->where('AdminID', $this->input->get('admin_id'));
 						$this->db->limit(1);
 						$admin = $this->db->get('admin');
@@ -98,6 +98,17 @@ class Admin_Model extends CI_Model
 	{
 		$this->db->select('AdminID, Name');
 		$this->db->where('Level', '25');
+		$this->db->where('Status', 'Y');
+		$this->db->order_by('Name', 'ASC');
+		return $this->db->get('admin')->result();
+	}
+
+	// Active OP TEAM LEADs (Level 45). Populates the "OP Team Lead" dropdown so
+	// an OP can be assigned to the lead who may tick that OP's booking checklists.
+	function Read_Op_Team_Leads()
+	{
+		$this->db->select('AdminID, Name');
+		$this->db->where('Level', '45');
 		$this->db->where('Status', 'Y');
 		$this->db->order_by('Name', 'ASC');
 		return $this->db->get('admin')->result();

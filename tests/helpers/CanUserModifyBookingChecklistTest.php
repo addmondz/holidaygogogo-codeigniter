@@ -58,6 +58,17 @@ $assertions['matches TC1 team lead, level 10 -> allowed (identity only)'] =
     can_user_modify_booking_checklist($booking_obj, 11, 10, $tc1_tl, $op_tl) === true;
 $assertions['matches NEITHER team lead -> blocked'] =
     can_user_modify_booking_checklist($booking_obj, 99, 25, $tc1_tl, $op_tl) === false;
+
+// OP TEAM LEAD role (level 45). Its team membership is resolved separately
+// (admin.OpTeamLeadID) and passed in as $op_team_lead_id, so identity still
+// decides: a level-45 lead over the booking's OP can tick; one who is not
+// this booking's OP lead (and matches no other slot) cannot.
+$assertions['OP team lead (level 45) over booking OP -> allowed'] =
+    can_user_modify_booking_checklist($booking_obj, 13, 45, $tc1_tl, $op_tl) === true;
+$assertions['OP team lead (level 45) NOT over this booking OP -> blocked'] =
+    can_user_modify_booking_checklist($booking_obj, 99, 45, $tc1_tl, $op_tl) === false;
+$assertions['level 45 also blocked when no op_tl resolved -> blocked'] =
+    can_user_modify_booking_checklist($booking_obj, 13, 45, $tc1_tl, null) === false;
 $assertions['both team-lead args null + non-matching user -> blocked'] =
     can_user_modify_booking_checklist($booking_obj, 11, 25, null, null) === false;
 $assertions['only TC1 TL set, user matches TC1 TL -> allowed'] =

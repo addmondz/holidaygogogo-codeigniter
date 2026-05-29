@@ -161,7 +161,9 @@
                                 <th style="text-align:center;">Name</th>
                                 <th style="text-align:center;">Phone</th>
                                 <th style="text-align:center;">Supplier Code (Autocount Creditor Code)</th>
+                                <?php if(in_array((int)$this->session->userdata('level'), [10, 30])) { ?>
                                 <th style="text-align:center;">Autocount Status</th>
+                                <?php } ?>
                                 <th class="action" style="text-align:center;">Action</th>
                             </tr>
                         </thead>
@@ -176,8 +178,9 @@
                                         <td style="text-align:center;"><?php echo $supplier->Name; ?></td>
                                         <td style="text-align:center;"><?php echo $supplier->Phone; ?></td>
                                         <td style="text-align:center;"><?php echo $supplier->SupplierCode; ?></td>
+                                        <?php if(in_array((int)$this->session->userdata('level'), [10, 30])) { ?>
                                         <td style="text-align:center;">
-                                            <?php 
+                                            <?php
                                                 // default
                                                 $statusColor = '#000000';
                                                 $statusText  = 'UNKNOWN';
@@ -213,6 +216,7 @@
                                                 <?= $statusText ?>
                                             </span>
                                         </td>
+                                        <?php } ?>
                                         <td style="text-align:center;">
                                             <div class="btn-group">
                                                 <button type="button" data-toggle="dropdown" class="btn btn-light-primary btn-sm dropdown-toggle" style="padding-left:3px;"></button>

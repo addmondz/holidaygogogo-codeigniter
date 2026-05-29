@@ -101,6 +101,7 @@ div.kt-datatable__pager-container {
                                         </div>
                                     </div>
                                     <div class="row">
+                                        <?php if(in_array((int)$this->session->userdata('level'), [10, 30])) { ?>
                                         <div class="col-md-3">
                                             <div class="form-group">
                                                 <label>Autocount Status</label>
@@ -112,6 +113,7 @@ div.kt-datatable__pager-container {
                                                 </select>
                                             </div>
                                         </div>
+                                        <?php } ?>
                                         <div class="col-md-3">
                                             <div class="form-group">
                                                 <label>Customer Type</label>
@@ -158,7 +160,9 @@ div.kt-datatable__pager-container {
                                 <th style="text-align:center;">Customer Code</th>
                                 <th style="text-align:center;">Chat Language</th>
                                 <th style="text-align:center;">Created Date</th>
+                                <?php if(in_array((int)$this->session->userdata('level'), [10, 30])) { ?>
                                 <th style="text-align:center;">Autocount Sync Status</th>
+                                <?php } ?>
                                 <th class="action" style="text-align:center;">Action</th>
                             </tr>
                         </thead>
@@ -175,8 +179,9 @@ div.kt-datatable__pager-container {
                                         <td style="text-align:center;"><?php echo $customer->CustomerCode; ?></td>
                                         <td style="text-align:center;"><?php echo $customer->ChatLanguage; ?></td>
                                         <td style="text-align:center;"><?php echo date('Y-m-d', strtotime($customer->created_at)); ?></td>
+                                        <?php if(in_array((int)$this->session->userdata('level'), [10, 30])) { ?>
                                         <td style="text-align:center;">
-                                            <?php 
+                                            <?php
                                                 $statusColor = '#000000';
                                                 $statusText  = 'UNKNOWN';
 
@@ -205,6 +210,7 @@ div.kt-datatable__pager-container {
                                             ?>
                                             <span class="font-weight-bold" style="color:<?= $statusColor ?>;" <?= $tooltipAttr ?>><?= $statusText ?></span>
                                         </td>
+                                        <?php } ?>
                                         <td style="text-align:center;">
                                             <div class="btn-group">
                                                 <button type="button" data-toggle="dropdown" class="btn btn-light-primary btn-sm dropdown-toggle" style="padding-left:3px;"></button>

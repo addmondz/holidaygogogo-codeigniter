@@ -1,5 +1,7 @@
 <?php
     $is_sales_agent = $this->session->userdata('level') == 20;
+    // Autocount status is only relevant to Owner (10) and Finance (30)
+    $show_autocount_status = in_array((int)$this->session->userdata('level'), [10, 30]);
     ini_set("memory_limit","512M");
 ?>
 <style>
@@ -263,7 +265,9 @@
                                 <?php } ?>
                                 <th style="text-align:center;">BC Status</th>
                                 <th class="gl_status" style="text-align:center;">GL Status</th>
+                                <?php if($show_autocount_status) { ?>
                                 <th class="autocount_sync_status" style="text-align:center;">Booking Autocount Status</th>
+                                <?php } ?>
                                 <th class="action" style="text-align:center;">Action</th>
                             </tr>
                         </thead>
@@ -710,7 +714,9 @@ $(document).ready(function() {
         columns = columns.concat([
             { data: 'status', className: 'text-center', responsivePriority: 7 },
             { data: 'gl_status', className: 'text-center', responsivePriority: 10009 },
+            <?php if($show_autocount_status) { ?>
             { data: 'autocount_status', className: 'text-center', responsivePriority: 10010 },
+            <?php } ?>
             { data: 'action', orderable: false, searchable: false, className: 'text-center', responsivePriority: 1 }
         ]);
 

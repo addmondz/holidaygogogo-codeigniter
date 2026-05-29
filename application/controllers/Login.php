@@ -26,6 +26,9 @@ class Login extends CI_Controller
 					case 30:
 						$priviledge = 'FINANCE';
 						break;
+					case 45:
+						$priviledge = 'OP TEAM LEAD';
+						break;
 					default:
 				}
 				$session = array(
