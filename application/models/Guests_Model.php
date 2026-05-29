@@ -30,9 +30,7 @@ class Guests_Model extends CI_Model
 		$like      = $has_q ? '%' . $q_raw . '%' : null;
 
 		$run_bookings = ($type !== 'ghl');
-		$run_ghl      = ($type === 'ghl');
-		$exclude_ghl_db = !empty($this->input->get('exclude_ghl'));
-		if($exclude_ghl_db) { $run_ghl = false; }
+		$run_ghl      = ($type !== 'guest');
 
 		$booking = null;
 		if($run_bookings) {
@@ -97,15 +95,6 @@ class Guests_Model extends CI_Model
 				$b_params[] = $like;
 			}
 
-			$ghl_anti_join = "";
-			if($exclude_ghl_db) {
-				$ghl_anti_join = "
-		LEFT JOIN (
-			SELECT DISTINCT {$gc_dedup} AS dk FROM ghl_contacts gc
-		) gh_keys ON gh_keys.dk = {$dedup}";
-				$where .= " AND gh_keys.dk IS NULL ";
-			}
-
 			$from_joins_where = "
 	FROM booking b
 	JOIN guest_list gl ON gl.BookingID = b.BookingID AND gl.Status = 'Y'
@@ -113,7 +102,6 @@ class Guests_Model extends CI_Model
 	LEFT JOIN admin        a  ON a.AdminID       = b.SalesAgent
 	LEFT JOIN source       s  ON s.SourceID      = b.Source
 	LEFT JOIN country_code cn ON cn.CountryCodeID = gl.Nationality
-	{$ghl_anti_join}
 	{$where}
 			";
 

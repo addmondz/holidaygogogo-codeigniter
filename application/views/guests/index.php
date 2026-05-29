@@ -121,15 +121,6 @@ div.kt-datatable__pager-container {
 												</select>
 											</div>
 										</div>
-										<div class="col-md-3 d-flex align-items-end">
-											<div class="form-group">
-												<label class="checkbox checkbox-outline checkbox-success">
-													<input type="checkbox" name="exclude_ghl" value="1" <?php if(!empty($this->input->get('exclude_ghl'))) echo 'checked'; ?>>
-													<span></span>
-													&nbsp;Exclude GHL records
-												</label>
-											</div>
-										</div>
 									</div>
 									<div class="row">
 										<div class="col-md-3">
@@ -297,7 +288,7 @@ div.kt-datatable__pager-container {
 
 <script>
 	<?php
-		$expanded_keys = array('q', 'sales_agent', 'source', 'customer_type', 'nationality', 'gender', 'language', 'booking_date', 'travel_date', 'type', 'exclude_ghl');
+		$expanded_keys = array('q', 'sales_agent', 'source', 'customer_type', 'nationality', 'gender', 'language', 'booking_date', 'travel_date', 'type');
 		$expand = false;
 		foreach($expanded_keys as $k) {
 			if($this->input->get($k) !== null && $this->input->get($k) !== '') { $expand = true; break; }
