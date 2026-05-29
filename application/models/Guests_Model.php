@@ -3,20 +3,12 @@ class Guests_Model extends CI_Model
 {
 	private function Dedup_Key_Expr()
 	{
-		return "(CONVERT(COALESCE("
-			. "NULLIF(RIGHT(REGEXP_REPLACE(IFNULL(gl.Mobile, ''), '[^0-9]', ''), 9), ''),"
-			. "LOWER(NULLIF(gl.Email, '')),"
-			. "CONCAT('row:', gl.GuestListID)"
-			. ") USING utf8mb4) COLLATE utf8mb4_unicode_ci)";
+		return "(COALESCE(gl.dedup_key, CONCAT('row:', gl.GuestListID)) COLLATE utf8mb4_unicode_ci)";
 	}
 
 	private function Ghl_Dedup_Key_Expr()
 	{
-		return "(CONVERT(COALESCE("
-			. "NULLIF(RIGHT(REGEXP_REPLACE(IFNULL(gc.phone, ''), '[^0-9]', ''), 9), ''),"
-			. "LOWER(NULLIF(gc.email, '')),"
-			. "CONCAT('ghl:', gc.id)"
-			. ") USING utf8mb4) COLLATE utf8mb4_unicode_ci)";
+		return "(COALESCE(gc.dedup_key, CONCAT('ghl:', gc.id)) COLLATE utf8mb4_unicode_ci)";
 	}
 
 	private function Build_Branches()
@@ -293,12 +285,11 @@ SELECT
 			";
 		} else if($col === 'Nationality') {
 			$sql = "
-				SELECT DISTINCT cn.Country AS value
-				FROM guest_list gl
-				JOIN country_code cn ON cn.CountryCodeID = gl.Nationality
-				WHERE gl.Status = 'Y'
-					AND cn.Country IS NOT NULL AND TRIM(cn.Country) != ''
-				ORDER BY cn.Country ASC
+				SELECT Country AS value
+				FROM country_code
+				WHERE Status = 'Y'
+					AND Country IS NOT NULL AND TRIM(Country) != ''
+				ORDER BY Country ASC
 			";
 		} else {
 			$sql = "
