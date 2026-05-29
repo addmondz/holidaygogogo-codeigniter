@@ -23,7 +23,7 @@ class Admin_Model extends CI_Model
 						}
 						$this->db->select($select);
 						$this->db->from('admin a');
-						$this->db->join('admin tl', 'a.TeamLeadID = tl.AdminID', 'left');
+						$this->db->join('admin tl', 'a.TeamLeadID = tl.AdminID AND tl.Level = "25" AND tl.Status = "Y"', 'left');
 						$this->db->where('a.AdminID !=', $this->session->admin_id);
 						$this->db->where('a.AdminID !=', 8);
 
