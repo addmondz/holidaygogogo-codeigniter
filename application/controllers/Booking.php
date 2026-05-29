@@ -569,12 +569,14 @@ class Booking extends MY_Controller
 			if(in_array('GB', $this->session->access_control)) {
 				$html .= '<a href="' . (strpos($current_url, '?') ? base_url('Booking/Duplicate?booking_id=') . $booking->BookingID . '&' . explode('?', $current_url)[1] : base_url('Booking/Duplicate?booking_id=') . $booking->BookingID) . '" class="dropdown-item" style="font-size:11px;">Duplicate Booking</a>';
 			}
-			// Edit Checklist - AB users, SA viewing own booking, or any Team Lead
-			// (level 25). The modal/save flow further scopes Team Leads via
-			// can_user_modify_booking_checklist() so only the matching TC1/OP TL
-			// can actually tick; non-matching TLs see a read-only modal.
+			// Edit Checklist - AB users, SA viewing own booking, the sales Team
+			// Lead (level 25), or the OP TEAM LEAD (level 45). The modal/save
+			// flow further scopes via can_user_modify_booking_checklist() so
+			// only the matching TC1/OP TL can actually tick; non-matching leads
+			// see a read-only modal.
 			$is_team_lead_user = (int)$this->session->userdata('level') === 25;
-			if(in_array('AB', $access_control) || ($is_sales_agent && !empty($booking->SalesAgentID) && $booking->SalesAgentID == $this->session->userdata('admin_id')) || $is_team_lead_user) {
+			$is_op_team_lead_user = (int)$this->session->userdata('level') === 45;
+			if(in_array('AB', $access_control) || ($is_sales_agent && !empty($booking->SalesAgentID) && $booking->SalesAgentID == $this->session->userdata('admin_id')) || $is_team_lead_user || $is_op_team_lead_user) {
 				$html .= '<button onclick="openChecklistModal(' . $booking->BookingID . ')" class="dropdown-item" style="font-size:11px;">Edit Checklist</button>';
 			}
 		}
