@@ -34,7 +34,13 @@ class Guests_Model extends CI_Model
 
 		$booking = null;
 		if($run_bookings) {
-			$where = " WHERE b.Status != 'N' AND b.CancelStatus = 'N' ";
+			$where = " WHERE b.Status != 'N' AND b.CancelStatus = 'N'
+				AND (
+					NULLIF(TRIM(gl.Name), '')     IS NOT NULL
+					OR NULLIF(TRIM(gl.LastName), '') IS NOT NULL
+					OR NULLIF(TRIM(gl.Mobile), '')   IS NOT NULL
+					OR NULLIF(TRIM(gl.Email), '')    IS NOT NULL
+				) ";
 			$b_params = array();
 
 			if(in_array($this->session->userdata('level'), array(20, 50))) {
