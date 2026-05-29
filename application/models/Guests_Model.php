@@ -103,7 +103,7 @@ class Guests_Model extends CI_Model
 
 			$from_joins_where = "
 	FROM booking b
-	JOIN guest_list gl ON gl.BookingID = b.BookingID AND gl.Status = 'Y'
+	STRAIGHT_JOIN guest_list gl ON gl.BookingID = b.BookingID AND gl.Status = 'Y'
 	LEFT JOIN customer     c  ON c.CustomerID    = b.CustomerID
 	LEFT JOIN admin        a  ON a.AdminID       = b.SalesAgent
 	LEFT JOIN source       s  ON s.SourceID      = b.Source
@@ -133,9 +133,9 @@ class Guests_Model extends CI_Model
 FROM ghl_contacts gc
 LEFT JOIN (
 	SELECT DISTINCT {$dedup} AS dk
-	FROM guest_list gl
-	JOIN booking b ON b.BookingID = gl.BookingID
-	WHERE gl.Status = 'Y' AND b.Status != 'N' AND b.CancelStatus = 'N'
+	FROM booking b
+	STRAIGHT_JOIN guest_list gl ON gl.BookingID = b.BookingID AND gl.Status = 'Y'
+	WHERE b.Status != 'N' AND b.CancelStatus = 'N'
 ) bg_keys ON bg_keys.dk = {$gc_dedup}
 WHERE bg_keys.dk IS NULL
 {$ghl_where}
