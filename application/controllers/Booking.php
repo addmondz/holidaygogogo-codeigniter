@@ -230,7 +230,8 @@ class Booking extends MY_Controller
 			$sa_as_tc2 = is_sa_acting_as_tc2(
 				$this->session->userdata('level'),
 				$this->session->userdata('admin_id'),
-				$booking->SalesAgent2
+				$booking->SalesAgent2,
+				$booking->SalesAgentID
 			);
 
 			// Format mobile

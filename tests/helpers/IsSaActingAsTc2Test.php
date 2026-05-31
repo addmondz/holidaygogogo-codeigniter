@@ -3,9 +3,9 @@
  * Run with: php tests/helpers/IsSaActingAsTc2Test.php
  *
  * Verifies is_sa_acting_as_tc2(): true when a level-20 Sales Agent matches
- * the booking's SalesAgent2 slot. Drives the booking-listing gating that
- * hides BC link, GL actions, and Customer actions for rows where the SA
- * is only the secondary consultant.
+ * the booking's SalesAgent2 slot AND is not also the SalesAgent (TC1).
+ * Drives the booking-listing gating that hides BC link, GL actions, and
+ * Customer actions for rows where the SA is only the secondary consultant.
  */
 
 if (!defined('BASEPATH')) {
@@ -31,6 +31,17 @@ $assertions['SA + empty-string SalesAgent2 -> false'] =
     is_sa_acting_as_tc2(20, 7, '') === false;
 $assertions['SA + zero SalesAgent2 -> false'] =
     is_sa_acting_as_tc2(20, 7, 0) === false;
+
+// SA who is BOTH TC1 and TC2 -> false (they ARE the primary consultant,
+// so they should see the full TC1 action set, not the limited TC2 view)
+$assertions['SA + matching TC1 and TC2 -> false'] =
+    is_sa_acting_as_tc2(20, 7, 7, 7) === false;
+$assertions['SA + matching TC1 only -> false'] =
+    is_sa_acting_as_tc2(20, 7, null, 7) === false;
+$assertions['SA + matching TC2 but different TC1 -> true'] =
+    is_sa_acting_as_tc2(20, 7, 7, 99) === true;
+$assertions['SA + matching TC1 (string) and TC2 -> false'] =
+    is_sa_acting_as_tc2(20, 7, 7, '7') === false;
 
 // Non-SA levels must NOT trigger the TC2 gating even if they happen to
 // match SalesAgent2 (admins/managers/TC keep full row access)

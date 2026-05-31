@@ -1034,15 +1034,24 @@ if (!function_exists('is_sa_blocked_from_completed_booking')) {
 if (!function_exists('is_sa_acting_as_tc2')) {
     /**
      * True when a level-20 Sales Agent matches the booking's SalesAgent2 (TC2)
-     * slot. Used in the booking listing to hide the BC link, GL actions, and
-     * Customer actions for rows where the SA is only the secondary consultant
-     * — those belong to TC1.
+     * slot and is NOT also the SalesAgent (TC1). Used in the booking listing
+     * to hide the BC link, GL actions, and Customer actions for rows where
+     * the SA is only the secondary consultant — those belong to TC1. When
+     * the same SA is assigned to both slots, they ARE the TC1, so the gate
+     * lifts and they see the full action set.
      */
-    function is_sa_acting_as_tc2($user_level, $user_id, $booking_sales_agent_2)
+    function is_sa_acting_as_tc2($user_level, $user_id, $booking_sales_agent_2, $booking_sales_agent = null)
     {
-        return (int)$user_level === 20
-            && !empty($booking_sales_agent_2)
-            && (int)$booking_sales_agent_2 === (int)$user_id;
+        if ((int)$user_level !== 20) {
+            return false;
+        }
+        if (empty($booking_sales_agent_2) || (int)$booking_sales_agent_2 !== (int)$user_id) {
+            return false;
+        }
+        if (!empty($booking_sales_agent) && (int)$booking_sales_agent === (int)$user_id) {
+            return false;
+        }
+        return true;
     }
 }
 
