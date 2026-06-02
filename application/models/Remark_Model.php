@@ -96,9 +96,16 @@ class Remark_Model extends CI_Model
 	}
 
 	/**
-	 * Restrict remark visibility to bookings the user owns (SA/OP) or remarks
-	 * they were tagged on via the notification table. Applied to every level
-	 * so the global Messages dropdown doesn't leak unrelated remarks.
+	 * Restrict remark visibility to bookings the user sits on (SA/OP seat) or
+	 * remarks they were tagged on via the notification table. Applied to every
+	 * level so the global Messages dropdown doesn't leak unrelated remarks.
+	 *
+	 * Visibility keys off seat membership (is this user the booking's
+	 * SalesAgent OR BookingOP), NOT the viewer's current level. A staff member
+	 * moved between roles (e.g. TC -> OP) therefore keeps seeing the remarks on
+	 * the bookings they were assigned to under their old role. $user_level is
+	 * retained for signature stability but intentionally no longer branches the
+	 * filter.
 	 */
 	private function _Apply_Visibility_Filter($user_id, $user_level)
 	{
@@ -108,13 +115,7 @@ class Remark_Model extends CI_Model
 		$uid = intval($user_id);
 		$tagged = "EXISTS (SELECT 1 FROM notification n WHERE n.remark_id = remark.RemarkID AND n.user_id = $uid)";
 
-		if ($user_level == 20) {
-			$this->db->where("(booking.SalesAgent = $uid OR $tagged)", null, false);
-		} elseif ($user_level == 40) {
-			$this->db->where("(booking.BookingOP = $uid OR $tagged)", null, false);
-		} else {
-			$this->db->where("(booking.SalesAgent = $uid OR booking.BookingOP = $uid OR $tagged)", null, false);
-		}
+		$this->db->where("(booking.SalesAgent = $uid OR booking.BookingOP = $uid OR $tagged)", null, false);
 	}
 
 	/**

@@ -184,6 +184,13 @@ class Invoice_Split_Model extends CI_Model
                         'message' => 'Quantity must be greater than 0 for pax "' . htmlspecialchars($pax_name) . '"'
                     ];
                 }
+                if (floor($qty) != $qty) {
+                    return [
+                        'ok' => false,
+                        'message' => 'Quantity must be a whole number for pax "' . htmlspecialchars($pax_name) . '"'
+                    ];
+                }
+                $qty = intval($qty);
 
                 $max_qty = floatval($product_lookup[$bp_id]['Quantity']);
                 if ($qty > $max_qty + 0.01) {

@@ -2611,11 +2611,10 @@
                     if (this === $row[0]) return;
                     var otherBp = parseInt($(this).find('.split-product-select').val(), 10) || 0;
                     if (otherBp === bpId) {
-                        otherSum += parseFloat($(this).find('.split-qty').val()) || 0;
+                        otherSum += parseInt($(this).find('.split-qty').val(), 10) || 0;
                     }
                 });
-                var remaining = bookingQty - otherSum;
-                remaining = Math.round(remaining * 100) / 100;
+                var remaining = Math.floor(bookingQty - otherSum);
                 return Math.max(0, remaining);
             }
 
@@ -2627,7 +2626,7 @@
                     return;
                 }
                 $qty.attr('max', remaining);
-                var val = parseFloat($qty.val());
+                var val = parseInt($qty.val(), 10);
                 if (!isNaN(val) && val > remaining) {
                     $qty.val(remaining);
                 }
@@ -2635,18 +2634,18 @@
 
             function addProductRow(paxIdx, product) {
                 var bpId = product ? product.BookingProductID : '';
-                var qty = product ? product.Quantity : '';
+                var qty = product ? (parseInt(product.Quantity, 10) || '') : '';
                 var price = product ? parseFloat(product.UnitPrice).toFixed(2) : '0.00';
                 var amount = product ? parseFloat(product.Amount).toFixed(2) : '0.00';
                 var maxAttr = '';
                 if (bpId) {
-                    var maxQty = getMaxQtyForBp(bpId);
+                    var maxQty = Math.floor(getMaxQtyForBp(bpId));
                     if (maxQty > 0) maxAttr = ' max="' + maxQty + '"';
                 }
 
                 var html = '<tr class="product-row" data-pax="' + paxIdx + '">';
                 html += '<td><select class="split-product-select" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:4px;font-size:13px;">' + getProductOptions(bpId) + '</select></td>';
-                html += '<td><input type="number" class="split-qty" value="' + qty + '" min="0.1" step="0.1"' + maxAttr + ' style="width:80px;padding:6px;border:1px solid #ddd;border-radius:4px;text-align:center;font-size:13px;"></td>';
+                html += '<td><input type="number" class="split-qty" value="' + qty + '" min="1" step="1" inputmode="numeric" pattern="[0-9]*" onkeypress="return event.charCode !== 46 && event.charCode !== 45 && event.charCode !== 101 && event.charCode !== 69;"' + maxAttr + ' style="width:80px;padding:6px;border:1px solid #ddd;border-radius:4px;text-align:center;font-size:13px;"></td>';
                 html += '<td class="split-price" style="text-align:right;font-size:13px;">RM ' + price + '</td>';
                 html += '<td class="split-amount-cell" style="text-align:right;font-size:13px;"><div class="split-amount">RM ' + amount + '</div></td>';
                 html += '<td><button type="button" class="remove-product-row" style="background:#dc3545;color:white;border:none;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:12px;"><i class="la la-trash"></i></button></td>';
@@ -2715,7 +2714,7 @@
                         var $qty = $row.find('.split-qty');
                         var bpId = parseInt($select.val(), 10) || 0;
                         var price = parseFloat($select.find('option:selected').data('price')) || 0;
-                        var qty = parseFloat($qty.val()) || 0;
+                        var qty = parseInt($qty.val(), 10) || 0;
                         var amount = Math.round(price * qty * 100) / 100;
 
                         $row.find('.split-price').text('RM ' + price.toFixed(2));
@@ -2796,6 +2795,13 @@
             });
 
             $(document).on('input change', '.split-qty', function() {
+                // Strip any non-digit characters (handles pasted decimals like
+                // "1.5" or "1,5") so the customer can only enter whole numbers.
+                var raw = String($(this).val() || '');
+                var sanitized = raw.replace(/[^0-9]/g, '');
+                if (raw !== sanitized) {
+                    $(this).val(sanitized);
+                }
                 applyRowCap($(this).closest('.product-row'));
                 recalculate();
             });
@@ -2814,11 +2820,12 @@
                 $body.empty();
                 for (var i = 0; i < bookingProducts.length; i++) {
                     var bp = bookingProducts[i];
+                    var seedQty = parseInt(bp.Quantity, 10) || 0;
                     $body.append(addProductRow(paxIdx, {
                         BookingProductID: bp.BookingProductID,
-                        Quantity: bp.Quantity,
+                        Quantity: seedQty,
                         UnitPrice: bp.Price,
-                        Amount: (parseFloat(bp.Price) * parseFloat(bp.Quantity)).toFixed(2)
+                        Amount: (parseFloat(bp.Price) * seedQty).toFixed(2)
                     }));
                 }
                 recalculate();
@@ -2919,7 +2926,8 @@
                     var products = [];
                     $(this).find('.product-row').each(function() {
                         var bpId = $(this).find('.split-product-select').val();
-                        var qty = parseFloat($(this).find('.split-qty').val()) || 0;
+                        var qtyRaw = $(this).find('.split-qty').val();
+                        var qty = parseInt(qtyRaw, 10) || 0;
                         if (bpId && qty > 0) {
                             products.push({ BookingProductID: parseInt(bpId), Quantity: qty });
                         }

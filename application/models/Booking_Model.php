@@ -433,9 +433,11 @@ class Booking_Model extends CI_Model
 
 	function Read_Booking_OP_Admins()
 	{
+		// Level 40 = OP, Level 45 = OP TEAM LEAD (a senior OP). Both can be
+		// assigned as a booking's OP, so the dropdown lists both roles.
 		$this->db->select('AdminID, Name');
 		$this->db->where('AdminID !=', 8);
-		$this->db->where('Level', '40');
+		$this->db->where_in('Level', array('40', '45'));
 		$this->db->where('Status', 'Y');
 		$this->db->order_by('Name', 'ASC');
 		return $this->db->get('admin')->result();

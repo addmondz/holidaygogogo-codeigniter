@@ -54,10 +54,13 @@ class Notification_Model extends CI_Model
 		// @mention rows (recipient is neither) stay in the Messages dropdown.
 		$this->db->where("(notification.type != 'remark' OR booking.SalesAgent = $uid OR booking.BookingOP = $uid)", NULL, FALSE);
 
-		if ($user_level == 20) {
-			$this->db->where("(notification.owner_type != 'booking' OR booking.SalesAgent = $uid)", NULL, FALSE);
-		} elseif ($user_level == 40) {
-			$this->db->where("(notification.owner_type != 'booking' OR booking.BookingOP = $uid)", NULL, FALSE);
+		// Front-line roles (SALES AGENT / OP) are scoped to bookings they sit on.
+		// Match EITHER seat (SalesAgent OR BookingOP), not the seat implied by
+		// their current level — otherwise a staff member moved between roles
+		// (e.g. TC -> OP) loses the notifications on bookings they were assigned
+		// to under their old role. Higher roles keep their unrestricted view.
+		if ($user_level == 20 || $user_level == 40) {
+			$this->db->where("(notification.owner_type != 'booking' OR booking.SalesAgent = $uid OR booking.BookingOP = $uid)", NULL, FALSE);
 		}
 	}
 
