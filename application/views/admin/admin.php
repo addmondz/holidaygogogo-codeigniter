@@ -507,35 +507,17 @@
                                 admin[0][key] = value;
 
                                 //Insert Admin Log
-                                var default_value = null;
-                                var country_codes = <?php echo count($country_codes) ?>;
-                                switch(key) {
-                                    case 'CountryCodeID':
-                                        default_value = (Object.values(dirty_fields[i])[country_codes + 1]).dirtyInitialValue;
-                                        break;
-                                    case 'Gender':
-                                        default_value = (Object.values(dirty_fields[i])[3]).dirtyInitialValue;
-                                        break;
-                                    case 'Level':
-                                        default_value = (Object.values(dirty_fields[i])[4]).dirtyInitialValue;
-                                        break;
-                                    case 'TeamLeadID':
-                                        <?php if(!empty($team_leads)) { ?>
-                                            default_value = (Object.values(dirty_fields[i])[<?php echo count($team_leads) + 1; ?>]).dirtyInitialValue;
-                                        <?php } else { ?>
-                                            default_value = (Object.values(dirty_fields[i])[1]).dirtyInitialValue;
-                                        <?php } ?>
-                                        break;
-                                    case 'OpTeamLeadID':
-                                        <?php if(!empty($op_team_leads)) { ?>
-                                            default_value = (Object.values(dirty_fields[i])[<?php echo count($op_team_leads) + 1; ?>]).dirtyInitialValue;
-                                        <?php } else { ?>
-                                            default_value = (Object.values(dirty_fields[i])[1]).dirtyInitialValue;
-                                        <?php } ?>
-                                        break;
-                                    default:
-                                        default_value = (Object.values(dirty_fields[i])[0]).dirtyInitialValue;
-                                }
+                                // Read the field's pre-edit value straight from the jquery-dirty
+                                // plugin's own stored "dirtyInitialValue" (the same key it sets in
+                                // assets/js/jquery-dirty.js). The previous Object.values(...)[N] index
+                                // math was brittle: the index drifted whenever the form gained a field
+                                // or a <select> gained options (new Level roles, OpTeamLeadID, lead
+                                // dashboard / sales-target selects), yielding a wrong/oversized
+                                // CurrentData that made the admin_log insert fail — which, with
+                                // db_debug on, corrupted the JSON response and showed a false
+                                // "Could Not Be Updated" even though the admin row was already saved.
+                                var default_value = $(dirty_fields[i]).data('dirtyInitialValue');
+                                if(default_value === undefined) { default_value = null; }
                                 admin_log.push({AdminID:admin_id, Column:key, CurrentData:default_value, NewData:value, InsertBy:session_id, InsertDate:current_datetime});
                             }
                         }

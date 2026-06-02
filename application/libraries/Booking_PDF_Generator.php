@@ -83,6 +83,17 @@ class Booking_PDF_Generator {
 		$country_code = $this->CI->Universal_Model->Read_Country_Code($array['SalesAgentCountryCode']);
 		$array['SalesAgentMobile'] = $country_code . $array['SalesAgentMobile'];
 
+		// From 2026-06-01 onward the BC shows a "Booking PIC" line for TC1
+		// (SalesAgent) and moves "Sales Agent" to TC2 (SalesAgent2).
+		$array['ShowBookingPIC'] = pdf_show_booking_pic_for_date($raw_booking_insert_date);
+		if (!empty($array['SalesAgent2Name'])) {
+			$sales_agent_2_country_code = $this->CI->Universal_Model->Read_Country_Code($array['SalesAgent2CountryCode']);
+			$array['SalesAgent2Mobile'] = $sales_agent_2_country_code . $array['SalesAgent2Mobile'];
+		} else {
+			$array['SalesAgent2Name'] = '';
+			$array['SalesAgent2Mobile'] = '';
+		}
+
 		$array['Title'] = str_replace(' ', '_', $array['BookingNumber'] . '_' . $array['Customer'] . '_' . $array['TravelDate']);
 
 		$subtotal = explode('.', $array['NetTotal']);

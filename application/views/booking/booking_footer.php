@@ -160,10 +160,20 @@
 				<td>No. Of Guests</td>
 				<td> : </td>
 				<td><?php echo $PaxNumber; ?></td>
-				<td>Sales Agent</td>
+				<td><?php echo !empty($ShowBookingPIC) ? 'Booking PIC' : 'Sales Agent'; ?></td>
 				<td> : </td>
 				<td><?php echo $SalesAgentName . ' (' . $SalesAgentMobile . ')'; ?></td>
 			</tr>
+			<?php if (!empty($ShowBookingPIC)) { ?>
+			<tr>
+				<td></td>
+				<td></td>
+				<td></td>
+				<td>Sales Agent</td>
+				<td> : </td>
+				<td><?php echo $SalesAgent2Name !== '' ? $SalesAgent2Name . ' (' . $SalesAgent2Mobile . ')' : '-'; ?></td>
+			</tr>
+			<?php } ?>
 		</table>
 		<hr style="margin-bottom:0px;">
 		<table style="width:100%; font-size:13px;">
