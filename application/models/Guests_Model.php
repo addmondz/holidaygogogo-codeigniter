@@ -97,10 +97,11 @@ class Guests_Model extends CI_Model
 			$from_joins_where = "
 	FROM booking b
 	STRAIGHT_JOIN guest_list gl ON gl.BookingID = b.BookingID AND gl.Status = 'Y'
-	LEFT JOIN customer     c  ON c.CustomerID    = b.CustomerID
-	LEFT JOIN admin        a  ON a.AdminID       = b.SalesAgent
-	LEFT JOIN source       s  ON s.SourceID      = b.Source
-	LEFT JOIN country_code cn ON cn.CountryCodeID = gl.Nationality
+	LEFT JOIN customer     c   ON c.CustomerID    = b.CustomerID
+	LEFT JOIN admin        a   ON a.AdminID       = b.SalesAgent
+	LEFT JOIN source       s   ON s.SourceID      = b.Source
+	LEFT JOIN country_code cn  ON cn.CountryCodeID = gl.Nationality
+	LEFT JOIN category     cat ON cat.CategoryID  = b.Destination
 	{$where}
 			";
 
@@ -163,12 +164,17 @@ SELECT
 	CONVERT(MAX(CASE WHEN rn = 1 THEN SalesAgentName END) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS AgentName,
 	CONVERT(MAX(CASE WHEN rn = 1 THEN SourceName     END) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Source,
 	CONVERT(MAX(CASE WHEN rn = 1 THEN customer_type  END) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS CustomerType,
+	CONVERT(MAX(CASE WHEN rn = 1 THEN Destination    END) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Destination,
 	CONVERT(MAX(CASE WHEN rn = 1 THEN Nationality    END) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Nationality,
 	CONVERT(MAX(CASE WHEN rn = 1 THEN Gender         END) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Gender,
 	MAX(CASE WHEN rn = 1 THEN DateOfBirth END) AS DOB,
 	COALESCE(SUM(CASE WHEN booking_rn = 1 THEN BookingPax      END), 0) AS TotalPax,
 	COALESCE(SUM(CASE WHEN booking_rn = 1 THEN BookingNetTotal END), 0) AS TotalSales,
-	CAST('Booking Guest' AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS Type
+	CAST('Booking Guest' AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS Type,
+	CONVERT(MAX(CASE WHEN rn = 1 THEN Token END) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Token,
+	CONVERT(CASE WHEN MAX(IsLeader) = 1 THEN 'Team Leader' ELSE 'Team Member' END USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Role,
+	CONVERT(GROUP_CONCAT(DISTINCT DATE(BookingDate) ORDER BY DATE(BookingDate) SEPARATOR ',') USING utf8mb4) COLLATE utf8mb4_unicode_ci AS BookingDates,
+	CONVERT(GROUP_CONCAT(DISTINCT CONCAT(DATE(TravelStart), '|', IFNULL(DATE(TravelEnd), '')) ORDER BY CONCAT(DATE(TravelStart), '|', IFNULL(DATE(TravelEnd), '')) SEPARATOR ',') USING utf8mb4) COLLATE utf8mb4_unicode_ci AS TravelDates
 FROM (
 	SELECT
 		{$dedup} AS dedup_key,
@@ -179,9 +185,18 @@ FROM (
 		a.Name           AS SalesAgentName,
 		s.Name           AS SourceName,
 		c.customer_type  AS customer_type,
+		cat.Name         AS Destination,
 		cn.Country       AS Nationality,
 		gl.Gender,
 		gl.DateOfBirth,
+		b.Token          AS Token,
+		b.InsertDate     AS BookingDate,
+		b.StartDate      AS TravelStart,
+		b.EndDate        AS TravelEnd,
+		CASE WHEN gl.dedup_key = COALESCE(
+			NULLIF(RIGHT(REGEXP_REPLACE(IFNULL(b.Mobile, ''),       '[^0-9]', ''), 9), ''),
+			NULLIF(RIGHT(REGEXP_REPLACE(IFNULL(c.phone_number, ''), '[^0-9]', ''), 9), '')
+		) THEN 1 ELSE 0 END AS IsLeader,
 		(COALESCE(b.Adult, 0) + COALESCE(b.Children, 0) + COALESCE(b.Infant, 0)) AS BookingPax,
 		COALESCE(b.NetTotal, 0) AS BookingNetTotal,
 		ROW_NUMBER() OVER (
@@ -211,12 +226,17 @@ SELECT
 	NULL AS AgentName,
 	NULL AS Source,
 	NULL AS CustomerType,
+	NULL AS Destination,
 	NULL AS Nationality,
 	NULL AS Gender,
 	NULL AS DOB,
 	0    AS TotalPax,
 	0    AS TotalSales,
-	CAST('GHL' AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS Type
+	CAST('GHL' AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS Type,
+	CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS Token,
+	CAST('Lead' AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS Role,
+	CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS BookingDates,
+	CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS TravelDates
 {$ghl['from']}
 			";
 			$params = array_merge($params, $ghl['params']);
