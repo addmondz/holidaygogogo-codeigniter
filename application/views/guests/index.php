@@ -241,7 +241,12 @@ div.kt-datatable__pager-container {
 															$bd_out[] = htmlspecialchars(date('d M Y', $ts));
 														}
 													}
-													echo implode('<br>', $bd_out);
+													if(!empty($bd_out)) {
+														if($is_ghl) {
+															echo '<span class="text-muted font-weight-bold d-block">Lead captured</span>';
+														}
+														echo implode('<br>', $bd_out);
+													}
 												}
 											?>
 										</td>

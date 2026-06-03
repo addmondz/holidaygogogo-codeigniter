@@ -235,7 +235,7 @@ SELECT
 	CAST('GHL' AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS Type,
 	CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS Token,
 	CAST('Lead' AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS Role,
-	CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS BookingDates,
+	CONVERT(DATE(COALESCE(gc.date_added, gc.created_at)) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS BookingDates,
 	CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS TravelDates
 {$ghl['from']}
 			";
