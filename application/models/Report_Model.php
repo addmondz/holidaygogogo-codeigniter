@@ -764,6 +764,7 @@ class Report_Model extends CI_Model
                 pl.contact_id,
                 COALESCE(NULLIF(gc.contact_name, ''), NULLIF(gc.full_name, ''), 'Unknown Contact') AS contact_name,
                 gc.phone,
+                gc.tags_json,
                 COALESCE(NULLIF(pl.assigned_to_user_id, ''), '__unassigned__') AS agent_id,
                 COALESCE(NULLIF(gu.Name, ''), NULLIF(pl.assigned_to_user_id, ''), 'Unassigned') AS agent_name,
                 pl.lead_started_at,
@@ -841,6 +842,39 @@ class Report_Model extends CI_Model
         }
 
         return $this->db->query($sql, $params)->result_array();
+    }
+
+    function Lead_Data_Tag_Options($filters = array())
+    {
+        $optionFilters = $filters;
+        unset($optionFilters['tag']);
+
+        $where = $this->build_lead_dashboard_where_clause($optionFilters);
+        $extraJoins = isset($where['extra_joins']) ? $where['extra_joins'] : '';
+
+        $sql = "
+            SELECT gc.tags_json
+            FROM ghl_processed_leads pl
+            LEFT JOIN ghl_conversations gc ON gc.conversation_id = pl.conversation_id
+            {$extraJoins}
+            {$where['sql']}
+              " . (!empty($where['sql']) ? 'AND' : 'WHERE') . " gc.tags_json IS NOT NULL
+              AND JSON_LENGTH(gc.tags_json) > 0
+        ";
+
+        $rows = $this->db->query($sql, $where['params'])->result_array();
+        $tags = array();
+
+        foreach ($rows as $row) {
+            foreach ($this->extract_ghl_tags(isset($row['tags_json']) ? $row['tags_json'] : null) as $tag) {
+                $tags[$tag] = $tag;
+            }
+        }
+
+        $tags = array_values($tags);
+        usort($tags, 'strcasecmp');
+
+        return $tags;
     }
 
     function Lead_Data_Messages($conversationId, $leadStartedAt, $nextLeadStartedAt = null)
@@ -1132,6 +1166,11 @@ class Report_Model extends CI_Model
             $params[] = '%' . $this->db->escape_like_str($filters['phone']) . '%';
         }
 
+        if (!empty($filters['tag'])) {
+            $clauses[] = "JSON_SEARCH(gc.tags_json, 'one', ?, '!') IS NOT NULL";
+            $params[] = $this->db->escape_like_str($filters['tag']);
+        }
+
         if (isset($filters['response_status']) && $filters['response_status'] !== '') {
             if ($filters['response_status'] === 'responded') {
                 $clauses[] = "pl.responded_message_count > 0";
@@ -1160,6 +1199,38 @@ class Report_Model extends CI_Model
             'params' => $params,
             'extra_joins' => $extraJoins,
         );
+    }
+
+    private function extract_ghl_tags($tagsJson)
+    {
+        if ($tagsJson === null || $tagsJson === '') {
+            return array();
+        }
+
+        $decoded = json_decode($tagsJson, true);
+        if (!is_array($decoded)) {
+            return array();
+        }
+
+        $tags = array();
+        foreach ($decoded as $tag) {
+            if (is_array($tag)) {
+                if (isset($tag['name'])) {
+                    $tag = $tag['name'];
+                } elseif (isset($tag['tag'])) {
+                    $tag = $tag['tag'];
+                } else {
+                    continue;
+                }
+            }
+
+            $tag = trim((string) $tag);
+            if ($tag !== '') {
+                $tags[] = $tag;
+            }
+        }
+
+        return $tags;
     }
 
     function Lead_Dashboard_Team_Leads()

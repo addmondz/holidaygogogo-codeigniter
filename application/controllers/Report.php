@@ -72,6 +72,7 @@ class Report extends MY_Controller
         $array = array(
             'lead_data_summary' => $payload['summary'],
             'lead_data_agents' => $payload['agents'],
+            'lead_data_tags' => $payload['tags'],
             'lead_data_rows' => $payload['rows'],
             'lead_data_filters' => $filters,
             'lead_data_pagination' => $payload['pagination'],
@@ -689,6 +690,7 @@ class Report extends MY_Controller
             'summary' => $this->format_lead_dashboard_summary($this->Report_Model->Lead_Dashboard_Summary($filters)),
             'rows' => $this->format_lead_data_rows($this->Report_Model->Lead_Data_Rows($filters, $perPage, $offset)),
             'agents' => $this->Report_Model->Lead_Dashboard_Agents($restrict),
+            'tags' => $this->Report_Model->Lead_Data_Tag_Options($filters),
             'pagination' => $this->build_lead_data_pagination($filters, $currentPage, $perPage, $totalRows),
             'updated_at' => $this->Report_Model->Lead_Data_Last_Synced_At(),
             'sorting' => $this->build_lead_data_sorting($filters),
@@ -753,6 +755,7 @@ class Report extends MY_Controller
         $conversationId = trim((string) $this->input->get('conversation_id'));
         $contactName = trim((string) $this->input->get('contact_name'));
         $phone = trim((string) $this->input->get('phone'));
+        $tag = trim((string) $this->input->get('tag'));
         $responseStatus = trim((string) $this->input->get('response_status'));
         $conversionStatus = trim((string) $this->input->get('conversion_status'));
         $parsedDates = $this->parse_report_date_range($leadDate, false);
@@ -771,6 +774,7 @@ class Report extends MY_Controller
             'conversation_id' => $conversationId,
             'contact_name' => $contactName,
             'phone' => $phone,
+            'tag' => $tag,
             'response_status' => $responseStatus,
             'conversion_status' => $conversionStatus,
             'page' => max(1, (int) $this->input->get('page')),
@@ -1000,6 +1004,7 @@ class Report extends MY_Controller
                 'contact_id' => $row['contact_id'],
                 'contact_name' => $row['contact_name'],
                 'phone' => $row['phone'],
+                'tags' => $this->format_lead_data_tags(isset($row['tags_json']) ? $row['tags_json'] : null),
                 'agent_id' => $row['agent_id'],
                 'agent_name' => $row['agent_name'],
                 'lead_started_at' => $row['lead_started_at'],
@@ -1059,6 +1064,38 @@ class Report extends MY_Controller
         }
 
         return $formatted;
+    }
+
+    private function format_lead_data_tags($tagsJson)
+    {
+        if ($tagsJson === null || $tagsJson === '') {
+            return array();
+        }
+
+        $decoded = json_decode($tagsJson, true);
+        if (!is_array($decoded)) {
+            return array();
+        }
+
+        $tags = array();
+        foreach ($decoded as $tag) {
+            if (is_array($tag)) {
+                if (isset($tag['name'])) {
+                    $tag = $tag['name'];
+                } elseif (isset($tag['tag'])) {
+                    $tag = $tag['tag'];
+                } else {
+                    continue;
+                }
+            }
+
+            $tag = trim((string) $tag);
+            if ($tag !== '') {
+                $tags[$tag] = $tag;
+            }
+        }
+
+        return array_values($tags);
     }
 
     private function format_duration_label($seconds)
