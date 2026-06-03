@@ -158,6 +158,13 @@
         border-bottom: 1px solid #e7d8c5;
     }
 
+    .lead-chat-modal-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        margin-top: 6px;
+    }
+
     .lead-chat-modal .modal-body {
         background: #f8f4ed;
         max-height: 70vh;
@@ -521,6 +528,7 @@ $leadSortIcon = function($column) use ($leadCurrentSortBy, $leadCurrentSortDir) 
                                                 data-lead-ended-at="<?php echo !empty($row['lead_ended_at']) ? html_escape($row['lead_ended_at']) : ''; ?>"
                                                 data-contact-name="<?php echo html_escape($row['contact_name']); ?>"
                                                 data-agent-name="<?php echo html_escape($row['agent_name']); ?>"
+                                                data-tags="<?php echo html_escape(json_encode($row['tags'])); ?>"
                                             >
                                                 View Messages
                                             </button>
@@ -570,6 +578,7 @@ $leadSortIcon = function($column) use ($leadCurrentSortBy, $leadCurrentSortDir) 
                 <div>
                     <h5 class="modal-title mb-1">Lead Messages</h5>
                     <div class="text-muted font-size-sm" id="lead-messages-modal-subtitle">Conversation</div>
+                    <div class="lead-chat-modal-tags" id="lead-messages-modal-tags"></div>
                 </div>
                 <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                     <span aria-hidden="true">&times;</span>
@@ -591,6 +600,7 @@ $leadSortIcon = function($column) use ($leadCurrentSortBy, $leadCurrentSortDir) 
     var leadDataCurrentDate = (new Date()).toLocaleDateString();
     var leadMessagesModalContent = $('#lead-messages-modal-content');
     var leadMessagesModalSubtitle = $('#lead-messages-modal-subtitle');
+    var leadMessagesModalTags = $('#lead-messages-modal-tags');
 
     $('#lead_data_daterangepicker').daterangepicker({
         buttonClasses: ' btn',
@@ -678,6 +688,39 @@ $leadSortIcon = function($column) use ($leadCurrentSortBy, $leadCurrentSortDir) 
         return html;
     }
 
+    function parseLeadTags(value) {
+        if ($.isArray(value)) {
+            return value;
+        }
+
+        if (!value) {
+            return [];
+        }
+
+        try {
+            var parsed = JSON.parse(value);
+            return $.isArray(parsed) ? parsed : [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function renderLeadModalTags(tags) {
+        tags = parseLeadTags(tags);
+
+        if (!tags.length) {
+            leadMessagesModalTags.html('<span class="text-muted font-size-sm">No tags</span>');
+            return;
+        }
+
+        var html = '';
+        $.each(tags, function(index, tag) {
+            html += '<span class="lead-tag" title="' + escapeHtml(tag) + '">' + escapeHtml(tag) + '</span>';
+        });
+
+        leadMessagesModalTags.html(html);
+    }
+
     function loadLeadMessages(button) {
         var cacheKey = [
             button.data('conversation-id'),
@@ -692,6 +735,7 @@ $leadSortIcon = function($column) use ($leadCurrentSortBy, $leadCurrentSortDir) 
             ' | ' +
             (button.data('conversation-id') || '')
         );
+        renderLeadModalTags(button.attr('data-tags'));
 
         if (leadMessagesModalContent.data('cache-key') === cacheKey && leadMessagesModalContent.data('loaded') === 1) {
             return;
