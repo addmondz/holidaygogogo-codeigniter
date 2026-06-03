@@ -533,16 +533,16 @@ class Report_Model extends CI_Model
         $convertedLeads = !empty($row['converted_leads']) ? (int) $row['converted_leads'] : 0;
 
         // Duty-hour-aware avg first-response time. Computed at query time from
-        // the per-slot agent reply timestamps so the duty-hour window can be
-        // changed (see duty_hours_helper.php) without re-running the cron.
+        // the per-slot timestamps so the duty-hour window can be changed
+        // (see duty_hours_helper.php) without re-running the cron.
         $this->load->helper('duty_hours');
         $slotSql = "
             SELECT
-                pl.response_1_agent_message_at AS at1, pl.response_1_seconds AS s1,
-                pl.response_2_agent_message_at AS at2, pl.response_2_seconds AS s2,
-                pl.response_3_agent_message_at AS at3, pl.response_3_seconds AS s3,
-                pl.response_4_agent_message_at AS at4, pl.response_4_seconds AS s4,
-                pl.response_5_agent_message_at AS at5, pl.response_5_seconds AS s5
+                pl.response_1_customer_message_at AS ct1, pl.response_1_agent_message_at AS at1, pl.response_1_seconds AS s1,
+                pl.response_2_customer_message_at AS ct2, pl.response_2_agent_message_at AS at2, pl.response_2_seconds AS s2,
+                pl.response_3_customer_message_at AS ct3, pl.response_3_agent_message_at AS at3, pl.response_3_seconds AS s3,
+                pl.response_4_customer_message_at AS ct4, pl.response_4_agent_message_at AS at4, pl.response_4_seconds AS s4,
+                pl.response_5_customer_message_at AS ct5, pl.response_5_agent_message_at AS at5, pl.response_5_seconds AS s5
             FROM ghl_processed_leads pl
             LEFT JOIN ghl_conversations gc ON gc.conversation_id = pl.conversation_id
             {$extraJoins}
@@ -555,8 +555,9 @@ class Report_Model extends CI_Model
             for ($i = 1; $i <= 5; $i++) {
                 $secs = $sr['s' . $i];
                 if ($secs === null || $secs === '') continue;
-                if (!is_within_duty_hours($sr['at' . $i])) continue;
-                $dutyTotal += (int) $secs;
+                $dutySeconds = calculate_duty_response_seconds($sr['ct' . $i], $sr['at' . $i]);
+                if ($dutySeconds === null) continue;
+                $dutyTotal += (int) $dutySeconds;
                 $dutyCount++;
             }
         }

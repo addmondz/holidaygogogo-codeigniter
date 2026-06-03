@@ -1959,8 +1959,8 @@ class Booking extends MY_Controller
 				: 'No leads ' . $conv_label . ' &rarr; <strong>0%</strong>';
 			$avg_secs = $ld['avg_response_seconds'];
 			$avg_detail = ($avg_secs === null)
-				? '<strong>Avg Time:</strong> n/a (no on-duty replies measured)'
-				: '<strong>Avg Time:</strong> ' . $ld['avg_response_time'] . ' (mean of each lead\'s first 5 TC reply gaps; fewer than 5 replies counts all available; <em>replies sent outside duty hours are excluded</em>)';
+				? '<strong>Avg Time:</strong> n/a (no replies measured)'
+				: '<strong>Avg Time:</strong> ' . $ld['avg_response_time'] . ' (mean of each lead\'s first 5 TC reply gaps; fewer than 5 replies counts all available; <em>only elapsed time inside duty hours is counted</em>)';
 			$popovers['pop-leads-conv'] =
 				'<strong>Window:</strong> ' . $window_conv . ' (all leads created ' . $conv_label . ', all agents)<br>' .
 				'<strong>This card (' . $total_leads . ' total leads):</strong><br>' .
@@ -1969,7 +1969,7 @@ class Booking extends MY_Controller
 				$avg_detail . '<br><br>' .
 				'<strong>Converted:</strong> Lead linked to a BC AND the TC has sales credit (TC1 before ' . $tc2_cutoff_disp . '; TC2 from ' . $tc2_cutoff_disp . ').<br>' .
 				'<strong>Responded:</strong> Lead has at least one TC reply.<br>' .
-				'<strong>Duty hours:</strong> Mon&ndash;Sat 09:00&ndash;18:00 MYT &mdash; only on-duty replies feed the Avg Time.';
+				'<strong>Duty hours:</strong> Mon&ndash;Sat 08:00&ndash;22:00 MYT &mdash; after-hours elapsed time is not counted in Avg Time.';
 		}
 
 		if(isset($cards['active_leads_dwm'])) {

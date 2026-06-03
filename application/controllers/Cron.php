@@ -848,6 +848,8 @@ class Cron extends CI_Controller
 
 	private function process_single_ghl_conversation($conversationId, $firstNewMessageRowId = 0)
 	{
+		$this->load->helper('duty_hours');
+
 		$messages = $this->Ghl_Processed_Leads_Model->get_conversation_messages($conversationId);
 		$existingConversions = $this->Ghl_Processed_Leads_Model->get_existing_conversion_map($conversationId);
 		$currentAssignedTo = $this->Ghl_Processed_Leads_Model->get_conversation_assigned_to($conversationId);
@@ -938,7 +940,10 @@ class Cron extends CI_Controller
 					if (isset($currentLead['_response_history'][$historyIndex])) {
 						$currentLead['_response_history'][$historyIndex]['agent_message_id'] = $message['message_id'];
 						$currentLead['_response_history'][$historyIndex]['agent_message_at'] = $message['message_timestamp'];
-						$currentLead['_response_history'][$historyIndex]['seconds'] = $messageTimestamp - $customerTimestamp;
+						$currentLead['_response_history'][$historyIndex]['seconds'] = calculate_duty_response_seconds(
+							$customerMessage['customer_message_at'],
+							$message['message_timestamp']
+						);
 					}
 				}
 			}
