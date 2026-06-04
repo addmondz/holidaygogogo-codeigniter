@@ -281,11 +281,11 @@
                 <div class="card card-custom">
                     <div class="card-header border-0 summary-card-header" style="background-color:#D7E2F2;">
                         <h3>Conversion Rate (YTD)</h3>
-                        <i id="pop-conv-rate" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>Formula:</strong> Converted &divide; Total Leads &times; 100<br><br><strong>Counted as your conversion when:</strong><ul><li>The lead is linked to a BC AND you hold the <strong>Sales Agent (TC2)</strong> slot on that BC</li></ul><strong>Scope:</strong> Leads assigned to you year-to-date (1 Jan &rarr; today), synced from GHL. Independent of the month filter.<br><br><strong>Best:</strong> Top agent across the whole team YTD. Agents with fewer than 3 leads are excluded so the bar stays meaningful."></i>
+                        <i id="pop-conv-rate" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>Formula:</strong> Converted &divide; Total Leads &times; 100<br><br><strong>Counted as your conversion when:</strong><ul><li>The lead is linked to a BC AND you hold the credited TC slot on that BC: <strong>Booking PIC (TC1)</strong> for BCs before 1 Jun 2026, <strong>Sales Agent (TC2)</strong> from 1 Jun 2026 onward</li></ul><strong>Scope:</strong> Leads assigned to you year-to-date (1 Jan &rarr; today), synced from GHL. Independent of the month filter.<br><br><strong>Best:</strong> Top agent across the whole team YTD. Agents with fewer than 3 leads are excluded so the bar stays meaningful."></i>
                     </div>
                     <div class="card-body summary-card-body">
                         <div class="summary-value" id="sc-conv-rate-value">...</div>
-                        <div class="summary-sub"><span id="sc-conv-rate-detail">—</span> of your leads year-to-date converted to a BC where you hold the Sales Agent (TC2) slot.</div>
+                        <div class="summary-sub"><span id="sc-conv-rate-detail">—</span> of your leads year-to-date converted to a BC where you hold the credited TC slot (Booking PIC / TC1 before 1 Jun, Sales Agent / TC2 after).</div>
                         <div class="summary-sub summary-best" id="sc-conv-rate-best">Best: —</div>
                     </div>
                 </div>

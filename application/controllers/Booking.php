@@ -1087,15 +1087,17 @@ class Booking extends MY_Controller
 
 			// Conversion Rate (YTD) — TC card. Fixed year-to-date window (Jan 1 of
 			// the current year through today, independent of the month filter) and
-			// credited via SalesAgent2 (TC2) for the whole year — see
-			// lead_conversion_credit_sql_fragment_tc2().
+			// credited under the standard TC1/TC2 cutoff rule: SalesAgent (TC1)
+			// for bookings before 2026-06-01, SalesAgent2 (TC2) on/after — see
+			// lead_conversion_credit_sql_fragment(). Crediting via TC2 alone would
+			// drop every pre-cutoff conversion (SalesAgent2 was empty then) and
+			// report 0%.
 			$this->load->model('Report_Model');
 			$this->load->helper('lead_conversion_credit');
 			$ytd_start = date('Y-01-01');
 			$ytd_end   = $today;
 			$by_agent = $this->Report_Model->Lead_Dashboard_By_Agent(
-				array('start_date' => $ytd_start, 'end_date' => $ytd_end),
-				lead_conversion_credit_sql_fragment_tc2()
+				array('start_date' => $ytd_start, 'end_date' => $ytd_end)
 			);
 
 			// Resolve the logged-in admin to their GHL UserID(s). Canonical source
