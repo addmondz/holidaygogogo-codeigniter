@@ -24,13 +24,47 @@ if (!function_exists('booking_status_filter_default_where')) {
     }
 }
 
+if (!function_exists('payment_overdue_cutoff_date')) {
+    /**
+     * Reference date for the "payment overdue" comparison `deadline < cutoff`.
+     *
+     * Business rule: a payment due TODAY becomes overdue once the clock passes
+     * 3:00pm. Before 3pm the cutoff is today (only deadlines strictly before
+     * today are overdue); from 3pm onward the cutoff rolls forward to tomorrow,
+     * which pulls today's deadlines into the overdue set. This keeps the
+     * dashboard Payment Overdue card and the booking list's PO status filter in
+     * agreement (both derive their cutoff from here).
+     *
+     * $now is injectable (a "Y-m-d H:i:s" string or a unix timestamp) so the
+     * rule can be unit-tested deterministically; production passes nothing and
+     * uses the current time.
+     *
+     * @param string|int|null $now
+     * @return string  Cutoff date as 'Y-m-d'.
+     */
+    function payment_overdue_cutoff_date($now = null)
+    {
+        $ts = ($now === null)
+            ? time()
+            : (is_numeric($now) ? (int) $now : strtotime((string) $now));
+        $hour = (int) date('G', $ts); // 24-hour, no leading zero
+        if ($hour >= 15) {
+            return date('Y-m-d', strtotime('+1 day', $ts));
+        }
+        return date('Y-m-d', $ts);
+    }
+}
+
 if (!function_exists('booking_status_filter_per_status_clauses')) {
     /**
      * Returns the WHERE-clause fragments (to be AND-ed) for a single status
      * code from the multi-select. Unknown codes return an empty array.
      */
-    function booking_status_filter_per_status_clauses($status, $today)
+    function booking_status_filter_per_status_clauses($status, $today, $overdue_cutoff = null)
     {
+        // Overdue (PO) compares against the 3pm-aware cutoff; falls back to
+        // $today so existing two-arg callers keep the legacy "< today" rule.
+        $po_cut = ($overdue_cutoff !== null && $overdue_cutoff !== '') ? $overdue_cutoff : $today;
         switch ($status) {
             case 'A':
                 return [
@@ -71,8 +105,8 @@ if (!function_exists('booking_status_filter_per_status_clauses')) {
                     . " AND (p.Type IS NULL OR p.Type != 'AGENT COMMISSION FROM SUPPLIER')), 0)";
                 return [
                     "CancelStatus = 'N'",
-                    "(((booking.FullPaymentDeadline < '" . $today . "' AND booking.Status IN ('P','PP'))"
-                    . " OR (booking.DepositDeadline < '" . $today . "' AND booking.Status = 'P'))"
+                    "(((booking.FullPaymentDeadline < '" . $po_cut . "' AND booking.Status IN ('P','PP'))"
+                    . " OR (booking.DepositDeadline < '" . $po_cut . "' AND booking.Status = 'P'))"
                     . " AND (booking.NetTotal - " . $approved_credit_sql . ") > 0)",
                 ];
             case 'PGL':
@@ -85,6 +119,16 @@ if (!function_exists('booking_status_filter_per_status_clauses')) {
                 return [
                     "CancelStatus = 'N'",
                     "booking.Status = 'PBC'",
+                ];
+            case 'PB':
+                return [
+                    "CancelStatus = 'N'",
+                    "booking.Status = 'PB'",
+                ];
+            case 'SAD':
+                return [
+                    "CancelStatus = 'N'",
+                    "booking.Status = 'SAD'",
                 ];
             case 'P':
                 return [
@@ -130,7 +174,7 @@ if (!function_exists('booking_status_filter_full_where')) {
      * - All-unknown tokens fall back to the default branch so cancelled rows
      *   never leak.
      */
-    function booking_status_filter_full_where($status_param, $today)
+    function booking_status_filter_full_where($status_param, $today, $overdue_cutoff = null)
     {
         if ($status_param === null || $status_param === '') {
             return booking_status_filter_default_where();
@@ -141,7 +185,7 @@ if (!function_exists('booking_status_filter_full_where')) {
             if ($s === '') {
                 continue;
             }
-            $clauses = booking_status_filter_per_status_clauses($s, $today);
+            $clauses = booking_status_filter_per_status_clauses($s, $today, $overdue_cutoff);
             if (!empty($clauses)) {
                 $or_parts[] = '(' . implode(' AND ', $clauses) . ')';
             }

@@ -40,11 +40,21 @@ class Customer_Intake extends CI_Controller
             return;
         }
 
+        // Pre-fill the overlapping fields from the admin's draft so the customer
+        // starts from what staff already entered (they can override any of it).
+        $prefill = array(
+            'booking_name'      => !empty($context->Customer)  ? $context->Customer  : '',
+            'contact_number'    => !empty($context->Mobile)    ? $context->Mobile    : '',
+            'travel_start_date' => !empty($context->StartDate) ? $context->StartDate : '',
+            'travel_end_date'   => !empty($context->EndDate)   ? $context->EndDate   : '',
+        );
+
         $this->load->view('customer_intake/form', array(
             'token'   => $token,
             'context' => $context,
             'errors'  => array(),
             'old'     => array(),
+            'prefill' => $prefill,
         ));
     }
 
@@ -72,6 +82,7 @@ class Customer_Intake extends CI_Controller
                 'context' => $context,
                 'errors'  => $errors,
                 'old'     => $post,
+                'prefill' => array(),
             ));
             return;
         }

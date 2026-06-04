@@ -587,7 +587,67 @@ class Report_Model extends CI_Model
         );
     }
 
-    function Lead_Dashboard_By_Agent($filters = array())
+    /**
+     * Per-agent lead counts for the three "Leads" card windows (Today / Week /
+     * Month) in a single conditional-SUM pass. Powers the OWNER-only
+     * "Leads by Agent" table — the same new-lead total as the Leads card, but
+     * broken out one row per agent.
+     *
+     * Windowed by pl.lead_started_at, identical to the Leads card. The outer
+     * WHERE is bounded by the union of the three windows so a week that spills
+     * into an adjacent month near a boundary is still scanned, while all-time
+     * leads are not. Unassigned leads ('' / NULL) are excluded; agent_name
+     * resolves from ghl_users.Name and falls back to the raw UID.
+     *
+     * @param string $today       'Y-m-d'
+     * @param string $week_start   'Y-m-d' (Monday)
+     * @param string $week_end     'Y-m-d' (Sunday)
+     * @param string $month_start  'Y-m-d' (1st)
+     * @param string $month_end    'Y-m-d' (last)
+     * @return array  rows of { agent_id, agent_name, day, week, month }
+     */
+    function Lead_Dashboard_Leads_By_Agent_DWM($today, $week_start, $week_end, $month_start, $month_end)
+    {
+        $range_start = min($today, $week_start, $month_start);
+        $range_end   = max($today, $week_end, $month_end);
+
+        $sql = "
+            SELECT
+                NULLIF(pl.assigned_to_user_id, '') AS agent_id,
+                COALESCE(NULLIF(gu.Name, ''), NULLIF(pl.assigned_to_user_id, '')) AS agent_name,
+                SUM(CASE WHEN pl.lead_started_at BETWEEN ? AND ? THEN 1 ELSE 0 END) AS day_cnt,
+                SUM(CASE WHEN pl.lead_started_at BETWEEN ? AND ? THEN 1 ELSE 0 END) AS week_cnt,
+                SUM(CASE WHEN pl.lead_started_at BETWEEN ? AND ? THEN 1 ELSE 0 END) AS month_cnt
+            FROM ghl_processed_leads pl
+            LEFT JOIN ghl_users gu ON gu.UserID = NULLIF(pl.assigned_to_user_id, '')
+            WHERE NULLIF(pl.assigned_to_user_id, '') IS NOT NULL
+              AND pl.lead_started_at BETWEEN ? AND ?
+            GROUP BY agent_id, agent_name
+            HAVING (day_cnt + week_cnt + month_cnt) > 0
+            ORDER BY month_cnt DESC, week_cnt DESC, day_cnt DESC, agent_name ASC
+        ";
+
+        $rows = $this->db->query($sql, array(
+            $today . ' 00:00:00',       $today . ' 23:59:59',
+            $week_start . ' 00:00:00',  $week_end . ' 23:59:59',
+            $month_start . ' 00:00:00', $month_end . ' 23:59:59',
+            $range_start . ' 00:00:00', $range_end . ' 23:59:59',
+        ))->result_array();
+
+        $results = array();
+        foreach ($rows as $row) {
+            $results[] = array(
+                'agent_id'   => $row['agent_id'],
+                'agent_name' => $row['agent_name'],
+                'day'        => (int) $row['day_cnt'],
+                'week'       => (int) $row['week_cnt'],
+                'month'      => (int) $row['month_cnt'],
+            );
+        }
+        return $results;
+    }
+
+    function Lead_Dashboard_By_Agent($filters = array(), $credit_fragment_override = null)
     {
         $this->load->helper('lead_conversion_credit');
         $where = $this->build_lead_dashboard_where_clause($filters);
@@ -601,7 +661,12 @@ class Report_Model extends CI_Model
         $agentWhereSql = !empty($clauses) ? 'WHERE ' . implode(' AND ', $clauses) : '';
 
         $extraJoins = isset($where['extra_joins']) ? $where['extra_joins'] : '';
-        $creditFragment = lead_conversion_credit_sql_fragment();
+        // Callers can inject an alternate credit fragment (e.g. the TC2-only
+        // variant for the dashboard's YTD Conversion Rate card); default keeps
+        // the standard cutoff-based TC1/TC2 attribution.
+        $creditFragment = ($credit_fragment_override !== null && $credit_fragment_override !== '')
+            ? $credit_fragment_override
+            : lead_conversion_credit_sql_fragment();
         $sql = "
             SELECT
                 COALESCE(NULLIF(pl.assigned_to_user_id, ''), '__unassigned__') AS agent_id,

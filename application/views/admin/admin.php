@@ -221,8 +221,9 @@
                         <br>
                         <small class="text-muted d-block mb-3">
                             Monthly sales target for this TC. Used by the TC's Booking dashboard
-                            "Total Sales (Month) vs Target" card. Future months are saved as
-                            planning &mdash; only the current month is read by the dashboard.
+                            "Month Sales vs Target" card. The dashboard reads whichever month
+                            the TC selects in its month filter, so future months are live once
+                            that month is chosen.
                         </small>
                         <?php if($Action == 'C') { ?>
                             <div class="alert alert-light-warning" style="font-size:13px;">
@@ -265,6 +266,24 @@
                                 <span id="StPeriodLabel"></span>
                                 <span id="StSavedHint" style="color:#6082B6;font-weight:600;display:none;">&nbsp;&middot;&nbsp;Will save with Update Admin</span>
                             </small>
+                            <div class="row mt-4 pt-4" style="border-top:1px dashed #EBEDF3;">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label>Yearly Target (RM) <span id="StYearLabel" style="font-weight:400;color:#7E8299;"></span></label>
+                                        <div class="input-icon">
+                                            <input type="number" min="0" step="0.01" id="StYearAmount" class="form-control" value="0.00" autocomplete="off">
+                                            <span><i class="la la-calendar-check-o"></i></span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 d-flex align-items-center">
+                                    <small class="text-muted">
+                                        Annual target for this TC, following the Year selector above.
+                                        Read by the Booking dashboard "Year Sales vs Target" card.
+                                        <span id="StYearSavedHint" style="color:#6082B6;font-weight:600;display:none;">&nbsp;&middot;&nbsp;Will save with Update Admin</span>
+                                    </small>
+                                </div>
+                            </div>
                             <div class="row mt-4">
                                 <div class="col-md-12">
                                     <label style="font-weight:600;color:#3F4254;">Currently saved targets</label>
@@ -315,6 +334,41 @@
     // Server pre-loaded as { "YYYY-MM": amount } (see Admin_Model->Read_Sales_Targets_For_Admin).
     var stInitial = <?php echo json_encode(!empty($sales_targets) ? $sales_targets : new stdClass()); ?>;
     var stTargets = $.extend({}, stInitial);
+
+    // ---- Yearly target editing — server pre-loaded as { "YYYY": amount }
+    // (see Admin_Model->Read_Year_Sales_Targets_For_Admin). Follows #StYear.
+    var styInitial = <?php echo json_encode(!empty($year_sales_targets) ? $year_sales_targets : new stdClass()); ?>;
+    var styTargets = $.extend({}, styInitial);
+
+    function sty_current_year() {
+        return String($('#StYear').val());
+    }
+    function sty_load_into_input() {
+        var y = sty_current_year();
+        var amt = (y in styTargets) ? styTargets[y] : 0;
+        $('#StYearAmount').val(parseFloat(amt).toFixed(2));
+        $('#StYearLabel').text('· ' + y);
+    }
+    function sty_capture_input_into_dict() {
+        var y = sty_current_year();
+        var v = parseFloat($('#StYearAmount').val());
+        styTargets[y] = isFinite(v) && v >= 0 ? v : 0;
+    }
+    function sty_is_dirty() {
+        var seen = {};
+        for(var k in styTargets) {
+            seen[k] = true;
+            var initial = (k in styInitial) ? parseFloat(styInitial[k]) : 0;
+            if(parseFloat(styTargets[k]) !== initial) return true;
+        }
+        for(var k2 in styInitial) {
+            if(!seen[k2] && parseFloat(styInitial[k2]) !== 0) return true;
+        }
+        return false;
+    }
+    function sty_update_hint() {
+        $('#StYearSavedHint').toggle(sty_is_dirty());
+    }
 
     function st_current_ym() {
         var y = $('#StYear').val();
@@ -401,16 +455,24 @@
         if($('#StYear').length) {
             st_load_period_into_input();
             st_render_saved_panel();
+            sty_load_into_input();
             $('#StYear, #StMonth').on('change', function() {
                 st_capture_input_into_dict();
                 st_load_period_into_input();
                 st_update_hint();
                 st_render_saved_panel();
             });
+            // Yearly amount follows the Year selector only. Captured on input
+            // (below) so switching years never loses the current edit.
+            $('#StYear').on('change', sty_load_into_input);
             $('#StAmount').on('input change', function() {
                 st_capture_input_into_dict();
                 st_update_hint();
                 st_render_saved_panel();
+            });
+            $('#StYearAmount').on('input change', function() {
+                sty_capture_input_into_dict();
+                sty_update_hint();
             });
             $('#StSavedTableBody').on('click', '.st-saved-row', function() {
                 var ym = $(this).data('ym');
@@ -470,6 +532,8 @@
                 // recent edit isn't lost when diffing.
                 if($('#StAmount').length) { st_capture_input_into_dict(); }
                 var st_dirty = $('#StAmount').length && st_is_dirty();
+                if($('#StYearAmount').length) { sty_capture_input_into_dict(); }
+                var sty_dirty = $('#StYearAmount').length && sty_is_dirty();
                 if(country_code == null || name == '' || (action == 'C' && gender == null) || mobile == '' || email == '' || (action == 'C' && username == '') || (action == 'C' && password == '') || (action == 'C' && level == null) || access_control == '') {
                     Display_Message(background, 'Please Insert All Required Admin Information', null);
                 } else {
@@ -477,7 +541,7 @@
                         var admin = [];
                         var url = '<?php echo base_url('Admin/Create') ?>';
                         admin.push({CountryCodeID:country_code, Name:name, Gender:gender, IdentificationNumber:identification_number, PassportNumber:passport_number, Mobile:mobile, Email:email, Username:username, Password:password, Level:level, AccessControl:access_control, TeamLeadID:team_lead_id ? team_lead_id : null, OpTeamLeadID:op_team_lead_id ? op_team_lead_id : null, InsertBy:session_id, InsertDate:current_datetime});
-                        Submit_Admin(url, admin, null, lead_dashboard_agents, true, {}, false);
+                        Submit_Admin(url, admin, null, lead_dashboard_agents, true, {}, false, {}, false);
                     } else {
                         var dirty_fields = $('#form').dirty('showDirtyFields');
                         var admin_id = <?php echo $AdminID ?>;
@@ -492,7 +556,8 @@
                             // (LeadDashboardAgents posts via its own array; Sales Target inputs
                             // post via the sales_targets dict).
                             if(!key || key == 'LeadDashboardAgents'
-                                    || key == 'StAmount' || key == 'StYear' || key == 'StMonth') {
+                                    || key == 'StAmount' || key == 'StYear' || key == 'StMonth'
+                                    || key == 'StYearAmount') {
                                 continue;
                             }
                             if(key != 'AccessControl') {
@@ -532,11 +597,11 @@
                         $.each(admin[0], function() {
                             count++;
                         });
-                        if(count == 3 && !lda_dirty && !st_dirty) {
+                        if(count == 3 && !lda_dirty && !st_dirty && !sty_dirty) {
                             var url = '<?php echo base_url('Admin') ?>';
                             Display_Message(background, '<?php echo 'No Changes Detected In Admin Record : ' . $Name; ?>', url);
                         } else {
-                            Submit_Admin(url, admin, admin_log, lead_dashboard_agents, lda_dirty, stTargets, st_dirty);
+                            Submit_Admin(url, admin, admin_log, lead_dashboard_agents, lda_dirty, stTargets, st_dirty, styTargets, sty_dirty);
                         }
                     }
                 }
@@ -544,7 +609,7 @@
         });
     });
 
-    function Submit_Admin(url, admin, admin_log, lead_dashboard_agents, lda_dirty, sales_targets, st_dirty)
+    function Submit_Admin(url, admin, admin_log, lead_dashboard_agents, lda_dirty, sales_targets, st_dirty, year_sales_targets, sty_dirty)
     {
         $.ajax({
             url: url,
@@ -555,7 +620,9 @@
                 lead_dashboard_agents: lead_dashboard_agents || [],
                 lead_dashboard_agents_dirty: lda_dirty ? '1' : '0',
                 sales_targets: sales_targets || {},
-                sales_targets_dirty: st_dirty ? '1' : '0'
+                sales_targets_dirty: st_dirty ? '1' : '0',
+                year_sales_targets: year_sales_targets || {},
+                year_sales_targets_dirty: sty_dirty ? '1' : '0'
             },
             dataType: 'json',
             success: function(status) {

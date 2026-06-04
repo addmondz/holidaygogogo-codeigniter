@@ -69,8 +69,8 @@ if (!function_exists('compute_response_seconds')) {
     /**
      * Pure subtraction between two MySQL DATETIME strings, returning the gap in
      * seconds. Returns null when either input is missing or unparseable. Split
-     * out from calculate_intake_response_seconds() so the maths can be unit
-     * tested without a database.
+     * out from calculate_submitted_to_payment_seconds() so the maths can be
+     * unit tested without a database.
      *
      * @param string|null $submitted_at MySQL DATETIME (e.g. '2026-05-22 09:00:00')
      * @param string|null $finalised_at MySQL DATETIME
@@ -90,16 +90,25 @@ if (!function_exists('compute_response_seconds')) {
     }
 }
 
-if (!function_exists('calculate_intake_response_seconds')) {
+if (!function_exists('calculate_submitted_to_payment_seconds')) {
     /**
      * Compute the response time (in seconds) for a booking:
      * gap between the customer intake submission and the earliest
-     * booking_status_log entry advancing the booking to PBC.
+     * booking_status_log entry advancing the booking TO P ("PENDING PAYMENT").
+     *
+     * This is the per-booking twin of the "Submitted -> Payment Time" summary
+     * card (submitted_payment_avg_response_sql), so the inline "Response:" value
+     * on the booking list / detail banner reconciles row-for-row with the card.
+     *
+     * Only TRANSITIONS into P count (from_status IS NOT NULL) so a booking that
+     * happened to be created directly at P (a creation row, from_status NULL)
+     * isn't mistaken for an advance into payment.
      *
      * @param int $booking_id
-     * @return int|null Seconds elapsed, or null when either timestamp is missing.
+     * @return int|null Seconds elapsed, or null when either timestamp is missing
+     *                  (e.g. the booking hasn't reached PENDING PAYMENT yet).
      */
-    function calculate_intake_response_seconds($booking_id)
+    function calculate_submitted_to_payment_seconds($booking_id)
     {
         $CI =& get_instance();
         $CI->load->database();
@@ -113,19 +122,20 @@ if (!function_exists('calculate_intake_response_seconds')) {
             return null;
         }
 
-        $pbc_row = $CI->db
+        $payment_row = $CI->db
             ->select('created_at')
             ->from('booking_status_log')
             ->where('booking_id', (int) $booking_id)
-            ->where('to_status', 'PBC')
+            ->where('to_status', 'P')
+            ->where('from_status IS NOT NULL', null, false)
             ->order_by('created_at', 'ASC')
             ->limit(1)
             ->get()->row();
-        if (empty($pbc_row) || empty($pbc_row->created_at)) {
+        if (empty($payment_row) || empty($payment_row->created_at)) {
             return null;
         }
 
-        return compute_response_seconds($submitted_row->submitted_at, $pbc_row->created_at);
+        return compute_response_seconds($submitted_row->submitted_at, $payment_row->created_at);
     }
 }
 
@@ -163,8 +173,10 @@ if (!function_exists('format_response_duration')) {
 if (!function_exists('customer_intake_response_window_sql_fragment')) {
     /**
      * Subquery that returns the earliest `booking_status_log` row per booking
-     * whose `to_status='PBC'`. Reused by both the average-response SQL and the
-     * best-agent SQL so the join shape is identical.
+     * that TRANSITIONS into PBC (`to_status='PBC' AND from_status IS NOT NULL`).
+     * The from_status guard skips the draft CREATION row (PBC, from_status NULL)
+     * that predates the customer's submission. Reused by both the average-response
+     * SQL and the best-agent SQL so the join shape is identical.
      *
      * @return string
      */
@@ -173,7 +185,7 @@ if (!function_exists('customer_intake_response_window_sql_fragment')) {
         return "(
             SELECT booking_id, MIN(created_at) AS first_pbc_at
             FROM booking_status_log
-            WHERE to_status = 'PBC'
+            WHERE to_status = 'PBC' AND from_status IS NOT NULL
             GROUP BY booking_id
         )";
     }

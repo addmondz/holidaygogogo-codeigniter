@@ -12,6 +12,36 @@
 div.kt-datatable__pager-container {
 	display: none !important;
 }
+
+/* Inline contact-number edit */
+.contact-edit-btn {
+	opacity: 0;
+	transition: opacity .15s ease;
+	vertical-align: middle;
+}
+.contact-editable:hover .contact-edit-btn,
+.contact-edit-btn:focus {
+	opacity: 1;
+}
+.contact-editor {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+}
+.contact-editor input.contact-input {
+	width: 150px;
+	height: 30px;
+	padding: 2px 8px;
+	font-size: 12px;
+}
+.contact-cell .contact-error {
+	display: block;
+	margin-top: 4px;
+	color: #f64e60;
+	font-size: 11px;
+	font-weight: 600;
+	white-space: normal;
+}
 </style>
 
 <div class="d-flex flex-column-fluid">
@@ -125,6 +155,57 @@ div.kt-datatable__pager-container {
 									<div class="row">
 										<div class="col-md-3">
 											<div class="form-group">
+												<label>Contact Number</label>
+												<div class="input-icon">
+													<input type="text" name="contact_number" value="<?php if(!empty($this->input->get('contact_number'))) { echo htmlspecialchars($this->input->get('contact_number'), ENT_QUOTES); } ?>" autocomplete="off" class="form-control" placeholder="e.g. 0123456789">
+													<span><i class="la la-phone"></i></span>
+												</div>
+											</div>
+										</div>
+										<div class="col-md-3">
+											<div class="form-group">
+												<label>Email</label>
+												<div class="input-icon">
+													<input type="text" name="email" value="<?php if(!empty($this->input->get('email'))) { echo htmlspecialchars($this->input->get('email'), ENT_QUOTES); } ?>" autocomplete="off" class="form-control" placeholder="e.g. name@email.com">
+													<span><i class="la la-envelope"></i></span>
+												</div>
+											</div>
+										</div>
+										<div class="col-md-3">
+											<div class="form-group">
+												<label>Destination</label>
+												<select name="destination" class="form-control selectpicker" data-live-search="true">
+													<option selected data-icon="la la-map-marker font-size-lg bs-icon" value="">--SELECT DESTINATION--</option>
+													<?php if(!empty($destinations)) { foreach($destinations as $d) { ?>
+														<option data-icon="la la-map-marker font-size-lg bs-icon" value="<?php echo $d->CategoryID; ?>" <?php if($this->input->get('destination') == $d->CategoryID) echo 'selected'; ?>><?php echo htmlspecialchars($d->Name); ?></option>
+													<?php } } ?>
+												</select>
+											</div>
+										</div>
+										<div class="col-md-3">
+											<div class="form-group">
+												<label>Guest Role</label>
+												<select name="role" class="form-control selectpicker">
+													<option selected data-icon="la la-user-friends font-size-lg bs-icon" value="">--SELECT ROLE--</option>
+													<option data-icon="la la-user-friends font-size-lg bs-icon" value="Team Leader" <?php if($this->input->get('role') === 'Team Leader') echo 'selected'; ?>>Team Leader</option>
+													<option data-icon="la la-user-friends font-size-lg bs-icon" value="Team Member" <?php if($this->input->get('role') === 'Team Member') echo 'selected'; ?>>Team Member</option>
+													<option data-icon="la la-user-friends font-size-lg bs-icon" value="Lead"        <?php if($this->input->get('role') === 'Lead')        echo 'selected'; ?>>Lead (GHL)</option>
+												</select>
+											</div>
+										</div>
+									</div>
+									<div class="row">
+										<div class="col-md-3">
+											<div class="form-group">
+												<label>Booking Number</label>
+												<div class="input-icon">
+													<input type="text" name="booking_number" value="<?php if(!empty($this->input->get('booking_number'))) { echo htmlspecialchars($this->input->get('booking_number'), ENT_QUOTES); } ?>" autocomplete="off" class="form-control" placeholder="e.g. 2606-001-0001">
+													<span><i class="la la-hashtag"></i></span>
+												</div>
+											</div>
+										</div>
+										<div class="col-md-3">
+											<div class="form-group">
 												<label>Booking Date
 													<a onclick="Reset_Booking_Date()" class="btn btn-icon btn-light-warning btn-xs" data-toggle="tooltip" title="Clear booking date">
 														<i class="la la-undo"></i>
@@ -146,6 +227,16 @@ div.kt-datatable__pager-container {
 												<div id="kt_daterangepicker_guests_travel" class="input-icon">
 													<input readonly type="text" name="travel_date" value="<?php if(!empty($this->input->get('travel_date'))) { echo $this->input->get('travel_date'); } ?>" autocomplete="off" class="form-control">
 													<span><i class="la la-calendar"></i></span>
+												</div>
+											</div>
+										</div>
+										<div class="col-md-3">
+											<div class="form-group">
+												<label>Num of Pax</label>
+												<div class="d-flex align-items-center">
+													<input type="number" min="0" name="pax_min" value="<?php if($this->input->get('pax_min') !== null && $this->input->get('pax_min') !== '') { echo (int)$this->input->get('pax_min'); } ?>" autocomplete="off" class="form-control" placeholder="Min">
+													<span class="px-2 font-weight-bold">&ndash;</span>
+													<input type="number" min="0" name="pax_max" value="<?php if($this->input->get('pax_max') !== null && $this->input->get('pax_max') !== '') { echo (int)$this->input->get('pax_max'); } ?>" autocomplete="off" class="form-control" placeholder="Max">
 												</div>
 											</div>
 										</div>
@@ -192,7 +283,26 @@ div.kt-datatable__pager-container {
 									<tr>
 										<td style="text-align:center; padding-top:15px; padding-bottom:15px;"><?php echo $count; ?></td>
 										<td style="text-align:center;"><?php echo htmlspecialchars($g->Name); ?></td>
-										<td style="text-align:center;"><?php echo htmlspecialchars($g->ContactNum); ?></td>
+										<?php
+											$is_ghl_row = isset($g->Type) && $g->Type === 'GHL';
+											$wa_number  = preg_replace('/[^0-9]/', '', (string)$g->ContactNum);
+										?>
+										<td class="contact-cell<?php if(!$is_ghl_row) echo ' contact-editable'; ?>" style="text-align:center; white-space:nowrap;"<?php if(!$is_ghl_row) { ?> data-dedup-key="<?php echo htmlspecialchars($g->dedup_key, ENT_QUOTES); ?>" data-mobile="<?php echo htmlspecialchars((string)$g->ContactNum, ENT_QUOTES); ?>"<?php } ?>>
+											<span class="contact-display">
+												<?php if(!empty($wa_number)) { ?>
+													<a class="contact-wa" href="https://wa.me/<?php echo $wa_number; ?>" target="_blank" rel="noopener" style="color:#25D366; text-decoration:none; display:inline-flex; align-items:center; gap:5px;" title="Open WhatsApp chat">
+														<i class="la la-whatsapp" style="font-size:16px;"></i><span class="contact-num"><?php echo htmlspecialchars($g->ContactNum); ?></span>
+													</a>
+												<?php } else { ?>
+													<span class="contact-num"><?php echo htmlspecialchars($g->ContactNum); ?></span>
+												<?php } ?>
+												<?php if(!$is_ghl_row) { ?>
+													<button type="button" class="btn btn-icon btn-light-primary btn-xs contact-edit-btn ml-1" data-toggle="tooltip" title="Edit contact number">
+														<i class="la la-pencil"></i>
+													</button>
+												<?php } ?>
+											</span>
+										</td>
 										<td style="text-align:center;"><?php echo htmlspecialchars($g->Email); ?></td>
 										<td style="text-align:center;"><?php echo htmlspecialchars($g->Language); ?></td>
 										<td style="text-align:center;"><?php echo htmlspecialchars($g->AgentName); ?></td>
@@ -315,7 +425,7 @@ div.kt-datatable__pager-container {
 
 <script>
 	<?php
-		$expanded_keys = array('q', 'sales_agent', 'source', 'customer_type', 'nationality', 'gender', 'language', 'booking_date', 'travel_date', 'type');
+		$expanded_keys = array('q', 'booking_number', 'contact_number', 'email', 'destination', 'role', 'pax_min', 'pax_max', 'sales_agent', 'source', 'customer_type', 'nationality', 'gender', 'language', 'booking_date', 'travel_date', 'type');
 		$expand = false;
 		foreach($expanded_keys as $k) {
 			if($this->input->get($k) !== null && $this->input->get($k) !== '') { $expand = true; break; }
@@ -377,4 +487,84 @@ div.kt-datatable__pager-container {
 	});
 
 	$('[data-toggle="tooltip"]').tooltip();
+
+	// ----- Inline contact-number edit -----
+	var GUEST_CONTACT_UPDATE_URL = '<?php echo base_url('Guests/Update_Contact'); ?>';
+
+	function waLink(num) {
+		var digits = (num || '').replace(/[^0-9]/g, '');
+		var label  = $('<span>').text(num).html();
+		if (digits === '') { return '<span class="contact-num">' + label + '</span>'; }
+		return '<a class="contact-wa" href="https://wa.me/' + digits + '" target="_blank" rel="noopener" ' +
+			'style="color:#25D366; text-decoration:none; display:inline-flex; align-items:center; gap:5px;" title="Open WhatsApp chat">' +
+			'<i class="la la-whatsapp" style="font-size:16px;"></i><span class="contact-num">' + label + '</span></a>';
+	}
+
+	function renderDisplay($cell) {
+		$cell.find('[data-toggle="tooltip"]').tooltip('dispose');
+		var num = $cell.attr('data-mobile') || '';
+		var html = '<span class="contact-display">' + waLink(num) +
+			'<button type="button" class="btn btn-icon btn-light-primary btn-xs contact-edit-btn ml-1" data-toggle="tooltip" title="Edit contact number">' +
+			'<i class="la la-pencil"></i></button></span>';
+		$cell.html(html);
+		$cell.find('[data-toggle="tooltip"]').tooltip();
+	}
+
+	$('#kt_datatable').on('click', '.contact-edit-btn', function() {
+		var $cell = $(this).closest('.contact-cell');
+		if ($cell.find('.contact-editor').length) { return; }
+		var current = $cell.attr('data-mobile') || '';
+		$cell.find('[data-toggle="tooltip"]').tooltip('dispose');
+		$cell.html(
+			'<span class="contact-editor">' +
+				'<input type="text" class="form-control contact-input" value="' + $('<span>').text(current).html() + '" autocomplete="off">' +
+				'<button type="button" class="btn btn-icon btn-light-success btn-xs contact-save" data-toggle="tooltip" title="Save"><i class="la la-check"></i></button>' +
+				'<button type="button" class="btn btn-icon btn-light-danger btn-xs contact-cancel" data-toggle="tooltip" title="Cancel"><i class="la la-times"></i></button>' +
+			'</span>' +
+			'<span class="contact-error" style="display:none;"></span>'
+		);
+		$cell.find('[data-toggle="tooltip"]').tooltip();
+		$cell.find('.contact-input').focus().select();
+	});
+
+	$('#kt_datatable').on('click', '.contact-cancel', function() {
+		renderDisplay($(this).closest('.contact-cell'));
+	});
+
+	$('#kt_datatable').on('keydown', '.contact-input', function(e) {
+		if (e.which === 13) { e.preventDefault(); $(this).closest('.contact-cell').find('.contact-save').click(); }
+		else if (e.which === 27) { e.preventDefault(); renderDisplay($(this).closest('.contact-cell')); }
+	});
+
+	$('#kt_datatable').on('click', '.contact-save', function() {
+		var $btn   = $(this);
+		var $cell  = $btn.closest('.contact-cell');
+		var $input = $cell.find('.contact-input');
+		var $error = $cell.find('.contact-error');
+		var mobile = $.trim($input.val());
+
+		$btn.tooltip('hide');
+		$error.hide().text('');
+		$btn.prop('disabled', true).find('i').attr('class', 'la la-spinner la-spin');
+
+		$.ajax({
+			url: GUEST_CONTACT_UPDATE_URL,
+			method: 'POST',
+			dataType: 'json',
+			data: { dedup_key: $cell.attr('data-dedup-key'), mobile: mobile },
+			timeout: 30000
+		}).done(function(res) {
+			if (res && res.ok) {
+				$cell.attr('data-mobile', res.mobile);
+				if (res.dedup_key) { $cell.attr('data-dedup-key', res.dedup_key); }
+				renderDisplay($cell);
+			} else {
+				$error.text((res && res.message) ? res.message : 'Could not update contact number.').show();
+				$btn.prop('disabled', false).find('i').attr('class', 'la la-check');
+			}
+		}).fail(function() {
+			$error.text('Network error. Please try again.').show();
+			$btn.prop('disabled', false).find('i').attr('class', 'la la-check');
+		});
+	});
 </script>

@@ -53,6 +53,10 @@ class Travel_Voucher extends CI_Controller
                 $array['InsertDate'] = strtoupper(date('j M Y', strtotime($array['InsertDate'])));
                 $country_code = $this->Universal_Model->Read_Country_Code($array['SalesAgentCountryCode']);
                 $array['SalesAgentMobile'] = $country_code . $array['SalesAgentMobile'];
+
+                // From 2026-06-01 onward the PIC line is labelled "Booking PIC"
+                // (TC1) to match the BC; earlier bookings keep "Sales Agent".
+                $array['ShowBookingPIC'] = pdf_show_booking_pic_for_date($RawBookingInsertDate);
                 $array['Title'] = str_replace(' ', '_', $array['BookingNumber'] . '_' . $array['Customer'] . '_' . $array['TravelDate']);
                 if(empty($array['ProductSequence'])) {
                     $array['ProductSequence'] = explode(',', $array['ProductSequence']);

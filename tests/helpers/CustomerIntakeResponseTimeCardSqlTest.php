@@ -55,6 +55,7 @@ assert_eq('team SQL is string', true, is_string($avg_sql_team) && $avg_sql_team 
 assert_eq('team SQL mentions booking_customer_intake', true, strpos($avg_sql_team, 'booking_customer_intake') !== false);
 assert_eq('team SQL mentions booking_status_log',      true, strpos($avg_sql_team, 'booking_status_log') !== false);
 assert_eq("team SQL filters to_status='PBC'",          true, strpos($avg_sql_team, "to_status = 'PBC'") !== false);
+assert_eq("team SQL excludes creation rows",           true, strpos($avg_sql_team, 'from_status IS NOT NULL') !== false);
 assert_eq("team SQL excludes b.Status='N'",            true, strpos($avg_sql_team, "b.Status != 'N'") !== false);
 assert_eq('team SQL does NOT include credit clause',   false, strpos($avg_sql_team, 'SalesAgent') !== false);
 assert_eq('TC SQL DOES include credit clause',         true,  strpos($avg_sql_tc,   'SalesAgent') !== false);
@@ -87,6 +88,7 @@ $pdo->exec("CREATE TABLE booking_customer_intake (
 $pdo->exec("CREATE TABLE booking_status_log (
     id INTEGER PRIMARY KEY,
     booking_id INTEGER,
+    from_status TEXT,
     to_status TEXT,
     created_at TEXT
 )");
@@ -124,16 +126,20 @@ $pdo->exec("INSERT INTO booking_customer_intake (booking_id, submitted_at) VALUE
     (400, '2026-05-21 09:00:00'),
     (500, '2026-05-22 09:00:00')
 ");
-$pdo->exec("INSERT INTO booking_status_log (booking_id, to_status, created_at) VALUES
-    (100, 'PBC', '2026-05-10 10:00:00'),
-    (101, 'PBC', '2026-05-12 13:00:00'),
-    (102, 'PBC', '2026-05-15 10:30:00'),
-    (103, 'PBC', '2026-05-15 11:00:00'),
-    (200, 'PBC', '2026-05-01 09:00:00'),
-    /* 300 has no PBC log */
-    (400, 'PBC', '2026-05-21 09:30:00'),
-    (500, 'PBC', '2026-05-22 12:00:00'),
-    (500, 'PBC', '2026-05-22 11:00:00')
+// Graduation rows are TRANSITIONS into PBC (from_status set). Booking 100 also
+// carries a draft CREATION row (from_status NULL) timestamped BEFORE its intake
+// submission — it must be excluded, otherwise the gap would be negative.
+$pdo->exec("INSERT INTO booking_status_log (booking_id, from_status, to_status, created_at) VALUES
+    (100, NULL,  'PBC', '2026-05-10 07:00:00'),
+    (100, 'SAD', 'PBC', '2026-05-10 10:00:00'),
+    (101, 'SAD', 'PBC', '2026-05-12 13:00:00'),
+    (102, 'SAD', 'PBC', '2026-05-15 10:30:00'),
+    (103, 'SAD', 'PBC', '2026-05-15 11:00:00'),
+    (200, 'SAD', 'PBC', '2026-05-01 09:00:00'),
+    /* 300 has no PBC transition log */
+    (400, 'SAD', 'PBC', '2026-05-21 09:30:00'),
+    (500, 'PB',  'PBC', '2026-05-22 12:00:00'),
+    (500, 'PB',  'PBC', '2026-05-22 11:00:00')
 ");
 
 // -- 1) Team average (no credit clause) ---------------------------------

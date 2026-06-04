@@ -136,8 +136,23 @@ function materialise(PDO $pdo, $booking_id, array $rooms, $glr_seed = array())
         $booking_id,
     ));
 
-    $existing = (int) $pdo->query("SELECT COUNT(*) FROM guest_list_room WHERE booking_id = {$booking_id}")->fetchColumn();
-    if ($existing === 0) {
+    // Hardened seeding: seed unless a *real* room (with pax) already exists.
+    // Empty placeholder rooms (0/0/0 — e.g. the booking form's default "ROOM 1")
+    // are cleared first so they can't block the customer's submission.
+    $existing = $pdo->query("SELECT id, adult_count, child_count, infant_count FROM guest_list_room WHERE booking_id = {$booking_id}")->fetchAll(PDO::FETCH_ASSOC);
+    $has_real_room = false;
+    $empty_ids = array();
+    foreach ($existing as $er) {
+        if (((int) $er['adult_count'] + (int) $er['child_count'] + (int) $er['infant_count']) > 0) {
+            $has_real_room = true;
+        } else {
+            $empty_ids[] = (int) $er['id'];
+        }
+    }
+    if (!$has_real_room) {
+        if (!empty($empty_ids)) {
+            $pdo->exec("DELETE FROM guest_list_room WHERE id IN (" . implode(',', $empty_ids) . ")");
+        }
         foreach ($rooms as $r) {
             $child_count = count_age_list($r['child_ages']);
             $baby_count  = count_age_list($r['baby_ages']);
@@ -182,14 +197,33 @@ assert_eq('A: row 2 adults',          2,          (int) $state['rooms'][1]['adul
 assert_eq('A: row 2 child_count = 0', 0,          (int) $state['rooms'][1]['child_count']);
 assert_eq('A: row 2 infant_count = 0',0,          (int) $state['rooms'][1]['infant_count']);
 
-// Scenario B: a staff-seeded guest_list_room row already exists. The
-// materialisation MUST NOT add intake rooms on top.
+// Scenario B: a real staff-seeded guest_list_room row (with pax) already
+// exists. The materialisation MUST NOT add intake rooms on top.
 $state = materialise($pdo, 9407, $rooms_two, array(
     array('STAFF ROOM', 1, 0, 0),
 ));
 assert_eq('B: pax totals still overwritten (Adult=4)', '4', $state['booking']['Adult']);
 assert_eq('B: guest_list_room count stays at 1',       1,   count($state['rooms']));
 assert_eq('B: staff room preserved verbatim',          'STAFF ROOM', $state['rooms'][0]['room_name']);
+
+// Scenario D: only an EMPTY placeholder room exists (0/0/0 — the booking
+// form's default "ROOM 1"). It must be cleared and replaced by the customer's
+// intake rooms, not left to block the seed. This is the BC-2606-0030 bug.
+$state = materialise($pdo, 9407, $rooms_two, array(
+    array('ROOM 1', 0, 0, 0),
+));
+assert_eq('D: placeholder replaced, 2 intake rooms', 2, count($state['rooms']));
+assert_eq('D: row 1 is the intake room',  'DELUXE',   $state['rooms'][0]['room_name']);
+assert_eq('D: no leftover ROOM 1',        false,      in_array('ROOM 1', array_column($state['rooms'], 'room_name'), true));
+
+// Scenario E: a real room AND an empty placeholder coexist. The real room is
+// preserved and the customer's rooms are skipped (staff data wins).
+$state = materialise($pdo, 9407, $rooms_two, array(
+    array('STAFF ROOM', 2, 0, 0),
+    array('ROOM 1', 0, 0, 0),
+));
+assert_eq('E: staff data wins, both staff rows kept', 2, count($state['rooms']));
+assert_eq('E: no intake room seeded (DELUXE absent)', false, in_array('DELUXE', array_column($state['rooms'], 'room_name'), true));
 
 // Scenario C: zero intake rooms (edge case — caller shouldn't normally hit
 // this since validation requires at least one room, but be defensive).

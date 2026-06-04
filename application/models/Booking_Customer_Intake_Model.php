@@ -22,6 +22,7 @@ class Booking_Customer_Intake_Model extends CI_Model
             return null;
         }
         $this->db->select('booking.BookingID AS booking_id, booking.BookingNumber, booking.Customer, booking.Status,'
+            . ' booking.Mobile, booking.StartDate, booking.EndDate,'
             . ' booking_customer_intake.id AS intake_id,'
             . ' booking_customer_intake.locked,'
             . ' booking_customer_intake.submitted_at');
@@ -132,7 +133,7 @@ class Booking_Customer_Intake_Model extends CI_Model
         $totals = compute_intake_pax_totals($rooms);
 
         // Pax totals: always overwrite — the intake is the customer's
-        // authoritative submission at PCI time. The `feedback_booking_pax`
+        // authoritative submission at draft (SAD) time. The `feedback_booking_pax`
         // rule about not touching these from room edits still applies to
         // staff-side edits; intake submission is the initial-population case.
         $this->db->where('BookingID', (int) $booking_id)->update('booking', array(
@@ -141,11 +142,31 @@ class Booking_Customer_Intake_Model extends CI_Model
             'Infant'   => (string) $totals['baby'],
         ));
 
-        // Guest-list rooms: only seed when none exist, so staff who started
-        // their own room table aren't clobbered by a customer's submission.
-        $existing_glr = (int) $this->db->where('booking_id', (int) $booking_id)
-            ->count_all_results('guest_list_room');
-        if ($existing_glr === 0) {
+        // Guest-list rooms: seed from the customer's submission unless staff have
+        // already entered a *real* room (one with pax). Empty placeholder rooms —
+        // e.g. the booking form's default "ROOM 1" with 0/0/0 — must NOT block the
+        // seed, so they are cleared first. A room with any pax is treated as real
+        // staff data and left untouched (the customer's rooms are then skipped).
+        $existing_rooms = $this->db
+            ->select('id, adult_count, child_count, infant_count')
+            ->where('booking_id', (int) $booking_id)
+            ->where('Status', 'Y')
+            ->get('guest_list_room')->result();
+        $has_real_room = false;
+        $empty_room_ids = array();
+        foreach ($existing_rooms as $er) {
+            if (((int) $er->adult_count + (int) $er->child_count + (int) $er->infant_count) > 0) {
+                $has_real_room = true;
+            } else {
+                $empty_room_ids[] = (int) $er->id;
+            }
+        }
+        if (!$has_real_room) {
+            // Drop empty placeholders (they carry no guests) so the customer's
+            // submission becomes the authoritative room table.
+            if (!empty($empty_room_ids)) {
+                $this->db->where_in('id', $empty_room_ids)->delete('guest_list_room');
+            }
             foreach ($rooms as $room) {
                 $child_count = _intake_count_ages(isset($room['child_ages']) ? $room['child_ages'] : null);
                 $baby_count  = _intake_count_ages(isset($room['baby_ages'])  ? $room['baby_ages']  : null);

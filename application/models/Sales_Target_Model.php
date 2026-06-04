@@ -46,6 +46,41 @@ class Sales_Target_Model extends CI_Model
 		return $this->get($admin_id, $year, $month);
 	}
 
+	// ---- Yearly target (sales_target_year) --------------------------------
+	// Companion to the monthly methods above. One row per admin per year, keyed
+	// by the unique (AdminID, target_year). Backs the Booking dashboard
+	// "Year Sales vs Target" card.
+
+	public function get_year($admin_id, $year)
+	{
+		return $this->db
+			->where('AdminID', (int)$admin_id)
+			->where('target_year', (int)$year)
+			->get('sales_target_year')
+			->row_array();
+	}
+
+	public function get_year_amount($admin_id, $year)
+	{
+		$row = $this->get_year($admin_id, $year);
+		return $row ? (float)$row['target_amount'] : 0.0;
+	}
+
+	public function upsert_year($admin_id, $year, $amount)
+	{
+		$admin_id = (int)$admin_id;
+		$year     = (int)$year;
+		$amount   = max(0.0, (float)$amount);
+
+		$sql = "INSERT INTO sales_target_year (AdminID, target_year, target_amount)
+		        VALUES (?, ?, ?)
+		        ON DUPLICATE KEY UPDATE
+		            target_amount = VALUES(target_amount),
+		            updated_at    = CURRENT_TIMESTAMP";
+		$this->db->query($sql, array($admin_id, $year, $amount));
+		return $this->get_year($admin_id, $year);
+	}
+
 	public function copy_from_previous_month($year, $month)
 	{
 		$prev_year  = (int)$year;

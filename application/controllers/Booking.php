@@ -103,10 +103,11 @@ class Booking extends MY_Controller
 				if(empty($payments)) {
 					// No payments at all, set to PBC if not already in flow
 					if($booking->Status != 'PBC' && $booking->Status != 'P') {
-						// Only reset if not already in a recognised flow status. PCI
-						// (Pending Customer Info) is the customer-intake draft anchor
-						// and must NOT be silently flipped to PBC by this sweep.
-						if(!in_array($booking->Status, ['PBC', 'P', 'PBO', 'PTV', 'PT', 'Y', 'OG', 'PCI'])) {
+						// Only reset if not already in a recognised flow status. SAD
+						// (Save as Draft) is the customer-intake draft anchor and PB
+						// (Pending BC) is an early flow status — neither must be
+						// silently flipped to PBC by this sweep.
+						if(!in_array($booking->Status, ['PBC', 'PB', 'P', 'PBO', 'PTV', 'PT', 'Y', 'OG', 'SAD'])) {
 							$this->Booking_Model->Update_Status('PBC', $booking->BookingID);
 							$this->Booking_Model->Create_Booking_Log2($booking->Status, 'PBC', $booking->BookingID);
 						}
@@ -396,18 +397,19 @@ class Booking extends MY_Controller
 			}
 
 			// Customer intake annotations next to the status cell:
-			// - "Customer Submitted" badge while booking still sits in PCI but the
+			// - "Customer Submitted" badge while booking still sits in SAD but the
 			//   intake has been completed by the customer.
-			// - "Response: 1h 15m" once staff have advanced PCI -> PBC.
+			// - "Response: 1h 15m" once the booking has reached PENDING PAYMENT —
+			//   submission -> P, matching the "Submitted -> Payment Time" card.
 			$this->load->helper('customer_intake');
 			$intake_row = $this->db->select('submitted_at')
 				->where('booking_id', (int) $booking->BookingID)
 				->get('booking_customer_intake')->row();
 			if (!empty($intake_row)) {
-				if ($display_status === 'PCI') {
+				if ($display_status === 'SAD') {
 					$row['status'] .= ' <span class="badge badge-info" style="font-size:9px; margin-left:4px;" data-toggle="tooltip" data-placement="top" title="Customer submitted intake form">Customer Submitted</span>';
 				}
-				$resp_seconds = calculate_intake_response_seconds((int) $booking->BookingID);
+				$resp_seconds = calculate_submitted_to_payment_seconds((int) $booking->BookingID);
 				if ($resp_seconds !== null) {
 					$row['status'] .= '<br><small style="color:#6b7385;">Response: <strong>' . htmlspecialchars(format_response_duration($resp_seconds)) . '</strong></small>';
 				}
@@ -700,12 +702,23 @@ class Booking extends MY_Controller
 		$week_end     = date('Y-m-d', strtotime('sunday this week'));
 		$next7_start  = date('Y-m-d', strtotime('+1 day'));
 		$next7_end    = date('Y-m-d', strtotime('+7 days'));
+		// Cumulative 14-day window shares the 7-day start (tomorrow) and extends
+		// to +14, so "within 14 days" is a superset of "within 7 days".
+		$next14_start = $next7_start;
+		$next14_end   = date('Y-m-d', strtotime('+14 days'));
 		// Current calendar quarter (used for owner-only conversion cards):
 		// Q1 Jan–Mar · Q2 Apr–Jun · Q3 Jul–Sep · Q4 Oct–Dec.
 		$q_idx         = (int) ceil(((int) date('n')) / 3);
 		$q_start_month = ($q_idx - 1) * 3 + 1;
 		$quarter_start = date('Y-' . sprintf('%02d', $q_start_month) . '-01');
 		$quarter_end   = date('Y-m-t', strtotime($quarter_start . ' +2 months'));
+
+		// Selected reporting period for the TC summary cards' month filter
+		// (?month=YYYY-MM). Falls back to the current month. Re-scopes every
+		// TC "(Month)" / "(Year)" card; the rolling Today/Week/Month cards and
+		// the other roles keep the live current-month windows above.
+		$this->load->helper('summary_period_helper');
+		$period = summary_resolve_month($this->input->get('month'), $today);
 
 		$base = base_url('Booking');
 		$fmt_dmy = function($d) { return date('d/m/Y', strtotime($d)); };
@@ -729,6 +742,15 @@ class Booking extends MY_Controller
 		if($is_tc) {
 			$this->load->helper('lead_conversion_credit');
 			$credit_clause = lead_conversion_credit_booking_clause();
+
+			// Re-scope every TC "(Month)" card to the selected period. Keep the
+			// live current month for the rolling Today/Week/Month cards below.
+			$cur_month_start = $month_start;
+			$cur_month_end   = $month_end;
+			$month_start = $period['month_start'];
+			$month_end   = $period['month_end'];
+			$year_start  = $period['year_start'];
+			$year_end    = $period['year_end'];
 
 			$row = $this->db->query(
 				"SELECT COUNT(*) AS cnt FROM booking
@@ -769,33 +791,33 @@ class Booking extends MY_Controller
 			)->row();
 			$sales_month_actual = (float)$row->total;
 
-			$row_week = $this->db->query(
+			$row_year = $this->db->query(
 				$fully_paid_sales_sql,
-				array($admin_id, $admin_id, $week_start, $week_end)
+				array($admin_id, $admin_id, $year_start, $year_end)
 			)->row();
-			$sales_week_actual = (float)$row_week->total;
+			$sales_year_actual = (float)$row_year->total;
 
-			// Target lookup for the current month — set by Owner / Team Lead via
-			// Admin / sales_targets. Missing row => target 0 => percent rendered "—".
+			// Target lookups for the selected period — set by Owner / Team Lead
+			// via Admin (sales_targets monthly, sales_target_year yearly).
+			// Missing row => target 0 => percent rendered "—".
 			$this->load->model('Sales_Target_Model');
 			$target_amount = $this->Sales_Target_Model->get_amount(
-				$admin_id, (int)date('Y'), (int)date('n')
+				$admin_id, $period['year'], $period['month']
+			);
+			$year_target_amount = $this->Sales_Target_Model->get_year_amount(
+				$admin_id, $period['year']
 			);
 
 			$pct_month = $target_amount > 0
 				? round(($sales_month_actual / $target_amount) * 100, 1)
 				: null;
-
-			// Week pace: expected revenue by today = target * (days_elapsed / days_in_month).
-			$days_elapsed  = max(1, (int)date('j'));
-			$days_in_month = max(1, (int)date('t'));
-			$expected_to_date = $target_amount > 0
-				? ($target_amount * ($days_elapsed / $days_in_month))
-				: 0.0;
-			$pace_week = $expected_to_date > 0
-				? round(($sales_week_actual / $expected_to_date) * 100, 1)
+			$pct_year = $year_target_amount > 0
+				? round(($sales_year_actual / $year_target_amount) * 100, 1)
 				: null;
 
+			// raw / raw_target feed the Actual-vs-Target bar charts on the front
+			// end; the chart caps the actual bar at 100% of target visually but
+			// keeps the true percent in the label (over-achievement allowed).
 			$cards['sales_month'] = array(
 				'value'      => $money($sales_month_actual),
 				'target'     => $money($target_amount),
@@ -804,11 +826,13 @@ class Booking extends MY_Controller
 				'raw'        => $sales_month_actual,
 				'raw_target' => $target_amount,
 			);
-			$cards['sales_week'] = array(
-				'value'    => $money($sales_week_actual),
-				'pace'     => $pace_week === null ? '—' : ($pace_week . '%'),
-				'has_pace' => $pace_week !== null,
-				'raw'      => $sales_week_actual,
+			$cards['sales_year'] = array(
+				'value'      => $money($sales_year_actual),
+				'target'     => $money($year_target_amount),
+				'percent'    => $pct_year === null ? '—' : ($pct_year . '%'),
+				'has_target' => $year_target_amount > 0,
+				'raw'        => $sales_year_actual,
+				'raw_target' => $year_target_amount,
 			);
 
 			$row = $this->db->query(
@@ -829,6 +853,11 @@ class Booking extends MY_Controller
 			);
 
 			// Disjoint breakdown so full_overdue + deposit_only_overdue = total.
+			// $po_cutoff applies the 3pm rule: a deadline falling today counts as
+			// overdue from 3:00pm onward (cutoff rolls to tomorrow). Shared with
+			// the booking list's PO filter so the card and listing agree.
+			$this->load->helper('booking_status_filter');
+			$po_cutoff = payment_overdue_cutoff_date();
 			$row = $this->db->query(
 				"SELECT
 				   SUM(CASE WHEN FullPaymentDeadline < ? AND Status IN ('P','PP') THEN 1 ELSE 0 END) AS full_overdue,
@@ -843,7 +872,7 @@ class Booking extends MY_Controller
 				        (FullPaymentDeadline < ? AND Status IN ('P','PP'))
 				     OR (DepositDeadline < ? AND Status='P')
 				   )",
-				array($today, $today, $today, $admin_id, $admin_id, $today, $today)
+				array($po_cutoff, $po_cutoff, $po_cutoff, $admin_id, $admin_id, $po_cutoff, $po_cutoff)
 			)->row();
 			$po_full    = (int)$row->full_overdue;
 			$po_deposit = (int)$row->deposit_only_overdue;
@@ -881,6 +910,37 @@ class Booking extends MY_Controller
 				'link'   => $base . $qs(array(
 					'upcoming_not_ready' => 1,
 					'travel_date'        => $fmt_dmy($next7_start) . ' - ' . $fmt_dmy($next7_end),
+				)),
+			);
+
+			// Same "not yet ready" set over the cumulative 14-day window.
+			$row = $this->db->query(
+				"SELECT
+				   SUM(CASE WHEN Status='P'   THEN 1 ELSE 0 END) AS s_p,
+				   SUM(CASE WHEN Status='PBO' THEN 1 ELSE 0 END) AS s_pbo,
+				   SUM(CASE WHEN Status='PGL' THEN 1 ELSE 0 END) AS s_pgl,
+				   SUM(CASE WHEN Status='PTV' THEN 1 ELSE 0 END) AS s_ptv
+				 FROM booking
+				 WHERE {$credit_clause}
+				   AND BookingConfirmationTitle='BOOKING CONFIRMATION'
+				   AND CancelStatus='N'
+				   AND Status IN ('P','PBO','PGL','PTV')
+				   AND StartDate BETWEEN ? AND ?",
+				array($admin_id, $admin_id, $next14_start, $next14_end)
+			)->row();
+			$un14_p   = (int)$row->s_p;
+			$un14_pbo = (int)$row->s_pbo;
+			$un14_pgl = (int)$row->s_pgl;
+			$un14_ptv = (int)$row->s_ptv;
+			$cards['upcoming_travel_not_ready_14'] = array(
+				'count'  => $un14_p + $un14_pbo + $un14_pgl + $un14_ptv,
+				'by_p'   => $un14_p,
+				'by_pbo' => $un14_pbo,
+				'by_pgl' => $un14_pgl,
+				'by_ptv' => $un14_ptv,
+				'link'   => $base . $qs(array(
+					'upcoming_not_ready' => 1,
+					'travel_date'        => $fmt_dmy($next14_start) . ' - ' . $fmt_dmy($next14_end),
 				)),
 			);
 
@@ -971,6 +1031,30 @@ class Booking extends MY_Controller
 				? array('name' => $best_sales['agent_name'], 'value' => $money($best_sales['total_sales']))
 				: null;
 
+			// Year leaderboard — same fully-paid filter over the selected year so
+			// the "Best" figure on the Year card is apples-to-apples with Month.
+			$best_sales_year_rows = $this->db->query(
+				"SELECT
+				   {$agent_expr} AS credited_agent_id,
+				   admin.Name AS agent_name,
+				   COALESCE(SUM(booking.NetTotal), 0) AS total_sales
+				 FROM booking
+				 LEFT JOIN admin ON admin.AdminID = {$agent_expr}
+				 WHERE booking.BookingConfirmationTitle='BOOKING CONFIRMATION'
+				   AND booking.CancelStatus='N'
+				   AND booking.Status!='N'
+				   AND booking.NetTotal > 0
+				   AND {$paid_subquery} >= booking.NetTotal
+				   AND CAST(booking.InsertDate AS DATE) BETWEEN ? AND ?
+				 GROUP BY credited_agent_id, agent_name
+				 HAVING credited_agent_id IS NOT NULL AND credited_agent_id > 0",
+				array($year_start, $year_end)
+			)->result_array();
+			$best_sales_year = $pick_best($best_sales_year_rows, 'total_sales', true);
+			$cards['sales_year']['best'] = $best_sales_year
+				? array('name' => $best_sales_year['agent_name'], 'value' => $money($best_sales_year['total_sales']))
+				: null;
+
 			// Cancellation Rate: drop the CancelStatus filter because the
 			// numerator needs the cancelled rows; min-sample 3 keeps a single-BC
 			// agent at 0% from dominating.
@@ -1001,10 +1085,18 @@ class Booking extends MY_Controller
 				)
 				: null;
 
-			// Conversion Rate (Month) — new TC card. Reuses Lead_Dashboard_By_Agent
-			// so the TC1/TC2 credit fragment inside converted_leads is preserved.
+			// Conversion Rate (YTD) — TC card. Fixed year-to-date window (Jan 1 of
+			// the current year through today, independent of the month filter) and
+			// credited via SalesAgent2 (TC2) for the whole year — see
+			// lead_conversion_credit_sql_fragment_tc2().
 			$this->load->model('Report_Model');
-			$by_agent = $this->Report_Model->Lead_Dashboard_By_Agent(array('start_date' => $month_start, 'end_date' => $month_end));
+			$this->load->helper('lead_conversion_credit');
+			$ytd_start = date('Y-01-01');
+			$ytd_end   = $today;
+			$by_agent = $this->Report_Model->Lead_Dashboard_By_Agent(
+				array('start_date' => $ytd_start, 'end_date' => $ytd_end),
+				lead_conversion_credit_sql_fragment_tc2()
+			);
 
 			// Resolve the logged-in admin to their GHL UserID(s). Canonical source
 			// is admin_lead_dashboard_agents (maintained from Admin / Update);
@@ -1051,7 +1143,7 @@ class Booking extends MY_Controller
 			if($best_conv && !empty($my_ghl_uids) && in_array((string)$best_conv['agent_id'], $my_ghl_uids, true)) {
 				$best_conv['agent_name'] = 'You';
 			}
-			$cards['conversion_rate_month'] = array(
+			$cards['conversion_rate_ytd'] = array(
 				'value'  => $own_rate === null ? '-' : (round($own_rate, 1) . '%'),
 				'detail' => $own_converted . ' / ' . $own_total_leads,
 				'best'   => $best_conv
@@ -1083,7 +1175,7 @@ class Booking extends MY_Controller
 				));
 				$mine_month = $this->Report_Model->Lead_Dashboard_Summary(array(
 					'agent_id'   => $my_ghl_uids,
-					'start_date' => $month_start, 'end_date' => $month_end,
+					'start_date' => $cur_month_start, 'end_date' => $cur_month_end,
 				));
 				$cards['tc_leads_dwm'] = array(
 					'day'   => (int)$mine_day['total_leads'],
@@ -1107,6 +1199,61 @@ class Booking extends MY_Controller
 					'day_seconds' => null, 'week_seconds' => null, 'month_seconds' => null,
 				);
 			}
+
+			// Pending BC (self) — current backlog of the TC's bookings parked at
+			// PB ("PENDING BC"). Not period-scoped (it's a live to-do count, like
+			// Payment Overdue); credited via the same TC1/TC2 slot rule.
+			$row = $this->db->query(
+				"SELECT COUNT(*) AS cnt FROM booking
+				 WHERE {$credit_clause}
+				   AND CancelStatus='N' AND Status='PB'",
+				array($admin_id, $admin_id)
+			)->row();
+			$cards['pending_bc'] = array(
+				'count' => (int)$row->cnt,
+				'link'  => $base . $qs(array('status' => 'PB')),
+			);
+
+			// Submitted -> Payment Time (self, selected month). Average gap from
+			// the customer submitting their intake to the booking first reaching
+			// PENDING PAYMENT (P), windowed on the submission date — the same
+			// start anchor as the Intake -> BC Response Time card. "Best:" footer
+			// ranks the fastest TC team-wide ("You" when that's the logged-in agent).
+			$this->load->helper(array('submitted_payment_response', 'customer_intake'));
+			$sp_start = $month_start . ' 00:00:00';
+			$sp_next  = date('Y-m-01 00:00:00', strtotime($month_start . ' +1 month'));
+			$sp_row = $this->db->query(
+				submitted_payment_avg_response_sql(true),
+				array($sp_start, $sp_next, $admin_id, $admin_id)
+			)->row();
+			$sp_n    = !empty($sp_row) ? (int)$sp_row->n : 0;
+			$sp_secs = ($sp_n > 0 && $sp_row->avg_seconds !== null)
+				? (int)round((float)$sp_row->avg_seconds) : null;
+			$best_sp_row = $this->db->query(
+				submitted_payment_best_agent_sql(),
+				array($sp_start, $sp_next)
+			)->row();
+			$best_sp = null;
+			if(!empty($best_sp_row) && !empty($best_sp_row->AdminID)) {
+				if((int)$best_sp_row->AdminID === (int)$admin_id) {
+					$bd_name = 'You';
+				} else {
+					$bd_admin = $this->db->select('Name')
+						->where('AdminID', (int)$best_sp_row->AdminID)
+						->get('admin')->row();
+					$bd_name = $bd_admin ? $bd_admin->Name : '#' . (int)$best_sp_row->AdminID;
+				}
+				$best_sp = array(
+					'name'  => $bd_name,
+					'value' => format_response_duration((int)round((float)$best_sp_row->avg_seconds)),
+				);
+			}
+			$cards['submitted_payment_response_month'] = array(
+				'value'   => format_response_duration($sp_secs),
+				'count'   => $sp_n,
+				'seconds' => $sp_secs,
+				'best'    => $best_sp,
+			);
 		}
 
 		// ---------- TC LEAD / Owner (team-wide lead + booking metrics) ----------
@@ -1222,6 +1369,61 @@ class Booking extends MY_Controller
 				);
 			}
 			$tables['agent_conversion'] = $top_agents;
+
+			// Leads by Agent (Today / Week / Month) — OWNER only. The same
+			// new-lead total as the "Leads" card, broken out one row per agent
+			// so the owner can read volume agent-by-agent. Windowed by lead
+			// start date, identical to the Leads card.
+			if($is_owner) {
+				$tables['leads_by_agent'] = $this->Report_Model->Lead_Dashboard_Leads_By_Agent_DWM(
+					$today, $week_start, $week_end, $month_start, $month_end
+				);
+
+				// Pending BC (team) — every booking currently parked at PB
+				// ("PENDING BC"), across all agents. Live backlog count.
+				$row = $this->db->query(
+					"SELECT COUNT(*) AS cnt FROM booking
+					 WHERE CancelStatus='N' AND Status='PB'"
+				)->row();
+				$cards['pending_bc'] = array(
+					'count' => (int)$row->cnt,
+					'link'  => $base . $qs(array('status' => 'PB')),
+				);
+
+				// Submitted -> Payment Time (team, this month). Same submitted_at
+				// -> first-P metric as the TC card but company-wide, windowed on
+				// the submission date. "Best:" footer = fastest TC this month.
+				$this->load->helper(array('submitted_payment_response', 'customer_intake'));
+				$sp_start = $month_start . ' 00:00:00';
+				$sp_next  = date('Y-m-01 00:00:00', strtotime($month_start . ' +1 month'));
+				$sp_row = $this->db->query(
+					submitted_payment_avg_response_sql(false),
+					array($sp_start, $sp_next)
+				)->row();
+				$sp_n    = !empty($sp_row) ? (int)$sp_row->n : 0;
+				$sp_secs = ($sp_n > 0 && $sp_row->avg_seconds !== null)
+					? (int)round((float)$sp_row->avg_seconds) : null;
+				$best_sp_row = $this->db->query(
+					submitted_payment_best_agent_sql(),
+					array($sp_start, $sp_next)
+				)->row();
+				$best_sp = null;
+				if(!empty($best_sp_row) && !empty($best_sp_row->AdminID)) {
+					$bd_admin = $this->db->select('Name')
+						->where('AdminID', (int)$best_sp_row->AdminID)
+						->get('admin')->row();
+					$best_sp = array(
+						'name'  => $bd_admin ? $bd_admin->Name : '#' . (int)$best_sp_row->AdminID,
+						'value' => format_response_duration((int)round((float)$best_sp_row->avg_seconds)),
+					);
+				}
+				$cards['submitted_payment_response_month'] = array(
+					'value'   => format_response_duration($sp_secs),
+					'count'   => $sp_n,
+					'seconds' => $sp_secs,
+					'best'    => $best_sp,
+				);
+			}
 
 			// Closed Sales by Destination (Month) — fully-paid BCs only, ranked
 			// by revenue. "Fully paid" matches the TC Total Sales card at
@@ -1393,6 +1595,36 @@ class Booking extends MY_Controller
 				'link'   => $base . $qs(array(
 					'upcoming_not_ready' => 1,
 					'travel_date'        => $fmt_dmy($next7_start) . ' - ' . $fmt_dmy($next7_end),
+				)),
+			);
+
+			// Team-wide "not yet ready" over the cumulative 14-day window.
+			$row = $this->db->query(
+				"SELECT
+				   SUM(CASE WHEN Status='P'   THEN 1 ELSE 0 END) AS s_p,
+				   SUM(CASE WHEN Status='PBO' THEN 1 ELSE 0 END) AS s_pbo,
+				   SUM(CASE WHEN Status='PGL' THEN 1 ELSE 0 END) AS s_pgl,
+				   SUM(CASE WHEN Status='PTV' THEN 1 ELSE 0 END) AS s_ptv
+				 FROM booking
+				 WHERE BookingConfirmationTitle='BOOKING CONFIRMATION'
+				   AND CancelStatus='N'
+				   AND Status IN ('P','PBO','PGL','PTV')
+				   AND StartDate BETWEEN ? AND ?",
+				array($next14_start, $next14_end)
+			)->row();
+			$un_op14_p   = (int)$row->s_p;
+			$un_op14_pbo = (int)$row->s_pbo;
+			$un_op14_pgl = (int)$row->s_pgl;
+			$un_op14_ptv = (int)$row->s_ptv;
+			$cards['upcoming_travel_not_ready_op_14'] = array(
+				'count'  => $un_op14_p + $un_op14_pbo + $un_op14_pgl + $un_op14_ptv,
+				'by_p'   => $un_op14_p,
+				'by_pbo' => $un_op14_pbo,
+				'by_pgl' => $un_op14_pgl,
+				'by_ptv' => $un_op14_ptv,
+				'link'   => $base . $qs(array(
+					'upcoming_not_ready' => 1,
+					'travel_date'        => $fmt_dmy($next14_start) . ' - ' . $fmt_dmy($next14_end),
 				)),
 			);
 
@@ -1773,6 +2005,8 @@ class Booking extends MY_Controller
 		}
 
 		$meta = array();
+		$meta['selected_month']       = $period['value'];
+		$meta['selected_month_label'] = $period['label'];
 		if($is_owner) {
 			$row = $this->db
 				->select('completed_at')
@@ -1814,7 +2048,8 @@ class Booking extends MY_Controller
 		$window_conv    = $rng_disp($conv_start_pop, $conv_end_pop);
 		$conv_label     = $is_owner ? 'this quarter' : 'this month';
 		$window_week  = $rng_disp($week_start, $week_end);
-		$window_next7 = $rng_disp($next7_start, $next7_end);
+		$window_next7  = $rng_disp($next7_start, $next7_end);
+		$window_next14 = $rng_disp($next14_start, $next14_end);
 
 		// TC cards
 		if(isset($cards['bc_month'])) {
@@ -1842,6 +2077,18 @@ class Booking extends MY_Controller
 				'Sum of NetTotal &rarr; <strong>' . $cards['sales_month']['value'] . '</strong><br><br>' .
 				'<strong>NetTotal:</strong> BC price after discount, before any later refunds.<br>' .
 				'<strong>Excludes:</strong> Cancelled, drafts. Later refunds not subtracted.';
+		}
+
+		if(isset($cards['sales_year'])) {
+			$popovers['pop-sales-year'] =
+				'<strong>Formula:</strong> Sum of NetTotal across your fully-paid BCs for the year.<br><br>' .
+				'<strong>Window:</strong> ' . $rng_disp($year_start, $year_end) . ' (by creation date)<br>' .
+				'<strong>This card:</strong><br>' .
+				'Year sales &rarr; <strong>' . $cards['sales_year']['value'] . '</strong><br>' .
+				'Yearly target &rarr; <strong>' . $cards['sales_year']['target'] . '</strong> (' . $cards['sales_year']['percent'] . ')<br><br>' .
+				'<strong>Fully paid</strong> = approved customer payments (Status Y, excl. agent commission) &ge; NetTotal.<br>' .
+				'<strong>Target:</strong> Set per TC per year under Admin &rarr; Yearly Target. Percent = actual &divide; target &times; 100.<br>' .
+				'<strong>Excludes:</strong> Cancelled, drafts, partial / unpaid BCs.';
 		}
 
 		if(isset($cards['cancellation_rate']) && $is_tc) {
@@ -1874,6 +2121,7 @@ class Booking extends MY_Controller
 				'<li>Deposit deadline passed AND deposit still unpaid (Status <code>P</code>)</li>' .
 				'</ul>' .
 				'<strong>As of:</strong> ' . $fmt_disp($today) . ' (no date window)<br>' .
+				'<strong>Due today:</strong> counts as overdue from 3:00pm onward.<br>' .
 				'<strong>This card (your BCs):</strong><br>' .
 				'Full-payment overdue: ' . $po_full . ' ' . $plural($po_full, 'BC') . '<br>' .
 				'Deposit overdue (full not yet due): ' . $po_deposit . ' ' . $plural($po_deposit, 'BC') . '<br>' .
@@ -1896,6 +2144,23 @@ class Booking extends MY_Controller
 				'&rarr; <strong>' . $tot . ' ' . $plural($tot, 'BC') . '</strong><br><br>' .
 				'<strong>Excludes:</strong> Cancelled. "Ready" (Pending Travel and beyond) not counted.<br>' .
 				'<strong>Why it matters:</strong> Guests travel within a week.';
+		}
+
+		if(isset($cards['upcoming_travel_not_ready_14'])) {
+			$u   = $cards['upcoming_travel_not_ready_14'];
+			$tot = (int)$u['count'];
+			$popovers['pop-upcoming-not-ready-14'] =
+				'<strong>"Not yet ready" upstream stages:</strong> Payment / Booking Op / Guest List / Travel Voucher.<br><br>' .
+				'<strong>Window:</strong> ' . $window_next14 . ' (by travel start date)<br>' .
+				'<strong>This card (your BCs):</strong><br>' .
+				'<code>P</code> Payment: ' . (int)$u['by_p'] . '<br>' .
+				'<code>PBO</code> Booking Op: ' . (int)$u['by_pbo'] . '<br>' .
+				'<code>PGL</code> Guest List: ' . (int)$u['by_pgl'] . '<br>' .
+				'<code>PTV</code> Travel Voucher: ' . (int)$u['by_ptv'] . '<br>' .
+				'&rarr; <strong>' . $tot . ' ' . $plural($tot, 'BC') . '</strong><br><br>' .
+				'<strong>Includes</strong> the "within 7 days" set (cumulative window).<br>' .
+				'<strong>Excludes:</strong> Cancelled. "Ready" (Pending Travel and beyond) not counted.<br>' .
+				'<strong>Why it matters:</strong> Two-week heads-up to get BCs ready.';
 		}
 
 		// TC LEAD / Owner cards
@@ -2003,6 +2268,20 @@ class Booking extends MY_Controller
 				'<strong>Excludes:</strong> Unassigned leads.';
 		}
 
+		if(isset($tables['leads_by_agent'])) {
+			$rows = count($tables['leads_by_agent']);
+			$popovers['pop-leads-by-agent'] =
+				'<strong>Source:</strong> New lead conversations synced from GHL, broken out per agent.<br><br>' .
+				'<strong>Windows (by lead creation date):</strong><br>' .
+				'Today: ' . $fmt_disp($today) . '<br>' .
+				'Week: ' . $window_week . ' (Mon&ndash;Sun)<br>' .
+				'Month: ' . $window_month . '<br><br>' .
+				'<strong>Per agent:</strong> count of new leads assigned to that agent in each window. The windows nest &mdash; a lead created today is also counted in this week and this month.<br><br>' .
+				'<strong>Sort:</strong> By month leads (highest first), then week, day, agent name.<br>' .
+				'<strong>This card:</strong> ' . $rows . ' ' . $plural($rows, 'agent') . ' shown.<br>' .
+				'<strong>Excludes:</strong> Unassigned leads.';
+		}
+
 		// OP cards
 		if(isset($cards['upcoming_travel_not_ready_op'])) {
 			$u   = $cards['upcoming_travel_not_ready_op'];
@@ -2018,6 +2297,23 @@ class Booking extends MY_Controller
 				'&rarr; <strong>' . $tot . ' ' . $plural($tot, 'BC') . '</strong><br><br>' .
 				'<strong>Excludes:</strong> Cancelled. "Ready" (Pending Travel and beyond) not counted.<br>' .
 				'<strong>Why it matters:</strong> Guests travel within a week.';
+		}
+
+		if(isset($cards['upcoming_travel_not_ready_op_14'])) {
+			$u   = $cards['upcoming_travel_not_ready_op_14'];
+			$tot = (int)$u['count'];
+			$popovers['pop-upcoming-not-ready-op-14'] =
+				'<strong>"Not yet ready" upstream stages:</strong> Payment / Booking Op / Guest List / Travel Voucher.<br><br>' .
+				'<strong>Window:</strong> ' . $window_next14 . ' (by travel start date)<br>' .
+				'<strong>This card (team-wide):</strong><br>' .
+				'<code>P</code> Payment: ' . (int)$u['by_p'] . '<br>' .
+				'<code>PBO</code> Booking Op: ' . (int)$u['by_pbo'] . '<br>' .
+				'<code>PGL</code> Guest List: ' . (int)$u['by_pgl'] . '<br>' .
+				'<code>PTV</code> Travel Voucher: ' . (int)$u['by_ptv'] . '<br>' .
+				'&rarr; <strong>' . $tot . ' ' . $plural($tot, 'BC') . '</strong><br><br>' .
+				'<strong>Includes</strong> the "within 7 days" set (cumulative window).<br>' .
+				'<strong>Excludes:</strong> Cancelled. "Ready" (Pending Travel and beyond) not counted.<br>' .
+				'<strong>Why it matters:</strong> Two-week heads-up to get BCs ready.';
 		}
 
 		if(isset($cards['insurance_pending'])) {
@@ -2259,16 +2555,16 @@ class Booking extends MY_Controller
 				$booking_id = $this->Booking_Model->Create();
 
 				// Customer-intake draft: created before staff knows pricing/suppliers.
-				// Park the booking in PCI ("PENDING CUSTOMER INFO") so the booking list
-				// shows it as awaiting customer input, and reflect that in the status log.
+				// Park the booking in SAD ("SAVE AS DRAFT") so the booking list shows
+				// it as awaiting customer input, and reflect that in the status log.
 				$is_draft_intake = (string) $this->input->post('is_draft_intake') === '1';
 				if ($is_draft_intake) {
 					$this->load->helper('booking_status_log');
-					$this->Booking_Model->update_by_id($booking_id, array('Status' => 'PCI'));
+					$this->Booking_Model->update_by_id($booking_id, array('Status' => 'SAD'));
 					$created_by = (int) $this->session->userdata('admin_id');
 					log_booking_status_change(
 						$booking_id,
-						'PCI',
+						'SAD',
 						'PBC',
 						$created_by,
 						'Booking created as draft for customer intake link',
@@ -2276,10 +2572,14 @@ class Booking extends MY_Controller
 					);
 				}
 
-				$this->Booking_Product_Model->Create($this->input->post('booking_products'), $booking_id);
+				// A customer-intake draft is created with no products yet, so guard
+				// the batch insert (insert_batch errors on an empty set).
+				if (!empty($this->input->post('booking_products'))) {
+					$this->Booking_Product_Model->Create($this->input->post('booking_products'), $booking_id);
 
-				// Recompute Subtotal from booking_product totals to keep booking.Subtotal authoritative
-				$this->Booking_Product_Model->Recompute_Subtotal($booking_id);
+					// Recompute Subtotal from booking_product totals to keep booking.Subtotal authoritative
+					$this->Booking_Product_Model->Recompute_Subtotal($booking_id);
+				}
 
 				// Create rooms if provided
 				$booking_rooms = $this->input->post('booking_rooms');
@@ -2467,10 +2767,10 @@ class Booking extends MY_Controller
 		
 		if(in_array('AB', $this->session->access_control)) {
 			if($this->input->is_ajax_request()) {
-				// Capture the booking's pre-save Status so that we can advance a
-				// "Pending Customer Info" draft to "Pending BC Confirmation" once
-				// the staff member completes the form — the trigger for the
-				// customer-intake response-time metric.
+				// Capture the booking's pre-save Status so that we can graduate a
+				// "Save as Draft" (SAD) booking to PB / PBC once the staff member
+				// picks a graduate button — and so the SAD -> PBC transition anchors
+				// the customer-intake response-time metric.
 				$intake_pre_save_status = null;
 				$intake_post_booking_id = $this->input->post('booking_id');
 				if (!empty($intake_post_booking_id) && is_numeric($intake_post_booking_id)) {
@@ -2504,6 +2804,30 @@ class Booking extends MY_Controller
 				if (!empty($posted_booking_id) && is_numeric($posted_booking_id) && is_array($posted_customer_types)) {
 					$this->load->model('Booking_Customer_Type_Model');
 					$this->Booking_Customer_Type_Model->Sync($posted_booking_id, $posted_customer_types);
+				}
+
+				// Draft write guard: while a booking sits in SAD *and the customer
+				// has not yet submitted the intake*, the admin form disables every
+				// field but a small whitelist. Re-enforce that server-side so a
+				// tampered request can't write locked columns — strip booking[0]
+				// down to the editable fields plus the structural keys the model
+				// needs. Once the intake is submitted the form unlocks and staff
+				// complete the whole booking before graduating, so the guard lifts.
+				$intake_already_submitted = !empty($intake_post_booking_id)
+					&& (int) $this->db->where('booking_id', (int) $intake_post_booking_id)
+						->count_all_results('booking_customer_intake') > 0;
+				if ($intake_pre_save_status === 'SAD' && !$intake_already_submitted) {
+					$this->load->helper('booking_draft');
+					$posted_booking = $this->input->post('booking');
+					if (!empty($posted_booking) && isset($posted_booking[0]) && is_array($posted_booking[0])) {
+						$allowed = array_merge(draft_editable_fields(), array('BookingID', 'UpdateBy', 'UpdateDate'));
+						foreach (array_keys($posted_booking[0]) as $col) {
+							if (!in_array($col, $allowed, true)) {
+								unset($posted_booking[0][$col]);
+							}
+						}
+						$_POST['booking'] = $posted_booking;
+					}
 				}
 
 				// Booking
@@ -2795,21 +3119,46 @@ class Booking extends MY_Controller
 					$this->session->userdata('admin_id')
 				);
 
-				// Customer-intake draft: staff saving a PCI booking is the
-				// "BC created" event — advance to PBC and log it so the
-				// PCI -> PBC log row anchors the response-time metric.
-				if ($intake_pre_save_status === 'PCI' && !empty($intake_post_booking_id)) {
-					$this->load->helper('booking_status_log');
+				// Customer-intake draft lifecycle (draft_save_mode):
+				//   approve -> set DraftApproved (status stays SAD)
+				//   PB      -> park at PENDING BC (stays editable; can graduate later)
+				//   PBC     -> PENDING BC CONFIRMATION; enters the normal flow and
+				//              writes the log row the intake response-time metric needs
+				//   draft / '' -> stays SAD
+				// Applies from SAD (approve / graduate) or from PB (re-graduate PB->PBC).
+				if (in_array($intake_pre_save_status, array('SAD', 'PB'), true) && !empty($intake_post_booking_id)) {
+					$this->load->helper('booking_draft');
+					$bid  = (int) $intake_post_booking_id;
+					$mode = $this->input->post('draft_save_mode');
 					$advancer_id = (int) $this->session->userdata('admin_id');
-					$this->Booking_Model->update_by_id((int) $intake_post_booking_id, array('Status' => 'PBC'));
-					log_booking_status_change(
-						(int) $intake_post_booking_id,
-						'PBC',
-						'PCI',
-						$advancer_id,
-						'Staff completed customer intake — booking advanced to PENDING BC CONFIRMATION',
-						true
-					);
+
+					if ($mode === 'approve' && $intake_pre_save_status === 'SAD') {
+						$this->Booking_Model->update_by_id($bid, array(
+							'DraftApproved'     => 1,
+							'DraftApprovedDate' => date('Y-m-d H:i:s'),
+						));
+					} else {
+						$target = resolve_graduate_status($mode);
+						if ($target !== null) {
+							$this->load->helper(array('booking_status_log', 'booking_flow'));
+							$status_info  = get_booking_status_info();
+							$target_label = isset($status_info['texts'][$target]) ? $status_info['texts'][$target] : $target;
+							// Graduating implies approval (the buttons only show once
+							// approved), so keep the flag set.
+							$this->Booking_Model->update_by_id($bid, array(
+								'Status'        => $target,
+								'DraftApproved' => 1,
+							));
+							log_booking_status_change(
+								$bid,
+								$target,
+								$intake_pre_save_status,
+								$advancer_id,
+								'Customer intake — booking advanced to ' . $target_label,
+								true
+							);
+						}
+					}
 				}
 			} else {
 				$valid_booking_id = $this->Universal_Model->Validate_Id('BookingID', $this->input->get('booking_id'), 'booking');
@@ -2979,7 +3328,7 @@ class Booking extends MY_Controller
 					$this->load->helper('customer_intake');
 					$intake_data = $this->Booking_Customer_Intake_Model->get_by_booking_id($array['BookingID']);
 					$array['customer_intake'] = $intake_data;
-					$array['customer_intake_response_seconds'] = calculate_intake_response_seconds($array['BookingID']);
+					$array['customer_intake_response_seconds'] = calculate_submitted_to_payment_seconds($array['BookingID']);
 					if (!empty($intake_data)) {
 						$intake = $intake_data['intake'];
 						if (empty($array['Customer']) && !empty($intake->booking_name)) {

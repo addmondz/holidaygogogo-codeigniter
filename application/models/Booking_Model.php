@@ -90,13 +90,17 @@ class Booking_Model extends CI_Model
 	private function apply_status_filter()
 	{
 		$this->load->helper('booking_status_filter');
-		$where = booking_status_filter_full_where($this->input->get('status'), date('Y-m-d'));
+		// PO uses the 3pm-aware overdue cutoff so the list agrees with the
+		// dashboard Payment Overdue card (today's deadlines count from 3pm).
+		$where = booking_status_filter_full_where(
+			$this->input->get('status'), date('Y-m-d'), payment_overdue_cutoff_date()
+		);
 		$this->db->where($where, null, false);
 	}
 
 	function Read_Booking()
 	{
-		$this->db->select('booking.BookingID, booking.AllowReview, booking.CustomerReview, booking.CustomerReviewTimestamp, BookingConfirmationFooterID, TravelVoucherFooterID, booking.CountryCodeID AS CustomerCountryCode, booking.CountryCodeID2 AS CustomerCountryCode2, BookingNumber, ReservationNumber, DepositDeadline, FullPaymentDeadline, AdditionalPaymentDeadline, Customer, booking.Customer2, booking.Mobile AS CustomerMobile, booking.Mobile2 AS CustomerMobile2, StartDate, EndDate, Adult, Children, Infant, Destination, SalesAgent, Tag, BookingRemark, Subtotal, Discount, NetTotal, DepositPercentage, DepositMode, DepositFixedAmount, booking.ChatLanguage, Source, Token, booking.BookingConfirmationTitle, BookingConfirmationFooter, TravelVoucherFooter, booking.KeyContacts, booking.SpecialRemarks, ProductSequence, booking.Status, booking.CancelStatus, booking.PartialRefund, booking.LockStatus, booking.AfterSalesService, booking.bc_approved, booking.bc_approval_admin_id, booking.bc_approval_date, admin.Name AS SalesAgentName, booking.AutocountSyncStatus, booking.AutocountSyncMessage, booking.AutocountSyncAction, booking.CustomerAutocountSyncStatus, booking.CustomerAutocountSyncMessage, booking.CustomerAutocountSyncAction, customer.CustomerCode AS CustomerCode, customer.ic_passport_no AS ic_passport_no, customer.tin_no AS tin_no, customer.customer_type AS customer_type, booking.CustomerID, booking.CustomerID2, booking.BookingOP, booking.SalesAgent2, booking.InsertDate');
+		$this->db->select('booking.BookingID, booking.AllowReview, booking.CustomerReview, booking.CustomerReviewTimestamp, BookingConfirmationFooterID, TravelVoucherFooterID, booking.CountryCodeID AS CustomerCountryCode, booking.CountryCodeID2 AS CustomerCountryCode2, BookingNumber, ReservationNumber, DepositDeadline, FullPaymentDeadline, AdditionalPaymentDeadline, Customer, booking.Customer2, booking.Mobile AS CustomerMobile, booking.Mobile2 AS CustomerMobile2, StartDate, EndDate, Adult, Children, Infant, Destination, SalesAgent, Tag, BookingRemark, Subtotal, Discount, NetTotal, DepositPercentage, DepositMode, DepositFixedAmount, booking.ChatLanguage, Source, Token, booking.BookingConfirmationTitle, BookingConfirmationFooter, TravelVoucherFooter, booking.KeyContacts, booking.SpecialRemarks, ProductSequence, booking.Status, booking.CancelStatus, booking.PartialRefund, booking.LockStatus, booking.AfterSalesService, booking.bc_approved, booking.bc_approval_admin_id, booking.bc_approval_date, admin.Name AS SalesAgentName, booking.AutocountSyncStatus, booking.AutocountSyncMessage, booking.AutocountSyncAction, booking.CustomerAutocountSyncStatus, booking.CustomerAutocountSyncMessage, booking.CustomerAutocountSyncAction, customer.CustomerCode AS CustomerCode, customer.ic_passport_no AS ic_passport_no, customer.tin_no AS tin_no, customer.customer_type AS customer_type, booking.CustomerID, booking.CustomerID2, booking.BookingOP, booking.SalesAgent2, booking.BookingFormText, booking.DraftApproved, booking.DraftApprovedDate, booking.InsertDate');
 		$this->db->join('admin', 'admin.AdminID = booking.SalesAgent', 'left');
 		$this->db->join('customer', 'customer.CustomerID = booking.CustomerID', 'left');
 		$this->db->where('booking.BookingID', $this->input->get('booking_id'));

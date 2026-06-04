@@ -120,6 +120,22 @@
 
                 <form id="form">
 
+                    <?php if(current_url() == base_url('Booking/Create')) { ?>
+                        <div class="d-flex align-items-center justify-content-between mb-5 p-4" style="background:#F3F6F9; border:1px solid #E4E6EF; border-radius:8px;">
+                            <div class="mr-4">
+                                <div style="font-weight:700; color:#1c3d5a; font-size:14px;">Save as customer intake draft</div>
+                                <div style="font-size:13px; color:#4a5266; margin-top:2px;">Park this booking as a draft awaiting customer-supplied details. Only the basics stay editable; a shareable intake link appears in the booking list.</div>
+                            </div>
+                            <span class="switch switch-sm">
+                                <label class="mb-0">
+                                    <input type="checkbox" id="is_draft_intake_toggle">
+                                    <span></span>
+                                </label>
+                            </span>
+                        </div>
+                        <input type="hidden" id="is_draft_intake" name="is_draft_intake" value="0">
+                    <?php } ?>
+
                     <?php if (!empty($customer_intake) && !empty($customer_intake['intake'])):
                         $ci_intake = $customer_intake['intake'];
                         $ci_rooms  = $customer_intake['rooms'];
@@ -323,6 +339,14 @@
                                     </span>
 
                                 </div>
+
+                            </div>
+
+                            <div class="form-group">
+
+                                <label>Booking Form</label>
+
+                                <textarea id="BookingFormText" rows="3" autocomplete="off" class="form-control" placeholder="Free-text booking details (editable while the booking is a draft)"><?php if(current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) { echo isset($BookingFormText) ? htmlspecialchars($BookingFormText, ENT_QUOTES) : ''; } ?></textarea>
 
                             </div>
 
@@ -1157,14 +1181,38 @@
 
                     <div class="d-flex justify-content-between border-top pt-5" style="overflow-x:auto;">
 
-                        <?php if(current_url() == base_url('Booking/Create')) { ?>
-                            <label class="d-flex align-items-center mr-3 mb-0" style="font-size:13px; color:#4a5266;" title="Park this booking as a draft awaiting customer-supplied details. A shareable intake link will appear in the booking list action menu.">
-                                <input type="checkbox" id="is_draft_intake_toggle" class="mr-2"> Save as customer intake draft
-                            </label>
-                            <input type="hidden" id="is_draft_intake" name="is_draft_intake" value="0">
-                        <?php } ?>
+                        <?php
+                            // Customer-intake draft lifecycle controls (Update page).
+                            // The button set depends on the draft state:
+                            //   SAD, intake not submitted -> Save as Draft (form locked)
+                            //   SAD, submitted, not approved -> Approve + Save as Draft
+                            //   SAD approved, or PB -> Save as Pending BC + Pending BC Confirmation
+                            // A single hidden #draft_save_mode carries the chosen action.
+                            $is_update_page  = (current_url() == base_url('Booking/Update'));
+                            $is_draft_booking = isset($Status) && $Status === 'SAD';
+                            $is_pending_bc    = isset($Status) && $Status === 'PB';
+                            $intake_submitted = !empty($customer_intake) && !empty($customer_intake['intake']);
+                            $draft_approved   = !empty($DraftApproved);
 
-                        <input type="button" value="<?php if(current_url() == base_url('Booking/Create') || current_url() == base_url('Booking/Duplicate')) { echo 'Create Booking'; } else { echo 'Update Booking'; } ?>" class="btn btn-success font-weight-bold px-9 py-4" style="width:180px; margin-left:auto;">
+                            $show_graduate    = $is_update_page && (($is_draft_booking && $draft_approved) || $is_pending_bc);
+                            $show_approve     = $is_update_page && $is_draft_booking && $intake_submitted && !$draft_approved;
+                            $show_save_draft  = $is_update_page && $is_draft_booking && !$draft_approved;
+                            // Hide the default Update button whenever draft-specific controls take over.
+                            $hide_main_btn    = $show_graduate || $show_approve || $show_save_draft;
+                        ?>
+                        <input type="hidden" id="draft_save_mode" name="draft_save_mode" value="">
+
+                        <input type="button" id="main_submit_btn" value="<?php if(current_url() == base_url('Booking/Create') || current_url() == base_url('Booking/Duplicate')) { echo 'Create Booking'; } else { echo 'Update Booking'; } ?>" class="btn btn-success font-weight-bold px-9 py-4" style="width:180px; margin-left:auto;<?php if($hide_main_btn) { echo ' display:none;'; } ?>">
+
+                        <?php if($show_approve) { ?>
+                            <button type="button" id="draft_save_btn" class="btn btn-light-primary font-weight-bold px-6 py-4" style="margin-left:auto;">Save as Draft</button>
+                            <button type="button" id="draft_approve_btn" class="btn btn-success font-weight-bold px-6 py-4 ml-1">Approve</button>
+                        <?php } elseif($show_save_draft) { ?>
+                            <button type="button" id="draft_save_btn" class="btn btn-success font-weight-bold px-9 py-4" style="width:180px; margin-left:auto;">Save as Draft</button>
+                        <?php } elseif($show_graduate) { ?>
+                            <button type="button" id="graduate_pb_btn" class="btn btn-light-warning font-weight-bold px-6 py-4" style="margin-left:auto;">Save as Pending BC</button>
+                            <button type="button" id="graduate_pbc_btn" class="btn btn-success font-weight-bold px-6 py-4 ml-1">Save as Pending BC Confirmation</button>
+                        <?php } ?>
 
                         <?php if(current_url() == base_url('Booking/Update')) { ?>
 
@@ -2451,7 +2499,7 @@
 
     var booking_products = <?php echo json_encode($booking_products) ?>;
 
-    // Guard against empty booking_products: PCI customer-intake drafts have no
+    // Guard against empty booking_products: SAD customer-intake drafts have no
     // products yet, so booking_products[0] would be undefined and reading
     // .BookingProductID on it throws a TypeError that halts the rest of this
     // <script> block — leaving every later click handler (Insert Product,
@@ -3371,6 +3419,73 @@
 
             if(action.isConfirmed) {
 
+                // Customer-intake draft (Create page): park the booking with only
+                // the basics. Every other field is optional here and only becomes
+                // required when staff complete + graduate the booking after the
+                // customer submits. Bypass the full required-field validation.
+                var __isDraft = ($('#is_draft_intake_toggle').length && $('#is_draft_intake_toggle').is(':checked'));
+                if (__isDraft) {
+                    submitDraftBooking();
+                    return;
+                }
+
+                function submitDraftBooking() {
+                    var admin_id = <?php echo (int) $this->session->userdata('admin_id'); ?>;
+                    var now   = '<?php echo date('Y-m-d H:i:s'); ?>';
+                    var today = '<?php echo date('Y-m-d'); ?>';
+
+                    // NOT NULL columns (strict SQL mode) need valid values even for
+                    // a draft, so empties fall back to safe placeholders the staff
+                    // overwrite when completing the booking.
+                    var booking = [{
+                        InsertBy: admin_id, InsertDate: now, UpdateBy: admin_id, UpdateDate: now,
+                        ReservationNumber: ($('#ReservationNumber').val() || '').toUpperCase(),
+                        Customer: ($('#Customer').val() || '').toUpperCase(),
+                        Mobile: $('#Mobile').val() || '',
+                        CountryCodeID: $('#CountryCodeID').val(),
+                        Destination: $('#Destination').val() || 0,
+                        SalesAgent: ($('#SalesAgent').length && $('#SalesAgent').val()) ? $('#SalesAgent').val() : admin_id,
+                        ChatLanguage: $('#ChatLanguage').val() || 'EN',
+                        BookingConfirmationTitle: $('#BookingConfirmationTitle').val() || 'BOOKING CONFIRMATION',
+                        FullPaymentDeadline: today
+                    }];
+
+                    var sa2 = $('#SalesAgent2').val();
+                    if (sa2) { booking[0]['SalesAgent2'] = sa2; }
+
+                    var td = $('#TravelDate').val();
+                    if (td && td.indexOf(' - ') !== -1) {
+                        var p = td.split(' - ');
+                        var sd = p[0].split('/');
+                        var ed = p[1].split('/');
+                        booking[0]['StartDate'] = `${sd[2]}-${sd[1]}-${sd[0]}`;
+                        booking[0]['EndDate']   = `${ed[2]}-${ed[1]}-${ed[0]}`;
+                        booking[0]['FullPaymentDeadline'] = booking[0]['StartDate'];
+                    }
+
+                    var dd = $('input[name="DepositDeadline"]').val();
+                    if (dd) { var d = dd.split('/'); booking[0]['DepositDeadline'] = `${d[2]}-${d[1]}-${d[0]}`; }
+                    var fpd = $('input[name="FullPaymentDeadline"]').val();
+                    if (fpd) { var f = fpd.split('/'); booking[0]['FullPaymentDeadline'] = `${f[2]}-${f[1]}-${f[0]}`; }
+
+                    if ($('#BookingFormText').length) { booking[0]['BookingFormText'] = $('#BookingFormText').val(); }
+
+                    var br = ($('#BookingRemark').val() || '').toUpperCase();
+                    if (br) { booking[0]['BookingRemark'] = br; }
+
+                    var booking_number = ($('#booking_number').val() || '').toUpperCase();
+                    if (booking_number) { booking[0]['BookingNumber'] = booking_number; }
+
+                    var CustomerID = $('input[name="CustomerID"]').val();
+
+                    // Send NO rooms for a draft: a draft's rooms are supplied by the
+                    // customer's intake submission, which seeds guest_list_room only
+                    // when none exist yet. Sending the form's default "ROOM 1"
+                    // placeholder here would block that seeding (Room Management would
+                    // then stay empty after the customer submits).
+                    Submit_Booking('<?php echo base_url('Booking/Create') ?>', null, booking_number, booking, null, [], CustomerID, []);
+                }
+
                 var booking_confirmation_footer = $('#booking_confirmation_footer').val();
 
                 var travel_voucher_footer = $('#travel_voucher_footer').val();
@@ -3446,11 +3561,18 @@
                     'BC title': bc_title,
                 };
 
+                // Draft lifecycle saves (Save as Draft / Approve / Save as Pending BC)
+                // are lenient — only "Save as Pending BC Confirmation" (PBC), which
+                // enters the real booking flow, requires a complete booking. Normal
+                // bookings (empty mode) always run full validation.
+                var __saveMode = $('#draft_save_mode').length ? $('#draft_save_mode').val() : '';
+                var __lenient = (__saveMode === 'draft' || __saveMode === 'approve' || __saveMode === 'PB');
+
                 const missing = Object.keys(fields).filter(
                     key => fields[key] === null || fields[key] === ''
                 );
 
-                if (missing.length) {
+                if (missing.length && !__lenient) {
                     Display_Message(
                         '<?= base_url("assets/image/sweetalert.jpg") ?>',
                         `Please insert: ${missing.join(', ')}`,
@@ -3465,13 +3587,13 @@
 
                         } else {
 
-                            if(booking_product_ids.length == 0) {
+                            if(booking_product_ids.length == 0 && !__lenient) {
 
                                 Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', 'Please Insert Product', null);
 
                             } else {
 
-                                for(var i = 0; i < booking_product_ids.length; i++) {
+                                for(var i = 0; i < booking_product_ids.length && !__lenient; i++) {
 
                                     if($(`#ProductID-${booking_product_ids[i]}`).val() == null || $(`#Quantity-${booking_product_ids[i]}`).val() == '' || $(`#Price-${booking_product_ids[i]}`).val() == '' || $(`#Price-${booking_product_ids[i]}`).val() == '0.00') {
 
@@ -3502,7 +3624,7 @@
                                 } else {
                                     hasRooms = $('#rooms_table tbody tr').length > 0 && $('#no_rooms_row').length === 0;
                                 }
-                                if(!hasRooms) {
+                                if(!hasRooms && !__lenient) {
                                     Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', 'Please set up at least 1 room in Room Management', null);
                                     return;
                                 }
@@ -3650,6 +3772,12 @@
 
                                     booking[0]['SpecialRemarks'] = tinyMCE.editors[3].getContent();
 
+                                    if($('#BookingFormText').length) {
+
+                                        booking[0]['BookingFormText'] = $('#BookingFormText').val();
+
+                                    }
+
 
 
                                     booking_products = Create_Booking_Products();
@@ -3744,13 +3872,13 @@
 
                                                 var key = dirty_fields[i].id == 'kt_datepicker_4_3' || dirty_fields[i].id == 'kt_datepicker_4_4' ? dirty_fields[i].name : dirty_fields[i].id;
 
-                                                var value = dirty_fields[i].id == 'kt_datepicker_4_3' || dirty_fields[i].id == 'kt_datepicker_4_4' ? `${((dirty_fields[i].value).split('/'))[2]}-${((dirty_fields[i].value).split('/'))[1]}-${((dirty_fields[i].value).split('/'))[0]}` : (dirty_fields[i].value).toUpperCase();
+                                                var value = dirty_fields[i].id == 'kt_datepicker_4_3' || dirty_fields[i].id == 'kt_datepicker_4_4' ? `${((dirty_fields[i].value).split('/'))[2]}-${((dirty_fields[i].value).split('/'))[1]}-${((dirty_fields[i].value).split('/'))[0]}` : (dirty_fields[i].id == 'BookingFormText' ? dirty_fields[i].value : (dirty_fields[i].value).toUpperCase());
 
                                                 // Booking
 
                                                 // Action : Update
 
-                                                if(key == 'CountryCodeID' || key == 'ReservationNumber' || key == 'DepositDeadline' || key == 'FullPaymentDeadline' || key == 'Customer' || key == 'Mobile' || key == 'Destination' || key == 'SalesAgent' || key == 'SalesAgent2' || key == 'BookingRemark' || key == 'ChatLanguage' || key == 'Source' || key == 'BookingConfirmationTitle' || key == 'BookingOP') {
+                                                if(key == 'CountryCodeID' || key == 'ReservationNumber' || key == 'DepositDeadline' || key == 'FullPaymentDeadline' || key == 'Customer' || key == 'Mobile' || key == 'Destination' || key == 'SalesAgent' || key == 'SalesAgent2' || key == 'BookingRemark' || key == 'BookingFormText' || key == 'ChatLanguage' || key == 'Source' || key == 'BookingConfirmationTitle' || key == 'BookingOP') {
 
                                                     if(key == 'BookingOP' && value == '') {
 
@@ -4230,7 +4358,11 @@
 
                                     });
 
-                                    if(count == 3 && booking_products[0].length == 0 && booking_products[1].length == 0 && booking_products[2].length == 0) {
+                                    // A draft lifecycle action (Save as Draft / Approve /
+                                    // Save as Pending BC[ Confirmation]) is itself a change,
+                                    // so always submit even when no field was edited —
+                                    // otherwise "no changes detected" would swallow it.
+                                    if(__saveMode === '' && count == 3 && booking_products[0].length == 0 && booking_products[1].length == 0 && booking_products[2].length == 0) {
 
                                         <?php if(current_url() == base_url('Booking/Update')) { ?>
 
@@ -4368,9 +4500,16 @@
 
         // Customer intake draft toggle (Create page only). Reads the checkbox
         // beside the Create button so the controller can park the new booking
-        // in PCI status.
+        // in SAD ("SAVE AS DRAFT") status.
         if ($('#is_draft_intake_toggle').length && $('#is_draft_intake_toggle').is(':checked')) {
             postData.is_draft_intake = '1';
+        }
+
+        // Draft save mode set by the Save as Draft / Approve / Save as Pending BC /
+        // Pending BC Confirmation buttons (draft bookings only). Empty for a normal save.
+        var draft_save_mode = $('#draft_save_mode').length ? $('#draft_save_mode').val() : '';
+        if (draft_save_mode) {
+            postData.draft_save_mode = draft_save_mode;
         }
 
         if (typeof Collect_Supplier_Invoices === 'function') {
@@ -7074,4 +7213,68 @@ $(document).ready(function() {
         });
         return [createRows, updateRows, deleteRows];
     };
+</script>
+
+<script>
+// Customer-intake draft: admin booking form field locking + graduate buttons.
+//
+// While a booking sits in SAD ("SAVE AS DRAFT") only a small whitelist of fields
+// is editable; everything else is disabled (a UX guardrail — the controller also
+// strips non-whitelisted columns server-side). Once the customer submits the
+// public intake, two graduate buttons replace the single save button.
+$(function() {
+    // Element IDs the admin may edit on a draft. Travel date is the #TravelDate
+    // picker; it posts as StartDate/EndDate. CustomerID is the hidden companion
+    // to the Customer search and must stay readable.
+    // kt_datepicker_4_3 = Deposit Deadline, kt_datepicker_4_4 = Full Payment Deadline.
+    var DRAFT_EDITABLE_IDS = ['is_draft_intake_toggle', 'Customer', 'CustomerID', 'Mobile', 'CountryCodeID', 'SalesAgent2', 'Destination', 'TravelDate', 'kt_datepicker_4_3', 'kt_datepicker_4_4', 'BookingFormText'];
+    var CURRENT_ADMIN_ID = '<?php echo (int) $this->session->userdata('admin_id'); ?>';
+
+    function applyDraftLock(on) {
+        $('#form').find('input, select, textarea').each(function() {
+            var t = (this.type || '').toLowerCase();
+            if (t === 'button' || t === 'submit' || t === 'hidden') { return; }
+            if (DRAFT_EDITABLE_IDS.indexOf(this.id) !== -1) { return; }
+            $(this).prop('disabled', !!on);
+            if ($(this).hasClass('selectpicker')) {
+                $(this).selectpicker('refresh');
+            }
+        });
+    }
+
+    // "presales auto select": default Sales Agent 2 (Pre Sales) to the logged-in
+    // admin when it hasn't been set yet.
+    function autoSelectPresales() {
+        var $sa2 = $('#SalesAgent2');
+        if ($sa2.length && !$sa2.val() && CURRENT_ADMIN_ID) {
+            $sa2.val(CURRENT_ADMIN_ID);
+            if ($sa2.hasClass('selectpicker')) { $sa2.selectpicker('refresh'); }
+        }
+    }
+
+    <?php if (current_url() == base_url('Booking/Update') && $is_draft_booking && !$intake_submitted) { ?>
+        // Parked draft, customer has not submitted yet — lock to the whitelist.
+        // Once the intake is in, the form unlocks so staff can complete every
+        // field and the graduate buttons enforce the normal required-field rules.
+        applyDraftLock(true);
+        autoSelectPresales();
+    <?php } ?>
+
+    // Create page: ticking the draft toggle restricts the form live.
+    $('#is_draft_intake_toggle').on('change', function() {
+        var on = $(this).is(':checked');
+        applyDraftLock(on);
+        if (on) { autoSelectPresales(); }
+    });
+
+    // Draft lifecycle buttons set the save mode then run the normal save path.
+    function runDraftSave(mode) {
+        $('#draft_save_mode').val(mode);
+        $('#main_submit_btn').trigger('click');
+    }
+    $('#draft_save_btn').on('click',    function() { runDraftSave('draft'); });
+    $('#draft_approve_btn').on('click', function() { runDraftSave('approve'); });
+    $('#graduate_pb_btn').on('click',   function() { runDraftSave('PB'); });
+    $('#graduate_pbc_btn').on('click',  function() { runDraftSave('PBC'); });
+});
 </script>

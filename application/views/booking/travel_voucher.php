@@ -122,7 +122,7 @@
 			<td>No. Of Guests</td>
 			<td> : </td>
 			<td><?php echo $PaxNumber; ?></td>
-			<td>Sales Agent</td>
+			<td><?php echo !empty($ShowBookingPIC) ? 'Booking PIC' : 'Sales Agent'; ?></td>
 			<td> : </td>
 			<td><?php echo $SalesAgentName . ' (' . $SalesAgentMobile . ')'; ?></td>
 		</tr>

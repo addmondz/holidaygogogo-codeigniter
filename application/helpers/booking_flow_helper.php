@@ -387,8 +387,9 @@ if (!function_exists('get_booking_status_info')) {
                 'OG' => '#CCCCFF',      // ON-GOING - Lavender
                 'PO' => '#DA70D6',      // PAYMENT OVERDUE - Orchid
                 'PBC' => '#FFD700',     // PENDING BC CONFIRMATION - Gold
+                'PB'  => '#F5803E',     // PENDING BC - Burnt Orange
                 'PBO' => '#87CEEB',     // PENDING BOOKING OPERATION - Sky Blue
-                'PCI' => '#B8B8FF',     // PENDING CUSTOMER INFO - Soft Indigo
+                'SAD' => '#B8B8FF',     // SAVE AS DRAFT - Soft Indigo
                 'CANCELLED' => '#FF69B4' // CANCELLED - Hot Pink
             ],
             'texts' => [
@@ -402,8 +403,9 @@ if (!function_exists('get_booking_status_info')) {
                 'OG' => 'ON-GOING',
                 'PO' => 'PAYMENT OVERDUE',
                 'PBC' => 'PENDING BC CONFIRMATION',
+                'PB'  => 'PENDING BC',
                 'PBO' => 'PENDING BOOKING OPERATION',
-                'PCI' => 'PENDING CUSTOMER INFO',
+                'SAD' => 'SAVE AS DRAFT',
                 'CANCELLED' => 'CANCELLED'
             ]
         ];
@@ -480,8 +482,9 @@ if (!function_exists('display_booking_status')) {
             'OG' => '#CCCCFF',
             'PO' => '#DA70D6',
             'PBC' => '#FFD700',
+            'PB'  => '#F5803E',
             'PBO' => '#87CEEB',
-            'PCI' => '#B8B8FF'
+            'SAD' => '#B8B8FF'
         );
         $status_texts = array(
             'Y' => 'COMPLETED',
@@ -494,8 +497,9 @@ if (!function_exists('display_booking_status')) {
             'OG' => 'ON-GOING',
             'PO' => 'PAYMENT OVERDUE',
             'PBC' => 'PENDING BC CONFIRMATION',
+            'PB'  => 'PENDING BC',
             'PBO' => 'PENDING BOOKING OPERATION',
-            'PCI' => 'PENDING CUSTOMER INFO'
+            'SAD' => 'SAVE AS DRAFT'
         );
         $status_color = $booking->CancelStatus == 'Y' ? '#FF69B4' : (isset($status_colors[$display_status]) ? $status_colors[$display_status] : '#DA70D6');
         $status_text = $booking->CancelStatus == 'Y' ? 'CANCELLED' : (isset($status_texts[$display_status]) ? $status_texts[$display_status] : 'UNKNOWN');

@@ -3,6 +3,14 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 $booking_label = !empty($context->BookingNumber) ? $context->BookingNumber : ('#' . $context->booking_id);
 $action_url = base_url('customer-intake/' . urlencode($token) . '/submit');
 $old_room_rows = !empty($old['rooms']) && is_array($old['rooms']) ? $old['rooms'] : array(array());
+$prefill = isset($prefill) && is_array($prefill) ? $prefill : array();
+// On first load show the admin's pre-filled values; after a validation error
+// the customer's own ($old) input takes precedence. Either is overridable.
+$field_value = function ($key) use ($old, $prefill) {
+    if (isset($old[$key]) && $old[$key] !== '') { return $old[$key]; }
+    if (isset($prefill[$key]) && $prefill[$key] !== '') { return $prefill[$key]; }
+    return '';
+};
 ?><!DOCTYPE html>
 <html lang="en">
 <head>
@@ -79,13 +87,13 @@ body {
                 <div class="field">
                     <label for="booking_name">Booking Name <span class="hint">(Full name as per IC / Passport)</span></label>
                     <input type="text" id="booking_name" name="booking_name" required
-                           value="<?php echo htmlspecialchars(isset($old['booking_name']) ? $old['booking_name'] : ''); ?>">
+                           value="<?php echo htmlspecialchars($field_value('booking_name')); ?>">
                     <?php if (!empty($errors['booking_name'])): ?><div class="error"><?php echo htmlspecialchars($errors['booking_name']); ?></div><?php endif; ?>
                 </div>
                 <div class="field">
                     <label for="contact_number">Contact Number</label>
                     <input type="tel" id="contact_number" name="contact_number" required
-                           value="<?php echo htmlspecialchars(isset($old['contact_number']) ? $old['contact_number'] : ''); ?>">
+                           value="<?php echo htmlspecialchars($field_value('contact_number')); ?>">
                     <?php if (!empty($errors['contact_number'])): ?><div class="error"><?php echo htmlspecialchars($errors['contact_number']); ?></div><?php endif; ?>
                 </div>
                 <div class="field">
@@ -99,14 +107,14 @@ body {
                         <label for="travel_start_date">Travel Start Date</label>
                         <input type="date" id="travel_start_date" name="travel_start_date" required
                                min="<?php echo date('Y-m-d'); ?>"
-                               value="<?php echo htmlspecialchars(isset($old['travel_start_date']) ? $old['travel_start_date'] : ''); ?>">
+                               value="<?php echo htmlspecialchars($field_value('travel_start_date')); ?>">
                         <?php if (!empty($errors['travel_start_date'])): ?><div class="error"><?php echo htmlspecialchars($errors['travel_start_date']); ?></div><?php endif; ?>
                     </div>
                     <div class="field">
                         <label for="travel_end_date">Travel End Date</label>
                         <input type="date" id="travel_end_date" name="travel_end_date" required
-                               min="<?php echo htmlspecialchars(!empty($old['travel_start_date']) ? $old['travel_start_date'] : date('Y-m-d')); ?>"
-                               value="<?php echo htmlspecialchars(isset($old['travel_end_date']) ? $old['travel_end_date'] : ''); ?>">
+                               min="<?php echo htmlspecialchars($field_value('travel_start_date') !== '' ? $field_value('travel_start_date') : date('Y-m-d')); ?>"
+                               value="<?php echo htmlspecialchars($field_value('travel_end_date')); ?>">
                         <?php if (!empty($errors['travel_end_date'])): ?><div class="error"><?php echo htmlspecialchars($errors['travel_end_date']); ?></div><?php endif; ?>
                     </div>
                 </div>
