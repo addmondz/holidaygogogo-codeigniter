@@ -48,6 +48,8 @@ if (!function_exists('draft_editable_fields')) {
             'Mobile',
             'CountryCodeID',
             'SalesAgent2',
+            'Source',
+            'ChatLanguage',
             'Destination',
             'StartDate',
             'EndDate',

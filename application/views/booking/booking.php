@@ -120,22 +120,6 @@
 
                 <form id="form">
 
-                    <?php if(current_url() == base_url('Booking/Create')) { ?>
-                        <div class="d-flex align-items-center justify-content-between mb-5 p-4" style="background:#F3F6F9; border:1px solid #E4E6EF; border-radius:8px;">
-                            <div class="mr-4">
-                                <div style="font-weight:700; color:#1c3d5a; font-size:14px;">Save as customer intake draft</div>
-                                <div style="font-size:13px; color:#4a5266; margin-top:2px;">Park this booking as a draft awaiting customer-supplied details. Only the basics stay editable; a shareable intake link appears in the booking list.</div>
-                            </div>
-                            <span class="switch switch-sm">
-                                <label class="mb-0">
-                                    <input type="checkbox" id="is_draft_intake_toggle">
-                                    <span></span>
-                                </label>
-                            </span>
-                        </div>
-                        <input type="hidden" id="is_draft_intake" name="is_draft_intake" value="0">
-                    <?php } ?>
-
                     <?php if (!empty($customer_intake) && !empty($customer_intake['intake'])):
                         $ci_intake = $customer_intake['intake'];
                         $ci_rooms  = $customer_intake['rooms'];
@@ -735,11 +719,7 @@
 
                             <div class="form-group">
 
-                                <label>Full Payment Deadline
-
-                                    <span style="color:red;">*</span>
-
-                                </label>
+                                <label>Full Payment Deadline</label>
 
                                 <div class="input-icon">
 
@@ -858,6 +838,22 @@
                     <br><br>
 
                     <div id="benchmark" class="row draggable-zone"></div>
+
+                    <?php if(current_url() == base_url('Booking/Create')) { ?>
+                        <div class="d-flex align-items-center justify-content-between mb-5 p-4" style="background:#F3F6F9; border:1px solid #E4E6EF; border-radius:8px;">
+                            <div class="mr-4">
+                                <div style="font-weight:700; color:#1c3d5a; font-size:14px;">Save as customer intake draft</div>
+                                <div style="font-size:13px; color:#4a5266; margin-top:2px;">Park this booking as a draft awaiting customer-supplied details. Only the basics stay editable; a shareable intake link appears in the booking list.</div>
+                            </div>
+                            <span class="switch switch-sm">
+                                <label class="mb-0">
+                                    <input type="checkbox" id="is_draft_intake_toggle">
+                                    <span></span>
+                                </label>
+                            </span>
+                        </div>
+                        <input type="hidden" id="is_draft_intake" name="is_draft_intake" value="0">
+                    <?php } ?>
 
                     <a id="create_booking_product" class="btn btn-light-success btn-sm mt-2" style="width:180px;">
 
@@ -3453,6 +3449,9 @@
                     var sa2 = $('#SalesAgent2').val();
                     if (sa2) { booking[0]['SalesAgent2'] = sa2; }
 
+                    var src = $('#Source').val();
+                    if (src) { booking[0]['Source'] = src; }
+
                     var td = $('#TravelDate').val();
                     if (td && td.indexOf(' - ') !== -1) {
                         var p = td.split(' - ');
@@ -3493,8 +3492,6 @@
                 var country_code = $('#CountryCodeID').val();
 
                 var reservation_number = ($('#ReservationNumber').val()).toUpperCase();
-
-                var full_payment_deadline = $('input[name="FullPaymentDeadline"]').val();
 
                 var customer = ($('#Customer').val()).toUpperCase();
 
@@ -3548,7 +3545,6 @@
                 const fields = {
                     'Country code': country_code,
                     'Reservation number': reservation_number,
-                    'Full payment deadline': full_payment_deadline,
                     'Customer': customer,
                     'IC / Passport / SSM No.': ic_passport_no,
                     'Customer Type': customer_type,
@@ -3639,7 +3635,19 @@
 
                                     var booking = [];
 
-                                    full_payment_deadline = ($('input[name="FullPaymentDeadline"]').val()).split('/');
+                                    // Full Payment Deadline is optional; when left blank fall back to the
+                                    // travel start date, else today (the column is NOT NULL).
+                                    var full_payment_deadline_raw = $('input[name="FullPaymentDeadline"]').val();
+                                    var full_payment_deadline_iso;
+                                    if (full_payment_deadline_raw) {
+                                        var __fpd = full_payment_deadline_raw.split('/');
+                                        full_payment_deadline_iso = `${__fpd[2]}-${__fpd[1]}-${__fpd[0]}`;
+                                    } else if (travel_date) {
+                                        var __tds = travel_date.split(' - ')[0].split('/');
+                                        full_payment_deadline_iso = `${__tds[2]}-${__tds[1]}-${__tds[0]}`;
+                                    } else {
+                                        full_payment_deadline_iso = '<?php echo date('Y-m-d') ?>';
+                                    }
 
                                     var subtotal = ($('#Subtotal').val()).replace(/,/g, '');
 
@@ -3649,7 +3657,7 @@
                                     var deposit_mode = $('#DepositMode').val();
                                     var deposit_fixed_amount = $('#DepositFixedAmount').val() != '' ? parseFloat($('#DepositFixedAmount').val()) : 0;
 
-                                    booking.push({CountryCodeID:country_code, ReservationNumber:reservation_number, FullPaymentDeadline:`${full_payment_deadline[2]}-${full_payment_deadline[1]}-${full_payment_deadline[0]}`, Customer:customer, Mobile:mobile, Destination:destination, SalesAgent:sales_agent, Source:source, Subtotal:subtotal, NetTotal:net_total, DepositPercentage:deposit_percentage, DepositMode:deposit_mode, DepositFixedAmount:deposit_fixed_amount, ChatLanguage:chat_language, BookingConfirmationTitle:bc_title, InsertBy:<?php echo $this->session->userdata('admin_id') ?>, InsertDate:'<?php echo date('Y-m-d H:i:s') ?>', UpdateBy:<?php echo $this->session->userdata('admin_id') ?>, UpdateDate:'<?php echo date('Y-m-d H:i:s') ?>'});
+                                    booking.push({CountryCodeID:country_code, ReservationNumber:reservation_number, FullPaymentDeadline:full_payment_deadline_iso, Customer:customer, Mobile:mobile, Destination:destination, SalesAgent:sales_agent, Source:source, Subtotal:subtotal, NetTotal:net_total, DepositPercentage:deposit_percentage, DepositMode:deposit_mode, DepositFixedAmount:deposit_fixed_amount, ChatLanguage:chat_language, BookingConfirmationTitle:bc_title, InsertBy:<?php echo $this->session->userdata('admin_id') ?>, InsertDate:'<?php echo date('Y-m-d H:i:s') ?>', UpdateBy:<?php echo $this->session->userdata('admin_id') ?>, UpdateDate:'<?php echo date('Y-m-d H:i:s') ?>'});
 
                                     if(booking_op != '') {
 
@@ -7227,7 +7235,7 @@ $(function() {
     // picker; it posts as StartDate/EndDate. CustomerID is the hidden companion
     // to the Customer search and must stay readable.
     // kt_datepicker_4_3 = Deposit Deadline, kt_datepicker_4_4 = Full Payment Deadline.
-    var DRAFT_EDITABLE_IDS = ['is_draft_intake_toggle', 'Customer', 'CustomerID', 'Mobile', 'CountryCodeID', 'SalesAgent2', 'Destination', 'TravelDate', 'kt_datepicker_4_3', 'kt_datepicker_4_4', 'BookingFormText'];
+    var DRAFT_EDITABLE_IDS = ['is_draft_intake_toggle', 'Customer', 'CustomerID', 'Mobile', 'CountryCodeID', 'SalesAgent2', 'Destination', 'TravelDate', 'kt_datepicker_4_3', 'kt_datepicker_4_4', 'BookingFormText', 'ic_passport_no', 'customer_type', 'Source', 'ChatLanguage'];
     var CURRENT_ADMIN_ID = '<?php echo (int) $this->session->userdata('admin_id'); ?>';
 
     function applyDraftLock(on) {
