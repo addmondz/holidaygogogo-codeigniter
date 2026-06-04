@@ -26,6 +26,16 @@
 	- Process Convertion with a custom batch size: `process_ghl_lead_conversions 200`
 	- Re-Process convertion: `process_ghl_lead_conversions --rebuild`
 
+7. Process Lead Ownership data
+	- This creates/updates `ghl_lead_ownership` for `Report > Lead Ownership` and `Report > Lead Ownership Data`.
+	- Run this after GHL leads and conversions are processed, so assignment, response, and conversion data are current.
+	- Assigned Owned: the owner is the current processed assigned user.
+	- Reply Owned: the owner is not assigned, but replied more than 2 times in the lead conversation window.
+	- Process ownership: `php index.php Cron process_ghl_lead_ownership`
+	- Process ownership with a custom batch size: `php index.php Cron process_ghl_lead_ownership 1000`
+	- Rebuild ownership table: `php index.php Cron process_ghl_lead_ownership rebuild`
+	- Reprocess one processed lead id: `php index.php Cron process_ghl_lead_ownership 1000 185878`
+
 I. Default Commands & order 
 	php index.php run_sql_patches
 	php index.php Cron syncGhlUsers
