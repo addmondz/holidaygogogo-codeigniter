@@ -29,6 +29,29 @@
         color: #8c8c8c;
     }
 
+    .lead-tag-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        min-width: 160px;
+    }
+
+    .lead-tag {
+        display: inline-flex;
+        align-items: center;
+        max-width: 180px;
+        border-radius: 4px;
+        padding: 3px 7px;
+        background: #edf4ff;
+        color: #27527a;
+        font-size: 11px;
+        font-weight: 600;
+        line-height: 1.2;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
     .lead-chat-thread {
         max-width: 760px;
         margin: 0 auto;
@@ -133,6 +156,13 @@
     .lead-chat-modal .modal-header {
         background: linear-gradient(135deg, #f3e7d3 0%, #fbf7ef 100%);
         border-bottom: 1px solid #e7d8c5;
+    }
+
+    .lead-chat-modal-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        margin-top: 6px;
     }
 
     .lead-chat-modal .modal-body {
@@ -259,6 +289,21 @@ $leadSortIcon = function($column) use ($leadCurrentSortBy, $leadCurrentSortDir) 
                                                 <input type="text" name="phone" value="<?php echo html_escape($lead_data_filters['phone']); ?>" class="form-control" placeholder="Search phone number">
                                             </div>
                                         </div>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-3">
+                                            <div class="form-group">
+                                                <label>Tag</label>
+                                                <select name="tag" data-live-search="true" class="form-control selectpicker">
+                                                    <option value="">--ALL TAGS--</option>
+                                                    <?php foreach($lead_data_tags as $tag) { ?>
+                                                        <option value="<?php echo html_escape($tag); ?>" <?php if($lead_data_filters['tag'] === $tag) { echo 'selected'; } ?>>
+                                                            <?php echo html_escape($tag); ?>
+                                                        </option>
+                                                    <?php } ?>
+                                                </select>
+                                            </div>
+                                        </div>
                                         <div class="col-md-3">
                                             <div class="form-group">
                                                 <label>Rows Per Page</label>
@@ -340,6 +385,7 @@ $leadSortIcon = function($column) use ($leadCurrentSortBy, $leadCurrentSortDir) 
                                         <i class="<?php echo $leadSortIcon('conversation_id'); ?>"></i>
                                     </a>
                                 </th>
+                                <th>Tags</th>
                                 <th>
                                     <a href="<?php echo html_escape($lead_data_sorting['links']['lead_started_at']); ?>" class="lead-sort-link">
                                         Lead Started
@@ -377,7 +423,7 @@ $leadSortIcon = function($column) use ($leadCurrentSortBy, $leadCurrentSortDir) 
                         <tbody>
                             <?php if(empty($lead_data_rows)) { ?>
                                 <tr>
-                                    <td colspan="11" class="text-center py-10">No lead records found for the selected filters.</td>
+                                    <td colspan="12" class="text-center py-10">No lead records found for the selected filters.</td>
                                 </tr>
                             <?php } else { ?>
                                 <?php $count = $lead_data_pagination['start_row']; ?>
@@ -396,6 +442,17 @@ $leadSortIcon = function($column) use ($leadCurrentSortBy, $leadCurrentSortDir) 
                                         </td>
                                         <td class="align-middle">
                                             <div class="font-weight-bold"><?php echo html_escape($row['conversation_id']); ?></div>
+                                        </td>
+                                        <td class="align-middle">
+                                            <?php if(!empty($row['tags'])) { ?>
+                                                <div class="lead-tag-list">
+                                                    <?php foreach($row['tags'] as $tag) { ?>
+                                                        <span class="lead-tag" title="<?php echo html_escape($tag); ?>"><?php echo html_escape($tag); ?></span>
+                                                    <?php } ?>
+                                                </div>
+                                            <?php } else { ?>
+                                                <span class="text-muted font-size-sm">No tags</span>
+                                            <?php } ?>
                                         </td>
                                         <td class="align-middle">
                                             <div class="font-weight-bold"><?php echo html_escape($row['lead_started_at_label']); ?></div>
@@ -471,6 +528,7 @@ $leadSortIcon = function($column) use ($leadCurrentSortBy, $leadCurrentSortDir) 
                                                 data-lead-ended-at="<?php echo !empty($row['lead_ended_at']) ? html_escape($row['lead_ended_at']) : ''; ?>"
                                                 data-contact-name="<?php echo html_escape($row['contact_name']); ?>"
                                                 data-agent-name="<?php echo html_escape($row['agent_name']); ?>"
+                                                data-tags="<?php echo html_escape(json_encode($row['tags'])); ?>"
                                             >
                                                 View Messages
                                             </button>
@@ -520,6 +578,7 @@ $leadSortIcon = function($column) use ($leadCurrentSortBy, $leadCurrentSortDir) 
                 <div>
                     <h5 class="modal-title mb-1">Lead Messages</h5>
                     <div class="text-muted font-size-sm" id="lead-messages-modal-subtitle">Conversation</div>
+                    <div class="lead-chat-modal-tags" id="lead-messages-modal-tags"></div>
                 </div>
                 <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                     <span aria-hidden="true">&times;</span>
@@ -541,6 +600,7 @@ $leadSortIcon = function($column) use ($leadCurrentSortBy, $leadCurrentSortDir) 
     var leadDataCurrentDate = (new Date()).toLocaleDateString();
     var leadMessagesModalContent = $('#lead-messages-modal-content');
     var leadMessagesModalSubtitle = $('#lead-messages-modal-subtitle');
+    var leadMessagesModalTags = $('#lead-messages-modal-tags');
 
     $('#lead_data_daterangepicker').daterangepicker({
         buttonClasses: ' btn',
@@ -628,6 +688,39 @@ $leadSortIcon = function($column) use ($leadCurrentSortBy, $leadCurrentSortDir) 
         return html;
     }
 
+    function parseLeadTags(value) {
+        if ($.isArray(value)) {
+            return value;
+        }
+
+        if (!value) {
+            return [];
+        }
+
+        try {
+            var parsed = JSON.parse(value);
+            return $.isArray(parsed) ? parsed : [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function renderLeadModalTags(tags) {
+        tags = parseLeadTags(tags);
+
+        if (!tags.length) {
+            leadMessagesModalTags.html('<span class="text-muted font-size-sm">No tags</span>');
+            return;
+        }
+
+        var html = '';
+        $.each(tags, function(index, tag) {
+            html += '<span class="lead-tag" title="' + escapeHtml(tag) + '">' + escapeHtml(tag) + '</span>';
+        });
+
+        leadMessagesModalTags.html(html);
+    }
+
     function loadLeadMessages(button) {
         var cacheKey = [
             button.data('conversation-id'),
@@ -642,6 +735,7 @@ $leadSortIcon = function($column) use ($leadCurrentSortBy, $leadCurrentSortDir) 
             ' | ' +
             (button.data('conversation-id') || '')
         );
+        renderLeadModalTags(button.attr('data-tags'));
 
         if (leadMessagesModalContent.data('cache-key') === cacheKey && leadMessagesModalContent.data('loaded') === 1) {
             return;
@@ -694,6 +788,7 @@ $leadSortIcon = function($column) use ($leadCurrentSortBy, $leadCurrentSortDir) 
         !empty($lead_data_filters['conversation_id']) ||
         !empty($lead_data_filters['contact_name']) ||
         !empty($lead_data_filters['phone']) ||
+        !empty($lead_data_filters['tag']) ||
         !empty($lead_data_filters['response_status']) ||
         !empty($lead_data_filters['conversion_status'])
     ) { ?>

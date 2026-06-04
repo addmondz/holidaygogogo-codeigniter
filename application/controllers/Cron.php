@@ -9,6 +9,7 @@ class Cron extends CI_Controller
 	public $allowGhlModuleSync = true;
 	public $allowGhlModuleLog = true;
 	public $allowConvertionProcessing = true;
+	public $allowLeadOwnershipProcessing = true;
 	public $ghlModuleLogFile = 'GHL_MODULES_SYNC.log';
 
 	function __construct()
@@ -443,6 +444,11 @@ class Cron extends CI_Controller
 				$this->customCronLogging('[CRON-40] allowConvertionProcessing - process_ghl_lead_conversions');
 				$this->process_ghl_lead_conversions();
 			}
+
+			if($this->allowLeadOwnershipProcessing) {
+				$this->customCronLogging('[CRON-40] allowLeadOwnershipProcessing - process_ghl_lead_ownership');
+				$this->process_ghl_lead_ownership();
+			}
 		}
 
 		
@@ -755,6 +761,199 @@ class Cron extends CI_Controller
 		echo "=== GHL Lead Conversion Processing End ===" . PHP_EOL;
 	}
 
+	public function process_ghl_lead_ownership($chunkSize = 1000)
+	{
+		if (!$this->input->is_cli_request()) {
+			show_error('This script can only be run from the command line.', 403);
+			return;
+		}
+
+		$this->load->model('Ghl_Lead_Ownership_Model');
+		$this->load->helper('ghl_lead_ownership');
+
+		$args = isset($_SERVER['argv']) ? $_SERVER['argv'] : array();
+		$uriSegments = $this->uri->segment_array();
+		$cliArgs = array_slice($args, 3);
+		if (empty($cliArgs) && !empty($uriSegments)) {
+			$cliArgs = array_slice($uriSegments, 2);
+		}
+
+		$flags = array();
+		$targetLeadId = null;
+		$targetConversationId = null;
+		$chunkSizeResolved = false;
+
+		foreach ($cliArgs as $arg) {
+			if ((string) $arg === 'process_ghl_lead_ownership') {
+				continue;
+			}
+
+			$plainArg = strtolower(trim((string) $arg));
+			if (in_array($plainArg, array('rebuild', 'restart', 'reset'), true)) {
+				$flags[] = '--' . $plainArg;
+				continue;
+			}
+
+			if (strncmp((string) $arg, '--', 2) === 0) {
+				if (strpos((string) $arg, '--lead-id=') === 0) {
+					$targetLeadId = (int) substr((string) $arg, strlen('--lead-id='));
+				} elseif (strpos((string) $arg, '--conversation-id=') === 0) {
+					$targetConversationId = (string) substr((string) $arg, strlen('--conversation-id='));
+				}
+				$flags[] = (string) $arg;
+				continue;
+			}
+
+			if (is_numeric($arg)) {
+				if (!$chunkSizeResolved) {
+					$chunkSize = (int) $arg;
+					$chunkSizeResolved = true;
+					continue;
+				}
+
+				if ($targetLeadId === null) {
+					$targetLeadId = (int) $arg;
+				}
+
+				continue;
+			}
+
+			if ($targetConversationId === null) {
+				$targetConversationId = (string) $arg;
+			}
+		}
+
+		if ($chunkSize !== null) {
+			$chunkSize = (int) $chunkSize;
+			if ($chunkSize <= 0) {
+				$chunkSize = null;
+			}
+		}
+
+		$shouldRebuild = in_array('--rebuild', $flags, true)
+			|| in_array('--restart', $flags, true)
+			|| in_array('--reset', $flags, true);
+
+		$replyThreshold = 2;
+		$summary = array(
+			'leads_scanned' => 0,
+			'ownership_rows' => 0,
+			'batches' => 0,
+		);
+		$runId = $this->start_ghl_processor_run_log(
+			'process_ghl_lead_ownership',
+			array(
+				'full_sync' => $shouldRebuild ? 1 : 0,
+			)
+		);
+
+		echo "=== GHL Lead Ownership Processing Start ===" . PHP_EOL;
+		echo 'Chunk size: ' . ($chunkSize === null ? 'ALL' : $chunkSize) . PHP_EOL;
+		echo "Reply threshold: more than {$replyThreshold} outbound replies" . PHP_EOL;
+
+		if (!$this->Ghl_Lead_Ownership_Model->acquire_processor_lock('ghl_lead_ownership_processor', 0)) {
+			$this->finish_ghl_processor_run_log(
+				$runId,
+				'failed',
+				array(
+					'module_name' => 'process_ghl_lead_ownership',
+					'total_page' => $summary['batches'],
+					'total_data' => $summary['leads_scanned'],
+					'updated_count' => $summary['ownership_rows'],
+				)
+			);
+			echo "Another ghl lead ownership processor run is already active." . PHP_EOL;
+			return;
+		}
+
+		try {
+			if ($shouldRebuild) {
+				echo "Rebuild mode: clearing ghl_lead_ownership before processing." . PHP_EOL;
+				if (!$this->Ghl_Lead_Ownership_Model->reset_ownership_data()) {
+					show_error('Failed resetting ghl lead ownership data.', 500);
+				}
+			}
+
+			$lastLeadId = 0;
+
+			while (true) {
+				$batch = $this->Ghl_Lead_Ownership_Model->get_processed_lead_batch(
+					$chunkSize,
+					$lastLeadId,
+					$targetLeadId,
+					$targetConversationId
+				);
+
+				if (empty($batch)) {
+					break;
+				}
+
+				$summary['batches']++;
+				echo "Processing ownership batch {$summary['batches']} with " . count($batch) . " lead(s)" . PHP_EOL;
+
+				$leadIds = array();
+				foreach ($batch as $lead) {
+					$leadIds[] = (int) $lead['id'];
+					$lastLeadId = (int) $lead['id'];
+				}
+
+				$replyOwnerMap = $this->Ghl_Lead_Ownership_Model->get_reply_owners_for_leads($leadIds, $replyThreshold);
+				$calculatedAt = date('Y-m-d H:i:s');
+				$ownershipRows = array();
+
+				foreach ($batch as $lead) {
+					$summary['leads_scanned']++;
+					$leadReplyOwners = isset($replyOwnerMap[(int) $lead['id']]) ? $replyOwnerMap[(int) $lead['id']] : array();
+					$leadOwnershipRows = ghl_build_lead_ownership_rows($lead, $leadReplyOwners, $calculatedAt);
+					$ownershipRows = array_merge($ownershipRows, $leadOwnershipRows);
+				}
+
+				$replaced = $this->Ghl_Lead_Ownership_Model->replace_ownership_for_leads($leadIds, $ownershipRows);
+				if (!$replaced) {
+					show_error('Failed replacing ghl lead ownership rows.', 500);
+				}
+
+				$summary['ownership_rows'] += count($ownershipRows);
+				echo " - ownership rows: " . count($ownershipRows) . PHP_EOL;
+
+				if ($targetLeadId !== null || $targetConversationId !== null) {
+					break;
+				}
+			}
+
+			$this->finish_ghl_processor_run_log(
+				$runId,
+				'completed',
+				array(
+					'module_name' => 'process_ghl_lead_ownership',
+					'total_page' => $summary['batches'],
+					'total_data' => $summary['leads_scanned'],
+					'updated_count' => $summary['ownership_rows'],
+				)
+			);
+		} catch (Throwable $e) {
+			$this->finish_ghl_processor_run_log(
+				$runId,
+				'failed',
+				array(
+					'module_name' => 'process_ghl_lead_ownership',
+					'total_page' => $summary['batches'],
+					'total_data' => $summary['leads_scanned'],
+					'updated_count' => $summary['ownership_rows'],
+				)
+			);
+
+			throw $e;
+		} finally {
+			$this->Ghl_Lead_Ownership_Model->release_processor_lock('ghl_lead_ownership_processor');
+		}
+
+		echo "Leads scanned: {$summary['leads_scanned']}" . PHP_EOL;
+		echo "Ownership rows: {$summary['ownership_rows']}" . PHP_EOL;
+		echo "Batches: {$summary['batches']}" . PHP_EOL;
+		echo "=== GHL Lead Ownership Processing End ===" . PHP_EOL;
+	}
+
 	public function rebuild_ghl_conversations()
 	{
 		if (!$this->input->is_cli_request()) {
@@ -848,6 +1047,8 @@ class Cron extends CI_Controller
 
 	private function process_single_ghl_conversation($conversationId, $firstNewMessageRowId = 0)
 	{
+		$this->load->helper('duty_hours');
+
 		$messages = $this->Ghl_Processed_Leads_Model->get_conversation_messages($conversationId);
 		$existingConversions = $this->Ghl_Processed_Leads_Model->get_existing_conversion_map($conversationId);
 		$currentAssignedTo = $this->Ghl_Processed_Leads_Model->get_conversation_assigned_to($conversationId);
@@ -938,7 +1139,10 @@ class Cron extends CI_Controller
 					if (isset($currentLead['_response_history'][$historyIndex])) {
 						$currentLead['_response_history'][$historyIndex]['agent_message_id'] = $message['message_id'];
 						$currentLead['_response_history'][$historyIndex]['agent_message_at'] = $message['message_timestamp'];
-						$currentLead['_response_history'][$historyIndex]['seconds'] = $messageTimestamp - $customerTimestamp;
+						$currentLead['_response_history'][$historyIndex]['seconds'] = calculate_duty_response_seconds(
+							$customerMessage['customer_message_at'],
+							$message['message_timestamp']
+						);
 					}
 				}
 			}

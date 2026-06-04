@@ -1,0 +1,37 @@
+-- Processed lead ownership table.
+-- Separate from ghl_processed_leads so assignment-based reports remain unchanged.
+
+CREATE TABLE IF NOT EXISTS `ghl_lead_ownership` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `processed_lead_id` BIGINT UNSIGNED NOT NULL,
+  `conversation_id` VARCHAR(100) NOT NULL,
+  `contact_id` VARCHAR(100) NULL DEFAULT NULL,
+  `lead_started_at` DATETIME NOT NULL,
+  `lead_ended_at` DATETIME NULL DEFAULT NULL,
+  `owner_user_id` VARCHAR(100) NOT NULL,
+  `assigned_to_user_id` VARCHAR(100) NULL DEFAULT NULL,
+  `is_assigned_owner` TINYINT(1) NOT NULL DEFAULT 0,
+  `is_reply_owner` TINYINT(1) NOT NULL DEFAULT 0,
+  `outbound_reply_count` INT UNSIGNED NOT NULL DEFAULT 0,
+  `tracked_message_count` TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  `responded_message_count` TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  `avg_first_5_response_seconds` INT NULL DEFAULT NULL,
+  `recent_tracked_message_count` TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  `recent_responded_message_count` TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  `avg_recent_5_response_seconds` INT NULL DEFAULT NULL,
+  `is_converted` TINYINT(1) NOT NULL DEFAULT 0,
+  `booking_id` INT(11) NULL DEFAULT NULL,
+  `converted_at` DATETIME NULL DEFAULT NULL,
+  `calculated_at` DATETIME NOT NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_processed_lead_owner` (`processed_lead_id`, `owner_user_id`),
+  KEY `idx_owner_started_at` (`owner_user_id`, `lead_started_at`),
+  KEY `idx_conversation_started_at` (`conversation_id`, `lead_started_at`),
+  KEY `idx_processed_lead_id` (`processed_lead_id`),
+  KEY `idx_assigned_owner` (`is_assigned_owner`, `owner_user_id`),
+  KEY `idx_reply_owner` (`is_reply_owner`, `owner_user_id`),
+  KEY `idx_conversion_status` (`is_converted`, `converted_at`),
+  KEY `idx_booking_id` (`booking_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

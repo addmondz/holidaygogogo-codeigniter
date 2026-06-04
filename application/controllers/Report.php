@@ -59,6 +59,67 @@ class Report extends MY_Controller
             ->set_output(json_encode($response));
     }
 
+    function Lead_Ownership_Dashboard()
+    {
+        $filters = $this->lead_ownership_filters();
+        $payload = $this->lead_ownership_payload($filters);
+
+        $titles = array(
+            'tab_title' => 'HolidayGoGoGo | Report',
+            'breadcrumb_title' => 'Report >> Lead Ownership Dashboard'
+        );
+
+        $array = array(
+            'ownership_summary' => $payload['summary'],
+            'lead_ownership_agents' => $payload['agents'],
+            'lead_ownership_team_leads' => $payload['team_leads'],
+            'lead_ownership_rows' => $payload['rows'],
+            'lead_ownership_filters' => $filters,
+            'lead_ownership_updated_at' => $payload['updated_at'],
+        );
+
+        $this->load->view('layout/header', $titles);
+        $this->load->view('report/lead_ownership_dashboard', $array);
+        $this->load->view('layout/footer');
+    }
+
+    function Lead_Ownership_Dashboard_Data()
+    {
+        $filters = $this->lead_ownership_filters();
+        $payload = $this->lead_ownership_payload($filters);
+
+        $this->output
+            ->set_content_type('application/json')
+            ->set_output(json_encode(array(
+                'summary' => $payload['summary'],
+                'rows' => $payload['rows'],
+                'updated_at' => $payload['updated_at'],
+            )));
+    }
+
+    function Lead_Ownership_Data()
+    {
+        $filters = $this->lead_ownership_data_filters();
+        $payload = $this->lead_ownership_data_payload($filters);
+
+        $titles = array(
+            'tab_title' => 'HolidayGoGoGo | Report',
+            'breadcrumb_title' => 'Report >> Lead Ownership Data'
+        );
+
+        $array = array(
+            'lead_ownership_data_rows' => $payload['rows'],
+            'lead_ownership_data_agents' => $payload['agents'],
+            'lead_ownership_data_filters' => $filters,
+            'lead_ownership_data_pagination' => $payload['pagination'],
+            'lead_ownership_data_updated_at' => $payload['updated_at'],
+        );
+
+        $this->load->view('layout/header', $titles);
+        $this->load->view('report/lead_ownership_data', $array);
+        $this->load->view('layout/footer');
+    }
+
     function Lead_Data()
     {
         $filters = $this->lead_data_filters();
@@ -72,6 +133,7 @@ class Report extends MY_Controller
         $array = array(
             'lead_data_summary' => $payload['summary'],
             'lead_data_agents' => $payload['agents'],
+            'lead_data_tags' => $payload['tags'],
             'lead_data_rows' => $payload['rows'],
             'lead_data_filters' => $filters,
             'lead_data_pagination' => $payload['pagination'],
@@ -677,6 +739,35 @@ class Report extends MY_Controller
         );
     }
 
+    private function lead_ownership_payload($filters)
+    {
+        $restrict = isset($filters['_restrict_agent_ids']) ? $filters['_restrict_agent_ids'] : null;
+
+        return array(
+            'summary' => $this->format_lead_ownership_summary($this->Report_Model->Lead_Ownership_Summary($filters)),
+            'rows' => $this->format_lead_ownership_rows($this->Report_Model->Lead_Ownership_By_Agent($filters)),
+            'agents' => $this->Report_Model->Lead_Ownership_Agents($restrict),
+            'team_leads' => $this->Report_Model->Lead_Dashboard_Team_Leads(),
+            'updated_at' => $this->Report_Model->Lead_Ownership_Last_Calculated_At(),
+        );
+    }
+
+    private function lead_ownership_data_payload($filters)
+    {
+        $perPage = isset($filters['per_page']) ? max(10, (int) $filters['per_page']) : 25;
+        $currentPage = isset($filters['page']) ? max(1, (int) $filters['page']) : 1;
+        $offset = ($currentPage - 1) * $perPage;
+        $totalRows = (int) $this->Report_Model->Lead_Ownership_Data_Total_Count($filters);
+        $restrict = isset($filters['_restrict_agent_ids']) ? $filters['_restrict_agent_ids'] : null;
+
+        return array(
+            'rows' => $this->format_lead_ownership_data_rows($this->Report_Model->Lead_Ownership_Data_Rows($filters, $perPage, $offset)),
+            'agents' => $this->Report_Model->Lead_Ownership_Agents($restrict),
+            'pagination' => $this->build_lead_ownership_data_pagination($filters, $currentPage, $perPage, $totalRows),
+            'updated_at' => $this->Report_Model->Lead_Ownership_Last_Calculated_At(),
+        );
+    }
+
     private function lead_data_payload($filters)
     {
         $perPage = isset($filters['per_page']) ? max(10, (int) $filters['per_page']) : 25;
@@ -689,6 +780,7 @@ class Report extends MY_Controller
             'summary' => $this->format_lead_dashboard_summary($this->Report_Model->Lead_Dashboard_Summary($filters)),
             'rows' => $this->format_lead_data_rows($this->Report_Model->Lead_Data_Rows($filters, $perPage, $offset)),
             'agents' => $this->Report_Model->Lead_Dashboard_Agents($restrict),
+            'tags' => $this->Report_Model->Lead_Data_Tag_Options($filters),
             'pagination' => $this->build_lead_data_pagination($filters, $currentPage, $perPage, $totalRows),
             'updated_at' => $this->Report_Model->Lead_Data_Last_Synced_At(),
             'sorting' => $this->build_lead_data_sorting($filters),
@@ -724,6 +816,49 @@ class Report extends MY_Controller
         return $filters;
     }
 
+    private function lead_ownership_filters()
+    {
+        $leadDate = trim((string) $this->input->get('lead_date'));
+        $owners = $this->normalize_id_array($this->input->get('owner'));
+        $teamLeads = $this->normalize_id_array($this->input->get('team_lead'));
+        $ownershipType = strtolower(trim((string) $this->input->get('ownership_type')));
+        $parsedDates = $this->parse_report_date_range($leadDate, true);
+
+        if (!in_array($ownershipType, array('assigned', 'reply'), true)) {
+            $ownershipType = '';
+        }
+
+        $restriction = $this->get_lead_dashboard_agent_restriction();
+        if ($restriction !== null && !empty($owners)) {
+            $allowedSet = array_map('strval', $restriction);
+            $owners = array_values(array_intersect(array_map('strval', $owners), $allowedSet));
+        }
+
+        $filters = array(
+            'lead_date' => $leadDate !== '' ? $leadDate : $parsedDates['display'],
+            'start_date' => $parsedDates['start_date'],
+            'end_date' => $parsedDates['end_date'],
+            'owner' => $owners,
+            'owner_user_id' => $owners,
+            'team_lead' => $teamLeads,
+            'ownership_type' => $ownershipType,
+        );
+
+        if ($restriction !== null) {
+            $filters['_restrict_agent_ids'] = $restriction;
+        }
+
+        return $filters;
+    }
+
+    private function lead_ownership_data_filters()
+    {
+        $filters = $this->lead_ownership_filters();
+        $filters['page'] = max(1, (int) $this->input->get('page'));
+        $filters['per_page'] = $this->normalize_lead_data_per_page($this->input->get('per_page'));
+        return $filters;
+    }
+
     private function get_lead_dashboard_agent_restriction()
     {
         if ((string) $this->session->level === '10') {
@@ -753,6 +888,7 @@ class Report extends MY_Controller
         $conversationId = trim((string) $this->input->get('conversation_id'));
         $contactName = trim((string) $this->input->get('contact_name'));
         $phone = trim((string) $this->input->get('phone'));
+        $tag = trim((string) $this->input->get('tag'));
         $responseStatus = trim((string) $this->input->get('response_status'));
         $conversionStatus = trim((string) $this->input->get('conversion_status'));
         $parsedDates = $this->parse_report_date_range($leadDate, false);
@@ -771,6 +907,7 @@ class Report extends MY_Controller
             'conversation_id' => $conversationId,
             'contact_name' => $contactName,
             'phone' => $phone,
+            'tag' => $tag,
             'response_status' => $responseStatus,
             'conversion_status' => $conversionStatus,
             'page' => max(1, (int) $this->input->get('page')),
@@ -848,6 +985,60 @@ class Report extends MY_Controller
 
             $queryString = http_build_query($params);
             return base_url('Report/Lead_Data') . ($queryString !== '' ? '?' . $queryString : '');
+        };
+
+        $pages = array();
+        $windowStart = max(1, $currentPage - 2);
+        $windowEnd = min($totalPages, $currentPage + 2);
+
+        for ($page = $windowStart; $page <= $windowEnd; $page++) {
+            $pages[] = array(
+                'page' => $page,
+                'url' => $buildPageUrl($page),
+                'is_current' => $page === $currentPage,
+            );
+        }
+
+        return array(
+            'current_page' => $currentPage,
+            'per_page' => $perPage,
+            'total_rows' => $totalRows,
+            'total_pages' => $totalPages,
+            'start_row' => $startRow,
+            'end_row' => $endRow,
+            'pages' => $pages,
+            'has_previous' => $currentPage > 1,
+            'has_next' => $currentPage < $totalPages,
+            'previous_url' => $currentPage > 1 ? $buildPageUrl($currentPage - 1) : '',
+            'next_url' => $currentPage < $totalPages ? $buildPageUrl($currentPage + 1) : '',
+            'first_url' => $buildPageUrl(1),
+            'last_url' => $buildPageUrl($totalPages),
+        );
+    }
+
+    private function build_lead_ownership_data_pagination($filters, $currentPage, $perPage, $totalRows)
+    {
+        $totalPages = $perPage > 0 ? (int) ceil($totalRows / $perPage) : 1;
+        $totalPages = max(1, $totalPages);
+        $currentPage = min(max(1, (int) $currentPage), $totalPages);
+        $startRow = $totalRows > 0 ? (($currentPage - 1) * $perPage) + 1 : 0;
+        $endRow = $totalRows > 0 ? min($totalRows, $startRow + $perPage - 1) : 0;
+
+        $query = $filters;
+        unset($query['start_date'], $query['end_date'], $query['owner_user_id']);
+
+        $buildPageUrl = function($page) use ($query) {
+            $params = $query;
+            $params['page'] = max(1, (int) $page);
+
+            foreach ($params as $key => $value) {
+                if ($value === '' || $value === null || $value === array()) {
+                    unset($params[$key]);
+                }
+            }
+
+            $queryString = http_build_query($params);
+            return base_url('Report/Lead_Ownership_Data') . ($queryString !== '' ? '?' . $queryString : '');
         };
 
         $pages = array();
@@ -989,6 +1180,107 @@ class Report extends MY_Controller
         return $formatted;
     }
 
+    private function format_lead_ownership_summary($summary)
+    {
+        return array(
+            'owned_leads' => (int) $summary['owned_leads'],
+            'unique_leads' => (int) $summary['unique_leads'],
+            'assigned_owned_leads' => (int) $summary['assigned_owned_leads'],
+            'reply_owned_leads' => (int) $summary['reply_owned_leads'],
+            'responded_leads' => (int) $summary['responded_leads'],
+            'converted_leads' => (int) $summary['converted_leads'],
+            'active_owners' => (int) $summary['active_owners'],
+            'response_rate' => number_format((float) $summary['response_rate'], 1),
+            'conversion_rate' => number_format((float) $summary['conversion_rate'], 1),
+            'avg_response_time_seconds' => $summary['avg_response_time_seconds'],
+            'avg_response_time_label' => $this->format_duration_label($summary['avg_response_time_seconds']),
+            'avg_recent_response_time_seconds' => $summary['avg_recent_response_time_seconds'],
+            'avg_recent_response_time_label' => $this->format_duration_label($summary['avg_recent_response_time_seconds']),
+            'avg_responded_messages' => number_format((float) $summary['avg_responded_messages'], 1),
+            'avg_recent_responded_messages' => number_format((float) $summary['avg_recent_responded_messages'], 1),
+        );
+    }
+
+    private function format_lead_ownership_rows($rows)
+    {
+        $formatted = array();
+
+        foreach ($rows as $row) {
+            $formatted[] = array(
+                'owner_user_id' => $row['owner_user_id'],
+                'owner_name' => $row['owner_name'],
+                'owned_leads' => (int) $row['owned_leads'],
+                'unique_leads' => (int) $row['unique_leads'],
+                'assigned_owned_leads' => (int) $row['assigned_owned_leads'],
+                'reply_owned_leads' => (int) $row['reply_owned_leads'],
+                'responded_leads' => (int) $row['responded_leads'],
+                'converted_leads' => (int) $row['converted_leads'],
+                'response_rate' => number_format((float) $row['response_rate'], 1),
+                'conversion_rate' => number_format((float) $row['conversion_rate'], 1),
+                'avg_response_time_seconds' => $row['avg_response_time_seconds'],
+                'avg_response_time_label' => $this->format_duration_label($row['avg_response_time_seconds']),
+                'avg_recent_response_time_seconds' => $row['avg_recent_response_time_seconds'],
+                'avg_recent_response_time_label' => $this->format_duration_label($row['avg_recent_response_time_seconds']),
+                'avg_responded_messages' => number_format((float) $row['avg_responded_messages'], 1),
+                'avg_recent_responded_messages' => number_format((float) $row['avg_recent_responded_messages'], 1),
+                'last_calculated_at' => $row['last_calculated_at'],
+            );
+        }
+
+        return $formatted;
+    }
+
+    private function format_lead_ownership_data_rows($rows)
+    {
+        $formatted = array();
+
+        foreach ($rows as $row) {
+            $isAssigned = (int) $row['is_assigned_owner'] === 1;
+
+            $formatted[] = array(
+                'id' => (int) $row['id'],
+                'processed_lead_id' => (int) $row['processed_lead_id'],
+                'conversation_id' => $row['conversation_id'],
+                'contact_id' => $row['contact_id'],
+                'contact_name' => $row['contact_name'],
+                'phone' => $row['phone'],
+                'owner_user_id' => $row['owner_user_id'],
+                'owner_name' => $row['owner_name'],
+                'assigned_to_user_id' => $row['assigned_to_user_id'],
+                'assigned_name' => $row['assigned_name'],
+                'ownership_label' => $isAssigned ? 'Assigned Owned' : 'Reply Owned',
+                'ownership_class' => $isAssigned ? 'label-light-primary' : 'label-light-info',
+                'is_assigned_owner' => (int) $row['is_assigned_owner'],
+                'is_reply_owner' => (int) $row['is_reply_owner'],
+                'outbound_reply_count' => (int) $row['outbound_reply_count'],
+                'lead_started_at' => $row['lead_started_at'],
+                'lead_ended_at' => $row['lead_ended_at'],
+                'lead_started_at_label' => !empty($row['lead_started_at']) ? date('d M Y h:i A', strtotime($row['lead_started_at'])) : '-',
+                'lead_ended_at_label' => !empty($row['lead_ended_at']) ? date('d M Y h:i A', strtotime($row['lead_ended_at'])) : '-',
+                'tracked_message_count' => isset($row['tracked_message_count']) ? (int) $row['tracked_message_count'] : 0,
+                'responded_message_count' => isset($row['responded_message_count']) ? (int) $row['responded_message_count'] : 0,
+                'response_progress_label' => (isset($row['responded_message_count']) ? (int) $row['responded_message_count'] : 0) . ' / ' . (isset($row['tracked_message_count']) ? (int) $row['tracked_message_count'] : 0),
+                'avg_first_5_response_seconds' => $row['avg_first_5_response_seconds'] !== null ? (int) $row['avg_first_5_response_seconds'] : null,
+                'avg_first_5_response_label' => $this->format_duration_label($row['avg_first_5_response_seconds']),
+                'recent_tracked_message_count' => isset($row['recent_tracked_message_count']) ? (int) $row['recent_tracked_message_count'] : 0,
+                'recent_responded_message_count' => isset($row['recent_responded_message_count']) ? (int) $row['recent_responded_message_count'] : 0,
+                'recent_response_progress_label' => (isset($row['recent_responded_message_count']) ? (int) $row['recent_responded_message_count'] : 0) . ' / ' . (isset($row['recent_tracked_message_count']) ? (int) $row['recent_tracked_message_count'] : 0),
+                'avg_recent_5_response_seconds' => $row['avg_recent_5_response_seconds'] !== null ? (int) $row['avg_recent_5_response_seconds'] : null,
+                'avg_recent_5_response_label' => $this->format_duration_label($row['avg_recent_5_response_seconds']),
+                'is_converted' => (int) $row['is_converted'],
+                'booking_id' => !empty($row['booking_id']) ? (int) $row['booking_id'] : null,
+                'booking_number' => isset($row['BookingNumber']) ? $row['BookingNumber'] : '',
+                'booking_url' => !empty($row['booking_id']) ? base_url('Booking/View?booking_id=') . (int) $row['booking_id'] : '',
+                'converted_at' => $row['converted_at'],
+                'converted_at_label' => !empty($row['converted_at']) ? date('d M Y h:i A', strtotime($row['converted_at'])) : '-',
+                'calculated_at' => $row['calculated_at'],
+                'lead_data_url' => base_url('Report/Lead_Data?conversation_id=') . urlencode($row['conversation_id']),
+            );
+        }
+
+        return $formatted;
+    }
+
     private function format_lead_data_rows($rows)
     {
         $formatted = array();
@@ -1000,6 +1292,7 @@ class Report extends MY_Controller
                 'contact_id' => $row['contact_id'],
                 'contact_name' => $row['contact_name'],
                 'phone' => $row['phone'],
+                'tags' => $this->format_lead_data_tags(isset($row['tags_json']) ? $row['tags_json'] : null),
                 'agent_id' => $row['agent_id'],
                 'agent_name' => $row['agent_name'],
                 'lead_started_at' => $row['lead_started_at'],
@@ -1059,6 +1352,38 @@ class Report extends MY_Controller
         }
 
         return $formatted;
+    }
+
+    private function format_lead_data_tags($tagsJson)
+    {
+        if ($tagsJson === null || $tagsJson === '') {
+            return array();
+        }
+
+        $decoded = json_decode($tagsJson, true);
+        if (!is_array($decoded)) {
+            return array();
+        }
+
+        $tags = array();
+        foreach ($decoded as $tag) {
+            if (is_array($tag)) {
+                if (isset($tag['name'])) {
+                    $tag = $tag['name'];
+                } elseif (isset($tag['tag'])) {
+                    $tag = $tag['tag'];
+                } else {
+                    continue;
+                }
+            }
+
+            $tag = trim((string) $tag);
+            if ($tag !== '') {
+                $tags[$tag] = $tag;
+            }
+        }
+
+        return array_values($tags);
     }
 
     private function format_duration_label($seconds)

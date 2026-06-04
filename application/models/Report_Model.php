@@ -533,16 +533,16 @@ class Report_Model extends CI_Model
         $convertedLeads = !empty($row['converted_leads']) ? (int) $row['converted_leads'] : 0;
 
         // Duty-hour-aware avg first-response time. Computed at query time from
-        // the per-slot agent reply timestamps so the duty-hour window can be
-        // changed (see duty_hours_helper.php) without re-running the cron.
+        // the per-slot timestamps so the duty-hour window can be changed
+        // (see duty_hours_helper.php) without re-running the cron.
         $this->load->helper('duty_hours');
         $slotSql = "
             SELECT
-                pl.response_1_agent_message_at AS at1, pl.response_1_seconds AS s1,
-                pl.response_2_agent_message_at AS at2, pl.response_2_seconds AS s2,
-                pl.response_3_agent_message_at AS at3, pl.response_3_seconds AS s3,
-                pl.response_4_agent_message_at AS at4, pl.response_4_seconds AS s4,
-                pl.response_5_agent_message_at AS at5, pl.response_5_seconds AS s5
+                pl.response_1_customer_message_at AS ct1, pl.response_1_agent_message_at AS at1, pl.response_1_seconds AS s1,
+                pl.response_2_customer_message_at AS ct2, pl.response_2_agent_message_at AS at2, pl.response_2_seconds AS s2,
+                pl.response_3_customer_message_at AS ct3, pl.response_3_agent_message_at AS at3, pl.response_3_seconds AS s3,
+                pl.response_4_customer_message_at AS ct4, pl.response_4_agent_message_at AS at4, pl.response_4_seconds AS s4,
+                pl.response_5_customer_message_at AS ct5, pl.response_5_agent_message_at AS at5, pl.response_5_seconds AS s5
             FROM ghl_processed_leads pl
             LEFT JOIN ghl_conversations gc ON gc.conversation_id = pl.conversation_id
             {$extraJoins}
@@ -555,8 +555,9 @@ class Report_Model extends CI_Model
             for ($i = 1; $i <= 5; $i++) {
                 $secs = $sr['s' . $i];
                 if ($secs === null || $secs === '') continue;
-                if (!is_within_duty_hours($sr['at' . $i])) continue;
-                $dutyTotal += (int) $secs;
+                $dutySeconds = calculate_duty_response_seconds($sr['ct' . $i], $sr['at' . $i]);
+                if ($dutySeconds === null) continue;
+                $dutyTotal += (int) $dutySeconds;
                 $dutyCount++;
             }
         }
@@ -587,6 +588,7 @@ class Report_Model extends CI_Model
         );
     }
 
+<<<<<<< HEAD
     /**
      * Per-agent lead counts for the three "Leads" card windows (Today / Week /
      * Month) in a single conditional-SUM pass. Powers the OWNER-only
@@ -652,6 +654,13 @@ class Report_Model extends CI_Model
         $this->load->helper('lead_conversion_credit');
         $where = $this->build_lead_dashboard_where_clause($filters);
         $clauses = array();
+=======
+    function Lead_Dashboard_By_Agent($filters = array())
+    {
+        $this->load->helper('lead_conversion_credit');
+        $where = $this->build_lead_dashboard_where_clause($filters);
+        $clauses = array();
+>>>>>>> 68db7084fd580f3833b7c95853638bc96c02a846
 
         if (!empty($where['sql'])) {
             $clauses[] = preg_replace('/^\s*WHERE\s+/i', '', $where['sql']);
@@ -725,6 +734,226 @@ class Report_Model extends CI_Model
         }
 
         return $results;
+    }
+
+    function Lead_Ownership_Summary($filters = array())
+    {
+        $where = $this->build_lead_ownership_where_clause($filters);
+        $extraJoins = isset($where['extra_joins']) ? $where['extra_joins'] : '';
+
+        $sql = "
+            SELECT
+                COUNT(*) AS owned_leads,
+                COUNT(DISTINCT glo.processed_lead_id) AS unique_leads,
+                SUM(CASE WHEN glo.is_assigned_owner = 1 THEN 1 ELSE 0 END) AS assigned_owned_leads,
+                SUM(CASE WHEN glo.is_assigned_owner = 0 AND glo.is_reply_owner = 1 THEN 1 ELSE 0 END) AS reply_owned_leads,
+                SUM(CASE WHEN glo.responded_message_count > 0 THEN 1 ELSE 0 END) AS responded_leads,
+                SUM(CASE WHEN glo.is_converted = 1 AND glo.booking_id IS NOT NULL THEN 1 ELSE 0 END) AS converted_leads,
+                COUNT(DISTINCT glo.owner_user_id) AS active_owners,
+                AVG(glo.avg_first_5_response_seconds) AS avg_response_time_seconds,
+                AVG(glo.avg_recent_5_response_seconds) AS avg_recent_response_time_seconds,
+                AVG(glo.responded_message_count) AS avg_responded_messages,
+                AVG(glo.recent_responded_message_count) AS avg_recent_responded_messages
+            FROM ghl_lead_ownership glo
+            LEFT JOIN ghl_users gu ON gu.UserID = glo.owner_user_id
+            {$extraJoins}
+            {$where['sql']}
+        ";
+
+        $row = $this->db->query($sql, $where['params'])->row_array();
+        $ownedLeads = !empty($row['owned_leads']) ? (int) $row['owned_leads'] : 0;
+        $respondedLeads = !empty($row['responded_leads']) ? (int) $row['responded_leads'] : 0;
+        $convertedLeads = !empty($row['converted_leads']) ? (int) $row['converted_leads'] : 0;
+
+        return array(
+            'owned_leads' => $ownedLeads,
+            'unique_leads' => !empty($row['unique_leads']) ? (int) $row['unique_leads'] : 0,
+            'assigned_owned_leads' => !empty($row['assigned_owned_leads']) ? (int) $row['assigned_owned_leads'] : 0,
+            'reply_owned_leads' => !empty($row['reply_owned_leads']) ? (int) $row['reply_owned_leads'] : 0,
+            'responded_leads' => $respondedLeads,
+            'converted_leads' => $convertedLeads,
+            'active_owners' => !empty($row['active_owners']) ? (int) $row['active_owners'] : 0,
+            'response_rate' => $ownedLeads > 0 ? round(($respondedLeads / $ownedLeads) * 100, 1) : 0.0,
+            'conversion_rate' => $ownedLeads > 0 ? round(($convertedLeads / $ownedLeads) * 100, 1) : 0.0,
+            'avg_response_time_seconds' => $row['avg_response_time_seconds'] !== null ? (int) round($row['avg_response_time_seconds']) : null,
+            'avg_recent_response_time_seconds' => $row['avg_recent_response_time_seconds'] !== null ? (int) round($row['avg_recent_response_time_seconds']) : null,
+            'avg_responded_messages' => $row['avg_responded_messages'] !== null ? round((float) $row['avg_responded_messages'], 1) : 0.0,
+            'avg_recent_responded_messages' => $row['avg_recent_responded_messages'] !== null ? round((float) $row['avg_recent_responded_messages'], 1) : 0.0,
+        );
+    }
+
+    function Lead_Ownership_By_Agent($filters = array())
+    {
+        $where = $this->build_lead_ownership_where_clause($filters);
+        $extraJoins = isset($where['extra_joins']) ? $where['extra_joins'] : '';
+
+        $sql = "
+            SELECT
+                glo.owner_user_id,
+                COALESCE(NULLIF(gu.Name, ''), glo.owner_user_id) AS owner_name,
+                COUNT(*) AS owned_leads,
+                COUNT(DISTINCT glo.processed_lead_id) AS unique_leads,
+                SUM(CASE WHEN glo.is_assigned_owner = 1 THEN 1 ELSE 0 END) AS assigned_owned_leads,
+                SUM(CASE WHEN glo.is_assigned_owner = 0 AND glo.is_reply_owner = 1 THEN 1 ELSE 0 END) AS reply_owned_leads,
+                SUM(CASE WHEN glo.responded_message_count > 0 THEN 1 ELSE 0 END) AS responded_leads,
+                SUM(CASE WHEN glo.is_converted = 1 AND glo.booking_id IS NOT NULL THEN 1 ELSE 0 END) AS converted_leads,
+                AVG(glo.avg_first_5_response_seconds) AS avg_response_time_seconds,
+                AVG(glo.avg_recent_5_response_seconds) AS avg_recent_response_time_seconds,
+                AVG(glo.responded_message_count) AS avg_responded_messages,
+                AVG(glo.recent_responded_message_count) AS avg_recent_responded_messages,
+                MAX(glo.calculated_at) AS last_calculated_at
+            FROM ghl_lead_ownership glo
+            LEFT JOIN ghl_users gu ON gu.UserID = glo.owner_user_id
+            {$extraJoins}
+            {$where['sql']}
+            GROUP BY glo.owner_user_id, owner_name
+            ORDER BY owned_leads DESC, owner_name ASC
+        ";
+
+        $rows = $this->db->query($sql, $where['params'])->result_array();
+        $results = array();
+
+        foreach ($rows as $row) {
+            $ownedLeads = (int) $row['owned_leads'];
+            $respondedLeads = (int) $row['responded_leads'];
+            $convertedLeads = (int) $row['converted_leads'];
+
+            $results[] = array(
+                'owner_user_id' => $row['owner_user_id'],
+                'owner_name' => $row['owner_name'],
+                'owned_leads' => $ownedLeads,
+                'unique_leads' => (int) $row['unique_leads'],
+                'assigned_owned_leads' => (int) $row['assigned_owned_leads'],
+                'reply_owned_leads' => (int) $row['reply_owned_leads'],
+                'responded_leads' => $respondedLeads,
+                'converted_leads' => $convertedLeads,
+                'response_rate' => $ownedLeads > 0 ? round(($respondedLeads / $ownedLeads) * 100, 1) : 0.0,
+                'conversion_rate' => $ownedLeads > 0 ? round(($convertedLeads / $ownedLeads) * 100, 1) : 0.0,
+                'avg_response_time_seconds' => $row['avg_response_time_seconds'] !== null ? (int) round($row['avg_response_time_seconds']) : null,
+                'avg_recent_response_time_seconds' => $row['avg_recent_response_time_seconds'] !== null ? (int) round($row['avg_recent_response_time_seconds']) : null,
+                'avg_responded_messages' => $row['avg_responded_messages'] !== null ? round((float) $row['avg_responded_messages'], 1) : 0.0,
+                'avg_recent_responded_messages' => $row['avg_recent_responded_messages'] !== null ? round((float) $row['avg_recent_responded_messages'], 1) : 0.0,
+                'last_calculated_at' => $row['last_calculated_at'],
+            );
+        }
+
+        return $results;
+    }
+
+    function Lead_Ownership_Agents($restrict_agent_ids = null)
+    {
+        $params = array();
+        $extra = '';
+        if (is_array($restrict_agent_ids)) {
+            if (empty($restrict_agent_ids)) {
+                return array();
+            }
+            $placeholders = implode(',', array_fill(0, count($restrict_agent_ids), '?'));
+            $extra = " AND glo.owner_user_id IN ({$placeholders}) ";
+            $params = array_values(array_map('strval', $restrict_agent_ids));
+        }
+
+        $sql = "
+            SELECT DISTINCT
+                glo.owner_user_id AS agent_id,
+                COALESCE(NULLIF(gu.Name, ''), glo.owner_user_id) AS agent_name
+            FROM ghl_lead_ownership glo
+            LEFT JOIN ghl_users gu ON gu.UserID = glo.owner_user_id
+            WHERE glo.owner_user_id IS NOT NULL
+              AND glo.owner_user_id <> ''
+              {$extra}
+            ORDER BY agent_name ASC
+        ";
+
+        return $this->db->query($sql, $params)->result();
+    }
+
+    function Lead_Ownership_Last_Calculated_At()
+    {
+        $row = $this->db
+            ->select('MAX(calculated_at) AS calculated_at', false)
+            ->from('ghl_lead_ownership')
+            ->get()
+            ->row_array();
+
+        return !empty($row['calculated_at']) ? $row['calculated_at'] : null;
+    }
+
+    function Lead_Ownership_Data_Total_Count($filters = array())
+    {
+        $where = $this->build_lead_ownership_where_clause($filters);
+        $extraJoins = isset($where['extra_joins']) ? $where['extra_joins'] : '';
+
+        $sql = "
+            SELECT COUNT(*) AS total_rows
+            FROM ghl_lead_ownership glo
+            LEFT JOIN ghl_users gu ON gu.UserID = glo.owner_user_id
+            {$extraJoins}
+            {$where['sql']}
+        ";
+
+        $row = $this->db->query($sql, $where['params'])->row_array();
+        return !empty($row['total_rows']) ? (int) $row['total_rows'] : 0;
+    }
+
+    function Lead_Ownership_Data_Rows($filters = array(), $limit = null, $offset = null)
+    {
+        $where = $this->build_lead_ownership_where_clause($filters);
+        $extraJoins = isset($where['extra_joins']) ? $where['extra_joins'] : '';
+        $limit = $limit !== null ? max(1, (int) $limit) : null;
+        $offset = $offset !== null ? max(0, (int) $offset) : null;
+
+        $sql = "
+            SELECT
+                glo.id,
+                glo.processed_lead_id,
+                glo.conversation_id,
+                glo.contact_id,
+                COALESCE(NULLIF(gc.contact_name, ''), NULLIF(gc.full_name, ''), 'Unknown Contact') AS contact_name,
+                gc.phone,
+                COALESCE(NULLIF(gu.Name, ''), glo.owner_user_id) AS owner_name,
+                glo.owner_user_id,
+                COALESCE(NULLIF(assigned_gu.Name, ''), NULLIF(glo.assigned_to_user_id, ''), 'Unassigned') AS assigned_name,
+                glo.assigned_to_user_id,
+                glo.is_assigned_owner,
+                glo.is_reply_owner,
+                glo.outbound_reply_count,
+                glo.lead_started_at,
+                glo.lead_ended_at,
+                glo.tracked_message_count,
+                glo.responded_message_count,
+                glo.avg_first_5_response_seconds,
+                glo.recent_tracked_message_count,
+                glo.recent_responded_message_count,
+                glo.avg_recent_5_response_seconds,
+                glo.is_converted,
+                glo.booking_id,
+                glo.converted_at,
+                glo.calculated_at,
+                b.BookingNumber
+            FROM ghl_lead_ownership glo
+            LEFT JOIN ghl_users gu ON gu.UserID = glo.owner_user_id
+            LEFT JOIN ghl_users assigned_gu ON assigned_gu.UserID = glo.assigned_to_user_id
+            LEFT JOIN ghl_conversations gc ON gc.conversation_id = glo.conversation_id
+            LEFT JOIN booking b ON b.BookingID = glo.booking_id
+            {$extraJoins}
+            {$where['sql']}
+            ORDER BY glo.lead_started_at DESC, glo.id DESC
+        ";
+
+        $params = $where['params'];
+
+        if ($limit !== null) {
+            $sql .= " LIMIT ?";
+            $params[] = $limit;
+
+            if ($offset !== null) {
+                $sql .= " OFFSET ?";
+                $params[] = $offset;
+            }
+        }
+
+        return $this->db->query($sql, $params)->result_array();
     }
 
     /**
@@ -828,6 +1057,7 @@ class Report_Model extends CI_Model
                 pl.contact_id,
                 COALESCE(NULLIF(gc.contact_name, ''), NULLIF(gc.full_name, ''), 'Unknown Contact') AS contact_name,
                 gc.phone,
+                gc.tags_json,
                 COALESCE(NULLIF(pl.assigned_to_user_id, ''), '__unassigned__') AS agent_id,
                 COALESCE(NULLIF(gu.Name, ''), NULLIF(pl.assigned_to_user_id, ''), 'Unassigned') AS agent_name,
                 pl.lead_started_at,
@@ -905,6 +1135,39 @@ class Report_Model extends CI_Model
         }
 
         return $this->db->query($sql, $params)->result_array();
+    }
+
+    function Lead_Data_Tag_Options($filters = array())
+    {
+        $optionFilters = $filters;
+        unset($optionFilters['tag']);
+
+        $where = $this->build_lead_dashboard_where_clause($optionFilters);
+        $extraJoins = isset($where['extra_joins']) ? $where['extra_joins'] : '';
+
+        $sql = "
+            SELECT gc.tags_json
+            FROM ghl_processed_leads pl
+            LEFT JOIN ghl_conversations gc ON gc.conversation_id = pl.conversation_id
+            {$extraJoins}
+            {$where['sql']}
+              " . (!empty($where['sql']) ? 'AND' : 'WHERE') . " gc.tags_json IS NOT NULL
+              AND JSON_LENGTH(gc.tags_json) > 0
+        ";
+
+        $rows = $this->db->query($sql, $where['params'])->result_array();
+        $tags = array();
+
+        foreach ($rows as $row) {
+            foreach ($this->extract_ghl_tags(isset($row['tags_json']) ? $row['tags_json'] : null) as $tag) {
+                $tags[$tag] = $tag;
+            }
+        }
+
+        $tags = array_values($tags);
+        usort($tags, 'strcasecmp');
+
+        return $tags;
     }
 
     function Lead_Data_Messages($conversationId, $leadStartedAt, $nextLeadStartedAt = null)
@@ -1196,6 +1459,11 @@ class Report_Model extends CI_Model
             $params[] = '%' . $this->db->escape_like_str($filters['phone']) . '%';
         }
 
+        if (!empty($filters['tag'])) {
+            $clauses[] = "JSON_SEARCH(gc.tags_json, 'one', ?, '!') IS NOT NULL";
+            $params[] = $this->db->escape_like_str($filters['tag']);
+        }
+
         if (isset($filters['response_status']) && $filters['response_status'] !== '') {
             if ($filters['response_status'] === 'responded') {
                 $clauses[] = "pl.responded_message_count > 0";
@@ -1224,6 +1492,112 @@ class Report_Model extends CI_Model
             'params' => $params,
             'extra_joins' => $extraJoins,
         );
+    }
+
+    private function build_lead_ownership_where_clause($filters = array())
+    {
+        $clauses = array();
+        $params = array();
+        $extraJoins = '';
+
+        if (array_key_exists('_restrict_agent_ids', $filters)) {
+            $allowed = array_values(array_filter(
+                array_map('strval', (array) $filters['_restrict_agent_ids']),
+                'strlen'
+            ));
+            if (empty($allowed)) {
+                return array('sql' => 'WHERE 1=0', 'params' => array(), 'extra_joins' => '');
+            }
+            $placeholders = implode(',', array_fill(0, count($allowed), '?'));
+            $clauses[] = "glo.owner_user_id IN ({$placeholders})";
+            foreach ($allowed as $id) { $params[] = $id; }
+        }
+
+        if (!empty($filters['start_date'])) {
+            $clauses[] = 'glo.lead_started_at >= ?';
+            $params[] = $filters['start_date'] . ' 00:00:00';
+        }
+
+        if (!empty($filters['end_date'])) {
+            $clauses[] = 'glo.lead_started_at <= ?';
+            $params[] = $filters['end_date'] . ' 23:59:59';
+        }
+
+        if (!empty($filters['owner_user_id'])) {
+            $ownerIds = is_array($filters['owner_user_id']) ? $filters['owner_user_id'] : array($filters['owner_user_id']);
+            $ownerIds = array_values(array_filter($ownerIds, function($v) { return $v !== '' && $v !== null; }));
+
+            if (!empty($ownerIds)) {
+                $placeholders = implode(',', array_fill(0, count($ownerIds), '?'));
+                $clauses[] = "glo.owner_user_id IN ({$placeholders})";
+                foreach ($ownerIds as $id) { $params[] = $id; }
+            }
+        }
+
+        if (!empty($filters['team_lead'])) {
+            $teamLeadIds = is_array($filters['team_lead']) ? $filters['team_lead'] : array($filters['team_lead']);
+            $teamLeadIds = array_values(array_filter($teamLeadIds, function($v) { return $v !== '' && $v !== null; }));
+
+            if (!empty($teamLeadIds)) {
+                $extraJoins  = " LEFT JOIN admin_lead_dashboard_agents tl_alda ON tl_alda.GhlUserID = glo.owner_user_id ";
+                $extraJoins .= " LEFT JOIN admin tl_admin ON tl_admin.AdminID = tl_alda.AdminID AND tl_admin.Status = 'Y' ";
+
+                $placeholders = implode(',', array_fill(0, count($teamLeadIds), '?'));
+                $clauses[] = "tl_admin.TeamLeadID IN ({$placeholders})";
+                foreach ($teamLeadIds as $id) { $params[] = $id; }
+            }
+        }
+
+        if (isset($filters['ownership_type']) && $filters['ownership_type'] !== '') {
+            if ($filters['ownership_type'] === 'assigned') {
+                $clauses[] = 'glo.is_assigned_owner = 1';
+            } elseif ($filters['ownership_type'] === 'reply') {
+                $clauses[] = 'glo.is_assigned_owner = 0 AND glo.is_reply_owner = 1';
+            }
+        }
+
+        $sql = '';
+        if (!empty($clauses)) {
+            $sql = 'WHERE ' . implode(' AND ', $clauses);
+        }
+
+        return array(
+            'sql' => $sql,
+            'params' => $params,
+            'extra_joins' => $extraJoins,
+        );
+    }
+
+    private function extract_ghl_tags($tagsJson)
+    {
+        if ($tagsJson === null || $tagsJson === '') {
+            return array();
+        }
+
+        $decoded = json_decode($tagsJson, true);
+        if (!is_array($decoded)) {
+            return array();
+        }
+
+        $tags = array();
+        foreach ($decoded as $tag) {
+            if (is_array($tag)) {
+                if (isset($tag['name'])) {
+                    $tag = $tag['name'];
+                } elseif (isset($tag['tag'])) {
+                    $tag = $tag['tag'];
+                } else {
+                    continue;
+                }
+            }
+
+            $tag = trim((string) $tag);
+            if ($tag !== '') {
+                $tags[] = $tag;
+            }
+        }
+
+        return $tags;
     }
 
     function Lead_Dashboard_Team_Leads()

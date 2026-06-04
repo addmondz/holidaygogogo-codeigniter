@@ -334,6 +334,22 @@ $is_dev_env = ($app_env !== 'prod');
 															<span class="menu-text">Lead Data</span>
 														</a>
 													</li>
+													<li class="menu-item <?php if($this->router->method == 'Lead_Ownership_Dashboard') { echo 'menu-item-active'; } ?>">
+														<a href="<?php echo base_url('Report/Lead_Ownership_Dashboard'); ?>" class="menu-link">
+															<i class="menu-bullet menu-bullet-dot">
+																<span></span>
+															</i>
+															<span class="menu-text">Lead Ownership</span>
+														</a>
+													</li>
+													<li class="menu-item <?php if($this->router->method == 'Lead_Ownership_Data') { echo 'menu-item-active'; } ?>">
+														<a href="<?php echo base_url('Report/Lead_Ownership_Data'); ?>" class="menu-link">
+															<i class="menu-bullet menu-bullet-dot">
+																<span></span>
+															</i>
+															<span class="menu-text">Lead Ownership Data</span>
+														</a>
+													</li>
 												<?php } ?>
 											</ul>
 										</div>
