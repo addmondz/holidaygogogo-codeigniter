@@ -177,6 +177,22 @@
                     </div>
                     <?php endif; ?>
 
+                    <?php if(current_url() == base_url('Booking/Create')) { ?>
+                        <div class="d-flex align-items-center justify-content-between mb-5 p-4" style="background:#C5D6EF; border:1px solid #A9C2E6; border-radius:8px;">
+                            <div class="mr-4">
+                                <div style="font-weight:700; color:#1c3d5a; font-size:14px;">Save as customer intake draft</div>
+                                <div style="font-size:13px; color:#3a4256; margin-top:2px;">Park this booking as a draft awaiting customer-supplied details. Only the basics stay editable; a shareable intake link appears in the booking list.</div>
+                            </div>
+                            <span class="switch switch-sm">
+                                <label class="mb-0">
+                                    <input type="checkbox" id="is_draft_intake_toggle">
+                                    <span></span>
+                                </label>
+                            </span>
+                        </div>
+                        <input type="hidden" id="is_draft_intake" name="is_draft_intake" value="0">
+                    <?php } ?>
+
                     <strong>Booking Information :</strong>
 
                     <br><br>
@@ -838,22 +854,6 @@
                     <br><br>
 
                     <div id="benchmark" class="row draggable-zone"></div>
-
-                    <?php if(current_url() == base_url('Booking/Create')) { ?>
-                        <div class="d-flex align-items-center justify-content-between mb-5 p-4" style="background:#F3F6F9; border:1px solid #E4E6EF; border-radius:8px;">
-                            <div class="mr-4">
-                                <div style="font-weight:700; color:#1c3d5a; font-size:14px;">Save as customer intake draft</div>
-                                <div style="font-size:13px; color:#4a5266; margin-top:2px;">Park this booking as a draft awaiting customer-supplied details. Only the basics stay editable; a shareable intake link appears in the booking list.</div>
-                            </div>
-                            <span class="switch switch-sm">
-                                <label class="mb-0">
-                                    <input type="checkbox" id="is_draft_intake_toggle">
-                                    <span></span>
-                                </label>
-                            </span>
-                        </div>
-                        <input type="hidden" id="is_draft_intake" name="is_draft_intake" value="0">
-                    <?php } ?>
 
                     <a id="create_booking_product" class="btn btn-light-success btn-sm mt-2" style="width:180px;">
 
