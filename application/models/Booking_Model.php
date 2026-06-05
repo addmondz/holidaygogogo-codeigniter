@@ -1895,8 +1895,42 @@ class Booking_Model extends CI_Model
 				$level2Ignore = 1;
 			}
 			if(!empty($this->input->get('upcoming_not_ready'))) {
+				// Mirror the dashboard "Travel in N Days – Not Yet Ready" card query
+				// exactly so the count and the linked listing return the same set.
+				// The card (Booking::ajax_summary_cards) counts confirmed BCs the TC
+				// is *credited* for under the TC1/TC2 cutoff rule, in a not-yet-
+				// departed status, whose travel STARTS within the window. Three
+				// alignments vs the generic filters:
+				//   1. require BOOKING CONFIRMATION (the card excludes quotations);
+				//   2. scope by the credited slot, not the broad SalesAgent OR
+				//      SalesAgent2 the TC listing applies at the top of this method;
+				//   3. constrain on StartDate within the window. The card link also
+				//      carries travel_date, whose generic range-overlap clause is
+				//      broader; ANDing StartDate-in-window collapses it to the card's
+				//      StartDate-BETWEEN (an in-window StartDate already implies
+				//      overlap), so no change to that shared block is needed.
 				$this->db->where('CancelStatus', 'N');
 				$this->db->where_in('booking.Status', array('P','PBO','PGL','PTV'));
+				$this->db->where('booking.BookingConfirmationTitle', 'BOOKING CONFIRMATION');
+
+				if(in_array($this->session->userdata('level'), [20, 50])) {
+					$this->load->helper('lead_conversion_credit');
+					$admin_id = (int) $this->session->userdata('admin_id');
+					$cutoff   = LEAD_CONVERSION_TC2_CUTOFF_DATE;
+					$this->db->where(
+						"((booking.InsertDate < '{$cutoff}' AND booking.SalesAgent = {$admin_id})"
+						. " OR (booking.InsertDate >= '{$cutoff}' AND booking.SalesAgent2 = {$admin_id}))",
+						null, false
+					);
+				}
+
+				if(!empty($this->input->get('travel_date'))) {
+					$travel_date = explode(' - ', $this->input->get('travel_date'));
+					$win_start = date('Y-m-d', strtotime(str_replace('/', '-', $travel_date[0])));
+					$win_end   = date('Y-m-d', strtotime(str_replace('/', '-', $travel_date[1])));
+					$this->db->where('booking.StartDate >=', $win_start);
+					$this->db->where('booking.StartDate <=', $win_end);
+				}
 				$level2Ignore = 1;
 			}
 			$this->apply_status_filter();

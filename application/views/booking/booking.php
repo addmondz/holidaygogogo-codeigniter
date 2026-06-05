@@ -177,22 +177,6 @@
                     </div>
                     <?php endif; ?>
 
-                    <?php if(current_url() == base_url('Booking/Create')) { ?>
-                        <div class="d-flex align-items-center justify-content-between mb-5 p-4" style="background:#C5D6EF; border:1px solid #A9C2E6; border-radius:8px;">
-                            <div class="mr-4">
-                                <div style="font-weight:700; color:#1c3d5a; font-size:14px;">Save as customer intake draft</div>
-                                <div style="font-size:13px; color:#3a4256; margin-top:2px;">Park this booking as a draft awaiting customer-supplied details. Only the basics stay editable; a shareable intake link appears in the booking list.</div>
-                            </div>
-                            <span class="switch switch-sm">
-                                <label class="mb-0">
-                                    <input type="checkbox" id="is_draft_intake_toggle">
-                                    <span></span>
-                                </label>
-                            </span>
-                        </div>
-                        <input type="hidden" id="is_draft_intake" name="is_draft_intake" value="0">
-                    <?php } ?>
-
                     <strong>Booking Information :</strong>
 
                     <br><br>
@@ -339,14 +323,6 @@
                                     </span>
 
                                 </div>
-
-                            </div>
-
-                            <div class="form-group">
-
-                                <label>Booking Form</label>
-
-                                <textarea id="BookingFormText" rows="3" autocomplete="off" class="form-control" placeholder="Free-text booking details (editable while the booking is a draft)"><?php if(current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) { echo isset($BookingFormText) ? htmlspecialchars($BookingFormText, ENT_QUOTES) : ''; } ?></textarea>
 
                             </div>
 
@@ -671,7 +647,7 @@
 
                                 </label>
 
-                                <select id="Destination" data-live-search="true" class="form-control selectpicker">
+                                <select id="Destination" data-live-search="true" data-live-search-style="contains" data-live-search-normalize="true" class="form-control selectpicker">
 
                                     <option selected disabled data-icon="la la-map-pin font-size-lg bs-icon" value="">--SELECT DESTINATION--</option>
 
@@ -850,6 +826,27 @@
                         </div>
 
                     <?php } ?>
+
+                    <?php if(current_url() == base_url('Booking/Create')) { ?>
+                        <div class="d-flex align-items-center justify-content-between mb-5 p-4" style="background:#C5D6EF; border:1px solid #A9C2E6; border-radius:8px;">
+                            <div class="mr-4">
+                                <div style="font-weight:700; color:#1c3d5a; font-size:14px;">Save as customer intake draft</div>
+                                <div style="font-size:13px; color:#3a4256; margin-top:2px;">Park this booking as a draft awaiting customer-supplied details. Only the basics stay editable; a shareable intake link appears in the booking list.</div>
+                            </div>
+                            <span class="switch switch-sm">
+                                <label class="mb-0">
+                                    <input type="checkbox" id="is_draft_intake_toggle">
+                                    <span></span>
+                                </label>
+                            </span>
+                        </div>
+                        <input type="hidden" id="is_draft_intake" name="is_draft_intake" value="0">
+                    <?php } ?>
+
+                    <div class="form-group">
+                        <label>Booking Form</label>
+                        <textarea id="BookingFormText" rows="6" autocomplete="off" class="form-control" placeholder="Free-text booking details (editable while the booking is a draft)"><?php if(current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) { echo isset($BookingFormText) ? htmlspecialchars($BookingFormText, ENT_QUOTES) : ''; } ?></textarea>
+                    </div>
 
                     <br><br>
 
@@ -3440,14 +3437,20 @@
                         Mobile: $('#Mobile').val() || '',
                         CountryCodeID: $('#CountryCodeID').val(),
                         Destination: $('#Destination').val() || 0,
-                        SalesAgent: ($('#SalesAgent').length && $('#SalesAgent').val()) ? $('#SalesAgent').val() : admin_id,
+                        // TC1 (Sales Agent 1 / After Sales) is assigned later when the
+                        // draft graduates, so leave it empty (0 -> no admin join match,
+                        // blank in the booking list). The creating TC is the TC2, set
+                        // below. SalesAgent is NOT NULL, so 0 stands in for "unassigned".
+                        SalesAgent: ($('#SalesAgent').length && $('#SalesAgent').val()) ? $('#SalesAgent').val() : 0,
                         ChatLanguage: $('#ChatLanguage').val() || 'EN',
                         BookingConfirmationTitle: $('#BookingConfirmationTitle').val() || 'BOOKING CONFIRMATION',
                         FullPaymentDeadline: today
                     }];
 
+                    // TC2 (Sales Agent 2 / Pre Sales) is the TC who creates the draft.
+                    // Honour an explicit pick, otherwise default to the creator.
                     var sa2 = $('#SalesAgent2').val();
-                    if (sa2) { booking[0]['SalesAgent2'] = sa2; }
+                    booking[0]['SalesAgent2'] = sa2 ? sa2 : admin_id;
 
                     var src = $('#Source').val();
                     if (src) { booking[0]['Source'] = src; }
@@ -6050,6 +6053,20 @@ $(document).ready(function() {
         min-height: 60px;
     }
 
+    /* Draft lock: clearly grey out disabled fields (e.g. Deposit /
+       Full Payment Deadline while saving as a customer intake draft). */
+    #form input.form-control:disabled,
+    #form select.form-control:disabled,
+    #form textarea.form-control:disabled,
+    #form input.form-control[disabled],
+    #form select.form-control[disabled],
+    #form textarea.form-control[disabled] {
+        background-color: #F3F6F9;
+        color: #6c757d;
+        cursor: not-allowed;
+        opacity: 1;
+    }
+
     /* Booking Checklist Professional Styling */
     .checklist-container {
         padding: 0;
@@ -7234,8 +7251,10 @@ $(function() {
     // Element IDs the admin may edit on a draft. Travel date is the #TravelDate
     // picker; it posts as StartDate/EndDate. CustomerID is the hidden companion
     // to the Customer search and must stay readable.
-    // kt_datepicker_4_3 = Deposit Deadline, kt_datepicker_4_4 = Full Payment Deadline.
-    var DRAFT_EDITABLE_IDS = ['is_draft_intake_toggle', 'Customer', 'CustomerID', 'Mobile', 'CountryCodeID', 'SalesAgent2', 'Destination', 'TravelDate', 'kt_datepicker_4_3', 'kt_datepicker_4_4', 'BookingFormText', 'ic_passport_no', 'customer_type', 'Source', 'ChatLanguage'];
+    // A draft has no products/pricing yet, so the Deposit Deadline
+    // (kt_datepicker_4_3) and Full Payment Deadline (kt_datepicker_4_4) are
+    // intentionally left OUT of this whitelist — they grey out while in draft.
+    var DRAFT_EDITABLE_IDS = ['is_draft_intake_toggle', 'Customer', 'CustomerID', 'Mobile', 'CountryCodeID', 'SalesAgent2', 'Destination', 'TravelDate', 'BookingFormText', 'ic_passport_no', 'customer_type', 'Source', 'ChatLanguage'];
     var CURRENT_ADMIN_ID = '<?php echo (int) $this->session->userdata('admin_id'); ?>';
 
     function applyDraftLock(on) {
