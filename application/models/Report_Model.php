@@ -588,7 +588,6 @@ class Report_Model extends CI_Model
         );
     }
 
-<<<<<<< HEAD
     /**
      * Per-agent lead counts for the three "Leads" card windows (Today / Week /
      * Month) in a single conditional-SUM pass. Powers the OWNER-only
@@ -654,13 +653,6 @@ class Report_Model extends CI_Model
         $this->load->helper('lead_conversion_credit');
         $where = $this->build_lead_dashboard_where_clause($filters);
         $clauses = array();
-=======
-    function Lead_Dashboard_By_Agent($filters = array())
-    {
-        $this->load->helper('lead_conversion_credit');
-        $where = $this->build_lead_dashboard_where_clause($filters);
-        $clauses = array();
->>>>>>> 68db7084fd580f3833b7c95853638bc96c02a846
 
         if (!empty($where['sql'])) {
             $clauses[] = preg_replace('/^\s*WHERE\s+/i', '', $where['sql']);
