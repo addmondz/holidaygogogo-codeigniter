@@ -120,62 +120,33 @@
 
                 <form id="form">
 
-                    <?php if (!empty($customer_intake) && !empty($customer_intake['intake'])):
-                        $ci_intake = $customer_intake['intake'];
-                        $ci_rooms  = $customer_intake['rooms'];
-                        $ci_when   = !empty($ci_intake->submitted_at) ? date('j M Y, g:i a', strtotime($ci_intake->submitted_at)) : '';
-                        $ci_resp   = isset($customer_intake_response_seconds) ? $customer_intake_response_seconds : null;
-                    ?>
-                    <div class="alert" style="border:1px solid #BFD4EF; background:#EDF4FC; border-radius:8px; padding:14px 16px; margin-bottom:16px;">
-                        <div class="d-flex justify-content-between align-items-start" style="gap:12px;">
-                            <div>
-                                <div style="font-weight:700; color:#1c3d5a;">Customer intake submitted</div>
-                                <div style="font-size:13px; color:#4a5266; margin-top:2px;">Received <?php echo htmlspecialchars($ci_when); ?>. Editable fields below are pre-populated where blank.</div>
+                    <?php $dp_resp = isset($draft_payment_seconds) ? $draft_payment_seconds : null; ?>
+                    <?php if ($dp_resp !== null): ?>
+                    <div class="alert" style="border:1px solid #BFD4EF; background:#EDF4FC; border-radius:8px; padding:12px 16px; margin-bottom:16px;">
+                        <div class="d-flex justify-content-between align-items-center" style="gap:12px;">
+                            <div style="font-weight:700; color:#1c3d5a;">Draft &rarr; Payment response time</div>
+                            <div style="text-align:right; font-size:12px; color:#4a5266;">
+                                Saved as draft to payment<br><strong style="font-size:14px; color:#1c3d5a;"><?php echo htmlspecialchars(format_response_duration($dp_resp)); ?></strong>
                             </div>
-                            <?php if ($ci_resp !== null): ?>
-                                <div style="text-align:right; font-size:12px; color:#4a5266;">
-                                    Response time<br><strong style="font-size:14px; color:#1c3d5a;"><?php echo htmlspecialchars(format_response_duration($ci_resp)); ?></strong>
-                                </div>
-                            <?php endif; ?>
                         </div>
-                        <div style="margin-top:10px; font-size:13px; color:#28324a;">
-                            <strong>Name:</strong> <?php echo htmlspecialchars($ci_intake->booking_name); ?> &middot;
-                            <strong>Contact:</strong> <?php echo htmlspecialchars($ci_intake->contact_number); ?> &middot;
-                            <strong>IC/Passport:</strong> <?php echo htmlspecialchars($ci_intake->ic_passport_no); ?> &middot;
-                            <strong>Travel:</strong>
-                            <?php
-                                $ci_start_h = !empty($ci_intake->travel_start_date) ? date('d M Y', strtotime($ci_intake->travel_start_date)) : '';
-                                $ci_end_h   = !empty($ci_intake->travel_end_date)   ? date('d M Y', strtotime($ci_intake->travel_end_date))   : '';
-                                echo htmlspecialchars($ci_start_h . ($ci_end_h !== '' && $ci_end_h !== $ci_start_h ? ' → ' . $ci_end_h : ''));
-                            ?>
-                        </div>
-                        <?php if (!empty($ci_intake->special_remarks)): ?>
-                            <div style="margin-top:6px; font-size:13px; color:#28324a;">
-                                <strong>Remarks:</strong> <?php echo nl2br(htmlspecialchars($ci_intake->special_remarks)); ?>
-                            </div>
-                        <?php endif; ?>
-                        <?php if (!empty($ci_rooms)): ?>
-                            <div style="margin-top:8px; font-size:13px; color:#28324a;">
-                                <strong>Rooms:</strong>
-                                <ul style="margin:4px 0 0 18px; padding:0;">
-                                <?php foreach ($ci_rooms as $idx => $room):
-                                    $ages_child = !empty($room->child_ages) ? $room->child_ages : '';
-                                    $ages_baby  = !empty($room->baby_ages)  ? $room->baby_ages  : '';
-                                ?>
-                                    <li>
-                                        Room <?php echo ($idx + 1); ?>
-                                        <?php if (!empty($room->room_type)): ?>(<?php echo htmlspecialchars($room->room_type); ?>)<?php endif; ?>
-                                        &mdash;
-                                        <?php echo (int) $room->adult_count; ?> Adult<?php echo ((int) $room->adult_count !== 1 ? 's' : ''); ?>
-                                        <?php if ($ages_child !== ''): ?> + <?php echo count(explode(',', $ages_child)); ?> Child (age <?php echo htmlspecialchars($ages_child); ?>)<?php endif; ?>
-                                        <?php if ($ages_baby !== ''):  ?> + <?php echo count(explode(',', $ages_baby));  ?> Baby (age <?php echo htmlspecialchars($ages_baby);  ?>)<?php endif; ?>
-                                    </li>
-                                <?php endforeach; ?>
-                                </ul>
-                            </div>
-                        <?php endif; ?>
                     </div>
                     <?php endif; ?>
+
+                    <?php if(current_url() == base_url('Booking/Create')) { ?>
+                        <div class="d-flex align-items-center justify-content-between mb-5 p-4" style="background:#C5D6EF; border:1px solid #A9C2E6; border-radius:8px;">
+                            <div class="mr-4">
+                                <div style="font-weight:700; color:#1c3d5a; font-size:14px;">Save as draft</div>
+                                <div style="font-size:13px; color:#3a4256; margin-top:2px;">Park this booking as a draft. Only the basics stay editable until it is approved and graduated to Pending BC.</div>
+                            </div>
+                            <span class="switch switch-sm">
+                                <label class="mb-0">
+                                    <input type="checkbox" id="is_draft_intake_toggle">
+                                    <span></span>
+                                </label>
+                            </span>
+                        </div>
+                        <input type="hidden" id="is_draft_intake" name="is_draft_intake" value="0">
+                    <?php } ?>
 
                     <strong>Booking Information :</strong>
 
@@ -827,22 +798,6 @@
 
                     <?php } ?>
 
-                    <?php if(current_url() == base_url('Booking/Create')) { ?>
-                        <div class="d-flex align-items-center justify-content-between mb-5 p-4" style="background:#C5D6EF; border:1px solid #A9C2E6; border-radius:8px;">
-                            <div class="mr-4">
-                                <div style="font-weight:700; color:#1c3d5a; font-size:14px;">Save as customer intake draft</div>
-                                <div style="font-size:13px; color:#3a4256; margin-top:2px;">Park this booking as a draft awaiting customer-supplied details. Only the basics stay editable; a shareable intake link appears in the booking list.</div>
-                            </div>
-                            <span class="switch switch-sm">
-                                <label class="mb-0">
-                                    <input type="checkbox" id="is_draft_intake_toggle">
-                                    <span></span>
-                                </label>
-                            </span>
-                        </div>
-                        <input type="hidden" id="is_draft_intake" name="is_draft_intake" value="0">
-                    <?php } ?>
-
                     <div class="form-group">
                         <label>Booking Form</label>
                         <textarea id="BookingFormText" rows="6" autocomplete="off" class="form-control" placeholder="Free-text booking details (editable while the booking is a draft)"><?php if(current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) { echo isset($BookingFormText) ? htmlspecialchars($BookingFormText, ENT_QUOTES) : ''; } ?></textarea>
@@ -1175,23 +1130,20 @@
                     <div class="d-flex justify-content-between border-top pt-5" style="overflow-x:auto;">
 
                         <?php
-                            // Customer-intake draft lifecycle controls (Update page).
-                            // The button set depends on the draft state:
-                            //   SAD, intake not submitted -> Save as Draft (form locked)
-                            //   SAD, submitted, not approved -> Approve + Save as Draft
+                            // Draft lifecycle controls (Update page). The button set
+                            // depends on the draft state:
+                            //   SAD, not approved -> Save as Draft + Approve (form locked)
                             //   SAD approved, or PB -> Save as Pending BC + Pending BC Confirmation
                             // A single hidden #draft_save_mode carries the chosen action.
                             $is_update_page  = (current_url() == base_url('Booking/Update'));
                             $is_draft_booking = isset($Status) && $Status === 'SAD';
                             $is_pending_bc    = isset($Status) && $Status === 'PB';
-                            $intake_submitted = !empty($customer_intake) && !empty($customer_intake['intake']);
                             $draft_approved   = !empty($DraftApproved);
 
                             $show_graduate    = $is_update_page && (($is_draft_booking && $draft_approved) || $is_pending_bc);
-                            $show_approve     = $is_update_page && $is_draft_booking && $intake_submitted && !$draft_approved;
-                            $show_save_draft  = $is_update_page && $is_draft_booking && !$draft_approved;
+                            $show_approve     = $is_update_page && $is_draft_booking && !$draft_approved;
                             // Hide the default Update button whenever draft-specific controls take over.
-                            $hide_main_btn    = $show_graduate || $show_approve || $show_save_draft;
+                            $hide_main_btn    = $show_graduate || $show_approve;
                         ?>
                         <input type="hidden" id="draft_save_mode" name="draft_save_mode" value="">
 
@@ -1200,8 +1152,6 @@
                         <?php if($show_approve) { ?>
                             <button type="button" id="draft_save_btn" class="btn btn-light-primary font-weight-bold px-6 py-4" style="margin-left:auto;">Save as Draft</button>
                             <button type="button" id="draft_approve_btn" class="btn btn-success font-weight-bold px-6 py-4 ml-1">Approve</button>
-                        <?php } elseif($show_save_draft) { ?>
-                            <button type="button" id="draft_save_btn" class="btn btn-success font-weight-bold px-9 py-4" style="width:180px; margin-left:auto;">Save as Draft</button>
                         <?php } elseif($show_graduate) { ?>
                             <button type="button" id="graduate_pb_btn" class="btn btn-light-warning font-weight-bold px-6 py-4" style="margin-left:auto;">Save as Pending BC</button>
                             <button type="button" id="graduate_pbc_btn" class="btn btn-success font-weight-bold px-6 py-4 ml-1">Save as Pending BC Confirmation</button>
@@ -2492,7 +2442,7 @@
 
     var booking_products = <?php echo json_encode($booking_products) ?>;
 
-    // Guard against empty booking_products: SAD customer-intake drafts have no
+    // Guard against empty booking_products: SAD drafts have no
     // products yet, so booking_products[0] would be undefined and reading
     // .BookingProductID on it throws a TypeError that halts the rest of this
     // <script> block — leaving every later click handler (Insert Product,
@@ -3412,10 +3362,10 @@
 
             if(action.isConfirmed) {
 
-                // Customer-intake draft (Create page): park the booking with only
-                // the basics. Every other field is optional here and only becomes
-                // required when staff complete + graduate the booking after the
-                // customer submits. Bypass the full required-field validation.
+                // Draft (Create page): park the booking with only the basics.
+                // Every other field is optional here and only becomes required
+                // when staff complete + graduate the booking. Bypass the full
+                // required-field validation.
                 var __isDraft = ($('#is_draft_intake_toggle').length && $('#is_draft_intake_toggle').is(':checked'));
                 if (__isDraft) {
                     submitDraftBooking();
@@ -3480,11 +3430,10 @@
 
                     var CustomerID = $('input[name="CustomerID"]').val();
 
-                    // Send NO rooms for a draft: a draft's rooms are supplied by the
-                    // customer's intake submission, which seeds guest_list_room only
-                    // when none exist yet. Sending the form's default "ROOM 1"
-                    // placeholder here would block that seeding (Room Management would
-                    // then stay empty after the customer submits).
+                    // Send NO rooms for a draft: staff add the real rooms after the
+                    // draft is graduated. Sending the form's default "ROOM 1"
+                    // placeholder here would leave a stray room behind in Room
+                    // Management once the booking is completed.
                     Submit_Booking('<?php echo base_url('Booking/Create') ?>', null, booking_number, booking, null, [], CustomerID, []);
                 }
 
@@ -4509,9 +4458,9 @@
             postData.booking_rooms = booking_rooms;
         }
 
-        // Customer intake draft toggle (Create page only). Reads the checkbox
-        // beside the Create button so the controller can park the new booking
-        // in SAD ("SAVE AS DRAFT") status.
+        // Draft toggle (Create page only). Reads the checkbox beside the Create
+        // button so the controller can park the new booking in SAD
+        // ("SAVE AS DRAFT") status.
         if ($('#is_draft_intake_toggle').length && $('#is_draft_intake_toggle').is(':checked')) {
             postData.is_draft_intake = '1';
         }
@@ -6054,7 +6003,7 @@ $(document).ready(function() {
     }
 
     /* Draft lock: clearly grey out disabled fields (e.g. Deposit /
-       Full Payment Deadline while saving as a customer intake draft). */
+       Full Payment Deadline while saving as a draft). */
     #form input.form-control:disabled,
     #form select.form-control:disabled,
     #form textarea.form-control:disabled,
@@ -7241,12 +7190,12 @@ $(document).ready(function() {
 </script>
 
 <script>
-// Customer-intake draft: admin booking form field locking + graduate buttons.
+// Draft: admin booking form field locking + graduate buttons.
 //
 // While a booking sits in SAD ("SAVE AS DRAFT") only a small whitelist of fields
 // is editable; everything else is disabled (a UX guardrail — the controller also
-// strips non-whitelisted columns server-side). Once the customer submits the
-// public intake, two graduate buttons replace the single save button.
+// strips non-whitelisted columns server-side). Approving then graduating the
+// draft replaces the single save button with the graduate buttons.
 $(function() {
     // Element IDs the admin may edit on a draft. Travel date is the #TravelDate
     // picker; it posts as StartDate/EndDate. CustomerID is the hidden companion
@@ -7261,6 +7210,10 @@ $(function() {
         $('#form').find('input, select, textarea').each(function() {
             var t = (this.type || '').toLowerCase();
             if (t === 'button' || t === 'submit' || t === 'hidden') { return; }
+            // bootstrap-select's live-search inputs have no id and are managed by
+            // the plugin based on the parent select's disabled state. Leave them
+            // alone so whitelisted selects (e.g. Destination) keep a usable search.
+            if ($(this).closest('.bs-searchbox').length) { return; }
             if (DRAFT_EDITABLE_IDS.indexOf(this.id) !== -1) { return; }
             $(this).prop('disabled', !!on);
             if ($(this).hasClass('selectpicker')) {
@@ -7279,10 +7232,10 @@ $(function() {
         }
     }
 
-    <?php if (current_url() == base_url('Booking/Update') && $is_draft_booking && !$intake_submitted) { ?>
-        // Parked draft, customer has not submitted yet — lock to the whitelist.
-        // Once the intake is in, the form unlocks so staff can complete every
-        // field and the graduate buttons enforce the normal required-field rules.
+    <?php if (current_url() == base_url('Booking/Update') && $is_draft_booking) { ?>
+        // Parked draft (SAD) — lock to the whitelist. The form unlocks once the
+        // draft graduates out of SAD (Save as Pending BC / PBC), where the
+        // graduate buttons enforce the normal required-field rules.
         applyDraftLock(true);
         autoSelectPresales();
     <?php } ?>

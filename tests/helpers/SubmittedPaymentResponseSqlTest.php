@@ -2,11 +2,11 @@
 /**
  * Run with: php tests/helpers/SubmittedPaymentResponseSqlTest.php
  *
- * Locks the SQL behind the "Submitted -> Payment Time" summary card. The card
+ * Locks the SQL behind the "Draft -> Payment Time" summary card. The card
  * measures, per booking, the gap between:
  *
- *   START : booking_customer_intake.submitted_at (the customer's submission —
- *           the SAME anchor as the Intake -> BC Response Time card)
+ *   START : earliest TRANSITION into SAD ("SAVE AS DRAFT") in booking_status_log
+ *           (the moment the booking was saved as draft)
  *   END   : earliest TRANSITION into P ("PENDING PAYMENT", from_status set)
  *
  * windowed on the START anchor. Three variants:
@@ -57,8 +57,8 @@ $avg_sql_tc   = submitted_payment_avg_response_sql(true);
 $best_sql     = submitted_payment_best_agent_sql();
 
 assert_eq('team SQL is string', true, is_string($avg_sql_team) && $avg_sql_team !== '');
-assert_eq('team SQL anchors start on submitted_at', true, strpos($avg_sql_team, 'ci.submitted_at') !== false);
-assert_eq('team SQL joins booking_customer_intake',  true, strpos($avg_sql_team, 'booking_customer_intake') !== false);
+assert_eq('team SQL anchors start on first_sad_at', true, strpos($avg_sql_team, 'd.first_sad_at') !== false);
+assert_eq("team SQL reads SAD from booking_status_log", true, strpos($avg_sql_team, "to_status = 'SAD'") !== false);
 assert_eq("team SQL anchors end on to_status='P'",   true, strpos($avg_sql_team, "to_status = 'P'") !== false);
 assert_eq("team SQL excludes P creation rows",       true, strpos($avg_sql_team, 'from_status IS NOT NULL') !== false);
 assert_eq("team SQL excludes b.Status='N'",          true, strpos($avg_sql_team, "b.Status != 'N'") !== false);
@@ -86,11 +86,6 @@ $pdo->exec("CREATE TABLE booking (
     InsertDate TEXT,
     Status TEXT
 )");
-$pdo->exec("CREATE TABLE booking_customer_intake (
-    id INTEGER PRIMARY KEY,
-    booking_id INTEGER,
-    submitted_at TEXT
-)");
 $pdo->exec("CREATE TABLE booking_status_log (
     id INTEGER PRIMARY KEY,
     booking_id INTEGER,
@@ -104,14 +99,14 @@ $win_end   = '2026-06-01 00:00:00';
 
 // AdminID 4 = NATASHA, AdminID 5 = AISYAH. All pre-cutoff -> TC1 credited.
 //
-// 100: submit 05-10 09:00 -> P 05-10 11:00 = 7200s.  TC1=4.
-// 101: submit 05-12 09:00 -> P 05-12 12:00 = 10800s. TC1=4.
-// 102: submit 05-15 09:00 -> P 05-15 10:00 = 3600s.  TC1=5.
-// 103: submit 05-15 09:00 -> P 05-15 11:00 = 7200s.  TC1=5.
-// 200: submit 04-30 09:00 -> P 05-01 09:00 — submitted PREVIOUS month -> excluded by window.
-// 300: submit 05-20 09:00 -> NO P transition -> excluded.
-// 400: submit 05-21 09:00 -> P 05-21 09:30, but Status='N' (soft-deleted) -> excluded.
-// 500: submit 05-22 09:00 -> P creation row (NULL) 08:00 + real P transition 10:00 = 3600s (picks transition). TC1=4.
+// 100: SAD 05-10 09:00 -> P 05-10 11:00 = 7200s.  TC1=4.
+// 101: SAD 05-12 09:00 -> P 05-12 12:00 = 10800s. TC1=4.
+// 102: SAD 05-15 09:00 -> P 05-15 10:00 = 3600s.  TC1=5.
+// 103: SAD 05-15 09:00 -> P 05-15 11:00 = 7200s.  TC1=5.
+// 200: SAD 04-30 09:00 -> P 05-01 09:00 — saved as draft PREVIOUS month -> excluded by window.
+// 300: SAD 05-20 09:00 -> NO P transition -> excluded.
+// 400: SAD 05-21 09:00 -> P 05-21 09:30, but Status='N' (soft-deleted) -> excluded.
+// 500: SAD 05-22 09:00 -> P creation row (NULL) 08:00 + real P transition 10:00 = 3600s (picks transition). TC1=4.
 $pdo->exec("INSERT INTO booking (BookingID, SalesAgent, SalesAgent2, InsertDate, Status) VALUES
     (100, 4, NULL, '2026-05-10 08:00:00', 'P'),
     (101, 4, NULL, '2026-05-12 08:00:00', 'P'),
@@ -122,18 +117,16 @@ $pdo->exec("INSERT INTO booking (BookingID, SalesAgent, SalesAgent2, InsertDate,
     (400, 4, NULL, '2026-05-21 08:00:00', 'N'),
     (500, 4, NULL, '2026-05-22 08:00:00', 'P')
 ");
-$pdo->exec("INSERT INTO booking_customer_intake (booking_id, submitted_at) VALUES
-    (100, '2026-05-10 09:00:00'),
-    (101, '2026-05-12 09:00:00'),
-    (102, '2026-05-15 09:00:00'),
-    (103, '2026-05-15 09:00:00'),
-    (200, '2026-04-30 09:00:00'),
-    (300, '2026-05-20 09:00:00'),
-    (400, '2026-05-21 09:00:00'),
-    (500, '2026-05-22 09:00:00')
-");
-// P rows: only TRANSITIONS (from_status set) count as the end anchor.
+// SAD rows anchor the START; P rows (TRANSITIONS only, from_status set) anchor the END.
 $pdo->exec("INSERT INTO booking_status_log (booking_id, from_status, to_status, created_at) VALUES
+    (100, 'PBC', 'SAD', '2026-05-10 09:00:00'),
+    (101, 'PBC', 'SAD', '2026-05-12 09:00:00'),
+    (102, 'PBC', 'SAD', '2026-05-15 09:00:00'),
+    (103, 'PBC', 'SAD', '2026-05-15 09:00:00'),
+    (200, 'PBC', 'SAD', '2026-04-30 09:00:00'),
+    (300, 'PBC', 'SAD', '2026-05-20 09:00:00'),
+    (400, 'PBC', 'SAD', '2026-05-21 09:00:00'),
+    (500, 'PBC', 'SAD', '2026-05-22 09:00:00'),
     (100, 'PBC', 'P', '2026-05-10 11:00:00'),
     (101, 'PBC', 'P', '2026-05-12 12:00:00'),
     (102, 'PBC', 'P', '2026-05-15 10:00:00'),
@@ -177,7 +170,6 @@ assert_eq('best n = 2', 2, (int) $best['n']);
 // -- 4) Min-sample guard ------------------------------------------------
 // Drop 101/500 so AdminID 4 has only booking 100 (n=1). AdminID 5 still n=2.
 $pdo->exec("DELETE FROM booking WHERE BookingID IN (101, 500)");
-$pdo->exec("DELETE FROM booking_customer_intake WHERE booking_id IN (101, 500)");
 $pdo->exec("DELETE FROM booking_status_log WHERE booking_id IN (101, 500)");
 $stmt = $pdo->prepare($best_sql);
 $stmt->execute(array($win_start, $win_end));
@@ -186,7 +178,6 @@ assert_eq('min-sample guard: AdminID = 5', 5, (int) $best['AdminID']);
 assert_eq('min-sample guard: n = 2',       2, (int) $best['n']);
 
 // -- 5) Empty window ----------------------------------------------------
-$pdo->exec("DELETE FROM booking_customer_intake");
 $pdo->exec("DELETE FROM booking_status_log");
 $stmt = $pdo->prepare($avg_sql_team);
 $stmt->execute(array($win_start, $win_end));

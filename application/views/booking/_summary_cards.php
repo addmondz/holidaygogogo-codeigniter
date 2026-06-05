@@ -255,7 +255,7 @@
                     <div class="card card-custom">
                         <div class="card-header border-0 summary-card-header" style="background-color:#F5E6CD;">
                             <h3>Pending BC</h3>
-                            <i id="pop-pending-bc" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>Counted when:</strong><ul><li>The booking is parked at <strong>PENDING BC</strong> (status PB)</li><li>Not cancelled</li><li>You hold the credited sales slot (TC1 before 1 Jun 2026; TC2 from 1 Jun 2026)</li></ul><strong>Live backlog</strong> — no date window. PB is the stage after a customer intake draft has been graduated to &ldquo;Pending BC&rdquo; but not yet confirmed (PBC). Click to view and progress them."></i>
+                            <i id="pop-pending-bc" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>Counted when:</strong><ul><li>The booking is parked at <strong>PENDING BC</strong> (status PB)</li><li>Not cancelled</li><li>You hold the credited sales slot (TC1 before 1 Jun 2026; TC2 from 1 Jun 2026)</li></ul><strong>Live backlog</strong> — no date window. PB is the stage after a draft has been graduated to &ldquo;Pending BC&rdquo; but not yet confirmed (PBC). Click to view and progress them."></i>
                         </div>
                         <div class="card-body summary-card-body">
                             <div class="summary-value" id="sc-pending-bc-count">...</div>
@@ -267,12 +267,12 @@
             <div class="col-md-3 sc-pos-bottom">
                 <div class="card card-custom">
                     <div class="card-header border-0 summary-card-header" style="background-color:#D7E2F2;">
-                        <h3>Submitted &rarr; Payment Time (Month)</h3>
-                        <i id="pop-submitted-payment" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>Measures:</strong> Average time from the customer submitting their intake to the booking first reaching <strong>PENDING PAYMENT</strong>.<br><br><strong>Start:</strong> when the customer submitted the intake form (same anchor as the Intake &rarr; BC card).<br><strong>End:</strong> first time the BC was approved into PENDING PAYMENT (P).<br><br><strong>Window:</strong> intakes submitted in the selected month. Only your bookings (credited slot) that have reached payment are averaged; ones still in progress aren&rsquo;t counted yet.<br><br><strong>Best:</strong> fastest TC team-wide (min 2 bookings)."></i>
+                        <h3>Draft &rarr; Payment Time (Month)</h3>
+                        <i id="pop-submitted-payment" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>Measures:</strong> Average time from a booking being saved as draft to it first reaching <strong>PENDING PAYMENT</strong>.<br><br><strong>Start:</strong> when the booking was saved as draft (status SAD).<br><strong>End:</strong> first time the BC was approved into PENDING PAYMENT (P).<br><br><strong>Window:</strong> drafts saved in the selected month. Only your bookings (credited slot) that have reached payment are averaged; ones still in progress aren&rsquo;t counted yet.<br><br><strong>Best:</strong> fastest TC team-wide (min 2 bookings)."></i>
                     </div>
                     <div class="card-body summary-card-body">
                         <div class="summary-value" id="sc-submitted-payment-value">...</div>
-                        <div class="summary-sub"><span id="sc-submitted-payment-count">—</span> of your submitted intakes this month reached payment. Average submitted-to-payment time.</div>
+                        <div class="summary-sub"><span id="sc-submitted-payment-count">—</span> of your drafts this month reached payment. Average draft-to-payment time.</div>
                         <div class="summary-sub summary-best" id="sc-submitted-payment-best">Best: —</div>
                     </div>
                 </div>
@@ -447,7 +447,7 @@
                     <div class="card card-custom">
                         <div class="card-header border-0 summary-card-header" style="background-color:#FFFAA030;">
                             <h3>Pending BC</h3>
-                            <i id="pop-pending-bc" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>Counted when:</strong><ul><li>The booking is parked at <strong>PENDING BC</strong> (status PB)</li><li>Not cancelled</li></ul><strong>Team-wide live backlog</strong> — no date window. PB is the stage after a customer-intake draft has been graduated to &ldquo;Pending BC&rdquo; but not yet confirmed (PBC). Click to view and progress them."></i>
+                            <i id="pop-pending-bc" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>Counted when:</strong><ul><li>The booking is parked at <strong>PENDING BC</strong> (status PB)</li><li>Not cancelled</li></ul><strong>Team-wide live backlog</strong> — no date window. PB is the stage after a draft has been graduated to &ldquo;Pending BC&rdquo; but not yet confirmed (PBC). Click to view and progress them."></i>
                         </div>
                         <div class="card-body summary-card-body">
                             <div class="summary-value" id="sc-pending-bc-count">...</div>
@@ -459,12 +459,12 @@
             <div class="col-md-6">
                 <div class="card card-custom">
                     <div class="card-header border-0 summary-card-header" style="background-color:#A7C7E730;">
-                        <h3>Submitted &rarr; Payment Time (Month)</h3>
-                        <i id="pop-submitted-payment" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>Measures:</strong> Average time from the customer submitting their intake to the booking first reaching <strong>PENDING PAYMENT</strong>.<br><br><strong>Start:</strong> when the customer submitted the intake form (same anchor as the Intake &rarr; BC card).<br><strong>End:</strong> first time the BC was approved into PENDING PAYMENT (P).<br><br><strong>Window:</strong> intakes submitted this month, team-wide. Ones still in progress aren&rsquo;t counted yet.<br><br><strong>Best:</strong> fastest TC this month (min 2 bookings)."></i>
+                        <h3>Draft &rarr; Payment Time (Month)</h3>
+                        <i id="pop-submitted-payment" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>Measures:</strong> Average time from a booking being saved as draft to it first reaching <strong>PENDING PAYMENT</strong>.<br><br><strong>Start:</strong> when the booking was saved as draft (status SAD).<br><strong>End:</strong> first time the BC was approved into PENDING PAYMENT (P).<br><br><strong>Window:</strong> drafts saved this month, team-wide. Ones still in progress aren&rsquo;t counted yet.<br><br><strong>Best:</strong> fastest TC this month (min 2 bookings)."></i>
                     </div>
                     <div class="card-body summary-card-body">
                         <div class="summary-value" id="sc-submitted-payment-value">...</div>
-                        <div class="summary-sub"><span id="sc-submitted-payment-count">—</span> submitted intakes this month reached payment. Average submitted-to-payment time across the team.</div>
+                        <div class="summary-sub"><span id="sc-submitted-payment-count">—</span> drafts this month reached payment. Average draft-to-payment time across the team.</div>
                         <div class="summary-sub summary-best" id="sc-submitted-payment-best">Best: —</div>
                     </div>
                 </div>
@@ -598,19 +598,6 @@
                         </div>
                     </div>
                 </a>
-            </div>
-            <div class="col-md-3">
-                <div class="card card-custom">
-                    <div class="card-header border-0 summary-card-header" style="background-color:#EDF4FC;">
-                        <h3>Intake &rarr; BC Response Time (Month)</h3>
-                        <i id="pop-intake-resp-month-op" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>Team-wide avg</strong> time between a customer hitting Submit on the intake form and the booking being advanced to <strong>Pending BC Confirmation</strong> by staff this month.<br><br><strong>Counted when:</strong><ul><li>Customer submitted this month</li><li>Booking has at least one <code>SAD &rarr; PBC</code> transition logged</li><li>Booking is not soft-deleted</li></ul><strong>Best:</strong> Fastest TC across the team. Agents with fewer than 2 intakes are excluded so a single fast booking doesn't crown someone."></i>
-                    </div>
-                    <div class="card-body summary-card-body">
-                        <div class="summary-value-sm" id="sc-intake-resp-month-value">...</div>
-                        <div class="summary-sub"><span id="sc-intake-resp-month-count">—</span> intakes this month, team-wide.</div>
-                        <div class="summary-sub summary-best" id="sc-intake-resp-month-best">Best: —</div>
-                    </div>
-                </div>
             </div>
             <div class="col-md-3">
                 <a class="summary-card" id="sc-gl-submitted-link" href="#">
@@ -935,15 +922,6 @@ $(function() {
             setText('sc-tc-resp-week',  c.tc_response_time_dwm.week);
             setText('sc-tc-resp-month', c.tc_response_time_dwm.month);
         }
-        if(c.intake_response_month) {
-            var ir = c.intake_response_month;
-            // format_response_duration returns '-' for null; for the card we'd
-            // rather render an em-dash when no intakes happened this month.
-            var hasData = (ir.count > 0 && ir.value && ir.value !== '-');
-            setText('sc-intake-resp-month-value', hasData ? ir.value : '—');
-            setText('sc-intake-resp-month-count', ir.count);
-            setBest('sc-intake-resp-month-best', ir.best);
-        }
         if(c.pending_bc) {
             setText('sc-pending-bc-count', c.pending_bc.count);
             setLink('sc-pending-bc-link', c.pending_bc.link);
@@ -951,7 +929,7 @@ $(function() {
         if(c.submitted_payment_response_month) {
             var sp = c.submitted_payment_response_month;
             // format_response_duration returns '-' for null; render an em-dash
-            // when no submitted intakes reached payment in the window.
+            // when no drafts reached payment in the window.
             var spHas = (sp.count > 0 && sp.value && sp.value !== '-');
             setText('sc-submitted-payment-value', spHas ? sp.value : '—');
             setText('sc-submitted-payment-count', sp.count);

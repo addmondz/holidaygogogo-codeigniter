@@ -1,6 +1,6 @@
 <?php
 /**
- * Run with: php tests/helpers/CustomerIntakeFormatDurationTest.php
+ * Run with: php tests/helpers/ResponseTimeFormatDurationTest.php
  *
  * Locks the format used for the "Response Time" column in the booking list,
  * surfaced by format_response_duration(). The shape (s / m / h Xm / '-' on
@@ -12,7 +12,7 @@ if (!defined('BASEPATH')) {
     define('BASEPATH', __DIR__);
 }
 
-require_once __DIR__ . '/../../application/helpers/customer_intake_helper.php';
+require_once __DIR__ . '/../../application/helpers/response_time_helper.php';
 
 function assert_eq($label, $expected, $actual) {
     if ($expected === $actual) {

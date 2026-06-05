@@ -104,9 +104,9 @@ class Booking extends MY_Controller
 					// No payments at all, set to PBC if not already in flow
 					if($booking->Status != 'PBC' && $booking->Status != 'P') {
 						// Only reset if not already in a recognised flow status. SAD
-						// (Save as Draft) is the customer-intake draft anchor and PB
-						// (Pending BC) is an early flow status — neither must be
-						// silently flipped to PBC by this sweep.
+						// (Save as Draft) is the draft anchor and PB (Pending BC) is
+						// an early flow status — neither must be silently flipped to
+						// PBC by this sweep.
 						if(!in_array($booking->Status, ['PBC', 'PB', 'P', 'PBO', 'PTV', 'PT', 'Y', 'OG', 'SAD'])) {
 							$this->Booking_Model->Update_Status('PBC', $booking->BookingID);
 							$this->Booking_Model->Create_Booking_Log2($booking->Status, 'PBC', $booking->BookingID);
@@ -396,23 +396,13 @@ class Booking extends MY_Controller
 				$row['status'] = '<span class="font-weight-bold" style="color:' . $status_color . ';">' . $status_text . '</span>';
 			}
 
-			// Customer intake annotations next to the status cell:
-			// - "Customer Submitted" badge while booking still sits in SAD but the
-			//   intake has been completed by the customer.
-			// - "Response: 1h 15m" once the booking has reached PENDING PAYMENT —
-			//   submission -> P, matching the "Submitted -> Payment Time" card.
-			$this->load->helper('customer_intake');
-			$intake_row = $this->db->select('submitted_at')
-				->where('booking_id', (int) $booking->BookingID)
-				->get('booking_customer_intake')->row();
-			if (!empty($intake_row)) {
-				if ($display_status === 'SAD') {
-					$row['status'] .= ' <span class="badge badge-info" style="font-size:9px; margin-left:4px;" data-toggle="tooltip" data-placement="top" title="Customer submitted intake form">Customer Submitted</span>';
-				}
-				$resp_seconds = calculate_submitted_to_payment_seconds((int) $booking->BookingID);
-				if ($resp_seconds !== null) {
-					$row['status'] .= '<br><small style="color:#6b7385;">Response: <strong>' . htmlspecialchars(format_response_duration($resp_seconds)) . '</strong></small>';
-				}
+			// Draft response time next to the status cell: "Response: 1h 15m" once
+			// the booking has reached PENDING PAYMENT — saved-as-draft (SAD) -> P,
+			// matching the "Draft -> Payment Time" card.
+			$this->load->helper('response_time');
+			$resp_seconds = calculate_submitted_to_payment_seconds((int) $booking->BookingID);
+			if ($resp_seconds !== null) {
+				$row['status'] .= '<br><small style="color:#6b7385;">Response: <strong>' . htmlspecialchars(format_response_duration($resp_seconds)) . '</strong></small>';
 			}
 
 			// GL Status rules:
@@ -627,12 +617,6 @@ class Booking extends MY_Controller
 			$booking_page_url = base_url('customer/booking/' . $booking->Token);
 			$html .= '<a href="' . $booking_page_url . '" target="_blank" class="dropdown-item" style="font-size:11px;">Go to Booking Page</a>';
 			$html .= '<button id="booking_page_url-' . $booking->BookingID . '" value="' . $booking_page_url . '" onclick="Copy_URL(\'BOOKING PAGE LINK\', ' . $booking->BookingID . ')" class="dropdown-item" style="font-size:11px;">Copy Booking Page Link</button>';
-		}
-		if(!empty($booking->Token)) {
-			$intake_url = base_url('customer-intake/' . $booking->Token);
-			$html .= '<div class="dropdown-divider"></div>';
-			$html .= '<a href="' . $intake_url . '" target="_blank" class="dropdown-item" style="font-size:11px;">Customer Intake Form</a>';
-			$html .= '<button id="customer_intake_url-' . $booking->BookingID . '" value="' . $intake_url . '" onclick="Copy_URL(\'CUSTOMER INTAKE LINK\', ' . $booking->BookingID . ')" class="dropdown-item" style="font-size:11px;">Copy Customer Intake Link</button>';
 		}
 		$html .= '</div></div>';
 
@@ -1216,12 +1200,11 @@ class Booking extends MY_Controller
 				'link'  => $base . $qs(array('status' => 'PB')),
 			);
 
-			// Submitted -> Payment Time (self, selected month). Average gap from
-			// the customer submitting their intake to the booking first reaching
-			// PENDING PAYMENT (P), windowed on the submission date — the same
-			// start anchor as the Intake -> BC Response Time card. "Best:" footer
-			// ranks the fastest TC team-wide ("You" when that's the logged-in agent).
-			$this->load->helper(array('submitted_payment_response', 'customer_intake'));
+			// Draft -> Payment Time (self, selected month). Average gap from the
+			// booking being saved as draft (SAD) to it first reaching PENDING
+			// PAYMENT (P), windowed on the draft-save date. "Best:" footer ranks
+			// the fastest TC team-wide ("You" when that's the logged-in agent).
+			$this->load->helper(array('submitted_payment_response', 'response_time'));
 			$sp_start = $month_start . ' 00:00:00';
 			$sp_next  = date('Y-m-01 00:00:00', strtotime($month_start . ' +1 month'));
 			$sp_row = $this->db->query(
@@ -1392,10 +1375,10 @@ class Booking extends MY_Controller
 					'link'  => $base . $qs(array('status' => 'PB')),
 				);
 
-				// Submitted -> Payment Time (team, this month). Same submitted_at
-				// -> first-P metric as the TC card but company-wide, windowed on
-				// the submission date. "Best:" footer = fastest TC this month.
-				$this->load->helper(array('submitted_payment_response', 'customer_intake'));
+				// Draft -> Payment Time (team, this month). Same SAD -> first-P
+				// metric as the TC card but company-wide, windowed on the
+				// draft-save date. "Best:" footer = fastest TC this month.
+				$this->load->helper(array('submitted_payment_response', 'response_time'));
 				$sp_start = $month_start . ' 00:00:00';
 				$sp_next  = date('Y-m-01 00:00:00', strtotime($month_start . ' +1 month'));
 				$sp_row = $this->db->query(
@@ -1628,46 +1611,6 @@ class Booking extends MY_Controller
 					'upcoming_not_ready' => 1,
 					'travel_date'        => $fmt_dmy($next14_start) . ' - ' . $fmt_dmy($next14_end),
 				)),
-			);
-
-			// Intake → BC Response Time (Month) — team-wide SLA card for OP.
-			// Window uses [start, next-month-start) so submissions on the last
-			// day of the month are included.
-			// lead_conversion_credit_helper provides lead_conversion_credit_agent_expr()
-			// which customer_intake_best_agent_sql() depends on. The TC and TC Lead
-			// blocks load it transitively earlier, but the OP block doesn't, so
-			// load it explicitly here.
-			$this->load->helper('lead_conversion_credit');
-			$this->load->helper('customer_intake');
-			$intake_month_start_op = $month_start . ' 00:00:00';
-			$intake_month_next_op  = date('Y-m-01 00:00:00', strtotime($month_start . ' +1 month'));
-			$intake_resp_row = $this->db->query(
-				customer_intake_avg_response_sql(false),
-				array($intake_month_start_op, $intake_month_next_op)
-			)->row();
-			$op_intake_n       = !empty($intake_resp_row) ? (int) $intake_resp_row->n : 0;
-			$op_intake_seconds = ($op_intake_n > 0 && $intake_resp_row->avg_seconds !== null)
-				? (int) round((float) $intake_resp_row->avg_seconds)
-				: null;
-			$best_intake_row = $this->db->query(
-				customer_intake_best_agent_sql(),
-				array($intake_month_start_op, $intake_month_next_op)
-			)->row();
-			$best_intake = null;
-			if (!empty($best_intake_row) && !empty($best_intake_row->AdminID)) {
-				$best_admin = $this->db->select('Name')
-					->where('AdminID', (int) $best_intake_row->AdminID)
-					->get('admin')->row();
-				$best_intake = array(
-					'name'  => $best_admin ? $best_admin->Name : '#' . (int) $best_intake_row->AdminID,
-					'value' => format_response_duration((int) round((float) $best_intake_row->avg_seconds)),
-				);
-			}
-			$cards['intake_response_month'] = array(
-				'value'   => format_response_duration($op_intake_seconds),
-				'count'   => $op_intake_n,
-				'seconds' => $op_intake_seconds,
-				'best'    => $best_intake,
 			);
 
 			$row = $this->db->query(
@@ -2556,9 +2499,10 @@ class Booking extends MY_Controller
 
 				$booking_id = $this->Booking_Model->Create();
 
-				// Customer-intake draft: created before staff knows pricing/suppliers.
-				// Park the booking in SAD ("SAVE AS DRAFT") so the booking list shows
-				// it as awaiting customer input, and reflect that in the status log.
+				// Draft: created before staff know pricing/suppliers. Park the
+				// booking in SAD ("SAVE AS DRAFT") so the booking list shows it as
+				// a draft, and reflect that in the status log. This SAD log row is
+				// the start anchor for the Draft -> Payment response-time metric.
 				$is_draft_intake = (string) $this->input->post('is_draft_intake') === '1';
 				if ($is_draft_intake) {
 					$this->load->helper('booking_status_log');
@@ -2569,13 +2513,13 @@ class Booking extends MY_Controller
 						'SAD',
 						'PBC',
 						$created_by,
-						'Booking created as draft for customer intake link',
+						'Booking saved as draft',
 						true
 					);
 				}
 
-				// A customer-intake draft is created with no products yet, so guard
-				// the batch insert (insert_batch errors on an empty set).
+				// A draft is created with no products yet, so guard the batch
+				// insert (insert_batch errors on an empty set).
 				if (!empty($this->input->post('booking_products'))) {
 					$this->Booking_Product_Model->Create($this->input->post('booking_products'), $booking_id);
 
@@ -2680,8 +2624,7 @@ class Booking extends MY_Controller
 				$array['customer_types'] = $this->Customer_Type_Model->Read_Customer_Types();
 				$array['supplier_invoices'] = [];
 				$array['supplier_invoice_suppliers'] = $this->Payment_Model->Read_Suppliers();
-				$array['customer_intake'] = null;
-				$array['customer_intake_response_seconds'] = null;
+				$array['draft_payment_seconds'] = null;
 				$this->load->view('layout/header', $titles);
 				$this->load->view('booking/booking', $array);
 				$this->load->view('layout/footer');
@@ -2771,8 +2714,7 @@ class Booking extends MY_Controller
 			if($this->input->is_ajax_request()) {
 				// Capture the booking's pre-save Status so that we can graduate a
 				// "Save as Draft" (SAD) booking to PB / PBC once the staff member
-				// picks a graduate button — and so the SAD -> PBC transition anchors
-				// the customer-intake response-time metric.
+				// picks a graduate button.
 				$intake_pre_save_status = null;
 				$intake_post_booking_id = $this->input->post('booking_id');
 				if (!empty($intake_post_booking_id) && is_numeric($intake_post_booking_id)) {
@@ -2808,17 +2750,13 @@ class Booking extends MY_Controller
 					$this->Booking_Customer_Type_Model->Sync($posted_booking_id, $posted_customer_types);
 				}
 
-				// Draft write guard: while a booking sits in SAD *and the customer
-				// has not yet submitted the intake*, the admin form disables every
-				// field but a small whitelist. Re-enforce that server-side so a
-				// tampered request can't write locked columns — strip booking[0]
-				// down to the editable fields plus the structural keys the model
-				// needs. Once the intake is submitted the form unlocks and staff
-				// complete the whole booking before graduating, so the guard lifts.
-				$intake_already_submitted = !empty($intake_post_booking_id)
-					&& (int) $this->db->where('booking_id', (int) $intake_post_booking_id)
-						->count_all_results('booking_customer_intake') > 0;
-				if ($intake_pre_save_status === 'SAD' && !$intake_already_submitted) {
+				// Draft write guard: while a booking sits in SAD ("SAVE AS DRAFT")
+				// the admin form disables every field but a small whitelist.
+				// Re-enforce that server-side so a tampered request can't write
+				// locked columns — strip booking[0] down to the editable fields
+				// plus the structural keys the model needs. The guard lifts once
+				// the draft graduates out of SAD (Save as Pending BC / PBC).
+				if ($intake_pre_save_status === 'SAD') {
 					$this->load->helper('booking_draft');
 					$posted_booking = $this->input->post('booking');
 					if (!empty($posted_booking) && isset($posted_booking[0]) && is_array($posted_booking[0])) {
@@ -3121,11 +3059,10 @@ class Booking extends MY_Controller
 					$this->session->userdata('admin_id')
 				);
 
-				// Customer-intake draft lifecycle (draft_save_mode):
+				// Draft lifecycle (draft_save_mode):
 				//   approve -> set DraftApproved (status stays SAD)
 				//   PB      -> park at PENDING BC (stays editable; can graduate later)
-				//   PBC     -> PENDING BC CONFIRMATION; enters the normal flow and
-				//              writes the log row the intake response-time metric needs
+				//   PBC     -> PENDING BC CONFIRMATION; enters the normal flow
 				//   draft / '' -> stays SAD
 				// Applies from SAD (approve / graduate) or from PB (re-graduate PB->PBC).
 				if (in_array($intake_pre_save_status, array('SAD', 'PB'), true) && !empty($intake_post_booking_id)) {
@@ -3156,7 +3093,7 @@ class Booking extends MY_Controller
 								$target,
 								$intake_pre_save_status,
 								$advancer_id,
-								'Customer intake — booking advanced to ' . $target_label,
+								'Draft — booking advanced to ' . $target_label,
 								true
 							);
 						}
@@ -3322,42 +3259,10 @@ class Booking extends MY_Controller
 						$booking_product->PaymentOutSupplierDeposit = !empty($booking_product->PaymentOutSupplierDeposit) ? date('d/m/Y', strtotime($booking_product->PaymentOutSupplierDeposit)) : '';
 					}
 
-					// Customer-intake context: surface the customer-submitted intake
-					// data so the edit form can render a banner with the raw values
-					// and pre-populate empty booking fields. Empty values are only
-					// filled — staff edits are never clobbered.
-					$this->load->model('Booking_Customer_Intake_Model');
-					$this->load->helper('customer_intake');
-					$intake_data = $this->Booking_Customer_Intake_Model->get_by_booking_id($array['BookingID']);
-					$array['customer_intake'] = $intake_data;
-					$array['customer_intake_response_seconds'] = calculate_submitted_to_payment_seconds($array['BookingID']);
-					if (!empty($intake_data)) {
-						$intake = $intake_data['intake'];
-						if (empty($array['Customer']) && !empty($intake->booking_name)) {
-							$array['Customer'] = $intake->booking_name;
-						}
-						if (empty($array['CustomerMobile']) && !empty($intake->contact_number)) {
-							$array['CustomerMobile'] = $intake->contact_number;
-						}
-						if (empty($array['ic_passport_no']) && !empty($intake->ic_passport_no)) {
-							$array['ic_passport_no'] = $intake->ic_passport_no;
-						}
-						if (empty($array['StartDate']) && !empty($intake->travel_start_date)) {
-							$array['StartDate'] = $intake->travel_start_date;
-						}
-						if (empty($array['EndDate']) && !empty($intake->travel_end_date)) {
-							$array['EndDate'] = $intake->travel_end_date;
-						}
-						if (empty($array['SpecialRemarks']) && !empty($intake->special_remarks)) {
-							$array['SpecialRemarks'] = $intake->special_remarks;
-						}
-						if (empty($array['TravelDate'])
-							&& !empty($intake->travel_start_date)
-							&& !empty($intake->travel_end_date)) {
-							$array['TravelDate'] = date('d/m/Y', strtotime($intake->travel_start_date))
-								. ' - ' . date('d/m/Y', strtotime($intake->travel_end_date));
-						}
-					}
+					// Draft response time: saved-as-draft (SAD) -> PENDING PAYMENT (P),
+					// surfaced on the edit form (matches the "Draft -> Payment Time" card).
+					$this->load->helper('response_time');
+					$array['draft_payment_seconds'] = calculate_submitted_to_payment_seconds($array['BookingID']);
 
 					// Get booking checklists
 					$array['booking_checklists'] = $this->get_booking_checklists($array['booking_products']);
