@@ -1265,11 +1265,12 @@
 								<?php if($guest_lists[0]->TravelInsuranceStatus == 'Y') { ?>
 								if (nationality_text != 'MALAYSIA' && nationality_text != '--SELECT NATIONALITY--' && selectedOptionValue(`#permit_visa-${gid}`) == '') missing.push('Staying in Malaysia with valid permit/visa');
 								if ($(`#employment-${gid}`).val() == '') missing.push('Employment');
-								if ($(`#address-${gid}`).val() == '') missing.push('Address');
-								if ($(`#postcode-${gid}`).val() == '') missing.push('Postcode');
-								if ($(`#city-${gid}`).val() == '') missing.push('City');
-								if ($(`#state-${gid}`).val() == '') missing.push('State');
-								if (selectedOptionValue(`#country-${gid}`) == '') missing.push('Country');
+								// Address/Postcode/City/State/Country only rendered for the first pax — skip when absent
+								if ($(`#address-${gid}`).length && $(`#address-${gid}`).val() == '') missing.push('Address');
+								if ($(`#postcode-${gid}`).length && $(`#postcode-${gid}`).val() == '') missing.push('Postcode');
+								if ($(`#city-${gid}`).length && $(`#city-${gid}`).val() == '') missing.push('City');
+								if ($(`#state-${gid}`).length && $(`#state-${gid}`).val() == '') missing.push('State');
+								if ($(`#country-${gid}`).length && selectedOptionValue(`#country-${gid}`) == '') missing.push('Country');
 								<?php } ?>
 
 								if (missing.length > 0) {
@@ -1307,11 +1308,12 @@
 								<?php if($guest_lists[0]->TravelInsuranceStatus == 'Y') { ?>
 								if (nationality_text != 'MALAYSIA' && nationality_text != '--SELECT NATIONALITY--' && selectedOptionValue(`#permit_visa-${gid}`) == '') missing.push('Staying in Malaysia with valid permit/visa');
 								if ($(`#employment-${gid}`).val() == '') missing.push('Employment');
-								if ($(`#address-${gid}`).val() == '') missing.push('Address');
-								if ($(`#postcode-${gid}`).val() == '') missing.push('Postcode');
-								if ($(`#city-${gid}`).val() == '') missing.push('City');
-								if ($(`#state-${gid}`).val() == '') missing.push('State');
-								if (selectedOptionValue(`#country-${gid}`) == '') missing.push('Country');
+								// Address/Postcode/City/State/Country only rendered for the first pax — skip when absent
+								if ($(`#address-${gid}`).length && $(`#address-${gid}`).val() == '') missing.push('Address');
+								if ($(`#postcode-${gid}`).length && $(`#postcode-${gid}`).val() == '') missing.push('Postcode');
+								if ($(`#city-${gid}`).length && $(`#city-${gid}`).val() == '') missing.push('City');
+								if ($(`#state-${gid}`).length && $(`#state-${gid}`).val() == '') missing.push('State');
+								if ($(`#country-${gid}`).length && selectedOptionValue(`#country-${gid}`) == '') missing.push('Country');
 								<?php } ?>
 
 								if (missing.length > 0) {
