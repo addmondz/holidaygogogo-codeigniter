@@ -408,7 +408,7 @@
 											<div class="row">
 												<div class="col-md-6 mb-7 mb-md-0">
 													<label id="<?php echo 'nationality_label-' . $guest->GuestListID; ?>">Nationality</label>
-													<select <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> name="nationalities[]" id="<?php echo 'nationality-' . $guest->GuestListID; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" class="form-control">
+													<select <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> name="nationalities[]" id="<?php echo 'nationality-' . $guest->GuestListID; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>); Expand_Insurance_For_Foreign(<?php echo $guest->GuestListID; ?>);" class="form-control">
 														<option selected disabled value="">--SELECT NATIONALITY--</option>
 														<?php 
 															$malaysia_id = null;
@@ -511,24 +511,6 @@
 												</div>
 											</div>
 											<br>
-											<?php
-												// "Staying in Malaysia with valid permit/visa?" — only for non-Malaysian guests
-												$is_non_malaysian = (!empty($current_nationality_name) && $current_nationality_name != 'MALAYSIA');
-												$permit_required  = $is_non_malaysian && (!empty($guest->Guest) || !empty($guest->GuestLastName));
-											?>
-											<div id="permit_visa_fields-<?php echo $guest->GuestListID; ?>" class="permit-visa-fields-container" style="<?php echo $is_non_malaysian ? '' : 'display:none;'; ?>">
-												<div class="row">
-													<div class="col-md-12">
-														<label id="permit_visa_label-<?php echo $guest->GuestListID; ?>">Are you staying in Malaysia with valid permit/visa? <?php if($permit_required) { echo '<span style="color:red;">*</span>'; } ?></label>
-														<select <?php if($permit_required) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> name="staying_in_malaysia_permits[]" id="permit_visa-<?php echo $guest->GuestListID; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" class="form-control">
-															<option value="" <?php if(empty($guest->StayingInMalaysiaWithPermit)) { echo 'selected'; } ?>>--SELECT--</option><?php // no disabled: keeps staying_in_malaysia_permits[] index aligned with guests[] ?>
-															<option value="Yes" <?php if($guest->StayingInMalaysiaWithPermit == 'Yes') { echo 'selected'; } ?>>Yes</option>
-															<option value="No" <?php if($guest->StayingInMalaysiaWithPermit == 'No') { echo 'selected'; } ?>>No</option>
-														</select>
-													</div>
-												</div>
-												<br>
-											</div>
 											<input type="hidden" name="dietary_requirements[]" value="<?php echo htmlspecialchars($guest->DietaryRequirement ?? '', ENT_QUOTES); ?>">
 											<div class="row">
 												<div class="col-md-12">
@@ -622,6 +604,24 @@
 													<div id="<?php echo 'travel_insurance_info-' . $guest->GuestListID; ?>" class="collapse">
 														<div class="card-body">
 															<div class="form-group">
+																<?php
+																	// "Staying in Malaysia with valid permit/visa?" — only for non-Malaysian guests
+																	$is_non_malaysian = (!empty($current_nationality_name) && $current_nationality_name != 'MALAYSIA');
+																	$permit_required  = $is_non_malaysian && (!empty($guest->Guest) || !empty($guest->GuestLastName));
+																?>
+																<div id="permit_visa_fields-<?php echo $guest->GuestListID; ?>" class="permit-visa-fields-container" style="<?php echo $is_non_malaysian ? '' : 'display:none;'; ?>">
+																	<div class="row">
+																		<div class="col-md-12">
+																			<label id="permit_visa_label-<?php echo $guest->GuestListID; ?>">Are you staying in Malaysia with valid permit/visa? <?php if($permit_required) { echo '<span style="color:red;">*</span>'; } ?></label>
+																			<select <?php if($permit_required) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> name="staying_in_malaysia_permits[]" id="permit_visa-<?php echo $guest->GuestListID; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" class="form-control">
+																				<option value="" <?php if(empty($guest->StayingInMalaysiaWithPermit)) { echo 'selected'; } ?>>--SELECT--</option><?php // no disabled: keeps staying_in_malaysia_permits[] index aligned with guests[] ?>
+																				<option value="Yes" <?php if($guest->StayingInMalaysiaWithPermit == 'Yes') { echo 'selected'; } ?>>Yes</option>
+																				<option value="No" <?php if($guest->StayingInMalaysiaWithPermit == 'No') { echo 'selected'; } ?>>No</option>
+																			</select>
+																		</div>
+																	</div>
+																	<br>
+																</div>
 																<div class="row">
 																	<div class="col-md-6 mb-7 mb-md-0">
 																		<label id="<?php echo 'employment_label-' . $guest->GuestListID; ?>">Employment <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>
@@ -684,7 +684,7 @@
 							</div>
 							<?php $counter++; ?>
 							<script>
-								<?php if($guest_lists[0]->TravelInsuranceStatus == 'Y' && !empty($guest->Employment)) { ?>
+								<?php if($guest_lists[0]->TravelInsuranceStatus == 'Y' && (!empty($guest->Employment) || $is_non_malaysian)) { ?>
 									$(`#travel_insurance_header-${<?php echo $guest->GuestListID; ?>}`).click();
 								<?php } ?>
 							</script>
@@ -1122,7 +1122,16 @@
 				<?php } ?>
 			}
 		}
-		
+
+		// Reveal the Travel Insurance section (where the permit/visa field lives) for non-Malaysian guests
+		function Expand_Insurance_For_Foreign(guest_list_id) {
+			var nationality_text = $(`#nationality-${guest_list_id} option:selected`).text().toUpperCase();
+			if(nationality_text && nationality_text != 'MALAYSIA' && nationality_text != '--SELECT NATIONALITY--') {
+				if(!$(`#travel_insurance_info-${guest_list_id}`).hasClass('show')) {
+					$(`#travel_insurance_header-${guest_list_id}`).click();
+				}
+			}
+		}
 
 		function Delete_Guest(guest_list_id) {
 			if(guest_list_id > 0) {
@@ -1253,8 +1262,8 @@
 								if (country_code == '' || country_code == null) missing.push('Country Code');
 								if (mobile == '') missing.push('Mobile');
 								if (nationality_text == 'MALAYSIA' && (identification_number == '' || identification_number == null)) missing.push('Identification Number');
-								if (nationality_text != 'MALAYSIA' && nationality_text != '--SELECT NATIONALITY--' && selectedOptionValue(`#permit_visa-${gid}`) == '') missing.push('Staying in Malaysia with valid permit/visa');
 								<?php if($guest_lists[0]->TravelInsuranceStatus == 'Y') { ?>
+								if (nationality_text != 'MALAYSIA' && nationality_text != '--SELECT NATIONALITY--' && selectedOptionValue(`#permit_visa-${gid}`) == '') missing.push('Staying in Malaysia with valid permit/visa');
 								if ($(`#employment-${gid}`).val() == '') missing.push('Employment');
 								if ($(`#address-${gid}`).val() == '') missing.push('Address');
 								if ($(`#postcode-${gid}`).val() == '') missing.push('Postcode');
@@ -1295,8 +1304,8 @@
 								if (country_code == '' || country_code == null) missing.push('Country Code');
 								if (mobile == '') missing.push('Mobile');
 								if (nationality_text == 'MALAYSIA' && (identification_number == '' || identification_number == null)) missing.push('Identification Number');
-								if (nationality_text != 'MALAYSIA' && nationality_text != '--SELECT NATIONALITY--' && selectedOptionValue(`#permit_visa-${gid}`) == '') missing.push('Staying in Malaysia with valid permit/visa');
 								<?php if($guest_lists[0]->TravelInsuranceStatus == 'Y') { ?>
+								if (nationality_text != 'MALAYSIA' && nationality_text != '--SELECT NATIONALITY--' && selectedOptionValue(`#permit_visa-${gid}`) == '') missing.push('Staying in Malaysia with valid permit/visa');
 								if ($(`#employment-${gid}`).val() == '') missing.push('Employment');
 								if ($(`#address-${gid}`).val() == '') missing.push('Address');
 								if ($(`#postcode-${gid}`).val() == '') missing.push('Postcode');
