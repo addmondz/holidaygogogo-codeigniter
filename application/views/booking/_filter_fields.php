@@ -69,7 +69,7 @@
         <div class="form-group">
             <label>Destination</label>
             <?php $selected_destinations = !empty($filter_values['destination'] ?? '') ? explode(',', $filter_values['destination']) : []; ?>
-            <select id="destination_select" data-live-search="true" class="form-control selectpicker" multiple data-actions-box="true" title="--SELECT DESTINATION--">
+            <select id="destination_select" data-live-search="true" data-live-search-style="contains" data-live-search-normalize="true" class="form-control selectpicker" multiple data-actions-box="true" title="--SELECT DESTINATION--">
                 <?php foreach($categories as $category) { ?>
                     <option data-icon="la la-map-pin font-size-lg bs-icon" value="<?php echo $category->CategoryID; ?>" <?php if(in_array($category->CategoryID, $selected_destinations)) { echo 'selected'; } ?>><?php echo $category->Name; ?></option>
                 <?php } ?>

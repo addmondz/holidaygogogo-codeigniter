@@ -29,6 +29,19 @@
     #booking_summary_cards .summary-best { color:#5C6473; font-weight:600; margin-top:6px; padding-top:6px; border-top:1px dashed #EBEDF3; }
     #booking_summary_cards .summary-best .best-name { color:#3F4254; }
     #booking_summary_cards .summary-best .best-name.is-you { color:#6082B6; }
+    #booking_summary_cards .summary-best .best-fig { color:#2F6F4F; font-weight:700; background:#E5F3EC; padding:1px 7px; border-radius:4px; }
+    #booking_summary_cards .sc-month-filter { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:14px; padding:10px 14px; background:#EEF3FB; border-radius:6px; }
+    #booking_summary_cards .sc-month-filter label { margin:0; font-weight:600; color:#3F4254; font-size:13px; }
+    #booking_summary_cards .sc-month-filter input[type=month] { width:auto; max-width:190px; height:auto; padding:6px 10px; font-size:13px; }
+    #booking_summary_cards .sc-month-filter-hint { font-size:12px; color:#7E8299; }
+    #booking_summary_cards .sc-bars { margin-top:10px; }
+    #booking_summary_cards .sc-bar-row { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+    #booking_summary_cards .sc-bar-label { font-size:11px; color:#5C6473; width:48px; flex-shrink:0; font-weight:600; }
+    #booking_summary_cards .sc-bar-track { flex:1; height:14px; background:#E6EAF1; border-radius:7px; overflow:hidden; }
+    #booking_summary_cards .sc-bar-fill { display:block; height:100%; width:0; border-radius:7px; transition:width .35s ease; }
+    #booking_summary_cards .sc-bar-actual { background:#6082B6; }
+    #booking_summary_cards .sc-bar-target { background:#C4A23F; }
+    #booking_summary_cards .sc-bar-amt { font-size:11px; color:#3F4254; font-weight:600; min-width:70px; text-align:right; flex-shrink:0; }
     #booking_summary_cards .summary-row-3 { display:flex; gap:14px; }
     #booking_summary_cards .summary-row-3 > div { flex:1; }
     #booking_summary_cards .summary-row-3 .lbl { font-size:10px; color:#7E8299; text-transform:uppercase; letter-spacing:0.5px; }
@@ -43,6 +56,31 @@
     #booking_summary_cards .panel-body { padding-top:12px; }
     #booking_summary_cards .panel-toggle .panel-title { flex-shrink:0; }
     #booking_summary_cards .ghl-last-sync { margin-left:auto; margin-right:14px; font-size:12px; color:#3F4254; white-space:nowrap; flex-shrink:0; }
+    /* TC summary: float the four KPI cards to the top row in this order, then
+       let the operational cards follow. .row is a flexbox so `order` reorders
+       visually without moving the source blocks. The full-width month filter
+       keeps default order 0 and stays above everything. */
+    #booking_summary_cards .sc-pos-1 { order: 1; }
+    #booking_summary_cards .sc-pos-2 { order: 2; }
+    #booking_summary_cards .sc-pos-3 { order: 3; }
+    #booking_summary_cards .sc-pos-4 { order: 4; }
+    #booking_summary_cards .sc-pos-bottom { order: 5; }
+    /* ---------- Mobile (< md / 768px) ---------- */
+    @media (max-width: 767.98px) {
+        /* Wide data tables (e.g. Sales by Agent's 7 columns) scroll sideways
+           inside their card instead of squishing or forcing page-wide scroll.
+           white-space:nowrap stops columns collapsing so overflow-x kicks in. */
+        #booking_summary_cards .summary-card-body { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        #booking_summary_cards .summary-table th,
+        #booking_summary_cards .summary-table td { white-space: nowrap; }
+        /* "Last synced from GHL" (Owner) drops to its own full-width line so it
+           no longer overflows the Summary header bar on narrow screens. */
+        #booking_summary_cards .panel-toggle { flex-wrap: wrap; }
+        #booking_summary_cards .ghl-last-sync { order: 3; flex-basis: 100%; margin: 6px 0 0; white-space: normal; }
+        /* Tighten the 3-up KPI strips so the figures don't crowd on small phones. */
+        #booking_summary_cards .summary-row-3 { gap: 8px; }
+        #booking_summary_cards .summary-value-sm { font-size: 16px; }
+    }
 </style>
 <div id="booking_summary_cards" class="mb-4">
     <div class="panel-toggle" data-toggle="collapse" data-target="#booking_summary_cards_body" aria-expanded="true" aria-controls="booking_summary_cards_body">
@@ -57,10 +95,17 @@
 
         <?php /* ---------- TC (level 20 / 50) ---------- */ ?>
         <?php if($show_tc) { ?>
-            <div class="col-md-3">
+            <div class="col-md-12">
+                <div class="sc-month-filter">
+                    <label for="sc-month-picker">Viewing month</label>
+                    <input type="month" id="sc-month-picker" class="form-control">
+                    <span class="sc-month-filter-hint">Re-scopes every &ldquo;(Month)&rdquo; card below; the Year card follows the selected year.</span>
+                </div>
+            </div>
+            <div class="col-md-3 sc-pos-bottom">
                 <a class="summary-card" id="sc-bc-month-link" href="#">
                     <div class="card card-custom">
-                        <div class="card-header border-0 summary-card-header" style="background-color:#A7C7E730;">
+                        <div class="card-header border-0 summary-card-header" style="background-color:#F5E6CD;">
                             <h3>BC Created (Month)</h3>
                             <i id="pop-bc-month" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>Formula:</strong> Total count of confirmations credited to you this month.<br><br><strong>Counted when you hold the credited sales slot for the BC:</strong><ul><li>BCs created before 1 Jun 2026: you are the primary sales person (TC1)</li><li>BCs created from 1 Jun 2026: you are the secondary sales person (TC2)</li><li>It's a booking confirmation (not a quotation)</li><li>Not cancelled, not draft</li><li>Created date is in this month</li></ul>"></i>
                         </div>
@@ -72,11 +117,11 @@
                     </div>
                 </a>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-3 sc-pos-bottom">
                 <div class="card card-custom">
-                    <div class="card-header border-0 summary-card-header" style="background-color:#C4B45420;">
-                        <h3>Total Sales (Month) vs Target</h3>
-                        <i id="pop-sales-month" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>Numerator:</strong> Sum of NetTotal across your fully-paid BCs created this month.<br><br><strong>Fully paid</strong> = approved customer payments (Status Y, excluding agent commission) &ge; NetTotal. Partial / deposit-only / unpaid BCs are not counted.<br><br><strong>Same TC1/TC2 credit rule as BC Created (Month).</strong><br><br><strong>Target:</strong> Set per TC per month under Admin &rarr; Sales Targets. Percent = actual &divide; target &times; 100. Week pace compares this week's fully-paid sales against the expected revenue by today if you stayed on target."></i>
+                    <div class="card-header border-0 summary-card-header" style="background-color:#F5E6CD;">
+                        <h3>Month Sales vs Target</h3>
+                        <i id="pop-sales-month" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>Numerator:</strong> Sum of NetTotal across your fully-paid BCs created this month.<br><br><strong>Fully paid</strong> = approved customer payments (Status Y, excluding agent commission) &ge; NetTotal. Partial / deposit-only / unpaid BCs are not counted.<br><br><strong>Same TC1/TC2 credit rule as BC Created (Month).</strong><br><br><strong>Target:</strong> Set per TC per month under Admin &rarr; Sales Targets. Percent = actual &divide; target &times; 100."></i>
                     </div>
                     <div class="card-body summary-card-body">
                         <div class="summary-value-sm" id="sc-sales-month-value">...</div>
@@ -84,7 +129,18 @@
                             Target: <span id="sc-sales-month-target">—</span> ·
                             <span id="sc-sales-month-percent" style="color:#6082B6;font-weight:600;">—</span>
                         </div>
-                        <div class="summary-sub">Week pace: <span id="sc-sales-week-pace">—</span> (<span id="sc-sales-week-value">RM 0.00</span> this week)</div>
+                        <div class="sc-bars">
+                            <div class="sc-bar-row">
+                                <span class="sc-bar-label">Actual</span>
+                                <span class="sc-bar-track"><span class="sc-bar-fill sc-bar-actual" id="sc-sales-month-bar-actual"></span></span>
+                                <span class="sc-bar-amt" id="sc-sales-month-value-2">—</span>
+                            </div>
+                            <div class="sc-bar-row">
+                                <span class="sc-bar-label">Target</span>
+                                <span class="sc-bar-track"><span class="sc-bar-fill sc-bar-target" id="sc-sales-month-bar-target"></span></span>
+                                <span class="sc-bar-amt" id="sc-sales-month-target-2">—</span>
+                            </div>
+                        </div>
                         <div class="summary-sub" id="sc-sales-month-empty-target" style="color:#7E8299;display:none;">
                             Ask your team lead to set a monthly target.
                         </div>
@@ -92,27 +148,58 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-3 sc-pos-bottom">
+                <div class="card card-custom">
+                    <div class="card-header border-0 summary-card-header" style="background-color:#F5E6CD;">
+                        <h3>Year Sales vs Target</h3>
+                        <i id="pop-sales-year" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>Numerator:</strong> Sum of NetTotal across your fully-paid BCs created in the selected year.<br><br><strong>Fully paid</strong> = approved customer payments (Status Y, excluding agent commission) &ge; NetTotal.<br><br><strong>Target:</strong> Set per TC per year under Admin &rarr; Yearly Target. Percent = actual &divide; target &times; 100."></i>
+                    </div>
+                    <div class="card-body summary-card-body">
+                        <div class="summary-value-sm" id="sc-sales-year-value">...</div>
+                        <div class="summary-sub">
+                            Target: <span id="sc-sales-year-target">—</span> ·
+                            <span id="sc-sales-year-percent" style="color:#6082B6;font-weight:600;">—</span>
+                        </div>
+                        <div class="sc-bars">
+                            <div class="sc-bar-row">
+                                <span class="sc-bar-label">Actual</span>
+                                <span class="sc-bar-track"><span class="sc-bar-fill sc-bar-actual" id="sc-sales-year-bar-actual"></span></span>
+                                <span class="sc-bar-amt" id="sc-sales-year-value-2">—</span>
+                            </div>
+                            <div class="sc-bar-row">
+                                <span class="sc-bar-label">Target</span>
+                                <span class="sc-bar-track"><span class="sc-bar-fill sc-bar-target" id="sc-sales-year-bar-target"></span></span>
+                                <span class="sc-bar-amt" id="sc-sales-year-target-2">—</span>
+                            </div>
+                        </div>
+                        <div class="summary-sub" id="sc-sales-year-empty-target" style="color:#7E8299;display:none;">
+                            Ask your team lead to set a yearly target.
+                        </div>
+                        <div class="summary-sub summary-best" id="sc-sales-year-best">Best: —</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 sc-pos-4">
                 <a class="summary-card" id="sc-cancel-rate-link" href="#">
                     <div class="card card-custom">
-                        <div class="card-header border-0 summary-card-header" style="background-color:#FFFAA030;">
+                        <div class="card-header border-0 summary-card-header" style="background-color:#D7E2F2;">
                             <h3>Cancellation Rate (Month)</h3>
                             <i id="pop-cancel-rate" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>Formula:</strong> Cancelled &divide; Total &times; 100<br><br><strong>Top number:</strong> BCs created this month that were cancelled.<br><strong>Bottom number:</strong> All BCs created this month (cancelled ones included).<br><br><strong>Filters:</strong> Drafts excluded. TC view counts only your BCs; team view counts everyone's.<br><br><strong>Example:</strong> 20 BCs, 5 cancelled &rarr; 25%.<br><br><strong>Note:</strong> Based on creation date, not cancellation date. A BC cancelled this month but created last month is NOT counted here."></i>
                         </div>
                         <div class="card-body summary-card-body">
                             <div class="summary-value" id="sc-cancel-rate-value">...</div>
                             <div class="summary-sub"><span id="sc-cancel-rate-detail">—</span> of your BCs created this month were cancelled. Click to view the cancelled list.</div>
-                            <div class="summary-sub summary-best" id="sc-cancel-rate-best">Best: —</div>
+                            <div class="summary-sub summary-best" id="sc-cancel-rate-best">Lowest cancellation rate: —</div>
                         </div>
                     </div>
                 </a>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-3 sc-pos-bottom">
                 <a class="summary-card" id="sc-payment-overdue-link" href="#">
                     <div class="card card-custom">
-                        <div class="card-header border-0 summary-card-header" style="background-color:#FAA0A030;">
+                        <div class="card-header border-0 summary-card-header" style="background-color:#F5E6CD;">
                             <h3>Payment Overdue</h3>
-                            <i id="pop-payment-overdue" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>Counted when EITHER:</strong><ul><li>Full payment deadline has passed AND the BC is still waiting for full payment (deposit unpaid, or deposit paid but balance still owing)</li><li>Deposit deadline has passed AND the deposit is still unpaid</li></ul><strong>Filters:</strong> Your BCs only; not cancelled.<br><br><strong>Excludes:</strong> BCs already fully paid.<br><br><strong>No period filter</strong> — checks each BC's own deadlines against today."></i>
+                            <i id="pop-payment-overdue" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>Counted when EITHER:</strong><ul><li>Full payment deadline has passed AND the BC is still waiting for full payment (deposit unpaid, or deposit paid but balance still owing)</li><li>Deposit deadline has passed AND the deposit is still unpaid</li></ul><strong>Filters:</strong> Your BCs only; not cancelled.<br><br><strong>Excludes:</strong> BCs already fully paid.<br><br><strong>No period filter</strong> — checks each BC's own deadlines against today. A deadline falling today counts as overdue from 3:00pm onward."></i>
                         </div>
                         <div class="card-body summary-card-body">
                             <div class="summary-value" id="sc-payment-overdue-count">...</div>
@@ -121,10 +208,10 @@
                     </div>
                 </a>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-3 sc-pos-bottom">
                 <a class="summary-card" id="sc-upcoming-not-ready-link" href="#">
                     <div class="card card-custom">
-                        <div class="card-header border-0 summary-card-header" style="background-color:#FFFAA030;">
+                        <div class="card-header border-0 summary-card-header" style="background-color:#F5E6CD;">
                             <h3>Travel in 7 Days – Not Yet Ready</h3>
                             <i id="pop-upcoming-not-ready" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>&quot;Not yet ready&quot; means the BC is still waiting on:</strong><ul><li>Payment</li><li>Booking operations</li><li>Guest list submission</li><li>Travel voucher</li></ul>&quot;Ready&quot; means the BC has moved to Pending Travel (or beyond).<br><br><strong>Filters:</strong><ul><li>Travel start date between <strong>tomorrow</strong> and today + 7 days</li><li>Still at one of the upstream stages above</li><li>Not cancelled</li></ul>TC view shows your BCs only; OP/Owner view is team-wide.<br><br><strong>Why it matters:</strong> Urgent — guests travel within a week."></i>
                         </div>
@@ -135,10 +222,24 @@
                     </div>
                 </a>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-3 sc-pos-bottom">
+                <a class="summary-card" id="sc-upcoming-not-ready-14-link" href="#">
+                    <div class="card card-custom">
+                        <div class="card-header border-0 summary-card-header" style="background-color:#F5E6CD;">
+                            <h3>Travel in 14 Days – Not Yet Ready</h3>
+                            <i id="pop-upcoming-not-ready-14" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>&quot;Not yet ready&quot; means the BC is still waiting on:</strong><ul><li>Payment</li><li>Booking operations</li><li>Guest list submission</li><li>Travel voucher</li></ul>&quot;Ready&quot; means the BC has moved to Pending Travel (or beyond).<br><br><strong>Filters:</strong><ul><li>Travel start date between <strong>tomorrow</strong> and today + 14 days</li><li>Still at one of the upstream stages above</li><li>Not cancelled</li></ul>Cumulative window &mdash; includes the &quot;within 7 days&quot; BCs.<br><br><strong>Why it matters:</strong> Two-week heads-up to get ready."></i>
+                        </div>
+                        <div class="card-body summary-card-body">
+                            <div class="summary-value" id="sc-upcoming-not-ready-14-count">...</div>
+                            <div class="summary-sub">Your BCs starting travel within 14 days that are still upstream (Payment / Booking Op / Guest List / Travel Voucher) and not yet flagged "Pending Travel". Click to chase readiness.</div>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            <div class="col-md-3 sc-pos-bottom">
                 <a class="summary-card" id="sc-pending-review-link" href="#">
                     <div class="card card-custom">
-                        <div class="card-header border-0 summary-card-header" style="background-color:#FFFAA030;">
+                        <div class="card-header border-0 summary-card-header" style="background-color:#F5E6CD;">
                             <h3>Travel Completed - Pending Review</h3>
                             <i id="pop-pending-review" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>Counted when:</strong><ul><li>The BC is confirmed (Status = COMPLETED)</li><li>After-sales review is still pending (AfterSalesService = PENDING)</li><li>Not cancelled</li><li>You are the sales agent</li></ul><strong>Why it matters:</strong> Travel has ended — close the loop with the customer (review request / feedback) and mark the booking complete."></i>
                         </div>
@@ -149,22 +250,49 @@
                     </div>
                 </a>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-3 sc-pos-bottom">
+                <a class="summary-card" id="sc-pending-bc-link" href="#">
+                    <div class="card card-custom">
+                        <div class="card-header border-0 summary-card-header" style="background-color:#F5E6CD;">
+                            <h3>Pending BC</h3>
+                            <i id="pop-pending-bc" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>Counted when:</strong><ul><li>The booking is parked at <strong>PENDING BC</strong> (status PB)</li><li>Not cancelled</li><li>You hold the credited sales slot (TC1 before 1 Jun 2026; TC2 from 1 Jun 2026)</li></ul><strong>Live backlog</strong> — no date window. PB is the stage after a draft has been graduated to &ldquo;Pending BC&rdquo; but not yet confirmed (PBC). Click to view and progress them."></i>
+                        </div>
+                        <div class="card-body summary-card-body">
+                            <div class="summary-value" id="sc-pending-bc-count">...</div>
+                            <div class="summary-sub">Your bookings sitting at &ldquo;Pending BC&rdquo;, waiting to be confirmed. Click to view the list.</div>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            <div class="col-md-3 sc-pos-bottom">
                 <div class="card card-custom">
-                    <div class="card-header border-0 summary-card-header" style="background-color:#F0FFFF;">
-                        <h3>Conversion Rate (Month)</h3>
-                        <i id="pop-conv-rate" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>Formula:</strong> Converted &divide; Total Leads &times; 100<br><br><strong>Counted as your conversion when:</strong><ul><li>The lead is linked to a BC AND you hold the credited TC slot for that BC (TC1 before 1 Jun 2026; TC2 from 1 Jun 2026)</li></ul><strong>Scope:</strong> Leads assigned to you this month (synced from GHL).<br><br><strong>Best:</strong> Top agent across the whole team this month. Agents with fewer than 3 leads are excluded so the bar stays meaningful."></i>
+                    <div class="card-header border-0 summary-card-header" style="background-color:#D7E2F2;">
+                        <h3>Draft &rarr; Payment Time (Month)</h3>
+                        <i id="pop-submitted-payment" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>Measures:</strong> Average time from a booking being saved as draft to it first reaching <strong>PENDING PAYMENT</strong>.<br><br><strong>Start:</strong> when the booking was saved as draft (status SAD).<br><strong>End:</strong> first time the BC was approved into PENDING PAYMENT (P).<br><br><strong>Window:</strong> drafts saved in the selected month. Only your bookings (credited slot) that have reached payment are averaged; ones still in progress aren&rsquo;t counted yet.<br><br><strong>Best:</strong> fastest TC team-wide (min 2 bookings)."></i>
+                    </div>
+                    <div class="card-body summary-card-body">
+                        <div class="summary-value" id="sc-submitted-payment-value">...</div>
+                        <div class="summary-sub"><span id="sc-submitted-payment-count">—</span> of your drafts this month reached payment. Average draft-to-payment time.</div>
+                        <div class="summary-sub summary-best" id="sc-submitted-payment-best">Best: —</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 sc-pos-1">
+                <div class="card card-custom">
+                    <div class="card-header border-0 summary-card-header" style="background-color:#D7E2F2;">
+                        <h3>Conversion Rate (YTD)</h3>
+                        <i id="pop-conv-rate" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>Formula:</strong> Converted &divide; Total Leads &times; 100<br><br><strong>Counted as your conversion when:</strong><ul><li>The lead is linked to a BC AND you hold the credited TC slot on that BC: <strong>Booking PIC (TC1)</strong> for BCs before 1 Jun 2026, <strong>Sales Agent (TC2)</strong> from 1 Jun 2026 onward</li></ul><strong>Scope:</strong> Leads assigned to you year-to-date (1 Jan &rarr; today), synced from GHL. Independent of the month filter.<br><br><strong>Best:</strong> Top agent across the whole team YTD. Agents with fewer than 3 leads are excluded so the bar stays meaningful."></i>
                     </div>
                     <div class="card-body summary-card-body">
                         <div class="summary-value" id="sc-conv-rate-value">...</div>
-                        <div class="summary-sub"><span id="sc-conv-rate-detail">—</span> of your leads this month converted to a BC where you hold sales credit.</div>
+                        <div class="summary-sub"><span id="sc-conv-rate-detail">—</span> of your leads year-to-date converted to a BC where you hold the credited TC slot (Booking PIC / TC1 before 1 Jun, Sales Agent / TC2 after).</div>
                         <div class="summary-sub summary-best" id="sc-conv-rate-best">Best: —</div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-3 sc-pos-2">
                 <div class="card card-custom">
-                    <div class="card-header border-0 summary-card-header" style="background-color:#A7C7E730;">
+                    <div class="card-header border-0 summary-card-header" style="background-color:#D7E2F2;">
                         <h3>My Leads</h3>
                         <i id="pop-tc-leads" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>From:</strong> GHL leads assigned to you (matched by your admin email &rarr; GHL user).<br><br><strong>Counts by lead creation date:</strong><ul><li><strong>Today:</strong> leads created today</li><li><strong>Week:</strong> Mon &rarr; Sun of this week</li><li><strong>Month:</strong> 1st &rarr; last day of this month</li></ul><strong>Note:</strong> If your admin email isn't linked to a GHL user, this card shows zeros."></i>
                     </div>
@@ -178,9 +306,9 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-3 sc-pos-3">
                 <div class="card card-custom">
-                    <div class="card-header border-0 summary-card-header" style="background-color:#F0FFFF;">
+                    <div class="card-header border-0 summary-card-header" style="background-color:#D7E2F2;">
                         <h3>My Response Time</h3>
                         <i id="pop-tc-resp" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>From:</strong> GHL leads assigned to you.<br><br><strong>Avg first reply</strong> = mean time across the first 5 replies on each lead, formatted as seconds / minutes / hours.<br><br><strong>Duty-hours only:</strong> Response time counts only elapsed time inside Mon&ndash;Sat 08:00&ndash;22:00 MYT, so after-hours time does not increase the number.<br><br><strong>Per window (by lead creation date):</strong><ul><li><strong>Today</strong></li><li><strong>Week</strong> (Mon &rarr; Sun)</li><li><strong>Month</strong> (1st &rarr; last)</li></ul><strong>Empty (&mdash;)</strong> when there were no responded leads in that window."></i>
                     </div>
@@ -198,6 +326,9 @@
 
         <?php /* ---------- TC LEAD / Owner ---------- */ ?>
         <?php if($show_tclead || $show_owner) { ?>
+            <?php /* Owner replaces this aggregate Leads card with the per-agent
+                     "Leads" table below; TC LEAD keeps the team-wide totals. */ ?>
+            <?php if($show_tclead) { ?>
             <div class="col-md-4">
                 <div class="card card-custom">
                     <div class="card-header border-0 summary-card-header" style="background-color:#A7C7E730;">
@@ -214,6 +345,7 @@
                     </div>
                 </div>
             </div>
+            <?php } ?>
             <div class="col-md-4">
                 <div class="card card-custom">
                     <div class="card-header border-0 summary-card-header" style="background-color:#FFFAA030;">
@@ -294,6 +426,50 @@
                     </div>
                 </div>
             </div>
+            <?php if($show_owner) { ?>
+            <div class="col-md-6">
+                <div class="card card-custom">
+                    <div class="card-header border-0 summary-card-header" style="background-color:#A7C7E730;">
+                        <h3>Leads</h3>
+                        <i id="pop-leads-by-agent" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="Loading…"></i>
+                    </div>
+                    <div class="card-body summary-card-body">
+                        <div class="summary-sub mb-2">New leads synced from GHL, one row per agent for today, this week, and this month-to-date.</div>
+                        <table class="table table-sm summary-table">
+                            <thead><tr><th>Agent</th><th class="text-right">Today</th><th class="text-right">Week</th><th class="text-right">Month</th></tr></thead>
+                            <tbody id="sc-leads-by-agent-body"><tr><td colspan="4" class="text-center text-muted">Loading…</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <a class="summary-card" id="sc-pending-bc-link" href="#">
+                    <div class="card card-custom">
+                        <div class="card-header border-0 summary-card-header" style="background-color:#FFFAA030;">
+                            <h3>Pending BC</h3>
+                            <i id="pop-pending-bc" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>Counted when:</strong><ul><li>The booking is parked at <strong>PENDING BC</strong> (status PB)</li><li>Not cancelled</li></ul><strong>Team-wide live backlog</strong> — no date window. PB is the stage after a draft has been graduated to &ldquo;Pending BC&rdquo; but not yet confirmed (PBC). Click to view and progress them."></i>
+                        </div>
+                        <div class="card-body summary-card-body">
+                            <div class="summary-value" id="sc-pending-bc-count">...</div>
+                            <div class="summary-sub">All bookings sitting at &ldquo;Pending BC&rdquo;, waiting to be confirmed. Click to view the list.</div>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            <div class="col-md-6">
+                <div class="card card-custom">
+                    <div class="card-header border-0 summary-card-header" style="background-color:#A7C7E730;">
+                        <h3>Draft &rarr; Payment Time (Month)</h3>
+                        <i id="pop-submitted-payment" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>Measures:</strong> Average time from a booking being saved as draft to it first reaching <strong>PENDING PAYMENT</strong>.<br><br><strong>Start:</strong> when the booking was saved as draft (status SAD).<br><strong>End:</strong> first time the BC was approved into PENDING PAYMENT (P).<br><br><strong>Window:</strong> drafts saved this month, team-wide. Ones still in progress aren&rsquo;t counted yet.<br><br><strong>Best:</strong> fastest TC this month (min 2 bookings)."></i>
+                    </div>
+                    <div class="card-body summary-card-body">
+                        <div class="summary-value" id="sc-submitted-payment-value">...</div>
+                        <div class="summary-sub"><span id="sc-submitted-payment-count">—</span> drafts this month reached payment. Average draft-to-payment time across the team.</div>
+                        <div class="summary-sub summary-best" id="sc-submitted-payment-best">Best: —</div>
+                    </div>
+                </div>
+            </div>
+            <?php } ?>
             <div class="col-md-6">
                 <div class="card card-custom">
                     <div class="card-header border-0 summary-card-header" style="background-color:#A7C7E730;">
@@ -410,17 +586,18 @@
                 </a>
             </div>
             <div class="col-md-3">
-                <div class="card card-custom">
-                    <div class="card-header border-0 summary-card-header" style="background-color:#EDF4FC;">
-                        <h3>Intake &rarr; BC Response Time (Month)</h3>
-                        <i id="pop-intake-resp-month-op" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>Team-wide avg</strong> time between a customer hitting Submit on the intake form and the booking being advanced to <strong>Pending BC Confirmation</strong> by staff this month.<br><br><strong>Counted when:</strong><ul><li>Customer submitted this month</li><li>Booking has at least one <code>PCI &rarr; PBC</code> transition logged</li><li>Booking is not soft-deleted</li></ul><strong>Best:</strong> Fastest TC across the team. Agents with fewer than 2 intakes are excluded so a single fast booking doesn't crown someone."></i>
+                <a class="summary-card" id="sc-upcoming-not-ready-op-14-link" href="#">
+                    <div class="card card-custom">
+                        <div class="card-header border-0 summary-card-header" style="background-color:#FFFAA030;">
+                            <h3>Travel in 14 Days – Not Yet Ready</h3>
+                            <i id="pop-upcoming-not-ready-op-14" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>&quot;Not yet ready&quot; means the BC is still waiting on:</strong><ul><li>Payment</li><li>Booking operations</li><li>Guest list submission</li><li>Travel voucher</li></ul>&quot;Ready&quot; means the BC has moved to Pending Travel (or beyond).<br><br><strong>Filters:</strong><ul><li>Travel start date between <strong>tomorrow</strong> and today + 14 days</li><li>Still at one of the upstream stages above</li><li>Not cancelled</li></ul>Cumulative window &mdash; includes the &quot;within 7 days&quot; BCs.<br><br><strong>Why it matters:</strong> Two-week heads-up to get ready."></i>
+                        </div>
+                        <div class="card-body summary-card-body">
+                            <div class="summary-value" id="sc-upcoming-not-ready-op-14-count">...</div>
+                            <div class="summary-sub">All BCs starting travel within 14 days still upstream (Payment / Booking Op / Guest List / Travel Voucher) and not yet flagged "Pending Travel". Click to chase team-wide readiness.</div>
+                        </div>
                     </div>
-                    <div class="card-body summary-card-body">
-                        <div class="summary-value-sm" id="sc-intake-resp-month-value">...</div>
-                        <div class="summary-sub"><span id="sc-intake-resp-month-count">—</span> intakes this month, team-wide.</div>
-                        <div class="summary-sub summary-best" id="sc-intake-resp-month-best">Best: —</div>
-                    </div>
-                </div>
+                </a>
             </div>
             <div class="col-md-3">
                 <a class="summary-card" id="sc-gl-submitted-link" href="#">
@@ -648,23 +825,46 @@ $(function() {
         var el = document.getElementById(id);
         if(el && href) el.setAttribute('href', href);
     }
-    function setBest(id, best) {
+    function setBest(id, best, label) {
         var el = document.getElementById(id);
         if(!el) return;
+        label = label || 'Best';
         if(!best || best.name == null || best.value == null) {
-            el.innerHTML = 'Best: —';
+            el.innerHTML = label + ': —';
             return;
         }
         var isYou = (String(best.name) === 'You');
-        el.innerHTML = 'Best: <span class="best-name' + (isYou ? ' is-you' : '') + '">'
+        el.innerHTML = label + ': <span class="best-name' + (isYou ? ' is-you' : '') + '">'
             + escapeHtml(best.name) + '</span> · ' + escapeHtml(best.value);
+    }
+    // Actual vs Target bars: both scaled to max(actual, target) so the longer
+    // bar fills the track and the other is proportional. Over-achievement caps
+    // the actual bar at 100% visually while the % label keeps the true figure.
+    function setBars(actualId, targetId, raw, rawTarget) {
+        var a = parseFloat(raw) || 0;
+        var tg = parseFloat(rawTarget) || 0;
+        var scale = Math.max(a, tg, 1);
+        var af = document.getElementById(actualId);
+        var tf = document.getElementById(targetId);
+        if(af) af.style.width = Math.max(0, Math.min(100, (a / scale) * 100)) + '%';
+        if(tf) tf.style.width = (tg > 0 ? Math.max(0, Math.min(100, (tg / scale) * 100)) : 0) + '%';
+    }
+    // Best line, figure only (no agent name) with standout styling.
+    function setBestFigure(id, best) {
+        var el = document.getElementById(id);
+        if(!el) return;
+        if(!best || best.value == null) { el.innerHTML = 'Best: —'; return; }
+        el.innerHTML = 'Best: <span class="best-fig">' + escapeHtml(best.value) + '</span>';
     }
     // Keep clicks on the "Last synced" text from collapsing the panel.
     $('#booking_summary_cards .ghl-last-sync').on('click', function(e) {
         e.stopPropagation();
     });
 
-    $.getJSON('<?php echo base_url("Booking/ajax_summary_cards"); ?>', function(resp) {
+    function loadSummaryCards(month) {
+        var url = '<?php echo base_url("Booking/ajax_summary_cards"); ?>';
+        if(month) { url += '?month=' + encodeURIComponent(month); }
+        $.getJSON(url, function(resp) {
         if(!resp || resp.error) return;
         var c = resp.cards || {};
         var t = resp.tables || {};
@@ -673,26 +873,44 @@ $(function() {
         if(m.last_ghl_sync_display) {
             setText('ghl-last-sync', m.last_ghl_sync_display);
         }
+        // Reflect the server-resolved period back into the picker (covers the
+        // first load and any fallback when a bad month was requested).
+        var scPick = document.getElementById('sc-month-picker');
+        if(scPick && m.selected_month && scPick.value !== m.selected_month) {
+            scPick.value = m.selected_month;
+        }
 
         // TC cards
         if(c.bc_month) {
             setText('sc-bc-month-count', c.bc_month.count);
             setLink('sc-bc-month-link', c.bc_month.link);
-            setBest('sc-bc-month-best', c.bc_month.best);
+            setBestFigure('sc-bc-month-best', c.bc_month.best);
         }
         if(c.sales_month) {
             setText('sc-sales-month-value', c.sales_month.value);
             setText('sc-sales-month-target', c.sales_month.target);
             setText('sc-sales-month-percent', c.sales_month.percent);
-            setBest('sc-sales-month-best', c.sales_month.best);
+            setText('sc-sales-month-value-2', c.sales_month.value);
+            setText('sc-sales-month-target-2', c.sales_month.has_target ? c.sales_month.target : '—');
+            setBars('sc-sales-month-bar-actual', 'sc-sales-month-bar-target', c.sales_month.raw, c.sales_month.raw_target);
+            setBestFigure('sc-sales-month-best', c.sales_month.best);
             var emptyEl = document.getElementById('sc-sales-month-empty-target');
             if(emptyEl) {
                 emptyEl.style.display = c.sales_month.has_target ? 'none' : '';
             }
         }
-        if(c.sales_week) {
-            setText('sc-sales-week-value', c.sales_week.value);
-            setText('sc-sales-week-pace',  c.sales_week.pace);
+        if(c.sales_year) {
+            setText('sc-sales-year-value', c.sales_year.value);
+            setText('sc-sales-year-target', c.sales_year.target);
+            setText('sc-sales-year-percent', c.sales_year.percent);
+            setText('sc-sales-year-value-2', c.sales_year.value);
+            setText('sc-sales-year-target-2', c.sales_year.has_target ? c.sales_year.target : '—');
+            setBars('sc-sales-year-bar-actual', 'sc-sales-year-bar-target', c.sales_year.raw, c.sales_year.raw_target);
+            setBestFigure('sc-sales-year-best', c.sales_year.best);
+            var emptyElY = document.getElementById('sc-sales-year-empty-target');
+            if(emptyElY) {
+                emptyElY.style.display = c.sales_year.has_target ? 'none' : '';
+            }
         }
         if(c.tc_leads_dwm) {
             setText('sc-tc-leads-day',   c.tc_leads_dwm.day);
@@ -704,28 +922,32 @@ $(function() {
             setText('sc-tc-resp-week',  c.tc_response_time_dwm.week);
             setText('sc-tc-resp-month', c.tc_response_time_dwm.month);
         }
-        if(c.intake_response_month) {
-            var ir = c.intake_response_month;
-            // format_response_duration returns '-' for null; for the card we'd
-            // rather render an em-dash when no intakes happened this month.
-            var hasData = (ir.count > 0 && ir.value && ir.value !== '-');
-            setText('sc-intake-resp-month-value', hasData ? ir.value : '—');
-            setText('sc-intake-resp-month-count', ir.count);
-            setBest('sc-intake-resp-month-best', ir.best);
+        if(c.pending_bc) {
+            setText('sc-pending-bc-count', c.pending_bc.count);
+            setLink('sc-pending-bc-link', c.pending_bc.link);
+        }
+        if(c.submitted_payment_response_month) {
+            var sp = c.submitted_payment_response_month;
+            // format_response_duration returns '-' for null; render an em-dash
+            // when no drafts reached payment in the window.
+            var spHas = (sp.count > 0 && sp.value && sp.value !== '-');
+            setText('sc-submitted-payment-value', spHas ? sp.value : '—');
+            setText('sc-submitted-payment-count', sp.count);
+            setBest('sc-submitted-payment-best', sp.best, 'Fastest');
         }
         if(c.cancellation_rate) {
             setText('sc-cancel-rate-value', c.cancellation_rate.value);
             setText('sc-cancel-rate-detail', c.cancellation_rate.detail);
             setLink('sc-cancel-rate-link', c.cancellation_rate.link);
-            setBest('sc-cancel-rate-best', c.cancellation_rate.best);
+            setBest('sc-cancel-rate-best', c.cancellation_rate.best, 'Lowest cancellation rate');
             setText('sc-cancel-rate-tl-value', c.cancellation_rate.value);
             setText('sc-cancel-rate-tl-detail', c.cancellation_rate.detail);
             setLink('sc-cancel-rate-tl-link', c.cancellation_rate.link);
         }
-        if(c.conversion_rate_month) {
-            setText('sc-conv-rate-value',  c.conversion_rate_month.value);
-            setText('sc-conv-rate-detail', c.conversion_rate_month.detail);
-            setBest('sc-conv-rate-best',   c.conversion_rate_month.best);
+        if(c.conversion_rate_ytd) {
+            setText('sc-conv-rate-value',  c.conversion_rate_ytd.value);
+            setText('sc-conv-rate-detail', c.conversion_rate_ytd.detail);
+            setBestFigure('sc-conv-rate-best',   c.conversion_rate_ytd.best);
         }
         if(c.payment_overdue) {
             setText('sc-payment-overdue-count', c.payment_overdue.count);
@@ -735,6 +957,10 @@ $(function() {
             setText('sc-upcoming-not-ready-count', c.upcoming_travel_not_ready.count);
             setLink('sc-upcoming-not-ready-link',  c.upcoming_travel_not_ready.link);
         }
+        if(c.upcoming_travel_not_ready_14) {
+            setText('sc-upcoming-not-ready-14-count', c.upcoming_travel_not_ready_14.count);
+            setLink('sc-upcoming-not-ready-14-link',  c.upcoming_travel_not_ready_14.link);
+        }
         if(c.pending_review) {
             setText('sc-pending-review-count', c.pending_review.count);
             setLink('sc-pending-review-link',  c.pending_review.link);
@@ -742,6 +968,10 @@ $(function() {
         if(c.upcoming_travel_not_ready_op) {
             setText('sc-upcoming-not-ready-op-count', c.upcoming_travel_not_ready_op.count);
             setLink('sc-upcoming-not-ready-op-link',  c.upcoming_travel_not_ready_op.link);
+        }
+        if(c.upcoming_travel_not_ready_op_14) {
+            setText('sc-upcoming-not-ready-op-14-count', c.upcoming_travel_not_ready_op_14.count);
+            setLink('sc-upcoming-not-ready-op-14-link',  c.upcoming_travel_not_ready_op_14.link);
         }
 
         // TC LEAD / OP / Owner BC week+month
@@ -883,6 +1113,24 @@ $(function() {
             }
         }
 
+        // Leads by Agent (Owner) — Today / Week / Month new-lead counts per agent.
+        var leadsByAgent = t.leads_by_agent;
+        var leadsByAgentBody = document.getElementById('sc-leads-by-agent-body');
+        if(leadsByAgentBody) {
+            if(leadsByAgent && leadsByAgent.length) {
+                leadsByAgentBody.innerHTML = leadsByAgent.map(function(r) {
+                    return '<tr>' +
+                        '<td>' + escapeHtml(r.agent_name || '—') + '</td>' +
+                        '<td class="text-right">' + escapeHtml(r.day) + '</td>' +
+                        '<td class="text-right">' + escapeHtml(r.week) + '</td>' +
+                        '<td class="text-right">' + escapeHtml(r.month) + '</td>' +
+                    '</tr>';
+                }).join('');
+            } else {
+                leadsByAgentBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No leads this month</td></tr>';
+            }
+        }
+
         var teams = t.sales_by_team;
         var teamBody = document.getElementById('sc-sales-by-team-body');
         if(teamBody) {
@@ -997,7 +1245,18 @@ $(function() {
                 });
             });
         }
-    });
+        });
+    }
+
+    // Month filter: re-fetch all cards scoped to the chosen month. The Year
+    // card follows the selected year. Only present for TC (level 20/50).
+    var scMonthPicker = document.getElementById('sc-month-picker');
+    if(scMonthPicker) {
+        scMonthPicker.addEventListener('change', function() {
+            loadSummaryCards(scMonthPicker.value);
+        });
+    }
+    loadSummaryCards();
 })();
 </script>
 <?php } ?>

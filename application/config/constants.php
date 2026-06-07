@@ -109,7 +109,8 @@ defined('BOOKING_STATUS')      or define('BOOKING_STATUS', serialize(array(
     'PR'    => 'PENDING REVIEW',
 
     // current booking flow
-    'PCI'   => 'PENDING CUSTOMER INFO',
+    'SAD'   => 'SAVE AS DRAFT',
+    'PB'    => 'PENDING BC',
     'PBC'   => 'PENDING BC CONFIRMATION',
     'P'     => 'PENDING PAYMENT',
     'PBO'   => 'PENDING BOOKING OPERATION',

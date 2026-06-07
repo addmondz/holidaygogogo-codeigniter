@@ -21,8 +21,17 @@ class Guests_Model extends CI_Model
 		$has_q     = $q_raw !== '';
 		$like      = $has_q ? '%' . $q_raw . '%' : null;
 
-		$run_bookings = ($type !== 'ghl');
-		$run_ghl      = ($type !== 'guest');
+		$this->load->helper('guest_contact');
+
+		// Guest Role = Lead selects GHL leads only, so it drops the booking
+		// branch (mirror of the GHL suppression below).
+		$run_bookings = ($type !== 'ghl')
+			&& !guest_list_bookings_suppressed_by_filters($this->input->get());
+		// GHL leads carry no booking-only attributes (sales agent, source,
+		// travel dates, destination, pax, etc.), so any such filter drops them
+		// from the listing.
+		$run_ghl      = ($type !== 'guest')
+			&& !guest_list_ghl_suppressed_by_filters($this->input->get());
 
 		$booking = null;
 		if($run_bookings) {
@@ -41,28 +50,39 @@ class Guests_Model extends CI_Model
 				$b_params[] = $this->session->userdata('admin_id');
 			}
 
-			if(!empty($this->input->get('booking_date'))) {
-				$range = explode(' - ', $this->input->get('booking_date'));
-				if(count($range) == 2) {
-					$start = date('Y-m-d', strtotime(str_replace('/', '-', $range[0])));
-					$end   = date('Y-m-d', strtotime(str_replace('/', '-', $range[1])));
-					$where     .= " AND b.InsertDate >= ? AND b.InsertDate < DATE_ADD(?, INTERVAL 1 DAY) ";
-					$b_params[] = $start;
-					$b_params[] = $end;
-				}
+			$booking_range = guest_list_parse_date_range($this->input->get('booking_date'));
+			if($booking_range !== null) {
+				$where     .= " AND b.InsertDate >= ? AND b.InsertDate < DATE_ADD(?, INTERVAL 1 DAY) ";
+				$b_params[] = $booking_range[0];
+				$b_params[] = $booking_range[1];
 			}
 
-			if(!empty($this->input->get('travel_date'))) {
-				$range = explode(' - ', $this->input->get('travel_date'));
-				if(count($range) == 2) {
-					$start = date('Y-m-d', strtotime(str_replace('/', '-', $range[0])));
-					$end   = date('Y-m-d', strtotime(str_replace('/', '-', $range[1])));
-					$where     .= " AND b.StartDate <= ? AND b.EndDate >= ? ";
-					$b_params[] = $end;
-					$b_params[] = $start;
-				}
+			$travel_range = guest_list_parse_date_range($this->input->get('travel_date'));
+			if($travel_range !== null) {
+				$where     .= " AND b.StartDate <= ? AND b.EndDate >= ? ";
+				$b_params[] = $travel_range[1];
+				$b_params[] = $travel_range[0];
 			}
 
+			$booking_number = trim((string)$this->input->get('booking_number'));
+			if($booking_number !== '') {
+				$where     .= " AND b.BookingNumber LIKE ? ";
+				$b_params[] = '%' . $booking_number . '%';
+			}
+			$contact_number = trim((string)$this->input->get('contact_number'));
+			if($contact_number !== '') {
+				$where     .= " AND gl.Mobile LIKE ? ";
+				$b_params[] = '%' . $contact_number . '%';
+			}
+			$email = trim((string)$this->input->get('email'));
+			if($email !== '') {
+				$where     .= " AND gl.Email LIKE ? ";
+				$b_params[] = '%' . $email . '%';
+			}
+			if(!empty($this->input->get('destination'))) {
+				$where     .= " AND b.Destination = ? ";
+				$b_params[] = $this->input->get('destination');
+			}
 			if(!empty($this->input->get('sales_agent'))) {
 				$where     .= " AND b.SalesAgent = ? ";
 				$b_params[] = $this->input->get('sales_agent');
@@ -105,10 +125,35 @@ class Guests_Model extends CI_Model
 	{$where}
 			";
 
+			// Guest Role and Num of Pax are per-guest aggregates, so they filter
+			// the GROUP BY result via HAVING (not the row-level WHERE). The
+			// expressions below reuse columns produced by the windowed inner
+			// subquery (IsLeader, BookingPax, booking_rn) so Read and Count agree.
+			$having        = array();
+			$having_params = array();
+
+			$role = trim((string)$this->input->get('role'));
+			if($role === 'Team Leader')     { $having[] = "MAX(IsLeader) = 1"; }
+			elseif($role === 'Team Member') { $having[] = "MAX(IsLeader) = 0"; }
+
+			$pax_expr = "COALESCE(SUM(CASE WHEN booking_rn = 1 THEN BookingPax END), 0)";
+			$pax_min  = trim((string)$this->input->get('pax_min'));
+			$pax_max  = trim((string)$this->input->get('pax_max'));
+			if($pax_min !== '' && is_numeric($pax_min)) {
+				$having[]        = "{$pax_expr} >= ?";
+				$having_params[] = (int)$pax_min;
+			}
+			if($pax_max !== '' && is_numeric($pax_max)) {
+				$having[]        = "{$pax_expr} <= ?";
+				$having_params[] = (int)$pax_max;
+			}
+
 			$booking = array(
-				'dedup'  => $dedup,
-				'from'   => $from_joins_where,
-				'params' => $b_params,
+				'dedup'         => $dedup,
+				'from'          => $from_joins_where,
+				'params'        => $b_params,
+				'having'        => empty($having) ? '' : ' HAVING ' . implode(' AND ', $having),
+				'having_params' => $having_params,
 			);
 		}
 
@@ -121,6 +166,29 @@ class Guests_Model extends CI_Model
 				$g_params[] = $like;
 				$g_params[] = $like;
 				$g_params[] = $like;
+			}
+
+			// Booking-date filter matches a lead's captured date — the same
+			// DATE(COALESCE(date_added, created_at)) shown in the listing.
+			$ghl_range = guest_list_parse_date_range($this->input->get('booking_date'));
+			if($ghl_range !== null) {
+				$ghl_where .= " AND DATE(COALESCE(gc.date_added, gc.created_at)) >= ?
+					AND DATE(COALESCE(gc.date_added, gc.created_at)) < DATE_ADD(?, INTERVAL 1 DAY) ";
+				$g_params[] = $ghl_range[0];
+				$g_params[] = $ghl_range[1];
+			}
+
+			// Contact Number / Email are not booking-only — a lead carries both,
+			// so they filter the GHL branch too (gc.phone / gc.email).
+			$contact_number = trim((string)$this->input->get('contact_number'));
+			if($contact_number !== '') {
+				$ghl_where .= " AND gc.phone LIKE ? ";
+				$g_params[] = '%' . $contact_number . '%';
+			}
+			$email = trim((string)$this->input->get('email'));
+			if($email !== '') {
+				$ghl_where .= " AND gc.email LIKE ? ";
+				$g_params[] = '%' . $email . '%';
 			}
 
 			$from_joins_where = "
@@ -143,6 +211,51 @@ WHERE bg_keys.dk IS NULL
 		}
 
 		return array($booking, $ghl);
+	}
+
+	/**
+	 * The per-(guest-row) windowed subquery shared by the listing (Read_Guests)
+	 * and the count (Count_Guests). It exposes IsLeader / BookingPax /
+	 * booking_rn / dedup_key so an outer GROUP BY dedup_key can aggregate them
+	 * into Role and Num of Pax — and the HAVING built in Build_Branches filters
+	 * on exactly those, identically in both paths.
+	 */
+	private function Booking_Windowed_Select($dedup, $from)
+	{
+		return "
+	SELECT
+		{$dedup} AS dedup_key,
+		TRIM(CONCAT_WS(' ', NULLIF(gl.Name, ''), NULLIF(gl.LastName, ''))) AS display_name,
+		gl.Mobile        AS ContactNum,
+		gl.Email,
+		COALESCE(c.ChatLanguage, b.ChatLanguage) AS ChatLanguage,
+		a.Name           AS SalesAgentName,
+		s.Name           AS SourceName,
+		c.customer_type  AS customer_type,
+		cat.Name         AS Destination,
+		cn.Country       AS Nationality,
+		gl.Gender,
+		gl.DateOfBirth,
+		b.Token          AS Token,
+		b.InsertDate     AS BookingDate,
+		b.StartDate      AS TravelStart,
+		b.EndDate        AS TravelEnd,
+		CASE WHEN gl.dedup_key = COALESCE(
+			NULLIF(RIGHT(REGEXP_REPLACE(IFNULL(b.Mobile, ''),       '[^0-9]', ''), 9), ''),
+			NULLIF(RIGHT(REGEXP_REPLACE(IFNULL(c.phone_number, ''), '[^0-9]', ''), 9), '')
+		) THEN 1 ELSE 0 END AS IsLeader,
+		(COALESCE(b.Adult, 0) + COALESCE(b.Children, 0) + COALESCE(b.Infant, 0)) AS BookingPax,
+		COALESCE(b.NetTotal, 0) AS BookingNetTotal,
+		ROW_NUMBER() OVER (
+			PARTITION BY {$dedup}
+			ORDER BY b.InsertDate DESC, b.BookingID DESC
+		) AS rn,
+		ROW_NUMBER() OVER (
+			PARTITION BY {$dedup}, b.BookingID
+			ORDER BY gl.GuestListID
+		) AS booking_rn
+	{$from}
+		";
 	}
 
 	private function Build_Merged_Sql_And_Params()
@@ -176,42 +289,12 @@ SELECT
 	CONVERT(GROUP_CONCAT(DISTINCT DATE(BookingDate) ORDER BY DATE(BookingDate) SEPARATOR ',') USING utf8mb4) COLLATE utf8mb4_unicode_ci AS BookingDates,
 	CONVERT(GROUP_CONCAT(DISTINCT CONCAT(DATE(TravelStart), '|', IFNULL(DATE(TravelEnd), '')) ORDER BY CONCAT(DATE(TravelStart), '|', IFNULL(DATE(TravelEnd), '')) SEPARATOR ',') USING utf8mb4) COLLATE utf8mb4_unicode_ci AS TravelDates
 FROM (
-	SELECT
-		{$dedup} AS dedup_key,
-		TRIM(CONCAT_WS(' ', NULLIF(gl.Name, ''), NULLIF(gl.LastName, ''))) AS display_name,
-		gl.Mobile        AS ContactNum,
-		gl.Email,
-		COALESCE(c.ChatLanguage, b.ChatLanguage) AS ChatLanguage,
-		a.Name           AS SalesAgentName,
-		s.Name           AS SourceName,
-		c.customer_type  AS customer_type,
-		cat.Name         AS Destination,
-		cn.Country       AS Nationality,
-		gl.Gender,
-		gl.DateOfBirth,
-		b.Token          AS Token,
-		b.InsertDate     AS BookingDate,
-		b.StartDate      AS TravelStart,
-		b.EndDate        AS TravelEnd,
-		CASE WHEN gl.dedup_key = COALESCE(
-			NULLIF(RIGHT(REGEXP_REPLACE(IFNULL(b.Mobile, ''),       '[^0-9]', ''), 9), ''),
-			NULLIF(RIGHT(REGEXP_REPLACE(IFNULL(c.phone_number, ''), '[^0-9]', ''), 9), '')
-		) THEN 1 ELSE 0 END AS IsLeader,
-		(COALESCE(b.Adult, 0) + COALESCE(b.Children, 0) + COALESCE(b.Infant, 0)) AS BookingPax,
-		COALESCE(b.NetTotal, 0) AS BookingNetTotal,
-		ROW_NUMBER() OVER (
-			PARTITION BY {$dedup}
-			ORDER BY b.InsertDate DESC, b.BookingID DESC
-		) AS rn,
-		ROW_NUMBER() OVER (
-			PARTITION BY {$dedup}, b.BookingID
-			ORDER BY gl.GuestListID
-		) AS booking_rn
-	{$booking['from']}
+	{$this->Booking_Windowed_Select($dedup, $booking['from'])}
 ) t
 GROUP BY dedup_key
+{$booking['having']}
 			";
-			$params = array_merge($params, $booking['params']);
+			$params = array_merge($params, $booking['params'], $booking['having_params']);
 		}
 
 		if($ghl !== null) {
@@ -268,8 +351,19 @@ SELECT
 		$total = 0;
 
 		if($booking !== null) {
-			$sql = "SELECT COUNT(DISTINCT {$booking['dedup']}) AS cnt {$booking['from']}";
-			$row = $this->db->query($sql, $booking['params'])->row();
+			if($booking['having'] !== '') {
+				// Role / pax filter on a per-guest aggregate: count the grouped
+				// rows that survive the same HAVING the listing applies.
+				$inner = $this->Booking_Windowed_Select($booking['dedup'], $booking['from']);
+				$sql   = "SELECT COUNT(*) AS cnt FROM (
+					SELECT dedup_key FROM ({$inner}) t GROUP BY dedup_key {$booking['having']}
+				) z";
+				$params = array_merge($booking['params'], $booking['having_params']);
+				$row    = $this->db->query($sql, $params)->row();
+			} else {
+				$sql = "SELECT COUNT(DISTINCT {$booking['dedup']}) AS cnt {$booking['from']}";
+				$row = $this->db->query($sql, $booking['params'])->row();
+			}
 			if($row) { $total += (int)$row->cnt; }
 		}
 
@@ -280,6 +374,49 @@ SELECT
 		}
 
 		return $total;
+	}
+
+	/**
+	 * True when $new_key already belongs to a DIFFERENT person than
+	 * $current_dedup_key — either an active booking guest or a GHL lead.
+	 * Shared predicate lives in guest_contact_duplicate_key_sql() so the unit
+	 * test exercises the exact same SQL. Global (not sales-agent scoped) so two
+	 * distinct guests can never silently merge onto one number.
+	 */
+	function Contact_Key_Belongs_To_Other($new_key, $current_dedup_key)
+	{
+		$new_key = (string) $new_key;
+		if ($new_key === '') {
+			return false;
+		}
+		$this->load->helper('guest_contact');
+		$sql = guest_contact_duplicate_key_sql();
+		$row = $this->db->query($sql, array($new_key, $current_dedup_key, $new_key, $current_dedup_key))->row();
+		return $row && (int) $row->dup === 1;
+	}
+
+	/**
+	 * Overwrite Mobile on every active guest_list row that shares
+	 * $current_dedup_key (this person's records across bookings), keeping them
+	 * grouped under the new key. When $scope_admin_id is set (levels 20/50) the
+	 * update is confined to that agent's own bookings. Returns affected rows.
+	 */
+	function Update_Guest_Contact($current_dedup_key, $new_mobile, $admin_id, $scope_admin_id = null)
+	{
+		$sql = "UPDATE guest_list gl
+			JOIN booking b ON b.BookingID = gl.BookingID
+			SET gl.Mobile = ?, gl.UpdateBy = ?, gl.UpdateDate = ?
+			WHERE gl.Status = 'Y' AND b.Status != 'N' AND b.CancelStatus = 'N'
+				AND gl.dedup_key = ?";
+		$params = array($new_mobile, $admin_id, date('Y-m-d H:i:s'), $current_dedup_key);
+
+		if ($scope_admin_id !== null) {
+			$sql      .= " AND b.SalesAgent = ?";
+			$params[]  = $scope_admin_id;
+		}
+
+		$this->db->query($sql, $params);
+		return $this->db->affected_rows();
 	}
 
 	function Read_Distinct($col)

@@ -171,6 +171,37 @@ class Admin_Model extends CI_Model
 		}
 	}
 
+	function Read_Year_Sales_Targets_For_Admin($admin_id)
+	{
+		$admin_id = (int) $admin_id;
+		if ($admin_id <= 0) return array();
+		$this->db->select('target_year, target_amount');
+		$this->db->where('AdminID', $admin_id);
+		$rows = $this->db->get('sales_target_year')->result();
+		$out = array();
+		foreach ($rows as $r) {
+			$out[(string)(int)$r->target_year] = (float) $r->target_amount;
+		}
+		return $out;
+	}
+
+	private function _Sync_Year_Sales_Targets($admin_id, array $year_amount_map)
+	{
+		$admin_id = (int) $admin_id;
+		if ($admin_id <= 0) return;
+
+		$this->load->model('Sales_Target_Model');
+		foreach ($year_amount_map as $y => $amount) {
+			if (!preg_match('/^\d{4}$/', (string) $y)) {
+				continue;
+			}
+			$year = (int) $y;
+			if ($year < 2000 || $year > 2100) continue;
+			$amt = max(0.0, (float) $amount);
+			$this->Sales_Target_Model->upsert_year($admin_id, $year, $amt);
+		}
+	}
+
 	private function _Sync_Lead_Dashboard_Agents($admin_id, array $ghl_user_ids)
 	{
 		$admin_id = (int) $admin_id;
@@ -253,13 +284,14 @@ class Admin_Model extends CI_Model
 						$adminId = (!empty($adminPayload[0]['AdminID'])) ? (int) $adminPayload[0]['AdminID'] : 0;
 						$ldaDirty = ($this->input->post('lead_dashboard_agents_dirty') === '1');
 						$stDirty  = ($this->input->post('sales_targets_dirty') === '1');
+						$styDirty = ($this->input->post('year_sales_targets_dirty') === '1');
 
 						// update_batch returns int (>=0) on success, FALSE on input error.
 						// 0 means "row matched but values already equal" — still a success for the user.
 						$updateResult = $this->db->update_batch('admin', json_decode(json_encode($this->input->post('admin'))), 'AdminID');
 						$adminOk = ($updateResult !== FALSE);
 
-						if($adminOk || $ldaDirty || $stDirty) {
+						if($adminOk || $ldaDirty || $stDirty || $styDirty) {
 							$adminLog = $this->input->post('admin_log');
 							if(!empty($adminLog)) {
 								$this->db->insert_batch('admin_log', json_decode(json_encode($adminLog)));
@@ -282,6 +314,16 @@ class Admin_Model extends CI_Model
 									);
 								} catch (Exception $e) {
 									log_message('error', 'Sales targets sync failed for AdminID '.$adminId.': '.$e->getMessage());
+								}
+							}
+							if($styDirty && $adminId > 0) {
+								try {
+									$this->_Sync_Year_Sales_Targets(
+										$adminId,
+										(array) $this->input->post('year_sales_targets')
+									);
+								} catch (Exception $e) {
+									log_message('error', 'Year sales targets sync failed for AdminID '.$adminId.': '.$e->getMessage());
 								}
 							}
 							return true;

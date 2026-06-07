@@ -286,6 +286,7 @@ class Ghl_Processed_Leads_Model extends CI_Model
             FROM booking b
             LEFT JOIN customer c ON c.CustomerID = b.CustomerID
             WHERE b.InsertDate >= ?
+              AND b.BookingConfirmationTitle = 'BOOKING CONFIRMATION'
               AND (
                   b.Mobile IN ({$placeholders})
                   OR b.Mobile2 IN ({$placeholders})

@@ -90,13 +90,17 @@ class Booking_Model extends CI_Model
 	private function apply_status_filter()
 	{
 		$this->load->helper('booking_status_filter');
-		$where = booking_status_filter_full_where($this->input->get('status'), date('Y-m-d'));
+		// PO uses the 3pm-aware overdue cutoff so the list agrees with the
+		// dashboard Payment Overdue card (today's deadlines count from 3pm).
+		$where = booking_status_filter_full_where(
+			$this->input->get('status'), date('Y-m-d'), payment_overdue_cutoff_date()
+		);
 		$this->db->where($where, null, false);
 	}
 
 	function Read_Booking()
 	{
-		$this->db->select('booking.BookingID, booking.AllowReview, booking.CustomerReview, booking.CustomerReviewTimestamp, BookingConfirmationFooterID, TravelVoucherFooterID, booking.CountryCodeID AS CustomerCountryCode, booking.CountryCodeID2 AS CustomerCountryCode2, BookingNumber, ReservationNumber, DepositDeadline, FullPaymentDeadline, AdditionalPaymentDeadline, Customer, booking.Customer2, booking.Mobile AS CustomerMobile, booking.Mobile2 AS CustomerMobile2, StartDate, EndDate, Adult, Children, Infant, Destination, SalesAgent, Tag, BookingRemark, Subtotal, Discount, NetTotal, DepositPercentage, DepositMode, DepositFixedAmount, booking.ChatLanguage, Source, Token, booking.BookingConfirmationTitle, BookingConfirmationFooter, TravelVoucherFooter, booking.KeyContacts, booking.SpecialRemarks, ProductSequence, booking.Status, booking.CancelStatus, booking.PartialRefund, booking.LockStatus, booking.AfterSalesService, booking.bc_approved, booking.bc_approval_admin_id, booking.bc_approval_date, admin.Name AS SalesAgentName, booking.AutocountSyncStatus, booking.AutocountSyncMessage, booking.AutocountSyncAction, booking.CustomerAutocountSyncStatus, booking.CustomerAutocountSyncMessage, booking.CustomerAutocountSyncAction, customer.CustomerCode AS CustomerCode, customer.ic_passport_no AS ic_passport_no, customer.tin_no AS tin_no, customer.customer_type AS customer_type, booking.CustomerID, booking.CustomerID2, booking.BookingOP, booking.SalesAgent2, booking.InsertDate');
+		$this->db->select('booking.BookingID, booking.AllowReview, booking.CustomerReview, booking.CustomerReviewTimestamp, BookingConfirmationFooterID, TravelVoucherFooterID, booking.CountryCodeID AS CustomerCountryCode, booking.CountryCodeID2 AS CustomerCountryCode2, BookingNumber, ReservationNumber, DepositDeadline, FullPaymentDeadline, AdditionalPaymentDeadline, Customer, booking.Customer2, booking.Mobile AS CustomerMobile, booking.Mobile2 AS CustomerMobile2, StartDate, EndDate, Adult, Children, Infant, Destination, SalesAgent, Tag, BookingRemark, Subtotal, Discount, NetTotal, DepositPercentage, DepositMode, DepositFixedAmount, booking.ChatLanguage, Source, Token, booking.BookingConfirmationTitle, BookingConfirmationFooter, TravelVoucherFooter, booking.KeyContacts, booking.SpecialRemarks, ProductSequence, booking.Status, booking.CancelStatus, booking.PartialRefund, booking.LockStatus, booking.AfterSalesService, booking.bc_approved, booking.bc_approval_admin_id, booking.bc_approval_date, admin.Name AS SalesAgentName, booking.AutocountSyncStatus, booking.AutocountSyncMessage, booking.AutocountSyncAction, booking.CustomerAutocountSyncStatus, booking.CustomerAutocountSyncMessage, booking.CustomerAutocountSyncAction, customer.CustomerCode AS CustomerCode, customer.ic_passport_no AS ic_passport_no, customer.tin_no AS tin_no, customer.customer_type AS customer_type, booking.CustomerID, booking.CustomerID2, booking.BookingOP, booking.SalesAgent2, booking.BookingFormText, booking.DraftApproved, booking.DraftApprovedDate, booking.InsertDate');
 		$this->db->join('admin', 'admin.AdminID = booking.SalesAgent', 'left');
 		$this->db->join('customer', 'customer.CustomerID = booking.CustomerID', 'left');
 		$this->db->where('booking.BookingID', $this->input->get('booking_id'));
@@ -1891,8 +1895,42 @@ class Booking_Model extends CI_Model
 				$level2Ignore = 1;
 			}
 			if(!empty($this->input->get('upcoming_not_ready'))) {
+				// Mirror the dashboard "Travel in N Days – Not Yet Ready" card query
+				// exactly so the count and the linked listing return the same set.
+				// The card (Booking::ajax_summary_cards) counts confirmed BCs the TC
+				// is *credited* for under the TC1/TC2 cutoff rule, in a not-yet-
+				// departed status, whose travel STARTS within the window. Three
+				// alignments vs the generic filters:
+				//   1. require BOOKING CONFIRMATION (the card excludes quotations);
+				//   2. scope by the credited slot, not the broad SalesAgent OR
+				//      SalesAgent2 the TC listing applies at the top of this method;
+				//   3. constrain on StartDate within the window. The card link also
+				//      carries travel_date, whose generic range-overlap clause is
+				//      broader; ANDing StartDate-in-window collapses it to the card's
+				//      StartDate-BETWEEN (an in-window StartDate already implies
+				//      overlap), so no change to that shared block is needed.
 				$this->db->where('CancelStatus', 'N');
 				$this->db->where_in('booking.Status', array('P','PBO','PGL','PTV'));
+				$this->db->where('booking.BookingConfirmationTitle', 'BOOKING CONFIRMATION');
+
+				if(in_array($this->session->userdata('level'), [20, 50])) {
+					$this->load->helper('lead_conversion_credit');
+					$admin_id = (int) $this->session->userdata('admin_id');
+					$cutoff   = LEAD_CONVERSION_TC2_CUTOFF_DATE;
+					$this->db->where(
+						"((booking.InsertDate < '{$cutoff}' AND booking.SalesAgent = {$admin_id})"
+						. " OR (booking.InsertDate >= '{$cutoff}' AND booking.SalesAgent2 = {$admin_id}))",
+						null, false
+					);
+				}
+
+				if(!empty($this->input->get('travel_date'))) {
+					$travel_date = explode(' - ', $this->input->get('travel_date'));
+					$win_start = date('Y-m-d', strtotime(str_replace('/', '-', $travel_date[0])));
+					$win_end   = date('Y-m-d', strtotime(str_replace('/', '-', $travel_date[1])));
+					$this->db->where('booking.StartDate >=', $win_start);
+					$this->db->where('booking.StartDate <=', $win_end);
+				}
 				$level2Ignore = 1;
 			}
 			$this->apply_status_filter();

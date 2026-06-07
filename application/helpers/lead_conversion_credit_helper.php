@@ -71,6 +71,29 @@ function lead_conversion_credit_sql_fragment()
 }
 
 /**
+ * TC2-only variant of lead_conversion_credit_sql_fragment(): credits a
+ * conversion to the agent who holds the booking's SalesAgent2 (TC2) slot,
+ * regardless of date — i.e. it drops the pre-cutoff TC1 rule. Used by the TC
+ * dashboard's YTD "Conversion Rate" card, which always attributes by the Sales
+ * Agent (TC2) field across the whole year. Same `pl` alias and mapping-table
+ * identity match as the standard fragment.
+ */
+function lead_conversion_credit_sql_fragment_tc2()
+{
+    return "EXISTS (
+        SELECT 1
+        FROM booking b
+        INNER JOIN admin_lead_dashboard_agents alda_credit
+            ON alda_credit.GhlUserID = NULLIF(pl.assigned_to_user_id, '')
+        INNER JOIN admin a_credit
+            ON a_credit.AdminID = alda_credit.AdminID
+            AND a_credit.Status = 'Y'
+        WHERE b.BookingID = pl.booking_id
+          AND b.SalesAgent2 = a_credit.AdminID
+    )";
+}
+
+/**
  * WHERE-clause fragment for filtering `booking` rows down to the ones credited
  * to a specific admin under the TC1/TC2 cutoff rule. Returns two `?`
  * placeholders that the caller must bind to the same admin_id (in order). Use

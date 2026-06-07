@@ -342,14 +342,6 @@
 							$adult = 0;
 							$child = 0;
 							$infant = 0;
-							$nominee_relations = [
-								'Husband', 'Wife', 'Son', 'Daughter', 'Father', 'Mother',
-								'Brother', 'Sister', 'Cousin', 'Uncle', 'Aunt',
-								'Grandfather', 'Grandmother', 'Grandson', 'Granddaughter',
-								'Nephew', 'Niece',
-								'Mother in law', 'Father in law', 'Brother in law', 'Sister in law',
-								'Daughter in law', 'Son in law',
-							];
 						?>
 						<input type="hidden" name="new_guests">
 						<input type="hidden" name="deleted_guests">
@@ -416,7 +408,7 @@
 											<div class="row">
 												<div class="col-md-6 mb-7 mb-md-0">
 													<label id="<?php echo 'nationality_label-' . $guest->GuestListID; ?>">Nationality</label>
-													<select <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> name="nationalities[]" id="<?php echo 'nationality-' . $guest->GuestListID; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" class="form-control">
+													<select <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> name="nationalities[]" id="<?php echo 'nationality-' . $guest->GuestListID; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>); Expand_Insurance_For_Foreign(<?php echo $guest->GuestListID; ?>);" class="form-control">
 														<option selected disabled value="">--SELECT NATIONALITY--</option>
 														<?php 
 															$malaysia_id = null;
@@ -612,47 +604,65 @@
 													<div id="<?php echo 'travel_insurance_info-' . $guest->GuestListID; ?>" class="collapse">
 														<div class="card-body">
 															<div class="form-group">
+																<?php
+																	// "Staying in Malaysia with valid permit/visa?" — only for non-Malaysian guests
+																	$is_non_malaysian = (!empty($current_nationality_name) && $current_nationality_name != 'MALAYSIA');
+																	$permit_required  = $is_non_malaysian && (!empty($guest->Guest) || !empty($guest->GuestLastName));
+																?>
+																<div id="permit_visa_fields-<?php echo $guest->GuestListID; ?>" class="permit-visa-fields-container" style="<?php echo $is_non_malaysian ? '' : 'display:none;'; ?>">
+																	<div class="row">
+																		<div class="col-md-12">
+																			<label id="permit_visa_label-<?php echo $guest->GuestListID; ?>">Are you staying in Malaysia with valid permit/visa? <?php if($permit_required) { echo '<span style="color:red;">*</span>'; } ?></label>
+																			<select <?php if($permit_required) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> name="staying_in_malaysia_permits[]" id="permit_visa-<?php echo $guest->GuestListID; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" class="form-control">
+																				<option value="" <?php if(empty($guest->StayingInMalaysiaWithPermit)) { echo 'selected'; } ?>>--SELECT--</option><?php // no disabled: keeps staying_in_malaysia_permits[] index aligned with guests[] ?>
+																				<option value="Yes" <?php if($guest->StayingInMalaysiaWithPermit == 'Yes') { echo 'selected'; } ?>>Yes</option>
+																				<option value="No" <?php if($guest->StayingInMalaysiaWithPermit == 'No') { echo 'selected'; } ?>>No</option>
+																			</select>
+																		</div>
+																	</div>
+																	<br>
+																</div>
 																<div class="row">
 																	<div class="col-md-6 mb-7 mb-md-0">
-																		<label id="<?php echo 'marital_status_label-' . $guest->GuestListID; ?>">Marital Status <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>
-																		<select <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> name="marital_statuses[]" id="<?php echo 'marital_status-' . $guest->GuestListID; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" class="form-control">
-																			<option <?php if(empty($guest->MaritalStatus)) { echo 'selected'; } ?> value="">--SELECT MARITAL STATUS--</option><?php // no disabled: keeps marital_statuses[] index aligned with guests[] ?>
-																			<option value="DIVORCED" <?php if($guest->MaritalStatus == 'DIVORCED') { echo 'selected'; } ?>>DIVORCED</option>
-																			<option value="MARRIED" <?php if($guest->MaritalStatus == 'MARRIED') { echo 'selected'; } ?>>MARRIED</option>
-																			<option value="SINGLE" <?php if($guest->MaritalStatus == 'SINGLE') { echo 'selected'; } ?>>SINGLE</option>
-																			<option value="WIDOW" <?php if($guest->MaritalStatus == 'WIDOW') { echo 'selected'; } ?>>WIDOW</option>
+																		<label id="<?php echo 'employment_label-' . $guest->GuestListID; ?>">Employment <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>
+																		<select <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> name="employments[]" id="<?php echo 'employment-' . $guest->GuestListID; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" class="form-control">
+																			<option <?php if(empty($guest->Employment)) { echo 'selected'; } ?> value="">--SELECT EMPLOYMENT--</option><?php // no disabled: keeps employments[] index aligned with guests[] ?>
+																			<option value="EMPLOYED" <?php if($guest->Employment == 'EMPLOYED') { echo 'selected'; } ?>>EMPLOYED</option>
+																			<option value="UNEMPLOYED" <?php if($guest->Employment == 'UNEMPLOYED') { echo 'selected'; } ?>>UNEMPLOYED</option>
+																			<option value="STUDENT" <?php if($guest->Employment == 'STUDENT') { echo 'selected'; } ?>>STUDENT</option>
+																			<option value="RETIRED" <?php if($guest->Employment == 'RETIRED') { echo 'selected'; } ?>>RETIRED</option>
+																			<option value="HOUSEWIFE" <?php if($guest->Employment == 'HOUSEWIFE') { echo 'selected'; } ?>>HOUSEWIFE</option>
+																			<?php $employment_options = array('EMPLOYED', 'UNEMPLOYED', 'STUDENT', 'RETIRED', 'HOUSEWIFE'); if(!empty($guest->Employment) && !in_array($guest->Employment, $employment_options)): ?>
+																			<option value="<?php echo $guest->Employment; ?>" selected><?php echo $guest->Employment; ?></option>
+																			<?php endif; ?>
 																		</select>
 																	</div>
+																<?php if($counter == 1) { ?>
 																	<div class="col-md-6">
-																		<label id="<?php echo 'employment_label-' . $guest->GuestListID; ?>">Employment <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>
-																		<input <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="employments[]" id="<?php echo 'employment-' . $guest->GuestListID; ?>" value="<?php echo $guest->Employment; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="form-control">
-																	</div>
-																</div>
-																<br>
-																<div class="row">
-																	<div class="col-md-6 mb-7 mb-md-0">
 																		<label id="<?php echo 'address_label-' . $guest->GuestListID; ?>">Address <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>
 																		<input <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="addresses[]" id="<?php echo 'address-' . $guest->GuestListID; ?>" value="<?php echo $guest->Address; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="form-control">
 																	</div>
-																	<div class="col-md-6">
+																<?php } ?>
+																</div>
+															<?php if($counter == 1) { ?>
+																<br>
+																<div class="row">
+																	<div class="col-md-6 mb-7 mb-md-0">
 																		<label id="<?php echo 'postcode_label-' . $guest->GuestListID; ?>">Postcode <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>
 																		<input <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="postcodes[]" id="<?php echo 'postcode-' . $guest->GuestListID; ?>" value="<?php echo $guest->Postcode; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="form-control">
 																	</div>
-																</div>
-																<br>
-																<div class="row">
-																	<div class="col-md-6 mb-7 mb-md-0">
+																	<div class="col-md-6">
 																		<label id="<?php echo 'city_label-' . $guest->GuestListID; ?>">City <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>
 																		<input <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="cities[]" id="<?php echo 'city-' . $guest->GuestListID; ?>" value="<?php echo $guest->City; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="form-control">
 																	</div>
-																	<div class="col-md-6">
-																		<label id="<?php echo 'state_label-' . $guest->GuestListID; ?>">State <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>
-																		<input <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="states[]" id="<?php echo 'state-' . $guest->GuestListID; ?>" value="<?php echo $guest->State; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="form-control">
-																	</div>
 																</div>
 																<br>
 																<div class="row">
 																	<div class="col-md-6 mb-7 mb-md-0">
+																		<label id="<?php echo 'state_label-' . $guest->GuestListID; ?>">State <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>
+																		<input <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="states[]" id="<?php echo 'state-' . $guest->GuestListID; ?>" value="<?php echo $guest->State; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="form-control">
+																	</div>
+																	<div class="col-md-6">
 																		<label id="<?php echo 'country_label-' . $guest->GuestListID; ?>">Country <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>
 																		<select <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> name="countries[]" id="<?php echo 'country-' . $guest->GuestListID; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" class="form-control">
 																			<option <?php if(empty($guest->Country)) { echo 'selected'; } ?> value="">--SELECT COUNTRY--</option><?php // no disabled: keeps countries[] index aligned with guests[] ?>
@@ -661,44 +671,8 @@
 																			<?php } ?>
 																		</select>
 																	</div>
-																	<div class="col-md-6">
-																		<label id="<?php echo 'nominee_name_label-' . $guest->GuestListID; ?>">Nominee Name <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>
-																		<input <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="nominee_names[]" id="<?php echo 'nominee_name-' . $guest->GuestListID; ?>" value="<?php echo $guest->Nominee; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="form-control">
-																	</div>
 																</div>
-																<br>
-																<div class="row">
-																	<div class="col-md-6 mb-7 mb-md-0">
-																		<label id="<?php echo 'nominee_identification_number_label-' . $guest->GuestListID; ?>">Nominee Identification Number <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>
-																		<input <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="nominee_identification_numbers[]" id="<?php echo 'nominee_identification_number-' . $guest->GuestListID; ?>" value="<?php echo $guest->NomineeIdentificationNumber; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="form-control">
-																	</div>
-																	<div class="col-md-6">
-																		<label id="<?php echo 'nominee_contact_number_label-' . $guest->GuestListID; ?>">Nominee Contact Number <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>
-																		<input <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="nominee_contact_numbers[]" id="<?php echo 'nominee_contact_number-' . $guest->GuestListID; ?>" value="<?php echo $guest->NomineeContactNumber; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="form-control">
-																	</div>
-																</div>
-																<br>
-																<div class="row">
-																	<div class="col-md-6 mb-7 mb-md-0">
-																		<label id="<?php echo 'relationship_label-' . $guest->GuestListID; ?>">Relationship <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>
-																		<select <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> name="relationships[]" id="<?php echo 'relationship-' . $guest->GuestListID; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" class="form-control">
-																			<option value="" <?php if(empty($guest->Relationship)) { echo 'selected'; } ?>>--SELECT RELATIONSHIP--</option>
-																			<?php
-																				$current_rel = trim((string)$guest->Relationship);
-																				$matched = false;
-																				foreach($nominee_relations as $rel) {
-																					$is_match = (strcasecmp($current_rel, $rel) === 0);
-																					if($is_match) { $matched = true; }
-																			?>
-																				<option value="<?php echo $rel; ?>" <?php if($is_match) { echo 'selected'; } ?>><?php echo $rel; ?></option>
-																			<?php } ?>
-																			<?php if(!$matched && $current_rel !== '') { ?>
-																				<option value="<?php echo htmlspecialchars($current_rel, ENT_QUOTES); ?>" selected><?php echo htmlspecialchars($current_rel); ?> (existing)</option>
-																			<?php } ?>
-																		</select>
-																		<p style="color:#FAA0A0; font-size:10px; margin-top:5px;">(must be relative and not in the trip)</p>
-																	</div>
-																</div>
+															<?php } ?>
 															</div>
 														</div>
 													</div>
@@ -710,7 +684,7 @@
 							</div>
 							<?php $counter++; ?>
 							<script>
-								<?php if($guest_lists[0]->TravelInsuranceStatus == 'Y' && !empty($guest->Nominee)) { ?>
+								<?php if($guest_lists[0]->TravelInsuranceStatus == 'Y' && (!empty($guest->Employment) || $is_non_malaysian)) { ?>
 									$(`#travel_insurance_header-${<?php echo $guest->GuestListID; ?>}`).click();
 								<?php } ?>
 							</script>
@@ -952,19 +926,14 @@
 			var email = $(`#email-${guest_list_id}`).val();
 
 			//Travel Insurance
-			var marital_status = $(`#marital_status-${guest_list_id}`).val();
 			var employment = $(`#employment-${guest_list_id}`).val();
-			var address = $(`#address-${guest_list_id}`).val();
-			var postcode = $(`#postcode-${guest_list_id}`).val();
-			var city = $(`#city-${guest_list_id}`).val();
-			var state = $(`#state-${guest_list_id}`).val();
-			var country = $(`#country-${guest_list_id}`).val();
-			var nominee_name = $(`#nominee_name-${guest_list_id}`).val();
-			var nominee_identification_number = $(`#nominee_identification_number-${guest_list_id}`).val();
-			var relationship = $(`#relationship-${guest_list_id}`).val();
-			var nominee_contact_number = $(`#nominee_contact_number-${guest_list_id}`).val();
+			var address = $(`#address-${guest_list_id}`).val() || '';
+			var postcode = $(`#postcode-${guest_list_id}`).val() || '';
+			var city = $(`#city-${guest_list_id}`).val() || '';
+			var state = $(`#state-${guest_list_id}`).val() || '';
+			var country = $(`#country-${guest_list_id}`).val() || '';
 
-			if(name != '' || last_name != '' || gender != '' || date_of_birth != '' || identification_number != '' || passport_number != '' || mobile != '' || email != '' || marital_status != '' || employment != '' || address != '' || postcode != '' || city != '' || state != '' || country != '' || nominee_name != '' || nominee_identification_number != '' || relationship != '' || nominee_contact_number != '') {
+			if(name != '' || last_name != '' || gender != '' || date_of_birth != '' || identification_number != '' || passport_number != '' || mobile != '' || email != '' || employment != '' || address != '' || postcode != '' || city != '' || state != '' || country != '') {
 				$(`#name_label-${guest_list_id}`).html('First Name <span style="color:red;">*</span>');
 				$(`#name-${guest_list_id}`).prop('required', 'true');
 				$(`#last_name_label-${guest_list_id}`).html('Last Name <span style="color:red;">*</span>');
@@ -986,12 +955,24 @@
 					var destination_upper = (destination || '').toUpperCase();
 					var is_malaysian = (nationality_text == 'MALAYSIA');
 					var passport_container = $(`#passport_fields-${guest_list_id}`);
-					
+					var permit_container = $(`#permit_visa_fields-${guest_list_id}`);
+
+					// "Staying in Malaysia with valid permit/visa?" — non-Malaysians only
+					if(is_malaysian) {
+						permit_container.hide();
+						$(`#permit_visa_label-${guest_list_id}`).html('Are you staying in Malaysia with valid permit/visa?');
+						$(`#permit_visa-${guest_list_id}`).removeAttr('required').val('');
+					} else {
+						permit_container.show();
+						$(`#permit_visa_label-${guest_list_id}`).html('Are you staying in Malaysia with valid permit/visa? <span style="color:red;">*</span>');
+						$(`#permit_visa-${guest_list_id}`).prop('required', 'true');
+					}
+
 					if(is_malaysian) {
 						// Malaysian: show identification number as required
 						$(`#identification_number_label-${guest_list_id}`).html('Identification Number <span style="color:red;">*</span>');
 						$(`#identification_number-${guest_list_id}`).prop('required', 'true');
-						
+
 						// Check destination for Malaysians
 						// If destination is empty or Malaysia, don't require passport fields
 						if(!destination_upper || destination_upper == '' || destination_upper == 'MALAYSIA') {
@@ -1059,6 +1040,9 @@
 					if(passport_container.length) {
 						passport_container.hide();
 					}
+					// No nationality selected - hide the Malaysia permit/visa field too
+					$(`#permit_visa_fields-${guest_list_id}`).hide();
+					$(`#permit_visa-${guest_list_id}`).removeAttr('required').val('');
 					// Remove required from passport fields
 					$(`#passport_number_label-${guest_list_id}`).html('Passport Number');
 					$(`#passport_number-${guest_list_id}`).removeAttr('required');
@@ -1072,8 +1056,6 @@
 
 				//Travel Insurance
 				<?php if($guest_lists[0]->TravelInsuranceStatus == 'Y') { ?>
-					$(`#marital_status_label-${guest_list_id}`).html('Marital Status <span style="color:red;">*</span>');
-					$(`#marital_status-${guest_list_id}`).prop('required', 'true');
 					$(`#employment_label-${guest_list_id}`).html('Employment <span style="color:red;">*</span>');
 					$(`#employment-${guest_list_id}`).prop('required', 'true');
 					$(`#address_label-${guest_list_id}`).html('Address <span style="color:red;">*</span>');
@@ -1086,14 +1068,6 @@
 					$(`#state-${guest_list_id}`).prop('required', 'true');
 					$(`#country_label-${guest_list_id}`).html('Country <span style="color:red;">*</span>');
 					$(`#country-${guest_list_id}`).prop('required', 'true');
-					$(`#nominee_name_label-${guest_list_id}`).html('Nominee Name <span style="color:red;">*</span>');
-					$(`#nominee_name-${guest_list_id}`).prop('required', 'true');
-					$(`#nominee_identification_number_label-${guest_list_id}`).html('Nominee Identification Number <span style="color:red;">*</span>');
-					$(`#nominee_identification_number-${guest_list_id}`).prop('required', 'true');
-					$(`#relationship_label-${guest_list_id}`).html('Relationship <span style="color:red;">*</span>');
-					$(`#relationship-${guest_list_id}`).prop('required', 'true');
-					$(`#nominee_contact_number_label-${guest_list_id}`).html('Nominee Contact Number <span style="color:red;">*</span>');
-					$(`#nominee_contact_number-${guest_list_id}`).prop('required', 'true');
 				<?php } ?>
 			} else {
 				$(`#name_label-${guest_list_id}`).html('First Name');
@@ -1116,6 +1090,10 @@
 				if(passport_container.length) {
 					passport_container.hide(); // Hide by default when form is cleared
 				}
+				// Hide and clear the Malaysia permit/visa field when form is cleared
+				$(`#permit_visa_fields-${guest_list_id}`).hide();
+				$(`#permit_visa_label-${guest_list_id}`).html('Are you staying in Malaysia with valid permit/visa?');
+				$(`#permit_visa-${guest_list_id}`).removeAttr('required').val('');
 				$(`#passport_number_label-${guest_list_id}`).html('Passport Number');
 				$(`#passport_number-${guest_list_id}`).removeAttr('required');
 				$(`#passport_issue_date_label-${guest_list_id}`).html('Passport Issue Date');
@@ -1129,8 +1107,6 @@
 
 				//Travel Insurance
 				<?php if($guest_lists[0]->TravelInsuranceStatus == 'Y') { ?>
-					$(`#marital_status_label-${guest_list_id}`).html('Marital Status');
-					$(`#marital_status-${guest_list_id}`).removeAttr('required');
 					$(`#employment_label-${guest_list_id}`).html('Employment');
 					$(`#employment-${guest_list_id}`).removeAttr('required');
 					$(`#address_label-${guest_list_id}`).html('Address');
@@ -1143,18 +1119,19 @@
 					$(`#state-${guest_list_id}`).removeAttr('required');
 					$(`#country_label-${guest_list_id}`).html('Country');
 					$(`#country-${guest_list_id}`).removeAttr('required');
-					$(`#nominee_name_label-${guest_list_id}`).html('Nominee Name');
-					$(`#nominee_name-${guest_list_id}`).removeAttr('required');
-					$(`#nominee_identification_number_label-${guest_list_id}`).html('Nominee Identification Number');
-					$(`#nominee_identification_number-${guest_list_id}`).removeAttr('required');
-					$(`#relationship_label-${guest_list_id}`).html('Relationship');
-					$(`#relationship-${guest_list_id}`).removeAttr('required');
-					$(`#nominee_contact_number_label-${guest_list_id}`).html('Nominee Contact Number');
-					$(`#nominee_contact_number-${guest_list_id}`).removeAttr('required');
 				<?php } ?>
 			}
 		}
-		
+
+		// Reveal the Travel Insurance section (where the permit/visa field lives) for non-Malaysian guests
+		function Expand_Insurance_For_Foreign(guest_list_id) {
+			var nationality_text = $(`#nationality-${guest_list_id} option:selected`).text().toUpperCase();
+			if(nationality_text && nationality_text != 'MALAYSIA' && nationality_text != '--SELECT NATIONALITY--') {
+				if(!$(`#travel_insurance_info-${guest_list_id}`).hasClass('show')) {
+					$(`#travel_insurance_header-${guest_list_id}`).click();
+				}
+			}
+		}
 
 		function Delete_Guest(guest_list_id) {
 			if(guest_list_id > 0) {
@@ -1235,9 +1212,6 @@
 							if(value.Email != null && $(`#email-${value.GuestListID}`).val() == '') {
 								$(`#email-${value.GuestListID}`).val(value.Email);
 							}
-							if(value.MaritalStatus != null && $(`#marital_status-${value.GuestListID}`).val() == '') {
-								$(`#marital_status-${value.GuestListID}`).val(value.MaritalStatus).change();
-							}
 							if(value.Employment != null && $(`#employment-${value.GuestListID}`).val() == '') {
 								$(`#employment-${value.GuestListID}`).val(value.Employment);
 							}
@@ -1255,18 +1229,6 @@
 							}
 							if(value.Country != null && $(`#country-${value.GuestListID}`).val() == '') {
 								$(`#country-${value.GuestListID}`).val(value.Country).change();
-							}
-							if(value.Nominee != null && $(`#nominee_name-${value.GuestListID}`).val() == '') {
-								$(`#nominee_name-${value.GuestListID}`).val(value.Nominee);
-							}
-							if(value.NomineeIdentificationNumber != null && $(`#nominee_identification_number-${value.GuestListID}`).val() == '') {
-								$(`#nominee_identification_number-${value.GuestListID}`).val(value.NomineeIdentificationNumber);
-							}
-							if(value.NomineeContactNumber != null && $(`#nominee_contact_number-${value.GuestListID}`).val() == '') {
-								$(`#nominee_contact_number-${value.GuestListID}`).val(value.NomineeContactNumber);
-							}
-							if(value.Relationship != null && $(`#relationship-${value.GuestListID}`).val() == '') {
-								$(`#relationship-${value.GuestListID}`).val(value.Relationship);
 							}
 						});
 
@@ -1301,17 +1263,14 @@
 								if (mobile == '') missing.push('Mobile');
 								if (nationality_text == 'MALAYSIA' && (identification_number == '' || identification_number == null)) missing.push('Identification Number');
 								<?php if($guest_lists[0]->TravelInsuranceStatus == 'Y') { ?>
-								if (selectedOptionValue(`#marital_status-${gid}`) == '') missing.push('Marital Status');
+								if (nationality_text != 'MALAYSIA' && nationality_text != '--SELECT NATIONALITY--' && selectedOptionValue(`#permit_visa-${gid}`) == '') missing.push('Staying in Malaysia with valid permit/visa');
 								if ($(`#employment-${gid}`).val() == '') missing.push('Employment');
-								if ($(`#address-${gid}`).val() == '') missing.push('Address');
-								if ($(`#postcode-${gid}`).val() == '') missing.push('Postcode');
-								if ($(`#city-${gid}`).val() == '') missing.push('City');
-								if ($(`#state-${gid}`).val() == '') missing.push('State');
-								if (selectedOptionValue(`#country-${gid}`) == '') missing.push('Country');
-								if ($(`#nominee_name-${gid}`).val() == '') missing.push('Nominee Name');
-								if ($(`#nominee_contact_number-${gid}`).val() == '') missing.push('Nominee Contact Number');
-								if ($(`#nominee_identification_number-${gid}`).val() == '') missing.push('Nominee Identification Number');
-								if ($(`#relationship-${gid}`).val() == '') missing.push('Relationship');
+								// Address/Postcode/City/State/Country only rendered for the first pax — skip when absent
+								if ($(`#address-${gid}`).length && $(`#address-${gid}`).val() == '') missing.push('Address');
+								if ($(`#postcode-${gid}`).length && $(`#postcode-${gid}`).val() == '') missing.push('Postcode');
+								if ($(`#city-${gid}`).length && $(`#city-${gid}`).val() == '') missing.push('City');
+								if ($(`#state-${gid}`).length && $(`#state-${gid}`).val() == '') missing.push('State');
+								if ($(`#country-${gid}`).length && selectedOptionValue(`#country-${gid}`) == '') missing.push('Country');
 								<?php } ?>
 
 								if (missing.length > 0) {
@@ -1347,17 +1306,14 @@
 								if (mobile == '') missing.push('Mobile');
 								if (nationality_text == 'MALAYSIA' && (identification_number == '' || identification_number == null)) missing.push('Identification Number');
 								<?php if($guest_lists[0]->TravelInsuranceStatus == 'Y') { ?>
-								if (selectedOptionValue(`#marital_status-${gid}`) == '') missing.push('Marital Status');
+								if (nationality_text != 'MALAYSIA' && nationality_text != '--SELECT NATIONALITY--' && selectedOptionValue(`#permit_visa-${gid}`) == '') missing.push('Staying in Malaysia with valid permit/visa');
 								if ($(`#employment-${gid}`).val() == '') missing.push('Employment');
-								if ($(`#address-${gid}`).val() == '') missing.push('Address');
-								if ($(`#postcode-${gid}`).val() == '') missing.push('Postcode');
-								if ($(`#city-${gid}`).val() == '') missing.push('City');
-								if ($(`#state-${gid}`).val() == '') missing.push('State');
-								if (selectedOptionValue(`#country-${gid}`) == '') missing.push('Country');
-								if ($(`#nominee_name-${gid}`).val() == '') missing.push('Nominee Name');
-								if ($(`#nominee_contact_number-${gid}`).val() == '') missing.push('Nominee Contact Number');
-								if ($(`#nominee_identification_number-${gid}`).val() == '') missing.push('Nominee Identification Number');
-								if ($(`#relationship-${gid}`).val() == '') missing.push('Relationship');
+								// Address/Postcode/City/State/Country only rendered for the first pax — skip when absent
+								if ($(`#address-${gid}`).length && $(`#address-${gid}`).val() == '') missing.push('Address');
+								if ($(`#postcode-${gid}`).length && $(`#postcode-${gid}`).val() == '') missing.push('Postcode');
+								if ($(`#city-${gid}`).length && $(`#city-${gid}`).val() == '') missing.push('City');
+								if ($(`#state-${gid}`).length && $(`#state-${gid}`).val() == '') missing.push('State');
+								if ($(`#country-${gid}`).length && selectedOptionValue(`#country-${gid}`) == '') missing.push('Country');
 								<?php } ?>
 
 								if (missing.length > 0) {
