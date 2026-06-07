@@ -3,6 +3,8 @@ defined('BASEPATH') or exit('No direct script access allowed');
 
 class Ghl_Lead_Ownership_Model extends CI_Model
 {
+    const OWNERSHIP_DELETE_BATCH_SIZE = 500;
+
     protected $messageTimeColumn = null;
     protected $activeLockName = null;
 
@@ -78,6 +80,7 @@ class Ghl_Lead_Ownership_Model extends CI_Model
                 pl.recent_tracked_message_count,
                 pl.recent_responded_message_count,
                 pl.avg_recent_5_response_seconds,
+                pl.follow_up_status,
                 pl.is_converted,
                 pl.booking_id,
                 pl.converted_at
@@ -148,9 +151,9 @@ class Ghl_Lead_Ownership_Model extends CI_Model
 
     public function replace_ownership_for_leads($leadIds, $ownershipRows)
     {
-        $leadIds = array_values(array_filter(array_map('intval', (array) $leadIds), function($id) {
+        $leadIds = array_values(array_unique(array_filter(array_map('intval', (array) $leadIds), function($id) {
             return $id > 0;
-        }));
+        })));
 
         if (empty($leadIds)) {
             return true;
@@ -158,9 +161,13 @@ class Ghl_Lead_Ownership_Model extends CI_Model
 
         $this->db->trans_start();
 
-        $this->db
-            ->where_in('processed_lead_id', $leadIds)
-            ->delete('ghl_lead_ownership');
+        foreach (array_chunk($leadIds, self::OWNERSHIP_DELETE_BATCH_SIZE) as $leadIdBatch) {
+            $placeholders = implode(',', array_fill(0, count($leadIdBatch), '?'));
+            $this->db->query(
+                "DELETE FROM ghl_lead_ownership WHERE processed_lead_id IN ({$placeholders})",
+                $leadIdBatch
+            );
+        }
 
         if (!empty($ownershipRows)) {
             $this->db->insert_batch('ghl_lead_ownership', $ownershipRows);

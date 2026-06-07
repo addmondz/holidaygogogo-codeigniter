@@ -433,7 +433,8 @@ class Cron extends CI_Controller
 			}
 		}
 
-		// process the leads every hour at 40 minutes past the hour, let it have 30 minutes to finish syncing the messages
+		// Process leads every hour at 40 minutes past the hour, after message sync has had time to finish.
+		// Lead processing also updates follow_up_status, which ownership reporting reads after conversion processing.
 		if ($this->shouldRunHourly(40)) {
 			if($this->allowGhlModuleSync) {
 				$this->customCronLogging('[CRON-40] allowGhlModuleSync - process_ghl_leads');
@@ -1102,6 +1103,10 @@ class Cron extends CI_Controller
 						'recent_tracked_message_count' => 0,
 						'recent_responded_message_count' => 0,
 						'avg_recent_5_response_seconds' => null,
+						'follow_up_status' => 'pending',
+						'follow_up_sent_at' => null,
+						'follow_up_replied_at' => null,
+						'follow_up_expired_at' => null,
 						'is_converted' => 0,
 						'booking_id' => null,
 						'converted_at' => null,
@@ -1109,11 +1114,26 @@ class Cron extends CI_Controller
 						'updated_at' => $now,
 						'_response_history' => array(),
 						'_pending_response_indexes' => array(),
+						'_last_agent_message_at' => null,
 					);
 					$this->initialize_ghl_processed_lead_response_slots($currentLead);
 				}
 
 				if ($currentLead !== null) {
+					$followUpSentTimestamp = !empty($currentLead['follow_up_sent_at'])
+						? strtotime((string) $currentLead['follow_up_sent_at'])
+						: false;
+
+					if ($currentLead['follow_up_status'] === 'sent'
+						&& $followUpSentTimestamp !== false
+						&& $messageTimestamp >= $followUpSentTimestamp) {
+						$currentLead['follow_up_status'] = 'completed';
+						$currentLead['follow_up_replied_at'] = $message['message_timestamp'];
+						$currentLead['follow_up_expired_at'] = null;
+					}
+
+					$currentLead['_last_agent_message_at'] = null;
+
 					if (empty($currentLead['_pending_response_indexes'])) {
 						$currentLead['_response_history'][] = array(
 							'customer_message_id' => $message['message_id'],
@@ -1125,24 +1145,42 @@ class Cron extends CI_Controller
 						$currentLead['_pending_response_indexes'][] = count($currentLead['_response_history']) - 1;
 					}
 				}
-			} elseif ($message['direction'] === 'outbound' && $currentLead !== null && !empty($currentLead['_pending_response_indexes'])) {
-				$historyIndex = (int) $currentLead['_pending_response_indexes'][0];
-				$customerMessage = isset($currentLead['_response_history'][$historyIndex])
-					? $currentLead['_response_history'][$historyIndex]
-					: null;
-				$customerTimestamp = !empty($customerMessage['customer_message_at'])
-					? strtotime((string) $customerMessage['customer_message_at'])
+			} elseif ($message['direction'] === 'outbound' && $currentLead !== null) {
+				$lastAgentTimestamp = !empty($currentLead['_last_agent_message_at'])
+					? strtotime((string) $currentLead['_last_agent_message_at'])
 					: false;
 
-				if ($customerTimestamp !== false && $messageTimestamp >= $customerTimestamp) {
-					array_shift($currentLead['_pending_response_indexes']);
-					if (isset($currentLead['_response_history'][$historyIndex])) {
-						$currentLead['_response_history'][$historyIndex]['agent_message_id'] = $message['message_id'];
-						$currentLead['_response_history'][$historyIndex]['agent_message_at'] = $message['message_timestamp'];
-						$currentLead['_response_history'][$historyIndex]['seconds'] = calculate_duty_response_seconds(
-							$customerMessage['customer_message_at'],
-							$message['message_timestamp']
-						);
+				if ($lastAgentTimestamp !== false
+					&& $messageTimestamp >= $lastAgentTimestamp
+					&& ($messageTimestamp - $lastAgentTimestamp) >= 86400
+					&& $currentLead['follow_up_status'] !== 'completed') {
+					$currentLead['follow_up_status'] = 'sent';
+					$currentLead['follow_up_sent_at'] = $message['message_timestamp'];
+					$currentLead['follow_up_replied_at'] = null;
+					$currentLead['follow_up_expired_at'] = null;
+				}
+
+				$currentLead['_last_agent_message_at'] = $message['message_timestamp'];
+
+				if (!empty($currentLead['_pending_response_indexes'])) {
+					$historyIndex = (int) $currentLead['_pending_response_indexes'][0];
+					$customerMessage = isset($currentLead['_response_history'][$historyIndex])
+						? $currentLead['_response_history'][$historyIndex]
+						: null;
+					$customerTimestamp = !empty($customerMessage['customer_message_at'])
+						? strtotime((string) $customerMessage['customer_message_at'])
+						: false;
+
+					if ($customerTimestamp !== false && $messageTimestamp >= $customerTimestamp) {
+						array_shift($currentLead['_pending_response_indexes']);
+						if (isset($currentLead['_response_history'][$historyIndex])) {
+							$currentLead['_response_history'][$historyIndex]['agent_message_id'] = $message['message_id'];
+							$currentLead['_response_history'][$historyIndex]['agent_message_at'] = $message['message_timestamp'];
+							$currentLead['_response_history'][$historyIndex]['seconds'] = calculate_duty_response_seconds(
+								$customerMessage['customer_message_at'],
+								$message['message_timestamp']
+							);
+						}
 					}
 				}
 			}
@@ -1165,7 +1203,7 @@ class Cron extends CI_Controller
 				$lead['converted_at'] = $existingConversions[$conversionKey]['converted_at'];
 			}
 
-			unset($lead['_response_history'], $lead['_pending_response_indexes']);
+			unset($lead['_response_history'], $lead['_pending_response_indexes'], $lead['_last_agent_message_at']);
 		}
 		unset($lead);
 

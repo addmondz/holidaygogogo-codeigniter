@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS `ghl_lead_ownership` (
   `recent_tracked_message_count` TINYINT UNSIGNED NOT NULL DEFAULT 0,
   `recent_responded_message_count` TINYINT UNSIGNED NOT NULL DEFAULT 0,
   `avg_recent_5_response_seconds` INT NULL DEFAULT NULL,
+  `follow_up_status` ENUM('pending', 'sent', 'completed', 'expired') NOT NULL DEFAULT 'pending',
   `is_converted` TINYINT(1) NOT NULL DEFAULT 0,
   `booking_id` INT(11) NULL DEFAULT NULL,
   `converted_at` DATETIME NULL DEFAULT NULL,
@@ -32,6 +33,7 @@ CREATE TABLE IF NOT EXISTS `ghl_lead_ownership` (
   KEY `idx_processed_lead_id` (`processed_lead_id`),
   KEY `idx_assigned_owner` (`is_assigned_owner`, `owner_user_id`),
   KEY `idx_reply_owner` (`is_reply_owner`, `owner_user_id`),
+  KEY `idx_follow_up_status` (`follow_up_status`),
   KEY `idx_conversion_status` (`is_converted`, `converted_at`),
   KEY `idx_booking_id` (`booking_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

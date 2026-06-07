@@ -854,6 +854,7 @@ class Report extends MY_Controller
     private function lead_ownership_data_filters()
     {
         $filters = $this->lead_ownership_filters();
+        $filters['follow_up_status'] = $this->normalize_follow_up_status($this->input->get('follow_up_status'));
         $filters['page'] = max(1, (int) $this->input->get('page'));
         $filters['per_page'] = $this->normalize_lead_data_per_page($this->input->get('per_page'));
         return $filters;
@@ -957,6 +958,7 @@ class Report extends MY_Controller
                 'response_status' => $buildSortUrl('response_status'),
                 'response_time' => $buildSortUrl('response_time'),
                 'conversion_status' => $buildSortUrl('conversion_status'),
+                'follow_up_status' => $buildSortUrl('follow_up_status'),
                 'message_count' => $buildSortUrl('message_count'),
             ),
         );
@@ -1077,6 +1079,13 @@ class Report extends MY_Controller
         return in_array($value, $allowed, true) ? $value : 25;
     }
 
+    private function normalize_follow_up_status($value)
+    {
+        $value = strtolower(trim((string) $value));
+        $allowed = array('pending', 'sent', 'completed');
+        return in_array($value, $allowed, true) ? $value : '';
+    }
+
     private function normalize_lead_data_sort_by($value)
     {
         $allowed = array(
@@ -1087,6 +1096,7 @@ class Report extends MY_Controller
             'response_status',
             'response_time',
             'conversion_status',
+            'follow_up_status',
             'message_count',
         );
 
@@ -1188,9 +1198,11 @@ class Report extends MY_Controller
             'assigned_owned_leads' => (int) $summary['assigned_owned_leads'],
             'reply_owned_leads' => (int) $summary['reply_owned_leads'],
             'responded_leads' => (int) $summary['responded_leads'],
+            'follow_up_leads' => (int) $summary['follow_up_leads'],
             'converted_leads' => (int) $summary['converted_leads'],
             'active_owners' => (int) $summary['active_owners'],
             'response_rate' => number_format((float) $summary['response_rate'], 1),
+            'follow_up_rate' => number_format((float) $summary['follow_up_rate'], 1),
             'conversion_rate' => number_format((float) $summary['conversion_rate'], 1),
             'avg_response_time_seconds' => $summary['avg_response_time_seconds'],
             'avg_response_time_label' => $this->format_duration_label($summary['avg_response_time_seconds']),
@@ -1214,8 +1226,10 @@ class Report extends MY_Controller
                 'assigned_owned_leads' => (int) $row['assigned_owned_leads'],
                 'reply_owned_leads' => (int) $row['reply_owned_leads'],
                 'responded_leads' => (int) $row['responded_leads'],
+                'follow_up_leads' => (int) $row['follow_up_leads'],
                 'converted_leads' => (int) $row['converted_leads'],
                 'response_rate' => number_format((float) $row['response_rate'], 1),
+                'follow_up_rate' => number_format((float) $row['follow_up_rate'], 1),
                 'conversion_rate' => number_format((float) $row['conversion_rate'], 1),
                 'avg_response_time_seconds' => $row['avg_response_time_seconds'],
                 'avg_response_time_label' => $this->format_duration_label($row['avg_response_time_seconds']),
@@ -1267,6 +1281,9 @@ class Report extends MY_Controller
                 'recent_response_progress_label' => (isset($row['recent_responded_message_count']) ? (int) $row['recent_responded_message_count'] : 0) . ' / ' . (isset($row['recent_tracked_message_count']) ? (int) $row['recent_tracked_message_count'] : 0),
                 'avg_recent_5_response_seconds' => $row['avg_recent_5_response_seconds'] !== null ? (int) $row['avg_recent_5_response_seconds'] : null,
                 'avg_recent_5_response_label' => $this->format_duration_label($row['avg_recent_5_response_seconds']),
+                'follow_up_status' => isset($row['follow_up_status']) ? (string) $row['follow_up_status'] : 'pending',
+                'follow_up_status_label' => $this->format_follow_up_status_label(isset($row['follow_up_status']) ? $row['follow_up_status'] : 'pending'),
+                'follow_up_status_class' => $this->format_follow_up_status_class(isset($row['follow_up_status']) ? $row['follow_up_status'] : 'pending'),
                 'is_converted' => (int) $row['is_converted'],
                 'booking_id' => !empty($row['booking_id']) ? (int) $row['booking_id'] : null,
                 'booking_number' => isset($row['BookingNumber']) ? $row['BookingNumber'] : '',
@@ -1310,6 +1327,15 @@ class Report extends MY_Controller
                 'recent_response_progress_label' => (isset($row['recent_responded_message_count']) ? (int) $row['recent_responded_message_count'] : 0) . ' / ' . (isset($row['recent_tracked_message_count']) ? (int) $row['recent_tracked_message_count'] : 0),
                 'avg_recent_5_response_seconds' => $row['avg_recent_5_response_seconds'] !== null ? (int) $row['avg_recent_5_response_seconds'] : null,
                 'avg_recent_5_response_label' => $this->format_duration_label($row['avg_recent_5_response_seconds']),
+                'follow_up_status' => isset($row['follow_up_status']) ? (string) $row['follow_up_status'] : 'pending',
+                'follow_up_status_label' => $this->format_follow_up_status_label(isset($row['follow_up_status']) ? $row['follow_up_status'] : 'pending'),
+                'follow_up_status_class' => $this->format_follow_up_status_class(isset($row['follow_up_status']) ? $row['follow_up_status'] : 'pending'),
+                'follow_up_sent_at' => isset($row['follow_up_sent_at']) ? $row['follow_up_sent_at'] : null,
+                'follow_up_replied_at' => isset($row['follow_up_replied_at']) ? $row['follow_up_replied_at'] : null,
+                'follow_up_expired_at' => isset($row['follow_up_expired_at']) ? $row['follow_up_expired_at'] : null,
+                'follow_up_sent_at_label' => !empty($row['follow_up_sent_at']) ? date('d M Y h:i A', strtotime($row['follow_up_sent_at'])) : '-',
+                'follow_up_replied_at_label' => !empty($row['follow_up_replied_at']) ? date('d M Y h:i A', strtotime($row['follow_up_replied_at'])) : '-',
+                'follow_up_expired_at_label' => !empty($row['follow_up_expired_at']) ? date('d M Y h:i A', strtotime($row['follow_up_expired_at'])) : '-',
                 'response_1_pair_label' => $this->format_response_pair_label(isset($row['response_1_agent_message_at']) ? $row['response_1_agent_message_at'] : null, isset($row['response_1_customer_message_at']) ? $row['response_1_customer_message_at'] : null),
                 'response_2_pair_label' => $this->format_response_pair_label(isset($row['response_2_agent_message_at']) ? $row['response_2_agent_message_at'] : null, isset($row['response_2_customer_message_at']) ? $row['response_2_customer_message_at'] : null),
                 'response_3_pair_label' => $this->format_response_pair_label(isset($row['response_3_agent_message_at']) ? $row['response_3_agent_message_at'] : null, isset($row['response_3_customer_message_at']) ? $row['response_3_customer_message_at'] : null),
@@ -1384,6 +1410,32 @@ class Report extends MY_Controller
         }
 
         return array_values($tags);
+    }
+
+    private function format_follow_up_status_label($status)
+    {
+        $status = strtolower(trim((string) $status));
+        $labels = array(
+            'pending' => 'Pending',
+            'sent' => 'Sent',
+            'completed' => 'Completed',
+            'expired' => 'Sent',
+        );
+
+        return isset($labels[$status]) ? $labels[$status] : 'Pending';
+    }
+
+    private function format_follow_up_status_class($status)
+    {
+        $status = strtolower(trim((string) $status));
+        $classes = array(
+            'pending' => 'label-light-warning',
+            'sent' => 'label-light-info',
+            'completed' => 'label-light-success',
+            'expired' => 'label-light-info',
+        );
+
+        return isset($classes[$status]) ? $classes[$status] : 'label-light-warning';
     }
 
     private function format_duration_label($seconds)

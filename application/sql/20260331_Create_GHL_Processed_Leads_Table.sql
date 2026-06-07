@@ -11,6 +11,10 @@ CREATE TABLE IF NOT EXISTS `ghl_processed_leads` (
   `tracked_message_count` TINYINT UNSIGNED NOT NULL DEFAULT 0,
   `responded_message_count` TINYINT UNSIGNED NOT NULL DEFAULT 0,
   `avg_first_5_response_seconds` INT NULL DEFAULT NULL,
+  `follow_up_status` ENUM('pending', 'sent', 'completed', 'expired') NOT NULL DEFAULT 'pending',
+  `follow_up_sent_at` DATETIME NULL DEFAULT NULL,
+  `follow_up_replied_at` DATETIME NULL DEFAULT NULL,
+  `follow_up_expired_at` DATETIME NULL DEFAULT NULL,
   `response_1_customer_message_id` VARCHAR(100) NULL DEFAULT NULL,
   `response_1_customer_message_at` DATETIME NULL DEFAULT NULL,
   `response_1_agent_message_id` VARCHAR(100) NULL DEFAULT NULL,
@@ -46,6 +50,7 @@ CREATE TABLE IF NOT EXISTS `ghl_processed_leads` (
   KEY `idx_conversation_started_at` (`conversation_id`, `lead_started_at`),
   KEY `idx_contact_started_at` (`contact_id`, `lead_started_at`),
   KEY `idx_assigned_to_user_id` (`assigned_to_user_id`),
+  KEY `idx_follow_up_status` (`follow_up_status`, `follow_up_sent_at`),
   KEY `idx_conversion_status` (`is_converted`, `converted_at`),
   KEY `idx_booking_id` (`booking_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

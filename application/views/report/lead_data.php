@@ -412,6 +412,12 @@ $leadSortIcon = function($column) use ($leadCurrentSortBy, $leadCurrentSortDir) 
                                     </a>
                                 </th>
                                 <th style="text-align:center;">
+                                    <a href="<?php echo html_escape($lead_data_sorting['links']['follow_up_status']); ?>" class="lead-sort-link justify-content-center">
+                                        Follow Up
+                                        <i class="<?php echo $leadSortIcon('follow_up_status'); ?>"></i>
+                                    </a>
+                                </th>
+                                <th style="text-align:center;">
                                     <a href="<?php echo html_escape($lead_data_sorting['links']['message_count']); ?>" class="lead-sort-link justify-content-center">
                                         Messages
                                         <i class="<?php echo $leadSortIcon('message_count'); ?>"></i>
@@ -423,7 +429,7 @@ $leadSortIcon = function($column) use ($leadCurrentSortBy, $leadCurrentSortDir) 
                         <tbody>
                             <?php if(empty($lead_data_rows)) { ?>
                                 <tr>
-                                    <td colspan="12" class="text-center py-10">No lead records found for the selected filters.</td>
+                                    <td colspan="13" class="text-center py-10">No lead records found for the selected filters.</td>
                                 </tr>
                             <?php } else { ?>
                                 <?php $count = $lead_data_pagination['start_row']; ?>
@@ -511,6 +517,15 @@ $leadSortIcon = function($column) use ($leadCurrentSortBy, $leadCurrentSortDir) 
                                                 <?php } ?>
                                             <?php } else { ?>
                                                 <span class="label label-light-warning label-inline font-weight-bold">Open</span>
+                                            <?php } ?>
+                                        </td>
+                                        <td class="text-center align-middle">
+                                            <span class="label <?php echo html_escape($row['follow_up_status_class']); ?> label-inline font-weight-bold"><?php echo html_escape($row['follow_up_status_label']); ?></span>
+                                            <?php if(!empty($row['follow_up_sent_at']) || !empty($row['follow_up_replied_at']) || !empty($row['follow_up_expired_at'])) { ?>
+                                                <div class="text-muted font-size-sm mt-2">Sent: <?php echo html_escape($row['follow_up_sent_at_label']); ?></div>
+                                                <?php if($row['follow_up_status'] === 'completed') { ?>
+                                                    <div class="text-muted font-size-sm">Replied: <?php echo html_escape($row['follow_up_replied_at_label']); ?></div>
+                                                <?php } ?>
                                             <?php } ?>
                                         </td>
                                         <td class="text-center align-middle">

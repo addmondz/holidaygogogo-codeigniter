@@ -68,6 +68,17 @@
                                         </div>
                                         <div class="col-md-3">
                                             <div class="form-group">
+                                                <label>Follow Up</label>
+                                                <select name="follow_up_status" class="form-control selectpicker">
+                                                    <option value="">--ALL FOLLOW UPS--</option>
+                                                    <option value="pending" <?php if($lead_ownership_data_filters['follow_up_status'] === 'pending') { echo 'selected'; } ?>>Pending</option>
+                                                    <option value="sent" <?php if($lead_ownership_data_filters['follow_up_status'] === 'sent') { echo 'selected'; } ?>>Sent</option>
+                                                    <option value="completed" <?php if($lead_ownership_data_filters['follow_up_status'] === 'completed') { echo 'selected'; } ?>>Completed</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="form-group">
                                                 <label>Rows Per Page</label>
                                                 <select name="per_page" id="lead-ownership-data-per-page" class="form-control selectpicker">
                                                     <option value="25" <?php if((int) $lead_ownership_data_filters['per_page'] === 25) { echo 'selected'; } ?>>25</option>
@@ -97,6 +108,7 @@
                                 <th>Lead Started</th>
                                 <th style="text-align:center;">Reply Count</th>
                                 <th style="text-align:center;">Response</th>
+                                <th style="text-align:center;">Follow Up</th>
                                 <th style="text-align:center;">Conversion</th>
                                 <th style="text-align:center;">Action</th>
                             </tr>
@@ -104,7 +116,7 @@
                         <tbody>
                             <?php if(empty($lead_ownership_data_rows)) { ?>
                                 <tr>
-                                    <td colspan="10" class="text-center py-10">No owned leads found for the selected filters.</td>
+                                    <td colspan="11" class="text-center py-10">No owned leads found for the selected filters.</td>
                                 </tr>
                             <?php } else { ?>
                                 <?php $count = $lead_ownership_data_pagination['start_row']; ?>
@@ -134,6 +146,9 @@
                                             <div class="font-weight-bold"><?php echo html_escape($row['avg_first_5_response_label']); ?></div>
                                             <div class="text-muted font-size-sm"><?php echo html_escape($row['response_progress_label']); ?> replied</div>
                                             <div class="text-muted font-size-sm">Last 5: <?php echo html_escape($row['avg_recent_5_response_label']); ?></div>
+                                        </td>
+                                        <td class="text-center align-middle">
+                                            <span class="label <?php echo html_escape($row['follow_up_status_class']); ?> label-inline font-weight-bold"><?php echo html_escape($row['follow_up_status_label']); ?></span>
                                         </td>
                                         <td class="text-center align-middle">
                                             <?php if((int) $row['is_converted'] === 1) { ?>

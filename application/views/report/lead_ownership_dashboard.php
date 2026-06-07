@@ -147,6 +147,15 @@ $buildOwnershipDataUrl = function($ownerId, $ownershipType = null) use ($lead_ow
                             </div>
                         </div>
                     </div>
+                    <div class="col-xl-3 col-md-6">
+                        <div class="card card-custom gutter-b shadow-sm">
+                            <div class="card-body">
+                                <div class="text-muted text-uppercase font-size-sm font-weight-bold mb-2">Follow Up Rate</div>
+                                <div class="font-weight-bolder font-size-h2 text-warning"><span data-summary="follow_up_rate"><?php echo html_escape($ownership_summary['follow_up_rate']); ?></span>%</div>
+                                <div class="text-muted mt-2">Follow ups: <span data-summary="follow_up_leads"><?php echo number_format($ownership_summary['follow_up_leads']); ?></span></div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="table-responsive">
@@ -162,6 +171,8 @@ $buildOwnershipDataUrl = function($ownerId, $ownershipType = null) use ($lead_ow
                                 <th style="text-align:center;">Response Rate</th>
                                 <th style="text-align:center;">Avg First 5 Response</th>
                                 <th style="text-align:center;">Avg Last 5 Response</th>
+                                <th style="text-align:center;">Follow Up</th>
+                                <th style="text-align:center;">Follow Up Rate</th>
                                 <th style="text-align:center;">Converted</th>
                                 <th style="text-align:center;">Conversion Rate</th>
                                 <th style="text-align:center;">Last Calculated</th>
@@ -170,7 +181,7 @@ $buildOwnershipDataUrl = function($ownerId, $ownershipType = null) use ($lead_ow
                         <tbody id="lead-ownership-table-body">
                             <?php if(empty($lead_ownership_rows)) { ?>
                                 <tr>
-                                    <td colspan="12" class="text-center py-10">Lead ownership activity not found for the selected filters.</td>
+                                    <td colspan="14" class="text-center py-10">Lead ownership activity not found for the selected filters.</td>
                                 </tr>
                             <?php } else { ?>
                                 <?php $count = 1; ?>
@@ -204,6 +215,8 @@ $buildOwnershipDataUrl = function($ownerId, $ownershipType = null) use ($lead_ow
                                             <div class="font-weight-bold"><?php echo html_escape($row['avg_recent_response_time_label']); ?></div>
                                             <div class="text-muted font-size-sm"><?php echo html_escape($row['avg_recent_responded_messages']); ?> / 5 replied</div>
                                         </td>
+                                        <td class="text-center"><?php echo number_format($row['follow_up_leads']); ?></td>
+                                        <td class="text-center"><?php echo html_escape($row['follow_up_rate']); ?>%</td>
                                         <td class="text-center"><?php echo number_format($row['converted_leads']); ?></td>
                                         <td class="text-center"><?php echo html_escape($row['conversion_rate']); ?>%</td>
                                         <td class="text-center"><?php echo !empty($row['last_calculated_at']) ? html_escape($row['last_calculated_at']) : '-'; ?></td>
@@ -254,7 +267,7 @@ $buildOwnershipDataUrl = function($ownerId, $ownershipType = null) use ($lead_ow
         var html = '';
 
         if (!rows || rows.length === 0) {
-            $('#lead-ownership-table-body').html('<tr><td colspan="12" class="text-center py-10">Lead ownership activity not found for the selected filters.</td></tr>');
+            $('#lead-ownership-table-body').html('<tr><td colspan="14" class="text-center py-10">Lead ownership activity not found for the selected filters.</td></tr>');
             return;
         }
 
@@ -273,6 +286,8 @@ $buildOwnershipDataUrl = function($ownerId, $ownershipType = null) use ($lead_ow
             html += '<td class="text-center">' + row.response_rate + '%</td>';
             html += '<td class="text-center"><div class="font-weight-bold">' + escapeHtml(row.avg_response_time_label) + '</div><div class="text-muted font-size-sm">' + escapeHtml(row.avg_responded_messages) + ' / 5 replied</div></td>';
             html += '<td class="text-center"><div class="font-weight-bold">' + escapeHtml(row.avg_recent_response_time_label) + '</div><div class="text-muted font-size-sm">' + escapeHtml(row.avg_recent_responded_messages) + ' / 5 replied</div></td>';
+            html += '<td class="text-center">' + row.follow_up_leads + '</td>';
+            html += '<td class="text-center">' + row.follow_up_rate + '%</td>';
             html += '<td class="text-center">' + row.converted_leads + '</td>';
             html += '<td class="text-center">' + row.conversion_rate + '%</td>';
             html += '<td class="text-center">' + escapeHtml(row.last_calculated_at || '-') + '</td>';
@@ -309,6 +324,8 @@ $buildOwnershipDataUrl = function($ownerId, $ownershipType = null) use ($lead_ow
         $('[data-summary="reply_owned_leads"]').text(summary.reply_owned_leads);
         $('[data-summary="avg_response_time_label"]').text(summary.avg_response_time_label);
         $('[data-summary="avg_recent_response_time_label"]').text(summary.avg_recent_response_time_label);
+        $('[data-summary="follow_up_leads"]').text(summary.follow_up_leads);
+        $('[data-summary="follow_up_rate"]').text(summary.follow_up_rate);
         $('[data-summary="converted_leads"]').text(summary.converted_leads);
         $('[data-summary="conversion_rate"]').text(summary.conversion_rate);
     }

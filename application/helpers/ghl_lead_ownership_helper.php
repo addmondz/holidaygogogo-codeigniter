@@ -64,6 +64,7 @@ if (!function_exists('ghl_build_lead_ownership_rows')) {
                 'recent_tracked_message_count' => isset($lead['recent_tracked_message_count']) ? (int) $lead['recent_tracked_message_count'] : 0,
                 'recent_responded_message_count' => isset($lead['recent_responded_message_count']) ? (int) $lead['recent_responded_message_count'] : 0,
                 'avg_recent_5_response_seconds' => isset($lead['avg_recent_5_response_seconds']) && $lead['avg_recent_5_response_seconds'] !== null ? (int) $lead['avg_recent_5_response_seconds'] : null,
+                'follow_up_status' => isset($lead['follow_up_status']) && $lead['follow_up_status'] !== '' ? (string) $lead['follow_up_status'] : 'pending',
                 'is_converted' => isset($lead['is_converted']) ? (int) $lead['is_converted'] : 0,
                 'booking_id' => !empty($lead['booking_id']) ? (int) $lead['booking_id'] : null,
                 'converted_at' => !empty($lead['converted_at']) ? (string) $lead['converted_at'] : null,

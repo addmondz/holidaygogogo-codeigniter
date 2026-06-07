@@ -675,6 +675,7 @@ class Report_Model extends CI_Model
                 SUM(CASE WHEN glo.is_assigned_owner = 1 THEN 1 ELSE 0 END) AS assigned_owned_leads,
                 SUM(CASE WHEN glo.is_assigned_owner = 0 AND glo.is_reply_owner = 1 THEN 1 ELSE 0 END) AS reply_owned_leads,
                 SUM(CASE WHEN glo.responded_message_count > 0 THEN 1 ELSE 0 END) AS responded_leads,
+                SUM(CASE WHEN glo.follow_up_status IN ('sent', 'completed') THEN 1 ELSE 0 END) AS follow_up_leads,
                 SUM(CASE WHEN glo.is_converted = 1 AND glo.booking_id IS NOT NULL THEN 1 ELSE 0 END) AS converted_leads,
                 COUNT(DISTINCT glo.owner_user_id) AS active_owners,
                 AVG(glo.avg_first_5_response_seconds) AS avg_response_time_seconds,
@@ -690,6 +691,7 @@ class Report_Model extends CI_Model
         $row = $this->db->query($sql, $where['params'])->row_array();
         $ownedLeads = !empty($row['owned_leads']) ? (int) $row['owned_leads'] : 0;
         $respondedLeads = !empty($row['responded_leads']) ? (int) $row['responded_leads'] : 0;
+        $followUpLeads = !empty($row['follow_up_leads']) ? (int) $row['follow_up_leads'] : 0;
         $convertedLeads = !empty($row['converted_leads']) ? (int) $row['converted_leads'] : 0;
 
         return array(
@@ -698,9 +700,11 @@ class Report_Model extends CI_Model
             'assigned_owned_leads' => !empty($row['assigned_owned_leads']) ? (int) $row['assigned_owned_leads'] : 0,
             'reply_owned_leads' => !empty($row['reply_owned_leads']) ? (int) $row['reply_owned_leads'] : 0,
             'responded_leads' => $respondedLeads,
+            'follow_up_leads' => $followUpLeads,
             'converted_leads' => $convertedLeads,
             'active_owners' => !empty($row['active_owners']) ? (int) $row['active_owners'] : 0,
             'response_rate' => $ownedLeads > 0 ? round(($respondedLeads / $ownedLeads) * 100, 1) : 0.0,
+            'follow_up_rate' => $ownedLeads > 0 ? round(($followUpLeads / $ownedLeads) * 100, 1) : 0.0,
             'conversion_rate' => $ownedLeads > 0 ? round(($convertedLeads / $ownedLeads) * 100, 1) : 0.0,
             'avg_response_time_seconds' => $row['avg_response_time_seconds'] !== null ? (int) round($row['avg_response_time_seconds']) : null,
             'avg_recent_response_time_seconds' => $row['avg_recent_response_time_seconds'] !== null ? (int) round($row['avg_recent_response_time_seconds']) : null,
@@ -723,6 +727,7 @@ class Report_Model extends CI_Model
                 SUM(CASE WHEN glo.is_assigned_owner = 1 THEN 1 ELSE 0 END) AS assigned_owned_leads,
                 SUM(CASE WHEN glo.is_assigned_owner = 0 AND glo.is_reply_owner = 1 THEN 1 ELSE 0 END) AS reply_owned_leads,
                 SUM(CASE WHEN glo.responded_message_count > 0 THEN 1 ELSE 0 END) AS responded_leads,
+                SUM(CASE WHEN glo.follow_up_status IN ('sent', 'completed') THEN 1 ELSE 0 END) AS follow_up_leads,
                 SUM(CASE WHEN glo.is_converted = 1 AND glo.booking_id IS NOT NULL THEN 1 ELSE 0 END) AS converted_leads,
                 AVG(glo.avg_first_5_response_seconds) AS avg_response_time_seconds,
                 AVG(glo.avg_recent_5_response_seconds) AS avg_recent_response_time_seconds,
@@ -743,6 +748,7 @@ class Report_Model extends CI_Model
         foreach ($rows as $row) {
             $ownedLeads = (int) $row['owned_leads'];
             $respondedLeads = (int) $row['responded_leads'];
+            $followUpLeads = (int) $row['follow_up_leads'];
             $convertedLeads = (int) $row['converted_leads'];
 
             $results[] = array(
@@ -753,8 +759,10 @@ class Report_Model extends CI_Model
                 'assigned_owned_leads' => (int) $row['assigned_owned_leads'],
                 'reply_owned_leads' => (int) $row['reply_owned_leads'],
                 'responded_leads' => $respondedLeads,
+                'follow_up_leads' => $followUpLeads,
                 'converted_leads' => $convertedLeads,
                 'response_rate' => $ownedLeads > 0 ? round(($respondedLeads / $ownedLeads) * 100, 1) : 0.0,
+                'follow_up_rate' => $ownedLeads > 0 ? round(($followUpLeads / $ownedLeads) * 100, 1) : 0.0,
                 'conversion_rate' => $ownedLeads > 0 ? round(($convertedLeads / $ownedLeads) * 100, 1) : 0.0,
                 'avg_response_time_seconds' => $row['avg_response_time_seconds'] !== null ? (int) round($row['avg_response_time_seconds']) : null,
                 'avg_recent_response_time_seconds' => $row['avg_recent_response_time_seconds'] !== null ? (int) round($row['avg_recent_response_time_seconds']) : null,
@@ -853,6 +861,7 @@ class Report_Model extends CI_Model
                 glo.recent_tracked_message_count,
                 glo.recent_responded_message_count,
                 glo.avg_recent_5_response_seconds,
+                glo.follow_up_status,
                 glo.is_converted,
                 glo.booking_id,
                 glo.converted_at,
@@ -996,6 +1005,10 @@ class Report_Model extends CI_Model
                 pl.recent_tracked_message_count,
                 pl.recent_responded_message_count,
                 pl.avg_recent_5_response_seconds,
+                pl.follow_up_status,
+                pl.follow_up_sent_at,
+                pl.follow_up_replied_at,
+                pl.follow_up_expired_at,
                 pl.response_1_customer_message_at,
                 pl.response_1_agent_message_at,
                 pl.response_2_customer_message_at,
@@ -1159,6 +1172,8 @@ class Report_Model extends CI_Model
                 return "ORDER BY (CASE WHEN pl.avg_first_5_response_seconds IS NULL THEN 1 ELSE 0 END) ASC, pl.avg_first_5_response_seconds {$sortDir}, pl.id DESC";
             case 'conversion_status':
                 return "ORDER BY pl.is_converted {$sortDir}, pl.converted_at {$sortDir}, pl.id DESC";
+            case 'follow_up_status':
+                return "ORDER BY FIELD(pl.follow_up_status, 'completed', 'sent', 'pending') {$sortDir}, pl.id DESC";
             case 'message_count':
                 return "ORDER BY message_count {$sortDir}, pl.id DESC";
             case 'lead_started_at':
@@ -1481,6 +1496,11 @@ class Report_Model extends CI_Model
             } elseif ($filters['ownership_type'] === 'reply') {
                 $clauses[] = 'glo.is_assigned_owner = 0 AND glo.is_reply_owner = 1';
             }
+        }
+
+        if (isset($filters['follow_up_status']) && $filters['follow_up_status'] !== '') {
+            $clauses[] = 'glo.follow_up_status = ?';
+            $params[] = $filters['follow_up_status'];
         }
 
         $sql = '';
