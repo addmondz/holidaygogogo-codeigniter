@@ -616,13 +616,14 @@ if (!function_exists('has_booking_payment')) {
         $CI->load->model('Booking_Model');
         $payments = $CI->Booking_Model->Read_Payments($booking_id);
 
-        // Check for any approved or pending payment (Status = 'Y' or 'P', Credit > 0, Type != 'SUPPLIER REFUND')
-        // If payment exists (even pending), don't show as overdue
+        // Only an APPROVED credit counts as money actually received. A pending
+        // line (Status='P') is just an expected/invoiced amount — e.g. the FULL
+        // line a duplicated booking carries over (BC-2606-0057) — and must NOT
+        // promote PENDING PAYMENT (P) to PARTIAL PAYMENT (PP).
         if (!empty($payments)) {
             foreach ($payments as $payment) {
                 $credit_amount = !empty($payment->Credit) ? floatval($payment->Credit) : 0;
-                // Check for approved (Y) or pending (P) payments
-                if ($payment->Type != 'SUPPLIER REFUND' && $credit_amount > 0 && ($payment->Status == 'Y' || $payment->Status == 'P')) {
+                if ($payment->Type != 'SUPPLIER REFUND' && $credit_amount > 0 && $payment->Status == 'Y') {
                     return true;
                 }
             }
