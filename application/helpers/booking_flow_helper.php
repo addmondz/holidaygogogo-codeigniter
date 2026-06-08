@@ -1170,16 +1170,57 @@ if (!function_exists('resolve_booking_checklist_team_leads')) {
         }
 
         $CI =& get_instance();
+
+        // Step 1: read each role's dedicated lead pointer.
+        $tc1_candidate = 0;
+        $op_candidate  = 0;
         $CI->db->select('AdminID, TeamLeadID, OpTeamLeadID');
         $CI->db->where_in('AdminID', $ids);
         foreach ($CI->db->get('admin')->result() as $row) {
             if ((int)$row->AdminID === $sales_agent) {
-                $out['tc1_tl'] = (int)$row->TeamLeadID;
+                $tc1_candidate = (int)$row->TeamLeadID;
             }
             if ((int)$row->AdminID === $booking_op) {
-                $out['op_tl'] = (int)$row->OpTeamLeadID;
+                $op_candidate = (int)$row->OpTeamLeadID;
             }
         }
+
+        // Step 2: only honour a pointer that still resolves to an ACTIVE admin
+        // of the role that slot requires — a sales lead (Level 25) for
+        // TeamLeadID, an OP TEAM LEAD (Level 45) for OpTeamLeadID. This mirrors
+        // the admin listing/edit form, which already hide a pointer to anyone
+        // who is not an active lead of that level. Without it, a stale pointer
+        // (e.g. a sales agent whose TeamLeadID still references someone since
+        // moved to the OP-lead role, or a since-disabled lead) would silently
+        // grant checklist rights the UI shows as unassigned.
+        $lead_ids = array_values(array_unique(array_filter(array($tc1_candidate, $op_candidate))));
+        if (empty($lead_ids)) {
+            return $out;
+        }
+
+        $valid = array();
+        $CI->db->select('AdminID, Level, Status');
+        $CI->db->where_in('AdminID', $lead_ids);
+        foreach ($CI->db->get('admin')->result() as $row) {
+            $valid[(int)$row->AdminID] = array(
+                'level'  => (string)$row->Level,
+                'status' => (string)$row->Status,
+            );
+        }
+
+        if ($tc1_candidate > 0
+            && isset($valid[$tc1_candidate])
+            && $valid[$tc1_candidate]['level'] === '25'
+            && $valid[$tc1_candidate]['status'] === 'Y') {
+            $out['tc1_tl'] = $tc1_candidate;
+        }
+        if ($op_candidate > 0
+            && isset($valid[$op_candidate])
+            && $valid[$op_candidate]['level'] === '45'
+            && $valid[$op_candidate]['status'] === 'Y') {
+            $out['op_tl'] = $op_candidate;
+        }
+
         return $out;
     }
 }
