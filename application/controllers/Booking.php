@@ -6,6 +6,11 @@ use PhpOffice\PhpSpreadsheet\Writer\Xlxs;
 
 class Booking extends MY_Controller
 {
+	/** Whether a clean JSON body has already been emitted for the current AJAX endpoint. */
+	private $json_response_sent = false;
+	/** Output-buffer nesting level captured before an AJAX endpoint started buffering. */
+	private $json_ob_level = 0;
+
 	function __construct()
 	{
 		parent::__construct();
@@ -131,16 +136,91 @@ class Booking extends MY_Controller
 	 * AJAX endpoint for DataTables server-side processing
 	 * Returns paginated booking data as JSON
 	 */
+	/**
+	 * Harden a JSON/AJAX endpoint against stray PHP output corrupting the body.
+	 *
+	 * The booking listing is rendered by DataTables in server-side mode, so the
+	 * endpoint MUST return pure JSON. Three things otherwise leak into the body and
+	 * produce DataTables' "Invalid JSON response" warning:
+	 *   1. PHP warnings/notices printed inline when display_errors is on (which it is
+	 *      whenever CI_ENV is unset and ENVIRONMENT falls back to 'development').
+	 *   2. Fatal \Error types (TypeError, etc.) that bypass catch (Exception).
+	 *   3. True fatals — max_execution_time exceeded, memory exhausted — that abort
+	 *      mid-stream with no catch at all.
+	 *
+	 * This silences display_errors for the request, buffers output so stray text can
+	 * be discarded before the real body, and registers a shutdown handler that emits
+	 * a valid JSON envelope if a fatal kills the request before send_json() runs.
+	 *
+	 * @param int $draw DataTables draw counter echoed back in the fatal fallback (0 if N/A).
+	 */
+	private function begin_json_endpoint($draw = 0)
+	{
+		@ini_set('display_errors', '0');
+		if (!headers_sent()) {
+			header('Content-Type: application/json');
+		}
+
+		$this->json_response_sent = false;
+		$this->json_ob_level = ob_get_level();
+		ob_start();
+
+		register_shutdown_function(function () use ($draw) {
+			if ($this->json_response_sent) {
+				return;
+			}
+			$error = error_get_last();
+			$fatal_types = E_ERROR | E_PARSE | E_CORE_ERROR | E_COMPILE_ERROR | E_USER_ERROR;
+			if ($error === null || !($error['type'] & $fatal_types)) {
+				return;
+			}
+
+			// Discard any partial output or fatal-error text the engine appended.
+			while (ob_get_level() > $this->json_ob_level) {
+				ob_end_clean();
+			}
+			log_message('error', 'Booking JSON endpoint fatal: ' . $error['message']
+				. ' in ' . $error['file'] . ':' . $error['line']);
+			if (!headers_sent()) {
+				header('Content-Type: application/json');
+			}
+			echo json_encode(array(
+				'error'           => 'An error occurred while loading bookings',
+				'draw'            => (int) $draw,
+				'recordsTotal'    => 0,
+				'recordsFiltered' => 0,
+				'data'            => array(),
+			));
+		});
+	}
+
+	/**
+	 * Emit the final JSON body for an endpoint prepared by begin_json_endpoint().
+	 * Drops anything that leaked into the output buffer (warnings, notices, dumps)
+	 * so the body is always clean JSON, then marks the response sent so the shutdown
+	 * handler stands down.
+	 */
+	private function send_json($data)
+	{
+		while (ob_get_level() > $this->json_ob_level) {
+			ob_end_clean();
+		}
+		if (!headers_sent()) {
+			header('Content-Type: application/json');
+		}
+		$this->json_response_sent = true;
+		echo json_encode($data);
+	}
+
 	function ajax_list()
 	{
-		// Set JSON header first to prevent any output issues
-		header('Content-Type: application/json');
-		
+		$this->begin_json_endpoint(intval($this->input->get('draw')));
+
 		try {
 			// Ensure access_control is an array to prevent warnings
 			$access_control = $this->session->access_control ?? array();
 			if(!in_array('VB', $access_control)) {
-				echo json_encode(array('error' => 'Access denied'));
+				$this->send_json(array('error' => 'Access denied'));
 				return;
 			}
 
@@ -459,13 +539,13 @@ class Booking extends MY_Controller
 				'data' => $data
 			);
 
-			// Header already set at the beginning, just output JSON
-			echo json_encode($output);
+			// Discard any stray buffered output, then emit clean JSON.
+			$this->send_json($output);
 			exit; // Prevent any additional output
-		} catch (Exception $e) {
-			// Log error and return JSON error response
+		} catch (\Throwable $e) {
+			// \Throwable (not just \Exception) so fatal \Error types are caught too.
 			log_message('error', 'Booking ajax_list error: ' . $e->getMessage());
-			echo json_encode(array(
+			$this->send_json(array(
 				'error' => 'An error occurred while loading bookings',
 				'draw' => intval($this->input->get('draw') ?? 0),
 				'recordsTotal' => 0,
@@ -629,39 +709,45 @@ class Booking extends MY_Controller
 	 */
 	function ajax_summary()
 	{
-		if(!in_array('VB', $this->session->access_control)) {
-			echo json_encode(array('error' => 'Access denied'));
-			return;
-		}
+		$this->begin_json_endpoint();
 
-		$is_sales_agent = $this->session->userdata('level') == 20;
-
-		$summary = $this->Booking_Model->Calculate_Summary();
-
-		$total_sales = $summary['total_sales'];
-
-		// Format output
-		$total_sales_formatted = number_format($total_sales, 2, '.', ',');
-
-		$output = array(
-			'total_sales' => $total_sales_formatted,
-			'is_sales_agent' => $is_sales_agent
-		);
-
-		// Net profit is restricted to non-sales-agents
-		if(!$is_sales_agent) {
-			$total_net_profit = $summary['total_net_profit'];
-			if($total_net_profit != 0 && $total_sales != 0) {
-				$profit_percentage = round(($total_net_profit / $total_sales) * 100);
-				$total_net_profit_formatted = number_format($total_net_profit, 2, '.', ',') . ' (' . $profit_percentage . '%)';
-			} else {
-				$total_net_profit_formatted = number_format($total_net_profit, 2, '.', ',') . ' (0%)';
+		try {
+			if(!in_array('VB', $this->session->access_control)) {
+				$this->send_json(array('error' => 'Access denied'));
+				return;
 			}
-			$output['total_net_profit'] = $total_net_profit_formatted;
-		}
 
-		header('Content-Type: application/json');
-		echo json_encode($output);
+			$is_sales_agent = $this->session->userdata('level') == 20;
+
+			$summary = $this->Booking_Model->Calculate_Summary();
+
+			$total_sales = $summary['total_sales'];
+
+			// Format output
+			$total_sales_formatted = number_format($total_sales, 2, '.', ',');
+
+			$output = array(
+				'total_sales' => $total_sales_formatted,
+				'is_sales_agent' => $is_sales_agent
+			);
+
+			// Net profit is restricted to non-sales-agents
+			if(!$is_sales_agent) {
+				$total_net_profit = $summary['total_net_profit'];
+				if($total_net_profit != 0 && $total_sales != 0) {
+					$profit_percentage = round(($total_net_profit / $total_sales) * 100);
+					$total_net_profit_formatted = number_format($total_net_profit, 2, '.', ',') . ' (' . $profit_percentage . '%)';
+				} else {
+					$total_net_profit_formatted = number_format($total_net_profit, 2, '.', ',') . ' (0%)';
+				}
+				$output['total_net_profit'] = $total_net_profit_formatted;
+			}
+
+			$this->send_json($output);
+		} catch (\Throwable $e) {
+			log_message('error', 'Booking ajax_summary error: ' . $e->getMessage());
+			$this->send_json(array('error' => 'An error occurred while loading summary'));
+		}
 	}
 
 	/**
@@ -670,9 +756,11 @@ class Booking extends MY_Controller
 	 */
 	function ajax_summary_cards()
 	{
+		$this->begin_json_endpoint();
+
+		try {
 		if(!in_array('VB', $this->session->access_control)) {
-			header('Content-Type: application/json');
-			echo json_encode(array('error' => 'Access denied'));
+			$this->send_json(array('error' => 'Access denied'));
 			return;
 		}
 
@@ -2482,14 +2570,17 @@ class Booking extends MY_Controller
 				'<strong>Filters:</strong> Booking confirmations only; not cancelled; not draft; active line items only.';
 		}
 
-		header('Content-Type: application/json');
-		echo json_encode(array(
+		$this->send_json(array(
 			'level'    => $level,
 			'cards'    => $cards,
 			'tables'   => $tables,
 			'meta'     => $meta,
 			'popovers' => $popovers,
 		));
+		} catch (\Throwable $e) {
+			log_message('error', 'Booking ajax_summary_cards error: ' . $e->getMessage());
+			$this->send_json(array('error' => 'An error occurred while loading summary cards'));
+		}
 	}
 
 	function Create()
@@ -3212,7 +3303,8 @@ class Booking extends MY_Controller
 						$this->session->userdata('admin_id'),
 						$this->session->userdata('level'),
 						$checklist_tl_ids['tc1_tl'],
-						$checklist_tl_ids['op_tl']
+						$checklist_tl_ids['op_tl'],
+						$checklist_tl_ids['tc1_op_tl']
 					);
 					// Calculate deposit status and format Deposit Paid display
 					$deposit_difference = $deposit_paid - $deposit_total;
@@ -5674,9 +5766,9 @@ class Booking extends MY_Controller
 		}
 
 		// Strict whitelist: only TC1 (booking SalesAgent), OP (BookingOP), the
-		// SalesAgent's sales Team Lead, and the BookingOP's OP TEAM LEAD may
-		// mutate this booking's checklist. The modal can still load read-only
-		// for everyone else with AB access.
+		// SalesAgent's sales Team Lead, the BookingOP's OP TEAM LEAD, and the
+		// SalesAgent's own OP TEAM LEAD may mutate this booking's checklist. The
+		// modal can still load read-only for everyone else with AB access.
 		$this->load->helper('booking_flow');
 		$tl_ids = resolve_booking_checklist_team_leads($booking);
 		$can_modify = can_user_modify_booking_checklist(
@@ -5684,7 +5776,8 @@ class Booking extends MY_Controller
 			$this->session->userdata('admin_id'),
 			$this->session->userdata('level'),
 			$tl_ids['tc1_tl'],
-			$tl_ids['op_tl']
+			$tl_ids['op_tl'],
+			$tl_ids['tc1_op_tl']
 		);
 
 		// Get booking products (need ProductID and Name for checklist grouping)
@@ -5966,13 +6059,14 @@ class Booking extends MY_Controller
 
 		$tl_ids = $booking
 			? resolve_booking_checklist_team_leads($booking)
-			: array('tc1_tl' => null, 'op_tl' => null);
+			: array('tc1_tl' => null, 'op_tl' => null, 'tc1_op_tl' => null);
 		$allowed = $booking && can_user_modify_booking_checklist(
 			$booking,
 			$admin_id,
 			$this->session->userdata('level'),
 			$tl_ids['tc1_tl'],
-			$tl_ids['op_tl']
+			$tl_ids['op_tl'],
+			$tl_ids['tc1_op_tl']
 		);
 
 		if (!$allowed) {

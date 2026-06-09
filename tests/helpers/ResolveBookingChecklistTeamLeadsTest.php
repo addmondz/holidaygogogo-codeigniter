@@ -100,6 +100,11 @@ $pdo->exec("CREATE TABLE admin (
 //  90 OPSTALE L40, OpTeamLeadID=46 (OPGONE D)  -> invalid: op NULL
 //  91 OPWRONG L40, OpTeamLeadID=25 (SARAH L25) -> wrong level: op NULL
 //  29 JESIKA  L40, TeamLeadID=0 (orphan)       -> tc1 NULL
+//
+// Sales agents (TC1) that ALSO carry an OpTeamLeadID — gates tc1_op_tl:
+//   8 TCOPOK    L20, TeamLeadID=25, OpTeamLeadID=45 -> tc1=25, tc1_op=45
+//  92 TCOPSTALE L20, OpTeamLeadID=46 (OPGONE D)      -> tc1_op NULL
+//  93 TCOPWRONG L20, OpTeamLeadID=25 (SARAH L25)     -> wrong level: tc1_op NULL
 $pdo->exec("INSERT INTO admin VALUES
     (20, 'HANI',    '45', 'Y', NULL, NULL),
     (25, 'SARAH',   '25', 'Y', NULL, NULL),
@@ -112,7 +117,10 @@ $pdo->exec("INSERT INTO admin VALUES
     (9,  'OPSTAFF', '40', 'Y', NULL, 45),
     (90, 'OPSTALE', '40', 'Y', NULL, 46),
     (91, 'OPWRONG', '40', 'Y', NULL, 25),
-    (29, 'JESIKA',  '40', 'Y', 0,    NULL)
+    (29, 'JESIKA',  '40', 'Y', 0,    NULL),
+    (8,  'TCOPOK',  '20', 'Y', 25,   45),
+    (92, 'TCOPSTALE','20','Y', NULL, 46),
+    (93, 'TCOPWRONG','20','Y', NULL, 25)
 ");
 
 $ci = new stdClass();
@@ -135,78 +143,109 @@ $assertions = [];
 // This is the BC-2606-0042 case: Hani must NOT be resolved as CHEN's tc1 lead.
 assert_eq(
     'CHEN.TeamLeadID -> HANI (L45) is NOT a valid sales lead -> tc1 NULL',
-    ['tc1_tl' => null, 'op_tl' => null],
+    ['tc1_tl' => null, 'op_tl' => null, 'tc1_op_tl' => null],
     resolve_booking_checklist_team_leads(['SalesAgent' => 30, 'BookingOP' => null])
 );
 
 // Disabled sales lead -> dropped.
 assert_eq(
     'NATASHA.TeamLeadID -> KELVIN (L25, Status D) -> tc1 NULL',
-    ['tc1_tl' => null, 'op_tl' => null],
+    ['tc1_tl' => null, 'op_tl' => null, 'tc1_op_tl' => null],
     resolve_booking_checklist_team_leads(['SalesAgent' => 4, 'BookingOP' => null])
 );
 
 // Valid active Level-25 sales lead -> honoured.
 assert_eq(
     'GOODSA.TeamLeadID -> SARAH (L25, Y) -> tc1 = 25',
-    ['tc1_tl' => 25, 'op_tl' => null],
+    ['tc1_tl' => 25, 'op_tl' => null, 'tc1_op_tl' => null],
     resolve_booking_checklist_team_leads(['SalesAgent' => 7, 'BookingOP' => null])
 );
 
 // Valid active Level-45 OP lead -> honoured.
 assert_eq(
     'OPSTAFF.OpTeamLeadID -> OPLEAD (L45, Y) -> op = 45',
-    ['tc1_tl' => null, 'op_tl' => 45],
+    ['tc1_tl' => null, 'op_tl' => 45, 'tc1_op_tl' => null],
     resolve_booking_checklist_team_leads(['SalesAgent' => null, 'BookingOP' => 9])
 );
 
 // Disabled OP lead -> dropped.
 assert_eq(
     'OPSTALE.OpTeamLeadID -> OPGONE (L45, D) -> op NULL',
-    ['tc1_tl' => null, 'op_tl' => null],
+    ['tc1_tl' => null, 'op_tl' => null, 'tc1_op_tl' => null],
     resolve_booking_checklist_team_leads(['SalesAgent' => null, 'BookingOP' => 90])
 );
 
 // OP slot pointing to a Level-25 admin (wrong role) -> dropped.
 assert_eq(
     'OPWRONG.OpTeamLeadID -> SARAH (L25, wrong role for op slot) -> op NULL',
-    ['tc1_tl' => null, 'op_tl' => null],
+    ['tc1_tl' => null, 'op_tl' => null, 'tc1_op_tl' => null],
     resolve_booking_checklist_team_leads(['SalesAgent' => null, 'BookingOP' => 91])
 );
 
 // Orphan pointer TeamLeadID = 0 -> NULL.
 assert_eq(
     'JESIKA.TeamLeadID = 0 (orphan) -> tc1 NULL',
-    ['tc1_tl' => null, 'op_tl' => null],
+    ['tc1_tl' => null, 'op_tl' => null, 'tc1_op_tl' => null],
     resolve_booking_checklist_team_leads(['SalesAgent' => 29, 'BookingOP' => null])
 );
 
 // Both slots valid on one booking.
 assert_eq(
     'GOODSA (sales) + OPSTAFF (op) -> tc1 = 25, op = 45',
-    ['tc1_tl' => 25, 'op_tl' => 45],
+    ['tc1_tl' => 25, 'op_tl' => 45, 'tc1_op_tl' => null],
     resolve_booking_checklist_team_leads(['SalesAgent' => 7, 'BookingOP' => 9])
 );
 
 // Unassigned booking -> both NULL.
 assert_eq(
     'unassigned booking -> both NULL',
-    ['tc1_tl' => null, 'op_tl' => null],
+    ['tc1_tl' => null, 'op_tl' => null, 'tc1_op_tl' => null],
     resolve_booking_checklist_team_leads(['SalesAgent' => null, 'BookingOP' => null])
 );
 
 // Empty / null booking -> both NULL.
 assert_eq(
     'null booking -> both NULL',
-    ['tc1_tl' => null, 'op_tl' => null],
+    ['tc1_tl' => null, 'op_tl' => null, 'tc1_op_tl' => null],
     resolve_booking_checklist_team_leads(null)
 );
 
 // Object booking shape also supported.
 assert_eq(
     'object booking: CHEN -> tc1 NULL (HANI invalid)',
-    ['tc1_tl' => null, 'op_tl' => null],
+    ['tc1_tl' => null, 'op_tl' => null, 'tc1_op_tl' => null],
     resolve_booking_checklist_team_leads((object) ['SalesAgent' => 30, 'BookingOP' => null])
+);
+
+// --- TC1's own OP TEAM LEAD (tc1_op_tl) ----------------------------------
+
+// SalesAgent carries a valid Level-45 OpTeamLeadID -> resolved as tc1_op_tl,
+// alongside its sales-side tc1 lead.
+assert_eq(
+    'TCOPOK -> tc1 = 25 (SARAH) AND tc1_op = 45 (OPLEAD)',
+    ['tc1_tl' => 25, 'op_tl' => null, 'tc1_op_tl' => 45],
+    resolve_booking_checklist_team_leads(['SalesAgent' => 8, 'BookingOP' => null])
+);
+
+// TC1 OP pointer to a disabled Level-45 lead -> dropped.
+assert_eq(
+    'TCOPSTALE.OpTeamLeadID -> OPGONE (L45, D) -> tc1_op NULL',
+    ['tc1_tl' => null, 'op_tl' => null, 'tc1_op_tl' => null],
+    resolve_booking_checklist_team_leads(['SalesAgent' => 92, 'BookingOP' => null])
+);
+
+// TC1 OP pointer to a Level-25 admin (wrong role) -> dropped.
+assert_eq(
+    'TCOPWRONG.OpTeamLeadID -> SARAH (L25, wrong role) -> tc1_op NULL',
+    ['tc1_tl' => null, 'op_tl' => null, 'tc1_op_tl' => null],
+    resolve_booking_checklist_team_leads(['SalesAgent' => 93, 'BookingOP' => null])
+);
+
+// Distinct TC OP lead and booking OP's OP lead resolve into separate slots.
+assert_eq(
+    'TCOPOK (tc1_op=45) + OPSTAFF (op=45) -> both slots filled',
+    ['tc1_tl' => 25, 'op_tl' => 45, 'tc1_op_tl' => 45],
+    resolve_booking_checklist_team_leads(['SalesAgent' => 8, 'BookingOP' => 9])
 );
 
 $failed = 0;

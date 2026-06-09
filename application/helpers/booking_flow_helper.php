@@ -1090,6 +1090,10 @@ if (!function_exists('can_user_modify_booking_checklist')) {
      *   - user_id === TeamLeadID of the booking's SalesAgent OR BookingOP
      *     (callers pre-resolve and pass these in via $tc1_team_lead_id /
      *      $op_team_lead_id, typically using resolve_booking_checklist_team_leads()).
+     *   - user_id === the OP TEAM LEAD of the booking's SalesAgent
+     *     (admin.OpTeamLeadID of the TC1, passed in via $tc1_op_team_lead_id) —
+     *     so a TC's OP team lead may also tick, alongside the booking OP's own
+     *     OP team lead.
      * Anyone else is blocked. This means an Owner (level 10) personally
      * assigned as a booking's SalesAgent CAN tick that booking's checklist
      * even though they aren't a level-20 SA in the role registry.
@@ -1102,7 +1106,8 @@ if (!function_exists('can_user_modify_booking_checklist')) {
         $user_id,
         $user_level = null,
         $tc1_team_lead_id = null,
-        $op_team_lead_id = null
+        $op_team_lead_id = null,
+        $tc1_op_team_lead_id = null
     ) {
         // $user_level is retained for API compatibility but no longer consulted.
         unset($user_level);
@@ -1136,24 +1141,32 @@ if (!function_exists('can_user_modify_booking_checklist')) {
         if ($op_tl > 0 && $op_tl === $uid) {
             return true;
         }
+        $tc1_op_tl = (int)$tc1_op_team_lead_id;
+        if ($tc1_op_tl > 0 && $tc1_op_tl === $uid) {
+            return true;
+        }
         return false;
     }
 }
 
 if (!function_exists('resolve_booking_checklist_team_leads')) {
     /**
-     * Resolves the two team-lead slots used to gate checklist ticking, in a
-     * single query. Returns ['tc1_tl' => int|null, 'op_tl' => int|null]
-     * suitable for passing into can_user_modify_booking_checklist():
-     *   - tc1_tl = the SalesAgent's sales-side lead   (admin.TeamLeadID)
-     *   - op_tl  = the BookingOP's OP TEAM LEAD        (admin.OpTeamLeadID)
+     * Resolves the team-lead slots used to gate checklist ticking, in a single
+     * query. Returns ['tc1_tl' => int|null, 'op_tl' => int|null,
+     * 'tc1_op_tl' => int|null] suitable for passing into
+     * can_user_modify_booking_checklist():
+     *   - tc1_tl    = the SalesAgent's sales-side lead   (TC1 admin.TeamLeadID)
+     *   - op_tl     = the BookingOP's OP TEAM LEAD        (OP  admin.OpTeamLeadID)
+     *   - tc1_op_tl = the SalesAgent's OP TEAM LEAD       (TC1 admin.OpTeamLeadID)
      * The OP side intentionally uses the dedicated OpTeamLeadID column, kept
      * separate from the sales TeamLeadID hierarchy, so the OP TEAM LEAD role
      * (level 45) governs OP checklist rights without overloading TeamLeadID.
+     * tc1_op_tl lets the TC's own OP team lead tick too, not just the booking
+     * OP's OP lead.
      */
     function resolve_booking_checklist_team_leads($booking)
     {
-        $out = array('tc1_tl' => null, 'op_tl' => null);
+        $out = array('tc1_tl' => null, 'op_tl' => null, 'tc1_op_tl' => null);
         if (empty($booking)) {
             return $out;
         }
@@ -1171,14 +1184,18 @@ if (!function_exists('resolve_booking_checklist_team_leads')) {
 
         $CI =& get_instance();
 
-        // Step 1: read each role's dedicated lead pointer.
-        $tc1_candidate = 0;
-        $op_candidate  = 0;
+        // Step 1: read each role's dedicated lead pointer. The SalesAgent
+        // contributes both a sales lead (TeamLeadID) and its own OP team lead
+        // (OpTeamLeadID); the BookingOP contributes its OP team lead.
+        $tc1_candidate    = 0;
+        $op_candidate     = 0;
+        $tc1_op_candidate = 0;
         $CI->db->select('AdminID, TeamLeadID, OpTeamLeadID');
         $CI->db->where_in('AdminID', $ids);
         foreach ($CI->db->get('admin')->result() as $row) {
             if ((int)$row->AdminID === $sales_agent) {
-                $tc1_candidate = (int)$row->TeamLeadID;
+                $tc1_candidate    = (int)$row->TeamLeadID;
+                $tc1_op_candidate = (int)$row->OpTeamLeadID;
             }
             if ((int)$row->AdminID === $booking_op) {
                 $op_candidate = (int)$row->OpTeamLeadID;
@@ -1193,7 +1210,7 @@ if (!function_exists('resolve_booking_checklist_team_leads')) {
         // (e.g. a sales agent whose TeamLeadID still references someone since
         // moved to the OP-lead role, or a since-disabled lead) would silently
         // grant checklist rights the UI shows as unassigned.
-        $lead_ids = array_values(array_unique(array_filter(array($tc1_candidate, $op_candidate))));
+        $lead_ids = array_values(array_unique(array_filter(array($tc1_candidate, $op_candidate, $tc1_op_candidate))));
         if (empty($lead_ids)) {
             return $out;
         }
@@ -1219,6 +1236,12 @@ if (!function_exists('resolve_booking_checklist_team_leads')) {
             && $valid[$op_candidate]['level'] === '45'
             && $valid[$op_candidate]['status'] === 'Y') {
             $out['op_tl'] = $op_candidate;
+        }
+        if ($tc1_op_candidate > 0
+            && isset($valid[$tc1_op_candidate])
+            && $valid[$tc1_op_candidate]['level'] === '45'
+            && $valid[$tc1_op_candidate]['status'] === 'Y') {
+            $out['tc1_op_tl'] = $tc1_op_candidate;
         }
 
         return $out;

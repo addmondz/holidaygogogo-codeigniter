@@ -94,3 +94,13 @@ $route['customer/booking/(:any)/remark'] = 'Customer_Portal/add_customer_remark/
 $route['customer/booking/(:any)'] = 'Customer_Portal/booking_details/$1';
 $route['customer/(:any)/verify'] = 'Customer_Portal/verify_phone/$1';
 $route['customer/(:any)'] = 'Customer_Portal/dashboard/$1';
+
+/*
+|--------------------------------------------------------------------------
+| FAQ display pages
+|--------------------------------------------------------------------------
+| External (customer-facing) is public at /faq/external. The internal page is
+| login-protected and served by Faq::Internal() at /Faq/Internal, so it can't
+| be reached by guessing a URL. Both render the same accordion view.
+*/
+$route['faq/external'] = 'Faq_Display/external';

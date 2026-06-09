@@ -76,6 +76,25 @@ $assertions['only TC1 TL set, user matches TC1 TL -> allowed'] =
 $assertions['only OP TL set, user matches OP TL -> allowed'] =
     can_user_modify_booking_checklist($booking_obj, 13, 25, null, 13) === true;
 
+// TC1's OWN OP TEAM LEAD (6th arg $tc1_op_team_lead_id). The SalesAgent may
+// carry its own OpTeamLeadID; that lead can tick too, alongside the booking
+// OP's OP lead. Identity still decides.
+$tc1_op_tl = 17;
+$assertions['matches TC1 OP team lead (6th arg) -> allowed'] =
+    can_user_modify_booking_checklist($booking_obj, 17, 45, $tc1_tl, $op_tl, $tc1_op_tl) === true;
+$assertions['matches TC1 OP team lead, level-agnostic -> allowed'] =
+    can_user_modify_booking_checklist($booking_obj, 17, 10, $tc1_tl, $op_tl, $tc1_op_tl) === true;
+$assertions['TC1 OP TL arg null, user not otherwise matched -> blocked'] =
+    can_user_modify_booking_checklist($booking_obj, 17, 45, $tc1_tl, $op_tl, null) === false;
+$assertions['only TC1 OP TL set, user matches it -> allowed'] =
+    can_user_modify_booking_checklist($booking_obj, 17, 45, null, null, 17) === true;
+$assertions['string user "17" matches TC1 OP TL "17" -> allowed'] =
+    can_user_modify_booking_checklist($booking_obj, '17', '45', null, null, '17') === true;
+$assertions['user not matching any of the 4 slots incl TC1 OP TL -> blocked'] =
+    can_user_modify_booking_checklist($booking_obj, 99, 45, $tc1_tl, $op_tl, $tc1_op_tl) === false;
+$assertions['zero TC1 OP TL must not collide with user_id 0 -> blocked'] =
+    can_user_modify_booking_checklist(['SalesAgent' => 0, 'BookingOP' => 0], 0, 45, 0, 0, 0) === false;
+
 // Non-matching identity, any level -> blocked
 $assertions['Owner-level + no identity match -> blocked'] =
     can_user_modify_booking_checklist($booking_obj, 99, 10, $tc1_tl, $op_tl) === false;
