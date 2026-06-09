@@ -116,6 +116,26 @@
 												</div>
 												<input type="text" name="sub_questions[]" class="form-control mb-2 faq-item-q" placeholder="Sub-question" autocomplete="off" value="<?php echo htmlspecialchars((string)$item['q'], ENT_QUOTES); ?>">
 												<textarea name="sub_answers[]" rows="3" class="form-control faq-item-a" placeholder="Sub-answer"><?php echo htmlspecialchars((string)$item['a'], ENT_QUOTES); ?></textarea>
+												<?php
+													// Audit trail carried back so Build_Items can keep created-by/date
+													// and bump updated-by/date only when this row's text changes. oq/oa
+													// snapshot the saved text for that change detection.
+													$cb = isset($item['cb']) ? (string)$item['cb'] : '';
+													$cd = isset($item['cd']) ? (string)$item['cd'] : '';
+													$ub = isset($item['ub']) ? (string)$item['ub'] : '';
+													$ud = isset($item['ud']) ? (string)$item['ud'] : '';
+												?>
+												<input type="hidden" name="sub_cb[]" value="<?php echo htmlspecialchars($cb, ENT_QUOTES); ?>">
+												<input type="hidden" name="sub_cd[]" value="<?php echo htmlspecialchars($cd, ENT_QUOTES); ?>">
+												<input type="hidden" name="sub_ub[]" value="<?php echo htmlspecialchars($ub, ENT_QUOTES); ?>">
+												<input type="hidden" name="sub_ud[]" value="<?php echo htmlspecialchars($ud, ENT_QUOTES); ?>">
+												<input type="hidden" name="sub_oq[]" value="<?php echo htmlspecialchars((string)$item['q'], ENT_QUOTES); ?>">
+												<input type="hidden" name="sub_oa[]" value="<?php echo htmlspecialchars((string)$item['a'], ENT_QUOTES); ?>">
+												<?php if($ub !== '' && $ud !== '') { ?>
+													<div class="text-muted mt-2" style="font-size:12.5px;">
+														<i class="la la-history"></i> Last updated by <strong><?php echo htmlspecialchars($ub); ?></strong> &middot; <?php echo htmlspecialchars(date('j M Y, g:i A', strtotime($ud))); ?>
+													</div>
+												<?php } ?>
 											</div>
 										</div>
 									<?php } ?>
@@ -144,6 +164,14 @@
 					</div>
 					<input type="text" name="sub_questions[]" class="form-control mb-2 faq-item-q" placeholder="Sub-question" autocomplete="off">
 					<textarea name="sub_answers[]" rows="3" class="form-control faq-item-a" placeholder="Sub-answer"></textarea>
+					<!-- Empty audit fields keep new/copied rows aligned with the
+					     parallel hidden arrays; blank cd marks the row as new. -->
+					<input type="hidden" name="sub_cb[]" value="">
+					<input type="hidden" name="sub_cd[]" value="">
+					<input type="hidden" name="sub_ub[]" value="">
+					<input type="hidden" name="sub_ud[]" value="">
+					<input type="hidden" name="sub_oq[]" value="">
+					<input type="hidden" name="sub_oa[]" value="">
 				</div>
 			</div>
 		</template>

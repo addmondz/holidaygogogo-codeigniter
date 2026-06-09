@@ -124,7 +124,19 @@ class Faq extends MY_Controller
 			return 'Failed to save FAQ. Title is required.';
 		}
 
-		$built = Faq_Model::Build_Items($this->input->post('sub_questions'), $this->input->post('sub_answers'));
+		// Per-item audit: the form posts the prior created/updated stamps and the
+		// original text back as hidden fields (parallel arrays aligned by row).
+		// Build_Items keeps cb/cd, and bumps ub/ud only for rows whose text changed.
+		$meta = array(
+			'cb' => $this->input->post('sub_cb'),
+			'cd' => $this->input->post('sub_cd'),
+			'ub' => $this->input->post('sub_ub'),
+			'ud' => $this->input->post('sub_ud'),
+			'oq' => $this->input->post('sub_oq'),
+			'oa' => $this->input->post('sub_oa'),
+		);
+		$actor = (string)$this->session->userdata('name');
+		$built = Faq_Model::Build_Items($this->input->post('sub_questions'), $this->input->post('sub_answers'), $meta, $actor, date('Y-m-d H:i:s'));
 		if($built['error'] !== null) {
 			return $built['error'];
 		}

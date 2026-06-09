@@ -64,10 +64,19 @@ class Faq_Model extends CI_Model
 			$items = array();
 			foreach($decoded as $row) {
 				if(is_array($row) && (isset($row['q']) || isset($row['a']))) {
-					$items[] = array(
+					$item = array(
 						'q' => (string)(isset($row['q']) ? $row['q'] : ''),
 						'a' => (string)(isset($row['a']) ? $row['a'] : ''),
 					);
+					// Audit fields (created/updated by-name + date) are passed
+					// through only when present, so legacy {q,a} rows decode
+					// unchanged and consumers can isset()-guard the meta.
+					foreach(array('cb', 'cd', 'ub', 'ud') as $k) {
+						if(isset($row[$k]) && (string)$row[$k] !== '') {
+							$item[$k] = (string)$row[$k];
+						}
+					}
+					$items[] = $item;
 				}
 			}
 			return $items;
@@ -81,11 +90,31 @@ class Faq_Model extends CI_Model
 	// Returns array('items' => array, 'error' => null|string). Fully-empty rows
 	// are dropped; a half-filled row (one side blank) is an error because every
 	// pair must carry both a sub-question and a sub-answer.
-	public static function Build_Items($questions, $answers)
+	//
+	// Audit mode: when $meta is provided (not null), each kept row is also
+	// stamped with created-by/date (cb/cd) and updated-by/date (ub/ud). $meta
+	// carries the prior values posted back as hidden fields - parallel arrays
+	// keyed 'cb','cd','ub','ud' plus the original text 'oq','oa' for change
+	// detection. A row with a blank stored cd is new (everything = actor/now);
+	// an existing row keeps cb/cd and only bumps ub/ud when its text changed.
+	// $actor is the acting admin's name and $now a 'Y-m-d H:i:s' timestamp;
+	// both are passed in so the helper stays pure + unit-testable. Calling with
+	// only ($questions, $answers) preserves the original bare {q,a} contract.
+	public static function Build_Items($questions, $answers, $meta = null, $actor = '', $now = '')
 	{
 		$questions = is_array($questions) ? array_values($questions) : array();
 		$answers   = is_array($answers)   ? array_values($answers)   : array();
 		$count     = max(count($questions), count($answers));
+
+		$audited = ($meta !== null);
+		$actor   = (string)$actor;
+		$now     = (string)$now;
+		$meta_at = function($key, $i) use ($meta) {
+			if(!is_array($meta) || !isset($meta[$key]) || !is_array($meta[$key]) || !array_key_exists($i, $meta[$key])) {
+				return '';
+			}
+			return trim((string)$meta[$key][$i]);
+		};
 
 		$items = array();
 		for($i = 0; $i < $count; $i++) {
@@ -98,7 +127,31 @@ class Faq_Model extends CI_Model
 			if($q === '' || $a === '') {
 				return array('items' => array(), 'error' => 'Each sub-question must have a matching sub-answer.');
 			}
-			$items[] = array('q' => $q, 'a' => $a);
+
+			if(!$audited) {
+				$items[] = array('q' => $q, 'a' => $a);
+				continue;
+			}
+
+			$cd = $meta_at('cd', $i);
+			if($cd === '') {
+				// New row: created + first update are the same event.
+				$items[] = array('q' => $q, 'a' => $a, 'cb' => $actor, 'cd' => $now, 'ub' => $actor, 'ud' => $now);
+				continue;
+			}
+
+			// Existing row: preserve creation; bump "updated" only on edit.
+			$cb = $meta_at('cb', $i);
+			if($q !== $meta_at('oq', $i) || $a !== $meta_at('oa', $i)) {
+				$ub = $actor;
+				$ud = $now;
+			} else {
+				$ub = $meta_at('ub', $i);
+				$ud = $meta_at('ud', $i);
+				if($ub === '') { $ub = $cb; }
+				if($ud === '') { $ud = $cd; }
+			}
+			$items[] = array('q' => $q, 'a' => $a, 'cb' => $cb, 'cd' => $cd, 'ub' => $ub, 'ud' => $ud);
 		}
 
 		return array('items' => $items, 'error' => null);

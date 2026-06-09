@@ -203,6 +203,19 @@
 			margin-bottom: 6px;
 		}
 		.a-a { color: var(--muted); }
+		/* Per-item audit line (internal page only). */
+		.a-meta {
+			display: flex;
+			justify-content: flex-end;
+			align-items: center;
+			gap: 6px;
+			margin-top: 10px;
+			font-size: 12.5px;
+			font-weight: 400;
+			color: var(--accent-deep);
+		}
+		.a-meta svg { width: 13px; height: 13px; stroke: var(--accent-deep); flex-shrink: 0; }
+		.a-meta strong { font-weight: 600; }
 
 		/* Tag / destination chips (internal page only) */
 		.faq-meta { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 18px; }
@@ -316,6 +329,17 @@
 											<?php } ?>
 											<?php if(trim($item['a']) !== '') { ?>
 												<div class="a-a"><?php echo nl2br(htmlspecialchars($item['a'])); ?></div>
+											<?php } ?>
+											<?php
+												// Internal page shows when each sub Q&A was last updated.
+												$ud = isset($item['ud']) ? trim((string)$item['ud']) : '';
+												if(!$is_external && $ud !== '') {
+													$ud_ts = strtotime($ud);
+											?>
+												<span class="a-meta">
+													<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><polyline points="12 7 12 12 15.5 14"></polyline></svg>
+													Updated <?php echo htmlspecialchars($ud_ts ? date('j M Y', $ud_ts) : $ud); ?>
+												</span>
 											<?php } ?>
 										</div>
 									<?php } } ?>
