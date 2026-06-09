@@ -5,6 +5,7 @@ class Faq extends MY_Controller
 	{
 		parent::__construct();
 		$this->load->model('Faq_Model');
+		$this->load->model('Faq_Tag_Model');
 		$this->load->model('Universal_Model');
 	}
 
@@ -17,11 +18,23 @@ class Faq extends MY_Controller
 		$this->load->view('layout/footer');
 	}
 
+	// OWNER (level 10) is the only role allowed to create/edit/delete FAQs.
+	// Everyone else has read-only access to the listing and the FAQ pages.
+	private function Is_Owner()
+	{
+		return (int)$this->session->level === 10;
+	}
+
 	function Create()
 	{
+		if(!$this->Is_Owner()) {
+			redirect(base_url('Faq'));
+			return;
+		}
 		if($this->input->post()) {
-			if($this->Save_From_Post(null) === false) {
-				$this->session->set_flashdata('faq_error', 'Failed to create FAQ. Title is required.');
+			$error = $this->Save_From_Post(null);
+			if($error !== true) {
+				$this->session->set_flashdata('faq_error', $error);
 				redirect(base_url('Faq/Create'));
 				return;
 			}
@@ -33,6 +46,11 @@ class Faq extends MY_Controller
 		$titles = array('tab_title' => 'HolidayGoGoGo | FAQ', 'breadcrumb_title' => 'FAQ >> Create');
 		$data['mode'] = 'create';
 		$data['faq']  = (object) array('FAQID' => 0, 'Title' => '', 'Description' => '', 'Type' => 'internal', 'DisplayOrder' => 0);
+		$data['items'] = array();
+		$data['tags'] = $this->Faq_Tag_Model->Read_Active();
+		$data['selected_tag_ids'] = array();
+		$data['destinations'] = $this->Faq_Model->Read_Destinations();
+		$data['selected_destination_ids'] = array();
 		$this->load->view('layout/header', $titles);
 		$this->load->view('faq/form', $data);
 		$this->load->view('layout/footer');
@@ -40,6 +58,10 @@ class Faq extends MY_Controller
 
 	function Update()
 	{
+		if(!$this->Is_Owner()) {
+			redirect(base_url('Faq'));
+			return;
+		}
 		$id = (int)$this->input->get('faq_id');
 		if($this->input->post()) {
 			$post_id = (int)$this->input->post('faq_id');
@@ -47,8 +69,9 @@ class Faq extends MY_Controller
 				redirect(base_url('Faq'));
 				return;
 			}
-			if($this->Save_From_Post($post_id) === false) {
-				$this->session->set_flashdata('faq_error', 'Failed to update FAQ. Title is required.');
+			$error = $this->Save_From_Post($post_id);
+			if($error !== true) {
+				$this->session->set_flashdata('faq_error', $error);
 				redirect(base_url('Faq/Update?faq_id=') . $post_id);
 				return;
 			}
@@ -65,6 +88,11 @@ class Faq extends MY_Controller
 		$titles = array('tab_title' => 'HolidayGoGoGo | FAQ', 'breadcrumb_title' => 'FAQ >> Update');
 		$data['mode'] = 'update';
 		$data['faq']  = $this->Faq_Model->Read_Faq($id);
+		$data['items'] = Faq_Model::Decode_Items($data['faq']->Description);
+		$data['tags'] = $this->Faq_Tag_Model->Read_Active();
+		$data['selected_tag_ids'] = $this->Faq_Model->Read_Tag_Ids($id);
+		$data['destinations'] = $this->Faq_Model->Read_Destinations();
+		$data['selected_destination_ids'] = $this->Faq_Model->Read_Destination_Ids($id);
 		$this->load->view('layout/header', $titles);
 		$this->load->view('faq/form', $data);
 		$this->load->view('layout/footer');
@@ -72,6 +100,9 @@ class Faq extends MY_Controller
 
 	function Delete()
 	{
+		if(!$this->Is_Owner()) {
+			return;
+		}
 		$this->Universal_Model->Delete('FAQID', $this->input->get('faq_id'), 'faq');
 	}
 
@@ -85,11 +116,17 @@ class Faq extends MY_Controller
 		$this->load->view('faq/display', $data);
 	}
 
+	// Returns true on success, or an error message string on failure.
 	private function Save_From_Post($id)
 	{
 		$title = trim((string)$this->input->post('Title'));
 		if($title === '') {
-			return false;
+			return 'Failed to save FAQ. Title is required.';
+		}
+
+		$built = Faq_Model::Build_Items($this->input->post('sub_questions'), $this->input->post('sub_answers'));
+		if($built['error'] !== null) {
+			return $built['error'];
 		}
 
 		$type = $this->input->post('Type');
@@ -99,14 +136,23 @@ class Faq extends MY_Controller
 
 		$data = array(
 			'Title'        => $title,
-			'Description'  => (string)$this->input->post('Description'),
+			'Description'  => Faq_Model::Encode_Items($built['items']),
 			'Type'         => $type,
 			'DisplayOrder' => (int)$this->input->post('DisplayOrder'),
 		);
 
+		$tag_ids         = $this->input->post('Tags');
+		$destination_ids = $this->input->post('Destinations');
+
 		if($id === null) {
-			return $this->Faq_Model->Create($data);
+			$new_id = $this->Faq_Model->Create($data);
+			$this->Faq_Model->Sync_Tags($new_id, $tag_ids);
+			$this->Faq_Model->Sync_Destinations($new_id, $destination_ids);
+		} else {
+			$this->Faq_Model->Update($id, $data);
+			$this->Faq_Model->Sync_Tags($id, $tag_ids);
+			$this->Faq_Model->Sync_Destinations($id, $destination_ids);
 		}
-		return $this->Faq_Model->Update($id, $data);
+		return true;
 	}
 }

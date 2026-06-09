@@ -1,11 +1,4 @@
-<style>
-.faq-description-cell {
-	max-width: 420px;
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
-}
-</style>
+<?php $is_owner = ((int)$this->session->level === 10); // only OWNER may create/edit/delete; others view only ?>
 
 <div class="d-flex flex-column-fluid">
 	<div class="container-fluid">
@@ -31,12 +24,16 @@
 					<a href="<?php echo base_url('Faq/Internal'); ?>" target="_blank" class="btn btn-light-primary font-weight-bold" data-toggle="tooltip" title="Open the internal FAQ page (staff login required)">
 						<i class="la la-lock"></i>Internal Page
 					</a>
+					<?php /* temporary: external FAQ not needed for now
 					<a href="<?php echo base_url('faq/external'); ?>" target="_blank" class="btn btn-light-success font-weight-bold ml-2" data-toggle="tooltip" title="Open the public external FAQ page">
 						<i class="la la-external-link-alt"></i>External Page
 					</a>
-					<a href="<?php echo base_url('Faq/Create'); ?>" class="btn btn-primary font-weight-bold ml-2" style="width:160px;">
-						<i class="la la-clipboard-list"></i>Create FAQ
-					</a>
+					*/ ?>
+					<?php if($is_owner) { ?>
+						<a href="<?php echo base_url('Faq/Create'); ?>" class="btn btn-primary font-weight-bold ml-2" style="width:160px;">
+							<i class="la la-clipboard-list"></i>Create FAQ
+						</a>
+					<?php } ?>
 					<?php $current_url = base_url($_SERVER['REQUEST_URI']); ?>
 				</div>
 			</div>
@@ -65,7 +62,9 @@
 												<select name="type" class="form-control selectpicker">
 													<option data-icon="la la-list font-size-lg bs-icon" value="">--SELECT TYPE--</option>
 													<option data-icon="la la-user-shield font-size-lg bs-icon" value="internal" <?php if($this->input->get('type') === 'internal') { echo 'selected'; } ?>>Internal</option>
+													<?php /* temporary: external FAQ not needed for now
 													<option data-icon="la la-globe font-size-lg bs-icon" value="external" <?php if($this->input->get('type') === 'external') { echo 'selected'; } ?>>External</option>
+													*/ ?>
 												</select>
 											</div>
 										</div>
@@ -84,20 +83,50 @@
 							<tr>
 								<th style="text-align:center;">No.</th>
 								<th style="text-align:center;">Title</th>
+								<?php /* temporary: external FAQ not needed for now, Type column hidden
 								<th style="text-align:center;">Type</th>
-								<th style="text-align:center;">Description</th>
+								*/ ?>
+								<th style="text-align:center;">Tags</th>
+								<th style="text-align:center;">Destination</th>
 								<th style="text-align:center;">Order</th>
 								<th style="text-align:center;">Created By</th>
-								<th class="action" style="text-align:center;">Action</th>
+								<?php if($is_owner) { ?>
+									<th class="action" style="text-align:center;">Action</th>
+								<?php } ?>
 							</tr>
 						</thead>
 						<tbody>
 							<?php if(empty($faqs)) { ?>
-								<tr><td colspan="7" style="text-align:center; padding-top:10px; padding-bottom:10px;">FAQ Records Not Found</td></tr>
+								<tr><td colspan="<?php echo $is_owner ? 7 : 6; ?>" style="text-align:center; padding-top:10px; padding-bottom:10px;">FAQ Records Not Found</td></tr>
 							<?php } else { $count = 1; foreach($faqs as $faq) { ?>
 								<tr>
 									<td style="text-align:center; padding-top:15px; padding-bottom:15px;"><?php echo $count; ?></td>
 									<td style="text-align:left;"><strong><?php echo htmlspecialchars($faq->Title); ?></strong></td>
+									<td style="text-align:center;">
+										<?php
+											$tag_names = ($faq->Tags === null || $faq->Tags === '') ? array() : explode('||', $faq->Tags);
+											if(empty($tag_names)) {
+												echo '<span class="text-muted">-</span>';
+											} else {
+												foreach($tag_names as $tag_name) {
+													echo '<span class="label label-inline label-pill label-light-info font-weight-bold mr-1 mb-1">' . htmlspecialchars($tag_name) . '</span>';
+												}
+											}
+										?>
+									</td>
+									<td style="text-align:center;">
+										<?php
+											$destination_names = ($faq->Destinations === null || $faq->Destinations === '') ? array() : explode('||', $faq->Destinations);
+											if(empty($destination_names)) {
+												echo '<span class="text-muted">-</span>';
+											} else {
+												foreach($destination_names as $destination_name) {
+													echo '<span class="label label-inline label-pill label-light-primary font-weight-bold mr-1 mb-1">' . htmlspecialchars($destination_name) . '</span>';
+												}
+											}
+										?>
+									</td>
+									<?php /* temporary: external FAQ not needed for now, Type column hidden
 									<td style="text-align:center;">
 										<?php if($faq->Type === 'external') { ?>
 											<span class="label label-inline label-pill label-light-success font-weight-bold">External</span>
@@ -105,21 +134,21 @@
 											<span class="label label-inline label-pill label-light-primary font-weight-bold">Internal</span>
 										<?php } ?>
 									</td>
-									<td class="faq-description-cell" title="<?php echo htmlspecialchars((string)$faq->Description, ENT_QUOTES); ?>">
-										<?php echo htmlspecialchars((string)$faq->Description); ?>
-									</td>
+									*/ ?>
 									<td style="text-align:center;"><?php echo (int)$faq->DisplayOrder; ?></td>
 									<td style="text-align:center;"><?php echo htmlspecialchars((string)$faq->InsertByName); ?></td>
-									<td style="text-align:center;">
-										<div class="btn-group">
-											<a href="<?php echo base_url('Faq/Update?faq_id=') . (int)$faq->FAQID; ?>" class="btn btn-icon btn-light-warning btn-sm" data-toggle="tooltip" title="Edit FAQ">
-												<i class="la la-edit"></i>
-											</a>
-											<button onclick="Delete_Record('<?php echo base_url('assets/image/sweetalert.jpg'); ?>', '<?php echo 'FAQ : ' . str_replace('\'', '', $faq->Title); ?>', '<?php echo base_url('Faq/Delete'); ?>', 'faq_id', <?php echo (int)$faq->FAQID; ?>, 'Y', '<?php if(strpos($current_url, '?') == true) { echo base_url('Faq?') . (explode('?', $current_url))[1]; } else { echo base_url('Faq'); } ?>')" class="btn btn-icon btn-light-danger btn-sm" data-toggle="tooltip" title="Delete FAQ" style="margin-left:4px;">
-												<i class="la la-trash"></i>
-											</button>
-										</div>
-									</td>
+									<?php if($is_owner) { ?>
+										<td style="text-align:center;">
+											<div class="btn-group">
+												<a href="<?php echo base_url('Faq/Update?faq_id=') . (int)$faq->FAQID; ?>" class="btn btn-icon btn-light-warning btn-sm" data-toggle="tooltip" title="Edit FAQ">
+													<i class="la la-edit"></i>
+												</a>
+												<button onclick="Delete_Record('<?php echo base_url('assets/image/sweetalert.jpg'); ?>', '<?php echo 'FAQ : ' . str_replace('\'', '', $faq->Title); ?>', '<?php echo base_url('Faq/Delete'); ?>', 'faq_id', <?php echo (int)$faq->FAQID; ?>, 'Y', '<?php if(strpos($current_url, '?') == true) { echo base_url('Faq?') . (explode('?', $current_url))[1]; } else { echo base_url('Faq'); } ?>')" class="btn btn-icon btn-light-danger btn-sm" data-toggle="tooltip" title="Delete FAQ" style="margin-left:4px;">
+													<i class="la la-trash"></i>
+												</button>
+											</div>
+										</td>
+									<?php } ?>
 								</tr>
 								<?php $count++; ?>
 							<?php } } ?>

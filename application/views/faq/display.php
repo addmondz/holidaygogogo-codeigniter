@@ -196,6 +196,41 @@
 			background: var(--line);
 			margin-bottom: 18px;
 		}
+		.a-item + .a-item { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--line); }
+		.a-q {
+			font-weight: 500;
+			color: var(--ink);
+			margin-bottom: 6px;
+		}
+		.a-a { color: var(--muted); }
+
+		/* Tag / destination chips (internal page only) */
+		.faq-meta { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 18px; }
+		.chip {
+			display: inline-flex;
+			align-items: center;
+			gap: 6px;
+			font-size: 12.5px;
+			font-weight: 500;
+			padding: 4px 12px;
+			border-radius: 100px;
+			line-height: 1.4;
+		}
+		.chip-tag {
+			background: var(--accent-soft);
+			color: var(--accent-deep);
+		}
+		.chip-dest {
+			background: var(--card);
+			color: var(--muted);
+			border: 1px solid var(--line);
+		}
+		.chip-dest::before {
+			content: "";
+			width: 6px; height: 6px;
+			border-radius: 50%;
+			background: var(--accent);
+		}
 
 		.empty {
 			margin-top: 40px;
@@ -246,7 +281,7 @@
 		<?php } else { ?>
 			<div class="faqs">
 				<?php $i = 1; foreach($faqs as $faq) {
-					$has_body = trim((string)$faq->Description) !== '';
+					$items = Faq_Model::Decode_Items($faq->Description);
 				?>
 					<div class="faq" style="animation-delay: <?php echo min($i * 60, 480); ?>ms;">
 						<button type="button" class="q" aria-expanded="false">
@@ -259,7 +294,31 @@
 						<div class="a">
 							<div class="a-inner">
 								<div class="a-body">
-									<?php echo $has_body ? nl2br(htmlspecialchars($faq->Description)) : '<em>No additional details.</em>'; ?>
+									<?php if(!$is_external) {
+										$tag_names  = ($faq->Tags === null || $faq->Tags === '') ? array() : explode('||', $faq->Tags);
+										$dest_names = ($faq->Destinations === null || $faq->Destinations === '') ? array() : explode('||', $faq->Destinations);
+										if(!empty($tag_names) || !empty($dest_names)) { ?>
+											<div class="faq-meta">
+												<?php foreach($dest_names as $dest_name) { ?>
+													<span class="chip chip-dest"><?php echo htmlspecialchars($dest_name); ?></span>
+												<?php } ?>
+												<?php foreach($tag_names as $tag_name) { ?>
+													<span class="chip chip-tag"><?php echo htmlspecialchars($tag_name); ?></span>
+												<?php } ?>
+											</div>
+									<?php } } ?>
+									<?php if(empty($items)) { ?>
+										<em>No additional details.</em>
+									<?php } else { foreach($items as $item) { ?>
+										<div class="a-item">
+											<?php if(trim($item['q']) !== '') { ?>
+												<div class="a-q"><?php echo htmlspecialchars($item['q']); ?></div>
+											<?php } ?>
+											<?php if(trim($item['a']) !== '') { ?>
+												<div class="a-a"><?php echo nl2br(htmlspecialchars($item['a'])); ?></div>
+											<?php } ?>
+										</div>
+									<?php } } ?>
 								</div>
 							</div>
 						</div>
