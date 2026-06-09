@@ -3345,8 +3345,8 @@ class Booking extends MY_Controller
 					$array['tags'] = $this->Booking_Model->Read_Tags();
 					$array['sources'] = $this->Booking_Model->Read_Sources_With_Inactive($array['Source']);
 					foreach($array['booking_products'] as $booking_product) {
-						$booking_product->Price = number_format($booking_product->Price, 2, '.', ',');
-						$booking_product->Total = number_format($booking_product->Total, 2, '.', ',');
+						$booking_product->Price = number_format((float)($booking_product->Price ?? 0), 2, '.', ',');
+						$booking_product->Total = number_format((float)($booking_product->Total ?? 0), 2, '.', ',');
 						$booking_product->PaymentOutSupplierFull = !empty($booking_product->PaymentOutSupplierFull) ? date('d/m/Y', strtotime($booking_product->PaymentOutSupplierFull)) : '';
 						$booking_product->PaymentOutSupplierDeposit = !empty($booking_product->PaymentOutSupplierDeposit) ? date('d/m/Y', strtotime($booking_product->PaymentOutSupplierDeposit)) : '';
 					}
