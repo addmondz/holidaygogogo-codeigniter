@@ -121,6 +121,7 @@ class Guests_Model extends CI_Model
 	LEFT JOIN admin        a   ON a.AdminID       = b.SalesAgent
 	LEFT JOIN source       s   ON s.SourceID      = b.Source
 	LEFT JOIN country_code cn  ON cn.CountryCodeID = gl.Nationality
+	LEFT JOIN country_code ccp ON ccp.CountryCodeID = gl.CountryCodeID
 	LEFT JOIN category     cat ON cat.CategoryID  = b.Destination
 	{$where}
 			";
@@ -227,6 +228,7 @@ WHERE bg_keys.dk IS NULL
 		{$dedup} AS dedup_key,
 		TRIM(CONCAT_WS(' ', NULLIF(gl.Name, ''), NULLIF(gl.LastName, ''))) AS display_name,
 		gl.Mobile        AS ContactNum,
+		ccp.CountryCode  AS CallingCode,
 		gl.Email,
 		COALESCE(c.ChatLanguage, b.ChatLanguage) AS ChatLanguage,
 		a.Name           AS SalesAgentName,
@@ -272,6 +274,7 @@ SELECT
 	dedup_key,
 	CONVERT(MAX(CASE WHEN rn = 1 THEN display_name   END) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Name,
 	CONVERT(MAX(CASE WHEN rn = 1 THEN ContactNum     END) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS ContactNum,
+	CONVERT(MAX(CASE WHEN rn = 1 THEN CallingCode    END) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS CallingCode,
 	CONVERT(MAX(CASE WHEN rn = 1 THEN Email          END) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Email,
 	CONVERT(MAX(CASE WHEN rn = 1 THEN ChatLanguage   END) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Language,
 	CONVERT(MAX(CASE WHEN rn = 1 THEN SalesAgentName END) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS AgentName,
@@ -304,6 +307,7 @@ SELECT
 	{$gc_dedup} AS dedup_key,
 	CONVERT(TRIM(CONCAT_WS(' ', NULLIF(gc.first_name, ''), NULLIF(gc.last_name, ''))) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Name,
 	CONVERT(gc.phone USING utf8mb4) COLLATE utf8mb4_unicode_ci AS ContactNum,
+	CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS CallingCode,
 	CONVERT(gc.email USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Email,
 	NULL AS Language,
 	NULL AS AgentName,

@@ -6,6 +6,24 @@
 	$items      = Faq_Model::Decode_Items($faq->Description);
 	$dest_names = ($faq->Destinations === null || $faq->Destinations === '') ? array() : explode('||', $faq->Destinations);
 	$updated_ts = isset($faq->UpdateDate) ? strtotime((string)$faq->UpdateDate) : false;
+
+	// Union of tags actually used across this FAQ's sub-Q&As (id => name),
+	// for the tag filter bar. Only tags that appear on an item are offered,
+	// so the bar never lists a tag that would match nothing. Sorted by name.
+	$present_tags = array();
+	if(isset($tag_names)) {
+		foreach($items as $it) {
+			if(isset($it['tags']) && is_array($it['tags'])) {
+				foreach($it['tags'] as $tid) {
+					$tid = (int)$tid;
+					if($tid > 0 && isset($tag_names[$tid])) {
+						$present_tags[$tid] = $tag_names[$tid];
+					}
+				}
+			}
+		}
+		asort($present_tags, SORT_NATURAL | SORT_FLAG_CASE);
+	}
 ?>
 <!DOCTYPE html>
 <html lang="en" data-faq-theme="internal">
@@ -184,6 +202,48 @@
 		}
 		.search-count strong { color: var(--accent-deep); font-weight: 600; }
 
+		/* ---- Tag filter ---- */
+		.tag-filter {
+			display: flex;
+			flex-wrap: wrap;
+			align-items: center;
+			gap: 7px;
+			margin: 12px 0 2px;
+		}
+		.tag-filter-label {
+			display: inline-flex;
+			align-items: center;
+			gap: 6px;
+			font-size: 12px;
+			font-weight: 600;
+			letter-spacing: 0.04em;
+			text-transform: uppercase;
+			color: var(--muted);
+			margin-right: 2px;
+		}
+		.tag-filter-label svg { width: 14px; height: 14px; stroke: var(--muted); }
+		.tag-filter-chip {
+			font-family: 'Outfit', sans-serif;
+			font-size: 12.5px;
+			font-weight: 500;
+			line-height: 1.4;
+			padding: 5px 13px;
+			border-radius: 100px;
+			border: 1px solid var(--line);
+			background: var(--card);
+			color: var(--muted);
+			cursor: pointer;
+			transition: border-color .2s ease, background .2s ease, color .2s ease, box-shadow .2s ease;
+		}
+		.tag-filter-chip:hover { border-color: var(--accent); color: var(--accent-deep); }
+		.tag-filter-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+		.tag-filter-chip.is-active {
+			background: var(--accent);
+			border-color: var(--accent);
+			color: #fff;
+			box-shadow: 0 6px 16px -10px var(--ring);
+		}
+
 		/* ---- Accordion ---- */
 		.a-item { border-top: 1px solid var(--line); }
 		.a-item:first-child { border-top: none; }
@@ -316,16 +376,32 @@
 						<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
 					</button>
 				</div>
+				<?php if(!empty($present_tags)) { ?>
+					<div class="tag-filter" id="tagFilter" role="group" aria-label="Filter by tag">
+						<span class="tag-filter-label">
+							<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
+							Tags
+						</span>
+						<button type="button" class="tag-filter-chip is-active" data-tag-all aria-pressed="true">All</button>
+						<?php foreach($present_tags as $tid => $tname) { ?>
+							<button type="button" class="tag-filter-chip" data-tag="<?php echo (int)$tid; ?>" aria-pressed="false"><?php echo htmlspecialchars($tname); ?></button>
+						<?php } ?>
+					</div>
+				<?php } ?>
 				<div class="search-count" id="searchCount" aria-live="polite"></div>
 
 				<div class="a-list" id="faqList">
 				<?php foreach($items as $item) {
 					// Resolve per-item tag chips through the $tag_names map.
-					$item_tags = array();
+					// $item_tag_ids feeds the data-tags attribute the tag filter reads.
+					$item_tags    = array();
+					$item_tag_ids = array();
 					if(isset($tag_names) && isset($item['tags']) && is_array($item['tags'])) {
 						foreach($item['tags'] as $tid) {
-							if(isset($tag_names[(int)$tid])) {
-								$item_tags[] = $tag_names[(int)$tid];
+							$tid = (int)$tid;
+							if(isset($tag_names[$tid])) {
+								$item_tags[]    = $tag_names[$tid];
+								$item_tag_ids[] = $tid;
 							}
 						}
 					}
@@ -337,7 +413,7 @@
 					$search_blob = strtolower($q_text . ' ' . $a_text . ' ' . implode(' ', $item_tags));
 					$ud = isset($item['ud']) ? trim((string)$item['ud']) : '';
 				?>
-					<div class="a-item" data-search="<?php echo htmlspecialchars($search_blob, ENT_QUOTES); ?>">
+					<div class="a-item" data-search="<?php echo htmlspecialchars($search_blob, ENT_QUOTES); ?>" data-tags="<?php echo htmlspecialchars(implode(' ', $item_tag_ids), ENT_QUOTES); ?>">
 						<button type="button" class="a-trigger" aria-expanded="false">
 							<span class="a-q"><?php echo htmlspecialchars($label); ?></span>
 							<svg class="a-chevron" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
@@ -430,25 +506,73 @@
 			var countEl = document.getElementById('searchCount');
 			var noResults = document.getElementById('noResults');
 
+			// Active tag ids (as strings). Empty = no tag filter. OR semantics:
+			// an item shows if it carries ANY active tag.
+			var activeTags = [];
+			function matchesTags(item) {
+				if (activeTags.length === 0) return true;
+				var raw = (item.getAttribute('data-tags') || '').trim();
+				if (raw === '') return false;
+				var ids = raw.split(' ');
+				for (var i = 0; i < activeTags.length; i++) {
+					if (ids.indexOf(activeTags[i]) !== -1) return true;
+				}
+				return false;
+			}
+
 			function runSearch() {
 				var q = input.value.trim().toLowerCase();
 				wrap.classList.toggle('has-value', q !== '');
+				var filtering = q !== '' || activeTags.length > 0;
 				var matches = 0;
 				items.forEach(function (item) {
-					var hit = q === '' || item.getAttribute('data-search').indexOf(q) !== -1;
+					var hit = (q === '' || item.getAttribute('data-search').indexOf(q) !== -1) && matchesTags(item);
 					item.classList.toggle('is-hidden', !hit);
-					// Auto-expand matches while searching so answers are visible;
-					// collapse everything again when the box is cleared.
+					// Auto-expand on a text query so answers are visible; tag-only
+					// filtering keeps items collapsed. Collapse when nothing applies.
 					if (hit && q !== '') openItem(item); else closeItem(item);
 					if (hit) matches++;
 				});
-				if (q === '') {
+				if (!filtering) {
 					countEl.textContent = '';
 					noResults.classList.remove('show');
 				} else {
 					noResults.classList.toggle('show', matches === 0);
 					countEl.innerHTML = matches === 0 ? '' :
 						'<strong>' + matches + '</strong> ' + (matches === 1 ? 'match' : 'matches');
+				}
+			}
+
+			// ---- Tag filter chips ----
+			var tagBar = document.getElementById('tagFilter');
+			if (tagBar) {
+				var tagChips = Array.prototype.slice.call(tagBar.querySelectorAll('.tag-filter-chip[data-tag]'));
+				var allChip = tagBar.querySelector('.tag-filter-chip[data-tag-all]');
+				function syncAll() {
+					if (allChip) allChip.classList.toggle('is-active', activeTags.length === 0);
+				}
+				tagChips.forEach(function (chip) {
+					chip.addEventListener('click', function () {
+						var id = chip.getAttribute('data-tag');
+						var idx = activeTags.indexOf(id);
+						var nowActive = idx === -1;
+						if (nowActive) activeTags.push(id); else activeTags.splice(idx, 1);
+						chip.classList.toggle('is-active', nowActive);
+						chip.setAttribute('aria-pressed', nowActive ? 'true' : 'false');
+						syncAll();
+						runSearch();
+					});
+				});
+				if (allChip) {
+					allChip.addEventListener('click', function () {
+						activeTags = [];
+						tagChips.forEach(function (c) {
+							c.classList.remove('is-active');
+							c.setAttribute('aria-pressed', 'false');
+						});
+						syncAll();
+						runSearch();
+					});
 				}
 			}
 

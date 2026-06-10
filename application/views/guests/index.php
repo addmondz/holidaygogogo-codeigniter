@@ -284,17 +284,19 @@ div.kt-datatable__pager-container {
 										<td style="text-align:center; padding-top:15px; padding-bottom:15px;"><?php echo $count; ?></td>
 										<td style="text-align:center;"><?php echo htmlspecialchars($g->Name); ?></td>
 										<?php
-											$is_ghl_row = isset($g->Type) && $g->Type === 'GHL';
-											$wa_number  = preg_replace('/[^0-9]/', '', (string)$g->ContactNum);
+											$is_ghl_row      = isset($g->Type) && $g->Type === 'GHL';
+											$calling_code    = isset($g->CallingCode) ? (string)$g->CallingCode : '';
+											$contact_display = guest_contact_format_display($calling_code, (string)$g->ContactNum);
+											$wa_number       = guest_contact_wa_digits($calling_code, (string)$g->ContactNum);
 										?>
-										<td class="contact-cell<?php if(!$is_ghl_row) echo ' contact-editable'; ?>" style="text-align:center; white-space:nowrap;"<?php if(!$is_ghl_row) { ?> data-dedup-key="<?php echo htmlspecialchars($g->dedup_key, ENT_QUOTES); ?>" data-mobile="<?php echo htmlspecialchars((string)$g->ContactNum, ENT_QUOTES); ?>"<?php } ?>>
+										<td class="contact-cell<?php if(!$is_ghl_row) echo ' contact-editable'; ?>" style="text-align:center; white-space:nowrap;"<?php if(!$is_ghl_row) { ?> data-dedup-key="<?php echo htmlspecialchars($g->dedup_key, ENT_QUOTES); ?>" data-mobile="<?php echo htmlspecialchars((string)$g->ContactNum, ENT_QUOTES); ?>" data-calling-code="<?php echo htmlspecialchars($calling_code, ENT_QUOTES); ?>"<?php } ?>>
 											<span class="contact-display">
 												<?php if(!empty($wa_number)) { ?>
 													<a class="contact-wa" href="https://wa.me/<?php echo $wa_number; ?>" target="_blank" rel="noopener" style="color:#25D366; text-decoration:none; display:inline-flex; align-items:center; gap:5px;" title="Open WhatsApp chat">
-														<i class="la la-whatsapp" style="font-size:16px;"></i><span class="contact-num"><?php echo htmlspecialchars($g->ContactNum); ?></span>
+														<i class="la la-whatsapp" style="font-size:16px;"></i><span class="contact-num"><?php echo htmlspecialchars($contact_display); ?></span>
 													</a>
 												<?php } else { ?>
-													<span class="contact-num"><?php echo htmlspecialchars($g->ContactNum); ?></span>
+													<span class="contact-num"><?php echo htmlspecialchars($contact_display); ?></span>
 												<?php } ?>
 												<?php if(!$is_ghl_row) { ?>
 													<button type="button" class="btn btn-icon btn-light-primary btn-xs contact-edit-btn ml-1" data-toggle="tooltip" title="Edit contact number">
@@ -491,19 +493,40 @@ div.kt-datatable__pager-container {
 	// ----- Inline contact-number edit -----
 	var GUEST_CONTACT_UPDATE_URL = '<?php echo base_url('Guests/Update_Contact'); ?>';
 
-	function waLink(num) {
-		var digits = (num || '').replace(/[^0-9]/g, '');
-		var label  = $('<span>').text(num).html();
-		if (digits === '') { return '<span class="contact-num">' + label + '</span>'; }
+	// Mirror of guest_contact_format_display() / guest_contact_wa_digits() in
+	// application/helpers/guest_contact_helper.php — keep the two in sync.
+	function gcFormatDisplay(callingCode, local) {
+		local       = $.trim(local || '');
+		callingCode = $.trim(callingCode || '');
+		if (local === '') { return ''; }
+		if (callingCode === '') { return local; }
+		if (local.charAt(0) === '0') { local = local.substring(1); }
+		if (local === '') { return callingCode; }
+		return callingCode + ' ' + local;
+	}
+
+	function gcWaDigits(callingCode, local) {
+		var localDigits = (local || '').replace(/[^0-9]/g, '');
+		if (localDigits === '') { return ''; }
+		callingCode = $.trim(callingCode || '');
+		if (callingCode === '') { return localDigits; }
+		localDigits = localDigits.replace(/^0+/, '');
+		return callingCode.replace(/[^0-9]/g, '') + localDigits;
+	}
+
+	function waLink(label, digits) {
+		var safe = $('<span>').text(label).html();
+		if (digits === '') { return '<span class="contact-num">' + safe + '</span>'; }
 		return '<a class="contact-wa" href="https://wa.me/' + digits + '" target="_blank" rel="noopener" ' +
 			'style="color:#25D366; text-decoration:none; display:inline-flex; align-items:center; gap:5px;" title="Open WhatsApp chat">' +
-			'<i class="la la-whatsapp" style="font-size:16px;"></i><span class="contact-num">' + label + '</span></a>';
+			'<i class="la la-whatsapp" style="font-size:16px;"></i><span class="contact-num">' + safe + '</span></a>';
 	}
 
 	function renderDisplay($cell) {
 		$cell.find('[data-toggle="tooltip"]').tooltip('dispose');
 		var num = $cell.attr('data-mobile') || '';
-		var html = '<span class="contact-display">' + waLink(num) +
+		var cc  = $cell.attr('data-calling-code') || '';
+		var html = '<span class="contact-display">' + waLink(gcFormatDisplay(cc, num), gcWaDigits(cc, num)) +
 			'<button type="button" class="btn btn-icon btn-light-primary btn-xs contact-edit-btn ml-1" data-toggle="tooltip" title="Edit contact number">' +
 			'<i class="la la-pencil"></i></button></span>';
 		$cell.html(html);

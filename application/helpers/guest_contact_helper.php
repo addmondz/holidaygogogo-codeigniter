@@ -68,6 +68,70 @@ if (!function_exists('guest_contact_validate_mobile')) {
     }
 }
 
+if (!function_exists('guest_contact_format_display')) {
+    /**
+     * Render a contact number for display WITH its international calling code.
+     *
+     * Booking guests store a local Mobile (e.g. "0169546738") and a separate
+     * calling code ("+60"); the leading trunk "0" is dropped so the result is
+     * the proper international form "+60 169546738". GHL leads already store a
+     * full E.164 phone and carry an empty calling code, which is passed through
+     * unchanged.
+     *
+     * @param string $calling_code e.g. "+60" (country_code.CountryCode), or '' for an already-complete number.
+     * @param string $local        The local/raw number as stored.
+     * @return string Display string, or '' when there is no local number.
+     */
+    function guest_contact_format_display($calling_code, $local)
+    {
+        $local        = trim((string) $local);
+        $calling_code = trim((string) $calling_code);
+
+        if ($local === '') {
+            return '';
+        }
+        if ($calling_code === '') {
+            return $local;
+        }
+        if ($local[0] === '0') {
+            $local = substr($local, 1);
+        }
+        if ($local === '') {
+            return $calling_code;
+        }
+        return $calling_code . ' ' . $local;
+    }
+}
+
+if (!function_exists('guest_contact_wa_digits')) {
+    /**
+     * Build the digits-only international number for a wa.me link.
+     *
+     * Mirrors guest_contact_format_display(): drops the local trunk "0" and
+     * prepends the calling code's digits. When the calling code is empty the
+     * local number already carries its code (GHL leads), so its digits are
+     * returned as-is.
+     *
+     * @param string $calling_code e.g. "+60", or '' for an already-complete number.
+     * @param string $local        The local/raw number as stored.
+     * @return string Digits only, or '' when there is no local number.
+     */
+    function guest_contact_wa_digits($calling_code, $local)
+    {
+        $local_digits = preg_replace('/[^0-9]/', '', (string) $local);
+        if ($local_digits === '') {
+            return '';
+        }
+        $calling_code = trim((string) $calling_code);
+        if ($calling_code === '') {
+            return $local_digits;
+        }
+        $local_digits = ltrim($local_digits, '0');
+        $cc_digits    = preg_replace('/[^0-9]/', '', $calling_code);
+        return $cc_digits . $local_digits;
+    }
+}
+
 if (!function_exists('guest_list_parse_date_range')) {
     /**
      * Parse a daterangepicker value ("DD/MM/YYYY - DD/MM/YYYY") into a
