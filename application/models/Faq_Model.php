@@ -17,9 +17,6 @@ class Faq_Model extends CI_Model
 		$this->db->join('category c', "c.CategoryID = fdm.CategoryID AND c.Status = 'Y'", 'left', false);
 		$this->db->where('f.Status', 'Y');
 
-		if(!empty($this->input->get('title'))) {
-			$this->db->like('f.Title', $this->input->get('title'));
-		}
 		if(!empty($this->input->get('type')) && in_array($this->input->get('type'), array('internal', 'external'), true)) {
 			$this->db->where('f.Type', $this->input->get('type'));
 		}
@@ -44,7 +41,8 @@ class Faq_Model extends CI_Model
 		$tag_names = $this->Tag_Name_Map();
 		$out = array();
 		foreach($rows as $row) {
-			$faq_tag_ids = self::Item_Tag_Ids(self::Decode_Items($row->Description));
+			$items = self::Decode_Items($row->Description);
+			$faq_tag_ids = self::Item_Tag_Ids($items);
 			if(!empty($tag_ids) && count(array_intersect($tag_ids, $faq_tag_ids)) === 0) {
 				continue; // no chosen tag on any sub-item
 			}
@@ -56,6 +54,10 @@ class Faq_Model extends CI_Model
 			}
 			sort($names);
 			$row->Tags = implode('||', $names);
+			// Flatten the sub-Q&A text into a hidden, searchable cell so the
+			// listing's client-side DataTable search (which only sees rendered
+			// cells) can match on sub-question / sub-answer content too.
+			$row->SearchText = self::Search_Blob($items);
 			$out[] = $row;
 		}
 		return $out;
@@ -241,6 +243,32 @@ class Faq_Model extends CI_Model
 		$ids = array_values($ids);
 		sort($ids);
 		return $ids;
+	}
+
+	// Flatten a decoded item list into one space-joined string of every
+	// sub-question + sub-answer (q before a, in item order). Blank pieces are
+	// dropped and inner whitespace is collapsed so the result is clean search
+	// text. Per-item tag ids and audit metadata are excluded - only q/a text.
+	// Pure + static for unit testing; the listing emits this as a hidden cell so
+	// the client-side DataTable search reaches sub-Q&A content.
+	public static function Search_Blob($items)
+	{
+		if(!is_array($items)) {
+			return '';
+		}
+		$parts = array();
+		foreach($items as $item) {
+			if(!is_array($item)) {
+				continue;
+			}
+			foreach(array('q', 'a') as $k) {
+				if(isset($item[$k]) && trim((string)$item[$k]) !== '') {
+					$parts[] = trim((string)$item[$k]);
+				}
+			}
+		}
+		// Collapse any inner runs of whitespace (newlines, tabs) to single spaces.
+		return preg_replace('/\s+/', ' ', implode(' ', $parts));
 	}
 
 	function Create($data)

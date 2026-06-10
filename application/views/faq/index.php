@@ -41,29 +41,6 @@
 									<div class="row">
 										<div class="col-md-4">
 											<div class="form-group">
-												<label>Title</label>
-												<div class="input-icon">
-													<input type="text" name="title" value="<?php echo htmlspecialchars((string)$this->input->get('title'), ENT_QUOTES); ?>" autocomplete="off" class="form-control">
-													<span><i class="la la-clipboard-list"></i></span>
-												</div>
-											</div>
-										</div>
-										<div class="col-md-4">
-											<div class="form-group">
-												<label>Type</label>
-												<select name="type" class="form-control selectpicker">
-													<option data-icon="la la-list font-size-lg bs-icon" value="">--SELECT TYPE--</option>
-													<option data-icon="la la-user-shield font-size-lg bs-icon" value="internal" <?php if($this->input->get('type') === 'internal') { echo 'selected'; } ?>>Internal</option>
-													<?php /* temporary: external FAQ not needed for now
-													<option data-icon="la la-globe font-size-lg bs-icon" value="external" <?php if($this->input->get('type') === 'external') { echo 'selected'; } ?>>External</option>
-													*/ ?>
-												</select>
-											</div>
-										</div>
-									</div>
-									<div class="row">
-										<div class="col-md-4">
-											<div class="form-group">
 												<label>Tags</label>
 												<?php $selected_tags = !empty($this->input->get('tag')) ? explode(',', $this->input->get('tag')) : array(); ?>
 												<select id="tag_select" data-live-search="true" data-live-search-style="contains" data-live-search-normalize="true" class="form-control selectpicker" multiple data-actions-box="true" title="--SELECT TAG--">
@@ -116,7 +93,7 @@
 							<?php } else { $count = 1; foreach($faqs as $faq) { ?>
 								<tr>
 									<td style="text-align:center; padding-top:15px; padding-bottom:15px;"><?php echo $count; ?></td>
-									<td style="text-align:left;"><strong><?php echo htmlspecialchars($faq->Title); ?></strong></td>
+									<td style="text-align:left;"><strong><?php echo htmlspecialchars($faq->Title); ?></strong><?php if(!empty($faq->SearchText)) { ?><span class="faq-search-blob" style="display:none;"><?php echo htmlspecialchars($faq->SearchText); ?></span><?php } ?></td>
 									<td style="text-align:center;">
 										<?php
 											$tag_names = ($faq->Tags === null || $faq->Tags === '') ? array() : explode('||', $faq->Tags);
@@ -180,7 +157,7 @@
 </div>
 
 <script>
-	<?php if(trim((string)$this->input->get('title')) !== '' || trim((string)$this->input->get('type')) !== '' || trim((string)$this->input->get('tag')) !== '' || trim((string)$this->input->get('destination')) !== '') { ?>
+	<?php if(trim((string)$this->input->get('tag')) !== '' || trim((string)$this->input->get('destination')) !== '') { ?>
 		$('#faq_header').click();
 	<?php } ?>
 

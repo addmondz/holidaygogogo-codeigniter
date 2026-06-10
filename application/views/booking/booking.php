@@ -803,6 +803,11 @@
                         <textarea id="BookingFormText" rows="6" autocomplete="off" class="form-control" placeholder="Free-text booking details (editable while the booking is a draft)"><?php if(current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) { echo isset($BookingFormText) ? htmlspecialchars($BookingFormText, ENT_QUOTES) : ''; } ?></textarea>
                     </div>
 
+                    <div class="form-group">
+                        <label>Chat Summary</label>
+                        <textarea id="ChatSummary" rows="6" autocomplete="off" class="form-control" placeholder="Summary of the customer chat (editable while the booking is a draft)"><?php if(current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) { echo isset($ChatSummary) ? htmlspecialchars($ChatSummary, ENT_QUOTES) : ''; } ?></textarea>
+                    </div>
+
                     <br><br>
 
                     <div id="benchmark" class="row draggable-zone"></div>
@@ -3422,6 +3427,8 @@
 
                     if ($('#BookingFormText').length) { booking[0]['BookingFormText'] = $('#BookingFormText').val(); }
 
+                    if ($('#ChatSummary').length) { booking[0]['ChatSummary'] = $('#ChatSummary').val(); }
+
                     var br = ($('#BookingRemark').val() || '').toUpperCase();
                     if (br) { booking[0]['BookingRemark'] = br; }
 
@@ -3738,6 +3745,12 @@
 
                                     }
 
+                                    if($('#ChatSummary').length) {
+
+                                        booking[0]['ChatSummary'] = $('#ChatSummary').val();
+
+                                    }
+
 
 
                                     booking_products = Create_Booking_Products();
@@ -3832,13 +3845,13 @@
 
                                                 var key = dirty_fields[i].id == 'kt_datepicker_4_3' || dirty_fields[i].id == 'kt_datepicker_4_4' ? dirty_fields[i].name : dirty_fields[i].id;
 
-                                                var value = dirty_fields[i].id == 'kt_datepicker_4_3' || dirty_fields[i].id == 'kt_datepicker_4_4' ? `${((dirty_fields[i].value).split('/'))[2]}-${((dirty_fields[i].value).split('/'))[1]}-${((dirty_fields[i].value).split('/'))[0]}` : (dirty_fields[i].id == 'BookingFormText' ? dirty_fields[i].value : (dirty_fields[i].value).toUpperCase());
+                                                var value = dirty_fields[i].id == 'kt_datepicker_4_3' || dirty_fields[i].id == 'kt_datepicker_4_4' ? `${((dirty_fields[i].value).split('/'))[2]}-${((dirty_fields[i].value).split('/'))[1]}-${((dirty_fields[i].value).split('/'))[0]}` : ((dirty_fields[i].id == 'BookingFormText' || dirty_fields[i].id == 'ChatSummary') ? dirty_fields[i].value : (dirty_fields[i].value).toUpperCase());
 
                                                 // Booking
 
                                                 // Action : Update
 
-                                                if(key == 'CountryCodeID' || key == 'ReservationNumber' || key == 'DepositDeadline' || key == 'FullPaymentDeadline' || key == 'Customer' || key == 'Mobile' || key == 'Destination' || key == 'SalesAgent' || key == 'SalesAgent2' || key == 'BookingRemark' || key == 'BookingFormText' || key == 'ChatLanguage' || key == 'Source' || key == 'BookingConfirmationTitle' || key == 'BookingOP') {
+                                                if(key == 'CountryCodeID' || key == 'ReservationNumber' || key == 'DepositDeadline' || key == 'FullPaymentDeadline' || key == 'Customer' || key == 'Mobile' || key == 'Destination' || key == 'SalesAgent' || key == 'SalesAgent2' || key == 'BookingRemark' || key == 'BookingFormText' || key == 'ChatSummary' || key == 'ChatLanguage' || key == 'Source' || key == 'BookingConfirmationTitle' || key == 'BookingOP') {
 
                                                     if(key == 'BookingOP' && value == '') {
 
@@ -7203,7 +7216,7 @@ $(function() {
     // A draft has no products/pricing yet, so the Deposit Deadline
     // (kt_datepicker_4_3) and Full Payment Deadline (kt_datepicker_4_4) are
     // intentionally left OUT of this whitelist — they grey out while in draft.
-    var DRAFT_EDITABLE_IDS = ['is_draft_intake_toggle', 'Customer', 'CustomerID', 'Mobile', 'CountryCodeID', 'SalesAgent2', 'Destination', 'TravelDate', 'BookingFormText', 'ic_passport_no', 'customer_type', 'Source', 'ChatLanguage'];
+    var DRAFT_EDITABLE_IDS = ['is_draft_intake_toggle', 'Customer', 'CustomerID', 'Mobile', 'CountryCodeID', 'SalesAgent2', 'Destination', 'TravelDate', 'BookingFormText', 'ChatSummary', 'ic_passport_no', 'customer_type', 'Source', 'ChatLanguage'];
     var CURRENT_ADMIN_ID = '<?php echo (int) $this->session->userdata('admin_id'); ?>';
 
     function applyDraftLock(on) {

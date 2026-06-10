@@ -282,8 +282,8 @@ class Booking extends MY_Controller
 				13 => 'EndDate',                      // end
 				14 => 'category.Name',                // destination
 				15 => 'NetTotal',                     // net sales
-				16 => 'NetTotal',                     // profit
-				17 => 'NetTotal',                     // profit margin
+				16 => 'net_profit_sort',              // profit
+				17 => 'profit_margin_sort',           // profit margin
 				18 => "status_sort_priority",          // BC status
 				19 => 'LockStatus',                   // GL status
 				20 => 'booking.AutocountSyncStatus',  // autocount status
@@ -3151,7 +3151,8 @@ class Booking extends MY_Controller
 				);
 
 				// Draft lifecycle (draft_save_mode):
-				//   approve -> set DraftApproved (status stays SAD)
+				//   approve -> APPROVE + graduate straight to PENDING BC (PB),
+				//              stamping the approval flag/date
 				//   PB      -> park at PENDING BC (stays editable; can graduate later)
 				//   PBC     -> PENDING BC CONFIRMATION; enters the normal flow
 				//   draft / '' -> stays SAD
@@ -3162,32 +3163,36 @@ class Booking extends MY_Controller
 					$mode = $this->input->post('draft_save_mode');
 					$advancer_id = (int) $this->session->userdata('admin_id');
 
-					if ($mode === 'approve' && $intake_pre_save_status === 'SAD') {
-						$this->Booking_Model->update_by_id($bid, array(
-							'DraftApproved'     => 1,
-							'DraftApprovedDate' => date('Y-m-d H:i:s'),
-						));
-					} else {
-						$target = resolve_graduate_status($mode);
-						if ($target !== null) {
-							$this->load->helper(array('booking_status_log', 'booking_flow'));
-							$status_info  = get_booking_status_info();
-							$target_label = isset($status_info['texts'][$target]) ? $status_info['texts'][$target] : $target;
-							// Graduating implies approval (the buttons only show once
-							// approved), so keep the flag set.
-							$this->Booking_Model->update_by_id($bid, array(
-								'Status'        => $target,
-								'DraftApproved' => 1,
-							));
-							log_booking_status_change(
-								$bid,
-								$target,
-								$intake_pre_save_status,
-								$advancer_id,
-								'Draft — booking advanced to ' . $target_label,
-								true
-							);
+					// "Approve" graduates a saved draft straight to PENDING BC (PB),
+					// so it shares the graduate path below with the PB/PBC buttons.
+					// The only extra is the DraftApprovedDate approval stamp.
+					$is_approve = ($mode === 'approve' && $intake_pre_save_status === 'SAD');
+					$target     = $is_approve ? 'PB' : resolve_graduate_status($mode);
+
+					if ($target !== null) {
+						$this->load->helper(array('booking_status_log', 'booking_flow'));
+						$status_info  = get_booking_status_info();
+						$target_label = isset($status_info['texts'][$target]) ? $status_info['texts'][$target] : $target;
+						// Graduating implies approval (the graduate buttons only show
+						// once approved), so keep the flag set.
+						$update = array(
+							'Status'        => $target,
+							'DraftApproved' => 1,
+						);
+						if ($is_approve) {
+							$update['DraftApprovedDate'] = date('Y-m-d H:i:s');
 						}
+						$this->Booking_Model->update_by_id($bid, $update);
+						log_booking_status_change(
+							$bid,
+							$target,
+							$intake_pre_save_status,
+							$advancer_id,
+							$is_approve
+								? 'Draft — approved and advanced to ' . $target_label
+								: 'Draft — booking advanced to ' . $target_label,
+							true
+						);
 					}
 				}
 			} else {

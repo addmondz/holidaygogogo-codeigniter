@@ -56,6 +56,7 @@ if (!function_exists('draft_editable_fields')) {
             'DepositDeadline',
             'FullPaymentDeadline',
             'BookingFormText',
+            'ChatSummary',
         );
     }
 }

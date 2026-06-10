@@ -39,7 +39,7 @@ assert_eq("'' not draft",    false, is_draft_status(''));
 // ---- draft_editable_fields --------------------------------------------------
 $fields = draft_editable_fields();
 assert_eq('returns array', true, is_array($fields));
-foreach (array('Customer', 'Mobile', 'CountryCodeID', 'SalesAgent2', 'Source', 'ChatLanguage', 'Destination', 'StartDate', 'EndDate', 'DepositDeadline', 'FullPaymentDeadline', 'BookingFormText') as $expected_key) {
+foreach (array('Customer', 'Mobile', 'CountryCodeID', 'SalesAgent2', 'Source', 'ChatLanguage', 'Destination', 'StartDate', 'EndDate', 'DepositDeadline', 'FullPaymentDeadline', 'BookingFormText', 'ChatSummary') as $expected_key) {
     assert_eq("whitelist contains {$expected_key}", true, in_array($expected_key, $fields, true));
 }
 // Locked-down fields must NOT be writable in draft mode.
