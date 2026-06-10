@@ -5,15 +5,14 @@ class Faq_Model extends CI_Model
 	// from the index page filter accordion.
 	function Read_Faqs()
 	{
-		// Tags and destinations are aggregated in the same query (left joins
-		// through their maps so FAQs without either are still returned). DISTINCT
-		// guards against the row fan-out of the two independent one-to-many joins.
-		// "||" separates names; the view splits on it to render one badge each.
-		$this->db->select('f.FAQID, f.Title, f.Description, f.Type, f.DisplayOrder, f.Status, f.InsertDate, a.Name AS InsertByName, GROUP_CONCAT(DISTINCT ft.Name ORDER BY ft.Name ASC SEPARATOR "||") AS Tags, GROUP_CONCAT(DISTINCT c.Name ORDER BY c.Name ASC SEPARATOR "||") AS Destinations', false);
+		// Destinations are still whole-FAQ, so they stay aggregated in the query
+		// (left join through the map so FAQs without one are still returned).
+		// DISTINCT guards the one-to-many fan-out; "||" separates names for the
+		// view. Tags now live per sub-Q&A inside Description, so they're resolved
+		// in PHP below (the SQL can't reach into the JSON list).
+		$this->db->select('f.FAQID, f.Title, f.Slug, f.Description, f.Type, f.Status, f.InsertDate, a.Name AS InsertByName, GROUP_CONCAT(DISTINCT c.Name ORDER BY c.Name ASC SEPARATOR "||") AS Destinations', false);
 		$this->db->from('faq f');
 		$this->db->join('admin a', 'a.AdminID = f.InsertBy', 'left');
-		$this->db->join('faq_tag_map ftm', 'ftm.FAQID = f.FAQID', 'left');
-		$this->db->join('faq_tag ft', "ft.FAQTagID = ftm.FAQTagID AND ft.Status = 'Y'", 'left', false);
 		$this->db->join('faq_destination_map fdm', 'fdm.FAQID = f.FAQID', 'left');
 		$this->db->join('category c', "c.CategoryID = fdm.CategoryID AND c.Status = 'Y'", 'left', false);
 		$this->db->where('f.Status', 'Y');
@@ -24,16 +23,47 @@ class Faq_Model extends CI_Model
 		if(!empty($this->input->get('type')) && in_array($this->input->get('type'), array('internal', 'external'), true)) {
 			$this->db->where('f.Type', $this->input->get('type'));
 		}
+		// Destination filter: match a FAQ that carries ANY of the chosen ids.
+		// Done with a subquery against the map (not a where_in on the joined row)
+		// so the GROUP_CONCAT above still lists every destination, not only the
+		// matched ones. IDs are int-sanitised, so inlining them is safe.
+		$destination_ids = self::Parse_Id_Csv($this->input->get('destination'));
+		if(!empty($destination_ids)) {
+			$this->db->where('f.FAQID IN (SELECT FAQID FROM faq_destination_map WHERE CategoryID IN (' . implode(',', $destination_ids) . '))', null, false);
+		}
 
 		$this->db->group_by('f.FAQID');
-		$this->db->order_by('f.DisplayOrder', 'ASC');
 		$this->db->order_by('f.FAQID', 'ASC');
-		return $this->db->get()->result();
+		$rows = $this->db->get()->result();
+
+		// Resolve per-item tags: a FAQ's effective tag set is the union across its
+		// sub-Q&As. The tag filter keeps a FAQ when ANY sub-item carries a chosen
+		// tag. $row->Tags is filled with the "||"-joined names so the view (which
+		// already splits on "||") renders the badge column unchanged.
+		$tag_ids   = self::Parse_Id_Csv($this->input->get('tag'));
+		$tag_names = $this->Tag_Name_Map();
+		$out = array();
+		foreach($rows as $row) {
+			$faq_tag_ids = self::Item_Tag_Ids(self::Decode_Items($row->Description));
+			if(!empty($tag_ids) && count(array_intersect($tag_ids, $faq_tag_ids)) === 0) {
+				continue; // no chosen tag on any sub-item
+			}
+			$names = array();
+			foreach($faq_tag_ids as $id) {
+				if(isset($tag_names[$id])) {
+					$names[] = $tag_names[$id];
+				}
+			}
+			sort($names);
+			$row->Tags = implode('||', $names);
+			$out[] = $row;
+		}
+		return $out;
 	}
 
 	function Read_Faq($id)
 	{
-		$this->db->select('FAQID, Title, Description, Type, DisplayOrder, Status');
+		$this->db->select('FAQID, Title, Description, Type, Status');
 		$this->db->where('FAQID', (int)$id);
 		return $this->db->get('faq')->row();
 	}
@@ -68,6 +98,14 @@ class Faq_Model extends CI_Model
 						'q' => (string)(isset($row['q']) ? $row['q'] : ''),
 						'a' => (string)(isset($row['a']) ? $row['a'] : ''),
 					);
+					// Per-item tag ids (FAQTagID list). Normalised and only kept
+					// when non-empty so untagged/legacy rows decode unchanged.
+					if(isset($row['tags'])) {
+						$tags = self::Normalize_Ids($row['tags']);
+						if(!empty($tags)) {
+							$item['tags'] = $tags;
+						}
+					}
 					// Audit fields (created/updated by-name + date) are passed
 					// through only when present, so legacy {q,a} rows decode
 					// unchanged and consumers can isset()-guard the meta.
@@ -100,7 +138,11 @@ class Faq_Model extends CI_Model
 	// $actor is the acting admin's name and $now a 'Y-m-d H:i:s' timestamp;
 	// both are passed in so the helper stays pure + unit-testable. Calling with
 	// only ($questions, $answers) preserves the original bare {q,a} contract.
-	public static function Build_Items($questions, $answers, $meta = null, $actor = '', $now = '')
+	//
+	// $tags (optional) is a parallel array aligned to the posted rows - each
+	// entry a list of FAQTagID ids. A kept row gets a normalised, non-empty
+	// 'tags' key (placed right after 'a'); empty/absent tag sets omit the key.
+	public static function Build_Items($questions, $answers, $meta = null, $actor = '', $now = '', $tags = null)
 	{
 		$questions = is_array($questions) ? array_values($questions) : array();
 		$answers   = is_array($answers)   ? array_values($answers)   : array();
@@ -128,15 +170,26 @@ class Faq_Model extends CI_Model
 				return array('items' => array(), 'error' => 'Each sub-question must have a matching sub-answer.');
 			}
 
+			// Base row, plus this row's tags (kept only when non-empty so the
+			// no-$tags call path returns the original bare {q,a} shape).
+			$item = array('q' => $q, 'a' => $a);
+			if($tags !== null) {
+				$row_tags = self::Normalize_Ids(isset($tags[$i]) ? $tags[$i] : array());
+				if(!empty($row_tags)) {
+					$item['tags'] = $row_tags;
+				}
+			}
+
 			if(!$audited) {
-				$items[] = array('q' => $q, 'a' => $a);
+				$items[] = $item;
 				continue;
 			}
 
 			$cd = $meta_at('cd', $i);
 			if($cd === '') {
 				// New row: created + first update are the same event.
-				$items[] = array('q' => $q, 'a' => $a, 'cb' => $actor, 'cd' => $now, 'ub' => $actor, 'ud' => $now);
+				$item['cb'] = $actor; $item['cd'] = $now; $item['ub'] = $actor; $item['ud'] = $now;
+				$items[] = $item;
 				continue;
 			}
 
@@ -151,7 +204,8 @@ class Faq_Model extends CI_Model
 				if($ub === '') { $ub = $cb; }
 				if($ud === '') { $ud = $cd; }
 			}
-			$items[] = array('q' => $q, 'a' => $a, 'cb' => $cb, 'cd' => $cd, 'ub' => $ub, 'ud' => $ud);
+			$item['cb'] = $cb; $item['cd'] = $cd; $item['ub'] = $ub; $item['ud'] = $ud;
+			$items[] = $item;
 		}
 
 		return array('items' => $items, 'error' => null);
@@ -166,25 +220,27 @@ class Faq_Model extends CI_Model
 		return json_encode($items, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 	}
 
-	// Public read used by both /faq/internal and /faq/external. Only active
-	// FAQs of the requested type, in display order. Tags and destinations are
-	// aggregated in the same query (see Read_Faqs for the join/DISTINCT notes);
-	// "||" separates names so the display view can split them into badges.
-	function Read_Public($type)
+	// Deduped, sorted union of every item's tag ids (a FAQ's effective tag set,
+	// since tags now live per sub-Q&A). Pure + static for unit testing; used for
+	// the listing badge column and the "match any sub-item" tag filter.
+	public static function Item_Tag_Ids($items)
 	{
-		$type = ($type === 'external') ? 'external' : 'internal';
-		$this->db->select('f.FAQID, f.Title, f.Description, GROUP_CONCAT(DISTINCT ft.Name ORDER BY ft.Name ASC SEPARATOR "||") AS Tags, GROUP_CONCAT(DISTINCT c.Name ORDER BY c.Name ASC SEPARATOR "||") AS Destinations', false);
-		$this->db->from('faq f');
-		$this->db->join('faq_tag_map ftm', 'ftm.FAQID = f.FAQID', 'left');
-		$this->db->join('faq_tag ft', "ft.FAQTagID = ftm.FAQTagID AND ft.Status = 'Y'", 'left', false);
-		$this->db->join('faq_destination_map fdm', 'fdm.FAQID = f.FAQID', 'left');
-		$this->db->join('category c', "c.CategoryID = fdm.CategoryID AND c.Status = 'Y'", 'left', false);
-		$this->db->where('f.Status', 'Y');
-		$this->db->where('f.Type', $type);
-		$this->db->group_by('f.FAQID');
-		$this->db->order_by('f.DisplayOrder', 'ASC');
-		$this->db->order_by('f.FAQID', 'ASC');
-		return $this->db->get()->result();
+		$ids = array();
+		if(is_array($items)) {
+			foreach($items as $item) {
+				if(is_array($item) && isset($item['tags']) && is_array($item['tags'])) {
+					foreach($item['tags'] as $id) {
+						$id = (int)$id;
+						if($id > 0) {
+							$ids[$id] = $id; // key dedupes
+						}
+					}
+				}
+			}
+		}
+		$ids = array_values($ids);
+		sort($ids);
+		return $ids;
 	}
 
 	function Create($data)
@@ -194,9 +250,9 @@ class Faq_Model extends CI_Model
 
 		$row = array(
 			'Title'        => $data['Title'],
+			'Slug'         => $data['Slug'],
 			'Description'  => $data['Description'],
 			'Type'         => $data['Type'],
-			'DisplayOrder' => (int)$data['DisplayOrder'],
 			'Status'       => 'Y',
 			'InsertBy'     => $admin_id,
 			'InsertDate'   => $now,
@@ -211,9 +267,9 @@ class Faq_Model extends CI_Model
 	{
 		$row = array(
 			'Title'        => $data['Title'],
+			'Slug'         => $data['Slug'],
 			'Description'  => $data['Description'],
 			'Type'         => $data['Type'],
-			'DisplayOrder' => (int)$data['DisplayOrder'],
 			'UpdateBy'     => $this->session->userdata('admin_id'),
 			'UpdateDate'   => date('Y-m-d H:i:s'),
 		);
@@ -240,37 +296,134 @@ class Faq_Model extends CI_Model
 		return array_values($ids);
 	}
 
-	// IDs of the tags currently mapped to a FAQ (for pre-selecting the form).
-	function Read_Tag_Ids($faq_id)
+	// Turn a free-text Title into a URL-safe slug for the per-FAQ page
+	// (/faq/<slug>). Lowercase; every run of non-[a-z0-9] collapses to a single
+	// hyphen; leading/trailing hyphens trimmed; capped at 80 chars (trimmed back
+	// to a hyphen boundary so it never ends mid-word or on a hyphen). A title
+	// that reduces to nothing (blank / symbols / non-latin) falls back to 'faq'
+	// so the Slug column is never empty. Pure + static for unit testing.
+	public static function Slugify($title)
 	{
-		$this->db->select('FAQTagID');
-		$this->db->where('FAQID', (int)$faq_id);
-		$rows = $this->db->get('faq_tag_map')->result();
-
-		$ids = array();
-		foreach($rows as $row) {
-			$ids[] = (int)$row->FAQTagID;
+		$slug = strtolower((string)$title);
+		$slug = preg_replace('/[^a-z0-9]+/', '-', $slug);
+		$slug = trim($slug, '-');
+		if(strlen($slug) > 80) {
+			$slug = substr($slug, 0, 80);
+			// Don't leave a dangling partial word fragment after a hyphen.
+			$cut = strrpos($slug, '-');
+			if($cut !== false) {
+				$slug = substr($slug, 0, $cut);
+			}
+			$slug = trim($slug, '-');
 		}
-		return $ids;
+		return ($slug === '') ? 'faq' : $slug;
 	}
 
-	// Replace a FAQ's tag links with the given set (full-sync, idempotent).
-	function Sync_Tags($faq_id, $tag_ids)
+	// Disambiguate a base slug against the slugs already in use. Returns $base
+	// when free, otherwise the lowest 'base-N' (N>=2) not present in $taken
+	// (gaps are filled, so base + base-3 taken yields base-2). The DB query that
+	// collects $taken lives in Generate_Slug(); this stays pure + unit-testable.
+	public static function Unique_Slug($base, $taken)
 	{
-		$faq_id = (int)$faq_id;
-		$this->db->where('FAQID', $faq_id);
-		$this->db->delete('faq_tag_map');
-
-		$ids = self::Normalize_Ids($tag_ids);
-		if(empty($ids)) {
-			return;
+		$taken = is_array($taken) ? $taken : array();
+		if(!in_array($base, $taken, true)) {
+			return $base;
 		}
-
-		$rows = array();
-		foreach($ids as $id) {
-			$rows[] = array('FAQID' => $faq_id, 'FAQTagID' => $id);
+		$n = 2;
+		while(in_array($base . '-' . $n, $taken, true)) {
+			$n++;
 		}
-		$this->db->insert_batch('faq_tag_map', $rows);
+		return $base . '-' . $n;
+	}
+
+	// Build a unique slug for a FAQ from its Title. Slugifies, then disambiguates
+	// against existing slugs (only the base and its 'base-%' family are fetched,
+	// excluding the row being updated) via the pure Unique_Slug() helper.
+	function Generate_Slug($title, $ignore_id = 0)
+	{
+		$base = self::Slugify($title);
+		$this->db->select('Slug');
+		$this->db->where('Slug IS NOT NULL', null, false);
+		if((int)$ignore_id > 0) {
+			$this->db->where('FAQID !=', (int)$ignore_id);
+		}
+		$this->db->group_start();
+		$this->db->where('Slug', $base);
+		$this->db->or_like('Slug', $base . '-', 'after');
+		$this->db->group_end();
+		$rows = $this->db->get('faq')->result();
+
+		$taken = array();
+		foreach($rows as $row) {
+			$taken[] = $row->Slug;
+		}
+		return self::Unique_Slug($base, $taken);
+	}
+
+	// Single active FAQ by its slug, for the per-FAQ page (/faq/<slug>). Carries
+	// the whole-FAQ destinations (same "||"-joined aggregation the public read
+	// uses) and UpdateDate so the page can show when it was last touched. Returns
+	// null for a blank slug or a miss (caller 404s).
+	function Read_By_Slug($slug)
+	{
+		$slug = trim((string)$slug);
+		if($slug === '') {
+			return null;
+		}
+		$this->db->select('f.FAQID, f.Title, f.Slug, f.Description, f.Type, f.UpdateDate, GROUP_CONCAT(DISTINCT c.Name ORDER BY c.Name ASC SEPARATOR "||") AS Destinations', false);
+		$this->db->from('faq f');
+		$this->db->join('faq_destination_map fdm', 'fdm.FAQID = f.FAQID', 'left');
+		$this->db->join('category c', "c.CategoryID = fdm.CategoryID AND c.Status = 'Y'", 'left', false);
+		$this->db->where('f.Slug', $slug);
+		$this->db->where('f.Status', 'Y');
+		$this->db->group_by('f.FAQID');
+		return $this->db->get()->row();
+	}
+
+	// One-time, idempotent backfill: stamp a unique slug onto any active FAQ that
+	// doesn't have one yet (rows created before the Slug column existed). Cheap on
+	// the happy path - a single SELECT that returns nothing once every row has a
+	// slug. Called from the FAQ listing so it self-heals the moment slugs matter.
+	function Backfill_Slugs()
+	{
+		$this->db->select('FAQID, Title');
+		$this->db->group_start();
+		$this->db->where('Slug IS NULL', null, false);
+		$this->db->or_where('Slug', '');
+		$this->db->group_end();
+		$rows = $this->db->get('faq')->result();
+
+		foreach($rows as $row) {
+			$slug = $this->Generate_Slug($row->Title, $row->FAQID);
+			$this->db->where('FAQID', (int)$row->FAQID);
+			$this->db->update('faq', array('Slug' => $slug));
+		}
+	}
+
+	// Turn a comma-separated id string (the tag/destination filter values posted
+	// by the listing page, e.g. "3,7,9") into a clean list of positive ints.
+	// Pure so it can be unit tested without a DB; reuses Normalize_Ids' rules.
+	public static function Parse_Id_Csv($raw)
+	{
+		if(!is_string($raw) || trim($raw) === '') {
+			return array();
+		}
+		return self::Normalize_Ids(explode(',', $raw));
+	}
+
+	// Map of active FAQTagID => Name. Resolves the per-item tag ids stored in
+	// Description into display names for the listing column and the public page.
+	function Tag_Name_Map()
+	{
+		$this->db->select('FAQTagID, Name');
+		$this->db->where('Status', 'Y');
+		$rows = $this->db->get('faq_tag')->result();
+
+		$map = array();
+		foreach($rows as $row) {
+			$map[(int)$row->FAQTagID] = $row->Name;
+		}
+		return $map;
 	}
 
 	// Active destination categories for the FAQ form's multi-select. Same source

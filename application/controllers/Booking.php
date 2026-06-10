@@ -583,8 +583,8 @@ class Booking extends MY_Controller
 						$html .= '<button onclick="Cancel_With_Partial_Refund(\'' . base_url('assets/image/sweetalert.jpg') . '\', \'' . $booking->BookingNumber . '\', ' . $booking->BookingID . ', \'' . urlencode($current_url) . '\')" class="dropdown-item" style="color:#E0115F; font-size:11px;">Cancel With Partial Refund</button>';
 					}
 				}
-				// Approve BC - only show when BC is not approved
-				if(empty($booking->bc_approved) || $booking->bc_approved == 0) {
+				// Approve BC - only show when status is Pending BC Confirmation and BC is not approved
+				if($booking->Status == 'PBC' && (empty($booking->bc_approved) || $booking->bc_approved == 0)) {
 					$html .= '<a href="' . base_url('Booking/Approve_BC?booking_id=') . $booking->BookingID . '&param=' . urlencode($current_url) . '" class="dropdown-item" style="color:#50C878; font-size:11px;">Approve BC</a>';
 					$shown_approve_bc = true;
 				}
@@ -623,8 +623,8 @@ class Booking extends MY_Controller
 					$html .= '<a href="' . (strpos($current_url, '?') ? base_url('Booking/View?booking_id=') . $booking->BookingID . '&' . explode('?', $current_url)[1] : base_url('Booking/View?booking_id=') . $booking->BookingID) . '" class="dropdown-item" style="font-size:11px;">View Booking</a>';
 				}
 			}
-			// Approve BC - Allow SA users to approve their own bookings
-			if($is_sales_agent && (empty($booking->bc_approved) || $booking->bc_approved == 0) && !empty($booking->SalesAgentID) && $booking->SalesAgentID == $this->session->userdata('admin_id') && !$shown_approve_bc) {
+			// Approve BC - Allow SA users to approve their own bookings (only when status is Pending BC Confirmation)
+			if($is_sales_agent && $booking->Status == 'PBC' && (empty($booking->bc_approved) || $booking->bc_approved == 0) && !empty($booking->SalesAgentID) && $booking->SalesAgentID == $this->session->userdata('admin_id') && !$shown_approve_bc) {
 				$html .= '<a href="' . base_url('Booking/Approve_BC?booking_id=') . $booking->BookingID . '&param=' . urlencode($current_url) . '" class="dropdown-item" style="color:#50C878; font-size:11px;">Approve BC</a>';
 			}
 			// Complete Booking / Revert Pending Review - Allow SA users to complete after-sales service

@@ -21,14 +21,6 @@
 					</h3>
 				</div>
 				<div class="card-toolbar">
-					<a href="<?php echo base_url('Faq/Internal'); ?>" target="_blank" class="btn btn-light-primary font-weight-bold" data-toggle="tooltip" title="Open the internal FAQ page (staff login required)">
-						<i class="la la-lock"></i>Internal Page
-					</a>
-					<?php /* temporary: external FAQ not needed for now
-					<a href="<?php echo base_url('faq/external'); ?>" target="_blank" class="btn btn-light-success font-weight-bold ml-2" data-toggle="tooltip" title="Open the public external FAQ page">
-						<i class="la la-external-link-alt"></i>External Page
-					</a>
-					*/ ?>
 					<?php if($is_owner) { ?>
 						<a href="<?php echo base_url('Faq/Create'); ?>" class="btn btn-primary font-weight-bold ml-2" style="width:160px;">
 							<i class="la la-clipboard-list"></i>Create FAQ
@@ -45,7 +37,7 @@
 						</div>
 						<div id="faq_info" class="collapse">
 							<div class="card-body">
-								<form action="<?php echo base_url('Faq') ?>" method="get" class="form">
+								<form id="faq_filter_form" action="<?php echo base_url('Faq') ?>" method="get" class="form">
 									<div class="row">
 										<div class="col-md-4">
 											<div class="form-group">
@@ -69,6 +61,32 @@
 											</div>
 										</div>
 									</div>
+									<div class="row">
+										<div class="col-md-4">
+											<div class="form-group">
+												<label>Tags</label>
+												<?php $selected_tags = !empty($this->input->get('tag')) ? explode(',', $this->input->get('tag')) : array(); ?>
+												<select id="tag_select" data-live-search="true" data-live-search-style="contains" data-live-search-normalize="true" class="form-control selectpicker" multiple data-actions-box="true" title="--SELECT TAG--">
+													<?php foreach($tags as $tag) { ?>
+														<option data-icon="la la-tag font-size-lg bs-icon" value="<?php echo (int)$tag->FAQTagID; ?>" <?php if(in_array((string)$tag->FAQTagID, $selected_tags, true)) { echo 'selected'; } ?>><?php echo htmlspecialchars((string)$tag->Name); ?></option>
+													<?php } ?>
+												</select>
+												<input type="hidden" name="tag" id="tag_hidden" value="<?php echo htmlspecialchars((string)$this->input->get('tag'), ENT_QUOTES); ?>">
+											</div>
+										</div>
+										<div class="col-md-4">
+											<div class="form-group">
+												<label>Destination</label>
+												<?php $selected_destinations = !empty($this->input->get('destination')) ? explode(',', $this->input->get('destination')) : array(); ?>
+												<select id="destination_select" data-live-search="true" data-live-search-style="contains" data-live-search-normalize="true" class="form-control selectpicker" multiple data-actions-box="true" title="--SELECT DESTINATION--">
+													<?php foreach($destinations as $destination) { ?>
+														<option data-icon="la la-map-pin font-size-lg bs-icon" value="<?php echo (int)$destination->CategoryID; ?>" <?php if(in_array((string)$destination->CategoryID, $selected_destinations, true)) { echo 'selected'; } ?>><?php echo htmlspecialchars((string)$destination->Name); ?></option>
+													<?php } ?>
+												</select>
+												<input type="hidden" name="destination" id="destination_hidden" value="<?php echo htmlspecialchars((string)$this->input->get('destination'), ENT_QUOTES); ?>">
+											</div>
+										</div>
+									</div>
 									<input type="submit" value="Filter" class="btn btn-light-success font-weight-bold" style="width:80px;">
 									<input type="button" id="reset" value="Reset" class="btn btn-light-primary font-weight-bold" style="width:80px;">
 								</form>
@@ -88,16 +106,13 @@
 								*/ ?>
 								<th style="text-align:center;">Tags</th>
 								<th style="text-align:center;">Destination</th>
-								<th style="text-align:center;">Order</th>
 								<th style="text-align:center;">Created By</th>
-								<?php if($is_owner) { ?>
-									<th class="action" style="text-align:center;">Action</th>
-								<?php } ?>
+								<th class="action" style="text-align:center;">Action</th>
 							</tr>
 						</thead>
 						<tbody>
 							<?php if(empty($faqs)) { ?>
-								<tr><td colspan="<?php echo $is_owner ? 7 : 6; ?>" style="text-align:center; padding-top:10px; padding-bottom:10px;">FAQ Records Not Found</td></tr>
+								<tr><td colspan="6" style="text-align:center; padding-top:10px; padding-bottom:10px;">FAQ Records Not Found</td></tr>
 							<?php } else { $count = 1; foreach($faqs as $faq) { ?>
 								<tr>
 									<td style="text-align:center; padding-top:15px; padding-bottom:15px;"><?php echo $count; ?></td>
@@ -135,20 +150,24 @@
 										<?php } ?>
 									</td>
 									*/ ?>
-									<td style="text-align:center;"><?php echo (int)$faq->DisplayOrder; ?></td>
 									<td style="text-align:center;"><?php echo htmlspecialchars((string)$faq->InsertByName); ?></td>
-									<?php if($is_owner) { ?>
-										<td style="text-align:center;">
-											<div class="btn-group">
-												<a href="<?php echo base_url('Faq/Update?faq_id=') . (int)$faq->FAQID; ?>" class="btn btn-icon btn-light-warning btn-sm" data-toggle="tooltip" title="Edit FAQ">
+									<td style="text-align:center;">
+										<div class="btn-group">
+											<?php if(!empty($faq->Slug)) { ?>
+												<a href="<?php echo base_url('faq/' . rawurlencode($faq->Slug)); ?>" target="_blank" class="btn btn-icon btn-light-primary btn-sm" data-toggle="tooltip" title="Open FAQ page in new tab">
+													<i class="la la-external-link-alt"></i>
+												</a>
+											<?php } ?>
+											<?php if($is_owner) { ?>
+												<a href="<?php echo base_url('Faq/Update?faq_id=') . (int)$faq->FAQID; ?>" class="btn btn-icon btn-light-warning btn-sm ml-1" data-toggle="tooltip" title="Edit FAQ">
 													<i class="la la-edit"></i>
 												</a>
-												<button onclick="Delete_Record('<?php echo base_url('assets/image/sweetalert.jpg'); ?>', '<?php echo 'FAQ : ' . str_replace('\'', '', $faq->Title); ?>', '<?php echo base_url('Faq/Delete'); ?>', 'faq_id', <?php echo (int)$faq->FAQID; ?>, 'Y', '<?php if(strpos($current_url, '?') == true) { echo base_url('Faq?') . (explode('?', $current_url))[1]; } else { echo base_url('Faq'); } ?>')" class="btn btn-icon btn-light-danger btn-sm" data-toggle="tooltip" title="Delete FAQ" style="margin-left:4px;">
+												<button onclick="Delete_Record('<?php echo base_url('assets/image/sweetalert.jpg'); ?>', '<?php echo 'FAQ : ' . str_replace('\'', '', $faq->Title); ?>', '<?php echo base_url('Faq/Delete'); ?>', 'faq_id', <?php echo (int)$faq->FAQID; ?>, 'Y', '<?php if(strpos($current_url, '?') == true) { echo base_url('Faq?') . (explode('?', $current_url))[1]; } else { echo base_url('Faq'); } ?>')" class="btn btn-icon btn-light-danger btn-sm ml-1" data-toggle="tooltip" title="Delete FAQ">
 													<i class="la la-trash"></i>
 												</button>
-											</div>
-										</td>
-									<?php } ?>
+											<?php } ?>
+										</div>
+									</td>
 								</tr>
 								<?php $count++; ?>
 							<?php } } ?>
@@ -161,9 +180,26 @@
 </div>
 
 <script>
-	<?php if($this->input->get('title') !== null && $this->input->get('title') !== '' || ($this->input->get('type') !== null && $this->input->get('type') !== '')) { ?>
+	<?php if(trim((string)$this->input->get('title')) !== '' || trim((string)$this->input->get('type')) !== '' || trim((string)$this->input->get('tag')) !== '' || trim((string)$this->input->get('destination')) !== '') { ?>
 		$('#faq_header').click();
 	<?php } ?>
+
+	// Mirror each multi-select's chosen ids into its hidden input (CSV) so the
+	// GET form submits them under one named field, matching the model's parser.
+	var faq_multi_filters = ['tag', 'destination'];
+	function syncFaqMultiSelect(name) {
+		var $sel = $('#' + name + '_select');
+		var $hid = $('#' + name + '_hidden');
+		if(!$sel.length || !$hid.length) return;
+		var v = $sel.val();
+		$hid.val(v ? v.join(',') : '');
+	}
+	faq_multi_filters.forEach(function(name) {
+		$('#' + name + '_select').on('changed.bs.select', function() { syncFaqMultiSelect(name); });
+	});
+	$('#faq_filter_form').on('submit', function() {
+		faq_multi_filters.forEach(syncFaqMultiSelect);
+	});
 
 	$('#reset').click(function() { Reset('<?php echo base_url('Faq'); ?>'); });
 	$('[data-toggle="tooltip"]').tooltip();

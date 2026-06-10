@@ -97,10 +97,10 @@ $route['customer/(:any)'] = 'Customer_Portal/dashboard/$1';
 
 /*
 |--------------------------------------------------------------------------
-| FAQ display pages
+| FAQ per-FAQ page
 |--------------------------------------------------------------------------
-| External (customer-facing) is public at /faq/external. The internal page is
-| login-protected and served by Faq::Internal() at /Faq/Internal, so it can't
-| be reached by guessing a URL. Both render the same accordion view.
+| Each FAQ gets its own page at /faq/<slug>, served by Faq::Page() and
+| login-protected via MY_Controller. The admin actions live under capital-F
+| /Faq/... and are unaffected by this lowercase catch-all.
 */
-$route['faq/external'] = 'Faq_Display/external';
+$route['faq/(:any)'] = 'Faq/Page/$1';
