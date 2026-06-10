@@ -1,4 +1,4 @@
-<?php $is_owner = ((int)$this->session->level === 10); // only OWNER may create/edit/delete; others view only ?>
+<?php $can_edit = isset($can_edit) ? $can_edit : ((int)$this->session->level === 10); // OWNER or FAQ EDIT ACCESS (FE) may create/edit/delete; others view only ?>
 
 <div class="d-flex flex-column-fluid">
 	<div class="container-fluid">
@@ -21,7 +21,7 @@
 					</h3>
 				</div>
 				<div class="card-toolbar">
-					<?php if($is_owner) { ?>
+					<?php if($can_edit) { ?>
 						<a href="<?php echo base_url('Faq/Create'); ?>" class="btn btn-primary font-weight-bold ml-2" style="width:160px;">
 							<i class="la la-clipboard-list"></i>Create FAQ
 						</a>
@@ -135,7 +135,7 @@
 													<i class="la la-external-link-alt"></i>
 												</a>
 											<?php } ?>
-											<?php if($is_owner) { ?>
+											<?php if($can_edit) { ?>
 												<a href="<?php echo base_url('Faq/Update?faq_id=') . (int)$faq->FAQID; ?>" class="btn btn-icon btn-light-warning btn-sm ml-1" data-toggle="tooltip" title="Edit FAQ">
 													<i class="la la-edit"></i>
 												</a>

@@ -178,6 +178,7 @@ $is_dev_env = ($app_env !== 'prod');
 										<span class="menu-text">Admin</span>
 									</a>
 								</li>
+								<?php if($this->session->level == 10 || in_array('FV', (array)$this->session->access_control)) { ?>
 								<li class="menu-item menu-item-submenu <?php if($this->router->class == 'Faq' || $this->router->class == 'Faq_Tag') { echo 'menu-item-active menu-item-open'; } ?>">
 									<a href="javascript:;" class="menu-link menu-toggle">
 										<span class="svg-icon menu-icon">
@@ -215,6 +216,7 @@ $is_dev_env = ($app_env !== 'prod');
 										</ul>
 									</div>
 								</li>
+								<?php } ?>
 							<?php } ?>
 							<?php if(in_array('VB', $this->session->access_control)) { ?>
 								<li class="menu-item <?php if($this->router->class == 'Booking') { echo 'menu-item-active'; } ?>">

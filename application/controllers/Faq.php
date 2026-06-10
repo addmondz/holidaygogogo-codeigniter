@@ -11,6 +11,11 @@ class Faq extends MY_Controller
 
 	function index()
 	{
+		if(!$this->Can_View()) {
+			redirect(base_url('Dashboard'));
+			return;
+		}
+
 		// Self-healing backfill: stamp a slug onto any FAQ created before the
 		// per-FAQ page existed, so every listed row has a working page link.
 		// No-op (one cheap SELECT) once every row has a slug.
@@ -20,21 +25,30 @@ class Faq extends MY_Controller
 		$data['faqs'] = $this->Faq_Model->Read_Faqs();
 		$data['tags'] = $this->Faq_Tag_Model->Read_Active();
 		$data['destinations'] = $this->Faq_Model->Read_Destinations();
+		// Gates the Create / Edit / Delete controls in the listing view.
+		$data['can_edit'] = $this->Can_Edit();
 		$this->load->view('layout/header', $titles);
 		$this->load->view('faq/index', $data);
 		$this->load->view('layout/footer');
 	}
 
-	// OWNER (level 10) is the only role allowed to create/edit/delete FAQs.
-	// Everyone else has read-only access to the listing and the FAQ pages.
-	private function Is_Owner()
+	// Access-control gates. OWNER (level 10) always passes (bypass); every other
+	// role needs the matching code assigned on their admin record:
+	//   'FV' (FAQ VIEW ACCESS) to reach the listing and the per-FAQ pages,
+	//   'FE' (FAQ EDIT ACCESS) to create / edit / delete.
+	private function Can_View()
 	{
-		return (int)$this->session->level === 10;
+		return (int)$this->session->level === 10 || in_array('FV', (array)$this->session->access_control);
+	}
+
+	private function Can_Edit()
+	{
+		return (int)$this->session->level === 10 || in_array('FE', (array)$this->session->access_control);
 	}
 
 	function Create()
 	{
-		if(!$this->Is_Owner()) {
+		if(!$this->Can_Edit()) {
 			redirect(base_url('Faq'));
 			return;
 		}
@@ -64,7 +78,7 @@ class Faq extends MY_Controller
 
 	function Update()
 	{
-		if(!$this->Is_Owner()) {
+		if(!$this->Can_Edit()) {
 			redirect(base_url('Faq'));
 			return;
 		}
@@ -105,7 +119,7 @@ class Faq extends MY_Controller
 
 	function Delete()
 	{
-		if(!$this->Is_Owner()) {
+		if(!$this->Can_Edit()) {
 			return;
 		}
 		$this->Universal_Model->Delete('FAQID', $this->input->get('faq_id'), 'faq');
@@ -117,6 +131,10 @@ class Faq extends MY_Controller
 	// reachable; anything else (including external FAQs) 404s.
 	function Page($slug = '')
 	{
+		if(!$this->Can_View()) {
+			redirect(base_url('Dashboard'));
+			return;
+		}
 		$faq = $this->Faq_Model->Read_By_Slug($slug);
 		if($faq === null || $faq->Type !== 'internal') {
 			show_404();

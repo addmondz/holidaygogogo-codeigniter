@@ -72,6 +72,21 @@
 										<i class="la la-plus"></i>Add Sub Q&amp;A
 									</button>
 								</div>
+								<?php if(!empty($tags)) { ?>
+									<div class="form-group mb-3" id="faq-item-filter-wrap">
+										<label class="text-muted mb-1" style="font-size:12.5px;"><i class="la la-filter"></i> Filter sub Q&amp;A by tag</label>
+										<div class="d-flex align-items-center flex-wrap">
+											<!-- No name attribute: this control filters rows in the browser and never posts. -->
+											<select id="faq-item-filter" class="form-control selectpicker" multiple data-actions-box="true" data-live-search="true" data-live-search-style="contains" data-live-search-normalize="true" title="--SHOW ALL--" style="max-width:420px;">
+												<?php foreach($tags as $t) { ?>
+													<option data-icon="la la-tag font-size-lg bs-icon" value="<?php echo (int)$t->FAQTagID; ?>"><?php echo htmlspecialchars($t->Name); ?></option>
+												<?php } ?>
+											</select>
+											<span id="faq-item-filter-count" class="text-muted ml-3" style="font-size:12.5px;"></span>
+										</div>
+										<small class="form-text text-muted">A row matches if it carries any selected tag. Adding a sub Q&amp;A clears the filter.</small>
+									</div>
+								<?php } ?>
 								<div id="faq-items">
 									<?php foreach($items as $index => $item) { ?>
 										<div class="faq-item card mb-3" style="border:1px solid #e4e6ef;">
@@ -171,9 +186,61 @@
 
 <script>
 	(function () {
-		var list     = document.getElementById('faq-items');
-		var template = document.getElementById('faq-item-template');
-		var addBtn   = document.getElementById('faq-add-item');
+		var list       = document.getElementById('faq-items');
+		var template   = document.getElementById('faq-item-template');
+		var addBtn     = document.getElementById('faq-add-item');
+		var filterSel  = document.getElementById('faq-item-filter');
+		var filterNote = document.getElementById('faq-item-filter-count');
+
+		// Read selected values straight off the native <select>. selectedOptions is
+		// the source of truth bootstrap-select keeps in sync, so this works whether
+		// or not the picker widget has initialised — no dependence on $().val() state.
+		function selectedValues(sel) {
+			if (!sel) { return []; }
+			return Array.prototype.map.call(sel.selectedOptions, function (o) { return o.value; });
+		}
+
+		// Show/hide rows by the tag filter. A row is shown when it carries any of
+		// the selected tags; an empty filter shows everything. Pure client-side —
+		// it never touches what the form posts.
+		function applyFilter() {
+			if (!filterSel) { return; }
+			var selected = selectedValues(filterSel);
+			var items    = list.querySelectorAll('.faq-item');
+			if (!selected.length) {
+				items.forEach(function (item) { item.style.display = ''; });
+				if (filterNote) { filterNote.textContent = ''; }
+				return;
+			}
+			var shown = 0;
+			items.forEach(function (item) {
+				// Scope to the real <select>: bootstrap-select copies the element's
+				// classes onto its generated wrapper <div>, so a bare '.faq-item-tags'
+				// would match that div first (no .selectedOptions) and throw.
+				var tags  = selectedValues(item.querySelector('select.faq-item-tags'));
+				var match = tags.some(function (t) { return selected.indexOf(t) !== -1; });
+				item.style.display = match ? '' : 'none';
+				if (match) { shown++; }
+			});
+			if (filterNote) {
+				filterNote.textContent = 'Showing ' + shown + ' of ' + items.length;
+			}
+		}
+
+		function clearFilter() {
+			if (!filterSel) { return; }
+			Array.prototype.forEach.call(filterSel.options, function (o) { o.selected = false; });
+			if ($(filterSel).data('selectpicker')) { $(filterSel).selectpicker('refresh'); }
+			applyFilter();
+		}
+
+		if (filterSel) {
+			// Listen for both the selectpicker event and the native one so the
+			// filter works even if the picker widget never upgrades this control.
+			$(filterSel).on('changed.bs.select change', applyFilter);
+			// Re-run when a row's own tags change so the view stays consistent.
+			$(list).on('changed.bs.select change', 'select.faq-item-tags', applyFilter);
+		}
 
 		function renumber() {
 			var items = list.querySelectorAll('.faq-item');
@@ -183,7 +250,7 @@
 				// 0..n-1 in document order, aligned with the other parallel sub_*
 				// arrays (the hidden empty input shares the name so a tagless row
 				// still posts its key).
-				item.querySelectorAll('.faq-item-tags, .faq-item-tags-empty').forEach(function (el) {
+				item.querySelectorAll('select.faq-item-tags, .faq-item-tags-empty').forEach(function (el) {
 					el.name = 'sub_tags[' + i + '][]';
 				});
 			});
@@ -201,6 +268,9 @@
 			// The cloned <select> is inert until it's in the DOM, so init its
 			// searchable picker now (bootstrap-select guards against re-init).
 			$(node).find('.faq-item-tags').selectpicker();
+			// A new row has no tags yet, so an active filter would hide it. Clear
+			// the filter so the row the user just asked for is actually visible.
+			clearFilter();
 			node.querySelector('.faq-item-q').focus();
 		}
 
@@ -239,6 +309,7 @@
 			if (removeBtn) {
 				removeBtn.closest('.faq-item').remove();
 				renumber();
+				applyFilter();
 				return;
 			}
 			var copyBtn = e.target.closest('.faq-item-copy');
