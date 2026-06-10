@@ -16,7 +16,7 @@ class Booking_Supplier_Invoice_Model extends CI_Model
         $paid = supplier_invoice_paid_subquery_sql();
         $this->db->select(
             "bsi.SupplierInvoiceID, bsi.BookingID, bsi.SupplierID, bsi.InvoiceNumber,
-             bsi.InvoiceAmount, bsi.PaymentDeadline, bsi.Remark, bsi.Status,
+             bsi.InvoiceAmount, bsi.PaymentDeadline, bsi.Remark, bsi.InvoiceFilePath, bsi.Status,
              s.Name AS SupplierName,
              COALESCE(({$paid}), 0) AS PaidAmount,
              (bsi.InvoiceAmount - COALESCE(({$paid}), 0)) AS BalanceDue",
@@ -29,6 +29,17 @@ class Booking_Supplier_Invoice_Model extends CI_Model
         $this->db->order_by('bsi.PaymentDeadline', 'ASC');
         $this->db->order_by('bsi.SupplierInvoiceID', 'ASC');
         return $this->db->get()->result();
+    }
+
+    /**
+     * Single invoice row by id (all columns, regardless of Status). Used by the
+     * auth-gated attachment download/upload endpoints to resolve InvoiceFilePath
+     * and verify the row belongs to the expected booking.
+     */
+    function Get_By_Id($supplier_invoice_id)
+    {
+        $this->db->where('SupplierInvoiceID', (int) $supplier_invoice_id);
+        return $this->db->get('booking_supplier_invoice')->row();
     }
 
     /**
@@ -52,6 +63,7 @@ class Booking_Supplier_Invoice_Model extends CI_Model
                 'InvoiceAmount'   => isset($r->InvoiceAmount) ? $r->InvoiceAmount : 0,
                 'PaymentDeadline' => !empty($r->PaymentDeadline) ? $r->PaymentDeadline : null,
                 'Remark'          => isset($r->Remark) ? $r->Remark : null,
+                'InvoiceFilePath' => (isset($r->InvoiceFilePath) && $r->InvoiceFilePath !== '') ? $r->InvoiceFilePath : null,
                 'Status'          => 'Y',
                 'InsertBy'        => $admin_id,
                 'InsertDate'      => date('Y-m-d H:i:s'),
@@ -82,6 +94,8 @@ class Booking_Supplier_Invoice_Model extends CI_Model
             if (isset($r->InvoiceAmount))   { $row['InvoiceAmount']   = $r->InvoiceAmount; }
             if (isset($r->PaymentDeadline)) { $row['PaymentDeadline'] = !empty($r->PaymentDeadline) ? $r->PaymentDeadline : null; }
             if (isset($r->Remark))          { $row['Remark']          = $r->Remark; }
+            // property_exists (not isset) so an explicit empty/null clears the attachment.
+            if (property_exists($r, 'InvoiceFilePath')) { $row['InvoiceFilePath'] = ($r->InvoiceFilePath !== '' && $r->InvoiceFilePath !== null) ? $r->InvoiceFilePath : null; }
             if (isset($r->Status))          { $row['Status']          = $r->Status; }
             $row['UpdateBy']   = $admin_id;
             $row['UpdateDate'] = date('Y-m-d H:i:s');

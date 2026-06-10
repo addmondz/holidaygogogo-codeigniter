@@ -5190,6 +5190,143 @@ class Booking extends MY_Controller
 	}
 
 	/**
+	 * Upload an invoice document attached to a single supplier-invoice row.
+	 *
+	 * Multipart AJAX (the main booking save posts url-encoded JSON and cannot
+	 * carry files, so attachments upload immediately on file-select). Restricted
+	 * to the 'AB' (All Booking) code — the whole controller is already behind
+	 * admin login via MY_Controller, so customers can never reach this.
+	 *
+	 * Files are commercially sensitive (supplier cost) and are NEVER linked to
+	 * directly: they land in a deny-all-protected directory and are read back
+	 * only through Supplier_Invoice_File(). For an existing row the new path is
+	 * persisted immediately (and any previous file removed); for a brand-new row
+	 * the relative path is returned so the main save can persist it.
+	 */
+	function Upload_Supplier_Invoice_File()
+	{
+		$this->output->set_content_type('application/json');
+
+		if (!in_array('AB', $this->session->access_control)) {
+			$this->output->set_output(json_encode(['success' => false, 'message' => 'Access denied']));
+			return;
+		}
+		if (!$this->input->is_ajax_request()) {
+			$this->output->set_output(json_encode(['success' => false, 'message' => 'Invalid request']));
+			return;
+		}
+
+		$booking_id          = (int) $this->input->post('booking_id');
+		$supplier_invoice_id = (int) $this->input->post('supplier_invoice_id'); // 0 for an unsaved row
+		if (empty($booking_id)) {
+			$this->output->set_output(json_encode(['success' => false, 'message' => 'Booking ID is required']));
+			return;
+		}
+		if (empty($this->Booking_Model->find($booking_id))) {
+			$this->output->set_output(json_encode(['success' => false, 'message' => 'Booking not found']));
+			return;
+		}
+
+		$this->load->helper('supplier_invoice');
+
+		// Extension whitelist BEFORE handing off to the upload library — rejects
+		// scripts/executables and double-extension payloads up front.
+		$client_name = isset($_FILES['invoice_file']['name']) ? $_FILES['invoice_file']['name'] : '';
+		if ($client_name === '' || !supplier_invoice_is_allowed_file($client_name)) {
+			$this->output->set_output(json_encode([
+				'success' => false,
+				'message' => 'Unsupported file type. Allowed: PDF, JPG, PNG, DOC(X), XLS(X).'
+			]));
+			return;
+		}
+
+		$config = [
+			'upload_path'   => supplier_invoice_ensure_upload_dir(),
+			'allowed_types' => supplier_invoice_allowed_types(),
+			'max_size'      => 10240, // 10MB
+			'encrypt_name'  => true,
+		];
+		$this->load->library('upload', $config);
+
+		if (!$this->upload->do_upload('invoice_file')) {
+			$error = trim(strip_tags($this->upload->display_errors('', '')));
+			$this->output->set_output(json_encode(['success' => false, 'message' => 'Upload failed: ' . $error]));
+			return;
+		}
+
+		$upload_data = $this->upload->data();
+		$rel_path    = supplier_invoice_upload_reldir() . $upload_data['file_name'];
+
+		// Existing row: persist the path now and unlink the file it replaces.
+		if ($supplier_invoice_id) {
+			$existing = $this->Booking_Supplier_Invoice_Model->Get_By_Id($supplier_invoice_id);
+			if (!empty($existing) && (int) $existing->BookingID === $booking_id) {
+				if (!empty($existing->InvoiceFilePath) && is_file(FCPATH . $existing->InvoiceFilePath)) {
+					@unlink(FCPATH . $existing->InvoiceFilePath);
+				}
+				$this->Booking_Supplier_Invoice_Model->Update([
+					['SupplierInvoiceID' => $supplier_invoice_id, 'InvoiceFilePath' => $rel_path]
+				]);
+			} else {
+				// id didn't resolve to this booking — drop the orphan upload.
+				@unlink(FCPATH . $rel_path);
+				$this->output->set_output(json_encode(['success' => false, 'message' => 'Invoice not found']));
+				return;
+			}
+		}
+
+		$this->output->set_output(json_encode([
+			'success'    => true,
+			'message'    => 'File uploaded',
+			'file_path'  => $rel_path,                          // travels in the main save for unsaved rows
+			'file_name'  => $upload_data['orig_name'],
+			'view_url'   => $supplier_invoice_id
+				? base_url('Booking/Supplier_Invoice_File/' . $supplier_invoice_id)
+				: '',
+		]));
+	}
+
+	/**
+	 * Stream a supplier-invoice attachment to authorised staff only.
+	 *
+	 * Admin login is enforced controller-wide by MY_Controller; this further
+	 * restricts to the 'AB' code. The file is read from disk with readfile() —
+	 * it is never exposed at a public asset URL, and a realpath containment
+	 * check guarantees only files inside the invoice upload dir can be served
+	 * (defends against a tampered InvoiceFilePath / path traversal).
+	 */
+	function Supplier_Invoice_File($supplier_invoice_id = null)
+	{
+		if (!in_array('AB', $this->session->access_control)) {
+			show_error('Access denied', 403);
+			return;
+		}
+
+		$invoice = $this->Booking_Supplier_Invoice_Model->Get_By_Id((int) $supplier_invoice_id);
+		if (empty($invoice) || empty($invoice->InvoiceFilePath)) {
+			show_404();
+			return;
+		}
+
+		$this->load->helper('supplier_invoice');
+		$base = realpath(supplier_invoice_upload_dir());
+		$real = realpath(FCPATH . $invoice->InvoiceFilePath);
+		if ($real === false || $base === false || strpos($real, $base . DIRECTORY_SEPARATOR) !== 0) {
+			show_404();
+			return;
+		}
+
+		$download_name = 'invoice_' . $invoice->SupplierInvoiceID . '.' . strtolower(pathinfo($real, PATHINFO_EXTENSION));
+		header('Content-Type: ' . supplier_invoice_file_mime($real));
+		header('Content-Disposition: inline; filename="' . $download_name . '"');
+		header('Content-Length: ' . filesize($real));
+		header('X-Content-Type-Options: nosniff');
+		header('Cache-Control: private, max-age=0, no-cache');
+		readfile($real);
+		exit;
+	}
+
+	/**
 	 * Upload an inline image from the booking voucher TinyMCE editors.
 	 *
 	 * TinyMCE 5 posts the file as multipart field `file` to images_upload_url

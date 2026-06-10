@@ -1218,6 +1218,7 @@
                                             <th style="min-width:160px;">Remark</th>
                                             <th style="min-width:110px; text-align:right;">Paid (RM)</th>
                                             <th style="min-width:110px; text-align:right;">Balance (RM)</th>
+                                            <th style="min-width:110px; text-align:center;">Invoice File</th>
                                             <th style="width:50px; text-align:center;">&nbsp;</th>
                                         </tr>
                                     </thead>
@@ -1232,6 +1233,8 @@
                                                 data-initial-invoice-amount="<?php echo htmlspecialchars($inv->InvoiceAmount, ENT_QUOTES); ?>"
                                                 data-initial-payment-deadline="<?php echo htmlspecialchars((string)$inv->PaymentDeadline, ENT_QUOTES); ?>"
                                                 data-initial-remark="<?php echo htmlspecialchars((string)$inv->Remark, ENT_QUOTES); ?>"
+                                                data-file-path="<?php echo htmlspecialchars((string)$inv->InvoiceFilePath, ENT_QUOTES); ?>"
+                                                data-initial-file-path="<?php echo htmlspecialchars((string)$inv->InvoiceFilePath, ENT_QUOTES); ?>"
                                                 data-deleted="0">
                                                 <td>
                                                     <select class="supplier-invoice-supplier form-control form-control-sm">
@@ -1260,6 +1263,10 @@
                                                 </td>
                                                 <td style="text-align:right; vertical-align:middle; color:<?php echo ((float)$inv->BalanceDue > 0 ? '#C62828' : '#9E9E9E'); ?>;">
                                                     <strong><?php echo number_format((float)$inv->BalanceDue, 2, '.', ','); ?></strong>
+                                                </td>
+                                                <td class="supplier-invoice-file-cell" style="text-align:center; vertical-align:middle;">
+                                                    <input type="file" class="supplier-invoice-file-input" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx" style="display:none;">
+                                                    <span class="supplier-invoice-file-ui"></span>
                                                 </td>
                                                 <td style="text-align:center; vertical-align:middle;">
                                                     <button type="button" class="supplier-invoice-remove btn btn-danger btn-xs" data-toggle="tooltip" title="Remove invoice">
@@ -7096,7 +7103,7 @@ $(document).ready(function() {
         }
 
         function buildEmptyRowHtml() {
-            return '<tr class="supplier-invoice-row" data-supplier-invoice-id="" data-deleted="0">' +
+            return '<tr class="supplier-invoice-row" data-supplier-invoice-id="" data-file-path="" data-initial-file-path="" data-deleted="0">' +
                 '<td><select class="supplier-invoice-supplier form-control form-control-sm">' + supplierOptionsHtml + '</select></td>' +
                 '<td><input type="text" class="supplier-invoice-number form-control form-control-sm"></td>' +
                 '<td><input type="number" step="0.01" min="0" class="supplier-invoice-amount form-control form-control-sm" style="text-align:right;"></td>' +
@@ -7104,6 +7111,10 @@ $(document).ready(function() {
                 '<td><input type="text" class="supplier-invoice-remark form-control form-control-sm"></td>' +
                 '<td style="text-align:right; vertical-align:middle; color:#9E9E9E;">&mdash;</td>' +
                 '<td style="text-align:right; vertical-align:middle; color:#9E9E9E;">&mdash;</td>' +
+                '<td class="supplier-invoice-file-cell" style="text-align:center; vertical-align:middle;">' +
+                    '<input type="file" class="supplier-invoice-file-input" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx" style="display:none;">' +
+                    '<span class="supplier-invoice-file-ui"></span>' +
+                '</td>' +
                 '<td style="text-align:center; vertical-align:middle;">' +
                     '<button type="button" class="supplier-invoice-remove btn btn-danger btn-xs" data-toggle="tooltip" title="Remove invoice">' +
                         '<i class="la la-trash"></i>' +
@@ -7112,11 +7123,40 @@ $(document).ready(function() {
             '</tr>';
         }
 
+        // Invoice attachments are never linked to directly — the View action hits
+        // the auth-gated Booking/Supplier_Invoice_File/<id> endpoint.
+        var supplierInvoiceBaseUrl = '<?php echo base_url(); ?>';
+        var supplierInvoiceUploadUrl = '<?php echo base_url('Booking/Upload_Supplier_Invoice_File'); ?>';
+
+        // (Re)render the per-row file controls from the row's data-file-path.
+        function renderInvoiceFileUi($row) {
+            var id   = $row.data('supplier-invoice-id');
+            var path = $row.attr('data-file-path') || '';
+            var $ui  = $row.find('.supplier-invoice-file-ui');
+            var html;
+            if (path) {
+                html = '<div class="d-inline-flex align-items-center">';
+                if (id) {
+                    html += '<a href="' + supplierInvoiceBaseUrl + 'Booking/Supplier_Invoice_File/' + id + '" target="_blank" rel="noopener" class="btn btn-light-primary btn-xs mr-1 supplier-invoice-file-view" data-toggle="tooltip" title="View invoice file"><i class="la la-file-alt"></i></a>';
+                } else {
+                    html += '<span class="text-muted mr-1" style="font-size:0.75rem;" data-toggle="tooltip" title="Attached — save the booking to view">attached</span>';
+                }
+                html += '<button type="button" class="btn btn-light-warning btn-xs mr-1 supplier-invoice-file-attach" data-toggle="tooltip" title="Replace file"><i class="la la-sync-alt"></i></button>';
+                html += '<button type="button" class="btn btn-light-danger btn-xs supplier-invoice-file-remove" data-toggle="tooltip" title="Remove file"><i class="la la-times"></i></button>';
+                html += '</div>';
+            } else {
+                html = '<button type="button" class="btn btn-light-primary btn-xs supplier-invoice-file-attach" data-toggle="tooltip" title="Attach invoice file"><i class="la la-paperclip"></i></button>';
+            }
+            $ui.html(html);
+            $ui.find('[data-toggle="tooltip"]').tooltip();
+        }
+
         $('#add-supplier-invoice-btn').on('click', function() {
             $('#supplier-invoices-empty').remove();
             var $row = $(buildEmptyRowHtml());
             $('#supplier-invoices-tbody').append($row);
             initDeadlinePicker($row.find('.supplier-invoice-deadline'));
+            renderInvoiceFileUi($row);
             $row.find('[data-toggle="tooltip"]').tooltip();
         });
 
@@ -7129,9 +7169,62 @@ $(document).ready(function() {
             }
         });
 
-        // Activate datepicker on any server-rendered rows.
-        $('#supplier-invoices-tbody .supplier-invoice-deadline').each(function() {
-            initDeadlinePicker($(this));
+        // Attach / Replace -> open the row's hidden file picker.
+        $('#supplier-invoices-tbody').on('click', '.supplier-invoice-file-attach', function() {
+            $(this).closest('tr').find('.supplier-invoice-file-input').trigger('click');
+        });
+
+        // Remove -> clear the attachment. For a saved row the empty path is sent
+        // on the next booking save and the controller nulls InvoiceFilePath.
+        $('#supplier-invoices-tbody').on('click', '.supplier-invoice-file-remove', function() {
+            var $row = $(this).closest('tr');
+            $row.attr('data-file-path', '');
+            renderInvoiceFileUi($row);
+        });
+
+        // File chosen -> upload immediately (the main save posts url-encoded JSON
+        // and cannot carry files).
+        $('#supplier-invoices-tbody').on('change', '.supplier-invoice-file-input', function() {
+            var input = this;
+            if (!input.files || !input.files.length) { return; }
+            var $row = $(input).closest('tr');
+            var $attachBtn = $row.find('.supplier-invoice-file-attach');
+            var fd = new FormData();
+            fd.append('booking_id', $('#upload_booking_id').val() || '<?php echo isset($BookingID) ? (int)$BookingID : ''; ?>');
+            fd.append('supplier_invoice_id', $row.data('supplier-invoice-id') || 0);
+            fd.append('invoice_file', input.files[0]);
+
+            $attachBtn.prop('disabled', true).html('<i class="la la-spinner la-spin"></i>');
+            $.ajax({
+                url: supplierInvoiceUploadUrl,
+                type: 'post',
+                data: fd,
+                processData: false,
+                contentType: false,
+                dataType: 'json',
+                success: function(res) {
+                    if (res && res.success) {
+                        $row.attr('data-file-path', res.file_path);
+                        renderInvoiceFileUi($row);
+                    } else {
+                        alert((res && res.message) ? res.message : 'Upload failed');
+                        renderInvoiceFileUi($row);
+                    }
+                },
+                error: function() {
+                    alert('Upload failed. Please try again.');
+                    renderInvoiceFileUi($row);
+                },
+                complete: function() {
+                    input.value = ''; // allow re-selecting the same file
+                }
+            });
+        });
+
+        // Activate datepicker + file controls on any server-rendered rows.
+        $('#supplier-invoices-tbody tr.supplier-invoice-row').each(function() {
+            initDeadlinePicker($(this).find('.supplier-invoice-deadline'));
+            renderInvoiceFileUi($(this));
         });
         $('#supplier-invoices-tbody [data-toggle="tooltip"]').tooltip();
     })();
@@ -7164,9 +7257,10 @@ $(document).ready(function() {
             var invoice_amount = $row.find('.supplier-invoice-amount').val();
             var deadline_disp  = $row.find('.supplier-invoice-deadline').val();
             var remark         = $row.find('.supplier-invoice-remark').val() || '';
+            var file_path      = $row.attr('data-file-path') || '';
 
-            // Skip blank new rows (everything empty).
-            if (!existingId && !supplier_id && !invoice_number && !invoice_amount && !deadline_disp && !remark) {
+            // Skip blank new rows (everything empty, including no attachment).
+            if (!existingId && !supplier_id && !invoice_number && !invoice_amount && !deadline_disp && !remark && !file_path) {
                 return;
             }
 
@@ -7175,7 +7269,8 @@ $(document).ready(function() {
                 InvoiceNumber: invoice_number,
                 InvoiceAmount: invoice_amount === '' ? 0 : parseFloat(invoice_amount),
                 PaymentDeadline: _supplierInvoiceFormatDeadline(deadline_disp),
-                Remark: remark
+                Remark: remark,
+                InvoiceFilePath: file_path
             };
 
             if (existingId) {
@@ -7185,12 +7280,14 @@ $(document).ready(function() {
                 var initialAmount   = String($row.data('initial-invoice-amount') || '');
                 var initialDeadline = String($row.data('initial-payment-deadline') || '');
                 var initialRemark   = String($row.data('initial-remark') || '');
+                var initialFile     = String($row.attr('data-initial-file-path') || '');
                 var changed =
                     String(payload.SupplierID || '')      !== initialSupplier
                     || String(payload.InvoiceNumber)      !== initialNumber
                     || String(payload.InvoiceAmount)      !== String(initialAmount === '' ? 0 : parseFloat(initialAmount))
                     || String(payload.PaymentDeadline || '') !== initialDeadline
-                    || String(payload.Remark)             !== initialRemark;
+                    || String(payload.Remark)             !== initialRemark
+                    || String(file_path)                  !== initialFile;
                 if (changed) {
                     updateRows.push(payload);
                 }
