@@ -72,21 +72,35 @@
 										<i class="la la-plus"></i>Add Sub Q&amp;A
 									</button>
 								</div>
-								<?php if(!empty($tags)) { ?>
-									<div class="form-group mb-3" id="faq-item-filter-wrap">
-										<label class="text-muted mb-1" style="font-size:12.5px;"><i class="la la-filter"></i> Filter sub Q&amp;A by tag</label>
-										<div class="d-flex align-items-center flex-wrap">
-											<!-- No name attribute: this control filters rows in the browser and never posts. -->
-											<select id="faq-item-filter" class="form-control selectpicker" multiple data-actions-box="true" data-live-search="true" data-live-search-style="contains" data-live-search-normalize="true" title="--SHOW ALL--" style="max-width:420px;">
-												<?php foreach($tags as $t) { ?>
-													<option data-icon="la la-tag font-size-lg bs-icon" value="<?php echo (int)$t->FAQTagID; ?>"><?php echo htmlspecialchars($t->Name); ?></option>
-												<?php } ?>
-											</select>
-											<span id="faq-item-filter-count" class="text-muted ml-3" style="font-size:12.5px;"></span>
+								<div class="row" id="faq-item-filter-row">
+									<div class="<?php echo empty($tags) ? 'col-md-12' : 'col-md-6'; ?>">
+										<div class="form-group mb-3" id="faq-item-search-wrap">
+											<label class="text-muted mb-1" style="font-size:12.5px;"><i class="la la-search"></i> Search sub Q&amp;A</label>
+											<div class="d-flex align-items-center flex-wrap">
+												<!-- No name attribute: this control filters rows in the browser and never posts. -->
+												<input type="text" id="faq-item-search" class="form-control" placeholder="Search sub-question or sub-answer…" autocomplete="off" style="max-width:420px;">
+												<span id="faq-item-filter-count" class="text-muted ml-3" style="font-size:12.5px;"></span>
+											</div>
+											<small class="form-text text-muted">Matches sub-question or sub-answer text, and combines with the tag filter. Adding a sub Q&amp;A clears the search.</small>
 										</div>
-										<small class="form-text text-muted">A row matches if it carries any selected tag. Adding a sub Q&amp;A clears the filter.</small>
 									</div>
-								<?php } ?>
+									<?php if(!empty($tags)) { ?>
+										<div class="col-md-6">
+											<div class="form-group mb-3" id="faq-item-filter-wrap">
+												<label class="text-muted mb-1" style="font-size:12.5px;"><i class="la la-filter"></i> Filter sub Q&amp;A by tag</label>
+												<div class="d-flex align-items-center flex-wrap">
+													<!-- No name attribute: this control filters rows in the browser and never posts. -->
+													<select id="faq-item-filter" class="form-control selectpicker" multiple data-actions-box="true" data-live-search="true" data-live-search-style="contains" data-live-search-normalize="true" title="--SHOW ALL--" style="max-width:420px;">
+														<?php foreach($tags as $t) { ?>
+															<option data-icon="la la-tag font-size-lg bs-icon" value="<?php echo (int)$t->FAQTagID; ?>"><?php echo htmlspecialchars($t->Name); ?></option>
+														<?php } ?>
+													</select>
+												</div>
+												<small class="form-text text-muted">A row matches if it carries any selected tag. Adding a sub Q&amp;A clears the filter.</small>
+											</div>
+										</div>
+									<?php } ?>
+								</div>
 								<div id="faq-items">
 									<?php foreach($items as $index => $item) { ?>
 										<div class="faq-item card mb-3" style="border:1px solid #e4e6ef;">
@@ -188,9 +202,10 @@
 	(function () {
 		var list       = document.getElementById('faq-items');
 		var template   = document.getElementById('faq-item-template');
-		var addBtn     = document.getElementById('faq-add-item');
-		var filterSel  = document.getElementById('faq-item-filter');
-		var filterNote = document.getElementById('faq-item-filter-count');
+		var addBtn      = document.getElementById('faq-add-item');
+		var filterSel   = document.getElementById('faq-item-filter');
+		var searchInput = document.getElementById('faq-item-search');
+		var filterNote  = document.getElementById('faq-item-filter-count');
 
 		// Read selected values straight off the native <select>. selectedOptions is
 		// the source of truth bootstrap-select keeps in sync, so this works whether
@@ -200,25 +215,36 @@
 			return Array.prototype.map.call(sel.selectedOptions, function (o) { return o.value; });
 		}
 
-		// Show/hide rows by the tag filter. A row is shown when it carries any of
-		// the selected tags; an empty filter shows everything. Pure client-side —
-		// it never touches what the form posts.
+		// Show/hide rows by the text search and tag filter combined. A row is shown
+		// when it matches the search text AND carries any selected tag; an empty
+		// search/filter shows everything. Pure client-side — it never touches what
+		// the form posts.
 		function applyFilter() {
-			if (!filterSel) { return; }
-			var selected = selectedValues(filterSel);
+			var selected = filterSel ? selectedValues(filterSel) : [];
+			var query    = searchInput ? searchInput.value.trim().toLowerCase() : '';
 			var items    = list.querySelectorAll('.faq-item');
-			if (!selected.length) {
+			if (!selected.length && !query) {
 				items.forEach(function (item) { item.style.display = ''; });
 				if (filterNote) { filterNote.textContent = ''; }
 				return;
 			}
 			var shown = 0;
 			items.forEach(function (item) {
-				// Scope to the real <select>: bootstrap-select copies the element's
-				// classes onto its generated wrapper <div>, so a bare '.faq-item-tags'
-				// would match that div first (no .selectedOptions) and throw.
-				var tags  = selectedValues(item.querySelector('select.faq-item-tags'));
-				var match = tags.some(function (t) { return selected.indexOf(t) !== -1; });
+				var tagMatch = true;
+				if (selected.length) {
+					// Scope to the real <select>: bootstrap-select copies the element's
+					// classes onto its generated wrapper <div>, so a bare '.faq-item-tags'
+					// would match that div first (no .selectedOptions) and throw.
+					var tags = selectedValues(item.querySelector('select.faq-item-tags'));
+					tagMatch = tags.some(function (t) { return selected.indexOf(t) !== -1; });
+				}
+				var textMatch = true;
+				if (query) {
+					var q = (item.querySelector('.faq-item-q').value || '').toLowerCase();
+					var a = (item.querySelector('.faq-item-a').value || '').toLowerCase();
+					textMatch = (q.indexOf(query) !== -1) || (a.indexOf(query) !== -1);
+				}
+				var match = tagMatch && textMatch;
 				item.style.display = match ? '' : 'none';
 				if (match) { shown++; }
 			});
@@ -228,10 +254,16 @@
 		}
 
 		function clearFilter() {
-			if (!filterSel) { return; }
-			Array.prototype.forEach.call(filterSel.options, function (o) { o.selected = false; });
-			if ($(filterSel).data('selectpicker')) { $(filterSel).selectpicker('refresh'); }
+			if (searchInput) { searchInput.value = ''; }
+			if (filterSel) {
+				Array.prototype.forEach.call(filterSel.options, function (o) { o.selected = false; });
+				if ($(filterSel).data('selectpicker')) { $(filterSel).selectpicker('refresh'); }
+			}
 			applyFilter();
+		}
+
+		if (searchInput) {
+			searchInput.addEventListener('input', applyFilter);
 		}
 
 		if (filterSel) {

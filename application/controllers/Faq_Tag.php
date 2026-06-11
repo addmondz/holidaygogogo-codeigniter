@@ -10,15 +10,40 @@ class Faq_Tag extends MY_Controller
 
 	function index()
 	{
+		if(!$this->Can_View()) {
+			redirect(base_url('Dashboard'));
+			return;
+		}
+
 		$titles = array('tab_title' => 'HolidayGoGoGo | FAQ Tag', 'breadcrumb_title' => 'FAQ Tag');
 		$data['tags'] = $this->Faq_Tag_Model->Read_Faq_Tags();
+		// Gates the Create / Edit / Delete controls in the listing view.
+		$data['can_edit'] = $this->Can_Edit();
 		$this->load->view('layout/header', $titles);
 		$this->load->view('faq_tag/index', $data);
 		$this->load->view('layout/footer');
 	}
 
+	// Access-control gates. OWNER (level 10) always passes (bypass); every other
+	// role needs the matching code assigned on their admin record:
+	//   'TV' (FAQ TAG VIEW ACCESS) to reach the listing,
+	//   'TE' (FAQ TAG EDIT ACCESS) to create / edit / delete.
+	private function Can_View()
+	{
+		return (int)$this->session->level === 10 || in_array('TV', (array)$this->session->access_control);
+	}
+
+	private function Can_Edit()
+	{
+		return (int)$this->session->level === 10 || in_array('TE', (array)$this->session->access_control);
+	}
+
 	function Create()
 	{
+		if(!$this->Can_Edit()) {
+			redirect(base_url('Faq_Tag'));
+			return;
+		}
 		if($this->input->post()) {
 			$error = $this->Save_From_Post(null);
 			if($error !== true) {
@@ -41,6 +66,10 @@ class Faq_Tag extends MY_Controller
 
 	function Update()
 	{
+		if(!$this->Can_Edit()) {
+			redirect(base_url('Faq_Tag'));
+			return;
+		}
 		$id = (int)$this->input->get('faq_tag_id');
 		if($this->input->post()) {
 			$post_id = (int)$this->input->post('faq_tag_id');
@@ -74,6 +103,10 @@ class Faq_Tag extends MY_Controller
 
 	function Delete()
 	{
+		if(!$this->Can_Edit()) {
+			redirect(base_url('Faq_Tag'));
+			return;
+		}
 		$this->Universal_Model->Delete('FAQTagID', $this->input->get('faq_tag_id'), 'faq_tag');
 	}
 

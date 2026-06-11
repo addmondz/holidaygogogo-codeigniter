@@ -160,6 +160,7 @@
                                         <?php if($key == 'GB') { ?><optgroup label="BOOKING MODULE"><?php } ?>
                                         <?php if($key == 'GP') { ?><optgroup label="PAYMENT MODULE"><?php } ?>
                                         <?php if($key == 'VR') { ?><optgroup label="REPORT MODULE"><?php } ?>
+                                        <?php if($key == 'FV') { ?><optgroup label="FAQ MODULE"><?php } ?>
                                         <option <?php if($Action == 'U' && in_array($key, $AccessControl)) { echo 'selected'; } ?> data-icon="la la-check-circle font-size-lg bs-icon" value="<?php echo $key; ?>"><?php echo $value; ?></option>
                                     <?php } ?>
                                 </select>

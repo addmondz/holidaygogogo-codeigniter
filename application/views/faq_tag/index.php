@@ -1,3 +1,4 @@
+<?php $can_edit = isset($can_edit) ? $can_edit : ((int)$this->session->level === 10); // OWNER or FAQ TAG EDIT ACCESS (TE) may create/edit/delete; others view only ?>
 <div class="d-flex flex-column-fluid">
 	<div class="container-fluid">
 		<?php if($this->session->flashdata('faq_tag_success')) { ?>
@@ -19,9 +20,11 @@
 					</h3>
 				</div>
 				<div class="card-toolbar">
-					<a href="<?php echo base_url('Faq_Tag/Create'); ?>" class="btn btn-primary font-weight-bold" style="width:170px;">
-						<i class="la la-tag"></i>Create FAQ Tag
-					</a>
+					<?php if($can_edit) { ?>
+						<a href="<?php echo base_url('Faq_Tag/Create'); ?>" class="btn btn-primary font-weight-bold" style="width:170px;">
+							<i class="la la-tag"></i>Create FAQ Tag
+						</a>
+					<?php } ?>
 					<?php $current_url = base_url($_SERVER['REQUEST_URI']); ?>
 				</div>
 			</div>
@@ -73,12 +76,16 @@
 									<td style="text-align:center;"><?php echo htmlspecialchars((string)$tag->InsertByName); ?></td>
 									<td style="text-align:center;">
 										<div class="btn-group">
-											<a href="<?php echo base_url('Faq_Tag/Update?faq_tag_id=') . (int)$tag->FAQTagID; ?>" class="btn btn-icon btn-light-warning btn-sm" data-toggle="tooltip" title="Edit FAQ Tag">
-												<i class="la la-edit"></i>
-											</a>
-											<button onclick="Delete_Record('<?php echo base_url('assets/image/sweetalert.jpg'); ?>', '<?php echo 'FAQ Tag : ' . str_replace('\'', '', $tag->Name); ?>', '<?php echo base_url('Faq_Tag/Delete'); ?>', 'faq_tag_id', <?php echo (int)$tag->FAQTagID; ?>, 'Y', '<?php if(strpos($current_url, '?') == true) { echo base_url('Faq_Tag?') . (explode('?', $current_url))[1]; } else { echo base_url('Faq_Tag'); } ?>')" class="btn btn-icon btn-light-danger btn-sm" data-toggle="tooltip" title="Delete FAQ Tag" style="margin-left:4px;">
-												<i class="la la-trash"></i>
-											</button>
+											<?php if($can_edit) { ?>
+												<a href="<?php echo base_url('Faq_Tag/Update?faq_tag_id=') . (int)$tag->FAQTagID; ?>" class="btn btn-icon btn-light-warning btn-sm" data-toggle="tooltip" title="Edit FAQ Tag">
+													<i class="la la-edit"></i>
+												</a>
+												<button onclick="Delete_Record('<?php echo base_url('assets/image/sweetalert.jpg'); ?>', '<?php echo 'FAQ Tag : ' . str_replace('\'', '', $tag->Name); ?>', '<?php echo base_url('Faq_Tag/Delete'); ?>', 'faq_tag_id', <?php echo (int)$tag->FAQTagID; ?>, 'Y', '<?php if(strpos($current_url, '?') == true) { echo base_url('Faq_Tag?') . (explode('?', $current_url))[1]; } else { echo base_url('Faq_Tag'); } ?>')" class="btn btn-icon btn-light-danger btn-sm" data-toggle="tooltip" title="Delete FAQ Tag" style="margin-left:4px;">
+													<i class="la la-trash"></i>
+												</button>
+											<?php } else { ?>
+												<span class="text-muted">&mdash;</span>
+											<?php } ?>
 										</div>
 									</td>
 								</tr>
