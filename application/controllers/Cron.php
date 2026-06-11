@@ -6,6 +6,8 @@ use PhpOffice\PhpSpreadsheet\Writer\Xlxs;
 
 class Cron extends CI_Controller
 {
+	const GHL_LEAD_INACTIVITY_SPLIT_DAYS = 90;
+
 	public $allowGhlModuleSync = true;
 	public $allowGhlModuleLog = true;
 	public $allowConvertionProcessing = true;
@@ -909,8 +911,8 @@ class Cron extends CI_Controller
 						$leadAssignmentRows = isset($assignmentHistoryMap[(string) $lead['conversation_id']])
 							? $assignmentHistoryMap[(string) $lead['conversation_id']]
 							: array();
-						$assignedAt = $this->Ghl_Lead_Ownership_Model->resolve_assigned_at_for_lead($lead, $leadAssignmentRows);
-						$leadOwnershipRows = ghl_build_lead_ownership_rows($lead, $leadReplyOwners, $calculatedAt, $assignedAt);
+						$assignmentOwners = $this->Ghl_Lead_Ownership_Model->resolve_assignment_owners_for_lead($lead, $leadAssignmentRows);
+						$leadOwnershipRows = ghl_build_lead_ownership_rows($lead, $leadReplyOwners, $calculatedAt, $assignmentOwners);
 						$ownershipRows = array_merge($ownershipRows, $leadOwnershipRows);
 					}
 
@@ -1070,6 +1072,7 @@ class Cron extends CI_Controller
 		$leads = array();
 		$currentLead = null;
 		$fallbackContactId = null;
+		$lastMessageTimestamp = null;
 		$now = date('Y-m-d H:i:s');
 
 		foreach ($messages as $message) {
@@ -1084,7 +1087,13 @@ class Cron extends CI_Controller
 			}
 
 			if ($message['direction'] === 'inbound') {
-				$startsNewLead = ($currentLead === null);
+				$startsNewLead = ($currentLead === null)
+					|| $this->should_start_new_ghl_processed_lead(
+						$currentLead,
+						$existingConversions,
+						$lastMessageTimestamp,
+						$messageTimestamp
+					);
 
 				if ($startsNewLead) {
 					if ($currentLead !== null) {
@@ -1189,6 +1198,8 @@ class Cron extends CI_Controller
 					}
 				}
 			}
+
+			$lastMessageTimestamp = $messageTimestamp;
 		}
 
 		if ($currentLead !== null) {
@@ -1220,6 +1231,27 @@ class Cron extends CI_Controller
 		}
 
 		return count($leads);
+	}
+
+	private function should_start_new_ghl_processed_lead($currentLead, $existingConversions, $lastMessageTimestamp, $messageTimestamp)
+	{
+		if ($currentLead === null) {
+			return false;
+		}
+
+		$conversionKey = $currentLead['lead_started_at'] . '|' . $currentLead['first_customer_message_id'];
+		if (!empty($existingConversions[$conversionKey]['converted_at'])) {
+			$convertedAt = strtotime((string) $existingConversions[$conversionKey]['converted_at']);
+			if ($convertedAt !== false && $messageTimestamp > $convertedAt) {
+				return true;
+			}
+		}
+
+		if ($lastMessageTimestamp === null || $messageTimestamp < $lastMessageTimestamp) {
+			return false;
+		}
+
+		return ($messageTimestamp - $lastMessageTimestamp) >= (self::GHL_LEAD_INACTIVITY_SPLIT_DAYS * 86400);
 	}
 
 	private function finalize_ghl_processed_lead(&$lead)

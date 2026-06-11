@@ -56,6 +56,23 @@ assert_eq('second reply owner is credited', 'agent_b', $rows[1]['owner_user_id']
 assert_eq('second reply owner is not assigned owner', 0, $rows[1]['is_assigned_owner']);
 assert_eq('second reply owner reply flag', 1, $rows[1]['is_reply_owner']);
 
+$reassignedRows = ghl_build_lead_ownership_rows(
+    array_merge($lead, array('assigned_to_user_id' => 'agent_b')),
+    array(),
+    '2026-06-03 12:00:00',
+    array(
+        array('owner_user_id' => 'agent_a', 'assigned_at' => '2026-06-02 17:45:00'),
+        array('owner_user_id' => 'agent_b', 'assigned_at' => '2026-06-03 09:00:00'),
+    )
+);
+
+assert_eq('reassigned lead keeps first assignee', 2, count($reassignedRows));
+assert_eq('first assignee owner id', 'agent_a', $reassignedRows[0]['owner_user_id']);
+assert_eq('first assignee is assigned owner', 1, $reassignedRows[0]['is_assigned_owner']);
+assert_eq('first assignee assigned_at retained', '2026-06-02 17:45:00', $reassignedRows[0]['assigned_at']);
+assert_eq('current assignee owner id', 'agent_b', $reassignedRows[1]['owner_user_id']);
+assert_eq('current assigned_to_user_id retained on first row', 'agent_b', $reassignedRows[0]['assigned_to_user_id']);
+
 $unassignedRows = ghl_build_lead_ownership_rows(
     array_merge($lead, array('id' => 11, 'assigned_to_user_id' => '')),
     array(array('owner_user_id' => 'agent_c', 'outbound_reply_count' => 5)),

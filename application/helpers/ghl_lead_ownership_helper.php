@@ -2,18 +2,53 @@
 defined('BASEPATH') or exit('No direct script access allowed');
 
 if (!function_exists('ghl_build_lead_ownership_rows')) {
-    function ghl_build_lead_ownership_rows(array $lead, array $replyOwners, $calculatedAt, $assignedAt = null)
+    function ghl_build_lead_ownership_rows(array $lead, array $replyOwners, $calculatedAt, $assignmentOwners = array())
     {
         $owners = array();
         $assignedTo = isset($lead['assigned_to_user_id']) ? trim((string) $lead['assigned_to_user_id']) : '';
 
-        if ($assignedTo !== '') {
-            $owners[$assignedTo] = array(
+        if (!is_array($assignmentOwners)) {
+            $assignmentOwners = array();
+        }
+
+        if (empty($assignmentOwners) && $assignedTo !== '') {
+            $assignmentOwners[] = array(
                 'owner_user_id' => $assignedTo,
-                'is_assigned_owner' => 1,
-                'is_reply_owner' => 0,
-                'outbound_reply_count' => 0,
+                'assigned_at' => null,
             );
+        }
+
+        foreach ($assignmentOwners as $assignmentOwner) {
+            $ownerUserId = isset($assignmentOwner['owner_user_id'])
+                ? trim((string) $assignmentOwner['owner_user_id'])
+                : (isset($assignmentOwner['user_id']) ? trim((string) $assignmentOwner['user_id']) : '');
+
+            if ($ownerUserId === '') {
+                continue;
+            }
+
+            if (!isset($owners[$ownerUserId])) {
+                $owners[$ownerUserId] = array(
+                    'owner_user_id' => $ownerUserId,
+                    'assigned_at' => null,
+                    'is_assigned_owner' => 0,
+                    'is_reply_owner' => 0,
+                    'outbound_reply_count' => 0,
+                );
+            }
+
+            $owners[$ownerUserId]['is_assigned_owner'] = 1;
+            if (!empty($assignmentOwner['assigned_at'])) {
+                $existingAssignedAt = !empty($owners[$ownerUserId]['assigned_at'])
+                    ? strtotime($owners[$ownerUserId]['assigned_at'])
+                    : null;
+                $candidateAssignedAt = strtotime((string) $assignmentOwner['assigned_at']);
+
+                if ($candidateAssignedAt !== false
+                    && ($existingAssignedAt === null || $candidateAssignedAt > $existingAssignedAt)) {
+                    $owners[$ownerUserId]['assigned_at'] = (string) $assignmentOwner['assigned_at'];
+                }
+            }
         }
 
         foreach ($replyOwners as $replyOwner) {
@@ -32,6 +67,7 @@ if (!function_exists('ghl_build_lead_ownership_rows')) {
             if (!isset($owners[$ownerUserId])) {
                 $owners[$ownerUserId] = array(
                     'owner_user_id' => $ownerUserId,
+                    'assigned_at' => null,
                     'is_assigned_owner' => 0,
                     'is_reply_owner' => 0,
                     'outbound_reply_count' => 0,
@@ -55,7 +91,7 @@ if (!function_exists('ghl_build_lead_ownership_rows')) {
                 'lead_ended_at' => !empty($lead['lead_ended_at']) ? (string) $lead['lead_ended_at'] : null,
                 'owner_user_id' => $owner['owner_user_id'],
                 'assigned_to_user_id' => $assignedTo !== '' ? $assignedTo : null,
-                'assigned_at' => ((int) $owner['is_assigned_owner'] === 1 && !empty($assignedAt)) ? (string) $assignedAt : null,
+                'assigned_at' => ((int) $owner['is_assigned_owner'] === 1 && !empty($owner['assigned_at'])) ? (string) $owner['assigned_at'] : null,
                 'is_assigned_owner' => (int) $owner['is_assigned_owner'],
                 'is_reply_owner' => (int) $owner['is_reply_owner'],
                 'outbound_reply_count' => (int) $owner['outbound_reply_count'],

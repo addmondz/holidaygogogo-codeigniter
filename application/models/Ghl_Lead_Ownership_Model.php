@@ -193,24 +193,23 @@ class Ghl_Lead_Ownership_Model extends CI_Model
         return $map;
     }
 
-    public function resolve_assigned_at_for_lead($lead, $assignmentRows)
+    public function resolve_assignment_owners_for_lead($lead, $assignmentRows)
     {
         $assignedTo = isset($lead['assigned_to_user_id']) ? trim((string) $lead['assigned_to_user_id']) : '';
-        if ($assignedTo === '') {
-            return null;
-        }
-
         $leadStart = !empty($lead['lead_started_at']) ? strtotime($lead['lead_started_at']) : false;
         if ($leadStart === false) {
-            return null;
+            return $assignedTo !== '' ? array(array(
+                'owner_user_id' => $assignedTo,
+                'assigned_at' => null,
+            )) : array();
         }
 
         $leadEnd = !empty($lead['lead_ended_at']) ? strtotime($lead['lead_ended_at']) : null;
-        $bestAssignedAt = null;
-        $bestAssignedTs = null;
+        $owners = array();
 
         foreach ((array) $assignmentRows as $row) {
-            if (!isset($row['owner_user_id']) || (string) $row['owner_user_id'] !== $assignedTo) {
+            $ownerUserId = isset($row['owner_user_id']) ? trim((string) $row['owner_user_id']) : '';
+            if ($ownerUserId === '') {
                 continue;
             }
 
@@ -227,13 +226,55 @@ class Ghl_Lead_Ownership_Model extends CI_Model
                 continue;
             }
 
-            if ($bestAssignedTs === null || $assignedTs > $bestAssignedTs) {
-                $bestAssignedTs = $assignedTs;
-                $bestAssignedAt = $row['assigned_at'];
+            if (!isset($owners[$ownerUserId])) {
+                $owners[$ownerUserId] = array(
+                    'owner_user_id' => $ownerUserId,
+                    'assigned_at' => $row['assigned_at'],
+                    '_assigned_ts' => $assignedTs,
+                );
+                continue;
+            }
+
+            if ($assignedTs > (int) $owners[$ownerUserId]['_assigned_ts']) {
+                $owners[$ownerUserId]['assigned_at'] = $row['assigned_at'];
+                $owners[$ownerUserId]['_assigned_ts'] = $assignedTs;
             }
         }
 
-        return $bestAssignedAt;
+        if ($assignedTo !== '' && !isset($owners[$assignedTo])) {
+            $owners[$assignedTo] = array(
+                'owner_user_id' => $assignedTo,
+                'assigned_at' => null,
+                '_assigned_ts' => 0,
+            );
+        }
+
+        foreach ($owners as &$owner) {
+            unset($owner['_assigned_ts']);
+        }
+        unset($owner);
+
+        uasort($owners, function($a, $b) {
+            return strcmp($a['owner_user_id'], $b['owner_user_id']);
+        });
+
+        return array_values($owners);
+    }
+
+    public function resolve_assigned_at_for_lead($lead, $assignmentRows)
+    {
+        $assignedTo = isset($lead['assigned_to_user_id']) ? trim((string) $lead['assigned_to_user_id']) : '';
+        if ($assignedTo === '') {
+            return null;
+        }
+
+        foreach ($this->resolve_assignment_owners_for_lead($lead, $assignmentRows) as $owner) {
+            if ((string) $owner['owner_user_id'] === $assignedTo) {
+                return !empty($owner['assigned_at']) ? $owner['assigned_at'] : null;
+            }
+        }
+
+        return null;
     }
 
     public function replace_ownership_for_leads($leadIds, $ownershipRows)
