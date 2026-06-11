@@ -21,6 +21,9 @@
 					</h3>
 				</div>
 				<div class="card-toolbar">
+					<a href="<?php echo base_url('Faq/Internal'); ?>" target="_blank" rel="noopener" class="btn btn-light-primary font-weight-bold" data-toggle="tooltip" title="Open every FAQ together on one page">
+						<i class="la la-book"></i>Internal FAQs
+					</a>
 					<?php if($can_edit) { ?>
 						<a href="<?php echo base_url('Faq/Create'); ?>" class="btn btn-primary font-weight-bold ml-2" style="width:160px;">
 							<i class="la la-clipboard-list"></i>Create FAQ

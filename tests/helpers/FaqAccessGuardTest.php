@@ -76,8 +76,10 @@ check('Can_Edit() checks session level === 10 (owner bypass)',
 check("Can_Edit() checks the 'FE' access_control code",
     $edit_body !== null && strpos($edit_body, "'FE'") !== false && strpos($edit_body, 'access_control') !== false);
 
-// View actions gated by Can_View().
-foreach (array('index', 'Page') as $method) {
+// View actions gated by Can_View(). Internal() is the grouped "all FAQs on one
+// page" view; it exposes the same internal content as Page(), so it must sit
+// behind the same FV/owner gate.
+foreach (array('index', 'Page', 'Internal') as $method) {
     $body = body_of($source, $method);
     check("{$method}() is gated by Can_View()", $body !== null && strpos($body, 'Can_View()') !== false);
 }

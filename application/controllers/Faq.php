@@ -145,6 +145,28 @@ class Faq extends MY_Controller
 		$this->load->view('faq/page', $data);
 	}
 
+	// Grouped page: every active internal FAQ rendered together on one screen
+	// (/Faq/Internal), with a single search box and tag filter spanning the whole
+	// set. Same FV/owner gate and internal-only scope as Page(), so the staff-only
+	// content is safe to show. Honours the same ?tag= / ?destination= filters as
+	// the listing (Read_Faqs reads them), so a filtered listing can hand its
+	// query string straight to this page to narrow the group.
+	function Internal()
+	{
+		if(!$this->Can_View()) {
+			redirect(base_url('Dashboard'));
+			return;
+		}
+		// Read_Faqs() returns both types; the grouped page mirrors Page() and
+		// shows internal FAQs only.
+		$faqs = $this->Faq_Model->Read_Faqs();
+		$data['faqs'] = array_values(array_filter($faqs, function($faq) {
+			return $faq->Type === 'internal';
+		}));
+		$data['tag_names'] = $this->Faq_Model->Tag_Name_Map();
+		$this->load->view('faq/all', $data);
+	}
+
 	// Returns true on success, or an error message string on failure.
 	private function Save_From_Post($id)
 	{
