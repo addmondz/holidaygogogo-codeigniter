@@ -149,6 +149,93 @@ class Ghl_Lead_Ownership_Model extends CI_Model
         return $map;
     }
 
+    public function get_assignment_history_for_leads($leads)
+    {
+        if (!$this->db->table_exists('ghl_lead_assignment_history')) {
+            return array();
+        }
+
+        $conversationIds = array();
+        foreach ((array) $leads as $lead) {
+            if (!empty($lead['conversation_id'])) {
+                $conversationIds[(string) $lead['conversation_id']] = (string) $lead['conversation_id'];
+            }
+        }
+
+        if (empty($conversationIds)) {
+            return array();
+        }
+
+        $placeholders = implode(',', array_fill(0, count($conversationIds), '?'));
+        $rows = $this->db->query(
+            "
+            SELECT
+                conversation_id,
+                owner_user_id,
+                assigned_at,
+                unassigned_at
+            FROM ghl_lead_assignment_history
+            WHERE conversation_id IN ({$placeholders})
+            ORDER BY conversation_id ASC, owner_user_id ASC, assigned_at ASC
+            ",
+            array_values($conversationIds)
+        )->result_array();
+
+        $map = array();
+        foreach ($rows as $row) {
+            $conversationId = (string) $row['conversation_id'];
+            if (!isset($map[$conversationId])) {
+                $map[$conversationId] = array();
+            }
+            $map[$conversationId][] = $row;
+        }
+
+        return $map;
+    }
+
+    public function resolve_assigned_at_for_lead($lead, $assignmentRows)
+    {
+        $assignedTo = isset($lead['assigned_to_user_id']) ? trim((string) $lead['assigned_to_user_id']) : '';
+        if ($assignedTo === '') {
+            return null;
+        }
+
+        $leadStart = !empty($lead['lead_started_at']) ? strtotime($lead['lead_started_at']) : false;
+        if ($leadStart === false) {
+            return null;
+        }
+
+        $leadEnd = !empty($lead['lead_ended_at']) ? strtotime($lead['lead_ended_at']) : null;
+        $bestAssignedAt = null;
+        $bestAssignedTs = null;
+
+        foreach ((array) $assignmentRows as $row) {
+            if (!isset($row['owner_user_id']) || (string) $row['owner_user_id'] !== $assignedTo) {
+                continue;
+            }
+
+            $assignedTs = !empty($row['assigned_at']) ? strtotime($row['assigned_at']) : false;
+            if ($assignedTs === false) {
+                continue;
+            }
+
+            $unassignedTs = !empty($row['unassigned_at']) ? strtotime($row['unassigned_at']) : null;
+            if ($leadEnd !== null && $assignedTs > $leadEnd) {
+                continue;
+            }
+            if ($unassignedTs !== null && $unassignedTs < $leadStart) {
+                continue;
+            }
+
+            if ($bestAssignedTs === null || $assignedTs > $bestAssignedTs) {
+                $bestAssignedTs = $assignedTs;
+                $bestAssignedAt = $row['assigned_at'];
+            }
+        }
+
+        return $bestAssignedAt;
+    }
+
     public function replace_ownership_for_leads($leadIds, $ownershipRows)
     {
         $leadIds = array_values(array_unique(array_filter(array_map('intval', (array) $leadIds), function($id) {
@@ -170,6 +257,12 @@ class Ghl_Lead_Ownership_Model extends CI_Model
         }
 
         if (!empty($ownershipRows)) {
+            if (!$this->db->field_exists('assigned_at', 'ghl_lead_ownership')) {
+                foreach ($ownershipRows as &$ownershipRow) {
+                    unset($ownershipRow['assigned_at']);
+                }
+                unset($ownershipRow);
+            }
             $this->db->insert_batch('ghl_lead_ownership', $ownershipRows);
         }
 

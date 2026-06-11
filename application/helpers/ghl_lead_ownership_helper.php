@@ -2,7 +2,7 @@
 defined('BASEPATH') or exit('No direct script access allowed');
 
 if (!function_exists('ghl_build_lead_ownership_rows')) {
-    function ghl_build_lead_ownership_rows(array $lead, array $replyOwners, $calculatedAt)
+    function ghl_build_lead_ownership_rows(array $lead, array $replyOwners, $calculatedAt, $assignedAt = null)
     {
         $owners = array();
         $assignedTo = isset($lead['assigned_to_user_id']) ? trim((string) $lead['assigned_to_user_id']) : '';
@@ -55,6 +55,7 @@ if (!function_exists('ghl_build_lead_ownership_rows')) {
                 'lead_ended_at' => !empty($lead['lead_ended_at']) ? (string) $lead['lead_ended_at'] : null,
                 'owner_user_id' => $owner['owner_user_id'],
                 'assigned_to_user_id' => $assignedTo !== '' ? $assignedTo : null,
+                'assigned_at' => ((int) $owner['is_assigned_owner'] === 1 && !empty($assignedAt)) ? (string) $assignedAt : null,
                 'is_assigned_owner' => (int) $owner['is_assigned_owner'],
                 'is_reply_owner' => (int) $owner['is_reply_owner'],
                 'outbound_reply_count' => (int) $owner['outbound_reply_count'],

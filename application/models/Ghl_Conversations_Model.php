@@ -12,7 +12,7 @@ class Ghl_Conversations_Model extends CI_Model
         }
 
         $existing = $this->db
-            ->select('id')
+            ->select('id, assigned_to, date_added, date_updated')
             ->from('ghl_conversations')
             ->where('conversation_id', $conversationId)
             ->limit(1)
@@ -90,10 +90,102 @@ class Ghl_Conversations_Model extends CI_Model
                     'raw_json' => $insert['raw_json'],
                 ));
 
+            if ($updated) {
+                $this->record_assignment_change_if_needed(
+                    $conversationId,
+                    isset($existing['assigned_to']) ? $existing['assigned_to'] : null,
+                    $insert['assigned_to']
+                );
+            }
+
             return $updated ? 'updated' : false;
         }
 
         $inserted = $this->db->insert('ghl_conversations', $insert);
+        if ($inserted) {
+            $this->record_initial_assignment($conversationId, $insert['assigned_to'], $insert);
+        }
         return $inserted ? 'inserted' : false;
+    }
+
+    private function record_assignment_change_if_needed($conversationId, $oldAssignedTo, $newAssignedTo)
+    {
+        if (!$this->assignment_history_table_exists()) {
+            return;
+        }
+
+        $oldAssignedTo = trim((string) $oldAssignedTo);
+        $newAssignedTo = trim((string) $newAssignedTo);
+
+        if ($oldAssignedTo === $newAssignedTo) {
+            return;
+        }
+
+        $changedAt = date('Y-m-d H:i:s');
+
+        if ($oldAssignedTo !== '') {
+            $this->close_open_assignment($conversationId, $oldAssignedTo, $changedAt);
+        }
+
+        if ($newAssignedTo !== '') {
+            $this->insert_assignment_if_no_open_row($conversationId, $newAssignedTo, $changedAt);
+        }
+    }
+
+    private function record_initial_assignment($conversationId, $assignedTo, $data)
+    {
+        if (!$this->assignment_history_table_exists()) {
+            return;
+        }
+
+        $assignedTo = trim((string) $assignedTo);
+        if ($assignedTo === '') {
+            return;
+        }
+
+        $assignedAt = !empty($data['date_updated'])
+            ? $data['date_updated']
+            : (!empty($data['date_added']) ? $data['date_added'] : date('Y-m-d H:i:s'));
+
+        $this->insert_assignment_if_no_open_row($conversationId, $assignedTo, $assignedAt);
+    }
+
+    private function close_open_assignment($conversationId, $ownerUserId, $unassignedAt)
+    {
+        $this->db
+            ->where('conversation_id', (string) $conversationId)
+            ->where('owner_user_id', (string) $ownerUserId)
+            ->where('unassigned_at IS NULL', null, false)
+            ->update('ghl_lead_assignment_history', array(
+                'unassigned_at' => $unassignedAt,
+            ));
+    }
+
+    private function insert_assignment_if_no_open_row($conversationId, $ownerUserId, $assignedAt)
+    {
+        $existing = $this->db
+            ->select('id')
+            ->from('ghl_lead_assignment_history')
+            ->where('conversation_id', (string) $conversationId)
+            ->where('owner_user_id', (string) $ownerUserId)
+            ->where('unassigned_at IS NULL', null, false)
+            ->limit(1)
+            ->get()
+            ->row_array();
+
+        if (!empty($existing['id'])) {
+            return;
+        }
+
+        $this->db->insert('ghl_lead_assignment_history', array(
+            'conversation_id' => (string) $conversationId,
+            'owner_user_id' => (string) $ownerUserId,
+            'assigned_at' => $assignedAt,
+        ));
+    }
+
+    private function assignment_history_table_exists()
+    {
+        return $this->db->table_exists('ghl_lead_assignment_history');
     }
 }

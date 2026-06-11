@@ -854,6 +854,11 @@ class Report extends MY_Controller
     private function lead_ownership_data_filters()
     {
         $filters = $this->lead_ownership_filters();
+        $assignmentDate = trim((string) $this->input->get('assignment_date'));
+        $parsedAssignmentDates = $this->parse_report_date_range($assignmentDate, false);
+        $filters['assignment_date'] = $assignmentDate;
+        $filters['assignment_start_date'] = $parsedAssignmentDates['start_date'];
+        $filters['assignment_end_date'] = $parsedAssignmentDates['end_date'];
         $filters['follow_up_status'] = $this->normalize_follow_up_status($this->input->get('follow_up_status'));
         $filters['page'] = max(1, (int) $this->input->get('page'));
         $filters['per_page'] = $this->normalize_lead_data_per_page($this->input->get('per_page'));
@@ -1027,7 +1032,7 @@ class Report extends MY_Controller
         $endRow = $totalRows > 0 ? min($totalRows, $startRow + $perPage - 1) : 0;
 
         $query = $filters;
-        unset($query['start_date'], $query['end_date'], $query['owner_user_id']);
+        unset($query['start_date'], $query['end_date'], $query['assignment_start_date'], $query['assignment_end_date'], $query['owner_user_id']);
 
         $buildPageUrl = function($page) use ($query) {
             $params = $query;
@@ -1262,6 +1267,8 @@ class Report extends MY_Controller
                 'owner_name' => $row['owner_name'],
                 'assigned_to_user_id' => $row['assigned_to_user_id'],
                 'assigned_name' => $row['assigned_name'],
+                'assigned_at' => isset($row['assigned_at']) ? $row['assigned_at'] : null,
+                'assigned_at_label' => !empty($row['assigned_at']) ? date('d M Y h:i A', strtotime($row['assigned_at'])) : '-',
                 'ownership_label' => $isAssigned ? 'Assigned Owned' : 'Reply Owned',
                 'ownership_class' => $isAssigned ? 'label-light-primary' : 'label-light-info',
                 'is_assigned_owner' => (int) $row['is_assigned_owner'],

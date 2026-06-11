@@ -58,6 +58,21 @@
                                         </div>
                                         <div class="col-md-3">
                                             <div class="form-group">
+                                                <label>Assignment Date Range
+                                                    <a onclick="resetLeadOwnershipAssignmentDate()" class="btn btn-icon btn-light-warning btn-xs">
+                                                        <i class="la la-undo"></i>
+                                                    </a>
+                                                </label>
+                                                <div id="lead_ownership_assignment_daterangepicker" class="input-icon">
+                                                    <input readonly type="text" name="assignment_date" value="<?php echo html_escape(isset($lead_ownership_data_filters['assignment_date']) ? $lead_ownership_data_filters['assignment_date'] : ''); ?>" autocomplete="off" class="form-control">
+                                                    <span>
+                                                        <i class="la la-calendar"></i>
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="form-group">
                                                 <label>Ownership Reason</label>
                                                 <select name="ownership_type" class="form-control selectpicker">
                                                     <option value="">--ALL REASONS--</option>
@@ -105,6 +120,7 @@
                                 <th>Owner</th>
                                 <th style="text-align:center;">Reason</th>
                                 <th>Current Assigned</th>
+                                <th>Assigned At</th>
                                 <th>Lead Started</th>
                                 <th style="text-align:center;">Reply Count</th>
                                 <th style="text-align:center;">Response</th>
@@ -116,7 +132,7 @@
                         <tbody>
                             <?php if(empty($lead_ownership_data_rows)) { ?>
                                 <tr>
-                                    <td colspan="11" class="text-center py-10">No owned leads found for the selected filters.</td>
+                                    <td colspan="12" class="text-center py-10">No owned leads found for the selected filters.</td>
                                 </tr>
                             <?php } else { ?>
                                 <?php $count = $lead_ownership_data_pagination['start_row']; ?>
@@ -135,6 +151,9 @@
                                             <span class="label <?php echo html_escape($row['ownership_class']); ?> label-inline font-weight-bold"><?php echo html_escape($row['ownership_label']); ?></span>
                                         </td>
                                         <td class="align-middle"><?php echo html_escape($row['assigned_name']); ?></td>
+                                        <td class="align-middle">
+                                            <div class="font-weight-bold"><?php echo html_escape($row['assigned_at_label']); ?></div>
+                                        </td>
                                         <td class="align-middle">
                                             <div class="font-weight-bold"><?php echo html_escape($row['lead_started_at_label']); ?></div>
                                             <?php if(!empty($row['lead_ended_at'])) { ?>
@@ -226,8 +245,30 @@
         }
     });
 
+    $('#lead_ownership_assignment_daterangepicker').daterangepicker({
+        buttonClasses: ' btn',
+        applyClass: 'btn-primary',
+        cancelClass: 'btn-secondary',
+        autoApply: true
+    }, function(start, end) {
+        $('#lead_ownership_assignment_daterangepicker .form-control').val(start.format('DD/MM/YYYY') + ' - ' + end.format('DD/MM/YYYY'));
+    });
+
+    $('#lead_ownership_assignment_daterangepicker').on('apply.daterangepicker', function(event, daterange) {
+        var startDate = (new Date(daterange.startDate._d)).toLocaleDateString();
+        var endDate = (new Date(daterange.endDate._d)).toLocaleDateString();
+
+        if (startDate == leadOwnershipDataCurrentDate && endDate == leadOwnershipDataCurrentDate) {
+            $('input[name="assignment_date"]').val(moment().format('DD/MM/YYYY') + ' - ' + moment().format('DD/MM/YYYY'));
+        }
+    });
+
     function resetLeadOwnershipDataDate() {
         $('input[name="lead_date"]').val('');
+    }
+
+    function resetLeadOwnershipAssignmentDate() {
+        $('input[name="assignment_date"]').val('');
     }
 
     $('#lead-ownership-data-reset').click(function() {

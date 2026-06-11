@@ -898,16 +898,21 @@ class Cron extends CI_Controller
 					$lastLeadId = (int) $lead['id'];
 				}
 
-				$replyOwnerMap = $this->Ghl_Lead_Ownership_Model->get_reply_owners_for_leads($leadIds, $replyThreshold);
-				$calculatedAt = date('Y-m-d H:i:s');
-				$ownershipRows = array();
+					$replyOwnerMap = $this->Ghl_Lead_Ownership_Model->get_reply_owners_for_leads($leadIds, $replyThreshold);
+					$assignmentHistoryMap = $this->Ghl_Lead_Ownership_Model->get_assignment_history_for_leads($batch);
+					$calculatedAt = date('Y-m-d H:i:s');
+					$ownershipRows = array();
 
-				foreach ($batch as $lead) {
-					$summary['leads_scanned']++;
-					$leadReplyOwners = isset($replyOwnerMap[(int) $lead['id']]) ? $replyOwnerMap[(int) $lead['id']] : array();
-					$leadOwnershipRows = ghl_build_lead_ownership_rows($lead, $leadReplyOwners, $calculatedAt);
-					$ownershipRows = array_merge($ownershipRows, $leadOwnershipRows);
-				}
+					foreach ($batch as $lead) {
+						$summary['leads_scanned']++;
+						$leadReplyOwners = isset($replyOwnerMap[(int) $lead['id']]) ? $replyOwnerMap[(int) $lead['id']] : array();
+						$leadAssignmentRows = isset($assignmentHistoryMap[(string) $lead['conversation_id']])
+							? $assignmentHistoryMap[(string) $lead['conversation_id']]
+							: array();
+						$assignedAt = $this->Ghl_Lead_Ownership_Model->resolve_assigned_at_for_lead($lead, $leadAssignmentRows);
+						$leadOwnershipRows = ghl_build_lead_ownership_rows($lead, $leadReplyOwners, $calculatedAt, $assignedAt);
+						$ownershipRows = array_merge($ownershipRows, $leadOwnershipRows);
+					}
 
 				$replaced = $this->Ghl_Lead_Ownership_Model->replace_ownership_for_leads($leadIds, $ownershipRows);
 				if (!$replaced) {

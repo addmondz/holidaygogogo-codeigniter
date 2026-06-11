@@ -900,6 +900,9 @@ class Report_Model extends CI_Model
     {
         $where = $this->build_lead_ownership_where_clause($filters);
         $extraJoins = isset($where['extra_joins']) ? $where['extra_joins'] : '';
+        $assignedAtSelect = $this->db->field_exists('assigned_at', 'ghl_lead_ownership')
+            ? 'glo.assigned_at'
+            : 'NULL AS assigned_at';
         $limit = $limit !== null ? max(1, (int) $limit) : null;
         $offset = $offset !== null ? max(0, (int) $offset) : null;
 
@@ -915,6 +918,7 @@ class Report_Model extends CI_Model
                 glo.owner_user_id,
                 COALESCE(NULLIF(assigned_gu.Name, ''), NULLIF(glo.assigned_to_user_id, ''), 'Unassigned') AS assigned_name,
                 glo.assigned_to_user_id,
+                {$assignedAtSelect},
                 glo.is_assigned_owner,
                 glo.is_reply_owner,
                 glo.outbound_reply_count,
@@ -1528,6 +1532,18 @@ class Report_Model extends CI_Model
         if (!empty($filters['end_date'])) {
             $clauses[] = 'glo.lead_started_at <= ?';
             $params[] = $filters['end_date'] . ' 23:59:59';
+        }
+
+        if ($this->db->field_exists('assigned_at', 'ghl_lead_ownership')) {
+            if (!empty($filters['assignment_start_date'])) {
+                $clauses[] = 'glo.assigned_at >= ?';
+                $params[] = $filters['assignment_start_date'] . ' 00:00:00';
+            }
+
+            if (!empty($filters['assignment_end_date'])) {
+                $clauses[] = 'glo.assigned_at <= ?';
+                $params[] = $filters['assignment_end_date'] . ' 23:59:59';
+            }
         }
 
         if (!empty($filters['owner_user_id'])) {
