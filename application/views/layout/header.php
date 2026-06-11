@@ -178,7 +178,7 @@ $is_dev_env = ($app_env !== 'prod');
 										<span class="menu-text">Admin</span>
 									</a>
 								</li>
-								<?php if($this->session->level == 10 || in_array('FV', (array)$this->session->access_control) || in_array('TV', (array)$this->session->access_control)) { ?>
+								<?php if($this->session->level == 10 || in_array('FV', (array)$this->session->access_control)) { ?>
 								<li class="menu-item menu-item-submenu <?php if($this->router->class == 'Faq' || $this->router->class == 'Faq_Tag') { echo 'menu-item-active menu-item-open'; } ?>">
 									<a href="javascript:;" class="menu-link menu-toggle">
 										<span class="svg-icon menu-icon">
@@ -205,7 +205,7 @@ $is_dev_env = ($app_env !== 'prod');
 												</a>
 											</li>
 											<?php } ?>
-											<?php if($this->session->level == 10 || in_array('TV', (array)$this->session->access_control)) { ?>
+											<?php if($this->session->level == 10 || in_array('FV', (array)$this->session->access_control)) { ?>
 											<li class="menu-item <?php if($this->router->class == 'Faq_Tag') { echo 'menu-item-active'; } ?>">
 												<a href="<?php echo base_url('Faq_Tag'); ?>" class="menu-link">
 													<i class="menu-bullet menu-bullet-dot">

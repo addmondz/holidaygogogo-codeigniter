@@ -25,17 +25,18 @@ class Faq_Tag extends MY_Controller
 	}
 
 	// Access-control gates. OWNER (level 10) always passes (bypass); every other
-	// role needs the matching code assigned on their admin record:
-	//   'TV' (FAQ TAG VIEW ACCESS) to reach the listing,
-	//   'TE' (FAQ TAG EDIT ACCESS) to create / edit / delete.
+	// role needs the matching code assigned on their admin record. FAQ tags share
+	// the FAQ permission codes:
+	//   'FV' (FAQ VIEW ACCESS) to reach the listing,
+	//   'FE' (FAQ EDIT ACCESS) to create / edit / delete.
 	private function Can_View()
 	{
-		return (int)$this->session->level === 10 || in_array('TV', (array)$this->session->access_control);
+		return (int)$this->session->level === 10 || in_array('FV', (array)$this->session->access_control);
 	}
 
 	private function Can_Edit()
 	{
-		return (int)$this->session->level === 10 || in_array('TE', (array)$this->session->access_control);
+		return (int)$this->session->level === 10 || in_array('FE', (array)$this->session->access_control);
 	}
 
 	function Create()

@@ -1,4 +1,4 @@
-<?php $can_edit = isset($can_edit) ? $can_edit : ((int)$this->session->level === 10); // OWNER or FAQ TAG EDIT ACCESS (TE) may create/edit/delete; others view only ?>
+<?php $can_edit = isset($can_edit) ? $can_edit : ((int)$this->session->level === 10); // OWNER or FAQ EDIT ACCESS (FE) may create/edit/delete; others view only ?>
 <div class="d-flex flex-column-fluid">
 	<div class="container-fluid">
 		<?php if($this->session->flashdata('faq_tag_success')) { ?>

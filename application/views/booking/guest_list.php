@@ -637,14 +637,11 @@
 																			<?php endif; ?>
 																		</select>
 																	</div>
-																<?php if($counter == 1) { ?>
 																	<div class="col-md-6">
 																		<label id="<?php echo 'address_label-' . $guest->GuestListID; ?>">Address <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>
 																		<input <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="addresses[]" id="<?php echo 'address-' . $guest->GuestListID; ?>" value="<?php echo $guest->Address; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="form-control">
 																	</div>
-																<?php } ?>
 																</div>
-															<?php if($counter == 1) { ?>
 																<br>
 																<div class="row">
 																	<div class="col-md-6 mb-7 mb-md-0">
@@ -672,7 +669,6 @@
 																		</select>
 																	</div>
 																</div>
-															<?php } ?>
 															</div>
 														</div>
 													</div>
@@ -1265,12 +1261,12 @@
 								<?php if($guest_lists[0]->TravelInsuranceStatus == 'Y') { ?>
 								if (nationality_text != 'MALAYSIA' && nationality_text != '--SELECT NATIONALITY--' && selectedOptionValue(`#permit_visa-${gid}`) == '') missing.push('Staying in Malaysia with valid permit/visa');
 								if ($(`#employment-${gid}`).val() == '') missing.push('Employment');
-								// Address/Postcode/City/State/Country only rendered for the first pax — skip when absent
-								if ($(`#address-${gid}`).length && $(`#address-${gid}`).val() == '') missing.push('Address');
-								if ($(`#postcode-${gid}`).length && $(`#postcode-${gid}`).val() == '') missing.push('Postcode');
-								if ($(`#city-${gid}`).length && $(`#city-${gid}`).val() == '') missing.push('City');
-								if ($(`#state-${gid}`).length && $(`#state-${gid}`).val() == '') missing.push('State');
-								if ($(`#country-${gid}`).length && selectedOptionValue(`#country-${gid}`) == '') missing.push('Country');
+								// Address/Postcode/City/State/Country required for all pax (same as first pax)
+								if ($(`#address-${gid}`).val() == '') missing.push('Address');
+								if ($(`#postcode-${gid}`).val() == '') missing.push('Postcode');
+								if ($(`#city-${gid}`).val() == '') missing.push('City');
+								if ($(`#state-${gid}`).val() == '') missing.push('State');
+								if (selectedOptionValue(`#country-${gid}`) == '') missing.push('Country');
 								<?php } ?>
 
 								if (missing.length > 0) {
@@ -1308,12 +1304,12 @@
 								<?php if($guest_lists[0]->TravelInsuranceStatus == 'Y') { ?>
 								if (nationality_text != 'MALAYSIA' && nationality_text != '--SELECT NATIONALITY--' && selectedOptionValue(`#permit_visa-${gid}`) == '') missing.push('Staying in Malaysia with valid permit/visa');
 								if ($(`#employment-${gid}`).val() == '') missing.push('Employment');
-								// Address/Postcode/City/State/Country only rendered for the first pax — skip when absent
-								if ($(`#address-${gid}`).length && $(`#address-${gid}`).val() == '') missing.push('Address');
-								if ($(`#postcode-${gid}`).length && $(`#postcode-${gid}`).val() == '') missing.push('Postcode');
-								if ($(`#city-${gid}`).length && $(`#city-${gid}`).val() == '') missing.push('City');
-								if ($(`#state-${gid}`).length && $(`#state-${gid}`).val() == '') missing.push('State');
-								if ($(`#country-${gid}`).length && selectedOptionValue(`#country-${gid}`) == '') missing.push('Country');
+								// Address/Postcode/City/State/Country required for all pax (same as first pax)
+								if ($(`#address-${gid}`).val() == '') missing.push('Address');
+								if ($(`#postcode-${gid}`).val() == '') missing.push('Postcode');
+								if ($(`#city-${gid}`).val() == '') missing.push('City');
+								if ($(`#state-${gid}`).val() == '') missing.push('State');
+								if (selectedOptionValue(`#country-${gid}`) == '') missing.push('Country');
 								<?php } ?>
 
 								if (missing.length > 0) {
