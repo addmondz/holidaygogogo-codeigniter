@@ -6465,9 +6465,15 @@ $(document).ready(function() {
                 }
             });
         } else {
-            // New bookings start with no rooms — staff add the first room
-            // manually via "Add Room". The at-least-1-room submit validation
-            // enforces that one exists before the booking can be created.
+            // Add default room for new bookings
+            tempRoomCounter++;
+            roomsList.push({
+                id: 'temp_' + tempRoomCounter,
+                room_name: 'ROOM 1',
+                adult_count: 0,
+                child_count: 0,
+                infant_count: 0
+            });
             renderRoomsTable();
         }
     }
