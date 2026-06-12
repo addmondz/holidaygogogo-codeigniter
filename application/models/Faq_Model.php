@@ -271,6 +271,62 @@ class Faq_Model extends CI_Model
 		return preg_replace('/\s+/', ' ', implode(' ', $parts));
 	}
 
+	// Flatten a list of FAQ rows (each carrying Title, the Description JSON of
+	// sub-Q&As, and a "||"-joined Destinations string) into a flat list of
+	// export rows: one row per sub-Q&A, plus a single title-only row for a FAQ
+	// that has no sub-Q&As yet. $tag_names maps FAQTagID => Name so the per-item
+	// tag ids resolve to display names (unknown ids are dropped). Pure + static
+	// so it can be unit tested without a DB; both the Excel and PDF "download all
+	// FAQs" exports build on it, so the two formats never drift.
+	public static function Export_Rows($faqs, $tag_names = array())
+	{
+		if(!is_array($faqs)) {
+			return array();
+		}
+		$tag_names = is_array($tag_names) ? $tag_names : array();
+
+		$rows = array();
+		foreach($faqs as $faq) {
+			$title    = isset($faq->Title) ? (string)$faq->Title : '';
+			$dest_raw = isset($faq->Destinations) ? (string)$faq->Destinations : '';
+			$destinations = ($dest_raw === '') ? '' : implode(', ', explode('||', $dest_raw));
+			$items = self::Decode_Items(isset($faq->Description) ? $faq->Description : '');
+
+			if(empty($items)) {
+				// A FAQ with no sub-Q&As still appears once, by title, so the
+				// export is a faithful 1:1 of the library.
+				$rows[] = array(
+					'title' => $title, 'destinations' => $destinations,
+					'question' => '', 'answer' => '', 'tags' => '',
+					'created' => '', 'updated' => '',
+				);
+				continue;
+			}
+
+			foreach($items as $item) {
+				$names = array();
+				if(isset($item['tags']) && is_array($item['tags'])) {
+					foreach($item['tags'] as $tid) {
+						$tid = (int)$tid;
+						if(isset($tag_names[$tid])) {
+							$names[] = $tag_names[$tid];
+						}
+					}
+				}
+				$rows[] = array(
+					'title'        => $title,
+					'destinations' => $destinations,
+					'question'     => isset($item['q']) ? (string)$item['q'] : '',
+					'answer'       => isset($item['a']) ? (string)$item['a'] : '',
+					'tags'         => implode(', ', $names),
+					'created'      => isset($item['cd']) ? (string)$item['cd'] : '',
+					'updated'      => isset($item['ud']) ? (string)$item['ud'] : '',
+				);
+			}
+		}
+		return $rows;
+	}
+
 	function Create($data)
 	{
 		$admin_id = $this->session->userdata('admin_id');

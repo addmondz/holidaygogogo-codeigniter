@@ -1,4 +1,5 @@
 <?php $can_edit = isset($can_edit) ? $can_edit : ((int)$this->session->level === 10); // OWNER or FAQ EDIT ACCESS (FE) may create/edit/delete; others view only ?>
+<?php $is_owner = ((int)$this->session->level === 10); // OWNER only: bulk download of the whole FAQ library (Excel / PDF) ?>
 
 <div class="d-flex flex-column-fluid">
 	<div class="container-fluid">
@@ -24,6 +25,14 @@
 					<a href="<?php echo base_url('Faq/Internal'); ?>" target="_blank" rel="noopener" class="btn btn-light-primary font-weight-bold" data-toggle="tooltip" title="Open every FAQ together on one page">
 						<i class="la la-book"></i>Internal FAQs
 					</a>
+					<?php if($is_owner) { ?>
+						<a href="<?php echo base_url('Faq/Download'); ?>" class="btn btn-light-success font-weight-bold ml-2" data-toggle="tooltip" title="Download every FAQ as an Excel file">
+							<i class="la la-file-excel"></i>Excel
+						</a>
+						<a href="<?php echo base_url('Faq/Download_Pdf'); ?>" class="btn btn-light-danger font-weight-bold ml-2" data-toggle="tooltip" title="Download every FAQ as a PDF file">
+							<i class="la la-file-pdf"></i>PDF
+						</a>
+					<?php } ?>
 					<?php if($can_edit) { ?>
 						<a href="<?php echo base_url('Faq/Create'); ?>" class="btn btn-primary font-weight-bold ml-2" style="width:160px;">
 							<i class="la la-clipboard-list"></i>Create FAQ

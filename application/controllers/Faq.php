@@ -1,4 +1,6 @@
 <?php
+require FCPATH.'vendor/autoload.php';
+
 class Faq extends MY_Controller
 {
 	function __construct()
@@ -44,6 +46,118 @@ class Faq extends MY_Controller
 	private function Can_Edit()
 	{
 		return (int)$this->session->level === 10 || in_array('FE', (array)$this->session->access_control);
+	}
+
+	// OWNER (level 10) only. Gates the "download every FAQ at once" exports, which
+	// pull the whole internal library into one file - kept owner-only regardless
+	// of FV/FE so bulk extraction isn't handed to every viewer/editor.
+	private function Can_Owner()
+	{
+		return (int)$this->session->level === 10;
+	}
+
+	// Active internal FAQs flattened into export rows (one per sub-Q&A), shared by
+	// the Excel and PDF downloads so both formats carry identical content. Mirrors
+	// Internal(): Read_Faqs() returns both types, so internal is filtered here.
+	private function Export_Faqs()
+	{
+		$faqs = array_values(array_filter($this->Faq_Model->Read_Faqs(), function($faq) {
+			return $faq->Type === 'internal';
+		}));
+		return Faq_Model::Export_Rows($faqs, $this->Faq_Model->Tag_Name_Map());
+	}
+
+	// Excel (.xlsx) export of every internal FAQ - one row per sub-Q&A. OWNER only.
+	function Download()
+	{
+		if(!$this->Can_Owner()) {
+			redirect(base_url('Faq'));
+			return;
+		}
+		$rows = $this->Export_Faqs();
+
+		$spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+		$sheet = $spreadsheet->getActiveSheet();
+		$sheet->setTitle('FAQ Records');
+		$spreadsheet->getProperties()->setCreator('HolidayGoGoGo');
+
+		$headers = array('A' => 'FAQ', 'B' => 'DESTINATION', 'C' => 'QUESTION', 'D' => 'ANSWER', 'E' => 'TAGS', 'F' => 'LAST UPDATED');
+		foreach($headers as $col => $label) {
+			$sheet->setCellValue($col . '1', $label);
+		}
+		$sheet->getStyle('A1:F1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_BLACK);
+		$sheet->getStyle('A1:F1')->getFont()->getColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_WHITE);
+		$sheet->getStyle('A1:F1')->getFont()->setBold(true);
+
+		if(!empty($rows)) {
+			$r = 2;
+			foreach($rows as $row) {
+				$updated = '';
+				if($row['updated'] !== '') {
+					$ts = strtotime($row['updated']);
+					$updated = $ts ? date('j M Y', $ts) : $row['updated'];
+				}
+				$sheet->setCellValueExplicit('A' . $r, $row['title'], \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+				$sheet->setCellValueExplicit('B' . $r, $row['destinations'], \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+				$sheet->setCellValueExplicit('C' . $r, $row['question'], \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+				$sheet->setCellValueExplicit('D' . $r, $row['answer'], \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+				$sheet->setCellValueExplicit('E' . $r, $row['tags'], \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+				$sheet->setCellValueExplicit('F' . $r, $updated, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+				$r++;
+			}
+			// Wrap the long free-text columns and top-align every data cell so the
+			// multi-line questions/answers stay readable.
+			$last = $r - 1;
+			$sheet->getStyle('C2:D' . $last)->getAlignment()->setWrapText(true);
+			$sheet->getStyle('A2:F' . $last)->getAlignment()->setVertical(\PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_TOP);
+		} else {
+			$sheet->mergeCells('A2:F2');
+			$sheet->getCell('A2')->setValue('FAQ Records Not Found');
+			$sheet->getStyle('A2:F2')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
+		}
+
+		$sheet->getColumnDimension('A')->setWidth(28);
+		$sheet->getColumnDimension('B')->setWidth(22);
+		$sheet->getColumnDimension('C')->setWidth(45);
+		$sheet->getColumnDimension('D')->setWidth(60);
+		$sheet->getColumnDimension('E')->setWidth(22);
+		$sheet->getColumnDimension('F')->setWidth(16);
+
+		$filename = 'FAQ_RECORDS_' . date('Ymd') . '.xlsx';
+		header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+		header('Content-Disposition: attachment;filename="' . $filename . '"');
+		header('Cache-Control: max-age=0');
+		header('Cache-Control: max-age=1');
+		$writer = \PhpOffice\PhpSpreadsheet\IOFactory::createWriter($spreadsheet, 'Xlsx');
+		$writer->save('php://output');
+	}
+
+	// PDF export of every internal FAQ, rendered through a print-friendly view
+	// that mirrors the FAQ Library design. OWNER only.
+	function Download_Pdf()
+	{
+		if(!$this->Can_Owner()) {
+			redirect(base_url('Faq'));
+			return;
+		}
+		$html = $this->load->view('faq/export_pdf', array('rows' => $this->Export_Faqs()), true);
+
+		$this->load->library('pdf');
+		$this->dompdf->loadHtml($html);
+		$this->dompdf->setPaper('A4', 'portrait');
+		$this->dompdf->render();
+		$output = $this->dompdf->output();
+
+		if(ob_get_length()) { ob_end_clean(); }
+
+		$filename = 'FAQ_RECORDS_' . date('Ymd') . '.pdf';
+		header('Content-Type: application/pdf');
+		header('Content-Disposition: attachment; filename="' . $filename . '"');
+		header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0, private');
+		header('Pragma: no-cache');
+		header('Expires: 0');
+		header('Content-Length: ' . strlen($output));
+		echo $output;
 	}
 
 	function Create()
