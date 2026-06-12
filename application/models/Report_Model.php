@@ -589,6 +589,103 @@ class Report_Model extends CI_Model
     }
 
     /**
+     * "Lead Pickup Speed" summary for one set of agents in one window.
+     *
+     * Pickup speed = RAW wall-clock seconds from when a lead started a brand-new
+     * conversation (pl.lead_started_at) to the agent's FIRST reply
+     * (pl.response_1_agent_message_at). Unlike Lead_Dashboard_Summary's
+     * avg_response_time_seconds, this is the single first-touch gap (not the mean
+     * of the first 5 reply gaps) and is NOT duty-hours adjusted -- it reflects
+     * how long the customer actually waited for someone to pick the lead up.
+     *
+     * Only leads that were actually picked up (response_1_agent_message_at not
+     * null, valid start anchor, non-negative gap) are averaged; un-replied leads
+     * are ignored rather than counted as infinitely slow. The windowing /
+     * agent / restriction filters are shared with the rest of the lead dashboard
+     * via build_lead_dashboard_where_clause (windows by pl.lead_started_at).
+     *
+     * @param array $filters  Same shape as Lead_Dashboard_Summary (agent_id,
+     *                         start_date, end_date, _restrict_agent_ids, ...).
+     * @return array { avg_seconds: int|null, count: int }
+     */
+    function Lead_Pickup_Speed_Summary($filters = array())
+    {
+        $where = $this->build_lead_dashboard_where_clause($filters);
+        $extraJoins = isset($where['extra_joins']) ? $where['extra_joins'] : '';
+
+        // Conditional aggregation keeps the shared WHERE untouched: non-qualifying
+        // rows fall to NULL inside AVG() (ignored) and 0 inside the SUM() count.
+        $gap  = 'UNIX_TIMESTAMP(pl.response_1_agent_message_at) - UNIX_TIMESTAMP(pl.lead_started_at)';
+        $qual = "pl.response_1_agent_message_at IS NOT NULL
+                 AND pl.lead_started_at IS NOT NULL
+                 AND ({$gap}) >= 0";
+        $sql = "
+            SELECT
+                AVG(CASE WHEN {$qual} THEN ({$gap}) END) AS avg_seconds,
+                SUM(CASE WHEN {$qual} THEN 1 ELSE 0 END) AS n
+            FROM ghl_processed_leads pl
+            LEFT JOIN ghl_conversations gc ON gc.conversation_id = pl.conversation_id
+            {$extraJoins}
+            {$where['sql']}
+        ";
+        $row = $this->db->query($sql, $where['params'])->row_array();
+
+        return array(
+            'avg_seconds' => (isset($row['avg_seconds']) && $row['avg_seconds'] !== null)
+                ? (int) round((float) $row['avg_seconds'])
+                : null,
+            'count' => !empty($row['n']) ? (int) $row['n'] : 0,
+        );
+    }
+
+    /**
+     * Fastest-picking-up agent team-wide in a window -- powers the "Best:" footer
+     * on the Lead Pickup Speed card. Groups by the GHL assigned agent, requires
+     * at least 2 qualifying leads (min-sample guard shared with the Draft ->
+     * Payment Time card so a single lucky lead can't top the board), and returns
+     * the lowest (fastest) average. Name resolves from ghl_users.Name, falling
+     * back to the raw UID.
+     *
+     * @param string $start_date  'Y-m-d'
+     * @param string $end_date    'Y-m-d'
+     * @return array|null { agent_id, agent_name, avg_seconds, n } or null.
+     */
+    function Lead_Pickup_Speed_Best_Agent($start_date, $end_date)
+    {
+        $gap = 'UNIX_TIMESTAMP(pl.response_1_agent_message_at) - UNIX_TIMESTAMP(pl.lead_started_at)';
+        $sql = "
+            SELECT
+                NULLIF(pl.assigned_to_user_id, '') AS agent_id,
+                COALESCE(NULLIF(gu.Name, ''), NULLIF(pl.assigned_to_user_id, '')) AS agent_name,
+                AVG({$gap}) AS avg_seconds,
+                COUNT(*) AS n
+            FROM ghl_processed_leads pl
+            LEFT JOIN ghl_users gu ON gu.UserID = NULLIF(pl.assigned_to_user_id, '')
+            WHERE NULLIF(pl.assigned_to_user_id, '') IS NOT NULL
+              AND pl.lead_started_at >= ? AND pl.lead_started_at <= ?
+              AND pl.response_1_agent_message_at IS NOT NULL
+              AND pl.lead_started_at IS NOT NULL
+              AND ({$gap}) >= 0
+            GROUP BY agent_id, agent_name
+            HAVING n >= 2
+            ORDER BY avg_seconds ASC
+            LIMIT 1
+        ";
+        $row = $this->db->query($sql, array(
+            $start_date . ' 00:00:00',
+            $end_date . ' 23:59:59',
+        ))->row_array();
+
+        if (empty($row)) { return null; }
+        return array(
+            'agent_id'    => $row['agent_id'],
+            'agent_name'  => $row['agent_name'],
+            'avg_seconds' => (int) round((float) $row['avg_seconds']),
+            'n'           => (int) $row['n'],
+        );
+    }
+
+    /**
      * Per-agent lead counts for the three "Leads" card windows (Today / Week /
      * Month) in a single conditional-SUM pass. Powers the OWNER-only
      * "Leads by Agent" table — the same new-lead total as the Leads card, but

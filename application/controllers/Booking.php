@@ -1264,6 +1264,22 @@ class Booking extends MY_Controller
 					'week_seconds'  => $mine_week['avg_response_time_seconds'],
 					'month_seconds' => $mine_month['avg_response_time_seconds'],
 				);
+
+				// "Lead Pickup Speed (Month)". Raw wall-clock time from a lead
+				// starting a brand-new conversation to the TC's first reply -- how
+				// fast you pick a fresh lead up, distinct from the avg-of-5 "My
+				// Response Time" above. Windowed by lead start date.
+				$this->load->helper('response_time');
+				$pickup_month = $this->Report_Model->Lead_Pickup_Speed_Summary(array(
+					'agent_id'   => $my_ghl_uids,
+					'start_date' => $cur_month_start, 'end_date' => $cur_month_end,
+				));
+				$cards['tc_pickup_speed_month'] = array(
+					'value'   => format_response_duration($pickup_month['avg_seconds']),
+					'count'   => $pickup_month['count'],
+					'seconds' => $pickup_month['avg_seconds'],
+					'best'    => $this->tc_pickup_speed_best($cur_month_start, $cur_month_end, $my_ghl_uids),
+				);
 			} else {
 				$cards['tc_leads_dwm'] = array(
 					'day' => 0, 'week' => 0, 'month' => 0,
@@ -1271,6 +1287,12 @@ class Booking extends MY_Controller
 				$cards['tc_response_time_dwm'] = array(
 					'day' => '-', 'week' => '-', 'month' => '-',
 					'day_seconds' => null, 'week_seconds' => null, 'month_seconds' => null,
+				);
+				// Still show the team-wide "Best:" benchmark even when this TC has
+				// no GHL link (own value renders as an em-dash on the front-end).
+				$cards['tc_pickup_speed_month'] = array(
+					'value' => '-', 'count' => 0, 'seconds' => null,
+					'best' => $this->tc_pickup_speed_best($cur_month_start, $cur_month_end, $my_ghl_uids),
 				);
 			}
 
@@ -2581,6 +2603,31 @@ class Booking extends MY_Controller
 			log_message('error', 'Booking ajax_summary_cards error: ' . $e->getMessage());
 			$this->send_json(array('error' => 'An error occurred while loading summary cards'));
 		}
+	}
+
+	/**
+	 * Build the "Best:" footer payload for the Lead Pickup Speed card -- the
+	 * fastest-picking-up agent team-wide for the month, shown as "You" when the
+	 * winner is the logged-in TC (matched against their own GHL user ids).
+	 *
+	 * @param string $month_start  'Y-m-d'
+	 * @param string $month_end    'Y-m-d'
+	 * @param array  $my_ghl_uids  GHL user ids belonging to the logged-in TC.
+	 * @return array|null { name, value } or null when nobody qualifies.
+	 */
+	private function tc_pickup_speed_best($month_start, $month_end, $my_ghl_uids)
+	{
+		$best = $this->Report_Model->Lead_Pickup_Speed_Best_Agent($month_start, $month_end);
+		if (empty($best)) { return null; }
+
+		$this->load->helper('response_time');
+		$name = (!empty($my_ghl_uids) && in_array($best['agent_id'], $my_ghl_uids, true))
+			? 'You'
+			: $best['agent_name'];
+		return array(
+			'name'  => $name,
+			'value' => format_response_duration($best['avg_seconds']),
+		);
 	}
 
 	function Create()
@@ -4702,6 +4749,13 @@ class Booking extends MY_Controller
 	public function autocount_create($data)
 	{
 		try {
+			// Use the first product row's description as the quotation header description
+			$firstProductDescription = '';
+			if (!empty($data['booking_product']) && is_array($data['booking_product'])) {
+				$firstProduct = reset($data['booking_product']);
+				$firstProductDescription = arr_get($firstProduct, 'product_Description', '');
+			}
+
 			$body['master'] = [
 				'docNo'           => arr_get($data, 'BookingNumber'),
 				'docNoFormatName' => arr_get($data, 'docNoFormatName', null),
@@ -4720,7 +4774,7 @@ class Booking extends MY_Controller
 				'deliverPhone1'   => arr_get($data, 'guest_phone'),
 				'deliverFax1'     => arr_get($data, 'deliver_fax1', ''),
 				'ref'             => arr_get($data, 'ref', null),
-				'description'     => arr_get($data, 'description', null),
+				'description'     => arr_get($data, 'description', $firstProductDescription),
 				'note'            => arr_get($data, 'note', null),
 				'salesAgent'      => arr_get($data, 'salesAgent', ''),
 				'creditTerm'      => arr_get($data, 'credit_term', 'C.O.D.'),
@@ -4790,6 +4844,13 @@ class Booking extends MY_Controller
 		try {
 			$docNo = arr_get($data, 'BookingNumber');
 
+			// Use the first product row's description as the quotation header description
+			$firstProductDescription = '';
+			if (!empty($data['booking_product']) && is_array($data['booking_product'])) {
+				$firstProduct = reset($data['booking_product']);
+				$firstProductDescription = arr_get($firstProduct, 'product_Description', '');
+			}
+
 			$body['master'] = [
 				'docNo'           => arr_get($data, 'BookingNumber'),
 				'docNoFormatName' => arr_get($data, 'docNoFormatName', null),
@@ -4808,7 +4869,7 @@ class Booking extends MY_Controller
 				'deliverPhone1'   => arr_get($data, 'guest_phone'),
 				'deliverFax1'     => arr_get($data, 'deliver_fax1', ''),
 				'ref'             => arr_get($data, 'ref', null),
-				'description'     => arr_get($data, 'description', null),
+				'description'     => arr_get($data, 'description', $firstProductDescription),
 				'note'            => arr_get($data, 'note', null),
 				'salesAgent'      => arr_get($data, 'salesAgent', ''),
 				'creditTerm'      => arr_get($data, 'credit_term', 'C.O.D.'),

@@ -322,6 +322,19 @@
                     </div>
                 </div>
             </div>
+            <div class="col-md-3 sc-pos-3">
+                <div class="card card-custom">
+                    <div class="card-header border-0 summary-card-header" style="background-color:#D7E2F2;">
+                        <h3>Lead Pickup Speed (Month)</h3>
+                        <i id="pop-tc-pickup" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>From:</strong> GHL leads assigned to you this month (by lead start date).<br><br><strong>Pickup speed</strong> = time from a lead <em>starting a brand-new conversation</em> to your <strong>first reply</strong> on it. Averaged across the month's leads.<br><br><strong>Raw wall-clock:</strong> Unlike &ldquo;My Response Time&rdquo;, this is the single first-touch gap and counts real elapsed time, including after-hours &mdash; it's how long the customer actually waited to be picked up.<br><br><strong>Best:</strong> fastest-picking-up agent team-wide this month (min 2 leads).<br><strong>Empty (&mdash;)</strong> when none of your leads were picked up this month."></i>
+                    </div>
+                    <div class="card-body summary-card-body">
+                        <div class="summary-value" id="sc-tc-pickup-value">...</div>
+                        <div class="summary-sub"><span id="sc-tc-pickup-count">—</span> of your leads this month were picked up. Average time to first reply.</div>
+                        <div class="summary-sub summary-best" id="sc-tc-pickup-best">Best: —</div>
+                    </div>
+                </div>
+            </div>
         <?php } ?>
 
         <?php /* ---------- TC LEAD / Owner ---------- */ ?>
@@ -921,6 +934,15 @@ $(function() {
             setText('sc-tc-resp-day',   c.tc_response_time_dwm.day);
             setText('sc-tc-resp-week',  c.tc_response_time_dwm.week);
             setText('sc-tc-resp-month', c.tc_response_time_dwm.month);
+        }
+        if(c.tc_pickup_speed_month) {
+            var pk = c.tc_pickup_speed_month;
+            // format_response_duration returns '-' for null; render an em-dash
+            // when none of this month's leads were picked up.
+            var pkHas = (pk.count > 0 && pk.value && pk.value !== '-');
+            setText('sc-tc-pickup-value', pkHas ? pk.value : '—');
+            setText('sc-tc-pickup-count', pk.count);
+            setBest('sc-tc-pickup-best',  pk.best, 'Fastest');
         }
         if(c.pending_bc) {
             setText('sc-pending-bc-count', c.pending_bc.count);
