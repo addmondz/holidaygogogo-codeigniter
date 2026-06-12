@@ -310,7 +310,7 @@
                 <div class="card card-custom">
                     <div class="card-header border-0 summary-card-header" style="background-color:#D7E2F2;">
                         <h3>My Response Time</h3>
-                        <i id="pop-tc-resp" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>From:</strong> GHL leads assigned to you.<br><br><strong>Avg first reply</strong> = mean time across the first 5 replies on each lead, formatted as seconds / minutes / hours.<br><br><strong>Duty-hours only:</strong> Response time counts only elapsed time inside Mon&ndash;Sat 08:00&ndash;22:00 MYT, so after-hours time does not increase the number.<br><br><strong>Per window (by lead creation date):</strong><ul><li><strong>Today</strong></li><li><strong>Week</strong> (Mon &rarr; Sun)</li><li><strong>Month</strong> (1st &rarr; last)</li></ul><strong>Empty (&mdash;)</strong> when there were no responded leads in that window."></i>
+                        <i id="pop-tc-resp" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>From:</strong> GHL leads assigned to you.<br><br><strong>Avg reply</strong> = mean time across the first 5 <em>and</em> the most-recent 5 replies on each lead, merged (overlapping replies counted once), formatted as seconds / minutes / hours.<br><br><strong>Duty-hours only:</strong> Response time counts only elapsed time inside Mon&ndash;Sat 08:00&ndash;22:00 MYT, so after-hours time does not increase the number.<br><br><strong>Per window (by lead creation date):</strong><ul><li><strong>Today</strong></li><li><strong>Week</strong> (Mon &rarr; Sun)</li><li><strong>Month</strong> (1st &rarr; last)</li></ul><strong>Empty (&mdash;)</strong> when there were no responded leads in that window."></i>
                     </div>
                     <div class="card-body summary-card-body">
                         <div class="summary-row-3">
@@ -318,7 +318,7 @@
                             <div><div class="lbl">Week</div><div class="summary-value-sm" id="sc-tc-resp-week">...</div></div>
                             <div><div class="lbl">Month</div><div class="summary-value-sm" id="sc-tc-resp-month">...</div></div>
                         </div>
-                        <div class="summary-sub">Avg time to first reply across your leads in each window.</div>
+                        <div class="summary-sub">Avg reply time (first 5 + most-recent 5, merged) across your leads in each window.</div>
                     </div>
                 </div>
             </div>
@@ -862,12 +862,20 @@ $(function() {
         if(af) af.style.width = Math.max(0, Math.min(100, (a / scale) * 100)) + '%';
         if(tf) tf.style.width = (tg > 0 ? Math.max(0, Math.min(100, (tg / scale) * 100)) : 0) + '%';
     }
-    // Best line, figure only (no agent name) with standout styling.
+    // Best line: agent name + standout figure. Falls back to figure-only when
+    // no name is resolved.
     function setBestFigure(id, best) {
         var el = document.getElementById(id);
         if(!el) return;
         if(!best || best.value == null) { el.innerHTML = 'Best: —'; return; }
-        el.innerHTML = 'Best: <span class="best-fig">' + escapeHtml(best.value) + '</span>';
+        var html = 'Best: ';
+        if(best.name != null) {
+            var isYou = (String(best.name) === 'You');
+            html += '<span class="best-name' + (isYou ? ' is-you' : '') + '">'
+                + escapeHtml(best.name) + '</span> · ';
+        }
+        html += '<span class="best-fig">' + escapeHtml(best.value) + '</span>';
+        el.innerHTML = html;
     }
     // Keep clicks on the "Last synced" text from collapsing the panel.
     $('#booking_summary_cards .ghl-last-sync').on('click', function(e) {

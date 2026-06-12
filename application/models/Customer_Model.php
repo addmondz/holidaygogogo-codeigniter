@@ -266,6 +266,10 @@ class Customer_Model extends CI_Model
 			'name'          => $customer['name'] ? $customer['name'] : null,
 			'phone_number'  => $customer['phone_number'] ? $customer['phone_number'] : null,
 			'ChatLanguage'  => $customer['ChatLanguage'] ? $customer['ChatLanguage'] : null,
+			// Flag for AutoCount sync so master-data customers (no booking) get
+			// pushed by the cron. AutoCount auto-generates the code if blank.
+			'AutocountSyncAction' => 'C',
+			'AutocountSyncStatus' => 'P',
 			'created_at'    => date('Y-m-d H:i:s'),
 			'updated_at'    => date('Y-m-d H:i:s'),
 		];
@@ -404,31 +408,9 @@ class Customer_Model extends CI_Model
 		$this->db->where('AutocountSyncAction IS NOT NULL', null, false);
 		$this->db->where('name IS NOT NULL', null, false);
 
-		// --- old, CLEARER QUERY START ---
-		// This query uses a nested EXISTS, which is easier to read
-		// and just as performant.
-		// $subquery = "EXISTS (
-		// 	SELECT 1 
-		// 	FROM booking b
-		// 	WHERE b.CustomerID = customer.CustomerID 
-		// 	AND EXISTS (
-		// 		SELECT 1 
-		// 		FROM payment p
-		// 		WHERE p.BookingID = b.BookingID
-		// 	)
-		// )";
-		
-		// new logic condition
-		$subquery = "EXISTS (
-			SELECT 1 
-			FROM booking b
-			WHERE b.CustomerID = customer.CustomerID 
-		)";
-		
-		// Pass the whole string to where()
-		$this->db->where($subquery, null, false); 
-
-		// --- NEW, CLEARER QUERY END ---
+		// No booking requirement: master-data customers (created directly,
+		// without any booking) are synced too. They are flagged on insert in
+		// Customer_Model::Create(), so the status/action gates above are enough.
 
 		if (!empty($config['customer_cutoff_date'])) {
 			$date = date('Y-m-d', strtotime($config['customer_cutoff_date']));

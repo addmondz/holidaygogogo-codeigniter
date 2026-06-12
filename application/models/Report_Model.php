@@ -535,14 +535,26 @@ class Report_Model extends CI_Model
         // Duty-hour-aware avg first-response time. Computed at query time from
         // the per-slot timestamps so the duty-hour window can be changed
         // (see duty_hours_helper.php) without re-running the cron.
+        //
+        // Two figures come out of one slot pass:
+        //   avg_response_time_seconds          - the first-5 reply slots only
+        //   avg_combined_response_time_seconds - first-5 merged with the
+        //       most-recent-5 reply slots, deduped by agent_message_id so a
+        //       short lead (whose first-5 and recent-5 overlap) is not
+        //       double-counted. This powers the TC "My Response Time" card.
         $this->load->helper('duty_hours');
         $slotSql = "
             SELECT
-                pl.response_1_customer_message_at AS ct1, pl.response_1_agent_message_at AS at1, pl.response_1_seconds AS s1,
-                pl.response_2_customer_message_at AS ct2, pl.response_2_agent_message_at AS at2, pl.response_2_seconds AS s2,
-                pl.response_3_customer_message_at AS ct3, pl.response_3_agent_message_at AS at3, pl.response_3_seconds AS s3,
-                pl.response_4_customer_message_at AS ct4, pl.response_4_agent_message_at AS at4, pl.response_4_seconds AS s4,
-                pl.response_5_customer_message_at AS ct5, pl.response_5_agent_message_at AS at5, pl.response_5_seconds AS s5
+                pl.response_1_agent_message_id AS aid1, pl.response_1_customer_message_at AS ct1, pl.response_1_agent_message_at AS at1, pl.response_1_seconds AS s1,
+                pl.response_2_agent_message_id AS aid2, pl.response_2_customer_message_at AS ct2, pl.response_2_agent_message_at AS at2, pl.response_2_seconds AS s2,
+                pl.response_3_agent_message_id AS aid3, pl.response_3_customer_message_at AS ct3, pl.response_3_agent_message_at AS at3, pl.response_3_seconds AS s3,
+                pl.response_4_agent_message_id AS aid4, pl.response_4_customer_message_at AS ct4, pl.response_4_agent_message_at AS at4, pl.response_4_seconds AS s4,
+                pl.response_5_agent_message_id AS aid5, pl.response_5_customer_message_at AS ct5, pl.response_5_agent_message_at AS at5, pl.response_5_seconds AS s5,
+                pl.recent_response_1_agent_message_id AS raid1, pl.recent_response_1_customer_message_at AS rct1, pl.recent_response_1_agent_message_at AS rat1, pl.recent_response_1_seconds AS rs1,
+                pl.recent_response_2_agent_message_id AS raid2, pl.recent_response_2_customer_message_at AS rct2, pl.recent_response_2_agent_message_at AS rat2, pl.recent_response_2_seconds AS rs2,
+                pl.recent_response_3_agent_message_id AS raid3, pl.recent_response_3_customer_message_at AS rct3, pl.recent_response_3_agent_message_at AS rat3, pl.recent_response_3_seconds AS rs3,
+                pl.recent_response_4_agent_message_id AS raid4, pl.recent_response_4_customer_message_at AS rct4, pl.recent_response_4_agent_message_at AS rat4, pl.recent_response_4_seconds AS rs4,
+                pl.recent_response_5_agent_message_id AS raid5, pl.recent_response_5_customer_message_at AS rct5, pl.recent_response_5_agent_message_at AS rat5, pl.recent_response_5_seconds AS rs5
             FROM ghl_processed_leads pl
             LEFT JOIN ghl_conversations gc ON gc.conversation_id = pl.conversation_id
             {$extraJoins}
@@ -551,7 +563,11 @@ class Report_Model extends CI_Model
         $slotRows = $this->db->query($slotSql, $where['params'])->result_array();
         $dutyTotal = 0;
         $dutyCount = 0;
+        $combinedTotal = 0;
+        $combinedCount = 0;
         foreach ($slotRows as $sr) {
+            $seen = array();
+            // First-5 slots: feed both the first-5-only figure and the merged one.
             for ($i = 1; $i <= 5; $i++) {
                 $secs = $sr['s' . $i];
                 if ($secs === null || $secs === '') continue;
@@ -559,10 +575,33 @@ class Report_Model extends CI_Model
                 if ($dutySeconds === null) continue;
                 $dutyTotal += (int) $dutySeconds;
                 $dutyCount++;
+
+                $aid = $sr['aid' . $i];
+                if ($aid !== null && $aid !== '') $seen[$aid] = true;
+                $combinedTotal += (int) $dutySeconds;
+                $combinedCount++;
+            }
+            // Recent-5 slots: merged figure only, skipping messages already
+            // counted above (overlap on short leads).
+            for ($i = 1; $i <= 5; $i++) {
+                $secs = $sr['rs' . $i];
+                if ($secs === null || $secs === '') continue;
+                $aid = $sr['raid' . $i];
+                if ($aid !== null && $aid !== '') {
+                    if (isset($seen[$aid])) continue;
+                    $seen[$aid] = true;
+                }
+                $dutySeconds = calculate_duty_response_seconds($sr['rct' . $i], $sr['rat' . $i]);
+                if ($dutySeconds === null) continue;
+                $combinedTotal += (int) $dutySeconds;
+                $combinedCount++;
             }
         }
         $avgResponseSeconds = $dutyCount > 0
             ? (int) round($dutyTotal / $dutyCount)
+            : null;
+        $avgCombinedResponseSeconds = $combinedCount > 0
+            ? (int) round($combinedTotal / $combinedCount)
             : null;
         $avgRecentResponseSeconds = isset($row['avg_recent_response_time_seconds']) && $row['avg_recent_response_time_seconds'] !== null
             ? (int) round($row['avg_recent_response_time_seconds'])
@@ -578,6 +617,7 @@ class Report_Model extends CI_Model
             'total_leads' => $totalLeads,
             'responded_leads' => $respondedLeads,
             'avg_response_time_seconds' => $avgResponseSeconds,
+            'avg_combined_response_time_seconds' => $avgCombinedResponseSeconds,
             'avg_recent_response_time_seconds' => $avgRecentResponseSeconds,
             'avg_responded_messages' => $avgRespondedMessages,
             'avg_recent_responded_messages' => $avgRecentRespondedMessages,

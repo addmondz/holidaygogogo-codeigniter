@@ -1256,13 +1256,17 @@ class Booking extends MY_Controller
 					'week'  => (int)$mine_week['total_leads'],
 					'month' => (int)$mine_month['total_leads'],
 				);
+				// "My Response Time" merges the first-5 reply gaps with the
+				// most-recent-5 (deduped) so the figure reflects both how fast a
+				// lead is picked up and how responsive the agent stays later in
+				// the thread. See avg_combined_response_time_seconds in the model.
 				$cards['tc_response_time_dwm'] = array(
-					'day'           => $fmt_seconds($mine_day['avg_response_time_seconds']),
-					'week'          => $fmt_seconds($mine_week['avg_response_time_seconds']),
-					'month'         => $fmt_seconds($mine_month['avg_response_time_seconds']),
-					'day_seconds'   => $mine_day['avg_response_time_seconds'],
-					'week_seconds'  => $mine_week['avg_response_time_seconds'],
-					'month_seconds' => $mine_month['avg_response_time_seconds'],
+					'day'           => $fmt_seconds($mine_day['avg_combined_response_time_seconds']),
+					'week'          => $fmt_seconds($mine_week['avg_combined_response_time_seconds']),
+					'month'         => $fmt_seconds($mine_month['avg_combined_response_time_seconds']),
+					'day_seconds'   => $mine_day['avg_combined_response_time_seconds'],
+					'week_seconds'  => $mine_week['avg_combined_response_time_seconds'],
+					'month_seconds' => $mine_month['avg_combined_response_time_seconds'],
 				);
 
 				// "Lead Pickup Speed (Month)". Raw wall-clock time from a lead
