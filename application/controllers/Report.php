@@ -120,6 +120,44 @@ class Report extends MY_Controller
         $this->load->view('layout/footer');
     }
 
+    function Lead_Reply_Activity_Dashboard()
+    {
+        $filters = $this->lead_reply_activity_filters();
+        $payload = $this->lead_reply_activity_payload($filters);
+
+        $titles = array(
+            'tab_title' => 'HolidayGoGoGo | Report',
+            'breadcrumb_title' => 'Report >> Lead Reply Activity Dashboard'
+        );
+
+        $array = array(
+            'reply_activity_summary' => $payload['summary'],
+            'lead_reply_activity_agents' => $payload['agents'],
+            'lead_reply_activity_team_leads' => $payload['team_leads'],
+            'lead_reply_activity_rows' => $payload['rows'],
+            'lead_reply_activity_filters' => $filters,
+            'lead_reply_activity_updated_at' => $payload['updated_at'],
+        );
+
+        $this->load->view('layout/header', $titles);
+        $this->load->view('report/lead_reply_activity_dashboard', $array);
+        $this->load->view('layout/footer');
+    }
+
+    function Lead_Reply_Activity_Dashboard_Data()
+    {
+        $filters = $this->lead_reply_activity_filters();
+        $payload = $this->lead_reply_activity_payload($filters);
+
+        $this->output
+            ->set_content_type('application/json')
+            ->set_output(json_encode(array(
+                'summary' => $payload['summary'],
+                'rows' => $payload['rows'],
+                'updated_at' => $payload['updated_at'],
+            )));
+    }
+
     function Lead_Data()
     {
         $filters = $this->lead_data_filters();
@@ -768,6 +806,19 @@ class Report extends MY_Controller
         );
     }
 
+    private function lead_reply_activity_payload($filters)
+    {
+        $restrict = isset($filters['_restrict_agent_ids']) ? $filters['_restrict_agent_ids'] : null;
+
+        return array(
+            'summary' => $this->format_lead_reply_activity_summary($this->Report_Model->Lead_Reply_Activity_Summary($filters)),
+            'rows' => $this->format_lead_reply_activity_rows($this->Report_Model->Lead_Reply_Activity_By_Agent($filters)),
+            'agents' => $this->Report_Model->Lead_Ownership_Agents($restrict),
+            'team_leads' => $this->Report_Model->Lead_Dashboard_Team_Leads(),
+            'updated_at' => date('Y-m-d H:i:s'),
+        );
+    }
+
     private function lead_data_payload($filters)
     {
         $perPage = isset($filters['per_page']) ? max(10, (int) $filters['per_page']) : 25;
@@ -842,6 +893,43 @@ class Report extends MY_Controller
             'owner_user_id' => $owners,
             'team_lead' => $teamLeads,
             'ownership_type' => $ownershipType,
+        );
+
+        if ($restriction !== null) {
+            $filters['_restrict_agent_ids'] = $restriction;
+        }
+
+        return $filters;
+    }
+
+    private function lead_reply_activity_filters()
+    {
+        $replyDate = trim((string) $this->input->get('reply_date'));
+        $owners = $this->normalize_id_array($this->input->get('owner'));
+        $teamLeads = $this->normalize_id_array($this->input->get('team_lead'));
+        $parsedDate = $this->parse_report_single_date($replyDate);
+
+        if (empty($parsedDate['date'])) {
+            $today = date('Y-m-d');
+            $parsedDate = array(
+                'date' => $today,
+                'display' => date('d/m/Y', strtotime($today)),
+            );
+        }
+
+        $restriction = $this->get_lead_dashboard_agent_restriction();
+        if ($restriction !== null && !empty($owners)) {
+            $allowedSet = array_map('strval', $restriction);
+            $owners = array_values(array_intersect(array_map('strval', $owners), $allowedSet));
+        }
+
+        $filters = array(
+            'reply_date' => $parsedDate['display'],
+            'start_date' => $parsedDate['date'],
+            'end_date' => $parsedDate['date'],
+            'owner' => $owners,
+            'owner_user_id' => $owners,
+            'team_lead' => $teamLeads,
         );
 
         if ($restriction !== null) {
@@ -1151,6 +1239,36 @@ class Report extends MY_Controller
         );
     }
 
+    private function parse_report_single_date($dateValue)
+    {
+        $dateValue = trim((string) $dateValue);
+
+        if ($dateValue === '') {
+            return array(
+                'date' => null,
+                'display' => '',
+            );
+        }
+
+        if (strpos($dateValue, ' - ') !== false) {
+            $parts = explode(' - ', $dateValue);
+            $dateValue = trim($parts[0]);
+        }
+
+        $date = date('Y-m-d', strtotime(str_replace('/', '-', $dateValue)));
+        if ($date === '1970-01-01') {
+            return array(
+                'date' => null,
+                'display' => '',
+            );
+        }
+
+        return array(
+            'date' => $date,
+            'display' => date('d/m/Y', strtotime($date)),
+        );
+    }
+
     private function format_lead_dashboard_summary($summary)
     {
         return array(
@@ -1243,6 +1361,46 @@ class Report extends MY_Controller
                 'avg_responded_messages' => number_format((float) $row['avg_responded_messages'], 1),
                 'avg_recent_responded_messages' => number_format((float) $row['avg_recent_responded_messages'], 1),
                 'last_calculated_at' => $row['last_calculated_at'],
+            );
+        }
+
+        return $formatted;
+    }
+
+    private function format_lead_reply_activity_summary($summary)
+    {
+        return array(
+            'replied_leads' => (int) $summary['replied_leads'],
+            'unique_leads' => (int) $summary['unique_leads'],
+            'new_leads_replied' => (int) $summary['new_leads_replied'],
+            'existing_leads_replied' => (int) $summary['existing_leads_replied'],
+            'outbound_replies' => (int) $summary['outbound_replies'],
+            'assigned_owned_replied' => (int) $summary['assigned_owned_replied'],
+            'reply_owned_replied' => (int) $summary['reply_owned_replied'],
+            'active_owners' => (int) $summary['active_owners'],
+            'avg_replies_per_lead' => number_format((float) $summary['avg_replies_per_lead'], 1),
+        );
+    }
+
+    private function format_lead_reply_activity_rows($rows)
+    {
+        $formatted = array();
+
+        foreach ($rows as $row) {
+            $formatted[] = array(
+                'owner_user_id' => $row['owner_user_id'],
+                'owner_name' => $row['owner_name'],
+                'replied_leads' => (int) $row['replied_leads'],
+                'new_leads_replied' => (int) $row['new_leads_replied'],
+                'existing_leads_replied' => (int) $row['existing_leads_replied'],
+                'outbound_replies' => (int) $row['outbound_replies'],
+                'assigned_owned_replied' => (int) $row['assigned_owned_replied'],
+                'reply_owned_replied' => (int) $row['reply_owned_replied'],
+                'avg_replies_per_lead' => number_format((float) $row['avg_replies_per_lead'], 1),
+                'first_reply_at' => $row['first_reply_at'],
+                'last_reply_at' => $row['last_reply_at'],
+                'first_reply_at_label' => !empty($row['first_reply_at']) ? date('d M Y h:i A', strtotime($row['first_reply_at'])) : '-',
+                'last_reply_at_label' => !empty($row['last_reply_at']) ? date('d M Y h:i A', strtotime($row['last_reply_at'])) : '-',
             );
         }
 

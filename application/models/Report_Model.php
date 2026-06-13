@@ -861,7 +861,6 @@ class Report_Model extends CI_Model
                 'last_updated_at' => $row['last_updated_at'],
             );
         }
-
         return $results;
     }
 
@@ -1096,6 +1095,146 @@ class Report_Model extends CI_Model
         }
 
         return $this->db->query($sql, $params)->result_array();
+    }
+
+    function Lead_Reply_Activity_Summary($filters = array())
+    {
+        $where = $this->build_lead_reply_activity_where_clause($filters);
+        $extraJoins = isset($where['extra_joins']) ? $where['extra_joins'] : '';
+        $messageTimeColumn = $this->escape_identifier($this->get_message_time_column());
+        $leadStart = !empty($filters['start_date']) ? $filters['start_date'] . ' 00:00:00' : '1970-01-01 00:00:00';
+        $leadEnd = !empty($filters['end_date']) ? $filters['end_date'] . ' 23:59:59' : '9999-12-31 23:59:59';
+
+        $params = array($leadStart, $leadEnd, $leadStart, $leadEnd);
+        $params = array_merge($params, $where['params']);
+
+        $sql = "
+            SELECT
+                COUNT(DISTINCT CONCAT(glo.owner_user_id, ':', glo.processed_lead_id)) AS replied_leads,
+                COUNT(DISTINCT glo.processed_lead_id) AS unique_leads,
+                COUNT(DISTINCT CASE
+                    WHEN glo.lead_started_at BETWEEN ? AND ?
+                    THEN CONCAT(glo.owner_user_id, ':', glo.processed_lead_id)
+                END) AS new_leads_replied,
+                COUNT(DISTINCT CASE
+                    WHEN glo.lead_started_at NOT BETWEEN ? AND ?
+                    THEN CONCAT(glo.owner_user_id, ':', glo.processed_lead_id)
+                END) AS existing_leads_replied,
+                COUNT(*) AS outbound_replies,
+                COUNT(DISTINCT CASE
+                    WHEN glo.is_assigned_owner = 1
+                    THEN CONCAT(glo.owner_user_id, ':', glo.processed_lead_id)
+                END) AS assigned_owned_replied,
+                COUNT(DISTINCT CASE
+                    WHEN glo.is_assigned_owner = 0 AND glo.is_reply_owner = 1
+                    THEN CONCAT(glo.owner_user_id, ':', glo.processed_lead_id)
+                END) AS reply_owned_replied,
+                COUNT(DISTINCT glo.owner_user_id) AS active_owners
+            FROM ghl_messages gm
+            INNER JOIN ghl_lead_ownership glo
+                ON glo.conversation_id = gm.conversation_id
+               AND glo.owner_user_id = gm.user_id
+               AND gm.{$messageTimeColumn} >= glo.lead_started_at
+               AND (
+                    glo.lead_ended_at IS NULL
+                    OR gm.{$messageTimeColumn} < glo.lead_ended_at
+               )
+            LEFT JOIN ghl_users gu ON gu.UserID = glo.owner_user_id
+            {$extraJoins}
+            {$where['sql']}
+        ";
+
+        $row = $this->db->query($sql, $params)->row_array();
+        $repliedLeads = !empty($row['replied_leads']) ? (int) $row['replied_leads'] : 0;
+        $outboundReplies = !empty($row['outbound_replies']) ? (int) $row['outbound_replies'] : 0;
+
+        return array(
+            'replied_leads' => $repliedLeads,
+            'unique_leads' => !empty($row['unique_leads']) ? (int) $row['unique_leads'] : 0,
+            'new_leads_replied' => !empty($row['new_leads_replied']) ? (int) $row['new_leads_replied'] : 0,
+            'existing_leads_replied' => !empty($row['existing_leads_replied']) ? (int) $row['existing_leads_replied'] : 0,
+            'outbound_replies' => $outboundReplies,
+            'assigned_owned_replied' => !empty($row['assigned_owned_replied']) ? (int) $row['assigned_owned_replied'] : 0,
+            'reply_owned_replied' => !empty($row['reply_owned_replied']) ? (int) $row['reply_owned_replied'] : 0,
+            'active_owners' => !empty($row['active_owners']) ? (int) $row['active_owners'] : 0,
+            'avg_replies_per_lead' => $repliedLeads > 0 ? round($outboundReplies / $repliedLeads, 1) : 0.0,
+        );
+    }
+
+    function Lead_Reply_Activity_By_Agent($filters = array())
+    {
+        $where = $this->build_lead_reply_activity_where_clause($filters);
+        $extraJoins = isset($where['extra_joins']) ? $where['extra_joins'] : '';
+        $messageTimeColumn = $this->escape_identifier($this->get_message_time_column());
+        $leadStart = !empty($filters['start_date']) ? $filters['start_date'] . ' 00:00:00' : '1970-01-01 00:00:00';
+        $leadEnd = !empty($filters['end_date']) ? $filters['end_date'] . ' 23:59:59' : '9999-12-31 23:59:59';
+
+        $params = array($leadStart, $leadEnd, $leadStart, $leadEnd);
+        $params = array_merge($params, $where['params']);
+
+        $sql = "
+            SELECT
+                glo.owner_user_id,
+                COALESCE(NULLIF(gu.Name, ''), glo.owner_user_id) AS owner_name,
+                COUNT(DISTINCT glo.processed_lead_id) AS replied_leads,
+                COUNT(DISTINCT CASE
+                    WHEN glo.lead_started_at BETWEEN ? AND ?
+                    THEN glo.processed_lead_id
+                END) AS new_leads_replied,
+                COUNT(DISTINCT CASE
+                    WHEN glo.lead_started_at NOT BETWEEN ? AND ?
+                    THEN glo.processed_lead_id
+                END) AS existing_leads_replied,
+                COUNT(*) AS outbound_replies,
+                COUNT(DISTINCT CASE
+                    WHEN glo.is_assigned_owner = 1
+                    THEN glo.processed_lead_id
+                END) AS assigned_owned_replied,
+                COUNT(DISTINCT CASE
+                    WHEN glo.is_assigned_owner = 0 AND glo.is_reply_owner = 1
+                    THEN glo.processed_lead_id
+                END) AS reply_owned_replied,
+                MIN(gm.{$messageTimeColumn}) AS first_reply_at,
+                MAX(gm.{$messageTimeColumn}) AS last_reply_at
+            FROM ghl_messages gm
+            INNER JOIN ghl_lead_ownership glo
+                ON glo.conversation_id = gm.conversation_id
+               AND glo.owner_user_id = gm.user_id
+               AND gm.{$messageTimeColumn} >= glo.lead_started_at
+               AND (
+                    glo.lead_ended_at IS NULL
+                    OR gm.{$messageTimeColumn} < glo.lead_ended_at
+               )
+            LEFT JOIN ghl_users gu ON gu.UserID = glo.owner_user_id
+            {$extraJoins}
+            {$where['sql']}
+            GROUP BY glo.owner_user_id, owner_name
+            ORDER BY replied_leads DESC, outbound_replies DESC, owner_name ASC
+        ";
+
+        $rows = $this->db->query($sql, $params)->result_array();
+        $results = array();
+
+        foreach ($rows as $row) {
+            $repliedLeads = (int) $row['replied_leads'];
+            $outboundReplies = (int) $row['outbound_replies'];
+
+            $results[] = array(
+                'owner_user_id' => $row['owner_user_id'],
+                'owner_name' => $row['owner_name'],
+                'replied_leads' => $repliedLeads,
+                'new_leads_replied' => (int) $row['new_leads_replied'],
+                'existing_leads_replied' => (int) $row['existing_leads_replied'],
+                'outbound_replies' => $outboundReplies,
+                'assigned_owned_replied' => (int) $row['assigned_owned_replied'],
+                'reply_owned_replied' => (int) $row['reply_owned_replied'],
+                'avg_replies_per_lead' => $repliedLeads > 0 ? round($outboundReplies / $repliedLeads, 1) : 0.0,
+                'first_reply_at' => $row['first_reply_at'],
+                'last_reply_at' => $row['last_reply_at'],
+            );
+        }
+
+        return $results;
     }
 
     /**
@@ -1763,6 +1902,77 @@ class Report_Model extends CI_Model
         }
 
         return $tags;
+    }
+
+    private function build_lead_reply_activity_where_clause($filters = array())
+    {
+        $clauses = array();
+        $params = array();
+        $extraJoins = '';
+        $messageTimeColumn = $this->escape_identifier($this->get_message_time_column());
+
+        $clauses[] = "gm.direction = 'outbound'";
+        $clauses[] = "gm.user_id IS NOT NULL";
+        $clauses[] = "gm.user_id <> ''";
+
+        if (array_key_exists('_restrict_agent_ids', $filters)) {
+            $allowed = array_values(array_filter(
+                array_map('strval', (array) $filters['_restrict_agent_ids']),
+                'strlen'
+            ));
+            if (empty($allowed)) {
+                return array('sql' => 'WHERE 1=0', 'params' => array(), 'extra_joins' => '');
+            }
+            $placeholders = implode(',', array_fill(0, count($allowed), '?'));
+            $clauses[] = "glo.owner_user_id IN ({$placeholders})";
+            foreach ($allowed as $id) { $params[] = $id; }
+        }
+
+        if (!empty($filters['start_date'])) {
+            $clauses[] = "gm.{$messageTimeColumn} >= ?";
+            $params[] = $filters['start_date'] . ' 00:00:00';
+        }
+
+        if (!empty($filters['end_date'])) {
+            $clauses[] = "gm.{$messageTimeColumn} <= ?";
+            $params[] = $filters['end_date'] . ' 23:59:59';
+        }
+
+        if (!empty($filters['owner_user_id'])) {
+            $ownerIds = is_array($filters['owner_user_id']) ? $filters['owner_user_id'] : array($filters['owner_user_id']);
+            $ownerIds = array_values(array_filter($ownerIds, function($v) { return $v !== '' && $v !== null; }));
+
+            if (!empty($ownerIds)) {
+                $placeholders = implode(',', array_fill(0, count($ownerIds), '?'));
+                $clauses[] = "glo.owner_user_id IN ({$placeholders})";
+                foreach ($ownerIds as $id) { $params[] = $id; }
+            }
+        }
+
+        if (!empty($filters['team_lead'])) {
+            $teamLeadIds = is_array($filters['team_lead']) ? $filters['team_lead'] : array($filters['team_lead']);
+            $teamLeadIds = array_values(array_filter($teamLeadIds, function($v) { return $v !== '' && $v !== null; }));
+
+            if (!empty($teamLeadIds)) {
+                $extraJoins  = " LEFT JOIN admin_lead_dashboard_agents tl_alda ON tl_alda.GhlUserID = glo.owner_user_id ";
+                $extraJoins .= " LEFT JOIN admin tl_admin ON tl_admin.AdminID = tl_alda.AdminID AND tl_admin.Status = 'Y' ";
+
+                $placeholders = implode(',', array_fill(0, count($teamLeadIds), '?'));
+                $clauses[] = "tl_admin.TeamLeadID IN ({$placeholders})";
+                foreach ($teamLeadIds as $id) { $params[] = $id; }
+            }
+        }
+
+        $sql = '';
+        if (!empty($clauses)) {
+            $sql = 'WHERE ' . implode(' AND ', $clauses);
+        }
+
+        return array(
+            'sql' => $sql,
+            'params' => $params,
+            'extra_joins' => $extraJoins,
+        );
     }
 
     function Lead_Dashboard_Team_Leads()

@@ -36,9 +36,14 @@ $buildOwnershipDataUrl = function($ownerId, $ownershipType = null) use ($lead_ow
                     </div>
                 </div>
                 <div class="card-toolbar">
-                    <span class="label label-light-success label-inline font-weight-bold" id="lead-ownership-last-updated">
-                        Calculated <?php echo !empty($lead_ownership_updated_at) ? html_escape($lead_ownership_updated_at) : 'Not available'; ?>
-                    </span>
+                    <div class="text-right">
+                        <span class="label label-light-success label-inline font-weight-bold" id="lead-ownership-last-updated">
+                            Calculated <?php echo !empty($lead_ownership_updated_at) ? html_escape($lead_ownership_updated_at) : 'Not available'; ?>
+                        </span>
+                        <div class="mt-2">
+                            <a href="javascript:;" id="lead-ownership-refresh-now" class="text-primary font-weight-bold lead-refresh-link">Refresh Now</a>
+                        </div>
+                    </div>
                 </div>
             </div>
             <div class="card-body">
@@ -103,7 +108,6 @@ $buildOwnershipDataUrl = function($ownerId, $ownershipType = null) use ($lead_ow
                                     </div>
                                     <input type="submit" value="Filter" class="btn btn-light-success font-weight-bold" style="width:80px;">
                                     <input type="button" id="lead-ownership-reset" value="Reset" class="btn btn-light-primary font-weight-bold" style="width:80px;">
-                                    <button type="button" id="lead-ownership-refresh-now" class="btn btn-light-warning font-weight-bold">Refresh Now</button>
                                 </form>
                             </div>
                         </div>
@@ -233,6 +237,8 @@ $buildOwnershipDataUrl = function($ownerId, $ownershipType = null) use ($lead_ow
 </div>
 
 <script>
+    $('<style>.lead-refresh-link:hover{text-decoration:underline;}</style>').appendTo('head');
+
     var leadOwnershipEndpoint = '<?php echo base_url('Report/Lead_Ownership_Dashboard_Data'); ?>';
     var leadOwnershipDataBaseUrl = '<?php echo base_url('Report/Lead_Ownership_Data'); ?>';
     var leadOwnershipCurrentDate = (new Date()).toLocaleDateString();
