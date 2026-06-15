@@ -56,7 +56,9 @@ class Quotation extends MY_Controller {
                     'Description'        => $product['product_Description'],
                     'FurtherDescription' => '',
                     'Qty'                => $product['product_Quantity'],
-                    'Unit'               => (isset($product['unit'])) ? $product['unit'] : 'unit',
+                    // Null UOM => AutoCount uses the stock item's base UOM. The literal
+                    // 'unit' is rejected as "unit or multi pack 'unit' not exists".
+                    'Unit'               => (isset($product['unit'])) ? $product['unit'] : null,
                     'UnitPrice'          => $product['product_Price'],
                     'Discount'           => null,
                     'TaxCode'            => (isset($product['tax_code'])) ? $product['tax_code'] : 'S-5',
@@ -93,7 +95,9 @@ class Quotation extends MY_Controller {
                     'Description'        => $product['product_Description'],
                     'FurtherDescription' => '',
                     'Qty'                => $product['product_Quantity'],
-                    'Unit'               => (isset($product['unit'])) ? $product['unit'] : 'unit',
+                    // Null UOM => AutoCount uses the stock item's base UOM. The literal
+                    // 'unit' is rejected as "unit or multi pack 'unit' not exists".
+                    'Unit'               => (isset($product['unit'])) ? $product['unit'] : null,
                     'UnitPrice'          => $product['product_Price'],
                     'Discount'           => null,
                     'TaxCode'            => (isset($product['tax_code'])) ? $product['tax_code'] : 'S-5',

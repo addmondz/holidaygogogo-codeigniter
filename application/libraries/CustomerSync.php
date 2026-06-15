@@ -19,7 +19,8 @@ class CustomerSync {
 				//"parentAccNo"       => arr_get($data, 'parentAccNo', ''),
 				"companyName"       => arr_get($data, 'name', ''),
 				"desc2"             => arr_get($data, 'desc2', ''),
-				"registerNo"        => arr_get($data, 'registerNo', ''),
+				// IC / Passport from master data falls back into the debtor registerNo.
+				"registerNo"        => arr_get($data, 'registerNo', '') ?: arr_get($data, 'ic_passport_no', ''),
 				"isActive"          => (bool)arr_get($data, 'isActive', true),
 				"address"           => arr_get($data, 'Address', ''),
 				"postCode"          => arr_get($data, 'postCode', ''),
@@ -38,7 +39,8 @@ class CustomerSync {
 				"currencyCode"      => arr_get($data, 'CurrencyCode', 'MYR'),
 				"creditTerm"        => $config['customer_creditTerm'],
 				"taxCode"           => arr_get($data, 'taxCode', ''),
-				"taxRegisterNo"     => arr_get($data, 'taxRegisterNo', ''),
+				// TIN from master data falls back into the debtor taxRegisterNo.
+				"taxRegisterNo"     => arr_get($data, 'taxRegisterNo', '') ?: arr_get($data, 'tin_no', ''),
 				"note"              => arr_get($data, 'note', ''),
 			];
 
@@ -73,7 +75,8 @@ class CustomerSync {
 				//"parentAccNo"      => arr_get($data, 'parentAccNo', ''),
 				"companyName"      => arr_get($data, 'name', ''),
 				"desc2"            => arr_get($data, 'desc2', ''),
-				"registerNo"       => arr_get($data, 'registerNo', ''),
+				// IC / Passport from master data falls back into the debtor registerNo.
+				"registerNo"       => arr_get($data, 'registerNo', '') ?: arr_get($data, 'ic_passport_no', ''),
 				"isActive"         => (bool)arr_get($data, 'isActive', true),
 				"address"          => arr_get($data, 'Address', ''),
 				"postCode"         => arr_get($data, 'postCode', ''),
@@ -90,7 +93,8 @@ class CustomerSync {
 				"currencyCode"     => arr_get($data, 'CurrencyCode', 'MYR'),
 				"creditTerm"       => $config['customer_creditTerm'],
 				"taxCode"          => arr_get($data, 'taxCode', ''),
-				"taxRegisterNo"    => arr_get($data, 'taxRegisterNo', ''),
+				// TIN from master data falls back into the debtor taxRegisterNo.
+				"taxRegisterNo"    => arr_get($data, 'taxRegisterNo', '') ?: arr_get($data, 'tin_no', ''),
 				"note"             => arr_get($data, 'note', ''),
 			];
 

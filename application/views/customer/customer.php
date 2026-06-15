@@ -46,6 +46,24 @@
                         </div>
                         <div class="col-md-6">
                             <div class="form-group">
+                                <label>IC / Passport No</label>
+                                <div class="input-icon">
+                                    <input type="text" id="ic_passport_no" <?php if(current_url() == base_url('Customer/Update')) { ?> value="<?php echo htmlspecialchars(isset($ic_passport_no) ? $ic_passport_no : '', ENT_QUOTES); ?>" <?php } ?> autocomplete="off" class="form-control">
+                                    <span><i class="la la-id-card"></i></span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>TIN</label>
+                                <div class="input-icon">
+                                    <input type="text" id="tin_no" <?php if(current_url() == base_url('Customer/Update')) { ?> value="<?php echo htmlspecialchars(isset($tin_no) ? $tin_no : '', ENT_QUOTES); ?>" <?php } ?> autocomplete="off" class="form-control">
+                                    <span><i class="la la-file-invoice"></i></span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
                                 <label>Customer Code</label>
                                 <?php if (current_url() == base_url('Customer/Update') && !empty($CustomerCode)) { ?> 
                                     <div class="input-icon">
@@ -118,6 +136,8 @@
                 var phone_number = $('#phone_number').val();
                 var ChatLanguage = $('#ChatLanguage').val();
                 var CustomerCode = $('#CustomerCode').val();
+                var ic_passport_no = ($('#ic_passport_no').val()).toUpperCase();
+                var tin_no = ($('#tin_no').val()).toUpperCase();
 
                 if(name == '') {
                     Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', 'Please Insert All Required Customer Information', null);
@@ -127,7 +147,9 @@
                             name: name,
                             phone_number: phone_number,
                             ChatLanguage: ChatLanguage,
-                            CustomerCode: CustomerCode
+                            CustomerCode: CustomerCode,
+                            ic_passport_no: ic_passport_no,
+                            tin_no: tin_no
                             // InsertBy: <?php echo $this->session->userdata('admin_id') ?>,
                             // InsertDate: '<?php echo date('Y-m-d H:i:s') ?>'
                         }];

@@ -60,7 +60,9 @@ class BookingSync {
 						'description'        => arr_get($product, 'product_Name'),
 						'furtherDescription' => arr_get($product, 'product_Description', ''),
 						'qty'                => (float)arr_get($product, 'product_Quantity', 1),
-						'unit'               => arr_get($product, 'unit', 'unit'),
+						// Null UOM => AutoCount uses the stock item's base UOM. The literal
+						// 'unit' is rejected as "unit or multi pack 'unit' not exists".
+						'unit'               => arr_get($product, 'unit', null),
 						'unitPrice'          => (float)arr_get($product, 'product_Price', 0),
 						'discount'           => arr_get($product, 'discount', null),
 						'taxCode'            => arr_get($product, 'tax_code'),
@@ -146,7 +148,9 @@ class BookingSync {
 						'description'        => arr_get($product, 'product_Name'),
 						'furtherDescription' => arr_get($product, 'product_Description', ''),
 						'qty'                => (float)arr_get($product, 'product_Quantity', 1),
-						'unit'               => arr_get($product, 'unit', 'unit'),
+						// Null UOM => AutoCount uses the stock item's base UOM. The literal
+						// 'unit' is rejected as "unit or multi pack 'unit' not exists".
+						'unit'               => arr_get($product, 'unit', null),
 						'unitPrice'          => (float)arr_get($product, 'product_Price', 0),
 						'discount'           => arr_get($product, 'discount', null),
 						'taxCode'            => arr_get($product, 'tax_code'),

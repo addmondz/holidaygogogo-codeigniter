@@ -4806,7 +4806,9 @@ class Booking extends MY_Controller
 						'description'        => arr_get($product, 'product_Description'),
 						'furtherDescription' => arr_get($product, 'furtherDescription', ''),
 						'qty'                => arr_get($product, 'product_Quantity', 1),
-						'unit'               => arr_get($product, 'unit', 'unit'),
+						// Null UOM => AutoCount uses the stock item's base UOM. The literal
+						// 'unit' is rejected as "unit or multi pack 'unit' not exists".
+						'unit'               => arr_get($product, 'unit', null),
 						'unitPrice'          => arr_get($product, 'product_Price', 0),
 						'discount'           => arr_get($product, 'discount', null),
 						'taxCode'            => arr_get($product, 'tax_code', 'S-5'),
@@ -4901,7 +4903,9 @@ class Booking extends MY_Controller
 						'description'        => arr_get($product, 'product_Description'),
 						'furtherDescription' => arr_get($product, 'furtherDescription', ''),
 						'qty'                => arr_get($product, 'product_Quantity', 1),
-						'unit'               => arr_get($product, 'unit', 'unit'),
+						// Null UOM => AutoCount uses the stock item's base UOM. The literal
+						// 'unit' is rejected as "unit or multi pack 'unit' not exists".
+						'unit'               => arr_get($product, 'unit', null),
 						'unitPrice'          => arr_get($product, 'product_Price', 0),
 						'discount'           => arr_get($product, 'discount', null),
 						'taxCode'            => arr_get($product, 'tax_code', 'S-5'),
