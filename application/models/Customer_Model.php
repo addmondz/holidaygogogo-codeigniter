@@ -269,6 +269,8 @@ class Customer_Model extends CI_Model
 			// Identity fields synced to AutoCount (IC -> registerNo, TIN -> taxRegisterNo).
 			'ic_passport_no' => !empty($customer['ic_passport_no']) ? strtoupper(trim($customer['ic_passport_no'])) : null,
 			'tin_no'         => !empty($customer['tin_no']) ? strtoupper(trim($customer['tin_no'])) : null,
+			// Billing address, synced to AutoCount debtor address.
+			'Address'        => !empty($customer['Address']) ? trim($customer['Address']) : null,
 			// Flag for AutoCount sync so master-data customers (no booking) get
 			// pushed by the cron. AutoCount auto-generates the code if blank.
 			'AutocountSyncAction' => 'C',

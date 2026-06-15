@@ -85,6 +85,15 @@
                                 <?php } ?>
                             </div>
                         </div>
+                        <div class="col-md-12">
+                            <div class="form-group">
+                                <label>Billing Address</label>
+                                <div class="input-icon">
+                                    <textarea id="Address" rows="2" autocomplete="off" class="form-control" placeholder="Enter billing address"><?php if(current_url() == base_url('Customer/Update')) { echo htmlspecialchars(isset($Address) ? $Address : '', ENT_QUOTES); } ?></textarea>
+                                    <span><i class="la la-map-marker"></i></span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <div class="d-flex justify-content-between border-top pt-5">
                         <input type="button" value="<?php if(current_url() == base_url('Customer/Create')) { echo 'Create Customer'; } else { echo 'Update Customer'; } ?>" class="btn btn-success font-weight-bold px-9 py-4" style="width:180px; margin-left:auto;">
@@ -138,6 +147,7 @@
                 var CustomerCode = $('#CustomerCode').val();
                 var ic_passport_no = ($('#ic_passport_no').val()).toUpperCase();
                 var tin_no = ($('#tin_no').val()).toUpperCase();
+                var Address = $('#Address').val();
 
                 if(name == '') {
                     Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', 'Please Insert All Required Customer Information', null);
@@ -149,7 +159,8 @@
                             ChatLanguage: ChatLanguage,
                             CustomerCode: CustomerCode,
                             ic_passport_no: ic_passport_no,
-                            tin_no: tin_no
+                            tin_no: tin_no,
+                            Address: Address
                             // InsertBy: <?php echo $this->session->userdata('admin_id') ?>,
                             // InsertDate: '<?php echo date('Y-m-d H:i:s') ?>'
                         }];
