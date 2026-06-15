@@ -490,9 +490,26 @@ class Cron extends CI_Controller
 		);
 
 		$flags = array();
-		foreach ($cliArgs as $arg) {
+		$until = null;
+		$chunkSizeResolved = false;
+		for ($i = 0; $i < count($cliArgs); $i++) {
+			$arg = $cliArgs[$i];
+			if ((string) $arg === 'process_ghl_leads') {
+				continue;
+			}
+
 			if (strncmp((string) $arg, '--', 2) === 0) {
+				if (strpos((string) $arg, '--until=') === 0) {
+					$until = substr((string) $arg, strlen('--until='));
+				} elseif ((string) $arg === '--until' && isset($cliArgs[$i + 1])) {
+					$until = (string) $cliArgs[++$i];
+				}
 				$flags[] = (string) $arg;
+				continue;
+			}
+
+			if (strtolower((string) $arg) === 'until' && isset($cliArgs[$i + 1])) {
+				$until = (string) $cliArgs[++$i];
 				continue;
 			}
 
@@ -500,14 +517,18 @@ class Cron extends CI_Controller
 				continue;
 			}
 
-			$chunkSize = (int) $arg;
-			break;
+			if (!$chunkSizeResolved) {
+				$chunkSize = (int) $arg;
+				$chunkSizeResolved = true;
+			}
 		}
 
 		$chunkSize = (int) $chunkSize;
 		if ($chunkSize <= 0) {
 			$chunkSize = 100;
 		}
+
+		$upperBound = $this->resolve_ghl_processing_upper_bound($until);
 
 		$shouldRebuild = in_array('--rebuild', $flags, true)
 			|| in_array('--restart', $flags, true)
@@ -521,6 +542,9 @@ class Cron extends CI_Controller
 
 		echo "=== GHL Lead Processing Start ===" . PHP_EOL;
 		echo "Chunk size: {$chunkSize}" . PHP_EOL;
+		if ($upperBound !== null) {
+			echo "Processing messages updated before: {$upperBound}" . PHP_EOL;
+		}
 
 		if (!$this->Ghl_Processed_Leads_Model->acquire_processor_lock('ghl_leads_processor', 0)) {
 			echo "Another ghl lead processor run is already active." . PHP_EOL;
@@ -529,38 +553,82 @@ class Cron extends CI_Controller
 
 		try {
 			if ($shouldRebuild) {
+				if ($upperBound === null) {
+					$upperBound = $this->Ghl_Processed_Leads_Model->get_current_processing_upper_bound();
+					echo "Processing messages updated before: {$upperBound}" . PHP_EOL;
+				}
+
 				echo "Rebuild mode: clearing ghl_processed_leads and ghl_processing_state before processing." . PHP_EOL;
 
 				if (!$this->Ghl_Processed_Leads_Model->reset_processing_data()) {
 					show_error('Failed resetting ghl lead processing data.', 500);
 				}
-			}
 
-			while (true) {
-				$batch = $this->Ghl_Processed_Leads_Model->get_next_conversation_batch('ghl_leads_processor', $chunkSize);
+				$lastConversationId = '';
 
-				if (empty($batch['conversations'])) {
-					break;
-				}
-
-				$summary['batches']++;
-				echo "Processing batch {$summary['batches']} with " . count($batch['conversations']) . " conversation(s)" . PHP_EOL;
-
-				foreach ($batch['conversations'] as $conversationMeta) {
-					$leadCount = $this->process_single_ghl_conversation(
-						$conversationMeta['conversation_id'],
-						(int) $conversationMeta['first_new_message_row_id']
+				while (true) {
+					$conversations = $this->Ghl_Processed_Leads_Model->get_rebuild_conversation_batch(
+						$lastConversationId,
+						$chunkSize,
+						$upperBound
 					);
-					$summary['conversations_processed']++;
-					$summary['leads_rebuilt'] += $leadCount;
 
-					echo " - {$conversationMeta['conversation_id']}: {$leadCount} lead(s)" . PHP_EOL;
+					if (empty($conversations)) {
+						break;
+					}
+
+					$summary['batches']++;
+					echo "Processing rebuild batch {$summary['batches']} with " . count($conversations) . " conversation(s)" . PHP_EOL;
+
+					foreach ($conversations as $conversationMeta) {
+						$lastConversationId = (string) $conversationMeta['conversation_id'];
+						$leadCount = $this->process_single_ghl_conversation(
+							$lastConversationId,
+							(int) $conversationMeta['first_new_message_row_id'],
+							$upperBound
+						);
+						$summary['conversations_processed']++;
+						$summary['leads_rebuilt'] += $leadCount;
+
+						echo " - {$lastConversationId}: {$leadCount} lead(s)" . PHP_EOL;
+					}
 				}
 
+				$completionCursor = $this->Ghl_Processed_Leads_Model->get_processing_completion_cursor($upperBound);
 				$this->Ghl_Processed_Leads_Model->save_processor_state(
 					'ghl_leads_processor',
-					$batch['cursor']['last_processed_message_row_id']
+					$completionCursor['last_processed_message_row_id'],
+					$completionCursor['last_processed_at']
 				);
+			} else {
+				while (true) {
+					$batch = $this->Ghl_Processed_Leads_Model->get_next_conversation_batch('ghl_leads_processor', $chunkSize, $upperBound);
+
+					if (empty($batch['conversations'])) {
+						break;
+					}
+
+					$summary['batches']++;
+					echo "Processing batch {$summary['batches']} with " . count($batch['conversations']) . " conversation(s)" . PHP_EOL;
+
+					foreach ($batch['conversations'] as $conversationMeta) {
+						$leadCount = $this->process_single_ghl_conversation(
+							$conversationMeta['conversation_id'],
+							(int) $conversationMeta['first_new_message_row_id'],
+							$upperBound
+						);
+						$summary['conversations_processed']++;
+						$summary['leads_rebuilt'] += $leadCount;
+
+						echo " - {$conversationMeta['conversation_id']}: {$leadCount} lead(s)" . PHP_EOL;
+					}
+
+					$this->Ghl_Processed_Leads_Model->save_processor_state(
+						'ghl_leads_processor',
+						$batch['cursor']['last_processed_message_row_id'],
+						$batch['cursor']['last_processed_at']
+					);
+				}
 			}
 		} finally {
 			$this->Ghl_Processed_Leads_Model->release_processor_lock('ghl_leads_processor');
@@ -570,6 +638,26 @@ class Cron extends CI_Controller
 		echo "Rebuilt leads: {$summary['leads_rebuilt']}" . PHP_EOL;
 		echo "Batches: {$summary['batches']}" . PHP_EOL;
 		echo "=== GHL Lead Processing End ===" . PHP_EOL;
+	}
+
+	private function resolve_ghl_processing_upper_bound($until)
+	{
+		$until = trim((string) $until);
+		if ($until === '') {
+			return null;
+		}
+
+		if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $until)) {
+			$timestamp = strtotime($until . ' +1 day');
+		} else {
+			$timestamp = strtotime($until);
+		}
+
+		if ($timestamp === false) {
+			show_error('Invalid --until value. Use YYYY-MM-DD or YYYY-MM-DD HH:MM:SS.', 500);
+		}
+
+		return date('Y-m-d H:i:s', $timestamp);
 	}
 
 	public function process_ghl_lead_conversions($chunkSize = null)
@@ -591,15 +679,26 @@ class Cron extends CI_Controller
 		$flags = array();
 		$targetLeadId = null;
 		$targetConversationId = null;
+		$until = null;
 		$chunkSizeResolved = false;
-		foreach ($cliArgs as $arg) {
+		for ($i = 0; $i < count($cliArgs); $i++) {
+			$arg = $cliArgs[$i];
 			if (strncmp((string) $arg, '--', 2) === 0) {
 				if (strpos((string) $arg, '--lead-id=') === 0) {
 					$targetLeadId = (int) substr((string) $arg, strlen('--lead-id='));
 				} elseif (strpos((string) $arg, '--conversation-id=') === 0) {
 					$targetConversationId = (string) substr((string) $arg, strlen('--conversation-id='));
+				} elseif (strpos((string) $arg, '--until=') === 0) {
+					$until = substr((string) $arg, strlen('--until='));
+				} elseif ((string) $arg === '--until' && isset($cliArgs[$i + 1])) {
+					$until = (string) $cliArgs[++$i];
 				}
 				$flags[] = (string) $arg;
+				continue;
+			}
+
+			if (strtolower((string) $arg) === 'until' && isset($cliArgs[$i + 1])) {
+				$until = (string) $cliArgs[++$i];
 				continue;
 			}
 
@@ -625,6 +724,8 @@ class Cron extends CI_Controller
 				continue;
 			}
 		}
+
+		$upperBound = $this->resolve_ghl_processing_upper_bound($until);
 
 		if ($chunkSize !== null) {
 			$chunkSize = (int) $chunkSize;
@@ -656,6 +757,9 @@ class Cron extends CI_Controller
 
 		echo "=== GHL Lead Conversion Processing Start ===" . PHP_EOL;
 		echo 'Chunk size: ' . ($chunkSize === null ? 'ALL' : $chunkSize) . PHP_EOL;
+		if ($upperBound !== null) {
+			echo "Matching bookings inserted before: {$upperBound}" . PHP_EOL;
+		}
 
 		if (!$this->Ghl_Processed_Leads_Model->acquire_processor_lock('ghl_lead_conversion_processor', 0)) {
 			$this->finish_ghl_processor_run_log(
@@ -707,7 +811,8 @@ class Cron extends CI_Controller
 
 					$conversion = $this->Ghl_Processed_Leads_Model->find_first_booking_conversion(
 						$phoneVariants,
-						$lead['lead_started_at']
+						$lead['lead_started_at'],
+						$upperBound
 					);
 
 					if (empty($conversion)) {
@@ -1053,11 +1158,11 @@ class Cron extends CI_Controller
 		$this->Ghl_Sync_Model->create_log($payload);
 	}
 
-	private function process_single_ghl_conversation($conversationId, $firstNewMessageRowId = 0)
+	private function process_single_ghl_conversation($conversationId, $firstNewMessageRowId = 0, $messageUpdatedBefore = null)
 	{
 		$this->load->helper('duty_hours');
 
-		$messages = $this->Ghl_Processed_Leads_Model->get_conversation_messages($conversationId);
+		$messages = $this->Ghl_Processed_Leads_Model->get_conversation_messages($conversationId, $messageUpdatedBefore);
 		$existingConversions = $this->Ghl_Processed_Leads_Model->get_existing_conversion_map($conversationId);
 		$currentAssignedTo = $this->Ghl_Processed_Leads_Model->get_conversation_assigned_to($conversationId);
 

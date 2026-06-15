@@ -33,30 +33,48 @@ class Ghl_Processed_Leads_Model extends CI_Model
         $this->activeLockName = null;
     }
 
-    public function get_next_conversation_batch($processorName, $conversationLimit)
+    public function get_next_conversation_batch($processorName, $conversationLimit, $upperBound = null)
     {
         $conversationLimit = max(1, (int) $conversationLimit);
         $scanLimit = min(max($conversationLimit * 20, 1000), 10000);
         $state = $this->get_processor_state($processorName);
+        $timeColumn = $this->escape_identifier($this->get_message_time_column());
 
+        $cursorProcessedAt = $state['last_processed_at'];
         $cursorMessageRowId = $state['last_processed_message_row_id'];
+        $batchUpperBound = $upperBound !== null && $upperBound !== ''
+            ? (string) $upperBound
+            : $this->get_database_datetime();
 
         $conversations = array();
         $selectedConversationIds = array();
+        $safeCursorProcessedAt = $cursorProcessedAt;
         $safeCursorMessageRowId = $cursorMessageRowId;
 
         while (true) {
             $rows = $this->db->query(
                 "
-                SELECT id, conversation_id
+                SELECT id, conversation_id, updated_at
                 FROM ghl_messages
-                WHERE id > ?
+                WHERE (
+                    updated_at > ?
+                    OR (updated_at = ? AND id > ?)
+                )
+                  AND updated_at < ?
+                  AND {$timeColumn} < ?
                   AND conversation_id IS NOT NULL
                   AND conversation_id <> ''
-                ORDER BY id ASC
+                ORDER BY updated_at ASC, id ASC
                 LIMIT ?
                 ",
-                array($cursorMessageRowId, $scanLimit)
+                array(
+                    $cursorProcessedAt,
+                    $cursorProcessedAt,
+                    $cursorMessageRowId,
+                    $batchUpperBound,
+                    $batchUpperBound,
+                    $scanLimit,
+                )
             )->result_array();
 
             if (empty($rows)) {
@@ -77,11 +95,13 @@ class Ghl_Processed_Leads_Model extends CI_Model
                         );
                     }
 
+                    $safeCursorProcessedAt = (string) $row['updated_at'];
                     $safeCursorMessageRowId = (int) $row['id'];
                     continue;
                 }
 
                 if (isset($selectedConversationIds[$conversationId])) {
+                    $safeCursorProcessedAt = (string) $row['updated_at'];
                     $safeCursorMessageRowId = (int) $row['id'];
                     continue;
                 }
@@ -99,20 +119,111 @@ class Ghl_Processed_Leads_Model extends CI_Model
             }
 
             $lastRow = $rows[count($rows) - 1];
+            $cursorProcessedAt = (string) $lastRow['updated_at'];
             $cursorMessageRowId = (int) $lastRow['id'];
         }
 
         return array(
             'conversations' => $conversations,
             'cursor' => array(
+                'last_processed_at' => $safeCursorProcessedAt,
                 'last_processed_message_row_id' => $safeCursorMessageRowId,
             ),
         );
     }
 
-    public function get_conversation_messages($conversationId)
+    public function get_rebuild_conversation_batch($lastConversationId, $conversationLimit, $upperBound = null)
+    {
+        $conversationLimit = max(1, (int) $conversationLimit);
+        $lastConversationId = (string) $lastConversationId;
+        $timeColumn = $this->escape_identifier($this->get_message_time_column());
+
+        $clauses = array(
+            'conversation_id IS NOT NULL',
+            "conversation_id <> ''",
+            'conversation_id > ?',
+        );
+        $params = array($lastConversationId);
+
+        if ($upperBound !== null && $upperBound !== '') {
+            $clauses[] = 'updated_at < ?';
+            $params[] = (string) $upperBound;
+            $clauses[] = "{$timeColumn} < ?";
+            $params[] = (string) $upperBound;
+        }
+
+        $params[] = $conversationLimit;
+
+        return $this->db->query(
+            "
+            SELECT conversation_id, MIN(id) AS first_new_message_row_id
+            FROM ghl_messages
+            WHERE " . implode(' AND ', $clauses) . "
+            GROUP BY conversation_id
+            ORDER BY conversation_id ASC
+            LIMIT ?
+            ",
+            $params
+        )->result_array();
+    }
+
+    public function get_processing_completion_cursor($upperBound = null)
     {
         $timeColumn = $this->escape_identifier($this->get_message_time_column());
+        $clauses = array(
+            'conversation_id IS NOT NULL',
+            "conversation_id <> ''",
+        );
+        $params = array();
+
+        if ($upperBound !== null && $upperBound !== '') {
+            $clauses[] = 'updated_at < ?';
+            $params[] = (string) $upperBound;
+            $clauses[] = "{$timeColumn} < ?";
+            $params[] = (string) $upperBound;
+        }
+
+        $row = $this->db->query(
+            "
+            SELECT id, updated_at
+            FROM ghl_messages
+            WHERE " . implode(' AND ', $clauses) . "
+            ORDER BY updated_at DESC, id DESC
+            LIMIT 1
+            ",
+            $params
+        )->row_array();
+
+        if (empty($row)) {
+            return array(
+                'last_processed_at' => '1970-01-01 00:00:00',
+                'last_processed_message_row_id' => 0,
+            );
+        }
+
+        return array(
+            'last_processed_at' => (string) $row['updated_at'],
+            'last_processed_message_row_id' => (int) $row['id'],
+        );
+    }
+
+    public function get_current_processing_upper_bound()
+    {
+        return $this->get_database_datetime();
+    }
+
+    public function get_conversation_messages($conversationId, $updatedBefore = null)
+    {
+        $timeColumn = $this->escape_identifier($this->get_message_time_column());
+        $clauses = array('conversation_id = ?');
+        $params = array((string) $conversationId);
+
+        if ($updatedBefore !== null && $updatedBefore !== '') {
+            $clauses[] = 'updated_at < ?';
+            $params[] = (string) $updatedBefore;
+            $clauses[] = "{$timeColumn} < ?";
+            $params[] = (string) $updatedBefore;
+        }
 
         return $this->db->query(
             "
@@ -125,10 +236,10 @@ class Ghl_Processed_Leads_Model extends CI_Model
                 user_id,
                 {$timeColumn} AS message_timestamp
             FROM ghl_messages
-            WHERE conversation_id = ?
+            WHERE " . implode(' AND ', $clauses) . "
             ORDER BY {$timeColumn} ASC, id ASC
             ",
-            array((string) $conversationId)
+            $params
         )->result_array();
     }
 
@@ -261,7 +372,7 @@ class Ghl_Processed_Leads_Model extends CI_Model
         )->result_array();
     }
 
-    public function find_first_booking_conversion($phoneVariants, $leadStartedAt)
+    public function find_first_booking_conversion($phoneVariants, $leadStartedAt, $convertedBefore = null)
     {
         $phoneVariants = array_values(array_filter(array_unique(array_map('strval', (array) $phoneVariants))));
         $leadStartedAt = trim((string) $leadStartedAt);
@@ -272,6 +383,11 @@ class Ghl_Processed_Leads_Model extends CI_Model
 
         $placeholders = implode(',', array_fill(0, count($phoneVariants), '?'));
         $params = array($leadStartedAt);
+        $convertedBeforeSql = '';
+        if ($convertedBefore !== null && $convertedBefore !== '') {
+            $convertedBeforeSql = ' AND b.InsertDate < ?';
+            $params[] = (string) $convertedBefore;
+        }
         $params = array_merge($params, $phoneVariants, $phoneVariants, $phoneVariants);
 
         $row = $this->db->query(
@@ -286,6 +402,7 @@ class Ghl_Processed_Leads_Model extends CI_Model
             FROM booking b
             LEFT JOIN customer c ON c.CustomerID = b.CustomerID
             WHERE b.InsertDate >= ?
+              {$convertedBeforeSql}
               AND b.BookingConfirmationTitle = 'BOOKING CONFIRMATION'
               AND (
                   b.Mobile IN ({$placeholders})
@@ -319,7 +436,7 @@ class Ghl_Processed_Leads_Model extends CI_Model
     public function get_processor_state($processorName)
     {
         $row = $this->db
-            ->select('last_processed_message_row_id')
+            ->select('last_processed_at, last_processed_message_row_id')
             ->from('ghl_processing_state')
             ->where('processor_name', (string) $processorName)
             ->limit(1)
@@ -328,21 +445,42 @@ class Ghl_Processed_Leads_Model extends CI_Model
 
         if (empty($row)) {
             return array(
+                'last_processed_at' => '1970-01-01 00:00:00',
                 'last_processed_message_row_id' => 0,
             );
         }
 
+        $lastProcessedAt = !empty($row['last_processed_at'])
+            ? (string) $row['last_processed_at']
+            : '1970-01-01 00:00:00';
+        $lastProcessedMessageRowId = isset($row['last_processed_message_row_id'])
+            ? (int) $row['last_processed_message_row_id']
+            : 0;
+
+        // Older code saved this value with PHP's timezone while ghl_messages.updated_at
+        // is DB-generated. Normalize future cursors to the stored message row's DB
+        // timestamp so later upserts to older rows are still picked up.
+        $maxMessageUpdatedAt = $this->get_max_message_updated_at();
+        if ($maxMessageUpdatedAt !== null && $lastProcessedAt > $maxMessageUpdatedAt) {
+            $messageCursor = $this->get_message_row_cursor($lastProcessedMessageRowId);
+            $lastProcessedAt = $messageCursor['last_processed_at'];
+            $lastProcessedMessageRowId = $messageCursor['last_processed_message_row_id'];
+        }
+
         return array(
-            'last_processed_message_row_id' => isset($row['last_processed_message_row_id']) ? (int) $row['last_processed_message_row_id'] : 0,
+            'last_processed_at' => $lastProcessedAt,
+            'last_processed_message_row_id' => $lastProcessedMessageRowId,
         );
     }
 
-    public function save_processor_state($processorName, $lastProcessedMessageRowId)
+    public function save_processor_state($processorName, $lastProcessedMessageRowId, $lastProcessedAt = null)
     {
         $payload = array(
             'processor_name' => (string) $processorName,
             'last_processed_message_row_id' => (int) $lastProcessedMessageRowId,
-            'last_processed_at' => date('Y-m-d H:i:s'),
+            'last_processed_at' => $lastProcessedAt !== null && $lastProcessedAt !== ''
+                ? (string) $lastProcessedAt
+                : $this->get_database_datetime(),
         );
 
         $existing = $this->db
@@ -360,6 +498,59 @@ class Ghl_Processed_Leads_Model extends CI_Model
         }
 
         return $this->db->insert('ghl_processing_state', $payload);
+    }
+
+    protected function get_database_datetime()
+    {
+        $row = $this->db
+            ->query('SELECT NOW() AS database_now')
+            ->row_array();
+
+        return !empty($row['database_now'])
+            ? (string) $row['database_now']
+            : date('Y-m-d H:i:s');
+    }
+
+    protected function get_message_row_cursor($messageRowId)
+    {
+        $messageRowId = max(0, (int) $messageRowId);
+        if ($messageRowId <= 0) {
+            return array(
+                'last_processed_at' => '1970-01-01 00:00:00',
+                'last_processed_message_row_id' => 0,
+            );
+        }
+
+        $row = $this->db->query(
+            "
+            SELECT id, updated_at
+            FROM ghl_messages
+            WHERE id = ?
+            LIMIT 1
+            ",
+            array($messageRowId)
+        )->row_array();
+
+        if (empty($row['updated_at'])) {
+            return array(
+                'last_processed_at' => '1970-01-01 00:00:00',
+                'last_processed_message_row_id' => 0,
+            );
+        }
+
+        return array(
+            'last_processed_at' => (string) $row['updated_at'],
+            'last_processed_message_row_id' => isset($row['id']) ? (int) $row['id'] : 0,
+        );
+    }
+
+    protected function get_max_message_updated_at()
+    {
+        $row = $this->db
+            ->query('SELECT MAX(updated_at) AS max_updated_at FROM ghl_messages')
+            ->row_array();
+
+        return !empty($row['max_updated_at']) ? (string) $row['max_updated_at'] : null;
     }
 
     protected function get_message_time_column()

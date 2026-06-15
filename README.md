@@ -47,7 +47,7 @@ I. Default Commands & order
 	php index.php Cron syncGhlConversations --full
 	php index.php Cron syncGhlMessages --full
 	php index.php Cron process_ghl_leads --rebuild
-	php index.php Cron process_ghl_lead_conversions --rebuild
+	php index.php Cron process_ghl_lead_conversions
 	php index.php Cron process_ghl_lead_ownership rebuild
 
 II. Default Daily & order 
