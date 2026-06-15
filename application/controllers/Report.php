@@ -1271,6 +1271,10 @@ class Report extends MY_Controller
 
     private function format_lead_dashboard_summary($summary)
     {
+        $avgResponseSeconds = array_key_exists('avg_combined_response_time_seconds', $summary)
+            ? $summary['avg_combined_response_time_seconds']
+            : $summary['avg_response_time_seconds'];
+
         return array(
             'total_leads' => (int) $summary['total_leads'],
             'responded_leads' => (int) $summary['responded_leads'],
@@ -1278,8 +1282,10 @@ class Report extends MY_Controller
             'active_agents' => (int) $summary['active_agents'],
             'response_rate' => number_format((float) $summary['response_rate'], 1),
             'conversion_rate' => number_format((float) $summary['conversion_rate'], 1),
-            'avg_response_time_seconds' => $summary['avg_response_time_seconds'],
-            'avg_response_time_label' => $this->format_duration_label($summary['avg_response_time_seconds']),
+            'avg_first_response_time_seconds' => $summary['avg_response_time_seconds'],
+            'avg_first_response_time_label' => $this->format_duration_label($summary['avg_response_time_seconds']),
+            'avg_response_time_seconds' => $avgResponseSeconds,
+            'avg_response_time_label' => $this->format_duration_label($avgResponseSeconds),
             'avg_recent_response_time_seconds' => $summary['avg_recent_response_time_seconds'],
             'avg_recent_response_time_label' => $this->format_duration_label($summary['avg_recent_response_time_seconds']),
             'avg_responded_messages' => number_format((float) $summary['avg_responded_messages'], 1),
@@ -1300,6 +1306,8 @@ class Report extends MY_Controller
                 'converted_leads' => (int) $row['converted_leads'],
                 'response_rate' => number_format((float) $row['response_rate'], 1),
                 'conversion_rate' => number_format((float) $row['conversion_rate'], 1),
+                'avg_first_response_time_seconds' => isset($row['avg_first_response_time_seconds']) ? $row['avg_first_response_time_seconds'] : null,
+                'avg_first_response_time_label' => $this->format_duration_label(isset($row['avg_first_response_time_seconds']) ? $row['avg_first_response_time_seconds'] : null),
                 'avg_response_time_seconds' => $row['avg_response_time_seconds'],
                 'avg_response_time_label' => $this->format_duration_label($row['avg_response_time_seconds']),
                 'avg_recent_response_time_seconds' => $row['avg_recent_response_time_seconds'],
@@ -1327,6 +1335,8 @@ class Report extends MY_Controller
             'response_rate' => number_format((float) $summary['response_rate'], 1),
             'follow_up_rate' => number_format((float) $summary['follow_up_rate'], 1),
             'conversion_rate' => number_format((float) $summary['conversion_rate'], 1),
+            'avg_first_response_time_seconds' => isset($summary['avg_first_response_time_seconds']) ? $summary['avg_first_response_time_seconds'] : null,
+            'avg_first_response_time_label' => $this->format_duration_label(isset($summary['avg_first_response_time_seconds']) ? $summary['avg_first_response_time_seconds'] : null),
             'avg_response_time_seconds' => $summary['avg_response_time_seconds'],
             'avg_response_time_label' => $this->format_duration_label($summary['avg_response_time_seconds']),
             'avg_recent_response_time_seconds' => $summary['avg_recent_response_time_seconds'],
@@ -1354,6 +1364,8 @@ class Report extends MY_Controller
                 'response_rate' => number_format((float) $row['response_rate'], 1),
                 'follow_up_rate' => number_format((float) $row['follow_up_rate'], 1),
                 'conversion_rate' => number_format((float) $row['conversion_rate'], 1),
+                'avg_first_response_time_seconds' => isset($row['avg_first_response_time_seconds']) ? $row['avg_first_response_time_seconds'] : null,
+                'avg_first_response_time_label' => $this->format_duration_label(isset($row['avg_first_response_time_seconds']) ? $row['avg_first_response_time_seconds'] : null),
                 'avg_response_time_seconds' => $row['avg_response_time_seconds'],
                 'avg_response_time_label' => $this->format_duration_label($row['avg_response_time_seconds']),
                 'avg_recent_response_time_seconds' => $row['avg_recent_response_time_seconds'],

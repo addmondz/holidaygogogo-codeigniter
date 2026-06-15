@@ -355,8 +355,10 @@ $leadSortIcon = function($column) use ($leadCurrentSortBy, $leadCurrentSortDir) 
                             <div class="card-body">
                                 <div class="text-muted text-uppercase font-size-sm font-weight-bold mb-2">Average Response</div>
                                 <div class="font-weight-bolder font-size-h2 text-primary"><?php echo html_escape($lead_data_summary['avg_response_time_label']); ?></div>
-                                <div class="text-muted mt-2">First 5 avg of tracked replied messages</div>
-                                <div class="text-muted mt-1">Last 5 avg: <?php echo html_escape($lead_data_summary['avg_recent_response_time_label']); ?></div>
+                                <div class="d-flex flex-wrap mt-2" style="gap:6px;">
+                                    <span class="label label-light-primary label-inline font-weight-bold">First 5 <?php echo html_escape($lead_data_summary['avg_first_response_time_label']); ?></span>
+                                    <span class="label label-light-info label-inline font-weight-bold">Last 5 <?php echo html_escape($lead_data_summary['avg_recent_response_time_label']); ?></span>
+                                </div>
                             </div>
                         </div>
                     </div>

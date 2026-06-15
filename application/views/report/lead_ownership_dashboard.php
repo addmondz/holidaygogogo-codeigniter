@@ -118,18 +118,12 @@ $buildOwnershipDataUrl = function($ownerId, $ownershipType = null) use ($lead_ow
                     <div class="col-xl-3 col-md-6">
                         <div class="card card-custom gutter-b shadow-sm">
                             <div class="card-body">
-                                <div class="text-muted text-uppercase font-size-sm font-weight-bold mb-2">Owned Leads</div>
+                                <div class="text-muted text-uppercase font-size-sm font-weight-bold mb-2">Total Leads</div>
                                 <div class="font-weight-bolder font-size-h2 text-dark" data-summary="owned_leads"><?php echo number_format($ownership_summary['owned_leads']); ?></div>
-                                <div class="text-muted mt-2">Unique leads: <span data-summary="unique_leads"><?php echo number_format($ownership_summary['unique_leads']); ?></span></div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-xl-3 col-md-6">
-                        <div class="card card-custom gutter-b shadow-sm">
-                            <div class="card-body">
-                                <div class="text-muted text-uppercase font-size-sm font-weight-bold mb-2">Assigned Owned</div>
-                                <div class="font-weight-bolder font-size-h2 text-primary" data-summary="assigned_owned_leads"><?php echo number_format($ownership_summary['assigned_owned_leads']); ?></div>
-                                <div class="text-muted mt-2">Reply owned: <span data-summary="reply_owned_leads"><?php echo number_format($ownership_summary['reply_owned_leads']); ?></span></div>
+                                <div class="d-flex flex-wrap mt-2" style="gap:6px;">
+                                    <span class="label label-light-primary label-inline font-weight-bold">Assigned Owned:&nbsp <span data-summary="assigned_owned_leads"><?php echo number_format($ownership_summary['assigned_owned_leads']); ?></span></span>
+                                    <span class="label label-light-info label-inline font-weight-bold">Reply Owned:&nbsp <span data-summary="reply_owned_leads"><?php echo number_format($ownership_summary['reply_owned_leads']); ?></span></span>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -138,7 +132,10 @@ $buildOwnershipDataUrl = function($ownerId, $ownershipType = null) use ($lead_ow
                             <div class="card-body">
                                 <div class="text-muted text-uppercase font-size-sm font-weight-bold mb-2">Average Response</div>
                                 <div class="font-weight-bolder font-size-h2 text-info" data-summary="avg_response_time_label"><?php echo html_escape($ownership_summary['avg_response_time_label']); ?></div>
-                                <div class="text-muted mt-2">Last 5 avg: <span data-summary="avg_recent_response_time_label"><?php echo html_escape($ownership_summary['avg_recent_response_time_label']); ?></span></div>
+                                <div class="d-flex flex-wrap mt-2" style="gap:6px;">
+                                    <span class="label label-light-info label-inline font-weight-bold">First 5 <span data-summary="avg_first_response_time_label"><?php echo html_escape($ownership_summary['avg_first_response_time_label']); ?></span></span>
+                                    <span class="label label-light-primary label-inline font-weight-bold">Last 5 <span data-summary="avg_recent_response_time_label"><?php echo html_escape($ownership_summary['avg_recent_response_time_label']); ?></span></span>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -213,7 +210,7 @@ $buildOwnershipDataUrl = function($ownerId, $ownershipType = null) use ($lead_ow
                                         <td class="text-center"><?php echo html_escape($row['response_rate']); ?>%</td>
                                         <td class="text-center">
                                             <div class="font-weight-bold"><?php echo html_escape($row['avg_response_time_label']); ?></div>
-                                            <div class="text-muted font-size-sm"><?php echo html_escape($row['avg_responded_messages']); ?> / 5 replied</div>
+                                            <div class="text-muted font-size-sm">First <?php echo html_escape($row['avg_first_response_time_label']); ?> | Last <?php echo html_escape($row['avg_recent_response_time_label']); ?></div>
                                         </td>
                                         <td class="text-center">
                                             <div class="font-weight-bold"><?php echo html_escape($row['avg_recent_response_time_label']); ?></div>
@@ -290,7 +287,7 @@ $buildOwnershipDataUrl = function($ownerId, $ownershipType = null) use ($lead_ow
             html += '<td class="text-center"><a href="' + replyUrl + '">' + row.reply_owned_leads + '</a></td>';
             html += '<td class="text-center">' + row.responded_leads + '</td>';
             html += '<td class="text-center">' + row.response_rate + '%</td>';
-            html += '<td class="text-center"><div class="font-weight-bold">' + escapeHtml(row.avg_response_time_label) + '</div><div class="text-muted font-size-sm">' + escapeHtml(row.avg_responded_messages) + ' / 5 replied</div></td>';
+            html += '<td class="text-center"><div class="font-weight-bold">' + escapeHtml(row.avg_response_time_label) + '</div><div class="text-muted font-size-sm">First ' + escapeHtml(row.avg_first_response_time_label) + ' | Last ' + escapeHtml(row.avg_recent_response_time_label) + '</div></td>';
             html += '<td class="text-center"><div class="font-weight-bold">' + escapeHtml(row.avg_recent_response_time_label) + '</div><div class="text-muted font-size-sm">' + escapeHtml(row.avg_recent_responded_messages) + ' / 5 replied</div></td>';
             html += '<td class="text-center">' + row.follow_up_leads + '</td>';
             html += '<td class="text-center">' + row.follow_up_rate + '%</td>';
@@ -329,6 +326,7 @@ $buildOwnershipDataUrl = function($ownerId, $ownershipType = null) use ($lead_ow
         $('[data-summary="assigned_owned_leads"]').text(summary.assigned_owned_leads);
         $('[data-summary="reply_owned_leads"]').text(summary.reply_owned_leads);
         $('[data-summary="avg_response_time_label"]').text(summary.avg_response_time_label);
+        $('[data-summary="avg_first_response_time_label"]').text(summary.avg_first_response_time_label);
         $('[data-summary="avg_recent_response_time_label"]').text(summary.avg_recent_response_time_label);
         $('[data-summary="follow_up_leads"]').text(summary.follow_up_leads);
         $('[data-summary="follow_up_rate"]').text(summary.follow_up_rate);

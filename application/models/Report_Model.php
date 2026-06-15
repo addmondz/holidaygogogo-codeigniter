@@ -3,6 +3,104 @@ class Report_Model extends CI_Model
 {
     protected $messageTimeColumn = null;
 
+    private function get_processed_lead_response_slot_select($alias = 'pl')
+    {
+        $prefix = $alias !== '' ? $alias . '.' : '';
+        $parts = array();
+
+        for ($i = 1; $i <= 5; $i++) {
+            $parts[] = "{$prefix}response_{$i}_agent_message_id AS aid{$i}";
+            $parts[] = "{$prefix}response_{$i}_customer_message_at AS ct{$i}";
+            $parts[] = "{$prefix}response_{$i}_agent_message_at AS at{$i}";
+            $parts[] = "{$prefix}response_{$i}_seconds AS s{$i}";
+        }
+
+        for ($i = 1; $i <= 5; $i++) {
+            $parts[] = "{$prefix}recent_response_{$i}_agent_message_id AS raid{$i}";
+            $parts[] = "{$prefix}recent_response_{$i}_customer_message_at AS rct{$i}";
+            $parts[] = "{$prefix}recent_response_{$i}_agent_message_at AS rat{$i}";
+            $parts[] = "{$prefix}recent_response_{$i}_seconds AS rs{$i}";
+        }
+
+        return implode(",\n                ", $parts);
+    }
+
+    private function calculate_combined_response_averages($slotRows, $groupKey = null, $useDutyHours = false)
+    {
+        if ($useDutyHours) {
+            $this->load->helper('duty_hours');
+        }
+
+        $stats = array();
+
+        foreach ((array) $slotRows as $sr) {
+            $bucket = $groupKey !== null
+                ? (isset($sr[$groupKey]) ? (string) $sr[$groupKey] : '')
+                : '__all__';
+
+            if (!isset($stats[$bucket])) {
+                $stats[$bucket] = array('total' => 0, 'count' => 0);
+            }
+
+            $seen = array();
+
+            for ($i = 1; $i <= 5; $i++) {
+                $secs = isset($sr['s' . $i]) ? $sr['s' . $i] : null;
+                if ($secs === null || $secs === '') continue;
+
+                $seconds = $useDutyHours
+                    ? calculate_duty_response_seconds($sr['ct' . $i], $sr['at' . $i])
+                    : (int) $secs;
+                if ($seconds === null) continue;
+
+                $aid = isset($sr['aid' . $i]) ? $sr['aid' . $i] : null;
+                if ($aid !== null && $aid !== '') $seen[$aid] = true;
+
+                $stats[$bucket]['total'] += (int) $seconds;
+                $stats[$bucket]['count']++;
+            }
+
+            for ($i = 1; $i <= 5; $i++) {
+                $secs = isset($sr['rs' . $i]) ? $sr['rs' . $i] : null;
+                if ($secs === null || $secs === '') continue;
+
+                $aid = isset($sr['raid' . $i]) ? $sr['raid' . $i] : null;
+                if ($aid !== null && $aid !== '') {
+                    if (isset($seen[$aid])) continue;
+                    $seen[$aid] = true;
+                }
+
+                $seconds = $useDutyHours
+                    ? calculate_duty_response_seconds($sr['rct' . $i], $sr['rat' . $i])
+                    : (int) $secs;
+                if ($seconds === null) continue;
+
+                $stats[$bucket]['total'] += (int) $seconds;
+                $stats[$bucket]['count']++;
+            }
+        }
+
+        $averages = array();
+        foreach ($stats as $bucket => $stat) {
+            $averages[$bucket] = $stat['count'] > 0
+                ? (int) round($stat['total'] / $stat['count'])
+                : null;
+        }
+
+        return $averages;
+    }
+
+    private function ownership_combined_response_average_sql($alias = 'glo')
+    {
+        $prefix = $alias !== '' ? $alias . '.' : '';
+        $firstTotal = "CASE WHEN {$prefix}avg_first_5_response_seconds IS NOT NULL THEN {$prefix}avg_first_5_response_seconds * {$prefix}responded_message_count ELSE 0 END";
+        $recentTotal = "CASE WHEN {$prefix}avg_recent_5_response_seconds IS NOT NULL THEN {$prefix}avg_recent_5_response_seconds * {$prefix}recent_responded_message_count ELSE 0 END";
+        $firstCount = "CASE WHEN {$prefix}avg_first_5_response_seconds IS NOT NULL THEN {$prefix}responded_message_count ELSE 0 END";
+        $recentCount = "CASE WHEN {$prefix}avg_recent_5_response_seconds IS NOT NULL THEN {$prefix}recent_responded_message_count ELSE 0 END";
+
+        return "SUM(({$firstTotal}) + ({$recentTotal})) / NULLIF(SUM(({$firstCount}) + ({$recentCount})), 0)";
+    }
+
 	function Destination_Profits()
 	{
 		$this->db->select('EndDate As Month, SUM(Credit) - SUM(Debit) As Profit, category.Name As Destination');
@@ -827,6 +925,22 @@ class Report_Model extends CI_Model
         ";
 
         $rows = $this->db->query($sql, $where['params'])->result_array();
+        $slotSelect = $this->get_processed_lead_response_slot_select('pl');
+        $slotSql = "
+            SELECT
+                COALESCE(NULLIF(pl.assigned_to_user_id, ''), '__unassigned__') AS agent_id,
+                {$slotSelect}
+            FROM ghl_processed_leads pl
+            LEFT JOIN ghl_conversations gc ON gc.conversation_id = pl.conversation_id
+            LEFT JOIN ghl_users gu ON gu.UserID = NULLIF(pl.assigned_to_user_id, '')
+            {$extraJoins}
+            {$agentWhereSql}
+        ";
+        $combinedResponseByAgent = $this->calculate_combined_response_averages(
+            $this->db->query($slotSql, $where['params'])->result_array(),
+            'agent_id',
+            false
+        );
         $results = array();
 
         foreach ($rows as $row) {
@@ -836,6 +950,9 @@ class Report_Model extends CI_Model
             $avgResponseSeconds = $row['avg_response_time_seconds'] !== null
                 ? (int) round($row['avg_response_time_seconds'])
                 : null;
+            if (array_key_exists($row['agent_id'], $combinedResponseByAgent)) {
+                $avgResponseSeconds = $combinedResponseByAgent[$row['agent_id']];
+            }
             $avgRecentResponseSeconds = $row['avg_recent_response_time_seconds'] !== null
                 ? (int) round($row['avg_recent_response_time_seconds'])
                 : null;
@@ -851,6 +968,7 @@ class Report_Model extends CI_Model
                 'agent_name' => $row['agent_name'],
                 'total_leads' => $totalLeads,
                 'responded_leads' => $respondedLeads,
+                'avg_first_response_time_seconds' => $row['avg_response_time_seconds'] !== null ? (int) round($row['avg_response_time_seconds']) : null,
                 'avg_response_time_seconds' => $avgResponseSeconds,
                 'avg_recent_response_time_seconds' => $avgRecentResponseSeconds,
                 'avg_responded_messages' => $avgRespondedMessages,
@@ -868,6 +986,7 @@ class Report_Model extends CI_Model
     {
         $where = $this->build_lead_ownership_where_clause($filters);
         $extraJoins = isset($where['extra_joins']) ? $where['extra_joins'] : '';
+        $combinedAverageSql = $this->ownership_combined_response_average_sql('glo');
 
         $sql = "
             SELECT
@@ -879,7 +998,8 @@ class Report_Model extends CI_Model
                 SUM(CASE WHEN glo.follow_up_status IN ('sent', 'completed') THEN 1 ELSE 0 END) AS follow_up_leads,
                 SUM(CASE WHEN glo.is_converted = 1 AND glo.booking_id IS NOT NULL THEN 1 ELSE 0 END) AS converted_leads,
                 COUNT(DISTINCT glo.owner_user_id) AS active_owners,
-                AVG(glo.avg_first_5_response_seconds) AS avg_response_time_seconds,
+                AVG(glo.avg_first_5_response_seconds) AS avg_first_response_time_seconds,
+                {$combinedAverageSql} AS avg_response_time_seconds,
                 AVG(glo.avg_recent_5_response_seconds) AS avg_recent_response_time_seconds,
                 AVG(glo.responded_message_count) AS avg_responded_messages,
                 AVG(glo.recent_responded_message_count) AS avg_recent_responded_messages
@@ -907,6 +1027,7 @@ class Report_Model extends CI_Model
             'response_rate' => $ownedLeads > 0 ? round(($respondedLeads / $ownedLeads) * 100, 1) : 0.0,
             'follow_up_rate' => $ownedLeads > 0 ? round(($followUpLeads / $ownedLeads) * 100, 1) : 0.0,
             'conversion_rate' => $ownedLeads > 0 ? round(($convertedLeads / $ownedLeads) * 100, 1) : 0.0,
+            'avg_first_response_time_seconds' => $row['avg_first_response_time_seconds'] !== null ? (int) round($row['avg_first_response_time_seconds']) : null,
             'avg_response_time_seconds' => $row['avg_response_time_seconds'] !== null ? (int) round($row['avg_response_time_seconds']) : null,
             'avg_recent_response_time_seconds' => $row['avg_recent_response_time_seconds'] !== null ? (int) round($row['avg_recent_response_time_seconds']) : null,
             'avg_responded_messages' => $row['avg_responded_messages'] !== null ? round((float) $row['avg_responded_messages'], 1) : 0.0,
@@ -918,6 +1039,7 @@ class Report_Model extends CI_Model
     {
         $where = $this->build_lead_ownership_where_clause($filters);
         $extraJoins = isset($where['extra_joins']) ? $where['extra_joins'] : '';
+        $combinedAverageSql = $this->ownership_combined_response_average_sql('glo');
 
         $sql = "
             SELECT
@@ -930,7 +1052,8 @@ class Report_Model extends CI_Model
                 SUM(CASE WHEN glo.responded_message_count > 0 THEN 1 ELSE 0 END) AS responded_leads,
                 SUM(CASE WHEN glo.follow_up_status IN ('sent', 'completed') THEN 1 ELSE 0 END) AS follow_up_leads,
                 SUM(CASE WHEN glo.is_converted = 1 AND glo.booking_id IS NOT NULL THEN 1 ELSE 0 END) AS converted_leads,
-                AVG(glo.avg_first_5_response_seconds) AS avg_response_time_seconds,
+                AVG(glo.avg_first_5_response_seconds) AS avg_first_response_time_seconds,
+                {$combinedAverageSql} AS avg_response_time_seconds,
                 AVG(glo.avg_recent_5_response_seconds) AS avg_recent_response_time_seconds,
                 AVG(glo.responded_message_count) AS avg_responded_messages,
                 AVG(glo.recent_responded_message_count) AS avg_recent_responded_messages,
@@ -965,6 +1088,7 @@ class Report_Model extends CI_Model
                 'response_rate' => $ownedLeads > 0 ? round(($respondedLeads / $ownedLeads) * 100, 1) : 0.0,
                 'follow_up_rate' => $ownedLeads > 0 ? round(($followUpLeads / $ownedLeads) * 100, 1) : 0.0,
                 'conversion_rate' => $ownedLeads > 0 ? round(($convertedLeads / $ownedLeads) * 100, 1) : 0.0,
+                'avg_first_response_time_seconds' => $row['avg_first_response_time_seconds'] !== null ? (int) round($row['avg_first_response_time_seconds']) : null,
                 'avg_response_time_seconds' => $row['avg_response_time_seconds'] !== null ? (int) round($row['avg_response_time_seconds']) : null,
                 'avg_recent_response_time_seconds' => $row['avg_recent_response_time_seconds'] !== null ? (int) round($row['avg_recent_response_time_seconds']) : null,
                 'avg_responded_messages' => $row['avg_responded_messages'] !== null ? round((float) $row['avg_responded_messages'], 1) : 0.0,

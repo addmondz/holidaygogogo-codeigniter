@@ -105,8 +105,10 @@
                             <div class="card-body">
                                 <div class="text-muted text-uppercase font-size-sm font-weight-bold mb-2">Average Response</div>
                                 <div class="font-weight-bolder font-size-h2 text-info" data-summary="avg_response_time_label"><?php echo html_escape($dashboard_summary['avg_response_time_label']); ?></div>
-                                <div class="text-muted mt-2">Avg replied msgs: <span data-summary="avg_responded_messages"><?php echo html_escape($dashboard_summary['avg_responded_messages']); ?></span> / 5</div>
-                                <div class="text-muted mt-1">Last 5 avg: <span data-summary="avg_recent_response_time_label"><?php echo html_escape($dashboard_summary['avg_recent_response_time_label']); ?></span> (<span data-summary="avg_recent_responded_messages"><?php echo html_escape($dashboard_summary['avg_recent_responded_messages']); ?></span> / 5 replied)</div>
+                                <div class="d-flex flex-wrap mt-2" style="gap:6px;">
+                                    <span class="label label-light-info label-inline font-weight-bold">First 5 <span data-summary="avg_first_response_time_label"><?php echo html_escape($dashboard_summary['avg_first_response_time_label']); ?></span></span>
+                                    <span class="label label-light-primary label-inline font-weight-bold">Last 5 <span data-summary="avg_recent_response_time_label"><?php echo html_escape($dashboard_summary['avg_recent_response_time_label']); ?></span></span>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -163,7 +165,7 @@
                                         <td class="text-center"><?php echo html_escape($row['response_rate']); ?>%</td>
                                         <td class="text-center">
                                             <div class="font-weight-bold"><?php echo html_escape($row['avg_response_time_label']); ?></div>
-                                            <div class="text-muted font-size-sm"><?php echo html_escape($row['avg_responded_messages']); ?> / 5 replied</div>
+                                            <div class="text-muted font-size-sm">First <?php echo html_escape($row['avg_first_response_time_label']); ?> | Last <?php echo html_escape($row['avg_recent_response_time_label']); ?></div>
                                         </td>
                                         <td class="text-center">
                                             <div class="font-weight-bold"><?php echo html_escape($row['avg_recent_response_time_label']); ?></div>
@@ -237,7 +239,7 @@
             html += '<td class="text-center">' + row.total_leads + '</td>';
             html += '<td class="text-center">' + row.responded_leads + '</td>';
             html += '<td class="text-center">' + row.response_rate + '%</td>';
-            html += '<td class="text-center"><div class="font-weight-bold">' + escapeHtml(row.avg_response_time_label) + '</div><div class="text-muted font-size-sm">' + escapeHtml(row.avg_responded_messages) + ' / 5 replied</div></td>';
+            html += '<td class="text-center"><div class="font-weight-bold">' + escapeHtml(row.avg_response_time_label) + '</div><div class="text-muted font-size-sm">First ' + escapeHtml(row.avg_first_response_time_label) + ' | Last ' + escapeHtml(row.avg_recent_response_time_label) + '</div></td>';
             html += '<td class="text-center"><div class="font-weight-bold">' + escapeHtml(row.avg_recent_response_time_label) + '</div><div class="text-muted font-size-sm">' + escapeHtml(row.avg_recent_responded_messages) + ' / 5 replied</div></td>';
             html += '<td class="text-center">' + row.converted_leads + '</td>';
             html += '<td class="text-center">' + row.conversion_rate + '%</td>';
@@ -269,6 +271,7 @@
         $('[data-summary="total_leads"]').text(summary.total_leads);
         $('[data-summary="responded_leads"]').text(summary.responded_leads);
         $('[data-summary="avg_response_time_label"]').text(summary.avg_response_time_label);
+        $('[data-summary="avg_first_response_time_label"]').text(summary.avg_first_response_time_label);
         $('[data-summary="avg_responded_messages"]').text(summary.avg_responded_messages);
         $('[data-summary="avg_recent_response_time_label"]').text(summary.avg_recent_response_time_label);
         $('[data-summary="avg_recent_responded_messages"]').text(summary.avg_recent_responded_messages);
