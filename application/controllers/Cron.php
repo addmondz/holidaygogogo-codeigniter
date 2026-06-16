@@ -533,11 +533,17 @@ class Cron extends CI_Controller
 		$shouldRebuild = in_array('--rebuild', $flags, true)
 			|| in_array('--restart', $flags, true)
 			|| in_array('--reset', $flags, true);
+		$shouldReconcile = !$shouldRebuild && !in_array('--no-reconcile', $flags, true);
+		$reconcileDays = (int) (get_env('GHL_LEAD_RECONCILE_DAYS') ?: get_env('GHL_MESSAGES_SYNC_DAYS') ?: 3);
+		if ($reconcileDays <= 0) {
+			$reconcileDays = 3;
+		}
 
 		$summary = array(
 			'conversations_processed' => 0,
 			'leads_rebuilt' => 0,
 			'batches' => 0,
+			'reconciliation_conversations' => 0,
 		);
 
 		echo "=== GHL Lead Processing Start ===" . PHP_EOL;
@@ -629,12 +635,39 @@ class Cron extends CI_Controller
 						$batch['cursor']['last_processed_at']
 					);
 				}
+
+				if ($shouldReconcile) {
+					$reconcileBatch = $this->Ghl_Processed_Leads_Model->get_uncovered_recent_inbound_conversation_batch(
+						$reconcileDays,
+						$chunkSize,
+						$upperBound
+					);
+
+					if (!empty($reconcileBatch)) {
+						$summary['batches']++;
+						echo "Reconciling " . count($reconcileBatch) . " recent conversation(s) with uncovered inbound messages from the last {$reconcileDays} day(s)" . PHP_EOL;
+
+						foreach ($reconcileBatch as $conversationMeta) {
+							$leadCount = $this->process_single_ghl_conversation(
+								$conversationMeta['conversation_id'],
+								(int) $conversationMeta['first_new_message_row_id'],
+								$upperBound
+							);
+							$summary['conversations_processed']++;
+							$summary['reconciliation_conversations']++;
+							$summary['leads_rebuilt'] += $leadCount;
+
+							echo " - {$conversationMeta['conversation_id']}: {$leadCount} lead(s)" . PHP_EOL;
+						}
+					}
+				}
 			}
 		} finally {
 			$this->Ghl_Processed_Leads_Model->release_processor_lock('ghl_leads_processor');
 		}
 
 		echo "Processed conversations: {$summary['conversations_processed']}" . PHP_EOL;
+		echo "Reconciled conversations: {$summary['reconciliation_conversations']}" . PHP_EOL;
 		echo "Rebuilt leads: {$summary['leads_rebuilt']}" . PHP_EOL;
 		echo "Batches: {$summary['batches']}" . PHP_EOL;
 		echo "=== GHL Lead Processing End ===" . PHP_EOL;

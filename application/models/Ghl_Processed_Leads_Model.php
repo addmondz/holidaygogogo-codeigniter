@@ -167,6 +167,44 @@ class Ghl_Processed_Leads_Model extends CI_Model
         )->result_array();
     }
 
+    public function get_uncovered_recent_inbound_conversation_batch($daysBack, $conversationLimit, $upperBound = null)
+    {
+        $daysBack = max(1, (int) $daysBack);
+        $conversationLimit = max(1, (int) $conversationLimit);
+        $timeColumn = $this->escape_identifier($this->get_message_time_column());
+
+        $batchUpperBound = $upperBound !== null && $upperBound !== ''
+            ? (string) $upperBound
+            : $this->get_database_datetime();
+        $cutoffTimestamp = strtotime($batchUpperBound . ' -' . $daysBack . ' days');
+        $cutoff = $cutoffTimestamp !== false
+            ? date('Y-m-d H:i:s', $cutoffTimestamp)
+            : date('Y-m-d H:i:s', strtotime('-' . $daysBack . ' days'));
+
+        return $this->db->query(
+            "
+            SELECT
+                m.conversation_id,
+                MIN(m.id) AS first_new_message_row_id
+            FROM ghl_messages m
+            LEFT JOIN ghl_processed_leads pl
+              ON pl.conversation_id = m.conversation_id
+             AND pl.lead_started_at <= m.{$timeColumn}
+             AND (pl.lead_ended_at IS NULL OR pl.lead_ended_at > m.{$timeColumn})
+            WHERE m.direction = 'inbound'
+              AND m.{$timeColumn} >= ?
+              AND m.{$timeColumn} < ?
+              AND m.conversation_id IS NOT NULL
+              AND m.conversation_id <> ''
+              AND pl.id IS NULL
+            GROUP BY m.conversation_id
+            ORDER BY MIN(m.{$timeColumn}) ASC, MIN(m.id) ASC
+            LIMIT ?
+            ",
+            array($cutoff, $batchUpperBound, $conversationLimit)
+        )->result_array();
+    }
+
     public function get_processing_completion_cursor($upperBound = null)
     {
         $timeColumn = $this->escape_identifier($this->get_message_time_column());
