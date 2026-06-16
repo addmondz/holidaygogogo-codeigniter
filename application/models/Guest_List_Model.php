@@ -61,11 +61,54 @@ class Guest_List_Model extends CI_Model
 		$this->db->insert('guest_list', $array);
 	}
 
+	// Destination country = first product's category country (mirrors the
+	// Guest List form's nationality/destination logic).
+	private function Destination_Country_Name($booking_id)
+	{
+		$this->db->select('country_code.Country As CategoryCountryName');
+		$this->db->from('booking_product');
+		$this->db->join('product', 'product.ProductID = booking_product.ProductID', 'left');
+		$this->db->join('category', 'category.CategoryID = product.CategoryID', 'left');
+		$this->db->join('country_code', 'country_code.CountryCodeID = category.Country', 'left');
+		$this->db->where('booking_product.BookingID', $booking_id);
+		$this->db->where('booking_product.Status', 'Y');
+		$row = $this->db->get()->row();
+		return ($row && !empty($row->CategoryCountryName)) ? strtoupper($row->CategoryCountryName) : '';
+	}
+
+	// A passport only applies to non-Malaysians, or Malaysians travelling
+	// overseas. Domestic Malaysian trips never carry a passport, so any value
+	// posted for them is dropped here rather than persisted. $nationality_id is
+	// empty for an unset nationality, which defaults to Malaysia (as the form does).
+	private function Passport_Applicable($destination_country_name, $nationality_id)
+	{
+		$nationality = 'MALAYSIA';
+		if(!empty($nationality_id)) {
+			$row = $this->db->select('Country')->where('CountryCodeID', $nationality_id)->get('country_code')->row();
+			if($row && !empty($row->Country)) {
+				$nationality = strtoupper($row->Country);
+			}
+		}
+		$is_malaysian = ($nationality == 'MALAYSIA');
+		$going_to_malaysia = ($destination_country_name == 'MALAYSIA');
+		return (!$is_malaysian) || ($is_malaysian && !empty($destination_country_name) && !$going_to_malaysia);
+	}
+
+	// Null out every passport column on a guest row when a passport doesn't apply.
+	private function Clear_Inapplicable_Passport(&$array)
+	{
+		$array['PassportNumber'] = null;
+		$array['PassportIssueDate'] = null;
+		$array['PassportExpiryDate'] = null;
+		$array['PassportCopy'] = null;
+	}
+
 	function Create_Guest($booking_id, $preserve_case = false)
 	{
 		$upper = function($value) use ($preserve_case) {
 			return $preserve_case ? $value : strtoupper($value);
 		};
+		$destination_country_name = $this->Destination_Country_Name($booking_id);
 		for($i = 0; $i < count(explode(',', $this->input->post('new_guests'))); $i++) {
 			$array = array(
 				'BookingID' => $booking_id,
@@ -94,6 +137,9 @@ class Guest_List_Model extends CI_Model
 				'InsertBy' => $this->session->userdata('admin_id'),
 				'InsertDate' => date('Y-m-d H:i:s')
 			);
+			if(!$this->Passport_Applicable($destination_country_name, $this->input->post('new_nationalities')[$i] ?? null)) {
+				$this->Clear_Inapplicable_Passport($array);
+			}
 			$this->db->insert('guest_list', $array);
 		}
 	}
@@ -109,13 +155,14 @@ class Guest_List_Model extends CI_Model
 		$this->db->insert('guest_list_log', $array);
 	}
 
-	function Update($preserve_case = false)
+	function Update($preserve_case = false, $booking_id = null)
 	{
 		$upper = function($value) use ($preserve_case) {
 			return $preserve_case ? $value : strtoupper($value);
 		};
 		$value = false;
 		if(!empty($this->input->post('names'))) {
+			$destination_country_name = $this->Destination_Country_Name($booking_id);
 			for($i = 0; $i < count($this->input->post('names')); $i++) {
 				$array = array(
 					'CountryCodeID' => empty($this->input->post('country_codes')[$i]) ? null : $this->input->post('country_codes')[$i],
@@ -143,6 +190,9 @@ class Guest_List_Model extends CI_Model
 				if (isset($this->input->post('passport_copies')[$i])) {
 					$passport_copy_value = $this->input->post('passport_copies')[$i];
 					$array['PassportCopy'] = !empty($passport_copy_value) ? $passport_copy_value : null;
+				}
+				if(!$this->Passport_Applicable($destination_country_name, $this->input->post('nationalities')[$i] ?? null)) {
+					$this->Clear_Inapplicable_Passport($array);
 				}
 				$this->db->where('GuestListID', $this->input->post('guests')[$i]);
 				$this->db->update('guest_list', $array);

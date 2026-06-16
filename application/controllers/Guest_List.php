@@ -79,7 +79,7 @@ class Guest_List extends CI_Controller
 				$_POST['new_passport_copies'] = $new_passport_copy_paths;
 			}
 			
-			if($this->Guest_List_Model->Update() || !empty($this->input->post('new_guests')) || !empty($this->input->post('deleted_guests'))) {
+			if($this->Guest_List_Model->Update(false, $booking_id) || !empty($this->input->post('new_guests')) || !empty($this->input->post('deleted_guests'))) {
 				if(!empty($this->input->post('new_guests'))) {
 					$this->Guest_List_Model->Create_Guest($booking_id);
 				}
@@ -798,7 +798,7 @@ class Guest_List extends CI_Controller
 			// preserve_case=true: auto-save must store exactly what the user
 			// typed so the reload shows their text verbatim. Normal submit
 			// (index()) still uppercases as it always has.
-			$this->Guest_List_Model->Update(true);
+			$this->Guest_List_Model->Update(true, $booking_id);
 
 			if (!empty($this->input->post('new_guests'))) {
 				$this->Guest_List_Model->Create_Guest($booking_id, true);
