@@ -133,8 +133,8 @@ $buildOwnershipDataUrl = function($ownerId, $ownershipType = null) use ($lead_ow
                                 <div class="text-muted text-uppercase font-size-sm font-weight-bold mb-2">Average Response</div>
                                 <div class="font-weight-bolder font-size-h2 text-info" data-summary="avg_response_time_label"><?php echo html_escape($ownership_summary['avg_response_time_label']); ?></div>
                                 <div class="d-flex flex-wrap mt-2" style="gap:6px;">
-                                    <span class="label label-light-info label-inline font-weight-bold">First 5 <span data-summary="avg_first_response_time_label"><?php echo html_escape($ownership_summary['avg_first_response_time_label']); ?></span></span>
-                                    <span class="label label-light-primary label-inline font-weight-bold">Last 5 <span data-summary="avg_recent_response_time_label"><?php echo html_escape($ownership_summary['avg_recent_response_time_label']); ?></span></span>
+                                    <span class="label label-light-info label-inline font-weight-bold">First 5:&nbsp <span data-summary="avg_first_response_time_label"><?php echo html_escape($ownership_summary['avg_first_response_time_label']); ?></span></span>
+                                    <span class="label label-light-primary label-inline font-weight-bold">Last 5:&nbsp <span data-summary="avg_recent_response_time_label"><?php echo html_escape($ownership_summary['avg_recent_response_time_label']); ?></span></span>
                                 </div>
                             </div>
                         </div>
@@ -165,24 +165,18 @@ $buildOwnershipDataUrl = function($ownerId, $ownershipType = null) use ($lead_ow
                             <tr>
                                 <th style="text-align:center;">No.</th>
                                 <th>Owner</th>
-                                <th style="text-align:center;">Owned Leads</th>
-                                <th style="text-align:center;">Assigned Owned</th>
-                                <th style="text-align:center;">Reply Owned</th>
+                                <th style="text-align:center;">Ownership</th>
                                 <th style="text-align:center;">Responded</th>
-                                <th style="text-align:center;">Response Rate</th>
-                                <th style="text-align:center;">Avg First 5 Response</th>
-                                <th style="text-align:center;">Avg Last 5 Response</th>
+                                <th style="text-align:center;">Avg Response</th>
                                 <th style="text-align:center;">Follow Up</th>
-                                <th style="text-align:center;">Follow Up Rate</th>
                                 <th style="text-align:center;">Converted</th>
-                                <th style="text-align:center;">Conversion Rate</th>
                                 <th style="text-align:center;">Last Calculated</th>
                             </tr>
                         </thead>
                         <tbody id="lead-ownership-table-body">
                             <?php if(empty($lead_ownership_rows)) { ?>
                                 <tr>
-                                    <td colspan="14" class="text-center py-10">Lead ownership activity not found for the selected filters.</td>
+                                    <td colspan="8" class="text-center py-10">Lead ownership activity not found for the selected filters.</td>
                                 </tr>
                             <?php } else { ?>
                                 <?php $count = 1; ?>
@@ -194,32 +188,26 @@ $buildOwnershipDataUrl = function($ownerId, $ownershipType = null) use ($lead_ow
                                                 <?php echo html_escape($row['owner_name']); ?>
                                             </a>
                                         </td>
-                                        <td class="text-center">
-                                            <div class="font-weight-bold">
-                                                <a href="<?php echo html_escape($buildOwnershipDataUrl($row['owner_user_id'])); ?>"><?php echo number_format($row['owned_leads']); ?></a>
-                                            </div>
-                                            <div class="text-muted font-size-sm"><?php echo number_format($row['unique_leads']); ?> unique</div>
+                                        <td class="text-center" style="white-space:nowrap;">
+                                            <a href="<?php echo html_escape($buildOwnershipDataUrl($row['owner_user_id'])); ?>" class="font-weight-bold text-primary"><?php echo number_format($row['owned_leads']); ?></a>
+                                            <span class="text-muted mx-1">&middot;</span>
+                                            <span class="font-weight-bold"><?php echo number_format($row['assigned_owned_leads']); ?></span> <span class="text-muted font-size-sm">asgn</span>
+                                            <span class="text-muted mx-1">&middot;</span>
+                                            <span class="font-weight-bold"><?php echo number_format($row['reply_owned_leads']); ?></span> <span class="text-muted font-size-sm">reply</span>
                                         </td>
                                         <td class="text-center">
-                                            <a href="<?php echo html_escape($buildOwnershipDataUrl($row['owner_user_id'], 'assigned')); ?>"><?php echo number_format($row['assigned_owned_leads']); ?></a>
+                                            <div class="font-weight-bold"><?php echo number_format($row['responded_leads']); ?></div>
+                                            <div class="text-muted font-size-sm"><?php echo html_escape($row['response_rate']); ?>%</div>
+                                        </td>
+                                        <td class="text-center"><?php echo html_escape($row['avg_displayed_response_time_label']); ?></td>
+                                        <td class="text-center">
+                                            <div class="font-weight-bold"><?php echo number_format($row['follow_up_leads']); ?></div>
+                                            <div class="text-muted font-size-sm"><?php echo html_escape($row['follow_up_rate']); ?>%</div>
                                         </td>
                                         <td class="text-center">
-                                            <a href="<?php echo html_escape($buildOwnershipDataUrl($row['owner_user_id'], 'reply')); ?>"><?php echo number_format($row['reply_owned_leads']); ?></a>
+                                            <div class="font-weight-bold"><?php echo number_format($row['converted_leads']); ?></div>
+                                            <div class="text-muted font-size-sm"><?php echo html_escape($row['conversion_rate']); ?>%</div>
                                         </td>
-                                        <td class="text-center"><?php echo number_format($row['responded_leads']); ?></td>
-                                        <td class="text-center"><?php echo html_escape($row['response_rate']); ?>%</td>
-                                        <td class="text-center">
-                                            <div class="font-weight-bold"><?php echo html_escape($row['avg_response_time_label']); ?></div>
-                                            <div class="text-muted font-size-sm">First <?php echo html_escape($row['avg_first_response_time_label']); ?> | Last <?php echo html_escape($row['avg_recent_response_time_label']); ?></div>
-                                        </td>
-                                        <td class="text-center">
-                                            <div class="font-weight-bold"><?php echo html_escape($row['avg_recent_response_time_label']); ?></div>
-                                            <div class="text-muted font-size-sm"><?php echo html_escape($row['avg_recent_responded_messages']); ?> / 5 replied</div>
-                                        </td>
-                                        <td class="text-center"><?php echo number_format($row['follow_up_leads']); ?></td>
-                                        <td class="text-center"><?php echo html_escape($row['follow_up_rate']); ?>%</td>
-                                        <td class="text-center"><?php echo number_format($row['converted_leads']); ?></td>
-                                        <td class="text-center"><?php echo html_escape($row['conversion_rate']); ?>%</td>
                                         <td class="text-center"><?php echo !empty($row['last_calculated_at']) ? html_escape($row['last_calculated_at']) : '-'; ?></td>
                                     </tr>
                                     <?php $count++; ?>
@@ -270,7 +258,7 @@ $buildOwnershipDataUrl = function($ownerId, $ownershipType = null) use ($lead_ow
         var html = '';
 
         if (!rows || rows.length === 0) {
-            $('#lead-ownership-table-body').html('<tr><td colspan="14" class="text-center py-10">Lead ownership activity not found for the selected filters.</td></tr>');
+            $('#lead-ownership-table-body').html('<tr><td colspan="8" class="text-center py-10">Lead ownership activity not found for the selected filters.</td></tr>');
             return;
         }
 
@@ -282,17 +270,17 @@ $buildOwnershipDataUrl = function($ownerId, $ownershipType = null) use ($lead_ow
             html += '<tr>';
             html += '<td class="text-center">' + (index + 1) + '</td>';
             html += '<td><a href="' + allUrl + '" class="font-weight-bold text-dark">' + escapeHtml(row.owner_name) + '</a></td>';
-            html += '<td class="text-center"><div class="font-weight-bold"><a href="' + allUrl + '">' + row.owned_leads + '</a></div><div class="text-muted font-size-sm">' + row.unique_leads + ' unique</div></td>';
-            html += '<td class="text-center"><a href="' + assignedUrl + '">' + row.assigned_owned_leads + '</a></td>';
-            html += '<td class="text-center"><a href="' + replyUrl + '">' + row.reply_owned_leads + '</a></td>';
-            html += '<td class="text-center">' + row.responded_leads + '</td>';
-            html += '<td class="text-center">' + row.response_rate + '%</td>';
-            html += '<td class="text-center"><div class="font-weight-bold">' + escapeHtml(row.avg_response_time_label) + '</div><div class="text-muted font-size-sm">First ' + escapeHtml(row.avg_first_response_time_label) + ' | Last ' + escapeHtml(row.avg_recent_response_time_label) + '</div></td>';
-            html += '<td class="text-center"><div class="font-weight-bold">' + escapeHtml(row.avg_recent_response_time_label) + '</div><div class="text-muted font-size-sm">' + escapeHtml(row.avg_recent_responded_messages) + ' / 5 replied</div></td>';
-            html += '<td class="text-center">' + row.follow_up_leads + '</td>';
-            html += '<td class="text-center">' + row.follow_up_rate + '%</td>';
-            html += '<td class="text-center">' + row.converted_leads + '</td>';
-            html += '<td class="text-center">' + row.conversion_rate + '%</td>';
+            html += '<td class="text-center" style="white-space:nowrap;">';
+            html += '<a href="' + allUrl + '" class="font-weight-bold text-primary">' + row.owned_leads + '</a>';
+            html += '<span class="text-muted mx-1">&middot;</span>';
+            html += '<span class="font-weight-bold">' + row.assigned_owned_leads + '</span> <span class="text-muted font-size-sm">asgn</span>';
+            html += '<span class="text-muted mx-1">&middot;</span>';
+            html += '<span class="font-weight-bold">' + row.reply_owned_leads + '</span> <span class="text-muted font-size-sm">reply</span>';
+            html += '</td>';
+            html += '<td class="text-center"><div class="font-weight-bold">' + row.responded_leads + '</div><div class="text-muted font-size-sm">' + row.response_rate + '%</div></td>';
+            html += '<td class="text-center">' + escapeHtml(row.avg_displayed_response_time_label) + '</td>';
+            html += '<td class="text-center"><div class="font-weight-bold">' + row.follow_up_leads + '</div><div class="text-muted font-size-sm">' + row.follow_up_rate + '%</div></td>';
+            html += '<td class="text-center"><div class="font-weight-bold">' + row.converted_leads + '</div><div class="text-muted font-size-sm">' + row.conversion_rate + '%</div></td>';
             html += '<td class="text-center">' + escapeHtml(row.last_calculated_at || '-') + '</td>';
             html += '</tr>';
         });

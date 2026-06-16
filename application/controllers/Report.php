@@ -1351,6 +1351,11 @@ class Report extends MY_Controller
         $formatted = array();
 
         foreach ($rows as $row) {
+            $avgDisplayedResponseSeconds = $this->average_duration_seconds(
+                isset($row['avg_first_response_time_seconds']) ? $row['avg_first_response_time_seconds'] : null,
+                isset($row['avg_recent_response_time_seconds']) ? $row['avg_recent_response_time_seconds'] : null
+            );
+
             $formatted[] = array(
                 'owner_user_id' => $row['owner_user_id'],
                 'owner_name' => $row['owner_name'],
@@ -1370,6 +1375,8 @@ class Report extends MY_Controller
                 'avg_response_time_label' => $this->format_duration_label($row['avg_response_time_seconds']),
                 'avg_recent_response_time_seconds' => $row['avg_recent_response_time_seconds'],
                 'avg_recent_response_time_label' => $this->format_duration_label($row['avg_recent_response_time_seconds']),
+                'avg_displayed_response_time_seconds' => $avgDisplayedResponseSeconds,
+                'avg_displayed_response_time_label' => $this->format_duration_label($avgDisplayedResponseSeconds),
                 'avg_responded_messages' => number_format((float) $row['avg_responded_messages'], 1),
                 'avg_recent_responded_messages' => number_format((float) $row['avg_recent_responded_messages'], 1),
                 'last_calculated_at' => $row['last_calculated_at'],
@@ -1613,6 +1620,23 @@ class Report extends MY_Controller
         );
 
         return isset($classes[$status]) ? $classes[$status] : 'label-light-warning';
+    }
+
+    private function average_duration_seconds($firstSeconds, $secondSeconds)
+    {
+        if (($firstSeconds === null || $firstSeconds === '') && ($secondSeconds === null || $secondSeconds === '')) {
+            return null;
+        }
+
+        if ($firstSeconds === null || $firstSeconds === '') {
+            return (int) $secondSeconds;
+        }
+
+        if ($secondSeconds === null || $secondSeconds === '') {
+            return (int) $firstSeconds;
+        }
+
+        return (int) round(((int) $firstSeconds + (int) $secondSeconds) / 2);
     }
 
     private function format_duration_label($seconds)

@@ -90,10 +90,10 @@
                                 <th style="text-align:center;">Replied Leads</th>
                                 <th style="text-align:center;">New Leads</th>
                                 <th style="text-align:center;">Existing Leads</th>
-                                <th style="text-align:center;">Assigned Owned</th>
+                                <!-- <th style="text-align:center;">Assigned Owned</th>
                                 <th style="text-align:center;">Reply Owned</th>
                                 <th style="text-align:center;">First Reply</th>
-                                <th style="text-align:center;">Last Reply</th>
+                                <th style="text-align:center;">Last Reply</th> -->
                             </tr>
                         </thead>
                         <tbody id="lead-reply-activity-table-body">
@@ -110,10 +110,10 @@
                                         <td class="text-center"><?php echo number_format($row['replied_leads']); ?></td>
                                         <td class="text-center"><?php echo number_format($row['new_leads_replied']); ?></td>
                                         <td class="text-center"><?php echo number_format($row['existing_leads_replied']); ?></td>
-                                        <td class="text-center"><?php echo number_format($row['assigned_owned_replied']); ?></td>
+                                        <!-- <td class="text-center"><?php echo number_format($row['assigned_owned_replied']); ?></td>
                                         <td class="text-center"><?php echo number_format($row['reply_owned_replied']); ?></td>
                                         <td class="text-center"><?php echo html_escape($row['first_reply_at_label']); ?></td>
-                                        <td class="text-center"><?php echo html_escape($row['last_reply_at_label']); ?></td>
+                                        <td class="text-center"><?php echo html_escape($row['last_reply_at_label']); ?></td> -->
                                     </tr>
                                     <?php $count++; ?>
                                 <?php } ?>
