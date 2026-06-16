@@ -165,12 +165,14 @@
                         Submit_Category('<?php echo base_url('Category/Create') ?>', category, products);
                     } else {
                         var category = [{CategoryID:<?php echo $CategoryID ?>, UpdateBy:<?php echo $this->session->userdata('admin_id') ?>, UpdateDate:'<?php echo date('Y-m-d H:i:s') ?>'}];
+                        // Only real category columns may be pushed; the Products selectpicker
+                        // spawns auxiliary dirty elements (no id) that would otherwise leak in.
+                        var category_columns = ['CategoryCodeID', 'Name', 'City', 'State', 'Country', 'IsDestination'];
                         var dirty_fields = $('#form').dirty('showDirtyFields');
                         if(dirty_fields.length > 0) {
                             for(var i = 0; i < dirty_fields.length; i++) {
                                 var key = dirty_fields[i].id;
-                                // Products is a link table, not a category column; never push it as a column update.
-                                if(key == 'Products') { continue; }
+                                if(category_columns.indexOf(key) === -1) { continue; }
                                 var value = (dirty_fields[i].value).toUpperCase();
                                 category[0][key] = value;
                             }

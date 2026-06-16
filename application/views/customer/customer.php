@@ -85,6 +85,15 @@
                                 <?php } ?>
                             </div>
                         </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Email</label>
+                                <div class="input-icon">
+                                    <input type="email" id="PrimaryEmail" <?php if(current_url() == base_url('Customer/Update')) { ?> value="<?php echo htmlspecialchars(isset($PrimaryEmail) ? $PrimaryEmail : '', ENT_QUOTES); ?>" <?php } ?> autocomplete="off" class="form-control" placeholder="Enter email">
+                                    <span><i class="la la-envelope"></i></span>
+                                </div>
+                            </div>
+                        </div>
                         <div class="col-md-12">
                             <div class="form-group">
                                 <label>Billing Address</label>
@@ -148,6 +157,7 @@
                 var ic_passport_no = ($('#ic_passport_no').val()).toUpperCase();
                 var tin_no = ($('#tin_no').val()).toUpperCase();
                 var Address = $('#Address').val();
+                var PrimaryEmail = $('#PrimaryEmail').val();
 
                 if(name == '') {
                     Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', 'Please Insert All Required Customer Information', null);
@@ -160,7 +170,8 @@
                             CustomerCode: CustomerCode,
                             ic_passport_no: ic_passport_no,
                             tin_no: tin_no,
-                            Address: Address
+                            Address: Address,
+                            PrimaryEmail: PrimaryEmail
                             // InsertBy: <?php echo $this->session->userdata('admin_id') ?>,
                             // InsertDate: '<?php echo date('Y-m-d H:i:s') ?>'
                         }];
@@ -171,7 +182,9 @@
                         if(dirty_fields.length > 0){
                             for(var i = 0; i < dirty_fields.length; i++){
                                 var key = dirty_fields[i].id;
-                                var value = (dirty_fields[i].value).toUpperCase();
+                                // Email and billing address are case-sensitive; keep as typed.
+                                var preserveCase = (key === 'PrimaryEmail' || key === 'Address');
+                                var value = preserveCase ? dirty_fields[i].value : (dirty_fields[i].value).toUpperCase();
                                 customer[0][key] = value;
                             }
                         }

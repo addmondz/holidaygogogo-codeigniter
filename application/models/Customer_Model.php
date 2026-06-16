@@ -271,6 +271,8 @@ class Customer_Model extends CI_Model
 			'tin_no'         => !empty($customer['tin_no']) ? strtoupper(trim($customer['tin_no'])) : null,
 			// Billing address, synced to AutoCount debtor address.
 			'Address'        => !empty($customer['Address']) ? trim($customer['Address']) : null,
+			// Primary email, synced to AutoCount debtor emailAddress.
+			'PrimaryEmail'   => !empty($customer['PrimaryEmail']) ? trim($customer['PrimaryEmail']) : null,
 			// Flag for AutoCount sync so master-data customers (no booking) get
 			// pushed by the cron. AutoCount auto-generates the code if blank.
 			'AutocountSyncAction' => 'C',

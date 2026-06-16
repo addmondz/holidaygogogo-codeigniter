@@ -80,6 +80,7 @@ $data = [
     'tin_no'          => 'IG12345678901',
     'ic_passport_no'  => '900101-14-5678',
     'Address'         => '12 JALAN BUKIT, 50000 KUALA LUMPUR',
+    'PrimaryEmail'    => 'alice@example.com',
 ];
 
 // --- create ---
@@ -88,6 +89,7 @@ $create = $GLOBALS['__captured']['payload'];
 assert_eq('create: TIN -> taxRegisterNo', 'IG12345678901', $create['taxRegisterNo']);
 assert_eq('create: IC  -> registerNo',    '900101-14-5678', $create['registerNo']);
 assert_eq('create: Address -> address',   '12 JALAN BUKIT, 50000 KUALA LUMPUR', $create['address']);
+assert_eq('create: PrimaryEmail -> emailAddress', 'alice@example.com', $create['emailAddress']);
 
 // --- update ---
 $GLOBALS['__captured'] = null;
@@ -96,5 +98,6 @@ $update = $GLOBALS['__captured']['payload'];
 assert_eq('update: TIN -> taxRegisterNo', 'IG12345678901', $update['taxRegisterNo']);
 assert_eq('update: IC  -> registerNo',    '900101-14-5678', $update['registerNo']);
 assert_eq('update: Address -> address',   '12 JALAN BUKIT, 50000 KUALA LUMPUR', $update['address']);
+assert_eq('update: PrimaryEmail -> emailAddress', 'alice@example.com', $update['emailAddress']);
 
 echo "\nAll assertions passed.\n";

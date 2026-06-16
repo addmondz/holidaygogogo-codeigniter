@@ -84,6 +84,15 @@ class Category_Model extends CI_Model
 	function Update()
 	{
 		$category = json_decode(json_encode($this->input->post('category')));
+		// Drop any non-column keys (e.g. numeric keys from a malformed post)
+		// so they can never become invalid SQL columns.
+		foreach($category as $row) {
+			foreach((array) $row as $key => $value) {
+				if(!is_string($key) || $key === '' || ctype_digit($key)) {
+					unset($row->$key);
+				}
+			}
+		}
 		// Only run the category column update when there are real field changes
 		// (more than the always-present CategoryID/UpdateBy/UpdateDate trio);
 		// product-link changes alone are handled by Sync_Products() below.
