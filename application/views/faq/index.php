@@ -1,6 +1,46 @@
 <?php $can_edit = isset($can_edit) ? $can_edit : ((int)$this->session->level === 10); // OWNER or FAQ EDIT ACCESS (FE) may create/edit/delete; others view only ?>
 <?php $is_owner = ((int)$this->session->level === 10); // OWNER only: bulk download of the whole FAQ library (Excel / PDF) ?>
 
+<style>
+	/* Tag / Destination pills: let long labels (e.g. "Rawa Island Resort - Key
+	   Contacts") wrap inside the coloured pill instead of spilling past it. */
+	#kt_datatable .label.label-inline {
+		height: auto;
+		min-height: 24px;
+		white-space: normal;
+		line-height: 1.4;
+		padding-top: 4px;
+		padding-bottom: 4px;
+		text-align: center;
+	}
+
+	/* Mobile responsive child rows (Created By / Action): align each label and
+	   its value into two tidy columns so labels and values line up. */
+	#kt_datatable > tbody > tr.child ul.dtr-details {
+		width: 100%;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+	#kt_datatable > tbody > tr.child ul.dtr-details > li {
+		display: flex;
+		align-items: center;
+		border-bottom: 1px solid #ebedf3;
+		padding: 8px 10px;
+	}
+	#kt_datatable > tbody > tr.child ul.dtr-details > li:last-child {
+		border-bottom: none;
+	}
+	#kt_datatable > tbody > tr.child .dtr-title {
+		flex: 0 0 110px;
+		font-weight: 600;
+		color: #3f4254;
+	}
+	#kt_datatable > tbody > tr.child .dtr-data {
+		flex: 1 1 auto;
+	}
+</style>
+
 <div class="d-flex flex-column-fluid">
 	<div class="container-fluid">
 		<?php if($this->session->flashdata('faq_success')) { ?>

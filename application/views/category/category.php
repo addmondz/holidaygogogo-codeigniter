@@ -91,6 +91,17 @@
                                 </select>
                             </div>
                         </div>
+                        <div class="col-md-12">
+                            <div class="form-group">
+                                <label>Products</label>
+                                <select id="Products" multiple data-live-search="true" data-actions-box="true" class="form-control selectpicker" title="--SELECT PRODUCTS--">
+                                    <?php foreach($products as $product) { ?>
+                                        <option <?php if(in_array($product->ProductID, $category_product_ids)) { echo 'selected'; } ?> data-icon="la la-cube font-size-lg bs-icon" value="<?php echo $product->ProductID; ?>"><?php echo $product->ProductCode . ' - ' . $product->Name; ?></option>
+                                    <?php } ?>
+                                </select>
+                                <span class="form-text text-muted">Products expected to be covered when a booking selects this category as its Destination. A booking missing any of these will be warned at save.</span>
+                            </div>
+                        </div>
                     </div>
                     <div class="d-flex justify-content-between border-top pt-5">
                         <input type="button" value="<?php if(current_url() == base_url('Category/Create')) { echo 'Create Category'; } else { echo 'Update Category'; } ?>" class="btn btn-success font-weight-bold px-9 py-4" style="width:180px; margin-left:auto;">
@@ -144,19 +155,22 @@
                 var state = ($('#State').val()).toUpperCase();
                 var country = $('#Country').val();
                 var is_destination = $('#IsDestination').val();
+                var products = $('#Products').val() || [];
                 if(category_code == null || name == '' || city == '' || state == '' || country == null || is_destination == null) {
                     Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', 'Please Insert All Required Category Information', null);
                 } else {
                     if(window.location.href == '<?php echo base_url('Category/Create'); ?>') {
                         var category = [];
                         category.push({CategoryCodeID:category_code, Name:name, City:city, State:state, Country:country, IsDestination:is_destination, InsertBy:<?php echo $this->session->userdata('admin_id') ?>, InsertDate:'<?php echo date('Y-m-d H:i:s') ?>'});
-                        Submit_Category('<?php echo base_url('Category/Create') ?>', category);
+                        Submit_Category('<?php echo base_url('Category/Create') ?>', category, products);
                     } else {
                         var category = [{CategoryID:<?php echo $CategoryID ?>, UpdateBy:<?php echo $this->session->userdata('admin_id') ?>, UpdateDate:'<?php echo date('Y-m-d H:i:s') ?>'}];
                         var dirty_fields = $('#form').dirty('showDirtyFields');
                         if(dirty_fields.length > 0) {
                             for(var i = 0; i < dirty_fields.length; i++) {
                                 var key = dirty_fields[i].id;
+                                // Products is a link table, not a category column; never push it as a column update.
+                                if(key == 'Products') { continue; }
                                 var value = (dirty_fields[i].value).toUpperCase();
                                 category[0][key] = value;
                             }
@@ -165,10 +179,13 @@
                         $.each(category[0], function() {
                             count++;
                         });
-                        if(count == 3) {
+                        // Detect product-link changes independently of the category columns.
+                        var original_products = <?php echo json_encode(array_map('strval', $category_product_ids)); ?>;
+                        var products_changed = (products.slice().sort().join(',') !== original_products.slice().sort().join(','));
+                        if(count == 3 && !products_changed) {
                             Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', '<?php echo 'No Changes Detected In Category Record : ' . str_replace('\'', '', $Name); ?>', '<?php echo base_url('Category') ?>');
                         } else {
-                            Submit_Category('<?php echo base_url('Category/Update') ?>', category);
+                            Submit_Category('<?php echo base_url('Category/Update') ?>', category, products);
                         }
                     }
                 }
@@ -176,13 +193,16 @@
         });
     });
 
-    function Submit_Category(url, category)
+    function Submit_Category(url, category, products)
     {
         $.ajax({
             url: url,
             type: 'post',
             data: {
-                category: category
+                category: category,
+                // JSON-encoded so an empty selection still reaches the server
+                // (jQuery drops empty arrays), letting "remove all" clear links.
+                products: JSON.stringify(products)
             },
             success: function() {
                 Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', '<?php if(current_url() == base_url('Category/Create')) { echo 'New'; } ?> Category Record <?php if(current_url() == base_url('Category/Update')) { echo ': ' . str_replace('\'', '', $Name); } ?> Successfully <?php if(current_url() == base_url('Category/Create')) { echo 'Created'; } else { echo 'Updated'; } ?>', '<?php echo base_url('Category') ?>');

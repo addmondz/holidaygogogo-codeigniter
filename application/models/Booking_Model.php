@@ -466,6 +466,19 @@ class Booking_Model extends CI_Model
 		return $this->db->get('product')->result();
 	}
 
+	// Products each category expects a booking to cover when chosen as Destination.
+	// Only active links to active products are returned. Used to warn (not block)
+	// when a booking's inserted products miss any of these at save time.
+	function Read_Category_Products()
+	{
+		$this->db->select('category_product.CategoryID, category_product.ProductID, product.Name As Product, product.ProductCode');
+		$this->db->join('product', 'product.ProductID = category_product.ProductID', 'inner');
+		$this->db->where('category_product.Status', 'Y');
+		$this->db->where('product.Status', 'Y');
+		$this->db->order_by('product.ProductCode', 'ASC');
+		return $this->db->get('category_product')->result();
+	}
+
 	function Read_Footers()
 	{
 		$this->db->select('FooterID, BookingConfirmationTitle, TravelVoucherTitle');

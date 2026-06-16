@@ -2759,6 +2759,7 @@ class Booking extends MY_Controller
 					$array['booking_products'][0] = (object) array('BookingProductID' => 'NA');
 				$array['categories'] = $this->Booking_Model->Read_Categories();
 				$array['products'] = $this->Booking_Model->Read_Products();
+				$array['category_products'] = $this->Booking_Model->Read_Category_Products();
 				$array['footers'] = $this->Booking_Model->Read_Footers();
 				$array['country_codes'] = $this->Booking_Model->Read_Country_Codes();
 				$array['tags'] = $this->Booking_Model->Read_Tags();
@@ -3396,6 +3397,7 @@ class Booking extends MY_Controller
 					}
 					$array['categories'] = $this->Booking_Model->Read_Categories();
 					$array['products'] = $this->Booking_Model->Read_Products();
+					$array['category_products'] = $this->Booking_Model->Read_Category_Products();
 					$array['footers'] = $this->Booking_Model->Read_Footers();
 					$array['country_codes'] = $this->Booking_Model->Read_Country_Codes();
 					$array['tags'] = $this->Booking_Model->Read_Tags();

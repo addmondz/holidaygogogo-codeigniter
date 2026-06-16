@@ -3336,6 +3336,53 @@
 
 
 
+    // Products each destination (category) expects a booking to cover, keyed by
+    // CategoryID. Rendered from the category_product link table. Empty when the
+    // page wasn't given the map (e.g. an unrelated render path).
+    <?php
+        $__category_products_map = array();
+        if(!empty($category_products)) {
+            foreach($category_products as $__cp) {
+                $__category_products_map[$__cp->CategoryID][] = array(
+                    'ProductID'   => $__cp->ProductID,
+                    'Product'     => $__cp->Product,
+                    'ProductCode' => $__cp->ProductCode
+                );
+            }
+        }
+    ?>
+    var CATEGORY_PRODUCTS = <?php echo json_encode($__category_products_map); ?>;
+
+    // Return the list of products the selected destination expects but that are
+    // not present in the booking's inserted products. Empty array = fully covered
+    // (or nothing to check). Draft saves are exempt and never warn.
+    function Booking_Coverage_Gap() {
+        var saveMode = $('#draft_save_mode').length ? $('#draft_save_mode').val() : '';
+        var lenient = (saveMode === 'draft' || saveMode === 'approve' || saveMode === 'PB');
+        var isDraftToggle = ($('#is_draft_intake_toggle').length && $('#is_draft_intake_toggle').is(':checked'));
+        if (lenient || isDraftToggle) { return []; }
+
+        var destination = $('#Destination').val();
+        if (!destination) { return []; }
+
+        var required = CATEGORY_PRODUCTS[destination] || [];
+        if (!required.length) { return []; }
+
+        var inserted = {};
+        for (var i = 0; i < booking_product_ids.length; i++) {
+            var pid = $(`#ProductID-${booking_product_ids[i]}`).val();
+            if (pid != null && pid !== '') { inserted[String(pid)] = true; }
+        }
+
+        var missing = [];
+        for (var j = 0; j < required.length; j++) {
+            if (!inserted[String(required[j].ProductID)]) {
+                missing.push(required[j].ProductCode + ' - ' + required[j].Product);
+            }
+        }
+        return missing;
+    }
+
     $('input[type="button"]').click(function() {
 
         const swalWithBootstrapButtons = Swal.mixin({
@@ -3352,7 +3399,7 @@
 
         });
 
-        const proceedToConfirm = () => {
+        const runBookingSave = () => {
 
         swalWithBootstrapButtons.fire({
 
@@ -4384,6 +4431,33 @@
 
         });
 
+        };
+
+        // Soft gate: if the chosen Destination (category) defines expected
+        // products that this booking does not fully cover, warn first and let the
+        // user proceed anyway. Skipped for draft saves (handled inside the helper).
+        const proceedToConfirm = () => {
+            var __coverageGap = Booking_Coverage_Gap();
+            if (__coverageGap.length > 0) {
+                swalWithBootstrapButtons.fire({
+                    width: 550,
+                    background: 'url(<?php echo base_url('assets/image/sweetalert.jpg') ?>)',
+                    icon: 'warning',
+                    title: 'Incomplete Destination Products',
+                    html: 'These products are defined for this destination but are not in the booking:<br><br><strong>'
+                        + __coverageGap.join('<br>')
+                        + '</strong><br><br>Proceed anyway?',
+                    confirmButtonText: 'Proceed Anyway',
+                    cancelButtonText: 'Cancel',
+                    showCancelButton: true
+                }).then((action) => {
+                    if (action.isConfirmed) {
+                        runBookingSave();
+                    }
+                });
+            } else {
+                runBookingSave();
+            }
         };
 
         // Pre-submit duplicate-customer check: only when no CustomerID is bound

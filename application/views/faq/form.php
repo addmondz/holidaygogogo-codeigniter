@@ -81,7 +81,6 @@
 												<input type="text" id="faq-item-search" class="form-control" placeholder="Search sub-question or sub-answer…" autocomplete="off" style="max-width:420px;">
 												<span id="faq-item-filter-count" class="text-muted ml-3" style="font-size:12.5px;"></span>
 											</div>
-											<small class="form-text text-muted">Matches sub-question or sub-answer text, and combines with the tag filter. Adding a sub Q&amp;A clears the search.</small>
 										</div>
 									</div>
 									<?php if(!empty($tags)) { ?>
@@ -96,7 +95,6 @@
 														<?php } ?>
 													</select>
 												</div>
-												<small class="form-text text-muted">A row matches if it carries any selected tag. Adding a sub Q&amp;A clears the filter.</small>
 											</div>
 										</div>
 									<?php } ?>
