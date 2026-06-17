@@ -424,10 +424,10 @@ class Cron extends CI_Controller
 	{
 		$this->customCronLogging('[CRON] syncGhlModules');
 		
-		// run this hourly at 10 minutes past the hour
-		if ($this->shouldRunHourly(10)) {
+		// Run GHL sync every 20 minutes at :00, :20, and :40.
+		if ($this->shouldRunHourly(0) || $this->shouldRunHourly(20) || $this->shouldRunHourly(40)) {
 			if($this->allowGhlModuleSync) {
-				$this->customCronLogging('[CRON-10] syncGhlModules');
+				$this->customCronLogging('[CRON-00/20/40] syncGhlModules');
 				$this->syncGhlUsers();
 				$this->syncGhlContacts();
 				$this->syncGhlConversations();
@@ -435,21 +435,21 @@ class Cron extends CI_Controller
 			}
 		}
 
-		// Process leads every hour at 40 minutes past the hour, after message sync has had time to finish.
+		// Process leads 10 minutes after each GHL sync window: :10, :30, and :50.
 		// Lead processing also updates follow_up_status, which ownership reporting reads after conversion processing.
-		if ($this->shouldRunHourly(40)) {
+		if ($this->shouldRunHourly(10) || $this->shouldRunHourly(30) || $this->shouldRunHourly(50)) {
 			if($this->allowGhlModuleSync) {
-				$this->customCronLogging('[CRON-40] allowGhlModuleSync - process_ghl_leads');
+				$this->customCronLogging('[CRON-10/30/50] allowGhlModuleSync - process_ghl_leads');
 				$this->process_ghl_leads();
 			}
 
 			if($this->allowConvertionProcessing) {
-				$this->customCronLogging('[CRON-40] allowConvertionProcessing - process_ghl_lead_conversions');
+				$this->customCronLogging('[CRON-10/30/50] allowConvertionProcessing - process_ghl_lead_conversions');
 				$this->process_ghl_lead_conversions();
 			}
 
 			if($this->allowLeadOwnershipProcessing) {
-				$this->customCronLogging('[CRON-40] allowLeadOwnershipProcessing - process_ghl_lead_ownership');
+				$this->customCronLogging('[CRON-10/30/50] allowLeadOwnershipProcessing - process_ghl_lead_ownership');
 				$this->process_ghl_lead_ownership();
 			}
 		}

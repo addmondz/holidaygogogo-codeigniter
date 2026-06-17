@@ -29,6 +29,7 @@ class Ghl_Sync_Model extends CI_Model
     {
         $runId = isset($data['RunID']) ? trim((string) $data['RunID']) : '';
         $moduleName = isset($data['module_name']) ? trim((string) $data['module_name']) : '';
+        $now = date('Y-m-d H:i:s');
 
         if ($runId === '' || $moduleName === '') {
             return 0;
@@ -46,8 +47,9 @@ class Ghl_Sync_Model extends CI_Model
         );
         if (isset($data['completed_at']) && $data['completed_at'] !== '') {
             $payload['completed_at'] = (string) $data['completed_at'];
+        } elseif (isset($payload['status']) && in_array($payload['status'], array('completed', 'failed'), true)) {
+            $payload['completed_at'] = $now;
         }
-        $payload = $this->filter_run_log_payload($payload);
 
         $existing = $this->db
             ->select('id')
@@ -58,12 +60,22 @@ class Ghl_Sync_Model extends CI_Model
             ->row_array();
 
         if (!empty($existing['id'])) {
+            $payload['updated_at'] = $now;
+            $payload = $this->filter_run_log_payload($payload);
+
             $this->db
                 ->where('id', (int) $existing['id'])
                 ->update('ghl_sync_run_log', $payload);
 
             return (int) $existing['id'];
         }
+
+        $payload['created_at'] = $now;
+        $payload['updated_at'] = $now;
+        $payload['started_at'] = isset($data['started_at']) && $data['started_at'] !== ''
+            ? (string) $data['started_at']
+            : $now;
+        $payload = $this->filter_run_log_payload($payload);
 
         $this->db->insert('ghl_sync_run_log', $payload);
         return (int) $this->db->insert_id();
