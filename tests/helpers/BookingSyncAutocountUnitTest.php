@@ -105,4 +105,36 @@ $sync->autocount_update(build_booking(array(
 $details = $GLOBALS['__ac_last_body']['details'];
 assert_eq('update: explicit unit kept', 'PCS', $details[0]['unit']);
 
+// --- header Description ----------------------------------------------------
+// Bug: master description was hard-coded to null, so AutoCount kept whatever
+// stale/unrelated value was already in the field (an unrelated debtor's name
+// was observed). Contract: default the header Description to the FIRST product
+// line's name, but let an explicit description override it.
+
+// 5. create: no explicit description -> first product name.
+$sync->autocount_create(build_booking(array(
+    array('product_ProductCode' => 'P005', 'product_Name' => 'AIR FLIGHT TICKET', 'product_Quantity' => 1),
+    array('product_ProductCode' => 'P006', 'product_Name' => 'HOTEL', 'product_Quantity' => 1),
+)));
+assert_eq('create: description -> first product name', 'AIR FLIGHT TICKET', $GLOBALS['__ac_last_body']['master']['description']);
+
+// 6. create: explicit description wins.
+$data = build_booking(array(
+    array('product_ProductCode' => 'P007', 'product_Name' => 'AIR FLIGHT TICKET', 'product_Quantity' => 1),
+));
+$data['description'] = 'Custom header text';
+$sync->autocount_create($data);
+assert_eq('create: explicit description kept', 'Custom header text', $GLOBALS['__ac_last_body']['master']['description']);
+
+// 7. update: no explicit description -> first product name.
+$sync->autocount_update(build_booking(array(
+    array('product_ProductCode' => 'P008', 'product_Name' => 'AIR FLIGHT TICKET', 'product_Quantity' => 1),
+)));
+assert_eq('update: description -> first product name', 'AIR FLIGHT TICKET', $GLOBALS['__ac_last_body']['master']['description']);
+
+// 8. create: no products -> empty string, never null (so AutoCount cannot keep stale).
+$noProducts = build_booking(array());
+$sync->autocount_create($noProducts);
+assert_eq('create: no products -> empty description', '', $GLOBALS['__ac_last_body']['master']['description']);
+
 echo "\nAll assertions passed.\n";

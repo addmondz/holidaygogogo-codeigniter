@@ -4755,11 +4755,11 @@ class Booking extends MY_Controller
 	public function autocount_create($data)
 	{
 		try {
-			// Use the first product row's description as the quotation header description
-			$firstProductDescription = '';
+			// Use the first product row's name as the quotation header description
+			$firstProductName = '';
 			if (!empty($data['booking_product']) && is_array($data['booking_product'])) {
 				$firstProduct = reset($data['booking_product']);
-				$firstProductDescription = arr_get($firstProduct, 'product_Description', '');
+				$firstProductName = arr_get($firstProduct, 'product_Name', '');
 			}
 
 			$body['master'] = [
@@ -4780,7 +4780,7 @@ class Booking extends MY_Controller
 				'deliverPhone1'   => arr_get($data, 'guest_phone'),
 				'deliverFax1'     => arr_get($data, 'deliver_fax1', ''),
 				'ref'             => arr_get($data, 'ref', null),
-				'description'     => arr_get($data, 'description', $firstProductDescription),
+				'description'     => arr_get($data, 'description', $firstProductName),
 				'note'            => arr_get($data, 'note', null),
 				'salesAgent'      => arr_get($data, 'salesAgent', ''),
 				'creditTerm'      => arr_get($data, 'credit_term', 'C.O.D.'),
@@ -4852,11 +4852,11 @@ class Booking extends MY_Controller
 		try {
 			$docNo = arr_get($data, 'BookingNumber');
 
-			// Use the first product row's description as the quotation header description
-			$firstProductDescription = '';
+			// Use the first product row's name as the quotation header description
+			$firstProductName = '';
 			if (!empty($data['booking_product']) && is_array($data['booking_product'])) {
 				$firstProduct = reset($data['booking_product']);
-				$firstProductDescription = arr_get($firstProduct, 'product_Description', '');
+				$firstProductName = arr_get($firstProduct, 'product_Name', '');
 			}
 
 			$body['master'] = [
@@ -4877,7 +4877,7 @@ class Booking extends MY_Controller
 				'deliverPhone1'   => arr_get($data, 'guest_phone'),
 				'deliverFax1'     => arr_get($data, 'deliver_fax1', ''),
 				'ref'             => arr_get($data, 'ref', null),
-				'description'     => arr_get($data, 'description', $firstProductDescription),
+				'description'     => arr_get($data, 'description', $firstProductName),
 				'note'            => arr_get($data, 'note', null),
 				'salesAgent'      => arr_get($data, 'salesAgent', ''),
 				'creditTerm'      => arr_get($data, 'credit_term', 'C.O.D.'),

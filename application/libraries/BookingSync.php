@@ -14,6 +14,15 @@ class BookingSync {
     public function autocount_create($data)
 	{
 		try {
+			// Use the first product row's name as the document description so the
+			// header Description reflects the booking, instead of leaving it null
+			// (which lets AutoCount keep a stale/unrelated value).
+			$firstProductName = '';
+			if (!empty($data['booking_product']) && is_array($data['booking_product'])) {
+				$firstProduct = reset($data['booking_product']);
+				$firstProductName = arr_get($firstProduct, 'product_Name', '');
+			}
+
 			$body['master'] = [
 				'docNo'           => arr_get($data, 'BookingNumber'),
 				'docNoFormatName' => arr_get($data, 'docNoFormatName', null),
@@ -32,7 +41,7 @@ class BookingSync {
 				'deliverPhone1'   => arr_get($data, 'guest_phone'),
 				'deliverFax1'     => arr_get($data, 'deliver_fax1', ''),
 				'ref'             => arr_get($data, 'ref', null),
-				'description'     => arr_get($data, 'description', null),
+				'description'     => arr_get($data, 'description', $firstProductName),
 				'note'            => arr_get($data, 'note', null),
 				'salesAgent'      => arr_get($data, 'salesAgent', ''),
 				'creditTerm'      => arr_get($data, 'credit_term', 'C.O.D.'),
@@ -102,6 +111,15 @@ class BookingSync {
 		try {
 			$docNo = arr_get($data, 'BookingNumber');
 
+			// Use the first product row's name as the document description so the
+			// header Description reflects the booking, instead of leaving it null
+			// (which lets AutoCount keep a stale/unrelated value).
+			$firstProductName = '';
+			if (!empty($data['booking_product']) && is_array($data['booking_product'])) {
+				$firstProduct = reset($data['booking_product']);
+				$firstProductName = arr_get($firstProduct, 'product_Name', '');
+			}
+
 			$body['master'] = [
 				'docNo'           => arr_get($data, 'BookingNumber'),
 				'docNoFormatName' => arr_get($data, 'docNoFormatName', null),
@@ -120,7 +138,7 @@ class BookingSync {
 				'deliverPhone1'   => arr_get($data, 'guest_phone'),
 				'deliverFax1'     => arr_get($data, 'deliver_fax1', ''),
 				'ref'             => arr_get($data, 'ref', null),
-				'description'     => arr_get($data, 'description', null),
+				'description'     => arr_get($data, 'description', $firstProductName),
 				'note'            => arr_get($data, 'note', null),
 				'salesAgent'      => arr_get($data, 'salesAgent', ''),
 				'creditTerm'      => arr_get($data, 'credit_term', 'C.O.D.'),
