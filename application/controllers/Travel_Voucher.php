@@ -91,7 +91,12 @@ class Travel_Voucher extends CI_Controller
                 $this->db->join('guest_list_room', 'guest_list_room.id = guest_list.guest_list_room_id', 'left');
                 $this->db->where('guest_list.BookingID', $bookingID);
                 $this->db->where('guest_list.Status', 'Y');
-                $this->db->order_by('Type', 'ASC');
+                // Arrange by room: assigned rooms first (natural sorted), unassigned last,
+                // then by Name within each room.
+                $this->db->order_by('guest_list_room.room_name IS NULL', 'ASC', FALSE);
+                $this->db->order_by('LENGTH(guest_list_room.room_name)', 'ASC', FALSE);
+                $this->db->order_by('guest_list_room.room_name', 'ASC');
+                $this->db->order_by('guest_list.Name', 'ASC');
                 $array['guest_lists'] = $this->db->get('guest_list')->result();
                 
                 $array['CustomerProfileURL'] = base_url('customer/' . generate_customer_portal_slug($array['CustomerID']));
