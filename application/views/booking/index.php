@@ -643,7 +643,7 @@
                         cancellation_reason_id: action.value
                     },
                     success: function() {
-                        Display_Message(background, 'Booking ' + bookingNumber + ' Marked As Partial Refund', window.location.href);
+                        Display_Message(background, 'Booking ' + bookingNumber + ' Successfully Marked As Partial Refund', window.location.href);
                     },
                     error: function() {
                         Display_Message(background, 'Booking ' + bookingNumber + ' Could Not Be Marked As Partial Refund', null);
