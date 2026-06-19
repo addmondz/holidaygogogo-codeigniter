@@ -367,34 +367,108 @@ class Customer_Model extends CI_Model
             return null;
         }
 
-        // Get first character, uppercase if alphabetic
+        $this->load->helper('customer_code');
+
+        // The first letter selects the debtor series. Pull EVERY code in that
+        // series (local rows + codes AutoCount handed back via docNo) so we never
+        // re-issue one that already exists — re-issuing is what produced the
+        // `AccNo "303-T126" exists in Chart of Account` sync failures.
         $first_char = substr(trim($customer_name), 0, 1);
         if (ctype_alpha($first_char)) {
             $first_char = strtoupper($first_char);
         }
 
-        // Start from prefix 303, increment if sequence exceeds 999
-        $prefix_num = 303;
-        $max_prefix = 399;
+        $rows = $this->db
+            ->select('CustomerCode')
+            ->from('customer')
+            ->where('CustomerCode IS NOT NULL', null, false)
+            ->like('CustomerCode', '-' . $first_char) // matches "<prefix>-<letter>..."
+            ->get()
+            ->result_array();
 
-        while ($prefix_num <= $max_prefix) {
-            $prefix = $prefix_num . '-' . $first_char;
+        return next_customer_code($customer_name, array_column($rows, 'CustomerCode'));
+    }
 
-            $this->db->select("MAX(CAST(SUBSTRING(CustomerCode, 6) AS UNSIGNED)) as max_seq");
-            $this->db->from('customer');
-            $this->db->like('CustomerCode', $prefix, 'after');
-            $result = $this->db->get()->row();
-
-            $max_seq = ($result && $result->max_seq !== null) ? (int)$result->max_seq : 0;
-
-            if ($max_seq < 999) {
-                return $prefix . sprintf('%03d', $max_seq + 1);
-            }
-
-            $prefix_num++;
+    /**
+     * Whether a CustomerCode is already used by any customer row.
+     */
+    public function code_exists($code)
+    {
+        if (empty($code)) {
+            return false;
         }
 
-        return null;
+        return $this->db
+            ->where('CustomerCode', $code)
+            ->count_all_results('customer') > 0;
+    }
+
+    /**
+     * Insert a customer with a freshly generated, collision-free CustomerCode.
+     *
+     * The uniqueness is enforced in code (no DB UNIQUE constraint): a MySQL
+     * advisory lock serialises generation+insert so two concurrent requests
+     * can't pick the same code, and an explicit code_exists() check is the
+     * final guard before insert. generate_customer_code() already skips codes
+     * it can see (local rows + AutoCount-issued); the lock closes the
+     * read-then-insert window between two simultaneous callers.
+     *
+     * @param array $data         Customer row (CustomerCode is set/overwritten here).
+     * @param int   $max_attempts Regeneration attempts before giving up.
+     * @return int|null New CustomerID, or null on failure.
+     */
+    public function create_with_generated_code(array $data, $max_attempts = 5)
+    {
+        $name   = isset($data['name']) ? $data['name'] : '';
+        $locked = $this->_lock_customer_code();
+
+        try {
+            for ($attempt = 1; $attempt <= $max_attempts; $attempt++) {
+                $data['CustomerCode'] = $this->generate_customer_code($name);
+
+                // Final code-level guard: skip a code that appeared since we read
+                // the series (covers the unlocked fallback path too).
+                if (!empty($data['CustomerCode']) && $this->code_exists($data['CustomerCode'])) {
+                    continue;
+                }
+
+                if ($this->db->insert('customer', $data) && $this->db->affected_rows() > 0) {
+                    return (int) $this->db->insert_id();
+                }
+            }
+
+            log_message('error', 'create_with_generated_code: exhausted retries for customer "' . $name . '"');
+            return null;
+        } finally {
+            if ($locked) {
+                $this->_unlock_customer_code();
+            }
+        }
+    }
+
+    /**
+     * Serialise CustomerCode generation across requests via a MySQL advisory
+     * lock. Returns true if the lock was taken (false = proceed anyway; the
+     * code_exists() check still guards correctness for the common case).
+     */
+    private function _lock_customer_code($timeout = 10)
+    {
+        try {
+            $row = $this->db->query('SELECT GET_LOCK(?, ?) AS got', ['customer_code_gen', $timeout])->row();
+            return $row && (int) $row->got === 1;
+        } catch (Exception $e) {
+            // Non-MySQL driver or no lock support — fall back to the bare check.
+            return false;
+        }
+    }
+
+    private function _unlock_customer_code()
+    {
+        try {
+            $this->db->query('SELECT RELEASE_LOCK(?)', ['customer_code_gen']);
+        } catch (Exception $e) {
+            // best-effort release
+        }
     }
 
 	public function get_pending_sycn_customers()

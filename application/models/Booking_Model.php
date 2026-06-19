@@ -643,17 +643,16 @@ class Booking_Model extends CI_Model
 		} else {
 			if (!empty($data['name']) || !empty($data['phone_number'])) {
 				$this->load->model('Customer_Model');
-				$customer_code = $this->Customer_Model->generate_customer_code($data['name']);
 
 				$data['created_at'] = date('Y-m-d H:i:s');
-				$data['CustomerCode'] = $customer_code;
 				$data['AutocountSyncAction'] = 'C';
 				$data['AutocountSyncStatus'] = 'P';
 
-				$this->db->insert('customer', $data);
-				$customer_id = $this->db->insert_id();
- 
-				// remove this no need sync directly, cron will sync customer at first 
+				// Generates a unique CustomerCode; the model serialises and
+				// re-checks in code so a concurrent insert can't collide.
+				$customer_id = $this->Customer_Model->create_with_generated_code($data);
+
+				// remove this no need sync directly, cron will sync customer at first
 				// // Immediately sync to Autocount
 				// $this->load->library('CustomerSync');
 				// $this->load->helper('autocount');
@@ -1070,15 +1069,14 @@ class Booking_Model extends CI_Model
 		} else {
 			if (!empty($data['name']) || !empty($data['phone_number'])) {
 				$this->load->model('Customer_Model');
-				$customer_code = $this->Customer_Model->generate_customer_code($data['name']);
 
 				$data['created_at'] = date('Y-m-d H:i:s');
-				$data['CustomerCode'] = $customer_code;
 				$data['AutocountSyncAction'] = 'C';
 				$data['AutocountSyncStatus'] = 'P';
 
-				$this->db->insert('customer', $data);
-				$customer_id = $this->db->insert_id();
+				// Generates a unique CustomerCode; the model serialises and
+				// re-checks in code so a concurrent insert can't collide.
+				$customer_id = $this->Customer_Model->create_with_generated_code($data);
 
 				// no need sync directly, cron will sync customer at first
 				// // Immediately sync to Autocount

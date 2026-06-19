@@ -1591,7 +1591,17 @@ class Cron extends CI_Controller
 					]);
 
 					if (isset($result['docNo']) && !empty($result['docNo'])) {
-						$updateData['CustomerCode'] = $result['docNo'];
+						// Don't overwrite with a code another local customer already
+						// holds — that re-creates the very duplicate we're avoiding.
+						$clash = $this->db
+							->where('CustomerCode', $result['docNo'])
+							->where('CustomerID !=', $customer['CustomerID'])
+							->count_all_results('customer');
+						if ($clash == 0) {
+							$updateData['CustomerCode'] = $result['docNo'];
+						} else {
+							log_message('error', "syncCustomer: AutoCount docNo {$result['docNo']} already used by another local customer; not overwriting CustomerID {$customer['CustomerID']}.");
+						}
 					}
 					if (!empty($updateData)) {
 						$this->Customer_Model->update_by_id($customer['CustomerID'], $updateData);

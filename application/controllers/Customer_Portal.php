@@ -198,7 +198,7 @@ class Customer_Portal extends CI_Controller
     private function find_customer_by_slug($slug)
     {
         // Get all active customers ordered by ID so lower IDs get the 2-digit slug
-        $this->db->select('CustomerID, CustomerCode, name, phone_number, ChatLanguage, Status');
+        $this->db->select('CustomerID, CustomerCode, name, phone_number, ChatLanguage, Status, PrimaryEmail');
         $this->db->where('Status', 'Y');
         $this->db->order_by('CustomerID', 'ASC');
         $customers = $this->db->get('customer')->result_array();
@@ -226,19 +226,8 @@ class Customer_Portal extends CI_Controller
 
         $customer = $slug_map[$slug];
 
-        // Get customer email from guest_list (get first email from their bookings)
-        $this->db->select('guest_list.Email');
-        $this->db->from('guest_list');
-        $this->db->join('booking', 'booking.BookingID = guest_list.BookingID', 'left');
-        $this->db->where('booking.CustomerID', $customer['CustomerID']);
-        $this->db->where('guest_list.Email IS NOT NULL', null, false);
-        $this->db->where('guest_list.Email !=', '');
-        $this->db->where('guest_list.Status', 'Y');
-        $this->db->order_by('guest_list.GuestListID', 'ASC');
-        $this->db->limit(1);
-        $email_result = $this->db->get()->row_array();
-
-        $customer['email'] = !empty($email_result['Email']) ? $email_result['Email'] : null;
+        // Use the customer's primary email (booker's email), set in the admin Customer record
+        $customer['email'] = !empty($customer['PrimaryEmail']) ? $customer['PrimaryEmail'] : null;
         return $customer;
     }
 
