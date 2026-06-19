@@ -70,3 +70,27 @@ if (!function_exists('next_customer_code')) {
         return null;
     }
 }
+
+if (!function_exists('is_customer_code_clash')) {
+    /**
+     * Whether an AutoCount sync error means the AccNo we sent already exists in
+     * AutoCount's Chart of Account.
+     *
+     * This happens when a CustomerCode lives in AutoCount but NOT in the local
+     * `customer` table (an orphaned debtor — e.g. a customer deleted locally or
+     * whose code was changed), so local generation re-issues it and AutoCount
+     * rejects the create with `AccNo "303-T126" exists in Chart of Account`.
+     * Detecting it lets the sync bump to the next free code and retry.
+     *
+     * @param string|null $message AutoCount error string ($result['error']).
+     * @return bool
+     */
+    function is_customer_code_clash($message)
+    {
+        if (!is_string($message) || $message === '') {
+            return false;
+        }
+
+        return stripos($message, 'exists in Chart of Account') !== false;
+    }
+}

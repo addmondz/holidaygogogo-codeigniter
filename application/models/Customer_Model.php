@@ -447,6 +447,62 @@ class Customer_Model extends CI_Model
     }
 
     /**
+     * Issue the NEXT free CustomerCode to an existing customer and persist it.
+     *
+     * Used by the AutoCount sync to self-heal a `... exists in Chart of Account`
+     * rejection: the code we generated locally collides with an orphaned debtor
+     * that lives in AutoCount but not in our DB. Because the failing customer
+     * row already holds the colliding code, generate_customer_code() naturally
+     * steps to the next number; persisting it before the retry makes each bump
+     * advance further (126 -> 127 -> 128 ...) until AutoCount accepts.
+     *
+     * @param int    $customer_id
+     * @param string $name
+     * @return string|null New code, or null if the series is exhausted or the
+     *                     next code would not differ from the current one.
+     */
+    public function bump_customer_code($customer_id, $name)
+    {
+        $locked = $this->_lock_customer_code();
+
+        try {
+            $current = $this->find($customer_id);
+            $current_code = $current ? $current->CustomerCode : null;
+
+            for ($attempt = 1; $attempt <= 5; $attempt++) {
+                $code = $this->generate_customer_code($name);
+
+                // Exhausted, or generation can't move past the failing code.
+                if (empty($code) || $code === $current_code) {
+                    return null;
+                }
+
+                // Never step onto a code another local row already holds.
+                $clash = $this->db
+                    ->where('CustomerCode', $code)
+                    ->where('CustomerID !=', $customer_id)
+                    ->count_all_results('customer');
+                if ($clash > 0) {
+                    // Park the customer on this code so the next generate_*()
+                    // call steps past it, then try again.
+                    $this->update_by_id($customer_id, ['CustomerCode' => $code]);
+                    $current_code = $code;
+                    continue;
+                }
+
+                $this->update_by_id($customer_id, ['CustomerCode' => $code]);
+                return $code;
+            }
+
+            return null;
+        } finally {
+            if ($locked) {
+                $this->_unlock_customer_code();
+            }
+        }
+    }
+
+    /**
      * Serialise CustomerCode generation across requests via a MySQL advisory
      * lock. Returns true if the lock was taken (false = proceed anyway; the
      * code_exists() check still guards correctness for the common case).

@@ -1560,17 +1560,39 @@ class Cron extends CI_Controller
 
 		$this->load->library('CustomerSync');
 		$this->load->helper('autocount');
+		$this->load->helper('customer_code');
 		$config = get_autocount_config();
-		
+
 		foreach ($customers as $customer) {
 			echo "Customer {$customer['CustomerID']} [{$customer['AutocountSyncAction']}]... ";
 
 			$customer = $this->enrichCustomer($customer);
+			$updateData = [];
 
 			try {
 				switch ($customer['AutocountSyncAction']) {
 					case 'C':
 						$result = $this->customersync->autocount_create($customer, $config);
+
+						// Self-heal an orphaned-code collision: AutoCount already
+						// owns this AccNo (it exists in their Chart of Account but
+						// not in our DB). Bump to the next free code and retry.
+						$bump = 0;
+						while ($bump < 5
+							&& isset($result['error'])
+							&& is_customer_code_clash($result['error'])) {
+							$bump++;
+							$newCode = $this->Customer_Model->bump_customer_code(
+								$customer['CustomerID'],
+								$customer['name']
+							);
+							if (empty($newCode) || $newCode === $customer['CustomerCode']) {
+								break; // series exhausted — leave it Failed
+							}
+							$customer['CustomerCode'] = $newCode;
+							echo "BUMP->{$newCode} ";
+							$result = $this->customersync->autocount_create($customer, $config);
+						}
 						break;
 					case 'U':
 						$result = $this->customersync->autocount_update($customer, $config);
