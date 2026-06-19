@@ -1180,13 +1180,15 @@ class Payment extends MY_Controller
 		$spreadsheet->getActiveSheet()->setCellValue('R1', 'BANK ACCOUNT');
 		$spreadsheet->getActiveSheet()->setCellValue('S1', 'BANK HOLDER');
 		$spreadsheet->getActiveSheet()->setCellValue('T1', 'REMARK');
+		$spreadsheet->getActiveSheet()->setCellValue('U1', 'AUTOCOUNT REFERENCE');
+		$spreadsheet->getActiveSheet()->setCellValue('V1', 'STATUS');
 		$credit = 0;
 		$debit = 0;
 		$row = 2;
 		$payments = $this->Payment_Model->Read_Payments2();
-		$spreadsheet->getActiveSheet()->getStyle('A1:T1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_BLACK);
-		$spreadsheet->getActiveSheet()->getStyle('A1:T1')->getFont()->getColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_WHITE);
-		$spreadsheet->getActiveSheet()->getStyle('A1:T1')->getFont()->setBold(true);
+		$spreadsheet->getActiveSheet()->getStyle('A1:V1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_BLACK);
+		$spreadsheet->getActiveSheet()->getStyle('A1:V1')->getFont()->getColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_WHITE);
+		$spreadsheet->getActiveSheet()->getStyle('A1:V1')->getFont()->setBold(true);
 		if(!empty($payments)) {
 			foreach($payments as $payment) {
 				$credit = $credit + $payment->Credit;
@@ -1225,6 +1227,13 @@ class Payment extends MY_Controller
 				$spreadsheet->getActiveSheet()->setCellValueExplicit('R' . $row, $payment->BankAccount, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 				$spreadsheet->getActiveSheet()->setCellValueExplicit('S' . $row, $payment->BankHolder, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 				$spreadsheet->getActiveSheet()->setCellValueExplicit('T' . $row, $payment->PaymentRemark, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+				switch($payment->Status) {
+					case 'Y': $payment->StatusText = 'Approved'; break;
+					case 'P': $payment->StatusText = 'Pending'; break;
+					default: $payment->StatusText = 'Rejected'; break;
+				}
+				$spreadsheet->getActiveSheet()->setCellValueExplicit('U' . $row, $payment->AutocountReferenceNumber, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+				$spreadsheet->getActiveSheet()->setCellValueExplicit('V' . $row, $payment->StatusText, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 				$row++;
 			}
 			$spreadsheet->getActiveSheet()->getStyle('B')->getNumberFormat()->setFormatCode('#,##0.00_-');
@@ -1243,11 +1252,11 @@ class Payment extends MY_Controller
 			$spreadsheet->getActiveSheet()->getCell('B' . ($row + 4))->setValue('');
 			$spreadsheet->getActiveSheet()->getStyle('B' . ($row + 2))->getNumberFormat()->setFormatCode('#,##0.00_-');
 			$spreadsheet->getActiveSheet()->getStyle('C' . ($row + 2))->getNumberFormat()->setFormatCode('#,##0.00_-');
-			$spreadsheet->getActiveSheet()->getStyle('A:T')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_RIGHT);
+			$spreadsheet->getActiveSheet()->getStyle('A:V')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_RIGHT);
 		} else {
-			$spreadsheet->getActiveSheet()->mergeCells('A2:T2');
+			$spreadsheet->getActiveSheet()->mergeCells('A2:V2');
 			$spreadsheet->getActiveSheet()->getCell('A2')->setValue('Payment Records Not Found');
-			$spreadsheet->getActiveSheet()->getStyle('A:T')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
+			$spreadsheet->getActiveSheet()->getStyle('A:V')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
 		}
 		$spreadsheet->getActiveSheet()->getColumnDimension('A')->setWidth(35);
 		$spreadsheet->getActiveSheet()->getColumnDimension('B')->setWidth(35);
@@ -1269,6 +1278,8 @@ class Payment extends MY_Controller
 		$spreadsheet->getActiveSheet()->getColumnDimension('R')->setWidth(35);
 		$spreadsheet->getActiveSheet()->getColumnDimension('S')->setWidth(35);
 		$spreadsheet->getActiveSheet()->getColumnDimension('T')->setWidth(35);
+		$spreadsheet->getActiveSheet()->getColumnDimension('U')->setWidth(35);
+		$spreadsheet->getActiveSheet()->getColumnDimension('V')->setWidth(35);
 		$payment_records = 'PAYMENT_RECORDS_' . date('Ymd') . '.xlsx';
 		header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 		header('Content-Disposition: attachment;filename="' . $payment_records . '"');

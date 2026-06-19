@@ -109,7 +109,7 @@ class Payment_Model extends CI_Model
 
 	function Read_Payments2()
 	{
-		$this->db->select('Date, Type, ForeignCurrency, Credit, ReferenceNumber, Debit, Deadline, QuotationNumber, InvoiceNumber, payment.Bank, payment.BankAccount, payment.BankHolder, PaymentRemark, BookingNumber, ReservationNumber, Customer, StartDate, EndDate, admin.Name As SalesAgent, category.Name As Destination, supplier.Name As Supplier');
+		$this->db->select('Date, Type, ForeignCurrency, Credit, ReferenceNumber, Debit, Deadline, QuotationNumber, InvoiceNumber, payment.Bank, payment.BankAccount, payment.BankHolder, PaymentRemark, BookingNumber, ReservationNumber, Customer, StartDate, EndDate, admin.Name As SalesAgent, category.Name As Destination, supplier.Name As Supplier, payment.AutocountReferenceNumber, payment.Status');
 		$this->db->join('payment', 'payment.BookingID = booking.BookingID', 'left');
 		$this->db->join('admin', 'admin.AdminID = booking.SalesAgent', 'left');
 		$this->db->join('category', 'category.CategoryID = booking.Destination', 'left');
