@@ -5,10 +5,28 @@ class BookingSync {
 
     protected $CI;
 
+    // AutoCount quotation master field length limits. Exceeding these makes the
+    // API reject the whole document ("must be a string with a maximum length of N").
+    const MAX_YOUR_REF    = 20;
+    const MAX_DESCRIPTION = 80;
+
     public function __construct()
     {
         // get CI super object so we can use $this->CI->db, $this->CI->load etc.
         $this->CI =& get_instance();
+    }
+
+    /**
+     * Clip a string to AutoCount's allowed length so an over-long booking
+     * reference or product name doesn't fail the whole sync. Null stays null.
+     */
+    private function clip($value, $max)
+    {
+        if ($value === null || $value === '') {
+            return $value;
+        }
+
+        return mb_substr((string) $value, 0, $max);
     }
 
     public function autocount_create($data)
@@ -41,7 +59,7 @@ class BookingSync {
 				'deliverPhone1'   => arr_get($data, 'guest_phone'),
 				'deliverFax1'     => arr_get($data, 'deliver_fax1', ''),
 				'ref'             => arr_get($data, 'ref', null),
-				'description'     => arr_get($data, 'description', $firstProductName),
+				'description'     => $this->clip(arr_get($data, 'description', $firstProductName), self::MAX_DESCRIPTION),
 				'note'            => arr_get($data, 'note', null),
 				'salesAgent'      => arr_get($data, 'salesAgent', ''),
 				'creditTerm'      => arr_get($data, 'credit_term', 'C.O.D.'),
@@ -53,7 +71,7 @@ class BookingSync {
 				'currencyRate'    => arr_get($data, 'currency_rate', 1),
 				'inclusiveTax'    => arr_get($data, 'inclusive_tax', false),
 				'isRoundAdj'      => arr_get($data, 'is_round_adj', false),
-				'yourRef'         => arr_get($data, 'yourRef', null),
+				'yourRef'         => $this->clip(arr_get($data, 'yourRef', null), self::MAX_YOUR_REF),
 				'validity'        => arr_get($data, 'validity', null),
 				'cc'              => arr_get($data, 'cc', null),
 				'deliveryTerm'    => arr_get($data, 'deliveryTerm', null),
@@ -66,7 +84,7 @@ class BookingSync {
 					$body['details'][] = [
 						'productCode'        => arr_get($product, 'product_ProductCode'),
 						'productVariant'     => arr_get($product, 'productVariant', null),
-						'description'        => arr_get($product, 'product_Name'),
+						'description'        => $this->clip(arr_get($product, 'product_Name'), self::MAX_DESCRIPTION),
 						'furtherDescription' => arr_get($product, 'product_Description', ''),
 						'qty'                => (float)arr_get($product, 'product_Quantity', 1),
 						// Null UOM => AutoCount uses the stock item's base UOM. The literal
@@ -138,7 +156,7 @@ class BookingSync {
 				'deliverPhone1'   => arr_get($data, 'guest_phone'),
 				'deliverFax1'     => arr_get($data, 'deliver_fax1', ''),
 				'ref'             => arr_get($data, 'ref', null),
-				'description'     => arr_get($data, 'description', $firstProductName),
+				'description'     => $this->clip(arr_get($data, 'description', $firstProductName), self::MAX_DESCRIPTION),
 				'note'            => arr_get($data, 'note', null),
 				'salesAgent'      => arr_get($data, 'salesAgent', ''),
 				'creditTerm'      => arr_get($data, 'credit_term', 'C.O.D.'),
@@ -150,7 +168,7 @@ class BookingSync {
 				'currencyRate'    => arr_get($data, 'currency_rate', 1),
 				'inclusiveTax'    => arr_get($data, 'inclusive_tax', false),
 				'isRoundAdj'      => arr_get($data, 'is_round_adj', false),
-				'yourRef'         => arr_get($data, 'yourRef', null),
+				'yourRef'         => $this->clip(arr_get($data, 'yourRef', null), self::MAX_YOUR_REF),
 				'validity'        => arr_get($data, 'validity', null),
 				'cc'              => arr_get($data, 'cc', null),
 				'deliveryTerm'    => arr_get($data, 'deliveryTerm', null),
@@ -163,7 +181,7 @@ class BookingSync {
 					$body['details'][] = [
 						'productCode'        => arr_get($product, 'product_ProductCode'),
 						'productVariant'     => arr_get($product, 'productVariant', null),
-						'description'        => arr_get($product, 'product_Name'),
+						'description'        => $this->clip(arr_get($product, 'product_Name'), self::MAX_DESCRIPTION),
 						'furtherDescription' => arr_get($product, 'product_Description', ''),
 						'qty'                => (float)arr_get($product, 'product_Quantity', 1),
 						// Null UOM => AutoCount uses the stock item's base UOM. The literal
