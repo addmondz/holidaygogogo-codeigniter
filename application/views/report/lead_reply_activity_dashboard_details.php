@@ -1,7 +1,7 @@
 <style>
     .reply-detail-summary {
         display: grid;
-        grid-template-columns: repeat(4, minmax(160px, 1fr));
+        grid-template-columns: repeat(2, minmax(160px, 1fr));
         gap: 12px;
     }
 
@@ -50,7 +50,7 @@
                             <strong>Lead Reply Activity Details</strong>
                         </h3>
                         <div class="text-muted font-size-sm">
-                            Replied lead details by reply date and owner.
+                            Details for assigned leads and reply-created leads on the selected date.
                         </div>
                     </div>
                 </div>
@@ -111,11 +111,11 @@
                                         </div>
                                         <div class="col-md-3">
                                             <div class="form-group">
-                                                <label>Lead Type</label>
+                                                <label>Activity Type</label>
                                                 <select name="lead_type" class="form-control selectpicker">
-                                                    <option value="" <?php if($reply_activity_detail_filters['lead_type'] === '') { echo 'selected'; } ?>>--ALL LEADS--</option>
-                                                    <option value="replied" <?php if($reply_activity_detail_filters['lead_type'] === 'replied') { echo 'selected'; } ?>>Replied Lead</option>
-                                                    <option value="new" <?php if($reply_activity_detail_filters['lead_type'] === 'new') { echo 'selected'; } ?>>New Lead</option>
+                                                    <option value="" <?php if($reply_activity_detail_filters['lead_type'] === '') { echo 'selected'; } ?>>--ALL ACTIVITY--</option>
+                                                    <option value="assigned" <?php if($reply_activity_detail_filters['lead_type'] === 'assigned') { echo 'selected'; } ?>>Assigned Lead</option>
+                                                    <option value="reply_created" <?php if($reply_activity_detail_filters['lead_type'] === 'reply_created') { echo 'selected'; } ?>>Reply-Created Lead</option>
                                                 </select>
                                             </div>
                                         </div>
@@ -130,20 +130,12 @@
 
                 <div class="reply-detail-summary mt-8">
                     <div class="reply-detail-metric">
-                        <div class="label-text">Replied Leads</div>
-                        <div class="value-text"><?php echo number_format($reply_activity_detail_summary['replied_leads']); ?></div>
+                        <div class="label-text">Assigned Leads</div>
+                        <div class="value-text"><?php echo number_format($reply_activity_detail_summary['assigned_leads']); ?></div>
                     </div>
                     <div class="reply-detail-metric">
-                        <div class="label-text">New Leads</div>
-                        <div class="value-text"><?php echo number_format($reply_activity_detail_summary['new_leads_replied']); ?></div>
-                    </div>
-                    <div class="reply-detail-metric">
-                        <div class="label-text">Existing Leads</div>
-                        <div class="value-text"><?php echo number_format($reply_activity_detail_summary['existing_leads_replied']); ?></div>
-                    </div>
-                    <div class="reply-detail-metric">
-                        <div class="label-text">Outbound Replies</div>
-                        <div class="value-text"><?php echo number_format($reply_activity_detail_summary['outbound_replies']); ?></div>
+                        <div class="label-text">Reply-Created Leads</div>
+                        <div class="value-text"><?php echo number_format($reply_activity_detail_summary['reply_created_leads']); ?></div>
                     </div>
                 </div>
 
@@ -155,10 +147,10 @@
                                 <th>Contact</th>
                                 <th>Owner</th>
                                 <th>Assigned</th>
-                                <th style="text-align:center;">Lead Type</th>
+                                <th style="text-align:center;">Activity Type</th>
+                                <th>Activity Date</th>
                                 <th>Lead Started</th>
-                                <th>First Reply</th>
-                                <th>Last Reply</th>
+                                <th>Reply Created</th>
                                 <th style="text-align:center;">Replies</th>
                                 <th style="text-align:center;">Messages</th>
                                 <th style="text-align:center;">Status</th>
@@ -168,7 +160,7 @@
                         <tbody>
                             <?php if(empty($reply_activity_detail_rows)) { ?>
                                 <tr>
-                                    <td colspan="12" class="text-center py-10">No replied leads found for the selected filters.</td>
+                                    <td colspan="12" class="text-center py-10">No lead activity found for the selected filters.</td>
                                 </tr>
                             <?php } else { ?>
                                 <?php $count = 1; ?>
@@ -183,11 +175,11 @@
                                         <td class="align-middle font-weight-bold"><?php echo html_escape($row['owner_name']); ?></td>
                                         <td class="align-middle"><?php echo html_escape($row['assigned_name']); ?></td>
                                         <td class="text-center align-middle">
-                                            <span class="label <?php echo $row['lead_type'] === 'New Lead' ? 'label-light-success' : 'label-light-warning'; ?> label-inline font-weight-bold"><?php echo html_escape($row['lead_type']); ?></span>
+                                            <span class="label <?php echo html_escape($row['activity_type_class']); ?> label-inline font-weight-bold"><?php echo html_escape($row['activity_type']); ?></span>
                                         </td>
+                                        <td class="align-middle"><?php echo html_escape($row['activity_at_label']); ?></td>
                                         <td class="align-middle"><?php echo html_escape($row['lead_started_at_label']); ?></td>
-                                        <td class="align-middle"><?php echo html_escape($row['first_reply_at_label']); ?></td>
-                                        <td class="align-middle"><?php echo html_escape($row['last_reply_at_label']); ?></td>
+                                        <td class="align-middle"><?php echo html_escape($row['reply_created_at_label']); ?></td>
                                         <td class="text-center align-middle"><?php echo number_format($row['outbound_replies']); ?></td>
                                         <td class="text-center align-middle"><?php echo number_format($row['message_count']); ?></td>
                                         <td class="text-center align-middle">

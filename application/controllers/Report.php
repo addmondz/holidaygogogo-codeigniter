@@ -955,7 +955,7 @@ class Report extends MY_Controller
         $leadType = strtolower(trim((string) $this->input->get('lead_type')));
         $parsedDate = $this->parse_report_single_date($replyDate);
 
-        if (!in_array($leadType, array('replied', 'new'), true)) {
+        if (!in_array($leadType, array('assigned', 'reply_created'), true)) {
             $leadType = '';
         }
 
@@ -1440,15 +1440,9 @@ class Report extends MY_Controller
     private function format_lead_reply_activity_summary($summary)
     {
         return array(
-            'replied_leads' => (int) $summary['replied_leads'],
-            'unique_leads' => (int) $summary['unique_leads'],
-            'new_leads_replied' => (int) $summary['new_leads_replied'],
-            'existing_leads_replied' => (int) $summary['existing_leads_replied'],
-            'outbound_replies' => (int) $summary['outbound_replies'],
-            'assigned_owned_replied' => (int) $summary['assigned_owned_replied'],
-            'reply_owned_replied' => (int) $summary['reply_owned_replied'],
+            'assigned_leads' => (int) $summary['assigned_leads'],
+            'reply_created_leads' => (int) $summary['reply_created_leads'],
             'active_owners' => (int) $summary['active_owners'],
-            'avg_replies_per_lead' => number_format((float) $summary['avg_replies_per_lead'], 1),
         );
     }
 
@@ -1460,17 +1454,8 @@ class Report extends MY_Controller
             $formatted[] = array(
                 'owner_user_id' => $row['owner_user_id'],
                 'owner_name' => $row['owner_name'],
-                'replied_leads' => (int) $row['replied_leads'],
-                'new_leads_replied' => (int) $row['new_leads_replied'],
-                'existing_leads_replied' => (int) $row['existing_leads_replied'],
-                'outbound_replies' => (int) $row['outbound_replies'],
-                'assigned_owned_replied' => (int) $row['assigned_owned_replied'],
-                'reply_owned_replied' => (int) $row['reply_owned_replied'],
-                'avg_replies_per_lead' => number_format((float) $row['avg_replies_per_lead'], 1),
-                'first_reply_at' => $row['first_reply_at'],
-                'last_reply_at' => $row['last_reply_at'],
-                'first_reply_at_label' => !empty($row['first_reply_at']) ? date('d M Y h:i A', strtotime($row['first_reply_at'])) : '-',
-                'last_reply_at_label' => !empty($row['last_reply_at']) ? date('d M Y h:i A', strtotime($row['last_reply_at'])) : '-',
+                'assigned_leads' => (int) $row['assigned_leads'],
+                'reply_created_leads' => (int) $row['reply_created_leads'],
             );
         }
 
@@ -1480,10 +1465,8 @@ class Report extends MY_Controller
     private function format_lead_reply_activity_detail_summary($summary)
     {
         return array(
-            'replied_leads' => (int) $summary['replied_leads'],
-            'new_leads_replied' => (int) $summary['new_leads_replied'],
-            'existing_leads_replied' => (int) $summary['existing_leads_replied'],
-            'outbound_replies' => (int) $summary['outbound_replies'],
+            'assigned_leads' => (int) $summary['assigned_leads'],
+            'reply_created_leads' => (int) $summary['reply_created_leads'],
         );
     }
 
@@ -1501,13 +1484,14 @@ class Report extends MY_Controller
                 'owner_user_id' => $row['owner_user_id'],
                 'owner_name' => $row['owner_name'],
                 'assigned_name' => $row['assigned_name'],
-                'lead_type' => $row['lead_type'],
+                'activity_type' => $row['activity_type'],
+                'activity_type_class' => $row['activity_type'] === 'Assigned Lead' ? 'label-light-primary' : 'label-light-success',
+                'activity_at' => $row['activity_at'],
+                'activity_at_label' => !empty($row['activity_at']) ? date('d M Y h:i A', strtotime($row['activity_at'])) : '-',
                 'lead_started_at' => $row['lead_started_at'],
                 'lead_started_at_label' => !empty($row['lead_started_at']) ? date('d M Y h:i A', strtotime($row['lead_started_at'])) : '-',
-                'first_reply_at' => $row['first_reply_at'],
-                'first_reply_at_label' => !empty($row['first_reply_at']) ? date('d M Y h:i A', strtotime($row['first_reply_at'])) : '-',
-                'last_reply_at' => $row['last_reply_at'],
-                'last_reply_at_label' => !empty($row['last_reply_at']) ? date('d M Y h:i A', strtotime($row['last_reply_at'])) : '-',
+                'reply_created_at' => $row['reply_created_at'],
+                'reply_created_at_label' => !empty($row['reply_created_at']) ? date('d M Y h:i A', strtotime($row['reply_created_at'])) : '-',
                 'outbound_replies' => (int) $row['outbound_replies'],
                 'message_count' => (int) $row['message_count'],
                 'follow_up_status_label' => $this->format_follow_up_status_label(isset($row['follow_up_status']) ? $row['follow_up_status'] : 'pending'),

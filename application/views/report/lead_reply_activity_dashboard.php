@@ -7,9 +7,6 @@
                         <h3 class="card-label mb-1" style="color:#2f506f;">
                             <strong>Lead Reply Activity Dashboard</strong>
                         </h3>
-                        <div class="text-muted font-size-sm">
-                            Daily outbound replies by lead owner, split by leads created on the selected reply date and older existing leads.
-                        </div>
                     </div>
                 </div>
                 <div class="card-toolbar">
@@ -29,13 +26,21 @@
                         <div class="card-header">
                             <div id="lead_reply_activity_header" data-toggle="collapse" data-target="#lead_reply_activity_filters" class="card-title" style="font-size:13px;">Filter Reply Activity</div>
                         </div>
+                        <div class="alert alert-custom alert-light-primary py-3 px-4 mt-3 mb-0" role="alert">
+                            <div class="alert-icon">
+                                <i class="la la-info-circle"></i>
+                            </div>
+                            <div class="alert-text font-weight-bold" style="line-height:1.45;">
+                                Data is based on activity date: Assigned Leads use the date the lead was assigned to the owner; Reply-Created Leads use the date the owner crossed the reply-created threshold.
+                            </div>
+                        </div>
                         <div id="lead_reply_activity_filters" class="collapse show">
                             <div class="card-body">
                                 <form id="lead-reply-activity-form" action="<?php echo base_url('Report/Lead_Reply_Activity_Dashboard'); ?>" method="get" class="form">
                                     <div class="row">
                                         <div class="col-md-4">
                                             <div class="form-group">
-                                                <label>Reply Date
+                                                <label>Activity Date
                                                     <a onclick="resetLeadReplyActivityDate()" class="btn btn-icon btn-light-warning btn-xs">
                                                         <i class="la la-undo"></i>
                                                     </a>
@@ -87,19 +92,14 @@
                             <tr>
                                 <th style="text-align:center;">No.</th>
                                 <th>Owner</th>
-                                <th style="text-align:center;">Replied Leads</th>
-                                <th style="text-align:center;">New Leads</th>
-                                <th style="text-align:center;">Existing Leads</th>
-                                <!-- <th style="text-align:center;">Assigned Owned</th>
-                                <th style="text-align:center;">Reply Owned</th>
-                                <th style="text-align:center;">First Reply</th>
-                                <th style="text-align:center;">Last Reply</th> -->
+                                <th style="text-align:center;">Assigned Leads</th>
+                                <th style="text-align:center;">Reply-Created Leads</th>
                             </tr>
                         </thead>
                         <tbody id="lead-reply-activity-table-body">
                             <?php if(empty($lead_reply_activity_rows)) { ?>
                                 <tr>
-                                    <td colspan="9" class="text-center py-10">Lead reply activity not found for the selected filters.</td>
+                                    <td colspan="4" class="text-center py-10">Lead reply activity not found for the selected filters.</td>
                                 </tr>
                             <?php } else { ?>
                                 <?php $count = 1; ?>
@@ -107,13 +107,8 @@
                                     <tr>
                                         <td class="text-center"><?php echo $count; ?></td>
                                         <td class="font-weight-bold text-dark"><?php echo html_escape($row['owner_name']); ?></td>
-                                        <td class="text-center"><?php echo number_format($row['replied_leads']); ?></td>
-                                        <td class="text-center"><?php echo number_format($row['new_leads_replied']); ?></td>
-                                        <td class="text-center"><?php echo number_format($row['existing_leads_replied']); ?></td>
-                                        <!-- <td class="text-center"><?php echo number_format($row['assigned_owned_replied']); ?></td>
-                                        <td class="text-center"><?php echo number_format($row['reply_owned_replied']); ?></td>
-                                        <td class="text-center"><?php echo html_escape($row['first_reply_at_label']); ?></td>
-                                        <td class="text-center"><?php echo html_escape($row['last_reply_at_label']); ?></td> -->
+                                        <td class="text-center"><?php echo number_format($row['assigned_leads']); ?></td>
+                                        <td class="text-center"><?php echo number_format($row['reply_created_leads']); ?></td>
                                     </tr>
                                     <?php $count++; ?>
                                 <?php } ?>
@@ -159,7 +154,7 @@
         var html = '';
 
         if (!rows || rows.length === 0) {
-            $('#lead-reply-activity-table-body').html('<tr><td colspan="9" class="text-center py-10">Lead reply activity not found for the selected filters.</td></tr>');
+            $('#lead-reply-activity-table-body').html('<tr><td colspan="4" class="text-center py-10">Lead reply activity not found for the selected filters.</td></tr>');
             return;
         }
 
@@ -167,13 +162,8 @@
             html += '<tr>';
             html += '<td class="text-center">' + (index + 1) + '</td>';
             html += '<td class="font-weight-bold text-dark">' + escapeHtml(row.owner_name) + '</td>';
-            html += '<td class="text-center">' + row.replied_leads + '</td>';
-            html += '<td class="text-center">' + row.new_leads_replied + '</td>';
-            html += '<td class="text-center">' + row.existing_leads_replied + '</td>';
-            html += '<td class="text-center">' + row.assigned_owned_replied + '</td>';
-            html += '<td class="text-center">' + row.reply_owned_replied + '</td>';
-            html += '<td class="text-center">' + escapeHtml(row.first_reply_at_label) + '</td>';
-            html += '<td class="text-center">' + escapeHtml(row.last_reply_at_label) + '</td>';
+            html += '<td class="text-center">' + row.assigned_leads + '</td>';
+            html += '<td class="text-center">' + row.reply_created_leads + '</td>';
             html += '</tr>';
         });
 
