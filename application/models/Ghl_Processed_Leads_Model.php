@@ -59,17 +59,19 @@ class Ghl_Processed_Leads_Model extends CI_Model
                 WHERE (
                     updated_at > ?
                     OR (updated_at = ? AND id > ?)
+                    OR id > ?
                 )
                   AND updated_at < ?
                   AND {$timeColumn} < ?
                   AND conversation_id IS NOT NULL
                   AND conversation_id <> ''
-                ORDER BY updated_at ASC, id ASC
+                ORDER BY id ASC
                 LIMIT ?
                 ",
                 array(
                     $cursorProcessedAt,
                     $cursorProcessedAt,
+                    $cursorMessageRowId,
                     $cursorMessageRowId,
                     $batchUpperBound,
                     $batchUpperBound,
@@ -95,14 +97,22 @@ class Ghl_Processed_Leads_Model extends CI_Model
                         );
                     }
 
-                    $safeCursorProcessedAt = (string) $row['updated_at'];
-                    $safeCursorMessageRowId = (int) $row['id'];
+                    if ((string) $row['updated_at'] > $safeCursorProcessedAt) {
+                        $safeCursorProcessedAt = (string) $row['updated_at'];
+                    }
+                    if ((int) $row['id'] > $safeCursorMessageRowId) {
+                        $safeCursorMessageRowId = (int) $row['id'];
+                    }
                     continue;
                 }
 
                 if (isset($selectedConversationIds[$conversationId])) {
-                    $safeCursorProcessedAt = (string) $row['updated_at'];
-                    $safeCursorMessageRowId = (int) $row['id'];
+                    if ((string) $row['updated_at'] > $safeCursorProcessedAt) {
+                        $safeCursorProcessedAt = (string) $row['updated_at'];
+                    }
+                    if ((int) $row['id'] > $safeCursorMessageRowId) {
+                        $safeCursorMessageRowId = (int) $row['id'];
+                    }
                     continue;
                 }
 
@@ -119,8 +129,12 @@ class Ghl_Processed_Leads_Model extends CI_Model
             }
 
             $lastRow = $rows[count($rows) - 1];
-            $cursorProcessedAt = (string) $lastRow['updated_at'];
-            $cursorMessageRowId = (int) $lastRow['id'];
+            if ((string) $lastRow['updated_at'] > $cursorProcessedAt) {
+                $cursorProcessedAt = (string) $lastRow['updated_at'];
+            }
+            if ((int) $lastRow['id'] > $cursorMessageRowId) {
+                $cursorMessageRowId = (int) $lastRow['id'];
+            }
         }
 
         return array(

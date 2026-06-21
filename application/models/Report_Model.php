@@ -1361,6 +1361,247 @@ class Report_Model extends CI_Model
         return $results;
     }
 
+    function Lead_Reply_Activity_Details_Summary($filters = array())
+    {
+        $where = $this->build_lead_reply_activity_where_clause($filters);
+        $extraJoins = isset($where['extra_joins']) ? $where['extra_joins'] : '';
+        $messageTimeColumn = $this->escape_identifier($this->get_message_time_column());
+        $leadStart = !empty($filters['start_date']) ? $filters['start_date'] . ' 00:00:00' : '1970-01-01 00:00:00';
+        $leadEnd = !empty($filters['end_date']) ? $filters['end_date'] . ' 23:59:59' : '9999-12-31 23:59:59';
+
+        $params = array($leadStart, $leadEnd, $leadStart, $leadEnd);
+        $params = array_merge($params, $where['params']);
+
+        $sql = "
+            SELECT
+                COUNT(DISTINCT CONCAT(glo.owner_user_id, ':', glo.processed_lead_id)) AS replied_leads,
+                COUNT(DISTINCT CASE
+                    WHEN glo.lead_started_at BETWEEN ? AND ?
+                    THEN CONCAT(glo.owner_user_id, ':', glo.processed_lead_id)
+                END) AS new_leads_replied,
+                COUNT(DISTINCT CASE
+                    WHEN glo.lead_started_at NOT BETWEEN ? AND ?
+                    THEN CONCAT(glo.owner_user_id, ':', glo.processed_lead_id)
+                END) AS existing_leads_replied,
+                COUNT(*) AS outbound_replies
+            FROM ghl_messages gm
+            INNER JOIN ghl_lead_ownership glo
+                ON glo.conversation_id = gm.conversation_id
+               AND glo.owner_user_id = gm.user_id
+               AND gm.{$messageTimeColumn} >= glo.lead_started_at
+               AND (
+                    glo.lead_ended_at IS NULL
+                    OR gm.{$messageTimeColumn} < glo.lead_ended_at
+               )
+            LEFT JOIN ghl_users gu ON gu.UserID = glo.owner_user_id
+            {$extraJoins}
+            {$where['sql']}
+        ";
+
+        $row = $this->db->query($sql, $params)->row_array();
+
+        return array(
+            'replied_leads' => !empty($row['replied_leads']) ? (int) $row['replied_leads'] : 0,
+            'new_leads_replied' => !empty($row['new_leads_replied']) ? (int) $row['new_leads_replied'] : 0,
+            'existing_leads_replied' => !empty($row['existing_leads_replied']) ? (int) $row['existing_leads_replied'] : 0,
+            'outbound_replies' => !empty($row['outbound_replies']) ? (int) $row['outbound_replies'] : 0,
+        );
+    }
+
+    function Lead_Reply_Activity_Details_Rows($filters = array())
+    {
+        $where = $this->build_lead_reply_activity_where_clause($filters);
+        $extraJoins = isset($where['extra_joins']) ? $where['extra_joins'] : '';
+        $messageTimeColumn = $this->escape_identifier($this->get_message_time_column());
+        $leadStart = !empty($filters['start_date']) ? $filters['start_date'] . ' 00:00:00' : '1970-01-01 00:00:00';
+        $leadEnd = !empty($filters['end_date']) ? $filters['end_date'] . ' 23:59:59' : '9999-12-31 23:59:59';
+
+        $params = array($leadStart, $leadEnd);
+        $params = array_merge($params, $where['params']);
+
+        $sql = "
+            SELECT
+                glo.processed_lead_id,
+                glo.conversation_id,
+                glo.contact_id,
+                COALESCE(NULLIF(gc.contact_name, ''), NULLIF(gc.full_name, ''), 'Unknown Contact') AS contact_name,
+                gc.phone,
+                glo.owner_user_id,
+                COALESCE(NULLIF(gu.Name, ''), glo.owner_user_id) AS owner_name,
+                COALESCE(NULLIF(assigned_gu.Name, ''), NULLIF(glo.assigned_to_user_id, ''), 'Unassigned') AS assigned_name,
+                CASE WHEN glo.lead_started_at BETWEEN ? AND ? THEN 'New Lead' ELSE 'Existing Lead' END AS lead_type,
+                glo.lead_started_at,
+                MIN(gm.{$messageTimeColumn}) AS first_reply_at,
+                MAX(gm.{$messageTimeColumn}) AS last_reply_at,
+                COUNT(*) AS outbound_replies,
+                (
+                    SELECT COUNT(*)
+                    FROM ghl_messages gm_count
+                    WHERE gm_count.conversation_id = glo.conversation_id
+                      AND gm_count.{$messageTimeColumn} >= glo.lead_started_at
+                      AND (
+                          glo.lead_ended_at IS NULL
+                          OR gm_count.{$messageTimeColumn} < glo.lead_ended_at
+                      )
+                ) AS message_count,
+                glo.follow_up_status,
+                glo.is_converted,
+                glo.booking_id,
+                b.BookingNumber
+            FROM ghl_messages gm
+            INNER JOIN ghl_lead_ownership glo
+                ON glo.conversation_id = gm.conversation_id
+               AND glo.owner_user_id = gm.user_id
+               AND gm.{$messageTimeColumn} >= glo.lead_started_at
+               AND (
+                    glo.lead_ended_at IS NULL
+                    OR gm.{$messageTimeColumn} < glo.lead_ended_at
+               )
+            LEFT JOIN ghl_conversations gc ON gc.conversation_id = glo.conversation_id
+            LEFT JOIN ghl_users gu ON gu.UserID = glo.owner_user_id
+            LEFT JOIN ghl_users assigned_gu ON assigned_gu.UserID = glo.assigned_to_user_id
+            LEFT JOIN booking b ON b.BookingID = glo.booking_id
+            {$extraJoins}
+            {$where['sql']}
+            GROUP BY
+                glo.processed_lead_id,
+                glo.conversation_id,
+                glo.contact_id,
+                contact_name,
+                gc.phone,
+                glo.owner_user_id,
+                owner_name,
+                assigned_name,
+                lead_type,
+                glo.lead_started_at,
+                glo.lead_ended_at,
+                glo.follow_up_status,
+                glo.is_converted,
+                glo.booking_id,
+                b.BookingNumber
+            ORDER BY first_reply_at DESC, glo.processed_lead_id DESC, owner_name ASC
+        ";
+
+        return $this->db->query($sql, $params)->result_array();
+    }
+
+    function Lead_Reply_Activity_Mobile_Summary($mobile, $filters = array())
+    {
+        $where = $this->build_mobile_search_where_clause($mobile, $filters, 'gc.phone', 'glo.owner_user_id');
+        if ($where['empty']) {
+            return array(
+                'conversation_count' => 0,
+                'lead_count' => 0,
+                'message_count' => 0,
+                'inbound_message_count' => 0,
+                'outbound_message_count' => 0,
+                'owner_count' => 0,
+                'first_message_at' => null,
+                'last_message_at' => null,
+            );
+        }
+
+        $messageTimeColumn = $this->escape_identifier($this->get_message_time_column());
+
+        $sql = "
+            SELECT
+                COUNT(DISTINCT gc.conversation_id) AS conversation_count,
+                COUNT(DISTINCT pl.id) AS lead_count,
+                COUNT(DISTINCT gm.id) AS message_count,
+                COUNT(DISTINCT CASE WHEN gm.direction = 'inbound' THEN gm.id END) AS inbound_message_count,
+                COUNT(DISTINCT CASE WHEN gm.direction = 'outbound' THEN gm.id END) AS outbound_message_count,
+                COUNT(DISTINCT NULLIF(glo.owner_user_id, '')) AS owner_count,
+                MIN(gm.{$messageTimeColumn}) AS first_message_at,
+                MAX(gm.{$messageTimeColumn}) AS last_message_at
+            FROM ghl_conversations gc
+            LEFT JOIN ghl_processed_leads pl ON pl.conversation_id = gc.conversation_id
+            LEFT JOIN ghl_messages gm ON gm.conversation_id = gc.conversation_id
+            LEFT JOIN ghl_lead_ownership glo ON glo.processed_lead_id = pl.id
+            {$where['sql']}
+        ";
+
+        $row = $this->db->query($sql, $where['params'])->row_array();
+
+        return array(
+            'conversation_count' => !empty($row['conversation_count']) ? (int) $row['conversation_count'] : 0,
+            'lead_count' => !empty($row['lead_count']) ? (int) $row['lead_count'] : 0,
+            'message_count' => !empty($row['message_count']) ? (int) $row['message_count'] : 0,
+            'inbound_message_count' => !empty($row['inbound_message_count']) ? (int) $row['inbound_message_count'] : 0,
+            'outbound_message_count' => !empty($row['outbound_message_count']) ? (int) $row['outbound_message_count'] : 0,
+            'owner_count' => !empty($row['owner_count']) ? (int) $row['owner_count'] : 0,
+            'first_message_at' => isset($row['first_message_at']) ? $row['first_message_at'] : null,
+            'last_message_at' => isset($row['last_message_at']) ? $row['last_message_at'] : null,
+        );
+    }
+
+    function Lead_Reply_Activity_Mobile_Leads($mobile, $filters = array())
+    {
+        $where = $this->build_mobile_search_where_clause($mobile, $filters, 'gc.phone', 'pl.assigned_to_user_id');
+        if ($where['empty']) {
+            return array();
+        }
+
+        $messageTimeColumn = $this->escape_identifier($this->get_message_time_column());
+
+        $sql = "
+            SELECT
+                pl.id AS processed_lead_id,
+                pl.conversation_id,
+                COALESCE(NULLIF(gc.contact_name, ''), NULLIF(gc.full_name, ''), 'Unknown Contact') AS contact_name,
+                gc.phone,
+                COALESCE(NULLIF(gu.Name, ''), NULLIF(pl.assigned_to_user_id, ''), 'Unassigned') AS agent_name,
+                pl.lead_started_at,
+                pl.lead_ended_at,
+                pl.responded_message_count,
+                pl.tracked_message_count,
+                (
+                    SELECT COUNT(*)
+                    FROM ghl_messages gm_count
+                    WHERE gm_count.conversation_id = pl.conversation_id
+                      AND gm_count.{$messageTimeColumn} >= pl.lead_started_at
+                      AND (
+                          pl.lead_ended_at IS NULL
+                          OR gm_count.{$messageTimeColumn} < pl.lead_ended_at
+                      )
+                ) AS message_count,
+                pl.is_converted,
+                b.BookingNumber
+            FROM ghl_processed_leads pl
+            LEFT JOIN ghl_conversations gc ON gc.conversation_id = pl.conversation_id
+            LEFT JOIN ghl_users gu ON gu.UserID = pl.assigned_to_user_id
+            LEFT JOIN booking b ON b.BookingID = pl.booking_id
+            {$where['sql']}
+            ORDER BY pl.lead_started_at DESC, pl.id DESC
+            LIMIT 100
+        ";
+
+        return $this->db->query($sql, $where['params'])->result_array();
+    }
+
+    function Lead_Reply_Activity_Mobile_Owners($mobile, $filters = array())
+    {
+        $where = $this->build_mobile_search_where_clause($mobile, $filters, 'gc.phone', 'glo.owner_user_id');
+        if ($where['empty']) {
+            return array();
+        }
+
+        $sql = "
+            SELECT
+                glo.owner_user_id,
+                COALESCE(NULLIF(gu.Name, ''), glo.owner_user_id) AS owner_name,
+                COUNT(DISTINCT glo.processed_lead_id) AS lead_count,
+                SUM(glo.outbound_reply_count) AS outbound_reply_count
+            FROM ghl_lead_ownership glo
+            LEFT JOIN ghl_conversations gc ON gc.conversation_id = glo.conversation_id
+            LEFT JOIN ghl_users gu ON gu.UserID = glo.owner_user_id
+            {$where['sql']}
+            GROUP BY glo.owner_user_id, owner_name
+            ORDER BY lead_count DESC, outbound_reply_count DESC, owner_name ASC
+        ";
+
+        return $this->db->query($sql, $where['params'])->result_array();
+    }
+
     /**
      * Active (unconverted) leads grouped by allowlisted GHL tag, broken into
      * destination / language / race buckets. Powers the TC LEAD card
@@ -2062,6 +2303,19 @@ class Report_Model extends CI_Model
             $params[] = $filters['end_date'] . ' 23:59:59';
         }
 
+        if (!empty($filters['lead_type']) && !empty($filters['start_date']) && !empty($filters['end_date'])) {
+            if ($filters['lead_type'] === 'new') {
+                $clauses[] = 'glo.lead_started_at BETWEEN ? AND ?';
+            } elseif ($filters['lead_type'] === 'replied') {
+                $clauses[] = 'glo.lead_started_at NOT BETWEEN ? AND ?';
+            }
+
+            if ($filters['lead_type'] === 'new' || $filters['lead_type'] === 'replied') {
+                $params[] = $filters['start_date'] . ' 00:00:00';
+                $params[] = $filters['end_date'] . ' 23:59:59';
+            }
+        }
+
         if (!empty($filters['owner_user_id'])) {
             $ownerIds = is_array($filters['owner_user_id']) ? $filters['owner_user_id'] : array($filters['owner_user_id']);
             $ownerIds = array_values(array_filter($ownerIds, function($v) { return $v !== '' && $v !== null; }));
@@ -2096,6 +2350,47 @@ class Report_Model extends CI_Model
             'sql' => $sql,
             'params' => $params,
             'extra_joins' => $extraJoins,
+        );
+    }
+
+    private function build_mobile_search_where_clause($mobile, $filters, $phoneColumn, $ownerColumn)
+    {
+        $raw = trim((string) $mobile);
+        if ($raw === '') {
+            return array('sql' => 'WHERE 1=0', 'params' => array(), 'empty' => true);
+        }
+
+        $digits = preg_replace('/\D+/', '', $raw);
+        $normalizedPhoneColumn = "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE({$phoneColumn}, '+', ''), ' ', ''), '-', ''), '(', ''), ')', '')";
+        $clauses = array();
+        $params = array();
+
+        if ($digits !== '') {
+            $clauses[] = "({$phoneColumn} LIKE ? OR {$normalizedPhoneColumn} LIKE ?)";
+            $params[] = '%' . $raw . '%';
+            $params[] = '%' . $digits . '%';
+        } else {
+            $clauses[] = "{$phoneColumn} LIKE ?";
+            $params[] = '%' . $raw . '%';
+        }
+
+        if (array_key_exists('_restrict_agent_ids', $filters)) {
+            $allowed = array_values(array_filter(
+                array_map('strval', (array) $filters['_restrict_agent_ids']),
+                'strlen'
+            ));
+            if (empty($allowed)) {
+                return array('sql' => 'WHERE 1=0', 'params' => array(), 'empty' => true);
+            }
+            $placeholders = implode(',', array_fill(0, count($allowed), '?'));
+            $clauses[] = "{$ownerColumn} IN ({$placeholders})";
+            foreach ($allowed as $id) { $params[] = $id; }
+        }
+
+        return array(
+            'sql' => 'WHERE ' . implode(' AND ', $clauses),
+            'params' => $params,
+            'empty' => false,
         );
     }
 

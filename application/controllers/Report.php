@@ -158,6 +158,31 @@ class Report extends MY_Controller
             )));
     }
 
+    function Lead_Reply_Activity_Dashboard_Details()
+    {
+        $filters = $this->lead_reply_activity_filters();
+        $payload = $this->lead_reply_activity_details_payload($filters);
+
+        $titles = array(
+            'tab_title' => 'HolidayGoGoGo | Report',
+            'breadcrumb_title' => 'Report >> Lead Reply Activity Details'
+        );
+
+        $array = array(
+            'reply_activity_detail_summary' => $payload['summary'],
+            'reply_activity_detail_rows' => $payload['rows'],
+            'reply_activity_detail_agents' => $payload['agents'],
+            'reply_activity_detail_team_leads' => $payload['team_leads'],
+            'reply_activity_detail_filters' => $filters,
+            'reply_activity_mobile_search' => $payload['mobile_search'],
+            'reply_activity_updated_at' => $payload['updated_at'],
+        );
+
+        $this->load->view('layout/header', $titles);
+        $this->load->view('report/lead_reply_activity_dashboard_details', $array);
+        $this->load->view('layout/footer');
+    }
+
     function Lead_Data()
     {
         $filters = $this->lead_data_filters();
@@ -819,6 +844,26 @@ class Report extends MY_Controller
         );
     }
 
+    private function lead_reply_activity_details_payload($filters)
+    {
+        $restrict = isset($filters['_restrict_agent_ids']) ? $filters['_restrict_agent_ids'] : null;
+        $mobile = trim((string) $this->input->get('mobile'));
+
+        return array(
+            'summary' => $this->format_lead_reply_activity_detail_summary($this->Report_Model->Lead_Reply_Activity_Details_Summary($filters)),
+            'rows' => $this->format_lead_reply_activity_detail_rows($this->Report_Model->Lead_Reply_Activity_Details_Rows($filters)),
+            'agents' => $this->Report_Model->Lead_Ownership_Agents($restrict),
+            'team_leads' => $this->Report_Model->Lead_Dashboard_Team_Leads(),
+            'mobile_search' => array(
+                'mobile' => $mobile,
+                'summary' => $mobile !== '' ? $this->format_lead_reply_activity_mobile_summary($this->Report_Model->Lead_Reply_Activity_Mobile_Summary($mobile, $filters)) : null,
+                'leads' => $mobile !== '' ? $this->format_lead_reply_activity_mobile_leads($this->Report_Model->Lead_Reply_Activity_Mobile_Leads($mobile, $filters)) : array(),
+                'owners' => $mobile !== '' ? $this->Report_Model->Lead_Reply_Activity_Mobile_Owners($mobile, $filters) : array(),
+            ),
+            'updated_at' => date('Y-m-d H:i:s'),
+        );
+    }
+
     private function lead_data_payload($filters)
     {
         $perPage = isset($filters['per_page']) ? max(10, (int) $filters['per_page']) : 25;
@@ -907,7 +952,12 @@ class Report extends MY_Controller
         $replyDate = trim((string) $this->input->get('reply_date'));
         $owners = $this->normalize_id_array($this->input->get('owner'));
         $teamLeads = $this->normalize_id_array($this->input->get('team_lead'));
+        $leadType = strtolower(trim((string) $this->input->get('lead_type')));
         $parsedDate = $this->parse_report_single_date($replyDate);
+
+        if (!in_array($leadType, array('replied', 'new'), true)) {
+            $leadType = '';
+        }
 
         if (empty($parsedDate['date'])) {
             $today = date('Y-m-d');
@@ -930,6 +980,7 @@ class Report extends MY_Controller
             'owner' => $owners,
             'owner_user_id' => $owners,
             'team_lead' => $teamLeads,
+            'lead_type' => $leadType,
         );
 
         if ($restriction !== null) {
@@ -1420,6 +1471,91 @@ class Report extends MY_Controller
                 'last_reply_at' => $row['last_reply_at'],
                 'first_reply_at_label' => !empty($row['first_reply_at']) ? date('d M Y h:i A', strtotime($row['first_reply_at'])) : '-',
                 'last_reply_at_label' => !empty($row['last_reply_at']) ? date('d M Y h:i A', strtotime($row['last_reply_at'])) : '-',
+            );
+        }
+
+        return $formatted;
+    }
+
+    private function format_lead_reply_activity_detail_summary($summary)
+    {
+        return array(
+            'replied_leads' => (int) $summary['replied_leads'],
+            'new_leads_replied' => (int) $summary['new_leads_replied'],
+            'existing_leads_replied' => (int) $summary['existing_leads_replied'],
+            'outbound_replies' => (int) $summary['outbound_replies'],
+        );
+    }
+
+    private function format_lead_reply_activity_detail_rows($rows)
+    {
+        $formatted = array();
+
+        foreach ($rows as $row) {
+            $formatted[] = array(
+                'processed_lead_id' => (int) $row['processed_lead_id'],
+                'conversation_id' => $row['conversation_id'],
+                'contact_id' => $row['contact_id'],
+                'contact_name' => $row['contact_name'],
+                'phone' => $row['phone'],
+                'owner_user_id' => $row['owner_user_id'],
+                'owner_name' => $row['owner_name'],
+                'assigned_name' => $row['assigned_name'],
+                'lead_type' => $row['lead_type'],
+                'lead_started_at' => $row['lead_started_at'],
+                'lead_started_at_label' => !empty($row['lead_started_at']) ? date('d M Y h:i A', strtotime($row['lead_started_at'])) : '-',
+                'first_reply_at' => $row['first_reply_at'],
+                'first_reply_at_label' => !empty($row['first_reply_at']) ? date('d M Y h:i A', strtotime($row['first_reply_at'])) : '-',
+                'last_reply_at' => $row['last_reply_at'],
+                'last_reply_at_label' => !empty($row['last_reply_at']) ? date('d M Y h:i A', strtotime($row['last_reply_at'])) : '-',
+                'outbound_replies' => (int) $row['outbound_replies'],
+                'message_count' => (int) $row['message_count'],
+                'follow_up_status_label' => $this->format_follow_up_status_label(isset($row['follow_up_status']) ? $row['follow_up_status'] : 'pending'),
+                'follow_up_status_class' => $this->format_follow_up_status_class(isset($row['follow_up_status']) ? $row['follow_up_status'] : 'pending'),
+                'conversion_status_label' => (int) $row['is_converted'] === 1 ? 'Converted' : 'Open',
+                'booking_id' => !empty($row['booking_id']) ? (int) $row['booking_id'] : null,
+                'booking_number' => isset($row['BookingNumber']) ? $row['BookingNumber'] : '',
+                'booking_url' => !empty($row['booking_id']) ? base_url('Booking/View?booking_id=') . (int) $row['booking_id'] : '',
+                'lead_data_url' => base_url('Report/Lead_Data?conversation_id=') . urlencode($row['conversation_id']),
+            );
+        }
+
+        return $formatted;
+    }
+
+    private function format_lead_reply_activity_mobile_summary($summary)
+    {
+        return array(
+            'conversation_count' => (int) $summary['conversation_count'],
+            'lead_count' => (int) $summary['lead_count'],
+            'message_count' => (int) $summary['message_count'],
+            'inbound_message_count' => (int) $summary['inbound_message_count'],
+            'outbound_message_count' => (int) $summary['outbound_message_count'],
+            'owner_count' => (int) $summary['owner_count'],
+            'first_message_at_label' => !empty($summary['first_message_at']) ? date('d M Y h:i A', strtotime($summary['first_message_at'])) : '-',
+            'last_message_at_label' => !empty($summary['last_message_at']) ? date('d M Y h:i A', strtotime($summary['last_message_at'])) : '-',
+        );
+    }
+
+    private function format_lead_reply_activity_mobile_leads($rows)
+    {
+        $formatted = array();
+
+        foreach ($rows as $row) {
+            $formatted[] = array(
+                'processed_lead_id' => (int) $row['processed_lead_id'],
+                'conversation_id' => $row['conversation_id'],
+                'contact_name' => $row['contact_name'],
+                'phone' => $row['phone'],
+                'agent_name' => $row['agent_name'],
+                'lead_started_at_label' => !empty($row['lead_started_at']) ? date('d M Y h:i A', strtotime($row['lead_started_at'])) : '-',
+                'lead_ended_at_label' => !empty($row['lead_ended_at']) ? date('d M Y h:i A', strtotime($row['lead_ended_at'])) : '-',
+                'responded_message_count' => (int) $row['responded_message_count'],
+                'tracked_message_count' => (int) $row['tracked_message_count'],
+                'message_count' => (int) $row['message_count'],
+                'conversion_status_label' => (int) $row['is_converted'] === 1 ? 'Converted' : 'Open',
+                'booking_number' => isset($row['BookingNumber']) ? $row['BookingNumber'] : '',
+                'lead_data_url' => base_url('Report/Lead_Data?conversation_id=') . urlencode($row['conversation_id']),
             );
         }
 

@@ -76,6 +76,7 @@ $route['404_override'] = '';
 $route['translate_uri_dashes'] = FALSE;
 $route['customer/search'] = 'customer/search';
 $route['customer/check_duplicate'] = 'customer/check_duplicate';
+$route['ghl-details'] = 'Ghl_Details';
 
 
 
