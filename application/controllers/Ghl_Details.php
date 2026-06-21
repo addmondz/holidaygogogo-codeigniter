@@ -193,6 +193,14 @@ class Ghl_Details extends MY_Controller
     private function uncovered_count_sql($days)
     {
         $days = max(1, (int) $days);
+        $now = $this->get_code_datetime();
+        $cutoffTimestamp = strtotime($now . ' -' . $days . ' days');
+        $cutoff = $cutoffTimestamp !== false
+            ? date('Y-m-d H:i:s', $cutoffTimestamp)
+            : $now;
+        $safeCutoff = $this->db->escape($cutoff);
+        $safeNow = $this->db->escape($now);
+
         return "
             SELECT COUNT(*) c
             FROM ghl_messages gm
@@ -201,8 +209,8 @@ class Ghl_Details extends MY_Controller
              AND pl.lead_started_at <= gm.date_added
              AND (pl.lead_ended_at IS NULL OR pl.lead_ended_at > gm.date_added)
             WHERE gm.direction = 'inbound'
-              AND gm.date_added >= DATE_SUB(NOW(), INTERVAL {$days} DAY)
-              AND gm.date_added < NOW()
+              AND gm.date_added >= {$safeCutoff}
+              AND gm.date_added < {$safeNow}
               AND pl.id IS NULL
         ";
     }
@@ -210,6 +218,12 @@ class Ghl_Details extends MY_Controller
     private function normalized_phone_sql($column)
     {
         return "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE({$column}, '+', ''), ' ', ''), '-', ''), '(', ''), ')', '')";
+    }
+
+    private function get_code_datetime()
+    {
+        return (new DateTimeImmutable('now', new DateTimeZone('Asia/Kuala_Lumpur')))
+            ->format('Y-m-d H:i:s');
     }
 
     private function table($title, $rows)

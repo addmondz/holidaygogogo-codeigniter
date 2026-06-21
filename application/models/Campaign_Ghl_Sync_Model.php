@@ -7,7 +7,7 @@ class Campaign_Ghl_Sync_Model extends CI_Model
 
 	public function log_row($data)
 	{
-		$now = date('Y-m-d H:i:s');
+		$now = $this->get_code_datetime();
 		$row = array(
 			'CampaignID'    => isset($data['CampaignID'])    ? (int) $data['CampaignID']    : 0,
 			'RunID'         => isset($data['RunID'])         ? (string) $data['RunID']      : '',
@@ -62,13 +62,13 @@ class Campaign_Ghl_Sync_Model extends CI_Model
 	}
 
 	// Atomically picks the next pending run, or reclaims a stale-running run
-	// whose worker died (ClaimedAt older than 5 minutes). Sets ClaimedAt=NOW()
+	// whose worker died (ClaimedAt older than 5 minutes). Sets ClaimedAt from code time
 	// so concurrent workers don't both grab the same job. Returns the claimed
 	// run row or null.
 	public function claim_next_pending_run()
 	{
-		$now    = date('Y-m-d H:i:s');
-		$stale  = date('Y-m-d H:i:s', time() - 5 * 60);
+		$now    = $this->get_code_datetime();
+		$stale  = $this->get_code_datetime('Y-m-d H:i:s', '-5 minutes');
 
 		// Find the candidate ID first (LIMIT in UPDATE...JOIN is portable).
 		$sql = "SELECT ID FROM campaign_ghl_sync_log
@@ -123,7 +123,7 @@ class Campaign_Ghl_Sync_Model extends CI_Model
 		$this->db->query($sql, array(
 			$matched, $created, $enrolled, $failed,
 			(int) $current_offset,
-			date('Y-m-d H:i:s'),
+			$this->get_code_datetime(),
 			(string) $run_id,
 		));
 		return $this->db->affected_rows();
@@ -133,7 +133,7 @@ class Campaign_Ghl_Sync_Model extends CI_Model
 	// status is a no-op except for refreshing CompletedAt.
 	public function finalize_run($run_id, $status, $completed_at = null)
 	{
-		$completed_at = $completed_at ?: date('Y-m-d H:i:s');
+		$completed_at = $completed_at ?: $this->get_code_datetime();
 		$this->db->where('RunID', (string) $run_id);
 		$this->db->where('Action', 'run_summary');
 		$this->db->update('campaign_ghl_sync_log', array(
@@ -202,5 +202,15 @@ INNER JOIN (
 			$out[(int) $r->CampaignID] = $r;
 		}
 		return $out;
+	}
+
+	private function get_code_datetime($format = 'Y-m-d H:i:s', $modifier = null)
+	{
+		$date = new DateTimeImmutable('now', new DateTimeZone('Asia/Kuala_Lumpur'));
+		if ($modifier !== null && $modifier !== '') {
+			$date = $date->modify((string) $modifier);
+		}
+
+		return $date->format($format);
 	}
 }

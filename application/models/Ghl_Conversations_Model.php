@@ -6,6 +6,7 @@ class Ghl_Conversations_Model extends CI_Model
     public function upsert_conversation($data)
     {
         $conversationId = isset($data['conversation_id']) ? trim((string) $data['conversation_id']) : '';
+        $now = $this->get_code_datetime();
 
         if ($conversationId === '') {
             return false;
@@ -88,6 +89,7 @@ class Ghl_Conversations_Model extends CI_Model
                     'sort_json' => $insert['sort_json'],
                     'attributed_json' => $insert['attributed_json'],
                     'raw_json' => $insert['raw_json'],
+                    'updated_at' => $now,
                 ));
 
             if ($updated) {
@@ -101,6 +103,8 @@ class Ghl_Conversations_Model extends CI_Model
             return $updated ? 'updated' : false;
         }
 
+        $insert['created_at'] = $now;
+        $insert['updated_at'] = $now;
         $inserted = $this->db->insert('ghl_conversations', $insert);
         if ($inserted) {
             $this->record_initial_assignment($conversationId, $insert['assigned_to'], $insert);
@@ -121,7 +125,7 @@ class Ghl_Conversations_Model extends CI_Model
             return;
         }
 
-        $changedAt = date('Y-m-d H:i:s');
+        $changedAt = $this->get_code_datetime();
 
         if ($oldAssignedTo !== '') {
             $this->close_open_assignment($conversationId, $oldAssignedTo, $changedAt);
@@ -145,7 +149,7 @@ class Ghl_Conversations_Model extends CI_Model
 
         $assignedAt = !empty($data['date_updated'])
             ? $data['date_updated']
-            : (!empty($data['date_added']) ? $data['date_added'] : date('Y-m-d H:i:s'));
+            : (!empty($data['date_added']) ? $data['date_added'] : $this->get_code_datetime());
 
         $this->insert_assignment_if_no_open_row($conversationId, $assignedTo, $assignedAt);
     }
@@ -158,6 +162,7 @@ class Ghl_Conversations_Model extends CI_Model
             ->where('unassigned_at IS NULL', null, false)
             ->update('ghl_lead_assignment_history', array(
                 'unassigned_at' => $unassignedAt,
+                'updated_at' => $this->get_code_datetime(),
             ));
     }
 
@@ -177,15 +182,24 @@ class Ghl_Conversations_Model extends CI_Model
             return;
         }
 
+        $now = $this->get_code_datetime();
         $this->db->insert('ghl_lead_assignment_history', array(
             'conversation_id' => (string) $conversationId,
             'owner_user_id' => (string) $ownerUserId,
             'assigned_at' => $assignedAt,
+            'created_at' => $now,
+            'updated_at' => $now,
         ));
     }
 
     private function assignment_history_table_exists()
     {
         return $this->db->table_exists('ghl_lead_assignment_history');
+    }
+
+    private function get_code_datetime()
+    {
+        return (new DateTimeImmutable('now', new DateTimeZone('Asia/Kuala_Lumpur')))
+            ->format('Y-m-d H:i:s');
     }
 }

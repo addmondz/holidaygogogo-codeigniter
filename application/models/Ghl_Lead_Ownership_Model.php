@@ -283,6 +283,17 @@ class Ghl_Lead_Ownership_Model extends CI_Model
         }
 
         if (!empty($ownershipRows)) {
+            $now = $this->get_code_datetime();
+            foreach ($ownershipRows as &$ownershipRow) {
+                if (!array_key_exists('created_at', $ownershipRow) || $ownershipRow['created_at'] === null || $ownershipRow['created_at'] === '') {
+                    $ownershipRow['created_at'] = $now;
+                }
+                if (!array_key_exists('updated_at', $ownershipRow) || $ownershipRow['updated_at'] === null || $ownershipRow['updated_at'] === '') {
+                    $ownershipRow['updated_at'] = $now;
+                }
+            }
+            unset($ownershipRow);
+
             if (!$this->db->field_exists('assigned_at', 'ghl_lead_ownership')) {
                 foreach ($ownershipRows as &$ownershipRow) {
                     unset($ownershipRow['assigned_at']);
@@ -321,5 +332,11 @@ class Ghl_Lead_Ownership_Model extends CI_Model
     protected function escape_identifier($identifier)
     {
         return '`' . str_replace('`', '', (string) $identifier) . '`';
+    }
+
+    protected function get_code_datetime()
+    {
+        return (new DateTimeImmutable('now', new DateTimeZone('Asia/Kuala_Lumpur')))
+            ->format('Y-m-d H:i:s');
     }
 }

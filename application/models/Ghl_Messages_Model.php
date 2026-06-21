@@ -6,6 +6,7 @@ class Ghl_Messages_Model extends CI_Model
     public function upsert_message($data)
     {
         $messageId = isset($data['message_id']) ? trim((string) $data['message_id']) : '';
+        $now = $this->get_code_datetime();
 
         if ($messageId === '') {
             return false;
@@ -68,12 +69,21 @@ class Ghl_Messages_Model extends CI_Model
                     'attachments_json' => $insert['attachments_json'],
                     'meta_json' => $insert['meta_json'],
                     'raw_json' => $insert['raw_json'],
+                    'updated_at' => $now,
                 ));
 
             return $updated ? 'updated' : false;
         }
 
+        $insert['created_at'] = $now;
+        $insert['updated_at'] = $now;
         $inserted = $this->db->insert('ghl_messages', $insert);
         return $inserted ? 'inserted' : false;
+    }
+
+    private function get_code_datetime()
+    {
+        return (new DateTimeImmutable('now', new DateTimeZone('Asia/Kuala_Lumpur')))
+            ->format('Y-m-d H:i:s');
     }
 }

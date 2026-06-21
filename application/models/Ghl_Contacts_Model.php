@@ -6,6 +6,7 @@ class Ghl_Contacts_Model extends CI_Model
     public function upsert_contact($data)
     {
         $contactId = isset($data['contact_id']) ? trim((string) $data['contact_id']) : '';
+        $now = $this->get_code_datetime();
 
         if ($contactId === '') {
             return false;
@@ -44,11 +45,14 @@ class Ghl_Contacts_Model extends CI_Model
                     'phone' => $insert['phone'],
                     'assigned_to' => $insert['assigned_to'],
                     'date_added' => $insert['date_added'],
+                    'updated_at' => $now,
                 ));
 
             return $updated ? 'updated' : false;
         }
 
+        $insert['created_at'] = $now;
+        $insert['updated_at'] = $now;
         $inserted = $this->db->insert('ghl_contacts', $insert);
         return $inserted ? 'inserted' : false;
     }
@@ -64,5 +68,11 @@ class Ghl_Contacts_Model extends CI_Model
             ->row_array();
 
        return $row['contact_id'] ?? null;
+    }
+
+    private function get_code_datetime()
+    {
+        return (new DateTimeImmutable('now', new DateTimeZone('Asia/Kuala_Lumpur')))
+            ->format('Y-m-d H:i:s');
     }
 }
