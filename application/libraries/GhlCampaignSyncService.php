@@ -429,7 +429,7 @@ class GhlCampaignSyncService
             'failed'       => $final ? (int) $final->FailedCount   : 0,
             'skipped'      => 0, // skipped guests are logged but not in the run_summary counter set
             'failures'     => array(),
-            'completed_at' => $final && $final->CompletedAt ? $final->CompletedAt : date('Y-m-d H:i:s'),
+            'completed_at' => $final && $final->CompletedAt ? $final->CompletedAt : $this->getCodeDateTime(),
         );
     }
 
@@ -637,6 +637,11 @@ class GhlCampaignSyncService
             'body'        => isset($resp['body']) ? $resp['body'] : array(),
             'error'       => isset($resp['error']) ? $resp['error'] : null,
         );
+    }
+
+    protected function getCodeDateTime($format = 'Y-m-d H:i:s')
+    {
+        return (new DateTimeImmutable('now', new DateTimeZone('Asia/Kuala_Lumpur')))->format($format);
     }
 
     public function curlRequest($method, $url, $payload = array(), $headers = array())

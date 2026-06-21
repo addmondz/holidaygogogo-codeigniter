@@ -145,7 +145,7 @@ class GhlContactsSyncService
                 'total_data' => $apiTotal !== null ? (int) $apiTotal : 0,
                 'pulled_count' => (int) $pulledTotal,
                 'updated_count' => (int) $updatedTotal,
-                'completed_at' => date('Y-m-d H:i:s'),
+                'completed_at' => $this->getCodeDateTime(),
             ));
 
             return array(
@@ -339,7 +339,7 @@ class GhlContactsSyncService
     protected function buildCutoffDateTime($daysBack)
     {
         $daysBack = (int) $daysBack;
-        $timezone = new DateTimeZone(date_default_timezone_get());
+        $timezone = $this->getCodeTimezone();
 
         return (new DateTimeImmutable('now', $timezone))
             ->setTime(0, 0, 0)
@@ -377,11 +377,21 @@ class GhlContactsSyncService
 
         try {
             $date = new DateTimeImmutable((string) $value, new DateTimeZone('UTC'));
-            $date = $date->setTimezone(new DateTimeZone(date_default_timezone_get()));
+            $date = $date->setTimezone($this->getCodeTimezone());
             return $date->format('Y-m-d H:i:s');
         } catch (Exception $e) {
             return null;
         }
+    }
+
+    protected function getCodeDateTime($format = 'Y-m-d H:i:s')
+    {
+        return (new DateTimeImmutable('now', $this->getCodeTimezone()))->format($format);
+    }
+
+    protected function getCodeTimezone()
+    {
+        return new DateTimeZone('Asia/Kuala_Lumpur');
     }
 
     protected function curlRequest($method, $url, $payload = array(), $headers = array())
