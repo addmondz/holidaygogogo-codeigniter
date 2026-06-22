@@ -130,6 +130,7 @@
 							<tr>
 								<th style="text-align:center;">No.</th>
 								<th style="text-align:center;">Title</th>
+								<th style="text-align:center;">Questions</th>
 								<?php /* temporary: external FAQ not needed for now, Type column hidden
 								<th style="text-align:center;">Type</th>
 								*/ ?>
@@ -141,11 +142,12 @@
 						</thead>
 						<tbody>
 							<?php if(empty($faqs)) { ?>
-								<tr><td colspan="6" style="text-align:center; padding-top:10px; padding-bottom:10px;">FAQ Records Not Found</td></tr>
+								<tr><td colspan="7" style="text-align:center; padding-top:10px; padding-bottom:10px;">FAQ Records Not Found</td></tr>
 							<?php } else { $count = 1; foreach($faqs as $faq) { ?>
 								<tr>
 									<td style="text-align:center; padding-top:15px; padding-bottom:15px;"><?php echo $count; ?></td>
 									<td style="text-align:left;"><strong><?php echo htmlspecialchars($faq->Title); ?></strong><?php if(!empty($faq->SearchText)) { ?><span class="faq-search-blob" style="display:none;"><?php echo htmlspecialchars($faq->SearchText); ?></span><?php } ?></td>
+									<td style="text-align:center;"><span class="label label-inline label-pill label-light-dark font-weight-bold"><?php echo (int)$faq->QuestionCount; ?></span></td>
 									<td style="text-align:center;">
 										<?php
 											$tag_names = ($faq->Tags === null || $faq->Tags === '') ? array() : explode('||', $faq->Tags);

@@ -54,6 +54,9 @@ class Faq_Model extends CI_Model
 			}
 			sort($names);
 			$row->Tags = implode('||', $names);
+			// How many sub-questions live under this title, for the listing's
+			// "Questions" count column.
+			$row->QuestionCount = count($items);
 			// Flatten the sub-Q&A text into a hidden, searchable cell so the
 			// listing's client-side DataTable search (which only sees rendered
 			// cells) can match on sub-question / sub-answer content too.
