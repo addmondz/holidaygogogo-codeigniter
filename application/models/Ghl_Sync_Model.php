@@ -12,7 +12,7 @@ class Ghl_Sync_Model extends CI_Model
             return '';
         }
 
-        $timestamp = date('Ymd-His');
+        $timestamp = $this->get_code_datetime('Ymd-His');
         $baseRunId = $moduleName . '_' . $timestamp;
         $runId = $baseRunId;
         $suffix = 1;
@@ -29,7 +29,7 @@ class Ghl_Sync_Model extends CI_Model
     {
         $runId = isset($data['RunID']) ? trim((string) $data['RunID']) : '';
         $moduleName = isset($data['module_name']) ? trim((string) $data['module_name']) : '';
-        $now = date('Y-m-d H:i:s');
+        $now = $this->get_code_datetime();
 
         if ($runId === '' || $moduleName === '') {
             return 0;
@@ -140,5 +140,11 @@ class Ghl_Sync_Model extends CI_Model
         }
 
         return $this->runLogColumns;
+    }
+
+    protected function get_code_datetime($format = 'Y-m-d H:i:s')
+    {
+        return (new DateTimeImmutable('now', new DateTimeZone('Asia/Kuala_Lumpur')))
+            ->format($format);
     }
 }

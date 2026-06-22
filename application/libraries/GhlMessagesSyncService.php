@@ -114,7 +114,7 @@ class GhlMessagesSyncService
                 'total_data' => $apiTotal !== null ? (int) $apiTotal : 0,
                 'pulled_count' => (int) $pulledTotal,
                 'updated_count' => (int) $updatedTotal,
-                'completed_at' => date('Y-m-d H:i:s'),
+                'completed_at' => $this->getCodeDateTime(),
             ));
 
             return array(
@@ -291,7 +291,7 @@ class GhlMessagesSyncService
     protected function buildCutoffDateTime($daysBack)
     {
         $daysBack = (int) $daysBack;
-        $timezone = new DateTimeZone(date_default_timezone_get());
+        $timezone = $this->getCodeTimezone();
 
         return (new DateTimeImmutable('now', $timezone))
             ->setTime(0, 0, 0)
@@ -300,8 +300,18 @@ class GhlMessagesSyncService
 
     protected function normalizeUtcDateTime($value)
     {
-        $date = $this->parseUtcDateTime($value, new DateTimeZone(date_default_timezone_get()));
+        $date = $this->parseUtcDateTime($value, $this->getCodeTimezone());
         return $date ? $date->format('Y-m-d H:i:s') : null;
+    }
+
+    protected function getCodeDateTime($format = 'Y-m-d H:i:s')
+    {
+        return (new DateTimeImmutable('now', $this->getCodeTimezone()))->format($format);
+    }
+
+    protected function getCodeTimezone()
+    {
+        return new DateTimeZone('Asia/Kuala_Lumpur');
     }
 
     protected function parseUtcDateTime($value, DateTimeZone $timezone)

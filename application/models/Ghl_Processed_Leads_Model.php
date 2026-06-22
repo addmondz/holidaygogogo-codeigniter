@@ -44,7 +44,7 @@ class Ghl_Processed_Leads_Model extends CI_Model
         $cursorMessageRowId = $state['last_processed_message_row_id'];
         $batchUpperBound = $upperBound !== null && $upperBound !== ''
             ? (string) $upperBound
-            : $this->get_database_datetime();
+            : $this->get_code_datetime();
 
         $conversations = array();
         $selectedConversationIds = array();
@@ -59,17 +59,19 @@ class Ghl_Processed_Leads_Model extends CI_Model
                 WHERE (
                     updated_at > ?
                     OR (updated_at = ? AND id > ?)
+                    OR id > ?
                 )
                   AND updated_at < ?
                   AND {$timeColumn} < ?
                   AND conversation_id IS NOT NULL
                   AND conversation_id <> ''
-                ORDER BY updated_at ASC, id ASC
+                ORDER BY id ASC
                 LIMIT ?
                 ",
                 array(
                     $cursorProcessedAt,
                     $cursorProcessedAt,
+                    $cursorMessageRowId,
                     $cursorMessageRowId,
                     $batchUpperBound,
                     $batchUpperBound,
@@ -95,14 +97,22 @@ class Ghl_Processed_Leads_Model extends CI_Model
                         );
                     }
 
-                    $safeCursorProcessedAt = (string) $row['updated_at'];
-                    $safeCursorMessageRowId = (int) $row['id'];
+                    if ((string) $row['updated_at'] > $safeCursorProcessedAt) {
+                        $safeCursorProcessedAt = (string) $row['updated_at'];
+                    }
+                    if ((int) $row['id'] > $safeCursorMessageRowId) {
+                        $safeCursorMessageRowId = (int) $row['id'];
+                    }
                     continue;
                 }
 
                 if (isset($selectedConversationIds[$conversationId])) {
-                    $safeCursorProcessedAt = (string) $row['updated_at'];
-                    $safeCursorMessageRowId = (int) $row['id'];
+                    if ((string) $row['updated_at'] > $safeCursorProcessedAt) {
+                        $safeCursorProcessedAt = (string) $row['updated_at'];
+                    }
+                    if ((int) $row['id'] > $safeCursorMessageRowId) {
+                        $safeCursorMessageRowId = (int) $row['id'];
+                    }
                     continue;
                 }
 
@@ -119,8 +129,12 @@ class Ghl_Processed_Leads_Model extends CI_Model
             }
 
             $lastRow = $rows[count($rows) - 1];
-            $cursorProcessedAt = (string) $lastRow['updated_at'];
-            $cursorMessageRowId = (int) $lastRow['id'];
+            if ((string) $lastRow['updated_at'] > $cursorProcessedAt) {
+                $cursorProcessedAt = (string) $lastRow['updated_at'];
+            }
+            if ((int) $lastRow['id'] > $cursorMessageRowId) {
+                $cursorMessageRowId = (int) $lastRow['id'];
+            }
         }
 
         return array(
@@ -175,7 +189,7 @@ class Ghl_Processed_Leads_Model extends CI_Model
 
         $batchUpperBound = $upperBound !== null && $upperBound !== ''
             ? (string) $upperBound
-            : $this->get_database_datetime();
+            : $this->get_code_datetime();
         $cutoffTimestamp = strtotime($batchUpperBound . ' -' . $daysBack . ' days');
         $cutoff = $cutoffTimestamp !== false
             ? date('Y-m-d H:i:s', $cutoffTimestamp)
@@ -247,7 +261,7 @@ class Ghl_Processed_Leads_Model extends CI_Model
 
     public function get_current_processing_upper_bound()
     {
-        return $this->get_database_datetime();
+        return $this->get_code_datetime();
     }
 
     public function get_conversation_messages($conversationId, $updatedBefore = null)
@@ -338,6 +352,17 @@ class Ghl_Processed_Leads_Model extends CI_Model
             ->delete('ghl_processed_leads');
 
         if (!empty($leads)) {
+            $now = $this->get_code_datetime();
+            foreach ($leads as &$lead) {
+                if (!array_key_exists('created_at', $lead) || $lead['created_at'] === null || $lead['created_at'] === '') {
+                    $lead['created_at'] = $now;
+                }
+                if (!array_key_exists('updated_at', $lead) || $lead['updated_at'] === null || $lead['updated_at'] === '') {
+                    $lead['updated_at'] = $now;
+                }
+            }
+            unset($lead);
+
             $this->db->insert_batch('ghl_processed_leads', $leads);
         }
 
@@ -466,7 +491,7 @@ class Ghl_Processed_Leads_Model extends CI_Model
                     'is_converted' => 1,
                     'booking_id' => (int) $bookingId > 0 ? (int) $bookingId : null,
                     'converted_at' => $convertedAt,
-                    'updated_at' => date('Y-m-d H:i:s'),
+                    'updated_at' => $this->get_code_datetime(),
                 )
             );
     }
@@ -518,7 +543,7 @@ class Ghl_Processed_Leads_Model extends CI_Model
             'last_processed_message_row_id' => (int) $lastProcessedMessageRowId,
             'last_processed_at' => $lastProcessedAt !== null && $lastProcessedAt !== ''
                 ? (string) $lastProcessedAt
-                : $this->get_database_datetime(),
+                : $this->get_code_datetime(),
         );
 
         $existing = $this->db
@@ -538,15 +563,10 @@ class Ghl_Processed_Leads_Model extends CI_Model
         return $this->db->insert('ghl_processing_state', $payload);
     }
 
-    protected function get_database_datetime()
+    protected function get_code_datetime()
     {
-        $row = $this->db
-            ->query('SELECT NOW() AS database_now')
-            ->row_array();
-
-        return !empty($row['database_now'])
-            ? (string) $row['database_now']
-            : date('Y-m-d H:i:s');
+        return (new DateTimeImmutable('now', new DateTimeZone('Asia/Kuala_Lumpur')))
+            ->format('Y-m-d H:i:s');
     }
 
     protected function get_message_row_cursor($messageRowId)

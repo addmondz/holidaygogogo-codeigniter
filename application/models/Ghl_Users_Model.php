@@ -11,6 +11,7 @@ class Ghl_Users_Model extends CI_Model
     {
         $userId = isset($data['UserID']) ? trim((string) $data['UserID']) : '';
         $locationId = isset($data['LocationID']) ? trim((string) $data['LocationID']) : '';
+        $now = $this->get_code_datetime();
 
         if ($userId === '' || $locationId === '') {
             return false;
@@ -26,12 +27,15 @@ class Ghl_Users_Model extends CI_Model
             ->row_array();
 
         if (!empty($existing['ID'])) {
+            $data['UpdatedAt'] = $now;
             $updated = $this->db
                 ->where('ID', (int) $existing['ID'])
                 ->update('ghl_users', $data);
             return $updated ? 'updated' : false;
         }
 
+        $data['CreatedAt'] = isset($data['CreatedAt']) && $data['CreatedAt'] !== '' ? $data['CreatedAt'] : $now;
+        $data['UpdatedAt'] = $now;
         $inserted = $this->db->insert('ghl_users', $data);
         return $inserted ? 'inserted' : false;
     }
@@ -70,5 +74,11 @@ class Ghl_Users_Model extends CI_Model
             ->get()
             ->row_array();
         return !empty($row) ? $row : null;
+    }
+
+    private function get_code_datetime()
+    {
+        return (new DateTimeImmutable('now', new DateTimeZone('Asia/Kuala_Lumpur')))
+            ->format('Y-m-d H:i:s');
     }
 }

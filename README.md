@@ -1,5 +1,9 @@
 # holidaygogogo-codeigniter
 
+Extra Routes
+	- domain/ghl-details
+		show all the conversation without leads, be it (unsynced / missed out)
+	
 1. Copy the environment file
 	cp .env.example .env
 

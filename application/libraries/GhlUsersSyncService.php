@@ -81,7 +81,7 @@ class GhlUsersSyncService
                 'total_data' => $apiTotal !== null ? (int) $apiTotal : 0,
                 'pulled_count' => (int) $pulled,
                 'updated_count' => (int) $updated,
-                'completed_at' => date('Y-m-d H:i:s'),
+                'completed_at' => $this->getCodeDateTime(),
             ));
 
             return array(
@@ -183,6 +183,11 @@ class GhlUsersSyncService
         );
 
         return $this->curlRequest('GET', $url, array(), $headers);
+    }
+
+    protected function getCodeDateTime($format = 'Y-m-d H:i:s')
+    {
+        return (new DateTimeImmutable('now', new DateTimeZone('Asia/Kuala_Lumpur')))->format($format);
     }
 
     protected function curlRequest($method, $url, $payload = array(), $headers = array())

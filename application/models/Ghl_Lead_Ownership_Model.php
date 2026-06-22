@@ -71,7 +71,7 @@ class Ghl_Lead_Ownership_Model extends CI_Model
                 pl.id,
                 pl.conversation_id,
                 pl.contact_id,
-                pl.assigned_to_user_id,
+                COALESCE(NULLIF(gc.assigned_to, ''), pl.assigned_to_user_id) AS assigned_to_user_id,
                 pl.lead_started_at,
                 pl.lead_ended_at,
                 pl.tracked_message_count,
@@ -85,6 +85,7 @@ class Ghl_Lead_Ownership_Model extends CI_Model
                 pl.booking_id,
                 pl.converted_at
             FROM ghl_processed_leads pl
+            LEFT JOIN ghl_conversations gc ON gc.conversation_id = pl.conversation_id
             WHERE " . implode(' AND ', $clauses) . "
             ORDER BY pl.id ASC" . $limitSql . "
             ",
@@ -196,20 +197,25 @@ class Ghl_Lead_Ownership_Model extends CI_Model
     public function resolve_assignment_owners_for_lead($lead, $assignmentRows)
     {
         $assignedTo = isset($lead['assigned_to_user_id']) ? trim((string) $lead['assigned_to_user_id']) : '';
+        if ($assignedTo === '') {
+            return array();
+        }
+
         $leadStart = !empty($lead['lead_started_at']) ? strtotime($lead['lead_started_at']) : false;
         if ($leadStart === false) {
-            return $assignedTo !== '' ? array(array(
+            return array(array(
                 'owner_user_id' => $assignedTo,
                 'assigned_at' => null,
-            )) : array();
+            ));
         }
 
         $leadEnd = !empty($lead['lead_ended_at']) ? strtotime($lead['lead_ended_at']) : null;
-        $owners = array();
+        $assignedAt = null;
+        $assignedAtTs = null;
 
         foreach ((array) $assignmentRows as $row) {
             $ownerUserId = isset($row['owner_user_id']) ? trim((string) $row['owner_user_id']) : '';
-            if ($ownerUserId === '') {
+            if ($ownerUserId === '' || $ownerUserId !== $assignedTo) {
                 continue;
             }
 
@@ -226,39 +232,18 @@ class Ghl_Lead_Ownership_Model extends CI_Model
                 continue;
             }
 
-            if (!isset($owners[$ownerUserId])) {
-                $owners[$ownerUserId] = array(
-                    'owner_user_id' => $ownerUserId,
-                    'assigned_at' => $row['assigned_at'],
-                    '_assigned_ts' => $assignedTs,
-                );
-                continue;
-            }
-
-            if ($assignedTs > (int) $owners[$ownerUserId]['_assigned_ts']) {
-                $owners[$ownerUserId]['assigned_at'] = $row['assigned_at'];
-                $owners[$ownerUserId]['_assigned_ts'] = $assignedTs;
+            if ($assignedAtTs === null || $assignedTs > $assignedAtTs) {
+                $assignedAt = $row['assigned_at'];
+                $assignedAtTs = $assignedTs;
             }
         }
 
-        if ($assignedTo !== '' && !isset($owners[$assignedTo])) {
-            $owners[$assignedTo] = array(
+        return array(
+            array(
                 'owner_user_id' => $assignedTo,
-                'assigned_at' => null,
-                '_assigned_ts' => 0,
-            );
-        }
-
-        foreach ($owners as &$owner) {
-            unset($owner['_assigned_ts']);
-        }
-        unset($owner);
-
-        uasort($owners, function($a, $b) {
-            return strcmp($a['owner_user_id'], $b['owner_user_id']);
-        });
-
-        return array_values($owners);
+                'assigned_at' => $assignedAt,
+            ),
+        );
     }
 
     public function resolve_assigned_at_for_lead($lead, $assignmentRows)
@@ -298,6 +283,17 @@ class Ghl_Lead_Ownership_Model extends CI_Model
         }
 
         if (!empty($ownershipRows)) {
+            $now = $this->get_code_datetime();
+            foreach ($ownershipRows as &$ownershipRow) {
+                if (!array_key_exists('created_at', $ownershipRow) || $ownershipRow['created_at'] === null || $ownershipRow['created_at'] === '') {
+                    $ownershipRow['created_at'] = $now;
+                }
+                if (!array_key_exists('updated_at', $ownershipRow) || $ownershipRow['updated_at'] === null || $ownershipRow['updated_at'] === '') {
+                    $ownershipRow['updated_at'] = $now;
+                }
+            }
+            unset($ownershipRow);
+
             if (!$this->db->field_exists('assigned_at', 'ghl_lead_ownership')) {
                 foreach ($ownershipRows as &$ownershipRow) {
                     unset($ownershipRow['assigned_at']);
@@ -336,5 +332,11 @@ class Ghl_Lead_Ownership_Model extends CI_Model
     protected function escape_identifier($identifier)
     {
         return '`' . str_replace('`', '', (string) $identifier) . '`';
+    }
+
+    protected function get_code_datetime()
+    {
+        return (new DateTimeImmutable('now', new DateTimeZone('Asia/Kuala_Lumpur')))
+            ->format('Y-m-d H:i:s');
     }
 }
