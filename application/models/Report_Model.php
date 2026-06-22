@@ -2026,6 +2026,68 @@ class Report_Model extends CI_Model
         return !empty($row['updated_at']) ? $row['updated_at'] : null;
     }
 
+    /**
+     * One page of raw GHL messages (newest first) for the Message Log. Selects
+     * only the four display columns within the inclusive date window and bounds
+     * the result with LIMIT/OFFSET so the page is memory-safe regardless of how
+     * many rows match.
+     *
+     * @param string $startDate 'Y-m-d' inclusive lower bound.
+     * @param string $endDate   'Y-m-d' inclusive upper bound (whole day covered).
+     * @param int    $limit     Rows per page.
+     * @param int    $offset    Rows to skip.
+     * @return array Rows keyed: message_timestamp, from_number, to_number, body.
+     */
+    function Ghl_Messages_Log($startDate, $endDate, $limit, $offset)
+    {
+        $messageTimeColumn = $this->escape_identifier($this->get_message_time_column());
+
+        $sql = "
+            SELECT
+                gm.{$messageTimeColumn} AS message_timestamp,
+                gm.from_number AS from_number,
+                gm.to_number AS to_number,
+                gm.body AS body
+            FROM ghl_messages gm
+            WHERE gm.{$messageTimeColumn} >= ?
+              AND gm.{$messageTimeColumn} <= ?
+            ORDER BY gm.{$messageTimeColumn} DESC, gm.id DESC
+            LIMIT ? OFFSET ?
+        ";
+
+        $params = array(
+            $startDate . ' 00:00:00',
+            $endDate . ' 23:59:59',
+            (int) $limit,
+            (int) $offset,
+        );
+
+        return $this->db->query($sql, $params)->result_array();
+    }
+
+    /**
+     * Count of raw GHL messages in the date window, to drive Message Log
+     * pagination.
+     *
+     * @param string $startDate 'Y-m-d' inclusive lower bound.
+     * @param string $endDate   'Y-m-d' inclusive upper bound (whole day covered).
+     * @return int
+     */
+    function Ghl_Messages_Log_Count($startDate, $endDate)
+    {
+        $messageTimeColumn = $this->escape_identifier($this->get_message_time_column());
+
+        $row = $this->db->query(
+            "SELECT COUNT(*) AS total
+               FROM ghl_messages gm
+              WHERE gm.{$messageTimeColumn} >= ?
+                AND gm.{$messageTimeColumn} <= ?",
+            array($startDate . ' 00:00:00', $endDate . ' 23:59:59')
+        )->row_array();
+
+        return isset($row['total']) ? (int) $row['total'] : 0;
+    }
+
     private function build_lead_data_order_clause($filters = array())
     {
         $sortBy = isset($filters['sort_by']) ? (string) $filters['sort_by'] : 'lead_started_at';

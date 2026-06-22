@@ -59,6 +59,38 @@ class Report extends MY_Controller
             ->set_output(json_encode($response));
     }
 
+    function Ghl_Message_Log()
+    {
+        $this->load->helper('ghl_messages_log');
+
+        $range = $this->ghl_message_log_range(trim((string) $this->input->get('log_date')));
+
+        $total = $this->Report_Model->Ghl_Messages_Log_Count($range['start_date'], $range['end_date']);
+        $pagination = ghl_messages_log_pagination($total, (int) $this->input->get('page'), 50);
+
+        $messages = $this->Report_Model->Ghl_Messages_Log(
+            $range['start_date'],
+            $range['end_date'],
+            $pagination['per_page'],
+            $pagination['offset']
+        );
+
+        $titles = array(
+            'tab_title' => 'HolidayGoGoGo | Report',
+            'breadcrumb_title' => 'Report >> Message Log'
+        );
+
+        $array = array(
+            'log_messages' => $messages,
+            'log_pagination' => $pagination,
+            'log_filters' => $range,
+        );
+
+        $this->load->view('layout/header', $titles);
+        $this->load->view('report/ghl_message_log', $array);
+        $this->load->view('layout/footer');
+    }
+
     function Lead_Ownership_Dashboard()
     {
         $filters = $this->lead_ownership_filters();
@@ -1287,6 +1319,39 @@ class Report extends MY_Controller
             'start_date' => $startDate,
             'end_date' => $endDate,
             'display' => date('d/m/Y', strtotime($startDate)) . ' - ' . date('d/m/Y', strtotime($endDate)),
+        );
+    }
+
+    /**
+     * Resolve the date window for the Message Log. Honours a
+     * "dd/mm/YYYY - dd/mm/YYYY" picker value, otherwise defaults to the last 7
+     * days so the newest messages load quickly.
+     */
+    private function ghl_message_log_range($rangeInput)
+    {
+        if ($rangeInput !== '' && strpos($rangeInput, ' - ') !== false) {
+            $parts = explode(' - ', $rangeInput);
+            if (count($parts) === 2) {
+                $startDate = date('Y-m-d', strtotime(str_replace('/', '-', trim($parts[0]))));
+                $endDate = date('Y-m-d', strtotime(str_replace('/', '-', trim($parts[1]))));
+
+                if ($startDate !== '1970-01-01' && $endDate !== '1970-01-01' && $startDate <= $endDate) {
+                    return array(
+                        'log_date' => date('d/m/Y', strtotime($startDate)) . ' - ' . date('d/m/Y', strtotime($endDate)),
+                        'start_date' => $startDate,
+                        'end_date' => $endDate,
+                    );
+                }
+            }
+        }
+
+        $endDate = date('Y-m-d');
+        $startDate = date('Y-m-d', strtotime('-6 days'));
+
+        return array(
+            'log_date' => date('d/m/Y', strtotime($startDate)) . ' - ' . date('d/m/Y', strtotime($endDate)),
+            'start_date' => $startDate,
+            'end_date' => $endDate,
         );
     }
 

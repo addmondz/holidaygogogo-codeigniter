@@ -399,6 +399,14 @@ $is_dev_env = ($app_env !== 'prod');
 															<span class="menu-text">Lead Reply Activity</span>
 														</a>
 													</li>
+													<li class="menu-item <?php if($this->router->method == 'Ghl_Message_Log') { echo 'menu-item-active'; } ?>">
+														<a href="<?php echo base_url('Report/Ghl_Message_Log'); ?>" class="menu-link">
+															<i class="menu-bullet menu-bullet-dot">
+																<span></span>
+															</i>
+															<span class="menu-text">Message Log</span>
+														</a>
+													</li>
 												<?php } ?>
 											</ul>
 										</div>
