@@ -184,7 +184,7 @@
 
                                 <div class="input-icon">
 
-                                    <input type="text" id="ReservationNumber" <?php if(current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) { ?> value="<?php echo $ReservationNumber; ?>" <?php } ?> autocomplete="off" class="form-control">
+                                    <input type="text" id="ReservationNumber" <?php if(current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) { ?> value="<?php echo $ReservationNumber; ?>" <?php } ?> maxlength="20" autocomplete="off" class="form-control">
 
                                     <span>
 
@@ -2777,7 +2777,7 @@
 
                         '<div class="input-icon">' +
 
-                            '<input disabled type="text" id="Description-'+ booking_product_id +'" autocomplete="off" class="form-control">' +
+                            '<input disabled type="text" id="Description-'+ booking_product_id +'" maxlength="80" autocomplete="off" class="form-control">' +
 
                             '<span>' +
 
@@ -2786,6 +2786,8 @@
                             '</span>' +
 
                         '</div>' +
+
+                        '<small id="Description-'+ booking_product_id +'Error" class="text-danger"></small>' +
 
                     '</div>' +
 
@@ -2943,6 +2945,14 @@
 
             $(`#PaymentOutSupplierDeposit-${booking_product_id}`).datepicker({format: 'dd/mm/yyyy', autoclose: true, todayHighlight: true});
 
+        }
+
+        // Cap the line description to AutoCount's quotation limit so an over-long
+        // value doesn't fail the whole booking sync (mirrors BookingSync MAX_DESCRIPTION).
+        // Guarded: the Update/Duplicate prefill loop fires this click handler before the
+        // validateLength helper's <script> block is parsed; native maxlength still caps.
+        if (typeof validateLength === 'function') {
+            validateLength('Description-' + booking_product_id, 'Description-' + booking_product_id + 'Error', 80);
         }
 
         booking_product_ids.push(booking_product_id);

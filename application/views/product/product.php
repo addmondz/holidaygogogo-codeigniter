@@ -19,11 +19,12 @@
                                     <span style="color:red;">*</span>
                                 </label>
                                 <div class="input-icon">
-                                    <input type="text" id="Name" <?php if(current_url() == base_url('Product/Update')) { ?> value="<?php echo $Product; ?>" <?php } ?> autocomplete="off" maxlength="99" class="form-control">
+                                    <input type="text" id="Name" <?php if(current_url() == base_url('Product/Update')) { ?> value="<?php echo $Product; ?>" <?php } ?> autocomplete="off" maxlength="80" class="form-control">
                                     <span>
                                         <i class="la la-product-hunt"></i>
                                     </span>
                                 </div>
+                                <small id="NameError" class="text-danger"></small>
                             </div>
                         </div>
                         <div class="col-md-6">
@@ -682,4 +683,31 @@
     }
     
     $('#form').dirty('isClean');
+
+    // Cap the product name to AutoCount's quotation description limit (80) so an
+    // over-long name doesn't fail the whole booking sync. Mirrors the booking form
+    // and the BookingSync MAX_DESCRIPTION backend safety net.
+    function validateLength(inputId, errorId, maxLength) {
+        const input = document.getElementById(inputId);
+        const error = document.getElementById(errorId);
+
+        if (!input) return; // safety check
+
+        input.addEventListener('input', function () {
+            let value = this.value;
+
+            if (value.length > maxLength) {
+                if (error) error.textContent = `Length can't be more than ${maxLength} characters`;
+                value = value.substring(0, maxLength);
+            } else if (error) {
+                error.textContent = '';
+            }
+
+            this.value = value;
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        validateLength('Name', 'NameError', 80);
+    });
 </script>
