@@ -91,6 +91,46 @@ class Report extends MY_Controller
         $this->load->view('layout/footer');
     }
 
+    function Ghl_Message_Log_Export()
+    {
+        $this->load->helper('ghl_messages_log');
+
+        $range = $this->ghl_message_log_range(trim((string) $this->input->get('log_date')));
+
+        $filename = ghl_message_log_export_filename($range['start_date'], $range['end_date']);
+
+        // Stream the CSV directly so a large export never builds up in memory.
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Cache-Control: no-store, no-cache, must-revalidate');
+
+        $out = fopen('php://output', 'w');
+        fwrite($out, "\xEF\xBB\xBF"); // UTF-8 BOM so Excel reads accents/emoji correctly.
+        fputcsv($out, ghl_message_log_export_columns());
+
+        // Page through the result in bounded chunks instead of loading every
+        // matching row at once.
+        $chunk = 5000;
+        $offset = 0;
+        do {
+            $rows = $this->Report_Model->Ghl_Messages_Log(
+                $range['start_date'],
+                $range['end_date'],
+                $chunk,
+                $offset
+            );
+
+            foreach ($rows as $row) {
+                fputcsv($out, ghl_message_log_export_row($row));
+            }
+
+            $offset += $chunk;
+        } while (count($rows) === $chunk);
+
+        fclose($out);
+        exit;
+    }
+
     function Lead_Ownership_Dashboard()
     {
         $filters = $this->lead_ownership_filters();

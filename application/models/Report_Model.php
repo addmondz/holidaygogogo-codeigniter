@@ -2036,7 +2036,7 @@ class Report_Model extends CI_Model
      * @param string $endDate   'Y-m-d' inclusive upper bound (whole day covered).
      * @param int    $limit     Rows per page.
      * @param int    $offset    Rows to skip.
-     * @return array Rows keyed: message_timestamp, from_number, to_number, body.
+     * @return array Rows keyed: message_timestamp, from_number, to_number, agent, body.
      */
     function Ghl_Messages_Log($startDate, $endDate, $limit, $offset)
     {
@@ -2047,8 +2047,10 @@ class Report_Model extends CI_Model
                 gm.{$messageTimeColumn} AS message_timestamp,
                 gm.from_number AS from_number,
                 gm.to_number AS to_number,
+                gu.Name AS agent,
                 gm.body AS body
             FROM ghl_messages gm
+            LEFT JOIN ghl_users gu ON gu.UserID = gm.user_id
             WHERE gm.{$messageTimeColumn} >= ?
               AND gm.{$messageTimeColumn} <= ?
             ORDER BY gm.{$messageTimeColumn} DESC, gm.id DESC

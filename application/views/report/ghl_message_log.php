@@ -38,9 +38,12 @@ $page_url = function ($page) use ($log_filters) {
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-8">
                             <input type="submit" value="Filter" class="btn btn-light-success font-weight-bold" style="width:80px;">
                             <input type="button" id="ghl-message-log-reset" value="Reset" class="btn btn-light-primary font-weight-bold" style="width:80px;">
+                            <a href="<?php echo base_url('Report/Ghl_Message_Log_Export?log_date=') . urlencode($log_filters['log_date']); ?>" class="btn btn-light-info font-weight-bold float-right">
+                                <i class="la la-download"></i> Export CSV
+                            </a>
                         </div>
                     </div>
                 </form>
@@ -50,20 +53,22 @@ $page_url = function ($page) use ($log_filters) {
                         <thead>
                             <tr>
                                 <th style="width:170px;">Date / Time</th>
-                                <th style="width:160px;">From</th>
-                                <th style="width:160px;">To</th>
+                                <th style="width:150px;">Agent</th>
+                                <th style="width:150px;">From</th>
+                                <th style="width:150px;">To</th>
                                 <th>Message</th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php if (empty($log_messages)) { ?>
                                 <tr>
-                                    <td colspan="4" class="text-center py-10">No messages found for the selected range.</td>
+                                    <td colspan="5" class="text-center py-10">No messages found for the selected range.</td>
                                 </tr>
                             <?php } else { ?>
                                 <?php foreach ($log_messages as $m) { ?>
                                     <tr>
                                         <td class="text-nowrap"><?php echo html_escape($m['message_timestamp']); ?></td>
+                                        <td><?php echo !empty($m['agent']) ? html_escape($m['agent']) : '<span class="text-muted">&mdash;</span>'; ?></td>
                                         <td class="text-nowrap"><?php echo html_escape($m['from_number']); ?></td>
                                         <td class="text-nowrap"><?php echo html_escape($m['to_number']); ?></td>
                                         <td style="white-space:pre-wrap; word-break:break-word;"><?php echo html_escape($m['body']); ?></td>

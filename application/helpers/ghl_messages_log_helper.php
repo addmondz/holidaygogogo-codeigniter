@@ -9,6 +9,57 @@ defined('BASEPATH') OR exit('No direct script access allowed');
  * tests/helpers/GhlMessagesLogPaginationTest.php.
  */
 
+if (!function_exists('ghl_message_log_export_columns')) {
+    /**
+     * CSV header for the Message Log export, in the same order as the on-screen
+     * table.
+     *
+     * @return array
+     */
+    function ghl_message_log_export_columns()
+    {
+        return array('Date / Time', 'Agent', 'From', 'To', 'Message');
+    }
+}
+
+if (!function_exists('ghl_message_log_export_row')) {
+    /**
+     * Map a Ghl_Messages_Log() row to ordered CSV cells, coercing missing/null
+     * values to '' so Excel shows blanks rather than "null".
+     *
+     * @param array $row
+     * @return array
+     */
+    function ghl_message_log_export_row($row)
+    {
+        $cell = function ($key) use ($row) {
+            return isset($row[$key]) && $row[$key] !== null ? (string) $row[$key] : '';
+        };
+
+        return array(
+            $cell('message_timestamp'),
+            $cell('agent'),
+            $cell('from_number'),
+            $cell('to_number'),
+            $cell('body'),
+        );
+    }
+}
+
+if (!function_exists('ghl_message_log_export_filename')) {
+    /**
+     * Download filename encoding the exported date window.
+     *
+     * @param string $startDate 'Y-m-d'
+     * @param string $endDate   'Y-m-d'
+     * @return string
+     */
+    function ghl_message_log_export_filename($startDate, $endDate)
+    {
+        return 'ghl_message_log_' . $startDate . '_to_' . $endDate . '.csv';
+    }
+}
+
 if (!function_exists('ghl_messages_log_pagination')) {
     /**
      * Resolve a requested page against the row count into a clamped, render-ready
