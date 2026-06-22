@@ -14,9 +14,6 @@
                         <span class="label label-light-primary label-inline font-weight-bold" id="lead-reply-activity-last-updated">
                             Updated <?php echo !empty($lead_reply_activity_updated_at) ? html_escape($lead_reply_activity_updated_at) : 'Not available'; ?>
                         </span>
-                        <div class="mt-2">
-                            <a href="javascript:;" id="lead-reply-activity-refresh-now" class="text-primary font-weight-bold lead-refresh-link">Refresh Now</a>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -94,12 +91,13 @@
                                 <th>Owner</th>
                                 <th style="text-align:center;">Assigned Leads</th>
                                 <th style="text-align:center;">Reply-Created Leads</th>
+                                <th style="text-align:center;">Total Leads</th>
                             </tr>
                         </thead>
                         <tbody id="lead-reply-activity-table-body">
                             <?php if(empty($lead_reply_activity_rows)) { ?>
                                 <tr>
-                                    <td colspan="4" class="text-center py-10">Lead reply activity not found for the selected filters.</td>
+                                    <td colspan="5" class="text-center py-10">Lead reply activity not found for the selected filters.</td>
                                 </tr>
                             <?php } else { ?>
                                 <?php $count = 1; ?>
@@ -109,6 +107,7 @@
                                         <td class="font-weight-bold text-dark"><?php echo html_escape($row['owner_name']); ?></td>
                                         <td class="text-center"><?php echo number_format($row['assigned_leads']); ?></td>
                                         <td class="text-center"><?php echo number_format($row['reply_created_leads']); ?></td>
+                                        <td class="text-center font-weight-bold text-dark"><?php echo number_format($row['assigned_leads'] + $row['reply_created_leads']); ?></td>
                                     </tr>
                                     <?php $count++; ?>
                                 <?php } ?>
@@ -122,7 +121,7 @@
 </div>
 
 <script>
-    $('<style>.lead-refresh-link:hover{text-decoration:underline;}</style>').appendTo('head');
+    $('<style>.lead-refresh-link:hover{text-decoration:underline;}#lead-reply-activity-table tbody tr{transition:background-color .15s ease;}#lead-reply-activity-table tbody tr:hover{background-color:#e4edf5;cursor:pointer;}</style>').appendTo('head');
 
     var leadReplyActivityEndpoint = '<?php echo base_url('Report/Lead_Reply_Activity_Dashboard_Data'); ?>';
     $('#lead_reply_activity_daterangepicker').daterangepicker({
@@ -154,16 +153,19 @@
         var html = '';
 
         if (!rows || rows.length === 0) {
-            $('#lead-reply-activity-table-body').html('<tr><td colspan="4" class="text-center py-10">Lead reply activity not found for the selected filters.</td></tr>');
+            $('#lead-reply-activity-table-body').html('<tr><td colspan="5" class="text-center py-10">Lead reply activity not found for the selected filters.</td></tr>');
             return;
         }
 
         $.each(rows, function(index, row) {
+            var assignedLeads = Number(row.assigned_leads) || 0;
+            var replyCreatedLeads = Number(row.reply_created_leads) || 0;
             html += '<tr>';
             html += '<td class="text-center">' + (index + 1) + '</td>';
             html += '<td class="font-weight-bold text-dark">' + escapeHtml(row.owner_name) + '</td>';
-            html += '<td class="text-center">' + row.assigned_leads + '</td>';
-            html += '<td class="text-center">' + row.reply_created_leads + '</td>';
+            html += '<td class="text-center">' + assignedLeads + '</td>';
+            html += '<td class="text-center">' + replyCreatedLeads + '</td>';
+            html += '<td class="text-center font-weight-bold text-dark">' + (assignedLeads + replyCreatedLeads) + '</td>';
             html += '</tr>';
         });
 
@@ -181,7 +183,4 @@
         Reset('<?php echo base_url('Report/Lead_Reply_Activity_Dashboard'); ?>');
     });
 
-    $('#lead-reply-activity-refresh-now').click(function() {
-        refreshLeadReplyActivityDashboard();
-    });
 </script>

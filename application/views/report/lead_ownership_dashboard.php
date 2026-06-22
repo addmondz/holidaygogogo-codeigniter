@@ -40,9 +40,6 @@ $buildOwnershipDataUrl = function($ownerId, $ownershipType = null) use ($lead_ow
                         <span class="label label-light-success label-inline font-weight-bold" id="lead-ownership-last-updated">
                             Calculated <?php echo !empty($lead_ownership_updated_at) ? html_escape($lead_ownership_updated_at) : 'Not available'; ?>
                         </span>
-                        <div class="mt-2">
-                            <a href="javascript:;" id="lead-ownership-refresh-now" class="text-primary font-weight-bold lead-refresh-link">Refresh Now</a>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -334,7 +331,4 @@ $buildOwnershipDataUrl = function($ownerId, $ownershipType = null) use ($lead_ow
         Reset('<?php echo base_url('Report/Lead_Ownership_Dashboard'); ?>');
     });
 
-    $('#lead-ownership-refresh-now').click(function() {
-        refreshLeadOwnershipDashboard();
-    });
 </script>

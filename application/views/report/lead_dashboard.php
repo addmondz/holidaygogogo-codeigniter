@@ -83,7 +83,6 @@
                                     </div>
                                     <input type="submit" value="Filter" class="btn btn-light-success font-weight-bold" style="width:80px;">
                                     <input type="button" id="lead-dashboard-reset" value="Reset" class="btn btn-light-primary font-weight-bold" style="width:80px;">
-                                    <button type="button" id="lead-dashboard-refresh-now" class="btn btn-light-warning font-weight-bold">Refresh Now</button>
                                 </form>
                             </div>
                         </div>
@@ -303,10 +302,6 @@
 
     $('#lead-dashboard-reset').click(function() {
         Reset('<?php echo base_url('Report/Lead_Dashboard'); ?>');
-    });
-
-    $('#lead-dashboard-refresh-now').click(function() {
-        refreshLeadDashboard();
     });
 
     $('#lead-dashboard-refresh-interval').on('changed.bs.select', function() {
