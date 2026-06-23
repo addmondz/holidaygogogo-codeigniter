@@ -3,6 +3,10 @@ class Report_Model extends CI_Model
 {
     protected $messageTimeColumn = null;
 
+    // Request-level caches so the same expensive work is not repeated within one page load.
+    protected $replyCreatedBaseRowsCache = array();
+    protected $assignmentDateExpressionCache = null;
+
     private function get_processed_lead_response_slot_select($alias = 'pl')
     {
         $prefix = $alias !== '' ? $alias . '.' : '';
@@ -1413,12 +1417,34 @@ class Report_Model extends CI_Model
 
     private function Lead_Reply_Activity_Reply_Created_Base_Rows($filters = array())
     {
+        // This query is invoked by both the summary and the by-agent payloads on every
+        // page load. Cache per filter-set so the heavy aggregation only runs once per request.
+        $cacheKey = md5(serialize($filters));
+        if (array_key_exists($cacheKey, $this->replyCreatedBaseRowsCache)) {
+            return $this->replyCreatedBaseRowsCache[$cacheKey];
+        }
+
         $where = $this->build_lead_reply_created_where_clause($filters);
         $extraJoins = isset($where['extra_joins']) ? $where['extra_joins'] : '';
         $messageTimeColumn = $this->escape_identifier($this->get_message_time_column());
         $assignmentDate = $this->lead_reply_assignment_date_expression('glo');
         $start = !empty($filters['start_date']) ? $filters['start_date'] . ' 00:00:00' : '1970-01-01 00:00:00';
         $end = !empty($filters['end_date']) ? $filters['end_date'] . ' 23:59:59' : '9999-12-31 23:59:59';
+
+        // A lead only qualifies when its 3rd outbound message (reply_created_at) lands inside
+        // the requested window, which means the conversation MUST have an owner outbound message
+        // in that window. Pre-filtering to those leads lets MySQL skip aggregating the entire
+        // ghl_lead_ownership / ghl_messages history just to discard it in the outer WHERE.
+        $datePreFilter = "
+                  AND EXISTS (
+                      SELECT 1
+                      FROM ghl_messages gm_window
+                      WHERE gm_window.conversation_id = glo.conversation_id
+                        AND gm_window.user_id = glo.owner_user_id
+                        AND gm_window.direction = 'outbound'
+                        AND gm_window.{$messageTimeColumn} BETWEEN ? AND ?
+                  )
+        ";
 
         $sql = "
             SELECT *
@@ -1448,6 +1474,7 @@ class Report_Model extends CI_Model
                 LEFT JOIN ghl_users gu ON gu.UserID = glo.owner_user_id
                 {$extraJoins}
                 {$where['sql']}
+                {$datePreFilter}
                 GROUP BY
                     glo.owner_user_id,
                     owner_name,
@@ -1464,8 +1491,12 @@ class Report_Model extends CI_Model
               )
         ";
 
-        $params = array_merge($where['params'], array($start, $end, $start, $end));
-        return $this->db->query($sql, $params)->result_array();
+        // Param order matches placeholder order: inner WHERE, then EXISTS window, then outer WHERE.
+        $params = array_merge($where['params'], array($start, $end), array($start, $end, $start, $end));
+        $rows = $this->db->query($sql, $params)->result_array();
+
+        $this->replyCreatedBaseRowsCache[$cacheKey] = $rows;
+        return $rows;
     }
 
     function Lead_Reply_Activity_Details_Summary($filters = array())
@@ -2808,7 +2839,12 @@ class Report_Model extends CI_Model
     {
         $alias = preg_replace('/[^A-Za-z0-9_]/', '', (string) $alias);
 
-        if ($this->db->field_exists('assigned_at', 'ghl_lead_ownership')) {
+        // field_exists() hits the schema; cache the boolean for the rest of the request.
+        if ($this->assignmentDateExpressionCache === null) {
+            $this->assignmentDateExpressionCache = $this->db->field_exists('assigned_at', 'ghl_lead_ownership');
+        }
+
+        if ($this->assignmentDateExpressionCache) {
             return "COALESCE({$alias}.assigned_at, {$alias}.lead_started_at)";
         }
 
