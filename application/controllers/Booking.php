@@ -1796,9 +1796,21 @@ class Booking extends MY_Controller
 			} else {
 				$insurance_count = 0;
 			}
-			// Display-only card (not clickable) — no drill-down link.
+			// status=A + the BOOKING CONFIRMATION title reproduce the card's own
+			// row filters (CancelStatus='N', Status!='N', confirmations only) and,
+			// crucially, suppress the booking list's default AfterSalesService='PENDING'
+			// gate (Booking_Model::apply_booking_filters applies it whenever no
+			// `status` is present). Without status=A the drill-down silently drops
+			// the already-completed BCs the card counts, so 56 on the card would
+			// open as 11 in the list. Card is the source of truth.
 			$cards['insurance_pending'] = array(
 				'count' => $insurance_count,
+				'link'  => $base . $qs(array(
+					'checklist_filter'           => implode(',', $insurance_ids),
+					'travel_date'                => $fmt_dmy($insurance_window_start) . ' - ' . $fmt_dmy($insurance_window_end),
+					'status'                     => 'A',
+					'booking_confirmation_title' => 'BOOKING CONFIRMATION',
+				)),
 			);
 
 			// Pending Ferry Transfer Checklist (travel this & next month) —
@@ -1857,11 +1869,17 @@ class Booking extends MY_Controller
 			} else {
 				$ferry_count = 0;
 			}
+			// status=A + the BOOKING CONFIRMATION title reproduce the card's row
+			// filters and suppress the list's default AfterSalesService='PENDING'
+			// gate, so the drill-down matches the card row-for-row even when a
+			// completed BC falls inside the travel window (same fix as insurance).
 			$cards['ferry_pending'] = array(
 				'count' => $ferry_count,
 				'link'  => $base . $qs(array(
-					'checklist_filter' => implode(',', $ferry_ids),
-					'travel_date'      => $fmt_dmy($ferry_window_start) . ' - ' . $fmt_dmy($ferry_window_end),
+					'checklist_filter'           => implode(',', $ferry_ids),
+					'travel_date'                => $fmt_dmy($ferry_window_start) . ' - ' . $fmt_dmy($ferry_window_end),
+					'status'                     => 'A',
+					'booking_confirmation_title' => 'BOOKING CONFIRMATION',
 				)),
 			);
 
@@ -2477,7 +2495,8 @@ class Booking extends MY_Controller
 				'</ul>' .
 				'<strong>Live queue &middot; as of ' . $fmt_disp($today) . '</strong> &mdash; travel from ' . $fmt_disp($insurance_window_start) . ' onwards.<br>' .
 				'<strong>This card:</strong> ' .
-				'Insurance pending &rarr; <strong>' . $ip . ' ' . $plural($ip, 'BC') . '</strong>';
+				'Insurance pending &rarr; <strong>' . $ip . ' ' . $plural($ip, 'BC') . '</strong><br><br>' .
+				'<strong>Action:</strong> Click to filter the list to these BCs and tick off insurance.';
 		}
 
 		if(isset($cards['ferry_pending'])) {

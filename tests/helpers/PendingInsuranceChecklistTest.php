@@ -178,4 +178,37 @@ function assert_eq($label, $expected, $actual) {
 // before the window.
 assert_eq('pending insurance bookings', 3, $count);
 
+// ---------------------------------------------------------------------------
+// Drill-down parity: the card count applies NO AfterSalesService gate, but the
+// generic booking list defaults to AfterSalesService='PENDING' whenever the
+// query string carries no `status` (Booking_Model::apply_booking_filters). So
+// the insurance card link MUST carry status=A (CancelStatus='N', Status!='N' —
+// the card's own filters, and suppresses that default) plus the confirmation
+// title, or the drill-down silently drops the completed BCs the card counted.
+// Card is the source of truth (see CLAUDE memory feedback_guest_list_submitted).
+// ---------------------------------------------------------------------------
+function assert_true($label, $cond) {
+    if ($cond) {
+        echo "  PASS  {$label}\n";
+    } else {
+        echo "  FAIL  {$label}\n";
+        exit(1);
+    }
+}
+
+$controller = file_get_contents(__DIR__ . '/../../application/controllers/Booking.php');
+// Isolate the insurance_pending card link block.
+$start = strpos($controller, "\$cards['insurance_pending']");
+$link_block = $start !== false ? substr($controller, $start, 400) : '';
+
+assert_true("insurance link carries checklist_filter",
+    strpos($link_block, "'checklist_filter'") !== false);
+assert_true("insurance link carries the travel_date window",
+    strpos($link_block, "'travel_date'") !== false);
+assert_true("insurance link carries status=A (suppresses AfterSalesService='PENDING' default)",
+    strpos($link_block, "'status'") !== false && strpos($link_block, "'A'") !== false);
+assert_true("insurance link constrains booking_confirmation_title to BOOKING CONFIRMATION",
+    strpos($link_block, "'booking_confirmation_title'") !== false
+    && strpos($link_block, 'BOOKING CONFIRMATION') !== false);
+
 echo "\nAll assertions passed.\n";

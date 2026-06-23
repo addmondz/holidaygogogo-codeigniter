@@ -635,18 +635,18 @@
                 </a>
             </div>
             <div class="col-md-3">
-                <div class="summary-card">
+                <a class="summary-card" id="sc-insurance-pending-link" href="#">
                     <div class="card card-custom">
                         <div class="card-header border-0 summary-card-header" style="background-color:#FAA0A030;">
                             <h3>Pending Insurance Checklist</h3>
-                            <i id="pop-insurance-pending" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>Counted when, for an active line item:</strong><ul><li>Product carries an Insurance package checklist</li><li>No completion record yet for that checklist on that line</li><li><code>booking_product.disable_checklist_payment_out = 0</code> (same rule the modal/filter uses)</li><li>BC, not cancelled, not draft</li><li>Travel from 1 March of the current year onwards</li></ul><strong>Live queue</strong> — travel from 1 March onwards."></i>
+                            <i id="pop-insurance-pending" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>Counted when, for an active line item:</strong><ul><li>Product carries an Insurance package checklist</li><li>No completion record yet for that checklist on that line</li><li><code>booking_product.disable_checklist_payment_out = 0</code> (same rule the modal/filter uses)</li><li>BC, not cancelled, not draft</li><li>Travel from 1 March of the current year onwards</li></ul><strong>Live queue</strong> — travel from 1 March onwards. Click to filter the list to these BCs."></i>
                         </div>
                         <div class="card-body summary-card-body">
                             <div class="summary-value" id="sc-insurance-pending-count">...</div>
-                            <div class="summary-sub">BCs whose insurance checklist is not yet ticked on at least one active line.</div>
+                            <div class="summary-sub">BCs whose insurance checklist is not yet ticked on at least one active line. Click to review and complete.</div>
                         </div>
                     </div>
-                </div>
+                </a>
             </div>
             <div class="col-md-3">
                 <a class="summary-card" id="sc-ferry-pending-link" href="#">
@@ -1065,6 +1065,7 @@ $(function() {
         }
         if(c.insurance_pending) {
             setText('sc-insurance-pending-count', c.insurance_pending.count);
+            setLink('sc-insurance-pending-link',  c.insurance_pending.link);
         }
         if(c.ferry_pending) {
             setText('sc-ferry-pending-count', c.ferry_pending.count);

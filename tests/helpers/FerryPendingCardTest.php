@@ -80,6 +80,16 @@ if (preg_match("/\\\$cards\['ferry_pending'\]\s*=\s*array\((.*?)\);/s", $control
         strpos($link_block, "'travel_date'") !== false
         && strpos($link_block, '$ferry_window_start') !== false
         && strpos($link_block, '$ferry_window_end') !== false;
+    // status=A reproduces the card's filters AND suppresses the booking list's
+    // default AfterSalesService='PENDING' gate (applied when no `status` is
+    // present), so completed BCs in the window aren't silently dropped from the
+    // drill-down. Same parity fix as the insurance card.
+    $assertions['link carries status=A (suppresses AfterSalesService default)'] =
+        strpos($link_block, "'status'") !== false
+        && strpos($link_block, "'A'") !== false;
+    $assertions['link constrains booking_confirmation_title to BOOKING CONFIRMATION'] =
+        strpos($link_block, "'booking_confirmation_title'") !== false
+        && strpos($link_block, 'BOOKING CONFIRMATION') !== false;
 } else {
     $assertions["\$cards['ferry_pending'] assignment is locatable"] = false;
 }
