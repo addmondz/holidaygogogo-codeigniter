@@ -802,7 +802,7 @@ class Booking extends MY_Controller
 
 		$is_tc      = ($level == 20 || $level == 50);
 		$is_tclead  = ($level == 25);
-		$is_op      = ($level == 40);
+		$is_op      = ($level == 40 || $level == 45); // OP and OP TEAM LEAD share the OP cards
 		$is_finance = ($level == 30);
 		$is_owner   = ($level == 10);
 

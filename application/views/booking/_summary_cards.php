@@ -2,7 +2,7 @@
     $card_level = (int) $this->session->userdata('level');
     $show_tc      = ($card_level == 20 || $card_level == 50);
     $show_tclead  = ($card_level == 25);
-    $show_op      = ($card_level == 40);
+    $show_op      = ($card_level == 40 || $card_level == 45); // OP and OP TEAM LEAD share the OP cards
     $show_finance = ($card_level == 30);
     $show_owner   = ($card_level == 10);
     $any_cards    = $show_tc || $show_tclead || $show_op || $show_finance || $show_owner;
