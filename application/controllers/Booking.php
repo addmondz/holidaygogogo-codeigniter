@@ -790,6 +790,7 @@ class Booking extends MY_Controller
 		// TC "(Month)" / "(Year)" card; the rolling Today/Week/Month cards and
 		// the other roles keep the live current-month windows above.
 		$this->load->helper('summary_period_helper');
+		$this->load->helper('guest_list_status_filter');
 		$period = summary_resolve_month($this->input->get('month'), $today);
 
 		$base = base_url('Booking');
@@ -1727,11 +1728,10 @@ class Booking extends MY_Controller
 				)),
 			);
 
+			// Shares guest_list_submitted_where() with the drill-down listing
+			// (?guest_list_status=submitted) so the card and the list always agree.
 			$row = $this->db->query(
-				"SELECT COUNT(*) AS cnt FROM booking
-				 WHERE BookingConfirmationTitle='BOOKING CONFIRMATION'
-				   AND CancelStatus='N' AND Status!='N'
-				   AND is_submitted=1 AND LockStatus='N'"
+				"SELECT COUNT(*) AS cnt FROM booking WHERE " . guest_list_submitted_where()
 			)->row();
 			$cards['gl_submitted'] = array(
 				'count' => (int)$row->cnt,
@@ -1787,26 +1787,97 @@ class Booking extends MY_Controller
 				)),
 			);
 
-			// Supplier Pay-out Due Soon — forward-looking mirror of the
-			// Finance Supplier Overdue card, scoped to deadlines 1-3 days
-			// ahead so the two cards stay disjoint (today and earlier
-			// belong to Supplier Overdue). Headline + per-supplier table
-			// reuse the same filters; only the Deadline predicate changes.
-			$due_soon_start = date('Y-m-d', strtotime('+1 day'));
-			$due_soon_end   = date('Y-m-d', strtotime('+3 days'));
+			// Pending Ferry Transfer Checklist (travel this & next month) —
+			// same mechanics as Pending Insurance Checklist (an active line whose
+			// product carries the checklist, with no completion record yet, and
+			// disable_checklist_payment_out=0), but scoped to BCs whose travel
+			// falls in this month or next. The travel window uses the SAME
+			// range-overlap predicate as the generic ?travel_date filter
+			// (Booking_Model::filter_bookings), so this card and its drill-down
+			// (?checklist_filter=<ferry ids>&travel_date=<window>) agree
+			// row-for-row. Window: 1st of this month → last day of next month.
+			$ferry_window_start = $month_start;                                        // 1st of this month
+			$ferry_window_end   = date('Y-m-t', strtotime('first day of next month')); // last day of next month
+			$ferry_ids = $this->db
+				->select('ID')
+				->from('package_checklist')
+				->like('name', 'Book Ferry Transfer', 'both')
+				->get()
+				->result_array();
+			$ferry_ids = array_map(function($r){ return (int)$r['ID']; }, $ferry_ids);
+			if(!empty($ferry_ids)) {
+				$ids_list = implode(',', $ferry_ids);
+				$json_contains_or = implode(' OR ', array_map(function($id) {
+					return "JSON_CONTAINS(ppc.package_checklist_json, '{$id}')";
+				}, $ferry_ids));
+				$row = $this->db->query(
+					"SELECT COUNT(DISTINCT booking.BookingID) AS cnt
+					 FROM booking
+					 WHERE booking.BookingConfirmationTitle='BOOKING CONFIRMATION'
+					   AND booking.CancelStatus='N' AND booking.Status!='N'
+					   AND ((booking.StartDate <= ? AND booking.EndDate >= ?)
+					        OR (booking.StartDate >= ? AND booking.StartDate <= ?)
+					        OR (booking.EndDate >= ? AND booking.EndDate <= ?))
+					   AND booking.BookingID IN (
+					     SELECT DISTINCT bp.BookingID
+					     FROM booking_product bp
+					     JOIN product p ON p.ProductID = bp.ProductID AND p.is_child_or_infant = 0
+					     JOIN product_package_checklist ppc ON ppc.product_id = bp.ProductID
+					       AND ({$json_contains_or})
+					     WHERE bp.Status = 'Y'
+					       AND bp.disable_checklist_payment_out = 0
+					       AND NOT EXISTS (
+					         SELECT 1 FROM booking_checklist_completion bcc
+					         WHERE bcc.booking_id = bp.BookingID
+					           AND bcc.product_id = bp.ProductID
+					           AND bcc.package_checklist_id IN ({$ids_list})
+					       )
+					   )",
+					array(
+						$ferry_window_start, $ferry_window_end,
+						$ferry_window_start, $ferry_window_end,
+						$ferry_window_start, $ferry_window_end,
+					)
+				)->row();
+				$ferry_count = (int)$row->cnt;
+			} else {
+				$ferry_count = 0;
+			}
+			$cards['ferry_pending'] = array(
+				'count' => $ferry_count,
+				'link'  => $base . $qs(array(
+					'checklist_filter' => implode(',', $ferry_ids),
+					'travel_date'      => $fmt_dmy($ferry_window_start) . ' - ' . $fmt_dmy($ferry_window_end),
+				)),
+			);
+
+			// Supplier Pay-out Due Soon — the immediate payout horizon,
+			// bucketed into Overdue (deadline already passed), Today, and
+			// Tomorrow so OP can triage by urgency. All three buckets share
+			// the same row filters as Supplier Overdue; only the Deadline
+			// predicate differs. The per-supplier table spans the whole
+			// window (overdue..tomorrow), earliest deadline first.
+			$due_soon_end   = date('Y-m-d', strtotime('+1 day'));  // tomorrow — window upper bound
 			$row = $this->db->query(
-				"SELECT COUNT(*) AS cnt, COALESCE(SUM(payment.Debit), 0) AS total_due
+				"SELECT
+				    SUM(CASE WHEN payment.Deadline <  ? THEN 1 ELSE 0 END) AS overdue_cnt,
+				    COALESCE(SUM(CASE WHEN payment.Deadline <  ? THEN payment.Debit ELSE 0 END), 0) AS overdue_due,
+				    SUM(CASE WHEN payment.Deadline =  ? THEN 1 ELSE 0 END) AS today_cnt,
+				    COALESCE(SUM(CASE WHEN payment.Deadline =  ? THEN payment.Debit ELSE 0 END), 0) AS today_due,
+				    SUM(CASE WHEN payment.Deadline =  ? THEN 1 ELSE 0 END) AS tomorrow_cnt,
+				    COALESCE(SUM(CASE WHEN payment.Deadline =  ? THEN payment.Debit ELSE 0 END), 0) AS tomorrow_due
 				 FROM payment
 				 WHERE payment.Status = 'P'
-				   AND payment.Deadline BETWEEN ? AND ?
+				   AND payment.Deadline <= ?
 				   AND payment.Debit > 0
 				   AND payment.Type LIKE 'SUPPLIER PAYMENT%'
 				   AND payment.SupplierID IS NOT NULL",
-				array($due_soon_start, $due_soon_end)
+				array($today, $today, $today, $today, $due_soon_end, $due_soon_end, $due_soon_end)
 			)->row();
 			$cards['supplier_due_soon'] = array(
-				'count'     => (int)$row->cnt,
-				'total_due' => $money($row->total_due),
+				'overdue'  => array('count' => (int)$row->overdue_cnt,  'total_due' => $money($row->overdue_due)),
+				'today'    => array('count' => (int)$row->today_cnt,    'total_due' => $money($row->today_due)),
+				'tomorrow' => array('count' => (int)$row->tomorrow_cnt, 'total_due' => $money($row->tomorrow_due)),
 			);
 
 			$due_rows = $this->db->query(
@@ -1817,13 +1888,13 @@ class Booking extends MY_Controller
 				 FROM payment
 				 JOIN supplier ON supplier.SupplierID = payment.SupplierID
 				 WHERE payment.Status = 'P'
-				   AND payment.Deadline BETWEEN ? AND ?
+				   AND payment.Deadline <= ?
 				   AND payment.Debit > 0
 				   AND payment.Type LIKE 'SUPPLIER PAYMENT%'
 				 GROUP BY supplier.SupplierID, supplier.Name
 				 ORDER BY MIN(payment.Deadline) ASC, total_due DESC
 				 LIMIT 5",
-				array($due_soon_start, $due_soon_end)
+				array($due_soon_end)
 			)->result();
 			$due_out = array();
 			foreach($due_rows as $r) {
@@ -2391,6 +2462,22 @@ class Booking extends MY_Controller
 				'<strong>Action:</strong> Click to filter the list to these BCs and tick off insurance.';
 		}
 
+		if(isset($cards['ferry_pending'])) {
+			$fp = (int)$cards['ferry_pending']['count'];
+			$popovers['pop-ferry-pending'] =
+				'<strong>Counted when, for an active line item:</strong>' .
+				'<ul>' .
+				'<li>Product carries a &ldquo;Book Ferry Transfer&rdquo; package checklist</li>' .
+				'<li>No completion record yet for that checklist on that line</li>' .
+				'<li><code>booking_product.disable_checklist_payment_out = 0</code> (the same rule the modal/filter uses)</li>' .
+				'<li>BC, not cancelled, not draft</li>' .
+				'</ul>' .
+				'<strong>Travel window:</strong> trips overlapping ' . $fmt_disp($ferry_window_start) . ' &ndash; ' . $fmt_disp($ferry_window_end) . ' (this month &amp; next).<br>' .
+				'<strong>This card:</strong> ' .
+				'Ferry transfer pending &rarr; <strong>' . $fp . ' ' . $plural($fp, 'BC') . '</strong><br><br>' .
+				'<strong>Action:</strong> Click to filter the list to these BCs and arrange the ferry transfer.';
+		}
+
 		if(isset($cards['gl_submitted'])) {
 			$g = (int)$cards['gl_submitted']['count'];
 			$popovers['pop-gl-submitted'] =
@@ -2567,18 +2654,22 @@ class Booking extends MY_Controller
 		if(isset($cards['supplier_due_soon'])) {
 			$ds = $cards['supplier_due_soon'];
 			$rows_n = isset($tables['supplier_due_soon']) ? count($tables['supplier_due_soon']) : 0;
+			$ds_total = (int)$ds['overdue']['count'] + (int)$ds['today']['count'] + (int)$ds['tomorrow']['count'];
 			$popovers['pop-supplier-due-soon'] =
 				'<strong>Counted when:</strong>' .
 				'<ul>' .
 				'<li>Payment-out (<code>Type LIKE \'SUPPLIER PAYMENT%\'</code>)</li>' .
 				'<li>Status pending (<code>Status = \'P\'</code>)</li>' .
-				'<li>Deadline ' . $rng_disp($due_soon_start, $due_soon_end) . ' (next 3 days)</li>' .
+				'<li>Deadline on or before tomorrow (' . $fmt_disp($due_soon_end) . ')</li>' .
 				'<li>Linked to a supplier</li>' .
 				'</ul>' .
-				'<strong>This card:</strong><br>' .
-				'<strong>' . (int)$ds['count'] . '</strong> ' . $plural($ds['count'], 'upcoming payment') . ' &middot; <strong>' . $ds['total_due'] . '</strong> total due<br>' .
-				'Top ' . $rows_n . ' ' . $plural($rows_n, 'supplier') . ' shown, earliest deadline first.<br><br>' .
-				'<strong>Disjoint from Supplier Overdue:</strong> rows due today or earlier roll into that card.<br>' .
+				'<strong>Bucketed by deadline:</strong>' .
+				'<ul>' .
+				'<li><strong>Overdue</strong> &mdash; before today (' . $fmt_disp($today) . '): <strong>' . (int)$ds['overdue']['count'] . '</strong> &middot; ' . $ds['overdue']['total_due'] . '</li>' .
+				'<li><strong>Today</strong>: <strong>' . (int)$ds['today']['count'] . '</strong> &middot; ' . $ds['today']['total_due'] . '</li>' .
+				'<li><strong>Tomorrow</strong> (' . $fmt_disp($due_soon_end) . '): <strong>' . (int)$ds['tomorrow']['count'] . '</strong> &middot; ' . $ds['tomorrow']['total_due'] . '</li>' .
+				'</ul>' .
+				'<strong>This card:</strong> ' . $ds_total . ' ' . $plural($ds_total, 'payout') . ' across the window; top ' . $rows_n . ' ' . $plural($rows_n, 'supplier') . ' shown, earliest deadline first.<br><br>' .
 				'<strong>Excludes:</strong> Already paid (Status=Y), deleted (Status=N), customer payment-ins, agent-commission entries.';
 		}
 

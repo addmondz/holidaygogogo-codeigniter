@@ -71,8 +71,10 @@ class Booking_Model extends CI_Model
 				$this->db->where('booking.LockStatus', 'N');
 				$this->db->where($active_soft_lock_sql, null, false);
 			} else if($status == 'submitted') {
-				$this->db->where('booking.LockStatus', 'N');
-				$this->db->where('booking.is_submitted', 1);
+				// Same predicate as the "Guest List Submitted" summary card so the
+				// card count and this drill-down list resolve to the same rows.
+				$this->load->helper('guest_list_status_filter');
+				$this->db->where(guest_list_submitted_where(), null, false);
 			} else if($status == 'not_submitted') {
 				$this->db->where('booking.LockStatus', 'N');
 				$this->db->group_start();
@@ -90,10 +92,25 @@ class Booking_Model extends CI_Model
 	private function apply_status_filter()
 	{
 		$this->load->helper('booking_status_filter');
+
+		// Guest-list status drill-downs (e.g. the "Guest List Submitted" card,
+		// ?guest_list_status=submitted) are orthogonal to after-sales state: a
+		// guest list stays submitted/locked even after the booking's after-sales
+		// is COMPLETE. When such a filter is active without an explicit booking
+		// status, the default landing scope's AfterSalesService='PENDING' gate
+		// must NOT apply, or it silently hides COMPLETE bookings and the listing
+		// undercounts versus the card. Cancelled bookings stay excluded so the
+		// list still matches the cards' CancelStatus='N' rule.
+		$status = $this->input->get('status');
+		if(($status === null || $status === '') && !empty($this->input->get('guest_list_status'))) {
+			$this->db->where('booking.CancelStatus', 'N');
+			return;
+		}
+
 		// PO uses the 3pm-aware overdue cutoff so the list agrees with the
 		// dashboard Payment Overdue card (today's deadlines count from 3pm).
 		$where = booking_status_filter_full_where(
-			$this->input->get('status'), date('Y-m-d'), payment_overdue_cutoff_date()
+			$status, date('Y-m-d'), payment_overdue_cutoff_date()
 		);
 		$this->db->where($where, null, false);
 	}
