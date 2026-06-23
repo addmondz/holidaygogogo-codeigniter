@@ -5,7 +5,10 @@
  * Locks the CSV shaping for the Message Log export. The controller streams the
  * export in chunks, so these pure helpers decide the header, the per-row cell
  * order, and the download filename. Rules:
- *   - columns match the on-screen table order: Date/Time, Agent, From, To, Message,
+ *   - the export leads with a Contact column (the chatroom/lead the row belongs
+ *     to) so rows grouped by contact can be analysed one thread at a time;
+ *     the remaining columns follow the on-screen order: Date/Time, Agent, From,
+ *     To, Message,
  *   - a missing agent (inbound message) becomes '' not null, so Excel shows a
  *     blank cell rather than the word "null",
  *   - message bodies (which contain newlines/commas) pass through untouched;
@@ -30,11 +33,12 @@ function assert_eq($label, $expected, $actual) {
 }
 
 assert_eq('header columns',
-    array('Date / Time', 'Agent', 'From', 'To', 'Message'),
+    array('Contact', 'Date / Time', 'Agent', 'From', 'To', 'Message'),
     ghl_message_log_export_columns());
 
-// Full outbound row -> cells in table order.
+// Full outbound row -> cells in table order, led by the contact/chatroom.
 $full = array(
+    'contact_name'      => 'Lim Wei Jian',
     'message_timestamp' => '2026-06-20 11:19:59',
     'agent'             => 'Hani OP Team',
     'from_number'       => '+60 10-295 6786',
@@ -42,11 +46,12 @@ $full = array(
     'body'              => "Line one\nLine two, with comma",
 );
 assert_eq('full row cells',
-    array('2026-06-20 11:19:59', 'Hani OP Team', '+60 10-295 6786', '+6591852988', "Line one\nLine two, with comma"),
+    array('Lim Wei Jian', '2026-06-20 11:19:59', 'Hani OP Team', '+60 10-295 6786', '+6591852988', "Line one\nLine two, with comma"),
     ghl_message_log_export_row($full));
 
-// Inbound row: null agent and null body -> empty strings, not null.
+// Inbound row: null contact/agent and null body -> empty strings, not null.
 $inbound = array(
+    'contact_name'      => null,
     'message_timestamp' => '2026-06-20 11:14:40',
     'agent'             => null,
     'from_number'       => '+60129871440',
@@ -54,12 +59,12 @@ $inbound = array(
     'body'              => null,
 );
 assert_eq('inbound row blanks nulls',
-    array('2026-06-20 11:14:40', '', '+60129871440', '+60 10-295 6786', ''),
+    array('', '2026-06-20 11:14:40', '', '+60129871440', '+60 10-295 6786', ''),
     ghl_message_log_export_row($inbound));
 
 // Missing keys entirely -> all blanks, never a warning.
 assert_eq('missing keys -> blanks',
-    array('', '', '', '', ''),
+    array('', '', '', '', '', ''),
     ghl_message_log_export_row(array()));
 
 assert_eq('filename encodes window',

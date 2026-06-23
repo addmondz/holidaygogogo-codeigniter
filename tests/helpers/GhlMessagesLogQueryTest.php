@@ -35,6 +35,7 @@ $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
 $pdo->exec("CREATE TABLE ghl_messages (
     id INTEGER PRIMARY KEY,
+    conversation_id TEXT,
     from_number TEXT,
     to_number TEXT,
     user_id TEXT,
@@ -47,13 +48,21 @@ $pdo->exec("CREATE TABLE ghl_messages (
 $pdo->exec("CREATE TABLE ghl_users (UserID TEXT, Name TEXT)");
 $pdo->exec("INSERT INTO ghl_users (UserID, Name) VALUES ('u-1', 'Agent Alice')");
 
+// Conversation directory: resolves a chatroom to its contact (lead).
+$pdo->exec("CREATE TABLE ghl_conversations (conversation_id TEXT, contact_id TEXT, contact_name TEXT, full_name TEXT)");
+$pdo->exec("INSERT INTO ghl_conversations (conversation_id, contact_id, contact_name, full_name) VALUES
+    ('cv-a', 'ct-1', 'Lead One', ''),
+    ('cv-b', 'ct-2', '', 'Lead Two')
+");
+
 // 5 rows over 2026-06-14..16; one (id 99) is OUTSIDE the test window (06-13).
-$pdo->exec("INSERT INTO ghl_messages (id, from_number, to_number, user_id, body, date_added) VALUES
-    (10, '+60123', '+60999', 'u-1', 'first',  '2026-06-14 08:00:00'),
-    (11, '+60124', '+60999', NULL,  'second', '2026-06-15 09:00:00'),
-    (12, '+60999', '+60125', 'u-1', 'third',  '2026-06-15 09:00:00'),
-    (13, '+60126', '+60999', NULL,  'fourth', '2026-06-16 23:59:59'),
-    (99, '+60127', '+60999', 'u-1', 'before', '2026-06-13 10:00:00')
+// Two chatrooms interleave in time: cv-a (ids 10,12,13) and cv-b (id 11).
+$pdo->exec("INSERT INTO ghl_messages (id, conversation_id, from_number, to_number, user_id, body, date_added) VALUES
+    (10, 'cv-a', '+60123', '+60999', 'u-1', 'first',  '2026-06-14 08:00:00'),
+    (11, 'cv-b', '+60124', '+60999', NULL,  'second', '2026-06-15 09:00:00'),
+    (12, 'cv-a', '+60999', '+60125', 'u-1', 'third',  '2026-06-15 09:00:00'),
+    (13, 'cv-a', '+60126', '+60999', NULL,  'fourth', '2026-06-16 23:59:59'),
+    (99, 'cv-a', '+60127', '+60999', 'u-1', 'before', '2026-06-13 10:00:00')
 ");
 
 $start = '2026-06-14 00:00:00';
@@ -115,5 +124,65 @@ assert_eq('no overlap with page1',
         array_column($page2, 'body')
     )) === 0
 );
+
+// --- Contact-number filter: returns the full two-way thread for a lead. ---
+// '+60999' is the lead here: it appears as to_number on inbound rows (10,11,13)
+// and as from_number on the outbound row (12). Filtering by it must return all
+// four in-window rows -- both directions of the conversation.
+$normExpr = function ($col) {
+    return "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE($col, '+', ''), ' ', ''), '-', ''), '(', ''), ')', '')";
+};
+
+$contactDigits = ghl_message_log_normalize_contact('+60 999'); // formatting stripped
+assert_eq('contact normalized to digits', '60999', $contactDigits);
+
+$contactSql = "SELECT gm.id, gm.body
+               FROM ghl_messages gm
+               WHERE gm.date_added >= :s AND gm.date_added <= :e
+                 AND ({$normExpr('gm.from_number')} LIKE :c OR {$normExpr('gm.to_number')} LIKE :c)
+               ORDER BY gm.date_added DESC, gm.id DESC";
+$cstmt = $pdo->prepare($contactSql);
+$cstmt->execute(array(':s' => $start, ':e' => $end, ':c' => '%' . $contactDigits . '%'));
+$threaded = $cstmt->fetchAll(PDO::FETCH_ASSOC);
+
+assert_eq('contact filter returns both directions (4 rows)', 4, count($threaded));
+assert_eq('contact thread ids (inbound + outbound)',
+    array(13, 12, 11, 10),
+    array_map('intval', array_column($threaded, 'id')));
+
+// A different contact only matches its own thread (id 12 outbound to +60125).
+$cstmt->execute(array(':s' => $start, ':e' => $end, ':c' => '%' . ghl_message_log_normalize_contact('60125') . '%'));
+$other = $cstmt->fetchAll(PDO::FETCH_ASSOC);
+assert_eq('narrow contact matches single row', 1, count($other));
+assert_eq('narrow contact matches expected row', 12, (int) $other[0]['id']);
+
+// --- Grouped export ordering: messages clustered by chatroom (contact/lead). ---
+// The CSV export is meant to be analysed one chatroom at a time, so rows are
+// grouped by the contact (then conversation) and read oldest-first within a
+// thread -- NOT the newest-first flat order the on-screen table uses. Here the
+// two chatrooms interleave in time (cv-b's id 11 sits between cv-a's ids 10 and
+// 12) so a time-only sort would scatter them; the grouped sort must keep each
+// thread contiguous.
+$exportSql = "SELECT gm.id, gm.body,
+                     COALESCE(NULLIF(gc.contact_name, ''), NULLIF(gc.full_name, ''), '') AS contact_name
+              FROM ghl_messages gm
+              LEFT JOIN ghl_users gu ON gu.UserID = gm.user_id
+              LEFT JOIN ghl_conversations gc ON gc.conversation_id = gm.conversation_id
+              WHERE gm.date_added >= :s AND gm.date_added <= :e
+              ORDER BY COALESCE(gc.contact_id, gm.conversation_id, '') ASC,
+                       gm.conversation_id ASC,
+                       gm.date_added ASC,
+                       gm.id ASC";
+$estmt = $pdo->prepare($exportSql);
+$estmt->execute(array(':s' => $start, ':e' => $end));
+$export = $estmt->fetchAll(PDO::FETCH_ASSOC);
+
+// cv-a (ct-1) first, oldest-first within it (10,12,13), then cv-b (ct-2): id 11.
+assert_eq('export groups by chatroom, oldest-first within',
+    array(10, 12, 13, 11),
+    array_map('intval', array_column($export, 'id')));
+// Contact label resolves from contact_name, falling back to full_name.
+assert_eq('contact label on first chatroom', 'Lead One', $export[0]['contact_name']);
+assert_eq('contact label falls back to full_name', 'Lead Two', $export[3]['contact_name']);
 
 echo "\nAll assertions passed.\n";

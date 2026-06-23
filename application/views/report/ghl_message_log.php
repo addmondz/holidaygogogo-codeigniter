@@ -1,9 +1,13 @@
 <?php
 $p = $log_pagination;
 
-/** Build a page URL keeping the current date filter. */
-$page_url = function ($page) use ($log_filters) {
-    return base_url('Report/Ghl_Message_Log?log_date=' . urlencode($log_filters['log_date']) . '&page=' . (int) $page);
+$log_contact = isset($log_filters['contact']) ? $log_filters['contact'] : '';
+
+/** Build a page URL keeping the current date and contact filters. */
+$page_url = function ($page) use ($log_filters, $log_contact) {
+    return base_url('Report/Ghl_Message_Log?log_date=' . urlencode($log_filters['log_date'])
+        . '&contact=' . urlencode($log_contact)
+        . '&page=' . (int) $page);
 };
 ?>
 <div class="d-flex flex-column-fluid">
@@ -38,10 +42,16 @@ $page_url = function ($page) use ($log_filters) {
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-8">
+                        <div class="col-md-3">
+                            <div class="form-group mb-0">
+                                <label>Contact Number</label>
+                                <input type="text" name="contact" value="<?php echo html_escape($log_contact); ?>" autocomplete="off" placeholder="e.g. 0123456789" class="form-control">
+                            </div>
+                        </div>
+                        <div class="col-md-5">
                             <input type="submit" value="Filter" class="btn btn-light-success font-weight-bold" style="width:80px;">
                             <input type="button" id="ghl-message-log-reset" value="Reset" class="btn btn-light-primary font-weight-bold" style="width:80px;">
-                            <a href="<?php echo base_url('Report/Ghl_Message_Log_Export?log_date=') . urlencode($log_filters['log_date']); ?>" class="btn btn-light-info font-weight-bold float-right">
+                            <a href="<?php echo base_url('Report/Ghl_Message_Log_Export?log_date=') . urlencode($log_filters['log_date']) . '&contact=' . urlencode($log_contact); ?>" class="btn btn-light-info font-weight-bold float-right">
                                 <i class="la la-download"></i> Export CSV
                             </a>
                         </div>

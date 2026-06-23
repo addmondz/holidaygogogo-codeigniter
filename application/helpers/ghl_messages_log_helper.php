@@ -9,16 +9,34 @@ defined('BASEPATH') OR exit('No direct script access allowed');
  * tests/helpers/GhlMessagesLogPaginationTest.php.
  */
 
+if (!function_exists('ghl_message_log_normalize_contact')) {
+    /**
+     * Reduce a contact-number filter to digits only, so format differences
+     * (spaces, dashes, '+', country-code prefixes) never block a match. The
+     * Message Log query compares this against a digits-only version of both
+     * from_number and to_number, surfacing the full two-way thread for a lead.
+     *
+     * @param string $input Raw user input.
+     * @return string Digits only ('' when nothing usable was typed).
+     */
+    function ghl_message_log_normalize_contact($input)
+    {
+        return preg_replace('/\D+/', '', (string) $input);
+    }
+}
+
 if (!function_exists('ghl_message_log_export_columns')) {
     /**
-     * CSV header for the Message Log export, in the same order as the on-screen
-     * table.
+     * CSV header for the Message Log export. Leads with Contact -- the
+     * chatroom/lead the row belongs to -- because the export groups rows by
+     * contact so each thread can be analysed together; the remaining columns
+     * follow the on-screen table order.
      *
      * @return array
      */
     function ghl_message_log_export_columns()
     {
-        return array('Date / Time', 'Agent', 'From', 'To', 'Message');
+        return array('Contact', 'Date / Time', 'Agent', 'From', 'To', 'Message');
     }
 }
 
@@ -37,6 +55,7 @@ if (!function_exists('ghl_message_log_export_row')) {
         };
 
         return array(
+            $cell('contact_name'),
             $cell('message_timestamp'),
             $cell('agent'),
             $cell('from_number'),

@@ -2036,11 +2036,22 @@ class Report_Model extends CI_Model
      * @param string $endDate   'Y-m-d' inclusive upper bound (whole day covered).
      * @param int    $limit     Rows per page.
      * @param int    $offset    Rows to skip.
+     * @param string $contact   Optional contact number; when set, only the
+     *                          two-way thread for that number is returned
+     *                          (matched against from_number OR to_number).
      * @return array Rows keyed: message_timestamp, from_number, to_number, agent, body.
      */
-    function Ghl_Messages_Log($startDate, $endDate, $limit, $offset)
+    function Ghl_Messages_Log($startDate, $endDate, $limit, $offset, $contact = '')
     {
         $messageTimeColumn = $this->escape_identifier($this->get_message_time_column());
+
+        $params = array(
+            $startDate . ' 00:00:00',
+            $endDate . ' 23:59:59',
+        );
+        $contactClause = $this->ghl_message_contact_clause($contact, $params);
+        $params[] = (int) $limit;
+        $params[] = (int) $offset;
 
         $sql = "
             SELECT
@@ -2053,16 +2064,66 @@ class Report_Model extends CI_Model
             LEFT JOIN ghl_users gu ON gu.UserID = gm.user_id
             WHERE gm.{$messageTimeColumn} >= ?
               AND gm.{$messageTimeColumn} <= ?
+              {$contactClause}
             ORDER BY gm.{$messageTimeColumn} DESC, gm.id DESC
             LIMIT ? OFFSET ?
         ";
 
+        return $this->db->query($sql, $params)->result_array();
+    }
+
+    /**
+     * One chunk of raw GHL messages shaped for the CSV export. Unlike the
+     * on-screen page (newest-first, flat), the export is meant to be analysed one
+     * chatroom at a time, so rows are grouped by contact (then conversation) and
+     * ordered oldest-first within a thread -- the natural reading order of a chat.
+     * A resolved contact name is selected as the leading column so each chatroom
+     * is labelled.
+     *
+     * The ORDER BY is total and deterministic, so chunked LIMIT/OFFSET paging
+     * keeps every thread contiguous across chunk boundaries.
+     *
+     * @param string $startDate 'Y-m-d' inclusive lower bound.
+     * @param string $endDate   'Y-m-d' inclusive upper bound (whole day covered).
+     * @param int    $limit     Rows per chunk.
+     * @param int    $offset    Rows to skip.
+     * @param string $contact   Optional contact number; when set, only the
+     *                          two-way thread for that number is returned.
+     * @return array Rows keyed: contact_name, message_timestamp, from_number,
+     *               to_number, agent, body.
+     */
+    function Ghl_Messages_Log_Export($startDate, $endDate, $limit, $offset, $contact = '')
+    {
+        $messageTimeColumn = $this->escape_identifier($this->get_message_time_column());
+
         $params = array(
             $startDate . ' 00:00:00',
             $endDate . ' 23:59:59',
-            (int) $limit,
-            (int) $offset,
         );
+        $contactClause = $this->ghl_message_contact_clause($contact, $params);
+        $params[] = (int) $limit;
+        $params[] = (int) $offset;
+
+        $sql = "
+            SELECT
+                COALESCE(NULLIF(gc.contact_name, ''), NULLIF(gc.full_name, ''), '') AS contact_name,
+                gm.{$messageTimeColumn} AS message_timestamp,
+                gm.from_number AS from_number,
+                gm.to_number AS to_number,
+                gu.Name AS agent,
+                gm.body AS body
+            FROM ghl_messages gm
+            LEFT JOIN ghl_users gu ON gu.UserID = gm.user_id
+            LEFT JOIN ghl_conversations gc ON gc.conversation_id = gm.conversation_id
+            WHERE gm.{$messageTimeColumn} >= ?
+              AND gm.{$messageTimeColumn} <= ?
+              {$contactClause}
+            ORDER BY COALESCE(gc.contact_id, gm.conversation_id, '') ASC,
+                     gm.conversation_id ASC,
+                     gm.{$messageTimeColumn} ASC,
+                     gm.id ASC
+            LIMIT ? OFFSET ?
+        ";
 
         return $this->db->query($sql, $params)->result_array();
     }
@@ -2073,21 +2134,67 @@ class Report_Model extends CI_Model
      *
      * @param string $startDate 'Y-m-d' inclusive lower bound.
      * @param string $endDate   'Y-m-d' inclusive upper bound (whole day covered).
+     * @param string $contact   Optional contact number; counts only the two-way
+     *                          thread for that number when set.
      * @return int
      */
-    function Ghl_Messages_Log_Count($startDate, $endDate)
+    function Ghl_Messages_Log_Count($startDate, $endDate, $contact = '')
     {
         $messageTimeColumn = $this->escape_identifier($this->get_message_time_column());
+
+        $params = array($startDate . ' 00:00:00', $endDate . ' 23:59:59');
+        $contactClause = $this->ghl_message_contact_clause($contact, $params);
 
         $row = $this->db->query(
             "SELECT COUNT(*) AS total
                FROM ghl_messages gm
               WHERE gm.{$messageTimeColumn} >= ?
-                AND gm.{$messageTimeColumn} <= ?",
-            array($startDate . ' 00:00:00', $endDate . ' 23:59:59')
+                AND gm.{$messageTimeColumn} <= ?
+                {$contactClause}",
+            $params
         )->row_array();
 
         return isset($row['total']) ? (int) $row['total'] : 0;
+    }
+
+    /**
+     * Build the optional contact-number WHERE fragment (and append its bound
+     * params) for the Message Log queries. Both the column and the typed value
+     * are reduced to digits only, so any phone format matches the same lead.
+     * Matching either from_number OR to_number returns the full two-way thread.
+     *
+     * @param string $contact Raw contact filter.
+     * @param array  $params  Query params, appended to in place.
+     * @return string SQL fragment beginning with ' AND ...', or '' when no filter.
+     */
+    protected function ghl_message_contact_clause($contact, array &$params)
+    {
+        $digits = preg_replace('/\D+/', '', (string) $contact);
+        if ($digits === '') {
+            return '';
+        }
+
+        $normFrom = $this->normalize_phone_sql('gm.from_number');
+        $normTo = $this->normalize_phone_sql('gm.to_number');
+
+        $like = '%' . $digits . '%';
+        $params[] = $like;
+        $params[] = $like;
+
+        return " AND ({$normFrom} LIKE ? OR {$normTo} LIKE ?)";
+    }
+
+    /**
+     * SQL expression that strips '+', spaces, dashes and parentheses from a
+     * phone column so it can be compared digit-for-digit against a normalized
+     * filter value.
+     *
+     * @param string $column Qualified column name.
+     * @return string
+     */
+    protected function normalize_phone_sql($column)
+    {
+        return "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE({$column}, '+', ''), ' ', ''), '-', ''), '(', ''), ')', '')";
     }
 
     private function build_lead_data_order_clause($filters = array())

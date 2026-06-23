@@ -64,15 +64,18 @@ class Report extends MY_Controller
         $this->load->helper('ghl_messages_log');
 
         $range = $this->ghl_message_log_range(trim((string) $this->input->get('log_date')));
+        $contact = trim((string) $this->input->get('contact'));
+        $range['contact'] = $contact;
 
-        $total = $this->Report_Model->Ghl_Messages_Log_Count($range['start_date'], $range['end_date']);
+        $total = $this->Report_Model->Ghl_Messages_Log_Count($range['start_date'], $range['end_date'], $contact);
         $pagination = ghl_messages_log_pagination($total, (int) $this->input->get('page'), 50);
 
         $messages = $this->Report_Model->Ghl_Messages_Log(
             $range['start_date'],
             $range['end_date'],
             $pagination['per_page'],
-            $pagination['offset']
+            $pagination['offset'],
+            $contact
         );
 
         $titles = array(
@@ -96,6 +99,7 @@ class Report extends MY_Controller
         $this->load->helper('ghl_messages_log');
 
         $range = $this->ghl_message_log_range(trim((string) $this->input->get('log_date')));
+        $contact = trim((string) $this->input->get('contact'));
 
         $filename = ghl_message_log_export_filename($range['start_date'], $range['end_date']);
 
@@ -109,15 +113,17 @@ class Report extends MY_Controller
         fputcsv($out, ghl_message_log_export_columns());
 
         // Page through the result in bounded chunks instead of loading every
-        // matching row at once.
+        // matching row at once. The export query groups rows by contact/lead so
+        // each chatroom reads as one contiguous thread.
         $chunk = 5000;
         $offset = 0;
         do {
-            $rows = $this->Report_Model->Ghl_Messages_Log(
+            $rows = $this->Report_Model->Ghl_Messages_Log_Export(
                 $range['start_date'],
                 $range['end_date'],
                 $chunk,
-                $offset
+                $offset,
+                $contact
             );
 
             foreach ($rows as $row) {
