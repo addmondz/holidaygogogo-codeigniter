@@ -63,6 +63,7 @@ $page_url = function ($page) use ($log_filters, $log_contact) {
                         <thead>
                             <tr>
                                 <th style="width:170px;">Date / Time</th>
+                                <th style="width:110px;">Direction</th>
                                 <th style="width:150px;">Agent</th>
                                 <th style="width:150px;">From</th>
                                 <th style="width:150px;">To</th>
@@ -72,12 +73,34 @@ $page_url = function ($page) use ($log_filters, $log_contact) {
                         <tbody>
                             <?php if (empty($log_messages)) { ?>
                                 <tr>
-                                    <td colspan="5" class="text-center py-10">No messages found for the selected range.</td>
+                                    <td colspan="6" class="text-center py-10">No messages found for the selected range.</td>
                                 </tr>
                             <?php } else { ?>
-                                <?php foreach ($log_messages as $m) { ?>
+                                <?php foreach ($log_messages as $m) {
+                                    $direction = isset($m['direction']) ? strtolower(trim((string) $m['direction'])) : '';
+                                    $direction_label = ghl_message_log_direction_label($direction);
+                                    if ($direction === 'inbound') {
+                                        $direction_badge = 'label-light-info';
+                                        $direction_icon = 'la-arrow-down';
+                                    } elseif ($direction === 'outbound') {
+                                        $direction_badge = 'label-light-success';
+                                        $direction_icon = 'la-arrow-up';
+                                    } else {
+                                        $direction_badge = 'label-light-secondary';
+                                        $direction_icon = '';
+                                    }
+                                ?>
                                     <tr>
                                         <td class="text-nowrap"><?php echo html_escape($m['message_timestamp']); ?></td>
+                                        <td>
+                                            <?php if ($direction_label !== '') { ?>
+                                                <span class="label <?php echo $direction_badge; ?> label-inline font-weight-bold">
+                                                    <?php if ($direction_icon !== '') { ?><i class="la <?php echo $direction_icon; ?> mr-1"></i><?php } ?><?php echo html_escape($direction_label); ?>
+                                                </span>
+                                            <?php } else { ?>
+                                                <span class="text-muted">&mdash;</span>
+                                            <?php } ?>
+                                        </td>
                                         <td><?php echo !empty($m['agent']) ? html_escape($m['agent']) : '<span class="text-muted">&mdash;</span>'; ?></td>
                                         <td class="text-nowrap"><?php echo html_escape($m['from_number']); ?></td>
                                         <td class="text-nowrap"><?php echo html_escape($m['to_number']); ?></td>

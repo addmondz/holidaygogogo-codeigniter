@@ -33,38 +33,49 @@ function assert_eq($label, $expected, $actual) {
 }
 
 assert_eq('header columns',
-    array('Contact', 'Date / Time', 'Agent', 'From', 'To', 'Message'),
+    array('Contact', 'Date / Time', 'Direction', 'Agent', 'From', 'To', 'Message'),
     ghl_message_log_export_columns());
+
+// Direction label: normalized to a readable word; unknown/empty -> blank.
+assert_eq('direction label inbound',  'Inbound',  ghl_message_log_direction_label('inbound'));
+assert_eq('direction label outbound', 'Outbound', ghl_message_log_direction_label('OUTBOUND'));
+assert_eq('direction label trims',    'Inbound',  ghl_message_log_direction_label('  inbound '));
+assert_eq('direction label empty',    '',         ghl_message_log_direction_label(''));
+assert_eq('direction label null',     '',         ghl_message_log_direction_label(null));
+assert_eq('direction label unknown',  'Note',     ghl_message_log_direction_label('note'));
 
 // Full outbound row -> cells in table order, led by the contact/chatroom.
 $full = array(
     'contact_name'      => 'Lim Wei Jian',
     'message_timestamp' => '2026-06-20 11:19:59',
+    'direction'         => 'outbound',
     'agent'             => 'Hani OP Team',
     'from_number'       => '+60 10-295 6786',
     'to_number'         => '+6591852988',
     'body'              => "Line one\nLine two, with comma",
 );
 assert_eq('full row cells',
-    array('Lim Wei Jian', '2026-06-20 11:19:59', 'Hani OP Team', '+60 10-295 6786', '+6591852988', "Line one\nLine two, with comma"),
+    array('Lim Wei Jian', '2026-06-20 11:19:59', 'Outbound', 'Hani OP Team', '+60 10-295 6786', '+6591852988', "Line one\nLine two, with comma"),
     ghl_message_log_export_row($full));
 
-// Inbound row: null contact/agent and null body -> empty strings, not null.
+// Inbound row: null contact/agent and null body -> empty strings, not null;
+// direction still resolves to a readable label.
 $inbound = array(
     'contact_name'      => null,
     'message_timestamp' => '2026-06-20 11:14:40',
+    'direction'         => 'inbound',
     'agent'             => null,
     'from_number'       => '+60129871440',
     'to_number'         => '+60 10-295 6786',
     'body'              => null,
 );
 assert_eq('inbound row blanks nulls',
-    array('', '2026-06-20 11:14:40', '', '+60129871440', '+60 10-295 6786', ''),
+    array('', '2026-06-20 11:14:40', 'Inbound', '', '+60129871440', '+60 10-295 6786', ''),
     ghl_message_log_export_row($inbound));
 
 // Missing keys entirely -> all blanks, never a warning.
 assert_eq('missing keys -> blanks',
-    array('', '', '', '', '', ''),
+    array('', '', '', '', '', '', ''),
     ghl_message_log_export_row(array()));
 
 assert_eq('filename encodes window',

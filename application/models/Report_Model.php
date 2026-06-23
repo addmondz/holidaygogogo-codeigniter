@@ -2070,7 +2070,8 @@ class Report_Model extends CI_Model
      * @param string $contact   Optional contact number; when set, only the
      *                          two-way thread for that number is returned
      *                          (matched against from_number OR to_number).
-     * @return array Rows keyed: message_timestamp, from_number, to_number, agent, body.
+     * @return array Rows keyed: message_timestamp, direction, from_number,
+     *               to_number, agent, body.
      */
     function Ghl_Messages_Log($startDate, $endDate, $limit, $offset, $contact = '')
     {
@@ -2087,12 +2088,15 @@ class Report_Model extends CI_Model
         $sql = "
             SELECT
                 gm.{$messageTimeColumn} AS message_timestamp,
+                gm.direction AS direction,
                 gm.from_number AS from_number,
                 gm.to_number AS to_number,
-                gu.Name AS agent,
+                COALESCE(NULLIF(gu.Name, ''), NULLIF(gu_assigned.Name, '')) AS agent,
                 gm.body AS body
             FROM ghl_messages gm
             LEFT JOIN ghl_users gu ON gu.UserID = gm.user_id
+            LEFT JOIN ghl_conversations gc ON gc.conversation_id = gm.conversation_id
+            LEFT JOIN ghl_users gu_assigned ON gu_assigned.UserID = gc.assigned_to
             WHERE gm.{$messageTimeColumn} >= ?
               AND gm.{$messageTimeColumn} <= ?
               {$contactClause}
@@ -2120,8 +2124,8 @@ class Report_Model extends CI_Model
      * @param int    $offset    Rows to skip.
      * @param string $contact   Optional contact number; when set, only the
      *                          two-way thread for that number is returned.
-     * @return array Rows keyed: contact_name, message_timestamp, from_number,
-     *               to_number, agent, body.
+     * @return array Rows keyed: contact_name, message_timestamp, direction,
+     *               from_number, to_number, agent, body.
      */
     function Ghl_Messages_Log_Export($startDate, $endDate, $limit, $offset, $contact = '')
     {
@@ -2139,13 +2143,15 @@ class Report_Model extends CI_Model
             SELECT
                 COALESCE(NULLIF(gc.contact_name, ''), NULLIF(gc.full_name, ''), '') AS contact_name,
                 gm.{$messageTimeColumn} AS message_timestamp,
+                gm.direction AS direction,
                 gm.from_number AS from_number,
                 gm.to_number AS to_number,
-                gu.Name AS agent,
+                COALESCE(NULLIF(gu.Name, ''), NULLIF(gu_assigned.Name, '')) AS agent,
                 gm.body AS body
             FROM ghl_messages gm
             LEFT JOIN ghl_users gu ON gu.UserID = gm.user_id
             LEFT JOIN ghl_conversations gc ON gc.conversation_id = gm.conversation_id
+            LEFT JOIN ghl_users gu_assigned ON gu_assigned.UserID = gc.assigned_to
             WHERE gm.{$messageTimeColumn} >= ?
               AND gm.{$messageTimeColumn} <= ?
               {$contactClause}

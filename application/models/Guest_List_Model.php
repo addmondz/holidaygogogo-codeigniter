@@ -16,12 +16,13 @@ class Guest_List_Model extends CI_Model
 		}
 		$this->db->where('guest_list.Status', 'Y');
 		// Arrange by room: assigned rooms first (natural sorted), unassigned last,
-		// then by Type (ADULT first) and Name within each room.
+		// then by Type (ADULT first). Keep entry order (GuestListID) within each
+		// room/type group so the form does not re-alphabetize guests on reload.
 		$this->db->order_by('guest_list_room.room_name IS NULL', 'ASC', FALSE);
 		$this->db->order_by('LENGTH(guest_list_room.room_name)', 'ASC', FALSE);
 		$this->db->order_by('guest_list_room.room_name', 'ASC');
 		$this->db->order_by("FIELD(Type, 'ADULT', 'CHILD', 'INFANT')", 'ASC', FALSE);
-		$this->db->order_by('guest_list.Name', 'ASC');
+		$this->db->order_by('guest_list.GuestListID', 'ASC');
 		return $this->db->get('booking')->result();
 	}
 

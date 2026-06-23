@@ -39,30 +39,33 @@ $pdo->exec("CREATE TABLE ghl_messages (
     from_number TEXT,
     to_number TEXT,
     user_id TEXT,
+    direction TEXT,
     body TEXT,
     date_added TEXT
 )");
 
 // Agent directory: outbound messages carry a user_id resolving to a name;
-// inbound messages have no user_id and must resolve to a blank agent.
+// inbound messages have no user_id and fall back to the agent the chatroom is
+// assigned to (ghl_conversations.assigned_to).
 $pdo->exec("CREATE TABLE ghl_users (UserID TEXT, Name TEXT)");
-$pdo->exec("INSERT INTO ghl_users (UserID, Name) VALUES ('u-1', 'Agent Alice')");
+$pdo->exec("INSERT INTO ghl_users (UserID, Name) VALUES ('u-1', 'Agent Alice'), ('u-2', 'Agent Bob')");
 
-// Conversation directory: resolves a chatroom to its contact (lead).
-$pdo->exec("CREATE TABLE ghl_conversations (conversation_id TEXT, contact_id TEXT, contact_name TEXT, full_name TEXT)");
-$pdo->exec("INSERT INTO ghl_conversations (conversation_id, contact_id, contact_name, full_name) VALUES
-    ('cv-a', 'ct-1', 'Lead One', ''),
-    ('cv-b', 'ct-2', '', 'Lead Two')
+// Conversation directory: resolves a chatroom to its contact (lead) and the
+// agent it is assigned to. cv-a -> Alice, cv-b -> Bob.
+$pdo->exec("CREATE TABLE ghl_conversations (conversation_id TEXT, contact_id TEXT, contact_name TEXT, full_name TEXT, assigned_to TEXT)");
+$pdo->exec("INSERT INTO ghl_conversations (conversation_id, contact_id, contact_name, full_name, assigned_to) VALUES
+    ('cv-a', 'ct-1', 'Lead One', '', 'u-1'),
+    ('cv-b', 'ct-2', '', 'Lead Two', 'u-2')
 ");
 
 // 5 rows over 2026-06-14..16; one (id 99) is OUTSIDE the test window (06-13).
 // Two chatrooms interleave in time: cv-a (ids 10,12,13) and cv-b (id 11).
-$pdo->exec("INSERT INTO ghl_messages (id, conversation_id, from_number, to_number, user_id, body, date_added) VALUES
-    (10, 'cv-a', '+60123', '+60999', 'u-1', 'first',  '2026-06-14 08:00:00'),
-    (11, 'cv-b', '+60124', '+60999', NULL,  'second', '2026-06-15 09:00:00'),
-    (12, 'cv-a', '+60999', '+60125', 'u-1', 'third',  '2026-06-15 09:00:00'),
-    (13, 'cv-a', '+60126', '+60999', NULL,  'fourth', '2026-06-16 23:59:59'),
-    (99, 'cv-a', '+60127', '+60999', 'u-1', 'before', '2026-06-13 10:00:00')
+$pdo->exec("INSERT INTO ghl_messages (id, conversation_id, from_number, to_number, user_id, direction, body, date_added) VALUES
+    (10, 'cv-a', '+60123', '+60999', 'u-1', 'outbound', 'first',  '2026-06-14 08:00:00'),
+    (11, 'cv-b', '+60124', '+60999', NULL,  'inbound',  'second', '2026-06-15 09:00:00'),
+    (12, 'cv-a', '+60999', '+60125', 'u-1', 'outbound', 'third',  '2026-06-15 09:00:00'),
+    (13, 'cv-a', '+60126', '+60999', NULL,  'inbound',  'fourth', '2026-06-16 23:59:59'),
+    (99, 'cv-a', '+60127', '+60999', 'u-1', 'outbound', 'before', '2026-06-13 10:00:00')
 ");
 
 $start = '2026-06-14 00:00:00';
@@ -77,9 +80,14 @@ $total = (int) $countStmt->fetchColumn();
 assert_eq('count excludes out-of-window row', 4, $total);
 
 // Page mirror: newest first, stable tiebreak, windowed, agent resolved.
-$pageSql = "SELECT gm.date_added, gm.from_number, gm.to_number, gu.Name AS agent, gm.body
+// Agent prefers the message sender (outbound user_id); inbound rows fall back
+// to the agent the conversation is assigned to.
+$pageSql = "SELECT gm.date_added, gm.direction, gm.from_number, gm.to_number,
+                   COALESCE(NULLIF(gu.Name, ''), NULLIF(gu_assigned.Name, '')) AS agent, gm.body
             FROM ghl_messages gm
             LEFT JOIN ghl_users gu ON gu.UserID = gm.user_id
+            LEFT JOIN ghl_conversations gc ON gc.conversation_id = gm.conversation_id
+            LEFT JOIN ghl_users gu_assigned ON gu_assigned.UserID = gc.assigned_to
             WHERE gm.date_added >= :s AND gm.date_added <= :e
             ORDER BY gm.date_added DESC, gm.id DESC
             LIMIT :lim OFFSET :off";
@@ -97,13 +105,17 @@ assert_eq('page1 size (limit 2)', 2, count($page1));
 // Newest first: id 13 (06-16) then the 06-15 pair, DESC id -> id 12 before id 11.
 assert_eq('row0 newest body', 'fourth', $page1[0]['body']);
 assert_eq('row1 tiebreak body (id12 before id11)', 'third', $page1[1]['body']);
-// The five display fields are present, including the resolved agent.
-assert_eq('row exposes 5 fields',
-    array('date_added', 'from_number', 'to_number', 'agent', 'body'),
+// The six display fields are present, including direction and the resolved agent.
+assert_eq('row exposes 6 fields',
+    array('date_added', 'direction', 'from_number', 'to_number', 'agent', 'body'),
     array_keys($page1[0]));
-// Agent resolves: id 13 (inbound, no user_id) -> null; id 12 (u-1) -> Agent Alice.
-assert_eq('inbound row has no agent', null,          $page1[0]['agent']);
-assert_eq('outbound row resolves agent', 'Agent Alice', $page1[1]['agent']);
+// Direction is surfaced so the UI can label inbound vs outbound.
+assert_eq('newest row direction', 'inbound',  $page1[0]['direction']); // id 13
+assert_eq('tiebreak row direction', 'outbound', $page1[1]['direction']); // id 12
+// Agent resolves: id 13 (inbound, cv-a assigned to u-1) -> Agent Alice;
+// id 12 (outbound, sender u-1) -> Agent Alice.
+assert_eq('inbound row resolves assigned agent', 'Agent Alice', $page1[0]['agent']);
+assert_eq('outbound row resolves sender agent', 'Agent Alice', $page1[1]['agent']);
 
 // Page 2 continues the order without overlap.
 $pg2 = ghl_messages_log_pagination($total, 2, 2);
@@ -117,6 +129,8 @@ $page2 = $stmt->fetchAll(PDO::FETCH_ASSOC);
 assert_eq('page2 size', 2, count($page2));
 assert_eq('page2 row0 body', 'second', $page2[0]['body']); // id 11
 assert_eq('page2 row1 body', 'first',  $page2[1]['body']); // id 10 (06-14)
+// id 11 is inbound on cv-b (assigned to u-2) -> resolves a distinct agent.
+assert_eq('inbound row resolves its own chatroom agent', 'Agent Bob', $page2[0]['agent']);
 assert_eq('no overlap with page1',
     true,
     count(array_intersect(

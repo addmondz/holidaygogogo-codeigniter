@@ -25,6 +25,28 @@ if (!function_exists('ghl_message_log_normalize_contact')) {
     }
 }
 
+if (!function_exists('ghl_message_log_direction_label')) {
+    /**
+     * Normalize a raw `ghl_messages.direction` value into a reader-friendly word
+     * ('Inbound' / 'Outbound'). Empty/null becomes '' so it renders as a blank
+     * cell; any other value is title-cased rather than dropped, so unexpected
+     * directions stay visible instead of silently vanishing.
+     *
+     * @param string|null $direction Raw direction value.
+     * @return string
+     */
+    function ghl_message_log_direction_label($direction)
+    {
+        $normalized = strtolower(trim((string) $direction));
+
+        if ($normalized === '') {
+            return '';
+        }
+
+        return ucfirst($normalized);
+    }
+}
+
 if (!function_exists('ghl_message_log_export_columns')) {
     /**
      * CSV header for the Message Log export. Leads with Contact -- the
@@ -36,7 +58,7 @@ if (!function_exists('ghl_message_log_export_columns')) {
      */
     function ghl_message_log_export_columns()
     {
-        return array('Contact', 'Date / Time', 'Agent', 'From', 'To', 'Message');
+        return array('Contact', 'Date / Time', 'Direction', 'Agent', 'From', 'To', 'Message');
     }
 }
 
@@ -57,6 +79,7 @@ if (!function_exists('ghl_message_log_export_row')) {
         return array(
             $cell('contact_name'),
             $cell('message_timestamp'),
+            ghl_message_log_direction_label($cell('direction')),
             $cell('agent'),
             $cell('from_number'),
             $cell('to_number'),
