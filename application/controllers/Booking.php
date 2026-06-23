@@ -1743,6 +1743,14 @@ class Booking extends MY_Controller
 			// been ticked. disable_checklist_payment_out=0 mirrors the
 			// modal/filter rule (see CLAUDE memory feedback_checklist_filter)
 			// so the card and the drill-down list agree row-for-row.
+			// Scoped to travel from 1 March of the current year onwards (same
+			// March-1 floor convention as Supplier Due Soon below) so the queue
+			// stays actionable instead of dragging in long-finished trips. Uses
+			// the SAME range-overlap predicate as the generic ?travel_date
+			// filter (Booking_Model::filter_bookings) with a far-future upper
+			// bound, so the card and its drill-down stay in exact agreement.
+			$insurance_window_start = date('Y') . '-03-01';
+			$insurance_window_end   = date('Y', strtotime('+5 years')) . '-12-31';
 			$insurance_ids = $this->db
 				->select('ID')
 				->from('package_checklist')
@@ -1760,6 +1768,9 @@ class Booking extends MY_Controller
 					 FROM booking
 					 WHERE booking.BookingConfirmationTitle='BOOKING CONFIRMATION'
 					   AND booking.CancelStatus='N' AND booking.Status!='N'
+					   AND ((booking.StartDate <= ? AND booking.EndDate >= ?)
+					        OR (booking.StartDate >= ? AND booking.StartDate <= ?)
+					        OR (booking.EndDate >= ? AND booking.EndDate <= ?))
 					   AND booking.BookingID IN (
 					     SELECT DISTINCT bp.BookingID
 					     FROM booking_product bp
@@ -1774,17 +1785,20 @@ class Booking extends MY_Controller
 					           AND bcc.product_id = bp.ProductID
 					           AND bcc.package_checklist_id IN ({$ids_list})
 					       )
-					   )"
+					   )",
+					array(
+						$insurance_window_start, $insurance_window_end,
+						$insurance_window_start, $insurance_window_end,
+						$insurance_window_start, $insurance_window_end,
+					)
 				)->row();
 				$insurance_count = (int)$row->cnt;
 			} else {
 				$insurance_count = 0;
 			}
+			// Display-only card (not clickable) — no drill-down link.
 			$cards['insurance_pending'] = array(
 				'count' => $insurance_count,
-				'link'  => $base . $qs(array(
-					'checklist_filter' => implode(',', $insurance_ids),
-				)),
 			);
 
 			// Pending Ferry Transfer Checklist (travel this & next month) —
@@ -1858,6 +1872,7 @@ class Booking extends MY_Controller
 			// predicate differs. The per-supplier table spans the whole
 			// window (overdue..tomorrow), earliest deadline first.
 			$due_soon_end   = date('Y-m-d', strtotime('+1 day'));  // tomorrow — window upper bound
+			$due_soon_start = date('Y') . '-03-01';                // overdue lookback floor: 1 March, current year
 			$row = $this->db->query(
 				"SELECT
 				    SUM(CASE WHEN payment.Deadline <  ? THEN 1 ELSE 0 END) AS overdue_cnt,
@@ -1868,16 +1883,19 @@ class Booking extends MY_Controller
 				    COALESCE(SUM(CASE WHEN payment.Deadline =  ? THEN payment.Debit ELSE 0 END), 0) AS tomorrow_due
 				 FROM payment
 				 WHERE payment.Status = 'P'
-				   AND payment.Deadline <= ?
+				   AND payment.Deadline BETWEEN ? AND ?
 				   AND payment.Debit > 0
 				   AND payment.Type LIKE 'SUPPLIER PAYMENT%'
 				   AND payment.SupplierID IS NOT NULL",
-				array($today, $today, $today, $today, $due_soon_end, $due_soon_end, $due_soon_end)
+				array($today, $today, $today, $today, $due_soon_end, $due_soon_end, $due_soon_start, $due_soon_end)
 			)->row();
+			// status=A (active: not deleted, not cancelled) scopes the linked list
+			// to real BCs and, crucially, suppresses the no-status default that
+			// would otherwise force AfterSalesService=PENDING and hide most matches.
 			$cards['supplier_due_soon'] = array(
-				'overdue'  => array('count' => (int)$row->overdue_cnt,  'total_due' => $money($row->overdue_due)),
-				'today'    => array('count' => (int)$row->today_cnt,    'total_due' => $money($row->today_due)),
-				'tomorrow' => array('count' => (int)$row->tomorrow_cnt, 'total_due' => $money($row->tomorrow_due)),
+				'overdue'  => array('count' => (int)$row->overdue_cnt,  'total_due' => $money($row->overdue_due),  'link' => $base . $qs(array('supplier_payout' => 'overdue',  'status' => 'A'))),
+				'today'    => array('count' => (int)$row->today_cnt,    'total_due' => $money($row->today_due),    'link' => $base . $qs(array('supplier_payout' => 'today',    'status' => 'A'))),
+				'tomorrow' => array('count' => (int)$row->tomorrow_cnt, 'total_due' => $money($row->tomorrow_due), 'link' => $base . $qs(array('supplier_payout' => 'tomorrow', 'status' => 'A'))),
 			);
 
 			$due_rows = $this->db->query(
@@ -1888,13 +1906,13 @@ class Booking extends MY_Controller
 				 FROM payment
 				 JOIN supplier ON supplier.SupplierID = payment.SupplierID
 				 WHERE payment.Status = 'P'
-				   AND payment.Deadline <= ?
+				   AND payment.Deadline BETWEEN ? AND ?
 				   AND payment.Debit > 0
 				   AND payment.Type LIKE 'SUPPLIER PAYMENT%'
 				 GROUP BY supplier.SupplierID, supplier.Name
 				 ORDER BY MIN(payment.Deadline) ASC, total_due DESC
 				 LIMIT 5",
-				array($due_soon_end)
+				array($due_soon_start, $due_soon_end)
 			)->result();
 			$due_out = array();
 			foreach($due_rows as $r) {
@@ -2455,11 +2473,11 @@ class Booking extends MY_Controller
 				'<li>No completion record yet for that checklist on that line</li>' .
 				'<li><code>booking_product.disable_checklist_payment_out = 0</code> (the same rule the modal/filter uses)</li>' .
 				'<li>BC, not cancelled, not draft</li>' .
+				'<li>Travel from <strong>' . $fmt_disp($insurance_window_start) . '</strong> onwards (1 March of the current year)</li>' .
 				'</ul>' .
-				'<strong>Live queue &middot; as of ' . $fmt_disp($today) . '</strong> &mdash; no date filter.<br>' .
+				'<strong>Live queue &middot; as of ' . $fmt_disp($today) . '</strong> &mdash; travel from ' . $fmt_disp($insurance_window_start) . ' onwards.<br>' .
 				'<strong>This card:</strong> ' .
-				'Insurance pending &rarr; <strong>' . $ip . ' ' . $plural($ip, 'BC') . '</strong><br><br>' .
-				'<strong>Action:</strong> Click to filter the list to these BCs and tick off insurance.';
+				'Insurance pending &rarr; <strong>' . $ip . ' ' . $plural($ip, 'BC') . '</strong>';
 		}
 
 		if(isset($cards['ferry_pending'])) {
@@ -2660,12 +2678,12 @@ class Booking extends MY_Controller
 				'<ul>' .
 				'<li>Payment-out (<code>Type LIKE \'SUPPLIER PAYMENT%\'</code>)</li>' .
 				'<li>Status pending (<code>Status = \'P\'</code>)</li>' .
-				'<li>Deadline on or before tomorrow (' . $fmt_disp($due_soon_end) . ')</li>' .
+				'<li>Deadline ' . $rng_disp($due_soon_start, $due_soon_end) . '</li>' .
 				'<li>Linked to a supplier</li>' .
 				'</ul>' .
 				'<strong>Bucketed by deadline:</strong>' .
 				'<ul>' .
-				'<li><strong>Overdue</strong> &mdash; before today (' . $fmt_disp($today) . '): <strong>' . (int)$ds['overdue']['count'] . '</strong> &middot; ' . $ds['overdue']['total_due'] . '</li>' .
+				'<li><strong>Overdue</strong> &mdash; ' . $fmt_disp($due_soon_start) . ' to before today (' . $fmt_disp($today) . '): <strong>' . (int)$ds['overdue']['count'] . '</strong> &middot; ' . $ds['overdue']['total_due'] . '</li>' .
 				'<li><strong>Today</strong>: <strong>' . (int)$ds['today']['count'] . '</strong> &middot; ' . $ds['today']['total_due'] . '</li>' .
 				'<li><strong>Tomorrow</strong> (' . $fmt_disp($due_soon_end) . '): <strong>' . (int)$ds['tomorrow']['count'] . '</strong> &middot; ' . $ds['tomorrow']['total_due'] . '</li>' .
 				'</ul>' .

@@ -37,6 +37,54 @@ class Booking_Model extends CI_Model
 		return true;
 	}
 
+	/**
+	 * Filter to BCs with a pending supplier payout whose deadline falls in the
+	 * requested bucket — backs the clickable Overdue / Today / Tomorrow segments
+	 * of the OP "Supplier Pay-out Due Soon" card (?supplier_payout=...).
+	 *
+	 * Mirrors the card's row filters (Booking::ajax_summary_cards): pending,
+	 * money-out, SUPPLIER PAYMENT%, supplier-linked. Buckets:
+	 *   overdue  : floor (1 March, current year) <= Deadline < today
+	 *   today    : Deadline = today
+	 *   tomorrow : Deadline = today + 1
+	 *
+	 * The bucket is whitelisted before use; dates are server-derived, so the
+	 * interpolated EXISTS subquery carries no user input. Returns true when a
+	 * recognised bucket was applied.
+	 */
+	private function apply_supplier_payout_filter()
+	{
+		$bucket = $this->input->get('supplier_payout');
+		if(empty($bucket)) {
+			return false;
+		}
+
+		$today    = date('Y-m-d');
+		$tomorrow = date('Y-m-d', strtotime('+1 day'));
+		$floor    = date('Y') . '-03-01';
+
+		if($bucket === 'overdue') {
+			$deadline = "p.Deadline >= '{$floor}' AND p.Deadline < '{$today}'";
+		} else if($bucket === 'today') {
+			$deadline = "p.Deadline = '{$today}'";
+		} else if($bucket === 'tomorrow') {
+			$deadline = "p.Deadline = '{$tomorrow}'";
+		} else {
+			return false;
+		}
+
+		$this->db->where(
+			"EXISTS (SELECT 1 FROM payment p"
+			. " WHERE p.BookingID = booking.BookingID"
+			. " AND p.Status = 'P' AND p.Debit > 0"
+			. " AND p.Type LIKE 'SUPPLIER PAYMENT%'"
+			. " AND p.SupplierID IS NOT NULL"
+			. " AND {$deadline})",
+			null, false
+		);
+		return true;
+	}
+
 	private function apply_guest_list_status_filter()
 	{
 		$raw = $this->input->get('guest_list_status');
@@ -277,6 +325,9 @@ class Booking_Model extends CI_Model
 				$level2Ignore = 1;
 			}
 			if($this->apply_checklist_filter()) {
+				$level2Ignore = 1;
+			}
+			if($this->apply_supplier_payout_filter()) {
 				$level2Ignore = 1;
 			}
 			if(!empty($this->input->get('cancellation_reason'))) {
@@ -1904,6 +1955,9 @@ class Booking_Model extends CI_Model
 				$level2Ignore = 1;
 			}
 			if($this->apply_checklist_filter()) {
+				$level2Ignore = 1;
+			}
+			if($this->apply_supplier_payout_filter()) {
 				$level2Ignore = 1;
 			}
 			if(!empty($this->input->get('cancellation_reason'))) {

@@ -43,9 +43,11 @@
     #booking_summary_cards .sc-bar-target { background:#C4A23F; }
     #booking_summary_cards .sc-bar-amt { font-size:11px; color:#3F4254; font-weight:600; min-width:70px; text-align:right; flex-shrink:0; }
     #booking_summary_cards .summary-row-3 { display:flex; gap:14px; }
-    #booking_summary_cards .summary-row-3 > div { flex:1; }
+    #booking_summary_cards .summary-row-3 > div, #booking_summary_cards .summary-row-3 > a { flex:1; }
     #booking_summary_cards .summary-row-3 .lbl { font-size:10px; color:#7E8299; text-transform:uppercase; letter-spacing:0.5px; }
-    #booking_summary_cards .due-bucket { padding:8px 10px; border-radius:6px; background:#F7F8FA; }
+    #booking_summary_cards .due-bucket { display:block; padding:8px 10px; border-radius:6px; background:#F7F8FA; }
+    #booking_summary_cards a.due-bucket { color:inherit; text-decoration:none; transition:box-shadow .15s, transform .15s; }
+    #booking_summary_cards a.due-bucket:hover { text-decoration:none; box-shadow:0 4px 10px rgba(96,130,182,0.18); transform:translateY(-1px); }
     #booking_summary_cards .due-bucket.is-overdue { background:#FAA0A025; }
     #booking_summary_cards .due-bucket.is-today { background:#FFFAA035; }
     #booking_summary_cards .due-bucket .summary-value-sm.amt-overdue { color:#D9342B; }
@@ -633,18 +635,18 @@
                 </a>
             </div>
             <div class="col-md-3">
-                <a class="summary-card" id="sc-insurance-pending-link" href="#">
+                <div class="summary-card">
                     <div class="card card-custom">
                         <div class="card-header border-0 summary-card-header" style="background-color:#FAA0A030;">
                             <h3>Pending Insurance Checklist</h3>
-                            <i id="pop-insurance-pending" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>Counted when, for an active line item:</strong><ul><li>Product carries an Insurance package checklist</li><li>No completion record yet for that checklist on that line</li><li><code>booking_product.disable_checklist_payment_out = 0</code> (same rule the modal/filter uses)</li><li>BC, not cancelled, not draft</li></ul><strong>Live queue</strong> — no date filter. Click to filter the list to these BCs."></i>
+                            <i id="pop-insurance-pending" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>Counted when, for an active line item:</strong><ul><li>Product carries an Insurance package checklist</li><li>No completion record yet for that checklist on that line</li><li><code>booking_product.disable_checklist_payment_out = 0</code> (same rule the modal/filter uses)</li><li>BC, not cancelled, not draft</li><li>Travel from 1 March of the current year onwards</li></ul><strong>Live queue</strong> — travel from 1 March onwards."></i>
                         </div>
                         <div class="card-body summary-card-body">
                             <div class="summary-value" id="sc-insurance-pending-count">...</div>
-                            <div class="summary-sub">BCs whose insurance checklist is not yet ticked on at least one active line. Click to review and complete.</div>
+                            <div class="summary-sub">BCs whose insurance checklist is not yet ticked on at least one active line.</div>
                         </div>
                     </div>
-                </a>
+                </div>
             </div>
             <div class="col-md-3">
                 <a class="summary-card" id="sc-ferry-pending-link" href="#">
@@ -664,27 +666,27 @@
                 <div class="card card-custom">
                     <div class="card-header border-0 summary-card-header" style="background-color:#FFFAA030;">
                         <h3>Supplier Pay-out Due Soon</h3>
-                        <i id="pop-supplier-due-soon" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>Counted when:</strong><ul><li>Payment-out (<code>Type LIKE 'SUPPLIER PAYMENT%'</code>)</li><li>Status pending (<code>Status = 'P'</code>)</li><li>Deadline on or before tomorrow</li><li>Linked to a supplier</li></ul><strong>Bucketed by deadline:</strong> Overdue (before today), Today, and Tomorrow &mdash; each showing payout count and total amount.<br><br><strong>Table:</strong> top 5 suppliers across the window, earliest deadline first.<br><strong>Excludes:</strong> Already paid (Y), deleted (N), customer payment-ins, agent-commission entries."></i>
+                        <i id="pop-supplier-due-soon" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>Counted when:</strong><ul><li>Payment-out (<code>Type LIKE 'SUPPLIER PAYMENT%'</code>)</li><li>Status pending (<code>Status = 'P'</code>)</li><li>Deadline from 1 March (current year) up to tomorrow</li><li>Linked to a supplier</li></ul><strong>Bucketed by deadline:</strong> Overdue (1 March to before today), Today, and Tomorrow &mdash; each showing payout count and total amount.<br><br><strong>Table:</strong> top 5 suppliers across the window, earliest deadline first.<br><strong>Excludes:</strong> Already paid (Y), deleted (N), customer payment-ins, agent-commission entries."></i>
                     </div>
                     <div class="card-body summary-card-body">
                         <div class="summary-row-3 mb-3">
-                            <div class="due-bucket is-overdue">
+                            <a href="#" class="due-bucket is-overdue" id="sc-supplier-due-soon-overdue-link" title="View BCs with supplier payouts overdue (since 1 March)">
                                 <div class="lbl">Overdue</div>
                                 <div class="summary-value-sm amt-overdue" id="sc-supplier-due-soon-overdue-count">...</div>
                                 <div class="due-amt" id="sc-supplier-due-soon-overdue-total">...</div>
-                            </div>
-                            <div class="due-bucket is-today">
+                            </a>
+                            <a href="#" class="due-bucket is-today" id="sc-supplier-due-soon-today-link" title="View BCs with supplier payouts due today">
                                 <div class="lbl">Today</div>
                                 <div class="summary-value-sm amt-today" id="sc-supplier-due-soon-today-count">...</div>
                                 <div class="due-amt" id="sc-supplier-due-soon-today-total">...</div>
-                            </div>
-                            <div class="due-bucket">
+                            </a>
+                            <a href="#" class="due-bucket" id="sc-supplier-due-soon-tomorrow-link" title="View BCs with supplier payouts due tomorrow">
                                 <div class="lbl">Tomorrow</div>
                                 <div class="summary-value-sm" id="sc-supplier-due-soon-tomorrow-count">...</div>
                                 <div class="due-amt" id="sc-supplier-due-soon-tomorrow-total">...</div>
-                            </div>
+                            </a>
                         </div>
-                        <div class="summary-sub mb-2">Pending supplier payouts due tomorrow or earlier, bucketed by urgency. Each bucket shows the payout count and total amount. Clear overdue and today first; the table lists the most urgent suppliers, earliest deadline first.</div>
+                        <div class="summary-sub mb-2">Pending supplier payouts with deadlines from 1 March up to tomorrow, bucketed by urgency. Each bucket shows the payout count and total amount. Clear overdue and today first; the table lists the most urgent suppliers, earliest deadline first.</div>
                         <table class="table table-sm summary-table">
                             <thead><tr><th>Supplier</th><th class="text-right">Payouts</th><th class="text-right">Amount</th><th>Earliest Deadline</th></tr></thead>
                             <tbody id="sc-supplier-due-soon-body"><tr><td colspan="4" class="text-center text-muted">Loading…</td></tr></tbody>
@@ -1063,7 +1065,6 @@ $(function() {
         }
         if(c.insurance_pending) {
             setText('sc-insurance-pending-count', c.insurance_pending.count);
-            setLink('sc-insurance-pending-link',  c.insurance_pending.link);
         }
         if(c.ferry_pending) {
             setText('sc-ferry-pending-count', c.ferry_pending.count);
@@ -1075,6 +1076,7 @@ $(function() {
                 if(!ds[b]) return;
                 setText('sc-supplier-due-soon-' + b + '-count', ds[b].count);
                 setText('sc-supplier-due-soon-' + b + '-total', ds[b].total_due);
+                setLink('sc-supplier-due-soon-' + b + '-link', ds[b].link);
             });
         }
 
@@ -1290,7 +1292,7 @@ $(function() {
                     '</tr>';
                 }).join('');
             } else {
-                dueBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No supplier payouts due tomorrow or earlier</td></tr>';
+                dueBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No supplier payouts due between 1 March and tomorrow</td></tr>';
             }
         }
 
