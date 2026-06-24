@@ -1669,27 +1669,32 @@ class Booking extends MY_Controller
 				);
 			}
 
-			// Conversion Time (this month, company-wide). How long converted BCs
-			// took to convert — wall-clock gap from the lead opening the GHL
-			// conversation to it being marked converted. "Avg Conversion Time"
-			// averages the gap across every agent's converted BCs this month;
-			// "Slow Conversions (> 24h)" counts the BCs that took longer than a
-			// day and links to them so OP can analyse why. Both come from one
-			// Lead_Conversion_Time_Summary call (live BCs only, windowed by lead
-			// start) so the slow count and its drill-down (?slow_conversion=1)
-			// agree; lead_month carries the same window to the listing filter.
-			$this->load->model('Report_Model');
-			$this->load->helper('response_time');
-			$conv_time = $this->Report_Model->Lead_Conversion_Time_Summary(
-				$month_start, $month_end, 86400
-			);
+			// Conversion Time (this month, company-wide). How long a booking took
+			// to go from being saved as draft (SAD) to reaching PENDING PAYMENT
+			// (P) — the same SAD -> first-P gap as the TC "Draft -> Payment Time"
+			// card, but across every agent. "Avg Conversion Time" averages the
+			// gap over drafts *saved this month* (that have since reached
+			// payment); "Slow Conversions (> 24h)" counts the ones that took
+			// longer than a day and links to them so OP can analyse why. The
+			// window keys off the SAD anchor and is cut off at today, not the
+			// future month-end. Card + drill-down (?slow_conversion=1) share one
+			// definition so the slow count and the listing agree; lead_month
+			// carries the same draft-save month to the listing filter.
+			$this->load->helper(array('submitted_payment_response', 'response_time'));
+			$ct_row = $this->db->query(
+				submitted_payment_conversion_summary_sql(86400),
+				array($month_start . ' 00:00:00', $today . ' 23:59:59')
+			)->row();
+			$ct_n    = !empty($ct_row) ? (int) $ct_row->n : 0;
+			$ct_secs = ($ct_n > 0 && $ct_row->avg_seconds !== null)
+				? (int) round((float) $ct_row->avg_seconds) : null;
 			$cards['conversion_time_month'] = array(
-				'value'   => format_response_duration($conv_time['avg_seconds']),
-				'count'   => $conv_time['count'],
-				'seconds' => $conv_time['avg_seconds'],
+				'value'   => format_response_duration($ct_secs),
+				'count'   => $ct_n,
+				'seconds' => $ct_secs,
 			);
 			$cards['slow_conversion_month'] = array(
-				'count' => $conv_time['slow_count'],
+				'count' => !empty($ct_row) ? (int) $ct_row->slow_n : 0,
 				'link'  => $base . $qs(array(
 					'slow_conversion' => 1,
 					'lead_month'      => date('Y-m', strtotime($month_start)),
@@ -1860,14 +1865,12 @@ class Booking extends MY_Controller
 			// the SAME range-overlap predicate as the generic ?travel_date
 			// filter (Booking_Model::filter_bookings) with a far-future upper
 			// bound, so the card and its drill-down stay in exact agreement.
-			// "Exclude completed & pending-review" card toggle: when on, drop BCs
-			// whose travel is already finished (booking.Status='Y' — both COMPLETE
-			// and PENDING-REVIEW after-sales states) so the queue shows only
-			// still-actionable trips. The drill-down carries ?exclude_finished=1
-			// (honoured by Booking_Model::apply_booking_filters) so it stays in
-			// exact agreement with this count.
-			$insurance_exclude_finished = !empty($this->input->get('insurance_exclude_finished'));
-			$insurance_finished_clause  = $insurance_exclude_finished ? " AND booking.Status != 'Y'" : '';
+			// Always drop BCs whose travel is already finished (booking.Status='Y'
+			// — both COMPLETE and PENDING-REVIEW after-sales states) so the queue
+			// shows only still-actionable trips. The drill-down carries
+			// ?exclude_finished=1 (honoured by Booking_Model::apply_booking_filters)
+			// so it stays in exact agreement with this count.
+			$insurance_finished_clause = " AND booking.Status != 'Y'";
 			$insurance_window_start = date('Y') . '-03-01';
 			$insurance_window_end   = date('Y', strtotime('+5 years')) . '-12-31';
 			$insurance_ids = $this->db
@@ -1924,13 +1927,13 @@ class Booking extends MY_Controller
 			// open as 11 in the list. Card is the source of truth.
 			$cards['insurance_pending'] = array(
 				'count'            => $insurance_count,
-				'exclude_finished' => $insurance_exclude_finished,
-				'link'             => $base . $qs(array_merge(array(
+				'link'             => $base . $qs(array(
 					'checklist_filter'           => implode(',', $insurance_ids),
 					'travel_date'                => $fmt_dmy($insurance_window_start) . ' - ' . $fmt_dmy($insurance_window_end),
 					'status'                     => 'A',
 					'booking_confirmation_title' => 'BOOKING CONFIRMATION',
-				), $insurance_exclude_finished ? array('exclude_finished' => 1) : array())),
+					'exclude_finished'           => 1,
+				)),
 			);
 
 			// Pending Ferry Transfer Checklist (travel this & next month) —
@@ -2063,6 +2066,79 @@ class Booking extends MY_Controller
 				);
 			}
 			$tables['supplier_due_soon'] = $due_out;
+
+			// Payment From Customer Due Soon — the money-IN mirror of Supplier
+			// Pay-out Due Soon, bucketed into Overdue / Today / Tomorrow so OP can
+			// chase customer payments by urgency. Customer deadlines live on the
+			// BOOKING (not the payment row), so we derive the operative "next due"
+			// deadline per BC and the outstanding balance still owed:
+			//   - Status 'P'  (nothing received): deposit first
+			//       -> COALESCE(DepositDeadline, FullPaymentDeadline)
+			//   - Status 'PP' (deposit in): balance -> FullPaymentDeadline
+			//   - outstanding = NetTotal - approved customer credits (Status='Y',
+			//     Credit>0, excluding AGENT COMMISSION FROM SUPPLIER)
+			// Mirrors the booking-list PO / P / PP status filters so the clickable
+			// drill-down (?customer_payment=...&status=A) agrees with the card.
+			$cust_due_end   = date('Y-m-d', strtotime('+1 day'));  // tomorrow — window upper bound
+			$cust_due_start = date('Y') . '-03-01';                // overdue lookback floor: 1 March, current year
+			$cust_nd  = "(CASE WHEN booking.Status = 'P' THEN COALESCE(booking.DepositDeadline, booking.FullPaymentDeadline) ELSE booking.FullPaymentDeadline END)";
+			$cust_out = "(booking.NetTotal - COALESCE((SELECT SUM(p.Credit) FROM payment p"
+				. " WHERE p.BookingID = booking.BookingID"
+				. " AND p.Status = 'Y' AND p.Credit > 0"
+				. " AND (p.Type IS NULL OR p.Type != 'AGENT COMMISSION FROM SUPPLIER')), 0))";
+			$row = $this->db->query(
+				"SELECT
+				    SUM(CASE WHEN t.nd <  ? THEN 1 ELSE 0 END) AS overdue_cnt,
+				    COALESCE(SUM(CASE WHEN t.nd <  ? THEN t.outstanding ELSE 0 END), 0) AS overdue_due,
+				    SUM(CASE WHEN t.nd =  ? THEN 1 ELSE 0 END) AS today_cnt,
+				    COALESCE(SUM(CASE WHEN t.nd =  ? THEN t.outstanding ELSE 0 END), 0) AS today_due,
+				    SUM(CASE WHEN t.nd =  ? THEN 1 ELSE 0 END) AS tomorrow_cnt,
+				    COALESCE(SUM(CASE WHEN t.nd =  ? THEN t.outstanding ELSE 0 END), 0) AS tomorrow_due
+				 FROM (
+				    SELECT {$cust_nd} AS nd, {$cust_out} AS outstanding
+				    FROM booking
+				    WHERE booking.CancelStatus = 'N'
+				      AND booking.Status IN ('P','PP')
+				 ) t
+				 WHERE t.nd BETWEEN ? AND ?
+				   AND t.outstanding > 0",
+				array($today, $today, $today, $today, $cust_due_end, $cust_due_end, $cust_due_start, $cust_due_end)
+			)->row();
+			// status=A scopes the linked list to live BCs and suppresses the
+			// no-status default (AfterSalesService='PENDING') that would otherwise
+			// hide most matches — same reasoning as the supplier payout card.
+			$cards['customer_payment_due_soon'] = array(
+				'overdue'  => array('count' => (int)$row->overdue_cnt,  'total_due' => $money($row->overdue_due),  'link' => $base . $qs(array('customer_payment' => 'overdue',  'status' => 'A'))),
+				'today'    => array('count' => (int)$row->today_cnt,    'total_due' => $money($row->today_due),    'link' => $base . $qs(array('customer_payment' => 'today',    'status' => 'A'))),
+				'tomorrow' => array('count' => (int)$row->tomorrow_cnt, 'total_due' => $money($row->tomorrow_due), 'link' => $base . $qs(array('customer_payment' => 'tomorrow', 'status' => 'A'))),
+			);
+
+			$cust_rows = $this->db->query(
+				"SELECT t.BookingNumber AS booking_number, t.Customer AS customer,
+				        t.nd AS earliest_deadline, t.outstanding AS total_due
+				 FROM (
+				    SELECT booking.BookingNumber AS BookingNumber, booking.Customer AS Customer,
+				           {$cust_nd} AS nd, {$cust_out} AS outstanding
+				    FROM booking
+				    WHERE booking.CancelStatus = 'N'
+				      AND booking.Status IN ('P','PP')
+				 ) t
+				 WHERE t.nd BETWEEN ? AND ?
+				   AND t.outstanding > 0
+				 ORDER BY t.nd ASC, t.outstanding DESC
+				 LIMIT 5",
+				array($cust_due_start, $cust_due_end)
+			)->result();
+			$cust_out_rows = array();
+			foreach($cust_rows as $r) {
+				$cust_out_rows[] = array(
+					'booking_number'    => $r->booking_number,
+					'customer'          => $r->customer,
+					'total_due'         => $money($r->total_due),
+					'earliest_deadline' => $r->earliest_deadline ? $fmt_dmy($r->earliest_deadline) : '-',
+				);
+			}
+			$tables['customer_payment_due_soon'] = $cust_out_rows;
 
 			// Supplier Pay-out Checklist Due Soon — the checklist counterpart to
 			// Supplier Pay-out Due Soon above. That card reads the payment table
@@ -2698,7 +2774,6 @@ class Booking extends MY_Controller
 
 		if(isset($cards['insurance_pending'])) {
 			$ip = (int)$cards['insurance_pending']['count'];
-			$ef = !empty($cards['insurance_pending']['exclude_finished']);
 			$popovers['pop-insurance-pending'] =
 				'<strong>Counted when, for an active line item:</strong>' .
 				'<ul>' .
@@ -2707,10 +2782,9 @@ class Booking extends MY_Controller
 				'<li><code>booking_product.disable_checklist_payment_out = 0</code> (the same rule the modal/filter uses)</li>' .
 				'<li>BC, not cancelled, not draft</li>' .
 				'<li>Travel from <strong>' . $fmt_disp($insurance_window_start) . '</strong> onwards (1 March of the current year)</li>' .
-				($ef ? '<li><em>Excluding completed &amp; pending-review BCs (toggle on)</em></li>' : '') .
+				'<li>Completed &amp; pending-review BCs (<code>Status = Y</code>) are always excluded</li>' .
 				'</ul>' .
 				'<strong>Live queue &middot; as of ' . $fmt_disp($today) . '</strong> &mdash; travel from ' . $fmt_disp($insurance_window_start) . ' onwards.<br>' .
-				'<strong>Toggle:</strong> "Exclude completed &amp; pending-review" drops BCs whose travel has finished (<code>Status = Y</code>, either after-sales state) so only still-actionable trips remain.<br>' .
 				'<strong>This card:</strong> ' .
 				'Insurance pending &rarr; <strong>' . $ip . ' ' . $plural($ip, 'BC') . '</strong><br><br>' .
 				'<strong>Action:</strong> Click to filter the list to these BCs and tick off insurance.';
@@ -2988,6 +3062,30 @@ class Booking extends MY_Controller
 				'</ul>' .
 				'<strong>This card:</strong> ' . $ds_total . ' ' . $plural($ds_total, 'payout') . ' across the window; top ' . $rows_n . ' ' . $plural($rows_n, 'supplier') . ' shown, earliest deadline first.<br><br>' .
 				'<strong>Excludes:</strong> Already paid (Status=Y), deleted (Status=N), customer payment-ins, agent-commission entries.';
+		}
+
+		if(isset($cards['customer_payment_due_soon'])) {
+			$cd = $cards['customer_payment_due_soon'];
+			$cd_rows_n = isset($tables['customer_payment_due_soon']) ? count($tables['customer_payment_due_soon']) : 0;
+			$cd_total = (int)$cd['overdue']['count'] + (int)$cd['today']['count'] + (int)$cd['tomorrow']['count'];
+			$popovers['pop-customer-payment-due-soon'] =
+				'<strong>Counted when:</strong>' .
+				'<ul>' .
+				'<li>BC still owes a scheduled payment (<code>Status = \'P\'</code> or <code>\'PP\'</code>)</li>' .
+				'<li>Outstanding balance &gt; 0 (NetTotal &minus; approved customer payments)</li>' .
+				'<li>Next due deadline ' . $rng_disp($cust_due_start, $cust_due_end) . '</li>' .
+				'<li>Not cancelled</li>' .
+				'</ul>' .
+				'<strong>Next due deadline:</strong> deposit first when nothing is paid (<code>DepositDeadline</code>, else <code>FullPaymentDeadline</code>); the balance once a deposit is in (<code>FullPaymentDeadline</code>).' .
+				'<br><br>' .
+				'<strong>Bucketed by deadline:</strong>' .
+				'<ul>' .
+				'<li><strong>Overdue</strong> &mdash; ' . $fmt_disp($cust_due_start) . ' to before today (' . $fmt_disp($today) . '): <strong>' . (int)$cd['overdue']['count'] . '</strong> &middot; ' . $cd['overdue']['total_due'] . '</li>' .
+				'<li><strong>Today</strong>: <strong>' . (int)$cd['today']['count'] . '</strong> &middot; ' . $cd['today']['total_due'] . '</li>' .
+				'<li><strong>Tomorrow</strong> (' . $fmt_disp($cust_due_end) . '): <strong>' . (int)$cd['tomorrow']['count'] . '</strong> &middot; ' . $cd['tomorrow']['total_due'] . '</li>' .
+				'</ul>' .
+				'<strong>This card:</strong> ' . $cd_total . ' ' . $plural($cd_total, 'BC') . ' across the window; top ' . $cd_rows_n . ' shown, earliest deadline first. Amounts are the outstanding balance still owed.<br><br>' .
+				'<strong>Excludes:</strong> Fully paid, cancelled, draft/quotation, and agent-commission credits.';
 		}
 
 		if(isset($cards['checklist_payout_due_soon'])) {

@@ -828,66 +828,6 @@ class Report_Model extends CI_Model
     }
 
     /**
-     * Company-wide conversion-time metrics for the OP / OP Team Lead "Avg
-     * Conversion Time" and "Slow Conversions (> 24h)" summary cards. Conversion
-     * time is the wall-clock gap from when a lead opened the GHL conversation
-     * (pl.lead_started_at) to when it was marked converted (pl.converted_at).
-     *
-     * Scope is every converted BC across all sales agents (OP and OP Team Lead
-     * oversee operations company-wide, not a sales-credit slot), and mirrors the
-     * cards' clickable drill-down (?slow_conversion=1&status=A,
-     * Booking_Model::apply_slow_conversion_filter) so the count and the linked
-     * listing return the same BCs:
-     *   - live BOOKING CONFIRMATIONs only (CancelStatus='N', Status!='N', which
-     *     is exactly the status=A drill-down scope);
-     *   - windowed by pl.lead_started_at within [$start_date, $end_date].
-     * Only converted leads carrying a booking_id, a converted_at, and a
-     * non-negative gap are averaged (clock-skew rows fall to NULL/0). count and
-     * slow_count are DISTINCT by BookingID so a BC with two leads counts once;
-     * "slow" is a gap strictly greater than $slow_threshold_seconds (24h).
-     *
-     * @param string $start_date  'Y-m-d'
-     * @param string $end_date    'Y-m-d'
-     * @param int    $slow_threshold_seconds  default 86400 (24h)
-     * @return array { avg_seconds: int|null, count: int, slow_count: int }
-     */
-    function Lead_Conversion_Time_Summary($start_date, $end_date, $slow_threshold_seconds = 86400)
-    {
-        $gap  = 'UNIX_TIMESTAMP(pl.converted_at) - UNIX_TIMESTAMP(pl.lead_started_at)';
-        $qual = "pl.is_converted = 1
-                 AND pl.booking_id IS NOT NULL
-                 AND pl.converted_at IS NOT NULL
-                 AND pl.lead_started_at IS NOT NULL
-                 AND ({$gap}) >= 0";
-        $sql = "
-            SELECT
-                AVG(CASE WHEN {$qual} THEN ({$gap}) END) AS avg_seconds,
-                COUNT(DISTINCT CASE WHEN {$qual} THEN b.BookingID END) AS n,
-                COUNT(DISTINCT CASE WHEN {$qual} AND ({$gap}) > ? THEN b.BookingID END) AS slow_n
-            FROM ghl_processed_leads pl
-            INNER JOIN booking b ON b.BookingID = pl.booking_id
-            WHERE b.CancelStatus = 'N'
-              AND b.Status != 'N'
-              AND b.BookingConfirmationTitle = 'BOOKING CONFIRMATION'
-              AND pl.lead_started_at >= ?
-              AND pl.lead_started_at <= ?
-        ";
-        $row = $this->db->query($sql, array(
-            (int) $slow_threshold_seconds,
-            $start_date . ' 00:00:00',
-            $end_date . ' 23:59:59',
-        ))->row_array();
-
-        return array(
-            'avg_seconds' => (isset($row['avg_seconds']) && $row['avg_seconds'] !== null)
-                ? (int) round((float) $row['avg_seconds'])
-                : null,
-            'count'      => !empty($row['n'])      ? (int) $row['n']      : 0,
-            'slow_count' => !empty($row['slow_n']) ? (int) $row['slow_n'] : 0,
-        );
-    }
-
-    /**
      * Per-agent lead counts for the three "Leads" card windows (Today / Week /
      * Month) in a single conditional-SUM pass. Powers the OWNER-only
      * "Leads by Agent" table — the same new-lead total as the Leads card, but

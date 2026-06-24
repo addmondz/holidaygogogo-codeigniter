@@ -86,6 +86,71 @@ class Booking_Model extends CI_Model
 	}
 
 	/**
+	 * Filter to BCs that still owe a scheduled customer payment whose operative
+	 * deadline falls in the requested bucket — backs the clickable Overdue /
+	 * Today / Tomorrow segments of the OP "Payment From Customer Due Soon" card
+	 * (?customer_payment=...). The money-IN counterpart of
+	 * apply_supplier_payout_filter().
+	 *
+	 * Customer deadlines live on the booking, not the payment row, so the
+	 * operative "next due" deadline depends on the payment stage (mirrors the
+	 * booking-status PO / P / PP filters and the card in
+	 * Booking::ajax_summary_cards):
+	 *   - Status 'P'  (nothing received): deposit first
+	 *       -> COALESCE(DepositDeadline, FullPaymentDeadline)
+	 *   - Status 'PP' (deposit in): the balance -> FullPaymentDeadline
+	 * Buckets (floor = 1 March of the current year):
+	 *   overdue  : floor <= deadline < today
+	 *   today    : deadline = today
+	 *   tomorrow : deadline = today + 1
+	 * Only BCs with an outstanding balance (NetTotal minus approved customer
+	 * credits, excluding supplier-sourced agent commission) are kept, so a
+	 * fully-paid BC past its deadline is not surfaced.
+	 *
+	 * The bucket is whitelisted before use and dates are server-derived, so the
+	 * interpolated predicate carries no user input. Booking-level scoping (live
+	 * BC, not cancelled) is supplied by the card link's status=A. Returns true
+	 * when a recognised bucket was applied.
+	 */
+	private function apply_customer_payment_filter()
+	{
+		$bucket = $this->input->get('customer_payment');
+		if(empty($bucket)) {
+			return false;
+		}
+
+		$today    = date('Y-m-d');
+		$tomorrow = date('Y-m-d', strtotime('+1 day'));
+		$floor    = date('Y') . '-03-01';
+
+		$range = function($col) use ($bucket, $today, $tomorrow, $floor) {
+			if($bucket === 'overdue')  return "{$col} >= '{$floor}' AND {$col} < '{$today}'";
+			if($bucket === 'today')    return "{$col} = '{$today}'";
+			if($bucket === 'tomorrow') return "{$col} = '{$tomorrow}'";
+			return null;
+		};
+		if($range('x') === null) {
+			return false;
+		}
+
+		$p_dl  = $range("COALESCE(booking.DepositDeadline, booking.FullPaymentDeadline)");
+		$pp_dl = $range("booking.FullPaymentDeadline");
+
+		$outstanding = "(booking.NetTotal - COALESCE((SELECT SUM(p.Credit) FROM payment p"
+			. " WHERE p.BookingID = booking.BookingID"
+			. " AND p.Status = 'Y' AND p.Credit > 0"
+			. " AND (p.Type IS NULL OR p.Type != 'AGENT COMMISSION FROM SUPPLIER')), 0)) > 0";
+
+		$this->db->where(
+			"((booking.Status = 'P' AND {$p_dl})"
+			. " OR (booking.Status = 'PP' AND {$pp_dl}))"
+			. " AND {$outstanding}",
+			null, false
+		);
+		return true;
+	}
+
+	/**
 	 * Filter to BCs whose "Payment Out To Supplier" CHECKLIST is not ticked yet
 	 * for a line whose payout deadline falls in the requested bucket — backs the
 	 * clickable Overdue / Today / Tomorrow segments of the OP "Supplier Pay-out
@@ -166,17 +231,19 @@ class Booking_Model extends CI_Model
 	}
 
 	/**
-	 * Filter to the BCs behind the OP / OP Team Lead "Slow Conversions (> 24h)"
-	 * card (?slow_conversion=1). A BC qualifies when a GHL lead converted into it
-	 * more than 24h after the lead opened the conversation (UNIX gap from
-	 * lead_started_at to converted_at). Mirrors Report_Model::
-	 * Lead_Conversion_Time_Summary so the card count and this listing agree:
-	 *   - BOOKING CONFIRMATION only;
-	 *   - company-wide (every agent's BCs — OP/OP Team Lead aren't scoped to a
-	 *     sales slot, and levels 40/45 see all bookings in the listing);
-	 *   - the lead's start month comes from ?lead_month=YYYY-MM (the card passes
-	 *     its own window), defaulting to the current month.
-	 * The card link also carries status=A, which supplies the live-BC scope
+	 * Filter to the bookings behind the OP / OP Team Lead "Slow Conversions
+	 * (> 24h)" card (?slow_conversion=1). A booking qualifies when it took more
+	 * than 24h to go from being saved as draft (SAD) to reaching PENDING PAYMENT
+	 * (P) — the same SAD -> first-P gap as the card. Mirrors
+	 * submitted_payment_conversion_summary_sql so the card count and this listing
+	 * agree:
+	 *   - company-wide (every agent's bookings — OP/OP Team Lead aren't scoped to
+	 *     a sales slot, and levels 40/45 see all bookings in the listing);
+	 *   - windowed by the SAD anchor (the draft-save date), i.e. drafts *saved*
+	 *     within the month, cut off at today (never a future month-end). The
+	 *     month comes from ?lead_month=YYYY-MM (the card passes its own window),
+	 *     defaulting to the current month.
+	 * The card link also carries status=A, which supplies the live scope
 	 * (CancelStatus='N', Status!='N') via the shared status filter.
 	 *
 	 * lead_month is validated to YYYY-MM and the threshold is a constant int, so
@@ -190,30 +257,23 @@ class Booking_Model extends CI_Model
 
 		$threshold = 86400; // 24h, in seconds
 
-		// Lead-start window: the card's selected month, or the current month.
+		// Draft-save window: the card's selected month, or the current month.
 		$lead_month = (string) $this->input->get('lead_month');
 		if(!preg_match('/^\d{4}-\d{2}$/', $lead_month)) {
 			$lead_month = date('Y-m');
 		}
 		$win_start = $lead_month . '-01 00:00:00';
-		$win_end   = date('Y-m-t', strtotime($lead_month . '-01')) . ' 23:59:59';
+		// Cut off at today: for the live current month the end bound is today,
+		// not the future month-end (matches the card, which passes $today).
+		$month_end = date('Y-m-t', strtotime($lead_month . '-01'));
+		$today     = date('Y-m-d');
+		$win_end   = min($month_end, $today) . ' 23:59:59';
 
-		$gap = 'UNIX_TIMESTAMP(pl.converted_at) - UNIX_TIMESTAMP(pl.lead_started_at)';
+		$this->load->helper('submitted_payment_response');
 		$this->db->where(
-			"booking.BookingConfirmationTitle = 'BOOKING CONFIRMATION'", null, false
-		);
-		$this->db->where(
-			"booking.BookingID IN (
-				SELECT pl.booking_id
-				FROM ghl_processed_leads pl
-				WHERE pl.is_converted = 1
-				  AND pl.booking_id IS NOT NULL
-				  AND pl.converted_at IS NOT NULL
-				  AND pl.lead_started_at IS NOT NULL
-				  AND pl.lead_started_at >= '{$win_start}'
-				  AND pl.lead_started_at <= '{$win_end}'
-				  AND ({$gap}) > {$threshold}
-			)", null, false
+			'booking.BookingID IN (' .
+				submitted_payment_slow_ids_sql_fragment($win_start, $win_end, $threshold) .
+			')', null, false
 		);
 		return true;
 	}
@@ -464,6 +524,9 @@ class Booking_Model extends CI_Model
 				$level2Ignore = 1;
 			}
 			if($this->apply_checklist_payout_filter()) {
+				$level2Ignore = 1;
+			}
+			if($this->apply_customer_payment_filter()) {
 				$level2Ignore = 1;
 			}
 			if(!empty($this->input->get('exclude_finished'))) {
@@ -2107,6 +2170,9 @@ class Booking_Model extends CI_Model
 				$level2Ignore = 1;
 			}
 			if($this->apply_checklist_payout_filter()) {
+				$level2Ignore = 1;
+			}
+			if($this->apply_customer_payment_filter()) {
 				$level2Ignore = 1;
 			}
 			if($this->apply_slow_conversion_filter()) {

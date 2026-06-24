@@ -105,6 +105,82 @@ if (!function_exists('submitted_payment_avg_response_sql')) {
     }
 }
 
+if (!function_exists('submitted_payment_conversion_summary_sql')) {
+    /**
+     * SQL for the OP / OP Team Lead "Avg Conversion Time" and
+     * "Slow Conversions (> 24h)" cards. Same SAD -> first-P gap as the TC
+     * "Draft -> Payment Time" card, but company-wide (every agent — OP oversees
+     * operations, not a sales slot) and returning the slow count in one pass:
+     *
+     *   avg_seconds : AVG(first_p_at - first_sad_at) over qualifying bookings
+     *   n           : how many drafts saved in the window reached payment
+     *   slow_n      : how many of those took longer than $slow_threshold_seconds
+     *
+     * Live bookings only (Status != 'N', CancelStatus = 'N'), matching the
+     * status=A scope of the drill-down (apply_slow_conversion_filter) so the
+     * card count and the linked listing return the same bookings. Windowed on
+     * the SAD anchor — bind two placeholders (first_sad_at >= ? AND <= ?); the
+     * caller passes today as the end so the window is cut off at today.
+     *
+     * The threshold is a server-side constant inlined as an integer (numeric
+     * UNIX_TIMESTAMP arithmetic, so no user input is interpolated).
+     *
+     * @param int $slow_threshold_seconds default 86400 (24h)
+     * @return string
+     */
+    function submitted_payment_conversion_summary_sql($slow_threshold_seconds = 86400)
+    {
+        $slow       = (int) $slow_threshold_seconds;
+        $draft_join = submitted_payment_draft_window_sql_fragment();
+        $pay_join   = submitted_payment_pending_window_sql_fragment();
+        $gap = 'UNIX_TIMESTAMP(p.first_p_at) - UNIX_TIMESTAMP(d.first_sad_at)';
+        return "SELECT
+                    AVG({$gap}) AS avg_seconds,
+                    COUNT(*) AS n,
+                    SUM(CASE WHEN ({$gap}) > {$slow} THEN 1 ELSE 0 END) AS slow_n
+                FROM {$draft_join} d
+                JOIN booking b ON b.BookingID = d.booking_id
+                JOIN {$pay_join} p ON p.booking_id = d.booking_id
+                WHERE d.first_sad_at >= ? AND d.first_sad_at <= ?
+                  AND b.Status != 'N'
+                  AND b.CancelStatus = 'N'";
+    }
+}
+
+if (!function_exists('submitted_payment_slow_ids_sql_fragment')) {
+    /**
+     * Subquery fragment for the "Slow Conversions (> 24h)" drill-down
+     * (Booking_Model::apply_slow_conversion_filter, ?slow_conversion=1):
+     * the booking_ids whose SAD -> first-P gap exceeds the threshold, with the
+     * SAD anchor inside ['$win_start', '$win_end']. Mirrors
+     * submitted_payment_conversion_summary_sql so the slow count and the listing
+     * agree. The live-booking scope (Status != 'N', CancelStatus = 'N') is
+     * supplied by the listing's status=A filter, so it isn't repeated here.
+     *
+     * $win_start / $win_end must be caller-validated timestamps and $threshold a
+     * constant int — they are interpolated, never bound (CodeIgniter active
+     * record one-liner), so the caller carries the no-user-input guarantee.
+     *
+     * @param string $win_start 'Y-m-d H:i:s'
+     * @param string $win_end   'Y-m-d H:i:s'
+     * @param int    $threshold seconds
+     * @return string
+     */
+    function submitted_payment_slow_ids_sql_fragment($win_start, $win_end, $threshold)
+    {
+        $threshold  = (int) $threshold;
+        $draft_join = submitted_payment_draft_window_sql_fragment();
+        $pay_join   = submitted_payment_pending_window_sql_fragment();
+        $gap = 'UNIX_TIMESTAMP(p.first_p_at) - UNIX_TIMESTAMP(d.first_sad_at)';
+        return "SELECT d.booking_id
+                FROM {$draft_join} d
+                JOIN {$pay_join} p ON p.booking_id = d.booking_id
+                WHERE d.first_sad_at >= '{$win_start}'
+                  AND d.first_sad_at <= '{$win_end}'
+                  AND ({$gap}) > {$threshold}";
+    }
+}
+
 if (!function_exists('submitted_payment_best_agent_sql')) {
     /**
      * SQL for the "Best:" footer on the Draft -> Payment Time card. Groups by
