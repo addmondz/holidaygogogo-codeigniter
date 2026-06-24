@@ -125,16 +125,21 @@ if (!function_exists('submitted_payment_conversion_summary_sql')) {
      * The threshold is a server-side constant inlined as an integer (numeric
      * UNIX_TIMESTAMP arithmetic, so no user input is interpolated).
      *
-     * @param int $slow_threshold_seconds default 86400 (24h)
+     * @param int  $slow_threshold_seconds default 86400 (24h)
+     * @param bool $sales_agent_only       when true, scope to a single agent's
+     *                                      TC1 slot (b.SalesAgent) — appends one
+     *                                      placeholder the caller binds to the
+     *                                      admin_id. Used by the OP cards, which
+     *                                      only see BCs where they are the TC1.
      * @return string
      */
-    function submitted_payment_conversion_summary_sql($slow_threshold_seconds = 86400)
+    function submitted_payment_conversion_summary_sql($slow_threshold_seconds = 86400, $sales_agent_only = false)
     {
         $slow       = (int) $slow_threshold_seconds;
         $draft_join = submitted_payment_draft_window_sql_fragment();
         $pay_join   = submitted_payment_pending_window_sql_fragment();
         $gap = 'UNIX_TIMESTAMP(p.first_p_at) - UNIX_TIMESTAMP(d.first_sad_at)';
-        return "SELECT
+        $sql = "SELECT
                     AVG({$gap}) AS avg_seconds,
                     COUNT(*) AS n,
                     SUM(CASE WHEN ({$gap}) > {$slow} THEN 1 ELSE 0 END) AS slow_n
@@ -144,6 +149,10 @@ if (!function_exists('submitted_payment_conversion_summary_sql')) {
                 WHERE d.first_sad_at >= ? AND d.first_sad_at <= ?
                   AND b.Status != 'N'
                   AND b.CancelStatus = 'N'";
+        if ($sales_agent_only) {
+            $sql .= " AND b.SalesAgent = ?";
+        }
+        return $sql;
     }
 }
 

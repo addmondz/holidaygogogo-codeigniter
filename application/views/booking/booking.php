@@ -7232,7 +7232,7 @@ $(document).ready(function() {
                 html = '<button type="button" class="btn btn-light-primary btn-xs supplier-invoice-file-attach" data-toggle="tooltip" title="Attach invoice file"><i class="la la-paperclip"></i></button>';
             }
             $ui.html(html);
-            $ui.find('[data-toggle="tooltip"]').tooltip();
+            $ui.find('[data-toggle="tooltip"]').tooltip({ container: 'body', boundary: 'viewport', trigger: 'hover' });
         }
 
         $('#add-supplier-invoice-btn').on('click', function() {
@@ -7241,7 +7241,7 @@ $(document).ready(function() {
             $('#supplier-invoices-tbody').append($row);
             initDeadlinePicker($row.find('.supplier-invoice-deadline'));
             renderInvoiceFileUi($row);
-            $row.find('[data-toggle="tooltip"]').tooltip();
+            $row.find('[data-toggle="tooltip"]').tooltip({ container: 'body', boundary: 'viewport', trigger: 'hover' });
         });
 
         $('#supplier-invoices-tbody').on('click', '.supplier-invoice-remove', function() {
@@ -7310,7 +7310,7 @@ $(document).ready(function() {
             initDeadlinePicker($(this).find('.supplier-invoice-deadline'));
             renderInvoiceFileUi($(this));
         });
-        $('#supplier-invoices-tbody [data-toggle="tooltip"]').tooltip();
+        $('#supplier-invoices-tbody [data-toggle="tooltip"]').tooltip({ container: 'body', boundary: 'viewport', trigger: 'hover' });
     })();
 
     function _supplierInvoiceFormatDeadline(displayValue) {

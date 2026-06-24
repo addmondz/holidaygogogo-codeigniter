@@ -1658,8 +1658,9 @@ class Booking extends MY_Controller
 					   SUM(CASE WHEN CAST(InsertDate AS DATE) BETWEEN ? AND ? THEN 1 ELSE 0 END) AS week_cnt
 					 FROM booking
 					 WHERE BookingConfirmationTitle='BOOKING CONFIRMATION'
-					   AND CancelStatus='N' AND Status!='N'",
-					array($month_start, $month_end, $week_start, $week_end)
+					   AND CancelStatus='N' AND Status!='N'
+					   AND booking.SalesAgent = ?",
+					array($month_start, $month_end, $week_start, $week_end, $admin_id)
 				)->row();
 				$cards['bc_week_month'] = array(
 					'week'       => (int)$row->week_cnt,
@@ -1681,9 +1682,11 @@ class Booking extends MY_Controller
 			// definition so the slow count and the listing agree; lead_month
 			// carries the same draft-save month to the listing filter.
 			$this->load->helper(array('submitted_payment_response', 'response_time'));
+			// Scoped to the OP user's own TC1 slot (b.SalesAgent) so the card
+			// agrees with the SalesAgent-scoped slow-conversion drill-down.
 			$ct_row = $this->db->query(
-				submitted_payment_conversion_summary_sql(86400),
-				array($month_start . ' 00:00:00', $today . ' 23:59:59')
+				submitted_payment_conversion_summary_sql(86400, true),
+				array($month_start . ' 00:00:00', $today . ' 23:59:59', $admin_id)
 			)->row();
 			$ct_n    = !empty($ct_row) ? (int) $ct_row->n : 0;
 			$ct_secs = ($ct_n > 0 && $ct_row->avg_seconds !== null)
@@ -1712,8 +1715,9 @@ class Booking extends MY_Controller
 				 WHERE BookingConfirmationTitle='BOOKING CONFIRMATION'
 				   AND CancelStatus='N'
 				   AND Status IN ('P','PBO','PGL','PTV')
-				   AND StartDate BETWEEN ? AND ?",
-				array($next7_start, $next7_end)
+				   AND StartDate BETWEEN ? AND ?
+				   AND booking.SalesAgent = ?",
+				array($next7_start, $next7_end, $admin_id)
 			)->row();
 			$un_op_p   = (int)$row->s_p;
 			$un_op_pbo = (int)$row->s_pbo;
@@ -1742,8 +1746,9 @@ class Booking extends MY_Controller
 				 WHERE BookingConfirmationTitle='BOOKING CONFIRMATION'
 				   AND CancelStatus='N'
 				   AND Status IN ('P','PBO','PGL','PTV')
-				   AND StartDate BETWEEN ? AND ?",
-				array($next14_start, $next14_end)
+				   AND StartDate BETWEEN ? AND ?
+				   AND booking.SalesAgent = ?",
+				array($next14_start, $next14_end, $admin_id)
 			)->row();
 			$un_op14_p   = (int)$row->s_p;
 			$un_op14_pbo = (int)$row->s_pbo;
@@ -1764,7 +1769,8 @@ class Booking extends MY_Controller
 			// Shares guest_list_submitted_where() with the drill-down listing
 			// (?guest_list_status=submitted) so the card and the list always agree.
 			$row = $this->db->query(
-				"SELECT COUNT(*) AS cnt FROM booking WHERE " . guest_list_submitted_where()
+				"SELECT COUNT(*) AS cnt FROM booking WHERE " . guest_list_submitted_where() . " AND booking.SalesAgent = ?",
+				array($admin_id)
 			)->row();
 			$cards['gl_submitted'] = array(
 				'count' => (int)$row->cnt,
@@ -1787,7 +1793,9 @@ class Booking extends MY_Controller
 			// Pending BC Confirmation (PBC) — bookings awaiting BC confirmation.
 			$row = $this->db->query(
 				"SELECT COUNT(*) AS cnt FROM booking
-				 WHERE CancelStatus='N' AND Status='PBC'"
+				 WHERE CancelStatus='N' AND Status='PBC'
+				   AND booking.SalesAgent = ?",
+				array($admin_id)
 			)->row();
 			$cards['pending_bc_confirmation_op'] = array(
 				'count' => (int)$row->cnt,
@@ -1805,8 +1813,9 @@ class Booking extends MY_Controller
 				"SELECT COUNT(*) AS cnt FROM booking
 				 WHERE BookingConfirmationTitle='BOOKING CONFIRMATION'
 				   AND CancelStatus='N' AND Status!='N'
-				   AND StartDate BETWEEN ? AND ?",
-				array($tomorrow, $tomorrow)
+				   AND StartDate BETWEEN ? AND ?
+				   AND booking.SalesAgent = ?",
+				array($tomorrow, $tomorrow, $admin_id)
 			)->row();
 			$cards['travel_tomorrow_op'] = array(
 				'count' => (int)$row->cnt,
@@ -1826,8 +1835,9 @@ class Booking extends MY_Controller
 				"SELECT COUNT(*) AS cnt FROM booking
 				 WHERE BookingConfirmationTitle='BOOKING CONFIRMATION'
 				   AND CancelStatus='N' AND Status!='N' AND Status!='PT'
-				   AND StartDate BETWEEN ? AND ?",
-				array($tomorrow, $tomorrow)
+				   AND StartDate BETWEEN ? AND ?
+				   AND booking.SalesAgent = ?",
+				array($tomorrow, $tomorrow, $admin_id)
 			)->row();
 			$cards['travel_tomorrow_not_ready_op'] = array(
 				'count' => (int)$row->cnt,
@@ -1847,7 +1857,9 @@ class Booking extends MY_Controller
 				 WHERE BookingConfirmationTitle='BOOKING CONFIRMATION'
 				   AND CancelStatus='N'
 				   AND AfterSalesService='PENDING'
-				   AND Status='Y'"
+				   AND Status='Y'
+				   AND booking.SalesAgent = ?",
+				array($admin_id)
 			)->row();
 			$cards['pending_review_op'] = array(
 				'count' => (int)$row->cnt,
@@ -1907,11 +1919,13 @@ class Booking extends MY_Controller
 					           AND bcc.product_id = bp.ProductID
 					           AND bcc.package_checklist_id IN ({$ids_list})
 					       )
-					   )",
+					   )
+					   AND booking.SalesAgent = ?",
 					array(
 						$insurance_window_start, $insurance_window_end,
 						$insurance_window_start, $insurance_window_end,
 						$insurance_window_start, $insurance_window_end,
+						$admin_id,
 					)
 				)->row();
 				$insurance_count = (int)$row->cnt;
@@ -1981,11 +1995,13 @@ class Booking extends MY_Controller
 					           AND bcc.product_id = bp.ProductID
 					           AND bcc.package_checklist_id IN ({$ids_list})
 					       )
-					   )",
+					   )
+					   AND booking.SalesAgent = ?",
 					array(
 						$ferry_window_start, $ferry_window_end,
 						$ferry_window_start, $ferry_window_end,
 						$ferry_window_start, $ferry_window_end,
+						$admin_id,
 					)
 				)->row();
 				$ferry_count = (int)$row->cnt;
@@ -2023,12 +2039,14 @@ class Booking extends MY_Controller
 				    SUM(CASE WHEN payment.Deadline =  ? THEN 1 ELSE 0 END) AS tomorrow_cnt,
 				    COALESCE(SUM(CASE WHEN payment.Deadline =  ? THEN payment.Debit ELSE 0 END), 0) AS tomorrow_due
 				 FROM payment
+				 JOIN booking b ON b.BookingID = payment.BookingID
 				 WHERE payment.Status = 'P'
 				   AND payment.Deadline BETWEEN ? AND ?
 				   AND payment.Debit > 0
 				   AND payment.Type LIKE 'SUPPLIER PAYMENT%'
-				   AND payment.SupplierID IS NOT NULL",
-				array($today, $today, $today, $today, $due_soon_end, $due_soon_end, $due_soon_start, $due_soon_end)
+				   AND payment.SupplierID IS NOT NULL
+				   AND b.SalesAgent = ?",
+				array($today, $today, $today, $today, $due_soon_end, $due_soon_end, $due_soon_start, $due_soon_end, $admin_id)
 			)->row();
 			// status=A (active: not deleted, not cancelled) scopes the linked list
 			// to real BCs and, crucially, suppresses the no-status default that
@@ -2046,14 +2064,16 @@ class Booking extends MY_Controller
 				        MIN(payment.Deadline) AS earliest_deadline
 				 FROM payment
 				 JOIN supplier ON supplier.SupplierID = payment.SupplierID
+				 JOIN booking b ON b.BookingID = payment.BookingID
 				 WHERE payment.Status = 'P'
 				   AND payment.Deadline BETWEEN ? AND ?
 				   AND payment.Debit > 0
 				   AND payment.Type LIKE 'SUPPLIER PAYMENT%'
+				   AND b.SalesAgent = ?
 				 GROUP BY supplier.SupplierID, supplier.Name
 				 ORDER BY MIN(payment.Deadline) ASC, total_due DESC
 				 LIMIT 5",
-				array($due_soon_start, $due_soon_end)
+				array($due_soon_start, $due_soon_end, $admin_id)
 			)->result();
 			$due_out = array();
 			foreach($due_rows as $r) {
@@ -2099,10 +2119,11 @@ class Booking extends MY_Controller
 				    FROM booking
 				    WHERE booking.CancelStatus = 'N'
 				      AND booking.Status IN ('P','PP')
+				      AND booking.SalesAgent = ?
 				 ) t
 				 WHERE t.nd BETWEEN ? AND ?
 				   AND t.outstanding > 0",
-				array($today, $today, $today, $today, $cust_due_end, $cust_due_end, $cust_due_start, $cust_due_end)
+				array($today, $today, $today, $today, $cust_due_end, $cust_due_end, $admin_id, $cust_due_start, $cust_due_end)
 			)->row();
 			// status=A scopes the linked list to live BCs and suppresses the
 			// no-status default (AfterSalesService='PENDING') that would otherwise
@@ -2122,12 +2143,13 @@ class Booking extends MY_Controller
 				    FROM booking
 				    WHERE booking.CancelStatus = 'N'
 				      AND booking.Status IN ('P','PP')
+				      AND booking.SalesAgent = ?
 				 ) t
 				 WHERE t.nd BETWEEN ? AND ?
 				   AND t.outstanding > 0
 				 ORDER BY t.nd ASC, t.outstanding DESC
 				 LIMIT 5",
-				array($cust_due_start, $cust_due_end)
+				array($admin_id, $cust_due_start, $cust_due_end)
 			)->result();
 			$cust_out_rows = array();
 			foreach($cust_rows as $r) {
@@ -2159,7 +2181,7 @@ class Booking extends MY_Controller
 			// when it is active, its product is non-child/infant and carries the
 			// checklist, the matching deadline is set, the booking is a live BC,
 			// and no completion row exists for that checklist on that line.
-			$cp_branch = function($checklist_id, $date_col) {
+			$cp_branch = function($checklist_id, $date_col) use ($admin_id) {
 				return "SELECT bp.BookingID AS bid, p.SupplierID AS sid, bp.{$date_col} AS dl"
 					. " FROM booking_product bp"
 					. " JOIN product p ON p.ProductID = bp.ProductID AND p.is_child_or_infant = 0"
@@ -2170,6 +2192,7 @@ class Booking extends MY_Controller
 					. " AND bp.{$date_col} IS NOT NULL"
 					. " AND b.BookingConfirmationTitle = 'BOOKING CONFIRMATION'"
 					. " AND b.CancelStatus = 'N' AND b.Status != 'N'"
+					. " AND b.SalesAgent = {$admin_id}"
 					. " AND NOT EXISTS (SELECT 1 FROM booking_checklist_completion bcc"
 					. " WHERE bcc.booking_id = bp.BookingID AND bcc.product_id = bp.ProductID"
 					. " AND bcc.package_checklist_id = {$checklist_id})";
@@ -2242,10 +2265,11 @@ class Booking extends MY_Controller
 				 WHERE booking.BookingConfirmationTitle='BOOKING CONFIRMATION'
 				   AND CancelStatus='N' AND booking.Status!='N'
 				   AND CAST(booking.InsertDate AS DATE) BETWEEN ? AND ?
+				   AND booking.SalesAgent = ?
 				 GROUP BY category.Name, category.CategoryID
 				 ORDER BY cnt DESC
 				 LIMIT 5",
-				array($month_start, $month_end)
+				array($month_start, $month_end, $admin_id)
 			)->result();
 			$dest_out = array();
 			foreach($dest_rows as $r) {
@@ -2263,7 +2287,8 @@ class Booking extends MY_Controller
 
 			// OP Top Products (Month) — same query Finance already runs; OP
 			// historically only saw destinations. Surfacing products here lets
-			// OP spot which package codes are driving the workload.
+			// OP spot which package codes are driving the workload. Scoped to the
+			// OP user's own TC1 (booking.SalesAgent) BCs like the other OP cards.
 			$prod_rows = $this->db->query(
 				"SELECT product.ProductCode AS code, product.Name AS name,
 				        COALESCE(SUM(booking_product.Total),0) AS total,
@@ -2276,10 +2301,11 @@ class Booking extends MY_Controller
 				   AND booking_product.Status='Y'
 				   AND CAST(booking.InsertDate AS DATE) BETWEEN ? AND ?
 				   AND product.ProductID IS NOT NULL
+				   AND booking.SalesAgent = ?
 				 GROUP BY product.ProductID, product.ProductCode, product.Name
 				 ORDER BY total DESC
 				 LIMIT 5",
-				array($month_start, $month_end)
+				array($month_start, $month_end, $admin_id)
 			)->result();
 			$prod_out = array();
 			foreach($prod_rows as $r) {
