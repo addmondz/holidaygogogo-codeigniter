@@ -65,3 +65,26 @@ III. Manual Daily Commands & order
 	php index.php Cron process_ghl_leads
 	php index.php Cron process_ghl_lead_conversions
 	php index.php Cron process_ghl_lead_ownership
+
+8. Tests (GHL leads / ownership)
+	The GHL lead tests are plain PHP scripts using in-memory SQLite — no database
+	or framework bootstrap needed. Each prints PASS/FAIL lines and exits non-zero
+	on failure.
+
+	Test:
+	- `GhlProcessedLeadsUpsertStabilityTest.php` — re-processing keeps each lead's
+	  id stable (update in place, no duplicate rows).
+	- `GhlLeadOwnershipOrphanPruneTest.php` — orphaned ownership rows are pruned;
+	  the same lead never appears under two owners.
+	- `GhlReplyOwnerThresholdTest.php` — reply owner = at least 2 replies; the
+	  assigned owner is never double-counted as a reply owner.
+	- `GhlContinueChunkedReplayTest.php` — replays ~20k messages in 5k chunks and
+	  asserts continue never creates more leads than a full rebuild.
+	- `GhlRebuildContinueParityTest.php` — rebuild and continue split a
+	  convert-and-return conversation the same way.
+
+
+	- Run all GHL lead tests:
+		for t in tests/helpers/Ghl*Test.php; do echo "== $t =="; php "$t" || break; done
+	- Run a single test:
+		php tests/helpers/GhlReplyOwnerThresholdTest.php
