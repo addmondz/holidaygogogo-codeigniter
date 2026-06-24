@@ -170,6 +170,61 @@ $other = $cstmt->fetchAll(PDO::FETCH_ASSOC);
 assert_eq('narrow contact matches single row', 1, count($other));
 assert_eq('narrow contact matches expected row', 12, (int) $other[0]['id']);
 
+// --- Agent filter: matches the resolved Agent column shown in the UI. ---
+// The displayed agent is COALESCE(sender name, assigned-chatroom name), so the
+// filter must compare against that same expression -- not a raw column -- so the
+// result agrees with what the reader sees. 'Agent Bob' owns only cv-b (id 11,
+// inbound, assigned to u-2); 'Agent Alice' owns cv-a (ids 10,12,13: 12 by sender,
+// 10/13 inbound via the chatroom assignee).
+$agentSql = "SELECT gm.id
+             FROM ghl_messages gm
+             LEFT JOIN ghl_users gu ON gu.UserID = gm.user_id
+             LEFT JOIN ghl_conversations gc ON gc.conversation_id = gm.conversation_id
+             LEFT JOIN ghl_users gu_assigned ON gu_assigned.UserID = gc.assigned_to
+             WHERE gm.date_added >= :s AND gm.date_added <= :e
+               AND COALESCE(NULLIF(gu.Name, ''), NULLIF(gu_assigned.Name, '')) = :a
+             ORDER BY gm.date_added DESC, gm.id DESC";
+$astmt = $pdo->prepare($agentSql);
+
+$astmt->execute(array(':s' => $start, ':e' => $end, ':a' => 'Agent Bob'));
+$bob = array_map('intval', array_column($astmt->fetchAll(PDO::FETCH_ASSOC), 'id'));
+assert_eq('agent filter matches only that agent thread (Bob -> id 11)', array(11), $bob);
+
+$astmt->execute(array(':s' => $start, ':e' => $end, ':a' => 'Agent Alice'));
+$alice = array_map('intval', array_column($astmt->fetchAll(PDO::FETCH_ASSOC), 'id'));
+// Includes the inbound rows resolved via the assigned agent, not just the sender.
+assert_eq('agent filter resolves inbound-via-assignee too (Alice -> 13,12,10)', array(13, 12, 10), $alice);
+
+// Agent + contact compose: Alice's thread narrowed to the +60125 leg is just id 12.
+$comboSql = "SELECT gm.id
+             FROM ghl_messages gm
+             LEFT JOIN ghl_users gu ON gu.UserID = gm.user_id
+             LEFT JOIN ghl_conversations gc ON gc.conversation_id = gm.conversation_id
+             LEFT JOIN ghl_users gu_assigned ON gu_assigned.UserID = gc.assigned_to
+             WHERE gm.date_added >= :s AND gm.date_added <= :e
+               AND ({$normExpr('gm.from_number')} LIKE :c OR {$normExpr('gm.to_number')} LIKE :c)
+               AND COALESCE(NULLIF(gu.Name, ''), NULLIF(gu_assigned.Name, '')) = :a
+             ORDER BY gm.date_added DESC, gm.id DESC";
+$cmbstmt = $pdo->prepare($comboSql);
+$cmbstmt->execute(array(':s' => $start, ':e' => $end, ':c' => '%' . ghl_message_log_normalize_contact('60125') . '%', ':a' => 'Agent Alice'));
+$combo = array_map('intval', array_column($cmbstmt->fetchAll(PDO::FETCH_ASSOC), 'id'));
+assert_eq('agent + contact filters compose', array(12), $combo);
+
+// --- Agent dropdown source: only agents that actually appear in the log. ---
+// Both Alice (sender + assignee) and Bob (assignee) appear; an unrelated named
+// user with no messages and no assigned chatroom must NOT pad the dropdown.
+$pdo->exec("INSERT INTO ghl_users (UserID, Name) VALUES ('u-3', 'Ghost Agent')");
+$agentListSql = "SELECT DISTINCT gu.Name
+                 FROM ghl_users gu
+                 WHERE gu.Name IS NOT NULL AND gu.Name <> ''
+                   AND (
+                       gu.UserID IN (SELECT user_id FROM ghl_messages WHERE user_id IS NOT NULL AND user_id <> '')
+                       OR gu.UserID IN (SELECT assigned_to FROM ghl_conversations WHERE assigned_to IS NOT NULL AND assigned_to <> '')
+                   )
+                 ORDER BY gu.Name ASC";
+$agentList = array_column($pdo->query($agentListSql)->fetchAll(PDO::FETCH_ASSOC), 'Name');
+assert_eq('agent dropdown lists only agents present in the log', array('Agent Alice', 'Agent Bob'), $agentList);
+
 // --- Grouped export ordering: messages clustered by chatroom (contact/lead). ---
 // The CSV export is meant to be analysed one chatroom at a time, so rows are
 // grouped by the contact (then conversation) and read oldest-first within a

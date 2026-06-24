@@ -14,6 +14,15 @@
     #booking_summary_cards a.summary-card .card { transition: box-shadow 0.15s ease, transform 0.15s ease; cursor:pointer; }
     #booking_summary_cards a.summary-card:hover .card { box-shadow: 0 4px 10px rgba(96,130,182,0.18); transform: translateY(-1px); }
     #booking_summary_cards .card-custom { margin-bottom: 12px; }
+    /* Red card — used for the urgent "Travelling Tomorrow – Not Pending Travel"
+       OP card so it stands out from the neutral queue cards. Kept clearly red
+       (not a faint tint) per the project styling rules. */
+    #booking_summary_cards .summary-card-red .card { border:1px solid #E8919199; }
+    #booking_summary_cards .summary-card-red .summary-card-header { background-color:#F1AEB5 !important; }
+    #booking_summary_cards .summary-card-red .summary-card-header h3 { color:#842029; }
+    #booking_summary_cards .summary-card-red .summary-info-icon { color:#9C4A4A; }
+    #booking_summary_cards .summary-card-red .summary-info-icon:hover { color:#842029; }
+    #booking_summary_cards .summary-card-red .summary-value { color:#C0392B; }
     #booking_summary_cards .summary-card-header { min-height:38px; padding:8px 14px; display:flex; justify-content:space-between; align-items:center; }
     #booking_summary_cards .summary-card-header h3 { margin:0; font-size:13px; color:#3F4254; }
     #booking_summary_cards .summary-info-icon { color:#8B95A7; font-size:14px; cursor:pointer; padding:2px 4px; line-height:1; }
@@ -593,6 +602,102 @@
             </div>
             <?php } ?>
             <div class="col-md-3">
+                <div class="card card-custom">
+                    <div class="card-header border-0 summary-card-header" style="background-color:#A7C7E730;">
+                        <h3>Avg Conversion Time (Month)</h3>
+                        <i id="pop-conv-time" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>Conversion time</strong> = wall-clock gap from a lead <em>opening the GHL conversation</em> to it being <strong>marked converted</strong> into a BC.<br><br><strong>Scope:</strong> All booking confirmations across every sales agent, windowed by the lead's start date in this month. Cancelled BCs are excluded.<br><br><strong>Averaged</strong> across those BCs and shown as hours &amp; minutes. <strong>Empty (&mdash;)</strong> when no leads converted this month."></i>
+                    </div>
+                    <div class="card-body summary-card-body">
+                        <div class="summary-value" id="sc-conv-time-value">...</div>
+                        <div class="summary-sub"><span id="sc-conv-time-count">—</span> BCs converted this month. Average lead-to-BC conversion time, all agents.</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <a class="summary-card" id="sc-slow-conv-link" href="#">
+                    <div class="card card-custom">
+                        <div class="card-header border-0 summary-card-header" style="background-color:#F3D9D9;">
+                            <h3>Slow Conversions (&gt; 24h)</h3>
+                            <i id="pop-slow-conv" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>Counts</strong> converted BCs this month whose <strong>conversion took longer than 24 hours</strong> &mdash; the gap from the lead opening the GHL conversation to it being marked converted.<br><br><strong>Scope:</strong> All booking confirmations across every sales agent, windowed by the lead's start date in this month. Cancelled BCs are excluded.<br><br><strong>Click</strong> to open these BCs in the list below and analyse why they took so long."></i>
+                        </div>
+                        <div class="card-body summary-card-body">
+                            <div class="summary-value" id="sc-slow-conv-count">...</div>
+                            <div class="summary-sub">BCs that took more than a day to convert this month. Click to review them below.</div>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            <div class="col-md-3">
+                <a class="summary-card" id="sc-pending-bc-op-link" href="#">
+                    <div class="card card-custom">
+                        <div class="card-header border-0 summary-card-header" style="background-color:#A7C7E730;">
+                            <h3>Pending BC</h3>
+                            <i id="pop-pending-bc-op" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>Counted when:</strong><ul><li>Booking parked at <strong>PENDING BC</strong> (Status PB)</li><li>Not cancelled</li></ul><strong>Team-wide live backlog</strong> &mdash; no date window. Click to view and progress them."></i>
+                        </div>
+                        <div class="card-body summary-card-body">
+                            <div class="summary-value" id="sc-pending-bc-op-count">...</div>
+                            <div class="summary-sub">All bookings sitting at &ldquo;Pending BC&rdquo;, waiting to be confirmed. Click to view the list.</div>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            <div class="col-md-3">
+                <a class="summary-card" id="sc-pending-bc-confirmation-op-link" href="#">
+                    <div class="card card-custom">
+                        <div class="card-header border-0 summary-card-header" style="background-color:#A7C7E730;">
+                            <h3>Pending BC Confirmation</h3>
+                            <i id="pop-pending-bc-confirmation-op" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>Counted when:</strong><ul><li>Booking parked at <strong>PENDING BC CONFIRMATION</strong> (Status PBC)</li><li>Not cancelled</li></ul><strong>Team-wide live backlog</strong> &mdash; no date window. Click to view and approve the booking confirmation."></i>
+                        </div>
+                        <div class="card-body summary-card-body">
+                            <div class="summary-value" id="sc-pending-bc-confirmation-op-count">...</div>
+                            <div class="summary-sub">All bookings sitting at &ldquo;Pending BC Confirmation&rdquo;, waiting to be approved. Click to view the list.</div>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            <div class="col-md-3">
+                <a class="summary-card" id="sc-travel-tomorrow-op-link" href="#">
+                    <div class="card card-custom">
+                        <div class="card-header border-0 summary-card-header" style="background-color:#A0D8EF30;">
+                            <h3>Travelling Tomorrow</h3>
+                            <i id="pop-travel-tomorrow-op" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>Counted when:</strong><ul><li>Travel <strong>starts tomorrow</strong></li><li>Booking confirmation; not cancelled, not draft</li><li><strong>Any</strong> workflow status</li></ul>Scoped by departure date (StartDate = tomorrow), not trips merely spanning tomorrow. Click to view them."></i>
+                        </div>
+                        <div class="card-body summary-card-body">
+                            <div class="summary-value" id="sc-travel-tomorrow-op-count">...</div>
+                            <div class="summary-sub">All BCs whose travel starts tomorrow, regardless of status. Click to view the list.</div>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            <div class="col-md-3">
+                <a class="summary-card summary-card-red" id="sc-travel-tomorrow-not-ready-op-link" href="#">
+                    <div class="card card-custom">
+                        <div class="card-header border-0 summary-card-header" style="background-color:#F1AEB5;">
+                            <h3>Travelling Tomorrow &ndash; Not Pending Travel</h3>
+                            <i id="pop-travel-tomorrow-not-ready-op" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>Counted when:</strong><ul><li>Travel <strong>starts tomorrow</strong></li><li>Status is <strong>NOT</strong> Pending Travel (Status &ne; PT)</li><li>Booking confirmation; not cancelled, not draft</li></ul><strong>Why it matters:</strong> Guests travel tomorrow yet the BC has not reached &ldquo;Pending Travel&rdquo; &mdash; chase these first. Click to view them."></i>
+                        </div>
+                        <div class="card-body summary-card-body">
+                            <div class="summary-value" id="sc-travel-tomorrow-not-ready-op-count">...</div>
+                            <div class="summary-sub">BCs travelling tomorrow that are not yet flagged &ldquo;Pending Travel&rdquo;. Urgent &mdash; click to chase readiness.</div>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            <div class="col-md-3">
+                <a class="summary-card" id="sc-pending-review-op-link" href="#">
+                    <div class="card card-custom">
+                        <div class="card-header border-0 summary-card-header" style="background-color:#F0FFFF;">
+                            <h3>Travel Completed - Pending Review</h3>
+                            <i id="pop-pending-review-op" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>Counted when:</strong><ul><li>Travel has ended (Status COMPLETED)</li><li>After-sales review still pending (AfterSalesService PENDING)</li><li>Booking confirmation; not cancelled</li></ul><strong>Team-wide live queue.</strong> Click to follow up and close the loop."></i>
+                        </div>
+                        <div class="card-body summary-card-body">
+                            <div class="summary-value" id="sc-pending-review-op-count">...</div>
+                            <div class="summary-sub">All BCs whose travel has ended and after-sales review is still pending. Click to follow up.</div>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            <div class="col-md-3">
                 <a class="summary-card" id="sc-upcoming-not-ready-op-link" href="#">
                     <div class="card card-custom">
                         <div class="card-header border-0 summary-card-header" style="background-color:#FFFAA030;">
@@ -644,6 +749,15 @@
                         <div class="card-body summary-card-body">
                             <div class="summary-value" id="sc-insurance-pending-count">...</div>
                             <div class="summary-sub">BCs whose insurance checklist is not yet ticked on at least one active line. Click to review and complete.</div>
+                            <div class="summary-card-toggle d-flex align-items-center mt-3" id="sc-insurance-exclude-finished-wrap">
+                                <span class="switch switch-sm switch-icon">
+                                    <label class="mb-0">
+                                        <input type="checkbox" id="sc-insurance-exclude-finished">
+                                        <span></span>
+                                    </label>
+                                </span>
+                                <span class="ml-3" style="font-size:12px; color:#3a4256; font-weight:600;">Exclude completed &amp; pending-review</span>
+                            </div>
                         </div>
                     </div>
                 </a>
@@ -690,6 +804,35 @@
                         <table class="table table-sm summary-table">
                             <thead><tr><th>Supplier</th><th class="text-right">Payouts</th><th class="text-right">Amount</th><th>Earliest Deadline</th></tr></thead>
                             <tbody id="sc-supplier-due-soon-body"><tr><td colspan="4" class="text-center text-muted">Loading…</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-12">
+                <div class="card card-custom">
+                    <div class="card-header border-0 summary-card-header" style="background-color:#FFE4B530;">
+                        <h3>Supplier Pay-out Checklist Due Soon</h3>
+                        <i id="pop-checklist-payout-due-soon" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>Counted when, for an active line item:</strong><ul><li>Product carries a &ldquo;Payment Out To Supplier (full / deposit)&rdquo; checklist</li><li>The checklist is <strong>not ticked yet</strong> (no completion record on that line)</li><li><code>booking_product.disable_checklist_payment_out = 0</code> (the same rule the modal/filter uses)</li><li>Pay-out deadline (full &rarr; <code>PaymentOutSupplierFull</code>, deposit &rarr; <code>PaymentOutSupplierDeposit</code>) from 1 March (current year) up to tomorrow</li><li>BC, not cancelled, not draft</li></ul><strong>Bucketed by deadline:</strong> Overdue (1 March to before today), Today, and Tomorrow &mdash; each showing the BC count.<br><br><strong>Difference from Supplier Pay-out Due Soon:</strong> that card reads created payment-out records; this one flags pay-outs whose checklist has not been actioned yet, so no RM amount is shown.<br><br><strong>Table:</strong> top 5 suppliers across the window, earliest deadline first."></i>
+                    </div>
+                    <div class="card-body summary-card-body">
+                        <div class="summary-row-3 mb-3">
+                            <a href="#" class="due-bucket is-overdue" id="sc-checklist-payout-due-soon-overdue-link" title="View BCs whose pay-out checklist is overdue (since 1 March)">
+                                <div class="lbl">Overdue</div>
+                                <div class="summary-value-sm amt-overdue" id="sc-checklist-payout-due-soon-overdue-count">...</div>
+                            </a>
+                            <a href="#" class="due-bucket is-today" id="sc-checklist-payout-due-soon-today-link" title="View BCs whose pay-out checklist is due today">
+                                <div class="lbl">Today</div>
+                                <div class="summary-value-sm amt-today" id="sc-checklist-payout-due-soon-today-count">...</div>
+                            </a>
+                            <a href="#" class="due-bucket" id="sc-checklist-payout-due-soon-tomorrow-link" title="View BCs whose pay-out checklist is due tomorrow">
+                                <div class="lbl">Tomorrow</div>
+                                <div class="summary-value-sm" id="sc-checklist-payout-due-soon-tomorrow-count">...</div>
+                            </a>
+                        </div>
+                        <div class="summary-sub mb-2">BCs whose &ldquo;Payment Out To Supplier&rdquo; checklist is not ticked yet, bucketed by the pay-out deadline on the line (full or deposit) from 1 March up to tomorrow. Clear overdue and today first; the table lists the most urgent suppliers, earliest deadline first.</div>
+                        <table class="table table-sm summary-table">
+                            <thead><tr><th>Supplier</th><th class="text-right">Pay-outs</th><th>Earliest Deadline</th></tr></thead>
+                            <tbody id="sc-checklist-payout-due-soon-body"><tr><td colspan="3" class="text-center text-muted">Loading…</td></tr></tbody>
                         </table>
                     </div>
                 </div>
@@ -913,7 +1056,11 @@ $(function() {
 
     function loadSummaryCards(month) {
         var url = '<?php echo base_url("Booking/ajax_summary_cards"); ?>';
-        if(month) { url += '?month=' + encodeURIComponent(month); }
+        var params = [];
+        if(month) { params.push('month=' + encodeURIComponent(month)); }
+        var exFin = document.getElementById('sc-insurance-exclude-finished');
+        if(exFin && exFin.checked) { params.push('insurance_exclude_finished=1'); }
+        if(params.length) { url += '?' + params.join('&'); }
         $.getJSON(url, function(resp) {
         if(!resp || resp.error) return;
         var c = resp.cards || {};
@@ -981,6 +1128,18 @@ $(function() {
             setText('sc-tc-pickup-count', pk.count);
             setBest('sc-tc-pickup-best',  pk.best, 'Fastest');
         }
+        if(c.conversion_time_month) {
+            var ct = c.conversion_time_month;
+            // format_response_duration returns '-' for null; render an em-dash
+            // when none of this month's BCs converted.
+            var ctHas = (ct.count > 0 && ct.value && ct.value !== '-');
+            setText('sc-conv-time-value', ctHas ? ct.value : '—');
+            setText('sc-conv-time-count', ct.count);
+        }
+        if(c.slow_conversion_month) {
+            setText('sc-slow-conv-count', c.slow_conversion_month.count);
+            setLink('sc-slow-conv-link',  c.slow_conversion_month.link);
+        }
         if(c.pending_bc) {
             setText('sc-pending-bc-count', c.pending_bc.count);
             setLink('sc-pending-bc-link', c.pending_bc.link);
@@ -1032,6 +1191,27 @@ $(function() {
             setText('sc-upcoming-not-ready-op-14-count', c.upcoming_travel_not_ready_op_14.count);
             setLink('sc-upcoming-not-ready-op-14-link',  c.upcoming_travel_not_ready_op_14.link);
         }
+        // OP operational queue cards.
+        if(c.pending_bc_op) {
+            setText('sc-pending-bc-op-count', c.pending_bc_op.count);
+            setLink('sc-pending-bc-op-link',  c.pending_bc_op.link);
+        }
+        if(c.pending_bc_confirmation_op) {
+            setText('sc-pending-bc-confirmation-op-count', c.pending_bc_confirmation_op.count);
+            setLink('sc-pending-bc-confirmation-op-link',  c.pending_bc_confirmation_op.link);
+        }
+        if(c.travel_tomorrow_op) {
+            setText('sc-travel-tomorrow-op-count', c.travel_tomorrow_op.count);
+            setLink('sc-travel-tomorrow-op-link',  c.travel_tomorrow_op.link);
+        }
+        if(c.travel_tomorrow_not_ready_op) {
+            setText('sc-travel-tomorrow-not-ready-op-count', c.travel_tomorrow_not_ready_op.count);
+            setLink('sc-travel-tomorrow-not-ready-op-link',  c.travel_tomorrow_not_ready_op.link);
+        }
+        if(c.pending_review_op) {
+            setText('sc-pending-review-op-count', c.pending_review_op.count);
+            setLink('sc-pending-review-op-link',  c.pending_review_op.link);
+        }
 
         // TC LEAD / OP / Owner BC week+month
         if(c.bc_week_month) {
@@ -1066,6 +1246,11 @@ $(function() {
         if(c.insurance_pending) {
             setText('sc-insurance-pending-count', c.insurance_pending.count);
             setLink('sc-insurance-pending-link',  c.insurance_pending.link);
+            // Reflect the server-resolved toggle state (covers first load).
+            var exFin = document.getElementById('sc-insurance-exclude-finished');
+            if(exFin && typeof c.insurance_pending.exclude_finished !== 'undefined') {
+                exFin.checked = !!c.insurance_pending.exclude_finished;
+            }
         }
         if(c.ferry_pending) {
             setText('sc-ferry-pending-count', c.ferry_pending.count);
@@ -1078,6 +1263,14 @@ $(function() {
                 setText('sc-supplier-due-soon-' + b + '-count', ds[b].count);
                 setText('sc-supplier-due-soon-' + b + '-total', ds[b].total_due);
                 setLink('sc-supplier-due-soon-' + b + '-link', ds[b].link);
+            });
+        }
+        if(c.checklist_payout_due_soon) {
+            var cp = c.checklist_payout_due_soon;
+            ['overdue', 'today', 'tomorrow'].forEach(function(b) {
+                if(!cp[b]) return;
+                setText('sc-checklist-payout-due-soon-' + b + '-count', cp[b].count);
+                setLink('sc-checklist-payout-due-soon-' + b + '-link', cp[b].link);
             });
         }
 
@@ -1297,6 +1490,22 @@ $(function() {
             }
         }
 
+        var cpay = t.checklist_payout_due_soon;
+        var cpayBody = document.getElementById('sc-checklist-payout-due-soon-body');
+        if(cpayBody) {
+            if(cpay && cpay.length) {
+                cpayBody.innerHTML = cpay.map(function(r) {
+                    return '<tr>' +
+                        '<td>' + escapeHtml(r.name || '—') + '</td>' +
+                        '<td class="text-right">' + escapeHtml(r.count) + '</td>' +
+                        '<td>' + escapeHtml(r.earliest_deadline) + '</td>' +
+                    '</tr>';
+                }).join('');
+            } else {
+                cpayBody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">No unticked pay-out checklists due between 1 March and tomorrow</td></tr>';
+            }
+        }
+
         // Inject value-rich popover HTML from the server. The view ships
         // static fallback copy in each icon's data-content so popovers still
         // make sense before this AJAX returns; here we overwrite with the
@@ -1322,6 +1531,21 @@ $(function() {
     if(scMonthPicker) {
         scMonthPicker.addEventListener('change', function() {
             loadSummaryCards(scMonthPicker.value);
+        });
+    }
+    // Insurance card "Exclude completed & pending-review" toggle. The whole
+    // switch row lives inside the card's <a>, so handle the click on the wrapper:
+    // prevent the card navigation, flip the checkbox ourselves (preventDefault
+    // would otherwise cancel the native toggle), then re-fetch with the current
+    // month so the count and drill-down link both re-scope.
+    var scExcludeWrap = document.getElementById('sc-insurance-exclude-finished-wrap');
+    var scExcludeFinished = document.getElementById('sc-insurance-exclude-finished');
+    if(scExcludeWrap && scExcludeFinished) {
+        scExcludeWrap.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            scExcludeFinished.checked = !scExcludeFinished.checked;
+            loadSummaryCards(scMonthPicker ? scMonthPicker.value : undefined);
         });
     }
     loadSummaryCards();

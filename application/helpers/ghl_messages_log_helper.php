@@ -47,6 +47,146 @@ if (!function_exists('ghl_message_log_direction_label')) {
     }
 }
 
+if (!function_exists('ghl_message_log_format_duration')) {
+    /**
+     * Render a whole-second duration as a compact, reader-friendly string:
+     * '4s', '1m 5s', '1h 2m'. Stops at minute precision once past an hour so a
+     * long gap reads cleanly rather than '1h 2m 5s'. Null or negative input (no
+     * measurable gap) renders as '' so the cell shows a dash, not a fake zero.
+     *
+     * @param int|float|null $seconds
+     * @return string
+     */
+    function ghl_message_log_format_duration($seconds)
+    {
+        if ($seconds === null || $seconds === '' || $seconds < 0) {
+            return '';
+        }
+
+        $seconds = (int) round($seconds);
+
+        if ($seconds < 60) {
+            return $seconds . 's';
+        }
+
+        if ($seconds < 3600) {
+            $minutes = intdiv($seconds, 60);
+            $rest = $seconds % 60;
+            return $rest > 0 ? $minutes . 'm ' . $rest . 's' : $minutes . 'm';
+        }
+
+        $hours = intdiv($seconds, 3600);
+        $minutes = intdiv($seconds % 3600, 60);
+        return $minutes > 0 ? $hours . 'h ' . $minutes . 'm' : $hours . 'h';
+    }
+}
+
+if (!function_exists('ghl_message_log_consecutive_gap_seconds')) {
+    /**
+     * Seconds between a message and the one immediately before it, but only when
+     * both fall on the SAME calendar day -- an overnight jump is dead air, not a
+     * reply, so it returns null and the column shows a blank instead of an
+     * misleading multi-hour value. Unparseable timestamps also yield null.
+     *
+     * @param string $newerTs The later message's timestamp ('Y-m-d H:i:s').
+     * @param string $olderTs The earlier (previous) message's timestamp.
+     * @return int|null Seconds elapsed, or null when not comparable.
+     */
+    function ghl_message_log_consecutive_gap_seconds($newerTs, $olderTs)
+    {
+        $newer = strtotime((string) $newerTs);
+        $older = strtotime((string) $olderTs);
+
+        if ($newer === false || $older === false) {
+            return null;
+        }
+
+        if (date('Y-m-d', $newer) !== date('Y-m-d', $older)) {
+            return null;
+        }
+
+        $gap = $newer - $older;
+
+        return $gap >= 0 ? $gap : null;
+    }
+}
+
+if (!function_exists('ghl_message_log_attach_reply_gaps')) {
+    /**
+     * Annotate a newest-first page of messages with the time taken since the
+     * previous (older) message. Each displayed row's gap is measured against the
+     * row directly below it; callers should pass one extra trailing row beyond
+     * $displayCount so even the bottom visible row gets its predecessor. The
+     * returned array is sliced back to $displayCount.
+     *
+     * Adds two keys per row: 'reply_gap_seconds' (int|null) and
+     * 'reply_gap_label' (formatted string, '' when not comparable).
+     *
+     * @param array  $rows         Newest-first rows, each with $timeKey set.
+     * @param int    $displayCount Rows actually shown.
+     * @param string $timeKey      Timestamp field name.
+     * @return array Sliced, gap-annotated rows.
+     */
+    function ghl_message_log_attach_reply_gaps(array $rows, $displayCount, $timeKey = 'message_timestamp')
+    {
+        $count = count($rows);
+        $shown = min((int) $displayCount, $count);
+
+        for ($i = 0; $i < $shown; $i++) {
+            $gap = null;
+            if ($i + 1 < $count) {
+                $gap = ghl_message_log_consecutive_gap_seconds(
+                    isset($rows[$i][$timeKey]) ? $rows[$i][$timeKey] : '',
+                    isset($rows[$i + 1][$timeKey]) ? $rows[$i + 1][$timeKey] : ''
+                );
+            }
+
+            $rows[$i]['reply_gap_seconds'] = $gap;
+            $rows[$i]['reply_gap_label'] = ghl_message_log_format_duration($gap);
+        }
+
+        return array_slice($rows, 0, $displayCount);
+    }
+}
+
+if (!function_exists('ghl_message_log_average_gap_seconds')) {
+    /**
+     * Mean consecutive same-day gap across one or more days, from per-day
+     * aggregates. Within a day the consecutive gaps telescope to (max - min) over
+     * (count - 1) intervals, so the daily-aggregated average is simply
+     * SUM(max - min) / SUM(count - 1) across every day with at least two
+     * messages. Days with a single message contribute no interval and are
+     * skipped. Returns null when there is no interval to average.
+     *
+     * @param array $dayRows Rows of array('count' => int, 'min_ts' => string,
+     *                       'max_ts' => string).
+     * @return float|null Average seconds, or null when nothing comparable.
+     */
+    function ghl_message_log_average_gap_seconds(array $dayRows)
+    {
+        $totalSpan = 0;
+        $totalIntervals = 0;
+
+        foreach ($dayRows as $row) {
+            $count = isset($row['count']) ? (int) $row['count'] : 0;
+            if ($count < 2) {
+                continue;
+            }
+
+            $min = strtotime((string) (isset($row['min_ts']) ? $row['min_ts'] : ''));
+            $max = strtotime((string) (isset($row['max_ts']) ? $row['max_ts'] : ''));
+            if ($min === false || $max === false || $max < $min) {
+                continue;
+            }
+
+            $totalSpan += $max - $min;
+            $totalIntervals += $count - 1;
+        }
+
+        return $totalIntervals > 0 ? (float) $totalSpan / $totalIntervals : null;
+    }
+}
+
 if (!function_exists('ghl_message_log_export_columns')) {
     /**
      * CSV header for the Message Log export. Leads with Contact -- the

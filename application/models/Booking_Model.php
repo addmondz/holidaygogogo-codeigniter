@@ -85,6 +85,139 @@ class Booking_Model extends CI_Model
 		return true;
 	}
 
+	/**
+	 * Filter to BCs whose "Payment Out To Supplier" CHECKLIST is not ticked yet
+	 * for a line whose payout deadline falls in the requested bucket — backs the
+	 * clickable Overdue / Today / Tomorrow segments of the OP "Supplier Pay-out
+	 * Checklist Due Soon" card (?checklist_payout=...).
+	 *
+	 * This is the checklist counterpart to apply_supplier_payout_filter(): that
+	 * one reads the payment table (payouts already created); this one reads the
+	 * checklist + booking_product deadline, the same signal the cron reminders
+	 * use (Cronjob_Model::get_bookings_with_supplier_date). A line qualifies when
+	 * it is active (Status='Y', disable_checklist_payment_out=0), its product is
+	 * non-child/infant and carries the full (PaymentOutSupplierFull) / deposit
+	 * (PaymentOutSupplierDeposit) checklist, the matching deadline is in the
+	 * bucket, and no completion row exists for that checklist on that line.
+	 *
+	 * Buckets (deadline; floor = 1 March of the current year):
+	 *   overdue  : floor <= deadline < today
+	 *   today    : deadline = today
+	 *   tomorrow : deadline = today + 1
+	 *
+	 * The bucket is whitelisted before use; checklist IDs are resolved by name
+	 * via a raw query (so the active-record state being built for the list query
+	 * is left untouched) and dates are server-derived, so the interpolated
+	 * subqueries carry no user input. Returns true when a recognised bucket was
+	 * applied. Booking-level scoping (confirmation, not cancelled, not draft) is
+	 * supplied by the card link's status=A + booking_confirmation_title params.
+	 */
+	private function apply_checklist_payout_filter()
+	{
+		$bucket = $this->input->get('checklist_payout');
+		if(empty($bucket)) {
+			return false;
+		}
+
+		$today    = date('Y-m-d');
+		$tomorrow = date('Y-m-d', strtotime('+1 day'));
+		$floor    = date('Y') . '-03-01';
+
+		$range = function($col) use ($bucket, $today, $tomorrow, $floor) {
+			if($bucket === 'overdue')  return "{$col} >= '{$floor}' AND {$col} < '{$today}'";
+			if($bucket === 'today')    return "{$col} = '{$today}'";
+			if($bucket === 'tomorrow') return "{$col} = '{$tomorrow}'";
+			return null;
+		};
+		if($range('x') === null) {
+			return false;
+		}
+
+		// Resolve the full/deposit checklist IDs by name. Raw query so the
+		// list's active-record query under construction is not clobbered.
+		$full = $this->db->query("SELECT ID FROM package_checklist WHERE name LIKE '%Payment Out To Supplier (full)%' LIMIT 1")->row();
+		$dep  = $this->db->query("SELECT ID FROM package_checklist WHERE name LIKE '%Payment Out To Supplier (deposit)%' LIMIT 1")->row();
+		$full_id = $full ? (int)$full->ID : 0;
+		$dep_id  = $dep  ? (int)$dep->ID  : 0;
+
+		$exists = function($checklist_id, $date_col) use ($range) {
+			return "EXISTS (SELECT 1 FROM booking_product bp"
+				. " JOIN product p ON p.ProductID = bp.ProductID AND p.is_child_or_infant = 0"
+				. " JOIN product_package_checklist ppc ON ppc.product_id = bp.ProductID"
+				. " AND JSON_CONTAINS(ppc.package_checklist_json, '{$checklist_id}')"
+				. " WHERE bp.BookingID = booking.BookingID"
+				. " AND bp.Status = 'Y' AND bp.disable_checklist_payment_out = 0"
+				. " AND bp.{$date_col} IS NOT NULL"
+				. " AND " . $range("bp.{$date_col}")
+				. " AND NOT EXISTS (SELECT 1 FROM booking_checklist_completion bcc"
+				. " WHERE bcc.booking_id = bp.BookingID AND bcc.product_id = bp.ProductID"
+				. " AND bcc.package_checklist_id = {$checklist_id}))";
+		};
+
+		$branches = array();
+		if($full_id) { $branches[] = $exists($full_id, 'PaymentOutSupplierFull'); }
+		if($dep_id)  { $branches[] = $exists($dep_id,  'PaymentOutSupplierDeposit'); }
+		if(empty($branches)) {
+			return false;
+		}
+
+		$this->db->where('(' . implode(' OR ', $branches) . ')', null, false);
+		return true;
+	}
+
+	/**
+	 * Filter to the BCs behind the OP / OP Team Lead "Slow Conversions (> 24h)"
+	 * card (?slow_conversion=1). A BC qualifies when a GHL lead converted into it
+	 * more than 24h after the lead opened the conversation (UNIX gap from
+	 * lead_started_at to converted_at). Mirrors Report_Model::
+	 * Lead_Conversion_Time_Summary so the card count and this listing agree:
+	 *   - BOOKING CONFIRMATION only;
+	 *   - company-wide (every agent's BCs — OP/OP Team Lead aren't scoped to a
+	 *     sales slot, and levels 40/45 see all bookings in the listing);
+	 *   - the lead's start month comes from ?lead_month=YYYY-MM (the card passes
+	 *     its own window), defaulting to the current month.
+	 * The card link also carries status=A, which supplies the live-BC scope
+	 * (CancelStatus='N', Status!='N') via the shared status filter.
+	 *
+	 * lead_month is validated to YYYY-MM and the threshold is a constant int, so
+	 * the interpolated subquery carries no user input. Returns true when applied.
+	 */
+	private function apply_slow_conversion_filter()
+	{
+		if(empty($this->input->get('slow_conversion'))) {
+			return false;
+		}
+
+		$threshold = 86400; // 24h, in seconds
+
+		// Lead-start window: the card's selected month, or the current month.
+		$lead_month = (string) $this->input->get('lead_month');
+		if(!preg_match('/^\d{4}-\d{2}$/', $lead_month)) {
+			$lead_month = date('Y-m');
+		}
+		$win_start = $lead_month . '-01 00:00:00';
+		$win_end   = date('Y-m-t', strtotime($lead_month . '-01')) . ' 23:59:59';
+
+		$gap = 'UNIX_TIMESTAMP(pl.converted_at) - UNIX_TIMESTAMP(pl.lead_started_at)';
+		$this->db->where(
+			"booking.BookingConfirmationTitle = 'BOOKING CONFIRMATION'", null, false
+		);
+		$this->db->where(
+			"booking.BookingID IN (
+				SELECT pl.booking_id
+				FROM ghl_processed_leads pl
+				WHERE pl.is_converted = 1
+				  AND pl.booking_id IS NOT NULL
+				  AND pl.converted_at IS NOT NULL
+				  AND pl.lead_started_at IS NOT NULL
+				  AND pl.lead_started_at >= '{$win_start}'
+				  AND pl.lead_started_at <= '{$win_end}'
+				  AND ({$gap}) > {$threshold}
+			)", null, false
+		);
+		return true;
+	}
+
 	private function apply_guest_list_status_filter()
 	{
 		$raw = $this->input->get('guest_list_status');
@@ -328,6 +461,19 @@ class Booking_Model extends CI_Model
 				$level2Ignore = 1;
 			}
 			if($this->apply_supplier_payout_filter()) {
+				$level2Ignore = 1;
+			}
+			if($this->apply_checklist_payout_filter()) {
+				$level2Ignore = 1;
+			}
+			if(!empty($this->input->get('exclude_finished'))) {
+				// "Exclude completed & pending-review" toggle on the OP
+				// "Pending Insurance Checklist" card. Status='Y' is a finished
+				// trip in either after-sales state — COMPLETE (review done) or
+				// PENDING (AfterSalesService='PENDING', i.e. pending review) —
+				// so dropping Status='Y' removes both at once and the drill-down
+				// matches the card's count when the switch is on.
+				$this->db->where('booking.Status !=', 'Y');
 				$level2Ignore = 1;
 			}
 			if(!empty($this->input->get('cancellation_reason'))) {
@@ -1960,6 +2106,22 @@ class Booking_Model extends CI_Model
 			if($this->apply_supplier_payout_filter()) {
 				$level2Ignore = 1;
 			}
+			if($this->apply_checklist_payout_filter()) {
+				$level2Ignore = 1;
+			}
+			if($this->apply_slow_conversion_filter()) {
+				$level2Ignore = 1;
+			}
+			if(!empty($this->input->get('exclude_finished'))) {
+				// "Exclude completed & pending-review" toggle on the OP
+				// "Pending Insurance Checklist" card. Status='Y' is a finished
+				// trip in either after-sales state — COMPLETE (review done) or
+				// PENDING (AfterSalesService='PENDING', i.e. pending review) —
+				// so dropping Status='Y' removes both at once and the drill-down
+				// matches the card's count when the switch is on.
+				$this->db->where('booking.Status !=', 'Y');
+				$level2Ignore = 1;
+			}
 			if(!empty($this->input->get('cancellation_reason'))) {
 				$this->db->where_in('booking.CancellationReasonID', explode(',', $this->input->get('cancellation_reason')));
 				$this->db->where('CancelStatus', 'Y');
@@ -1973,6 +2135,29 @@ class Booking_Model extends CI_Model
 					$this->db->where("(SELECT COUNT(*) FROM invoice_split_pax WHERE invoice_split_pax.BookingID = booking.BookingID AND invoice_split_pax.Status = 'Y') > 0");
 				} else if($has_no && !$has_yes) {
 					$this->db->where("(SELECT COUNT(*) FROM invoice_split_pax WHERE invoice_split_pax.BookingID = booking.BookingID AND invoice_split_pax.Status = 'Y') = 0");
+				}
+				$level2Ignore = 1;
+			}
+			// Departure-date scope (StartDate within range) — distinct from the
+			// generic travel_date OVERLAP filter above. Backs the OP "Travelling
+			// Tomorrow" cards whose count keys off StartDate = tomorrow exactly;
+			// the overlap clause would over-count trips merely spanning the day.
+			if(!empty($this->input->get('travel_start_date'))) {
+				$tsd = explode(' - ', $this->input->get('travel_start_date'));
+				$tsd_start = date('Y-m-d', strtotime(str_replace('/', '-', $tsd[0])));
+				$tsd_end   = date('Y-m-d', strtotime(str_replace('/', '-', $tsd[1])));
+				$this->db->where('booking.StartDate >=', $tsd_start);
+				$this->db->where('booking.StartDate <=', $tsd_end);
+				$level2Ignore = 1;
+			}
+			// Exclude specific booking statuses (comma list). Backs the OP
+			// "Travelling Tomorrow – Not Yet Ready" red card (exclude_status=PT),
+			// dropping the already-ready Pending Travel BCs so the drill-down
+			// matches the card count.
+			if(!empty($this->input->get('exclude_status'))) {
+				$excluded = array_filter(array_map('trim', explode(',', $this->input->get('exclude_status'))));
+				if(!empty($excluded)) {
+					$this->db->where_not_in('booking.Status', $excluded);
 				}
 				$level2Ignore = 1;
 			}

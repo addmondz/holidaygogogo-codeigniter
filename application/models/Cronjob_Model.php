@@ -43,6 +43,13 @@ class Cronjob_Model extends CI_Model
 	 * Returns count of notifications created.
 	 */
 	function create_supplier_reminder_notifications($booking_id, $booking_number, $type, $date) {
+		// Payment-out supplier notifications are gated off (superseded by the
+		// "Supplier Pay-out Checklist Due Soon" dashboard card). Flip
+		// enable_payment_out_notifications in config/features.php to re-enable.
+		if(!$this->config->item('enable_payment_out_notifications')) {
+			return 0;
+		}
+
 		$label = ($type == 'supplier_reminder_full') ? 'full' : 'deposit';
 		$formatted_date = date('d/m/Y', strtotime($date));
 		$message = "Reminder: Payment Out To Supplier ($label) for $booking_number is due on $formatted_date - checklist not completed";
@@ -122,6 +129,13 @@ class Cronjob_Model extends CI_Model
 	 * Returns count of notifications created.
 	 */
 	function create_payout_overdue_notifications($booking_id, $booking_number, $type, $date) {
+		// Payment-out supplier notifications are gated off (superseded by the
+		// "Supplier Pay-out Checklist Due Soon" dashboard card). Flip
+		// enable_payment_out_notifications in config/features.php to re-enable.
+		if(!$this->config->item('enable_payment_out_notifications')) {
+			return 0;
+		}
+
 		$label = ($type == 'payout_overdue_full') ? 'full' : 'deposit';
 		$formatted_date = date('d/m/Y', strtotime($date));
 		$message = "OVERDUE: Payment Out To Supplier ($label) for $booking_number was due on $formatted_date - checklist still pending";

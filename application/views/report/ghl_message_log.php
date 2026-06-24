@@ -2,11 +2,17 @@
 $p = $log_pagination;
 
 $log_contact = isset($log_filters['contact']) ? $log_filters['contact'] : '';
+$log_agent = isset($log_filters['agent']) ? $log_filters['agent'] : '';
+$log_agents = isset($log_agents) ? $log_agents : array();
+$log_show_reply_time = !empty($log_show_reply_time);
+$log_avg_reply = isset($log_avg_reply) ? $log_avg_reply : '';
+$log_table_colspan = $log_show_reply_time ? 7 : 6;
 
-/** Build a page URL keeping the current date and contact filters. */
-$page_url = function ($page) use ($log_filters, $log_contact) {
+/** Build a page URL keeping the current date, contact and agent filters. */
+$page_url = function ($page) use ($log_filters, $log_contact, $log_agent) {
     return base_url('Report/Ghl_Message_Log?log_date=' . urlencode($log_filters['log_date'])
         . '&contact=' . urlencode($log_contact)
+        . '&agent=' . urlencode($log_agent)
         . '&page=' . (int) $page);
 };
 ?>
@@ -25,6 +31,11 @@ $page_url = function ($page) use ($log_filters, $log_contact) {
                     </div>
                 </div>
                 <div class="card-toolbar">
+                    <?php if ($log_show_reply_time && $log_avg_reply !== '') { ?>
+                        <span class="label label-light-info label-inline font-weight-bold mr-2">
+                            Avg time taken: <?php echo html_escape($log_avg_reply); ?>
+                        </span>
+                    <?php } ?>
                     <span class="label label-light-primary label-inline font-weight-bold">
                         <?php echo number_format($p['total_rows']); ?> messages
                     </span>
@@ -33,7 +44,7 @@ $page_url = function ($page) use ($log_filters, $log_contact) {
             <div class="card-body">
                 <form id="ghl-message-log-form" action="<?php echo base_url('Report/Ghl_Message_Log'); ?>" method="get" class="form mb-6">
                     <div class="row align-items-end">
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <div class="form-group mb-0">
                                 <label>Date Range</label>
                                 <div id="ghl_message_log_daterangepicker" class="input-icon">
@@ -48,10 +59,21 @@ $page_url = function ($page) use ($log_filters, $log_contact) {
                                 <input type="text" name="contact" value="<?php echo html_escape($log_contact); ?>" autocomplete="off" placeholder="e.g. 0123456789" class="form-control">
                             </div>
                         </div>
-                        <div class="col-md-5">
+                        <div class="col-md-3">
+                            <div class="form-group mb-0">
+                                <label>Agent</label>
+                                <select name="agent" data-live-search="true" class="form-control selectpicker" title="All Agents">
+                                    <option value="" <?php if ($log_agent === '') { echo 'selected'; } ?>>All Agents</option>
+                                    <?php foreach ($log_agents as $agent_name) { ?>
+                                        <option data-icon="la la-user-alt font-size-lg bs-icon" value="<?php echo html_escape($agent_name); ?>" <?php if ($log_agent !== '' && $log_agent === $agent_name) { echo 'selected'; } ?>><?php echo html_escape($agent_name); ?></option>
+                                    <?php } ?>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
                             <input type="submit" value="Filter" class="btn btn-light-success font-weight-bold" style="width:80px;">
                             <input type="button" id="ghl-message-log-reset" value="Reset" class="btn btn-light-primary font-weight-bold" style="width:80px;">
-                            <a href="<?php echo base_url('Report/Ghl_Message_Log_Export?log_date=') . urlencode($log_filters['log_date']) . '&contact=' . urlencode($log_contact); ?>" class="btn btn-light-info font-weight-bold float-right">
+                            <a href="<?php echo base_url('Report/Ghl_Message_Log_Export?log_date=') . urlencode($log_filters['log_date']) . '&contact=' . urlencode($log_contact) . '&agent=' . urlencode($log_agent); ?>" class="btn btn-light-info font-weight-bold float-right">
                                 <i class="la la-download"></i> Export CSV
                             </a>
                         </div>
@@ -63,6 +85,9 @@ $page_url = function ($page) use ($log_filters, $log_contact) {
                         <thead>
                             <tr>
                                 <th style="width:170px;">Date / Time</th>
+                                <?php if ($log_show_reply_time) { ?>
+                                    <th style="width:110px;">Time Taken</th>
+                                <?php } ?>
                                 <th style="width:110px;">Direction</th>
                                 <th style="width:150px;">Agent</th>
                                 <th style="width:150px;">From</th>
@@ -73,7 +98,7 @@ $page_url = function ($page) use ($log_filters, $log_contact) {
                         <tbody>
                             <?php if (empty($log_messages)) { ?>
                                 <tr>
-                                    <td colspan="6" class="text-center py-10">No messages found for the selected range.</td>
+                                    <td colspan="<?php echo $log_table_colspan; ?>" class="text-center py-10">No messages found for the selected range.</td>
                                 </tr>
                             <?php } else { ?>
                                 <?php foreach ($log_messages as $m) {
@@ -92,6 +117,15 @@ $page_url = function ($page) use ($log_filters, $log_contact) {
                                 ?>
                                     <tr>
                                         <td class="text-nowrap"><?php echo html_escape($m['message_timestamp']); ?></td>
+                                        <?php if ($log_show_reply_time) { ?>
+                                            <td class="text-nowrap">
+                                                <?php if (!empty($m['reply_gap_label'])) { ?>
+                                                    <span class="font-weight-bold text-dark-75"><?php echo html_escape($m['reply_gap_label']); ?></span>
+                                                <?php } else { ?>
+                                                    <span class="text-muted">&mdash;</span>
+                                                <?php } ?>
+                                            </td>
+                                        <?php } ?>
                                         <td>
                                             <?php if ($direction_label !== '') { ?>
                                                 <span class="label <?php echo $direction_badge; ?> label-inline font-weight-bold">

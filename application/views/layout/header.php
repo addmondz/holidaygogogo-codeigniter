@@ -284,8 +284,7 @@ $is_dev_env = ($app_env !== 'prod');
 									</div>
 								</li>
 							<?php } ?>
-							<?php if($this->session->level != 20) { ?>
-								<?php if(in_array('VR', $this->session->access_control)) { ?>
+							<?php if(in_array('VR', $this->session->access_control) || in_array('ML', $this->session->access_control) || $this->session->level == 10) { ?>
 									<li class="menu-item menu-item-submenu <?php if($this->router->class == 'Report') { echo 'menu-item-active menu-item-open'; } ?>">
 										<a href="javascript:;" class="menu-link menu-toggle">
 											<span class="svg-icon menu-icon">
@@ -302,6 +301,7 @@ $is_dev_env = ($app_env !== 'prod');
 										<div class="menu-submenu">
 											<i class="menu-arrow"></i>
 											<ul class="menu-subnav">
+												<?php if(in_array('VR', $this->session->access_control)) { ?>
 												<li class="menu-item <?php if($this->router->method == 'Destination_Sales') { echo 'menu-item-active'; } ?>">
 													<a href="<?php echo base_url('Report/Destination_Sales'); ?>" class="menu-link">
 														<i class="menu-bullet menu-bullet-dot">
@@ -358,6 +358,7 @@ $is_dev_env = ($app_env !== 'prod');
 														<span class="menu-text">Guest By Country</span>
 													</a>
 												</li>
+												<?php } ?>
 												<?php if($this->session->level == 10) { ?>
 													<!-- <li class="menu-item <?php if($this->router->method == 'Lead_Dashboard') { echo 'menu-item-active'; } ?>">
 														<a href="<?php echo base_url('Report/Lead_Dashboard'); ?>" class="menu-link">
@@ -399,19 +400,22 @@ $is_dev_env = ($app_env !== 'prod');
 															<span class="menu-text">Lead Reply Activity</span>
 														</a>
 													</li>
-													<li class="menu-item <?php if($this->router->method == 'Ghl_Message_Log') { echo 'menu-item-active'; } ?>">
-														<a href="<?php echo base_url('Report/Ghl_Message_Log'); ?>" class="menu-link">
-															<i class="menu-bullet menu-bullet-dot">
-																<span></span>
-															</i>
-															<span class="menu-text">Message Log</span>
-														</a>
-													</li>
+												<?php } ?>
+												<?php if($this->session->level == 10 || in_array('ML', $this->session->access_control)) { ?>
+												<li class="menu-item <?php if($this->router->method == 'Ghl_Message_Log') { echo 'menu-item-active'; } ?>">
+													<a href="<?php echo base_url('Report/Ghl_Message_Log'); ?>" class="menu-link">
+														<i class="menu-bullet menu-bullet-dot">
+															<span></span>
+														</i>
+														<span class="menu-text">Message Log</span>
+													</a>
+												</li>
 												<?php } ?>
 											</ul>
 										</div>
 									</li>
 								<?php } ?>
+							<?php if($this->session->level != 20) { ?>
 								<li class="menu-item menu-item-submenu <?php if($this->router->class == 'Category_Code' || $this->router->class == 'Category' || $this->router->class == 'Supplier' || $this->router->class == 'Product' || $this->router->class == 'Footer' || $this->router->class == 'Country_Code' || $this->router->class == 'Tag' || $this->router->class == 'Source' || $this->router->class == 'Package_Checklist' || $this->router->class == 'Product_Package_Checklist' || $this->router->class == 'Cancellation_Reason' || $this->router->class == 'Customer_Type' || $this->router->class == 'Guests' || $this->router->class == 'Campaign' || $this->router->class == 'Quick_Filter') { echo 'menu-item-active menu-item-open'; } ?>">
 									<a href="javascript:;" class="menu-link menu-toggle">
 										<span class="svg-icon menu-icon">

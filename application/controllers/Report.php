@@ -11,7 +11,12 @@ class Report extends MY_Controller
 		parent::__construct();
 		$this->load->model('Report_Model');
 		$this->load->model('Universal_Model');
-		if(!in_array('VR', $this->session->access_control)) {
+		// Message Log has its own 'ML' permission, independent of VR (VIEW
+		// REPORT). Let its routes past the VR gate; each method enforces
+		// ML/owner itself.
+		$message_log_methods = array('Ghl_Message_Log', 'Ghl_Message_Log_Export');
+		if(!in_array($this->router->method, $message_log_methods)
+			&& !in_array('VR', $this->session->access_control)) {
 			redirect('Dashboard');
 		}
 	}
@@ -61,22 +66,61 @@ class Report extends MY_Controller
 
     function Ghl_Message_Log()
     {
+        // Message Log exposes raw customer conversations, so it is gated by its
+        // own 'ML' permission, independent of VR (VIEW REPORT). OWNER (level 10)
+        // always has access.
+        if($this->session->level != 10 && !in_array('ML', $this->session->access_control)) {
+            redirect('Dashboard');
+        }
+
         $this->load->helper('ghl_messages_log');
 
         $range = $this->ghl_message_log_range(trim((string) $this->input->get('log_date')));
         $contact = trim((string) $this->input->get('contact'));
+        $agent = trim((string) $this->input->get('agent'));
         $range['contact'] = $contact;
+        $range['agent'] = $agent;
 
-        $total = $this->Report_Model->Ghl_Messages_Log_Count($range['start_date'], $range['end_date'], $contact);
+        $total = $this->Report_Model->Ghl_Messages_Log_Count($range['start_date'], $range['end_date'], $contact, $agent);
         $pagination = ghl_messages_log_pagination($total, (int) $this->input->get('page'), 50);
 
-        $messages = $this->Report_Model->Ghl_Messages_Log(
-            $range['start_date'],
-            $range['end_date'],
-            $pagination['per_page'],
-            $pagination['offset'],
-            $contact
-        );
+        // The "Time Taken" column only makes sense when the stream is one agent's,
+        // so it (and the daily average) is computed only when an agent is filtered.
+        $show_reply_time = ($agent !== '');
+        $avg_reply_label = '';
+
+        if ($show_reply_time) {
+            // Fetch one extra older row so even the bottom visible row has a
+            // predecessor to measure its gap against; attach_reply_gaps slices
+            // the result back to the displayed page size.
+            $rows = $this->Report_Model->Ghl_Messages_Log(
+                $range['start_date'],
+                $range['end_date'],
+                $pagination['per_page'] + 1,
+                $pagination['offset'],
+                $contact,
+                $agent
+            );
+            $messages = ghl_message_log_attach_reply_gaps($rows, $pagination['per_page']);
+
+            $avg_reply_label = ghl_message_log_format_duration(
+                $this->Report_Model->Ghl_Messages_Log_Avg_Reply_Seconds(
+                    $range['start_date'],
+                    $range['end_date'],
+                    $contact,
+                    $agent
+                )
+            );
+        } else {
+            $messages = $this->Report_Model->Ghl_Messages_Log(
+                $range['start_date'],
+                $range['end_date'],
+                $pagination['per_page'],
+                $pagination['offset'],
+                $contact,
+                $agent
+            );
+        }
 
         $titles = array(
             'tab_title' => 'HolidayGoGoGo | Report',
@@ -87,6 +131,9 @@ class Report extends MY_Controller
             'log_messages' => $messages,
             'log_pagination' => $pagination,
             'log_filters' => $range,
+            'log_agents' => $this->Report_Model->Ghl_Message_Log_Agents(),
+            'log_show_reply_time' => $show_reply_time,
+            'log_avg_reply' => $avg_reply_label,
         );
 
         $this->load->view('layout/header', $titles);
@@ -96,10 +143,18 @@ class Report extends MY_Controller
 
     function Ghl_Message_Log_Export()
     {
+        // Same dedicated 'ML' gate as the on-screen log; the CSV export is the
+        // same data, so VR alone must never reach it. OWNER (level 10) always
+        // has access.
+        if($this->session->level != 10 && !in_array('ML', $this->session->access_control)) {
+            redirect('Dashboard');
+        }
+
         $this->load->helper('ghl_messages_log');
 
         $range = $this->ghl_message_log_range(trim((string) $this->input->get('log_date')));
         $contact = trim((string) $this->input->get('contact'));
+        $agent = trim((string) $this->input->get('agent'));
 
         $filename = ghl_message_log_export_filename($range['start_date'], $range['end_date']);
 
@@ -123,7 +178,8 @@ class Report extends MY_Controller
                 $range['end_date'],
                 $chunk,
                 $offset,
-                $contact
+                $contact,
+                $agent
             );
 
             foreach ($rows as $row) {

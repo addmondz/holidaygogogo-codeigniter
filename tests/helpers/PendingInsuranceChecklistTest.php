@@ -199,7 +199,7 @@ function assert_true($label, $cond) {
 $controller = file_get_contents(__DIR__ . '/../../application/controllers/Booking.php');
 // Isolate the insurance_pending card link block.
 $start = strpos($controller, "\$cards['insurance_pending']");
-$link_block = $start !== false ? substr($controller, $start, 400) : '';
+$link_block = $start !== false ? substr($controller, $start, 800) : '';
 
 assert_true("insurance link carries checklist_filter",
     strpos($link_block, "'checklist_filter'") !== false);

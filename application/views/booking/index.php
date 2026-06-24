@@ -721,9 +721,9 @@ $(document).ready(function() {
         // Get current filter params from URL
         var urlParams = new URLSearchParams(window.location.search);
         var filterParams = {};
-        ['customer', 'booking_number', 'reservation_number', 'mobile', 'destination', 'travel_date',
-         'deadline', 'source', 'chat_language', 'booking_date', 'status', 'booking_confirmation_title',
-         'tag', 'sales_agent', 'sales_agent_2', 'booking_op', 'autocount_status', 'guest_list_status', 'checklist_filter', 'cancellation_reason', 'einvoice_status', 'customer_type', 'upcoming_not_ready', 'supplier_payout'].forEach(function(param) {
+        ['customer', 'booking_number', 'reservation_number', 'mobile', 'destination', 'travel_date', 'travel_start_date',
+         'deadline', 'source', 'chat_language', 'booking_date', 'status', 'exclude_status', 'booking_confirmation_title',
+         'tag', 'sales_agent', 'sales_agent_2', 'booking_op', 'autocount_status', 'guest_list_status', 'checklist_filter', 'cancellation_reason', 'einvoice_status', 'customer_type', 'upcoming_not_ready', 'supplier_payout', 'exclude_finished', 'slow_conversion', 'lead_month'].forEach(function(param) {
             if (urlParams.has(param)) {
                 filterParams[param] = urlParams.get(param);
             }
@@ -792,9 +792,9 @@ $(document).ready(function() {
 function loadSummaryTotals() {
     var urlParams = new URLSearchParams(window.location.search);
     var params = [];
-    ['customer', 'booking_number', 'reservation_number', 'mobile', 'destination', 'travel_date',
-     'deadline', 'source', 'chat_language', 'booking_date', 'status', 'booking_confirmation_title',
-     'tag', 'sales_agent', 'sales_agent_2', 'booking_op', 'autocount_status', 'guest_list_status', 'checklist_filter', 'cancellation_reason', 'einvoice_status', 'customer_type', 'upcoming_not_ready'].forEach(function(param) {
+    ['customer', 'booking_number', 'reservation_number', 'mobile', 'destination', 'travel_date', 'travel_start_date',
+     'deadline', 'source', 'chat_language', 'booking_date', 'status', 'exclude_status', 'booking_confirmation_title',
+     'tag', 'sales_agent', 'sales_agent_2', 'booking_op', 'autocount_status', 'guest_list_status', 'checklist_filter', 'cancellation_reason', 'einvoice_status', 'customer_type', 'upcoming_not_ready', 'slow_conversion', 'lead_month'].forEach(function(param) {
         if (urlParams.has(param)) {
             params.push(param + '=' + encodeURIComponent(urlParams.get(param)));
         }

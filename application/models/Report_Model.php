@@ -107,7 +107,7 @@ class Report_Model extends CI_Model
 
 	function Destination_Profits()
 	{
-		$this->db->select('EndDate As Month, SUM(Credit) - SUM(Debit) As Profit, category.Name As Destination');
+		$this->db->select('MIN(EndDate) As Month, SUM(Credit) - SUM(Debit) As Profit, category.Name As Destination');
 		$this->db->join('payment', 'payment.BookingID = booking.BookingID', 'left');
 		$this->db->join('category', 'category.CategoryID = booking.Destination', 'left');
         if(!empty($this->input->get('destination'))) {
@@ -179,7 +179,7 @@ class Report_Model extends CI_Model
 
     function City_Profits()
 	{
-		$this->db->select('EndDate As Month, SUM(Credit) - SUM(Debit) As Profit, City');
+		$this->db->select('MIN(EndDate) As Month, SUM(Credit) - SUM(Debit) As Profit, City');
 		$this->db->join('payment', 'payment.BookingID = booking.BookingID', 'left');
 		$this->db->join('category', 'category.CategoryID = booking.Destination', 'left');
         $this->db->join('country_code', 'country_code.CountryCodeID = category.Country', 'left');
@@ -267,7 +267,7 @@ class Report_Model extends CI_Model
 
     function State_Profits()
 	{
-		$this->db->select('EndDate As Month, SUM(Credit) - SUM(Debit) As Profit, State');
+		$this->db->select('MIN(EndDate) As Month, SUM(Credit) - SUM(Debit) As Profit, State');
 		$this->db->join('payment', 'payment.BookingID = booking.BookingID', 'left');
 		$this->db->join('category', 'category.CategoryID = booking.Destination', 'left');
         $this->db->join('country_code', 'country_code.CountryCodeID = category.Country', 'left');
@@ -349,7 +349,7 @@ class Report_Model extends CI_Model
 
     function Country_Profits()
 	{
-		$this->db->select('EndDate As Month, SUM(Credit) - SUM(Debit) As Profit, country_code.Country');
+		$this->db->select('MIN(EndDate) As Month, SUM(Credit) - SUM(Debit) As Profit, country_code.Country');
 		$this->db->join('payment', 'payment.BookingID = booking.BookingID', 'left');
 		$this->db->join('category', 'category.CategoryID = booking.Destination', 'left');
         $this->db->join('country_code', 'country_code.CountryCodeID = category.Country', 'left');
@@ -423,7 +423,7 @@ class Report_Model extends CI_Model
 
     function Product_Sales()
 	{
-		$this->db->select('EndDate As Month, SUM(Quantity) As Quantity, SUM(Total) As NetTotal, product.ProductCode, product.Name As Product, SUM(Total) - (SupplierPrice * SUM(Quantity)) As Profit');
+		$this->db->select('MIN(EndDate) As Month, SUM(Quantity) As Quantity, SUM(Total) As NetTotal, product.ProductCode, product.Name As Product, SUM(Total) - (SupplierPrice * SUM(Quantity)) As Profit');
 		$this->db->join('booking_product', 'booking_product.BookingID = booking.BookingID', 'left');
         $this->db->join('product', 'product.ProductID = booking_product.ProductID', 'left');
         if(!empty($this->input->get('product'))) {
@@ -492,7 +492,7 @@ class Report_Model extends CI_Model
 
     function BC_By_Source()
 	{
-		$this->db->select('EndDate As Month, SUM(Credit) - SUM(Debit) As Profit, source.Name As Source');
+		$this->db->select('MIN(EndDate) As Month, SUM(Credit) - SUM(Debit) As Profit, source.Name As Source');
 		$this->db->join('payment', 'payment.BookingID = booking.BookingID', 'left');
 		$this->db->join('source', 'source.SourceID = booking.Source', 'left');
         if(!empty($this->input->get('source'))) {
@@ -564,7 +564,7 @@ class Report_Model extends CI_Model
 
     function Guest_By_Country()
 	{
-		$this->db->select('EndDate As Month, SUM(Adult) As TotalAdult, SUM(Children) As TotalChildren, SUM(Infant) As TotalInfant, country_code.Country');
+		$this->db->select('MIN(EndDate) As Month, SUM(Adult) As TotalAdult, SUM(Children) As TotalChildren, SUM(Infant) As TotalInfant, country_code.Country');
 		$this->db->join('category', 'category.CategoryID = booking.Destination', 'left');
         $this->db->join('country_code', 'country_code.CountryCodeID = category.Country', 'left');
         if(!empty($this->input->get('country'))) {
@@ -824,6 +824,66 @@ class Report_Model extends CI_Model
             'agent_name'  => $row['agent_name'],
             'avg_seconds' => (int) round((float) $row['avg_seconds']),
             'n'           => (int) $row['n'],
+        );
+    }
+
+    /**
+     * Company-wide conversion-time metrics for the OP / OP Team Lead "Avg
+     * Conversion Time" and "Slow Conversions (> 24h)" summary cards. Conversion
+     * time is the wall-clock gap from when a lead opened the GHL conversation
+     * (pl.lead_started_at) to when it was marked converted (pl.converted_at).
+     *
+     * Scope is every converted BC across all sales agents (OP and OP Team Lead
+     * oversee operations company-wide, not a sales-credit slot), and mirrors the
+     * cards' clickable drill-down (?slow_conversion=1&status=A,
+     * Booking_Model::apply_slow_conversion_filter) so the count and the linked
+     * listing return the same BCs:
+     *   - live BOOKING CONFIRMATIONs only (CancelStatus='N', Status!='N', which
+     *     is exactly the status=A drill-down scope);
+     *   - windowed by pl.lead_started_at within [$start_date, $end_date].
+     * Only converted leads carrying a booking_id, a converted_at, and a
+     * non-negative gap are averaged (clock-skew rows fall to NULL/0). count and
+     * slow_count are DISTINCT by BookingID so a BC with two leads counts once;
+     * "slow" is a gap strictly greater than $slow_threshold_seconds (24h).
+     *
+     * @param string $start_date  'Y-m-d'
+     * @param string $end_date    'Y-m-d'
+     * @param int    $slow_threshold_seconds  default 86400 (24h)
+     * @return array { avg_seconds: int|null, count: int, slow_count: int }
+     */
+    function Lead_Conversion_Time_Summary($start_date, $end_date, $slow_threshold_seconds = 86400)
+    {
+        $gap  = 'UNIX_TIMESTAMP(pl.converted_at) - UNIX_TIMESTAMP(pl.lead_started_at)';
+        $qual = "pl.is_converted = 1
+                 AND pl.booking_id IS NOT NULL
+                 AND pl.converted_at IS NOT NULL
+                 AND pl.lead_started_at IS NOT NULL
+                 AND ({$gap}) >= 0";
+        $sql = "
+            SELECT
+                AVG(CASE WHEN {$qual} THEN ({$gap}) END) AS avg_seconds,
+                COUNT(DISTINCT CASE WHEN {$qual} THEN b.BookingID END) AS n,
+                COUNT(DISTINCT CASE WHEN {$qual} AND ({$gap}) > ? THEN b.BookingID END) AS slow_n
+            FROM ghl_processed_leads pl
+            INNER JOIN booking b ON b.BookingID = pl.booking_id
+            WHERE b.CancelStatus = 'N'
+              AND b.Status != 'N'
+              AND b.BookingConfirmationTitle = 'BOOKING CONFIRMATION'
+              AND pl.lead_started_at >= ?
+              AND pl.lead_started_at <= ?
+        ";
+        $row = $this->db->query($sql, array(
+            (int) $slow_threshold_seconds,
+            $start_date . ' 00:00:00',
+            $end_date . ' 23:59:59',
+        ))->row_array();
+
+        return array(
+            'avg_seconds' => (isset($row['avg_seconds']) && $row['avg_seconds'] !== null)
+                ? (int) round((float) $row['avg_seconds'])
+                : null,
+            'count'      => !empty($row['n'])      ? (int) $row['n']      : 0,
+            'slow_count' => !empty($row['slow_n']) ? (int) $row['slow_n'] : 0,
         );
     }
 
@@ -2073,7 +2133,7 @@ class Report_Model extends CI_Model
      * @return array Rows keyed: message_timestamp, direction, from_number,
      *               to_number, agent, body.
      */
-    function Ghl_Messages_Log($startDate, $endDate, $limit, $offset, $contact = '')
+    function Ghl_Messages_Log($startDate, $endDate, $limit, $offset, $contact = '', $agent = '')
     {
         $messageTimeColumn = $this->escape_identifier($this->get_message_time_column());
 
@@ -2082,6 +2142,7 @@ class Report_Model extends CI_Model
             $endDate . ' 23:59:59',
         );
         $contactClause = $this->ghl_message_contact_clause($contact, $params);
+        $agentClause = $this->ghl_message_agent_clause($agent, $params);
         $params[] = (int) $limit;
         $params[] = (int) $offset;
 
@@ -2100,6 +2161,7 @@ class Report_Model extends CI_Model
             WHERE gm.{$messageTimeColumn} >= ?
               AND gm.{$messageTimeColumn} <= ?
               {$contactClause}
+              {$agentClause}
             ORDER BY gm.{$messageTimeColumn} DESC, gm.id DESC
             LIMIT ? OFFSET ?
         ";
@@ -2127,7 +2189,7 @@ class Report_Model extends CI_Model
      * @return array Rows keyed: contact_name, message_timestamp, direction,
      *               from_number, to_number, agent, body.
      */
-    function Ghl_Messages_Log_Export($startDate, $endDate, $limit, $offset, $contact = '')
+    function Ghl_Messages_Log_Export($startDate, $endDate, $limit, $offset, $contact = '', $agent = '')
     {
         $messageTimeColumn = $this->escape_identifier($this->get_message_time_column());
 
@@ -2136,6 +2198,7 @@ class Report_Model extends CI_Model
             $endDate . ' 23:59:59',
         );
         $contactClause = $this->ghl_message_contact_clause($contact, $params);
+        $agentClause = $this->ghl_message_agent_clause($agent, $params);
         $params[] = (int) $limit;
         $params[] = (int) $offset;
 
@@ -2155,6 +2218,7 @@ class Report_Model extends CI_Model
             WHERE gm.{$messageTimeColumn} >= ?
               AND gm.{$messageTimeColumn} <= ?
               {$contactClause}
+              {$agentClause}
             ORDER BY COALESCE(gc.contact_id, gm.conversation_id, '') ASC,
                      gm.conversation_id ASC,
                      gm.{$messageTimeColumn} ASC,
@@ -2175,23 +2239,110 @@ class Report_Model extends CI_Model
      *                          thread for that number when set.
      * @return int
      */
-    function Ghl_Messages_Log_Count($startDate, $endDate, $contact = '')
+    function Ghl_Messages_Log_Count($startDate, $endDate, $contact = '', $agent = '')
     {
         $messageTimeColumn = $this->escape_identifier($this->get_message_time_column());
 
         $params = array($startDate . ' 00:00:00', $endDate . ' 23:59:59');
         $contactClause = $this->ghl_message_contact_clause($contact, $params);
+        $agentClause = $this->ghl_message_agent_clause($agent, $params);
+
+        // The agent filter compares the resolved agent name, so the user/conversation
+        // joins are only needed -- and only added -- when an agent is selected. They
+        // stay out of the unfiltered count to avoid any chance of row fan-out.
+        $agentJoins = $agentClause !== ''
+            ? " LEFT JOIN ghl_users gu ON gu.UserID = gm.user_id
+                LEFT JOIN ghl_conversations gc ON gc.conversation_id = gm.conversation_id
+                LEFT JOIN ghl_users gu_assigned ON gu_assigned.UserID = gc.assigned_to "
+            : '';
 
         $row = $this->db->query(
             "SELECT COUNT(*) AS total
                FROM ghl_messages gm
+               {$agentJoins}
               WHERE gm.{$messageTimeColumn} >= ?
                 AND gm.{$messageTimeColumn} <= ?
-                {$contactClause}",
+                {$contactClause}
+                {$agentClause}",
             $params
         )->row_array();
 
         return isset($row['total']) ? (int) $row['total'] : 0;
+    }
+
+    /**
+     * Average consecutive same-day reply gap (in seconds) for the Message Log,
+     * across the whole filtered range -- NOT just the visible page. Used by the
+     * agent-filtered view to show how fast an agent moves between messages.
+     *
+     * The per-day aggregate (count, min, max time) is reduced in PHP by
+     * ghl_message_log_average_gap_seconds(), which telescopes each day's
+     * consecutive gaps to (max - min) over (count - 1) intervals. The HAVING
+     * drops single-message days that have no interval to average.
+     *
+     * @param string $startDate 'Y-m-d' inclusive lower bound.
+     * @param string $endDate   'Y-m-d' inclusive upper bound.
+     * @param string $contact   Optional contact-number filter.
+     * @param string $agent     Optional resolved agent-name filter.
+     * @return float|null Average seconds, or null when nothing to average.
+     */
+    function Ghl_Messages_Log_Avg_Reply_Seconds($startDate, $endDate, $contact = '', $agent = '')
+    {
+        $messageTimeColumn = $this->escape_identifier($this->get_message_time_column());
+
+        $params = array($startDate . ' 00:00:00', $endDate . ' 23:59:59');
+        $contactClause = $this->ghl_message_contact_clause($contact, $params);
+        $agentClause = $this->ghl_message_agent_clause($agent, $params);
+
+        // Joins are needed only when filtering by the resolved agent name.
+        $agentJoins = $agentClause !== ''
+            ? " LEFT JOIN ghl_users gu ON gu.UserID = gm.user_id
+                LEFT JOIN ghl_conversations gc ON gc.conversation_id = gm.conversation_id
+                LEFT JOIN ghl_users gu_assigned ON gu_assigned.UserID = gc.assigned_to "
+            : '';
+
+        $rows = $this->db->query(
+            "SELECT DATE(gm.{$messageTimeColumn}) AS d,
+                    COUNT(*) AS count,
+                    MIN(gm.{$messageTimeColumn}) AS min_ts,
+                    MAX(gm.{$messageTimeColumn}) AS max_ts
+               FROM ghl_messages gm
+               {$agentJoins}
+              WHERE gm.{$messageTimeColumn} >= ?
+                AND gm.{$messageTimeColumn} <= ?
+                {$contactClause}
+                {$agentClause}
+              GROUP BY DATE(gm.{$messageTimeColumn})
+             HAVING COUNT(*) >= 2",
+            $params
+        )->result_array();
+
+        return ghl_message_log_average_gap_seconds($rows);
+    }
+
+    /**
+     * Distinct agent names available to the Message Log agent filter. Restricted
+     * to agents that actually appear in the log -- either as a message sender
+     * (ghl_messages.user_id) or as a chatroom assignee (ghl_conversations.
+     * assigned_to) -- so the dropdown never pads out with named GHL users who
+     * never touched a conversation. Names match the resolved Agent column exactly.
+     *
+     * @return array List of agent name strings, ordered A-Z.
+     */
+    function Ghl_Message_Log_Agents()
+    {
+        $rows = $this->db->query(
+            "SELECT DISTINCT gu.Name
+               FROM ghl_users gu
+              WHERE gu.Name IS NOT NULL AND gu.Name <> ''
+                AND (
+                    gu.UserID IN (SELECT user_id FROM ghl_messages WHERE user_id IS NOT NULL AND user_id <> '')
+                    OR gu.UserID IN (SELECT assigned_to FROM ghl_conversations WHERE assigned_to IS NOT NULL AND assigned_to <> '')
+                )
+              ORDER BY gu.Name ASC"
+        )->result_array();
+
+        return array_column($rows, 'Name');
     }
 
     /**
@@ -2219,6 +2370,29 @@ class Report_Model extends CI_Model
         $params[] = $like;
 
         return " AND ({$normFrom} LIKE ? OR {$normTo} LIKE ?)";
+    }
+
+    /**
+     * Build the optional agent WHERE fragment (and append its bound param) for the
+     * Message Log queries. The filter matches the *resolved* agent -- the same
+     * COALESCE(sender name, assigned-chatroom name) shown in the Agent column --
+     * so the filtered list always agrees with what the reader sees. Requires the
+     * gu / gu_assigned joins to be present in the query.
+     *
+     * @param string $agent  Resolved agent name to match exactly.
+     * @param array  $params Query params, appended to in place.
+     * @return string SQL fragment beginning with ' AND ...', or '' when no filter.
+     */
+    protected function ghl_message_agent_clause($agent, array &$params)
+    {
+        $agent = trim((string) $agent);
+        if ($agent === '') {
+            return '';
+        }
+
+        $params[] = $agent;
+
+        return " AND COALESCE(NULLIF(gu.Name, ''), NULLIF(gu_assigned.Name, '')) = ?";
     }
 
     /**

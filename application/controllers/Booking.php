@@ -1669,6 +1669,34 @@ class Booking extends MY_Controller
 				);
 			}
 
+			// Conversion Time (this month, company-wide). How long converted BCs
+			// took to convert — wall-clock gap from the lead opening the GHL
+			// conversation to it being marked converted. "Avg Conversion Time"
+			// averages the gap across every agent's converted BCs this month;
+			// "Slow Conversions (> 24h)" counts the BCs that took longer than a
+			// day and links to them so OP can analyse why. Both come from one
+			// Lead_Conversion_Time_Summary call (live BCs only, windowed by lead
+			// start) so the slow count and its drill-down (?slow_conversion=1)
+			// agree; lead_month carries the same window to the listing filter.
+			$this->load->model('Report_Model');
+			$this->load->helper('response_time');
+			$conv_time = $this->Report_Model->Lead_Conversion_Time_Summary(
+				$month_start, $month_end, 86400
+			);
+			$cards['conversion_time_month'] = array(
+				'value'   => format_response_duration($conv_time['avg_seconds']),
+				'count'   => $conv_time['count'],
+				'seconds' => $conv_time['avg_seconds'],
+			);
+			$cards['slow_conversion_month'] = array(
+				'count' => $conv_time['slow_count'],
+				'link'  => $base . $qs(array(
+					'slow_conversion' => 1,
+					'lead_month'      => date('Y-m', strtotime($month_start)),
+					'status'          => 'A',
+				)),
+			);
+
 			$row = $this->db->query(
 				"SELECT
 				   SUM(CASE WHEN Status='P'   THEN 1 ELSE 0 END) AS s_p,
@@ -1738,6 +1766,89 @@ class Booking extends MY_Controller
 				'link'  => $base . $qs(array('guest_list_status' => 'submitted')),
 			);
 
+			// ---------- OP operational queue cards (team-wide) ----------
+			// Pending BC (PB) — bookings parked at "Pending BC", waiting to be
+			// confirmed. status=PB mirrors the shared status filter so the card
+			// count and the drill-down listing agree row-for-row.
+			$row = $this->db->query(
+				"SELECT COUNT(*) AS cnt FROM booking
+				 WHERE CancelStatus='N' AND Status='PB'"
+			)->row();
+			$cards['pending_bc_op'] = array(
+				'count' => (int)$row->cnt,
+				'link'  => $base . $qs(array('status' => 'PB')),
+			);
+
+			// Pending BC Confirmation (PBC) — bookings awaiting BC confirmation.
+			$row = $this->db->query(
+				"SELECT COUNT(*) AS cnt FROM booking
+				 WHERE CancelStatus='N' AND Status='PBC'"
+			)->row();
+			$cards['pending_bc_confirmation_op'] = array(
+				'count' => (int)$row->cnt,
+				'link'  => $base . $qs(array('status' => 'PBC')),
+			);
+
+			// Travelling Tomorrow (regardless of status) — BCs whose travel STARTS
+			// tomorrow, any workflow status. Drill-down: status=A drops the list's
+			// default AfterSalesService='PENDING' gate; travel_start_date scopes
+			// StartDate to tomorrow exactly (the generic travel_date overlap clause
+			// would also pull in trips merely spanning tomorrow, breaking parity);
+			// booking_confirmation_title matches the card's confirmations-only scope.
+			$tomorrow = $next7_start; // date('Y-m-d', strtotime('+1 day'))
+			$row = $this->db->query(
+				"SELECT COUNT(*) AS cnt FROM booking
+				 WHERE BookingConfirmationTitle='BOOKING CONFIRMATION'
+				   AND CancelStatus='N' AND Status!='N'
+				   AND StartDate BETWEEN ? AND ?",
+				array($tomorrow, $tomorrow)
+			)->row();
+			$cards['travel_tomorrow_op'] = array(
+				'count' => (int)$row->cnt,
+				'link'  => $base . $qs(array(
+					'travel_start_date'          => $fmt_dmy($tomorrow) . ' - ' . $fmt_dmy($tomorrow),
+					'status'                     => 'A',
+					'booking_confirmation_title' => 'BOOKING CONFIRMATION',
+				)),
+			);
+
+			// Travelling Tomorrow & NOT Pending Travel (red card) — same departing-
+			// tomorrow set as above but excluding the already-ready Pending Travel
+			// (PT) BCs. These are the urgent gap: guests travel tomorrow yet the BC
+			// is not flagged "Pending Travel". exclude_status=PT removes PT from the
+			// drill-down so it matches the card count.
+			$row = $this->db->query(
+				"SELECT COUNT(*) AS cnt FROM booking
+				 WHERE BookingConfirmationTitle='BOOKING CONFIRMATION'
+				   AND CancelStatus='N' AND Status!='N' AND Status!='PT'
+				   AND StartDate BETWEEN ? AND ?",
+				array($tomorrow, $tomorrow)
+			)->row();
+			$cards['travel_tomorrow_not_ready_op'] = array(
+				'count' => (int)$row->cnt,
+				'link'  => $base . $qs(array(
+					'travel_start_date'          => $fmt_dmy($tomorrow) . ' - ' . $fmt_dmy($tomorrow),
+					'status'                     => 'A',
+					'exclude_status'             => 'PT',
+					'booking_confirmation_title' => 'BOOKING CONFIRMATION',
+				)),
+			);
+
+			// Travel Completed - Pending Review (team-wide) — BCs whose travel has
+			// ended (Status='Y') with after-sales review still pending. status=PR
+			// mirrors the PR code in booking_status_filter_helper.
+			$row = $this->db->query(
+				"SELECT COUNT(*) AS cnt FROM booking
+				 WHERE BookingConfirmationTitle='BOOKING CONFIRMATION'
+				   AND CancelStatus='N'
+				   AND AfterSalesService='PENDING'
+				   AND Status='Y'"
+			)->row();
+			$cards['pending_review_op'] = array(
+				'count' => (int)$row->cnt,
+				'link'  => $base . $qs(array('status' => 'PR')),
+			);
+
 			// Pending Insurance Checklist — bookings with an active line whose
 			// product carries an "Insurance" package_checklist that hasn't yet
 			// been ticked. disable_checklist_payment_out=0 mirrors the
@@ -1749,6 +1860,14 @@ class Booking extends MY_Controller
 			// the SAME range-overlap predicate as the generic ?travel_date
 			// filter (Booking_Model::filter_bookings) with a far-future upper
 			// bound, so the card and its drill-down stay in exact agreement.
+			// "Exclude completed & pending-review" card toggle: when on, drop BCs
+			// whose travel is already finished (booking.Status='Y' — both COMPLETE
+			// and PENDING-REVIEW after-sales states) so the queue shows only
+			// still-actionable trips. The drill-down carries ?exclude_finished=1
+			// (honoured by Booking_Model::apply_booking_filters) so it stays in
+			// exact agreement with this count.
+			$insurance_exclude_finished = !empty($this->input->get('insurance_exclude_finished'));
+			$insurance_finished_clause  = $insurance_exclude_finished ? " AND booking.Status != 'Y'" : '';
 			$insurance_window_start = date('Y') . '-03-01';
 			$insurance_window_end   = date('Y', strtotime('+5 years')) . '-12-31';
 			$insurance_ids = $this->db
@@ -1767,7 +1886,7 @@ class Booking extends MY_Controller
 					"SELECT COUNT(DISTINCT booking.BookingID) AS cnt
 					 FROM booking
 					 WHERE booking.BookingConfirmationTitle='BOOKING CONFIRMATION'
-					   AND booking.CancelStatus='N' AND booking.Status!='N'
+					   AND booking.CancelStatus='N' AND booking.Status!='N'{$insurance_finished_clause}
 					   AND ((booking.StartDate <= ? AND booking.EndDate >= ?)
 					        OR (booking.StartDate >= ? AND booking.StartDate <= ?)
 					        OR (booking.EndDate >= ? AND booking.EndDate <= ?))
@@ -1804,13 +1923,14 @@ class Booking extends MY_Controller
 			// the already-completed BCs the card counts, so 56 on the card would
 			// open as 11 in the list. Card is the source of truth.
 			$cards['insurance_pending'] = array(
-				'count' => $insurance_count,
-				'link'  => $base . $qs(array(
+				'count'            => $insurance_count,
+				'exclude_finished' => $insurance_exclude_finished,
+				'link'             => $base . $qs(array_merge(array(
 					'checklist_filter'           => implode(',', $insurance_ids),
 					'travel_date'                => $fmt_dmy($insurance_window_start) . ' - ' . $fmt_dmy($insurance_window_end),
 					'status'                     => 'A',
 					'booking_confirmation_title' => 'BOOKING CONFIRMATION',
-				)),
+				), $insurance_exclude_finished ? array('exclude_finished' => 1) : array())),
 			);
 
 			// Pending Ferry Transfer Checklist (travel this & next month) —
@@ -1943,6 +2063,100 @@ class Booking extends MY_Controller
 				);
 			}
 			$tables['supplier_due_soon'] = $due_out;
+
+			// Supplier Pay-out Checklist Due Soon — the checklist counterpart to
+			// Supplier Pay-out Due Soon above. That card reads the payment table
+			// (payouts already created); this one flags BCs whose "Payment Out To
+			// Supplier (full|deposit)" CHECKLIST is not ticked yet, bucketed by the
+			// payout deadline on the line (booking_product.PaymentOutSupplierFull /
+			// PaymentOutSupplierDeposit). Same signal the cron reminders use
+			// (Cronjob_Model::get_bookings_with_supplier_date). Count only — no
+			// payment record exists yet, so no firm RM amount to total.
+			$cp_due_end   = date('Y-m-d', strtotime('+1 day'));  // tomorrow — window upper bound
+			$cp_due_start = date('Y') . '-03-01';                // overdue lookback floor: 1 March, current year
+			$full_pc = $this->db->select('ID')->from('package_checklist')->like('name', 'Payment Out To Supplier (full)', 'both')->get()->row();
+			$dep_pc  = $this->db->select('ID')->from('package_checklist')->like('name', 'Payment Out To Supplier (deposit)', 'both')->get()->row();
+			$cp_full_id = $full_pc ? (int)$full_pc->ID : 0;
+			$cp_dep_id  = $dep_pc  ? (int)$dep_pc->ID  : 0;
+
+			// One qualifying "due line" branch per payout checklist. A line counts
+			// when it is active, its product is non-child/infant and carries the
+			// checklist, the matching deadline is set, the booking is a live BC,
+			// and no completion row exists for that checklist on that line.
+			$cp_branch = function($checklist_id, $date_col) {
+				return "SELECT bp.BookingID AS bid, p.SupplierID AS sid, bp.{$date_col} AS dl"
+					. " FROM booking_product bp"
+					. " JOIN product p ON p.ProductID = bp.ProductID AND p.is_child_or_infant = 0"
+					. " JOIN product_package_checklist ppc ON ppc.product_id = bp.ProductID"
+					. " AND JSON_CONTAINS(ppc.package_checklist_json, '{$checklist_id}')"
+					. " JOIN booking b ON b.BookingID = bp.BookingID"
+					. " WHERE bp.Status = 'Y' AND bp.disable_checklist_payment_out = 0"
+					. " AND bp.{$date_col} IS NOT NULL"
+					. " AND b.BookingConfirmationTitle = 'BOOKING CONFIRMATION'"
+					. " AND b.CancelStatus = 'N' AND b.Status != 'N'"
+					. " AND NOT EXISTS (SELECT 1 FROM booking_checklist_completion bcc"
+					. " WHERE bcc.booking_id = bp.BookingID AND bcc.product_id = bp.ProductID"
+					. " AND bcc.package_checklist_id = {$checklist_id})";
+			};
+			$cp_branches = array();
+			if($cp_full_id) { $cp_branches[] = $cp_branch($cp_full_id, 'PaymentOutSupplierFull'); }
+			if($cp_dep_id)  { $cp_branches[] = $cp_branch($cp_dep_id,  'PaymentOutSupplierDeposit'); }
+
+			if(!empty($cp_branches)) {
+				$cp_union = implode("\nUNION ALL\n", $cp_branches);
+				$row = $this->db->query(
+					"SELECT
+					    COUNT(DISTINCT CASE WHEN dl <  ? THEN bid END) AS overdue_cnt,
+					    COUNT(DISTINCT CASE WHEN dl =  ? THEN bid END) AS today_cnt,
+					    COUNT(DISTINCT CASE WHEN dl =  ? THEN bid END) AS tomorrow_cnt
+					 FROM ({$cp_union}) due
+					 WHERE dl BETWEEN ? AND ?",
+					array($today, $today, $cp_due_end, $cp_due_start, $cp_due_end)
+				)->row();
+			} else {
+				$row = (object)array('overdue_cnt' => 0, 'today_cnt' => 0, 'tomorrow_cnt' => 0);
+			}
+			// status=A (active: not deleted, not cancelled) + the confirmation title
+			// reproduce the card's own row filters and suppress the booking list's
+			// default AfterSalesService='PENDING' gate, so the drill-down matches
+			// the card row-for-row (see Booking_Model::apply_checklist_payout_filter).
+			$cp_link = function($bucket) use ($base, $qs) {
+				return $base . $qs(array(
+					'checklist_payout'           => $bucket,
+					'status'                     => 'A',
+					'booking_confirmation_title' => 'BOOKING CONFIRMATION',
+				));
+			};
+			$cards['checklist_payout_due_soon'] = array(
+				'overdue'  => array('count' => (int)$row->overdue_cnt,  'link' => $cp_link('overdue')),
+				'today'    => array('count' => (int)$row->today_cnt,    'link' => $cp_link('today')),
+				'tomorrow' => array('count' => (int)$row->tomorrow_cnt, 'link' => $cp_link('tomorrow')),
+			);
+
+			$cp_out = array();
+			if(!empty($cp_branches)) {
+				$cp_rows = $this->db->query(
+					"SELECT supplier.SupplierID AS sid, supplier.Name AS name,
+					        COUNT(*) AS cnt,
+					        MIN(due.dl) AS earliest_deadline
+					 FROM ({$cp_union}) due
+					 JOIN supplier ON supplier.SupplierID = due.sid
+					 WHERE due.dl BETWEEN ? AND ?
+					 GROUP BY supplier.SupplierID, supplier.Name
+					 ORDER BY MIN(due.dl) ASC, COUNT(*) DESC
+					 LIMIT 5",
+					array($cp_due_start, $cp_due_end)
+				)->result();
+				foreach($cp_rows as $r) {
+					$cp_out[] = array(
+						'supplier_id'       => (int)$r->sid,
+						'name'              => $r->name,
+						'count'             => (int)$r->cnt,
+						'earliest_deadline' => $r->earliest_deadline ? $fmt_dmy($r->earliest_deadline) : '-',
+					);
+				}
+			}
+			$tables['checklist_payout_due_soon'] = $cp_out;
 
 			$dest_rows = $this->db->query(
 				"SELECT category.Name AS destination, category.CategoryID AS id,
@@ -2484,6 +2698,7 @@ class Booking extends MY_Controller
 
 		if(isset($cards['insurance_pending'])) {
 			$ip = (int)$cards['insurance_pending']['count'];
+			$ef = !empty($cards['insurance_pending']['exclude_finished']);
 			$popovers['pop-insurance-pending'] =
 				'<strong>Counted when, for an active line item:</strong>' .
 				'<ul>' .
@@ -2492,8 +2707,10 @@ class Booking extends MY_Controller
 				'<li><code>booking_product.disable_checklist_payment_out = 0</code> (the same rule the modal/filter uses)</li>' .
 				'<li>BC, not cancelled, not draft</li>' .
 				'<li>Travel from <strong>' . $fmt_disp($insurance_window_start) . '</strong> onwards (1 March of the current year)</li>' .
+				($ef ? '<li><em>Excluding completed &amp; pending-review BCs (toggle on)</em></li>' : '') .
 				'</ul>' .
 				'<strong>Live queue &middot; as of ' . $fmt_disp($today) . '</strong> &mdash; travel from ' . $fmt_disp($insurance_window_start) . ' onwards.<br>' .
+				'<strong>Toggle:</strong> "Exclude completed &amp; pending-review" drops BCs whose travel has finished (<code>Status = Y</code>, either after-sales state) so only still-actionable trips remain.<br>' .
 				'<strong>This card:</strong> ' .
 				'Insurance pending &rarr; <strong>' . $ip . ' ' . $plural($ip, 'BC') . '</strong><br><br>' .
 				'<strong>Action:</strong> Click to filter the list to these BCs and tick off insurance.';
@@ -2528,6 +2745,69 @@ class Booking extends MY_Controller
 				'<strong>This card:</strong> ' .
 				'Submitted, not yet locked &rarr; <strong>' . $g . ' ' . $plural($g, 'BC') . '</strong><br><br>' .
 				'<strong>Action:</strong> Review for completeness, then lock to stop further customer edits.';
+		}
+
+		// OP operational queue cards.
+		if(isset($cards['pending_bc_op'])) {
+			$n = (int)$cards['pending_bc_op']['count'];
+			$popovers['pop-pending-bc-op'] =
+				'<strong>Counted when:</strong>' .
+				'<ul>' .
+				'<li>Booking parked at <strong>PENDING BC</strong> (<code>Status=PB</code>)</li>' .
+				'<li>Not cancelled</li>' .
+				'</ul>' .
+				'<strong>Team-wide live backlog &middot; as of ' . $fmt_disp($today) . '</strong> &mdash; no date window.<br>' .
+				'<strong>This card:</strong> ' . $n . ' ' . $plural($n, 'BC') . ' &rarr; <strong>' . $n . '</strong><br><br>' .
+				'<strong>Action:</strong> Click to view and progress them to Pending BC Confirmation.';
+		}
+		if(isset($cards['pending_bc_confirmation_op'])) {
+			$n = (int)$cards['pending_bc_confirmation_op']['count'];
+			$popovers['pop-pending-bc-confirmation-op'] =
+				'<strong>Counted when:</strong>' .
+				'<ul>' .
+				'<li>Booking parked at <strong>PENDING BC CONFIRMATION</strong> (<code>Status=PBC</code>)</li>' .
+				'<li>Not cancelled</li>' .
+				'</ul>' .
+				'<strong>Team-wide live backlog &middot; as of ' . $fmt_disp($today) . '</strong> &mdash; no date window.<br>' .
+				'<strong>This card:</strong> ' . $n . ' ' . $plural($n, 'BC') . ' &rarr; <strong>' . $n . '</strong><br><br>' .
+				'<strong>Action:</strong> Click to view and approve the booking confirmation.';
+		}
+		if(isset($cards['travel_tomorrow_op'])) {
+			$n = (int)$cards['travel_tomorrow_op']['count'];
+			$popovers['pop-travel-tomorrow-op'] =
+				'<strong>Counted when:</strong>' .
+				'<ul>' .
+				'<li>Travel <strong>starts tomorrow</strong> (' . $fmt_disp($tomorrow) . ')</li>' .
+				'<li>Booking confirmation; not cancelled, not draft</li>' .
+				'<li><strong>Any</strong> workflow status</li>' .
+				'</ul>' .
+				'<strong>This card (team-wide):</strong> ' . $n . ' ' . $plural($n, 'BC') . ' &rarr; <strong>' . $n . '</strong><br><br>' .
+				'<strong>Note:</strong> Scoped by departure date (StartDate = tomorrow), not trips merely spanning tomorrow.';
+		}
+		if(isset($cards['travel_tomorrow_not_ready_op'])) {
+			$n = (int)$cards['travel_tomorrow_not_ready_op']['count'];
+			$popovers['pop-travel-tomorrow-not-ready-op'] =
+				'<strong>Counted when:</strong>' .
+				'<ul>' .
+				'<li>Travel <strong>starts tomorrow</strong> (' . $fmt_disp($tomorrow) . ')</li>' .
+				'<li>Status is <strong>NOT</strong> Pending Travel (<code>Status &ne; PT</code>)</li>' .
+				'<li>Booking confirmation; not cancelled, not draft</li>' .
+				'</ul>' .
+				'<strong>This card (team-wide):</strong> ' . $n . ' ' . $plural($n, 'BC') . ' &rarr; <strong>' . $n . '</strong><br><br>' .
+				'<strong>Why it matters:</strong> Guests travel tomorrow yet the BC has not reached Pending Travel &mdash; chase these first.';
+		}
+		if(isset($cards['pending_review_op'])) {
+			$n = (int)$cards['pending_review_op']['count'];
+			$popovers['pop-pending-review-op'] =
+				'<strong>Counted when:</strong>' .
+				'<ul>' .
+				'<li>Travel has ended (<code>Status=Y</code>, COMPLETED)</li>' .
+				'<li>After-sales review still pending (<code>AfterSalesService=PENDING</code>)</li>' .
+				'<li>Booking confirmation; not cancelled</li>' .
+				'</ul>' .
+				'<strong>Team-wide live queue &middot; as of ' . $fmt_disp($today) . '</strong>.<br>' .
+				'<strong>This card:</strong> ' . $n . ' ' . $plural($n, 'BC') . ' &rarr; <strong>' . $n . '</strong><br><br>' .
+				'<strong>Action:</strong> Close the loop with the customer, then mark the booking complete.';
 		}
 
 		if(isset($tables['destination_sales'])) {
@@ -2708,6 +2988,29 @@ class Booking extends MY_Controller
 				'</ul>' .
 				'<strong>This card:</strong> ' . $ds_total . ' ' . $plural($ds_total, 'payout') . ' across the window; top ' . $rows_n . ' ' . $plural($rows_n, 'supplier') . ' shown, earliest deadline first.<br><br>' .
 				'<strong>Excludes:</strong> Already paid (Status=Y), deleted (Status=N), customer payment-ins, agent-commission entries.';
+		}
+
+		if(isset($cards['checklist_payout_due_soon'])) {
+			$cp = $cards['checklist_payout_due_soon'];
+			$cp_rows_n = isset($tables['checklist_payout_due_soon']) ? count($tables['checklist_payout_due_soon']) : 0;
+			$cp_total = (int)$cp['overdue']['count'] + (int)$cp['today']['count'] + (int)$cp['tomorrow']['count'];
+			$popovers['pop-checklist-payout-due-soon'] =
+				'<strong>Counted when, for an active line item:</strong>' .
+				'<ul>' .
+				'<li>Product carries a &ldquo;Payment Out To Supplier (full / deposit)&rdquo; checklist</li>' .
+				'<li>The checklist is <strong>not ticked yet</strong> (no completion record on that line)</li>' .
+				'<li><code>booking_product.disable_checklist_payment_out = 0</code> (the same rule the modal/filter uses)</li>' .
+				'<li>Pay-out deadline (full &rarr; <code>PaymentOutSupplierFull</code>, deposit &rarr; <code>PaymentOutSupplierDeposit</code>) ' . $rng_disp($cp_due_start, $cp_due_end) . '</li>' .
+				'<li>BC, not cancelled, not draft</li>' .
+				'</ul>' .
+				'<strong>Bucketed by deadline:</strong>' .
+				'<ul>' .
+				'<li><strong>Overdue</strong> &mdash; ' . $fmt_disp($cp_due_start) . ' to before today (' . $fmt_disp($today) . '): <strong>' . (int)$cp['overdue']['count'] . '</strong> BCs</li>' .
+				'<li><strong>Today</strong>: <strong>' . (int)$cp['today']['count'] . '</strong> BCs</li>' .
+				'<li><strong>Tomorrow</strong> (' . $fmt_disp($cp_due_end) . '): <strong>' . (int)$cp['tomorrow']['count'] . '</strong> BCs</li>' .
+				'</ul>' .
+				'<strong>This card:</strong> the table lists top ' . $cp_rows_n . ' ' . $plural($cp_rows_n, 'supplier') . ' across the window, earliest deadline first.<br>' .
+				'<strong>Difference from Supplier Pay-out Due Soon:</strong> that card reads created payment-out records; this one flags pay-outs whose checklist has not been actioned yet, so no RM amount is shown.';
 		}
 
 		if(isset($tables['product_sales'])) {
