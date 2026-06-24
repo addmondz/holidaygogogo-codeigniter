@@ -2,19 +2,21 @@
 /**
  * Run with: php tests/helpers/OpCardsTc1ScopeTest.php
  *
- * Locks the rule: OP / OP TEAM LEAD (level 40/45) only see BCs where they are
- * the TC1 (booking.SalesAgent — the "Sales Agent" column in the booking
- * listing) across the summary cards AND the booking listing — with ONE
- * exception, the "Pending BC" card (status PB), which stays team-wide because
- * pending BCs have no TC1 assigned yet.
+ * Locks the rule: OP / OP TEAM LEAD (level 40/45) summary cards are scoped to
+ * the BCs of the user's whole OP TEAM (everyone under the same OP TEAM LEAD —
+ * see op_team_admin_ids / OpTeamAdminIdsTest) as TC1 (booking.SalesAgent), so
+ * teammates see each other's BCs. ONE exception: the "Pending BC" card (status
+ * PB) stays team-wide because pending BCs have no TC1 assigned yet.
  *
  * Two coordinated guarantees:
  *   - Card counts (Booking::ajax_summary_cards, $is_op block) carry
- *     `AND booking.SalesAgent = ?` everywhere EXCEPT pending_bc_op.
- *   - The booking listing (Booking_Model::apply_booking_filters) restricts
- *     level 40/45 to `SalesAgent = admin_id`, bypassed when status=PB, so each
- *     drill-down agrees with its card (same parity discipline as
- *     CLAUDE memory feedback_card_drilldown_status).
+ *     `AND booking.SalesAgent IN (<team>)` everywhere EXCEPT pending_bc_op.
+ *   - Each scoped card's drill-down link carries sales_agent=<team csv> (built via
+ *     the $op_link helper) so the listing filters to the same TC1 set and the
+ *     count/drill-down agree (CLAUDE memory feedback_card_drilldown_status). The
+ *     pending_bc_op link stays status=PB only (team-wide). The DEFAULT booking
+ *     listing is NOT scoped — without a sales_agent param it still shows all BCs,
+ *     so apply_booking_filters keeps no level 40/45 SalesAgent restriction.
  */
 
 if (!defined('BASEPATH')) {
@@ -34,20 +36,24 @@ $pdo->exec("CREATE TABLE booking (
     SalesAgent INTEGER
 )");
 
-$ME    = 100;  // logged-in OP user (as TC1)
-$OTHER = 200;  // another agent
+// Logged-in user's OP team = {HANI lead, CHEN}; OTHER is on a different team.
+$HANI  = 100;
+$CHEN  = 101;
+$OTHER = 200;
+$TEAM  = "{$HANI},{$CHEN}"; // the inlined "SalesAgent IN (...)" set
 
 $tomorrow = '2026-06-25';
 
 // Cols: id, title, CancelStatus, Status, AfterSalesService, StartDate, SalesAgent
 $pdo->exec("INSERT INTO booking VALUES
-    (1,  'BOOKING CONFIRMATION', 'N', 'PB',  'PENDING', '2026-12-01', {$ME}),    /* PB, mine                 */
-    (2,  'BOOKING CONFIRMATION', 'N', 'PB',  'PENDING', '2026-12-01', {$OTHER}), /* PB, other agent          */
-    (3,  'BOOKING CONFIRMATION', 'N', 'PB',  'PENDING', '2026-12-01', NULL),     /* PB, unassigned (no TC1)  */
-    (4,  'BOOKING CONFIRMATION', 'N', 'PBC', 'PENDING', '2026-12-01', {$ME}),    /* PBC, mine                */
-    (5,  'BOOKING CONFIRMATION', 'N', 'PBC', 'PENDING', '2026-12-01', {$OTHER}), /* PBC, other agent         */
-    (6,  'BOOKING CONFIRMATION', 'N', 'PBO', 'PENDING', '{$tomorrow}', {$ME}),   /* tomorrow, mine           */
-    (7,  'BOOKING CONFIRMATION', 'N', 'PBO', 'PENDING', '{$tomorrow}', {$OTHER}) /* tomorrow, other agent    */
+    (1,  'BOOKING CONFIRMATION', 'N', 'PB',  'PENDING', '2026-12-01', {$HANI}),   /* PB, team             */
+    (2,  'BOOKING CONFIRMATION', 'N', 'PB',  'PENDING', '2026-12-01', {$OTHER}),  /* PB, other team       */
+    (3,  'BOOKING CONFIRMATION', 'N', 'PB',  'PENDING', '2026-12-01', NULL),      /* PB, unassigned       */
+    (4,  'BOOKING CONFIRMATION', 'N', 'PBC', 'PENDING', '2026-12-01', {$HANI}),   /* PBC, Hani            */
+    (5,  'BOOKING CONFIRMATION', 'N', 'PBC', 'PENDING', '2026-12-01', {$CHEN}),   /* PBC, Chen (teammate) */
+    (6,  'BOOKING CONFIRMATION', 'N', 'PBC', 'PENDING', '2026-12-01', {$OTHER}),  /* PBC, other team      */
+    (7,  'BOOKING CONFIRMATION', 'N', 'PBO', 'PENDING', '{$tomorrow}', {$CHEN}),  /* tomorrow, teammate   */
+    (8,  'BOOKING CONFIRMATION', 'N', 'PBO', 'PENDING', '{$tomorrow}', {$OTHER}) /* tomorrow, other team */
 ");
 
 $count = function($where) use ($pdo) {
@@ -57,13 +63,14 @@ $count = function($where) use ($pdo) {
 // Pending BC card: UNTOUCHED — team-wide, all PB regardless of SalesAgent.
 $pending_bc = $count("CancelStatus='N' AND Status='PB'");
 
-// Every other OP card: scoped to the logged-in user's TC1 slot.
-$pending_bc_confirmation = $count("CancelStatus='N' AND Status='PBC' AND SalesAgent={$ME}");
-$travel_tomorrow         = $count("BookingConfirmationTitle='BOOKING CONFIRMATION' AND CancelStatus='N' AND Status!='N' AND StartDate='{$tomorrow}' AND SalesAgent={$ME}");
+// Every other OP card: scoped to the whole OP team (Hani + Chen), not just self.
+$pending_bc_confirmation = $count("CancelStatus='N' AND Status='PBC' AND SalesAgent IN ({$TEAM})");
+$travel_tomorrow         = $count("BookingConfirmationTitle='BOOKING CONFIRMATION' AND CancelStatus='N' AND Status!='N' AND StartDate='{$tomorrow}' AND SalesAgent IN ({$TEAM})");
 
-// Listing parity: level 40/45 drill-down adds SalesAgent=ME, except status=PB.
-$dd_pending_bc_confirmation = $count("CancelStatus='N' AND Status='PBC' AND SalesAgent={$ME}");
-$dd_pending_bc              = $count("CancelStatus='N' AND Status='PB'"); // status=PB bypass -> team-wide
+// Listing parity: a scoped card's drill-down link adds sales_agent=<team>, so the
+// list filters SalesAgent IN team. The pending_bc_op link omits it -> team-wide.
+$dd_pending_bc_confirmation = $count("CancelStatus='N' AND Status='PBC' AND SalesAgent IN ({$TEAM})");
+$dd_pending_bc              = $count("CancelStatus='N' AND Status='PB'");
 
 function assert_eq($label, $expected, $actual) {
     if ($expected === $actual) {
@@ -79,10 +86,10 @@ function assert_true($label, $cond) {
     else { echo "  FAIL  {$label}\n"; exit(1); }
 }
 
-// Behavioural: Pending BC stays team-wide; everything else is TC1-scoped.
+// Behavioural: Pending BC stays team-wide; everything else is whole-team scoped.
 assert_eq('pending BC team-wide (all PB incl. unassigned)', 3, $pending_bc);
-assert_eq('pending BC confirmation scoped to me',           1, $pending_bc_confirmation);
-assert_eq('travelling tomorrow scoped to me',               1, $travel_tomorrow);
+assert_eq('pending BC confirmation counts the whole team',  2, $pending_bc_confirmation); // Hani + Chen
+assert_eq('travelling tomorrow counts the whole team',      1, $travel_tomorrow);          // Chen
 
 // Parity: card count == drill-down list count.
 assert_eq('pending BC confirmation parity', $pending_bc_confirmation, $dd_pending_bc_confirmation);
@@ -92,12 +99,16 @@ assert_eq('pending BC parity (team-wide)',  $pending_bc,              $dd_pendin
 // Source-code locks.
 // ---------------------------------------------------------------------------
 $model = file_get_contents(__DIR__ . '/../../application/models/Booking_Model.php');
-// The OP listing scope: a level 40/45 branch that restricts SalesAgent and
-// bypasses on status=PB.
-assert_true('model scopes level 40/45 listing to SalesAgent',
-    preg_match('/\[40,\s*45\][\s\S]{0,260}?SalesAgent/', $model) === 1);
-assert_true('model bypasses OP listing scope when status=PB',
-    preg_match('/\[40,\s*45\][\s\S]{0,260}?(status[\'"\)\s]*[\s\S]{0,40}?PB|PB[\s\S]{0,40}?status)/', $model) === 1);
+// The DEFAULT OP listing must NOT be scoped — no level 40/45 SalesAgent
+// restriction in apply_booking_filters (it would hide all BCs by default).
+$abf_pos = strpos($model, 'private function apply_booking_filters');
+$abf = $abf_pos !== false ? substr($model, $abf_pos, 1200) : '';
+assert_true('apply_booking_filters has no level 40/45 SalesAgent restriction',
+    preg_match('/\[40,\s*45\][\s\S]{0,200}?SalesAgent/', $abf) === 0);
+// The drill-downs rely on the existing sales_agent filter param.
+assert_true('model supports the sales_agent filter param',
+    strpos($model, "input->get('sales_agent')") !== false
+    && strpos($model, "where_in('SalesAgent'") !== false);
 
 $controller = file_get_contents(__DIR__ . '/../../application/controllers/Booking.php');
 // Isolate the OP block so the locks below don't accidentally match TC-block code.
@@ -106,13 +117,21 @@ $fin_start = strpos($controller, 'if($is_finance) {');
 assert_true('controller has an $is_op block', $op_start !== false && $fin_start !== false && $fin_start > $op_start);
 $op_block = substr($controller, $op_start, $fin_start - $op_start);
 
+// The OP block resolves the team via op_team_admin_ids and scopes by IN(...).
+assert_true('OP block loads the op_team helper',
+    strpos($op_block, "load->helper('op_team')") !== false);
+assert_true('OP block resolves op_team_admin_ids for the logged-in user',
+    preg_match('/op_team_admin_ids\(\s*\$admin_id\s*,\s*\$level/', $op_block) === 1);
+assert_true('OP block scopes by SalesAgent IN (team)',
+    strpos($op_block, 'booking.SalesAgent IN ({$op_team_csv})') !== false);
+
 // pending_bc_op stays team-wide: its own query must NOT carry a SalesAgent filter.
 $pb_pos = strpos($op_block, "\$cards['pending_bc_op']");
 $pb_query = $pb_pos !== false ? substr($op_block, max(0, $pb_pos - 220), 220) : '';
 assert_true('pending_bc_op query stays team-wide (no SalesAgent filter)',
     strpos($pb_query, 'SalesAgent') === false);
 
-// The scoped cards must reference SalesAgent in the OP block.
+// The scoped cards exist in the OP block.
 foreach (array(
     "pending_bc_confirmation_op", "travel_tomorrow_op", "travel_tomorrow_not_ready_op",
     "pending_review_op", "gl_submitted", "insurance_pending", "ferry_pending",
@@ -121,16 +140,31 @@ foreach (array(
     $pos = strpos($op_block, "\$cards['{$card}']");
     assert_true("controller builds {$card} card", $pos !== false);
 }
-assert_true('OP block scopes queries by booking.SalesAgent',
-    substr_count($op_block, 'SalesAgent') >= 10);
+assert_true('OP block scopes queries by the team SalesAgent predicate',
+    substr_count($op_block, '$op_sa_in') >= 8
+    || substr_count($op_block, 'SalesAgent IN ({$op_team_csv})') >= 3);
 
-// Conversion helper accepts an optional SalesAgent scope.
+// Drill-down scoping: $op_link injects the team csv into sales_agent.
+assert_true('OP block defines an $op_link helper that injects the team sales_agent',
+    preg_match('/\$op_link\s*=\s*function[\s\S]{0,160}?sales_agent[\s\S]{0,60}?\$op_team_csv/', $op_block) === 1);
+assert_true('scoped OP card links go through $op_link',
+    substr_count($op_block, '$op_link(') >= 12);
+
+// pending_bc_op must NOT be scoped: its link stays on plain $qs (status=PB),
+// not $op_link (which would append sales_agent and hide the team-wide queue).
+$pb_link = $pb_pos !== false ? substr($op_block, $pb_pos, 200) : '';
+assert_true('pending_bc_op link uses status=PB on plain $qs (team-wide)',
+    strpos($pb_link, "\$base . \$qs(array('status' => 'PB'))") !== false);
+assert_true('pending_bc_op link does NOT go through $op_link',
+    strpos($pb_link, '$op_link(') === false);
+
+// Conversion helper accepts a team SalesAgent-ids scope and inlines IN(...).
 $helper = file_get_contents(__DIR__ . '/../../application/helpers/submitted_payment_response_helper.php');
 $cs_pos = strpos($helper, 'function submitted_payment_conversion_summary_sql');
 $cs_sig = $cs_pos !== false ? substr($helper, $cs_pos, 120) : '';
-assert_true('conversion summary helper takes a sales-agent scope param',
-    strpos($cs_sig, '$sales_agent_only') !== false);
-assert_true('conversion summary helper appends b.SalesAgent filter',
-    preg_match('/submitted_payment_conversion_summary_sql[\s\S]{0,900}?b\.SalesAgent\s*=\s*\?/', $helper) === 1);
+assert_true('conversion summary helper takes a sales-agent ids scope param',
+    strpos($cs_sig, '$sales_agent_ids') !== false);
+assert_true('conversion summary helper appends b.SalesAgent IN (...)',
+    preg_match('/submitted_payment_conversion_summary_sql[\s\S]{0,1100}?b\.SalesAgent\s+IN\s*\(/', $helper) === 1);
 
 echo "\nAll assertions passed.\n";

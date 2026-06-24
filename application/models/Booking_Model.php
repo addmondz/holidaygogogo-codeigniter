@@ -2029,17 +2029,6 @@ class Booking_Model extends CI_Model
 			$this->db->group_end();
 		}
 
-		// OP / OP TEAM LEAD (40/45): scope the listing to the user's own BCs as
-		// TC1 (booking.SalesAgent — the "Sales Agent" column), mirroring the TC
-		// restriction above so the OP summary cards and their drill-downs agree.
-		// Exception: the Pending BC drill-down (status=PB) stays team-wide —
-		// pending BCs have no TC1 assigned yet, so scoping would empty the queue.
-		// Matches the OP "Pending BC" card, which is also left team-wide.
-		if(in_array($this->session->userdata('level'), [40, 45])
-		   && $this->input->get('status') !== 'PB') {
-			$this->db->where('SalesAgent', $this->session->userdata('admin_id'));
-		}
-
 		// Hide completed bookings from TC only (SA can view in listing; detail page still blocks via Booking::View / Payment guards)
 		if($this->session->userdata('level') == 50) {
 			$this->db->where("NOT (booking.Status = 'Y' AND booking.AfterSalesService = 'COMPLETE')");

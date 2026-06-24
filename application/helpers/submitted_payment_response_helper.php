@@ -125,15 +125,19 @@ if (!function_exists('submitted_payment_conversion_summary_sql')) {
      * The threshold is a server-side constant inlined as an integer (numeric
      * UNIX_TIMESTAMP arithmetic, so no user input is interpolated).
      *
-     * @param int  $slow_threshold_seconds default 86400 (24h)
-     * @param bool $sales_agent_only       when true, scope to a single agent's
-     *                                      TC1 slot (b.SalesAgent) — appends one
-     *                                      placeholder the caller binds to the
-     *                                      admin_id. Used by the OP cards, which
-     *                                      only see BCs where they are the TC1.
+     * @param int       $slow_threshold_seconds default 86400 (24h)
+     * @param int[]|null $sales_agent_ids        when a non-empty list, scope to
+     *                                           those TC1 slots (b.SalesAgent IN
+     *                                           (...)). The OP cards pass the
+     *                                           logged-in user's whole OP team so
+     *                                           teammates share the metric. IDs
+     *                                           are cast to int and inlined (no
+     *                                           user input — admin ids from the
+     *                                           admin table), matching the inlined
+     *                                           threshold above.
      * @return string
      */
-    function submitted_payment_conversion_summary_sql($slow_threshold_seconds = 86400, $sales_agent_only = false)
+    function submitted_payment_conversion_summary_sql($slow_threshold_seconds = 86400, $sales_agent_ids = null)
     {
         $slow       = (int) $slow_threshold_seconds;
         $draft_join = submitted_payment_draft_window_sql_fragment();
@@ -149,8 +153,11 @@ if (!function_exists('submitted_payment_conversion_summary_sql')) {
                 WHERE d.first_sad_at >= ? AND d.first_sad_at <= ?
                   AND b.Status != 'N'
                   AND b.CancelStatus = 'N'";
-        if ($sales_agent_only) {
-            $sql .= " AND b.SalesAgent = ?";
+        if (!empty($sales_agent_ids)) {
+            $ids = array_values(array_filter(array_map('intval', (array) $sales_agent_ids)));
+            if (!empty($ids)) {
+                $sql .= " AND b.SalesAgent IN (" . implode(',', $ids) . ")";
+            }
         }
         return $sql;
     }

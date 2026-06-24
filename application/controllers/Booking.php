@@ -1651,6 +1651,30 @@ class Booking extends MY_Controller
 		// Owner is scoped to lead-conversion cards only, so they no longer
 		// trigger this block.
 		if($is_op) {
+			// Team scope: every OP card except "Pending BC" is scoped to the BCs
+			// of the user's whole OP team (everyone under the same OP TEAM LEAD,
+			// admin.OpTeamLeadID) as TC1 (booking.SalesAgent) — so e.g. a lead and
+			// their members all see each other's BCs. $op_sa_in is the inlined
+			// "SalesAgent IN (...)" predicate (admin ids are ints from the admin
+			// table, so safe to inline); $op_team_csv backs the drill-down links.
+			$this->load->helper('op_team');
+			$op_admins   = $this->db->select('AdminID, Level, OpTeamLeadID')
+				->where_in('Level', array('40', '45'))
+				->where('Status', 'Y')
+				->get('admin')->result();
+			$op_team_ids = op_team_admin_ids($admin_id, $level, $op_admins);
+			$op_team_csv = implode(',', $op_team_ids);
+			$op_sa_in    = "booking.SalesAgent IN ({$op_team_csv})";
+
+			// Each scoped card's drill-down link carries sales_agent=<team csv> so
+			// the listing filters to the same TC1 set and the count/list agree.
+			// The default booking listing (no sales_agent param) still shows all
+			// BCs; the "Pending BC" card link omits it and stays team-wide.
+			$op_link = function($params) use ($base, $qs, $op_team_csv) {
+				$params['sales_agent'] = $op_team_csv;
+				return $base . $qs($params);
+			};
+
 			if(!isset($cards['bc_week_month'])) {
 				$row = $this->db->query(
 					"SELECT
@@ -1659,14 +1683,14 @@ class Booking extends MY_Controller
 					 FROM booking
 					 WHERE BookingConfirmationTitle='BOOKING CONFIRMATION'
 					   AND CancelStatus='N' AND Status!='N'
-					   AND booking.SalesAgent = ?",
-					array($month_start, $month_end, $week_start, $week_end, $admin_id)
+					   AND {$op_sa_in}",
+					array($month_start, $month_end, $week_start, $week_end)
 				)->row();
 				$cards['bc_week_month'] = array(
 					'week'       => (int)$row->week_cnt,
 					'month'      => (int)$row->month_cnt,
-					'link_month' => $base . $qs(array('booking_date' => $fmt_dmy($month_start) . ' - ' . $fmt_dmy($month_end))),
-					'link_week'  => $base . $qs(array('booking_date' => $fmt_dmy($week_start) . ' - ' . $fmt_dmy($week_end))),
+					'link_month' => $op_link(array('booking_date' => $fmt_dmy($month_start) . ' - ' . $fmt_dmy($month_end))),
+					'link_week'  => $op_link(array('booking_date' => $fmt_dmy($week_start) . ' - ' . $fmt_dmy($week_end))),
 				);
 			}
 
@@ -1682,11 +1706,11 @@ class Booking extends MY_Controller
 			// definition so the slow count and the listing agree; lead_month
 			// carries the same draft-save month to the listing filter.
 			$this->load->helper(array('submitted_payment_response', 'response_time'));
-			// Scoped to the OP user's own TC1 slot (b.SalesAgent) so the card
-			// agrees with the SalesAgent-scoped slow-conversion drill-down.
+			// Scoped to the OP team's TC1 slots (b.SalesAgent) so the card agrees
+			// with the team-scoped slow-conversion drill-down (sales_agent=<team>).
 			$ct_row = $this->db->query(
-				submitted_payment_conversion_summary_sql(86400, true),
-				array($month_start . ' 00:00:00', $today . ' 23:59:59', $admin_id)
+				submitted_payment_conversion_summary_sql(86400, $op_team_ids),
+				array($month_start . ' 00:00:00', $today . ' 23:59:59')
 			)->row();
 			$ct_n    = !empty($ct_row) ? (int) $ct_row->n : 0;
 			$ct_secs = ($ct_n > 0 && $ct_row->avg_seconds !== null)
@@ -1698,7 +1722,7 @@ class Booking extends MY_Controller
 			);
 			$cards['slow_conversion_month'] = array(
 				'count' => !empty($ct_row) ? (int) $ct_row->slow_n : 0,
-				'link'  => $base . $qs(array(
+				'link'  => $op_link(array(
 					'slow_conversion' => 1,
 					'lead_month'      => date('Y-m', strtotime($month_start)),
 					'status'          => 'A',
@@ -1716,8 +1740,8 @@ class Booking extends MY_Controller
 				   AND CancelStatus='N'
 				   AND Status IN ('P','PBO','PGL','PTV')
 				   AND StartDate BETWEEN ? AND ?
-				   AND booking.SalesAgent = ?",
-				array($next7_start, $next7_end, $admin_id)
+				   AND {$op_sa_in}",
+				array($next7_start, $next7_end)
 			)->row();
 			$un_op_p   = (int)$row->s_p;
 			$un_op_pbo = (int)$row->s_pbo;
@@ -1729,7 +1753,7 @@ class Booking extends MY_Controller
 				'by_pbo' => $un_op_pbo,
 				'by_pgl' => $un_op_pgl,
 				'by_ptv' => $un_op_ptv,
-				'link'   => $base . $qs(array(
+				'link'   => $op_link(array(
 					'upcoming_not_ready' => 1,
 					'travel_date'        => $fmt_dmy($next7_start) . ' - ' . $fmt_dmy($next7_end),
 				)),
@@ -1747,8 +1771,8 @@ class Booking extends MY_Controller
 				   AND CancelStatus='N'
 				   AND Status IN ('P','PBO','PGL','PTV')
 				   AND StartDate BETWEEN ? AND ?
-				   AND booking.SalesAgent = ?",
-				array($next14_start, $next14_end, $admin_id)
+				   AND {$op_sa_in}",
+				array($next14_start, $next14_end)
 			)->row();
 			$un_op14_p   = (int)$row->s_p;
 			$un_op14_pbo = (int)$row->s_pbo;
@@ -1760,7 +1784,7 @@ class Booking extends MY_Controller
 				'by_pbo' => $un_op14_pbo,
 				'by_pgl' => $un_op14_pgl,
 				'by_ptv' => $un_op14_ptv,
-				'link'   => $base . $qs(array(
+				'link'   => $op_link(array(
 					'upcoming_not_ready' => 1,
 					'travel_date'        => $fmt_dmy($next14_start) . ' - ' . $fmt_dmy($next14_end),
 				)),
@@ -1769,12 +1793,11 @@ class Booking extends MY_Controller
 			// Shares guest_list_submitted_where() with the drill-down listing
 			// (?guest_list_status=submitted) so the card and the list always agree.
 			$row = $this->db->query(
-				"SELECT COUNT(*) AS cnt FROM booking WHERE " . guest_list_submitted_where() . " AND booking.SalesAgent = ?",
-				array($admin_id)
+				"SELECT COUNT(*) AS cnt FROM booking WHERE " . guest_list_submitted_where() . " AND {$op_sa_in}"
 			)->row();
 			$cards['gl_submitted'] = array(
 				'count' => (int)$row->cnt,
-				'link'  => $base . $qs(array('guest_list_status' => 'submitted')),
+				'link'  => $op_link(array('guest_list_status' => 'submitted')),
 			);
 
 			// ---------- OP operational queue cards (team-wide) ----------
@@ -1794,12 +1817,11 @@ class Booking extends MY_Controller
 			$row = $this->db->query(
 				"SELECT COUNT(*) AS cnt FROM booking
 				 WHERE CancelStatus='N' AND Status='PBC'
-				   AND booking.SalesAgent = ?",
-				array($admin_id)
+				   AND {$op_sa_in}"
 			)->row();
 			$cards['pending_bc_confirmation_op'] = array(
 				'count' => (int)$row->cnt,
-				'link'  => $base . $qs(array('status' => 'PBC')),
+				'link'  => $op_link(array('status' => 'PBC')),
 			);
 
 			// Travelling Tomorrow (regardless of status) — BCs whose travel STARTS
@@ -1814,12 +1836,12 @@ class Booking extends MY_Controller
 				 WHERE BookingConfirmationTitle='BOOKING CONFIRMATION'
 				   AND CancelStatus='N' AND Status!='N'
 				   AND StartDate BETWEEN ? AND ?
-				   AND booking.SalesAgent = ?",
-				array($tomorrow, $tomorrow, $admin_id)
+				   AND {$op_sa_in}",
+				array($tomorrow, $tomorrow)
 			)->row();
 			$cards['travel_tomorrow_op'] = array(
 				'count' => (int)$row->cnt,
-				'link'  => $base . $qs(array(
+				'link'  => $op_link(array(
 					'travel_start_date'          => $fmt_dmy($tomorrow) . ' - ' . $fmt_dmy($tomorrow),
 					'status'                     => 'A',
 					'booking_confirmation_title' => 'BOOKING CONFIRMATION',
@@ -1836,12 +1858,12 @@ class Booking extends MY_Controller
 				 WHERE BookingConfirmationTitle='BOOKING CONFIRMATION'
 				   AND CancelStatus='N' AND Status!='N' AND Status!='PT'
 				   AND StartDate BETWEEN ? AND ?
-				   AND booking.SalesAgent = ?",
-				array($tomorrow, $tomorrow, $admin_id)
+				   AND {$op_sa_in}",
+				array($tomorrow, $tomorrow)
 			)->row();
 			$cards['travel_tomorrow_not_ready_op'] = array(
 				'count' => (int)$row->cnt,
-				'link'  => $base . $qs(array(
+				'link'  => $op_link(array(
 					'travel_start_date'          => $fmt_dmy($tomorrow) . ' - ' . $fmt_dmy($tomorrow),
 					'status'                     => 'A',
 					'exclude_status'             => 'PT',
@@ -1858,12 +1880,11 @@ class Booking extends MY_Controller
 				   AND CancelStatus='N'
 				   AND AfterSalesService='PENDING'
 				   AND Status='Y'
-				   AND booking.SalesAgent = ?",
-				array($admin_id)
+				   AND {$op_sa_in}"
 			)->row();
 			$cards['pending_review_op'] = array(
 				'count' => (int)$row->cnt,
-				'link'  => $base . $qs(array('status' => 'PR')),
+				'link'  => $op_link(array('status' => 'PR')),
 			);
 
 			// Pending Insurance Checklist — bookings with an active line whose
@@ -1920,12 +1941,11 @@ class Booking extends MY_Controller
 					           AND bcc.package_checklist_id IN ({$ids_list})
 					       )
 					   )
-					   AND booking.SalesAgent = ?",
+					   AND {$op_sa_in}",
 					array(
 						$insurance_window_start, $insurance_window_end,
 						$insurance_window_start, $insurance_window_end,
 						$insurance_window_start, $insurance_window_end,
-						$admin_id,
 					)
 				)->row();
 				$insurance_count = (int)$row->cnt;
@@ -1941,7 +1961,7 @@ class Booking extends MY_Controller
 			// open as 11 in the list. Card is the source of truth.
 			$cards['insurance_pending'] = array(
 				'count'            => $insurance_count,
-				'link'             => $base . $qs(array(
+				'link'             => $op_link(array(
 					'checklist_filter'           => implode(',', $insurance_ids),
 					'travel_date'                => $fmt_dmy($insurance_window_start) . ' - ' . $fmt_dmy($insurance_window_end),
 					'status'                     => 'A',
@@ -1996,12 +2016,11 @@ class Booking extends MY_Controller
 					           AND bcc.package_checklist_id IN ({$ids_list})
 					       )
 					   )
-					   AND booking.SalesAgent = ?",
+					   AND {$op_sa_in}",
 					array(
 						$ferry_window_start, $ferry_window_end,
 						$ferry_window_start, $ferry_window_end,
 						$ferry_window_start, $ferry_window_end,
-						$admin_id,
 					)
 				)->row();
 				$ferry_count = (int)$row->cnt;
@@ -2014,7 +2033,7 @@ class Booking extends MY_Controller
 			// completed BC falls inside the travel window (same fix as insurance).
 			$cards['ferry_pending'] = array(
 				'count' => $ferry_count,
-				'link'  => $base . $qs(array(
+				'link'  => $op_link(array(
 					'checklist_filter'           => implode(',', $ferry_ids),
 					'travel_date'                => $fmt_dmy($ferry_window_start) . ' - ' . $fmt_dmy($ferry_window_end),
 					'status'                     => 'A',
@@ -2045,16 +2064,16 @@ class Booking extends MY_Controller
 				   AND payment.Debit > 0
 				   AND payment.Type LIKE 'SUPPLIER PAYMENT%'
 				   AND payment.SupplierID IS NOT NULL
-				   AND b.SalesAgent = ?",
-				array($today, $today, $today, $today, $due_soon_end, $due_soon_end, $due_soon_start, $due_soon_end, $admin_id)
+				   AND b.SalesAgent IN ({$op_team_csv})",
+				array($today, $today, $today, $today, $due_soon_end, $due_soon_end, $due_soon_start, $due_soon_end)
 			)->row();
 			// status=A (active: not deleted, not cancelled) scopes the linked list
 			// to real BCs and, crucially, suppresses the no-status default that
 			// would otherwise force AfterSalesService=PENDING and hide most matches.
 			$cards['supplier_due_soon'] = array(
-				'overdue'  => array('count' => (int)$row->overdue_cnt,  'total_due' => $money($row->overdue_due),  'link' => $base . $qs(array('supplier_payout' => 'overdue',  'status' => 'A'))),
-				'today'    => array('count' => (int)$row->today_cnt,    'total_due' => $money($row->today_due),    'link' => $base . $qs(array('supplier_payout' => 'today',    'status' => 'A'))),
-				'tomorrow' => array('count' => (int)$row->tomorrow_cnt, 'total_due' => $money($row->tomorrow_due), 'link' => $base . $qs(array('supplier_payout' => 'tomorrow', 'status' => 'A'))),
+				'overdue'  => array('count' => (int)$row->overdue_cnt,  'total_due' => $money($row->overdue_due),  'link' => $op_link(array('supplier_payout' => 'overdue',  'status' => 'A'))),
+				'today'    => array('count' => (int)$row->today_cnt,    'total_due' => $money($row->today_due),    'link' => $op_link(array('supplier_payout' => 'today',    'status' => 'A'))),
+				'tomorrow' => array('count' => (int)$row->tomorrow_cnt, 'total_due' => $money($row->tomorrow_due), 'link' => $op_link(array('supplier_payout' => 'tomorrow', 'status' => 'A'))),
 			);
 
 			$due_rows = $this->db->query(
@@ -2069,11 +2088,11 @@ class Booking extends MY_Controller
 				   AND payment.Deadline BETWEEN ? AND ?
 				   AND payment.Debit > 0
 				   AND payment.Type LIKE 'SUPPLIER PAYMENT%'
-				   AND b.SalesAgent = ?
+				   AND b.SalesAgent IN ({$op_team_csv})
 				 GROUP BY supplier.SupplierID, supplier.Name
 				 ORDER BY MIN(payment.Deadline) ASC, total_due DESC
 				 LIMIT 5",
-				array($due_soon_start, $due_soon_end, $admin_id)
+				array($due_soon_start, $due_soon_end)
 			)->result();
 			$due_out = array();
 			foreach($due_rows as $r) {
@@ -2119,19 +2138,19 @@ class Booking extends MY_Controller
 				    FROM booking
 				    WHERE booking.CancelStatus = 'N'
 				      AND booking.Status IN ('P','PP')
-				      AND booking.SalesAgent = ?
+				      AND {$op_sa_in}
 				 ) t
 				 WHERE t.nd BETWEEN ? AND ?
 				   AND t.outstanding > 0",
-				array($today, $today, $today, $today, $cust_due_end, $cust_due_end, $admin_id, $cust_due_start, $cust_due_end)
+				array($today, $today, $today, $today, $cust_due_end, $cust_due_end, $cust_due_start, $cust_due_end)
 			)->row();
 			// status=A scopes the linked list to live BCs and suppresses the
 			// no-status default (AfterSalesService='PENDING') that would otherwise
 			// hide most matches — same reasoning as the supplier payout card.
 			$cards['customer_payment_due_soon'] = array(
-				'overdue'  => array('count' => (int)$row->overdue_cnt,  'total_due' => $money($row->overdue_due),  'link' => $base . $qs(array('customer_payment' => 'overdue',  'status' => 'A'))),
-				'today'    => array('count' => (int)$row->today_cnt,    'total_due' => $money($row->today_due),    'link' => $base . $qs(array('customer_payment' => 'today',    'status' => 'A'))),
-				'tomorrow' => array('count' => (int)$row->tomorrow_cnt, 'total_due' => $money($row->tomorrow_due), 'link' => $base . $qs(array('customer_payment' => 'tomorrow', 'status' => 'A'))),
+				'overdue'  => array('count' => (int)$row->overdue_cnt,  'total_due' => $money($row->overdue_due),  'link' => $op_link(array('customer_payment' => 'overdue',  'status' => 'A'))),
+				'today'    => array('count' => (int)$row->today_cnt,    'total_due' => $money($row->today_due),    'link' => $op_link(array('customer_payment' => 'today',    'status' => 'A'))),
+				'tomorrow' => array('count' => (int)$row->tomorrow_cnt, 'total_due' => $money($row->tomorrow_due), 'link' => $op_link(array('customer_payment' => 'tomorrow', 'status' => 'A'))),
 			);
 
 			$cust_rows = $this->db->query(
@@ -2143,13 +2162,13 @@ class Booking extends MY_Controller
 				    FROM booking
 				    WHERE booking.CancelStatus = 'N'
 				      AND booking.Status IN ('P','PP')
-				      AND booking.SalesAgent = ?
+				      AND {$op_sa_in}
 				 ) t
 				 WHERE t.nd BETWEEN ? AND ?
 				   AND t.outstanding > 0
 				 ORDER BY t.nd ASC, t.outstanding DESC
 				 LIMIT 5",
-				array($admin_id, $cust_due_start, $cust_due_end)
+				array($cust_due_start, $cust_due_end)
 			)->result();
 			$cust_out_rows = array();
 			foreach($cust_rows as $r) {
@@ -2181,7 +2200,7 @@ class Booking extends MY_Controller
 			// when it is active, its product is non-child/infant and carries the
 			// checklist, the matching deadline is set, the booking is a live BC,
 			// and no completion row exists for that checklist on that line.
-			$cp_branch = function($checklist_id, $date_col) use ($admin_id) {
+			$cp_branch = function($checklist_id, $date_col) use ($op_team_csv) {
 				return "SELECT bp.BookingID AS bid, p.SupplierID AS sid, bp.{$date_col} AS dl"
 					. " FROM booking_product bp"
 					. " JOIN product p ON p.ProductID = bp.ProductID AND p.is_child_or_infant = 0"
@@ -2192,7 +2211,7 @@ class Booking extends MY_Controller
 					. " AND bp.{$date_col} IS NOT NULL"
 					. " AND b.BookingConfirmationTitle = 'BOOKING CONFIRMATION'"
 					. " AND b.CancelStatus = 'N' AND b.Status != 'N'"
-					. " AND b.SalesAgent = {$admin_id}"
+					. " AND b.SalesAgent IN ({$op_team_csv})"
 					. " AND NOT EXISTS (SELECT 1 FROM booking_checklist_completion bcc"
 					. " WHERE bcc.booking_id = bp.BookingID AND bcc.product_id = bp.ProductID"
 					. " AND bcc.package_checklist_id = {$checklist_id})";
@@ -2219,8 +2238,8 @@ class Booking extends MY_Controller
 			// reproduce the card's own row filters and suppress the booking list's
 			// default AfterSalesService='PENDING' gate, so the drill-down matches
 			// the card row-for-row (see Booking_Model::apply_checklist_payout_filter).
-			$cp_link = function($bucket) use ($base, $qs) {
-				return $base . $qs(array(
+			$cp_link = function($bucket) use ($op_link) {
+				return $op_link(array(
 					'checklist_payout'           => $bucket,
 					'status'                     => 'A',
 					'booking_confirmation_title' => 'BOOKING CONFIRMATION',
@@ -2265,11 +2284,11 @@ class Booking extends MY_Controller
 				 WHERE booking.BookingConfirmationTitle='BOOKING CONFIRMATION'
 				   AND CancelStatus='N' AND booking.Status!='N'
 				   AND CAST(booking.InsertDate AS DATE) BETWEEN ? AND ?
-				   AND booking.SalesAgent = ?
+				   AND {$op_sa_in}
 				 GROUP BY category.Name, category.CategoryID
 				 ORDER BY cnt DESC
 				 LIMIT 5",
-				array($month_start, $month_end, $admin_id)
+				array($month_start, $month_end)
 			)->result();
 			$dest_out = array();
 			foreach($dest_rows as $r) {
@@ -2277,7 +2296,7 @@ class Booking extends MY_Controller
 					'destination' => $r->destination,
 					'count'       => (int)$r->cnt,
 					'total'       => $money($r->total),
-					'link'        => $base . $qs(array(
+					'link'        => $op_link(array(
 						'destination'  => $r->id,
 						'booking_date' => $fmt_dmy($month_start) . ' - ' . $fmt_dmy($month_end),
 					)),
@@ -2301,11 +2320,11 @@ class Booking extends MY_Controller
 				   AND booking_product.Status='Y'
 				   AND CAST(booking.InsertDate AS DATE) BETWEEN ? AND ?
 				   AND product.ProductID IS NOT NULL
-				   AND booking.SalesAgent = ?
+				   AND {$op_sa_in}
 				 GROUP BY product.ProductID, product.ProductCode, product.Name
 				 ORDER BY total DESC
 				 LIMIT 5",
-				array($month_start, $month_end, $admin_id)
+				array($month_start, $month_end)
 			)->result();
 			$prod_out = array();
 			foreach($prod_rows as $r) {
