@@ -37,15 +37,25 @@ if(!function_exists('calculate_duty_response_seconds')) {
     /**
      * Returns elapsed seconds between two datetimes, counting only time inside
      * the configured duty-hours window. Off-days and off-hours contribute 0.
+     *
+     * Pass $opts to override the window for a specific report without touching
+     * the global constants (used by the Lead Ownership 9AM-7PM Mon-Fri window):
+     *   array('days' => array(1,2,3,4,5), 'start_hour' => 9, 'end_hour' => 19)
+     * Any omitted key falls back to the corresponding global default.
      */
-    function calculate_duty_response_seconds($start_datetime, $end_datetime) {
+    function calculate_duty_response_seconds($start_datetime, $end_datetime, $opts = null) {
         if(empty($start_datetime) || empty($end_datetime)) return null;
 
         $startTs = strtotime((string)$start_datetime);
         $endTs = strtotime((string)$end_datetime);
         if($startTs === false || $endTs === false || $endTs < $startTs) return null;
 
-        $allowedDays = array_map('intval', explode(',', DUTY_HOURS_DAYS));
+        $allowedDays = (is_array($opts) && isset($opts['days']))
+            ? array_map('intval', (array)$opts['days'])
+            : array_map('intval', explode(',', DUTY_HOURS_DAYS));
+        $startHour = (is_array($opts) && isset($opts['start_hour'])) ? (int)$opts['start_hour'] : DUTY_HOURS_START_HOUR;
+        $endHour   = (is_array($opts) && isset($opts['end_hour']))   ? (int)$opts['end_hour']   : DUTY_HOURS_END_HOUR;
+
         $total = 0;
         $cursor = strtotime(date('Y-m-d 00:00:00', $startTs));
         $endDay = strtotime(date('Y-m-d 00:00:00', $endTs));
@@ -53,8 +63,8 @@ if(!function_exists('calculate_duty_response_seconds')) {
         while($cursor !== false && $cursor <= $endDay) {
             $dow = (int)date('N', $cursor);
             if(in_array($dow, $allowedDays, true)) {
-                $windowStart = strtotime(date('Y-m-d', $cursor) . ' ' . sprintf('%02d:00:00', DUTY_HOURS_START_HOUR));
-                $windowEnd = strtotime(date('Y-m-d', $cursor) . ' ' . sprintf('%02d:00:00', DUTY_HOURS_END_HOUR));
+                $windowStart = strtotime(date('Y-m-d', $cursor) . ' ' . sprintf('%02d:00:00', $startHour));
+                $windowEnd = strtotime(date('Y-m-d', $cursor) . ' ' . sprintf('%02d:00:00', $endHour));
 
                 $overlapStart = max($startTs, $windowStart);
                 $overlapEnd = min($endTs, $windowEnd);

@@ -81,6 +81,95 @@ if (!function_exists('ghl_message_log_format_duration')) {
     }
 }
 
+if (!function_exists('ghl_message_log_within_business_hours')) {
+    /**
+     * Whether a timestamp falls inside working hours: a weekday (Mon-Fri) within
+     * 09:00:00-19:00:00 inclusive. Reply time is only counted while the office is
+     * meant to be answering, so anything on a weekend or outside 9AM-7PM is "out
+     * of hours". Unparseable input is treated as out of hours.
+     *
+     * @param int|string $timestamp Unix seconds or a parseable 'Y-m-d H:i:s'.
+     * @return bool
+     */
+    function ghl_message_log_within_business_hours($timestamp)
+    {
+        $ts = is_int($timestamp) ? $timestamp : strtotime((string) $timestamp);
+        if ($ts === false) {
+            return false;
+        }
+
+        if ((int) date('N', $ts) > 5) { // 6 = Sat, 7 = Sun
+            return false;
+        }
+
+        $secondsOfDay = (int) date('G', $ts) * 3600 + (int) date('i', $ts) * 60 + (int) date('s', $ts);
+
+        return $secondsOfDay >= 32400 && $secondsOfDay <= 68400; // 09:00:00 .. 19:00:00
+    }
+}
+
+if (!function_exists('lead_reply_activity_today_handling')) {
+    /**
+     * "Today Handling Lead" for the Lead Reply Activity dashboard: the leads an
+     * owner is still working today, derived as Lead Responded minus Transfer Out
+     * Lead. Clamped at zero so a stray rounding/edge case (transfer-out counts a
+     * lead the responded metric's business-hours gate excluded) can never render
+     * a negative, misleading count.
+     *
+     * @param int $responded   Lead Responded count (distinct leads replied to).
+     * @param int $transferOut Transfer Out Lead count (reply-created leads).
+     * @return int Non-negative leads still being handled.
+     */
+    function lead_reply_activity_today_handling($responded, $transferOut)
+    {
+        $handling = (int) $responded - (int) $transferOut;
+
+        return $handling > 0 ? $handling : 0;
+    }
+}
+
+if (!function_exists('ghl_message_log_reply_pair_seconds')) {
+    /**
+     * Seconds an agent took to answer a customer: the gap from an INBOUND message
+     * to the OUTBOUND reply that follows it. Counted only when the pair stays
+     * inside working hours -- both endpoints must be the same-day weekday within
+     * 09:00:00-19:00:00. A pair that leaves the window (overnight, weekend, before
+     * 9AM or after 7PM) is EXCLUDED entirely, returning null, rather than clamped
+     * to the in-window slice. A reply timestamped before the inbound, or an
+     * unparseable timestamp, also yields null.
+     *
+     * @param string $inboundTs  Customer message timestamp ('Y-m-d H:i:s').
+     * @param string $outboundTs Agent reply timestamp.
+     * @return int|null Seconds taken, or null when the pair does not qualify.
+     */
+    function ghl_message_log_reply_pair_seconds($inboundTs, $outboundTs)
+    {
+        $inbound = strtotime((string) $inboundTs);
+        $outbound = strtotime((string) $outboundTs);
+
+        if ($inbound === false || $outbound === false) {
+            return null;
+        }
+
+        if ($outbound < $inbound) {
+            return null;
+        }
+
+        // Same calendar day keeps the span from crossing an overnight close; the
+        // window check then guarantees both ends sit inside 9AM-7PM on a weekday.
+        if (date('Y-m-d', $inbound) !== date('Y-m-d', $outbound)) {
+            return null;
+        }
+
+        if (!ghl_message_log_within_business_hours($inbound)
+            || !ghl_message_log_within_business_hours($outbound)) {
+            return null;
+        }
+
+        return $outbound - $inbound;
+    }
+}
+
 if (!function_exists('ghl_message_log_consecutive_gap_seconds')) {
     /**
      * Seconds between a message and the one immediately before it, but only when
@@ -114,10 +203,15 @@ if (!function_exists('ghl_message_log_consecutive_gap_seconds')) {
 if (!function_exists('ghl_message_log_attach_reply_gaps')) {
     /**
      * Annotate a newest-first page of messages with the time taken since the
-     * previous (older) message. Each displayed row's gap is measured against the
-     * row directly below it; callers should pass one extra trailing row beyond
-     * $displayCount so even the bottom visible row gets its predecessor. The
-     * returned array is sliced back to $displayCount.
+     * previous (older) message -- shown for EVERY row, regardless of direction.
+     * Each displayed row's gap is measured against the row directly below it;
+     * callers should pass one extra trailing row beyond $displayCount so even the
+     * bottom visible row gets its predecessor. The returned array is sliced back
+     * to $displayCount.
+     *
+     * This per-row column is a raw cadence read, intentionally simpler than the
+     * "Avg time taken" summary (which counts only in-hours inbound->outbound
+     * replies via ghl_message_log_average_reply_seconds()).
      *
      * Adds two keys per row: 'reply_gap_seconds' (int|null) and
      * 'reply_gap_label' (formatted string, '' when not comparable).
@@ -149,41 +243,51 @@ if (!function_exists('ghl_message_log_attach_reply_gaps')) {
     }
 }
 
-if (!function_exists('ghl_message_log_average_gap_seconds')) {
+if (!function_exists('ghl_message_log_average_reply_seconds')) {
     /**
-     * Mean consecutive same-day gap across one or more days, from per-day
-     * aggregates. Within a day the consecutive gaps telescope to (max - min) over
-     * (count - 1) intervals, so the daily-aggregated average is simply
-     * SUM(max - min) / SUM(count - 1) across every day with at least two
-     * messages. Days with a single message contribute no interval and are
-     * skipped. Returns null when there is no interval to average.
+     * Mean agent reply time across a conversation-ordered message stream. Rows
+     * must arrive grouped by conversation and ascending in time (the order the
+     * model's query emits), so an inbound followed immediately by an outbound in
+     * the same thread is a reply. Each such pair contributes its in-hours gap
+     * (ghl_message_log_reply_pair_seconds(); pairs that leave working hours add
+     * nothing); the result is SUM(gap) / COUNT(pairs). Returns null when no pair
+     * qualifies.
      *
-     * @param array $dayRows Rows of array('count' => int, 'min_ts' => string,
-     *                       'max_ts' => string).
-     * @return float|null Average seconds, or null when nothing comparable.
+     * @param array  $rows    Rows of array('conversation_id' => string,
+     *                        'direction' => string, $timeKey => string),
+     *                        ordered by conversation then time ascending.
+     * @param string $timeKey Timestamp field name.
+     * @return float|null Average seconds, or null when nothing qualifies.
      */
-    function ghl_message_log_average_gap_seconds(array $dayRows)
+    function ghl_message_log_average_reply_seconds(array $rows, $timeKey = 'ts')
     {
-        $totalSpan = 0;
-        $totalIntervals = 0;
+        $totalSeconds = 0;
+        $pairs = 0;
+        $prev = null;
 
-        foreach ($dayRows as $row) {
-            $count = isset($row['count']) ? (int) $row['count'] : 0;
-            if ($count < 2) {
-                continue;
+        foreach ($rows as $row) {
+            if ($prev !== null) {
+                $prevDir = strtolower(trim((string) (isset($prev['direction']) ? $prev['direction'] : '')));
+                $curDir = strtolower(trim((string) (isset($row['direction']) ? $row['direction'] : '')));
+                $sameConversation = (string) (isset($prev['conversation_id']) ? $prev['conversation_id'] : '')
+                    === (string) (isset($row['conversation_id']) ? $row['conversation_id'] : '');
+
+                if ($sameConversation && $prevDir === 'inbound' && $curDir === 'outbound') {
+                    $seconds = ghl_message_log_reply_pair_seconds(
+                        isset($prev[$timeKey]) ? $prev[$timeKey] : '',
+                        isset($row[$timeKey]) ? $row[$timeKey] : ''
+                    );
+                    if ($seconds !== null) {
+                        $totalSeconds += $seconds;
+                        $pairs++;
+                    }
+                }
             }
 
-            $min = strtotime((string) (isset($row['min_ts']) ? $row['min_ts'] : ''));
-            $max = strtotime((string) (isset($row['max_ts']) ? $row['max_ts'] : ''));
-            if ($min === false || $max === false || $max < $min) {
-                continue;
-            }
-
-            $totalSpan += $max - $min;
-            $totalIntervals += $count - 1;
+            $prev = $row;
         }
 
-        return $totalIntervals > 0 ? (float) $totalSpan / $totalIntervals : null;
+        return $pairs > 0 ? (float) $totalSeconds / $pairs : null;
     }
 }
 

@@ -34,6 +34,8 @@ $page_url = function ($page) use ($log_filters, $log_contact, $log_agent) {
                     <?php if ($log_show_reply_time && $log_avg_reply !== '') { ?>
                         <span class="label label-light-info label-inline font-weight-bold mr-2">
                             Avg time taken: <?php echo html_escape($log_avg_reply); ?>
+                            <i class="la la-info-circle ml-1" style="cursor:help;" data-toggle="tooltip"
+                               title="Average time this agent takes to reply to a customer: from each incoming message to the agent's next reply in the same chat. Only replies where both the customer's message and the reply land on a weekday between 9AM and 7PM are counted &mdash; overnight, weekend and after-hours gaps are skipped."></i>
                         </span>
                     <?php } ?>
                     <span class="label label-light-primary label-inline font-weight-bold">
@@ -185,4 +187,6 @@ $page_url = function ($page) use ($log_filters, $log_contact, $log_agent) {
     $('#ghl-message-log-reset').on('click', function() {
         window.location.href = '<?php echo base_url('Report/Ghl_Message_Log'); ?>';
     });
+
+    $('[data-toggle="tooltip"]').tooltip({ container: 'body', boundary: 'viewport', trigger: 'hover' });
 </script>

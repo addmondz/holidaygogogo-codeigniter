@@ -6,8 +6,6 @@ use PhpOffice\PhpSpreadsheet\Writer\Xlxs;
 
 class Cron extends CI_Controller
 {
-	const GHL_LEAD_INACTIVITY_SPLIT_DAYS = 90;
-
 	public $allowGhlModuleSync = true;
 	public $allowGhlModuleLog = true;
 	public $allowConvertionProcessing = true;
@@ -1194,6 +1192,7 @@ class Cron extends CI_Controller
 	private function process_single_ghl_conversation($conversationId, $firstNewMessageRowId = 0, $messageUpdatedBefore = null)
 	{
 		$this->load->helper('duty_hours');
+		$this->load->helper('ghl_lead_segmentation');
 
 		$messages = $this->Ghl_Processed_Leads_Model->get_conversation_messages($conversationId, $messageUpdatedBefore);
 		$existingConversions = $this->Ghl_Processed_Leads_Model->get_existing_conversion_map($conversationId);
@@ -1226,7 +1225,7 @@ class Cron extends CI_Controller
 
 			if ($message['direction'] === 'inbound') {
 				$startsNewLead = ($currentLead === null)
-					|| $this->should_start_new_ghl_processed_lead(
+					|| ghl_should_start_new_processed_lead(
 						$currentLead,
 						$existingConversions,
 						$lastMessageTimestamp,
@@ -1369,27 +1368,6 @@ class Cron extends CI_Controller
 		}
 
 		return count($leads);
-	}
-
-	private function should_start_new_ghl_processed_lead($currentLead, $existingConversions, $lastMessageTimestamp, $messageTimestamp)
-	{
-		if ($currentLead === null) {
-			return false;
-		}
-
-		$conversionKey = $currentLead['lead_started_at'] . '|' . $currentLead['first_customer_message_id'];
-		if (!empty($existingConversions[$conversionKey]['converted_at'])) {
-			$convertedAt = strtotime((string) $existingConversions[$conversionKey]['converted_at']);
-			if ($convertedAt !== false && $messageTimestamp > $convertedAt) {
-				return true;
-			}
-		}
-
-		if ($lastMessageTimestamp === null || $messageTimestamp < $lastMessageTimestamp) {
-			return false;
-		}
-
-		return ($messageTimestamp - $lastMessageTimestamp) >= (self::GHL_LEAD_INACTIVITY_SPLIT_DAYS * 86400);
 	}
 
 	private function finalize_ghl_processed_lead(&$lead)

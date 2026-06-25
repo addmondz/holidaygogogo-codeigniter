@@ -94,15 +94,119 @@ class Report_Model extends CI_Model
         return $averages;
     }
 
-    private function ownership_combined_response_average_sql($alias = 'glo')
+    // The Lead Ownership "Average Response" card + column use a dedicated
+    // response window (9AM-7PM, Mon-Fri) that is independent of the global
+    // duty-hours constants every other report relies on.
+    private function ownership_duty_window()
     {
-        $prefix = $alias !== '' ? $alias . '.' : '';
-        $firstTotal = "CASE WHEN {$prefix}avg_first_5_response_seconds IS NOT NULL THEN {$prefix}avg_first_5_response_seconds * {$prefix}responded_message_count ELSE 0 END";
-        $recentTotal = "CASE WHEN {$prefix}avg_recent_5_response_seconds IS NOT NULL THEN {$prefix}avg_recent_5_response_seconds * {$prefix}recent_responded_message_count ELSE 0 END";
-        $firstCount = "CASE WHEN {$prefix}avg_first_5_response_seconds IS NOT NULL THEN {$prefix}responded_message_count ELSE 0 END";
-        $recentCount = "CASE WHEN {$prefix}avg_recent_5_response_seconds IS NOT NULL THEN {$prefix}recent_responded_message_count ELSE 0 END";
+        return array('days' => array(1, 2, 3, 4, 5), 'start_hour' => 9, 'end_hour' => 19);
+    }
 
-        return "SUM(({$firstTotal}) + ({$recentTotal})) / NULLIF(SUM(({$firstCount}) + ({$recentCount})), 0)";
+    // Recomputes the first-5 / last-5 / combined average response seconds from
+    // the raw slot timestamps, clipped to the ownership duty window. Returns a
+    // map of bucket => array('first' => ?int, 'recent' => ?int, 'combined' => ?int),
+    // where the bucket is $groupKey's value (owner_user_id) or '__all__' overall.
+    //
+    //   first    - the first-5 reply slots
+    //   recent   - the most-recent-5 reply slots, counted on their own
+    //   combined - first-5 merged with recent-5, deduped by agent_message_id so
+    //              short leads (whose first/recent slots overlap) are not
+    //              double-counted. This is the figure the card + column show.
+    private function calculate_ownership_duty_response_averages($slotRows, $groupKey = null)
+    {
+        $this->load->helper('duty_hours');
+        $window = $this->ownership_duty_window();
+        $stats = array();
+
+        foreach ((array) $slotRows as $sr) {
+            $bucket = $groupKey !== null
+                ? (isset($sr[$groupKey]) ? (string) $sr[$groupKey] : '')
+                : '__all__';
+
+            if (!isset($stats[$bucket])) {
+                $stats[$bucket] = array(
+                    'first_total' => 0, 'first_count' => 0,
+                    'recent_total' => 0, 'recent_count' => 0,
+                    'combined_total' => 0, 'combined_count' => 0,
+                );
+            }
+
+            $seen = array();
+
+            for ($i = 1; $i <= 5; $i++) {
+                $secs = isset($sr['s' . $i]) ? $sr['s' . $i] : null;
+                if ($secs === null || $secs === '') continue;
+
+                $seconds = calculate_duty_response_seconds($sr['ct' . $i], $sr['at' . $i], $window);
+                if ($seconds === null) continue;
+
+                $aid = isset($sr['aid' . $i]) ? $sr['aid' . $i] : null;
+                if ($aid !== null && $aid !== '') $seen[$aid] = true;
+
+                $stats[$bucket]['first_total'] += (int) $seconds;
+                $stats[$bucket]['first_count']++;
+                $stats[$bucket]['combined_total'] += (int) $seconds;
+                $stats[$bucket]['combined_count']++;
+            }
+
+            for ($i = 1; $i <= 5; $i++) {
+                $secs = isset($sr['rs' . $i]) ? $sr['rs' . $i] : null;
+                if ($secs === null || $secs === '') continue;
+
+                $seconds = calculate_duty_response_seconds($sr['rct' . $i], $sr['rat' . $i], $window);
+                if ($seconds === null) continue;
+
+                // Last-5 average counts every recent slot regardless of overlap.
+                $stats[$bucket]['recent_total'] += (int) $seconds;
+                $stats[$bucket]['recent_count']++;
+
+                // Combined dedupes against the first-5 set.
+                $aid = isset($sr['raid' . $i]) ? $sr['raid' . $i] : null;
+                if ($aid !== null && $aid !== '') {
+                    if (isset($seen[$aid])) continue;
+                    $seen[$aid] = true;
+                }
+
+                $stats[$bucket]['combined_total'] += (int) $seconds;
+                $stats[$bucket]['combined_count']++;
+            }
+        }
+
+        $averages = array();
+        foreach ($stats as $bucket => $stat) {
+            $averages[$bucket] = array(
+                'first' => $stat['first_count'] > 0 ? (int) round($stat['first_total'] / $stat['first_count']) : null,
+                'recent' => $stat['recent_count'] > 0 ? (int) round($stat['recent_total'] / $stat['recent_count']) : null,
+                'combined' => $stat['combined_count'] > 0 ? (int) round($stat['combined_total'] / $stat['combined_count']) : null,
+            );
+        }
+
+        return $averages;
+    }
+
+    // Slot-timestamp SELECT joined through to ghl_processed_leads so the
+    // ownership duty-window averages can be recomputed at query time. Shares the
+    // ownership WHERE clause so it always covers the same rows as the summary.
+    private function ownership_response_slot_rows($where, $groupKey = null)
+    {
+        $extraJoins = isset($where['extra_joins']) ? $where['extra_joins'] : '';
+        $slotSelect = $this->get_processed_lead_response_slot_select('pl');
+        $bucketSelect = $groupKey === 'owner_user_id' ? "glo.owner_user_id AS owner_user_id,\n                " : '';
+
+        $sql = "
+            SELECT
+                {$bucketSelect}{$slotSelect}
+            FROM ghl_lead_ownership glo
+            LEFT JOIN ghl_users gu ON gu.UserID = glo.owner_user_id
+            INNER JOIN ghl_processed_leads pl ON pl.id = glo.processed_lead_id
+            {$extraJoins}
+            {$where['sql']}
+        ";
+
+        return $this->calculate_ownership_duty_response_averages(
+            $this->db->query($sql, $where['params'])->result_array(),
+            $groupKey
+        );
     }
 
 	function Destination_Profits()
@@ -990,8 +1094,9 @@ class Report_Model extends CI_Model
     {
         $where = $this->build_lead_ownership_where_clause($filters);
         $extraJoins = isset($where['extra_joins']) ? $where['extra_joins'] : '';
-        $combinedAverageSql = $this->ownership_combined_response_average_sql('glo');
 
+        // Response-time averages are recomputed below from the slot timestamps
+        // through the ownership duty window, so they are not selected here.
         $sql = "
             SELECT
                 COUNT(*) AS owned_leads,
@@ -1002,9 +1107,6 @@ class Report_Model extends CI_Model
                 SUM(CASE WHEN glo.follow_up_status IN ('sent', 'completed') THEN 1 ELSE 0 END) AS follow_up_leads,
                 SUM(CASE WHEN glo.is_converted = 1 AND glo.booking_id IS NOT NULL THEN 1 ELSE 0 END) AS converted_leads,
                 COUNT(DISTINCT glo.owner_user_id) AS active_owners,
-                AVG(glo.avg_first_5_response_seconds) AS avg_first_response_time_seconds,
-                {$combinedAverageSql} AS avg_response_time_seconds,
-                AVG(glo.avg_recent_5_response_seconds) AS avg_recent_response_time_seconds,
                 AVG(glo.responded_message_count) AS avg_responded_messages,
                 AVG(glo.recent_responded_message_count) AS avg_recent_responded_messages
             FROM ghl_lead_ownership glo
@@ -1019,6 +1121,11 @@ class Report_Model extends CI_Model
         $followUpLeads = !empty($row['follow_up_leads']) ? (int) $row['follow_up_leads'] : 0;
         $convertedLeads = !empty($row['converted_leads']) ? (int) $row['converted_leads'] : 0;
 
+        // Override the wall-clock response averages with the dedicated
+        // 9AM-7PM Mon-Fri duty-window figures, recomputed from the slot stamps.
+        $duty = $this->ownership_response_slot_rows($where, null);
+        $dutyAll = isset($duty['__all__']) ? $duty['__all__'] : array('first' => null, 'recent' => null, 'combined' => null);
+
         return array(
             'owned_leads' => $ownedLeads,
             'unique_leads' => !empty($row['unique_leads']) ? (int) $row['unique_leads'] : 0,
@@ -1031,9 +1138,9 @@ class Report_Model extends CI_Model
             'response_rate' => $ownedLeads > 0 ? round(($respondedLeads / $ownedLeads) * 100, 1) : 0.0,
             'follow_up_rate' => $ownedLeads > 0 ? round(($followUpLeads / $ownedLeads) * 100, 1) : 0.0,
             'conversion_rate' => $ownedLeads > 0 ? round(($convertedLeads / $ownedLeads) * 100, 1) : 0.0,
-            'avg_first_response_time_seconds' => $row['avg_first_response_time_seconds'] !== null ? (int) round($row['avg_first_response_time_seconds']) : null,
-            'avg_response_time_seconds' => $row['avg_response_time_seconds'] !== null ? (int) round($row['avg_response_time_seconds']) : null,
-            'avg_recent_response_time_seconds' => $row['avg_recent_response_time_seconds'] !== null ? (int) round($row['avg_recent_response_time_seconds']) : null,
+            'avg_first_response_time_seconds' => $dutyAll['first'],
+            'avg_response_time_seconds' => $dutyAll['combined'],
+            'avg_recent_response_time_seconds' => $dutyAll['recent'],
             'avg_responded_messages' => $row['avg_responded_messages'] !== null ? round((float) $row['avg_responded_messages'], 1) : 0.0,
             'avg_recent_responded_messages' => $row['avg_recent_responded_messages'] !== null ? round((float) $row['avg_recent_responded_messages'], 1) : 0.0,
         );
@@ -1043,8 +1150,9 @@ class Report_Model extends CI_Model
     {
         $where = $this->build_lead_ownership_where_clause($filters);
         $extraJoins = isset($where['extra_joins']) ? $where['extra_joins'] : '';
-        $combinedAverageSql = $this->ownership_combined_response_average_sql('glo');
 
+        // Response-time averages are recomputed below from the slot timestamps
+        // through the ownership duty window, so they are not selected here.
         $sql = "
             SELECT
                 glo.owner_user_id,
@@ -1056,9 +1164,6 @@ class Report_Model extends CI_Model
                 SUM(CASE WHEN glo.responded_message_count > 0 THEN 1 ELSE 0 END) AS responded_leads,
                 SUM(CASE WHEN glo.follow_up_status IN ('sent', 'completed') THEN 1 ELSE 0 END) AS follow_up_leads,
                 SUM(CASE WHEN glo.is_converted = 1 AND glo.booking_id IS NOT NULL THEN 1 ELSE 0 END) AS converted_leads,
-                AVG(glo.avg_first_5_response_seconds) AS avg_first_response_time_seconds,
-                {$combinedAverageSql} AS avg_response_time_seconds,
-                AVG(glo.avg_recent_5_response_seconds) AS avg_recent_response_time_seconds,
                 AVG(glo.responded_message_count) AS avg_responded_messages,
                 AVG(glo.recent_responded_message_count) AS avg_recent_responded_messages,
                 MAX(glo.calculated_at) AS last_calculated_at
@@ -1071,6 +1176,16 @@ class Report_Model extends CI_Model
         ";
 
         $rows = $this->db->query($sql, $where['params'])->result_array();
+        // Per-owner 9AM-7PM Mon-Fri duty-window response averages, recomputed
+        // from the slot timestamps to override the stored wall-clock figures.
+        $duty = $this->ownership_response_slot_rows($where, 'owner_user_id');
+
+        // Per-agent conversion % is the MEAN of each day's "locked" conversion
+        // rate spread over every calendar day in the selected range, not a single
+        // aggregate ratio. See lead_ownership_daily_conversion_by_agent().
+        $rangeDays = $this->lead_ownership_range_day_count($filters);
+        $dailyConversion = $this->lead_ownership_daily_conversion_by_agent($where, $extraJoins);
+
         $results = array();
 
         foreach ($rows as $row) {
@@ -1078,6 +1193,18 @@ class Report_Model extends CI_Model
             $respondedLeads = (int) $row['responded_leads'];
             $followUpLeads = (int) $row['follow_up_leads'];
             $convertedLeads = (int) $row['converted_leads'];
+            $ownerDuty = isset($duty[(string) $row['owner_user_id']])
+                ? $duty[(string) $row['owner_user_id']]
+                : array('first' => null, 'recent' => null, 'combined' => null);
+
+            $ownerKey = (string) $row['owner_user_id'];
+            $daily = isset($dailyConversion[$ownerKey])
+                ? $dailyConversion[$ownerKey]
+                : array('sum_daily_rate' => 0.0, 'active_days' => 0);
+            // Denominator: calendar days in the range (empty days count as 0%);
+            // when no range is bounded, fall back to days that actually had leads.
+            $denomDays = $rangeDays !== null ? $rangeDays : (int) $daily['active_days'];
+            $conversionRate = $denomDays > 0 ? round(((float) $daily['sum_daily_rate']) / $denomDays, 1) : 0.0;
 
             $results[] = array(
                 'owner_user_id' => $row['owner_user_id'],
@@ -1091,10 +1218,10 @@ class Report_Model extends CI_Model
                 'converted_leads' => $convertedLeads,
                 'response_rate' => $ownedLeads > 0 ? round(($respondedLeads / $ownedLeads) * 100, 1) : 0.0,
                 'follow_up_rate' => $ownedLeads > 0 ? round(($followUpLeads / $ownedLeads) * 100, 1) : 0.0,
-                'conversion_rate' => $ownedLeads > 0 ? round(($convertedLeads / $ownedLeads) * 100, 1) : 0.0,
-                'avg_first_response_time_seconds' => $row['avg_first_response_time_seconds'] !== null ? (int) round($row['avg_first_response_time_seconds']) : null,
-                'avg_response_time_seconds' => $row['avg_response_time_seconds'] !== null ? (int) round($row['avg_response_time_seconds']) : null,
-                'avg_recent_response_time_seconds' => $row['avg_recent_response_time_seconds'] !== null ? (int) round($row['avg_recent_response_time_seconds']) : null,
+                'conversion_rate' => $conversionRate,
+                'avg_first_response_time_seconds' => $ownerDuty['first'],
+                'avg_response_time_seconds' => $ownerDuty['combined'],
+                'avg_recent_response_time_seconds' => $ownerDuty['recent'],
                 'avg_responded_messages' => $row['avg_responded_messages'] !== null ? round((float) $row['avg_responded_messages'], 1) : 0.0,
                 'avg_recent_responded_messages' => $row['avg_recent_responded_messages'] !== null ? round((float) $row['avg_recent_responded_messages'], 1) : 0.0,
                 'last_calculated_at' => $row['last_calculated_at'],
@@ -1102,6 +1229,70 @@ class Report_Model extends CI_Model
         }
 
         return $results;
+    }
+
+    /**
+     * Number of calendar days in the lead-ownership date range, inclusive of
+     * both endpoints. Returns null when the range is not bounded (e.g. a direct
+     * model call without start/end dates), letting the caller fall back to the
+     * count of days that actually carried leads.
+     */
+    private function lead_ownership_range_day_count($filters)
+    {
+        if (empty($filters['start_date']) || empty($filters['end_date'])) {
+            return null;
+        }
+
+        $start = strtotime($filters['start_date'] . ' 00:00:00');
+        $end = strtotime($filters['end_date'] . ' 00:00:00');
+
+        if ($start === false || $end === false || $end < $start) {
+            return null;
+        }
+
+        return (int) floor(($end - $start) / 86400) + 1;
+    }
+
+    /**
+     * Per-agent "locked daily" conversion components. Each day's conversion rate
+     * is 100 * converted(day) / owned(day) on DATE(lead_started_at); we return,
+     * per owner, the SUM of those daily rates and the count of days that had
+     * leads. The caller divides the sum by the calendar days in the range so
+     * that days with no leads count as 0%. Reuses the same WHERE/joins as the
+     * agent listing so every filter (date, owner, team lead, ownership type)
+     * applies identically.
+     *
+     * @return array map of owner_user_id => ['sum_daily_rate' => float, 'active_days' => int]
+     */
+    private function lead_ownership_daily_conversion_by_agent($where, $extraJoins)
+    {
+        $sql = "
+            SELECT owner_user_id,
+                   SUM(daily_rate) AS sum_daily_rate,
+                   COUNT(*) AS active_days
+            FROM (
+                SELECT glo.owner_user_id AS owner_user_id,
+                       (100.0 * SUM(CASE WHEN glo.is_converted = 1 AND glo.booking_id IS NOT NULL THEN 1 ELSE 0 END) / COUNT(*)) AS daily_rate
+                FROM ghl_lead_ownership glo
+                LEFT JOIN ghl_users gu ON gu.UserID = glo.owner_user_id
+                {$extraJoins}
+                {$where['sql']}
+                GROUP BY glo.owner_user_id, DATE(glo.lead_started_at)
+            ) daily
+            GROUP BY owner_user_id
+        ";
+
+        $rows = $this->db->query($sql, $where['params'])->result_array();
+        $map = array();
+
+        foreach ($rows as $row) {
+            $map[(string) $row['owner_user_id']] = array(
+                'sum_daily_rate' => (float) $row['sum_daily_rate'],
+                'active_days' => (int) $row['active_days'],
+            );
+        }
+
+        return $map;
     }
 
     function Lead_Ownership_Agents($restrict_agent_ids = null)
@@ -1245,8 +1436,10 @@ class Report_Model extends CI_Model
 
     function Lead_Reply_Activity_By_Agent($filters = array())
     {
+        $this->load->helper('ghl_messages_log');
         $assignedRows = $this->Lead_Reply_Activity_Assigned_New_Leads_By_Agent($filters);
         $replyCreatedRows = $this->Lead_Reply_Activity_Reply_Created_By_Agent($filters);
+        $respondedRows = $this->Lead_Reply_Activity_Responded_By_Agent($filters);
         $results = array();
 
         foreach ($assignedRows as $ownerId => $assignedRow) {
@@ -1258,6 +1451,8 @@ class Report_Model extends CI_Model
                 'reply_created_leads' => 0,
                 'reply_created_not_assigned_leads' => 0,
                 'assigned_reply_created_leads' => 0,
+                'lead_responded' => 0,
+                'today_handling_leads' => 0,
                 'total_productivity_leads' => $assignedLeads,
                 'first_reply_created_at' => null,
                 'last_reply_created_at' => null,
@@ -1273,6 +1468,8 @@ class Report_Model extends CI_Model
                     'reply_created_leads' => 0,
                     'reply_created_not_assigned_leads' => 0,
                     'assigned_reply_created_leads' => 0,
+                    'lead_responded' => 0,
+                    'today_handling_leads' => 0,
                     'total_productivity_leads' => 0,
                     'first_reply_created_at' => null,
                     'last_reply_created_at' => null,
@@ -1288,12 +1485,42 @@ class Report_Model extends CI_Model
             $results[$ownerId]['last_reply_created_at'] = $replyCreatedRow['last_reply_created_at'];
         }
 
-        usort($results, function($a, $b) {
-            if ($a['total_productivity_leads'] !== $b['total_productivity_leads']) {
-                return $b['total_productivity_leads'] - $a['total_productivity_leads'];
+        // "Lead Responded" stands on its own: an owner can have replied to leads
+        // in business hours without crossing the reply-created threshold or being
+        // assigned, so seed any owner the earlier passes missed.
+        foreach ($respondedRows as $ownerId => $respondedRow) {
+            if (!isset($results[$ownerId])) {
+                $results[$ownerId] = array(
+                    'owner_user_id' => $ownerId,
+                    'owner_name' => $respondedRow['owner_name'],
+                    'assigned_leads' => 0,
+                    'reply_created_leads' => 0,
+                    'reply_created_not_assigned_leads' => 0,
+                    'assigned_reply_created_leads' => 0,
+                    'lead_responded' => 0,
+                    'today_handling_leads' => 0,
+                    'total_productivity_leads' => 0,
+                    'first_reply_created_at' => null,
+                    'last_reply_created_at' => null,
+                );
             }
-            if ($a['assigned_leads'] !== $b['assigned_leads']) {
-                return $b['assigned_leads'] - $a['assigned_leads'];
+
+            $results[$ownerId]['lead_responded'] = (int) $respondedRow['lead_responded'];
+        }
+
+        foreach ($results as $ownerId => $row) {
+            $results[$ownerId]['today_handling_leads'] = lead_reply_activity_today_handling(
+                $row['lead_responded'],
+                $row['reply_created_leads']
+            );
+        }
+
+        usort($results, function($a, $b) {
+            if ($a['lead_responded'] !== $b['lead_responded']) {
+                return $b['lead_responded'] - $a['lead_responded'];
+            }
+            if ($a['today_handling_leads'] !== $b['today_handling_leads']) {
+                return $b['today_handling_leads'] - $a['today_handling_leads'];
             }
             if ($a['reply_created_leads'] !== $b['reply_created_leads']) {
                 return $b['reply_created_leads'] - $a['reply_created_leads'];
@@ -1302,6 +1529,76 @@ class Report_Model extends CI_Model
         });
 
         return array_values($results);
+    }
+
+    /**
+     * "Lead Responded" per owner: the DISTINCT leads an owner replied to whose
+     * qualifying outbound reply lands on a weekday between 09:00 and 19:00. Many
+     * replies (incl. more than three) to the same lead collapse to a single
+     * count via COUNT(DISTINCT processed_lead_id). Shares the reply-activity
+     * universe (is_reply_owner = 1) and owner/team filters with Transfer Out so
+     * Today Handling (responded - transfer out) stays meaningful.
+     */
+    private function Lead_Reply_Activity_Responded_By_Agent($filters = array())
+    {
+        $where = $this->build_lead_reply_created_where_clause($filters);
+        $extraJoins = isset($where['extra_joins']) ? $where['extra_joins'] : '';
+        $messageTimeColumn = $this->escape_identifier($this->get_message_time_column());
+        $businessHours = $this->lead_reply_business_hours_sql("gm.{$messageTimeColumn}");
+        $start = !empty($filters['start_date']) ? $filters['start_date'] . ' 00:00:00' : '1970-01-01 00:00:00';
+        $end = !empty($filters['end_date']) ? $filters['end_date'] . ' 23:59:59' : '9999-12-31 23:59:59';
+
+        $sql = "
+            SELECT
+                glo.owner_user_id,
+                COALESCE(NULLIF(gu.Name, ''), glo.owner_user_id) AS owner_name,
+                COUNT(DISTINCT glo.processed_lead_id) AS lead_responded
+            FROM ghl_lead_ownership glo
+            INNER JOIN ghl_messages gm
+                ON gm.conversation_id = glo.conversation_id
+               AND gm.user_id = glo.owner_user_id
+               AND gm.direction = 'outbound'
+               AND gm.{$messageTimeColumn} >= glo.lead_started_at
+               AND (
+                    glo.lead_ended_at IS NULL
+                    OR gm.{$messageTimeColumn} < glo.lead_ended_at
+               )
+            LEFT JOIN ghl_users gu ON gu.UserID = glo.owner_user_id
+            {$extraJoins}
+            {$where['sql']}
+              AND gm.{$messageTimeColumn} BETWEEN ? AND ?
+              AND {$businessHours}
+            GROUP BY glo.owner_user_id, owner_name
+        ";
+
+        $params = array_merge($where['params'], array($start, $end));
+        $rows = $this->db->query($sql, $params)->result_array();
+        $results = array();
+
+        foreach ($rows as $row) {
+            $results[(string) $row['owner_user_id']] = array(
+                'owner_user_id' => (string) $row['owner_user_id'],
+                'owner_name' => $row['owner_name'],
+                'lead_responded' => (int) $row['lead_responded'],
+            );
+        }
+
+        return $results;
+    }
+
+    /**
+     * SQL predicate restricting a timestamp expression to working hours: a
+     * weekday (Mon-Fri) between 09:00:00 and 19:00:00 inclusive. Mirrors
+     * ghl_message_log_within_business_hours() so the dashboard only counts
+     * replies made while the office is meant to be answering. DAYOFWEEK() returns
+     * 1=Sunday..7=Saturday, so 2..6 is Mon-Fri.
+     *
+     * @param string $expr A safe SQL timestamp expression (column/derived value).
+     * @return string
+     */
+    private function lead_reply_business_hours_sql($expr)
+    {
+        return "(DAYOFWEEK({$expr}) BETWEEN 2 AND 6 AND TIME({$expr}) BETWEEN '09:00:00' AND '19:00:00')";
     }
 
     private function Lead_Reply_Activity_Assigned_New_Leads_Summary($filters = array())
@@ -2211,20 +2508,22 @@ class Report_Model extends CI_Model
     }
 
     /**
-     * Average consecutive same-day reply gap (in seconds) for the Message Log,
-     * across the whole filtered range -- NOT just the visible page. Used by the
-     * agent-filtered view to show how fast an agent moves between messages.
+     * Average agent reply time (in seconds) for the Message Log, across the whole
+     * filtered range -- NOT just the visible page. Measures how fast the agent
+     * answers a customer: each INBOUND message answered by the next OUTBOUND
+     * message in the same conversation, counting only pairs that stay inside
+     * working hours (weekday 9AM-7PM); pairs that leave the window are excluded.
      *
-     * The per-day aggregate (count, min, max time) is reduced in PHP by
-     * ghl_message_log_average_gap_seconds(), which telescopes each day's
-     * consecutive gaps to (max - min) over (count - 1) intervals. The HAVING
-     * drops single-message days that have no interval to average.
+     * Messages are pulled grouped by conversation and ascending in time so the
+     * adjacent inbound->outbound pairing in ghl_message_log_average_reply_seconds()
+     * is sound. The reduction (direction pairing, business-hours eligibility) is
+     * done in PHP because it cannot be expressed as a single GROUP BY.
      *
      * @param string $startDate 'Y-m-d' inclusive lower bound.
      * @param string $endDate   'Y-m-d' inclusive upper bound.
      * @param string $contact   Optional contact-number filter.
      * @param string $agent     Optional resolved agent-name filter.
-     * @return float|null Average seconds, or null when nothing to average.
+     * @return float|null Average seconds, or null when nothing qualifies.
      */
     function Ghl_Messages_Log_Avg_Reply_Seconds($startDate, $endDate, $contact = '', $agent = '')
     {
@@ -2242,22 +2541,20 @@ class Report_Model extends CI_Model
             : '';
 
         $rows = $this->db->query(
-            "SELECT DATE(gm.{$messageTimeColumn}) AS d,
-                    COUNT(*) AS count,
-                    MIN(gm.{$messageTimeColumn}) AS min_ts,
-                    MAX(gm.{$messageTimeColumn}) AS max_ts
+            "SELECT gm.conversation_id AS conversation_id,
+                    gm.direction AS direction,
+                    gm.{$messageTimeColumn} AS ts
                FROM ghl_messages gm
                {$agentJoins}
               WHERE gm.{$messageTimeColumn} >= ?
                 AND gm.{$messageTimeColumn} <= ?
                 {$contactClause}
                 {$agentClause}
-              GROUP BY DATE(gm.{$messageTimeColumn})
-             HAVING COUNT(*) >= 2",
+              ORDER BY gm.conversation_id ASC, gm.{$messageTimeColumn} ASC, gm.id ASC",
             $params
         )->result_array();
 
-        return ghl_message_log_average_gap_seconds($rows);
+        return ghl_message_log_average_reply_seconds($rows);
     }
 
     /**

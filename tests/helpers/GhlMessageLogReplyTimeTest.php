@@ -3,17 +3,21 @@
  * Run with: php tests/helpers/GhlMessageLogReplyTimeTest.php
  *
  * Locks the "Time Taken" feature of the Message Log -- only meaningful when the
- * list is filtered to a single agent, so the consecutive-message gap measures
- * how fast THAT agent moves from one message to the next.
+ * list is filtered to a single agent.
  *
- * Rules pinned here:
- *   - per-row gap = (this message time) - (previous/older message time), but only
- *     within the SAME calendar day (an overnight jump is not "reply time"),
- *   - gaps are formatted compactly (4s, 1m 5s, 1h 2m),
- *   - the daily average is the mean consecutive same-day gap, derived by
- *     telescoping: within a day the gaps sum to (max - min), over (count - 1)
- *     intervals, so avg = SUM(max-min) / SUM(count-1) across days with >= 2 msgs.
- *     The GROUP-BY-DATE shape that feeds it is mirrored here in portable SQLite.
+ * Two distinct measures live here:
+ *   - the per-row "Time Taken" COLUMN is the consecutive same-day gap to the
+ *     message directly below, shown for EVERY row regardless of direction (an
+ *     overnight jump is blank). It is a raw cadence read,
+ *   - the "Avg time taken" SUMMARY is agent reply time: a customer INBOUND
+ *     answered by the agent's next OUTBOUND in the SAME conversation, counted
+ *     only when BOTH ends land on the same weekday (Mon-Fri) within working
+ *     hours 09:00:00-19:00:00. A pair that leaves the window (overnight, weekend,
+ *     before 9AM / after 7PM) is EXCLUDED entirely, not clamped. The average is
+ *     the mean of every qualifying gap; the conversation-ordered query shape that
+ *     feeds it is mirrored here in portable SQLite.
+ *
+ * Gaps are formatted compactly (4s, 1m 5s, 1h 2m).
  */
 
 if (!defined('BASEPATH')) {
@@ -43,7 +47,44 @@ assert_eq('format 1h 2m (drops seconds)', '1h 2m', ghl_message_log_format_durati
 assert_eq('format null is blank',  '',     ghl_message_log_format_duration(null));
 assert_eq('format negative blank', '',     ghl_message_log_format_duration(-5));
 
-// --- Consecutive gap: same-day difference in seconds, else null. ---
+// --- Business hours window: Mon-Fri, 09:00:00-19:00:00 inclusive. ---
+// 2026-06-19 = Friday, 2026-06-20 = Saturday, 2026-06-22 = Monday.
+assert_eq('weekday mid-window is in hours',
+    true, ghl_message_log_within_business_hours('2026-06-19 09:19:58'));
+assert_eq('09:00:00 sharp is in hours',
+    true, ghl_message_log_within_business_hours('2026-06-19 09:00:00'));
+assert_eq('19:00:00 sharp is in hours',
+    true, ghl_message_log_within_business_hours('2026-06-19 19:00:00'));
+assert_eq('before 9AM is out of hours',
+    false, ghl_message_log_within_business_hours('2026-06-19 08:59:59'));
+assert_eq('after 7PM is out of hours',
+    false, ghl_message_log_within_business_hours('2026-06-19 19:00:01'));
+assert_eq('Saturday is out of hours',
+    false, ghl_message_log_within_business_hours('2026-06-20 10:00:00'));
+assert_eq('Sunday is out of hours',
+    false, ghl_message_log_within_business_hours('2026-06-21 10:00:00'));
+assert_eq('unparseable time is out of hours',
+    false, ghl_message_log_within_business_hours(''));
+
+// --- Reply pair: inbound -> outbound seconds, only when both endpoints are
+//     same-day weekday within working hours; else null. ---
+assert_eq('reply within working hours',
+    4, ghl_message_log_reply_pair_seconds('2026-06-19 09:19:54', '2026-06-19 09:19:58'));
+assert_eq('reply before the inbound is null',
+    null, ghl_message_log_reply_pair_seconds('2026-06-19 09:19:58', '2026-06-19 09:19:54'));
+assert_eq('reply across days is null (overnight leaves window)',
+    null, ghl_message_log_reply_pair_seconds('2026-06-19 18:00:00', '2026-06-22 09:00:00'));
+assert_eq('weekend pair is null',
+    null, ghl_message_log_reply_pair_seconds('2026-06-20 10:00:00', '2026-06-20 10:00:30'));
+assert_eq('reply landing after 7PM is excluded',
+    null, ghl_message_log_reply_pair_seconds('2026-06-19 18:59:00', '2026-06-19 19:30:00'));
+assert_eq('inbound before 9AM is excluded',
+    null, ghl_message_log_reply_pair_seconds('2026-06-19 08:50:00', '2026-06-19 09:10:00'));
+assert_eq('unparseable pair is null',
+    null, ghl_message_log_reply_pair_seconds('2026-06-19 09:19:58', ''));
+
+// --- Per-row "Time Taken" column: consecutive same-day gap, shown for EVERY
+//     row regardless of direction (deliberately simpler than the average). ---
 assert_eq('gap within a day',
     4, ghl_message_log_consecutive_gap_seconds('2026-06-19 09:19:58', '2026-06-19 09:19:54'));
 assert_eq('gap across midnight is null (not a reply)',
@@ -51,8 +92,8 @@ assert_eq('gap across midnight is null (not a reply)',
 assert_eq('gap with unparseable time is null',
     null, ghl_message_log_consecutive_gap_seconds('2026-06-19 09:19:58', ''));
 
-// --- Attach gaps to a newest-first page (extra trailing row supplies the
-//     bottom row's predecessor; cross-day predecessor yields a blank gap). ---
+// Attach gaps to a newest-first page (extra trailing row supplies the bottom
+// row's predecessor; a cross-day predecessor yields a blank gap).
 $rows = array(
     array('message_timestamp' => '2026-06-19 09:19:58', 'body' => 'a'),
     array('message_timestamp' => '2026-06-19 09:19:54', 'body' => 'b'),
@@ -73,34 +114,58 @@ $last = ghl_message_log_attach_reply_gaps(array(
 ), 1);
 assert_eq('lone/oldest row has blank gap', '', $last[0]['reply_gap_label']);
 
-// --- Daily average from per-day GROUP BY rows. ---
-$dayRows = array(
-    array('count' => 3, 'min_ts' => '2026-06-19 09:19:40', 'max_ts' => '2026-06-19 09:19:58'), // span 18s / 2 gaps
-    array('count' => 1, 'min_ts' => '2026-06-18 17:00:00', 'max_ts' => '2026-06-18 17:00:00'), // single msg -> ignored
+// --- Average reply time across conversation-ordered rows. ---
+$ordered = array(
+    // c1, Friday: two clean replies (4s, 10s).
+    array('conversation_id' => 'c1', 'direction' => 'inbound',  'ts' => '2026-06-19 09:00:00'),
+    array('conversation_id' => 'c1', 'direction' => 'outbound', 'ts' => '2026-06-19 09:00:04'),
+    array('conversation_id' => 'c1', 'direction' => 'inbound',  'ts' => '2026-06-19 09:10:00'),
+    array('conversation_id' => 'c1', 'direction' => 'outbound', 'ts' => '2026-06-19 09:10:10'),
+    // c2, Saturday: excluded (weekend).
+    array('conversation_id' => 'c2', 'direction' => 'inbound',  'ts' => '2026-06-20 10:00:00'),
+    array('conversation_id' => 'c2', 'direction' => 'outbound', 'ts' => '2026-06-20 10:00:30'),
+    // c3, Friday but reply lands after 7PM: excluded.
+    array('conversation_id' => 'c3', 'direction' => 'inbound',  'ts' => '2026-06-19 18:59:00'),
+    array('conversation_id' => 'c3', 'direction' => 'outbound', 'ts' => '2026-06-19 19:30:00'),
+    // c4, overnight across days: excluded.
+    array('conversation_id' => 'c4', 'direction' => 'inbound',  'ts' => '2026-06-19 18:00:00'),
+    array('conversation_id' => 'c4', 'direction' => 'outbound', 'ts' => '2026-06-22 09:00:00'),
 );
-assert_eq('average gap seconds (18s over 2 intervals)', 9.0, ghl_message_log_average_gap_seconds($dayRows));
-assert_eq('average null when no day has >= 2 messages',
-    null, ghl_message_log_average_gap_seconds(array(array('count' => 1, 'min_ts' => 'x', 'max_ts' => 'x'))));
+assert_eq('average of the two qualifying replies (4s, 10s)',
+    7.0, ghl_message_log_average_reply_seconds($ordered));
+assert_eq('average null when nothing qualifies',
+    null, ghl_message_log_average_reply_seconds(array(
+        array('conversation_id' => 'c2', 'direction' => 'inbound',  'ts' => '2026-06-20 10:00:00'),
+        array('conversation_id' => 'c2', 'direction' => 'outbound', 'ts' => '2026-06-20 10:00:30'),
+    )));
 
-// --- SQLite mirror of the per-day aggregate query that feeds the average. ---
+// An outbound paired with an inbound from a DIFFERENT conversation must not count.
+assert_eq('cross-conversation does not pair in the average',
+    null, ghl_message_log_average_reply_seconds(array(
+        array('conversation_id' => 'a', 'direction' => 'inbound',  'ts' => '2026-06-19 09:00:00'),
+        array('conversation_id' => 'b', 'direction' => 'outbound', 'ts' => '2026-06-19 09:00:05'),
+    )));
+
+// --- SQLite mirror of the conversation-ordered query that feeds the average. ---
 $pdo = new PDO('sqlite::memory:');
 $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-$pdo->exec("CREATE TABLE ghl_messages (id INTEGER PRIMARY KEY, user_id TEXT, date_added TEXT)");
-$pdo->exec("INSERT INTO ghl_messages (id, user_id, date_added) VALUES
-    (1, 'u-1', '2026-06-19 09:19:40'),
-    (2, 'u-1', '2026-06-19 09:19:54'),
-    (3, 'u-1', '2026-06-19 09:19:58'),
-    (4, 'u-1', '2026-06-18 17:00:00')
+$pdo->exec("CREATE TABLE ghl_messages (id INTEGER PRIMARY KEY, conversation_id TEXT, direction TEXT, date_added TEXT)");
+$pdo->exec("INSERT INTO ghl_messages (id, conversation_id, direction, date_added) VALUES
+    (1, 'c1', 'inbound',  '2026-06-19 09:00:00'),
+    (2, 'c1', 'outbound', '2026-06-19 09:00:04'),
+    (3, 'c1', 'inbound',  '2026-06-19 09:10:00'),
+    (4, 'c1', 'outbound', '2026-06-19 09:10:10'),
+    (5, 'c2', 'inbound',  '2026-06-20 10:00:00'),
+    (6, 'c2', 'outbound', '2026-06-20 10:00:30')
 ");
-// Same GROUP BY DATE / MIN / MAX shape the model issues; HAVING drops lone days.
-$agg = $pdo->query(
-    "SELECT DATE(date_added) AS d, COUNT(*) AS count, MIN(date_added) AS min_ts, MAX(date_added) AS max_ts
+// Same conversation-ordered shape the model issues so adjacent pairing is sound.
+$ordered = $pdo->query(
+    "SELECT conversation_id AS conversation_id, direction AS direction, date_added AS ts
        FROM ghl_messages
-      GROUP BY DATE(date_added)
-     HAVING COUNT(*) >= 2"
+      ORDER BY conversation_id ASC, date_added ASC, id ASC"
 )->fetchAll(PDO::FETCH_ASSOC);
-$avg = ghl_message_log_average_gap_seconds($agg);
-assert_eq('mirror: only the 3-message day counts', 9.0, $avg);
-assert_eq('mirror: formats to 9s', '9s', ghl_message_log_format_duration($avg));
+$avg = ghl_message_log_average_reply_seconds($ordered);
+assert_eq('mirror: only the weekday in-hours replies count', 7.0, $avg);
+assert_eq('mirror: formats to 7s', '7s', ghl_message_log_format_duration($avg));
 
 echo "\nAll assertions passed.\n";

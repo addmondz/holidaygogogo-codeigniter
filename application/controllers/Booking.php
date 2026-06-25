@@ -1458,7 +1458,17 @@ class Booking extends MY_Controller
 				'month' => (int)$row->month_active,
 			);
 
-			$by_agent = $this->Report_Model->Lead_Dashboard_By_Agent(array('start_date' => $conv_start, 'end_date' => $conv_end));
+			// Top Agents – Conversion counts a conversion the same way the Lead
+			// Ownership dashboard's "Converted" column does: is_converted = 1 AND
+			// booking_id IS NOT NULL, with NO TC1/TC2 credit gate. The '1=1'
+			// override neutralises the credit fragment so an agent is credited for
+			// every converted lead assigned to them, regardless of which TC slot
+			// holds the booking. (The TC YTD card at ~line 1172 and the Lead
+			// Dashboard report keep the gated default.)
+			$by_agent = $this->Report_Model->Lead_Dashboard_By_Agent(
+				array('start_date' => $conv_start, 'end_date' => $conv_end),
+				'1=1'
+			);
 			$top_agents = array();
 			foreach(array_slice($by_agent, 0, 10) as $a) {
 				$top_agents[] = array(
@@ -2556,40 +2566,40 @@ class Booking extends MY_Controller
 		if(isset($cards['bc_month'])) {
 			$n = (int)$cards['bc_month']['count'];
 			$popovers['pop-bc-month'] =
-				'<strong>Formula:</strong> Count of confirmations credited to you this month.<br><br>' .
-				'<strong>Window:</strong> ' . $window_month . ' (by creation date)<br>' .
+				'<strong>What it shows:</strong> The number of booking confirmations credited to you this month.<br><br>' .
+				'<strong>Period:</strong> ' . $window_month . ' (by the date the booking was created)<br>' .
 				'<strong>This card:</strong><br>' .
-				$n . ' ' . $plural($n, 'BC') . ' credited to you &rarr; <strong>' . $n . '</strong><br><br>' .
-				'<strong>Credited-slot rule (TC1/TC2):</strong>' .
+				$n . ' ' . $plural($n, 'booking') . ' credited to you &rarr; <strong>' . $n . '</strong><br><br>' .
+				'<strong>Who gets the credit:</strong>' .
 				'<ul>' .
-				'<li>Before ' . $tc2_cutoff_disp . ': you hold TC1 (primary)</li>' .
-				'<li>From ' . $tc2_cutoff_disp . ': you hold TC2 (secondary)</li>' .
+				'<li>Before ' . $tc2_cutoff_disp . ': the main sales person on the booking</li>' .
+				'<li>From ' . $tc2_cutoff_disp . ': the second sales agent on the booking</li>' .
 				'</ul>' .
-				'<strong>Excludes:</strong> Quotations, cancelled, drafts.';
+				'<strong>Not counted:</strong> quotations, cancelled, and drafts.';
 		}
 
 		if(isset($cards['sales_month']) && isset($cards['bc_month'])) {
 			$n = (int)$cards['bc_month']['count'];
 			$popovers['pop-sales-month'] =
-				'<strong>Formula:</strong> Sum of NetTotal across BCs credited to you this month.<br><br>' .
-				'<strong>Window:</strong> ' . $window_month . ' (by creation date)<br>' .
+				'<strong>What it shows:</strong> The total value of the bookings credited to you this month.<br><br>' .
+				'<strong>Period:</strong> ' . $window_month . ' (by the date the booking was created)<br>' .
 				'<strong>This card:</strong><br>' .
-				$n . ' ' . $plural($n, 'BC') . ' counted (same as BC Created)<br>' .
-				'Sum of NetTotal &rarr; <strong>' . $cards['sales_month']['value'] . '</strong><br><br>' .
-				'<strong>NetTotal:</strong> BC price after discount, before any later refunds.<br>' .
-				'<strong>Excludes:</strong> Cancelled, drafts. Later refunds not subtracted.';
+				$n . ' ' . $plural($n, 'booking') . ' counted (same as BC Created)<br>' .
+				'Total value &rarr; <strong>' . $cards['sales_month']['value'] . '</strong><br><br>' .
+				'<strong>Value:</strong> the booking price after discount, before any later refunds.<br>' .
+				'<strong>Not counted:</strong> cancelled and drafts. Later refunds are not subtracted.';
 		}
 
 		if(isset($cards['sales_year'])) {
 			$popovers['pop-sales-year'] =
-				'<strong>Formula:</strong> Sum of NetTotal across your fully-paid BCs for the year.<br><br>' .
-				'<strong>Window:</strong> ' . $rng_disp($year_start, $year_end) . ' (by creation date)<br>' .
+				'<strong>What it shows:</strong> Your total sales for the year, compared against your yearly target.<br><br>' .
+				'<strong>Period:</strong> ' . $rng_disp($year_start, $year_end) . ' (by the date the booking was created)<br>' .
 				'<strong>This card:</strong><br>' .
 				'Year sales &rarr; <strong>' . $cards['sales_year']['value'] . '</strong><br>' .
 				'Yearly target &rarr; <strong>' . $cards['sales_year']['target'] . '</strong> (' . $cards['sales_year']['percent'] . ')<br><br>' .
-				'<strong>Fully paid</strong> = approved customer payments (Status Y, excl. agent commission) &ge; NetTotal.<br>' .
-				'<strong>Target:</strong> Set per TC per year under Admin &rarr; Yearly Target. Percent = actual &divide; target &times; 100.<br>' .
-				'<strong>Excludes:</strong> Cancelled, drafts, partial / unpaid BCs.';
+				'<strong>Fully paid</strong> means the approved customer payments cover the full booking amount (agent commission not included).<br>' .
+				'<strong>Target:</strong> set for each agent under Admin &rarr; Yearly Target. The percentage is your sales divided by your target.<br>' .
+				'<strong>Not counted:</strong> cancelled, drafts, and part-paid or unpaid bookings.';
 		}
 
 		if(isset($cards['cancellation_rate']) && $is_tc) {
@@ -2600,15 +2610,15 @@ class Booking extends MY_Controller
 			$total    = isset($parts[1]) ? (int)$parts[1] : 0;
 			$math     = ($total > 0)
 				? ($canc . ' &divide; ' . $total . ' &times; 100 = <strong>' . $rate . '</strong>')
-				: 'No BCs this month &rarr; <strong>0%</strong>';
+				: 'No bookings this month &rarr; <strong>0%</strong>';
 			$popovers['pop-cancel-rate'] =
-				'<strong>Formula:</strong> Cancelled &divide; Total &times; 100<br><br>' .
-				'<strong>Window:</strong> ' . $window_month . ' (by creation date)<br>' .
-				'<strong>This card (your BCs):</strong><br>' .
-				$canc . ' cancelled / ' . $total . ' total BCs<br>' .
+				'<strong>What it shows:</strong> The share of this month&rsquo;s bookings that ended up cancelled.<br><br>' .
+				'<strong>Period:</strong> ' . $window_month . ' (by the date the booking was created)<br>' .
+				'<strong>This card (your bookings):</strong><br>' .
+				$canc . ' cancelled / ' . $total . ' total bookings<br>' .
 				'&rarr; ' . $math . '<br><br>' .
-				'<strong>Filters:</strong> Drafts excluded. Your BCs only (credited-slot rule).<br>' .
-				'<strong>Note:</strong> Based on creation date, not cancellation date.';
+				'<strong>Scope:</strong> drafts not counted. Your bookings only.<br>' .
+				'<strong>Note:</strong> based on when the booking was created, not when it was cancelled.';
 		}
 
 		if(isset($cards['payment_overdue'])) {
@@ -2616,52 +2626,54 @@ class Booking extends MY_Controller
 			$po_full    = (int)$cards['payment_overdue']['full_overdue'];
 			$po_deposit = (int)$cards['payment_overdue']['deposit_only_overdue'];
 			$popovers['pop-payment-overdue'] =
-				'<strong>Counted when EITHER:</strong>' .
+				'<strong>What it shows:</strong> Your bookings whose payment deadline has passed but still have money owing.<br><br>' .
+				'<strong>Counted when either:</strong>' .
 				'<ul>' .
-				'<li>Full payment deadline passed AND BC still owes balance (Status <code>P</code> or <code>PP</code>)</li>' .
-				'<li>Deposit deadline passed AND deposit still unpaid (Status <code>P</code>)</li>' .
+				'<li>The full-payment deadline has passed and the booking still owes a balance</li>' .
+				'<li>The deposit deadline has passed and the deposit is still unpaid</li>' .
 				'</ul>' .
-				'<strong>As of:</strong> ' . $fmt_disp($today) . ' (no date window)<br>' .
+				'<strong>As of:</strong> ' . $fmt_disp($today) . ' (no date limit)<br>' .
 				'<strong>Due today:</strong> counts as overdue from 3:00pm onward.<br>' .
-				'<strong>This card (your BCs):</strong><br>' .
-				'Full-payment overdue: ' . $po_full . ' ' . $plural($po_full, 'BC') . '<br>' .
-				'Deposit overdue (full not yet due): ' . $po_deposit . ' ' . $plural($po_deposit, 'BC') . '<br>' .
-				'&rarr; <strong>' . $po_total . ' ' . $plural($po_total, 'BC') . '</strong><br><br>' .
-				'<strong>Status codes:</strong> <code>P</code> = waiting for payment · <code>PP</code> = deposit paid, balance pending.<br>' .
-				'<strong>Excludes:</strong> Cancelled, fully-paid BCs.';
+				'<strong>This card (your bookings):</strong><br>' .
+				'Full payment overdue: ' . $po_full . ' ' . $plural($po_full, 'booking') . '<br>' .
+				'Deposit overdue (full payment not yet due): ' . $po_deposit . ' ' . $plural($po_deposit, 'booking') . '<br>' .
+				'&rarr; <strong>' . $po_total . ' ' . $plural($po_total, 'booking') . '</strong><br><br>' .
+				'<strong>Not counted:</strong> cancelled and fully-paid bookings.';
 		}
 
 		if(isset($cards['upcoming_travel_not_ready'])) {
 			$u   = $cards['upcoming_travel_not_ready'];
 			$tot = (int)$u['count'];
 			$popovers['pop-upcoming-not-ready'] =
-				'<strong>"Not yet ready" upstream stages:</strong> Payment / Booking Op / Guest List / Travel Voucher.<br><br>' .
-				'<strong>Window:</strong> ' . $window_next7 . ' (by travel start date)<br>' .
-				'<strong>This card (your BCs):</strong><br>' .
-				'<code>P</code> Payment: ' . (int)$u['by_p'] . '<br>' .
-				'<code>PBO</code> Booking Op: ' . (int)$u['by_pbo'] . '<br>' .
-				'<code>PGL</code> Guest List: ' . (int)$u['by_pgl'] . '<br>' .
-				'<code>PTV</code> Travel Voucher: ' . (int)$u['by_ptv'] . '<br>' .
-				'&rarr; <strong>' . $tot . ' ' . $plural($tot, 'BC') . '</strong><br><br>' .
-				'<strong>Excludes:</strong> Cancelled. "Ready" (Pending Travel and beyond) not counted.<br>' .
-				'<strong>Why it matters:</strong> Guests travel within a week.';
+				'<strong>What it shows:</strong> Your bookings starting travel within 7 days that aren&rsquo;t ready yet.<br><br>' .
+				'<strong>&ldquo;Not yet ready&rdquo;</strong> means still waiting on: Payment / Booking Op / Guest List / Travel Voucher.<br><br>' .
+				'<strong>Period:</strong> ' . $window_next7 . ' (by travel start date)<br>' .
+				'<strong>This card (your bookings):</strong><br>' .
+				'Waiting on payment: ' . (int)$u['by_p'] . '<br>' .
+				'Waiting on booking operations: ' . (int)$u['by_pbo'] . '<br>' .
+				'Waiting on guest list: ' . (int)$u['by_pgl'] . '<br>' .
+				'Waiting on travel voucher: ' . (int)$u['by_ptv'] . '<br>' .
+				'&rarr; <strong>' . $tot . ' ' . $plural($tot, 'booking') . '</strong><br><br>' .
+				'<strong>Not counted:</strong> cancelled, and bookings already at Pending Travel or beyond.<br>' .
+				'<strong>Why it matters:</strong> guests travel within a week.';
 		}
 
 		if(isset($cards['upcoming_travel_not_ready_14'])) {
 			$u   = $cards['upcoming_travel_not_ready_14'];
 			$tot = (int)$u['count'];
 			$popovers['pop-upcoming-not-ready-14'] =
-				'<strong>"Not yet ready" upstream stages:</strong> Payment / Booking Op / Guest List / Travel Voucher.<br><br>' .
-				'<strong>Window:</strong> ' . $window_next14 . ' (by travel start date)<br>' .
-				'<strong>This card (your BCs):</strong><br>' .
-				'<code>P</code> Payment: ' . (int)$u['by_p'] . '<br>' .
-				'<code>PBO</code> Booking Op: ' . (int)$u['by_pbo'] . '<br>' .
-				'<code>PGL</code> Guest List: ' . (int)$u['by_pgl'] . '<br>' .
-				'<code>PTV</code> Travel Voucher: ' . (int)$u['by_ptv'] . '<br>' .
-				'&rarr; <strong>' . $tot . ' ' . $plural($tot, 'BC') . '</strong><br><br>' .
-				'<strong>Includes</strong> the "within 7 days" set (cumulative window).<br>' .
-				'<strong>Excludes:</strong> Cancelled. "Ready" (Pending Travel and beyond) not counted.<br>' .
-				'<strong>Why it matters:</strong> Two-week heads-up to get BCs ready.';
+				'<strong>What it shows:</strong> Your bookings starting travel within 14 days that aren&rsquo;t ready yet.<br><br>' .
+				'<strong>&ldquo;Not yet ready&rdquo;</strong> means still waiting on: Payment / Booking Op / Guest List / Travel Voucher.<br><br>' .
+				'<strong>Period:</strong> ' . $window_next14 . ' (by travel start date)<br>' .
+				'<strong>This card (your bookings):</strong><br>' .
+				'Waiting on payment: ' . (int)$u['by_p'] . '<br>' .
+				'Waiting on booking operations: ' . (int)$u['by_pbo'] . '<br>' .
+				'Waiting on guest list: ' . (int)$u['by_pgl'] . '<br>' .
+				'Waiting on travel voucher: ' . (int)$u['by_ptv'] . '<br>' .
+				'&rarr; <strong>' . $tot . ' ' . $plural($tot, 'booking') . '</strong><br><br>' .
+				'<strong>Includes</strong> the bookings shown in &ldquo;within 7 days&rdquo;.<br>' .
+				'<strong>Not counted:</strong> cancelled, and bookings already at Pending Travel or beyond.<br>' .
+				'<strong>Why it matters:</strong> a two-week heads-up to get bookings ready.';
 		}
 
 		// TC LEAD / Owner cards
@@ -2669,14 +2681,14 @@ class Booking extends MY_Controller
 			$w = (int)$cards['bc_week_month']['week'];
 			$m = (int)$cards['bc_week_month']['month'];
 			$bc_wm_html =
-				'<strong>Formula:</strong> Count of booking confirmations across all sales agents.<br><br>' .
-				'<strong>Windows (by creation date):</strong><br>' .
+				'<strong>What it shows:</strong> The total number of confirmed bookings across all sales agents.<br><br>' .
+				'<strong>Periods (by the date the booking was created):</strong><br>' .
 				'Week: ' . $window_week . ' (Mon&ndash;Sun)<br>' .
 				'Month: ' . $window_month . '<br>' .
 				'<strong>This card (team-wide):</strong><br>' .
-				'Week &rarr; <strong>' . $w . '</strong> ' . $plural($w, 'BC') . '<br>' .
-				'Month &rarr; <strong>' . $m . '</strong> ' . $plural($m, 'BC') . '<br><br>' .
-				'<strong>Excludes:</strong> Quotations, cancelled, drafts.';
+				'Week &rarr; <strong>' . $w . '</strong> ' . $plural($w, 'booking') . '<br>' .
+				'Month &rarr; <strong>' . $m . '</strong> ' . $plural($m, 'booking') . '<br><br>' .
+				'<strong>Not counted:</strong> quotations, cancelled, and drafts.';
 			$popovers['pop-bc-week-month-tl'] = $bc_wm_html;
 			$popovers['pop-bc-week-month-op'] = $bc_wm_html;
 		}
@@ -2689,22 +2701,22 @@ class Booking extends MY_Controller
 			$total    = isset($parts[1]) ? (int)$parts[1] : 0;
 			$math     = ($total > 0)
 				? ($canc . ' &divide; ' . $total . ' &times; 100 = <strong>' . $rate . '</strong>')
-				: 'No BCs this month &rarr; <strong>0%</strong>';
+				: 'No bookings this month &rarr; <strong>0%</strong>';
 			$popovers['pop-cancel-rate-tl'] =
-				'<strong>Formula:</strong> Cancelled &divide; Total &times; 100<br><br>' .
-				'<strong>Window:</strong> ' . $window_month . ' (by creation date)<br>' .
+				'<strong>What it shows:</strong> The share of this month&rsquo;s bookings that ended up cancelled, across the whole team.<br><br>' .
+				'<strong>Period:</strong> ' . $window_month . ' (by the date the booking was created)<br>' .
 				'<strong>This card (team-wide):</strong><br>' .
-				$canc . ' cancelled / ' . $total . ' total BCs<br>' .
+				$canc . ' cancelled / ' . $total . ' total bookings<br>' .
 				'&rarr; ' . $math . '<br><br>' .
-				'<strong>Filters:</strong> Drafts excluded. All agents counted.<br>' .
-				'<strong>Note:</strong> Based on creation date, not cancellation date.';
+				'<strong>Scope:</strong> drafts not counted. All agents included.<br>' .
+				'<strong>Note:</strong> based on when the booking was created, not when it was cancelled.';
 		}
 
 		if(isset($cards['leads_dwm'])) {
 			$ld = $cards['leads_dwm'];
 			$popovers['pop-leads-dwm'] =
-				'<strong>Source:</strong> Lead conversations synced from GHL.<br><br>' .
-				'<strong>Windows (by lead creation date):</strong><br>' .
+				'<strong>What it shows:</strong> New leads from GHL.<br><br>' .
+				'<strong>Periods (by the date the lead came in):</strong><br>' .
 				'Today: ' . $fmt_disp($today) . '<br>' .
 				'Week: ' . $window_week . ' (Mon&ndash;Sun)<br>' .
 				'Month: ' . $window_month . '<br>' .
@@ -2712,7 +2724,7 @@ class Booking extends MY_Controller
 				'Today &rarr; <strong>' . (int)$ld['day']   . '</strong> ' . $plural($ld['day'], 'lead') . '<br>' .
 				'Week &rarr; <strong>' . (int)$ld['week']  . '</strong> ' . $plural($ld['week'], 'lead') . '<br>' .
 				'Month &rarr; <strong>' . (int)$ld['month'] . '</strong> ' . $plural($ld['month'], 'lead') . '<br><br>' .
-				'Each GHL conversation = 1 lead. Re-entries to the same conversation don\'t double-count.';
+				'Each conversation counts as one lead &mdash; the same customer messaging again doesn\'t count twice.';
 
 			$total_leads = (int)$ld['total_conv'];
 			$converted   = (int)$ld['converted_month'];
@@ -2726,23 +2738,23 @@ class Booking extends MY_Controller
 			$avg_secs = $ld['avg_response_seconds'];
 			$avg_detail = ($avg_secs === null)
 				? '<strong>Avg Time:</strong> n/a (no replies measured)'
-				: '<strong>Avg Time:</strong> ' . $ld['avg_response_time'] . ' (mean of each lead\'s first 5 TC reply gaps; fewer than 5 replies counts all available; <em>only elapsed time inside duty hours is counted</em>)';
+				: '<strong>Avg Time:</strong> ' . $ld['avg_response_time'] . ' (average of each lead\'s first 5 reply times; if there are fewer than 5 replies, all of them are used; <em>only time during working hours is counted</em>)';
 			$popovers['pop-leads-conv'] =
-				'<strong>Window:</strong> ' . $window_conv . ' (all leads created ' . $conv_label . ', all agents)<br>' .
+				'<strong>Period:</strong> ' . $window_conv . ' (all leads from ' . $conv_label . ', every agent)<br>' .
 				'<strong>This card (' . $total_leads . ' total leads):</strong><br>' .
 				'Converted: ' . $converted . ' &rarr; Conversion ' . $conv_math . '<br>' .
 				'Responded: ' . $responded . ' &rarr; Response ' . $resp_math . '<br>' .
 				$avg_detail . '<br><br>' .
-				'<strong>Converted:</strong> Lead linked to a BC AND the TC has sales credit (TC1 before ' . $tc2_cutoff_disp . '; TC2 from ' . $tc2_cutoff_disp . ').<br>' .
-				'<strong>Responded:</strong> Lead has at least one TC reply.<br>' .
-				'<strong>Duty hours:</strong> Mon&ndash;Sat 08:00&ndash;22:00 MYT &mdash; after-hours elapsed time is not counted in Avg Time.';
+				'<strong>Converted:</strong> the lead is linked to a booking and the agent is credited for that sale (main sales person before ' . $tc2_cutoff_disp . '; second sales agent from ' . $tc2_cutoff_disp . ').<br>' .
+				'<strong>Responded:</strong> the lead got at least one reply.<br>' .
+				'<strong>Working hours:</strong> Mon&ndash;Sat 8:00am&ndash;10:00pm Malaysia time &mdash; time outside working hours is not counted in Avg Time.';
 		}
 
 		if(isset($cards['active_leads_dwm'])) {
 			$a = $cards['active_leads_dwm'];
 			$popovers['pop-active-leads'] =
-				'<strong>Formula:</strong> Count of GHL leads not yet converted to a BC, windowed by lead start date.<br><br>' .
-				'<strong>Windows (by lead creation date):</strong><br>' .
+				'<strong>What it shows:</strong> Leads that haven&rsquo;t turned into a booking yet, by the date they came in.<br><br>' .
+				'<strong>Periods (by the date the lead came in):</strong><br>' .
 				'Today: ' . $fmt_disp($today) . '<br>' .
 				'Week: ' . $window_week . ' (Mon&ndash;Sun)<br>' .
 				'Month: ' . $window_month . '<br>' .
@@ -2750,37 +2762,37 @@ class Booking extends MY_Controller
 				'Today &rarr; <strong>' . (int)$a['day']   . '</strong> ' . $plural($a['day'],   'lead') . ' still open<br>' .
 				'Week &rarr; <strong>'  . (int)$a['week']  . '</strong> ' . $plural($a['week'],  'lead') . ' still open<br>' .
 				'Month &rarr; <strong>' . (int)$a['month'] . '</strong> ' . $plural($a['month'], 'lead') . ' still open<br><br>' .
-				'<strong>Open =</strong> <code>is_converted = 0</code> &mdash; no linked BC yet.<br>' .
-				'<strong>Pair with:</strong> &quot;Leads&quot; (total) to see open vs converted at a glance.';
+				'<strong>Open</strong> means the lead has no booking linked to it yet.<br>' .
+				'<strong>Compare with:</strong> the &quot;Leads&quot; total to see open versus converted at a glance.';
 		}
 
 		if(isset($tables['agent_conversion'])) {
 			$rows = count($tables['agent_conversion']);
 			$popovers['pop-agent-conversion'] =
-				'<strong>Window:</strong> ' . $window_conv . '<br><br>' .
+				'<strong>Period:</strong> ' . $window_conv . '<br><br>' .
 				'<strong>Per agent:</strong>' .
 				'<ul>' .
-				'<li>Leads &mdash; total leads assigned ' . $conv_label . '</li>' .
-				'<li>Converted &mdash; leads with a linked BC where the agent has sales credit (TC1 before ' . $tc2_cutoff_disp . '; TC2 from ' . $tc2_cutoff_disp . ')</li>' .
-				'<li>Rate &mdash; Converted &divide; Leads &times; 100</li>' .
+				'<li>Leads &mdash; total leads assigned to them ' . $conv_label . '</li>' .
+				'<li>Converted &mdash; leads assigned to them that became a booking (same rule as the Lead Ownership dashboard&rsquo;s Converted column; no main/second sales-agent credit gate)</li>' .
+				'<li>Rate &mdash; converted divided by leads</li>' .
 				'</ul>' .
-				'<strong>Sort:</strong> By total leads (highest first), then agent name. Top 10.<br>' .
+				'<strong>Order:</strong> most leads first, then agent name. Top 10.<br>' .
 				'<strong>This card:</strong> ' . $rows . ' ' . $plural($rows, 'agent') . ' shown.<br>' .
-				'<strong>Excludes:</strong> Unassigned leads.';
+				'<strong>Not shown:</strong> leads with no agent assigned.';
 		}
 
 		if(isset($tables['leads_by_agent'])) {
 			$rows = count($tables['leads_by_agent']);
 			$popovers['pop-leads-by-agent'] =
-				'<strong>Source:</strong> New lead conversations synced from GHL, broken out per agent.<br><br>' .
-				'<strong>Windows (by lead creation date):</strong><br>' .
+				'<strong>What it shows:</strong> New leads from GHL, broken down per agent.<br><br>' .
+				'<strong>Periods (by the date the lead came in):</strong><br>' .
 				'Today: ' . $fmt_disp($today) . '<br>' .
 				'Week: ' . $window_week . ' (Mon&ndash;Sun)<br>' .
 				'Month: ' . $window_month . '<br><br>' .
-				'<strong>Per agent:</strong> count of new leads assigned to that agent in each window. The windows nest &mdash; a lead created today is also counted in this week and this month.<br><br>' .
-				'<strong>Sort:</strong> By month leads (highest first), then week, day, agent name.<br>' .
+				'<strong>Per agent:</strong> the number of new leads assigned to that agent in each period. The periods nest &mdash; a lead from today is also counted in this week and this month.<br><br>' .
+				'<strong>Order:</strong> most leads this month first, then week, day, agent name.<br>' .
 				'<strong>This card:</strong> ' . $rows . ' ' . $plural($rows, 'agent') . ' shown.<br>' .
-				'<strong>Excludes:</strong> Unassigned leads.';
+				'<strong>Not shown:</strong> leads with no agent assigned.';
 		}
 
 		// OP cards
@@ -2788,164 +2800,174 @@ class Booking extends MY_Controller
 			$u   = $cards['upcoming_travel_not_ready_op'];
 			$tot = (int)$u['count'];
 			$popovers['pop-upcoming-not-ready-op'] =
-				'<strong>"Not yet ready" upstream stages:</strong> Payment / Booking Op / Guest List / Travel Voucher.<br><br>' .
-				'<strong>Window:</strong> ' . $window_next7 . ' (by travel start date)<br>' .
+				'<strong>What it shows:</strong> Bookings starting travel within 7 days that aren&rsquo;t ready yet.<br><br>' .
+				'<strong>&ldquo;Not yet ready&rdquo;</strong> means still waiting on: Payment / Booking Op / Guest List / Travel Voucher.<br><br>' .
+				'<strong>Period:</strong> ' . $window_next7 . ' (by travel start date)<br>' .
 				'<strong>This card (team-wide):</strong><br>' .
-				'<code>P</code> Payment: ' . (int)$u['by_p'] . '<br>' .
-				'<code>PBO</code> Booking Op: ' . (int)$u['by_pbo'] . '<br>' .
-				'<code>PGL</code> Guest List: ' . (int)$u['by_pgl'] . '<br>' .
-				'<code>PTV</code> Travel Voucher: ' . (int)$u['by_ptv'] . '<br>' .
-				'&rarr; <strong>' . $tot . ' ' . $plural($tot, 'BC') . '</strong><br><br>' .
-				'<strong>Excludes:</strong> Cancelled. "Ready" (Pending Travel and beyond) not counted.<br>' .
-				'<strong>Why it matters:</strong> Guests travel within a week.';
+				'Waiting on payment: ' . (int)$u['by_p'] . '<br>' .
+				'Waiting on booking operations: ' . (int)$u['by_pbo'] . '<br>' .
+				'Waiting on guest list: ' . (int)$u['by_pgl'] . '<br>' .
+				'Waiting on travel voucher: ' . (int)$u['by_ptv'] . '<br>' .
+				'&rarr; <strong>' . $tot . ' ' . $plural($tot, 'booking') . '</strong><br><br>' .
+				'<strong>Not counted:</strong> cancelled, and bookings already at Pending Travel or beyond.<br>' .
+				'<strong>Why it matters:</strong> guests travel within a week.';
 		}
 
 		if(isset($cards['upcoming_travel_not_ready_op_14'])) {
 			$u   = $cards['upcoming_travel_not_ready_op_14'];
 			$tot = (int)$u['count'];
 			$popovers['pop-upcoming-not-ready-op-14'] =
-				'<strong>"Not yet ready" upstream stages:</strong> Payment / Booking Op / Guest List / Travel Voucher.<br><br>' .
-				'<strong>Window:</strong> ' . $window_next14 . ' (by travel start date)<br>' .
+				'<strong>What it shows:</strong> Bookings starting travel within 14 days that aren&rsquo;t ready yet.<br><br>' .
+				'<strong>&ldquo;Not yet ready&rdquo;</strong> means still waiting on: Payment / Booking Op / Guest List / Travel Voucher.<br><br>' .
+				'<strong>Period:</strong> ' . $window_next14 . ' (by travel start date)<br>' .
 				'<strong>This card (team-wide):</strong><br>' .
-				'<code>P</code> Payment: ' . (int)$u['by_p'] . '<br>' .
-				'<code>PBO</code> Booking Op: ' . (int)$u['by_pbo'] . '<br>' .
-				'<code>PGL</code> Guest List: ' . (int)$u['by_pgl'] . '<br>' .
-				'<code>PTV</code> Travel Voucher: ' . (int)$u['by_ptv'] . '<br>' .
-				'&rarr; <strong>' . $tot . ' ' . $plural($tot, 'BC') . '</strong><br><br>' .
-				'<strong>Includes</strong> the "within 7 days" set (cumulative window).<br>' .
-				'<strong>Excludes:</strong> Cancelled. "Ready" (Pending Travel and beyond) not counted.<br>' .
-				'<strong>Why it matters:</strong> Two-week heads-up to get BCs ready.';
+				'Waiting on payment: ' . (int)$u['by_p'] . '<br>' .
+				'Waiting on booking operations: ' . (int)$u['by_pbo'] . '<br>' .
+				'Waiting on guest list: ' . (int)$u['by_pgl'] . '<br>' .
+				'Waiting on travel voucher: ' . (int)$u['by_ptv'] . '<br>' .
+				'&rarr; <strong>' . $tot . ' ' . $plural($tot, 'booking') . '</strong><br><br>' .
+				'<strong>Includes</strong> the bookings shown in &ldquo;within 7 days&rdquo;.<br>' .
+				'<strong>Not counted:</strong> cancelled, and bookings already at Pending Travel or beyond.<br>' .
+				'<strong>Why it matters:</strong> a two-week heads-up to get bookings ready.';
 		}
 
 		if(isset($cards['insurance_pending'])) {
 			$ip = (int)$cards['insurance_pending']['count'];
 			$popovers['pop-insurance-pending'] =
-				'<strong>Counted when, for an active line item:</strong>' .
+				'<strong>What it shows:</strong> Bookings with an insurance checklist not yet ticked off on at least one product line.<br><br>' .
+				'<strong>Counted when, for an active product line:</strong>' .
 				'<ul>' .
-				'<li>Product carries an Insurance package checklist</li>' .
-				'<li>No completion record yet for that checklist on that line</li>' .
-				'<li><code>booking_product.disable_checklist_payment_out = 0</code> (the same rule the modal/filter uses)</li>' .
-				'<li>BC, not cancelled, not draft</li>' .
-				'<li>Travel from <strong>' . $fmt_disp($insurance_window_start) . '</strong> onwards (1 March of the current year)</li>' .
-				'<li>Completed &amp; pending-review BCs (<code>Status = Y</code>) are always excluded</li>' .
+				'<li>The product has an insurance checklist</li>' .
+				'<li>That checklist hasn&rsquo;t been completed yet</li>' .
+				'<li>The line isn&rsquo;t excluded from checklist pay-outs (same rule the checklist screen uses)</li>' .
+				'<li>It is a confirmed booking, not cancelled or draft</li>' .
+				'<li>Travel from <strong>' . $fmt_disp($insurance_window_start) . '</strong> onwards (1 March this year)</li>' .
+				'<li>Bookings already completed are left out</li>' .
 				'</ul>' .
-				'<strong>Live queue &middot; as of ' . $fmt_disp($today) . '</strong> &mdash; travel from ' . $fmt_disp($insurance_window_start) . ' onwards.<br>' .
+				'<strong>Live list &middot; as of ' . $fmt_disp($today) . '</strong> &mdash; travel from ' . $fmt_disp($insurance_window_start) . ' onwards.<br>' .
 				'<strong>This card:</strong> ' .
-				'Insurance pending &rarr; <strong>' . $ip . ' ' . $plural($ip, 'BC') . '</strong><br><br>' .
-				'<strong>Action:</strong> Click to filter the list to these BCs and tick off insurance.';
+				'Insurance pending &rarr; <strong>' . $ip . ' ' . $plural($ip, 'booking') . '</strong><br><br>' .
+				'<strong>What to do:</strong> click to filter the list to these bookings and tick off insurance.';
 		}
 
 		if(isset($cards['ferry_pending'])) {
 			$fp = (int)$cards['ferry_pending']['count'];
 			$popovers['pop-ferry-pending'] =
-				'<strong>Counted when, for an active line item:</strong>' .
+				'<strong>What it shows:</strong> Bookings with a &ldquo;Book Ferry Transfer&rdquo; checklist not yet ticked off on at least one product line.<br><br>' .
+				'<strong>Counted when, for an active product line:</strong>' .
 				'<ul>' .
-				'<li>Product carries a &ldquo;Book Ferry Transfer&rdquo; package checklist</li>' .
-				'<li>No completion record yet for that checklist on that line</li>' .
-				'<li><code>booking_product.disable_checklist_payment_out = 0</code> (the same rule the modal/filter uses)</li>' .
-				'<li>BC, not cancelled, not draft</li>' .
+				'<li>The product has a &ldquo;Book Ferry Transfer&rdquo; checklist</li>' .
+				'<li>That checklist hasn&rsquo;t been completed yet</li>' .
+				'<li>The line isn&rsquo;t excluded from checklist pay-outs (same rule the checklist screen uses)</li>' .
+				'<li>It is a confirmed booking, not cancelled or draft</li>' .
 				'</ul>' .
-				'<strong>Travel window:</strong> trips overlapping ' . $fmt_disp($ferry_window_start) . ' &ndash; ' . $fmt_disp($ferry_window_end) . ' (this month &amp; next).<br>' .
+				'<strong>Travel window:</strong> trips that fall between ' . $fmt_disp($ferry_window_start) . ' &ndash; ' . $fmt_disp($ferry_window_end) . ' (this month &amp; next).<br>' .
 				'<strong>This card:</strong> ' .
-				'Ferry transfer pending &rarr; <strong>' . $fp . ' ' . $plural($fp, 'BC') . '</strong><br><br>' .
-				'<strong>Action:</strong> Click to filter the list to these BCs and arrange the ferry transfer.';
+				'Ferry transfer pending &rarr; <strong>' . $fp . ' ' . $plural($fp, 'booking') . '</strong><br><br>' .
+				'<strong>What to do:</strong> click to filter the list to these bookings and arrange the ferry transfer.';
 		}
 
 		if(isset($cards['gl_submitted'])) {
 			$g = (int)$cards['gl_submitted']['count'];
 			$popovers['pop-gl-submitted'] =
+				'<strong>What it shows:</strong> Bookings where the customer has submitted their guest list but OP hasn&rsquo;t locked it yet.<br><br>' .
 				'<strong>Counted when:</strong>' .
 				'<ul>' .
-				'<li>Customer has submitted (<code>is_submitted=1</code>)</li>' .
-				'<li>OP has not yet locked (<code>LockStatus=N</code>)</li>' .
-				'<li>Booking confirmation; not cancelled, not draft</li>' .
+				'<li>The customer has submitted their guest list</li>' .
+				'<li>OP hasn&rsquo;t locked it yet</li>' .
+				'<li>It is a confirmed booking, not cancelled or draft</li>' .
 				'</ul>' .
-				'<strong>Live queue &middot; as of ' . $fmt_disp($today) . '</strong> &mdash; no date filter.<br>' .
+				'<strong>Live list &middot; as of ' . $fmt_disp($today) . '</strong> &mdash; no date limit.<br>' .
 				'<strong>This card:</strong> ' .
-				'Submitted, not yet locked &rarr; <strong>' . $g . ' ' . $plural($g, 'BC') . '</strong><br><br>' .
-				'<strong>Action:</strong> Review for completeness, then lock to stop further customer edits.';
+				'Submitted, not yet locked &rarr; <strong>' . $g . ' ' . $plural($g, 'booking') . '</strong><br><br>' .
+				'<strong>What to do:</strong> check the list is complete, then lock it to stop further customer edits.';
 		}
 
 		// OP operational queue cards.
 		if(isset($cards['pending_bc_op'])) {
 			$n = (int)$cards['pending_bc_op']['count'];
 			$popovers['pop-pending-bc-op'] =
+				'<strong>What it shows:</strong> Bookings sitting at the <strong>Pending BC</strong> stage, waiting to be confirmed.<br><br>' .
 				'<strong>Counted when:</strong>' .
 				'<ul>' .
-				'<li>Booking parked at <strong>PENDING BC</strong> (<code>Status=PB</code>)</li>' .
+				'<li>The booking is at the &ldquo;Pending BC&rdquo; stage</li>' .
 				'<li>Not cancelled</li>' .
 				'</ul>' .
-				'<strong>Team-wide live backlog &middot; as of ' . $fmt_disp($today) . '</strong> &mdash; no date window.<br>' .
-				'<strong>This card:</strong> ' . $n . ' ' . $plural($n, 'BC') . ' &rarr; <strong>' . $n . '</strong><br><br>' .
-				'<strong>Action:</strong> Click to view and progress them to Pending BC Confirmation.';
+				'<strong>Team-wide live list &middot; as of ' . $fmt_disp($today) . '</strong> &mdash; no date limit.<br>' .
+				'<strong>This card:</strong> ' . $n . ' ' . $plural($n, 'booking') . ' &rarr; <strong>' . $n . '</strong><br><br>' .
+				'<strong>What to do:</strong> click to view and move them along to Pending BC Confirmation.';
 		}
 		if(isset($cards['pending_bc_confirmation_op'])) {
 			$n = (int)$cards['pending_bc_confirmation_op']['count'];
 			$popovers['pop-pending-bc-confirmation-op'] =
+				'<strong>What it shows:</strong> Bookings sitting at the <strong>Pending BC Confirmation</strong> stage, waiting to be approved.<br><br>' .
 				'<strong>Counted when:</strong>' .
 				'<ul>' .
-				'<li>Booking parked at <strong>PENDING BC CONFIRMATION</strong> (<code>Status=PBC</code>)</li>' .
+				'<li>The booking is at the &ldquo;Pending BC Confirmation&rdquo; stage</li>' .
 				'<li>Not cancelled</li>' .
 				'</ul>' .
-				'<strong>Team-wide live backlog &middot; as of ' . $fmt_disp($today) . '</strong> &mdash; no date window.<br>' .
-				'<strong>This card:</strong> ' . $n . ' ' . $plural($n, 'BC') . ' &rarr; <strong>' . $n . '</strong><br><br>' .
-				'<strong>Action:</strong> Click to view and approve the booking confirmation.';
+				'<strong>Team-wide live list &middot; as of ' . $fmt_disp($today) . '</strong> &mdash; no date limit.<br>' .
+				'<strong>This card:</strong> ' . $n . ' ' . $plural($n, 'booking') . ' &rarr; <strong>' . $n . '</strong><br><br>' .
+				'<strong>What to do:</strong> click to view and approve the booking confirmation.';
 		}
 		if(isset($cards['travel_tomorrow_op'])) {
 			$n = (int)$cards['travel_tomorrow_op']['count'];
 			$popovers['pop-travel-tomorrow-op'] =
+				'<strong>What it shows:</strong> All confirmed bookings whose travel starts tomorrow, whatever stage they&rsquo;re at.<br><br>' .
 				'<strong>Counted when:</strong>' .
 				'<ul>' .
 				'<li>Travel <strong>starts tomorrow</strong> (' . $fmt_disp($tomorrow) . ')</li>' .
-				'<li>Booking confirmation; not cancelled, not draft</li>' .
-				'<li><strong>Any</strong> workflow status</li>' .
+				'<li>It is a confirmed booking, not cancelled or draft</li>' .
+				'<li><strong>Any</strong> stage</li>' .
 				'</ul>' .
-				'<strong>This card (team-wide):</strong> ' . $n . ' ' . $plural($n, 'BC') . ' &rarr; <strong>' . $n . '</strong><br><br>' .
-				'<strong>Note:</strong> Scoped by departure date (StartDate = tomorrow), not trips merely spanning tomorrow.';
+				'<strong>This card (team-wide):</strong> ' . $n . ' ' . $plural($n, 'booking') . ' &rarr; <strong>' . $n . '</strong><br><br>' .
+				'<strong>Note:</strong> based on the departure date (trips that merely pass through tomorrow are not included).';
 		}
 		if(isset($cards['travel_tomorrow_not_ready_op'])) {
 			$n = (int)$cards['travel_tomorrow_not_ready_op']['count'];
 			$popovers['pop-travel-tomorrow-not-ready-op'] =
+				'<strong>What it shows:</strong> Bookings travelling tomorrow that haven&rsquo;t reached &ldquo;Pending Travel&rdquo; yet.<br><br>' .
 				'<strong>Counted when:</strong>' .
 				'<ul>' .
 				'<li>Travel <strong>starts tomorrow</strong> (' . $fmt_disp($tomorrow) . ')</li>' .
-				'<li>Status is <strong>NOT</strong> Pending Travel (<code>Status &ne; PT</code>)</li>' .
-				'<li>Booking confirmation; not cancelled, not draft</li>' .
+				'<li>The booking is <strong>not</strong> yet at &ldquo;Pending Travel&rdquo;</li>' .
+				'<li>It is a confirmed booking, not cancelled or draft</li>' .
 				'</ul>' .
-				'<strong>This card (team-wide):</strong> ' . $n . ' ' . $plural($n, 'BC') . ' &rarr; <strong>' . $n . '</strong><br><br>' .
-				'<strong>Why it matters:</strong> Guests travel tomorrow yet the BC has not reached Pending Travel &mdash; chase these first.';
+				'<strong>This card (team-wide):</strong> ' . $n . ' ' . $plural($n, 'booking') . ' &rarr; <strong>' . $n . '</strong><br><br>' .
+				'<strong>Why it matters:</strong> guests travel tomorrow but the booking isn&rsquo;t ready &mdash; chase these first.';
 		}
 		if(isset($cards['pending_review_op'])) {
 			$n = (int)$cards['pending_review_op']['count'];
 			$popovers['pop-pending-review-op'] =
+				'<strong>What it shows:</strong> Bookings where travel has finished but the after-sales review is still outstanding.<br><br>' .
 				'<strong>Counted when:</strong>' .
 				'<ul>' .
-				'<li>Travel has ended (<code>Status=Y</code>, COMPLETED)</li>' .
-				'<li>After-sales review still pending (<code>AfterSalesService=PENDING</code>)</li>' .
-				'<li>Booking confirmation; not cancelled</li>' .
+				'<li>Travel has been completed</li>' .
+				'<li>The after-sales review is still pending</li>' .
+				'<li>It is a confirmed booking, not cancelled</li>' .
 				'</ul>' .
-				'<strong>Team-wide live queue &middot; as of ' . $fmt_disp($today) . '</strong>.<br>' .
-				'<strong>This card:</strong> ' . $n . ' ' . $plural($n, 'BC') . ' &rarr; <strong>' . $n . '</strong><br><br>' .
-				'<strong>Action:</strong> Close the loop with the customer, then mark the booking complete.';
+				'<strong>Team-wide live list &middot; as of ' . $fmt_disp($today) . '</strong>.<br>' .
+				'<strong>This card:</strong> ' . $n . ' ' . $plural($n, 'booking') . ' &rarr; <strong>' . $n . '</strong><br><br>' .
+				'<strong>What to do:</strong> follow up with the customer, then mark the booking complete.';
 		}
 
 		if(isset($tables['destination_sales'])) {
 			$rows = count($tables['destination_sales']);
 			$is_op_view = $is_op;
 			$sort_line = $is_op_view
-				? '<strong>Sort:</strong> By BC count (highest first). Top 5.'
-				: '<strong>Sort:</strong> By total sales (highest first). Top 5.';
+				? '<strong>Order:</strong> most bookings first. Top 5.'
+				: '<strong>Order:</strong> highest sales first. Top 5.';
 			$dest_html =
-				'<strong>Window:</strong> ' . $window_month . ' (by creation date)<br><br>' .
+				'<strong>Period:</strong> ' . $window_month . ' (by the date the booking was created)<br><br>' .
 				'<strong>Per destination:</strong>' .
 				'<ul>' .
 				'<li>BC &mdash; how many bookings</li>' .
-				'<li>Sales &mdash; sum of NetTotal</li>' .
+				'<li>Sales &mdash; total sales</li>' .
 				'</ul>' .
 				$sort_line . '<br>' .
 				'<strong>This card:</strong> ' . $rows . ' ' . $plural($rows, 'destination') . ' shown.<br>' .
-				'<strong>Filters:</strong> Booking confirmations only; not cancelled; not draft.<br>' .
-				'<strong>Tip:</strong> Click a row to filter the booking list by destination.';
+				'<strong>Counted:</strong> confirmed bookings only, not cancelled or draft.<br>' .
+				'<strong>Tip:</strong> click a row to filter the booking list by that destination.';
 			if($is_op_view) {
 				$popovers['pop-destination-sales-op'] = $dest_html;
 			} else {
@@ -2956,17 +2978,16 @@ class Booking extends MY_Controller
 		if(isset($tables['destination_closed_sales'])) {
 			$rows = count($tables['destination_closed_sales']);
 			$popovers['pop-destination-closed-sales'] =
-				'<strong>Window:</strong> ' . $window_month . ' (BCs created this month)<br><br>' .
+				'<strong>Period:</strong> ' . $window_month . ' (bookings created this month)<br><br>' .
 				'<strong>Per destination:</strong>' .
 				'<ul>' .
 				'<li>BC &mdash; how many fully-paid bookings</li>' .
-				'<li>Sales &mdash; sum of NetTotal across those BCs</li>' .
+				'<li>Sales &mdash; total sales across those bookings</li>' .
 				'</ul>' .
-				'<strong>Sort:</strong> By total sales (highest first). Top 5.<br>' .
+				'<strong>Order:</strong> highest sales first. Top 5.<br>' .
 				'<strong>This card:</strong> ' . $rows . ' ' . $plural($rows, 'destination') . ' shown.<br>' .
-				'<strong>Filters:</strong> Booking confirmations only; not cancelled; not draft; ' .
-				'sum of approved customer payments (excluding agent commission) &ge; NetTotal &mdash; ' .
-				'i.e. revenue is fully collected. Same definition as the TC Total Sales card.';
+				'<strong>Counted:</strong> confirmed bookings only, not cancelled or draft, where the customer has fully paid ' .
+				'(approved payments cover the full booking amount). Same &ldquo;fully paid&rdquo; rule as the Total Sales card.';
 		}
 
 		if(isset($tables['active_leads_by_tag'])) {
@@ -2975,22 +2996,20 @@ class Booking extends MY_Controller
 			$lang_n = isset($by_tag['language'])    ? count($by_tag['language'])    : 0;
 			$race_n = isset($by_tag['race'])        ? count($by_tag['race'])        : 0;
 			$popovers['pop-active-leads-by-tag'] =
-				'<strong>Scope:</strong> All active (unconverted) leads currently ' .
-				'residing in agents&rsquo; GHL inboxes &mdash; same lead set as the ' .
-				'"Active Leads" card, just sliced by tag instead of by window.<br><br>' .
-				'<strong>Per dimension:</strong>' .
+				'<strong>What it shows:</strong> All open (not-yet-converted) leads currently in agents&rsquo; ' .
+				'GHL inboxes &mdash; the same leads as the &ldquo;Active Leads&rdquo; card, ' .
+				'just grouped by tag instead of by date.<br><br>' .
+				'<strong>The three columns:</strong>' .
 				'<ul>' .
-				'<li>Destination &mdash; country / island / region tags on the GHL conversation</li>' .
+				'<li>Destination &mdash; country / island / region tags on the conversation</li>' .
 				'<li>Language &mdash; conversation language tags (bm / en / cn)</li>' .
-				'<li>Race &mdash; flags for halal / dietary tagging (e.g. muslim)</li>' .
+				'<li>Race &mdash; halal / dietary tags (e.g. muslim)</li>' .
 				'</ul>' .
-				'<strong>Match:</strong> Case-insensitive exact-string against an allowlist ' .
-				'(see <code>ghl_tag_categories_helper.php</code>). Substring matches do not count, ' .
-				'so &ldquo;redang052026&rdquo; is not lumped into &ldquo;redang&rdquo;.<br>' .
-				'<strong>Dedup:</strong> A lead carrying the same tag twice counts once. A lead ' .
-				'carrying tags in multiple dimensions counts in each of them (the three tables ' .
-				'are disjoint views over the same lead set).<br>' .
-				'<strong>Sort:</strong> Each table sorted by lead count (highest first), then tag name. Top 10 per dimension.<br>' .
+				'<strong>Matching:</strong> a tag must match a known tag exactly (not case-sensitive). ' .
+				'Partial matches don&rsquo;t count, so &ldquo;redang052026&rdquo; is not counted as &ldquo;redang&rdquo;.<br>' .
+				'<strong>Counting:</strong> the same tag on one lead counts once. A lead with tags in more than one ' .
+				'column is counted in each (the three columns are separate views of the same leads).<br>' .
+				'<strong>Order:</strong> each column is sorted by lead count (highest first), then tag name. Top 10 per column.<br>' .
 				'<strong>This card:</strong> ' .
 				$dest_n . ' ' . $plural($dest_n, 'destination') . ', ' .
 				$lang_n . ' ' . $plural($lang_n, 'language') . ', ' .
@@ -3004,46 +3023,46 @@ class Booking extends MY_Controller
 			$tot  = $sg_n + $co_n;
 			$sg_pct = $tot > 0 ? round(($sg_n / $tot) * 100, 1) : 0;
 			$popovers['pop-lead-source-split'] =
-				'<strong>Window:</strong> ' . $window_month . ' (by creation date)<br><br>' .
-				'<strong>Buckets:</strong>' .
+				'<strong>Period:</strong> ' . $window_month . ' (by the date the booking was created)<br><br>' .
+				'<strong>The two groups:</strong>' .
 				'<ul>' .
-				'<li><strong>Self Gen</strong> &mdash; booking source = &quot;' . SELF_GEN_SOURCE_NAME . '&quot;. The agent brought in the lead themselves.</li>' .
-				'<li><strong>Company</strong> &mdash; every other source (WhatsApp, WeChat, Email, Call, Telegram, Facebook, etc.) or no source at all.</li>' .
+				'<li><strong>Self Gen</strong> &mdash; booking source is &quot;' . SELF_GEN_SOURCE_NAME . '&quot;. The agent brought in the lead themselves.</li>' .
+				'<li><strong>Company</strong> &mdash; any other source (WhatsApp, WeChat, Email, Call, Telegram, Facebook, etc.) or no source at all.</li>' .
 				'</ul>' .
 				'<strong>This card:</strong><br>' .
-				'Self Gen &rarr; <strong>' . $sg_n . '</strong> ' . $plural($sg_n, 'BC') . ' &middot; ' . $ls['self_gen_total'] . '<br>' .
-				'Company &rarr; <strong>' . $co_n . '</strong> ' . $plural($co_n, 'BC') . ' &middot; ' . $ls['company_total'] . '<br>' .
+				'Self Gen &rarr; <strong>' . $sg_n . '</strong> ' . $plural($sg_n, 'booking') . ' &middot; ' . $ls['self_gen_total'] . '<br>' .
+				'Company &rarr; <strong>' . $co_n . '</strong> ' . $plural($co_n, 'booking') . ' &middot; ' . $ls['company_total'] . '<br>' .
 				($tot > 0 ? 'Self Gen share &rarr; ' . $sg_n . ' &divide; ' . $tot . ' &times; 100 = <strong>' . $sg_pct . '%</strong><br><br>' : '<br>') .
-				'<strong>Attribution:</strong> Primary SalesAgent (TC1) regardless of date &mdash; this card does <em>not</em> use the TC1/TC2 credited-slot rule (self-generation is about who hunted the lead, so the primary salesperson is what matters).<br>' .
-				'<strong>Filters:</strong> BC only; not cancelled; not draft.';
+				'<strong>Who it&rsquo;s credited to:</strong> the main sales person on the booking, whatever the date &mdash; this card always uses the main salesperson (self-generation is about who brought in the lead).<br>' .
+				'<strong>Counted:</strong> confirmed bookings only, not cancelled or draft.';
 		}
 
 		if(isset($tables['agent_source_split'])) {
 			$rows = count($tables['agent_source_split']);
 			$popovers['pop-agent-source-split'] =
-				'<strong>Window:</strong> ' . $window_month . ' (by creation date)<br><br>' .
+				'<strong>Period:</strong> ' . $window_month . ' (by the date the booking was created)<br><br>' .
 				'<strong>Per agent:</strong>' .
 				'<ul>' .
-				'<li>Self Gen &mdash; BCs whose source = &quot;' . SELF_GEN_SOURCE_NAME . '&quot;</li>' .
-				'<li>Company &mdash; BCs whose source is anything else (or NULL)</li>' .
-				'<li>% Self Gen &mdash; Self Gen count &divide; (Self Gen + Company) &times; 100</li>' .
+				'<li>Self Gen &mdash; bookings whose source is &quot;' . SELF_GEN_SOURCE_NAME . '&quot;</li>' .
+				'<li>Company &mdash; bookings whose source is anything else (or none)</li>' .
+				'<li>% Self Gen &mdash; Self Gen count divided by (Self Gen + Company)</li>' .
 				'</ul>' .
-				'<strong>Grouping:</strong> SalesAgent &rarr; <code>admin.TeamLeadID</code> &rarr; team lead. Agents sharing a team lead are consecutive; agents with no team lead appear last.<br>' .
+				'<strong>How agents are grouped:</strong> each agent rolls up to their team lead. Agents under the same team lead are listed together; agents with no team lead appear last.<br>' .
 				'<strong>This card:</strong> ' . $rows . ' ' . $plural($rows, 'agent') . ' shown.<br>' .
-				'<strong>Attribution:</strong> Primary SalesAgent (TC1) regardless of date &mdash; same as the headline Self Gen vs Company card.<br>' .
-				'<strong>Filters:</strong> BC only; not cancelled; not draft; agent must have created at least one BC this month.';
+				'<strong>Who it&rsquo;s credited to:</strong> the main sales person on the booking, whatever the date &mdash; same as the Self Gen vs Company card above.<br>' .
+				'<strong>Counted:</strong> confirmed bookings only, not cancelled or draft; the agent must have created at least one booking this month.';
 		}
 
 		// Finance cards
 		if(isset($cards['payment_in_dwm'])) {
 			$p = $cards['payment_in_dwm'];
 			$popovers['pop-payin'] =
-				'<strong>Formula:</strong> Sum of approved incoming customer payments (Credit > 0).<br><br>' .
-				'<strong>Windows (by payment date):</strong><br>' .
+				'<strong>What it shows:</strong> The total customer money received (approved payments coming in).<br><br>' .
+				'<strong>Periods (by payment date):</strong><br>' .
 				'Today &rarr; ' . $fmt_disp($today) . ' &rarr; <strong>' . $p['day']   . '</strong> across ' . (int)$p['day_count']   . ' ' . $plural($p['day_count'],   'payment') . '<br>' .
 				'Week &rarr; ' . $window_week  . ' &rarr; <strong>' . $p['week']  . '</strong> across ' . (int)$p['week_count']  . ' ' . $plural($p['week_count'],  'payment') . '<br>' .
 				'Month &rarr; ' . $window_month . ' &rarr; <strong>' . $p['month'] . '</strong> across ' . (int)$p['month_count'] . ' ' . $plural($p['month_count'], 'payment') . '<br><br>' .
-				'<strong>Excludes:</strong> Unapproved payments, refunds, outgoing entries, agent commission from suppliers.';
+				'<strong>Not counted:</strong> unapproved payments, refunds, outgoing payments, and agent commission from suppliers.';
 		}
 
 		if(isset($tables['sales_by_team'])) {
@@ -3058,33 +3077,34 @@ class Booking extends MY_Controller
 				$grand_count += (int)$t['count'];
 			}
 			$popovers['pop-sales-by-team'] =
-				'<strong>Window:</strong> ' . $window_month . ' (by creation date)<br><br>' .
+				'<strong>Period:</strong> ' . $window_month . ' (by the date the booking was created)<br><br>' .
 				'<strong>Per team:</strong>' .
 				'<ul>' .
 				'<li>BC &mdash; how many bookings credited to the team</li>' .
-				'<li>Sales &mdash; sum of NetTotal</li>' .
+				'<li>Sales &mdash; total sales</li>' .
 				'</ul>' .
-				'<strong>Grouping:</strong> SalesAgent &rarr; <code>admin.TeamLeadID</code> &rarr; team lead.<br>' .
+				'<strong>How teams are grouped:</strong> each booking&rsquo;s sales agent rolls up to their team lead.<br>' .
 				'Agents with no team lead fall into a single &quot;Unassigned&quot; row.<br>' .
-				'<strong>This card:</strong> ' . $rows . ' ' . $plural($rows, 'team') . ' shown &rarr; <strong>' . $grand_count . '</strong> ' . $plural($grand_count, 'BC') . ' &middot; <strong>' . $money($grand_total) . '</strong> total.<br>' .
-				'<strong>Filters:</strong> BC only; not cancelled; not draft.';
+				'<strong>This card:</strong> ' . $rows . ' ' . $plural($rows, 'team') . ' shown &rarr; <strong>' . $grand_count . '</strong> ' . $plural($grand_count, 'booking') . ' &middot; <strong>' . $money($grand_total) . '</strong> total.<br>' .
+				'<strong>Counted:</strong> confirmed bookings only, not cancelled or draft.';
 		}
 
 		if(isset($cards['supplier_overdue'])) {
 			$so = $cards['supplier_overdue'];
 			$rows_n = isset($tables['supplier_overdue']) ? count($tables['supplier_overdue']) : 0;
 			$popovers['pop-supplier-overdue'] =
+				'<strong>What it shows:</strong> Supplier pay-outs whose deadline has passed but are still unpaid.<br><br>' .
 				'<strong>Counted when:</strong>' .
 				'<ul>' .
-				'<li>Payment-out (<code>Type LIKE \'SUPPLIER PAYMENT%\'</code>)</li>' .
-				'<li>Status pending (<code>Status = \'P\'</code>)</li>' .
-				'<li>Deadline &lt; today (' . $fmt_disp($today) . ')</li>' .
-				'<li>Linked to a supplier</li>' .
+				'<li>It is a payment going out to a supplier</li>' .
+				'<li>It hasn&rsquo;t been paid yet</li>' .
+				'<li>The deadline is before today (' . $fmt_disp($today) . ')</li>' .
+				'<li>It is linked to a supplier</li>' .
 				'</ul>' .
 				'<strong>This card:</strong><br>' .
 				'<strong>' . (int)$so['count'] . '</strong> ' . $plural($so['count'], 'overdue payment') . ' &middot; <strong>' . $so['total_due'] . '</strong> total due<br>' .
 				'Top ' . $rows_n . ' ' . $plural($rows_n, 'supplier') . ' shown below; click a row to drill down.<br><br>' .
-				'<strong>Excludes:</strong> Already paid (Status=Y), deleted (Status=N), customer payment-ins, agent-commission entries.';
+				'<strong>Not counted:</strong> already paid, deleted, customer payments coming in, and agent-commission entries.';
 		}
 
 		if(isset($cards['supplier_due_soon'])) {
@@ -3092,21 +3112,22 @@ class Booking extends MY_Controller
 			$rows_n = isset($tables['supplier_due_soon']) ? count($tables['supplier_due_soon']) : 0;
 			$ds_total = (int)$ds['overdue']['count'] + (int)$ds['today']['count'] + (int)$ds['tomorrow']['count'];
 			$popovers['pop-supplier-due-soon'] =
+				'<strong>What it shows:</strong> Supplier pay-outs still unpaid, with a deadline coming up soon.<br><br>' .
 				'<strong>Counted when:</strong>' .
 				'<ul>' .
-				'<li>Payment-out (<code>Type LIKE \'SUPPLIER PAYMENT%\'</code>)</li>' .
-				'<li>Status pending (<code>Status = \'P\'</code>)</li>' .
-				'<li>Deadline ' . $rng_disp($due_soon_start, $due_soon_end) . '</li>' .
-				'<li>Linked to a supplier</li>' .
+				'<li>It is a payment going out to a supplier</li>' .
+				'<li>It hasn&rsquo;t been paid yet</li>' .
+				'<li>The deadline falls within ' . $rng_disp($due_soon_start, $due_soon_end) . '</li>' .
+				'<li>It is linked to a supplier</li>' .
 				'</ul>' .
-				'<strong>Bucketed by deadline:</strong>' .
+				'<strong>Grouped by deadline:</strong>' .
 				'<ul>' .
 				'<li><strong>Overdue</strong> &mdash; ' . $fmt_disp($due_soon_start) . ' to before today (' . $fmt_disp($today) . '): <strong>' . (int)$ds['overdue']['count'] . '</strong> &middot; ' . $ds['overdue']['total_due'] . '</li>' .
 				'<li><strong>Today</strong>: <strong>' . (int)$ds['today']['count'] . '</strong> &middot; ' . $ds['today']['total_due'] . '</li>' .
 				'<li><strong>Tomorrow</strong> (' . $fmt_disp($due_soon_end) . '): <strong>' . (int)$ds['tomorrow']['count'] . '</strong> &middot; ' . $ds['tomorrow']['total_due'] . '</li>' .
 				'</ul>' .
 				'<strong>This card:</strong> ' . $ds_total . ' ' . $plural($ds_total, 'payout') . ' across the window; top ' . $rows_n . ' ' . $plural($rows_n, 'supplier') . ' shown, earliest deadline first.<br><br>' .
-				'<strong>Excludes:</strong> Already paid (Status=Y), deleted (Status=N), customer payment-ins, agent-commission entries.';
+				'<strong>Not counted:</strong> already paid, deleted, customer payments coming in, and agent-commission entries.';
 		}
 
 		if(isset($cards['customer_payment_due_soon'])) {
@@ -3114,23 +3135,24 @@ class Booking extends MY_Controller
 			$cd_rows_n = isset($tables['customer_payment_due_soon']) ? count($tables['customer_payment_due_soon']) : 0;
 			$cd_total = (int)$cd['overdue']['count'] + (int)$cd['today']['count'] + (int)$cd['tomorrow']['count'];
 			$popovers['pop-customer-payment-due-soon'] =
+				'<strong>What it shows:</strong> Bookings that still owe a customer payment, with a deadline coming up soon.<br><br>' .
 				'<strong>Counted when:</strong>' .
 				'<ul>' .
-				'<li>BC still owes a scheduled payment (<code>Status = \'P\'</code> or <code>\'PP\'</code>)</li>' .
-				'<li>Outstanding balance &gt; 0 (NetTotal &minus; approved customer payments)</li>' .
-				'<li>Next due deadline ' . $rng_disp($cust_due_start, $cust_due_end) . '</li>' .
+				'<li>The booking still has a scheduled payment to collect</li>' .
+				'<li>There is still a balance owing (booking amount minus approved customer payments)</li>' .
+				'<li>The next deadline falls within ' . $rng_disp($cust_due_start, $cust_due_end) . '</li>' .
 				'<li>Not cancelled</li>' .
 				'</ul>' .
-				'<strong>Next due deadline:</strong> deposit first when nothing is paid (<code>DepositDeadline</code>, else <code>FullPaymentDeadline</code>); the balance once a deposit is in (<code>FullPaymentDeadline</code>).' .
+				'<strong>Next deadline:</strong> the deposit deadline when nothing is paid yet, otherwise the full-payment deadline once a deposit is in.' .
 				'<br><br>' .
-				'<strong>Bucketed by deadline:</strong>' .
+				'<strong>Grouped by deadline:</strong>' .
 				'<ul>' .
 				'<li><strong>Overdue</strong> &mdash; ' . $fmt_disp($cust_due_start) . ' to before today (' . $fmt_disp($today) . '): <strong>' . (int)$cd['overdue']['count'] . '</strong> &middot; ' . $cd['overdue']['total_due'] . '</li>' .
 				'<li><strong>Today</strong>: <strong>' . (int)$cd['today']['count'] . '</strong> &middot; ' . $cd['today']['total_due'] . '</li>' .
 				'<li><strong>Tomorrow</strong> (' . $fmt_disp($cust_due_end) . '): <strong>' . (int)$cd['tomorrow']['count'] . '</strong> &middot; ' . $cd['tomorrow']['total_due'] . '</li>' .
 				'</ul>' .
-				'<strong>This card:</strong> ' . $cd_total . ' ' . $plural($cd_total, 'BC') . ' across the window; top ' . $cd_rows_n . ' shown, earliest deadline first. Amounts are the outstanding balance still owed.<br><br>' .
-				'<strong>Excludes:</strong> Fully paid, cancelled, draft/quotation, and agent-commission credits.';
+				'<strong>This card:</strong> ' . $cd_total . ' ' . $plural($cd_total, 'booking') . ' across the window; top ' . $cd_rows_n . ' shown, earliest deadline first. Amounts are the balance still owed.<br><br>' .
+				'<strong>Not counted:</strong> fully paid, cancelled, drafts/quotations, and agent-commission credits.';
 		}
 
 		if(isset($cards['checklist_payout_due_soon'])) {
@@ -3138,36 +3160,37 @@ class Booking extends MY_Controller
 			$cp_rows_n = isset($tables['checklist_payout_due_soon']) ? count($tables['checklist_payout_due_soon']) : 0;
 			$cp_total = (int)$cp['overdue']['count'] + (int)$cp['today']['count'] + (int)$cp['tomorrow']['count'];
 			$popovers['pop-checklist-payout-due-soon'] =
-				'<strong>Counted when, for an active line item:</strong>' .
+				'<strong>What it shows:</strong> Bookings whose &ldquo;Payment Out To Supplier&rdquo; checklist isn&rsquo;t ticked off yet, with a deadline coming up soon.<br><br>' .
+				'<strong>Counted when, for an active product line:</strong>' .
 				'<ul>' .
-				'<li>Product carries a &ldquo;Payment Out To Supplier (full / deposit)&rdquo; checklist</li>' .
-				'<li>The checklist is <strong>not ticked yet</strong> (no completion record on that line)</li>' .
-				'<li><code>booking_product.disable_checklist_payment_out = 0</code> (the same rule the modal/filter uses)</li>' .
-				'<li>Pay-out deadline (full &rarr; <code>PaymentOutSupplierFull</code>, deposit &rarr; <code>PaymentOutSupplierDeposit</code>) ' . $rng_disp($cp_due_start, $cp_due_end) . '</li>' .
-				'<li>BC, not cancelled, not draft</li>' .
+				'<li>The product has a supplier pay-out checklist (full or deposit)</li>' .
+				'<li>The checklist is <strong>not ticked yet</strong></li>' .
+				'<li>The line isn&rsquo;t excluded from checklist pay-outs (same rule the checklist screen uses)</li>' .
+				'<li>The pay-out deadline (full or deposit) falls within ' . $rng_disp($cp_due_start, $cp_due_end) . '</li>' .
+				'<li>It is a confirmed booking, not cancelled or draft</li>' .
 				'</ul>' .
-				'<strong>Bucketed by deadline:</strong>' .
+				'<strong>Grouped by deadline:</strong>' .
 				'<ul>' .
-				'<li><strong>Overdue</strong> &mdash; ' . $fmt_disp($cp_due_start) . ' to before today (' . $fmt_disp($today) . '): <strong>' . (int)$cp['overdue']['count'] . '</strong> BCs</li>' .
-				'<li><strong>Today</strong>: <strong>' . (int)$cp['today']['count'] . '</strong> BCs</li>' .
-				'<li><strong>Tomorrow</strong> (' . $fmt_disp($cp_due_end) . '): <strong>' . (int)$cp['tomorrow']['count'] . '</strong> BCs</li>' .
+				'<li><strong>Overdue</strong> &mdash; ' . $fmt_disp($cp_due_start) . ' to before today (' . $fmt_disp($today) . '): <strong>' . (int)$cp['overdue']['count'] . '</strong> bookings</li>' .
+				'<li><strong>Today</strong>: <strong>' . (int)$cp['today']['count'] . '</strong> bookings</li>' .
+				'<li><strong>Tomorrow</strong> (' . $fmt_disp($cp_due_end) . '): <strong>' . (int)$cp['tomorrow']['count'] . '</strong> bookings</li>' .
 				'</ul>' .
-				'<strong>This card:</strong> the table lists top ' . $cp_rows_n . ' ' . $plural($cp_rows_n, 'supplier') . ' across the window, earliest deadline first.<br>' .
-				'<strong>Difference from Supplier Pay-out Due Soon:</strong> that card reads created payment-out records; this one flags pay-outs whose checklist has not been actioned yet, so no RM amount is shown.';
+				'<strong>This card:</strong> the table lists the top ' . $cp_rows_n . ' ' . $plural($cp_rows_n, 'supplier') . ' across the window, earliest deadline first.<br>' .
+				'<strong>How this differs from &ldquo;Supplier Pay-out Due Soon&rdquo;:</strong> that card looks at pay-out records already created; this one flags pay-outs whose checklist still hasn&rsquo;t been actioned, so no RM amount is shown.';
 		}
 
 		if(isset($tables['product_sales'])) {
 			$rows = count($tables['product_sales']);
 			$popovers['pop-product-sales'] =
-				'<strong>Window:</strong> ' . $window_month . ' (by booking creation date)<br><br>' .
-				'<strong>Per product (grouped by item code):</strong>' .
+				'<strong>Period:</strong> ' . $window_month . ' (by the date the booking was created)<br><br>' .
+				'<strong>Per product (grouped by product code):</strong>' .
 				'<ul>' .
 				'<li>Qty &mdash; total quantity sold</li>' .
-				'<li>Sales &mdash; sum of line totals</li>' .
+				'<li>Sales &mdash; total sales</li>' .
 				'</ul>' .
-				'<strong>Sort:</strong> By total sales (highest first). Top 5.<br>' .
+				'<strong>Order:</strong> highest sales first. Top 5.<br>' .
 				'<strong>This card:</strong> ' . $rows . ' ' . $plural($rows, 'product') . ' shown.<br>' .
-				'<strong>Filters:</strong> Booking confirmations only; not cancelled; not draft; active line items only.';
+				'<strong>Counted:</strong> confirmed bookings only, not cancelled or draft, active product lines only.';
 		}
 
 		$this->send_json(array(

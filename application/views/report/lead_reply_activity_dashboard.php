@@ -28,7 +28,7 @@
                                 <i class="la la-info-circle"></i>
                             </div>
                             <div class="alert-text font-weight-bold" style="line-height:1.45;">
-                                Data is based on activity date: Assigned Leads use the date the lead was assigned to the owner; Reply-Created Leads use the date the owner crossed the reply-created threshold.
+                                Counts only replies made on a weekday between 9AM and 7PM. Lead Responded is the distinct leads the owner replied to in that window (replying many times to one lead still counts once). Transfer Out Lead uses the date the owner crossed the reply-created threshold. Today Handling Lead = Lead Responded &minus; Transfer Out Lead.
                             </div>
                         </div>
                         <div id="lead_reply_activity_filters" class="collapse show">
@@ -89,9 +89,21 @@
                             <tr>
                                 <th style="text-align:center;">No.</th>
                                 <th>Owner</th>
-                                <th style="text-align:center;">Assigned Leads</th>
-                                <th style="text-align:center;">Reply-Created Leads</th>
-                                <th style="text-align:center;">Total Leads</th>
+                                <th style="text-align:center;">
+                                    Lead Responded
+                                    <i class="la la-info-circle ml-1" style="cursor:help; color:#2f506f;" data-toggle="tooltip"
+                                       title="Distinct leads this owner replied to, counted on a weekday between 9AM and 7PM only. Replying many times (even more than 3) to the same lead still counts as one."></i>
+                                </th>
+                                <th style="text-align:center;">
+                                    Transfer Out Lead
+                                    <i class="la la-info-circle ml-1" style="cursor:help; color:#2f506f;" data-toggle="tooltip"
+                                       title="Leads the owner crossed the reply-created threshold on (their 3rd outbound reply lands in the selected window). These are handed off / transferred out of the owner's active queue."></i>
+                                </th>
+                                <th style="text-align:center;">
+                                    Today Handling Lead
+                                    <i class="la la-info-circle ml-1" style="cursor:help; color:#2f506f;" data-toggle="tooltip"
+                                       title="Leads still being handled today: Lead Responded minus Transfer Out Lead (never below zero)."></i>
+                                </th>
                             </tr>
                         </thead>
                         <tbody id="lead-reply-activity-table-body">
@@ -105,9 +117,9 @@
                                     <tr>
                                         <td class="text-center"><?php echo $count; ?></td>
                                         <td class="font-weight-bold text-dark"><?php echo html_escape($row['owner_name']); ?></td>
-                                        <td class="text-center"><?php echo number_format($row['assigned_leads']); ?></td>
-                                        <td class="text-center"><?php echo number_format($row['reply_created_leads']); ?></td>
-                                        <td class="text-center font-weight-bold text-dark"><?php echo number_format($row['assigned_leads'] + $row['reply_created_leads']); ?></td>
+                                        <td class="text-center"><?php echo number_format($row['lead_responded']); ?></td>
+                                        <td class="text-center"><?php echo number_format($row['transfer_out_leads']); ?></td>
+                                        <td class="text-center font-weight-bold text-dark"><?php echo number_format($row['today_handling_leads']); ?></td>
                                     </tr>
                                     <?php $count++; ?>
                                 <?php } ?>
@@ -158,14 +170,15 @@
         }
 
         $.each(rows, function(index, row) {
-            var assignedLeads = Number(row.assigned_leads) || 0;
-            var replyCreatedLeads = Number(row.reply_created_leads) || 0;
+            var leadResponded = Number(row.lead_responded) || 0;
+            var transferOutLeads = Number(row.transfer_out_leads) || 0;
+            var todayHandlingLeads = Number(row.today_handling_leads) || 0;
             html += '<tr>';
             html += '<td class="text-center">' + (index + 1) + '</td>';
             html += '<td class="font-weight-bold text-dark">' + escapeHtml(row.owner_name) + '</td>';
-            html += '<td class="text-center">' + assignedLeads + '</td>';
-            html += '<td class="text-center">' + replyCreatedLeads + '</td>';
-            html += '<td class="text-center font-weight-bold text-dark">' + (assignedLeads + replyCreatedLeads) + '</td>';
+            html += '<td class="text-center">' + leadResponded + '</td>';
+            html += '<td class="text-center">' + transferOutLeads + '</td>';
+            html += '<td class="text-center font-weight-bold text-dark">' + todayHandlingLeads + '</td>';
             html += '</tr>';
         });
 
@@ -182,5 +195,7 @@
     $('#lead-reply-activity-reset').click(function() {
         Reset('<?php echo base_url('Report/Lead_Reply_Activity_Dashboard'); ?>');
     });
+
+    $('[data-toggle="tooltip"]').tooltip({ container: 'body', boundary: 'viewport', trigger: 'hover' });
 
 </script>

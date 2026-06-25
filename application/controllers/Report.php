@@ -1569,10 +1569,9 @@ class Report extends MY_Controller
         $formatted = array();
 
         foreach ($rows as $row) {
-            $avgDisplayedResponseSeconds = $this->average_duration_seconds(
-                isset($row['avg_first_response_time_seconds']) ? $row['avg_first_response_time_seconds'] : null,
-                isset($row['avg_recent_response_time_seconds']) ? $row['avg_recent_response_time_seconds'] : null
-            );
+            // The "Avg Response" column mirrors the card: the combined first-5 +
+            // last-5 average, duty-clipped to the 9AM-7PM Mon-Fri window.
+            $avgDisplayedResponseSeconds = $row['avg_response_time_seconds'];
 
             $formatted[] = array(
                 'owner_user_id' => $row['owner_user_id'],
@@ -1618,11 +1617,14 @@ class Report extends MY_Controller
         $formatted = array();
 
         foreach ($rows as $row) {
+            $responded = (int) $row['lead_responded'];
+            $transferOut = (int) $row['reply_created_leads'];
             $formatted[] = array(
                 'owner_user_id' => $row['owner_user_id'],
                 'owner_name' => $row['owner_name'],
-                'assigned_leads' => (int) $row['assigned_leads'],
-                'reply_created_leads' => (int) $row['reply_created_leads'],
+                'lead_responded' => $responded,
+                'transfer_out_leads' => $transferOut,
+                'today_handling_leads' => (int) $row['today_handling_leads'],
             );
         }
 
@@ -1907,23 +1909,6 @@ class Report extends MY_Controller
         );
 
         return isset($classes[$status]) ? $classes[$status] : 'label-light-warning';
-    }
-
-    private function average_duration_seconds($firstSeconds, $secondSeconds)
-    {
-        if (($firstSeconds === null || $firstSeconds === '') && ($secondSeconds === null || $secondSeconds === '')) {
-            return null;
-        }
-
-        if ($firstSeconds === null || $firstSeconds === '') {
-            return (int) $secondSeconds;
-        }
-
-        if ($secondSeconds === null || $secondSeconds === '') {
-            return (int) $firstSeconds;
-        }
-
-        return (int) round(((int) $firstSeconds + (int) $secondSeconds) / 2);
     }
 
     private function format_duration_label($seconds)

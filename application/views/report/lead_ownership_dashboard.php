@@ -189,8 +189,6 @@ $buildOwnershipDataUrl = function($ownerId, $ownershipType = null) use ($lead_ow
                                             <a href="<?php echo html_escape($buildOwnershipDataUrl($row['owner_user_id'])); ?>" class="font-weight-bold text-primary"><?php echo number_format($row['owned_leads']); ?></a>
                                             <span class="text-muted mx-1">&middot;</span>
                                             <span class="font-weight-bold"><?php echo number_format($row['assigned_owned_leads']); ?></span> <span class="text-muted font-size-sm">asgn</span>
-                                            <span class="text-muted mx-1">&middot;</span>
-                                            <span class="font-weight-bold"><?php echo number_format($row['reply_owned_leads']); ?></span> <span class="text-muted font-size-sm">reply</span>
                                         </td>
                                         <td class="text-center">
                                             <div class="font-weight-bold"><?php echo number_format($row['responded_leads']); ?></div>
@@ -262,7 +260,6 @@ $buildOwnershipDataUrl = function($ownerId, $ownershipType = null) use ($lead_ow
         $.each(rows, function(index, row) {
             var allUrl = buildLeadOwnershipDataUrl(row.owner_user_id, $('#lead-ownership-form select[name="ownership_type"]').val());
             var assignedUrl = buildLeadOwnershipDataUrl(row.owner_user_id, 'assigned');
-            var replyUrl = buildLeadOwnershipDataUrl(row.owner_user_id, 'reply');
 
             html += '<tr>';
             html += '<td class="text-center">' + (index + 1) + '</td>';
@@ -271,8 +268,6 @@ $buildOwnershipDataUrl = function($ownerId, $ownershipType = null) use ($lead_ow
             html += '<a href="' + allUrl + '" class="font-weight-bold text-primary">' + row.owned_leads + '</a>';
             html += '<span class="text-muted mx-1">&middot;</span>';
             html += '<span class="font-weight-bold">' + row.assigned_owned_leads + '</span> <span class="text-muted font-size-sm">asgn</span>';
-            html += '<span class="text-muted mx-1">&middot;</span>';
-            html += '<span class="font-weight-bold">' + row.reply_owned_leads + '</span> <span class="text-muted font-size-sm">reply</span>';
             html += '</td>';
             html += '<td class="text-center"><div class="font-weight-bold">' + row.responded_leads + '</div><div class="text-muted font-size-sm">' + row.response_rate + '%</div></td>';
             html += '<td class="text-center">' + escapeHtml(row.avg_displayed_response_time_label) + '</td>';
