@@ -858,21 +858,22 @@ class Booking extends MY_Controller
 				   AND {$paid_subquery} >= booking.NetTotal
 				   AND CAST(InsertDate AS DATE) BETWEEN ? AND ?";
 
-			// Total Sales card "Actual": counts ALL credited Booking Confirmations
-			// all-time, regardless of payment status. BC-only excludes QUOTATION /
-			// PROFORMA INVOICE; CancelStatus='N' / Status!='N' exclude cancelled /
-			// deleted. No fully-paid gate and no date window (the selected month is
-			// ignored for this figure).
-			$all_bc_sales_sql =
+			// Month Sales card "Actual": counts ALL credited Booking Confirmations
+			// in the selected month, regardless of payment status. BC-only excludes
+			// QUOTATION / PROFORMA INVOICE; CancelStatus='N' / Status!='N' exclude
+			// cancelled / deleted. No fully-paid gate (a BC counts whether or not
+			// it has been paid).
+			$month_bc_sales_sql =
 				"SELECT COALESCE(SUM(NetTotal),0) AS total FROM booking
 				 WHERE {$credit_clause}
 				   AND BookingConfirmationTitle='BOOKING CONFIRMATION'
 				   AND CancelStatus='N' AND Status!='N'
-				   AND booking.NetTotal > 0";
+				   AND booking.NetTotal > 0
+				   AND CAST(InsertDate AS DATE) BETWEEN ? AND ?";
 
 			$row = $this->db->query(
-				$all_bc_sales_sql,
-				array($admin_id, $admin_id)
+				$month_bc_sales_sql,
+				array($admin_id, $admin_id, $month_start, $month_end)
 			)->row();
 			$sales_month_actual = (float)$row->total;
 
@@ -1092,9 +1093,9 @@ class Booking extends MY_Controller
 				? array('name' => $best_bc['agent_name'], 'value' => (string)(int)$best_bc['bc_count'])
 				: null;
 
-			// Total Sales leaderboard mirrors the agent's own card: all credited
-			// Booking Confirmations all-time, regardless of payment (no fully-paid
-			// gate, no date window), so "Best" stays apples-to-apples.
+			// Month Sales leaderboard mirrors the agent's own card: all credited
+			// Booking Confirmations in the selected month, regardless of payment
+			// (no fully-paid gate), so "Best" stays apples-to-apples.
 			$best_sales_rows = $this->db->query(
 				"SELECT
 				   {$agent_expr} AS credited_agent_id,
@@ -1106,9 +1107,10 @@ class Booking extends MY_Controller
 				   AND booking.CancelStatus='N'
 				   AND booking.Status!='N'
 				   AND booking.NetTotal > 0
+				   AND CAST(booking.InsertDate AS DATE) BETWEEN ? AND ?
 				 GROUP BY credited_agent_id, agent_name
 				 HAVING credited_agent_id IS NOT NULL AND credited_agent_id > 0",
-				array()
+				array($month_start, $month_end)
 			)->result_array();
 			$best_sales = $pick_best($best_sales_rows, 'total_sales', true);
 			$cards['sales_month']['best'] = $best_sales
