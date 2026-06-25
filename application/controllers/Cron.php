@@ -448,7 +448,7 @@ class Cron extends CI_Controller
 
 			if($this->allowLeadOwnershipProcessing) {
 				$this->customCronLogging('[CRON-10/30/50] allowLeadOwnershipProcessing - process_ghl_lead_ownership');
-				$this->process_ghl_lead_ownership();
+				$this->process_ghl_lead_ownership(1000, true);
 			}
 		}
 
@@ -900,7 +900,7 @@ class Cron extends CI_Controller
 		echo "=== GHL Lead Conversion Processing End ===" . PHP_EOL;
 	}
 
-	public function process_ghl_lead_ownership($chunkSize = 1000)
+	public function process_ghl_lead_ownership($chunkSize = 1000, $forceRebuild = false)
 	{
 		if (!$this->input->is_cli_request()) {
 			show_error('This script can only be run from the command line.', 403);
@@ -971,7 +971,8 @@ class Cron extends CI_Controller
 
 		$shouldRebuild = in_array('--rebuild', $flags, true)
 			|| in_array('--restart', $flags, true)
-			|| in_array('--reset', $flags, true);
+			|| in_array('--reset', $flags, true)
+			|| $forceRebuild;
 
 		$replyThreshold = 2;
 		$summary = array(
