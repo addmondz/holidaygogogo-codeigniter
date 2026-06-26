@@ -7268,7 +7268,6 @@ $(document).ready(function() {
         }
 
         $('#add-supplier-invoice-btn').on('click', function() {
-            if (window.__supplierInvoiceLocked) { return; }
             $('#supplier-invoices-empty').remove();
             var $row = $(buildEmptyRowHtml());
             $('#supplier-invoices-tbody').append($row);
@@ -7278,7 +7277,6 @@ $(document).ready(function() {
         });
 
         $('#supplier-invoices-tbody').on('click', '.supplier-invoice-remove', function() {
-            if (window.__supplierInvoiceLocked) { return; }
             var $row = $(this).closest('tr');
             if (!$row.data('supplier-invoice-id')) {
                 $row.remove();
@@ -7289,14 +7287,12 @@ $(document).ready(function() {
 
         // Attach / Replace -> open the row's hidden file picker.
         $('#supplier-invoices-tbody').on('click', '.supplier-invoice-file-attach', function() {
-            if (window.__supplierInvoiceLocked) { return; }
             $(this).closest('tr').find('.supplier-invoice-file-input').trigger('click');
         });
 
         // Remove -> clear the attachment. For a saved row the empty path is sent
         // on the next booking save and the controller nulls InvoiceFilePath.
         $('#supplier-invoices-tbody').on('click', '.supplier-invoice-file-remove', function() {
-            if (window.__supplierInvoiceLocked) { return; }
             var $row = $(this).closest('tr');
             $row.attr('data-file-path', '');
             renderInvoiceFileUi($row);
@@ -7306,7 +7302,6 @@ $(document).ready(function() {
         // and cannot carry files).
         $('#supplier-invoices-tbody').on('change', '.supplier-invoice-file-input', function() {
             var input = this;
-            if (window.__supplierInvoiceLocked) { input.value = ''; return; }
             if (!input.files || !input.files.length) { return; }
             var $row = $(input).closest('tr');
             var $attachBtn = $row.find('.supplier-invoice-file-attach');
@@ -7468,24 +7463,17 @@ $(function() {
             // the plugin based on the parent select's disabled state. Leave them
             // alone so whitelisted selects (e.g. Destination) keep a usable search.
             if ($(this).closest('.bs-searchbox').length) { return; }
+            // Supplier Invoices stay editable on a parked draft so staff can
+            // upload invoices before the BC is approved. Incomplete rows (no
+            // supplier / no number) are dropped server-side, so this can't
+            // break the Approve save with a NOT NULL violation.
+            if ($(this).closest('#supplier-invoices').length) { return; }
             if (DRAFT_EDITABLE_IDS.indexOf(this.id) !== -1) { return; }
             $(this).prop('disabled', !!on);
             if ($(this).hasClass('selectpicker')) {
                 $(this).selectpicker('refresh');
             }
         });
-
-        // Supplier Invoices is a button-driven section: its row inputs are
-        // disabled by the loop above, but Add Invoice / attach / remove are
-        // <button> elements (skipped above). Lock them too so a draft can't end
-        // up with a file attached to an incomplete (no supplier / no number)
-        // invoice row, which would fail the NOT NULL insert on Approve. A flag
-        // also short-circuits the dynamically-bound handlers below.
-        window.__supplierInvoiceLocked = !!on;
-        $('#add-supplier-invoice-btn').prop('disabled', !!on);
-        $('#supplier-invoices').css('opacity', on ? 0.6 : '')
-            .find('.supplier-invoice-file-attach, .supplier-invoice-file-remove, .supplier-invoice-remove')
-            .css('pointer-events', on ? 'none' : '');
     }
 
     // "presales auto select": default Sales Agent 2 (Pre Sales) to the logged-in
