@@ -39,6 +39,12 @@
     #booking_summary_cards .summary-best .best-name { color:#3F4254; }
     #booking_summary_cards .summary-best .best-name.is-you { color:#6082B6; }
     #booking_summary_cards .summary-best .best-fig { color:#2F6F4F; font-weight:700; background:#E5F3EC; padding:1px 7px; border-radius:4px; }
+    /* Agent Score Month/Year toggle — sits between the title and the info icon. */
+    #booking_summary_cards .sc-score-toggle { display:inline-flex; gap:0; margin-left:auto; margin-right:8px; border:1px solid #B8C7E0; border-radius:5px; overflow:hidden; }
+    #booking_summary_cards .sc-score-tab { border:none; background:#EEF3FB; color:#5C6473; font-size:11px; font-weight:600; padding:3px 10px; cursor:pointer; line-height:1.4; }
+    #booking_summary_cards .sc-score-tab + .sc-score-tab { border-left:1px solid #B8C7E0; }
+    #booking_summary_cards .sc-score-tab.is-active { background:#6082B6; color:#fff; }
+    #booking_summary_cards .sc-score-tab:not(.is-active):hover { background:#DCE6F5; }
     #booking_summary_cards .sc-month-filter { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:14px; padding:10px 14px; background:#EEF3FB; border-radius:6px; }
     #booking_summary_cards .sc-month-filter label { margin:0; font-weight:600; color:#3F4254; font-size:13px; }
     #booking_summary_cards .sc-month-filter input[type=month] { width:auto; max-width:190px; height:auto; padding:6px 10px; font-size:13px; }
@@ -77,11 +83,18 @@
        let the operational cards follow. .row is a flexbox so `order` reorders
        visually without moving the source blocks. The full-width month filter
        keeps default order 0 and stays above everything. */
-    #booking_summary_cards .sc-pos-1 { order: 1; }
-    #booking_summary_cards .sc-pos-2 { order: 2; }
-    #booking_summary_cards .sc-pos-3 { order: 3; }
-    #booking_summary_cards .sc-pos-4 { order: 4; }
-    #booking_summary_cards .sc-pos-bottom { order: 5; }
+    #booking_summary_cards .sc-pos-1  { order: 1; }
+    #booking_summary_cards .sc-pos-2  { order: 2; }
+    #booking_summary_cards .sc-pos-3  { order: 3; }
+    #booking_summary_cards .sc-pos-4  { order: 4; }
+    #booking_summary_cards .sc-pos-5  { order: 5; }
+    #booking_summary_cards .sc-pos-6  { order: 6; }
+    #booking_summary_cards .sc-pos-7  { order: 7; }
+    #booking_summary_cards .sc-pos-8  { order: 8; }
+    #booking_summary_cards .sc-pos-9  { order: 9; }
+    #booking_summary_cards .sc-pos-10 { order: 10; }
+    #booking_summary_cards .sc-pos-11 { order: 11; }
+    #booking_summary_cards .sc-pos-bottom { order: 12; }
     /* ---------- Mobile (< md / 768px) ---------- */
     @media (max-width: 767.98px) {
         /* Wide data tables (e.g. Sales by Agent's 7 columns) scroll sideways
@@ -119,22 +132,24 @@
                     <span class="sc-month-filter-hint">Re-scopes every &ldquo;(Month)&rdquo; card below; the Year card follows the selected year.</span>
                 </div>
             </div>
-            <div class="col-md-3 sc-pos-bottom">
-                <a class="summary-card" id="sc-bc-month-link" href="#">
-                    <div class="card card-custom">
-                        <div class="card-header border-0 summary-card-header" style="background-color:#F5E6CD;">
-                            <h3>BC Created (Month)</h3>
-                            <i id="pop-bc-month" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>What it shows:</strong> The number of booking confirmations credited to you this month.<br><br><strong>A booking is counted when:</strong><ul><li>It is a confirmed booking, not a quotation or draft</li><li>It has not been cancelled</li><li>It was created this month</li><li>You are the agent who gets credit for the sale</li></ul><strong>Who gets the credit:</strong> for bookings created before 1 Jun 2026 it is the main sales person; from 1 Jun 2026 onward it is the second sales agent on the booking."></i>
-                        </div>
-                        <div class="card-body summary-card-body">
-                            <div class="summary-value" id="sc-bc-month-count">...</div>
-                            <div class="summary-sub">Booking confirmations you created this month. Click to view them in the list below.</div>
-                            <div class="summary-sub summary-best" id="sc-bc-month-best">Best: —</div>
-                        </div>
+            <div class="col-md-3 sc-pos-8">
+                <div class="card card-custom">
+                    <div class="card-header border-0 summary-card-header" style="background-color:#F5E6CD;">
+                        <h3>BC Created</h3>
+                        <i id="pop-bc-month" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>What it shows:</strong> The number of booking confirmations credited to you, this month and this year.<br><br><strong>A booking is counted when:</strong><ul><li>It is a confirmed booking, not a quotation or proforma invoice or draft</li><li>It has not been cancelled</li><li>It was created in the period</li><li>You are the agent who gets credit for the sale</li></ul><strong>Who gets the credit:</strong> for bookings created before 1 Jun 2026 it is the main sales person; from 1 Jun 2026 onward it is the second sales agent on the booking."></i>
                     </div>
-                </a>
+                    <div class="card-body summary-card-body">
+                        <div class="summary-row-3">
+                            <div><div class="lbl">This Month</div><a class="summary-value-sm" id="sc-bc-month-link" href="#" style="display:block;color:inherit;text-decoration:none;"><span id="sc-bc-month-count">...</span></a></div>
+                            <div><div class="lbl">This Year</div><a class="summary-value-sm" id="sc-bc-year-link" href="#" style="display:block;color:inherit;text-decoration:none;"><span id="sc-bc-year-count">...</span></a></div>
+                        </div>
+                        <div class="summary-sub">Booking confirmations credited to you (excludes quotation / proforma / cancelled). Click a figure to view that period's list.</div>
+                        <div class="summary-sub summary-best" id="sc-bc-month-best">Best (month): —</div>
+                        <div class="summary-sub summary-best" id="sc-bc-year-best">Best (year): —</div>
+                    </div>
+                </div>
             </div>
-            <div class="col-md-3 sc-pos-bottom">
+            <div class="col-md-3 sc-pos-6">
                 <div class="card card-custom">
                     <div class="card-header border-0 summary-card-header" style="background-color:#F5E6CD;">
                         <h3>Month Sales vs Target</h3>
@@ -165,11 +180,11 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-3 sc-pos-bottom">
+            <div class="col-md-3 sc-pos-7">
                 <div class="card card-custom">
                     <div class="card-header border-0 summary-card-header" style="background-color:#F5E6CD;">
                         <h3>Year Sales vs Target</h3>
-                        <i id="pop-sales-year" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>What it shows:</strong> Your total sales for the selected year compared against your yearly target.<br><br><strong>Sales total:</strong> adds up the value of your bookings that customers have <strong>fully paid</strong> during the year (approved payments covering the full booking amount).<br><br><strong>Target:</strong> set for each agent under Admin &rarr; Yearly Target. The percentage is your sales divided by your target."></i>
+                        <i id="pop-sales-year" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>What it shows:</strong> Your total sales for the selected year compared against your yearly target.<br><br><strong>Sales total:</strong> adds up the value of all your Booking Confirmations created this year, <strong>regardless of payment status</strong>. Quotations, proforma invoices and cancelled bookings are not included. Same rule as the Month card, just over the full year.<br><br><strong>Target:</strong> set for each agent under Admin &rarr; Yearly Target. The percentage is your sales divided by your target."></i>
                     </div>
                     <div class="card-body summary-card-body">
                         <div class="summary-value-sm" id="sc-sales-year-value">...</div>
@@ -196,7 +211,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-3 sc-pos-4">
+            <div class="col-md-3 sc-pos-10">
                 <a class="summary-card" id="sc-cancel-rate-link" href="#">
                     <div class="card card-custom">
                         <div class="card-header border-0 summary-card-header" style="background-color:#D7E2F2;">
@@ -211,103 +226,20 @@
                     </div>
                 </a>
             </div>
-            <div class="col-md-3 sc-pos-bottom">
-                <a class="summary-card" id="sc-payment-overdue-link" href="#">
-                    <div class="card card-custom">
-                        <div class="card-header border-0 summary-card-header" style="background-color:#F5E6CD;">
-                            <h3>Payment Overdue</h3>
-                            <i id="pop-payment-overdue" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>What it shows:</strong> Your bookings whose payment deadline has already passed but still have money owing.<br><br><strong>A booking is counted when either:</strong><ul><li>The full-payment deadline has passed and the booking still isn&rsquo;t fully paid (no deposit yet, or deposit paid but balance still owing)</li><li>The deposit deadline has passed and the deposit still hasn&rsquo;t been paid</li></ul><strong>Scope:</strong> your bookings only, not cancelled, and not already fully paid.<br><br>Each booking is checked against its own deadlines. A deadline that falls today becomes overdue from 3:00pm."></i>
-                        </div>
-                        <div class="card-body summary-card-body">
-                            <div class="summary-value" id="sc-payment-overdue-count">...</div>
-                            <div class="summary-sub">Your BCs whose payment deadline has passed with balance still outstanding. Click to view and follow up.</div>
-                        </div>
-                    </div>
-                </a>
-            </div>
-            <div class="col-md-3 sc-pos-bottom">
-                <a class="summary-card" id="sc-upcoming-not-ready-link" href="#">
-                    <div class="card card-custom">
-                        <div class="card-header border-0 summary-card-header" style="background-color:#F5E6CD;">
-                            <h3>Travel in 7 Days – Not Yet Ready</h3>
-                            <i id="pop-upcoming-not-ready" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>What it shows:</strong> Bookings that start travel within the next 7 days but aren&rsquo;t ready yet.<br><br><strong>&ldquo;Not yet ready&rdquo;</strong> means the booking is still waiting on one of these steps:<ul><li>Payment</li><li>Booking operations</li><li>Guest list submission</li><li>Travel voucher</li></ul>A booking becomes &ldquo;ready&rdquo; once it reaches the <strong>Pending Travel</strong> stage.<br><br><strong>Counted when:</strong><ul><li>Travel starts between tomorrow and 7 days from today</li><li>It is still stuck at one of the steps above</li><li>It is not cancelled</li></ul>Your own view shows your bookings; the OP/Owner view shows the whole team.<br><br><strong>Why it matters:</strong> guests travel within a week &mdash; act now."></i>
-                        </div>
-                        <div class="card-body summary-card-body">
-                            <div class="summary-value" id="sc-upcoming-not-ready-count">...</div>
-                            <div class="summary-sub">Your BCs starting travel within 7 days that are still upstream (Payment / Booking Op / Guest List / Travel Voucher) and not yet flagged "Pending Travel". Click to chase readiness.</div>
-                        </div>
-                    </div>
-                </a>
-            </div>
-            <div class="col-md-3 sc-pos-bottom">
-                <a class="summary-card" id="sc-upcoming-not-ready-14-link" href="#">
-                    <div class="card card-custom">
-                        <div class="card-header border-0 summary-card-header" style="background-color:#F5E6CD;">
-                            <h3>Travel in 14 Days – Not Yet Ready</h3>
-                            <i id="pop-upcoming-not-ready-14" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>What it shows:</strong> Bookings that start travel within the next 14 days but aren&rsquo;t ready yet.<br><br><strong>&ldquo;Not yet ready&rdquo;</strong> means the booking is still waiting on one of these steps:<ul><li>Payment</li><li>Booking operations</li><li>Guest list submission</li><li>Travel voucher</li></ul>A booking becomes &ldquo;ready&rdquo; once it reaches the <strong>Pending Travel</strong> stage.<br><br><strong>Counted when:</strong><ul><li>Travel starts between tomorrow and 14 days from today</li><li>It is still stuck at one of the steps above</li><li>It is not cancelled</li></ul>This window also includes the bookings shown in &ldquo;Travel in 7 Days&rdquo;.<br><br><strong>Why it matters:</strong> a two-week heads-up to get everything ready."></i>
-                        </div>
-                        <div class="card-body summary-card-body">
-                            <div class="summary-value" id="sc-upcoming-not-ready-14-count">...</div>
-                            <div class="summary-sub">Your BCs starting travel within 14 days that are still upstream (Payment / Booking Op / Guest List / Travel Voucher) and not yet flagged "Pending Travel". Click to chase readiness.</div>
-                        </div>
-                    </div>
-                </a>
-            </div>
-            <div class="col-md-3 sc-pos-bottom">
-                <a class="summary-card" id="sc-pending-review-link" href="#">
-                    <div class="card card-custom">
-                        <div class="card-header border-0 summary-card-header" style="background-color:#F5E6CD;">
-                            <h3>Travel Completed - Pending Review</h3>
-                            <i id="pop-pending-review" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>What it shows:</strong> Your bookings where travel has finished but the after-sales review is still outstanding.<br><br><strong>Counted when:</strong><ul><li>Travel has been completed</li><li>The after-sales review is still pending</li><li>The booking is not cancelled</li><li>You are the sales agent</li></ul><strong>Why it matters:</strong> the trip is over &mdash; follow up with the customer (review / feedback) and close the booking off."></i>
-                        </div>
-                        <div class="card-body summary-card-body">
-                            <div class="summary-value" id="sc-pending-review-count">...</div>
-                            <div class="summary-sub">Your BCs whose travel has ended and after-sales review is still pending. Click to follow up.</div>
-                        </div>
-                    </div>
-                </a>
-            </div>
-            <div class="col-md-3 sc-pos-bottom">
-                <a class="summary-card" id="sc-pending-bc-link" href="#">
-                    <div class="card card-custom">
-                        <div class="card-header border-0 summary-card-header" style="background-color:#F5E6CD;">
-                            <h3>Pending BC</h3>
-                            <i id="pop-pending-bc" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>What it shows:</strong> Your bookings sitting at the <strong>Pending BC</strong> stage, waiting to be confirmed.<br><br><strong>Counted when:</strong><ul><li>The booking is at the &ldquo;Pending BC&rdquo; stage</li><li>It is not cancelled</li><li>You are the agent credited with the sale</li></ul>This is a live list with no date limit. &ldquo;Pending BC&rdquo; is the step after a draft has been moved forward but before the booking is fully confirmed. Click to view and move them along."></i>
-                        </div>
-                        <div class="card-body summary-card-body">
-                            <div class="summary-value" id="sc-pending-bc-count">...</div>
-                            <div class="summary-sub">Your bookings sitting at &ldquo;Pending BC&rdquo;, waiting to be confirmed. Click to view the list.</div>
-                        </div>
-                    </div>
-                </a>
-            </div>
-            <div class="col-md-3 sc-pos-bottom">
-                <div class="card card-custom">
-                    <div class="card-header border-0 summary-card-header" style="background-color:#D7E2F2;">
-                        <h3>Draft &rarr; Payment Time (Month)</h3>
-                        <i id="pop-submitted-payment" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>What it shows:</strong> On average, how long your bookings take to go from first being saved as a draft to reaching the <strong>Pending Payment</strong> stage.<br><br><strong>Start:</strong> when the booking was saved as a draft.<br><strong>End:</strong> the first time it reached Pending Payment.<br><br><strong>Window:</strong> drafts you saved in the selected month. Only your bookings that have actually reached payment are averaged; ones still in progress aren&rsquo;t counted yet.<br><br><strong>Best:</strong> the fastest agent across the team (minimum 2 bookings)."></i>
-                    </div>
-                    <div class="card-body summary-card-body">
-                        <div class="summary-value" id="sc-submitted-payment-value">...</div>
-                        <div class="summary-sub"><span id="sc-submitted-payment-count">—</span> of your drafts this month reached payment. Average draft-to-payment time.</div>
-                        <div class="summary-sub summary-best" id="sc-submitted-payment-best">Best: —</div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3 sc-pos-1">
+            <div class="col-md-3 sc-pos-4">
                 <div class="card card-custom">
                     <div class="card-header border-0 summary-card-header" style="background-color:#D7E2F2;">
                         <h3>Conversion Rate (YTD)</h3>
-                        <i id="pop-conv-rate" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>What it shows:</strong> The share of your leads this year that turned into a booking.<br><br><strong>How it&rsquo;s worked out:</strong> your converted leads divided by your total leads.<br><br><strong>A lead counts as converted when:</strong><ul><li>It is linked to a booking, and</li><li>You are the agent credited with that booking (the booking&rsquo;s person-in-charge before 1 Jun 2026, the sales agent from 1 Jun 2026 onward)</li></ul><strong>Scope:</strong> leads assigned to you from 1 Jan to today (from GHL). This card ignores the month filter.<br><br><strong>Best:</strong> the top agent across the whole team this year. Agents with fewer than 3 leads are left out so the comparison stays fair."></i>
+                        <i id="pop-conv-rate" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>What it shows:</strong> The share of your leads this year that turned into a booking.<br><br><strong>How it&rsquo;s worked out:</strong> your converted leads divided by your total leads.<br><br><strong>A lead counts as converted when:</strong><ul><li>It is linked to a booking</li></ul>This is the same rule as the Lead Ownership dashboard&rsquo;s &ldquo;Converted&rdquo; column &mdash; it does not matter which sales agent is credited for the booking.<br><br><strong>Scope:</strong> leads assigned to you from 1 Jan to today (from GHL). This card ignores the month filter.<br><br><strong>Best:</strong> the top agent across the whole team this year. Agents with fewer than 3 leads are left out so the comparison stays fair."></i>
                     </div>
                     <div class="card-body summary-card-body">
                         <div class="summary-value" id="sc-conv-rate-value">...</div>
-                        <div class="summary-sub"><span id="sc-conv-rate-detail">—</span> of your leads year-to-date converted to a BC where you hold the credited TC slot (Booking PIC / TC1 before 1 Jun, Sales Agent / TC2 after).</div>
+                        <div class="summary-sub"><span id="sc-conv-rate-detail">—</span> of your leads year-to-date converted to a BC (counted the same way as the Lead Ownership dashboard&rsquo;s Converted column).</div>
                         <div class="summary-sub summary-best" id="sc-conv-rate-best">Best: —</div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-3 sc-pos-2">
+            <div class="col-md-3 sc-pos-3">
                 <div class="card card-custom">
                     <div class="card-header border-0 summary-card-header" style="background-color:#D7E2F2;">
                         <h3>My Leads</h3>
@@ -320,14 +252,15 @@
                             <div><div class="lbl">Month</div><div class="summary-value-sm" id="sc-tc-leads-month">...</div></div>
                         </div>
                         <div class="summary-sub">New leads assigned to you, by lead creation date.</div>
+                        <div class="summary-sub summary-best" id="sc-tc-leads-best">Best: —</div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-3 sc-pos-3">
+            <div class="col-md-3 sc-pos-1">
                 <div class="card card-custom">
                     <div class="card-header border-0 summary-card-header" style="background-color:#D7E2F2;">
-                        <h3>My Response Time</h3>
-                        <i id="pop-tc-resp" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>What it shows:</strong> On average, how quickly you reply to your leads (from GHL).<br><br><strong>How it&rsquo;s measured:</strong> the average reply time across the first 5 and the most recent 5 replies on each lead (any overlap counted once), shown in seconds, minutes, or hours.<br><br><strong>Working hours only:</strong> only time during working hours (Mon&ndash;Sat, 8:00am&ndash;10:00pm Malaysia time) is counted, so replies left overnight don&rsquo;t make the number look worse.<br><br><strong>By period</strong> (based on when the lead came in): Today, Week (Mon&ndash;Sun), and Month.<br><br>A dash (&mdash;) means no leads were replied to in that period."></i>
+                        <h3>Avg Reply Time to Inbound</h3>
+                        <i id="pop-tc-resp" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>What it shows:</strong> On average, how quickly you reply to an inbound message from your leads (from GHL).<br><br><strong>How it&rsquo;s measured:</strong> the average reply time across the first 5 and the most recent 5 replies on each lead (any overlap counted once), shown in seconds, minutes, or hours.<br><br><strong>Working hours only:</strong> only time during working hours (everyday, 7:00am&ndash;10:00pm Malaysia time) is counted, so replies left overnight don&rsquo;t make the number look worse.<br><br><strong>By period</strong> (based on when the lead came in): Today, Week (Mon&ndash;Sun), and Month.<br><br><strong>Best:</strong> the fastest agent across the team this month (minimum 3 leads).<br>A dash (&mdash;) means no leads were replied to in that period."></i>
                     </div>
                     <div class="card-body summary-card-body">
                         <div class="summary-row-3">
@@ -335,11 +268,12 @@
                             <div><div class="lbl">Week</div><div class="summary-value-sm" id="sc-tc-resp-week">...</div></div>
                             <div><div class="lbl">Month</div><div class="summary-value-sm" id="sc-tc-resp-month">...</div></div>
                         </div>
-                        <div class="summary-sub">Avg reply time (first 5 + most-recent 5, merged) across your leads in each window.</div>
+                        <div class="summary-sub">Avg reply time to an inbound message (first 5 + most-recent 5, merged) across your leads in each window.</div>
+                        <div class="summary-sub summary-best" id="sc-tc-resp-best">Fastest: —</div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-3 sc-pos-3">
+            <div class="col-md-3 sc-pos-2">
                 <div class="card card-custom">
                     <div class="card-header border-0 summary-card-header" style="background-color:#D7E2F2;">
                         <h3>Lead Pickup Speed (Month)</h3>
@@ -349,6 +283,53 @@
                         <div class="summary-value" id="sc-tc-pickup-value">...</div>
                         <div class="summary-sub"><span id="sc-tc-pickup-count">—</span> of your leads this month were picked up. Average time to first reply.</div>
                         <div class="summary-sub summary-best" id="sc-tc-pickup-best">Best: —</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 sc-pos-5">
+                <div class="card card-custom">
+                    <div class="card-header border-0 summary-card-header" style="background-color:#D7E2F2;">
+                        <h3>Outbound Messages</h3>
+                        <i id="pop-tc-outbound" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>What it shows:</strong> The number of messages you sent to leads (from GHL), counted by when they were sent.<ul><li><strong>Today:</strong> messages you sent today</li><li><strong>Week:</strong> Monday to Sunday of this week</li><li><strong>Month:</strong> 1st to last day of this month</li></ul>Only your outgoing (agent) messages are counted &mdash; incoming customer messages are not.<br><br><strong>Best:</strong> the top-sending agent across the team this month.<br><strong>Note:</strong> if your account isn&rsquo;t linked to a GHL user, this card shows zeros."></i>
+                    </div>
+                    <div class="card-body summary-card-body">
+                        <div class="summary-row-3">
+                            <div><div class="lbl">Today</div><div class="summary-value-sm" id="sc-tc-outbound-day">...</div></div>
+                            <div><div class="lbl">Week</div><div class="summary-value-sm" id="sc-tc-outbound-week">...</div></div>
+                            <div><div class="lbl">Month</div><div class="summary-value-sm" id="sc-tc-outbound-month">...</div></div>
+                        </div>
+                        <div class="summary-sub">Outbound messages you sent, by send date.</div>
+                        <div class="summary-sub summary-best" id="sc-tc-outbound-best">Best: —</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 sc-pos-9">
+                <div class="card card-custom">
+                    <div class="card-header border-0 summary-card-header" style="background-color:#D7E2F2;">
+                        <h3>Follow-up % (Month)</h3>
+                        <i id="pop-tc-followup" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>What it shows:</strong> The share of your leads this month that you followed up on.<br><br><strong>How it&rsquo;s worked out:</strong> followed-up leads divided by all leads you own.<ul><li><strong>Top number:</strong> your leads marked as followed up (follow-up sent or completed)</li><li><strong>Bottom number:</strong> all leads you own this month</li></ul>This uses the same &ldquo;Follow Up&rdquo; definition as the Lead Ownership dashboard.<br><br><strong>Best:</strong> the highest follow-up rate across the team this month (minimum 3 owned leads)."></i>
+                    </div>
+                    <div class="card-body summary-card-body">
+                        <div class="summary-value" id="sc-tc-followup-value">...</div>
+                        <div class="summary-sub"><span id="sc-tc-followup-detail">—</span> of your leads this month were followed up.</div>
+                        <div class="summary-sub summary-best" id="sc-tc-followup-best">Highest follow-up: —</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 sc-pos-11">
+                <div class="card card-custom">
+                    <div class="card-header border-0 summary-card-header" style="background-color:#D7E2F2;">
+                        <h3>Agent Score</h3>
+                        <span class="sc-score-toggle" role="group" aria-label="Agent score period">
+                            <button type="button" class="sc-score-tab is-active" data-period="month">Month</button>
+                            <button type="button" class="sc-score-tab" data-period="year">Year</button>
+                        </span>
+                        <i id="pop-agent-score" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>What it shows:</strong> Your overall performance score, ranked against everyone else, for the selected period.<br><br><strong>It blends four things, each benchmarked so the period&rsquo;s best performer scores 100 on that measure:</strong><ul><li>Avg reply time to inbound &mdash; <strong>30%</strong></li><li>1st-response / pickup speed &mdash; <strong>20%</strong></li><li>Conversion rate &mdash; <strong>20%</strong></li><li>Sales value &mdash; <strong>30%</strong></li></ul>For the two speed measures, faster is better; for conversion and sales, higher is better. A measure with no data scores 0.<br><br><strong>Score = 100</strong> would mean being the best on every single measure. Use the Month / Year tabs to switch period."></i>
+                    </div>
+                    <div class="card-body summary-card-body">
+                        <div class="summary-value" id="sc-agent-score-value">...</div>
+                        <div class="summary-sub">Rank <span id="sc-agent-score-rank">—</span> of <span id="sc-agent-score-total">—</span> agents. Weighted blend of reply speed, pickup speed, conversion &amp; sales, benchmarked against the best performer.</div>
+                        <div class="summary-sub summary-best" id="sc-agent-score-best">Top: —</div>
                     </div>
                 </div>
             </div>
@@ -1081,6 +1062,25 @@ $(function() {
         html += '<span class="best-fig">' + escapeHtml(best.value) + '</span>';
         el.innerHTML = html;
     }
+    // Agent Score card: render the stashed payload for the active period. The
+    // toggle choice is remembered (window._agentScorePeriod) so it survives the
+    // month-picker reloads. Empty payload -> em-dash, leaderboard "Top:" stays.
+    function renderAgentScore(period) {
+        var d = (window._agentScore || {})[period];
+        if(!d) { return; }
+        var has = (d.raw != null && d.value && d.value !== '-');
+        setText('sc-agent-score-value', has ? d.value : '—');
+        setText('sc-agent-score-rank',  d.rank == null ? '—' : d.rank);
+        setText('sc-agent-score-total', d.total == null ? '—' : d.total);
+        setBest('sc-agent-score-best', d.best, 'Top');
+    }
+    $('#booking_summary_cards').on('click', '.sc-score-tab', function() {
+        var p = $(this).data('period');
+        window._agentScorePeriod = p;
+        $('#booking_summary_cards .sc-score-tab').removeClass('is-active');
+        $(this).addClass('is-active');
+        renderAgentScore(p);
+    });
     // Keep clicks on the "Last synced" text from collapsing the panel.
     $('#booking_summary_cards .ghl-last-sync').on('click', function(e) {
         e.stopPropagation();
@@ -1113,6 +1113,11 @@ $(function() {
             setLink('sc-bc-month-link', c.bc_month.link);
             setBestFigure('sc-bc-month-best', c.bc_month.best);
         }
+        if(c.bc_year) {
+            setText('sc-bc-year-count', c.bc_year.count);
+            setLink('sc-bc-year-link', c.bc_year.link);
+            setBestFigure('sc-bc-year-best', c.bc_year.best);
+        }
         if(c.sales_month) {
             setText('sc-sales-month-value', c.sales_month.value);
             setText('sc-sales-month-target', c.sales_month.target);
@@ -1143,11 +1148,28 @@ $(function() {
             setText('sc-tc-leads-day',   c.tc_leads_dwm.day);
             setText('sc-tc-leads-week',  c.tc_leads_dwm.week);
             setText('sc-tc-leads-month', c.tc_leads_dwm.month);
+            setBestFigure('sc-tc-leads-best', c.tc_leads_dwm.best);
         }
         if(c.tc_response_time_dwm) {
             setText('sc-tc-resp-day',   c.tc_response_time_dwm.day);
             setText('sc-tc-resp-week',  c.tc_response_time_dwm.week);
             setText('sc-tc-resp-month', c.tc_response_time_dwm.month);
+            setBest('sc-tc-resp-best',  c.tc_response_time_dwm.best, 'Fastest');
+        }
+        if(c.outbound_msgs_dwm) {
+            setText('sc-tc-outbound-day',   c.outbound_msgs_dwm.day);
+            setText('sc-tc-outbound-week',  c.outbound_msgs_dwm.week);
+            setText('sc-tc-outbound-month', c.outbound_msgs_dwm.month);
+            setBestFigure('sc-tc-outbound-best', c.outbound_msgs_dwm.best);
+        }
+        if(c.followup_rate) {
+            setText('sc-tc-followup-value',  c.followup_rate.value);
+            setText('sc-tc-followup-detail', c.followup_rate.detail);
+            setBest('sc-tc-followup-best',   c.followup_rate.best, 'Highest follow-up');
+        }
+        if(c.agent_score_month || c.agent_score_year) {
+            window._agentScore = { month: c.agent_score_month, year: c.agent_score_year };
+            renderAgentScore(window._agentScorePeriod || 'month');
         }
         if(c.tc_pickup_speed_month) {
             var pk = c.tc_pickup_speed_month;
@@ -1196,22 +1218,6 @@ $(function() {
             setText('sc-conv-rate-value',  c.conversion_rate_ytd.value);
             setText('sc-conv-rate-detail', c.conversion_rate_ytd.detail);
             setBestFigure('sc-conv-rate-best',   c.conversion_rate_ytd.best);
-        }
-        if(c.payment_overdue) {
-            setText('sc-payment-overdue-count', c.payment_overdue.count);
-            setLink('sc-payment-overdue-link', c.payment_overdue.link);
-        }
-        if(c.upcoming_travel_not_ready) {
-            setText('sc-upcoming-not-ready-count', c.upcoming_travel_not_ready.count);
-            setLink('sc-upcoming-not-ready-link',  c.upcoming_travel_not_ready.link);
-        }
-        if(c.upcoming_travel_not_ready_14) {
-            setText('sc-upcoming-not-ready-14-count', c.upcoming_travel_not_ready_14.count);
-            setLink('sc-upcoming-not-ready-14-link',  c.upcoming_travel_not_ready_14.link);
-        }
-        if(c.pending_review) {
-            setText('sc-pending-review-count', c.pending_review.count);
-            setLink('sc-pending-review-link',  c.pending_review.link);
         }
         if(c.upcoming_travel_not_ready_op) {
             setText('sc-upcoming-not-ready-op-count', c.upcoming_travel_not_ready_op.count);

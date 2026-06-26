@@ -57,7 +57,7 @@ function assert_eq($label, $expected, $actual) {
     }
 }
 
-// Calendar anchor: 2026-05-20 (Wed). Duty hours: Mon-Sat 08:00-22:00.
+// Calendar anchor: 2026-05-20 (Wed). Duty hours: everyday 07:00-22:00.
 
 // Scenario 1: one lead, 3 slots all on-duty -> avg = mean of all three.
 assert_eq('s1 single lead all on-duty', 120, reduce_duty_avg(array(
@@ -68,8 +68,9 @@ assert_eq('s1 single lead all on-duty', 120, reduce_duty_avg(array(
     )),
 )));
 
-// Scenario 2: one lead, in-window + clipped after-hours + off-day.
-assert_eq('s2 mix clipped/off in single lead', 620, reduce_duty_avg(array(
+// Scenario 2: one lead, in-window + clipped after-hours + Sunday (now in-window).
+// 60 + clipped(21:30->22:00)=1800 + Sunday 09:00->10:00=3600 -> avg(60,1800,3600)=1820.
+assert_eq('s2 mix clipped/sunday in single lead', 1820, reduce_duty_avg(array(
     row(array(
         array('2026-05-20 09:59:00', '2026-05-20 10:00:00',   60),
         array('2026-05-20 21:30:00', '2026-05-20 22:30:00', 3600),
@@ -77,12 +78,12 @@ assert_eq('s2 mix clipped/off in single lead', 620, reduce_duty_avg(array(
     )),
 )));
 
-// Scenario 3: one lead, 0 working seconds -> avg = 0.
+// Scenario 3: one lead, 0 working seconds (all off-hours) -> avg = 0.
 assert_eq('s3 all off-duty', 0, reduce_duty_avg(array(
     row(array(
         array('2026-05-20 22:00:00', '2026-05-20 22:30:00', 1800),
         array('2026-05-20 06:00:00', '2026-05-20 07:00:00', 3600),
-        array('2026-05-17 10:00:00', '2026-05-17 12:00:00', 7200),
+        array('2026-05-20 03:00:00', '2026-05-20 05:00:00', 7200),
     )),
 )));
 

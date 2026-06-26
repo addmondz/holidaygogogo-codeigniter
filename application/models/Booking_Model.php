@@ -1505,8 +1505,11 @@ class Booking_Model extends CI_Model
 
 	function Update_Partial_Refund_Status()
 	{
+		// "Cancel With Partial Refund" is treated exactly as a cancellation, so
+		// CancelStatus moves in lockstep with PartialRefund (undo clears both).
 		$array = array(
 			'PartialRefund' => $this->input->get('new_partial_refund_status'),
+			'CancelStatus' => $this->input->get('new_partial_refund_status'),
 			'CancellationReasonID' => NULL,
 			'UpdateBy' => $this->session->userdata('admin_id'),
 			'UpdateDate' => date('Y-m-d H:i:s')
@@ -1517,8 +1520,12 @@ class Booking_Model extends CI_Model
 
 	function Update_Partial_Refund_Status_With_Reason()
 	{
+		// "Cancel With Partial Refund" is treated exactly as a cancellation, so
+		// it must also set CancelStatus='Y' — every status derivation and BC
+		// list filter keys off CancelStatus, not PartialRefund.
 		$array = array(
 			'PartialRefund' => 'Y',
+			'CancelStatus' => 'Y',
 			'CancellationReasonID' => $this->input->post('cancellation_reason_id'),
 			'UpdateBy' => $this->session->userdata('admin_id'),
 			'UpdateDate' => date('Y-m-d H:i:s')

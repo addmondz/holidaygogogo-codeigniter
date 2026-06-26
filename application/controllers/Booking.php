@@ -476,14 +476,9 @@ class Booking extends MY_Controller
 				$row['status'] = '<span class="font-weight-bold" style="color:' . $status_color . ';">' . $status_text . '</span>';
 			}
 
-			// Draft response time next to the status cell: "Response: 1h 15m" once
-			// the booking has reached PENDING PAYMENT — saved-as-draft (SAD) -> P,
-			// matching the "Draft -> Payment Time" card.
-			$this->load->helper('response_time');
-			$resp_seconds = calculate_submitted_to_payment_seconds((int) $booking->BookingID);
-			if ($resp_seconds !== null) {
-				$row['status'] .= '<br><small style="color:#6b7385;">Response: <strong>' . htmlspecialchars(format_response_duration($resp_seconds)) . '</strong></small>';
-			}
+			// Draft -> Payment response time is shown inside the booking edit
+			// page ("Draft -> Payment response time" alert), so it is intentionally
+			// not duplicated here in the BC status cell.
 
 			// GL Status rules:
 			// 1. If hard-locked (LockStatus = 'Y') -> locked icon (red)
@@ -838,32 +833,29 @@ class Booking extends MY_Controller
 				'link'  => $base . $qs(array('booking_date' => $fmt_dmy($month_start) . ' - ' . $fmt_dmy($month_end))),
 			);
 
-			// "Fully paid" = sum of approved customer payments (Status='Y',
-			// Credit>0, excluding agent commission) >= NetTotal. Matches the
-			// approved-credits pattern in Booking_Model (status='PO' filter).
-			// Still used by the Year Sales card / Year leaderboard below.
-			$paid_subquery = "COALESCE((
-				SELECT SUM(p.Credit) FROM payment p
-				WHERE p.BookingID = booking.BookingID
-				  AND p.Status = 'Y' AND p.Credit > 0
-				  AND (p.Type IS NULL OR p.Type != 'AGENT COMMISSION FROM SUPPLIER')
-			), 0)";
-
-			$fully_paid_sales_sql =
-				"SELECT COALESCE(SUM(NetTotal),0) AS total FROM booking
+			// BC Created (Year) — same confirmed-BC rule (excludes QUOTATION /
+			// PROFORMA INVOICE via BookingConfirmationTitle, and cancelled / draft
+			// via CancelStatus / Status) over the selected year.
+			$row_y = $this->db->query(
+				"SELECT COUNT(*) AS cnt FROM booking
 				 WHERE {$credit_clause}
 				   AND BookingConfirmationTitle='BOOKING CONFIRMATION'
 				   AND CancelStatus='N' AND Status!='N'
-				   AND booking.NetTotal > 0
-				   AND {$paid_subquery} >= booking.NetTotal
-				   AND CAST(InsertDate AS DATE) BETWEEN ? AND ?";
+				   AND CAST(InsertDate AS DATE) BETWEEN ? AND ?",
+				array($admin_id, $admin_id, $year_start, $year_end)
+			)->row();
+			$cards['bc_year'] = array(
+				'count' => (int)$row_y->cnt,
+				'link'  => $base . $qs(array('booking_date' => $fmt_dmy($year_start) . ' - ' . $fmt_dmy($year_end))),
+			);
 
-			// Month Sales card "Actual": counts ALL credited Booking Confirmations
-			// in the selected month, regardless of payment status. BC-only excludes
-			// QUOTATION / PROFORMA INVOICE; CancelStatus='N' / Status!='N' exclude
-			// cancelled / deleted. No fully-paid gate (a BC counts whether or not
-			// it has been paid).
-			$month_bc_sales_sql =
+			// Sales card "Actual" (both Month and Year): counts ALL credited
+			// Booking Confirmations in the period, regardless of payment status.
+			// BC-only excludes QUOTATION / PROFORMA INVOICE; CancelStatus='N' /
+			// Status!='N' exclude cancelled / deleted. No fully-paid gate (a BC
+			// counts whether or not it has been paid). Month and Year share the
+			// same logic — only the date range differs.
+			$bc_sales_sql =
 				"SELECT COALESCE(SUM(NetTotal),0) AS total FROM booking
 				 WHERE {$credit_clause}
 				   AND BookingConfirmationTitle='BOOKING CONFIRMATION'
@@ -872,13 +864,13 @@ class Booking extends MY_Controller
 				   AND CAST(InsertDate AS DATE) BETWEEN ? AND ?";
 
 			$row = $this->db->query(
-				$month_bc_sales_sql,
+				$bc_sales_sql,
 				array($admin_id, $admin_id, $month_start, $month_end)
 			)->row();
 			$sales_month_actual = (float)$row->total;
 
 			$row_year = $this->db->query(
-				$fully_paid_sales_sql,
+				$bc_sales_sql,
 				array($admin_id, $admin_id, $year_start, $year_end)
 			)->row();
 			$sales_year_actual = (float)$row_year->total;
@@ -938,116 +930,6 @@ class Booking extends MY_Controller
 				'link'   => $base . $qs(array('status' => 'C', 'booking_date' => $fmt_dmy($month_start) . ' - ' . $fmt_dmy($month_end))),
 			);
 
-			// Disjoint breakdown so full_overdue + deposit_only_overdue = total.
-			// $po_cutoff applies the 3pm rule: a deadline falling today counts as
-			// overdue from 3:00pm onward (cutoff rolls to tomorrow). Shared with
-			// the booking list's PO filter so the card and listing agree.
-			$this->load->helper('booking_status_filter');
-			$po_cutoff = payment_overdue_cutoff_date();
-			$row = $this->db->query(
-				"SELECT
-				   SUM(CASE WHEN FullPaymentDeadline < ? AND Status IN ('P','PP') THEN 1 ELSE 0 END) AS full_overdue,
-				   SUM(CASE WHEN DepositDeadline < ? AND Status='P'
-				             AND NOT (FullPaymentDeadline < ? AND Status IN ('P','PP'))
-				            THEN 1 ELSE 0 END) AS deposit_only_overdue
-				 FROM booking
-				 WHERE {$credit_clause}
-				   AND BookingConfirmationTitle='BOOKING CONFIRMATION'
-				   AND CancelStatus='N'
-				   AND (
-				        (FullPaymentDeadline < ? AND Status IN ('P','PP'))
-				     OR (DepositDeadline < ? AND Status='P')
-				   )",
-				array($po_cutoff, $po_cutoff, $po_cutoff, $admin_id, $admin_id, $po_cutoff, $po_cutoff)
-			)->row();
-			$po_full    = (int)$row->full_overdue;
-			$po_deposit = (int)$row->deposit_only_overdue;
-			$cards['payment_overdue'] = array(
-				'count'                => $po_full + $po_deposit,
-				'full_overdue'         => $po_full,
-				'deposit_only_overdue' => $po_deposit,
-				'link'                 => $base . $qs(array('status' => 'PO')),
-			);
-
-			$row = $this->db->query(
-				"SELECT
-				   SUM(CASE WHEN Status='P'   THEN 1 ELSE 0 END) AS s_p,
-				   SUM(CASE WHEN Status='PBO' THEN 1 ELSE 0 END) AS s_pbo,
-				   SUM(CASE WHEN Status='PGL' THEN 1 ELSE 0 END) AS s_pgl,
-				   SUM(CASE WHEN Status='PTV' THEN 1 ELSE 0 END) AS s_ptv
-				 FROM booking
-				 WHERE {$credit_clause}
-				   AND BookingConfirmationTitle='BOOKING CONFIRMATION'
-				   AND CancelStatus='N'
-				   AND Status IN ('P','PBO','PGL','PTV')
-				   AND StartDate BETWEEN ? AND ?",
-				array($admin_id, $admin_id, $next7_start, $next7_end)
-			)->row();
-			$un_p   = (int)$row->s_p;
-			$un_pbo = (int)$row->s_pbo;
-			$un_pgl = (int)$row->s_pgl;
-			$un_ptv = (int)$row->s_ptv;
-			$cards['upcoming_travel_not_ready'] = array(
-				'count'  => $un_p + $un_pbo + $un_pgl + $un_ptv,
-				'by_p'   => $un_p,
-				'by_pbo' => $un_pbo,
-				'by_pgl' => $un_pgl,
-				'by_ptv' => $un_ptv,
-				'link'   => $base . $qs(array(
-					'upcoming_not_ready' => 1,
-					'travel_date'        => $fmt_dmy($next7_start) . ' - ' . $fmt_dmy($next7_end),
-				)),
-			);
-
-			// Same "not yet ready" set over the cumulative 14-day window.
-			$row = $this->db->query(
-				"SELECT
-				   SUM(CASE WHEN Status='P'   THEN 1 ELSE 0 END) AS s_p,
-				   SUM(CASE WHEN Status='PBO' THEN 1 ELSE 0 END) AS s_pbo,
-				   SUM(CASE WHEN Status='PGL' THEN 1 ELSE 0 END) AS s_pgl,
-				   SUM(CASE WHEN Status='PTV' THEN 1 ELSE 0 END) AS s_ptv
-				 FROM booking
-				 WHERE {$credit_clause}
-				   AND BookingConfirmationTitle='BOOKING CONFIRMATION'
-				   AND CancelStatus='N'
-				   AND Status IN ('P','PBO','PGL','PTV')
-				   AND StartDate BETWEEN ? AND ?",
-				array($admin_id, $admin_id, $next14_start, $next14_end)
-			)->row();
-			$un14_p   = (int)$row->s_p;
-			$un14_pbo = (int)$row->s_pbo;
-			$un14_pgl = (int)$row->s_pgl;
-			$un14_ptv = (int)$row->s_ptv;
-			$cards['upcoming_travel_not_ready_14'] = array(
-				'count'  => $un14_p + $un14_pbo + $un14_pgl + $un14_ptv,
-				'by_p'   => $un14_p,
-				'by_pbo' => $un14_pbo,
-				'by_pgl' => $un14_pgl,
-				'by_ptv' => $un14_ptv,
-				'link'   => $base . $qs(array(
-					'upcoming_not_ready' => 1,
-					'travel_date'        => $fmt_dmy($next14_start) . ' - ' . $fmt_dmy($next14_end),
-				)),
-			);
-
-			// Travel Completed - Pending Review: BCs the TC owns where travel
-			// has ended (Status='Y') but after-sales review is still pending.
-			// Filter mirrors the PR status code in booking_status_filter_helper
-			// so the count and the linked listing return the same set.
-			$row = $this->db->query(
-				"SELECT COUNT(*) AS cnt FROM booking
-				 WHERE SalesAgent = ?
-				   AND BookingConfirmationTitle='BOOKING CONFIRMATION'
-				   AND CancelStatus='N'
-				   AND AfterSalesService='PENDING'
-				   AND Status='Y'",
-				array($admin_id)
-			)->row();
-			$cards['pending_review'] = array(
-				'count' => (int)$row->cnt,
-				'link'  => $base . $qs(array('status' => 'PR')),
-			);
-
 			// ---------- "Compare the Best" sub-lines for the TC KPI cards ----------
 			// Aggregate across every agent under the same TC1/TC2 credited-slot
 			// rule that the agent's own cards use, so the comparison universe is
@@ -1093,6 +975,27 @@ class Booking extends MY_Controller
 				? array('name' => $best_bc['agent_name'], 'value' => (string)(int)$best_bc['bc_count'])
 				: null;
 
+			// Same BC leaderboard over the selected year, for the BC (Year) figure.
+			$best_bc_year_rows = $this->db->query(
+				"SELECT
+				   {$agent_expr} AS credited_agent_id,
+				   admin.Name AS agent_name,
+				   COUNT(*) AS bc_count
+				 FROM booking
+				 LEFT JOIN admin ON admin.AdminID = {$agent_expr}
+				 WHERE booking.BookingConfirmationTitle='BOOKING CONFIRMATION'
+				   AND booking.CancelStatus='N'
+				   AND booking.Status!='N'
+				   AND CAST(booking.InsertDate AS DATE) BETWEEN ? AND ?
+				 GROUP BY credited_agent_id, agent_name
+				 HAVING credited_agent_id IS NOT NULL AND credited_agent_id > 0",
+				array($year_start, $year_end)
+			)->result_array();
+			$best_bc_year = $pick_best($best_bc_year_rows, 'bc_count', true);
+			$cards['bc_year']['best'] = $best_bc_year
+				? array('name' => $best_bc_year['agent_name'], 'value' => (string)(int)$best_bc_year['bc_count'])
+				: null;
+
 			// Month Sales leaderboard mirrors the agent's own card: all credited
 			// Booking Confirmations in the selected month, regardless of payment
 			// (no fully-paid gate), so "Best" stays apples-to-apples.
@@ -1117,8 +1020,9 @@ class Booking extends MY_Controller
 				? array('name' => $best_sales['agent_name'], 'value' => $money($best_sales['total_sales']))
 				: null;
 
-			// Year leaderboard — same fully-paid filter over the selected year so
-			// the "Best" figure on the Year card is apples-to-apples with Month.
+			// Year leaderboard mirrors the agent's own Year card: all credited
+			// Booking Confirmations in the selected year, regardless of payment
+			// (no fully-paid gate), so "Best" stays apples-to-apples with Month.
 			$best_sales_year_rows = $this->db->query(
 				"SELECT
 				   {$agent_expr} AS credited_agent_id,
@@ -1130,7 +1034,6 @@ class Booking extends MY_Controller
 				   AND booking.CancelStatus='N'
 				   AND booking.Status!='N'
 				   AND booking.NetTotal > 0
-				   AND {$paid_subquery} >= booking.NetTotal
 				   AND CAST(booking.InsertDate AS DATE) BETWEEN ? AND ?
 				 GROUP BY credited_agent_id, agent_name
 				 HAVING credited_agent_id IS NOT NULL AND credited_agent_id > 0",
@@ -1172,18 +1075,19 @@ class Booking extends MY_Controller
 				: null;
 
 			// Conversion Rate (YTD) — TC card. Fixed year-to-date window (Jan 1 of
-			// the current year through today, independent of the month filter) and
-			// credited under the standard TC1/TC2 cutoff rule: SalesAgent (TC1)
-			// for bookings before 2026-06-01, SalesAgent2 (TC2) on/after — see
-			// lead_conversion_credit_sql_fragment(). Crediting via TC2 alone would
-			// drop every pre-cutoff conversion (SalesAgent2 was empty then) and
-			// report 0%.
+			// the current year through today, independent of the month filter).
+			// Counts a conversion the same way the Lead Ownership dashboard's
+			// "Converted" column does: is_converted = 1 AND booking_id IS NOT NULL,
+			// with NO TC1/TC2 credit gate. The '1=1' override neutralises the credit
+			// fragment so a lead assigned to the agent counts as their conversion
+			// regardless of which TC slot holds the booking — matching the Top
+			// Agents – Conversion panel below.
 			$this->load->model('Report_Model');
-			$this->load->helper('lead_conversion_credit');
 			$ytd_start = date('Y-01-01');
 			$ytd_end   = $today;
 			$by_agent = $this->Report_Model->Lead_Dashboard_By_Agent(
-				array('start_date' => $ytd_start, 'end_date' => $ytd_end)
+				array('start_date' => $ytd_start, 'end_date' => $ytd_end),
+				'1=1'
 			);
 
 			// Resolve the logged-in admin to their GHL UserID(s). Canonical source
@@ -1314,59 +1218,132 @@ class Booking extends MY_Controller
 				);
 			}
 
-			// Pending BC (self) — current backlog of the TC's bookings parked at
-			// PB ("PENDING BC"). Not period-scoped (it's a live to-do count, like
-			// Payment Overdue); credited via the same TC1/TC2 slot rule.
-			$row = $this->db->query(
-				"SELECT COUNT(*) AS cnt FROM booking
-				 WHERE {$credit_clause}
-				   AND CancelStatus='N' AND Status='PB'",
-				array($admin_id, $admin_id)
+			// ---------- "Best:" benchmarks for Avg Reply Time & My Leads ----------
+			// Team-wide month-window leaderboard (live current month, matching the
+			// GHL-based cards above). Fastest avg reply time (min-sample 3 leads)
+			// and highest lead volume; "You" when that's the logged-in agent.
+			$this->load->helper('response_time');
+			$resp_rows = $this->Report_Model->Lead_Dashboard_By_Agent(array(
+				'start_date' => $cur_month_start, 'end_date' => $cur_month_end,
+			));
+			$pick_ghl_best = function($rows, $field, $sort_desc, $min_leads) use ($my_ghl_uids) {
+				$f = array();
+				foreach($rows as $r) {
+					if((string)$r['agent_id'] === '__unassigned__') { continue; }
+					if((int)$r['total_leads'] < $min_leads) { continue; }
+					if(!$sort_desc && ($r[$field] === null || (float)$r[$field] <= 0)) { continue; }
+					$f[] = $r;
+				}
+				if(empty($f)) { return null; }
+				usort($f, function($a, $b) use ($field, $sort_desc) {
+					$av = (float)$a[$field]; $bv = (float)$b[$field];
+					if($av !== $bv) { return $sort_desc ? ($bv <=> $av) : ($av <=> $bv); }
+					return strcmp((string)$a['agent_name'], (string)$b['agent_name']);
+				});
+				$top = $f[0];
+				if(!empty($my_ghl_uids) && in_array((string)$top['agent_id'], $my_ghl_uids, true)) {
+					$top['agent_name'] = 'You';
+				}
+				return $top;
+			};
+			$best_resp = $pick_ghl_best($resp_rows, 'avg_response_time_seconds', false, 3);
+			$cards['tc_response_time_dwm']['best'] = $best_resp
+				? array('name' => $best_resp['agent_name'], 'value' => format_response_duration((int)round((float)$best_resp['avg_response_time_seconds'])))
+				: null;
+			$best_leads = $pick_ghl_best($resp_rows, 'total_leads', true, 1);
+			$cards['tc_leads_dwm']['best'] = $best_leads
+				? array('name' => $best_leads['agent_name'], 'value' => (string)(int)$best_leads['total_leads'])
+				: null;
+
+			// ---------- Outbound Messages (Today / Week / Month) ----------
+			// Agent-sent (outbound) GHL messages by send time. Own counts scoped to
+			// the logged-in TC's GHL uid(s); "Best:" = top sender this month
+			// team-wide. Live current-month windows, matching the cards above.
+			$ob_day = $ob_week = $ob_month = 0;
+			if(!empty($my_ghl_uids)) {
+				$ob_place = implode(',', array_fill(0, count($my_ghl_uids), '?'));
+				$ob_count = function($start, $end) use ($my_ghl_uids, $ob_place) {
+					$r = $this->db->query(
+						"SELECT COUNT(*) AS c FROM ghl_messages
+						 WHERE direction='outbound'
+						   AND NULLIF(user_id,'') IN ({$ob_place})
+						   AND date_added BETWEEN ? AND ?",
+						array_merge($my_ghl_uids, array($start . ' 00:00:00', $end . ' 23:59:59'))
+					)->row();
+					return $r ? (int)$r->c : 0;
+				};
+				$ob_day   = $ob_count($today, $today);
+				$ob_week  = $ob_count($week_start, $week_end);
+				$ob_month = $ob_count($cur_month_start, $cur_month_end);
+			}
+			$ob_best = null;
+			$ob_best_row = $this->db->query(
+				"SELECT gm.user_id,
+				        COALESCE(NULLIF(gu.Name,''), gm.user_id) AS agent_name,
+				        COUNT(*) AS c
+				 FROM ghl_messages gm
+				 LEFT JOIN ghl_users gu ON gu.UserID = gm.user_id
+				 WHERE gm.direction='outbound'
+				   AND NULLIF(gm.user_id,'') IS NOT NULL
+				   AND gm.date_added BETWEEN ? AND ?
+				 GROUP BY gm.user_id, agent_name
+				 ORDER BY c DESC, agent_name ASC
+				 LIMIT 1",
+				array($cur_month_start . ' 00:00:00', $cur_month_end . ' 23:59:59')
 			)->row();
-			$cards['pending_bc'] = array(
-				'count' => (int)$row->cnt,
-				'link'  => $base . $qs(array('status' => 'PB')),
+			if(!empty($ob_best_row)) {
+				$ob_name = (!empty($my_ghl_uids) && in_array((string)$ob_best_row->user_id, $my_ghl_uids, true))
+					? 'You' : $ob_best_row->agent_name;
+				$ob_best = array('name' => $ob_name, 'value' => (string)(int)$ob_best_row->c);
+			}
+			$cards['outbound_msgs_dwm'] = array(
+				'day' => $ob_day, 'week' => $ob_week, 'month' => $ob_month, 'best' => $ob_best,
 			);
 
-			// Draft -> Payment Time (self, selected month). Average gap from the
-			// booking being saved as draft (SAD) to it first reaching PENDING
-			// PAYMENT (P), windowed on the draft-save date. "Best:" footer ranks
-			// the fastest TC team-wide ("You" when that's the logged-in agent).
-			$this->load->helper(array('submitted_payment_response', 'response_time'));
-			$sp_start = $month_start . ' 00:00:00';
-			$sp_next  = date('Y-m-01 00:00:00', strtotime($month_start . ' +1 month'));
-			$sp_row = $this->db->query(
-				submitted_payment_avg_response_sql(true),
-				array($sp_start, $sp_next, $admin_id, $admin_id)
-			)->row();
-			$sp_n    = !empty($sp_row) ? (int)$sp_row->n : 0;
-			$sp_secs = ($sp_n > 0 && $sp_row->avg_seconds !== null)
-				? (int)round((float)$sp_row->avg_seconds) : null;
-			$best_sp_row = $this->db->query(
-				submitted_payment_best_agent_sql(),
-				array($sp_start, $sp_next)
-			)->row();
-			$best_sp = null;
-			if(!empty($best_sp_row) && !empty($best_sp_row->AdminID)) {
-				if((int)$best_sp_row->AdminID === (int)$admin_id) {
-					$bd_name = 'You';
-				} else {
-					$bd_admin = $this->db->select('Name')
-						->where('AdminID', (int)$best_sp_row->AdminID)
-						->get('admin')->row();
-					$bd_name = $bd_admin ? $bd_admin->Name : '#' . (int)$best_sp_row->AdminID;
+			// ---------- Follow-up % (Month) ----------
+			// Reuses the Lead Ownership dashboard's definition: owned leads whose
+			// follow_up_status is sent/completed, over all owned leads. Own scoped
+			// to the TC's GHL uid(s); "Best:" = highest rate (min-sample 3 owned).
+			$fu_rows = $this->Report_Model->Lead_Ownership_By_Agent(array(
+				'start_date' => $cur_month_start, 'end_date' => $cur_month_end,
+			));
+			$fu_owned = 0; $fu_followed = 0;
+			$uid_set_fu = !empty($my_ghl_uids) ? array_flip($my_ghl_uids) : array();
+			$fu_best_pick = null;
+			foreach($fu_rows as $fr) {
+				if(isset($uid_set_fu[(string)$fr['owner_user_id']])) {
+					$fu_owned    += (int)$fr['owned_leads'];
+					$fu_followed += (int)$fr['follow_up_leads'];
 				}
-				$best_sp = array(
-					'name'  => $bd_name,
-					'value' => format_response_duration((int)round((float)$best_sp_row->avg_seconds)),
-				);
+				if((int)$fr['owned_leads'] >= 3) {
+					if($fu_best_pick === null
+						|| (float)$fr['follow_up_rate'] > (float)$fu_best_pick['follow_up_rate']
+						|| ((float)$fr['follow_up_rate'] === (float)$fu_best_pick['follow_up_rate']
+							&& strcmp((string)$fr['owner_name'], (string)$fu_best_pick['owner_name']) < 0)) {
+						$fu_best_pick = $fr;
+					}
+				}
 			}
-			$cards['submitted_payment_response_month'] = array(
-				'value'   => format_response_duration($sp_secs),
-				'count'   => $sp_n,
-				'seconds' => $sp_secs,
-				'best'    => $best_sp,
+			$fu_rate = $fu_owned > 0 ? round(($fu_followed / $fu_owned) * 100, 1) : null;
+			$fu_best = null;
+			if($fu_best_pick !== null) {
+				$fu_bname = (!empty($my_ghl_uids) && in_array((string)$fu_best_pick['owner_user_id'], $my_ghl_uids, true))
+					? 'You' : $fu_best_pick['owner_name'];
+				$fu_best = array('name' => $fu_bname, 'value' => round((float)$fu_best_pick['follow_up_rate'], 1) . '%');
+			}
+			$cards['followup_rate'] = array(
+				'value'  => $fu_rate === null ? '-' : ($fu_rate . '%'),
+				'detail' => $fu_followed . ' / ' . $fu_owned,
+				'best'   => $fu_best,
 			);
+
+			// ---------- Agent Score (Month / Year) ----------
+			// Weighted, best-benchmarked composite: reply 30% + pickup 20% +
+			// conversion 20% + sales 30%. Month uses the selected month, Year the
+			// selected year. Both are always computed so the leaderboard renders
+			// even when this TC has no data of their own.
+			$cards['agent_score_month'] = $this->agent_score_card($month_start, $month_end, false, $my_ghl_uids, $admin_id);
+			$cards['agent_score_year']  = $this->agent_score_card($year_start, $year_end, true, $my_ghl_uids, $admin_id);
 		}
 
 		// ---------- TC LEAD / Owner (team-wide lead + booking metrics) ----------
@@ -2577,18 +2554,23 @@ class Booking extends MY_Controller
 
 		// TC cards
 		if(isset($cards['bc_month'])) {
-			$n = (int)$cards['bc_month']['count'];
+			$n  = (int)$cards['bc_month']['count'];
+			$ny = isset($cards['bc_year']) ? (int)$cards['bc_year']['count'] : 0;
+			$window_year = $rng_disp($year_start, $year_end);
 			$popovers['pop-bc-month'] =
-				'<strong>What it shows:</strong> The number of booking confirmations credited to you this month.<br><br>' .
-				'<strong>Period:</strong> ' . $window_month . ' (by the date the booking was created)<br>' .
+				'<strong>What it shows:</strong> The number of booking confirmations credited to you, this month and this year.<br><br>' .
+				'<strong>Periods</strong> (by the date the booking was created):<br>' .
+				'This Month: ' . $window_month . '<br>' .
+				'This Year: ' . $window_year . '<br>' .
 				'<strong>This card:</strong><br>' .
-				$n . ' ' . $plural($n, 'booking') . ' credited to you &rarr; <strong>' . $n . '</strong><br><br>' .
+				'Month &rarr; <strong>' . $n . '</strong> ' . $plural($n, 'booking') . '<br>' .
+				'Year &rarr; <strong>' . $ny . '</strong> ' . $plural($ny, 'booking') . '<br><br>' .
 				'<strong>Who gets the credit:</strong>' .
 				'<ul>' .
 				'<li>Before ' . $tc2_cutoff_disp . ': the main sales person on the booking</li>' .
 				'<li>From ' . $tc2_cutoff_disp . ': the second sales agent on the booking</li>' .
 				'</ul>' .
-				'<strong>Not counted:</strong> quotations, cancelled, and drafts.';
+				'<strong>Not counted:</strong> quotations, proforma invoices, cancelled, and drafts.';
 		}
 
 		if(isset($cards['sales_month']) && isset($cards['bc_month'])) {
@@ -2610,9 +2592,9 @@ class Booking extends MY_Controller
 				'<strong>This card:</strong><br>' .
 				'Year sales &rarr; <strong>' . $cards['sales_year']['value'] . '</strong><br>' .
 				'Yearly target &rarr; <strong>' . $cards['sales_year']['target'] . '</strong> (' . $cards['sales_year']['percent'] . ')<br><br>' .
-				'<strong>Fully paid</strong> means the approved customer payments cover the full booking amount (agent commission not included).<br>' .
+				'<strong>Value:</strong> adds up all your Booking Confirmations created this year, regardless of payment status (same rule as the Month card, just over the full year).<br>' .
 				'<strong>Target:</strong> set for each agent under Admin &rarr; Yearly Target. The percentage is your sales divided by your target.<br>' .
-				'<strong>Not counted:</strong> cancelled, drafts, and part-paid or unpaid bookings.';
+				'<strong>Not counted:</strong> quotations, proforma invoices, cancelled, and drafts.';
 		}
 
 		if(isset($cards['cancellation_rate']) && $is_tc) {
@@ -2632,61 +2614,6 @@ class Booking extends MY_Controller
 				'&rarr; ' . $math . '<br><br>' .
 				'<strong>Scope:</strong> drafts not counted. Your bookings only.<br>' .
 				'<strong>Note:</strong> based on when the booking was created, not when it was cancelled.';
-		}
-
-		if(isset($cards['payment_overdue'])) {
-			$po_total   = (int)$cards['payment_overdue']['count'];
-			$po_full    = (int)$cards['payment_overdue']['full_overdue'];
-			$po_deposit = (int)$cards['payment_overdue']['deposit_only_overdue'];
-			$popovers['pop-payment-overdue'] =
-				'<strong>What it shows:</strong> Your bookings whose payment deadline has passed but still have money owing.<br><br>' .
-				'<strong>Counted when either:</strong>' .
-				'<ul>' .
-				'<li>The full-payment deadline has passed and the booking still owes a balance</li>' .
-				'<li>The deposit deadline has passed and the deposit is still unpaid</li>' .
-				'</ul>' .
-				'<strong>As of:</strong> ' . $fmt_disp($today) . ' (no date limit)<br>' .
-				'<strong>Due today:</strong> counts as overdue from 3:00pm onward.<br>' .
-				'<strong>This card (your bookings):</strong><br>' .
-				'Full payment overdue: ' . $po_full . ' ' . $plural($po_full, 'booking') . '<br>' .
-				'Deposit overdue (full payment not yet due): ' . $po_deposit . ' ' . $plural($po_deposit, 'booking') . '<br>' .
-				'&rarr; <strong>' . $po_total . ' ' . $plural($po_total, 'booking') . '</strong><br><br>' .
-				'<strong>Not counted:</strong> cancelled and fully-paid bookings.';
-		}
-
-		if(isset($cards['upcoming_travel_not_ready'])) {
-			$u   = $cards['upcoming_travel_not_ready'];
-			$tot = (int)$u['count'];
-			$popovers['pop-upcoming-not-ready'] =
-				'<strong>What it shows:</strong> Your bookings starting travel within 7 days that aren&rsquo;t ready yet.<br><br>' .
-				'<strong>&ldquo;Not yet ready&rdquo;</strong> means still waiting on: Payment / Booking Op / Guest List / Travel Voucher.<br><br>' .
-				'<strong>Period:</strong> ' . $window_next7 . ' (by travel start date)<br>' .
-				'<strong>This card (your bookings):</strong><br>' .
-				'Waiting on payment: ' . (int)$u['by_p'] . '<br>' .
-				'Waiting on booking operations: ' . (int)$u['by_pbo'] . '<br>' .
-				'Waiting on guest list: ' . (int)$u['by_pgl'] . '<br>' .
-				'Waiting on travel voucher: ' . (int)$u['by_ptv'] . '<br>' .
-				'&rarr; <strong>' . $tot . ' ' . $plural($tot, 'booking') . '</strong><br><br>' .
-				'<strong>Not counted:</strong> cancelled, and bookings already at Pending Travel or beyond.<br>' .
-				'<strong>Why it matters:</strong> guests travel within a week.';
-		}
-
-		if(isset($cards['upcoming_travel_not_ready_14'])) {
-			$u   = $cards['upcoming_travel_not_ready_14'];
-			$tot = (int)$u['count'];
-			$popovers['pop-upcoming-not-ready-14'] =
-				'<strong>What it shows:</strong> Your bookings starting travel within 14 days that aren&rsquo;t ready yet.<br><br>' .
-				'<strong>&ldquo;Not yet ready&rdquo;</strong> means still waiting on: Payment / Booking Op / Guest List / Travel Voucher.<br><br>' .
-				'<strong>Period:</strong> ' . $window_next14 . ' (by travel start date)<br>' .
-				'<strong>This card (your bookings):</strong><br>' .
-				'Waiting on payment: ' . (int)$u['by_p'] . '<br>' .
-				'Waiting on booking operations: ' . (int)$u['by_pbo'] . '<br>' .
-				'Waiting on guest list: ' . (int)$u['by_pgl'] . '<br>' .
-				'Waiting on travel voucher: ' . (int)$u['by_ptv'] . '<br>' .
-				'&rarr; <strong>' . $tot . ' ' . $plural($tot, 'booking') . '</strong><br><br>' .
-				'<strong>Includes</strong> the bookings shown in &ldquo;within 7 days&rdquo;.<br>' .
-				'<strong>Not counted:</strong> cancelled, and bookings already at Pending Travel or beyond.<br>' .
-				'<strong>Why it matters:</strong> a two-week heads-up to get bookings ready.';
 		}
 
 		// TC LEAD / Owner cards
@@ -2760,7 +2687,7 @@ class Booking extends MY_Controller
 				$avg_detail . '<br><br>' .
 				'<strong>Converted:</strong> the lead is linked to a booking and the agent is credited for that sale (main sales person before ' . $tc2_cutoff_disp . '; second sales agent from ' . $tc2_cutoff_disp . ').<br>' .
 				'<strong>Responded:</strong> the lead got at least one reply.<br>' .
-				'<strong>Working hours:</strong> Mon&ndash;Sat 8:00am&ndash;10:00pm Malaysia time &mdash; time outside working hours is not counted in Avg Time.';
+				'<strong>Working hours:</strong> everyday 7:00am&ndash;10:00pm Malaysia time &mdash; time outside working hours is not counted in Avg Time.';
 		}
 
 		if(isset($cards['active_leads_dwm'])) {
@@ -3241,6 +3168,171 @@ class Booking extends MY_Controller
 		return array(
 			'name'  => $name,
 			'value' => format_response_duration($best['avg_seconds']),
+		);
+	}
+
+	/**
+	 * Agent Score card payload for one period. Builds a unified per-agent table
+	 * by joining three GHL-user-keyed metrics (avg reply time + conversion via
+	 * Lead_Dashboard_By_Agent, pickup speed via Lead_Pickup_Speed_By_Agent) with
+	 * the admin-keyed credited-sales total, then hands the rows to the pure
+	 * agent_score_helper for normalisation + ranking. Returns the logged-in
+	 * agent's composite/rank plus the top performer ("You" when that's them).
+	 *
+	 * @param string $start       'Y-m-d'  period start
+	 * @param string $end         'Y-m-d'  period end
+	 * @param bool   $fully_paid   true => year sales gate (approved payments >= NetTotal)
+	 * @param array  $my_ghl_uids  logged-in agent's GHL user ids (may be empty)
+	 * @param int    $admin_id     logged-in agent's AdminID
+	 */
+	private function agent_score_card($start, $end, $fully_paid, $my_ghl_uids, $admin_id)
+	{
+		$this->load->helper(array('agent_score', 'lead_conversion_credit'));
+		$this->load->model('Report_Model');
+
+		// 1. GHL-keyed reply time + conversion (ungated, '1=1', matching the
+		//    Conversion Rate (YTD) card's attribution).
+		$by_agent = $this->Report_Model->Lead_Dashboard_By_Agent(
+			array('start_date' => $start, 'end_date' => $end), '1=1'
+		);
+		// 2. GHL-keyed pickup speed (one row per agent).
+		$pickup = $this->Report_Model->Lead_Pickup_Speed_By_Agent($start, $end);
+
+		// 3. Admin-keyed credited sales. Month = no fully-paid gate (mirrors the
+		//    Month Sales card); Year = approved-payments-cover-NetTotal gate
+		//    (mirrors the Year Sales card) so each period's sales component agrees
+		//    with the adjacent Sales card.
+		$agent_expr = lead_conversion_credit_agent_expr();
+		$paid_gate = '';
+		if($fully_paid) {
+			$paid_subquery = "COALESCE((
+				SELECT SUM(p.Credit) FROM payment p
+				WHERE p.BookingID = booking.BookingID
+				  AND p.Status = 'Y' AND p.Credit > 0
+				  AND (p.Type IS NULL OR p.Type != 'AGENT COMMISSION FROM SUPPLIER')
+			), 0)";
+			$paid_gate = " AND {$paid_subquery} >= booking.NetTotal";
+		}
+		$sales_rows = $this->db->query(
+			"SELECT
+			   {$agent_expr} AS admin_id,
+			   admin.Name AS agent_name,
+			   COALESCE(SUM(booking.NetTotal), 0) AS total_sales
+			 FROM booking
+			 LEFT JOIN admin ON admin.AdminID = {$agent_expr}
+			 WHERE booking.BookingConfirmationTitle='BOOKING CONFIRMATION'
+			   AND booking.CancelStatus='N'
+			   AND booking.Status!='N'
+			   AND booking.NetTotal > 0
+			   {$paid_gate}
+			   AND CAST(booking.InsertDate AS DATE) BETWEEN ? AND ?
+			 GROUP BY admin_id, agent_name
+			 HAVING admin_id IS NOT NULL AND admin_id > 0",
+			array($start, $end)
+		)->result_array();
+
+		// 4. Bridge GHL uid -> AdminID for every agent (generalises the logged-in
+		//    resolution used by the Conversion Rate card): mapping table first,
+		//    email match as fallback.
+		$map = array(); $name_by_admin = array();
+		foreach($this->db->query(
+			"SELECT alda.GhlUserID, alda.AdminID, a.Name
+			 FROM admin_lead_dashboard_agents alda
+			 INNER JOIN admin a ON a.AdminID = alda.AdminID
+			 WHERE NULLIF(alda.GhlUserID,'') IS NOT NULL"
+		)->result() as $r) {
+			$map[(string)$r->GhlUserID] = (int)$r->AdminID;
+			$name_by_admin[(int)$r->AdminID] = $r->Name;
+		}
+		foreach($this->db->query(
+			"SELECT gu.UserID, a.AdminID, a.Name
+			 FROM admin a
+			 INNER JOIN ghl_users gu ON LOWER(TRIM(gu.Email)) = LOWER(TRIM(a.Email))"
+		)->result() as $r) {
+			$uid = (string)$r->UserID;
+			if($uid !== '' && !isset($map[$uid])) { $map[$uid] = (int)$r->AdminID; }
+			if(!isset($name_by_admin[(int)$r->AdminID])) { $name_by_admin[(int)$r->AdminID] = $r->Name; }
+		}
+
+		// 5. Fold everything into one row per AdminID. Reply/pickup are
+		//    lead-weighted so a TC owning several GHL inboxes aggregates fairly.
+		$u = array();
+		$ensure = function(&$u, $aid) use ($name_by_admin) {
+			if(!isset($u[$aid])) {
+				$u[$aid] = array(
+					'name' => isset($name_by_admin[$aid]) ? $name_by_admin[$aid] : '',
+					'reply_sum' => 0.0, 'reply_n' => 0,
+					'pickup_sum' => 0.0, 'pickup_n' => 0,
+					'leads' => 0, 'converted' => 0, 'sales' => 0.0,
+					'has_leads' => false, 'has_sales' => false,
+				);
+			}
+		};
+		foreach($by_agent as $a) {
+			$uid = (string)$a['agent_id'];
+			if($uid === '__unassigned__' || !isset($map[$uid])) { continue; }
+			$aid = $map[$uid];
+			$ensure($u, $aid);
+			$leads = (int)$a['total_leads'];
+			$u[$aid]['leads']     += $leads;
+			$u[$aid]['converted'] += (int)$a['converted_leads'];
+			$u[$aid]['has_leads']  = true;
+			if($a['avg_response_time_seconds'] !== null && $leads > 0) {
+				$u[$aid]['reply_sum'] += (float)$a['avg_response_time_seconds'] * $leads;
+				$u[$aid]['reply_n']   += $leads;
+			}
+		}
+		foreach($pickup as $p) {
+			$uid = (string)$p['agent_id'];
+			if(!isset($map[$uid])) { continue; }
+			$aid = $map[$uid];
+			$ensure($u, $aid);
+			$n = (int)$p['n'];
+			if($n > 0) {
+				$u[$aid]['pickup_sum'] += (float)$p['avg_seconds'] * $n;
+				$u[$aid]['pickup_n']   += $n;
+			}
+		}
+		foreach($sales_rows as $s) {
+			$aid = (int)$s['admin_id'];
+			if($aid <= 0) { continue; }
+			$ensure($u, $aid);
+			$u[$aid]['sales']     += (float)$s['total_sales'];
+			$u[$aid]['has_sales']  = true;
+			if($u[$aid]['name'] === '') { $u[$aid]['name'] = $s['agent_name']; }
+		}
+
+		// 6. Eligible = had leads OR sales. Derive per-agent metric values.
+		$agents = array();
+		foreach($u as $aid => $row) {
+			if(!$row['has_leads'] && !$row['has_sales']) { continue; }
+			$agents[] = array(
+				'admin_id'    => $aid,
+				'name'        => $row['name'] !== '' ? $row['name'] : '#' . $aid,
+				'reply_secs'  => $row['reply_n']  > 0 ? $row['reply_sum']  / $row['reply_n']  : null,
+				'pickup_secs' => $row['pickup_n'] > 0 ? $row['pickup_sum'] / $row['pickup_n'] : null,
+				'conv_rate'   => $row['leads'] > 0 ? ($row['converted'] / $row['leads']) * 100 : null,
+				'sales'       => $row['has_sales'] ? $row['sales'] : null,
+				'pickup_n'    => $row['pickup_n'],
+				'leads_n'     => $row['leads'],
+			);
+		}
+
+		$res = agent_score_compute($agents);
+		$own = isset($res['by_admin'][(int)$admin_id]) ? $res['by_admin'][(int)$admin_id] : null;
+		$top = $res['top'];
+		$best = null;
+		if($top) {
+			$top_name = ((int)$top['admin_id'] === (int)$admin_id) ? 'You' : $top['name'];
+			$best = array('name' => $top_name, 'value' => round($top['composite'], 1) . '%');
+		}
+		return array(
+			'value'     => $own ? (round($own['composite'], 1) . '%') : '-',
+			'raw'       => $own ? $own['composite'] : null,
+			'rank'      => $own ? $own['rank'] : null,
+			'total'     => $res['total'],
+			'breakdown' => $own ? $own['norm'] : null,
+			'best'      => $best,
 		);
 	}
 
@@ -3855,6 +3947,24 @@ class Booking extends MY_Controller
 								: 'Draft — booking advanced to ' . $target_label,
 							true
 						);
+
+						// Drafts are created roomless on purpose, but a graduated
+						// booking must carry at least one room (the booking form,
+						// guest list and BC all expect it). Seed a default ROOM 1
+						// if the draft never had any rooms added.
+						$this->db->where('booking_id', $bid);
+						$this->db->where('Status', 'Y');
+						if ((int) $this->db->count_all_results('guest_list_room') === 0) {
+							$this->db->insert('guest_list_room', array(
+								'booking_id'  => $bid,
+								'room_name'   => 'ROOM 1',
+								'adult_count' => 0,
+								'child_count' => 0,
+								'infant_count' => 0,
+								'InsertBy'    => $advancer_id,
+								'InsertDate'  => date('Y-m-d H:i:s')
+							));
+						}
 					}
 				}
 			} else {

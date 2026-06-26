@@ -3,18 +3,18 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 
 // Sales team working window. Edit this block to change duty hours.
 // Days: 1=Mon ... 7=Sun (matches PHP date('N')).
-if(!defined('DUTY_HOURS_DAYS'))       define('DUTY_HOURS_DAYS', '1,2,3,4,5,6'); // Mon-Sat
-if(!defined('DUTY_HOURS_START_HOUR')) define('DUTY_HOURS_START_HOUR', 8);
-if(!defined('DUTY_HOURS_END_HOUR'))   define('DUTY_HOURS_END_HOUR', 22);        // exclusive
+if(!defined('DUTY_HOURS_DAYS'))       define('DUTY_HOURS_DAYS', '1,2,3,4,5,6,7'); // Everyday (Mon-Sun)
+if(!defined('DUTY_HOURS_START_HOUR')) define('DUTY_HOURS_START_HOUR', 7);          // 7AM inclusive
+if(!defined('DUTY_HOURS_END_HOUR'))   define('DUTY_HOURS_END_HOUR', 22);           // 10PM exclusive
 
 if(!function_exists('is_within_duty_hours')) {
     /**
      * Returns true if the given MySQL DATETIME string falls inside the sales
      * team's duty hours (server local time — server is MYT).
      *
-     *   is_within_duty_hours('2026-05-20 08:30:00') => true
+     *   is_within_duty_hours('2026-05-20 07:30:00') => true
      *   is_within_duty_hours('2026-05-20 22:00:00') => false  (end exclusive)
-     *   is_within_duty_hours('2026-05-17 10:00:00') => false  (Sunday)
+     *   is_within_duty_hours('2026-05-20 06:00:00') => false  (before start)
      *   is_within_duty_hours(null) => false
      */
     function is_within_duty_hours($mysql_datetime) {
@@ -39,7 +39,7 @@ if(!function_exists('calculate_duty_response_seconds')) {
      * the configured duty-hours window. Off-days and off-hours contribute 0.
      *
      * Pass $opts to override the window for a specific report without touching
-     * the global constants (used by the Lead Ownership 9AM-7PM Mon-Fri window):
+     * the global constants:
      *   array('days' => array(1,2,3,4,5), 'start_hour' => 9, 'end_hour' => 19)
      * Any omitted key falls back to the corresponding global default.
      */

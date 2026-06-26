@@ -4576,6 +4576,16 @@
             postData.draft_save_mode = draft_save_mode;
         }
 
+        // Draft lifecycle saves (Save as Draft / Approve / Save as Pending BC)
+        // lock the invoice inputs, and the controller skips incomplete rows, so
+        // only enforce the supplier + invoice # rule on a normal/PBC save where
+        // the fields are editable and the user can act on the message.
+        var __invLenient = (draft_save_mode === 'draft' || draft_save_mode === 'approve' || draft_save_mode === 'PB');
+        if (!__invLenient && typeof Validate_Supplier_Invoices === 'function' && !Validate_Supplier_Invoices()) {
+            Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', 'Each supplier invoice needs a Supplier and an Invoice # before saving. Please complete or remove the incomplete invoice row.', null);
+            return;
+        }
+
         if (typeof Collect_Supplier_Invoices === 'function') {
             var supplier_invoices_payload = Collect_Supplier_Invoices();
             if (supplier_invoices_payload && (supplier_invoices_payload[0].length || supplier_invoices_payload[1].length || supplier_invoices_payload[2].length)) {
@@ -6341,6 +6351,10 @@ $(document).ready(function() {
     var sourceBookingId = <?php echo (current_url() == base_url('Booking/Duplicate') && isset($BookingID) && $BookingID !== 'NA') ? (int)$BookingID : 'null'; ?>;
     var roomBookingId = <?php echo (isset($BookingID) && $BookingID !== 'NA' && current_url() != base_url('Booking/Duplicate')) ? (int)$BookingID : 'null'; ?>;
     var glLocked = <?php echo (isset($LockStatus) && $LockStatus == 'Y') ? 'true' : 'false'; ?>;
+    // Drafts (SAD) are deliberately roomless until they graduate; everything past
+    // draft must carry at least one room (see roomless-seed in loadRooms()).
+    var bookingStatus = '<?php echo isset($Status) ? $Status : ''; ?>';
+    var roomSeedAttempted = false;
     var tempRoomCounter = 0;
 
     function getAllocatedPax(excludeRoomId) {
@@ -6489,6 +6503,24 @@ $(document).ready(function() {
                 dataType: 'json',
                 success: function(data) {
                     roomsList = data || [];
+                    // A booking that has graduated out of draft (SAD) must always
+                    // have at least one room. Drafts are intentionally roomless,
+                    // so they are left alone; but once graduated to Pending BC or
+                    // beyond a roomless booking is a leftover of the draft flow —
+                    // seed a real ROOM 1 once so it shows and the +/- / edit
+                    // controls work against a persisted row.
+                    if (roomsList.length === 0 && bookingStatus !== 'SAD' && !glLocked && !roomSeedAttempted) {
+                        roomSeedAttempted = true;
+                        $.ajax({
+                            url: '<?php echo base_url("Guest_List_Room/Create"); ?>',
+                            type: 'post',
+                            data: { booking_id: roomBookingId, room_name: 'ROOM 1', adult_count: 0, child_count: 0, infant_count: 0 },
+                            dataType: 'json',
+                            success: function() { loadRooms(); },
+                            error: function() { renderRoomsTable(); }
+                        });
+                        return;
+                    }
                     // Also fetch guests
                     $.ajax({
                         url: '<?php echo base_url("Guest_List_Room/Read_Guests"); ?>',
@@ -7236,6 +7268,7 @@ $(document).ready(function() {
         }
 
         $('#add-supplier-invoice-btn').on('click', function() {
+            if (window.__supplierInvoiceLocked) { return; }
             $('#supplier-invoices-empty').remove();
             var $row = $(buildEmptyRowHtml());
             $('#supplier-invoices-tbody').append($row);
@@ -7245,6 +7278,7 @@ $(document).ready(function() {
         });
 
         $('#supplier-invoices-tbody').on('click', '.supplier-invoice-remove', function() {
+            if (window.__supplierInvoiceLocked) { return; }
             var $row = $(this).closest('tr');
             if (!$row.data('supplier-invoice-id')) {
                 $row.remove();
@@ -7255,12 +7289,14 @@ $(document).ready(function() {
 
         // Attach / Replace -> open the row's hidden file picker.
         $('#supplier-invoices-tbody').on('click', '.supplier-invoice-file-attach', function() {
+            if (window.__supplierInvoiceLocked) { return; }
             $(this).closest('tr').find('.supplier-invoice-file-input').trigger('click');
         });
 
         // Remove -> clear the attachment. For a saved row the empty path is sent
         // on the next booking save and the controller nulls InvoiceFilePath.
         $('#supplier-invoices-tbody').on('click', '.supplier-invoice-file-remove', function() {
+            if (window.__supplierInvoiceLocked) { return; }
             var $row = $(this).closest('tr');
             $row.attr('data-file-path', '');
             renderInvoiceFileUi($row);
@@ -7270,6 +7306,7 @@ $(document).ready(function() {
         // and cannot carry files).
         $('#supplier-invoices-tbody').on('change', '.supplier-invoice-file-input', function() {
             var input = this;
+            if (window.__supplierInvoiceLocked) { input.value = ''; return; }
             if (!input.files || !input.files.length) { return; }
             var $row = $(input).closest('tr');
             var $attachBtn = $row.find('.supplier-invoice-file-attach');
@@ -7319,6 +7356,29 @@ $(document).ready(function() {
         if (parts.length !== 3) return null;
         return parts[2] + '-' + parts[1] + '-' + parts[0];
     }
+
+    // Returns true when every active (non-deleted) invoice row that carries any
+    // data also has a supplier AND an invoice number — the two NOT NULL columns.
+    // Guards against a row that only had a file attached being silently dropped
+    // (or, pre-fix, aborting the booking save with a NOT NULL violation).
+    window.Validate_Supplier_Invoices = function() {
+        var incomplete = false;
+        $('#supplier-invoices-tbody tr.supplier-invoice-row').each(function() {
+            var $row = $(this);
+            if ($row.attr('data-deleted') === '1') { return; }
+            var supplier_id    = $row.find('.supplier-invoice-supplier').val();
+            var invoice_number = ($row.find('.supplier-invoice-number').val() || '').trim();
+            var invoice_amount = $row.find('.supplier-invoice-amount').val();
+            var deadline_disp  = $row.find('.supplier-invoice-deadline').val();
+            var remark         = $row.find('.supplier-invoice-remark').val() || '';
+            var file_path      = $row.attr('data-file-path') || '';
+            var hasData = supplier_id || invoice_number || invoice_amount || deadline_disp || remark || file_path;
+            if (hasData && (!supplier_id || !invoice_number)) {
+                incomplete = true;
+            }
+        });
+        return !incomplete;
+    };
 
     window.Collect_Supplier_Invoices = function() {
         var createRows = [];
@@ -7414,6 +7474,18 @@ $(function() {
                 $(this).selectpicker('refresh');
             }
         });
+
+        // Supplier Invoices is a button-driven section: its row inputs are
+        // disabled by the loop above, but Add Invoice / attach / remove are
+        // <button> elements (skipped above). Lock them too so a draft can't end
+        // up with a file attached to an incomplete (no supplier / no number)
+        // invoice row, which would fail the NOT NULL insert on Approve. A flag
+        // also short-circuits the dynamically-bound handlers below.
+        window.__supplierInvoiceLocked = !!on;
+        $('#add-supplier-invoice-btn').prop('disabled', !!on);
+        $('#supplier-invoices').css('opacity', on ? 0.6 : '')
+            .find('.supplier-invoice-file-attach, .supplier-invoice-file-remove, .supplier-invoice-remove')
+            .css('pointer-events', on ? 'none' : '');
     }
 
     // "presales auto select": default Sales Agent 2 (Pre Sales) to the logged-in

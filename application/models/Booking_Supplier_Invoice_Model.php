@@ -56,6 +56,13 @@ class Booking_Supplier_Invoice_Model extends CI_Model
         }
         $batch = [];
         foreach ($rows as $r) {
+            // SupplierID + InvoiceNumber are NOT NULL. A row with only a file
+            // attached (no supplier / no number — e.g. added on a parked draft
+            // where those inputs are locked) would abort the whole booking save
+            // with a NOT NULL violation, so drop it instead of inserting.
+            if (!supplier_invoice_row_is_complete($r)) {
+                continue;
+            }
             $batch[] = [
                 'BookingID'       => $booking_id,
                 'SupplierID'      => isset($r->SupplierID) ? (int) $r->SupplierID : null,
@@ -69,7 +76,9 @@ class Booking_Supplier_Invoice_Model extends CI_Model
                 'InsertDate'      => date('Y-m-d H:i:s'),
             ];
         }
-        $this->db->insert_batch('booking_supplier_invoice', $batch);
+        if (!empty($batch)) {
+            $this->db->insert_batch('booking_supplier_invoice', $batch);
+        }
     }
 
     /**

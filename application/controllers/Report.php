@@ -84,9 +84,10 @@ class Report extends MY_Controller
         $total = $this->Report_Model->Ghl_Messages_Log_Count($range['start_date'], $range['end_date'], $contact, $agent);
         $pagination = ghl_messages_log_pagination($total, (int) $this->input->get('page'), 50);
 
-        // The "Time Taken" column only makes sense when the stream is one agent's,
-        // so it (and the daily average) is computed only when an agent is filtered.
-        $show_reply_time = ($agent !== '');
+        // The "Time Taken" column only makes sense when the stream is a single
+        // coherent thread -- one agent's, or one contact's conversation -- so it
+        // (and the average) is computed when either of those filters is applied.
+        $show_reply_time = ($agent !== '' || $contact !== '');
         $avg_reply_label = '';
 
         if ($show_reply_time) {
@@ -1570,7 +1571,7 @@ class Report extends MY_Controller
 
         foreach ($rows as $row) {
             // The "Avg Response" column mirrors the card: the combined first-5 +
-            // last-5 average, duty-clipped to the 9AM-7PM Mon-Fri window.
+            // last-5 average, duty-clipped to the 7AM-10PM everyday window.
             $avgDisplayedResponseSeconds = $row['avg_response_time_seconds'];
 
             $formatted[] = array(

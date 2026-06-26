@@ -83,10 +83,10 @@ if (!function_exists('ghl_message_log_format_duration')) {
 
 if (!function_exists('ghl_message_log_within_business_hours')) {
     /**
-     * Whether a timestamp falls inside working hours: a weekday (Mon-Fri) within
-     * 09:00:00-19:00:00 inclusive. Reply time is only counted while the office is
-     * meant to be answering, so anything on a weekend or outside 9AM-7PM is "out
-     * of hours". Unparseable input is treated as out of hours.
+     * Whether a timestamp falls inside working hours: any day (everyday) within
+     * 07:00:00-22:00:00 inclusive. Reply time is only counted while the office is
+     * meant to be answering, so anything outside 7AM-10PM is "out of hours".
+     * Unparseable input is treated as out of hours.
      *
      * @param int|string $timestamp Unix seconds or a parseable 'Y-m-d H:i:s'.
      * @return bool
@@ -98,13 +98,9 @@ if (!function_exists('ghl_message_log_within_business_hours')) {
             return false;
         }
 
-        if ((int) date('N', $ts) > 5) { // 6 = Sat, 7 = Sun
-            return false;
-        }
-
         $secondsOfDay = (int) date('G', $ts) * 3600 + (int) date('i', $ts) * 60 + (int) date('s', $ts);
 
-        return $secondsOfDay >= 32400 && $secondsOfDay <= 68400; // 09:00:00 .. 19:00:00
+        return $secondsOfDay >= 25200 && $secondsOfDay <= 79200; // 07:00:00 .. 22:00:00
     }
 }
 
@@ -132,9 +128,9 @@ if (!function_exists('ghl_message_log_reply_pair_seconds')) {
     /**
      * Seconds an agent took to answer a customer: the gap from an INBOUND message
      * to the OUTBOUND reply that follows it. Counted only when the pair stays
-     * inside working hours -- both endpoints must be the same-day weekday within
-     * 09:00:00-19:00:00. A pair that leaves the window (overnight, weekend, before
-     * 9AM or after 7PM) is EXCLUDED entirely, returning null, rather than clamped
+     * inside working hours -- both endpoints must be on the same day within
+     * 07:00:00-22:00:00. A pair that leaves the window (overnight, before
+     * 7AM or after 10PM) is EXCLUDED entirely, returning null, rather than clamped
      * to the in-window slice. A reply timestamped before the inbound, or an
      * unparseable timestamp, also yields null.
      *
@@ -156,7 +152,7 @@ if (!function_exists('ghl_message_log_reply_pair_seconds')) {
         }
 
         // Same calendar day keeps the span from crossing an overnight close; the
-        // window check then guarantees both ends sit inside 9AM-7PM on a weekday.
+        // window check then guarantees both ends sit inside 7AM-10PM.
         if (date('Y-m-d', $inbound) !== date('Y-m-d', $outbound)) {
             return null;
         }

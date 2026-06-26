@@ -974,7 +974,7 @@ class Cron extends CI_Controller
 			|| in_array('--reset', $flags, true)
 			|| $forceRebuild;
 
-		$replyThreshold = 2;
+		$replyThreshold = 3;
 		$summary = array(
 			'leads_scanned' => 0,
 			'ownership_rows' => 0,

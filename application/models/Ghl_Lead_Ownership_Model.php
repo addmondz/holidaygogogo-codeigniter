@@ -93,7 +93,7 @@ class Ghl_Lead_Ownership_Model extends CI_Model
         )->result_array();
     }
 
-    public function get_reply_owners_for_leads($leadIds, $replyThreshold = 2)
+    public function get_reply_owners_for_leads($leadIds, $replyThreshold = 3)
     {
         $leadIds = array_values(array_filter(array_map('intval', (array) $leadIds), function($id) {
             return $id > 0;

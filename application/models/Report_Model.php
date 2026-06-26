@@ -95,11 +95,11 @@ class Report_Model extends CI_Model
     }
 
     // The Lead Ownership "Average Response" card + column use a dedicated
-    // response window (9AM-7PM, Mon-Fri) that is independent of the global
-    // duty-hours constants every other report relies on.
+    // response window (7AM-10PM, everyday) that is kept independent of the
+    // global duty-hours constants so it can be tuned on its own.
     private function ownership_duty_window()
     {
-        return array('days' => array(1, 2, 3, 4, 5), 'start_hour' => 9, 'end_hour' => 19);
+        return array('days' => array(1, 2, 3, 4, 5, 6, 7), 'start_hour' => 7, 'end_hour' => 22);
     }
 
     // Recomputes the first-5 / last-5 / combined average response seconds from
@@ -932,6 +932,54 @@ class Report_Model extends CI_Model
     }
 
     /**
+     * Per-agent pickup speed for a window -- one row per GHL assigned agent,
+     * not just the fastest. Same gap definition and qualification rules as
+     * Lead_Pickup_Speed_Best_Agent (raw wall-clock lead_started_at -> first
+     * agent reply, non-negative, picked-up leads only) but WITHOUT the
+     * min-sample HAVING / single-row LIMIT, so the Agent Score card can score
+     * every agent and apply its own min-sample anchor in PHP. Name resolves
+     * from ghl_users.Name, falling back to the raw UID.
+     *
+     * @param string $start_date  'Y-m-d'
+     * @param string $end_date    'Y-m-d'
+     * @return array list of { agent_id, agent_name, avg_seconds:int, n:int }
+     */
+    function Lead_Pickup_Speed_By_Agent($start_date, $end_date)
+    {
+        $gap = 'UNIX_TIMESTAMP(pl.response_1_agent_message_at) - UNIX_TIMESTAMP(pl.lead_started_at)';
+        $sql = "
+            SELECT
+                NULLIF(pl.assigned_to_user_id, '') AS agent_id,
+                COALESCE(NULLIF(gu.Name, ''), NULLIF(pl.assigned_to_user_id, '')) AS agent_name,
+                AVG({$gap}) AS avg_seconds,
+                COUNT(*) AS n
+            FROM ghl_processed_leads pl
+            LEFT JOIN ghl_users gu ON gu.UserID = NULLIF(pl.assigned_to_user_id, '')
+            WHERE NULLIF(pl.assigned_to_user_id, '') IS NOT NULL
+              AND pl.lead_started_at >= ? AND pl.lead_started_at <= ?
+              AND pl.response_1_agent_message_at IS NOT NULL
+              AND pl.lead_started_at IS NOT NULL
+              AND ({$gap}) >= 0
+            GROUP BY agent_id, agent_name
+        ";
+        $rows = $this->db->query($sql, array(
+            $start_date . ' 00:00:00',
+            $end_date . ' 23:59:59',
+        ))->result_array();
+
+        $out = array();
+        foreach ($rows as $r) {
+            $out[] = array(
+                'agent_id'    => $r['agent_id'],
+                'agent_name'  => $r['agent_name'],
+                'avg_seconds' => (int) round((float) $r['avg_seconds']),
+                'n'           => (int) $r['n'],
+            );
+        }
+        return $out;
+    }
+
+    /**
      * Per-agent lead counts for the three "Leads" card windows (Today / Week /
      * Month) in a single conditional-SUM pass. Powers the OWNER-only
      * "Leads by Agent" table — the same new-lead total as the Leads card, but
@@ -1122,7 +1170,7 @@ class Report_Model extends CI_Model
         $convertedLeads = !empty($row['converted_leads']) ? (int) $row['converted_leads'] : 0;
 
         // Override the wall-clock response averages with the dedicated
-        // 9AM-7PM Mon-Fri duty-window figures, recomputed from the slot stamps.
+        // 7AM-10PM everyday duty-window figures, recomputed from the slot stamps.
         $duty = $this->ownership_response_slot_rows($where, null);
         $dutyAll = isset($duty['__all__']) ? $duty['__all__'] : array('first' => null, 'recent' => null, 'combined' => null);
 
@@ -1176,7 +1224,7 @@ class Report_Model extends CI_Model
         ";
 
         $rows = $this->db->query($sql, $where['params'])->result_array();
-        // Per-owner 9AM-7PM Mon-Fri duty-window response averages, recomputed
+        // Per-owner 7AM-10PM everyday duty-window response averages, recomputed
         // from the slot timestamps to override the stored wall-clock figures.
         $duty = $this->ownership_response_slot_rows($where, 'owner_user_id');
 
@@ -1533,7 +1581,7 @@ class Report_Model extends CI_Model
 
     /**
      * "Lead Responded" per owner: the DISTINCT leads an owner replied to whose
-     * qualifying outbound reply lands on a weekday between 09:00 and 19:00. Many
+     * qualifying outbound reply lands on any day between 07:00 and 22:00. Many
      * replies (incl. more than three) to the same lead collapse to a single
      * count via COUNT(DISTINCT processed_lead_id). Shares the reply-activity
      * universe (is_reply_owner = 1) and owner/team filters with Transfer Out so
@@ -1587,18 +1635,17 @@ class Report_Model extends CI_Model
     }
 
     /**
-     * SQL predicate restricting a timestamp expression to working hours: a
-     * weekday (Mon-Fri) between 09:00:00 and 19:00:00 inclusive. Mirrors
+     * SQL predicate restricting a timestamp expression to working hours: any day
+     * (everyday) between 07:00:00 and 22:00:00 inclusive. Mirrors
      * ghl_message_log_within_business_hours() so the dashboard only counts
-     * replies made while the office is meant to be answering. DAYOFWEEK() returns
-     * 1=Sunday..7=Saturday, so 2..6 is Mon-Fri.
+     * replies made while the office is meant to be answering.
      *
      * @param string $expr A safe SQL timestamp expression (column/derived value).
      * @return string
      */
     private function lead_reply_business_hours_sql($expr)
     {
-        return "(DAYOFWEEK({$expr}) BETWEEN 2 AND 6 AND TIME({$expr}) BETWEEN '09:00:00' AND '19:00:00')";
+        return "(TIME({$expr}) BETWEEN '07:00:00' AND '22:00:00')";
     }
 
     private function Lead_Reply_Activity_Assigned_New_Leads_Summary($filters = array())
@@ -1728,7 +1775,7 @@ class Report_Model extends CI_Model
         $start = !empty($filters['start_date']) ? $filters['start_date'] . ' 00:00:00' : '1970-01-01 00:00:00';
         $end = !empty($filters['end_date']) ? $filters['end_date'] . ' 23:59:59' : '9999-12-31 23:59:59';
 
-        // A lead only qualifies when its 3rd outbound message (reply_created_at) lands inside
+        // A lead only qualifies when its 4th outbound message (reply_created_at) lands inside
         // the requested window, which means the conversation MUST have an owner outbound message
         // in that window. Pre-filtering to those leads lets MySQL skip aggregating the entire
         // ghl_lead_ownership / ghl_messages history just to discard it in the outer WHERE.
@@ -1754,7 +1801,7 @@ class Report_Model extends CI_Model
                     glo.assigned_to_user_id,
                     {$assignmentDate} AS assigned_activity_at,
                     SUBSTRING_INDEX(
-                        SUBSTRING_INDEX(GROUP_CONCAT(gm.{$messageTimeColumn} ORDER BY gm.{$messageTimeColumn} ASC, gm.id ASC), ',', 3),
+                        SUBSTRING_INDEX(GROUP_CONCAT(gm.{$messageTimeColumn} ORDER BY gm.{$messageTimeColumn} ASC, gm.id ASC), ',', 4),
                         ',',
                         -1
                     ) AS reply_created_at
@@ -1779,7 +1826,7 @@ class Report_Model extends CI_Model
                     glo.is_assigned_owner,
                     glo.assigned_to_user_id,
                     assigned_activity_at
-                HAVING COUNT(*) > 2
+                HAVING COUNT(*) > 3
             ) reply_created
             WHERE reply_created.reply_created_at BETWEEN ? AND ?
               AND NOT (
@@ -1894,7 +1941,7 @@ class Report_Model extends CI_Model
                 SELECT
                     'Reply-Created Lead' AS activity_type,
                     SUBSTRING_INDEX(
-                        SUBSTRING_INDEX(GROUP_CONCAT(gm.{$messageTimeColumn} ORDER BY gm.{$messageTimeColumn} ASC, gm.id ASC), ',', 3),
+                        SUBSTRING_INDEX(GROUP_CONCAT(gm.{$messageTimeColumn} ORDER BY gm.{$messageTimeColumn} ASC, gm.id ASC), ',', 4),
                         ',',
                         -1
                     ) AS activity_at,
@@ -1910,7 +1957,7 @@ class Report_Model extends CI_Model
                     COALESCE(NULLIF(assigned_gu.Name, ''), NULLIF(glo.assigned_to_user_id, ''), 'Unassigned') AS assigned_name,
                     glo.lead_started_at,
                     SUBSTRING_INDEX(
-                        SUBSTRING_INDEX(GROUP_CONCAT(gm.{$messageTimeColumn} ORDER BY gm.{$messageTimeColumn} ASC, gm.id ASC), ',', 3),
+                        SUBSTRING_INDEX(GROUP_CONCAT(gm.{$messageTimeColumn} ORDER BY gm.{$messageTimeColumn} ASC, gm.id ASC), ',', 4),
                         ',',
                         -1
                     ) AS reply_created_at,
@@ -1962,7 +2009,7 @@ class Report_Model extends CI_Model
                     glo.is_converted,
                     glo.booking_id,
                     b.BookingNumber
-                HAVING COUNT(*) > 2
+                HAVING COUNT(*) > 3
             ) reply_created
             WHERE reply_created.reply_created_at BETWEEN ? AND ?
               AND NOT (
@@ -2512,7 +2559,7 @@ class Report_Model extends CI_Model
      * filtered range -- NOT just the visible page. Measures how fast the agent
      * answers a customer: each INBOUND message answered by the next OUTBOUND
      * message in the same conversation, counting only pairs that stay inside
-     * working hours (weekday 9AM-7PM); pairs that leave the window are excluded.
+     * working hours (everyday 7AM-10PM); pairs that leave the window are excluded.
      *
      * Messages are pulled grouped by conversation and ascending in time so the
      * adjacent inbound->outbound pairing in ghl_message_log_average_reply_seconds()

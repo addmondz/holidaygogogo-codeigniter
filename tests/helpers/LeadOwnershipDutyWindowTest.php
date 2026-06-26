@@ -4,9 +4,9 @@
  *
  * Locks the Lead Ownership "Average Response" card + column behaviour:
  * the avg-response figures are recomputed at query time from the first-5 and
- * last-5 reply slots, restricted to a DEDICATED duty window of 9AM-7PM,
- * Monday-Friday (independent of the global 8AM-10PM Mon-Sat constants used
- * by every other report).
+ * last-5 reply slots, restricted to a DEDICATED duty window of 7AM-10PM,
+ * everyday (kept independent of the global constants so it can be tuned
+ * on its own).
  *
  * Two things are locked here:
  *   1. calculate_duty_response_seconds() honours an optional $opts override
@@ -15,10 +15,10 @@
  *      - first   = the first-5 reply slots
  *      - recent  = the most-recent-5 reply slots (counted on their own)
  *      - combined = first-5 merged with recent-5, deduped by agent_message_id
- *      every surviving gap duty-adjusted through the 9AM-7PM Mon-Fri window.
+ *      every surviving gap duty-adjusted through the 7AM-10PM everyday window.
  *
  * Calendar anchors:
- *   2026-05-20 (Wed), 2026-05-22 (Fri), 2026-05-23 (Sat)
+ *   2026-05-20 (Wed), 2026-05-23 (Sat), 2026-05-24 (Sun)
  */
 
 if (!defined('BASEPATH')) {
@@ -27,8 +27,8 @@ if (!defined('BASEPATH')) {
 
 require_once __DIR__ . '/../../application/helpers/duty_hours_helper.php';
 
-// The Lead Ownership window: weekdays only, 09:00 inclusive -> 19:00 exclusive.
-$OWNERSHIP_WINDOW = array('days' => array(1, 2, 3, 4, 5), 'start_hour' => 9, 'end_hour' => 19);
+// The Lead Ownership window: everyday, 07:00 inclusive -> 22:00 exclusive.
+$OWNERSHIP_WINDOW = array('days' => array(1, 2, 3, 4, 5, 6, 7), 'start_hour' => 7, 'end_hour' => 22);
 
 function assert_eq($label, $expected, $actual) {
     if ($expected === $actual) {
@@ -108,20 +108,20 @@ function ownership_row(array $responses) {
 
 // ---- Part 1: calculate_duty_response_seconds() honours $opts override ----
 
-assert_eq('win 09:00 start inclusive', 3600,
-    calculate_duty_response_seconds('2026-05-20 09:00:00', '2026-05-20 10:00:00', $OWNERSHIP_WINDOW));
-assert_eq('win clips before 09:00', 1800,
-    calculate_duty_response_seconds('2026-05-20 08:30:00', '2026-05-20 09:30:00', $OWNERSHIP_WINDOW));
-assert_eq('win clips after 19:00', 1800,
-    calculate_duty_response_seconds('2026-05-20 18:30:00', '2026-05-20 19:30:00', $OWNERSHIP_WINDOW));
-assert_eq('win Fri included', 3600,
-    calculate_duty_response_seconds('2026-05-22 10:00:00', '2026-05-22 11:00:00', $OWNERSHIP_WINDOW));
-assert_eq('win Sat excluded', 0,
+assert_eq('win 07:00 start inclusive', 3600,
+    calculate_duty_response_seconds('2026-05-20 07:00:00', '2026-05-20 08:00:00', $OWNERSHIP_WINDOW));
+assert_eq('win clips before 07:00', 1800,
+    calculate_duty_response_seconds('2026-05-20 06:30:00', '2026-05-20 07:30:00', $OWNERSHIP_WINDOW));
+assert_eq('win clips after 22:00', 1800,
+    calculate_duty_response_seconds('2026-05-20 21:30:00', '2026-05-20 22:30:00', $OWNERSHIP_WINDOW));
+assert_eq('win Sun included', 3600,
+    calculate_duty_response_seconds('2026-05-24 10:00:00', '2026-05-24 11:00:00', $OWNERSHIP_WINDOW));
+assert_eq('win Sat included', 7200,
     calculate_duty_response_seconds('2026-05-23 10:00:00', '2026-05-23 12:00:00', $OWNERSHIP_WINDOW));
-assert_eq('win overnight Wed->Thu', 7200,
+assert_eq('win overnight Wed->Thu', 25200,
     calculate_duty_response_seconds('2026-05-20 18:00:00', '2026-05-21 10:00:00', $OWNERSHIP_WINDOW));
 
-// Backward compatibility: no $opts -> global 8AM-10PM Mon-Sat unchanged.
+// Backward compatibility: no $opts -> global 7AM-10PM everyday unchanged.
 assert_eq('global default 08:00 start', 3600,
     calculate_duty_response_seconds('2026-05-20 08:00:00', '2026-05-20 09:00:00'));
 assert_eq('global default Sat included', 7200,
@@ -160,22 +160,22 @@ assert_eq('long first', 60, $long['first']);
 assert_eq('long recent', 120, $long['recent']);
 assert_eq('long combined', 90, $long['combined']);
 
-// After-hours gap is duty-clipped through the 19:00 boundary on the merged value.
-// m1 on-duty 60s; m2 spans 18:30->19:30 -> only 1800s on-duty. 2-reply lead, so
+// After-hours gap is duty-clipped through the 22:00 boundary on the merged value.
+// m1 on-duty 60s; m2 spans 21:30->22:30 -> only 1800s on-duty. 2-reply lead, so
 // first/recent share both. combined avg(60+1800)/2 = 930.
 $clip = reduce_ownership_duty_avgs(array(ownership_row(array(
     array('m1', '2026-05-20 09:59:00', '2026-05-20 10:00:00',   60),
-    array('m2', '2026-05-20 18:30:00', '2026-05-20 19:30:00', 3600),
+    array('m2', '2026-05-20 21:30:00', '2026-05-20 22:30:00', 3600),
 ))), $OWNERSHIP_WINDOW);
 assert_eq('clip combined', 930, $clip['combined']);
 
-// A Saturday-only lead falls entirely outside the Mon-Fri window -> 0s gaps.
+// A Saturday lead now falls inside the everyday window -> gaps count in full.
 $sat = reduce_ownership_duty_avgs(array(ownership_row(array(
     array('m1', '2026-05-23 10:00:00', '2026-05-23 10:30:00', 1800),
     array('m2', '2026-05-23 11:00:00', '2026-05-23 11:30:00', 1800),
 ))), $OWNERSHIP_WINDOW);
-assert_eq('sat first', 0, $sat['first']);
-assert_eq('sat combined', 0, $sat['combined']);
+assert_eq('sat first', 1800, $sat['first']);
+assert_eq('sat combined', 1800, $sat['combined']);
 
 // Empty input -> all NULL.
 $empty = reduce_ownership_duty_avgs(array(), $OWNERSHIP_WINDOW);

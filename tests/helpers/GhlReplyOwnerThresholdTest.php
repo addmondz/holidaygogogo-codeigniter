@@ -4,9 +4,9 @@
  *
  * Locks the reply-owner threshold and the assigned-vs-reply dashboard rule.
  *
- * Reply-owner rule: an agent who sends MORE THAN 2 outbound replies in a lead's
+ * Reply-owner rule: an agent who sends MORE THAN 3 outbound replies in a lead's
  * window is a reply owner. So:
- *   1 reply -> No,  2 replies -> No,  3 replies -> Yes,  4+ -> Yes.
+ *   1-2 replies -> No,  3 replies -> No,  4 replies -> Yes,  5+ -> Yes.
  *
  * Dashboard rule (no double counting):
  *   - The assigned owner counts as assigned_lead = 1 and is NEVER also counted
@@ -15,7 +15,7 @@
  *   - A non-assigned agent at/below the threshold counts as nothing.
  *
  * This mirrors:
- *   - Ghl_Lead_Ownership_Model::get_reply_owners_for_leads  (HAVING COUNT(*) > 2)
+ *   - Ghl_Lead_Ownership_Model::get_reply_owners_for_leads  (HAVING COUNT(*) > 3)
  *   - Report_Model dashboard SUM(CASE WHEN is_assigned_owner = 0
  *                                       AND is_reply_owner = 1 ...)
  *
@@ -28,7 +28,7 @@ if (!defined('BASEPATH')) {
     define('BASEPATH', __DIR__);
 }
 
-const REPLY_THRESHOLD = 2; // "more than N" replies => reply owner (so 3+)
+const REPLY_THRESHOLD = 3; // "more than N" replies => reply owner (so 4+)
 
 $pdo = new PDO('sqlite::memory:');
 $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -37,14 +37,15 @@ $pdo->exec("CREATE TABLE messages (lead_id INT, user_id TEXT, direction TEXT)");
 
 // Lead 1 assigned to agent-A.
 //   agent-A: assignee + 5 replies   -> assigned only (never double-counted)
-//   agent-B: not assigned + 3 replies -> reply owner (above threshold)
-//   agent-C: not assigned + 2 replies -> nothing (AT threshold, not above)
+//   agent-B: not assigned + 4 replies -> reply owner (above threshold)
+//   agent-C: not assigned + 3 replies -> nothing (AT threshold, not above)
 //   agent-D: not assigned + 1 reply   -> nothing (below threshold)
 $rows = array(
     array(1, 'agent-A', 'outbound'), array(1, 'agent-A', 'outbound'), array(1, 'agent-A', 'outbound'),
     array(1, 'agent-A', 'outbound'), array(1, 'agent-A', 'outbound'),
     array(1, 'agent-B', 'outbound'), array(1, 'agent-B', 'outbound'), array(1, 'agent-B', 'outbound'),
-    array(1, 'agent-C', 'outbound'), array(1, 'agent-C', 'outbound'),
+    array(1, 'agent-B', 'outbound'),
+    array(1, 'agent-C', 'outbound'), array(1, 'agent-C', 'outbound'), array(1, 'agent-C', 'outbound'),
     array(1, 'agent-D', 'outbound'),
     array(1, 'cust',    'inbound'),  // inbound must be ignored by the reply count
 );
@@ -93,8 +94,8 @@ function assert_eq($label, $expected, $actual) {
 
 // --- threshold behaviour ---
 assert_eq('agent-A (assignee, 5 replies) is a raw reply owner', true, isset($replyOwnerIds['agent-A']));
-assert_eq('agent-B (3 replies) is above threshold',             true, isset($replyOwnerIds['agent-B']));
-assert_eq('agent-C (2 replies) is NOT above threshold',         false, isset($replyOwnerIds['agent-C']));
+assert_eq('agent-B (4 replies) is above threshold',             true, isset($replyOwnerIds['agent-B']));
+assert_eq('agent-C (3 replies) is NOT above threshold',         false, isset($replyOwnerIds['agent-C']));
 assert_eq('agent-D (1 reply) is NOT above threshold',           false, isset($replyOwnerIds['agent-D']));
 
 // --- dashboard counting (no double counting) ---
@@ -110,12 +111,12 @@ assert_eq('agent-B reply_lead', 1, $rB);
 assert_eq('agent-C has no ownership row', false, isset($owners['agent-C']));
 assert_eq('agent-D has no ownership row', false, isset($owners['agent-D']));
 
-// --- boundary: exactly 2 replies by a non-assignee must NOT become a reply owner ---
-$two = $pdo->prepare("SELECT COUNT(*) FROM (
+// --- boundary: exactly 3 replies by a non-assignee must NOT become a reply owner ---
+$three = $pdo->prepare("SELECT COUNT(*) FROM (
     SELECT user_id FROM messages WHERE lead_id=1 AND direction='outbound'
     GROUP BY user_id HAVING COUNT(*) > CAST(? AS INTEGER)
 ) t WHERE user_id = 'agent-C'");
-$two->execute(array(REPLY_THRESHOLD));
-assert_eq('boundary: exactly 2 replies excluded', 0, (int) $two->fetchColumn());
+$three->execute(array(REPLY_THRESHOLD));
+assert_eq('boundary: exactly 3 replies excluded', 0, (int) $three->fetchColumn());
 
 echo "\nAll assertions passed.\n";

@@ -79,6 +79,37 @@ function supplier_invoice_is_allowed_file($filename)
 }
 
 /**
+ * Whether a posted supplier-invoice row carries the columns the DB requires for
+ * an INSERT. `booking_supplier_invoice.SupplierID` and `InvoiceNumber` are both
+ * NOT NULL, so a row missing either cannot be persisted.
+ *
+ * The booking form lets staff attach a file to a brand-new invoice row before
+ * picking a supplier / typing an invoice number (and on a parked draft the
+ * supplier + number inputs are locked entirely). Such a row would reach
+ * Booking_Supplier_Invoice_Model::Create() with SupplierID = null and blow up
+ * the whole booking save with a NOT NULL violation — surfacing to the user as
+ * "Booking Record … Could Not Be Updated". Callers use this to drop incomplete
+ * rows instead of attempting an invalid insert.
+ *
+ * Accepts either an array or an object row (the model decodes posted rows to
+ * objects via json_decode(json_encode())).
+ */
+function supplier_invoice_row_is_complete($row)
+{
+    if (is_array($row)) {
+        $supplier_id    = isset($row['SupplierID']) ? $row['SupplierID'] : null;
+        $invoice_number = isset($row['InvoiceNumber']) ? $row['InvoiceNumber'] : '';
+    } elseif (is_object($row)) {
+        $supplier_id    = isset($row->SupplierID) ? $row->SupplierID : null;
+        $invoice_number = isset($row->InvoiceNumber) ? $row->InvoiceNumber : '';
+    } else {
+        return false;
+    }
+
+    return (int) $supplier_id > 0 && trim((string) $invoice_number) !== '';
+}
+
+/**
  * Map an attachment filename to a Content-Type for inline streaming. Falls back
  * to application/octet-stream for anything not in the whitelist.
  */
