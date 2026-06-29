@@ -88,6 +88,9 @@
     #booking_summary_cards .sc-pos-1  { order: 1; }
     #booking_summary_cards .sc-pos-2  { order: 2; }
     #booking_summary_cards .sc-pos-3  { order: 3; }
+    /* "Daily Handle Lead Count" sits immediately after "My Leads" (both order 3,
+       tie broken by source order so it follows My Leads in the DOM). */
+    #booking_summary_cards .sc-pos-3b { order: 3; }
     #booking_summary_cards .sc-pos-4  { order: 4; }
     #booking_summary_cards .sc-pos-5  { order: 5; }
     #booking_summary_cards .sc-pos-6  { order: 6; }
@@ -255,6 +258,18 @@
                         </div>
                         <div class="summary-sub">New leads assigned to you, by lead creation date.</div>
                         <div class="summary-sub summary-best" id="sc-tc-leads-best">Best: —</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 sc-pos-3b">
+                <div class="card card-custom">
+                    <div class="card-header border-0 summary-card-header" style="background-color:#D7E2F2;">
+                        <h3>Daily Handle Lead Count</h3>
+                        <i id="pop-tc-handle" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>What it shows:</strong> The number of leads you handled <strong>today</strong> &mdash; the &ldquo;Lead Responded&rdquo; column from the Lead Reply Activity dashboard, scoped to you.<br><br><strong>How it&rsquo;s counted:</strong> the distinct leads you replied to today, with your reply landing between 7:00am and 10:00pm. Replying many times to the same lead still counts that lead once.<br><br><strong>Note:</strong> if your account isn&rsquo;t linked to a GHL user, this card shows zero."></i>
+                    </div>
+                    <div class="card-body summary-card-body">
+                        <div class="summary-value" id="sc-tc-handle-value">...</div>
+                        <div class="summary-sub">Distinct leads you replied to today (Lead Responded), counted 7am&ndash;10pm. Matches the Lead Reply Activity dashboard.</div>
                     </div>
                 </div>
             </div>
@@ -1196,6 +1211,9 @@ $(function() {
             setText('sc-tc-leads-week',  c.tc_leads_dwm.week);
             setText('sc-tc-leads-month', c.tc_leads_dwm.month);
             setBestFigure('sc-tc-leads-best', c.tc_leads_dwm.best);
+        }
+        if(c.tc_handle_lead_today) {
+            setText('sc-tc-handle-value', c.tc_handle_lead_today.value);
         }
         if(c.tc_response_time_dwm) {
             setText('sc-tc-resp-day',   c.tc_response_time_dwm.day);

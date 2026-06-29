@@ -1190,6 +1190,21 @@ class Booking extends MY_Controller
 					'week'  => (int)$mine_week['total_leads'],
 					'month' => (int)$mine_month['total_leads'],
 				);
+
+				// "Daily Handle Lead Count" card. Today's "Lead Responded" for the
+				// logged-in TC, reusing the Lead Reply Activity dashboard query so
+				// the figure matches that report's Lead Responded column exactly.
+				// Filtered to the TC's own GHL uid(s), so every returned row is the
+				// TC's -- sum the distinct-lead counts across any linked uids.
+				$handle_rows = $this->Report_Model->Lead_Reply_Activity_By_Agent(array(
+					'owner_user_id' => $my_ghl_uids,
+					'start_date'    => $today, 'end_date' => $today,
+				));
+				$handle_today = 0;
+				foreach($handle_rows as $hr) {
+					$handle_today += (int)$hr['lead_responded'];
+				}
+				$cards['tc_handle_lead_today'] = array('value' => $handle_today);
 				// "Avg Reply Time to Inbound" now uses Message-Log logic: every
 				// inbound->outbound reply pair in the agent's threads (in working
 				// hours, same day) is averaged, windowed by when the REPLY was
@@ -1226,6 +1241,7 @@ class Booking extends MY_Controller
 				$cards['tc_leads_dwm'] = array(
 					'day' => 0, 'week' => 0, 'month' => 0,
 				);
+				$cards['tc_handle_lead_today'] = array('value' => 0);
 				$cards['tc_response_time_dwm'] = array(
 					'day' => '-', 'week' => '-', 'month' => '-',
 					'day_seconds' => null, 'week_seconds' => null, 'month_seconds' => null,
