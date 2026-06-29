@@ -11,12 +11,16 @@ class Report extends MY_Controller
 		parent::__construct();
 		$this->load->model('Report_Model');
 		$this->load->model('Universal_Model');
-		// Message Log has its own 'ML' permission, independent of VR (VIEW
-		// REPORT). Let its routes past the VR gate; each method enforces
-		// ML/owner itself.
-		$message_log_methods = array('Ghl_Message_Log', 'Ghl_Message_Log_Export');
-		if(!in_array($this->router->method, $message_log_methods)
-			&& !in_array('VR', $this->session->access_control)) {
+		$this->load->helper('report_access');
+		// Access gate. Message Log carries its own 'ML' permission; sales agents
+		// (level 20) may open the Lead Reply Activity dashboard + hourly chart
+		// without VIEW REPORT ('VR') -- their data is self-scoped downstream.
+		// Everyone else needs 'VR'. See report_access_helper.php.
+		if(report_route_requires_redirect(
+			$this->router->method,
+			$this->session->level,
+			$this->session->access_control
+		)) {
 			redirect('Dashboard');
 		}
 	}
@@ -291,6 +295,152 @@ class Report extends MY_Controller
                 'rows' => $payload['rows'],
                 'updated_at' => $payload['updated_at'],
             )));
+    }
+
+    /**
+     * Stream the Lead Reply Activity figures for a date RANGE as an .xlsx.
+     *
+     * The dashboard itself is daily; here we walk each day in the chosen range,
+     * run the same daily by-agent query once per day, and lay the results out
+     * as owner rows with a (Responded / Transfer Out / Handling) column group
+     * per day -- so a manager can scan a whole month in one sheet.
+     */
+    function Lead_Reply_Activity_Export()
+    {
+        $this->load->helper('lead_reply_export');
+
+        // Reuse the dashboard filters (owner / team lead / agent restriction),
+        // then override the date window with the export's own range picker.
+        $baseFilters = $this->lead_reply_activity_filters();
+
+        $exportRange = $this->parse_report_date_range(trim((string) $this->input->get('export_range')), true);
+        $dates = lead_reply_export_dates($exportRange['start_date'], $exportRange['end_date'], 92);
+
+        if (empty($dates)) {
+            show_error('Please choose a valid export date range.', 400, 'Lead Reply Activity Export');
+            return;
+        }
+
+        $startDate = $dates[0];
+        $endDate = $dates[count($dates) - 1];
+
+        // Run the daily by-agent query once per day, formatted exactly as the
+        // on-screen table so the numbers match what users see for that date.
+        $perDayRows = array();
+        foreach ($dates as $date) {
+            $dayFilters = $baseFilters;
+            $dayFilters['reply_date'] = date('d/m/Y', strtotime($date));
+            $dayFilters['start_date'] = $date;
+            $dayFilters['end_date'] = $date;
+            $perDayRows[$date] = $this->format_lead_reply_activity_rows(
+                $this->Report_Model->Lead_Reply_Activity_By_Agent($dayFilters)
+            );
+        }
+
+        $matrix = lead_reply_export_build_matrix($dates, $perDayRows);
+
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Lead Reply Activity');
+        $spreadsheet->getProperties()->setCreator('HolidayGoGoGo');
+
+        $stringFromCol = function ($index) {
+            return \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($index);
+        };
+
+        // --- Header rows ---------------------------------------------------
+        // Dates run DOWN the left as rows; each owner is a column group across
+        // the top. Row 1: owner-name group header (merged over 3 columns).
+        // Row 2: the Responded / Transfer Out / Handling sub-headers.
+        $sheet->setCellValue('A1', 'Date');
+        $sheet->mergeCells('A1:A2');
+
+        $owners = $matrix['owners'];
+        $colIndex = 2; // first owner's first metric column (B)
+        foreach ($owners as &$owner) {
+            $startCol = $stringFromCol($colIndex);
+            $endCol = $stringFromCol($colIndex + 2);
+            $sheet->setCellValue($startCol . '1', $owner['owner_name']);
+            $sheet->mergeCells($startCol . '1:' . $endCol . '1');
+            $sheet->setCellValue($stringFromCol($colIndex) . '2', 'Responded');
+            $sheet->setCellValue($stringFromCol($colIndex + 1) . '2', 'Transfer Out');
+            $sheet->setCellValue($stringFromCol($colIndex + 2) . '2', 'Handling');
+            $owner['_col'] = $colIndex; // remember where this owner starts
+            $colIndex += 3;
+        }
+        unset($owner);
+
+        $lastColIdx = max(2, $colIndex - 1);
+        $lastCol = $stringFromCol($lastColIdx);
+
+        // Style the two header rows.
+        $headerRange = 'A1:' . $lastCol . '2';
+        $sheet->getStyle($headerRange)->getFill()
+            ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+            ->getStartColor()->setARGB('FF2F506F');
+        $sheet->getStyle($headerRange)->getFont()->getColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_WHITE);
+        $sheet->getStyle($headerRange)->getFont()->setBold(true);
+        $sheet->getStyle($headerRange)->getAlignment()
+            ->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER)
+            ->setVertical(\PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER);
+
+        // --- Body ----------------------------------------------------------
+        $rowNum = 3;
+        if (empty($owners)) {
+            $sheet->setCellValue('A3', 'No lead reply activity for the selected range and filters.');
+        } else {
+            // One row per date; each owner's trio of columns filled from the matrix.
+            foreach ($dates as $date) {
+                $sheet->setCellValueExplicit('A' . $rowNum, strtoupper(date('D, d M Y', strtotime($date))), \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+                foreach ($owners as $owner) {
+                    $cell = isset($matrix['lookup'][$owner['owner_user_id']][$date])
+                        ? $matrix['lookup'][$owner['owner_user_id']][$date]
+                        : array(0, 0, 0);
+                    $col = $owner['_col'];
+                    $sheet->setCellValue($stringFromCol($col) . $rowNum, $cell[0]);
+                    $sheet->setCellValue($stringFromCol($col + 1) . $rowNum, $cell[1]);
+                    $sheet->setCellValue($stringFromCol($col + 2) . $rowNum, $cell[2]);
+                }
+                $rowNum++;
+            }
+
+            // Trailing "RANGE TOTAL" row so each owner column still reads at a glance.
+            $totalRow = $rowNum;
+            $sheet->setCellValue('A' . $totalRow, 'RANGE TOTAL');
+            foreach ($owners as $owner) {
+                $col = $owner['_col'];
+                $handlingTotal = 0;
+                if (isset($matrix['lookup'][$owner['owner_user_id']])) {
+                    foreach ($matrix['lookup'][$owner['owner_user_id']] as $cell) {
+                        $handlingTotal += $cell[2];
+                    }
+                }
+                $sheet->setCellValue($stringFromCol($col) . $totalRow, (int) $owner['total_responded']);
+                $sheet->setCellValue($stringFromCol($col + 1) . $totalRow, (int) $owner['total_transfer_out']);
+                $sheet->setCellValue($stringFromCol($col + 2) . $totalRow, (int) $handlingTotal);
+            }
+            $sheet->getStyle('A' . $totalRow . ':' . $lastCol . $totalRow)->getFont()->setBold(true);
+            $sheet->getStyle('A' . $totalRow . ':' . $lastCol . $totalRow)->getBorders()->getTop()
+                ->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+
+            // Right-align every numeric column.
+            $sheet->getStyle($stringFromCol(2) . '3:' . $lastCol . $totalRow)
+                ->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_RIGHT);
+        }
+
+        $sheet->getColumnDimension('A')->setWidth(18);
+        for ($i = 2; $i <= $lastColIdx; $i++) {
+            $sheet->getColumnDimension($stringFromCol($i))->setWidth(13);
+        }
+        // Freeze the date column + the two header rows.
+        $sheet->freezePane('B3');
+
+        $filename = lead_reply_export_filename($startDate, $endDate);
+        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        header('Content-Disposition: attachment;filename="' . $filename . '"');
+        header('Cache-Control: max-age=0');
+        $writer = \PhpOffice\PhpSpreadsheet\IOFactory::createWriter($spreadsheet, 'Xlsx');
+        $writer->save('php://output');
     }
 
     function Lead_Reply_Activity_Dashboard_Details()
@@ -1198,6 +1348,12 @@ class Report extends MY_Controller
     {
         if ((string) $this->session->level === '10') {
             return null;
+        }
+        // Sales agents (level 20) see only their OWN reply activity: resolve
+        // their own GHL identity (mapping table first, email fallback) rather
+        // than the broader "agents this admin may view" set team leads get.
+        if ((string) $this->session->level === '20') {
+            return $this->Report_Model->Resolve_Self_Ghl_Agents($this->session->admin_id);
         }
         return $this->Report_Model->Get_Allowed_Lead_Dashboard_Agents($this->session->admin_id);
     }

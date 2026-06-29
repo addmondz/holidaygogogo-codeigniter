@@ -286,7 +286,7 @@ $is_dev_env = ($app_env !== 'prod');
 									</div>
 								</li>
 							<?php } ?>
-							<?php if(in_array('VR', $this->session->access_control) || in_array('ML', $this->session->access_control) || $this->session->level == 10) { ?>
+							<?php if(in_array('VR', $this->session->access_control) || in_array('ML', $this->session->access_control) || $this->session->level == 10 || $this->session->level == 20) { ?>
 									<li class="menu-item menu-item-submenu <?php if($this->router->class == 'Report') { echo 'menu-item-active menu-item-open'; } ?>">
 										<a href="javascript:;" class="menu-link menu-toggle">
 											<span class="svg-icon menu-icon">
@@ -394,7 +394,9 @@ $is_dev_env = ($app_env !== 'prod');
 															<span class="menu-text">Lead Ownership Data</span>
 														</a>
 													</li> -->
-													<li class="menu-item <?php if($this->router->method == 'Lead_Reply_Activity_Dashboard') { echo 'menu-item-active'; } ?>">
+													<?php } ?>
+												<?php if($this->session->level == 10 || $this->session->level == 20) { ?>
+												<li class="menu-item <?php if($this->router->method == 'Lead_Reply_Activity_Dashboard') { echo 'menu-item-active'; } ?>">
 														<a href="<?php echo base_url('Report/Lead_Reply_Activity_Dashboard'); ?>" class="menu-link">
 															<i class="menu-bullet menu-bullet-dot">
 																<span></span>

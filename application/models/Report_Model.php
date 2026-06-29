@@ -2350,6 +2350,37 @@ class Report_Model extends CI_Model
         return array_map(function($r) { return $r->GhlUserID; }, $rows);
     }
 
+    /**
+     * Resolve an admin to their OWN GHL UserID(s): the admin_lead_dashboard_agents
+     * mapping is canonical, with an admin.Email <-> ghl_users.Email match as a
+     * fallback for admins whose mapping hasn't been configured yet. Used to
+     * self-scope a sales agent's Lead Reply Activity dashboard to themselves
+     * (mirrors the sales-agent summary-card resolver in Booking.php).
+     *
+     * @param int $admin_id
+     * @return array list of GHL UserID strings (empty when no identity exists)
+     */
+    function Resolve_Self_Ghl_Agents($admin_id)
+    {
+        $admin_id = (int) $admin_id;
+        if ($admin_id <= 0) return array();
+
+        $mapped = $this->Get_Allowed_Lead_Dashboard_Agents($admin_id);
+        $mapped = array_values(array_filter(array_map('strval', $mapped), 'strlen'));
+        if (!empty($mapped)) return $mapped;
+
+        $rows = $this->db->query(
+            "SELECT gu.UserID
+             FROM admin a
+             INNER JOIN ghl_users gu ON LOWER(TRIM(gu.Email)) = LOWER(TRIM(a.Email))
+             WHERE a.AdminID = ?",
+            array($admin_id)
+        )->result();
+        return array_values(array_filter(array_map(function($r) {
+            return (string) $r->UserID;
+        }, $rows), 'strlen'));
+    }
+
     function Lead_Data_Total_Count($filters = array())
     {
         $where = $this->build_lead_dashboard_where_clause($filters);

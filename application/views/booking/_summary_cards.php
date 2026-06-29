@@ -39,6 +39,38 @@
     #booking_summary_cards .summary-best .best-name { color:#3F4254; }
     #booking_summary_cards .summary-best .best-name.is-you { color:#6082B6; }
     #booking_summary_cards .summary-best .best-fig { color:#2F6F4F; font-weight:700; background:#E5F3EC; padding:1px 7px; border-radius:4px; }
+    /* Agent Score card: score/rank on the left, Top-5 leaderboard on the right. */
+    #booking_summary_cards .agent-score-split { display:flex; gap:16px; align-items:flex-start; }
+    #booking_summary_cards .agent-score-main { flex:1 1 0; min-width:0; }
+    #booking_summary_cards .agent-score-board { flex:1 1 0; min-width:0; border-left:1px solid #EBEDF3; padding-left:16px; }
+    #booking_summary_cards .agent-score-board-title { font-size:11px; color:#7E8299; text-transform:uppercase; letter-spacing:0.5px; font-weight:600; margin-bottom:6px; }
+    #booking_summary_cards .agent-score-board-list { list-style:none; margin:0; padding:0; }
+    #booking_summary_cards .agent-score-board-list li { display:flex; align-items:center; gap:8px; padding:4px 6px; border-bottom:1px solid #F3F6F9; font-size:13px; border-radius:4px; }
+    #booking_summary_cards .agent-score-board-list li:last-child { border-bottom:none; }
+    #booking_summary_cards .agent-score-board-list li.is-you { background:#EEF3FB; }
+    #booking_summary_cards .agent-score-board-list .asb-empty { color:#7E8299; justify-content:center; }
+    #booking_summary_cards .agent-score-board-list .asb-rank { width:20px; color:#7E8299; font-weight:700; flex-shrink:0; text-align:center; }
+    #booking_summary_cards .agent-score-board-list .asb-name { flex:1; min-width:0; color:#3F4254; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    #booking_summary_cards .agent-score-board-list .asb-name.is-you { color:#6082B6; }
+    #booking_summary_cards .agent-score-board-list .asb-val { color:#2F6F4F; font-weight:700; flex-shrink:0; }
+    /* Agent Score hero (full-width row-1 card): gradient header, big score badge
+       on the left, Top-5 leaderboard on the right. */
+    #booking_summary_cards .agent-score-card .summary-card-header { background:linear-gradient(90deg,#5B79AB 0%,#6082B6 55%,#C4A23F 100%) !important; }
+    #booking_summary_cards .agent-score-card .summary-card-header h3 { color:#fff; font-size:14px; letter-spacing:0.3px; }
+    #booking_summary_cards .agent-score-card .summary-info-icon { color:#EAF0FA; }
+    #booking_summary_cards .agent-score-card .summary-info-icon:hover { color:#fff; }
+    #booking_summary_cards .agent-score-hero { display:flex; flex-direction:column; align-items:center; text-align:center; padding:4px 0 2px; }
+    #booking_summary_cards .agent-score-ring { width:120px; height:120px; border-radius:50%; display:flex; flex-direction:column; align-items:center; justify-content:center; background:linear-gradient(135deg,#6082B6 0%,#7E9BC9 45%,#C4A23F 100%); color:#fff; box-shadow:0 6px 16px rgba(96,130,182,0.35); margin-bottom:10px; }
+    #booking_summary_cards .agent-score-ring-val { font-size:40px; font-weight:800; line-height:1; }
+    #booking_summary_cards .agent-score-ring-max { font-size:12px; font-weight:600; opacity:0.85; margin-top:2px; }
+    #booking_summary_cards .agent-score-rankline { font-size:14px; color:#3F4254; font-weight:600; }
+    #booking_summary_cards .agent-score-rankline strong { color:#6082B6; font-size:17px; }
+    #booking_summary_cards .agent-score-top { margin-top:6px; padding-top:0; border-top:none; }
+    #booking_summary_cards .agent-score-blurb { margin-top:12px; text-align:center; }
+    /* Medal colours for the Top-3 leaderboard ranks. */
+    #booking_summary_cards .agent-score-board-list li:nth-child(1) .asb-rank { color:#C4A23F; }
+    #booking_summary_cards .agent-score-board-list li:nth-child(2) .asb-rank { color:#9AA3AF; }
+    #booking_summary_cards .agent-score-board-list li:nth-child(3) .asb-rank { color:#B97A56; }
     /* Owner per-agent matrix: global Day/Week/Month/Year toggle + dense table. */
     #booking_summary_cards .sc-owner-toggle { display:inline-flex; gap:0; margin-left:auto; border:1px solid #B8C7E0; border-radius:5px; overflow:hidden; }
     #booking_summary_cards .sc-owner-tab { border:none; background:#EEF3FB; color:#5C6473; font-size:12px; font-weight:600; padding:4px 14px; cursor:pointer; line-height:1.4; }
@@ -81,16 +113,18 @@
     #booking_summary_cards .panel-body { padding-top:12px; }
     #booking_summary_cards .panel-toggle .panel-title { flex-shrink:0; }
     #booking_summary_cards .ghl-last-sync { margin-left:auto; margin-right:14px; font-size:12px; color:#3F4254; white-space:nowrap; flex-shrink:0; }
-    /* TC summary: float the four KPI cards to the top row in this order, then
-       let the operational cards follow. .row is a flexbox so `order` reorders
-       visually without moving the source blocks. The full-width month filter
-       keeps default order 0 and stays above everything. */
+    /* TC summary card order. .row is a flexbox so `order` reorders cards
+       visually without moving the source blocks; full-width breaks (orders 11 &
+       14) snap the conceptual rows apart. The full-width month filter keeps
+       default order 0 and stays on top. Layout:
+         row 1  Agent Score (full width)                              -> 1
+         row 2  Month Sales / Year Sales / Conversion / Cancellation -> 2-5
+         row 3  New Leads / Daily Handle / Avg Reply / Pickup / Out   -> 6-10
+         row 4  Follow-up % / BC Created                              -> 12-13
+         bottom operational chase cards                               -> 15 */
     #booking_summary_cards .sc-pos-1  { order: 1; }
     #booking_summary_cards .sc-pos-2  { order: 2; }
     #booking_summary_cards .sc-pos-3  { order: 3; }
-    /* "Daily Handle Lead Count" sits immediately after "My Leads" (both order 3,
-       tie broken by source order so it follows My Leads in the DOM). */
-    #booking_summary_cards .sc-pos-3b { order: 3; }
     #booking_summary_cards .sc-pos-4  { order: 4; }
     #booking_summary_cards .sc-pos-5  { order: 5; }
     #booking_summary_cards .sc-pos-6  { order: 6; }
@@ -99,7 +133,13 @@
     #booking_summary_cards .sc-pos-9  { order: 9; }
     #booking_summary_cards .sc-pos-10 { order: 10; }
     #booking_summary_cards .sc-pos-11 { order: 11; }
-    #booking_summary_cards .sc-pos-bottom { order: 12; }
+    #booking_summary_cards .sc-pos-12 { order: 12; }
+    #booking_summary_cards .sc-pos-13 { order: 13; }
+    #booking_summary_cards .sc-pos-14 { order: 14; }
+    #booking_summary_cards .sc-pos-bottom { order: 15; }
+    /* Full-width zero-height spacer that forces the following cards onto a new
+       flex line, so the 5-up row 3 and the 2-up row 4 never merge. */
+    #booking_summary_cards .sc-row-break { flex: 0 0 100%; width: 100%; height: 0; margin: 0; padding: 0; }
     /* ---------- Mobile (< md / 768px) ---------- */
     @media (max-width: 767.98px) {
         /* Wide data tables (e.g. Sales by Agent's 7 columns) scroll sideways
@@ -115,6 +155,9 @@
         /* Tighten the 3-up KPI strips so the figures don't crowd on small phones. */
         #booking_summary_cards .summary-row-3 { gap: 8px; }
         #booking_summary_cards .summary-value-sm { font-size: 16px; }
+        /* Agent Score: stack score above the Top-5 list on narrow screens. */
+        #booking_summary_cards .agent-score-split { flex-direction: column; gap: 10px; }
+        #booking_summary_cards .agent-score-board { border-left: none; padding-left: 0; border-top: 1px dashed #EBEDF3; padding-top: 10px; }
     }
 </style>
 <div id="booking_summary_cards" class="mb-4">
@@ -137,7 +180,7 @@
                     <span class="sc-month-filter-hint">Re-scopes every &ldquo;(Month)&rdquo; card below; the Year card follows the selected year.</span>
                 </div>
             </div>
-            <div class="col-md-3 sc-pos-8">
+            <div class="col-md-3 sc-pos-13">
                 <div class="card card-custom">
                     <div class="card-header border-0 summary-card-header" style="background-color:#F5E6CD;">
                         <h3>BC Created</h3>
@@ -154,7 +197,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-3 sc-pos-6">
+            <div class="col-md-3 sc-pos-2">
                 <div class="card card-custom">
                     <div class="card-header border-0 summary-card-header" style="background-color:#F5E6CD;">
                         <h3>Month Sales vs Target</h3>
@@ -185,7 +228,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-3 sc-pos-7">
+            <div class="col-md-3 sc-pos-3">
                 <div class="card card-custom">
                     <div class="card-header border-0 summary-card-header" style="background-color:#F5E6CD;">
                         <h3>Year Sales vs Target</h3>
@@ -216,7 +259,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-3 sc-pos-10">
+            <div class="col-md-3 sc-pos-5">
                 <a class="summary-card" id="sc-cancel-rate-link" href="#">
                     <div class="card card-custom">
                         <div class="card-header border-0 summary-card-header" style="background-color:#D7E2F2;">
@@ -244,10 +287,10 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-3 sc-pos-3">
+            <div class="col-12 col-md sc-pos-6">
                 <div class="card card-custom">
                     <div class="card-header border-0 summary-card-header" style="background-color:#D7E2F2;">
-                        <h3>My Leads</h3>
+                        <h3>New Leads</h3>
                         <i id="pop-tc-leads" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>What it shows:</strong> New leads assigned to you (from GHL), counted by the date the lead came in.<ul><li><strong>Today:</strong> leads that came in today</li><li><strong>Week:</strong> Monday to Sunday of this week</li><li><strong>Month:</strong> 1st to last day of this month</li></ul>Your leads are matched to you by your account email. <strong>Note:</strong> if your email isn&rsquo;t linked to a GHL user, this card will show zeros."></i>
                     </div>
                     <div class="card-body summary-card-body">
@@ -261,19 +304,23 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-3 sc-pos-3b">
+            <div class="col-12 col-md sc-pos-7">
                 <div class="card card-custom">
                     <div class="card-header border-0 summary-card-header" style="background-color:#D7E2F2;">
                         <h3>Daily Handle Lead Count</h3>
-                        <i id="pop-tc-handle" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>What it shows:</strong> The number of leads you handled <strong>today</strong> &mdash; the &ldquo;Lead Responded&rdquo; column from the Lead Reply Activity dashboard, scoped to you.<br><br><strong>How it&rsquo;s counted:</strong> the distinct leads you replied to today, with your reply landing between 7:00am and 10:00pm. Replying many times to the same lead still counts that lead once.<br><br><strong>Note:</strong> if your account isn&rsquo;t linked to a GHL user, this card shows zero."></i>
+                        <i id="pop-tc-handle" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>What it shows:</strong> The number of leads you handled &mdash; the &ldquo;Lead Responded&rdquo; column from the Lead Reply Activity dashboard, scoped to you.<ul><li><strong>Today:</strong> leads you replied to today</li><li><strong>Week:</strong> Monday to Sunday of this week</li><li><strong>Month:</strong> 1st to last day of this month</li></ul><strong>How it&rsquo;s counted:</strong> distinct leads you replied to, with your reply landing between 7:00am and 10:00pm. Replying many times to the same lead still counts that lead once (even across different days in the week/month total).<br><br><strong>Note:</strong> if your account isn&rsquo;t linked to a GHL user, this card shows zero."></i>
                     </div>
                     <div class="card-body summary-card-body">
-                        <div class="summary-value" id="sc-tc-handle-value">...</div>
-                        <div class="summary-sub">Distinct leads you replied to today (Lead Responded), counted 7am&ndash;10pm. Matches the Lead Reply Activity dashboard.</div>
+                        <div class="summary-row-3">
+                            <div><div class="lbl">Today</div><div class="summary-value-sm" id="sc-tc-handle-day">...</div></div>
+                            <div><div class="lbl">Week</div><div class="summary-value-sm" id="sc-tc-handle-week">...</div></div>
+                            <div><div class="lbl">Month</div><div class="summary-value-sm" id="sc-tc-handle-month">...</div></div>
+                        </div>
+                        <div class="summary-sub">Distinct leads you replied to (Lead Responded), counted 7am&ndash;10pm. Matches the Lead Reply Activity dashboard.</div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-3 sc-pos-1">
+            <div class="col-12 col-md sc-pos-8">
                 <div class="card card-custom">
                     <div class="card-header border-0 summary-card-header" style="background-color:#D7E2F2;">
                         <h3>Avg Reply Time to Inbound</h3>
@@ -290,7 +337,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-3 sc-pos-2">
+            <div class="col-12 col-md sc-pos-9">
                 <div class="card card-custom">
                     <div class="card-header border-0 summary-card-header" style="background-color:#D7E2F2;">
                         <h3>Lead Pickup Speed (Month)</h3>
@@ -303,7 +350,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-3 sc-pos-5">
+            <div class="col-12 col-md sc-pos-10">
                 <div class="card card-custom">
                     <div class="card-header border-0 summary-card-header" style="background-color:#D7E2F2;">
                         <h3>Outbound Messages</h3>
@@ -320,7 +367,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-3 sc-pos-9">
+            <div class="col-md-3 sc-pos-12">
                 <div class="card card-custom">
                     <div class="card-header border-0 summary-card-header" style="background-color:#D7E2F2;">
                         <h3>Follow-up % (Month)</h3>
@@ -333,16 +380,99 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-3 sc-pos-11">
-                <div class="card card-custom">
-                    <div class="card-header border-0 summary-card-header" style="background-color:#D7E2F2;">
+            <div class="col-md-12 sc-pos-1">
+                <div class="card card-custom agent-score-card">
+                    <div class="card-header border-0 summary-card-header">
                         <h3>Agent Score (Month)</h3>
-                        <i id="pop-agent-score" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>What it shows:</strong> Your overall performance score this month, ranked against everyone else.<br><br><strong>It blends six things, each benchmarked so the month&rsquo;s best performer scores 100 on that measure:</strong><ul><li>Avg reply time to inbound &mdash; <strong>15%</strong></li><li>1st-response / pickup speed &mdash; <strong>15%</strong></li><li>Conversion rate &mdash; <strong>15%</strong></li><li>Sales value &mdash; <strong>25%</strong></li><li>Follow-up rate &mdash; <strong>15%</strong></li><li>Qty of leads served &mdash; <strong>15%</strong></li></ul>For the two speed measures, faster is better; for conversion, sales, follow-up and leads served, higher is better. A measure with no data scores 0.<br><br><strong>Score = 100</strong> would mean being the best on every single measure."></i>
+                        <i id="pop-agent-score" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>What it shows:</strong> Your overall performance score this month, ranked against everyone else.<br><br><strong>It blends six things, each benchmarked so the month&rsquo;s best performer scores 100 on that measure:</strong><ul><li>Avg reply time to inbound &mdash; <strong>15%</strong></li><li>1st-response / pickup speed &mdash; <strong>15%</strong></li><li>Conversion rate &mdash; <strong>15%</strong></li><li>Sales value &mdash; <strong>25%</strong></li><li>Follow-up rate &mdash; <strong>15%</strong></li><li>Qty of leads served &mdash; <strong>15%</strong></li></ul>For the two speed measures, faster is better; for conversion, sales, follow-up and leads served, higher is better. A measure with no data scores 0.<br><br><strong>Score = 100</strong> would mean being the best on every single measure.<br><br>The <strong>Top 5</strong> list ranks the whole team by this score; <strong>You</strong> are highlighted."></i>
                     </div>
                     <div class="card-body summary-card-body">
-                        <div class="summary-value" id="sc-agent-score-value">...</div>
-                        <div class="summary-sub">Rank <span id="sc-agent-score-rank">—</span> of <span id="sc-agent-score-total">—</span> agents. Weighted blend of reply speed, pickup speed, conversion, sales, follow-up &amp; leads served, benchmarked against the best performer.</div>
-                        <div class="summary-sub summary-best" id="sc-agent-score-best">Top: —</div>
+                        <div class="agent-score-split">
+                            <div class="agent-score-main">
+                                <div class="agent-score-hero">
+                                    <div class="agent-score-ring">
+                                        <span class="agent-score-ring-val" id="sc-agent-score-value">...</span>
+                                        <span class="agent-score-ring-max">/ 100</span>
+                                    </div>
+                                    <div class="agent-score-rankline">Rank <strong id="sc-agent-score-rank">—</strong> of <span id="sc-agent-score-total">—</span> agents</div>
+                                    <div class="summary-sub summary-best agent-score-top" id="sc-agent-score-best">Top: —</div>
+                                </div>
+                                <div class="summary-sub agent-score-blurb">Weighted blend of reply speed, pickup speed, conversion, sales, follow-up &amp; leads served, benchmarked against the best performer.</div>
+                            </div>
+                            <div class="agent-score-board">
+                                <div class="agent-score-board-title">Top 5 Agents</div>
+                                <ol class="agent-score-board-list" id="sc-agent-score-leaderboard">
+                                    <li class="asb-empty">…</li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <?php /* Full-width spacers: snap row 3 (5-up) and row 4 (2-up) apart,
+                     and keep the bottom chase cards from riding up next to row 4. */ ?>
+            <div class="sc-row-break sc-pos-11"></div>
+            <div class="sc-row-break sc-pos-14"></div>
+            <?php /* Operational "chase" cards, scoped to this agent's own bookings.
+                     Same DOM ids + card keys as the OP versions (TC and OP levels
+                     never render together), so the existing JS populates them. */ ?>
+            <div class="col-md-3 sc-pos-bottom">
+                <a class="summary-card" id="sc-upcoming-not-ready-op-link" href="#">
+                    <div class="card card-custom">
+                        <div class="card-header border-0 summary-card-header" style="background-color:#FFFAA030;">
+                            <h3>Travel in 7 Days – Not Yet Ready</h3>
+                            <i id="pop-upcoming-not-ready-op" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>What it shows:</strong> Your bookings that start travel within the next 7 days but aren&rsquo;t ready yet.<br><br><strong>&ldquo;Not yet ready&rdquo;</strong> means the booking is still waiting on one of these steps:<ul><li>Payment</li><li>Booking operations</li><li>Guest list submission</li><li>Travel voucher</li></ul>A booking becomes &ldquo;ready&rdquo; once it reaches the <strong>Pending Travel</strong> stage.<br><br><strong>Counted when:</strong><ul><li>Travel starts between tomorrow and 7 days from today</li><li>It is still stuck at one of the steps above</li><li>It is not cancelled</li><li>You are the credited sales agent</li></ul><strong>Why it matters:</strong> your guests travel within a week &mdash; act now."></i>
+                        </div>
+                        <div class="card-body summary-card-body">
+                            <div class="summary-value" id="sc-upcoming-not-ready-op-count">...</div>
+                            <div class="summary-sub">Your BCs starting travel within 7 days still upstream (Payment / Booking Op / Guest List / Travel Voucher) and not yet flagged "Pending Travel". Click to chase your readiness.</div>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            <div class="col-md-3 sc-pos-bottom">
+                <a class="summary-card" id="sc-upcoming-not-ready-op-14-link" href="#">
+                    <div class="card card-custom">
+                        <div class="card-header border-0 summary-card-header" style="background-color:#FFFAA030;">
+                            <h3>Travel in 14 Days – Not Yet Ready</h3>
+                            <i id="pop-upcoming-not-ready-op-14" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>What it shows:</strong> Your bookings that start travel within the next 14 days but aren&rsquo;t ready yet.<br><br><strong>&ldquo;Not yet ready&rdquo;</strong> means the booking is still waiting on one of these steps:<ul><li>Payment</li><li>Booking operations</li><li>Guest list submission</li><li>Travel voucher</li></ul>A booking becomes &ldquo;ready&rdquo; once it reaches the <strong>Pending Travel</strong> stage.<br><br><strong>Counted when:</strong><ul><li>Travel starts between tomorrow and 14 days from today</li><li>It is still stuck at one of the steps above</li><li>It is not cancelled</li><li>You are the credited sales agent</li></ul>This window also includes the bookings shown in &ldquo;Travel in 7 Days&rdquo;.<br><br><strong>Why it matters:</strong> a two-week heads-up to get everything ready."></i>
+                        </div>
+                        <div class="card-body summary-card-body">
+                            <div class="summary-value" id="sc-upcoming-not-ready-op-14-count">...</div>
+                            <div class="summary-sub">Your BCs starting travel within 14 days still upstream (Payment / Booking Op / Guest List / Travel Voucher) and not yet flagged "Pending Travel". Click to chase your readiness.</div>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            <div class="col-md-12 sc-pos-bottom">
+                <div class="card card-custom">
+                    <div class="card-header border-0 summary-card-header" style="background-color:#B7E4C730;">
+                        <h3>Payment From Customer Due Soon</h3>
+                        <i id="pop-customer-payment-due-soon" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>What it shows:</strong> Your confirmed bookings that still owe a customer payment, with a deadline coming up soon.<br><br><strong>Counted when:</strong><ul><li>The booking still has a scheduled payment to collect</li><li>There is still a balance owing (booking amount minus approved customer payments)</li><li>The next deadline falls between 1 March this year and tomorrow</li><li>It is not cancelled</li><li>You are the sales agent on the booking</li></ul><strong>Next deadline:</strong> the deposit deadline when nothing is paid yet, otherwise the full-payment deadline once a deposit is in.<br><br><strong>Grouped by deadline:</strong> Overdue (1 March up to before today), Today, and Tomorrow &mdash; each showing the number of bookings and the amount still owing.<br><br><strong>Table:</strong> the 5 most urgent bookings, earliest deadline first.<br><strong>Left out:</strong> fully paid, cancelled, and drafts/quotations."></i>
+                    </div>
+                    <div class="card-body summary-card-body">
+                        <div class="summary-row-3 mb-3">
+                            <a href="#" class="due-bucket is-overdue" id="sc-customer-payment-due-soon-overdue-link" title="View your bookings with customer payments overdue (since 1 March)">
+                                <div class="lbl">Overdue</div>
+                                <div class="summary-value-sm amt-overdue" id="sc-customer-payment-due-soon-overdue-count">...</div>
+                                <div class="due-amt" id="sc-customer-payment-due-soon-overdue-total">...</div>
+                            </a>
+                            <a href="#" class="due-bucket is-today" id="sc-customer-payment-due-soon-today-link" title="View your bookings with customer payments due today">
+                                <div class="lbl">Today</div>
+                                <div class="summary-value-sm amt-today" id="sc-customer-payment-due-soon-today-count">...</div>
+                                <div class="due-amt" id="sc-customer-payment-due-soon-today-total">...</div>
+                            </a>
+                            <a href="#" class="due-bucket" id="sc-customer-payment-due-soon-tomorrow-link" title="View your bookings with customer payments due tomorrow">
+                                <div class="lbl">Tomorrow</div>
+                                <div class="summary-value-sm" id="sc-customer-payment-due-soon-tomorrow-count">...</div>
+                                <div class="due-amt" id="sc-customer-payment-due-soon-tomorrow-total">...</div>
+                            </a>
+                        </div>
+                        <div class="summary-sub mb-2">Your booking confirmations that still owe a scheduled customer payment with a deadline from 1 March up to tomorrow, bucketed by urgency. Each bucket shows the BC count and outstanding amount. Clear overdue and today first; the table lists the most urgent BCs, earliest deadline first.</div>
+                        <table class="table table-sm summary-table">
+                            <thead><tr><th>Booking</th><th>Customer</th><th class="text-right">Outstanding</th><th>Deadline</th></tr></thead>
+                            <tbody id="sc-customer-payment-due-soon-body"><tr><td colspan="4" class="text-center text-muted">Loading…</td></tr></tbody>
+                        </table>
                     </div>
                 </div>
             </div>
@@ -1107,11 +1237,12 @@ $(function() {
     }
     // Best line: agent name + standout figure. Falls back to figure-only when
     // no name is resolved.
-    function setBestFigure(id, best) {
+    function setBestFigure(id, best, label) {
         var el = document.getElementById(id);
         if(!el) return;
-        if(!best || best.value == null) { el.innerHTML = 'Best: —'; return; }
-        var html = 'Best: ';
+        label = label || 'Best';
+        if(!best || best.value == null) { el.innerHTML = label + ': —'; return; }
+        var html = label + ': ';
         if(best.name != null) {
             var isYou = (String(best.name) === 'You');
             html += '<span class="best-name' + (isYou ? ' is-you' : '') + '">'
@@ -1130,6 +1261,23 @@ $(function() {
         setText('sc-agent-score-rank',  d.rank == null ? '—' : d.rank);
         setText('sc-agent-score-total', d.total == null ? '—' : d.total);
         setBest('sc-agent-score-best', d.best, 'Top');
+        // Top-5 leaderboard on the right; the logged-in agent's row is highlighted.
+        var lb = document.getElementById('sc-agent-score-leaderboard');
+        if(lb) {
+            var rows = (d.leaderboard && d.leaderboard.length) ? d.leaderboard : null;
+            if(!rows) {
+                lb.innerHTML = '<li class="asb-empty">No ranked agents yet.</li>';
+            } else {
+                lb.innerHTML = rows.map(function(r) {
+                    var you = r.is_you ? ' is-you' : '';
+                    return '<li class="' + (r.is_you ? 'is-you' : '') + '">'
+                        + '<span class="asb-rank">' + escapeHtml(String(r.rank)) + '</span>'
+                        + '<span class="asb-name' + you + '">' + escapeHtml(r.name) + '</span>'
+                        + '<span class="asb-val">' + escapeHtml(r.value) + '</span>'
+                        + '</li>';
+                }).join('');
+            }
+        }
     }
     // Keep clicks on the "Last synced" text from collapsing the panel.
     $('#booking_summary_cards .ghl-last-sync').on('click', function(e) {
@@ -1173,12 +1321,12 @@ $(function() {
         if(c.bc_month) {
             setText('sc-bc-month-count', c.bc_month.count);
             setLink('sc-bc-month-link', c.bc_month.link);
-            setBestFigure('sc-bc-month-best', c.bc_month.best);
+            setBestFigure('sc-bc-month-best', c.bc_month.best, 'Best (month)');
         }
         if(c.bc_year) {
             setText('sc-bc-year-count', c.bc_year.count);
             setLink('sc-bc-year-link', c.bc_year.link);
-            setBestFigure('sc-bc-year-best', c.bc_year.best);
+            setBestFigure('sc-bc-year-best', c.bc_year.best, 'Best (year)');
         }
         if(c.sales_month) {
             setText('sc-sales-month-value', c.sales_month.value);
@@ -1213,7 +1361,9 @@ $(function() {
             setBestFigure('sc-tc-leads-best', c.tc_leads_dwm.best);
         }
         if(c.tc_handle_lead_today) {
-            setText('sc-tc-handle-value', c.tc_handle_lead_today.value);
+            setText('sc-tc-handle-day',   c.tc_handle_lead_today.day);
+            setText('sc-tc-handle-week',  c.tc_handle_lead_today.week);
+            setText('sc-tc-handle-month', c.tc_handle_lead_today.month);
         }
         if(c.tc_response_time_dwm) {
             setText('sc-tc-resp-day',   c.tc_response_time_dwm.day);

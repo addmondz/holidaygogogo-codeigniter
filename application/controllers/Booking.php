@@ -1191,20 +1191,28 @@ class Booking extends MY_Controller
 					'month' => (int)$mine_month['total_leads'],
 				);
 
-				// "Daily Handle Lead Count" card. Today's "Lead Responded" for the
-				// logged-in TC, reusing the Lead Reply Activity dashboard query so
-				// the figure matches that report's Lead Responded column exactly.
+				// "Daily Handle Lead Count" card (Today / Week / Month). Each period
+				// is the distinct "Lead Responded" leads for the logged-in TC over
+				// that window, reusing the Lead Reply Activity dashboard query so the
+				// figures match that report's Lead Responded column exactly. The query
+				// counts DISTINCT leads across the whole date range, so a week/month
+				// window naturally de-dupes a lead replied to on several days.
 				// Filtered to the TC's own GHL uid(s), so every returned row is the
 				// TC's -- sum the distinct-lead counts across any linked uids.
-				$handle_rows = $this->Report_Model->Lead_Reply_Activity_By_Agent(array(
-					'owner_user_id' => $my_ghl_uids,
-					'start_date'    => $today, 'end_date' => $today,
-				));
-				$handle_today = 0;
-				foreach($handle_rows as $hr) {
-					$handle_today += (int)$hr['lead_responded'];
-				}
-				$cards['tc_handle_lead_today'] = array('value' => $handle_today);
+				$handle_count = function($start, $end) {
+					$rows = $this->Report_Model->Lead_Reply_Activity_By_Agent(array(
+						'owner_user_id' => $my_ghl_uids,
+						'start_date'    => $start, 'end_date' => $end,
+					));
+					$total = 0;
+					foreach($rows as $hr) { $total += (int)$hr['lead_responded']; }
+					return $total;
+				};
+				$cards['tc_handle_lead_today'] = array(
+					'day'   => $handle_count($today, $today),
+					'week'  => $handle_count($week_start, $week_end),
+					'month' => $handle_count($cur_month_start, $cur_month_end),
+				);
 				// "Avg Reply Time to Inbound" now uses Message-Log logic: every
 				// inbound->outbound reply pair in the agent's threads (in working
 				// hours, same day) is averaged, windowed by when the REPLY was
@@ -1241,7 +1249,7 @@ class Booking extends MY_Controller
 				$cards['tc_leads_dwm'] = array(
 					'day' => 0, 'week' => 0, 'month' => 0,
 				);
-				$cards['tc_handle_lead_today'] = array('value' => 0);
+				$cards['tc_handle_lead_today'] = array('day' => 0, 'week' => 0, 'month' => 0);
 				$cards['tc_response_time_dwm'] = array(
 					'day' => '-', 'week' => '-', 'month' => '-',
 					'day_seconds' => null, 'week_seconds' => null, 'month_seconds' => null,
@@ -1392,6 +1400,117 @@ class Booking extends MY_Controller
 			// data of their own. (No Year variant: a year-wide reply-time pass
 			// scans the whole message log and blew the request's memory limit.)
 			$cards['agent_score_month'] = $this->agent_score_card($month_start, $month_end, $my_ghl_uids, $admin_id);
+
+			// ---------- TC operational cards (own bookings) ----------
+			// Mirror three OP cards but scoped to this agent's own bookings so a
+			// sales agent can chase their own upcoming readiness and customer
+			// payments. They use live rolling windows (today / +7 / +14), so the
+			// TC month filter above does NOT re-scope them. Same card keys + DOM
+			// ids as the OP cards (TC and OP levels never render together), so the
+			// existing JS populates them with no extra wiring.
+			//
+			// "Travel in N Days – Not Yet Ready" counts confirmed BCs this agent is
+			// *credited* for (TC1 pre-cutoff, TC2 on/after) — the same credited-slot
+			// rule the ?upcoming_not_ready drill-down applies for level 20/50, so the
+			// card and its listing agree. No sales_agent param on the link: the
+			// listing self-scopes by the credited slot for this level.
+			foreach(array(
+				array('key' => 'upcoming_travel_not_ready_op',    's' => $next7_start,  'e' => $next7_end),
+				array('key' => 'upcoming_travel_not_ready_op_14', 's' => $next14_start, 'e' => $next14_end),
+			) as $w) {
+				$row = $this->db->query(
+					"SELECT
+					   SUM(CASE WHEN Status='P'   THEN 1 ELSE 0 END) AS s_p,
+					   SUM(CASE WHEN Status='PBO' THEN 1 ELSE 0 END) AS s_pbo,
+					   SUM(CASE WHEN Status='PGL' THEN 1 ELSE 0 END) AS s_pgl,
+					   SUM(CASE WHEN Status='PTV' THEN 1 ELSE 0 END) AS s_ptv
+					 FROM booking
+					 WHERE BookingConfirmationTitle='BOOKING CONFIRMATION'
+					   AND CancelStatus='N'
+					   AND Status IN ('P','PBO','PGL','PTV')
+					   AND StartDate BETWEEN ? AND ?
+					   AND {$credit_clause}",
+					array($w['s'], $w['e'], $admin_id, $admin_id)
+				)->row();
+				$cards[$w['key']] = array(
+					'count'  => (int)$row->s_p + (int)$row->s_pbo + (int)$row->s_pgl + (int)$row->s_ptv,
+					'by_p'   => (int)$row->s_p,
+					'by_pbo' => (int)$row->s_pbo,
+					'by_pgl' => (int)$row->s_pgl,
+					'by_ptv' => (int)$row->s_ptv,
+					'link'   => $base . $qs(array(
+						'upcoming_not_ready' => 1,
+						'travel_date'        => $fmt_dmy($w['s']) . ' - ' . $fmt_dmy($w['e']),
+					)),
+				);
+			}
+
+			// "Payment From Customer Due Soon" — own BCs still owing a scheduled
+			// customer payment, bucketed Overdue / Today / Tomorrow. Scoped to the
+			// agent's own bookings via the broad SalesAgent/SalesAgent2 slot the TC
+			// listing applies by default, so the card matches the ?customer_payment
+			// drill-down (which relies on that same default scope — no sales_agent
+			// param). Mirrors the OP query body verbatim, only the scope differs.
+			$cust_due_end   = date('Y-m-d', strtotime('+1 day'));  // tomorrow — window upper bound
+			$cust_due_start = date('Y') . '-03-01';                // overdue lookback floor: 1 March, current year
+			$cust_nd  = "(CASE WHEN booking.Status = 'P' THEN COALESCE(booking.DepositDeadline, booking.FullPaymentDeadline) ELSE booking.FullPaymentDeadline END)";
+			$cust_out = "(booking.NetTotal - COALESCE((SELECT SUM(p.Credit) FROM payment p"
+				. " WHERE p.BookingID = booking.BookingID"
+				. " AND p.Status = 'Y' AND p.Credit > 0"
+				. " AND (p.Type IS NULL OR p.Type != 'AGENT COMMISSION FROM SUPPLIER')), 0))";
+			$tc_own = "(booking.SalesAgent = ? OR booking.SalesAgent2 = ?)";
+			$row = $this->db->query(
+				"SELECT
+				    SUM(CASE WHEN t.nd <  ? THEN 1 ELSE 0 END) AS overdue_cnt,
+				    COALESCE(SUM(CASE WHEN t.nd <  ? THEN t.outstanding ELSE 0 END), 0) AS overdue_due,
+				    SUM(CASE WHEN t.nd =  ? THEN 1 ELSE 0 END) AS today_cnt,
+				    COALESCE(SUM(CASE WHEN t.nd =  ? THEN t.outstanding ELSE 0 END), 0) AS today_due,
+				    SUM(CASE WHEN t.nd =  ? THEN 1 ELSE 0 END) AS tomorrow_cnt,
+				    COALESCE(SUM(CASE WHEN t.nd =  ? THEN t.outstanding ELSE 0 END), 0) AS tomorrow_due
+				 FROM (
+				    SELECT {$cust_nd} AS nd, {$cust_out} AS outstanding
+				    FROM booking
+				    WHERE booking.CancelStatus = 'N'
+				      AND booking.Status IN ('P','PP')
+				      AND {$tc_own}
+				 ) t
+				 WHERE t.nd BETWEEN ? AND ?
+				   AND t.outstanding > 0",
+				array($today, $today, $today, $today, $cust_due_end, $cust_due_end, $admin_id, $admin_id, $cust_due_start, $cust_due_end)
+			)->row();
+			$cards['customer_payment_due_soon'] = array(
+				'overdue'  => array('count' => (int)$row->overdue_cnt,  'total_due' => $money($row->overdue_due),  'link' => $base . $qs(array('customer_payment' => 'overdue',  'status' => 'A'))),
+				'today'    => array('count' => (int)$row->today_cnt,    'total_due' => $money($row->today_due),    'link' => $base . $qs(array('customer_payment' => 'today',    'status' => 'A'))),
+				'tomorrow' => array('count' => (int)$row->tomorrow_cnt, 'total_due' => $money($row->tomorrow_due), 'link' => $base . $qs(array('customer_payment' => 'tomorrow', 'status' => 'A'))),
+			);
+
+			$cust_rows = $this->db->query(
+				"SELECT t.BookingNumber AS booking_number, t.Customer AS customer,
+				        t.nd AS earliest_deadline, t.outstanding AS total_due
+				 FROM (
+				    SELECT booking.BookingNumber AS BookingNumber, booking.Customer AS Customer,
+				           {$cust_nd} AS nd, {$cust_out} AS outstanding
+				    FROM booking
+				    WHERE booking.CancelStatus = 'N'
+				      AND booking.Status IN ('P','PP')
+				      AND {$tc_own}
+				 ) t
+				 WHERE t.nd BETWEEN ? AND ?
+				   AND t.outstanding > 0
+				 ORDER BY t.nd ASC, t.outstanding DESC
+				 LIMIT 5",
+				array($admin_id, $admin_id, $cust_due_start, $cust_due_end)
+			)->result();
+			$cust_out_rows = array();
+			foreach($cust_rows as $r) {
+				$cust_out_rows[] = array(
+					'booking_number'    => $r->booking_number,
+					'customer'          => $r->customer,
+					'total_due'         => $money($r->total_due),
+					'earliest_deadline' => $r->earliest_deadline ? $fmt_dmy($r->earliest_deadline) : '-',
+				);
+			}
+			$tables['customer_payment_due_soon'] = $cust_out_rows;
 		}
 
 		// ---------- TC LEAD (team-wide lead + booking metrics) ----------
@@ -2751,7 +2870,7 @@ class Booking extends MY_Controller
 				'<strong>What it shows:</strong> Bookings starting travel within 7 days that aren&rsquo;t ready yet.<br><br>' .
 				'<strong>&ldquo;Not yet ready&rdquo;</strong> means still waiting on: Payment / Booking Op / Guest List / Travel Voucher.<br><br>' .
 				'<strong>Period:</strong> ' . $window_next7 . ' (by travel start date)<br>' .
-				'<strong>This card (team-wide):</strong><br>' .
+				'<strong>This card (' . ($is_op ? 'team-wide' : 'your bookings') . '):</strong><br>' .
 				'Waiting on payment: ' . (int)$u['by_p'] . '<br>' .
 				'Waiting on booking operations: ' . (int)$u['by_pbo'] . '<br>' .
 				'Waiting on guest list: ' . (int)$u['by_pgl'] . '<br>' .
@@ -2768,7 +2887,7 @@ class Booking extends MY_Controller
 				'<strong>What it shows:</strong> Bookings starting travel within 14 days that aren&rsquo;t ready yet.<br><br>' .
 				'<strong>&ldquo;Not yet ready&rdquo;</strong> means still waiting on: Payment / Booking Op / Guest List / Travel Voucher.<br><br>' .
 				'<strong>Period:</strong> ' . $window_next14 . ' (by travel start date)<br>' .
-				'<strong>This card (team-wide):</strong><br>' .
+				'<strong>This card (' . ($is_op ? 'team-wide' : 'your bookings') . '):</strong><br>' .
 				'Waiting on payment: ' . (int)$u['by_p'] . '<br>' .
 				'Waiting on booking operations: ' . (int)$u['by_pbo'] . '<br>' .
 				'Waiting on guest list: ' . (int)$u['by_pgl'] . '<br>' .
@@ -3407,13 +3526,26 @@ class Booking extends MY_Controller
 			$top_name = ((int)$top['admin_id'] === (int)$admin_id) ? 'You' : $top['name'];
 			$best = array('name' => $top_name, 'value' => round($top['composite'], 1) . '%');
 		}
+		// Top-5 leaderboard for the card's right column — the logged-in agent is
+		// labelled "You" so they spot themselves even when outside the top 5.
+		$leaderboard = array();
+		foreach(array_slice($res['ranked'], 0, 5) as $r) {
+			$is_you = ((int)$r['admin_id'] === (int)$admin_id);
+			$leaderboard[] = array(
+				'rank'   => $r['rank'],
+				'name'   => $is_you ? 'You' : $r['name'],
+				'value'  => round($r['composite'], 1) . '%',
+				'is_you' => $is_you,
+			);
+		}
 		return array(
-			'value'     => $own ? (round($own['composite'], 1) . '%') : '-',
-			'raw'       => $own ? $own['composite'] : null,
-			'rank'      => $own ? $own['rank'] : null,
-			'total'     => $res['total'],
-			'breakdown' => $own ? $own['norm'] : null,
-			'best'      => $best,
+			'value'       => $own ? (round($own['composite'], 1) . '%') : '-',
+			'raw'         => $own ? $own['composite'] : null,
+			'rank'        => $own ? $own['rank'] : null,
+			'total'       => $res['total'],
+			'breakdown'   => $own ? $own['norm'] : null,
+			'best'        => $best,
+			'leaderboard' => $leaderboard,
 		);
 	}
 

@@ -50,6 +50,7 @@
                                                 </div>
                                             </div>
                                         </div>
+                                        <?php if($this->session->level != 20) { ?>
                                         <div class="col-md-4">
                                             <div class="form-group">
                                                 <label>Owner</label>
@@ -74,10 +75,37 @@
                                                 </select>
                                             </div>
                                         </div>
+                                        <?php } ?>
                                     </div>
                                     <input type="submit" value="Filter" class="btn btn-light-primary font-weight-bold" style="width:80px;">
                                     <input type="button" id="lead-reply-activity-reset" value="Reset" class="btn btn-light-success font-weight-bold" style="width:80px;">
                                 </form>
+
+                                <div class="separator separator-dashed my-5"></div>
+
+                                <div class="row align-items-end">
+                                    <div class="col-md-4">
+                                        <div class="form-group mb-0">
+                                            <label>Export Date Range
+                                                <i class="la la-info-circle ml-1" style="cursor:help; color:#2f506f;" data-toggle="tooltip"
+                                                   title="The on-screen table is for one day. The Excel download instead covers this whole range, with each date as a row and one column group per owner (max 92 days). Owner and Team Leader filters above are applied."></i>
+                                            </label>
+                                            <div id="lead_reply_export_daterangepicker" class="input-icon">
+                                                <input readonly type="text" id="lead-reply-export-range" autocomplete="off" class="form-control" placeholder="Select date range">
+                                                <span>
+                                                    <i class="la la-calendar"></i>
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="form-group mb-0">
+                                            <button type="button" id="lead-reply-export-btn" class="btn btn-light-success font-weight-bold">
+                                                <i class="la la-file-excel-o"></i> Download Excel
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -164,6 +192,43 @@
     function resetLeadReplyActivityDate() {
         $('input[name="reply_date"]').val('');
     }
+
+    // Export-only range picker: defaults to the last 30 days, independent of the
+    // daily Activity Date above. Stored as "DD/MM/YYYY - DD/MM/YYYY".
+    var leadReplyExportEndpoint = '<?php echo base_url('Report/Lead_Reply_Activity_Export'); ?>';
+    var leadReplyExportStart = moment().subtract(29, 'days');
+    var leadReplyExportEnd = moment();
+
+    function applyLeadReplyExportRange(start, end) {
+        leadReplyExportStart = start;
+        leadReplyExportEnd = end;
+        $('#lead-reply-export-range').val(start.format('DD/MM/YYYY') + ' - ' + end.format('DD/MM/YYYY'));
+    }
+
+    $('#lead_reply_export_daterangepicker').daterangepicker({
+        buttonClasses: ' btn',
+        applyClass: 'btn-primary',
+        cancelClass: 'btn-secondary',
+        startDate: leadReplyExportStart,
+        endDate: leadReplyExportEnd,
+        locale: {
+            format: 'DD/MM/YYYY'
+        }
+    }, applyLeadReplyExportRange);
+    applyLeadReplyExportRange(leadReplyExportStart, leadReplyExportEnd);
+
+    $('#lead-reply-export-btn').click(function() {
+        // Carry the same Owner / Team Leader filters shown above; only the date
+        // window differs (range here vs. single day in the form).
+        var params = $('#lead-reply-activity-form')
+            .serializeArray()
+            .filter(function(item) { return item.name !== 'reply_date'; });
+        params.push({
+            name: 'export_range',
+            value: leadReplyExportStart.format('DD/MM/YYYY') + ' - ' + leadReplyExportEnd.format('DD/MM/YYYY')
+        });
+        window.location.href = leadReplyExportEndpoint + '?' + $.param(params);
+    });
 
     function escapeHtml(value) {
         return $('<div>').text(value === null || value === undefined ? '' : value).html();
