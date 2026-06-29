@@ -95,6 +95,87 @@ if (!function_exists('calculate_submitted_to_payment_seconds')) {
     }
 }
 
+if (!function_exists('compute_draft_payment_segments')) {
+    /**
+     * Split the single SAD -> P gap into the three readable hops the inline card
+     * shows. Each segment is the time between the FIRST moment the booking
+     * reached one milestone and the FIRST moment it reached the next:
+     *
+     *   draft_to_pb : saved as draft        -> Pending BC
+     *   pb_to_pbc   : Pending BC            -> Pending BC Confirmation
+     *   pbc_to_p    : Pending BC Confirm.   -> Pending Payment
+     *
+     * Pure subtraction (reuses compute_response_seconds) so a missing milestone
+     * only nulls the segments that touch it - the others still report. Kept
+     * DB-free for unit testing.
+     *
+     * @param string|null $sad_at  saved-as-draft DATETIME
+     * @param string|null $pb_at   first-reached Pending BC DATETIME
+     * @param string|null $pbc_at  first-reached Pending BC Confirmation DATETIME
+     * @param string|null $p_at    first-reached Pending Payment DATETIME
+     * @return array{draft_to_pb:?int, pb_to_pbc:?int, pbc_to_p:?int}
+     */
+    function compute_draft_payment_segments($sad_at, $pb_at, $pbc_at, $p_at)
+    {
+        return array(
+            'draft_to_pb' => compute_response_seconds($sad_at, $pb_at),
+            'pb_to_pbc'   => compute_response_seconds($pb_at, $pbc_at),
+            'pbc_to_p'    => compute_response_seconds($pbc_at, $p_at),
+        );
+    }
+}
+
+if (!function_exists('calculate_draft_payment_breakdown')) {
+    /**
+     * Fetch the four status milestones for a booking and return the inline
+     * card's data: the three segments plus the overall SAD -> P total (which
+     * stays the same number the summary card reports).
+     *
+     * SAD is an anchor (earliest SAD row, creation or transition). PB / PBC / P
+     * use the earliest TRANSITION (from_status IS NOT NULL) so a booking created
+     * directly at one of these statuses isn't mistaken for an advance into it -
+     * matching calculate_submitted_to_payment_seconds().
+     *
+     * @param int $booking_id
+     * @return array{draft_to_pb:?int, pb_to_pbc:?int, pbc_to_p:?int, total:?int}
+     */
+    function calculate_draft_payment_breakdown($booking_id)
+    {
+        $CI =& get_instance();
+        $CI->load->database();
+        $booking_id = (int) $booking_id;
+
+        $sad_row = $CI->db
+            ->select('MIN(created_at) AS at')
+            ->from('booking_status_log')
+            ->where('booking_id', $booking_id)
+            ->where('to_status', 'SAD')
+            ->get()->row();
+        $sad_at = (!empty($sad_row) && !empty($sad_row->at)) ? $sad_row->at : null;
+
+        $first_reach = function ($status) use ($CI, $booking_id) {
+            $row = $CI->db
+                ->select('created_at')
+                ->from('booking_status_log')
+                ->where('booking_id', $booking_id)
+                ->where('to_status', $status)
+                ->where('from_status IS NOT NULL', null, false)
+                ->order_by('created_at', 'ASC')
+                ->limit(1)
+                ->get()->row();
+            return (!empty($row) && !empty($row->created_at)) ? $row->created_at : null;
+        };
+
+        $pb_at  = $first_reach('PB');
+        $pbc_at = $first_reach('PBC');
+        $p_at   = $first_reach('P');
+
+        $segments = compute_draft_payment_segments($sad_at, $pb_at, $pbc_at, $p_at);
+        $segments['total'] = compute_response_seconds($sad_at, $p_at);
+        return $segments;
+    }
+}
+
 if (!function_exists('format_response_duration')) {
     /**
      * Format a duration in seconds as a compact human-readable string.

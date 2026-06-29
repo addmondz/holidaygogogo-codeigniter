@@ -287,6 +287,72 @@ if (!function_exists('ghl_message_log_average_reply_seconds')) {
     }
 }
 
+if (!function_exists('ghl_message_log_average_reply_seconds_by_group')) {
+    /**
+     * Per-agent variant of ghl_message_log_average_reply_seconds(): the same
+     * inbound->outbound reply pairing and in-hours rule, but tallied separately
+     * per group (e.g. the resolved agent). Rows must arrive ordered by group,
+     * then conversation, then time ascending; a pair only counts when both rows
+     * share the same group AND conversation, so an agent boundary or a
+     * conversation boundary never produces a phantom pair. Powers the team-wide
+     * "Best:" reply-time leaderboard on the dashboard, which must compute every
+     * agent's figure with identical logic to the per-agent card.
+     *
+     * @param array  $rows     Rows of array($groupKey => string,
+     *                         'conversation_id' => string, 'direction' => string,
+     *                         $timeKey => string).
+     * @param string $groupKey Field naming the group (default 'agent_id').
+     * @param string $timeKey  Timestamp field name (default 'ts').
+     * @return array Map of group => array('avg_seconds' => float|null,
+     *               'lead_count' => int) where lead_count is the number of
+     *               distinct conversations that contributed at least one pair.
+     */
+    function ghl_message_log_average_reply_seconds_by_group(array $rows, $groupKey = 'agent_id', $timeKey = 'ts')
+    {
+        $acc = array();
+        $prev = null;
+
+        foreach ($rows as $row) {
+            if ($prev !== null) {
+                $prevGroup = (string) (isset($prev[$groupKey]) ? $prev[$groupKey] : '');
+                $curGroup = (string) (isset($row[$groupKey]) ? $row[$groupKey] : '');
+                $sameGroup = $prevGroup === $curGroup;
+                $sameConversation = (string) (isset($prev['conversation_id']) ? $prev['conversation_id'] : '')
+                    === (string) (isset($row['conversation_id']) ? $row['conversation_id'] : '');
+                $prevDir = strtolower(trim((string) (isset($prev['direction']) ? $prev['direction'] : '')));
+                $curDir = strtolower(trim((string) (isset($row['direction']) ? $row['direction'] : '')));
+
+                if ($sameGroup && $sameConversation && $prevDir === 'inbound' && $curDir === 'outbound') {
+                    $seconds = ghl_message_log_reply_pair_seconds(
+                        isset($prev[$timeKey]) ? $prev[$timeKey] : '',
+                        isset($row[$timeKey]) ? $row[$timeKey] : ''
+                    );
+                    if ($seconds !== null) {
+                        if (!isset($acc[$curGroup])) {
+                            $acc[$curGroup] = array('total' => 0, 'pairs' => 0, 'convs' => array());
+                        }
+                        $acc[$curGroup]['total'] += $seconds;
+                        $acc[$curGroup]['pairs']++;
+                        $acc[$curGroup]['convs'][(string) (isset($row['conversation_id']) ? $row['conversation_id'] : '')] = true;
+                    }
+                }
+            }
+
+            $prev = $row;
+        }
+
+        $out = array();
+        foreach ($acc as $group => $stat) {
+            $out[$group] = array(
+                'avg_seconds' => $stat['pairs'] > 0 ? (float) $stat['total'] / $stat['pairs'] : null,
+                'lead_count'  => count($stat['convs']),
+            );
+        }
+
+        return $out;
+    }
+}
+
 if (!function_exists('ghl_message_log_export_columns')) {
     /**
      * CSV header for the Message Log export. Leads with Contact -- the
@@ -395,6 +461,74 @@ if (!function_exists('ghl_messages_log_pagination')) {
             'to_row'      => $toRow,
             'has_prev'    => $page > 1,
             'has_next'    => $page < $totalPages,
+        );
+    }
+}
+
+if (!function_exists('ghl_message_log_hourly_breakdown')) {
+    /**
+     * Normalise sparse "messages per hour" rows into a full 24-hour series so the
+     * Lead Reply Hourly page always renders every hour 00:00..23:00, even the ones
+     * with no traffic. Each input row is one hour bucket the SQL actually returned
+     * (e.g. {hour_of_day: 9, inbound_count: 3, outbound_count: 5}); hours the query
+     * skipped are filled with zeros. Returns the ordered series plus day totals.
+     *
+     * @param array  $rows        Raw rows, one per hour that had any message.
+     * @param string $hourKey     Key holding the 0-23 hour value.
+     * @param string $inboundKey  Key holding the inbound count for that hour.
+     * @param string $outboundKey Key holding the outbound count for that hour.
+     * @return array{hours: array, total_inbound: int, total_outbound: int, total: int}
+     */
+    function ghl_message_log_hourly_breakdown(array $rows, $hourKey = 'hour_of_day', $inboundKey = 'inbound_count', $outboundKey = 'outbound_count')
+    {
+        $byHour = array();
+        foreach ($rows as $row) {
+            if (!isset($row[$hourKey])) {
+                continue;
+            }
+            $hour = (int) $row[$hourKey];
+            if ($hour < 0 || $hour > 23) {
+                continue;
+            }
+            $inbound = isset($row[$inboundKey]) ? (int) $row[$inboundKey] : 0;
+            $outbound = isset($row[$outboundKey]) ? (int) $row[$outboundKey] : 0;
+            if (!isset($byHour[$hour])) {
+                $byHour[$hour] = array('inbound' => 0, 'outbound' => 0);
+            }
+            $byHour[$hour]['inbound'] += $inbound;
+            $byHour[$hour]['outbound'] += $outbound;
+        }
+
+        $hours = array();
+        $totalInbound = 0;
+        $totalOutbound = 0;
+        for ($hour = 0; $hour <= 23; $hour++) {
+            $inbound = isset($byHour[$hour]) ? $byHour[$hour]['inbound'] : 0;
+            $outbound = isset($byHour[$hour]) ? $byHour[$hour]['outbound'] : 0;
+            $totalInbound += $inbound;
+            $totalOutbound += $outbound;
+
+            $suffix = $hour < 12 ? 'AM' : 'PM';
+            $display = $hour % 12;
+            if ($display === 0) {
+                $display = 12;
+            }
+
+            $hours[] = array(
+                'hour' => $hour,
+                'label' => $display . ' ' . $suffix,
+                'range_label' => sprintf('%02d:00 - %02d:59', $hour, $hour),
+                'inbound' => $inbound,
+                'outbound' => $outbound,
+                'total' => $inbound + $outbound,
+            );
+        }
+
+        return array(
+            'hours' => $hours,
+            'total_inbound' => $totalInbound,
+            'total_outbound' => $totalOutbound,
+            'total' => $totalInbound + $totalOutbound,
         );
     }
 }

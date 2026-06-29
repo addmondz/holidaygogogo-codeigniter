@@ -142,6 +142,7 @@
                                     <option selected disabled data-icon="la la-key font-size-lg bs-icon" value="">--SELECT LEVEL--</option>
                                     <?php foreach(unserialize(LEVEL) as $key => $value) { ?>
                                         <?php if($this->session->level == 30 && $key == 10) { continue; } ?>
+                                        <?php if($key == 50) { continue; } ?>
                                         <option <?php if($Action == 'U' && $key == $Level) { echo 'selected'; } ?> data-icon="<?php if($key == 20) { echo 'la la-user-alt'; } else if($key == 30) { echo 'la la-hand-holding-usd'; } else { echo 'la la-user-tie'; } ?> font-size-lg bs-icon" value="<?php echo $key; ?>"><?php echo $value; ?></option>
                                     <?php } ?>
                                 </select>

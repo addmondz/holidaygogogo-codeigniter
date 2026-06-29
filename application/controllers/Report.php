@@ -318,6 +318,29 @@ class Report extends MY_Controller
         $this->load->view('layout/footer');
     }
 
+    function Lead_Reply_Activity_Hourly()
+    {
+        $filters = $this->lead_reply_activity_filters();
+        $payload = $this->lead_reply_activity_hourly_payload($filters);
+
+        $titles = array(
+            'tab_title' => 'HolidayGoGoGo | Report',
+            'breadcrumb_title' => 'Report >> Lead Reply Hourly'
+        );
+
+        $array = array(
+            'lead_reply_hourly_owner_id' => $payload['owner_id'],
+            'lead_reply_hourly_owner_name' => $payload['owner_name'],
+            'lead_reply_hourly_date_label' => $filters['reply_date'],
+            'lead_reply_hourly_breakdown' => $payload['breakdown'],
+            'lead_reply_hourly_updated_at' => $payload['updated_at'],
+        );
+
+        $this->load->view('layout/header', $titles);
+        $this->load->view('report/lead_reply_activity_hourly', $array);
+        $this->load->view('layout/footer');
+    }
+
     function Lead_Data()
     {
         $filters = $this->lead_data_filters();
@@ -995,6 +1018,38 @@ class Report extends MY_Controller
                 'leads' => $mobile !== '' ? $this->format_lead_reply_activity_mobile_leads($this->Report_Model->Lead_Reply_Activity_Mobile_Leads($mobile, $filters)) : array(),
                 'owners' => $mobile !== '' ? $this->Report_Model->Lead_Reply_Activity_Mobile_Owners($mobile, $filters) : array(),
             ),
+            'updated_at' => date('Y-m-d H:i:s'),
+        );
+    }
+
+    private function lead_reply_activity_hourly_payload($filters)
+    {
+        $this->load->helper('ghl_messages_log');
+
+        $restrict = isset($filters['_restrict_agent_ids']) ? $filters['_restrict_agent_ids'] : null;
+        $ownerIds = isset($filters['owner_user_id']) ? array_values(array_filter((array) $filters['owner_user_id'], 'strlen')) : array();
+        $ownerId = !empty($ownerIds) ? (string) $ownerIds[0] : '';
+
+        // Lock the query to a single owner: this is a per-owner drill-down, never a
+        // whole-team roll-up. Drop any extra ids the URL may carry.
+        $singleOwnerFilters = $filters;
+        $singleOwnerFilters['owner'] = $ownerId !== '' ? array($ownerId) : array();
+        $singleOwnerFilters['owner_user_id'] = $singleOwnerFilters['owner'];
+
+        $ownerName = $ownerId;
+        foreach ($this->Report_Model->Lead_Ownership_Agents($restrict) as $agent) {
+            if ((string) $agent->agent_id === $ownerId) {
+                $ownerName = $agent->agent_name;
+                break;
+            }
+        }
+
+        $rows = $ownerId !== '' ? $this->Report_Model->Lead_Reply_Activity_Hourly_By_Owner($singleOwnerFilters) : array();
+
+        return array(
+            'owner_id' => $ownerId,
+            'owner_name' => $ownerName,
+            'breakdown' => ghl_message_log_hourly_breakdown($rows),
             'updated_at' => date('Y-m-d H:i:s'),
         );
     }

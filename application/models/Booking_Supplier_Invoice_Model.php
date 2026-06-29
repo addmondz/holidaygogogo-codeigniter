@@ -57,10 +57,15 @@ class Booking_Supplier_Invoice_Model extends CI_Model
         $batch = [];
         foreach ($rows as $r) {
             // SupplierID + InvoiceNumber are NOT NULL. A row with only a file
-            // attached (no supplier / no number — e.g. added on a parked draft
-            // where those inputs are locked) would abort the whole booking save
-            // with a NOT NULL violation, so drop it instead of inserting.
+            // attached (no supplier / no number) would abort the whole booking
+            // save with a NOT NULL violation, so drop it instead of inserting.
+            // The booking form blocks this before submit, but a direct/tampered
+            // POST can still reach here — reclaim any file already uploaded for
+            // the dropped row so it doesn't orphan on disk.
             if (!supplier_invoice_row_is_complete($r)) {
+                if (isset($r->InvoiceFilePath) && $r->InvoiceFilePath !== '') {
+                    supplier_invoice_delete_orphan_file($r->InvoiceFilePath);
+                }
                 continue;
             }
             $batch[] = [

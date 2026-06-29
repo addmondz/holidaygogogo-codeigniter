@@ -104,22 +104,30 @@
                                     <i class="la la-info-circle ml-1" style="cursor:help; color:#2f506f;" data-toggle="tooltip"
                                        title="Leads still being handled today: Lead Responded minus Transfer Out Lead (never below zero)."></i>
                                 </th>
+                                <th style="text-align:center;">Hourly</th>
                             </tr>
                         </thead>
                         <tbody id="lead-reply-activity-table-body">
                             <?php if(empty($lead_reply_activity_rows)) { ?>
                                 <tr>
-                                    <td colspan="5" class="text-center py-10">Lead reply activity not found for the selected filters.</td>
+                                    <td colspan="6" class="text-center py-10">Lead reply activity not found for the selected filters.</td>
                                 </tr>
                             <?php } else { ?>
                                 <?php $count = 1; ?>
+                                <?php $replyDateParam = isset($lead_reply_activity_filters['reply_date']) ? $lead_reply_activity_filters['reply_date'] : ''; ?>
                                 <?php foreach($lead_reply_activity_rows as $row) { ?>
+                                    <?php $hourlyUrl = base_url('Report/Lead_Reply_Activity_Hourly') . '?owner=' . urlencode($row['owner_user_id']) . '&reply_date=' . urlencode($replyDateParam); ?>
                                     <tr>
                                         <td class="text-center"><?php echo $count; ?></td>
                                         <td class="font-weight-bold text-dark"><?php echo html_escape($row['owner_name']); ?></td>
                                         <td class="text-center"><?php echo number_format($row['lead_responded']); ?></td>
                                         <td class="text-center"><?php echo number_format($row['transfer_out_leads']); ?></td>
                                         <td class="text-center font-weight-bold text-dark"><?php echo number_format($row['today_handling_leads']); ?></td>
+                                        <td class="text-center">
+                                            <a href="<?php echo html_escape($hourlyUrl); ?>" class="btn btn-sm btn-light-primary font-weight-bold" data-toggle="tooltip" title="View inbound/outbound per hour for this owner">
+                                                <i class="la la-clock-o"></i> Hourly
+                                            </a>
+                                        </td>
                                     </tr>
                                     <?php $count++; ?>
                                 <?php } ?>
@@ -161,28 +169,35 @@
         return $('<div>').text(value === null || value === undefined ? '' : value).html();
     }
 
+    var leadReplyHourlyBase = '<?php echo base_url('Report/Lead_Reply_Activity_Hourly'); ?>';
+
     function renderLeadReplyActivityRows(rows) {
         var html = '';
 
         if (!rows || rows.length === 0) {
-            $('#lead-reply-activity-table-body').html('<tr><td colspan="5" class="text-center py-10">Lead reply activity not found for the selected filters.</td></tr>');
+            $('#lead-reply-activity-table-body').html('<tr><td colspan="6" class="text-center py-10">Lead reply activity not found for the selected filters.</td></tr>');
             return;
         }
+
+        var replyDate = $('input[name="reply_date"]').val() || '';
 
         $.each(rows, function(index, row) {
             var leadResponded = Number(row.lead_responded) || 0;
             var transferOutLeads = Number(row.transfer_out_leads) || 0;
             var todayHandlingLeads = Number(row.today_handling_leads) || 0;
+            var hourlyUrl = leadReplyHourlyBase + '?owner=' + encodeURIComponent(row.owner_user_id) + '&reply_date=' + encodeURIComponent(replyDate);
             html += '<tr>';
             html += '<td class="text-center">' + (index + 1) + '</td>';
             html += '<td class="font-weight-bold text-dark">' + escapeHtml(row.owner_name) + '</td>';
             html += '<td class="text-center">' + leadResponded + '</td>';
             html += '<td class="text-center">' + transferOutLeads + '</td>';
             html += '<td class="text-center font-weight-bold text-dark">' + todayHandlingLeads + '</td>';
+            html += '<td class="text-center"><a href="' + hourlyUrl + '" class="btn btn-sm btn-light-primary font-weight-bold" data-toggle="tooltip" title="View inbound/outbound per hour for this owner"><i class="la la-clock-o"></i> Hourly</a></td>';
             html += '</tr>';
         });
 
         $('#lead-reply-activity-table-body').html(html);
+        $('#lead-reply-activity-table-body [data-toggle="tooltip"]').tooltip({ container: 'body', boundary: 'viewport', trigger: 'hover' });
     }
 
     function refreshLeadReplyActivityDashboard() {

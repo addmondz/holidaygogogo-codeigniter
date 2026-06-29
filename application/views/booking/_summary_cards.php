@@ -39,12 +39,14 @@
     #booking_summary_cards .summary-best .best-name { color:#3F4254; }
     #booking_summary_cards .summary-best .best-name.is-you { color:#6082B6; }
     #booking_summary_cards .summary-best .best-fig { color:#2F6F4F; font-weight:700; background:#E5F3EC; padding:1px 7px; border-radius:4px; }
-    /* Agent Score Month/Year toggle — sits between the title and the info icon. */
-    #booking_summary_cards .sc-score-toggle { display:inline-flex; gap:0; margin-left:auto; margin-right:8px; border:1px solid #B8C7E0; border-radius:5px; overflow:hidden; }
-    #booking_summary_cards .sc-score-tab { border:none; background:#EEF3FB; color:#5C6473; font-size:11px; font-weight:600; padding:3px 10px; cursor:pointer; line-height:1.4; }
-    #booking_summary_cards .sc-score-tab + .sc-score-tab { border-left:1px solid #B8C7E0; }
-    #booking_summary_cards .sc-score-tab.is-active { background:#6082B6; color:#fff; }
-    #booking_summary_cards .sc-score-tab:not(.is-active):hover { background:#DCE6F5; }
+    /* Owner per-agent matrix: global Day/Week/Month/Year toggle + dense table. */
+    #booking_summary_cards .sc-owner-toggle { display:inline-flex; gap:0; margin-left:auto; border:1px solid #B8C7E0; border-radius:5px; overflow:hidden; }
+    #booking_summary_cards .sc-owner-tab { border:none; background:#EEF3FB; color:#5C6473; font-size:12px; font-weight:600; padding:4px 14px; cursor:pointer; line-height:1.4; }
+    #booking_summary_cards .sc-owner-tab + .sc-owner-tab { border-left:1px solid #B8C7E0; }
+    #booking_summary_cards .sc-owner-tab.is-active { background:#6082B6; color:#fff; }
+    #booking_summary_cards .sc-owner-tab:not(.is-active):hover { background:#DCE6F5; }
+    #booking_summary_cards .sc-owner-matrix th, #booking_summary_cards .sc-owner-matrix td { white-space:nowrap; vertical-align:middle; }
+    #booking_summary_cards .sc-owner-matrix tbody tr:first-child td { font-weight:600; }
     #booking_summary_cards .sc-month-filter { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:14px; padding:10px 14px; background:#EEF3FB; border-radius:6px; }
     #booking_summary_cards .sc-month-filter label { margin:0; font-weight:600; color:#3F4254; font-size:13px; }
     #booking_summary_cards .sc-month-filter input[type=month] { width:auto; max-width:190px; height:auto; padding:6px 10px; font-size:13px; }
@@ -216,7 +218,7 @@
                     <div class="card card-custom">
                         <div class="card-header border-0 summary-card-header" style="background-color:#D7E2F2;">
                             <h3>Cancellation Rate (Month)</h3>
-                            <i id="pop-cancel-rate" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>What it shows:</strong> The share of this month&rsquo;s bookings that ended up cancelled.<br><br><strong>How it&rsquo;s worked out:</strong> cancelled bookings divided by all bookings created this month.<ul><li><strong>Top number:</strong> bookings created this month that were later cancelled</li><li><strong>Bottom number:</strong> all bookings created this month (including the cancelled ones)</li></ul><strong>Example:</strong> 20 bookings, 5 cancelled = 25%.<br><br><strong>Scope:</strong> drafts are not counted. Your own view shows only your bookings; the team view shows everyone&rsquo;s.<br><br><strong>Note:</strong> based on when the booking was <strong>created</strong>, not when it was cancelled. A booking created last month but cancelled this month is not counted here."></i>
+                            <i id="pop-cancel-rate" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>What it shows:</strong> The share of this month&rsquo;s bookings that ended up cancelled.<br><br><strong>How it&rsquo;s worked out:</strong> cancelled bookings divided by all bookings created this month.<ul><li><strong>Top number:</strong> bookings created this month that were later cancelled</li><li><strong>Bottom number:</strong> all bookings created this month (including the cancelled ones)</li></ul><strong>Example:</strong> 20 bookings, 5 cancelled = 25%.<br><br><strong>Scope:</strong> drafts are not counted, and bookings cancelled as a <strong>duplicate</strong> (reason &ldquo;Booking - Duplicated Booking&rdquo;) are left out of both numbers &mdash; they are data-entry copies, not lost sales. Your own view shows only your bookings; the team view shows everyone&rsquo;s.<br><br><strong>Note:</strong> based on when the booking was <strong>created</strong>, not when it was cancelled. A booking created last month but cancelled this month is not counted here."></i>
                         </div>
                         <div class="card-body summary-card-body">
                             <div class="summary-value" id="sc-cancel-rate-value">...</div>
@@ -260,7 +262,7 @@
                 <div class="card card-custom">
                     <div class="card-header border-0 summary-card-header" style="background-color:#D7E2F2;">
                         <h3>Avg Reply Time to Inbound</h3>
-                        <i id="pop-tc-resp" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>What it shows:</strong> On average, how quickly you reply to an inbound message from your leads (from GHL).<br><br><strong>How it&rsquo;s measured:</strong> the average reply time across the first 5 and the most recent 5 replies on each lead (any overlap counted once), shown in seconds, minutes, or hours.<br><br><strong>Working hours only:</strong> only time during working hours (everyday, 7:00am&ndash;10:00pm Malaysia time) is counted, so replies left overnight don&rsquo;t make the number look worse.<br><br><strong>By period</strong> (based on when the lead came in): Today, Week (Mon&ndash;Sun), and Month.<br><br><strong>Best:</strong> the fastest agent across the team this month (minimum 3 leads).<br>A dash (&mdash;) means no leads were replied to in that period."></i>
+                        <i id="pop-tc-resp" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>What it shows:</strong> On average, how quickly you reply to an inbound message from your leads (from GHL).<br><br><strong>How it&rsquo;s measured:</strong> every inbound customer message answered by your next reply in the same chat is timed, and all those reply times are averaged &mdash; the same as the Message Log&rsquo;s &lsquo;Avg time taken&rsquo;. Shown in seconds, minutes, or hours.<br><br><strong>Working hours only:</strong> only time during working hours (everyday, 7:00am&ndash;10:00pm Malaysia time) is counted, so replies left overnight don&rsquo;t make the number look worse.<br><br><strong>By period</strong> (based on when the reply was sent): Today, Week (Mon&ndash;Sun), and Month.<br><br><strong>Best:</strong> the fastest agent across the team this month (minimum 3 chats replied to).<br>A dash (&mdash;) means you sent no qualifying replies in that period."></i>
                     </div>
                     <div class="card-body summary-card-body">
                         <div class="summary-row-3">
@@ -268,7 +270,7 @@
                             <div><div class="lbl">Week</div><div class="summary-value-sm" id="sc-tc-resp-week">...</div></div>
                             <div><div class="lbl">Month</div><div class="summary-value-sm" id="sc-tc-resp-month">...</div></div>
                         </div>
-                        <div class="summary-sub">Avg reply time to an inbound message (first 5 + most-recent 5, merged) across your leads in each window.</div>
+                        <div class="summary-sub">Avg reply time to inbound messages (every reply counted), by when the reply was sent. Matches the Message Log.</div>
                         <div class="summary-sub summary-best" id="sc-tc-resp-best">Fastest: —</div>
                     </div>
                 </div>
@@ -319,16 +321,12 @@
             <div class="col-md-3 sc-pos-11">
                 <div class="card card-custom">
                     <div class="card-header border-0 summary-card-header" style="background-color:#D7E2F2;">
-                        <h3>Agent Score</h3>
-                        <span class="sc-score-toggle" role="group" aria-label="Agent score period">
-                            <button type="button" class="sc-score-tab is-active" data-period="month">Month</button>
-                            <button type="button" class="sc-score-tab" data-period="year">Year</button>
-                        </span>
-                        <i id="pop-agent-score" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>What it shows:</strong> Your overall performance score, ranked against everyone else, for the selected period.<br><br><strong>It blends four things, each benchmarked so the period&rsquo;s best performer scores 100 on that measure:</strong><ul><li>Avg reply time to inbound &mdash; <strong>30%</strong></li><li>1st-response / pickup speed &mdash; <strong>20%</strong></li><li>Conversion rate &mdash; <strong>20%</strong></li><li>Sales value &mdash; <strong>30%</strong></li></ul>For the two speed measures, faster is better; for conversion and sales, higher is better. A measure with no data scores 0.<br><br><strong>Score = 100</strong> would mean being the best on every single measure. Use the Month / Year tabs to switch period."></i>
+                        <h3>Agent Score (Month)</h3>
+                        <i id="pop-agent-score" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>What it shows:</strong> Your overall performance score this month, ranked against everyone else.<br><br><strong>It blends six things, each benchmarked so the month&rsquo;s best performer scores 100 on that measure:</strong><ul><li>Avg reply time to inbound &mdash; <strong>15%</strong></li><li>1st-response / pickup speed &mdash; <strong>15%</strong></li><li>Conversion rate &mdash; <strong>15%</strong></li><li>Sales value &mdash; <strong>25%</strong></li><li>Follow-up rate &mdash; <strong>15%</strong></li><li>Qty of leads served &mdash; <strong>15%</strong></li></ul>For the two speed measures, faster is better; for conversion, sales, follow-up and leads served, higher is better. A measure with no data scores 0.<br><br><strong>Score = 100</strong> would mean being the best on every single measure."></i>
                     </div>
                     <div class="card-body summary-card-body">
                         <div class="summary-value" id="sc-agent-score-value">...</div>
-                        <div class="summary-sub">Rank <span id="sc-agent-score-rank">—</span> of <span id="sc-agent-score-total">—</span> agents. Weighted blend of reply speed, pickup speed, conversion &amp; sales, benchmarked against the best performer.</div>
+                        <div class="summary-sub">Rank <span id="sc-agent-score-rank">—</span> of <span id="sc-agent-score-total">—</span> agents. Weighted blend of reply speed, pickup speed, conversion, sales, follow-up &amp; leads served, benchmarked against the best performer.</div>
                         <div class="summary-sub summary-best" id="sc-agent-score-best">Top: —</div>
                     </div>
                 </div>
@@ -336,9 +334,10 @@
         <?php } ?>
 
         <?php /* ---------- TC LEAD / Owner ---------- */ ?>
-        <?php if($show_tclead || $show_owner) { ?>
-            <?php /* Owner replaces this aggregate Leads card with the per-agent
-                     "Leads" table below; TC LEAD keeps the team-wide totals. */ ?>
+        <?php /* ---------- TC LEAD (level 25) ---------- */ ?>
+        <?php /* Owner (level 10) no longer shares this block — it renders the
+                 per-agent performance matrix below instead. */ ?>
+        <?php if($show_tclead) { ?>
             <?php if($show_tclead) { ?>
             <div class="col-md-4">
                 <div class="card card-custom">
@@ -412,7 +411,7 @@
                     <div class="card card-custom">
                         <div class="card-header border-0 summary-card-header" style="background-color:#FFFAA030;">
                             <h3>Cancellation Rate (Month)</h3>
-                            <i id="pop-cancel-rate-tl" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>What it shows:</strong> The share of this month&rsquo;s bookings that ended up cancelled.<br><br><strong>How it&rsquo;s worked out:</strong> cancelled bookings divided by all bookings created this month.<ul><li><strong>Top number:</strong> bookings created this month that were later cancelled</li><li><strong>Bottom number:</strong> all bookings created this month (including the cancelled ones)</li></ul><strong>Example:</strong> 20 bookings, 5 cancelled = 25%.<br><br><strong>Scope:</strong> drafts are not counted. Your own view shows only your bookings; the team view shows everyone&rsquo;s.<br><br><strong>Note:</strong> based on when the booking was <strong>created</strong>, not when it was cancelled. A booking created last month but cancelled this month is not counted here."></i>
+                            <i id="pop-cancel-rate-tl" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>What it shows:</strong> The share of this month&rsquo;s bookings that ended up cancelled.<br><br><strong>How it&rsquo;s worked out:</strong> cancelled bookings divided by all bookings created this month.<ul><li><strong>Top number:</strong> bookings created this month that were later cancelled</li><li><strong>Bottom number:</strong> all bookings created this month (including the cancelled ones)</li></ul><strong>Example:</strong> 20 bookings, 5 cancelled = 25%.<br><br><strong>Scope:</strong> drafts are not counted, and bookings cancelled as a <strong>duplicate</strong> (reason &ldquo;Booking - Duplicated Booking&rdquo;) are left out of both numbers &mdash; they are data-entry copies, not lost sales. Your own view shows only your bookings; the team view shows everyone&rsquo;s.<br><br><strong>Note:</strong> based on when the booking was <strong>created</strong>, not when it was cancelled. A booking created last month but cancelled this month is not counted here."></i>
                         </div>
                         <div class="card-body summary-card-body">
                             <div class="summary-value" id="sc-cancel-rate-tl-value">...</div>
@@ -437,50 +436,6 @@
                     </div>
                 </div>
             </div>
-            <?php if($show_owner) { ?>
-            <div class="col-md-6">
-                <div class="card card-custom">
-                    <div class="card-header border-0 summary-card-header" style="background-color:#A7C7E730;">
-                        <h3>Leads</h3>
-                        <i id="pop-leads-by-agent" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="Loading…"></i>
-                    </div>
-                    <div class="card-body summary-card-body">
-                        <div class="summary-sub mb-2">New leads synced from GHL, one row per agent for today, this week, and this month-to-date.</div>
-                        <table class="table table-sm summary-table">
-                            <thead><tr><th>Agent</th><th class="text-right">Today</th><th class="text-right">Week</th><th class="text-right">Month</th></tr></thead>
-                            <tbody id="sc-leads-by-agent-body"><tr><td colspan="4" class="text-center text-muted">Loading…</td></tr></tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-6">
-                <a class="summary-card" id="sc-pending-bc-link" href="#">
-                    <div class="card card-custom">
-                        <div class="card-header border-0 summary-card-header" style="background-color:#FFFAA030;">
-                            <h3>Pending BC</h3>
-                            <i id="pop-pending-bc" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>What it shows:</strong> All bookings sitting at the <strong>Pending BC</strong> stage, waiting to be confirmed.<br><br><strong>Counted when:</strong><ul><li>The booking is at the &ldquo;Pending BC&rdquo; stage</li><li>It is not cancelled</li></ul>This is a team-wide live list with no date limit. &ldquo;Pending BC&rdquo; is the step after a draft has been moved forward but before the booking is fully confirmed. Click to view and move them along."></i>
-                        </div>
-                        <div class="card-body summary-card-body">
-                            <div class="summary-value" id="sc-pending-bc-count">...</div>
-                            <div class="summary-sub">All bookings sitting at &ldquo;Pending BC&rdquo;, waiting to be confirmed. Click to view the list.</div>
-                        </div>
-                    </div>
-                </a>
-            </div>
-            <div class="col-md-6">
-                <div class="card card-custom">
-                    <div class="card-header border-0 summary-card-header" style="background-color:#A7C7E730;">
-                        <h3>Draft &rarr; Payment Time (Month)</h3>
-                        <i id="pop-submitted-payment" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>What it shows:</strong> On average, how long bookings take to go from first being saved as a draft to reaching the <strong>Pending Payment</strong> stage.<br><br><strong>Start:</strong> when the booking was saved as a draft.<br><strong>End:</strong> the first time it reached Pending Payment.<br><br><strong>Window:</strong> drafts saved this month, across the whole team. Ones still in progress aren&rsquo;t counted yet.<br><br><strong>Best:</strong> the fastest agent this month (minimum 2 bookings)."></i>
-                    </div>
-                    <div class="card-body summary-card-body">
-                        <div class="summary-value" id="sc-submitted-payment-value">...</div>
-                        <div class="summary-sub"><span id="sc-submitted-payment-count">—</span> drafts this month reached payment. Average draft-to-payment time across the team.</div>
-                        <div class="summary-sub summary-best" id="sc-submitted-payment-best">Best: —</div>
-                    </div>
-                </div>
-            </div>
-            <?php } ?>
             <div class="col-md-6">
                 <div class="card card-custom">
                     <div class="card-header border-0 summary-card-header" style="background-color:#A7C7E730;">
@@ -556,6 +511,48 @@
                             </thead>
                             <tbody id="sc-agent-source-split-body"><tr><td colspan="7" class="text-center text-muted">Loading&hellip;</td></tr></tbody>
                         </table>
+                    </div>
+                </div>
+            </div>
+        <?php } ?>
+
+        <?php /* ---------- OWNER (level 10) per-agent performance matrix ---------- */ ?>
+        <?php if($show_owner) { ?>
+            <div class="col-md-12">
+                <div class="card card-custom">
+                    <div class="card-header border-0 summary-card-header" style="background-color:#A7C7E730; display:flex; align-items:center;">
+                        <h3 style="margin:0;">Agent Performance &mdash; <span id="sc-owner-period-label">This month</span></h3>
+                        <i id="pop-owner-matrix" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="What each column means" data-content="<strong>Each row is one sales agent</strong>, for the selected period (use the Day / Week / Month / Year toggle).<ul><li><strong>Reply Time:</strong> average time to reply to an inbound message.</li><li><strong>1st Reply:</strong> average time to send the first reply to a new lead.</li><li><strong>New Leads:</strong> leads assigned to them in the period.</li><li><strong>Served:</strong> leads they owned (assigned or replied to).</li><li><strong>Conv % (credited):</strong> their leads that became a booking where they hold the credited sales slot, over their leads.</li><li><strong>Conv % (all):</strong> their leads that became a booking, whoever is credited, over their leads.</li><li><strong>Outbound:</strong> outbound messages they sent.</li><li><strong>Sales:</strong> value of booking confirmations credited to them (no payment gate).</li><li><strong>Follow-up %:</strong> owned leads that received a follow-up.</li><li><strong>Cancel %:</strong> credited booking confirmations later cancelled (duplicate cancellations excluded).</li><li><strong>Score:</strong> weighted 0&ndash;100 composite (reply 15% + 1st reply 15% + conversion 15% + sales 25% + follow-up 15% + leads served 15%); the period&rsquo;s best on each metric scores 100.</li></ul>Speed and score need a minimum sample to rank fairly. &ldquo;&mdash;&rdquo; means no data for that agent."></i>
+                        <span class="sc-owner-toggle" role="group" aria-label="Performance period">
+                            <button type="button" class="sc-owner-tab" data-owner-period="day">Day</button>
+                            <button type="button" class="sc-owner-tab" data-owner-period="week">Week</button>
+                            <button type="button" class="sc-owner-tab is-active" data-owner-period="month">Month</button>
+                            <button type="button" class="sc-owner-tab" data-owner-period="year">Year</button>
+                        </span>
+                    </div>
+                    <div class="card-body summary-card-body">
+                        <div class="summary-sub mb-2">One row per sales agent across all performance metrics for the selected period, sorted by Agent Score. The Day / Week / Month / Year toggle re-scopes every column at once. Some columns are only reported for certain periods &mdash; a &ldquo;&mdash;&rdquo; means that column doesn&rsquo;t apply to the selected period (e.g. Conversion &amp; Cancellation show only on <strong>Year</strong>; Follow-up &amp; Agent Score only on <strong>Month</strong>; Reply Time / New Leads / Served / Outbound on Day / Week / Month; Sales on Month / Year; 1st Reply on all periods).</div>
+                        <div class="table-responsive">
+                            <table class="table table-sm summary-table sc-owner-matrix">
+                                <thead>
+                                    <tr>
+                                        <th>Agent</th>
+                                        <th class="text-right">Reply Time</th>
+                                        <th class="text-right">1st Reply</th>
+                                        <th class="text-right">New Leads</th>
+                                        <th class="text-right">Served</th>
+                                        <th class="text-right">Conv % (credited)</th>
+                                        <th class="text-right">Conv % (all)</th>
+                                        <th class="text-right">Outbound</th>
+                                        <th class="text-right">Sales</th>
+                                        <th class="text-right">Follow-up %</th>
+                                        <th class="text-right">Cancel %</th>
+                                        <th class="text-right">Score</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="sc-owner-matrix-body"><tr><td colspan="12" class="text-center text-muted">Loading&hellip;</td></tr></tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1003,10 +1000,43 @@ $(function() {
     $body.on('hidden.bs.collapse', function() {
         try { localStorage.setItem(KEY, '1'); } catch(e) {}
     });
-    $('#booking_summary_cards [data-toggle="popover"]').popover({
-        customClass: 'summary-popover',
-        container: 'body',
-        boundary: 'window'
+    // Anti-flicker hover popover. The stock `trigger:'hover focus'` hides the
+    // popover the instant the cursor leaves the icon, so moving the mouse the
+    // few pixels down into the popover body fires mouseleave -> hide, and the
+    // re-entry fires mouseenter -> show again: a rapid show/hide flicker loop.
+    // Here we drive show/hide manually and keep the popover open while the
+    // cursor is over EITHER the icon or the popover tip, with a short grace
+    // delay so the gap between them no longer breaks the hover.
+    window.initSummaryPopover = function(el) {
+        var $el = $(el);
+        $el.popover('dispose').popover({
+            customClass: 'summary-popover',
+            container: 'body',
+            boundary: 'window',
+            html: true,
+            trigger: 'manual'
+        });
+        var hideTimer = null;
+        function cancelHide() { if(hideTimer) { clearTimeout(hideTimer); hideTimer = null; } }
+        function scheduleHide() {
+            cancelHide();
+            hideTimer = setTimeout(function() { $el.popover('hide'); }, 150);
+        }
+        $el.off('.scpop')
+            .on('mouseenter.scpop focus.scpop', function() { cancelHide(); $el.popover('show'); })
+            .on('mouseleave.scpop blur.scpop', scheduleHide)
+            .on('shown.bs.popover.scpop', function() {
+                var inst = $el.data('bs.popover');
+                var tip = inst && inst.tip;
+                if(tip) {
+                    $(tip).off('.scpop')
+                        .on('mouseenter.scpop', cancelHide)
+                        .on('mouseleave.scpop', scheduleHide);
+                }
+            });
+    };
+    $('#booking_summary_cards [data-toggle="popover"]').each(function() {
+        window.initSummaryPopover(this);
     });
 });
 (function() {
@@ -1018,6 +1048,19 @@ $(function() {
     function setText(id, val) {
         var el = document.getElementById(id);
         if(el) el.textContent = (val == null ? '-' : val);
+    }
+    // Owner matrix formatters. Seconds -> s/m/h (matches the TC response-time
+    // cards); raw RM value -> "RM 1,234.00". Null/undefined -> em-dash.
+    function fmtOwnerSecs(s) {
+        if(s === null || s === undefined) return '—';
+        s = Number(s);
+        if(s >= 3600) return (s / 3600).toFixed(1) + 'h';
+        if(s >= 60)   return (s / 60).toFixed(1) + 'm';
+        return Math.round(s) + 's';
+    }
+    function fmtOwnerMoney(v) {
+        v = Number(v) || 0;
+        return 'RM ' + v.toLocaleString('en-MY', {minimumFractionDigits: 2, maximumFractionDigits: 2});
     }
     function setLink(id, href) {
         var el = document.getElementById(id);
@@ -1062,11 +1105,10 @@ $(function() {
         html += '<span class="best-fig">' + escapeHtml(best.value) + '</span>';
         el.innerHTML = html;
     }
-    // Agent Score card: render the stashed payload for the active period. The
-    // toggle choice is remembered (window._agentScorePeriod) so it survives the
-    // month-picker reloads. Empty payload -> em-dash, leaderboard "Top:" stays.
-    function renderAgentScore(period) {
-        var d = (window._agentScore || {})[period];
+    // Agent Score card: render the stashed (month) payload. Empty payload ->
+    // em-dash, leaderboard "Top:" stays.
+    function renderAgentScore() {
+        var d = window._agentScore;
         if(!d) { return; }
         var has = (d.raw != null && d.value && d.value !== '-');
         setText('sc-agent-score-value', has ? d.value : '—');
@@ -1074,22 +1116,27 @@ $(function() {
         setText('sc-agent-score-total', d.total == null ? '—' : d.total);
         setBest('sc-agent-score-best', d.best, 'Top');
     }
-    $('#booking_summary_cards').on('click', '.sc-score-tab', function() {
-        var p = $(this).data('period');
-        window._agentScorePeriod = p;
-        $('#booking_summary_cards .sc-score-tab').removeClass('is-active');
-        $(this).addClass('is-active');
-        renderAgentScore(p);
-    });
     // Keep clicks on the "Last synced" text from collapsing the panel.
     $('#booking_summary_cards .ghl-last-sync').on('click', function(e) {
         e.stopPropagation();
     });
+    // Owner matrix: global Day/Week/Month/Year toggle. Re-requests the whole
+    // matrix scoped to the chosen period (remembered in window._ownerPeriod).
+    $('#booking_summary_cards').on('click', '.sc-owner-tab', function() {
+        var p = $(this).data('owner-period');
+        window._ownerPeriod = p;
+        $('#booking_summary_cards .sc-owner-tab').removeClass('is-active');
+        $(this).addClass('is-active');
+        var mp = document.getElementById('sc-month-picker');
+        loadSummaryCards(mp ? mp.value : null, p);
+    });
 
-    function loadSummaryCards(month) {
+    function loadSummaryCards(month, ownerPeriod) {
         var url = '<?php echo base_url("Booking/ajax_summary_cards"); ?>';
         var params = [];
         if(month) { params.push('month=' + encodeURIComponent(month)); }
+        var op = ownerPeriod || window._ownerPeriod;
+        if(op) { params.push('owner_period=' + encodeURIComponent(op)); }
         if(params.length) { url += '?' + params.join('&'); }
         $.getJSON(url, function(resp) {
         if(!resp || resp.error) return;
@@ -1167,9 +1214,9 @@ $(function() {
             setText('sc-tc-followup-detail', c.followup_rate.detail);
             setBest('sc-tc-followup-best',   c.followup_rate.best, 'Highest follow-up');
         }
-        if(c.agent_score_month || c.agent_score_year) {
-            window._agentScore = { month: c.agent_score_month, year: c.agent_score_year };
-            renderAgentScore(window._agentScorePeriod || 'month');
+        if(c.agent_score_month) {
+            window._agentScore = c.agent_score_month;
+            renderAgentScore();
         }
         if(c.tc_pickup_speed_month) {
             var pk = c.tc_pickup_speed_month;
@@ -1191,19 +1238,6 @@ $(function() {
         if(c.slow_conversion_month) {
             setText('sc-slow-conv-count', c.slow_conversion_month.count);
             setLink('sc-slow-conv-link',  c.slow_conversion_month.link);
-        }
-        if(c.pending_bc) {
-            setText('sc-pending-bc-count', c.pending_bc.count);
-            setLink('sc-pending-bc-link', c.pending_bc.link);
-        }
-        if(c.submitted_payment_response_month) {
-            var sp = c.submitted_payment_response_month;
-            // format_response_duration returns '-' for null; render an em-dash
-            // when no drafts reached payment in the window.
-            var spHas = (sp.count > 0 && sp.value && sp.value !== '-');
-            setText('sc-submitted-payment-value', spHas ? sp.value : '—');
-            setText('sc-submitted-payment-count', sp.count);
-            setBest('sc-submitted-payment-best', sp.best, 'Fastest');
         }
         if(c.cancellation_rate) {
             setText('sc-cancel-rate-value', c.cancellation_rate.value);
@@ -1414,23 +1448,63 @@ $(function() {
             }
         }
 
-        // Leads by Agent (Owner) — Today / Week / Month new-lead counts per agent.
-        var leadsByAgent = t.leads_by_agent;
-        var leadsByAgentBody = document.getElementById('sc-leads-by-agent-body');
-        if(leadsByAgentBody) {
-            if(leadsByAgent && leadsByAgent.length) {
-                leadsByAgentBody.innerHTML = leadsByAgent.map(function(r) {
+        // Owner per-agent performance matrix — one row per sales agent across
+        // all 11 metrics for the toggle-selected period. Each column only applies
+        // to certain periods; for any other period the cell shows an em-dash.
+        var ownerMatrix = t.owner_agent_matrix;
+        var ownerMatrixBody = document.getElementById('sc-owner-matrix-body');
+        if(ownerMatrixBody) {
+            // Periods each column is defined for (everything else renders "—").
+            var ownerColPeriods = {
+                reply:    ['day','week','month'],
+                pickup:   ['day','week','month','year'],
+                newleads: ['day','week','month'],
+                served:   ['day','week','month'],
+                convc:    ['year'],
+                conva:    ['year'],
+                outbound: ['day','week','month'],
+                sales:    ['month','year'],
+                followup: ['month'],
+                cancel:   ['year'],
+                score:    ['month']
+            };
+            var ownerP = m.owner_period || window._ownerPeriod || 'month';
+            var inP = function(col) { return ownerColPeriods[col].indexOf(ownerP) !== -1; };
+            // cell(applies, rendered-html) -> the html, or a right-aligned em-dash.
+            var oCell = function(col, html) {
+                return '<td class="text-right">' + (inP(col) ? html : '—') + '</td>';
+            };
+            if(ownerMatrix && ownerMatrix.length) {
+                ownerMatrixBody.innerHTML = ownerMatrix.map(function(r) {
+                    var score = (r.agent_score === null || r.agent_score === undefined)
+                        ? '—' : escapeHtml(r.agent_score);
                     return '<tr>' +
                         '<td>' + escapeHtml(r.agent_name || '—') + '</td>' +
-                        '<td class="text-right">' + escapeHtml(r.day) + '</td>' +
-                        '<td class="text-right">' + escapeHtml(r.week) + '</td>' +
-                        '<td class="text-right">' + escapeHtml(r.month) + '</td>' +
+                        oCell('reply',    fmtOwnerSecs(r.reply_secs)) +
+                        oCell('pickup',   fmtOwnerSecs(r.pickup_secs)) +
+                        oCell('newleads', escapeHtml(r.new_leads)) +
+                        oCell('served',   escapeHtml(r.served_leads)) +
+                        oCell('convc',    escapeHtml(r.conv_rate_gated) + '%') +
+                        oCell('conva',    escapeHtml(r.conv_rate_ungated) + '%') +
+                        oCell('outbound', escapeHtml(r.outbound_count)) +
+                        oCell('sales',    fmtOwnerMoney(r.sales_total)) +
+                        oCell('followup', escapeHtml(r.followup_rate) + '%') +
+                        oCell('cancel',   escapeHtml(r.cancel_rate) + '%') +
+                        oCell('score',    score) +
                     '</tr>';
                 }).join('');
             } else {
-                leadsByAgentBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No leads this month</td></tr>';
+                ownerMatrixBody.innerHTML = '<tr><td colspan="12" class="text-center text-muted">No data for this period</td></tr>';
             }
         }
+        // Reflect the server-resolved owner period onto the active toggle tab and
+        // header label (covers the default and the bad-input fallback).
+        if(m.owner_period) {
+            $('#booking_summary_cards .sc-owner-tab').removeClass('is-active');
+            $('#booking_summary_cards .sc-owner-tab[data-owner-period="' + m.owner_period + '"]').addClass('is-active');
+            window._ownerPeriod = m.owner_period;
+        }
+        if(m.owner_period_label) { setText('sc-owner-period-label', m.owner_period_label); }
 
         var teams = t.sales_by_team;
         var teamBody = document.getElementById('sc-sales-by-team-body');
@@ -1572,11 +1646,15 @@ $(function() {
                 var $el = $('#' + id);
                 if(!$el.length) return;
                 $el.attr('data-content', resp.popovers[id]);
-                $el.popover('dispose').popover({
-                    customClass: 'summary-popover',
-                    container: 'body',
-                    boundary: 'window'
-                });
+                if(window.initSummaryPopover) {
+                    window.initSummaryPopover($el.get(0));
+                } else {
+                    $el.popover('dispose').popover({
+                        customClass: 'summary-popover',
+                        container: 'body',
+                        boundary: 'window'
+                    });
+                }
             });
         }
         });

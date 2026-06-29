@@ -110,6 +110,41 @@ function supplier_invoice_row_is_complete($row)
 }
 
 /**
+ * Safely delete a supplier-invoice attachment given its stored relative
+ * (FCPATH-based) path. Used to reclaim a file that was uploaded for a brand-new
+ * invoice row which then could not be persisted (an incomplete row dropped by
+ * Booking_Supplier_Invoice_Model::Create()), so the upload doesn't leak on disk.
+ *
+ * A realpath containment check guarantees only files that actually live inside
+ * the supplier-invoice upload directory are removed — a tampered path such as
+ * "../../application/config/config.php" resolves outside the dir and is refused.
+ *
+ * Returns true only when a file was unlinked; false for an empty path, a file
+ * outside the upload dir, a missing file, or a failed unlink.
+ */
+function supplier_invoice_delete_orphan_file($rel_path)
+{
+    $rel_path = trim((string) $rel_path);
+    if ($rel_path === '') {
+        return false;
+    }
+    $full = realpath(FCPATH . $rel_path);
+    $base = realpath(supplier_invoice_upload_dir());
+    if ($full === false || $base === false) {
+        return false;
+    }
+    // The resolved file must sit strictly inside the upload directory.
+    $base_with_sep = rtrim($base, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
+    if (strpos($full, $base_with_sep) !== 0) {
+        return false;
+    }
+    if (!is_file($full)) {
+        return false;
+    }
+    return @unlink($full);
+}
+
+/**
  * Map an attachment filename to a Content-Type for inline streaming. Falls back
  * to application/octet-stream for anything not in the whitelist.
  */

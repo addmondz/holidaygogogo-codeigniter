@@ -186,9 +186,7 @@ $buildOwnershipDataUrl = function($ownerId, $ownershipType = null) use ($lead_ow
                                             </a>
                                         </td>
                                         <td class="text-center" style="white-space:nowrap;">
-                                            <a href="<?php echo html_escape($buildOwnershipDataUrl($row['owner_user_id'])); ?>" class="font-weight-bold text-primary"><?php echo number_format($row['owned_leads']); ?></a>
-                                            <span class="text-muted mx-1">&middot;</span>
-                                            <span class="font-weight-bold"><?php echo number_format($row['assigned_owned_leads']); ?></span> <span class="text-muted font-size-sm">asgn</span>
+                                            <a href="<?php echo html_escape($buildOwnershipDataUrl($row['owner_user_id'], 'assigned')); ?>" class="font-weight-bold text-primary"><?php echo number_format($row['assigned_owned_leads']); ?></a> <span class="text-muted font-size-sm">asgn</span>
                                         </td>
                                         <td class="text-center">
                                             <div class="font-weight-bold"><?php echo number_format($row['responded_leads']); ?></div>
@@ -265,9 +263,7 @@ $buildOwnershipDataUrl = function($ownerId, $ownershipType = null) use ($lead_ow
             html += '<td class="text-center">' + (index + 1) + '</td>';
             html += '<td><a href="' + allUrl + '" class="font-weight-bold text-dark">' + escapeHtml(row.owner_name) + '</a></td>';
             html += '<td class="text-center" style="white-space:nowrap;">';
-            html += '<a href="' + allUrl + '" class="font-weight-bold text-primary">' + row.owned_leads + '</a>';
-            html += '<span class="text-muted mx-1">&middot;</span>';
-            html += '<span class="font-weight-bold">' + row.assigned_owned_leads + '</span> <span class="text-muted font-size-sm">asgn</span>';
+            html += '<a href="' + assignedUrl + '" class="font-weight-bold text-primary">' + row.assigned_owned_leads + '</a> <span class="text-muted font-size-sm">asgn</span>';
             html += '</td>';
             html += '<td class="text-center"><div class="font-weight-bold">' + row.responded_leads + '</div><div class="text-muted font-size-sm">' + row.response_rate + '%</div></td>';
             html += '<td class="text-center">' + escapeHtml(row.avg_displayed_response_time_label) + '</td>';

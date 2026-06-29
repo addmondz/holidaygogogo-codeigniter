@@ -78,3 +78,73 @@ if (!function_exists('summary_resolve_month')) {
         );
     }
 }
+
+if (!function_exists('summary_resolve_owner_period')) {
+    /**
+     * Resolve the OWNER dashboard's global Day / Week / Month / Year toggle into
+     * the single calendar range the whole per-agent matrix is scoped to
+     * (Booking::owner_agent_matrix).
+     *
+     * Invalid / missing / unknown input falls back to $today's MONTH so a bad
+     * query string can never break the dashboard. $today is injectable so the
+     * resolver is deterministic under test; production passes date('Y-m-d').
+     *
+     * @param string|null $param  Raw `owner_period` query value: day|week|month|year.
+     * @param string|null $today  Reference date "Y-m-d"; defaults to now.
+     * @return array{
+     *   period:string, start_date:string, end_date:string, label:string
+     * }
+     */
+    function summary_resolve_owner_period($param, $today = null)
+    {
+        if ($today === null) {
+            $today = date('Y-m-d');
+        }
+
+        $period = is_string($param) ? strtolower(trim($param)) : '';
+        if (!in_array($period, array('day', 'week', 'month', 'year'), true)) {
+            $period = 'month'; // default
+        }
+
+        $ts = strtotime($today);
+
+        switch ($period) {
+            case 'day':
+                $start = $today;
+                $end   = $today;
+                $label = 'Today';
+                break;
+
+            case 'week':
+                // ISO week: Monday..Sunday containing $today. 'monday this week'
+                // resolves to the same Monday whether $today is mid-week or the
+                // trailing Sunday.
+                $start = date('Y-m-d', strtotime('monday this week', $ts));
+                $end   = date('Y-m-d', strtotime('sunday this week', $ts));
+                $label = 'This Week';
+                break;
+
+            case 'year':
+                $start = date('Y-01-01', $ts);
+                $end   = date('Y-12-31', $ts);
+                $label = date('Y', $ts);
+                break;
+
+            case 'month':
+            default:
+                // Day-1 anchor + 't' avoids any overflow when seeding from a
+                // 31-day reference date.
+                $start = date('Y-m-01', $ts);
+                $end   = date('Y-m-t', $ts);
+                $label = date('F Y', $ts);
+                break;
+        }
+
+        return array(
+            'period'     => $period,
+            'start_date' => $start,
+            'end_date'   => $end,
+            'label'      => $label,
+        );
+    }
+}

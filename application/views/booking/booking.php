@@ -120,18 +120,6 @@
 
                 <form id="form">
 
-                    <?php $dp_resp = isset($draft_payment_seconds) ? $draft_payment_seconds : null; ?>
-                    <?php if ($dp_resp !== null): ?>
-                    <div class="alert" style="border:1px solid #BFD4EF; background:#EDF4FC; border-radius:8px; padding:12px 16px; margin-bottom:16px;">
-                        <div class="d-flex justify-content-between align-items-center" style="gap:12px;">
-                            <div style="font-weight:700; color:#1c3d5a;">Draft &rarr; Payment response time</div>
-                            <div style="text-align:right; font-size:12px; color:#4a5266;">
-                                Saved as draft to payment<br><strong style="font-size:14px; color:#1c3d5a;"><?php echo htmlspecialchars(format_response_duration($dp_resp)); ?></strong>
-                            </div>
-                        </div>
-                    </div>
-                    <?php endif; ?>
-
                     <?php if(current_url() == base_url('Booking/Create')) { ?>
                         <div class="d-flex align-items-center justify-content-between mb-5 p-4" style="background:#C5D6EF; border:1px solid #A9C2E6; border-radius:8px;">
                             <div class="mr-4">
@@ -1439,6 +1427,85 @@
                             </div>
                         </div>
                     </div>
+                    <?php $dp_bd = isset($draft_payment_breakdown) ? $draft_payment_breakdown : null; ?>
+                    <?php if (!empty($dp_bd) && ($dp_bd['total'] !== null || $dp_bd['draft_to_pb'] !== null || $dp_bd['pb_to_pbc'] !== null || $dp_bd['pbc_to_p'] !== null)): ?>
+                    <div class="row mt-5">
+                        <div class="col">
+                            <div class="card card-custom">
+                                <div class="card-header flex-wrap py-2" style="background-color:#D7E2F2;">
+                                    <div class="card-title">
+                                        <h4 class="card-label mb-0" style="color:#6082B6; font-size: 1.1rem;">
+                                            <strong>Draft &rarr; Payment Response Time</strong>
+                                        </h4>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-center mb-3 p-3" style="background:#EDF4FC; border:1px solid #BFD4EF; border-radius:8px;">
+                                        <div style="font-weight:700; color:#1c3d5a;">Saved as draft &rarr; Pending Payment</div>
+                                        <div style="font-size:18px; font-weight:700; color:#1c3d5a;"><?php echo htmlspecialchars(format_response_duration($dp_bd['total'])); ?></div>
+                                    </div>
+                                    <div style="font-size:13px; color:#4a5266; margin-bottom:8px;">Breakdown by stage</div>
+                                    <table class="table table-sm mb-0">
+                                        <tbody>
+                                            <tr>
+                                                <td style="color:#3a4256;">Draft &rarr; Pending BC</td>
+                                                <td class="text-right font-weight-bold" style="color:#1c3d5a;"><?php echo htmlspecialchars(format_response_duration($dp_bd['draft_to_pb'])); ?></td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color:#3a4256;">Pending BC &rarr; Pending BC Confirmation</td>
+                                                <td class="text-right font-weight-bold" style="color:#1c3d5a;"><?php echo htmlspecialchars(format_response_duration($dp_bd['pb_to_pbc'])); ?></td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color:#3a4256;">Pending BC Confirmation &rarr; Pending Payment</td>
+                                                <td class="text-right font-weight-bold" style="color:#1c3d5a;"><?php echo htmlspecialchars(format_response_duration($dp_bd['pbc_to_p'])); ?></td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                    <small class="text-muted d-block mt-2" style="font-size:0.8125rem;">A dash (&mdash;) means the booking skipped that stage or hasn&rsquo;t reached it yet.</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <?php endif; ?>
+                    <?php if (!empty($is_slow_conversion)):
+                        $scr_selected = isset($slow_conversion_reason_selected) && is_array($slow_conversion_reason_selected) ? $slow_conversion_reason_selected : array();
+                    ?>
+                    <div class="row mt-5">
+                        <div class="col">
+                            <div class="card card-custom">
+                                <div class="card-header flex-wrap py-2" style="background-color:#FBE6D4;">
+                                    <div class="card-title">
+                                        <h4 class="card-label mb-0" style="color:#C0631B; font-size: 1.1rem;">
+                                            <strong><i class="la la-exclamation-triangle"></i> Slow Conversion Reasons</strong>
+                                        </h4>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <div class="alert alert-light-warning d-flex align-items-center mb-4" style="border:1px solid #F0C99B; background:#FDF3E9; color:#8A4B12; font-size:0.9rem;">
+                                        <i class="la la-clock mr-2" style="font-size:1.2rem;"></i>
+                                        This booking took over 24 hours from draft to payment. Tag the reason(s) why.
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Reason(s) <span class="text-muted" style="font-size:0.8rem;">(select all that apply)</span></label>
+                                        <select id="slow_conversion_reasons_select" class="form-control selectpicker" multiple data-actions-box="true" data-live-search="true" title="-- SELECT REASON(S) --">
+                                            <?php foreach ($slow_conversion_reasons as $reason): ?>
+                                                <option value="<?php echo (int) $reason->SlowConversionReasonID; ?>" <?php echo in_array((int) $reason->SlowConversionReasonID, $scr_selected) ? 'selected' : ''; ?>>
+                                                    <?php echo htmlspecialchars($reason->Name); ?>
+                                                </option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                        <?php if (empty($slow_conversion_reasons)): ?>
+                                            <small class="text-muted d-block mt-2">No reasons configured yet. Add them under <a href="<?php echo base_url('Slow_Conversion_Reason'); ?>" target="_blank">Settings &rarr; Slow Conversion Reason</a>.</small>
+                                        <?php endif; ?>
+                                    </div>
+                                    <button type="button" id="save_slow_conversion_reasons_btn" class="btn btn-primary font-weight-bold btn-sm" <?php echo empty($slow_conversion_reasons) ? 'disabled' : ''; ?>>
+                                        <i class="la la-save"></i> Save Reasons
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <?php endif; ?>
                 </div>
                 <div class="col-lg-6 col-md-12  mt-md-6 mt-lg-0">
                     <div class="row">
@@ -3444,7 +3511,6 @@
                 function submitDraftBooking() {
                     var admin_id = <?php echo (int) $this->session->userdata('admin_id'); ?>;
                     var now   = '<?php echo date('Y-m-d H:i:s'); ?>';
-                    var today = '<?php echo date('Y-m-d'); ?>';
 
                     // NOT NULL columns (strict SQL mode) need valid values even for
                     // a draft, so empties fall back to safe placeholders the staff
@@ -3462,8 +3528,9 @@
                         // below. SalesAgent is NOT NULL, so 0 stands in for "unassigned".
                         SalesAgent: ($('#SalesAgent').length && $('#SalesAgent').val()) ? $('#SalesAgent').val() : 0,
                         ChatLanguage: $('#ChatLanguage').val() || 'EN',
-                        BookingConfirmationTitle: $('#BookingConfirmationTitle').val() || 'BOOKING CONFIRMATION',
-                        FullPaymentDeadline: today
+                        BookingConfirmationTitle: $('#BookingConfirmationTitle').val() || 'BOOKING CONFIRMATION'
+                        // Full Payment Deadline stays blank for a draft (column is nullable);
+                        // staff set it later. Only sent below if they typed one.
                     }];
 
                     // TC2 (Sales Agent 2 / Pre Sales) is the TC who creates the draft.
@@ -3481,7 +3548,6 @@
                         var ed = p[1].split('/');
                         booking[0]['StartDate'] = `${sd[2]}-${sd[1]}-${sd[0]}`;
                         booking[0]['EndDate']   = `${ed[2]}-${ed[1]}-${ed[0]}`;
-                        booking[0]['FullPaymentDeadline'] = booking[0]['StartDate'];
                     }
 
                     var dd = $('input[name="DepositDeadline"]').val();
@@ -3658,13 +3724,19 @@
 
                                     var booking = [];
 
-                                    // Full Payment Deadline is optional; when left blank fall back to the
-                                    // travel start date, else today (the column is NOT NULL).
+                                    // Pending BC (Booking/Create) only: don't auto-fill the travel
+                                    // date — leave the field blank and warn the staff if they save
+                                    // a Pending BC without setting one (drafts may stay blank).
+                                    // Duplicate keeps its original fallback behaviour.
+                                    var is_pending_bc = window.location.href == '<?php echo base_url('Booking/Create'); ?>' || window.location.href.split('?')[0] == '<?php echo base_url('Booking/Create'); ?>';
                                     var full_payment_deadline_raw = $('input[name="FullPaymentDeadline"]').val();
                                     var full_payment_deadline_iso;
                                     if (full_payment_deadline_raw) {
                                         var __fpd = full_payment_deadline_raw.split('/');
                                         full_payment_deadline_iso = `${__fpd[2]}-${__fpd[1]}-${__fpd[0]}`;
+                                    } else if (is_pending_bc) {
+                                        Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', 'Please set the Full Payment Deadline', null);
+                                        return;
                                     } else if (travel_date) {
                                         var __tds = travel_date.split(' - ')[0].split('/');
                                         full_payment_deadline_iso = `${__tds[2]}-${__tds[1]}-${__tds[0]}`;
@@ -4576,12 +4648,15 @@
             postData.draft_save_mode = draft_save_mode;
         }
 
-        // Draft lifecycle saves (Save as Draft / Approve / Save as Pending BC)
-        // lock the invoice inputs, and the controller skips incomplete rows, so
-        // only enforce the supplier + invoice # rule on a normal/PBC save where
-        // the fields are editable and the user can act on the message.
-        var __invLenient = (draft_save_mode === 'draft' || draft_save_mode === 'approve' || draft_save_mode === 'PB');
-        if (!__invLenient && typeof Validate_Supplier_Invoices === 'function' && !Validate_Supplier_Invoices()) {
+        // Supplier-invoice inputs stay editable on every save path, including
+        // parked drafts (since the invoice section is excluded from the draft
+        // field lock). The controller drops any row missing a Supplier /
+        // Invoice # to dodge the NOT NULL columns — which silently discards a
+        // file the user already attached. So enforce the supplier + invoice #
+        // rule on EVERY save (draft / approve / PB / PBC / normal): the user is
+        // told to complete or remove the row instead of it vanishing on Approve.
+        // A draft with no invoice rows at all still saves freely.
+        if (typeof Validate_Supplier_Invoices === 'function' && !Validate_Supplier_Invoices()) {
             Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', 'Each supplier invoice needs a Supplier and an Invoice # before saving. Please complete or remove the incomplete invoice row.', null);
             return;
         }
@@ -5221,6 +5296,35 @@ $(document).ready(function() {
 
     // Quick Update Allow Review Button
     <?php if(current_url() == base_url('Booking/Update')) { ?>
+    $('#save_slow_conversion_reasons_btn').on('click', function() {
+        var $btn = $(this);
+        var reasonIds = $('#slow_conversion_reasons_select').val() || [];
+        var originalText = $btn.html();
+        $btn.prop('disabled', true).html('<i class="la la-spinner la-spin"></i> Saving...');
+
+        $.ajax({
+            url: '<?php echo base_url('Booking/UpdateSlowConversionReasons'); ?>',
+            type: 'post',
+            dataType: 'json',
+            data: {
+                booking_id: <?php echo $BookingID; ?>,
+                reason_ids: reasonIds
+            },
+            success: function(resp) {
+                $btn.prop('disabled', false).html(originalText);
+                if(resp && resp.success) {
+                    Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', 'Slow Conversion Reasons Successfully Saved', window.location.href);
+                } else {
+                    Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', (resp && resp.message) ? resp.message : 'Slow Conversion Reasons Could Not Be Saved', null);
+                }
+            },
+            error: function() {
+                $btn.prop('disabled', false).html(originalText);
+                Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', 'Slow Conversion Reasons Could Not Be Saved', null);
+            }
+        });
+    });
+
     $('#update_allow_review_btn').on('click', function() {
         var allowReview = $('#AllowReview').val();
         var bookingId = <?php echo $BookingID; ?>;

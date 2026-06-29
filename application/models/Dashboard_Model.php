@@ -532,13 +532,18 @@ class Dashboard_Model extends CI_Model
 
 	{
 
-		$this->db->select('(NetTotal - SUM(Credit) + SUM(DEbit)) As OutstandingBalance,
+		// Grouped by BookingNumber: Credit/Debit are summed across the booking's
+		// payment rows, while NetTotal and the deadline columns are constant per
+		// booking. Wrap the per-booking columns in MIN() so the SELECT is valid
+		// under MySQL's only_full_group_by mode without changing the grouping or
+		// the one-row-per-booking output.
+		$this->db->select('(MIN(NetTotal) - SUM(Credit) + SUM(DEbit)) As OutstandingBalance,
 
-		MONTH(CASE WHEN AdditionalPaymentDeadline IS NULL OR FullPaymentDeadline > AdditionalPaymentDeadline THEN FullPaymentDeadline
+		MONTH(CASE WHEN MIN(AdditionalPaymentDeadline) IS NULL OR MIN(FullPaymentDeadline) > MIN(AdditionalPaymentDeadline) THEN MIN(FullPaymentDeadline)
 
-		ELSE AdditionalPaymentDeadline
+		ELSE MIN(AdditionalPaymentDeadline)
 
-		END) As Month');
+		END) As Month', false);
 
 		$this->db->join('payment', 'payment.BookingID = booking.BookingID', 'left');
 

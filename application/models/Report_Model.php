@@ -717,6 +717,7 @@ class Report_Model extends CI_Model
 
         $extraJoins = isset($where['extra_joins']) ? $where['extra_joins'] : '';
         $creditFragment = lead_conversion_credit_sql_fragment();
+        $activeBooking = lead_conversion_active_booking_sql('pl');
         $sql = "
             SELECT
                 COUNT(*) AS total_leads,
@@ -725,7 +726,7 @@ class Report_Model extends CI_Model
                 AVG(pl.avg_recent_5_response_seconds) AS avg_recent_response_time_seconds,
                 AVG(pl.responded_message_count) AS avg_responded_messages,
                 AVG(pl.recent_responded_message_count) AS avg_recent_responded_messages,
-                SUM(CASE WHEN pl.is_converted = 1 AND pl.booking_id IS NOT NULL AND {$creditFragment} THEN 1 ELSE 0 END) AS converted_leads,
+                SUM(CASE WHEN pl.is_converted = 1 AND pl.booking_id IS NOT NULL AND {$creditFragment} AND {$activeBooking} THEN 1 ELSE 0 END) AS converted_leads,
                 COUNT(DISTINCT NULLIF(pl.assigned_to_user_id, '')) AS active_agents
             FROM ghl_processed_leads pl
             LEFT JOIN ghl_conversations gc ON gc.conversation_id = pl.conversation_id
@@ -980,6 +981,94 @@ class Report_Model extends CI_Model
     }
 
     /**
+     * Per-agent outbound message counts over a period. Powers the OWNER matrix
+     * "Outbound Messages" column. Generalises the single-agent outbound count in
+     * Booking::ajax_summary_cards (the TC "Outbound Messages" card) — same
+     * direction='outbound' + null-user guard + date_added window, but grouped by
+     * sending GHL user instead of scoped to one agent's uid(s).
+     *
+     * @param string $start_date 'Y-m-d'
+     * @param string $end_date   'Y-m-d'
+     * @return array  rows of { agent_id (GHL uid), outbound_count }
+     */
+    function Outbound_Messages_By_Agent($start_date, $end_date)
+    {
+        $sql = "
+            SELECT gm.user_id AS agent_id,
+                   COUNT(*) AS outbound_count
+            FROM ghl_messages gm
+            WHERE gm.direction='outbound'
+              AND NULLIF(gm.user_id,'') IS NOT NULL
+              AND gm.date_added BETWEEN ? AND ?
+            GROUP BY gm.user_id
+        ";
+        $rows = $this->db->query($sql, array(
+            $start_date . ' 00:00:00',
+            $end_date . ' 23:59:59',
+        ))->result_array();
+
+        $out = array();
+        foreach ($rows as $r) {
+            $out[] = array(
+                'agent_id'       => $r['agent_id'],
+                'outbound_count' => (int) $r['outbound_count'],
+            );
+        }
+        return $out;
+    }
+
+    /**
+     * Per-agent cancellation counts over a period, grouped by the credited TC
+     * slot. Powers the OWNER matrix "Cancellation %" column. This is the
+     * single-agent Cancellation Rate rule (cancellation_rate_exclude_duplicate_-
+     * clause — duplicates dropped from BOTH numerator and denominator) re-grouped
+     * per credited admin via lead_conversion_credit_agent_expr() so the universe
+     * matches the TC1/TC2 attribution used everywhere else.
+     *
+     * Rate is intentionally NOT computed here — the caller divides cancelled/total
+     * with an explicit total>0 guard so a zero-BC agent never divides by zero.
+     *
+     * Scoped to the TC sales-agent role (admin Level 20/50) via an INNER JOIN on
+     * the credited slot — matching the owner matrix's sales source — so a BC
+     * credited to a non-TC admin can't introduce an out-of-scope row.
+     *
+     * @param string $start_date 'Y-m-d'
+     * @param string $end_date   'Y-m-d'
+     * @return array  rows of { admin_id, total, cancelled }
+     */
+    function Cancellation_By_Agent($start_date, $end_date)
+    {
+        $this->load->helper(array('cancellation_rate', 'lead_conversion_credit'));
+        $agent_expr = lead_conversion_credit_agent_expr('booking');
+        $exclude    = cancellation_rate_exclude_duplicate_clause('booking');
+
+        $sql = "
+            SELECT {$agent_expr} AS admin_id,
+                   COUNT(*) AS total,
+                   SUM(CASE WHEN booking.CancelStatus='Y' THEN 1 ELSE 0 END) AS cancelled
+            FROM booking
+            INNER JOIN admin ON admin.AdminID = {$agent_expr} AND admin.Level IN ('20','50')
+            WHERE booking.BookingConfirmationTitle='BOOKING CONFIRMATION'
+              AND booking.Status!='N'
+              AND {$exclude}
+              AND CAST(booking.InsertDate AS DATE) BETWEEN ? AND ?
+            GROUP BY admin_id
+            HAVING admin_id IS NOT NULL AND admin_id > 0
+        ";
+        $rows = $this->db->query($sql, array($start_date, $end_date))->result_array();
+
+        $out = array();
+        foreach ($rows as $r) {
+            $out[] = array(
+                'admin_id'  => (int) $r['admin_id'],
+                'total'     => (int) $r['total'],
+                'cancelled' => (int) $r['cancelled'],
+            );
+        }
+        return $out;
+    }
+
+    /**
      * Per-agent lead counts for the three "Leads" card windows (Today / Week /
      * Month) in a single conditional-SUM pass. Powers the OWNER-only
      * "Leads by Agent" table — the same new-lead total as the Leads card, but
@@ -1059,6 +1148,7 @@ class Report_Model extends CI_Model
         $creditFragment = ($credit_fragment_override !== null && $credit_fragment_override !== '')
             ? $credit_fragment_override
             : lead_conversion_credit_sql_fragment();
+        $activeBooking = lead_conversion_active_booking_sql('pl');
         $sql = "
             SELECT
                 COALESCE(NULLIF(pl.assigned_to_user_id, ''), '__unassigned__') AS agent_id,
@@ -1069,7 +1159,7 @@ class Report_Model extends CI_Model
                 AVG(pl.avg_recent_5_response_seconds) AS avg_recent_response_time_seconds,
                 AVG(pl.responded_message_count) AS avg_responded_messages,
                 AVG(pl.recent_responded_message_count) AS avg_recent_responded_messages,
-                SUM(CASE WHEN pl.is_converted = 1 AND pl.booking_id IS NOT NULL AND {$creditFragment} THEN 1 ELSE 0 END) AS converted_leads,
+                SUM(CASE WHEN pl.is_converted = 1 AND pl.booking_id IS NOT NULL AND {$creditFragment} AND {$activeBooking} THEN 1 ELSE 0 END) AS converted_leads,
                 MAX(pl.updated_at) AS last_updated_at
             FROM ghl_processed_leads pl
             LEFT JOIN ghl_conversations gc ON gc.conversation_id = pl.conversation_id
@@ -1140,8 +1230,10 @@ class Report_Model extends CI_Model
 
     function Lead_Ownership_Summary($filters = array())
     {
+        $this->load->helper('lead_conversion_credit');
         $where = $this->build_lead_ownership_where_clause($filters);
         $extraJoins = isset($where['extra_joins']) ? $where['extra_joins'] : '';
+        $activeBooking = lead_conversion_active_booking_sql('glo');
 
         // Response-time averages are recomputed below from the slot timestamps
         // through the ownership duty window, so they are not selected here.
@@ -1153,7 +1245,7 @@ class Report_Model extends CI_Model
                 SUM(CASE WHEN glo.is_assigned_owner = 0 AND glo.is_reply_owner = 1 THEN 1 ELSE 0 END) AS reply_owned_leads,
                 SUM(CASE WHEN glo.responded_message_count > 0 THEN 1 ELSE 0 END) AS responded_leads,
                 SUM(CASE WHEN glo.follow_up_status IN ('sent', 'completed') THEN 1 ELSE 0 END) AS follow_up_leads,
-                SUM(CASE WHEN glo.is_converted = 1 AND glo.booking_id IS NOT NULL THEN 1 ELSE 0 END) AS converted_leads,
+                SUM(CASE WHEN glo.is_converted = 1 AND glo.booking_id IS NOT NULL AND {$activeBooking} THEN 1 ELSE 0 END) AS converted_leads,
                 COUNT(DISTINCT glo.owner_user_id) AS active_owners,
                 AVG(glo.responded_message_count) AS avg_responded_messages,
                 AVG(glo.recent_responded_message_count) AS avg_recent_responded_messages
@@ -1196,8 +1288,10 @@ class Report_Model extends CI_Model
 
     function Lead_Ownership_By_Agent($filters = array())
     {
+        $this->load->helper('lead_conversion_credit');
         $where = $this->build_lead_ownership_where_clause($filters);
         $extraJoins = isset($where['extra_joins']) ? $where['extra_joins'] : '';
+        $activeBooking = lead_conversion_active_booking_sql('glo');
 
         // Response-time averages are recomputed below from the slot timestamps
         // through the ownership duty window, so they are not selected here.
@@ -1211,7 +1305,7 @@ class Report_Model extends CI_Model
                 SUM(CASE WHEN glo.is_assigned_owner = 0 AND glo.is_reply_owner = 1 THEN 1 ELSE 0 END) AS reply_owned_leads,
                 SUM(CASE WHEN glo.responded_message_count > 0 THEN 1 ELSE 0 END) AS responded_leads,
                 SUM(CASE WHEN glo.follow_up_status IN ('sent', 'completed') THEN 1 ELSE 0 END) AS follow_up_leads,
-                SUM(CASE WHEN glo.is_converted = 1 AND glo.booking_id IS NOT NULL THEN 1 ELSE 0 END) AS converted_leads,
+                SUM(CASE WHEN glo.is_converted = 1 AND glo.booking_id IS NOT NULL AND {$activeBooking} THEN 1 ELSE 0 END) AS converted_leads,
                 AVG(glo.responded_message_count) AS avg_responded_messages,
                 AVG(glo.recent_responded_message_count) AS avg_recent_responded_messages,
                 MAX(glo.calculated_at) AS last_calculated_at
@@ -1314,13 +1408,15 @@ class Report_Model extends CI_Model
      */
     private function lead_ownership_daily_conversion_by_agent($where, $extraJoins)
     {
+        $this->load->helper('lead_conversion_credit');
+        $activeBooking = lead_conversion_active_booking_sql('glo');
         $sql = "
             SELECT owner_user_id,
                    SUM(daily_rate) AS sum_daily_rate,
                    COUNT(*) AS active_days
             FROM (
                 SELECT glo.owner_user_id AS owner_user_id,
-                       (100.0 * SUM(CASE WHEN glo.is_converted = 1 AND glo.booking_id IS NOT NULL THEN 1 ELSE 0 END) / COUNT(*)) AS daily_rate
+                       (100.0 * SUM(CASE WHEN glo.is_converted = 1 AND glo.booking_id IS NOT NULL AND {$activeBooking} THEN 1 ELSE 0 END) / COUNT(*)) AS daily_rate
                 FROM ghl_lead_ownership glo
                 LEFT JOIN ghl_users gu ON gu.UserID = glo.owner_user_id
                 {$extraJoins}
@@ -1632,6 +1728,53 @@ class Report_Model extends CI_Model
         }
 
         return $results;
+    }
+
+    /**
+     * Hourly inbound/outbound message counts for a single owner on one day. Powers
+     * the per-owner "Lead Reply Hourly" drill-down. Scoped to the owner's leads via
+     * ghl_lead_ownership (same reply-activity universe as the dashboard), bounded to
+     * each lead's ownership window so messages are only attributed while the owner
+     * actually held the lead. Outbound is restricted to the owner's own replies;
+     * inbound is every customer message landing on those leads. Returns one row per
+     * hour (0-23) that had any traffic -- gaps are filled in by the view helper.
+     */
+    function Lead_Reply_Activity_Hourly_By_Owner($filters = array())
+    {
+        $where = $this->build_lead_reply_created_where_clause($filters);
+        if (trim($where['sql']) === 'WHERE 1=0') {
+            return array();
+        }
+
+        $extraJoins = isset($where['extra_joins']) ? $where['extra_joins'] : '';
+        $messageTimeColumn = $this->escape_identifier($this->get_message_time_column());
+        $start = !empty($filters['start_date']) ? $filters['start_date'] . ' 00:00:00' : '1970-01-01 00:00:00';
+        $end = !empty($filters['end_date']) ? $filters['end_date'] . ' 23:59:59' : '9999-12-31 23:59:59';
+
+        $sql = "
+            SELECT
+                HOUR(gm.{$messageTimeColumn}) AS hour_of_day,
+                COUNT(DISTINCT CASE WHEN gm.direction = 'inbound' THEN gm.id END) AS inbound_count,
+                COUNT(DISTINCT CASE WHEN gm.direction = 'outbound' AND gm.user_id = glo.owner_user_id THEN gm.id END) AS outbound_count
+            FROM ghl_lead_ownership glo
+            INNER JOIN ghl_messages gm
+                ON gm.conversation_id = glo.conversation_id
+               AND gm.{$messageTimeColumn} >= glo.lead_started_at
+               AND (
+                    glo.lead_ended_at IS NULL
+                    OR gm.{$messageTimeColumn} < glo.lead_ended_at
+               )
+            {$extraJoins}
+            {$where['sql']}
+              AND gm.{$messageTimeColumn} BETWEEN ? AND ?
+              AND gm.direction IN ('inbound', 'outbound')
+            GROUP BY hour_of_day
+            ORDER BY hour_of_day ASC
+        ";
+
+        $params = array_merge($where['params'], array($start, $end));
+
+        return $this->db->query($sql, $params)->result_array();
     }
 
     /**
@@ -2602,6 +2745,126 @@ class Report_Model extends CI_Model
         )->result_array();
 
         return ghl_message_log_average_reply_seconds($rows);
+    }
+
+    /**
+     * Average agent reply time (Message-Log logic) for a set of GHL user IDs,
+     * windowed by message timestamp. This is the per-agent figure behind the
+     * dashboard "Avg Reply Time to Inbound" card: it scans raw ghl_messages and
+     * pairs each inbound customer message with the agent's next outbound reply in
+     * the same conversation, counting only in-hours same-day pairs (see
+     * ghl_message_log_average_reply_seconds()). Scoping mirrors the Message Log's
+     * resolved-agent idea but keyed by ID -- a row belongs to the agent when its
+     * sender (gm.user_id) is one of the IDs, or, for customer inbound messages
+     * with no sender, when the conversation is assigned to one of them. The whole
+     * matching conversation thread is therefore included so the inbound->outbound
+     * pairing stays intact.
+     *
+     * @param string $startDate 'Y-m-d' inclusive lower bound (message date).
+     * @param string $endDate   'Y-m-d' inclusive upper bound (message date).
+     * @param array  $uids      GHL user IDs to scope to.
+     * @return float|null Average seconds, or null when no pair qualifies.
+     */
+    function Ghl_Messages_Avg_Reply_Seconds_For_Uids($startDate, $endDate, $uids)
+    {
+        $uids = array_values(array_filter(array_map('strval', (array) $uids), 'strlen'));
+        if (empty($uids)) {
+            return null;
+        }
+
+        $this->load->helper('ghl_messages_log');
+        $messageTimeColumn = $this->escape_identifier($this->get_message_time_column());
+        $placeholders = implode(',', array_fill(0, count($uids), '?'));
+
+        $params = array($startDate . ' 00:00:00', $endDate . ' 23:59:59');
+        foreach ($uids as $u) {
+            $params[] = $u;
+        }
+
+        $rows = $this->db->query(
+            "SELECT gm.conversation_id AS conversation_id,
+                    gm.direction AS direction,
+                    gm.{$messageTimeColumn} AS ts
+               FROM ghl_messages gm
+               LEFT JOIN ghl_conversations gc ON gc.conversation_id = gm.conversation_id
+              WHERE gm.{$messageTimeColumn} >= ?
+                AND gm.{$messageTimeColumn} <= ?
+                AND COALESCE(NULLIF(gm.user_id, ''), gc.assigned_to) IN ({$placeholders})
+              ORDER BY gm.conversation_id ASC, gm.{$messageTimeColumn} ASC, gm.id ASC",
+            $params
+        )->result_array();
+
+        return ghl_message_log_average_reply_seconds($rows);
+    }
+
+    /**
+     * Per-agent average reply time (Message-Log logic) across the whole team for
+     * a message-date window, feeding the card's team-wide "Best:" benchmark so it
+     * is computed identically to each agent's own number. Returns one row per
+     * resolved agent (sender, or chatroom assignee for customer inbound rows)
+     * shaped like Lead_Dashboard_By_Agent so the caller's existing leaderboard
+     * picker can be reused: 'agent_id', 'agent_name', 'total_leads' (distinct
+     * conversations that produced at least one counted reply -- the min-sample
+     * basis) and 'avg_response_time_seconds'.
+     *
+     * @param string $startDate 'Y-m-d' inclusive lower bound (message date).
+     * @param string $endDate   'Y-m-d' inclusive upper bound (message date).
+     * @return array List of agent rows (unscoped; caller restricts to a role pool).
+     */
+    function Ghl_Messages_Avg_Reply_By_Agent($startDate, $endDate)
+    {
+        $this->load->helper('ghl_messages_log');
+        $messageTimeColumn = $this->escape_identifier($this->get_message_time_column());
+
+        $params = array($startDate . ' 00:00:00', $endDate . ' 23:59:59');
+        $rows = $this->db->query(
+            "SELECT COALESCE(NULLIF(gm.user_id, ''), gc.assigned_to) AS agent_id,
+                    gm.conversation_id AS conversation_id,
+                    gm.direction AS direction,
+                    gm.{$messageTimeColumn} AS ts,
+                    COALESCE(NULLIF(gu.Name, ''), NULLIF(gu_assigned.Name, '')) AS agent_name
+               FROM ghl_messages gm
+               LEFT JOIN ghl_users gu ON gu.UserID = gm.user_id
+               LEFT JOIN ghl_conversations gc ON gc.conversation_id = gm.conversation_id
+               LEFT JOIN ghl_users gu_assigned ON gu_assigned.UserID = gc.assigned_to
+              WHERE gm.{$messageTimeColumn} >= ?
+                AND gm.{$messageTimeColumn} <= ?
+              ORDER BY agent_id ASC, gm.conversation_id ASC, gm.{$messageTimeColumn} ASC, gm.id ASC",
+            $params
+        )->result_array();
+
+        $byGroup = ghl_message_log_average_reply_seconds_by_group($rows, 'agent_id', 'ts');
+
+        // First non-empty resolved name seen per agent id (sender name on the
+        // agent's own outbound rows, assignee name on customer inbound rows).
+        $names = array();
+        foreach ($rows as $r) {
+            $aid = (string) (isset($r['agent_id']) ? $r['agent_id'] : '');
+            if ($aid === '' || isset($names[$aid])) {
+                continue;
+            }
+            if (isset($r['agent_name']) && $r['agent_name'] !== '' && $r['agent_name'] !== null) {
+                $names[$aid] = $r['agent_name'];
+            }
+        }
+
+        $results = array();
+        foreach ($byGroup as $aid => $stat) {
+            $aid = (string) $aid;
+            if ($aid === '') {
+                continue;
+            }
+            $results[] = array(
+                'agent_id'   => $aid,
+                'agent_name' => isset($names[$aid]) ? $names[$aid] : $aid,
+                'total_leads' => (int) $stat['lead_count'],
+                'avg_response_time_seconds' => $stat['avg_seconds'] !== null
+                    ? (int) round($stat['avg_seconds'])
+                    : null,
+            );
+        }
+
+        return $results;
     }
 
     /**

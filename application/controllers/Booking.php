@@ -786,7 +786,11 @@ class Booking extends MY_Controller
 		// the other roles keep the live current-month windows above.
 		$this->load->helper('summary_period_helper');
 		$this->load->helper('guest_list_status_filter');
+		$this->load->helper('cancellation_rate');
 		$period = summary_resolve_month($this->input->get('month'), $today);
+		// Owner dashboard's global Day/Week/Month/Year toggle (?owner_period=...);
+		// re-scopes the whole owner per-agent matrix at once. Defaults to month.
+		$owner_period = summary_resolve_owner_period($this->input->get('owner_period'), $today);
 
 		$base = base_url('Booking');
 		$fmt_dmy = function($d) { return date('d/m/Y', strtotime($d)); };
@@ -920,6 +924,7 @@ class Booking extends MY_Controller
 				 WHERE {$credit_clause}
 				   AND BookingConfirmationTitle='BOOKING CONFIRMATION'
 				   AND Status!='N'
+				   AND " . cancellation_rate_exclude_duplicate_clause('booking') . "
 				   AND CAST(InsertDate AS DATE) BETWEEN ? AND ?",
 				array($admin_id, $admin_id, $month_start, $month_end)
 			)->row();
@@ -933,8 +938,11 @@ class Booking extends MY_Controller
 			// ---------- "Compare the Best" sub-lines for the TC KPI cards ----------
 			// Aggregate across every agent under the same TC1/TC2 credited-slot
 			// rule that the agent's own cards use, so the comparison universe is
-			// apples-to-apples. When the logged-in TC IS the best, the sub-line
-			// shows "Best: You" so they recognise themselves at a glance.
+			// apples-to-apples. The comparison population is restricted to the
+			// SALES AGENT role only (admin.Level = 20) via the INNER JOIN below,
+			// so a non-sales-agent (OP/Finance/Owner/TC) holding a credited slot
+			// never appears as the benchmark. When the logged-in TC IS the best,
+			// the sub-line shows "Best: You" so they recognise themselves.
 			$this->load->helper('best_agent');
 			$agent_expr = lead_conversion_credit_agent_expr();
 
@@ -961,7 +969,7 @@ class Booking extends MY_Controller
 				   admin.Name AS agent_name,
 				   COUNT(*) AS bc_count
 				 FROM booking
-				 LEFT JOIN admin ON admin.AdminID = {$agent_expr}
+				 INNER JOIN admin ON admin.AdminID = {$agent_expr} AND admin.Level = '20'
 				 WHERE booking.BookingConfirmationTitle='BOOKING CONFIRMATION'
 				   AND booking.CancelStatus='N'
 				   AND booking.Status!='N'
@@ -982,7 +990,7 @@ class Booking extends MY_Controller
 				   admin.Name AS agent_name,
 				   COUNT(*) AS bc_count
 				 FROM booking
-				 LEFT JOIN admin ON admin.AdminID = {$agent_expr}
+				 INNER JOIN admin ON admin.AdminID = {$agent_expr} AND admin.Level = '20'
 				 WHERE booking.BookingConfirmationTitle='BOOKING CONFIRMATION'
 				   AND booking.CancelStatus='N'
 				   AND booking.Status!='N'
@@ -1005,7 +1013,7 @@ class Booking extends MY_Controller
 				   admin.Name AS agent_name,
 				   COALESCE(SUM(booking.NetTotal), 0) AS total_sales
 				 FROM booking
-				 LEFT JOIN admin ON admin.AdminID = {$agent_expr}
+				 INNER JOIN admin ON admin.AdminID = {$agent_expr} AND admin.Level = '20'
 				 WHERE booking.BookingConfirmationTitle='BOOKING CONFIRMATION'
 				   AND booking.CancelStatus='N'
 				   AND booking.Status!='N'
@@ -1029,7 +1037,7 @@ class Booking extends MY_Controller
 				   admin.Name AS agent_name,
 				   COALESCE(SUM(booking.NetTotal), 0) AS total_sales
 				 FROM booking
-				 LEFT JOIN admin ON admin.AdminID = {$agent_expr}
+				 INNER JOIN admin ON admin.AdminID = {$agent_expr} AND admin.Level = '20'
 				 WHERE booking.BookingConfirmationTitle='BOOKING CONFIRMATION'
 				   AND booking.CancelStatus='N'
 				   AND booking.Status!='N'
@@ -1054,9 +1062,10 @@ class Booking extends MY_Controller
 				   COUNT(*) AS total,
 				   SUM(CASE WHEN booking.CancelStatus='Y' THEN 1 ELSE 0 END) AS cancelled
 				 FROM booking
-				 LEFT JOIN admin ON admin.AdminID = {$agent_expr}
+				 INNER JOIN admin ON admin.AdminID = {$agent_expr} AND admin.Level = '20'
 				 WHERE booking.BookingConfirmationTitle='BOOKING CONFIRMATION'
 				   AND booking.Status!='N'
+				   AND " . cancellation_rate_exclude_duplicate_clause('booking') . "
 				   AND CAST(booking.InsertDate AS DATE) BETWEEN ? AND ?
 				 GROUP BY credited_agent_id, agent_name
 				 HAVING credited_agent_id IS NOT NULL AND credited_agent_id > 0 AND COUNT(*) >= 3",
@@ -1131,7 +1140,14 @@ class Booking extends MY_Controller
 					? round(($own_converted / $own_total_leads) * 100, 1)
 					: null;
 			}
-			$best_conv = best_conversion_rate_agent($by_agent, 3);
+			// "Best:" compares only against the SALES AGENT role: restrict the
+			// leaderboard pool to GHL users mapping to a level-20 admin. The
+			// agent's own rate above is unaffected (it filters by $my_ghl_uids).
+			$sales_uid_set = $this->sales_agent_ghl_uids();
+			$conv_pool = array_values(array_filter($by_agent, function($a) use ($sales_uid_set) {
+				return isset($sales_uid_set[(string)$a['agent_id']]);
+			}));
+			$best_conv = best_conversion_rate_agent($conv_pool, 3);
 			if($best_conv && !empty($my_ghl_uids) && in_array((string)$best_conv['agent_id'], $my_ghl_uids, true)) {
 				$best_conv['agent_name'] = 'You';
 			}
@@ -1174,17 +1190,21 @@ class Booking extends MY_Controller
 					'week'  => (int)$mine_week['total_leads'],
 					'month' => (int)$mine_month['total_leads'],
 				);
-				// "My Response Time" merges the first-5 reply gaps with the
-				// most-recent-5 (deduped) so the figure reflects both how fast a
-				// lead is picked up and how responsive the agent stays later in
-				// the thread. See avg_combined_response_time_seconds in the model.
+				// "Avg Reply Time to Inbound" now uses Message-Log logic: every
+				// inbound->outbound reply pair in the agent's threads (in working
+				// hours, same day) is averaged, windowed by when the REPLY was
+				// sent. This matches the Message Log's "Avg time taken" exactly.
+				$resp_day   = $this->Report_Model->Ghl_Messages_Avg_Reply_Seconds_For_Uids($today, $today, $my_ghl_uids);
+				$resp_week  = $this->Report_Model->Ghl_Messages_Avg_Reply_Seconds_For_Uids($week_start, $week_end, $my_ghl_uids);
+				$resp_month = $this->Report_Model->Ghl_Messages_Avg_Reply_Seconds_For_Uids($cur_month_start, $cur_month_end, $my_ghl_uids);
+				$resp_round = function($secs) { return $secs === null ? null : (int) round($secs); };
 				$cards['tc_response_time_dwm'] = array(
-					'day'           => $fmt_seconds($mine_day['avg_combined_response_time_seconds']),
-					'week'          => $fmt_seconds($mine_week['avg_combined_response_time_seconds']),
-					'month'         => $fmt_seconds($mine_month['avg_combined_response_time_seconds']),
-					'day_seconds'   => $mine_day['avg_combined_response_time_seconds'],
-					'week_seconds'  => $mine_week['avg_combined_response_time_seconds'],
-					'month_seconds' => $mine_month['avg_combined_response_time_seconds'],
+					'day'           => $fmt_seconds($resp_round($resp_day)),
+					'week'          => $fmt_seconds($resp_round($resp_week)),
+					'month'         => $fmt_seconds($resp_round($resp_month)),
+					'day_seconds'   => $resp_round($resp_day),
+					'week_seconds'  => $resp_round($resp_week),
+					'month_seconds' => $resp_round($resp_month),
 				);
 
 				// "Lead Pickup Speed (Month)". Raw wall-clock time from a lead
@@ -1226,6 +1246,11 @@ class Booking extends MY_Controller
 			$resp_rows = $this->Report_Model->Lead_Dashboard_By_Agent(array(
 				'start_date' => $cur_month_start, 'end_date' => $cur_month_end,
 			));
+			// "Best:" compares only against the SALES AGENT role: keep rows whose
+			// GHL user maps to a level-20 admin ($sales_uid_set built above).
+			$resp_rows = array_values(array_filter($resp_rows, function($r) use ($sales_uid_set) {
+				return isset($sales_uid_set[(string)$r['agent_id']]);
+			}));
 			$pick_ghl_best = function($rows, $field, $sort_desc, $min_leads) use ($my_ghl_uids) {
 				$f = array();
 				foreach($rows as $r) {
@@ -1246,7 +1271,15 @@ class Booking extends MY_Controller
 				}
 				return $top;
 			};
-			$best_resp = $pick_ghl_best($resp_rows, 'avg_response_time_seconds', false, 3);
+			// Reply-time "Best:" uses the same Message-Log logic as the card's
+				// own value (per-agent, reply-date windowed) so the two are
+				// apples-to-apples. Restricted to the SALES AGENT pool; min 3
+				// conversations replied to.
+				$msg_resp_rows = $this->Report_Model->Ghl_Messages_Avg_Reply_By_Agent($cur_month_start, $cur_month_end);
+				$msg_resp_rows = array_values(array_filter($msg_resp_rows, function($r) use ($sales_uid_set) {
+					return isset($sales_uid_set[(string)$r['agent_id']]);
+				}));
+				$best_resp = $pick_ghl_best($msg_resp_rows, 'avg_response_time_seconds', false, 3);
 			$cards['tc_response_time_dwm']['best'] = $best_resp
 				? array('name' => $best_resp['agent_name'], 'value' => format_response_duration((int)round((float)$best_resp['avg_response_time_seconds'])))
 				: null;
@@ -1337,21 +1370,19 @@ class Booking extends MY_Controller
 				'best'   => $fu_best,
 			);
 
-			// ---------- Agent Score (Month / Year) ----------
-			// Weighted, best-benchmarked composite: reply 30% + pickup 20% +
-			// conversion 20% + sales 30%. Month uses the selected month, Year the
-			// selected year. Both are always computed so the leaderboard renders
-			// even when this TC has no data of their own.
-			$cards['agent_score_month'] = $this->agent_score_card($month_start, $month_end, false, $my_ghl_uids, $admin_id);
-			$cards['agent_score_year']  = $this->agent_score_card($year_start, $year_end, true, $my_ghl_uids, $admin_id);
+			// ---------- Agent Score (Month) ----------
+			// Weighted, best-benchmarked composite scoped to the selected month.
+			// Always computed so the leaderboard renders even when this TC has no
+			// data of their own. (No Year variant: a year-wide reply-time pass
+			// scans the whole message log and blew the request's memory limit.)
+			$cards['agent_score_month'] = $this->agent_score_card($month_start, $month_end, $my_ghl_uids, $admin_id);
 		}
 
-		// ---------- TC LEAD / Owner (team-wide lead + booking metrics) ----------
-		// Owner is scoped to the three lead-conversion cards only (Leads,
-		// Conversion & Response, Top Agents). BC Created (Week+Month) and the
-		// team-wide cancellation rate stay TC-Lead-only, so their queries are
-		// gated on $is_tclead inside this block.
-		if($is_tclead || $is_owner) {
+		// ---------- TC LEAD (team-wide lead + booking metrics) ----------
+		// Owner no longer shares this block: the owner dashboard is a single
+		// per-agent matrix built below (see the $is_owner branch). TC-Lead keeps
+		// the full card set unchanged.
+		if($is_tclead) {
 			if($is_tclead) {
 				$row = $this->db->query(
 					"SELECT
@@ -1374,6 +1405,7 @@ class Booking extends MY_Controller
 					        SUM(CASE WHEN CancelStatus='Y' THEN 1 ELSE 0 END) AS cancelled
 					 FROM booking
 					 WHERE BookingConfirmationTitle='BOOKING CONFIRMATION' AND Status!='N'
+					   AND " . cancellation_rate_exclude_duplicate_clause('booking') . "
 					   AND CAST(InsertDate AS DATE) BETWEEN ? AND ?",
 					array($month_start, $month_end)
 				)->row();
@@ -1469,61 +1501,6 @@ class Booking extends MY_Controller
 				);
 			}
 			$tables['agent_conversion'] = $top_agents;
-
-			// Leads by Agent (Today / Week / Month) — OWNER only. The same
-			// new-lead total as the "Leads" card, broken out one row per agent
-			// so the owner can read volume agent-by-agent. Windowed by lead
-			// start date, identical to the Leads card.
-			if($is_owner) {
-				$tables['leads_by_agent'] = $this->Report_Model->Lead_Dashboard_Leads_By_Agent_DWM(
-					$today, $week_start, $week_end, $month_start, $month_end
-				);
-
-				// Pending BC (team) — every booking currently parked at PB
-				// ("PENDING BC"), across all agents. Live backlog count.
-				$row = $this->db->query(
-					"SELECT COUNT(*) AS cnt FROM booking
-					 WHERE CancelStatus='N' AND Status='PB'"
-				)->row();
-				$cards['pending_bc'] = array(
-					'count' => (int)$row->cnt,
-					'link'  => $base . $qs(array('status' => 'PB')),
-				);
-
-				// Draft -> Payment Time (team, this month). Same SAD -> first-P
-				// metric as the TC card but company-wide, windowed on the
-				// draft-save date. "Best:" footer = fastest TC this month.
-				$this->load->helper(array('submitted_payment_response', 'response_time'));
-				$sp_start = $month_start . ' 00:00:00';
-				$sp_next  = date('Y-m-01 00:00:00', strtotime($month_start . ' +1 month'));
-				$sp_row = $this->db->query(
-					submitted_payment_avg_response_sql(false),
-					array($sp_start, $sp_next)
-				)->row();
-				$sp_n    = !empty($sp_row) ? (int)$sp_row->n : 0;
-				$sp_secs = ($sp_n > 0 && $sp_row->avg_seconds !== null)
-					? (int)round((float)$sp_row->avg_seconds) : null;
-				$best_sp_row = $this->db->query(
-					submitted_payment_best_agent_sql(),
-					array($sp_start, $sp_next)
-				)->row();
-				$best_sp = null;
-				if(!empty($best_sp_row) && !empty($best_sp_row->AdminID)) {
-					$bd_admin = $this->db->select('Name')
-						->where('AdminID', (int)$best_sp_row->AdminID)
-						->get('admin')->row();
-					$best_sp = array(
-						'name'  => $bd_admin ? $bd_admin->Name : '#' . (int)$best_sp_row->AdminID,
-						'value' => format_response_duration((int)round((float)$best_sp_row->avg_seconds)),
-					);
-				}
-				$cards['submitted_payment_response_month'] = array(
-					'value'   => format_response_duration($sp_secs),
-					'count'   => $sp_n,
-					'seconds' => $sp_secs,
-					'best'    => $best_sp,
-				);
-			}
 
 			// Closed Sales by Destination (Month) — fully-paid BCs only, ranked
 			// by revenue. "Fully paid" matches the TC Total Sales card at
@@ -1645,6 +1622,16 @@ class Booking extends MY_Controller
 				);
 			}
 			$tables['agent_source_split'] = $rows_out;
+		}
+
+		// ---------- OWNER (per-agent performance matrix) ----------
+		// One row per TC sales agent (Level 20/50) across all 11 owner metrics,
+		// scoped to the global Day/Week/Month/Year toggle ($owner_period). Built
+		// by owner_agent_matrix(); rendered as a single matrix table.
+		if($is_owner) {
+			$tables['owner_agent_matrix'] = $this->owner_agent_matrix(
+				$owner_period['start_date'], $owner_period['end_date'], $owner_period['period']
+			);
 		}
 
 		// ---------- OP ----------
@@ -2509,6 +2496,11 @@ class Booking extends MY_Controller
 		$meta['selected_month']       = $period['value'];
 		$meta['selected_month_label'] = $period['label'];
 		if($is_owner) {
+			// Echo the resolved toggle back so the front-end can highlight the
+			// active period tab (covers both the default and the bad-input fallback).
+			$meta['owner_period']       = $owner_period['period'];
+			$meta['owner_period_label'] = $owner_period['label'];
+
 			$row = $this->db
 				->select('completed_at')
 				->from('ghl_sync_run_log')
@@ -3147,9 +3139,47 @@ class Booking extends MY_Controller
 	}
 
 	/**
+	 * Set of GHL UserIDs that belong to a SALES AGENT (admin.Level = 20). Used
+	 * to restrict the GHL-user-keyed "Best:" leaderboards (Reply Time, Leads,
+	 * Conversion, Pickup Speed) to the sales-agent role only, mirroring the
+	 * admin.Level = 20 filter on the booking-table leaderboards. Mapping table
+	 * first (canonical), email match as fallback -- same bridge as the Agent
+	 * Score card and the logged-in TC's own resolution.
+	 *
+	 * @return array associative set { ghl_user_id => true } for O(1) membership.
+	 */
+	private function sales_agent_ghl_uids()
+	{
+		$uids = array();
+		foreach($this->db->query(
+			"SELECT alda.GhlUserID
+			 FROM admin_lead_dashboard_agents alda
+			 INNER JOIN admin a ON a.AdminID = alda.AdminID
+			 WHERE a.Level = '20' AND NULLIF(alda.GhlUserID,'') IS NOT NULL"
+		)->result() as $r) {
+			$uids[(string)$r->GhlUserID] = true;
+		}
+		foreach($this->db->query(
+			"SELECT gu.UserID
+			 FROM admin a
+			 INNER JOIN ghl_users gu ON LOWER(TRIM(gu.Email)) = LOWER(TRIM(a.Email))
+			 WHERE a.Level = '20'"
+		)->result() as $r) {
+			$uid = (string)$r->UserID;
+			if($uid !== '') { $uids[$uid] = true; }
+		}
+		return $uids;
+	}
+
+	/**
 	 * Build the "Best:" footer payload for the Lead Pickup Speed card -- the
-	 * fastest-picking-up agent team-wide for the month, shown as "You" when the
-	 * winner is the logged-in TC (matched against their own GHL user ids).
+	 * fastest-picking-up SALES AGENT team-wide for the month, shown as "You"
+	 * when the winner is the logged-in TC (matched against their own GHL user
+	 * ids). The comparison universe is restricted to the sales-agent role
+	 * (admin.Level = 20) via sales_agent_ghl_uids(), so we score every agent
+	 * row from Lead_Pickup_Speed_By_Agent and apply the same min-sample (n >= 2)
+	 * and fastest-wins / name-ASC tie-break that Lead_Pickup_Speed_Best_Agent
+	 * used to enforce in SQL.
 	 *
 	 * @param string $month_start  'Y-m-d'
 	 * @param string $month_end    'Y-m-d'
@@ -3158,8 +3188,20 @@ class Booking extends MY_Controller
 	 */
 	private function tc_pickup_speed_best($month_start, $month_end, $my_ghl_uids)
 	{
-		$best = $this->Report_Model->Lead_Pickup_Speed_Best_Agent($month_start, $month_end);
-		if (empty($best)) { return null; }
+		$rows = $this->Report_Model->Lead_Pickup_Speed_By_Agent($month_start, $month_end);
+		$sales_uid_set = $this->sales_agent_ghl_uids();
+		$best = null;
+		foreach($rows as $r) {
+			if(!isset($sales_uid_set[(string)$r['agent_id']])) { continue; }
+			if((int)$r['n'] < 2) { continue; }
+			if($best === null
+				|| (float)$r['avg_seconds'] < (float)$best['avg_seconds']
+				|| ((float)$r['avg_seconds'] === (float)$best['avg_seconds']
+					&& strcmp((string)$r['agent_name'], (string)$best['agent_name']) < 0)) {
+				$best = $r;
+			}
+		}
+		if($best === null) { return null; }
 
 		$this->load->helper('response_time');
 		$name = (!empty($my_ghl_uids) && in_array($best['agent_id'], $my_ghl_uids, true))
@@ -3172,59 +3214,55 @@ class Booking extends MY_Controller
 	}
 
 	/**
-	 * Agent Score card payload for one period. Builds a unified per-agent table
-	 * by joining three GHL-user-keyed metrics (avg reply time + conversion via
-	 * Lead_Dashboard_By_Agent, pickup speed via Lead_Pickup_Speed_By_Agent) with
-	 * the admin-keyed credited-sales total, then hands the rows to the pure
+	 * Agent Score card payload for the selected month. Builds a unified per-agent
+	 * table by joining three GHL-user-keyed metrics (avg reply time + conversion
+	 * via Lead_Dashboard_By_Agent, pickup speed via Lead_Pickup_Speed_By_Agent)
+	 * with the admin-keyed credited-sales total, then hands the rows to the pure
 	 * agent_score_helper for normalisation + ranking. Returns the logged-in
 	 * agent's composite/rank plus the top performer ("You" when that's them).
 	 *
 	 * @param string $start       'Y-m-d'  period start
 	 * @param string $end         'Y-m-d'  period end
-	 * @param bool   $fully_paid   true => year sales gate (approved payments >= NetTotal)
 	 * @param array  $my_ghl_uids  logged-in agent's GHL user ids (may be empty)
 	 * @param int    $admin_id     logged-in agent's AdminID
 	 */
-	private function agent_score_card($start, $end, $fully_paid, $my_ghl_uids, $admin_id)
+	private function agent_score_card($start, $end, $my_ghl_uids, $admin_id)
 	{
 		$this->load->helper(array('agent_score', 'lead_conversion_credit'));
 		$this->load->model('Report_Model');
 
-		// 1. GHL-keyed reply time + conversion (ungated, '1=1', matching the
-		//    Conversion Rate (YTD) card's attribution).
+		// 1. GHL-keyed conversion (ungated, '1=1', matching the Conversion Rate
+		//    (YTD) card's attribution). Reply time is sourced separately below.
 		$by_agent = $this->Report_Model->Lead_Dashboard_By_Agent(
 			array('start_date' => $start, 'end_date' => $end), '1=1'
 		);
+		// 1b. GHL-keyed reply time — the Message-Log reply-pair metric, the SAME
+		//     source as the "Avg Reply Time to Inbound" card, so the Agent Score's
+		//     reply component matches the reply figure each agent actually sees.
+		$reply = $this->Report_Model->Ghl_Messages_Avg_Reply_By_Agent($start, $end);
 		// 2. GHL-keyed pickup speed (one row per agent).
 		$pickup = $this->Report_Model->Lead_Pickup_Speed_By_Agent($start, $end);
 
-		// 3. Admin-keyed credited sales. Month = no fully-paid gate (mirrors the
-		//    Month Sales card); Year = approved-payments-cover-NetTotal gate
-		//    (mirrors the Year Sales card) so each period's sales component agrees
-		//    with the adjacent Sales card.
+		// 2b. GHL-keyed follow-up rate (owned leads with follow-up sent/completed,
+		//     over all owned leads) — same definition as the Follow-up % card.
+		$followup = $this->Report_Model->Lead_Ownership_By_Agent(
+			array('start_date' => $start, 'end_date' => $end)
+		);
+
+		// 3. Admin-keyed credited sales: no fully-paid gate (mirrors the Month
+		//    Sales card -- a BC counts whether or not it has been paid).
 		$agent_expr = lead_conversion_credit_agent_expr();
-		$paid_gate = '';
-		if($fully_paid) {
-			$paid_subquery = "COALESCE((
-				SELECT SUM(p.Credit) FROM payment p
-				WHERE p.BookingID = booking.BookingID
-				  AND p.Status = 'Y' AND p.Credit > 0
-				  AND (p.Type IS NULL OR p.Type != 'AGENT COMMISSION FROM SUPPLIER')
-			), 0)";
-			$paid_gate = " AND {$paid_subquery} >= booking.NetTotal";
-		}
 		$sales_rows = $this->db->query(
 			"SELECT
 			   {$agent_expr} AS admin_id,
 			   admin.Name AS agent_name,
 			   COALESCE(SUM(booking.NetTotal), 0) AS total_sales
 			 FROM booking
-			 LEFT JOIN admin ON admin.AdminID = {$agent_expr}
+			 INNER JOIN admin ON admin.AdminID = {$agent_expr} AND admin.Level = '20'
 			 WHERE booking.BookingConfirmationTitle='BOOKING CONFIRMATION'
 			   AND booking.CancelStatus='N'
 			   AND booking.Status!='N'
 			   AND booking.NetTotal > 0
-			   {$paid_gate}
 			   AND CAST(booking.InsertDate AS DATE) BETWEEN ? AND ?
 			 GROUP BY admin_id, agent_name
 			 HAVING admin_id IS NOT NULL AND admin_id > 0",
@@ -3234,12 +3272,16 @@ class Booking extends MY_Controller
 		// 4. Bridge GHL uid -> AdminID for every agent (generalises the logged-in
 		//    resolution used by the Conversion Rate card): mapping table first,
 		//    email match as fallback.
+		// Restrict the bridge (and therefore the whole Agent Score comparison
+		// population) to the SALES AGENT role (admin.Level = 20): non-sales-agent
+		// admins must never appear in the leaderboard the score is benchmarked
+		// against.
 		$map = array(); $name_by_admin = array();
 		foreach($this->db->query(
 			"SELECT alda.GhlUserID, alda.AdminID, a.Name
 			 FROM admin_lead_dashboard_agents alda
 			 INNER JOIN admin a ON a.AdminID = alda.AdminID
-			 WHERE NULLIF(alda.GhlUserID,'') IS NOT NULL"
+			 WHERE a.Level = '20' AND NULLIF(alda.GhlUserID,'') IS NOT NULL"
 		)->result() as $r) {
 			$map[(string)$r->GhlUserID] = (int)$r->AdminID;
 			$name_by_admin[(int)$r->AdminID] = $r->Name;
@@ -3247,7 +3289,8 @@ class Booking extends MY_Controller
 		foreach($this->db->query(
 			"SELECT gu.UserID, a.AdminID, a.Name
 			 FROM admin a
-			 INNER JOIN ghl_users gu ON LOWER(TRIM(gu.Email)) = LOWER(TRIM(a.Email))"
+			 INNER JOIN ghl_users gu ON LOWER(TRIM(gu.Email)) = LOWER(TRIM(a.Email))
+			 WHERE a.Level = '20'"
 		)->result() as $r) {
 			$uid = (string)$r->UserID;
 			if($uid !== '' && !isset($map[$uid])) { $map[$uid] = (int)$r->AdminID; }
@@ -3264,7 +3307,8 @@ class Booking extends MY_Controller
 					'reply_sum' => 0.0, 'reply_n' => 0,
 					'pickup_sum' => 0.0, 'pickup_n' => 0,
 					'leads' => 0, 'converted' => 0, 'sales' => 0.0,
-					'has_leads' => false, 'has_sales' => false,
+					'fu_owned' => 0, 'fu_followed' => 0,
+					'has_leads' => false, 'has_sales' => false, 'has_fu' => false,
 				);
 			}
 		};
@@ -3273,13 +3317,21 @@ class Booking extends MY_Controller
 			if($uid === '__unassigned__' || !isset($map[$uid])) { continue; }
 			$aid = $map[$uid];
 			$ensure($u, $aid);
-			$leads = (int)$a['total_leads'];
-			$u[$aid]['leads']     += $leads;
+			$u[$aid]['leads']     += (int)$a['total_leads'];
 			$u[$aid]['converted'] += (int)$a['converted_leads'];
 			$u[$aid]['has_leads']  = true;
-			if($a['avg_response_time_seconds'] !== null && $leads > 0) {
-				$u[$aid]['reply_sum'] += (float)$a['avg_response_time_seconds'] * $leads;
-				$u[$aid]['reply_n']   += $leads;
+		}
+		// Reply time: Message-Log metric, weighted by the reply sample (total_leads
+		// = conversations replied to), matching the Avg Reply Time to Inbound card.
+		foreach($reply as $r) {
+			$uid = (string)$r['agent_id'];
+			if(!isset($map[$uid])) { continue; }
+			$aid = $map[$uid];
+			$ensure($u, $aid);
+			$n = (int)$r['total_leads'];
+			if($r['avg_response_time_seconds'] !== null && $n > 0) {
+				$u[$aid]['reply_sum'] += (float)$r['avg_response_time_seconds'] * $n;
+				$u[$aid]['reply_n']   += $n;
 			}
 		}
 		foreach($pickup as $p) {
@@ -3301,20 +3353,33 @@ class Booking extends MY_Controller
 			$u[$aid]['has_sales']  = true;
 			if($u[$aid]['name'] === '') { $u[$aid]['name'] = $s['agent_name']; }
 		}
+		foreach($followup as $fr) {
+			$uid = (string)$fr['owner_user_id'];
+			if(!isset($map[$uid])) { continue; }
+			$aid = $map[$uid];
+			$ensure($u, $aid);
+			$u[$aid]['fu_owned']    += (int)$fr['owned_leads'];
+			$u[$aid]['fu_followed'] += (int)$fr['follow_up_leads'];
+			$u[$aid]['has_fu']       = true;
+			if($u[$aid]['name'] === '' && !empty($fr['owner_name'])) { $u[$aid]['name'] = $fr['owner_name']; }
+		}
 
-		// 6. Eligible = had leads OR sales. Derive per-agent metric values.
+		// 6. Eligible = had leads OR sales OR owned leads. Derive per-agent metric values.
 		$agents = array();
 		foreach($u as $aid => $row) {
-			if(!$row['has_leads'] && !$row['has_sales']) { continue; }
+			if(!$row['has_leads'] && !$row['has_sales'] && !$row['has_fu']) { continue; }
 			$agents[] = array(
-				'admin_id'    => $aid,
-				'name'        => $row['name'] !== '' ? $row['name'] : '#' . $aid,
-				'reply_secs'  => $row['reply_n']  > 0 ? $row['reply_sum']  / $row['reply_n']  : null,
-				'pickup_secs' => $row['pickup_n'] > 0 ? $row['pickup_sum'] / $row['pickup_n'] : null,
-				'conv_rate'   => $row['leads'] > 0 ? ($row['converted'] / $row['leads']) * 100 : null,
-				'sales'       => $row['has_sales'] ? $row['sales'] : null,
-				'pickup_n'    => $row['pickup_n'],
-				'leads_n'     => $row['leads'],
+				'admin_id'      => $aid,
+				'name'          => $row['name'] !== '' ? $row['name'] : '#' . $aid,
+				'reply_secs'    => $row['reply_n']  > 0 ? $row['reply_sum']  / $row['reply_n']  : null,
+				'pickup_secs'   => $row['pickup_n'] > 0 ? $row['pickup_sum'] / $row['pickup_n'] : null,
+				'conv_rate'     => $row['leads'] > 0 ? ($row['converted'] / $row['leads']) * 100 : null,
+				'sales'         => $row['has_sales'] ? $row['sales'] : null,
+				'followup_rate' => $row['fu_owned'] > 0 ? ($row['fu_followed'] / $row['fu_owned']) * 100 : null,
+				'served_leads'  => $row['fu_owned'] > 0 ? $row['fu_owned'] : null,
+				'pickup_n'      => $row['pickup_n'],
+				'leads_n'       => $row['leads'],
+				'owned_n'       => $row['fu_owned'],
 			);
 		}
 
@@ -3334,6 +3399,143 @@ class Booking extends MY_Controller
 			'breakdown' => $own ? $own['norm'] : null,
 			'best'      => $best,
 		);
+	}
+
+	/**
+	 * OWNER per-agent performance matrix — one row per TC sales agent (admin
+	 * Level 20/50) with all 11 owner metrics over a single resolved period:
+	 *   1 reply time · 2 pickup speed · 3 new leads · 4 served leads ·
+	 *   5 gated conversion · 6 ungated conversion · 7 outbound · 8 sales ·
+	 *   9 follow-up % · 10 cancellation % · 11 composite Agent Score.
+	 *
+	 * Generalises agent_score_card(): it fetches the same GHL-keyed sources plus
+	 * outbound + cancellation, bridges GHL uid -> AdminID, and hands everything to
+	 * the pure owner_agent_matrix_build() fold (unit-tested in isolation).
+	 *
+	 * Only the sources the selected period actually reports are fetched — a
+	 * column that would render "-" for $period runs no query and no calculation:
+	 *   - reply (Message-Log) + follow-up/served: Day / Week / Month only
+	 *     (reply over a full year would load ~250k message rows and exhaust memory)
+	 *   - gated conversion + cancellation: Year only
+	 *   - outbound: Day / Week / Month only
+	 *   - sales: Month / Year only
+	 *   - Agent Score: Month only
+	 * Pickup and new-leads/conversion are cheap grouped queries that feed all-period
+	 * columns, so they are always fetched.
+	 *
+	 * @param string $start  'Y-m-d' period start
+	 * @param string $end    'Y-m-d' period end
+	 * @param string $period day|week|month|year (drives the skip rules above)
+	 * @return array list of matrix rows (see owner_agent_matrix_helper.php)
+	 */
+	private function owner_agent_matrix($start, $end, $period)
+	{
+		$this->load->helper(array('agent_score', 'owner_agent_matrix', 'lead_conversion_credit'));
+		$this->load->model('Report_Model');
+
+		$filters = array('start_date' => $start, 'end_date' => $end);
+		$is_dwm = in_array($period, array('day', 'week', 'month'), true);
+		$is_my  = in_array($period, array('month', 'year'), true);
+		$is_year = ($period === 'year');
+
+		// Ungated ('1=1') gives new-lead totals (D/W/M) + ungated conversion (Year)
+		// + the Month score's conversion input — needed on every period, and it is a
+		// cheap grouped query. Pickup likewise (grouped) shows on all periods.
+		$leads_ungated = $this->Report_Model->Lead_Dashboard_By_Agent($filters, '1=1');
+		$pickup        = $this->Report_Model->Lead_Pickup_Speed_By_Agent($start, $end);
+
+		// Reply time uses the Message-Log reply-pair metric (SAME source as the TC
+		// "Avg Reply Time to Inbound" card). It loads every message row in the window
+		// and pairs them in PHP, so a full YEAR (~250k rows) exhausts memory — and
+		// there is no year reply card to match anyway. Reported on Day / Week / Month
+		// only; skipped on Year.
+		$reply         = $is_dwm ? $this->Report_Model->Ghl_Messages_Avg_Reply_By_Agent($start, $end) : array();
+		// Follow-up source feeds Served (D/W/M), Follow-up % (Month) and the Month
+		// score only — never Year, so skip it there.
+		$followup      = $is_dwm ? $this->Report_Model->Lead_Ownership_By_Agent($filters) : array();
+
+		// Period-gated: skip the query entirely when the column would only show "-".
+		// Gated conversion (Conv % credited) is reported on Year only.
+		$leads_gated   = $is_year ? $this->Report_Model->Lead_Dashboard_By_Agent($filters) : array();
+		// Outbound is reported on Day / Week / Month only.
+		$outbound      = $is_dwm  ? $this->Report_Model->Outbound_Messages_By_Agent($start, $end) : array();
+		// Cancellation is reported on Year only.
+		$cancellation  = $is_year ? $this->Report_Model->Cancellation_By_Agent($start, $end) : array();
+
+		// Admin-keyed credited sales — actual BC value, NO fully-paid gate (mirrors
+		// the TC Sales-Actual rule). Reported (and used by the score) on Month /
+		// Year only; skipped on Day / Week. Scoped to the TC sales-agent role
+		// (Level 20/50) via the same credited-slot expression used everywhere else.
+		$sales_rows = array();
+		if($is_my) {
+			$agent_expr  = lead_conversion_credit_agent_expr();
+			$sales_rows  = $this->db->query(
+				"SELECT
+				   {$agent_expr} AS admin_id,
+				   admin.Name AS agent_name,
+				   COALESCE(SUM(booking.NetTotal), 0) AS total_sales
+				 FROM booking
+				 INNER JOIN admin ON admin.AdminID = {$agent_expr} AND admin.Level IN ('20','50')
+				 WHERE booking.BookingConfirmationTitle='BOOKING CONFIRMATION'
+				   AND booking.CancelStatus='N'
+				   AND booking.Status!='N'
+				   AND booking.NetTotal > 0
+				   AND CAST(booking.InsertDate AS DATE) BETWEEN ? AND ?
+				 GROUP BY admin_id, agent_name
+				 HAVING admin_id IS NOT NULL AND admin_id > 0",
+				array($start, $end)
+			)->result_array();
+		}
+
+		// Bridge GHL uid -> AdminID, restricted to the TC sales-agent role
+		// (Level 20/50): mapping table first, corporate-email match as fallback.
+		$map = array(); $name_by_admin = array();
+		foreach($this->db->query(
+			"SELECT alda.GhlUserID, alda.AdminID, a.Name
+			 FROM admin_lead_dashboard_agents alda
+			 INNER JOIN admin a ON a.AdminID = alda.AdminID
+			 WHERE a.Level IN ('20','50') AND NULLIF(alda.GhlUserID,'') IS NOT NULL"
+		)->result() as $r) {
+			$map[(string)$r->GhlUserID] = (int)$r->AdminID;
+			$name_by_admin[(int)$r->AdminID] = $r->Name;
+		}
+		foreach($this->db->query(
+			"SELECT gu.UserID, a.AdminID, a.Name
+			 FROM admin a
+			 INNER JOIN ghl_users gu ON LOWER(TRIM(gu.Email)) = LOWER(TRIM(a.Email))
+			 WHERE a.Level IN ('20','50')"
+		)->result() as $r) {
+			$uid = (string)$r->UserID;
+			if($uid !== '' && !isset($map[$uid])) { $map[$uid] = (int)$r->AdminID; }
+			if(!isset($name_by_admin[(int)$r->AdminID])) { $name_by_admin[(int)$r->AdminID] = $r->Name; }
+		}
+		// Complete the name lookup for EVERY Level 20/50 admin, and capture the
+		// Level-20 subset as the Agent Score benchmark pool. The bridge above only
+		// names agents reachable through a GHL mapping/email; an agent who surfaces
+		// solely via an admin-keyed source that carries no name (e.g. a cancelled-
+		// only BC) would otherwise fall back to "#<AdminID>". $benchmark_admins
+		// restricts the score's 100-anchors to Level 20, so an L20 agent's matrix
+		// Score equals their own Agent Score card (L50 rows are still scored/shown).
+		$benchmark_admins = array();
+		foreach($this->db->query(
+			"SELECT AdminID, Name, Level FROM admin WHERE Level IN ('20','50')"
+		)->result() as $r) {
+			if(!isset($name_by_admin[(int)$r->AdminID])) { $name_by_admin[(int)$r->AdminID] = $r->Name; }
+			if((string)$r->Level === '20') { $benchmark_admins[(int)$r->AdminID] = true; }
+		}
+
+		// Agent Score is reported on Month only — skip the scoring work (and leave
+		// agent_score null) on every other period so a "-" column does no calc.
+		return owner_agent_matrix_build(array(
+			'leads_ungated' => $leads_ungated,
+			'leads_gated'   => $leads_gated,
+			'reply'         => $reply,
+			'pickup'        => $pickup,
+			'followup'      => $followup,
+			'outbound'      => $outbound,
+			'sales'         => $sales_rows,
+			'cancellation'  => $cancellation,
+		), $map, $name_by_admin, $benchmark_admins, ($period === 'month'));
 	}
 
 	function Create()
@@ -3470,6 +3672,10 @@ class Booking extends MY_Controller
 				$array['supplier_invoices'] = [];
 				$array['supplier_invoice_suppliers'] = $this->Payment_Model->Read_Suppliers();
 				$array['draft_payment_seconds'] = null;
+				$array['draft_payment_breakdown'] = null;
+				$array['is_slow_conversion'] = false;
+				$array['slow_conversion_reasons'] = array();
+				$array['slow_conversion_reason_selected'] = array();
 				$this->load->view('layout/header', $titles);
 				$this->load->view('booking/booking', $array);
 				$this->load->view('layout/footer');
@@ -3991,7 +4197,9 @@ class Booking extends MY_Controller
 					if(!empty($array['DepositDeadline'])) {
 						$array['DepositDeadline'] = date('d/m/Y', strtotime($array['DepositDeadline']));
 					}
-					$array['FullPaymentDeadline'] = date('d/m/Y', strtotime($array['FullPaymentDeadline']));
+					if(!empty($array['FullPaymentDeadline'])) {
+						$array['FullPaymentDeadline'] = date('d/m/Y', strtotime($array['FullPaymentDeadline']));
+					}
 					if(!empty($array['AdditionalPaymentDeadline'])) {
 						$array['AdditionalPaymentDeadline'] = date('d/m/Y', strtotime($array['AdditionalPaymentDeadline']));
 					}
@@ -4021,9 +4229,9 @@ class Booking extends MY_Controller
 					$array['DepositFixedAmountOriginal'] = isset($array['DepositFixedAmount']) ? $array['DepositFixedAmount'] : 0;
 					// For Update page: use actual DB value (even if 0). For Create/Duplicate: default to 50 if 0 or not set
 					if (current_url() == base_url('Booking/Update')) {
-						// Update page: use actual database value
-						if (!isset($array['DepositPercentage'])) {
-							$array['DepositPercentage'] = 0;
+						// Update page: default to 50 if 0 or not set (e.g. pending BC without a deposit)
+						if (!isset($array['DepositPercentage']) || $array['DepositPercentage'] == 0) {
+							$array['DepositPercentage'] = 50; // Default UI value
 						}
 						if (!isset($array['DepositMode'])) {
 							$array['DepositMode'] = 'percentage';
@@ -4132,7 +4340,18 @@ class Booking extends MY_Controller
 					// Draft response time: saved-as-draft (SAD) -> PENDING PAYMENT (P),
 					// surfaced on the edit form (matches the "Draft -> Payment Time" card).
 					$this->load->helper('response_time');
+					$this->load->helper('slow_conversion');
 					$array['draft_payment_seconds'] = calculate_submitted_to_payment_seconds($array['BookingID']);
+					$array['draft_payment_breakdown'] = calculate_draft_payment_breakdown($array['BookingID']);
+
+					// Slow-conversion reasons card: only for bookings that converted
+					// (reached Pending Payment) but took > 24h. Surface the master
+					// list + this booking's already-tagged ids so the multi-select
+					// can pre-select them.
+					$array['is_slow_conversion'] = is_slow_conversion($array['draft_payment_seconds']);
+					$this->load->model('Slow_Conversion_Reason_Model');
+					$array['slow_conversion_reasons'] = $this->Slow_Conversion_Reason_Model->Read_Slow_Conversion_Reasons();
+					$array['slow_conversion_reason_selected'] = $this->Slow_Conversion_Reason_Model->Read_Selected_Reason_Ids($array['BookingID']);
 
 					// Get booking checklists
 					$array['booking_checklists'] = $this->get_booking_checklists($array['booking_products']);
@@ -4311,7 +4530,9 @@ class Booking extends MY_Controller
 				if(!empty($array['DepositDeadline'])) {
 					$array['DepositDeadline'] = date('d/m/Y', strtotime($array['DepositDeadline']));
 				}
-				$array['FullPaymentDeadline'] = date('d/m/Y', strtotime($array['FullPaymentDeadline']));
+				if(!empty($array['FullPaymentDeadline'])) {
+					$array['FullPaymentDeadline'] = date('d/m/Y', strtotime($array['FullPaymentDeadline']));
+				}
 				if(!empty($array['AdditionalPaymentDeadline'])) {
 					$array['AdditionalPaymentDeadline'] = date('d/m/Y', strtotime($array['AdditionalPaymentDeadline']));
 				}
@@ -5866,6 +6087,61 @@ class Booking extends MY_Controller
 					'success' => false,
 					'message' => 'An error occurred while updating Allow Review'
 				]));
+		}
+	}
+
+	/**
+	 * Save the slow-conversion reasons tagged on a booking. Replaces the
+	 * booking's junction rows with exactly the submitted reason id set
+	 * (Save_Booking_Reasons writes only the add/remove difference).
+	 */
+	public function UpdateSlowConversionReasons()
+	{
+		if (!in_array('AB', $this->session->access_control)) {
+			$this->output->set_content_type('application/json')
+				->set_output(json_encode(['success' => false, 'message' => 'Access denied']));
+			return;
+		}
+
+		if (!$this->input->is_ajax_request()) {
+			$this->output->set_content_type('application/json')
+				->set_output(json_encode(['success' => false, 'message' => 'Invalid request']));
+			return;
+		}
+
+		try {
+			$bookingId = (int) $this->input->post('booking_id');
+			if (empty($bookingId)) {
+				$this->output->set_content_type('application/json')
+					->set_output(json_encode(['success' => false, 'message' => 'Booking ID is required']));
+				return;
+			}
+
+			$existingBooking = $this->Booking_Model->find($bookingId);
+			if (empty($existingBooking)) {
+				$this->output->set_content_type('application/json')
+					->set_output(json_encode(['success' => false, 'message' => 'Booking not found']));
+				return;
+			}
+
+			$reasonIds = $this->input->post('reason_ids');
+			if (!is_array($reasonIds)) {
+				$reasonIds = array();
+			}
+
+			$this->load->model('Slow_Conversion_Reason_Model');
+			$this->Slow_Conversion_Reason_Model->Save_Booking_Reasons(
+				$bookingId,
+				$reasonIds,
+				$this->session->userdata('admin_id')
+			);
+
+			$this->output->set_content_type('application/json')
+				->set_output(json_encode(['success' => true, 'message' => 'Slow conversion reasons saved']));
+		} catch (Exception $e) {
+			log_message('error', 'Update slow conversion reasons error: ' . $e->getMessage());
+			$this->output->set_content_type('application/json')
+				->set_output(json_encode(['success' => false, 'message' => 'An error occurred while saving reasons']));
 		}
 	}
 

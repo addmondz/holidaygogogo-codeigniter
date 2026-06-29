@@ -35,6 +35,34 @@ function lead_conversion_credited_admin_id($insert_date, $sales_agent, $sales_ag
 }
 
 /**
+ * SQL EXISTS-fragment requiring a converted lead's linked booking to still be
+ * live: not cancelled (CancelStatus='N') and not hard-deleted (Status<>'N').
+ * AND this into the conversion-count CASE so a booking cancelled AFTER the lead
+ * was marked converted stops counting on the next read — no flag recalculation,
+ * no cron rerun (the stored is_converted/booking_id are left as historical fact).
+ *
+ * NOTE: do NOT require Status='Y'. booking.Status carries pipeline states
+ * (P, PP, PBO, PTV, ...) that are perfectly valid confirmed bookings; only
+ * Status='N' marks a voided/deleted row. CancelStatus='Y' is the cancellation.
+ *
+ * Applies in BOTH the gated TC1/TC2 path and the no-gate ('1=1') path used by
+ * the booking summary YTD Conversion Rate card. $lead_alias is the alias of the
+ * table holding booking_id (pl for ghl_processed_leads, glo for
+ * ghl_lead_ownership). Uses a distinct booking alias so it composes alongside
+ * the credit fragments' own `booking b` join.
+ */
+function lead_conversion_active_booking_sql($lead_alias = 'pl')
+{
+    return "EXISTS (
+        SELECT 1
+        FROM booking b_active
+        WHERE b_active.BookingID = {$lead_alias}.booking_id
+          AND b_active.CancelStatus = 'N'
+          AND b_active.Status <> 'N'
+    )";
+}
+
+/**
  * SQL EXISTS-fragment that decides whether a ghl_processed_leads row counts as a
  * conversion under the TC1/TC2 cutoff rule. Expects the caller's FROM clause to
  * alias ghl_processed_leads as `pl`.
