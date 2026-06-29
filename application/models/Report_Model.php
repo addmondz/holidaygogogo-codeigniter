@@ -1731,6 +1731,56 @@ class Report_Model extends CI_Model
     }
 
     /**
+     * "Lead Responded" for a single agent who may own MORE THAN ONE GHL inbox:
+     * the DISTINCT leads replied to across ALL the given owner uids, counted once
+     * even when a lead was handled by two of the agent's inboxes (e.g. transferred
+     * between her own team inboxes). This is deliberately NOT the per-owner figure
+     * summed -- summing double counts such shared leads. Same reply-activity
+     * universe (is_reply_owner = 1), ownership window and 07:00-22:00 gate as the
+     * dashboard's per-owner "Lead Responded", so a single-inbox agent still equals
+     * her dashboard row exactly while a multi-inbox agent is de-duplicated.
+     *
+     * @param array  $uids   GHL owner user ids belonging to one agent
+     * @param string $start  inclusive date 'Y-m-d'
+     * @param string $end    inclusive date 'Y-m-d'
+     * @return int   distinct leads responded to across the uid set
+     */
+    public function Lead_Reply_Activity_Responded_Distinct_For_Uids($uids, $start, $end)
+    {
+        $uids = array_values(array_filter(array_map('strval', (array) $uids), 'strlen'));
+        if (empty($uids)) {
+            return 0;
+        }
+
+        $messageTimeColumn = $this->escape_identifier($this->get_message_time_column());
+        $businessHours = $this->lead_reply_business_hours_sql("gm.{$messageTimeColumn}");
+        $placeholders = implode(',', array_fill(0, count($uids), '?'));
+
+        $sql = "
+            SELECT COUNT(DISTINCT glo.processed_lead_id) AS lead_responded
+            FROM ghl_lead_ownership glo
+            INNER JOIN ghl_messages gm
+                ON gm.conversation_id = glo.conversation_id
+               AND gm.user_id = glo.owner_user_id
+               AND gm.direction = 'outbound'
+               AND gm.{$messageTimeColumn} >= glo.lead_started_at
+               AND (
+                    glo.lead_ended_at IS NULL
+                    OR gm.{$messageTimeColumn} < glo.lead_ended_at
+               )
+            WHERE glo.is_reply_owner = 1
+              AND glo.owner_user_id IN ({$placeholders})
+              AND gm.{$messageTimeColumn} BETWEEN ? AND ?
+              AND {$businessHours}
+        ";
+
+        $params = array_merge($uids, array($start . ' 00:00:00', $end . ' 23:59:59'));
+        $row = $this->db->query($sql, $params)->row_array();
+
+        return !empty($row['lead_responded']) ? (int) $row['lead_responded'] : 0;
+    }
+
+    /**
      * Hourly inbound/outbound message counts for a single owner on one day. Powers
      * the per-owner "Lead Reply Hourly" drill-down. Scoped to the owner's leads via
      * ghl_lead_ownership (same reply-activity universe as the dashboard), bounded to

@@ -1197,16 +1197,14 @@ class Booking extends MY_Controller
 				// figures match that report's Lead Responded column exactly. The query
 				// counts DISTINCT leads across the whole date range, so a week/month
 				// window naturally de-dupes a lead replied to on several days.
-				// Filtered to the TC's own GHL uid(s), so every returned row is the
-				// TC's -- sum the distinct-lead counts across any linked uids.
-				$handle_count = function($start, $end) {
-					$rows = $this->Report_Model->Lead_Reply_Activity_By_Agent(array(
-						'owner_user_id' => $my_ghl_uids,
-						'start_date'    => $start, 'end_date' => $end,
-					));
-					$total = 0;
-					foreach($rows as $hr) { $total += (int)$hr['lead_responded']; }
-					return $total;
+				// Counts DISTINCT leads across ALL the TC's linked GHL uids in one
+				// query -- NOT a per-inbox sum, which would double count a lead handled
+				// by two of her own inboxes (e.g. transferred between team inboxes). A
+				// single-inbox TC still equals her dashboard row exactly.
+				$handle_count = function($start, $end) use ($my_ghl_uids) {
+					return $this->Report_Model->Lead_Reply_Activity_Responded_Distinct_For_Uids(
+						$my_ghl_uids, $start, $end
+					);
 				};
 				$cards['tc_handle_lead_today'] = array(
 					'day'   => $handle_count($today, $today),
