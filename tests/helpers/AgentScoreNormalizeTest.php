@@ -5,8 +5,8 @@
  * Locks the pure scoring/normalisation behind the TC "Agent Score" card
  * (application/helpers/agent_score_helper.php):
  *
- *   score = reply 15% + pickup 15% + conversion 15% + sales 25%
- *         + follow-up 15% + leads-served 15%
+ *   score = reply 15% + pickup 10% + conversion 10% + sales 45%
+ *         + follow-up 10% + leads-served 10%
  *
  * Verified rules:
  *   - The best performer on a metric normalises to 100 (lower-better inverts,
@@ -54,7 +54,7 @@ assert_eq('higher: best 0 -> 0',             0.0, agent_score_norm_higher(50, 0)
 // Composite + ranking.
 // Alice is best on every metric -> composite 100, rank 1.
 // Bob is exactly half on every metric -> composite 50.
-// Carol has sales only -> composite = 25% * (sales ratio).
+// Carol has sales only -> composite = 45% * (sales ratio).
 // ---------------------------------------------------------------------------
 $agents = array(
     array('admin_id'=>10,'name'=>'Alice','reply_secs'=>60, 'pickup_secs'=>30, 'conv_rate'=>40,'sales'=>1000,'followup_rate'=>80,'served_leads'=>20,'pickup_n'=>5,'leads_n'=>5,'owned_n'=>5),
@@ -67,8 +67,8 @@ assert_eq('total agents', 3, $res['total']);
 assert_eq('rank1 name', 'Alice', $res['top']['name']);
 assert_eq('Alice composite 100', 100.0, $res['by_admin'][10]['composite']);
 assert_eq('Bob composite 50',     50.0, $res['by_admin'][20]['composite']);
-// Carol: only sales 250/1000 = 25 -> *0.25 = 6.25, rounded to 1dp = 6.3
-assert_eq('Carol composite 6.3',   6.3, $res['by_admin'][30]['composite']);
+// Carol: only sales 250/1000 = 25 -> *0.45 = 11.25, rounded to 1dp = 11.3
+assert_eq('Carol composite 11.3', 11.3, $res['by_admin'][30]['composite']);
 assert_eq('Alice rank', 1, $res['by_admin'][10]['rank']);
 assert_eq('Bob rank',   2, $res['by_admin'][20]['rank']);
 assert_eq('Carol rank', 3, $res['by_admin'][30]['rank']);
@@ -98,16 +98,16 @@ assert_eq('Eve followup capped at 100',                100.0, $res2['by_admin'][
 
 // ---------------------------------------------------------------------------
 // Division-by-zero: nobody sold, converted, or followed up -> those metrics 0
-// for all. Only reply/pickup carry weight (0.15 + 0.15 = 0.30). Frank best on
-// both -> 30.
+// for all. Only reply/pickup carry weight (0.15 + 0.10 = 0.25). Frank best on
+// both -> 25.
 // ---------------------------------------------------------------------------
 $agents3 = array(
     array('admin_id'=>60,'name'=>'Frank','reply_secs'=>30,'pickup_secs'=>15,'conv_rate'=>0,'sales'=>0,'followup_rate'=>0,'pickup_n'=>3,'leads_n'=>3,'owned_n'=>3),
     array('admin_id'=>70,'name'=>'Gina', 'reply_secs'=>60,'pickup_secs'=>30,'conv_rate'=>0,'sales'=>0,'followup_rate'=>0,'pickup_n'=>3,'leads_n'=>3,'owned_n'=>3),
 );
 $res3 = agent_score_compute($agents3);
-assert_eq('no sales/conv/fu: Frank composite 30', 30.0, $res3['by_admin'][60]['composite']);
-assert_eq('no sales/conv/fu: Gina composite 15',  15.0, $res3['by_admin'][70]['composite']);
+assert_eq('no sales/conv/fu: Frank composite 25', 25.0, $res3['by_admin'][60]['composite']);
+assert_eq('no sales/conv/fu: Gina composite 12.5', 12.5, $res3['by_admin'][70]['composite']);
 
 // ---------------------------------------------------------------------------
 // Tie-break: equal composite -> name ASC. Both identical metrics -> Hank before Ivy.

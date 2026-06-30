@@ -7,8 +7,8 @@ defined('BASEPATH') OR exit('No direct script access allowed');
  * The card ranks sales agents by a weighted blend of six metrics, each
  * benchmarked so the period's best performer scores 100 on that metric:
  *
- *     score = reply 15% + pickup 15% + conversion 15% + sales 25%
- *           + follow-up 15% + leads-served 15%
+ *     score = reply 15% + pickup 10% + conversion 10% + sales 45%
+ *           + follow-up 10% + leads-served 10%
  *
  * Two of the metrics are "lower is better" (reply time, pickup speed) and four
  * are "higher is better" (conversion rate, sales, follow-up rate, leads served).
@@ -45,11 +45,11 @@ if (!function_exists('agent_score_weights')) {
         // Per the product owner. Must sum to 1.0.
         return array(
             'reply'    => 0.15,
-            'pickup'   => 0.15,
-            'conv'     => 0.15,
-            'sales'    => 0.25,
-            'followup' => 0.15,
-            'served'   => 0.15,
+            'pickup'   => 0.10,
+            'conv'     => 0.10,
+            'sales'    => 0.45,
+            'followup' => 0.10,
+            'served'   => 0.10,
         );
     }
 }
