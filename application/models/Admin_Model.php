@@ -60,7 +60,8 @@ class Admin_Model extends CI_Model
 						if($this->input->get('status')) {
 							$this->db->where('a.Status', $this->input->get('status'));
 						} else {
-							$this->db->where('a.Status !=', 'N');
+							//Default: show active admins only; deactivated can be filtered when needed
+							$this->db->where('a.Status', 'Y');
 						}
 
 						$this->db->order_by('a.Name', 'ASC');
