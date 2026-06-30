@@ -315,20 +315,22 @@
                 </div>
             </div>
             <div class="col-12 col-md sc-pos-7">
-                <div class="card card-custom">
-                    <div class="card-header border-0 summary-card-header" style="background-color:#D7E2F2;">
-                        <h3>Daily Handle Lead Count</h3>
-                        <i id="pop-tc-handle" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>What it shows:</strong> The number of leads you handled &mdash; the &ldquo;Lead Responded&rdquo; column from the Lead Reply Activity dashboard, scoped to you.<ul><li><strong>Today:</strong> leads you replied to today</li><li><strong>Week:</strong> Monday to Sunday of this week</li><li><strong>Month:</strong> 1st to last day of this month</li></ul><strong>How it&rsquo;s counted:</strong> distinct leads you replied to, with your reply landing between 7:00am and 10:00pm. Replying many times to the same lead still counts that lead once (even across different days in the week/month total).<br><br><strong>Note:</strong> if your account isn&rsquo;t linked to a GHL user, this card shows zero."></i>
-                    </div>
-                    <div class="card-body summary-card-body">
-                        <div class="summary-row-3">
-                            <div><div class="lbl">Today</div><div class="summary-value-sm" id="sc-tc-handle-day">...</div></div>
-                            <div><div class="lbl">Week</div><div class="summary-value-sm" id="sc-tc-handle-week">...</div></div>
-                            <div><div class="lbl">Month</div><div class="summary-value-sm" id="sc-tc-handle-month">...</div></div>
+                <a class="summary-card" id="sc-tc-handle-link" href="#">
+                    <div class="card card-custom">
+                        <div class="card-header border-0 summary-card-header" style="background-color:#D7E2F2;">
+                            <h3>Daily Handle Lead Count</h3>
+                            <i id="pop-tc-handle" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>What it shows:</strong> The number of leads you handled &mdash; the &ldquo;Lead Responded&rdquo; column from the Lead Reply Activity dashboard, scoped to you.<ul><li><strong>Today:</strong> leads you replied to today</li><li><strong>Week:</strong> Monday to Sunday of this week</li><li><strong>Month:</strong> 1st to last day of this month</li></ul><strong>How it&rsquo;s counted:</strong> distinct leads you replied to, with your reply landing between 7:00am and 10:00pm. Replying many times to the same lead still counts that lead once (even across different days in the week/month total).<br><br><strong>Note:</strong> if your account isn&rsquo;t linked to a GHL user, this card shows zero."></i>
                         </div>
-                        <div class="summary-sub">Distinct leads you replied to (Lead Responded), counted 7am&ndash;10pm. Matches the Lead Reply Activity dashboard.</div>
+                        <div class="card-body summary-card-body">
+                            <div class="summary-row-3">
+                                <div><div class="lbl">Today</div><div class="summary-value-sm" id="sc-tc-handle-day">...</div></div>
+                                <div><div class="lbl">Week</div><div class="summary-value-sm" id="sc-tc-handle-week">...</div></div>
+                                <div><div class="lbl">Month</div><div class="summary-value-sm" id="sc-tc-handle-month">...</div></div>
+                            </div>
+                            <div class="summary-sub">Distinct leads you replied to (Lead Responded), counted 7am&ndash;10pm. Click to view today&rsquo;s Lead Reply Hourly report.</div>
+                        </div>
                     </div>
-                </div>
+                </a>
             </div>
             <div class="col-12 col-md sc-pos-8">
                 <div class="card card-custom">
@@ -1374,6 +1376,7 @@ $(function() {
             setText('sc-tc-handle-day',   c.tc_handle_lead_today.day);
             setText('sc-tc-handle-week',  c.tc_handle_lead_today.week);
             setText('sc-tc-handle-month', c.tc_handle_lead_today.month);
+            setLink('sc-tc-handle-link',  c.tc_handle_lead_today.link);
         }
         if(c.tc_response_time_dwm) {
             setText('sc-tc-resp-day',   c.tc_response_time_dwm.day);

@@ -1206,10 +1206,19 @@ class Booking extends MY_Controller
 						$my_ghl_uids, $start, $end
 					);
 				};
+				// Drill-down: open the Lead Reply Hourly report for this TC's own
+				// inbox, for today. The hourly report is single-owner, so use the
+				// first linked GHL uid (matches how the report locks to owner[0]).
+				$handle_owner = !empty($my_ghl_uids) ? (string) $my_ghl_uids[0] : '';
 				$cards['tc_handle_lead_today'] = array(
 					'day'   => $handle_count($today, $today),
 					'week'  => $handle_count($week_start, $week_end),
 					'month' => $handle_count($cur_month_start, $cur_month_end),
+					'link'  => $handle_owner !== ''
+						? base_url('Report/Lead_Reply_Activity_Hourly')
+							. '?owner=' . urlencode($handle_owner)
+							. '&reply_date=' . urlencode($fmt_dmy($today))
+						: '',
 				);
 				// "Avg Reply Time to Inbound" now uses Message-Log logic: every
 				// inbound->outbound reply pair in the agent's threads (in working
@@ -1247,7 +1256,7 @@ class Booking extends MY_Controller
 				$cards['tc_leads_dwm'] = array(
 					'day' => 0, 'week' => 0, 'month' => 0,
 				);
-				$cards['tc_handle_lead_today'] = array('day' => 0, 'week' => 0, 'month' => 0);
+				$cards['tc_handle_lead_today'] = array('day' => 0, 'week' => 0, 'month' => 0, 'link' => '');
 				$cards['tc_response_time_dwm'] = array(
 					'day' => '-', 'week' => '-', 'month' => '-',
 					'day_seconds' => null, 'week_seconds' => null, 'month_seconds' => null,
