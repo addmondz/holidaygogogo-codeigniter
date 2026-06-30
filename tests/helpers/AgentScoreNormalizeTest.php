@@ -150,4 +150,29 @@ $agents6b = array(
 );
 assert_eq('control: without flag Lia sales norm halves to 50', 50.0, agent_score_compute($agents6b)['by_admin'][1]['norm']['sales']);
 
+// ---------------------------------------------------------------------------
+// excluded flag: an 'excluded' => true agent is dropped ENTIRELY — never sets
+// the 100-anchors AND never appears in the ranked list / by_admin. Powers the
+// owner's "exclude these agents from the Agent Score" setting, so an excluded
+// star performer stops distorting everyone else's benchmark and stops showing
+// on the Top-5 leaderboard.
+//   Sam (excluded) has the top sales 2000. With Sam excluded, Pat's 500 becomes
+//   the sales anchor (Pat -> 100), and Sam is absent from the result set.
+// ---------------------------------------------------------------------------
+$agents7 = array(
+    array('admin_id'=>1,'name'=>'Pat','reply_secs'=>60,'pickup_secs'=>30,'conv_rate'=>40,'sales'=>500, 'followup_rate'=>80,'served_leads'=>5,'pickup_n'=>5,'leads_n'=>5,'owned_n'=>5),
+    array('admin_id'=>2,'name'=>'Sam','reply_secs'=>60,'pickup_secs'=>30,'conv_rate'=>40,'sales'=>2000,'followup_rate'=>80,'served_leads'=>5,'pickup_n'=>5,'leads_n'=>5,'owned_n'=>5,'excluded'=>true),
+);
+$res7 = agent_score_compute($agents7);
+assert_eq('excluded: dropped from total', 1, $res7['total']);
+assert_eq('excluded: absent from by_admin', false, isset($res7['by_admin'][2]));
+assert_eq('excluded: remaining agent anchors sales -> 100', 100.0, $res7['by_admin'][1]['norm']['sales']);
+assert_eq('excluded: top is the remaining agent', 'Pat', $res7['top']['name']);
+// All-excluded set behaves like an empty set: no top, total 0.
+$res7b = agent_score_compute(array(
+    array('admin_id'=>9,'name'=>'Solo','sales'=>100,'leads_n'=>5,'excluded'=>true),
+));
+assert_eq('excluded: all-excluded total 0', 0, $res7b['total']);
+assert_eq('excluded: all-excluded top null', null, $res7b['top']);
+
 echo "\nAll assertions passed.\n";

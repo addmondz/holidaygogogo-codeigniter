@@ -32,6 +32,9 @@ defined('BASEPATH') OR exit('No direct script access allowed');
  *     'owned_n'       => int,         // owned leads (min-sample for follow-up)
  *     'benchmark'     => bool,        // optional, default true; false = scored but
  *                                     //   excluded from setting the 100-anchors
+ *     'excluded'      => bool,        // optional, default false; true = dropped
+ *                                     //   ENTIRELY (no anchor, no rank, absent
+ *                                     //   from the result) — owner's exclude list
  *   ]
  *
  * A null/zero metric means "no data" and normalises to 0 — the agent gets no
@@ -94,6 +97,9 @@ if (!function_exists('agent_score_compute')) {
             // benchmark only against the Level-20 sales-agent pool while still
             // showing (and scoring) Level-50 rows. Default true -> every agent
             // contributes, so callers that omit the flag are unaffected.
+            // An 'excluded' agent never anchors the benchmark and is skipped in
+            // the ranking pass below — they leave the score comparison completely.
+            if (isset($a['excluded']) && $a['excluded'] === true) { continue; }
             $isBench  = !isset($a['benchmark']) || $a['benchmark'] !== false;
             $reply    = isset($a['reply_secs'])    && $a['reply_secs']    !== null ? (float) $a['reply_secs']    : null;
             $pickup   = isset($a['pickup_secs'])   && $a['pickup_secs']   !== null ? (float) $a['pickup_secs']   : null;
@@ -128,6 +134,7 @@ if (!function_exists('agent_score_compute')) {
         // ---- Normalise + weight each agent ----
         $ranked = array();
         foreach ($agents as $a) {
+            if (isset($a['excluded']) && $a['excluded'] === true) { continue; }
             $reply    = isset($a['reply_secs'])    && $a['reply_secs']    !== null ? (float) $a['reply_secs']    : null;
             $pickup   = isset($a['pickup_secs'])   && $a['pickup_secs']   !== null ? (float) $a['pickup_secs']   : null;
             $conv     = isset($a['conv_rate'])     && $a['conv_rate']     !== null ? (float) $a['conv_rate']     : null;

@@ -175,4 +175,20 @@ $nsBy = array(); foreach ($matrixNS as $r) { $nsBy[$r['admin_id']] = $r; }
 assert_eq('no-score: New Leads still computed', 20, $nsBy[10]['new_leads']);
 assert_eq('no-score: Outbound still computed',  500, $nsBy[10]['outbound_count']);
 
+// --- owner exclusion: Jane (10) is on the owner's exclude list. She stays a
+//     matrix row (all other metrics intact) but gets a null Agent Score and no
+//     longer anchors the benchmark — so Carol's 30000 becomes the sales anchor
+//     and the remaining agents score exactly as if Jane were absent. ---
+$matrixX = owner_agent_matrix_build($sources, $map, $name_by_admin, null, true, array(10 => true));
+$byX = array(); foreach ($matrixX as $r) { $byX[$r['admin_id']] = $r; }
+assert_eq('exclusion: all three rows still present', 3, count($matrixX));
+assert_eq('exclusion: Jane row kept (other metrics intact)', 20, $byX[10]['new_leads']);
+assert_eq('exclusion: Jane Agent Score nulled', null, $byX[10]['agent_score']);
+$expectedX = agent_score_compute(array(
+    array('admin_id' => 11, 'name' => 'Ben',   'reply_secs' => 50,  'pickup_secs' => 60,  'conv_rate' => 25.0, 'sales' => 10000, 'followup_rate' => 25.0, 'served_leads' => 4,  'pickup_n' => 2,  'leads_n' => 4,  'owned_n' => 4),
+    array('admin_id' => 12, 'name' => 'Carol', 'reply_secs' => null,'pickup_secs' => null,'conv_rate' => null, 'sales' => 30000, 'followup_rate' => null, 'served_leads' => null,'pickup_n' => 0,  'leads_n' => 0,  'owned_n' => 0),
+));
+assert_eq('exclusion: Ben re-anchored without Jane',   $expectedX['by_admin'][11]['composite'], $byX[11]['agent_score']);
+assert_eq('exclusion: Carol re-anchored without Jane', $expectedX['by_admin'][12]['composite'], $byX[12]['agent_score']);
+
 echo "\nAll assertions passed.\n";

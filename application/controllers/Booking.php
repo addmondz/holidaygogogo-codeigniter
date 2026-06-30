@@ -3258,6 +3258,19 @@ class Booking extends MY_Controller
 				'<strong>Counted:</strong> confirmed bookings only, not cancelled or draft, active product lines only.';
 		}
 
+		// Owner-managed per-card visibility: drop the data for any card the owner
+		// has hidden from this user so its numbers are never sent. Cards are
+		// visible by default; the matching column is also CSS-hidden in the view.
+		$this->load->helper('card_visibility');
+		$cv_hidden   = card_visibility_hidden_slugs_for($admin_id);
+		$cv_registry = card_visibility_registry();
+		foreach ($cv_hidden as $cv_slug => $cv_on) {
+			if (!isset($cv_registry[$cv_slug])) { continue; }
+			foreach ($cv_registry[$cv_slug]['keys'] as $cv_key) {
+				unset($cards[$cv_key], $tables[$cv_key]);
+			}
+		}
+
 		$this->send_json(array(
 			'level'    => $level,
 			'cards'    => $cards,
@@ -3359,10 +3372,25 @@ class Booking extends MY_Controller
 	 * @param array  $my_ghl_uids  logged-in agent's GHL user ids (may be empty)
 	 * @param int    $admin_id     logged-in agent's AdminID
 	 */
+	/**
+	 * Set of AdminIDs the owner has excluded from the Agent Score (table
+	 * agent_score_excluded_agents). Returned as admin_id => true for O(1) lookups.
+	 * Excluded agents leave both the TC leaderboard and the owner matrix score.
+	 */
+	private function agent_score_excluded_ids()
+	{
+		$out = array();
+		foreach($this->db->select('AdminID')->get('agent_score_excluded_agents')->result() as $r) {
+			$out[(int)$r->AdminID] = true;
+		}
+		return $out;
+	}
+
 	private function agent_score_card($start, $end, $my_ghl_uids, $admin_id)
 	{
 		$this->load->helper(array('agent_score', 'lead_conversion_credit'));
 		$this->load->model('Report_Model');
+		$excluded = $this->agent_score_excluded_ids();
 
 		// 1. GHL-keyed conversion (ungated, '1=1', matching the Conversion Rate
 		//    (YTD) card's attribution). Reply time is sourced separately below.
@@ -3513,6 +3541,8 @@ class Booking extends MY_Controller
 				'pickup_n'      => $row['pickup_n'],
 				'leads_n'       => $row['leads'],
 				'owned_n'       => $row['fu_owned'],
+				// Owner-excluded agents drop out of the benchmark + leaderboard.
+				'excluded'      => isset($excluded[$aid]),
 			);
 		}
 
@@ -3681,7 +3711,7 @@ class Booking extends MY_Controller
 			'outbound'      => $outbound,
 			'sales'         => $sales_rows,
 			'cancellation'  => $cancellation,
-		), $map, $name_by_admin, $benchmark_admins, ($period === 'month'));
+		), $map, $name_by_admin, $benchmark_admins, ($period === 'month'), $this->agent_score_excluded_ids());
 	}
 
 	function Create()

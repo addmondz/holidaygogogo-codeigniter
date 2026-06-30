@@ -38,9 +38,13 @@ if (!function_exists('owner_agent_matrix_build')) {
      *        every row's agent_score is null (rows then sort by name). Set false for
      *        periods where the Score column isn't reported (Day / Week) so no
      *        scoring work happens for a column that would only render "-".
+     * @param array|null $excluded_admins  AdminID => true for agents the owner has
+     *        excluded from the Agent Score. They still appear as matrix rows (with
+     *        every other metric intact) but get a null Agent Score and never anchor
+     *        the benchmark — matching their absence from the TC leaderboard.
      * @return array list of matrix rows (see file header / plan for shape)
      */
-    function owner_agent_matrix_build(array $sources, array $map, array $name_by_admin, $benchmark_admins = null, $compute_score = true)
+    function owner_agent_matrix_build(array $sources, array $map, array $name_by_admin, $benchmark_admins = null, $compute_score = true, $excluded_admins = null)
     {
         $src = function ($key) use ($sources) {
             return isset($sources[$key]) && is_array($sources[$key]) ? $sources[$key] : array();
@@ -192,6 +196,9 @@ if (!function_exists('owner_agent_matrix_build')) {
                 // Only the Level-20 sales-agent pool sets the 100-anchors, so an
                 // L20 agent's matrix Score equals their own Agent Score card.
                 'benchmark'     => ($benchmark_admins === null) || isset($benchmark_admins[$aid]),
+                // Owner-excluded agents leave the score entirely (null score, no
+                // anchor) — same exclusion the TC leaderboard applies.
+                'excluded'      => ($excluded_admins !== null) && isset($excluded_admins[$aid]),
             );
         }
         $score = agent_score_compute($score_inputs);

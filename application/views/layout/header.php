@@ -420,7 +420,7 @@ $is_dev_env = ($app_env !== 'prod');
 									</li>
 								<?php } ?>
 							<?php if($this->session->level != 20) { ?>
-								<li class="menu-item menu-item-submenu <?php if($this->router->class == 'Category_Code' || $this->router->class == 'Category' || $this->router->class == 'Supplier' || $this->router->class == 'Product' || $this->router->class == 'Footer' || $this->router->class == 'Country_Code' || $this->router->class == 'Tag' || $this->router->class == 'Source' || $this->router->class == 'Package_Checklist' || $this->router->class == 'Product_Package_Checklist' || $this->router->class == 'Cancellation_Reason' || $this->router->class == 'Slow_Conversion_Reason' || $this->router->class == 'Customer_Type' || $this->router->class == 'Guests' || $this->router->class == 'Campaign' || $this->router->class == 'Quick_Filter') { echo 'menu-item-active menu-item-open'; } ?>">
+								<li class="menu-item menu-item-submenu <?php if($this->router->class == 'Category_Code' || $this->router->class == 'Category' || $this->router->class == 'Supplier' || $this->router->class == 'Product' || $this->router->class == 'Footer' || $this->router->class == 'Country_Code' || $this->router->class == 'Tag' || $this->router->class == 'Source' || $this->router->class == 'Package_Checklist' || $this->router->class == 'Product_Package_Checklist' || $this->router->class == 'Cancellation_Reason' || $this->router->class == 'Slow_Conversion_Reason' || $this->router->class == 'Customer_Type' || $this->router->class == 'Guests' || $this->router->class == 'Campaign' || $this->router->class == 'Quick_Filter' || $this->router->class == 'Agent_Score_Setting' || $this->router->class == 'Card_Visibility_Setting') { echo 'menu-item-active menu-item-open'; } ?>">
 									<a href="javascript:;" class="menu-link menu-toggle">
 										<span class="svg-icon menu-icon">
 											<svg>
@@ -436,6 +436,24 @@ $is_dev_env = ($app_env !== 'prod');
 									<div class="menu-submenu">
 										<i class="menu-arrow"></i>
 										<ul class="menu-subnav">
+											<?php if($this->session->level == 10) { ?>
+											<li class="menu-item <?php if($this->router->class == 'Agent_Score_Setting') { echo 'menu-item-active'; } ?>">
+												<a href="<?php echo base_url('Agent_Score_Setting'); ?>" class="menu-link">
+													<i class="menu-bullet menu-bullet-dot">
+														<span></span>
+													</i>
+													<span class="menu-text">Agent Score</span>
+												</a>
+											</li>
+											<li class="menu-item <?php if($this->router->class == 'Card_Visibility_Setting') { echo 'menu-item-active'; } ?>">
+												<a href="<?php echo base_url('Card_Visibility_Setting'); ?>" class="menu-link">
+													<i class="menu-bullet menu-bullet-dot">
+														<span></span>
+													</i>
+													<span class="menu-text">Card Visibility</span>
+												</a>
+											</li>
+											<?php } ?>
 											<li class="menu-item <?php if($this->router->class == 'Category_Code') { echo 'menu-item-active'; } ?>">
 												<a href="<?php echo base_url('Category_Code'); ?>" class="menu-link">
 													<i class="menu-bullet menu-bullet-dot">
