@@ -42,9 +42,13 @@ if (!function_exists('owner_agent_matrix_build')) {
      *        excluded from the Agent Score. They still appear as matrix rows (with
      *        every other metric intact) but get a null Agent Score and never anchor
      *        the benchmark — matching their absence from the TC leaderboard.
+     * @param array|null $hidden_admins  AdminID => true for agents included in the
+     *        Agent Score CALCULATION but not shown — they set the 100-anchors
+     *        (respecting $benchmark_admins) yet are omitted from the returned matrix
+     *        rows entirely (Owner / TC Lead). null => no agent is hidden.
      * @return array list of matrix rows (see file header / plan for shape)
      */
-    function owner_agent_matrix_build(array $sources, array $map, array $name_by_admin, $benchmark_admins = null, $compute_score = true, $excluded_admins = null)
+    function owner_agent_matrix_build(array $sources, array $map, array $name_by_admin, $benchmark_admins = null, $compute_score = true, $excluded_admins = null, $hidden_admins = null)
     {
         $src = function ($key) use ($sources) {
             return isset($sources[$key]) && is_array($sources[$key]) ? $sources[$key] : array();
@@ -199,6 +203,9 @@ if (!function_exists('owner_agent_matrix_build')) {
                 // Owner-excluded agents leave the score entirely (null score, no
                 // anchor) — same exclusion the TC leaderboard applies.
                 'excluded'      => ($excluded_admins !== null) && isset($excluded_admins[$aid]),
+                // Owner / TC Lead anchor the benchmark but are dropped from the
+                // matrix rows below — included in the calc, not displayed.
+                'hidden'        => ($hidden_admins !== null) && isset($hidden_admins[$aid]),
             );
         }
         $score = agent_score_compute($score_inputs);
@@ -208,6 +215,9 @@ if (!function_exists('owner_agent_matrix_build')) {
         $matrix = array();
         foreach ($u as $aid => $row) {
             if (!$eligible($row)) { continue; }
+            // Hidden agents (Owner / TC Lead) anchored the score above but are not
+            // shown as rows — included in the calculation, not displayed.
+            if (($hidden_admins !== null) && isset($hidden_admins[$aid])) { continue; }
             $matrix[] = array(
                 'admin_id'          => $aid,
                 'agent_name'        => $row['name'] !== '' ? $row['name'] : '#' . $aid,

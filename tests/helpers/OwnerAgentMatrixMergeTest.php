@@ -191,4 +191,16 @@ $expectedX = agent_score_compute(array(
 assert_eq('exclusion: Ben re-anchored without Jane',   $expectedX['by_admin'][11]['composite'], $byX[11]['agent_score']);
 assert_eq('exclusion: Carol re-anchored without Jane', $expectedX['by_admin'][12]['composite'], $byX[12]['agent_score']);
 
+// --- hidden agents: Jane (10) is included in the score CALCULATION but NOT
+//     shown (Owner / TC Lead rule). She anchors the benchmark (her 50000 sales
+//     keep setting the bar) yet is dropped from the matrix rows entirely. Ben &
+//     Carol remain as rows, scored against the pool that still includes Jane. ---
+$matrixH = owner_agent_matrix_build($sources, $map, $name_by_admin, null, true, null, array(10 => true));
+$byH = array(); foreach ($matrixH as $r) { $byH[$r['admin_id']] = $r; }
+assert_eq('hidden: Jane dropped from rows', false, isset($byH[10]));
+assert_eq('hidden: two rows remain (Ben, Carol)', 2, count($matrixH));
+// Jane still anchored, so Ben & Carol score exactly as in the full (shown) build.
+assert_eq('hidden: Ben scored vs pool incl. hidden Jane',   $by[11]['agent_score'], $byH[11]['agent_score']);
+assert_eq('hidden: Carol scored vs pool incl. hidden Jane', $by[12]['agent_score'], $byH[12]['agent_score']);
+
 echo "\nAll assertions passed.\n";

@@ -160,6 +160,144 @@ class Faq extends MY_Controller
 		echo $output;
 	}
 
+	// Round-trip Excel template of every internal FAQ - one row per sub-Q&A, in
+	// the exact columns Import() reads back (FAQ | DESTINATION | QUESTION |
+	// ANSWER | TAGS). The owner downloads this, edits/adds rows, and re-imports
+	// to replace the whole internal library. OWNER only.
+	function Export_Template()
+	{
+		if(!$this->Can_Owner()) {
+			redirect(base_url('Faq'));
+			return;
+		}
+		$rows = $this->Export_Faqs();
+
+		$spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+		$sheet = $spreadsheet->getActiveSheet();
+		$sheet->setTitle('FAQ Template');
+		$spreadsheet->getProperties()->setCreator('HolidayGoGoGo');
+
+		$headers = array('A' => 'FAQ', 'B' => 'DESTINATION', 'C' => 'QUESTION', 'D' => 'ANSWER', 'E' => 'TAGS');
+		foreach($headers as $col => $label) {
+			$sheet->setCellValue($col . '1', $label);
+		}
+		$sheet->getStyle('A1:E1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_BLACK);
+		$sheet->getStyle('A1:E1')->getFont()->getColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_WHITE);
+		$sheet->getStyle('A1:E1')->getFont()->setBold(true);
+
+		if(!empty($rows)) {
+			$r = 2;
+			foreach($rows as $row) {
+				$sheet->setCellValueExplicit('A' . $r, $row['title'], \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+				$sheet->setCellValueExplicit('B' . $r, $row['destinations'], \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+				$sheet->setCellValueExplicit('C' . $r, $row['question'], \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+				$sheet->setCellValueExplicit('D' . $r, $row['answer'], \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+				$sheet->setCellValueExplicit('E' . $r, $row['tags'], \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+				$r++;
+			}
+			$last = $r - 1;
+			$sheet->getStyle('C2:D' . $last)->getAlignment()->setWrapText(true);
+			$sheet->getStyle('A2:E' . $last)->getAlignment()->setVertical(\PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_TOP);
+		}
+
+		$sheet->getColumnDimension('A')->setWidth(28);
+		$sheet->getColumnDimension('B')->setWidth(22);
+		$sheet->getColumnDimension('C')->setWidth(45);
+		$sheet->getColumnDimension('D')->setWidth(60);
+		$sheet->getColumnDimension('E')->setWidth(22);
+
+		$filename = 'FAQ_TEMPLATE_' . date('Ymd') . '.xlsx';
+		header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+		header('Content-Disposition: attachment;filename="' . $filename . '"');
+		header('Cache-Control: max-age=0');
+		$writer = \PhpOffice\PhpSpreadsheet\IOFactory::createWriter($spreadsheet, 'Xlsx');
+		$writer->save('php://output');
+	}
+
+	// Wipe-and-rebuild the internal FAQ library from an uploaded template (the
+	// file Export_Template() produced, with rows edited/added). OWNER only. The
+	// upload is stored under assets/upload/faq_import/ and the newest 3 are kept
+	// as backups; older ones are pruned. The whole rebuild runs in a transaction
+	// (Replace_Internal), so a failure leaves the old library intact.
+	function Import()
+	{
+		if(!$this->Can_Owner()) {
+			redirect(base_url('Faq'));
+			return;
+		}
+		if($this->input->server('REQUEST_METHOD') !== 'POST' || empty($_FILES['import_file']['name'])) {
+			redirect(base_url('Faq'));
+			return;
+		}
+
+		$file = $_FILES['import_file'];
+		if($file['error'] !== UPLOAD_ERR_OK) {
+			$this->session->set_flashdata('faq_error', 'Upload failed. Please try again.');
+			redirect(base_url('Faq'));
+			return;
+		}
+		$ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+		if(!in_array($ext, array('xlsx', 'xls'), true)) {
+			$this->session->set_flashdata('faq_error', 'Please upload an Excel file (.xlsx or .xls).');
+			redirect(base_url('Faq'));
+			return;
+		}
+		if($file['size'] > 10 * 1024 * 1024) {
+			$this->session->set_flashdata('faq_error', 'File too large. Maximum size is 10MB.');
+			redirect(base_url('Faq'));
+			return;
+		}
+
+		// Save the upload as a backup (the file itself is the backup), then keep
+		// only the newest 3 (Prune_Backups decides which to remove).
+		$dir = FCPATH . 'assets/upload/faq_import/';
+		if(!is_dir($dir)) {
+			mkdir($dir, 0755, true);
+		}
+		$dest = $dir . 'faq_import_' . time() . '.' . $ext;
+		if(!move_uploaded_file($file['tmp_name'], $dest)) {
+			$this->session->set_flashdata('faq_error', 'Could not save the uploaded file.');
+			redirect(base_url('Faq'));
+			return;
+		}
+		$existing = array();
+		foreach(glob($dir . 'faq_import_*') as $path) {
+			$existing[] = basename($path);
+		}
+		foreach(Faq_Model::Prune_Backups($existing, 3) as $old) {
+			@unlink($dir . $old);
+		}
+
+		// Read every cell as a 0-indexed row array, matching Parse_Import's columns.
+		try {
+			$spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($dest);
+			$rows = $spreadsheet->getActiveSheet()->toArray(null, true, true, false);
+		} catch(\Exception $e) {
+			$this->session->set_flashdata('faq_error', 'Could not read the Excel file. Please use the exported template.');
+			redirect(base_url('Faq'));
+			return;
+		}
+
+		$parsed = Faq_Model::Parse_Import($rows);
+		if(empty($parsed)) {
+			$this->session->set_flashdata('faq_error', 'No FAQ rows found in the file. Nothing was changed.');
+			redirect(base_url('Faq'));
+			return;
+		}
+
+		$summary = $this->Faq_Model->Replace_Internal($parsed);
+
+		$msg = 'Import complete: ' . (int)$summary['faqs'] . ' FAQ(s) and ' . (int)$summary['items'] . ' question(s) rebuilt.';
+		if(!empty($summary['tags_created'])) {
+			$msg .= ' New tags created: ' . implode(', ', array_values(array_unique($summary['tags_created']))) . '.';
+		}
+		if(!empty($summary['destinations_skipped'])) {
+			$msg .= ' Skipped unknown destinations: ' . implode(', ', $summary['destinations_skipped']) . '.';
+		}
+		$this->session->set_flashdata('faq_success', $msg);
+		redirect(base_url('Faq'));
+	}
+
 	function Create()
 	{
 		if(!$this->Can_Edit()) {

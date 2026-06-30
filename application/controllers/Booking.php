@@ -3428,7 +3428,7 @@ class Booking extends MY_Controller
 			   admin.Name AS agent_name,
 			   COALESCE(SUM(booking.NetTotal), 0) AS total_sales
 			 FROM booking
-			 INNER JOIN admin ON admin.AdminID = {$agent_expr} AND admin.Level = '20'
+			 INNER JOIN admin ON admin.AdminID = {$agent_expr} AND admin.Level IN ('20','10','25')
 			 WHERE booking.BookingConfirmationTitle='BOOKING CONFIRMATION'
 			   AND booking.CancelStatus='N'
 			   AND booking.Status!='N'
@@ -3442,16 +3442,17 @@ class Booking extends MY_Controller
 		// 4. Bridge GHL uid -> AdminID for every agent (generalises the logged-in
 		//    resolution used by the Conversion Rate card): mapping table first,
 		//    email match as fallback.
-		// Restrict the bridge (and therefore the whole Agent Score comparison
-		// population) to the SALES AGENT role (admin.Level = 20): non-sales-agent
-		// admins must never appear in the leaderboard the score is benchmarked
-		// against.
+		// The Agent Score comparison population is the SALES AGENT role
+		// (admin.Level = 20) plus the Owner (10) and TC Lead (25), who are scored
+		// and ranked but benchmarked against the Level-20 pool only (see
+		// $benchmark_admins below) — they never set the "100" anchors. No other
+		// role may appear in the leaderboard.
 		$map = array(); $name_by_admin = array();
 		foreach($this->db->query(
 			"SELECT alda.GhlUserID, alda.AdminID, a.Name
 			 FROM admin_lead_dashboard_agents alda
 			 INNER JOIN admin a ON a.AdminID = alda.AdminID
-			 WHERE a.Level = '20' AND NULLIF(alda.GhlUserID,'') IS NOT NULL"
+			 WHERE a.Level IN ('20','10','25') AND NULLIF(alda.GhlUserID,'') IS NOT NULL"
 		)->result() as $r) {
 			$map[(string)$r->GhlUserID] = (int)$r->AdminID;
 			$name_by_admin[(int)$r->AdminID] = $r->Name;
@@ -3460,11 +3461,22 @@ class Booking extends MY_Controller
 			"SELECT gu.UserID, a.AdminID, a.Name
 			 FROM admin a
 			 INNER JOIN ghl_users gu ON LOWER(TRIM(gu.Email)) = LOWER(TRIM(a.Email))
-			 WHERE a.Level = '20'"
+			 WHERE a.Level IN ('20','10','25')"
 		)->result() as $r) {
 			$uid = (string)$r->UserID;
 			if($uid !== '' && !isset($map[$uid])) { $map[$uid] = (int)$r->AdminID; }
 			if(!isset($name_by_admin[(int)$r->AdminID])) { $name_by_admin[(int)$r->AdminID] = $r->Name; }
+		}
+
+		// Owner (10) and TC Lead (25) are included in the calculation but NOT shown:
+		// their metrics still set the 100-anchors (so sales agents are benchmarked
+		// against them), but they are omitted from the ranked leaderboard via the
+		// 'hidden' flag below. Level-20 sales agents are the only visible rows.
+		$hidden_admins = array();
+		foreach($this->db->query(
+			"SELECT AdminID FROM admin WHERE Level IN ('10','25')"
+		)->result() as $r) {
+			$hidden_admins[(int)$r->AdminID] = true;
 		}
 
 		// 5. Fold everything into one row per AdminID. Reply/pickup are
@@ -3550,6 +3562,9 @@ class Booking extends MY_Controller
 				'pickup_n'      => $row['pickup_n'],
 				'leads_n'       => $row['leads'],
 				'owned_n'       => $row['fu_owned'],
+				// Owner (10) / TC Lead (25) anchor the benchmark but are kept off the
+				// leaderboard — included in the calculation, not displayed.
+				'hidden'        => isset($hidden_admins[$aid]),
 				// Owner-excluded agents drop out of the benchmark + leaderboard.
 				'excluded'      => isset($excluded[$aid]),
 			);
@@ -3587,8 +3602,11 @@ class Booking extends MY_Controller
 	}
 
 	/**
-	 * OWNER per-agent performance matrix — one row per TC sales agent (admin
-	 * Level 20/50) with all 11 owner metrics over a single resolved period:
+	 * OWNER per-agent performance matrix — one row per visible TC sales agent
+	 * (admin Level 20/50) with all 11 owner metrics over a single resolved period.
+	 * The Owner (10) and TC Lead (25) are folded into the Agent Score CALCULATION
+	 * (they set the 100-anchors alongside Level 20) but are NOT rendered as rows —
+	 * included in the calc, not displayed:
 	 *   1 reply time · 2 pickup speed · 3 new leads · 4 served leads ·
 	 *   5 gated conversion · 6 ungated conversion · 7 outbound · 8 sales ·
 	 *   9 follow-up % · 10 cancellation % · 11 composite Agent Score.
@@ -3660,7 +3678,7 @@ class Booking extends MY_Controller
 				   admin.Name AS agent_name,
 				   COALESCE(SUM(booking.NetTotal), 0) AS total_sales
 				 FROM booking
-				 INNER JOIN admin ON admin.AdminID = {$agent_expr} AND admin.Level IN ('20','50')
+				 INNER JOIN admin ON admin.AdminID = {$agent_expr} AND admin.Level IN ('20','50','10','25')
 				 WHERE booking.BookingConfirmationTitle='BOOKING CONFIRMATION'
 				   AND booking.CancelStatus='N'
 				   AND booking.Status!='N'
@@ -3672,14 +3690,15 @@ class Booking extends MY_Controller
 			)->result_array();
 		}
 
-		// Bridge GHL uid -> AdminID, restricted to the TC sales-agent role
-		// (Level 20/50): mapping table first, corporate-email match as fallback.
+		// Bridge GHL uid -> AdminID, restricted to the scored population — the TC
+		// sales-agent role (Level 20/50) plus the Owner (10) and TC Lead (25):
+		// mapping table first, corporate-email match as fallback.
 		$map = array(); $name_by_admin = array();
 		foreach($this->db->query(
 			"SELECT alda.GhlUserID, alda.AdminID, a.Name
 			 FROM admin_lead_dashboard_agents alda
 			 INNER JOIN admin a ON a.AdminID = alda.AdminID
-			 WHERE a.Level IN ('20','50') AND NULLIF(alda.GhlUserID,'') IS NOT NULL"
+			 WHERE a.Level IN ('20','50','10','25') AND NULLIF(alda.GhlUserID,'') IS NOT NULL"
 		)->result() as $r) {
 			$map[(string)$r->GhlUserID] = (int)$r->AdminID;
 			$name_by_admin[(int)$r->AdminID] = $r->Name;
@@ -3688,25 +3707,31 @@ class Booking extends MY_Controller
 			"SELECT gu.UserID, a.AdminID, a.Name
 			 FROM admin a
 			 INNER JOIN ghl_users gu ON LOWER(TRIM(gu.Email)) = LOWER(TRIM(a.Email))
-			 WHERE a.Level IN ('20','50')"
+			 WHERE a.Level IN ('20','50','10','25')"
 		)->result() as $r) {
 			$uid = (string)$r->UserID;
 			if($uid !== '' && !isset($map[$uid])) { $map[$uid] = (int)$r->AdminID; }
 			if(!isset($name_by_admin[(int)$r->AdminID])) { $name_by_admin[(int)$r->AdminID] = $r->Name; }
 		}
-		// Complete the name lookup for EVERY Level 20/50 admin, and capture the
-		// Level-20 subset as the Agent Score benchmark pool. The bridge above only
-		// names agents reachable through a GHL mapping/email; an agent who surfaces
-		// solely via an admin-keyed source that carries no name (e.g. a cancelled-
-		// only BC) would otherwise fall back to "#<AdminID>". $benchmark_admins
-		// restricts the score's 100-anchors to Level 20, so an L20 agent's matrix
-		// Score equals their own Agent Score card (L50 rows are still scored/shown).
+		// Complete the name lookup for EVERY scored admin (Level 20/50 + Owner 10 +
+		// TC Lead 25), and capture the benchmark + hidden subsets. The bridge above
+		// only names agents reachable through a GHL mapping/email; an agent who
+		// surfaces solely via an admin-keyed source that carries no name (e.g. a
+		// cancelled-only BC) would otherwise fall back to "#<AdminID>".
+		// $benchmark_admins are the 100-anchors: Level 20 sales agents PLUS the Owner
+		// (10) and TC Lead (25), so an L20 agent's matrix Score equals their Agent
+		// Score card (L50 rows are scored against this pool but never anchor).
+		// $hidden_admins (Owner + TC Lead) anchor the score but are dropped from the
+		// rendered rows — included in the calculation, not displayed.
 		$benchmark_admins = array();
+		$hidden_admins = array();
 		foreach($this->db->query(
-			"SELECT AdminID, Name, Level FROM admin WHERE Level IN ('20','50')"
+			"SELECT AdminID, Name, Level FROM admin WHERE Level IN ('20','50','10','25')"
 		)->result() as $r) {
 			if(!isset($name_by_admin[(int)$r->AdminID])) { $name_by_admin[(int)$r->AdminID] = $r->Name; }
-			if((string)$r->Level === '20') { $benchmark_admins[(int)$r->AdminID] = true; }
+			$lvl = (string)$r->Level;
+			if($lvl === '20' || $lvl === '10' || $lvl === '25') { $benchmark_admins[(int)$r->AdminID] = true; }
+			if($lvl === '10' || $lvl === '25') { $hidden_admins[(int)$r->AdminID] = true; }
 		}
 
 		// Agent Score is reported on Month only — skip the scoring work (and leave
@@ -3720,7 +3745,7 @@ class Booking extends MY_Controller
 			'outbound'      => $outbound,
 			'sales'         => $sales_rows,
 			'cancellation'  => $cancellation,
-		), $map, $name_by_admin, $benchmark_admins, ($period === 'month'), $this->agent_score_excluded_ids());
+		), $map, $name_by_admin, $benchmark_admins, ($period === 'month'), $this->agent_score_excluded_ids(), $hidden_admins);
 	}
 
 	function Create()

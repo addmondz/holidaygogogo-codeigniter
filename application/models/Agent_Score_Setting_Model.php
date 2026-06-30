@@ -12,15 +12,17 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 class Agent_Score_Setting_Model extends CI_Model
 {
 	/**
-	 * Every TC sales agent (Level 20/50, active) — the population the owner picks
-	 * from on the settings page. Ordered by name.
+	 * Every agent the owner can pick from on the settings page (active) — the TC
+	 * sales agents (Level 20/50) plus the Owner (10) and TC Lead (25), who are now
+	 * scored too (benchmarked against the Level-20 pool, never setting the 100).
+	 * Ordered by name.
 	 *
 	 * @return array list of {AdminID, Name, Level}
 	 */
 	function Sales_Agents()
 	{
 		$this->db->select('AdminID, Name, Level');
-		$this->db->where_in('Level', array('20', '50'));
+		$this->db->where_in('Level', array('10', '20', '25', '50'));
 		$this->db->where('Status', 'Y');
 		$this->db->order_by('Name', 'ASC');
 		return $this->db->get('admin')->result();

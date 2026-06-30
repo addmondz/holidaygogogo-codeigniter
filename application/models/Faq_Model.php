@@ -330,6 +330,121 @@ class Faq_Model extends CI_Model
 		return $rows;
 	}
 
+	// Inverse of Export_Rows(): regroup the flat sheet rows of an uploaded import
+	// template back into FAQ structures the wipe-and-rebuild importer recreates
+	// the library from. Each input row is [FAQ, DESTINATION, QUESTION, ANSWER,
+	// TAGS] (the export's column order). Returns an ordered list of
+	//   array('title' => .., 'destinations' => array(names), 'items' => array(
+	//       array('q' => .., 'a' => .., 'tags' => array(names)) ))
+	// Rules: rows are grouped by Title (first-appearance order); a blank Title
+	// cell inherits the FAQ above (the export repeats it on every sub-Q&A row,
+	// but hand-edits may leave it blank); destinations are unioned + deduped
+	// across the group; a row with any Q/A text adds one sub-Q&A item; a
+	// title-only row makes an item-less FAQ. The header row (FAQ/QUESTION/ANSWER
+	// labels) and fully-blank/orphan rows are dropped. Names (not ids) are kept
+	// here so the helper stays pure + DB-free; the controller resolves them.
+	public static function Parse_Import($rows)
+	{
+		if(!is_array($rows)) {
+			return array();
+		}
+		// Split a comma-list cell into trimmed, non-empty, order-preserving uniques.
+		$split = function($cell) {
+			$out = array();
+			$seen = array();
+			foreach(explode(',', (string)$cell) as $piece) {
+				$piece = trim($piece);
+				if($piece === '') { continue; }
+				$key = strtolower($piece);
+				if(isset($seen[$key])) { continue; }
+				$seen[$key] = true;
+				$out[] = $piece;
+			}
+			return $out;
+		};
+
+		$index = array(); // strtolower(title) => position in $order
+		$order = array();
+		$last_title = '';
+		foreach($rows as $row) {
+			if(!is_array($row)) { continue; }
+			$title = trim((string)(isset($row[0]) ? $row[0] : ''));
+			$dest  = isset($row[1]) ? $row[1] : '';
+			$q     = trim((string)(isset($row[2]) ? $row[2] : ''));
+			$a     = trim((string)(isset($row[3]) ? $row[3] : ''));
+			$tags  = isset($row[4]) ? $row[4] : '';
+
+			// Drop the header row wherever it sits (matches the export's labels).
+			if(strtolower($title) === 'faq' && strtolower($q) === 'question' && strtolower($a) === 'answer') {
+				continue;
+			}
+
+			// A blank Title inherits the FAQ above; an orphan (no FAQ yet) is skipped.
+			if($title === '') {
+				$title = $last_title;
+			} else {
+				$last_title = $title;
+			}
+			if($title === '') {
+				continue;
+			}
+
+			$key = strtolower($title);
+			if(!isset($index[$key])) {
+				$index[$key] = count($order);
+				$order[] = array('title' => $title, 'destinations' => array(), 'items' => array());
+			}
+			$pos = $index[$key];
+
+			// Merge this row's destinations into the group, deduped (case-insensitive).
+			foreach($split($dest) as $name) {
+				$dup = false;
+				foreach($order[$pos]['destinations'] as $have) {
+					if(strtolower($have) === strtolower($name)) { $dup = true; break; }
+				}
+				if(!$dup) { $order[$pos]['destinations'][] = $name; }
+			}
+
+			// A row carrying any Q/A text contributes one sub-Q&A item.
+			if($q !== '' || $a !== '') {
+				$order[$pos]['items'][] = array('q' => $q, 'a' => $a, 'tags' => $split($tags));
+			}
+		}
+		return $order;
+	}
+
+	// Decide which uploaded import files to delete so only the newest $keep are
+	// retained as backups. Recency is read from the unix stamp baked into the
+	// filename (faq_import_<unix>.xlsx); names without one sort oldest (ts 0) so
+	// they're pruned first. Returns the filenames to DELETE, oldest first. Pure +
+	// DB/filesystem-free so it can be unit tested; the controller does the unlink.
+	public static function Prune_Backups($filenames, $keep = 3)
+	{
+		if(!is_array($filenames)) {
+			return array();
+		}
+		$keep = max(0, (int)$keep);
+		$stamped = array();
+		foreach($filenames as $name) {
+			$ts = 0;
+			if(preg_match('/faq_import_(\d+)\./', (string)$name, $m)) {
+				$ts = (int)$m[1];
+			}
+			$stamped[] = array('name' => (string)$name, 'ts' => $ts);
+		}
+		// Newest first, so the first $keep survive.
+		usort($stamped, function($a, $b) {
+			if($a['ts'] === $b['ts']) { return 0; }
+			return ($a['ts'] < $b['ts']) ? 1 : -1;
+		});
+		$prune = array_reverse(array_slice($stamped, $keep)); // beyond newest $keep, oldest first
+		$out = array();
+		foreach($prune as $entry) {
+			$out[] = $entry['name'];
+		}
+		return $out;
+	}
+
 	function Create($data)
 	{
 		$admin_id = $this->session->userdata('admin_id');
@@ -555,5 +670,133 @@ class Faq_Model extends CI_Model
 			$rows[] = array('FAQID' => $faq_id, 'CategoryID' => $id);
 		}
 		$this->db->insert_batch('faq_destination_map', $rows);
+	}
+
+	// Soft-delete every active internal FAQ (Status -> 'N', the app-wide delete
+	// convention) and clear their destination maps, so the importer can rebuild
+	// the internal library from scratch. External FAQs are left untouched.
+	function Wipe_Internal()
+	{
+		$this->db->select('FAQID');
+		$this->db->where('Status', 'Y');
+		$this->db->where('Type', 'internal');
+		$rows = $this->db->get('faq')->result();
+		if(empty($rows)) {
+			return;
+		}
+		$ids = array();
+		foreach($rows as $row) {
+			$ids[] = (int)$row->FAQID;
+		}
+		$admin_id = $this->session->userdata('admin_id');
+		$now      = date('Y-m-d H:i:s');
+		$this->db->where_in('FAQID', $ids);
+		$this->db->update('faq', array('Status' => 'N', 'UpdateBy' => $admin_id, 'UpdateDate' => $now));
+		// Drop the now-orphaned destination links so they don't accumulate across
+		// repeated imports (the rebuilt FAQs get fresh ids + fresh maps).
+		$this->db->where_in('FAQID', $ids);
+		$this->db->delete('faq_destination_map');
+	}
+
+	// Wipe-and-rebuild the internal FAQ library from a Parse_Import() result.
+	// Runs in a transaction so a failure rolls the wipe back (the old library
+	// survives). Destination names are matched to existing active destinations
+	// (unknown ones are skipped + reported); tag names are matched case-insensitively
+	// and auto-created when missing. Every rebuilt sub-Q&A is stamped as freshly
+	// created now. Returns a summary: faqs/items created, tags auto-created, and
+	// the destination names that couldn't be matched.
+	function Replace_Internal($parsed)
+	{
+		$summary = array('faqs' => 0, 'items' => 0, 'tags_created' => array(), 'destinations_skipped' => array());
+		if(!is_array($parsed)) {
+			return $summary;
+		}
+
+		// Preload name -> id maps once (case-insensitive keys), grown in place as
+		// new tags are auto-created so a name appearing twice is created once.
+		$tag_map = array();  // strtolower(name) => FAQTagID
+		foreach($this->db->select('FAQTagID, Name')->where('Status', 'Y')->get('faq_tag')->result() as $t) {
+			$tag_map[strtolower(trim((string)$t->Name))] = (int)$t->FAQTagID;
+		}
+		$dest_map = array(); // strtolower(name) => CategoryID
+		foreach($this->Read_Destinations() as $d) {
+			$dest_map[strtolower(trim((string)$d->Name))] = (int)$d->CategoryID;
+		}
+		$skipped_dest = array(); // strtolower(name) => display name (deduped)
+
+		$admin_id = $this->session->userdata('admin_id');
+		$now      = date('Y-m-d H:i:s');
+		$actor    = (string)$this->session->userdata('name');
+
+		$this->db->trans_start();
+		$this->Wipe_Internal();
+
+		foreach($parsed as $faq) {
+			$title = isset($faq['title']) ? trim((string)$faq['title']) : '';
+			if($title === '') {
+				continue; // a FAQ with no title can't be rebuilt
+			}
+
+			// Resolve destination names -> ids (existing only; track the misses).
+			$dest_ids = array();
+			$names = isset($faq['destinations']) && is_array($faq['destinations']) ? $faq['destinations'] : array();
+			foreach($names as $dname) {
+				$key = strtolower(trim((string)$dname));
+				if($key === '') { continue; }
+				if(isset($dest_map[$key])) {
+					$dest_ids[] = $dest_map[$key];
+				} else {
+					$skipped_dest[$key] = trim((string)$dname);
+				}
+			}
+
+			// Build the stored sub-Q&A list, resolving (and auto-creating) tags.
+			$items = array();
+			$rows = isset($faq['items']) && is_array($faq['items']) ? $faq['items'] : array();
+			foreach($rows as $row) {
+				$q = isset($row['q']) ? (string)$row['q'] : '';
+				$a = isset($row['a']) ? (string)$row['a'] : '';
+				$tag_ids = array();
+				$tnames = isset($row['tags']) && is_array($row['tags']) ? $row['tags'] : array();
+				foreach($tnames as $tname) {
+					$key = strtolower(trim((string)$tname));
+					if($key === '') { continue; }
+					if(!isset($tag_map[$key])) {
+						$this->db->insert('faq_tag', array(
+							'Name' => trim((string)$tname), 'Status' => 'Y',
+							'InsertBy' => $admin_id, 'InsertDate' => $now,
+							'UpdateBy' => $admin_id, 'UpdateDate' => $now,
+						));
+						$tag_map[$key] = (int)$this->db->insert_id();
+						$summary['tags_created'][] = trim((string)$tname);
+					}
+					$tag_ids[] = $tag_map[$key];
+				}
+				// Fresh-rebuild audit: every item is created now (matches the
+				// new-row shape Build_Items() stamps, tags right after 'a').
+				$item = array('q' => $q, 'a' => $a);
+				$tag_ids = self::Normalize_Ids($tag_ids);
+				if(!empty($tag_ids)) {
+					$item['tags'] = $tag_ids;
+				}
+				$item['cb'] = $actor; $item['cd'] = $now; $item['ub'] = $actor; $item['ud'] = $now;
+				$items[] = $item;
+			}
+
+			$new_id = $this->Create(array(
+				'Title'       => $title,
+				'Slug'        => $this->Generate_Slug($title, 0),
+				'Description' => self::Encode_Items($items),
+				'Type'        => 'internal',
+			));
+			$this->Sync_Destinations($new_id, $dest_ids);
+
+			$summary['faqs']++;
+			$summary['items'] += count($items);
+		}
+
+		$this->db->trans_complete();
+		$summary['destinations_skipped'] = array_values($skipped_dest);
+		return $summary;
 	}
 }

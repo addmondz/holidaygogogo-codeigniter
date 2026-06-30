@@ -72,6 +72,12 @@
 						<a href="<?php echo base_url('Faq/Download_Pdf'); ?>" class="btn btn-light-danger font-weight-bold ml-2" data-toggle="tooltip" title="Download every FAQ as a PDF file">
 							<i class="la la-file-pdf"></i>PDF
 						</a>
+						<a href="<?php echo base_url('Faq/Export_Template'); ?>" class="btn btn-light-info font-weight-bold ml-2" data-toggle="tooltip" title="Download an editable Excel template of all FAQs to re-import">
+							<i class="la la-file-export"></i>Export
+						</a>
+						<button type="button" class="btn btn-light-warning font-weight-bold ml-2" data-toggle="modal" data-target="#faq_import_modal" title="Upload an edited template to rebuild all FAQs">
+							<i class="la la-file-import"></i>Import
+						</button>
 					<?php } ?>
 					<?php if($can_edit) { ?>
 						<a href="<?php echo base_url('Faq/Create'); ?>" class="btn btn-primary font-weight-bold ml-2" style="width:160px;">
@@ -210,6 +216,42 @@
 	</div>
 </div>
 
+<?php if($is_owner) { ?>
+<!-- Import modal: owner uploads an edited Export template to rebuild the whole
+     internal FAQ library (wipe-and-import). -->
+<div class="modal fade" id="faq_import_modal" tabindex="-1" role="dialog" aria-labelledby="faq_import_label" aria-hidden="true">
+	<div class="modal-dialog modal-dialog-centered" role="document">
+		<form action="<?php echo base_url('Faq/Import'); ?>" method="post" enctype="multipart/form-data" id="faq_import_form">
+			<div class="modal-content">
+				<div class="modal-header" style="background-color:#D7E2F2;">
+					<h5 class="modal-title" id="faq_import_label" style="color:#6082B6;"><strong>Import FAQs from Excel</strong></h5>
+					<button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+				</div>
+				<div class="modal-body">
+					<div class="alert alert-light-warning" role="alert" style="border-left:4px solid #ffa800;">
+						<strong>Heads up:</strong> Importing <strong>replaces all internal FAQs</strong> with the rows in your file. Export first, edit that file, then import it back.
+					</div>
+					<div class="form-group">
+						<label>Excel File <span class="text-danger">*</span></label>
+						<div class="custom-file">
+							<input type="file" name="import_file" class="custom-file-input" id="faq_import_file" accept=".xlsx,.xls" required>
+							<label class="custom-file-label" for="faq_import_file" id="faq_import_file_label">Choose .xlsx / .xls file</label>
+						</div>
+						<span class="form-text text-muted">Use the exported template (columns: FAQ, Destination, Question, Answer, Tags). Unknown tags are created; unknown destinations are skipped. The last 3 uploads are kept as backups.</span>
+					</div>
+				</div>
+				<div class="modal-footer">
+					<button type="button" class="btn btn-light font-weight-bold" data-dismiss="modal">Cancel</button>
+					<button type="submit" class="btn btn-warning font-weight-bold" id="faq_import_submit">
+						<i class="la la-file-import"></i>Replace &amp; Import
+					</button>
+				</div>
+			</div>
+		</form>
+	</div>
+</div>
+<?php } ?>
+
 <script>
 	<?php if(trim((string)$this->input->get('tag')) !== '' || trim((string)$this->input->get('destination')) !== '') { ?>
 		$('#faq_header').click();
@@ -234,4 +276,17 @@
 
 	$('#reset').click(function() { Reset('<?php echo base_url('Faq'); ?>'); });
 	$('[data-toggle="tooltip"]').tooltip();
+
+	// Import modal: show the picked filename, and confirm the wipe-and-replace
+	// once before the form submits (it rebuilds the whole internal FAQ library).
+	$('#faq_import_file').on('change', function() {
+		var name = (this.files && this.files.length) ? this.files[0].name : 'Choose .xlsx / .xls file';
+		$('#faq_import_file_label').text(name);
+	});
+	$('#faq_import_form').on('submit', function() {
+		if(!window.confirm('This will replace ALL internal FAQs with the rows in your file. Continue?')) {
+			return false;
+		}
+		$('#faq_import_submit').prop('disabled', true).html('<i class="la la-spinner la-spin"></i>Importing...');
+	});
 </script>

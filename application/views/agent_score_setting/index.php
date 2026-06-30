@@ -21,6 +21,10 @@
 						Excluded agents drop out of the TC <strong>Top&nbsp;5</strong> leaderboard, the score
 						benchmark (so they no longer set the &ldquo;100&rdquo; on any measure), and the Agent
 						Score column on the owner matrix. Everyone is <strong>included</strong> by default.
+						The <strong>Owner</strong> and <strong>TC&nbsp;Lead</strong> count toward the score
+						benchmark (their figures help set the &ldquo;100&rdquo;) but are <strong>not shown</strong>
+						on the leaderboard or matrix &mdash; included in the calculation, not displayed.
+						Switching one <strong>ON</strong> here removes them from the calculation entirely.
 					</div>
 
 					<div class="dataTables_wrapper dt-bootstrap4 no-footer" <?php if(empty($agents)) { echo 'style="overflow-x:auto;"'; } ?>>
@@ -35,11 +39,12 @@
 							</thead>
 							<tbody>
 								<?php if(empty($agents)) { ?>
-									<tr><td colspan="4" style="text-align:center; padding-top:10px; padding-bottom:10px;">No sales agents found.</td></tr>
+									<tr><td colspan="4" style="text-align:center; padding-top:10px; padding-bottom:10px;">No agents found.</td></tr>
 								<?php } else { $count = 1; foreach($agents as $agent) {
 									$aid = (int) $agent->AdminID;
 									$is_excluded = isset($excluded[$aid]);
-									$role = ((string)$agent->Level === '50') ? 'TC2' : 'TC';
+									$role_labels = array('10' => 'OWNER', '20' => 'TC', '25' => 'TC LEAD', '50' => 'TC2');
+									$role = isset($role_labels[(string)$agent->Level]) ? $role_labels[(string)$agent->Level] : 'TC';
 								?>
 									<tr>
 										<td style="text-align:center; padding-top:15px; padding-bottom:15px;"><?php echo $count; ?></td>

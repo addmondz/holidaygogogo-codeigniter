@@ -175,4 +175,37 @@ $res7b = agent_score_compute(array(
 assert_eq('excluded: all-excluded total 0', 0, $res7b['total']);
 assert_eq('excluded: all-excluded top null', null, $res7b['top']);
 
+// ---------------------------------------------------------------------------
+// hidden flag — the Agent_Score_Setting "include owner and tc lead in the
+// calculation, but DON'T show them" rule. A 'hidden' agent STILL sets the
+// 100-anchors (their figures raise the bar) but is omitted from the ranked
+// output / by_admin / total / top — counted toward the score, not displayed.
+//   Tess (L20, visible) sales 500. Olive (Owner, hidden) sales 1000: Olive's
+//   1000 becomes the sales anchor, so Tess normalises to 500/1000 = 50 — even
+//   though Olive never appears in the result. That deflation is the whole point
+//   of "include in calculation": the hidden agent moves the bar.
+// ---------------------------------------------------------------------------
+$base = array('reply_secs'=>60,'pickup_secs'=>30,'conv_rate'=>40,'followup_rate'=>80,'served_leads'=>5,'pickup_n'=>5,'leads_n'=>5,'owned_n'=>5);
+$agents8 = array(
+    array_merge(array('admin_id'=>1,'name'=>'Tess', 'sales'=>500),  $base),
+    array_merge(array('admin_id'=>2,'name'=>'Olive','sales'=>1000,'hidden'=>true), $base),
+);
+$res8 = agent_score_compute($agents8);
+assert_eq('hidden: only the visible agent is ranked', 1, $res8['total']);
+assert_eq('hidden: hidden Owner absent from by_admin', false, isset($res8['by_admin'][2]));
+assert_eq('hidden: top is the visible agent', 'Tess', $res8['top']['name']);
+assert_eq('hidden: hidden Owner sets the sales anchor -> Tess 500/1000 = 50', 50.0, $res8['by_admin'][1]['norm']['sales']);
+// Control: omit the hidden agent entirely -> Tess alone anchors sales -> 100.
+$ctrl8 = agent_score_compute(array($agents8[0]));
+assert_eq('hidden control: visible agent alone anchors sales -> 100', 100.0, $ctrl8['by_admin'][1]['norm']['sales']);
+// excluded beats hidden: an owner-excluded hidden agent does NOT anchor (and is
+// still absent), so the visible agent re-anchors to 100.
+$agents8b = array(
+    array_merge(array('admin_id'=>1,'name'=>'Tess', 'sales'=>500),  $base),
+    array_merge(array('admin_id'=>2,'name'=>'Olive','sales'=>1000,'hidden'=>true,'excluded'=>true), $base),
+);
+$res8b = agent_score_compute($agents8b);
+assert_eq('hidden+excluded: Owner absent', false, isset($res8b['by_admin'][2]));
+assert_eq('hidden+excluded: Owner no longer anchors -> Tess back to 100', 100.0, $res8b['by_admin'][1]['norm']['sales']);
+
 echo "\nAll assertions passed.\n";
