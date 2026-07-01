@@ -1828,6 +1828,60 @@ class Report_Model extends CI_Model
     }
 
     /**
+     * Average reply time (seconds) for a single owner on one day, matching the
+     * scoping of Lead_Reply_Activity_Hourly_By_Owner(): the owner's leads via
+     * ghl_lead_ownership, bounded to each lead's ownership window, inbound = every
+     * customer message, outbound = the owner's own replies. Raw messages are pulled
+     * grouped by conversation and ascending in time so the inbound->outbound pairing
+     * in ghl_message_log_average_reply_seconds() (in-hours pairs only) is sound.
+     * Powers the "Avg Response Time" card on the Lead Reply Hourly page.
+     *
+     * @param array $filters Same filter shape as Lead_Reply_Activity_Hourly_By_Owner().
+     * @return float|null Average seconds, or null when no pair qualifies.
+     */
+    function Lead_Reply_Activity_Hourly_Avg_Reply_Seconds_By_Owner($filters = array())
+    {
+        $where = $this->build_lead_reply_created_where_clause($filters);
+        if (trim($where['sql']) === 'WHERE 1=0') {
+            return null;
+        }
+
+        $this->load->helper('ghl_messages_log');
+        $extraJoins = isset($where['extra_joins']) ? $where['extra_joins'] : '';
+        $messageTimeColumn = $this->escape_identifier($this->get_message_time_column());
+        $start = !empty($filters['start_date']) ? $filters['start_date'] . ' 00:00:00' : '1970-01-01 00:00:00';
+        $end = !empty($filters['end_date']) ? $filters['end_date'] . ' 23:59:59' : '9999-12-31 23:59:59';
+
+        $sql = "
+            SELECT
+                gm.conversation_id AS conversation_id,
+                gm.direction AS direction,
+                gm.{$messageTimeColumn} AS ts
+            FROM ghl_lead_ownership glo
+            INNER JOIN ghl_messages gm
+                ON gm.conversation_id = glo.conversation_id
+               AND gm.{$messageTimeColumn} >= glo.lead_started_at
+               AND (
+                    glo.lead_ended_at IS NULL
+                    OR gm.{$messageTimeColumn} < glo.lead_ended_at
+               )
+            {$extraJoins}
+            {$where['sql']}
+              AND gm.{$messageTimeColumn} BETWEEN ? AND ?
+              AND (
+                    gm.direction = 'inbound'
+                    OR (gm.direction = 'outbound' AND gm.user_id = glo.owner_user_id)
+              )
+            ORDER BY gm.conversation_id ASC, gm.{$messageTimeColumn} ASC, gm.id ASC
+        ";
+
+        $params = array_merge($where['params'], array($start, $end));
+        $rows = $this->db->query($sql, $params)->result_array();
+
+        return ghl_message_log_average_reply_seconds($rows);
+    }
+
+    /**
      * SQL predicate restricting a timestamp expression to working hours: any day
      * (everyday) between 07:00:00 and 22:00:00 inclusive. Mirrors
      * ghl_message_log_within_business_hours() so the dashboard only counts

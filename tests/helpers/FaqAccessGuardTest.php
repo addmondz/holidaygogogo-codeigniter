@@ -7,8 +7,10 @@
  *
  *   - VIEW  (listing + Internal page): OWNER (level 10) OR the 'FV' code
  *     ("FAQ VIEW ACCESS").
- *   - EDIT  (create / update / delete): OWNER (level 10) OR the 'FE' code
- *     ("FAQ EDIT ACCESS").
+ *   - EDIT  (create / update / delete + bulk import/export): OWNER (level 10)
+ *     OR the 'FE' code ("FAQ EDIT ACCESS"). The Excel/PDF/Export/Import bulk
+ *     tools moved off the old OWNER-only gate onto FE so an assigned editor can
+ *     run them.
  *
  * OWNER always passes both (bypass) so an owner can never lock themselves out.
  *
@@ -16,7 +18,8 @@
  *   - Can_View()  checks level === 10 and the 'FV' access_control code
  *   - Can_Edit()  checks level === 10 and the 'FE' access_control code
  *   - index() and Page() are gated by Can_View()
- *   - Create(), Update() and Delete() are each gated by Can_Edit()
+ *   - Create(), Update(), Delete(), Download(), Download_Pdf(),
+ *     Export_Template() and Import() are each gated by Can_Edit()
  *   - the ACCESS_CONTROL constant declares the FV and FE codes so the Admin
  *     multi-select can assign them
  * Bug shape it guards against: a future edit dropping the gate from one of the
@@ -84,8 +87,8 @@ foreach (array('index', 'Page', 'Internal') as $method) {
     check("{$method}() is gated by Can_View()", $body !== null && strpos($body, 'Can_View()') !== false);
 }
 
-// Mutating actions gated by Can_Edit().
-foreach (array('Create', 'Update', 'Delete') as $method) {
+// Mutating actions + bulk import/export gated by Can_Edit().
+foreach (array('Create', 'Update', 'Delete', 'Download', 'Download_Pdf', 'Export_Template', 'Import') as $method) {
     $body = body_of($source, $method);
     check("{$method}() is gated by Can_Edit()", $body !== null && strpos($body, 'Can_Edit()') !== false);
 }

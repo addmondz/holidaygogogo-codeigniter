@@ -1,5 +1,4 @@
-<?php $can_edit = isset($can_edit) ? $can_edit : ((int)$this->session->level === 10); // OWNER or FAQ EDIT ACCESS (FE) may create/edit/delete; others view only ?>
-<?php $is_owner = ((int)$this->session->level === 10); // OWNER only: bulk download of the whole FAQ library (Excel / PDF) ?>
+<?php $can_edit = isset($can_edit) ? $can_edit : ((int)$this->session->level === 10); // OWNER or FAQ EDIT ACCESS (FE) may create/edit/delete + run bulk Excel/PDF/Export/Import; others view only ?>
 
 <style>
 	/* Tag / Destination pills: let long labels (e.g. "Rawa Island Resort - Key
@@ -65,7 +64,7 @@
 					<a href="<?php echo base_url('Faq/Internal'); ?>" target="_blank" rel="noopener" class="btn btn-light-primary font-weight-bold" data-toggle="tooltip" title="Open every FAQ together on one page">
 						<i class="la la-book"></i>Internal FAQs
 					</a>
-					<?php if($is_owner) { ?>
+					<?php if($can_edit) { ?>
 						<a href="<?php echo base_url('Faq/Download'); ?>" class="btn btn-light-success font-weight-bold ml-2" data-toggle="tooltip" title="Download every FAQ as an Excel file">
 							<i class="la la-file-excel"></i>Excel
 						</a>
@@ -216,9 +215,9 @@
 	</div>
 </div>
 
-<?php if($is_owner) { ?>
-<!-- Import modal: owner uploads an edited Export template to rebuild the whole
-     internal FAQ library (wipe-and-import). -->
+<?php if($can_edit) { ?>
+<!-- Import modal: an editor (OWNER or FE) uploads an edited Export template to
+     rebuild the whole internal FAQ library (wipe-and-import). -->
 <div class="modal fade" id="faq_import_modal" tabindex="-1" role="dialog" aria-labelledby="faq_import_label" aria-hidden="true">
 	<div class="modal-dialog modal-dialog-centered" role="document">
 		<form action="<?php echo base_url('Faq/Import'); ?>" method="post" enctype="multipart/form-data" id="faq_import_form">

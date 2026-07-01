@@ -35,6 +35,9 @@ class Admin extends MY_Controller
 					case 50:
 						$admin->Level = 'TC';
 						break;
+					case 60:
+						$admin->Level = 'MARKETING';
+						break;
 					default:
 				}
 

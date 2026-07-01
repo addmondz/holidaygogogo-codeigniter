@@ -537,7 +537,7 @@
                 var st_dirty = $('#StAmount').length && st_is_dirty();
                 if($('#StYearAmount').length) { sty_capture_input_into_dict(); }
                 var sty_dirty = $('#StYearAmount').length && sty_is_dirty();
-                if(country_code == null || name == '' || (action == 'C' && gender == null) || mobile == '' || email == '' || (action == 'C' && username == '') || (action == 'C' && password == '') || (action == 'C' && level == null) || access_control == '') {
+                if(country_code == null || name == '' || (action == 'C' && gender == null) || mobile == '' || email == '' || (action == 'C' && username == '') || (action == 'C' && password == '') || (action == 'C' && !level) || access_control == '') {
                     Display_Message(background, 'Please Insert All Required Admin Information', null);
                 } else {
                     if(action == 'C') {

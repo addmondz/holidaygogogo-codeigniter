@@ -5,16 +5,18 @@ class MY_Controller extends CI_Controller
 	{
 		parent::__construct();
 		if($this->session->has_userdata('admin_id') && $this->session->has_userdata('level')) {
-			if(in_array($this->session->level, [20, 25, 45])) {
+			if(in_array($this->session->level, [20, 25, 45, 60])) {
 				// Product / Customer / Guest List are gated per-admin: an Owner-granted
 				// AccessControl flag (VPR/VC/VGL) overrides the level block. See
-				// setting_module_access_helper.
+				// setting_module_access_helper. MARKETING (60) is restricted like a
+				// Sales Agent: no Settings pages except Customer / Guest List when the
+				// Owner grants the VC / VGL flag.
 				$level = $this->session->level;
 				$access_control = (array) $this->session->access_control;
 				switch($this->router->class) {
 					case 'Category':
-						// OP TEAM LEAD (45) may access Category; SALES AGENT (20) and TEAM LEAD (25) stay blocked
-						if(in_array($this->session->level, [20, 25])) {
+						// OP TEAM LEAD (45) may access Category; SALES AGENT (20), TEAM LEAD (25) and MARKETING (60) stay blocked
+						if(in_array($this->session->level, [20, 25, 60])) {
 							redirect('Dashboard');
 						}
 						break;

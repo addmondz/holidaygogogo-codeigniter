@@ -225,6 +225,10 @@ class Booking extends MY_Controller
 			}
 
 			$is_sales_agent = $this->session->userdata('level') == 20;
+			// Net Profit / Margin columns are hidden from Sales Agents (20) and
+			// Marketing (60). Kept separate from $is_sales_agent, which also drives
+			// sales-agent-only row behaviour that must NOT apply to Marketing.
+			$hide_profit = admin_hides_profit($this->session->userdata('level'));
 
 		$this->load->helper('booking_flow');
 
@@ -239,9 +243,9 @@ class Booking extends MY_Controller
 
 		// Map column index to database column
 		// Note: Column indices must match the frontend DataTables columns array.
-		// Sales agents (level 20) do NOT see the Net Profit / Net Profit Margin columns,
-		// so the indices for BC Status onwards shift left by 2 for them.
-		if($is_sales_agent) {
+		// Sales Agents (20) and Marketing (60) do NOT see the Net Profit / Net Profit
+		// Margin columns, so the indices for BC Status onwards shift left by 2 for them.
+		if($hide_profit) {
 			$columns = array(
 				0 => 'booking.BookingID',             // row number
 				1 => 'booking.BookingID',             // checkbox (placeholder)
@@ -463,8 +467,8 @@ class Booking extends MY_Controller
 			// Net Total
 			$row['net_total'] = number_format($booking->NetTotal, 2, '.', ',');
 
-			// Profit (hidden from sales agents)
-			if(!$is_sales_agent) {
+			// Profit (hidden from Sales Agents and Marketing)
+			if(!$hide_profit) {
 				$row['profit'] = '<span style="color:' . $profit_color . '">' . number_format($net_profit, 2, '.', ',') . '</span>';
 				$row['profit_margin'] = '<span style="color:' . $profit_color . '">' . $profit_margin . '</span>';
 			}
@@ -712,7 +716,8 @@ class Booking extends MY_Controller
 				return;
 			}
 
-			$is_sales_agent = $this->session->userdata('level') == 20;
+			// Net profit is hidden from Sales Agents (20) and Marketing (60).
+			$hide_profit = admin_hides_profit($this->session->userdata('level'));
 
 			$summary = $this->Booking_Model->Calculate_Summary();
 
@@ -723,11 +728,11 @@ class Booking extends MY_Controller
 
 			$output = array(
 				'total_sales' => $total_sales_formatted,
-				'is_sales_agent' => $is_sales_agent
+				'is_sales_agent' => $hide_profit
 			);
 
-			// Net profit is restricted to non-sales-agents
-			if(!$is_sales_agent) {
+			// Net profit is restricted to roles that may see profit
+			if(!$hide_profit) {
 				$total_net_profit = $summary['total_net_profit'];
 				if($total_net_profit != 0 && $total_sales != 0) {
 					$profit_percentage = round(($total_net_profit / $total_sales) * 100);
@@ -5345,6 +5350,9 @@ class Booking extends MY_Controller
 	}
 
 	function Download() {
+		// Sales Agents (20) and Marketing (60) never see profit, so it is left out
+		// of their export too (see admin_hides_profit / profit_visibility_helper).
+		$hide_profit = admin_hides_profit($this->session->userdata('level'));
 		$spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
 		$spreadsheet->getActiveSheet()->setTitle('Booking Records');
 		$spreadsheet->getProperties()->setCreator('HolidayGoGoGo');
@@ -5362,7 +5370,9 @@ class Booking extends MY_Controller
 		$spreadsheet->getActiveSheet()->setCellValue('L1', 'SUBTOTAL');
 		$spreadsheet->getActiveSheet()->setCellValue('M1', 'DISCOUNT');
 		$spreadsheet->getActiveSheet()->setCellValue('N1', 'NET TOTAL');
-		$spreadsheet->getActiveSheet()->setCellValue('O1', 'PROFIT');
+		if(!$hide_profit) {
+			$spreadsheet->getActiveSheet()->setCellValue('O1', 'PROFIT');
+		}
 		$spreadsheet->getActiveSheet()->setCellValue('P1', 'STATUS');
 		$spreadsheet->getActiveSheet()->setCellValue('Q1', 'REMARK');
 		$spreadsheet->getActiveSheet()->setCellValue('R1', 'CHAT LANGUAGE');
@@ -5516,7 +5526,9 @@ class Booking extends MY_Controller
 				$spreadsheet->getActiveSheet()->setCellValue('L' . $row, $booking->Subtotal);
 				$spreadsheet->getActiveSheet()->setCellValue('M' . $row, $booking->Discount);
 				$spreadsheet->getActiveSheet()->setCellValue('N' . $row, $booking->NetTotal);
-				$spreadsheet->getActiveSheet()->setCellValue('O' . $row, $booking->Profit);
+				if(!$hide_profit) {
+					$spreadsheet->getActiveSheet()->setCellValue('O' . $row, $booking->Profit);
+				}
 				$spreadsheet->getActiveSheet()->setCellValueExplicit('P' . $row, $booking->Status, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 				$spreadsheet->getActiveSheet()->setCellValueExplicit('Q' . $row, $booking->BookingRemark, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 				$spreadsheet->getActiveSheet()->setCellValueExplicit('R' . $row, $booking->ChatLanguage, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
@@ -5527,13 +5539,17 @@ class Booking extends MY_Controller
 			$spreadsheet->getActiveSheet()->getStyle('L')->getNumberFormat()->setFormatCode('"RM "#,##0.00_-');
 			$spreadsheet->getActiveSheet()->getStyle('M')->getNumberFormat()->setFormatCode('"RM "#,##0.00_-');
 			$spreadsheet->getActiveSheet()->getStyle('N')->getNumberFormat()->setFormatCode('"RM "#,##0.00_-');
-			$spreadsheet->getActiveSheet()->getStyle('O')->getNumberFormat()->setFormatCode('"RM "#,##0.00_-');
+			if(!$hide_profit) {
+				$spreadsheet->getActiveSheet()->getStyle('O')->getNumberFormat()->setFormatCode('"RM "#,##0.00_-');
+			}
 			$spreadsheet->getActiveSheet()->getCell('K' . ($row + 2))->setValue('Total');
 			$spreadsheet->getActiveSheet()->getStyle('L' . ($row + 2) . ':' . 'O' . ($row + 2))->getBorders()->getTop()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
 			$spreadsheet->getActiveSheet()->setCellValue('L' . ($row + 2), $total_subtotal);
 			$spreadsheet->getActiveSheet()->setCellValue('M' . ($row + 2), $total_discount);
 			$spreadsheet->getActiveSheet()->setCellValue('N' . ($row + 2), $total_net_total);
-			$spreadsheet->getActiveSheet()->setCellValue('O' . ($row + 2), $total_profit);
+			if(!$hide_profit) {
+				$spreadsheet->getActiveSheet()->setCellValue('O' . ($row + 2), $total_profit);
+			}
 			$spreadsheet->getActiveSheet()->getStyle('L' . ($row + 2) . ':' . 'O' . ($row + 2))->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_DOUBLE);
 			$spreadsheet->getActiveSheet()->getStyle('A:S')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_RIGHT);
 		} else {
@@ -5560,6 +5576,11 @@ class Booking extends MY_Controller
 		$spreadsheet->getActiveSheet()->getColumnDimension('Q')->setWidth(35);
 		$spreadsheet->getActiveSheet()->getColumnDimension('R')->setWidth(35);
 		$spreadsheet->getActiveSheet()->getColumnDimension('S')->setWidth(35);
+		if($hide_profit) {
+			// Profit column left empty for Sales Agents / Marketing — hide it so the
+			// sheet reads NET TOTAL -> STATUS with no blank gap.
+			$spreadsheet->getActiveSheet()->getColumnDimension('O')->setVisible(false);
+		}
 
 		if($this->input->get('checkbox') == 'ON') {
 			$spreadsheet->createSheet();

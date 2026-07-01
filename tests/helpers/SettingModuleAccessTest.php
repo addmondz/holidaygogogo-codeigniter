@@ -54,6 +54,17 @@ assert_eq('guests: sales(20) with VGL',    true,  admin_can_access_setting_modul
 assert_eq('guests: owner(10) feature off', false, admin_can_access_setting_module('guests', '10', $none, false));
 assert_eq('guests: VGL holder feature off',false, admin_can_access_setting_module('guests', '20', array('VGL'), false));
 
+// ---- MARKETING (60): never a base role; Customer / Guest List need the flag --
+// Product stays off (Owner never grants VPR to Marketing in practice), Customer
+// and Guest List open only once the Owner ticks VC / VGL — matching "subject to
+// my approval, and I can stop access".
+assert_eq('product: marketing(60) no flag',  false, admin_can_access_setting_module('product', '60', $none));
+assert_eq('customer: marketing(60) no flag', false, admin_can_access_setting_module('customer', '60', $none));
+assert_eq('customer: marketing(60) with VC', true,  admin_can_access_setting_module('customer', '60', array('VC')));
+assert_eq('guests: marketing(60) no flag',   false, admin_can_access_setting_module('guests', '60', $none, true));
+assert_eq('guests: marketing(60) with VGL',  true,  admin_can_access_setting_module('guests', '60', array('VGL'), true));
+assert_eq('guests: marketing(60) VGL feat off', false, admin_can_access_setting_module('guests', '60', array('VGL'), false));
+
 // ---- Robustness --------------------------------------------------------------
 assert_eq('unknown module blocked',        false, admin_can_access_setting_module('supplier', '10', array('VPR')));
 assert_eq('int level accepted',            true,  admin_can_access_setting_module('product', 45, $none));

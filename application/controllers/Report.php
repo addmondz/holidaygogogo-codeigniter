@@ -483,6 +483,7 @@ class Report extends MY_Controller
             'lead_reply_hourly_owner_name' => $payload['owner_name'],
             'lead_reply_hourly_date_label' => $filters['reply_date'],
             'lead_reply_hourly_breakdown' => $payload['breakdown'],
+            'lead_reply_hourly_avg_reply_label' => $payload['avg_reply_label'],
             'lead_reply_hourly_updated_at' => $payload['updated_at'],
         );
 
@@ -1195,11 +1196,13 @@ class Report extends MY_Controller
         }
 
         $rows = $ownerId !== '' ? $this->Report_Model->Lead_Reply_Activity_Hourly_By_Owner($singleOwnerFilters) : array();
+        $avgReplySeconds = $ownerId !== '' ? $this->Report_Model->Lead_Reply_Activity_Hourly_Avg_Reply_Seconds_By_Owner($singleOwnerFilters) : null;
 
         return array(
             'owner_id' => $ownerId,
             'owner_name' => $ownerName,
             'breakdown' => ghl_message_log_hourly_breakdown($rows),
+            'avg_reply_label' => ghl_message_log_format_duration($avgReplySeconds),
             'updated_at' => date('Y-m-d H:i:s'),
         );
     }

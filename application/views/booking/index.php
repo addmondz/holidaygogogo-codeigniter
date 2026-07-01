@@ -1,5 +1,7 @@
 <?php
-    $is_sales_agent = $this->session->userdata('level') == 20;
+    // Net Profit / Margin columns and the profit summary are hidden from Sales
+    // Agents (20) and Marketing (60). See profit_visibility_helper.
+    $hide_profit = admin_hides_profit($this->session->userdata('level'));
     // Autocount status is only relevant to Owner (10) and Finance (30)
     $show_autocount_status = in_array((int)$this->session->userdata('level'), [10, 30]);
     ini_set("memory_limit","512M");
@@ -155,7 +157,7 @@
 </style>
 <div class="d-flex flex-column-fluid">
     <div class="container-fluid">
-        <?php if((int)$this->session->userdata('level') !== 10) { $this->load->view('booking/_summary_cards'); } ?>
+        <?php if(!in_array((int)$this->session->userdata('level'), [10, 60])) { $this->load->view('booking/_summary_cards'); } ?>
         <div class="card card-custom mb-5">
             <div class="card-header flex-wrap py-3" style="background-color:#D7E2F2;">
                 <div class="card-title">
@@ -259,7 +261,7 @@
                                 <th class="end_date" style="text-align:center;">End</th>
                                 <th style="text-align:center;">Destination</th>
                                 <th class="subtotal" style="text-align:center;">Net Sales (RM)</th>
-                                <?php if(!$is_sales_agent) { ?>
+                                <?php if(!$hide_profit) { ?>
                                 <th class="profit" style="text-align:center;">Net Profit (RM)</th>
                                 <th style="text-align:center;">Net Profit Margin (%)</th>
                                 <?php } ?>
@@ -279,7 +281,7 @@
                 <div class="row" id="summary_section">
                     <div class="col-md-12 pt-3 pb-3" style="background-color:white; border:3px solid #D7E2F2; border-radius:8px;">
                         <div class="row">
-                            <div class="<?php echo $is_sales_agent ? 'col-md-12' : 'col-md-6 mb-7 mb-md-0'; ?>">
+                            <div class="<?php echo $hide_profit ? 'col-md-12' : 'col-md-6 mb-7 mb-md-0'; ?>">
                                 <label style="color:#C4B454;">Total Net Sales (RM)</label>
                                 <div class="input-icon">
                                     <input disabled type="text" id="total_sales_display" value="Loading..." class="form-control" style="text-align:right;">
@@ -288,7 +290,7 @@
                                     </span>
                                 </div>
                             </div>
-                            <?php if(!$is_sales_agent) { ?>
+                            <?php if(!$hide_profit) { ?>
                             <div class="col-md-6">
                                 <label style="color:#FFC000;">Total Net Profit (RM)</label>
                                 <div class="input-icon">
@@ -656,7 +658,7 @@
 
 <script>
 // DataTables Server-Side Initialization
-var is_sales_agent = <?php echo $is_sales_agent ? 'true' : 'false'; ?>;
+var hide_profit = <?php echo $hide_profit ? 'true' : 'false'; ?>;
 var bookingTable;
 
 $(document).ready(function() {
@@ -704,7 +706,7 @@ $(document).ready(function() {
             { data: 'net_total', className: 'text-center', responsivePriority: 6 }
         ]);
 
-        if (!is_sales_agent) {
+        if (!hide_profit) {
             columns.push({ data: 'profit', className: 'text-center', responsivePriority: 10007 });
             columns.push({ data: 'profit_margin', className: 'text-center', responsivePriority: 10008 });
         }
@@ -808,13 +810,13 @@ function loadSummaryTotals() {
         dataType: 'json',
         success: function(data) {
             $('#total_sales_display').val(data.total_sales);
-            if (!is_sales_agent) {
+            if (!hide_profit) {
                 $('#total_net_profit_display').val(data.total_net_profit);
             }
         },
         error: function() {
             $('#total_sales_display').val('Error loading');
-            if (!is_sales_agent) {
+            if (!hide_profit) {
                 $('#total_net_profit_display').val('Error loading');
             }
         }

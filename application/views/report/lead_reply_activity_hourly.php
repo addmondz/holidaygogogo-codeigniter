@@ -1,5 +1,6 @@
 <?php
 $breakdown = isset($lead_reply_hourly_breakdown) ? $lead_reply_hourly_breakdown : array('hours' => array(), 'total_inbound' => 0, 'total_outbound' => 0, 'total' => 0);
+$avgReplyLabel = isset($lead_reply_hourly_avg_reply_label) ? trim((string) $lead_reply_hourly_avg_reply_label) : '';
 $hours = isset($breakdown['hours']) ? $breakdown['hours'] : array();
 $peak = 0;
 foreach ($hours as $h) {
@@ -11,7 +12,7 @@ foreach ($hours as $h) {
 <style>
     .reply-hourly-summary {
         display: grid;
-        grid-template-columns: repeat(3, minmax(160px, 1fr));
+        grid-template-columns: repeat(4, minmax(160px, 1fr));
         gap: 12px;
     }
 
@@ -37,6 +38,7 @@ foreach ($hours as $h) {
         color: #263238;
     }
 
+    .reply-hourly-metric.response .value-text { color: #ff7b39; }
     .reply-hourly-metric.inbound .value-text { color: #2f6fed; }
     .reply-hourly-metric.outbound .value-text { color: #1bc5bd; }
 
@@ -102,6 +104,10 @@ foreach ($hours as $h) {
             </div>
             <div class="card-body">
                 <div class="reply-hourly-summary">
+                    <div class="reply-hourly-metric response">
+                        <div class="label-text" data-toggle="tooltip" title="Average time this owner took to reply to an inbound customer message, counting in-hours (7AM-10PM) same-day replies only.">Avg Response Time</div>
+                        <div class="value-text"><?php echo $avgReplyLabel !== '' ? html_escape($avgReplyLabel) : '&mdash;'; ?></div>
+                    </div>
                     <div class="reply-hourly-metric">
                         <div class="label-text">Total Messages</div>
                         <div class="value-text"><?php echo number_format($breakdown['total']); ?></div>

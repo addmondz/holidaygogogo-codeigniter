@@ -151,7 +151,7 @@ $is_dev_env = ($app_env !== 'prod');
 				<div class="aside-menu-wrapper flex-column-fluid">
 					<div id="kt_aside_menu" class="aside-menu my-4 scroll ps ps--active-y">
 						<ul class="menu-nav">
-							<?php if($this->session->level != 20) { ?>
+							<?php if(!in_array((int)$this->session->level, [20, 60])) { ?>
 								<?php if($this->session->level != 40 && $this->session->level != 45) { ?>
 								<li class="menu-item <?php if($this->router->class == 'Dashboard') { echo 'menu-item-active'; } ?>">
 									<a href="<?php echo base_url('Dashboard'); ?>" class="menu-link">
@@ -429,7 +429,7 @@ $is_dev_env = ($app_env !== 'prod');
 								$can_customer = admin_can_access_setting_module('customer', $sm_level, $sm_ac);
 								$can_guests   = admin_can_access_setting_module('guests',   $sm_level, $sm_ac, $this->config->item('show_guest_list'));
 							?>
-							<?php if($this->session->level != 20 || $can_product || $can_customer || $can_guests) { ?>
+							<?php if(!in_array((int)$this->session->level, [20, 60]) || $can_product || $can_customer || $can_guests) { ?>
 								<li class="menu-item menu-item-submenu <?php if($this->router->class == 'Category_Code' || $this->router->class == 'Category' || $this->router->class == 'Supplier' || $this->router->class == 'Product' || $this->router->class == 'Footer' || $this->router->class == 'Country_Code' || $this->router->class == 'Tag' || $this->router->class == 'Source' || $this->router->class == 'Package_Checklist' || $this->router->class == 'Product_Package_Checklist' || $this->router->class == 'Cancellation_Reason' || $this->router->class == 'Slow_Conversion_Reason' || $this->router->class == 'Customer_Type' || $this->router->class == 'Guests' || $this->router->class == 'Campaign' || $this->router->class == 'Quick_Filter' || $this->router->class == 'Agent_Score_Setting' || $this->router->class == 'Card_Visibility_Setting') { echo 'menu-item-active menu-item-open'; } ?>">
 									<a href="javascript:;" class="menu-link menu-toggle">
 										<span class="svg-icon menu-icon">
@@ -464,7 +464,7 @@ $is_dev_env = ($app_env !== 'prod');
 												</a>
 											</li>
 											<?php } ?>
-											<?php if($this->session->level != 20) { ?>
+											<?php if(!in_array((int)$this->session->level, [20, 60])) { ?>
 											<li class="menu-item <?php if($this->router->class == 'Category_Code') { echo 'menu-item-active'; } ?>">
 												<a href="<?php echo base_url('Category_Code'); ?>" class="menu-link">
 													<i class="menu-bullet menu-bullet-dot">
@@ -550,7 +550,7 @@ $is_dev_env = ($app_env !== 'prod');
 														</a>
 													</li>
 												<?php } ?>
-												<?php if($this->session->level != 20) { ?>
+												<?php if(!in_array((int)$this->session->level, [20, 60])) { ?>
 												<li class="menu-item <?php if($this->router->class == 'Footer') { echo 'menu-item-active'; } ?>">
 													<a href="<?php echo base_url('Footer'); ?>" class="menu-link">
 														<i class="menu-bullet menu-bullet-dot">
@@ -786,7 +786,7 @@ $is_dev_env = ($app_env !== 'prod');
 								</div>
 							</a>
 						</div>
-						<?php if($this->session->level != 20) { ?>
+						<?php if(!in_array((int)$this->session->level, [20, 60])) { ?>
 							<div class="navi navi-spacer-x-0 p-0">
 								<a href="<?php echo base_url('Company'); ?>" class="navi-item">
 									<div class="navi-link">

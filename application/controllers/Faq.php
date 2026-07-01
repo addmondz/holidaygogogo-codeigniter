@@ -37,7 +37,8 @@ class Faq extends MY_Controller
 	// Access-control gates. OWNER (level 10) always passes (bypass); every other
 	// role needs the matching code assigned on their admin record:
 	//   'FV' (FAQ VIEW ACCESS) to reach the listing and the per-FAQ pages,
-	//   'FE' (FAQ EDIT ACCESS) to create / edit / delete.
+	//   'FE' (FAQ EDIT ACCESS) to create / edit / delete and to run the bulk
+	//        Excel/PDF/Export/Import tools.
 	private function Can_View()
 	{
 		return (int)$this->session->level === 10 || in_array('FV', (array)$this->session->access_control);
@@ -46,14 +47,6 @@ class Faq extends MY_Controller
 	private function Can_Edit()
 	{
 		return (int)$this->session->level === 10 || in_array('FE', (array)$this->session->access_control);
-	}
-
-	// OWNER (level 10) only. Gates the "download every FAQ at once" exports, which
-	// pull the whole internal library into one file - kept owner-only regardless
-	// of FV/FE so bulk extraction isn't handed to every viewer/editor.
-	private function Can_Owner()
-	{
-		return (int)$this->session->level === 10;
 	}
 
 	// Active internal FAQs flattened into export rows (one per sub-Q&A), shared by
@@ -67,10 +60,10 @@ class Faq extends MY_Controller
 		return Faq_Model::Export_Rows($faqs, $this->Faq_Model->Tag_Name_Map());
 	}
 
-	// Excel (.xlsx) export of every internal FAQ - one row per sub-Q&A. OWNER only.
+	// Excel (.xlsx) export of every internal FAQ - one row per sub-Q&A. OWNER or FE.
 	function Download()
 	{
-		if(!$this->Can_Owner()) {
+		if(!$this->Can_Edit()) {
 			redirect(base_url('Faq'));
 			return;
 		}
@@ -133,10 +126,10 @@ class Faq extends MY_Controller
 	}
 
 	// PDF export of every internal FAQ, rendered through a print-friendly view
-	// that mirrors the FAQ Library design. OWNER only.
+	// that mirrors the FAQ Library design. OWNER or FE.
 	function Download_Pdf()
 	{
-		if(!$this->Can_Owner()) {
+		if(!$this->Can_Edit()) {
 			redirect(base_url('Faq'));
 			return;
 		}
@@ -163,10 +156,10 @@ class Faq extends MY_Controller
 	// Round-trip Excel template of every internal FAQ - one row per sub-Q&A, in
 	// the exact columns Import() reads back (FAQ | DESTINATION | QUESTION |
 	// ANSWER | TAGS). The owner downloads this, edits/adds rows, and re-imports
-	// to replace the whole internal library. OWNER only.
+	// to replace the whole internal library. OWNER or FE.
 	function Export_Template()
 	{
-		if(!$this->Can_Owner()) {
+		if(!$this->Can_Edit()) {
 			redirect(base_url('Faq'));
 			return;
 		}
@@ -215,13 +208,13 @@ class Faq extends MY_Controller
 	}
 
 	// Wipe-and-rebuild the internal FAQ library from an uploaded template (the
-	// file Export_Template() produced, with rows edited/added). OWNER only. The
+	// file Export_Template() produced, with rows edited/added). OWNER or FE. The
 	// upload is stored under assets/upload/faq_import/ and the newest 3 are kept
 	// as backups; older ones are pruned. The whole rebuild runs in a transaction
 	// (Replace_Internal), so a failure leaves the old library intact.
 	function Import()
 	{
-		if(!$this->Can_Owner()) {
+		if(!$this->Can_Edit()) {
 			redirect(base_url('Faq'));
 			return;
 		}

@@ -86,7 +86,7 @@ defined('EXIT__AUTO_MAX')      or define('EXIT__AUTO_MAX', 125); // highest auto
 
 //Admin
 defined('GENDER')              or define('GENDER', serialize(array('F' => 'FEMALE', 'M' => 'MALE')));
-defined('LEVEL')               or define('LEVEL', serialize(array(10 => 'OWNER', 20 => 'SALES AGENT', 25 => 'TEAM LEAD', 30 => 'FINANCE', 40 => 'OP', 45 => 'OP TEAM LEAD', 50 => 'TC')));
+defined('LEVEL')               or define('LEVEL', serialize(array(10 => 'OWNER', 20 => 'SALES AGENT', 25 => 'TEAM LEAD', 30 => 'FINANCE', 40 => 'OP', 45 => 'OP TEAM LEAD', 50 => 'TC', 60 => 'MARKETING')));
 
 // Bookings created on/after this date credit a lead-to-booking conversion to TC2
 // (booking.SalesAgent2); earlier bookings stay with TC1 (booking.SalesAgent).
