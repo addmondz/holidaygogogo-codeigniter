@@ -3,3 +3,5 @@ application/cache/sessions/*
 assets/upload/*
 backups/*.sql.gz
 backups/cron.log
+whats-new.txt
+commit.txt

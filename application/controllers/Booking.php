@@ -1241,16 +1241,19 @@ class Booking extends MY_Controller
 				// starting a brand-new conversation to the TC's first reply -- how
 				// fast you pick a fresh lead up, distinct from the avg-of-5 "My
 				// Response Time" above. Windowed by lead start date.
+				// A "(Month)" card: follows the selected reporting period
+				// ($month_start/$month_end), not the live current month, so the
+				// value re-scopes when the TC picks a month in the selector.
 				$this->load->helper('response_time');
 				$pickup_month = $this->Report_Model->Lead_Pickup_Speed_Summary(array(
 					'agent_id'   => $my_ghl_uids,
-					'start_date' => $cur_month_start, 'end_date' => $cur_month_end,
+					'start_date' => $month_start, 'end_date' => $month_end,
 				));
 				$cards['tc_pickup_speed_month'] = array(
 					'value'   => format_response_duration($pickup_month['avg_seconds']),
 					'count'   => $pickup_month['count'],
 					'seconds' => $pickup_month['avg_seconds'],
-					'best'    => $this->tc_pickup_speed_best($cur_month_start, $cur_month_end, $my_ghl_uids),
+					'best'    => $this->tc_pickup_speed_best($month_start, $month_end, $my_ghl_uids),
 				);
 			} else {
 				$cards['tc_leads_dwm'] = array(
@@ -1265,7 +1268,7 @@ class Booking extends MY_Controller
 				// no GHL link (own value renders as an em-dash on the front-end).
 				$cards['tc_pickup_speed_month'] = array(
 					'value' => '-', 'count' => 0, 'seconds' => null,
-					'best' => $this->tc_pickup_speed_best($cur_month_start, $cur_month_end, $my_ghl_uids),
+					'best' => $this->tc_pickup_speed_best($month_start, $month_end, $my_ghl_uids),
 				);
 			}
 
@@ -3428,7 +3431,7 @@ class Booking extends MY_Controller
 			   admin.Name AS agent_name,
 			   COALESCE(SUM(booking.NetTotal), 0) AS total_sales
 			 FROM booking
-			 INNER JOIN admin ON admin.AdminID = {$agent_expr} AND admin.Level IN ('20','10','25')
+			 INNER JOIN admin ON admin.AdminID = {$agent_expr} AND admin.Level IN ('20','10','25') AND admin.Status='Y'
 			 WHERE booking.BookingConfirmationTitle='BOOKING CONFIRMATION'
 			   AND booking.CancelStatus='N'
 			   AND booking.Status!='N'
@@ -3452,7 +3455,7 @@ class Booking extends MY_Controller
 			"SELECT alda.GhlUserID, alda.AdminID, a.Name
 			 FROM admin_lead_dashboard_agents alda
 			 INNER JOIN admin a ON a.AdminID = alda.AdminID
-			 WHERE a.Level IN ('20','10','25') AND NULLIF(alda.GhlUserID,'') IS NOT NULL"
+			 WHERE a.Level IN ('20','10','25') AND a.Status='Y' AND NULLIF(alda.GhlUserID,'') IS NOT NULL"
 		)->result() as $r) {
 			$map[(string)$r->GhlUserID] = (int)$r->AdminID;
 			$name_by_admin[(int)$r->AdminID] = $r->Name;
@@ -3461,7 +3464,7 @@ class Booking extends MY_Controller
 			"SELECT gu.UserID, a.AdminID, a.Name
 			 FROM admin a
 			 INNER JOIN ghl_users gu ON LOWER(TRIM(gu.Email)) = LOWER(TRIM(a.Email))
-			 WHERE a.Level IN ('20','10','25')"
+			 WHERE a.Level IN ('20','10','25') AND a.Status='Y'"
 		)->result() as $r) {
 			$uid = (string)$r->UserID;
 			if($uid !== '' && !isset($map[$uid])) { $map[$uid] = (int)$r->AdminID; }
@@ -3474,7 +3477,7 @@ class Booking extends MY_Controller
 		// 'hidden' flag below. Level-20 sales agents are the only visible rows.
 		$hidden_admins = array();
 		foreach($this->db->query(
-			"SELECT AdminID FROM admin WHERE Level IN ('10','25')"
+			"SELECT AdminID FROM admin WHERE Level IN ('10','25') AND Status='Y'"
 		)->result() as $r) {
 			$hidden_admins[(int)$r->AdminID] = true;
 		}
@@ -3678,7 +3681,7 @@ class Booking extends MY_Controller
 				   admin.Name AS agent_name,
 				   COALESCE(SUM(booking.NetTotal), 0) AS total_sales
 				 FROM booking
-				 INNER JOIN admin ON admin.AdminID = {$agent_expr} AND admin.Level IN ('20','50','10','25')
+				 INNER JOIN admin ON admin.AdminID = {$agent_expr} AND admin.Level IN ('20','50','10','25') AND admin.Status='Y'
 				 WHERE booking.BookingConfirmationTitle='BOOKING CONFIRMATION'
 				   AND booking.CancelStatus='N'
 				   AND booking.Status!='N'
@@ -3698,7 +3701,7 @@ class Booking extends MY_Controller
 			"SELECT alda.GhlUserID, alda.AdminID, a.Name
 			 FROM admin_lead_dashboard_agents alda
 			 INNER JOIN admin a ON a.AdminID = alda.AdminID
-			 WHERE a.Level IN ('20','50','10','25') AND NULLIF(alda.GhlUserID,'') IS NOT NULL"
+			 WHERE a.Level IN ('20','50','10','25') AND a.Status='Y' AND NULLIF(alda.GhlUserID,'') IS NOT NULL"
 		)->result() as $r) {
 			$map[(string)$r->GhlUserID] = (int)$r->AdminID;
 			$name_by_admin[(int)$r->AdminID] = $r->Name;
@@ -3707,7 +3710,7 @@ class Booking extends MY_Controller
 			"SELECT gu.UserID, a.AdminID, a.Name
 			 FROM admin a
 			 INNER JOIN ghl_users gu ON LOWER(TRIM(gu.Email)) = LOWER(TRIM(a.Email))
-			 WHERE a.Level IN ('20','50','10','25')"
+			 WHERE a.Level IN ('20','50','10','25') AND a.Status='Y'"
 		)->result() as $r) {
 			$uid = (string)$r->UserID;
 			if($uid !== '' && !isset($map[$uid])) { $map[$uid] = (int)$r->AdminID; }
@@ -3721,17 +3724,19 @@ class Booking extends MY_Controller
 		// $benchmark_admins are the 100-anchors: Level 20 sales agents PLUS the Owner
 		// (10) and TC Lead (25), so an L20 agent's matrix Score equals their Agent
 		// Score card (L50 rows are scored against this pool but never anchor).
-		// $hidden_admins (Owner + TC Lead) anchor the score but are dropped from the
-		// rendered rows — included in the calculation, not displayed.
+		// $hidden_admins (Owner only) anchor the score but are dropped from the
+		// rendered rows. TC Lead (25) anchors AND shows as a row on this owner matrix.
 		$benchmark_admins = array();
 		$hidden_admins = array();
 		foreach($this->db->query(
-			"SELECT AdminID, Name, Level FROM admin WHERE Level IN ('20','50','10','25')"
+			"SELECT AdminID, Name, Level FROM admin WHERE Level IN ('20','50','10','25') AND Status='Y'"
 		)->result() as $r) {
 			if(!isset($name_by_admin[(int)$r->AdminID])) { $name_by_admin[(int)$r->AdminID] = $r->Name; }
 			$lvl = (string)$r->Level;
 			if($lvl === '20' || $lvl === '10' || $lvl === '25') { $benchmark_admins[(int)$r->AdminID] = true; }
-			if($lvl === '10' || $lvl === '25') { $hidden_admins[(int)$r->AdminID] = true; }
+			// Owner (10) is anchored-but-hidden; TC Lead (25) is anchored AND shown as
+			// a matrix row (owner-facing view — they want the TC Lead visible here).
+			if($lvl === '10') { $hidden_admins[(int)$r->AdminID] = true; }
 		}
 
 		// Agent Score is reported on Month only — skip the scoring work (and leave
