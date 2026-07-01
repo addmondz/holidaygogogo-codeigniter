@@ -56,22 +56,16 @@ class Booking_Supplier_Invoice_Model extends CI_Model
         }
         $batch = [];
         foreach ($rows as $r) {
-            // SupplierID + InvoiceNumber are NOT NULL. A row with only a file
-            // attached (no supplier / no number) would abort the whole booking
-            // save with a NOT NULL violation, so drop it instead of inserting.
-            // The booking form blocks this before submit, but a direct/tampered
-            // POST can still reach here — reclaim any file already uploaded for
-            // the dropped row so it doesn't orphan on disk.
-            if (!supplier_invoice_row_is_complete($r)) {
-                if (isset($r->InvoiceFilePath) && $r->InvoiceFilePath !== '') {
-                    supplier_invoice_delete_orphan_file($r->InvoiceFilePath);
-                }
+            // A file-only row (no supplier / no number) is valid now — SupplierID
+            // and InvoiceNumber are nullable. Only skip a genuinely blank row so a
+            // stray "Add Invoice" click doesn't insert an empty record.
+            if (!supplier_invoice_row_has_data($r)) {
                 continue;
             }
             $batch[] = [
                 'BookingID'       => $booking_id,
-                'SupplierID'      => isset($r->SupplierID) ? (int) $r->SupplierID : null,
-                'InvoiceNumber'   => isset($r->InvoiceNumber) ? trim($r->InvoiceNumber) : '',
+                'SupplierID'      => (isset($r->SupplierID) && (int) $r->SupplierID > 0) ? (int) $r->SupplierID : null,
+                'InvoiceNumber'   => (isset($r->InvoiceNumber) && trim($r->InvoiceNumber) !== '') ? trim($r->InvoiceNumber) : null,
                 'InvoiceAmount'   => isset($r->InvoiceAmount) ? $r->InvoiceAmount : 0,
                 'PaymentDeadline' => !empty($r->PaymentDeadline) ? $r->PaymentDeadline : null,
                 'Remark'          => isset($r->Remark) ? $r->Remark : null,
@@ -103,8 +97,10 @@ class Booking_Supplier_Invoice_Model extends CI_Model
                 continue;
             }
             $row = ['SupplierInvoiceID' => (int) $r->SupplierInvoiceID];
-            if (isset($r->SupplierID))      { $row['SupplierID']      = (int) $r->SupplierID; }
-            if (isset($r->InvoiceNumber))   { $row['InvoiceNumber']   = trim($r->InvoiceNumber); }
+            // property_exists (not isset) so clearing a supplier / number back to
+            // blank persists as NULL — both columns are nullable now.
+            if (property_exists($r, 'SupplierID'))    { $row['SupplierID']    = ((int) $r->SupplierID > 0) ? (int) $r->SupplierID : null; }
+            if (property_exists($r, 'InvoiceNumber')) { $row['InvoiceNumber'] = (trim((string) $r->InvoiceNumber) !== '') ? trim($r->InvoiceNumber) : null; }
             if (isset($r->InvoiceAmount))   { $row['InvoiceAmount']   = $r->InvoiceAmount; }
             if (isset($r->PaymentDeadline)) { $row['PaymentDeadline'] = !empty($r->PaymentDeadline) ? $r->PaymentDeadline : null; }
             if (isset($r->Remark))          { $row['Remark']          = $r->Remark; }
@@ -118,67 +114,5 @@ class Booking_Supplier_Invoice_Model extends CI_Model
         if (!empty($batch)) {
             $this->db->update_batch('booking_supplier_invoice', $batch, 'SupplierInvoiceID');
         }
-    }
-
-    /**
-     * Per-supplier roll-up of outstanding balance across all active invoices.
-     * Optional $filters: ['supplier_id' => int, 'booking_id' => int].
-     * Returns rows: SupplierID, SupplierName, OutstandingTotal, InvoiceCount.
-     */
-    function Read_Outstanding_Summary($filters = [])
-    {
-        $paid = supplier_invoice_paid_subquery_sql();
-        $this->db->select(
-            "bsi.SupplierID,
-             s.Name AS SupplierName,
-             SUM(bsi.InvoiceAmount - COALESCE(({$paid}), 0)) AS OutstandingTotal,
-             COUNT(*) AS InvoiceCount",
-            false
-        );
-        $this->db->from('booking_supplier_invoice bsi');
-        $this->db->join('supplier s', 's.SupplierID = bsi.SupplierID', 'left');
-        $this->db->where('bsi.Status', 'Y');
-        $this->db->where("(bsi.InvoiceAmount - COALESCE(({$paid}), 0)) > 0", null, false);
-        if (!empty($filters['supplier_id'])) {
-            $this->db->where('bsi.SupplierID', (int) $filters['supplier_id']);
-        }
-        if (!empty($filters['booking_id'])) {
-            $this->db->where('bsi.BookingID', (int) $filters['booking_id']);
-        }
-        $this->db->group_by('bsi.SupplierID');
-        $this->db->order_by('s.Name', 'ASC');
-        return $this->db->get()->result();
-    }
-
-    /**
-     * Per-invoice outstanding rows. Drives the detail table and the Excel "Detail"
-     * sheet. Same optional $filters as Read_Outstanding_Summary().
-     */
-    function Read_Outstanding_Lines($filters = [])
-    {
-        $paid = supplier_invoice_paid_subquery_sql();
-        $this->db->select(
-            "bsi.SupplierInvoiceID, bsi.BookingID, bsi.SupplierID, bsi.InvoiceNumber,
-             bsi.InvoiceAmount, bsi.PaymentDeadline, bsi.Remark,
-             s.Name AS SupplierName,
-             b.BookingNumber,
-             COALESCE(({$paid}), 0) AS PaidAmount,
-             (bsi.InvoiceAmount - COALESCE(({$paid}), 0)) AS BalanceDue",
-            false
-        );
-        $this->db->from('booking_supplier_invoice bsi');
-        $this->db->join('supplier s', 's.SupplierID = bsi.SupplierID', 'left');
-        $this->db->join('booking b',  'b.BookingID = bsi.BookingID', 'left');
-        $this->db->where('bsi.Status', 'Y');
-        $this->db->where("(bsi.InvoiceAmount - COALESCE(({$paid}), 0)) > 0", null, false);
-        if (!empty($filters['supplier_id'])) {
-            $this->db->where('bsi.SupplierID', (int) $filters['supplier_id']);
-        }
-        if (!empty($filters['booking_id'])) {
-            $this->db->where('bsi.BookingID', (int) $filters['booking_id']);
-        }
-        $this->db->order_by('bsi.PaymentDeadline', 'ASC');
-        $this->db->order_by('s.Name', 'ASC');
-        return $this->db->get()->result();
     }
 }

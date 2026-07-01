@@ -79,34 +79,34 @@ function supplier_invoice_is_allowed_file($filename)
 }
 
 /**
- * Whether a posted supplier-invoice row carries the columns the DB requires for
- * an INSERT. `booking_supplier_invoice.SupplierID` and `InvoiceNumber` are both
- * NOT NULL, so a row missing either cannot be persisted.
+ * Whether a posted supplier-invoice row carries any content worth persisting.
  *
- * The booking form lets staff attach a file to a brand-new invoice row before
- * picking a supplier / typing an invoice number (and on a parked draft the
- * supplier + number inputs are locked entirely). Such a row would reach
- * Booking_Supplier_Invoice_Model::Create() with SupplierID = null and blow up
- * the whole booking save with a NOT NULL violation — surfacing to the user as
- * "Booking Record … Could Not Be Updated". Callers use this to drop incomplete
- * rows instead of attempting an invalid insert.
+ * Supplier invoices may now be attached with a FILE ONLY — no supplier and no
+ * invoice number (both columns are nullable). A row counts as "has data" when
+ * it has at least one of: a supplier, an invoice number, or an attached file.
+ * A completely blank row (a stray Add-Invoice click) has none of these and is
+ * dropped by the model rather than inserting an empty record.
  *
  * Accepts either an array or an object row (the model decodes posted rows to
  * objects via json_decode(json_encode())).
  */
-function supplier_invoice_row_is_complete($row)
+function supplier_invoice_row_has_data($row)
 {
     if (is_array($row)) {
         $supplier_id    = isset($row['SupplierID']) ? $row['SupplierID'] : null;
         $invoice_number = isset($row['InvoiceNumber']) ? $row['InvoiceNumber'] : '';
+        $file_path      = isset($row['InvoiceFilePath']) ? $row['InvoiceFilePath'] : '';
     } elseif (is_object($row)) {
         $supplier_id    = isset($row->SupplierID) ? $row->SupplierID : null;
         $invoice_number = isset($row->InvoiceNumber) ? $row->InvoiceNumber : '';
+        $file_path      = isset($row->InvoiceFilePath) ? $row->InvoiceFilePath : '';
     } else {
         return false;
     }
 
-    return (int) $supplier_id > 0 && trim((string) $invoice_number) !== '';
+    return (int) $supplier_id > 0
+        || trim((string) $invoice_number) !== ''
+        || trim((string) $file_path) !== '';
 }
 
 /**

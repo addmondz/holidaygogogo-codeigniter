@@ -4648,19 +4648,9 @@
             postData.draft_save_mode = draft_save_mode;
         }
 
-        // Supplier-invoice inputs stay editable on every save path, including
-        // parked drafts (since the invoice section is excluded from the draft
-        // field lock). The controller drops any row missing a Supplier /
-        // Invoice # to dodge the NOT NULL columns — which silently discards a
-        // file the user already attached. So enforce the supplier + invoice #
-        // rule on EVERY save (draft / approve / PB / PBC / normal): the user is
-        // told to complete or remove the row instead of it vanishing on Approve.
-        // A draft with no invoice rows at all still saves freely.
-        if (typeof Validate_Supplier_Invoices === 'function' && !Validate_Supplier_Invoices()) {
-            Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', 'Each supplier invoice needs a Supplier and an Invoice # before saving. Please complete or remove the incomplete invoice row.', null);
-            return;
-        }
-
+        // Supplier invoices can be attached with a file only — supplier / invoice
+        // number / amount are all optional now, so there is nothing to validate
+        // before saving. Blank rows are skipped by Collect_Supplier_Invoices().
         if (typeof Collect_Supplier_Invoices === 'function') {
             var supplier_invoices_payload = Collect_Supplier_Invoices();
             if (supplier_invoices_payload && (supplier_invoices_payload[0].length || supplier_invoices_payload[1].length || supplier_invoices_payload[2].length)) {
@@ -7455,29 +7445,6 @@ $(document).ready(function() {
         if (parts.length !== 3) return null;
         return parts[2] + '-' + parts[1] + '-' + parts[0];
     }
-
-    // Returns true when every active (non-deleted) invoice row that carries any
-    // data also has a supplier AND an invoice number — the two NOT NULL columns.
-    // Guards against a row that only had a file attached being silently dropped
-    // (or, pre-fix, aborting the booking save with a NOT NULL violation).
-    window.Validate_Supplier_Invoices = function() {
-        var incomplete = false;
-        $('#supplier-invoices-tbody tr.supplier-invoice-row').each(function() {
-            var $row = $(this);
-            if ($row.attr('data-deleted') === '1') { return; }
-            var supplier_id    = $row.find('.supplier-invoice-supplier').val();
-            var invoice_number = ($row.find('.supplier-invoice-number').val() || '').trim();
-            var invoice_amount = $row.find('.supplier-invoice-amount').val();
-            var deadline_disp  = $row.find('.supplier-invoice-deadline').val();
-            var remark         = $row.find('.supplier-invoice-remark').val() || '';
-            var file_path      = $row.attr('data-file-path') || '';
-            var hasData = supplier_id || invoice_number || invoice_amount || deadline_disp || remark || file_path;
-            if (hasData && (!supplier_id || !invoice_number)) {
-                incomplete = true;
-            }
-        });
-        return !incomplete;
-    };
 
     window.Collect_Supplier_Invoices = function() {
         var createRows = [];

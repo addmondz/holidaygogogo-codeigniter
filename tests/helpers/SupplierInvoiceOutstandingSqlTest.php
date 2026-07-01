@@ -2,11 +2,11 @@
 /**
  * Run with: php tests/helpers/SupplierInvoiceOutstandingSqlTest.php
  *
- * Locks the SQL that derives PaidAmount / BalanceDue for the new
- * booking_supplier_invoice feature. Mirrors the same shape used by
- * Booking_Supplier_Invoice_Model::Read_Outstanding_Summary() /
- * Read_Outstanding_Lines() by plugging the helper's correlated subquery into
- * a SQLite :memory: copy of the booking / supplier / payment / invoice schema.
+ * Locks the SQL that derives PaidAmount / BalanceDue for the
+ * booking_supplier_invoice feature. Mirrors the shape used by
+ * Booking_Supplier_Invoice_Model::Read_By_Booking() (the Paid / Balance columns
+ * on the booking form) by plugging the helper's correlated subquery into a
+ * SQLite :memory: copy of the booking / supplier / payment / invoice schema.
  *
  * Scenario driven by the user request: Supplier A has Invoice A (RM1000, paid
  * RM100) and Invoice B (RM2000, paid RM100). Total outstanding to Supplier A
@@ -100,7 +100,7 @@ $pdo->exec("INSERT INTO payment VALUES
 
 $paid = supplier_invoice_paid_subquery_sql();
 
-// --- 1) Per-invoice paid / balance (matches Read_Outstanding_Lines shape) ----
+// --- 1) Per-invoice paid / balance (Read_By_Booking Paid/Balance shape) ------
 
 $lines_sql = "SELECT
     bsi.SupplierInvoiceID,
@@ -142,7 +142,7 @@ $assertions['INV-B-1 (Supplier B) balance=800'] = isset($rows[104]) && abs($rows
 // Soft-deleted invoice must not appear
 $assertions['Soft-deleted INV-DEL excluded from active set'] = !isset($rows[105]);
 
-// --- 2) Outstanding-only filter (Read_Outstanding_Lines actually filters BalanceDue > 0) ---
+// --- 2) Outstanding-only view: only rows with BalanceDue > 0 -----------------
 
 $outstanding_lines_sql = "SELECT
     bsi.SupplierInvoiceID
@@ -156,7 +156,7 @@ foreach ($pdo->query($outstanding_lines_sql) as $r) {
 }
 $assertions['Outstanding lines = [101, 102, 104]'] = ($outstanding_ids === [101, 102, 104]);
 
-// --- 3) Per-supplier roll-up (Read_Outstanding_Summary shape) -----------------
+// --- 3) Per-supplier roll-up of outstanding balances ------------------------
 // Supplier A outstanding = 900 + 1900 = 2800 (user's expected total)
 // Supplier B outstanding = 800
 $summary_sql = "SELECT
