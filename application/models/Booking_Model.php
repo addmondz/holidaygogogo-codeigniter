@@ -161,9 +161,12 @@ class Booking_Model extends CI_Model
 	 * checklist + booking_product deadline, the same signal the cron reminders
 	 * use (Cronjob_Model::get_bookings_with_supplier_date). A line qualifies when
 	 * it is active (Status='Y', disable_checklist_payment_out=0), its product is
-	 * non-child/infant and carries the full (PaymentOutSupplierFull) / deposit
-	 * (PaymentOutSupplierDeposit) checklist, the matching deadline is in the
-	 * bucket, and no completion row exists for that checklist on that line.
+	 * non-child/infant, the matching deadline (PaymentOutSupplierFull /
+	 * PaymentOutSupplierDeposit) is in the bucket, and no completion row exists
+	 * for that checklist on that line. Assignment mirrors the booking checklist
+	 * modal: the full checklist must be assigned to the product, but the deposit
+	 * checklist is auto-added by the deposit date, so a deposit line qualifies by
+	 * its date alone (see checklist_payout_assignment_join_sql).
 	 *
 	 * Buckets (deadline; floor = 1 March of the current year):
 	 *   overdue  : floor <= deadline < today
@@ -205,11 +208,11 @@ class Booking_Model extends CI_Model
 		$full_id = $full ? (int)$full->ID : 0;
 		$dep_id  = $dep  ? (int)$dep->ID  : 0;
 
+		$this->load->helper('checklist_payout');
 		$exists = function($checklist_id, $date_col) use ($range) {
 			return "EXISTS (SELECT 1 FROM booking_product bp"
 				. " JOIN product p ON p.ProductID = bp.ProductID AND p.is_child_or_infant = 0"
-				. " JOIN product_package_checklist ppc ON ppc.product_id = bp.ProductID"
-				. " AND JSON_CONTAINS(ppc.package_checklist_json, '{$checklist_id}')"
+				. checklist_payout_assignment_join_sql($checklist_id, $date_col)
 				. " WHERE bp.BookingID = booking.BookingID"
 				. " AND bp.Status = 'Y' AND bp.disable_checklist_payment_out = 0"
 				. " AND bp.{$date_col} IS NOT NULL"

@@ -2343,15 +2343,19 @@ class Booking extends MY_Controller
 			$cp_dep_id  = $dep_pc  ? (int)$dep_pc->ID  : 0;
 
 			// One qualifying "due line" branch per payout checklist. A line counts
-			// when it is active, its product is non-child/infant and carries the
-			// checklist, the matching deadline is set, the booking is a live BC,
-			// and no completion row exists for that checklist on that line.
+			// when it is active, its product is non-child/infant, the matching
+			// deadline is set, the booking is a live BC, and no completion row
+			// exists for that checklist on that line. Assignment rule matches the
+			// booking checklist modal: the FULL checklist must be assigned to the
+			// product; the DEPOSIT checklist is auto-added by the deposit date, so
+			// a deposit line qualifies by its date alone (see
+			// checklist_payout_assignment_join_sql).
+			$this->load->helper('checklist_payout');
 			$cp_branch = function($checklist_id, $date_col) use ($op_team_csv) {
 				return "SELECT bp.BookingID AS bid, p.SupplierID AS sid, bp.{$date_col} AS dl"
 					. " FROM booking_product bp"
 					. " JOIN product p ON p.ProductID = bp.ProductID AND p.is_child_or_infant = 0"
-					. " JOIN product_package_checklist ppc ON ppc.product_id = bp.ProductID"
-					. " AND JSON_CONTAINS(ppc.package_checklist_json, '{$checklist_id}')"
+					. checklist_payout_assignment_join_sql($checklist_id, $date_col)
 					. " JOIN booking b ON b.BookingID = bp.BookingID"
 					. " WHERE bp.Status = 'Y' AND bp.disable_checklist_payment_out = 0"
 					. " AND bp.{$date_col} IS NOT NULL"
