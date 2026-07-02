@@ -17,13 +17,13 @@ class Admin_Model extends CI_Model
 			case 'Admin':
 				switch($this->router->method) {
 					case 'index':
-						$select = 'a.AdminID, a.Name, a.Username, a.Level, a.Status, a.TeamID, t.Name as TeamName';
+						// Team function DISABLED — no TeamID column / team join.
+						$select = 'a.AdminID, a.Name, a.Username, a.Level, a.Status';
 						if($this->session->level == 10) {
 							$select .= ', a.Password';
 						}
 						$this->db->select($select);
 						$this->db->from('admin a');
-						$this->db->join('team t', 'a.TeamID = t.TeamID AND t.Status = "Y"', 'left');
 						$this->db->where('a.AdminID !=', $this->session->admin_id);
 						$this->db->where('a.AdminID !=', 8);
 
@@ -72,7 +72,7 @@ class Admin_Model extends CI_Model
 							return false;
 						}
 					case 'Update':
-						$this->db->select('AdminID, CountryCodeID, Name, Gender, IdentificationNumber, PassportNumber, Mobile, Email, Username, Level, AccessControl, TeamLeadID, OpTeamLeadID, TeamID');
+						$this->db->select('AdminID, CountryCodeID, Name, Gender, IdentificationNumber, PassportNumber, Mobile, Email, Username, Level, AccessControl, TeamLeadID, OpTeamLeadID');
 						$this->db->where('AdminID', $this->input->get('admin_id'));
 						$this->db->limit(1);
 						$admin = $this->db->get('admin');

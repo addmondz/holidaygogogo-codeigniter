@@ -64,11 +64,10 @@ class Admin extends MY_Controller
 			echo json_encode($status);
 		} else {
 			$titles = array('tab_title' => 'HolidayGoGoGo | Admin', 'breadcrumb_title' => 'Admin >> Create');
-			$array = array('Action' => 'C', 'AdminID' => 0, 'Name' => 'NA', 'AccessControl' => array(), 'TeamLeadID' => '', 'OpTeamLeadID' => '', 'TeamID' => '');
+			$array = array('Action' => 'C', 'AdminID' => 0, 'Name' => 'NA', 'AccessControl' => array(), 'TeamLeadID' => '', 'OpTeamLeadID' => '');
 			$array['country_codes'] = $this->Admin_Model->Read_Country_Codes();
 			$array['team_leads'] = $this->Admin_Model->Read_Team_Leads();
 			$array['op_team_leads'] = $this->Admin_Model->Read_Op_Team_Leads();
-			$array['teams'] = $this->Admin_Model->Read_Teams();
 			$array['ghl_users'] = $this->Admin_Model->Read_GHL_Users();
 			$array['lead_dashboard_agents'] = array();
 			$array['sales_targets'] = array();
@@ -93,7 +92,6 @@ class Admin extends MY_Controller
 				$array['country_codes'] = $this->Admin_Model->Read_Country_Codes();
 				$array['team_leads'] = $this->Admin_Model->Read_Team_Leads();
 				$array['op_team_leads'] = $this->Admin_Model->Read_Op_Team_Leads();
-				$array['teams'] = $this->Admin_Model->Read_Teams();
 				$array['ghl_users'] = $this->Admin_Model->Read_GHL_Users();
 				$array['lead_dashboard_agents'] = $this->Admin_Model->Read_Lead_Dashboard_Agents_For_Admin($this->input->get('admin_id'));
 				$array['sales_targets'] = $this->Admin_Model->Read_Sales_Targets_For_Admin($this->input->get('admin_id'));

@@ -465,6 +465,7 @@ $is_dev_env = ($app_env !== 'prod');
 													<span class="menu-text">Card Visibility</span>
 												</a>
 											</li>
+<?php /* Team function DISABLED — menu hidden
 											<li class="menu-item <?php if($this->router->class == 'Team') { echo 'menu-item-active'; } ?>">
 												<a href="<?php echo base_url('Team'); ?>" class="menu-link">
 													<i class="menu-bullet menu-bullet-dot">
@@ -473,6 +474,7 @@ $is_dev_env = ($app_env !== 'prod');
 													<span class="menu-text">Team</span>
 												</a>
 											</li>
+*/ ?>
 											<?php } ?>
 											<?php if(!in_array((int)$this->session->level, [20, 60]) && !$op_footer_only) { ?>
 											<li class="menu-item <?php if($this->router->class == 'Category_Code') { echo 'menu-item-active'; } ?>">

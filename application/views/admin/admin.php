@@ -196,6 +196,7 @@
                                 </select>
                             </div>
                         </div>
+<?php /* Team function DISABLED — Team assignment field hidden
                         <div class="col-md-6">
                             <div class="form-group">
                                 <label>Team
@@ -211,6 +212,7 @@
                                 </select>
                             </div>
                         </div>
+*/ ?>
                         <div class="col-md-12">
                             <div class="form-group">
                                 <label>Lead Dashboard Agents
