@@ -13,6 +13,7 @@ Extra Routes
 
 3. Run DB patches
 	- Migration: `php index.php run_sql_patches`
+	- Seeders: `php index.php run_seeders`
 
 4. GoHighLevel sync
 	- Users: full sync on every run via `php index.php Cron syncGhlUsers`
