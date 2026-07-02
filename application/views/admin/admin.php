@@ -196,6 +196,21 @@
                                 </select>
                             </div>
                         </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Team
+                                    <small class="text-muted d-block">The Team this admin belongs to. A TEAM LEAD / OP TEAM LEAD sees all their team members' bookings &amp; payments; Sales Agent / OP see only their own.</small>
+                                </label>
+                                <select id="TeamID" class="form-control selectpicker">
+                                    <option selected data-icon="la la-users font-size-lg bs-icon" value="">--SELECT TEAM--</option>
+                                    <?php if(!empty($teams)) {
+                                        foreach($teams as $team) { ?>
+                                            <option <?php if($Action == 'U' && $TeamID == $team->TeamID) { echo 'selected'; } ?> data-icon="la la-users font-size-lg bs-icon" value="<?php echo $team->TeamID; ?>"><?php echo $team->Name; ?></option>
+                                        <?php }
+                                    } ?>
+                                </select>
+                            </div>
+                        </div>
                         <div class="col-md-12">
                             <div class="form-group">
                                 <label>Lead Dashboard Agents
@@ -527,6 +542,7 @@
                 var access_control = ($('#AccessControl').val()).toString();
                 var team_lead_id = $('#TeamLeadID').val();
                 var op_team_lead_id = $('#OpTeamLeadID').val();
+                var team_id = $('#TeamID').val();
                 var lead_dashboard_agents = $('#LeadDashboardAgents').val() || [];
                 var lda_initial_str = '<?php echo implode(",", $lead_dashboard_agents); ?>'.split(',').filter(Boolean).sort().join(',');
                 var lda_current_str = lead_dashboard_agents.slice().sort().join(',');
@@ -543,7 +559,7 @@
                     if(action == 'C') {
                         var admin = [];
                         var url = '<?php echo base_url('Admin/Create') ?>';
-                        admin.push({CountryCodeID:country_code, Name:name, Gender:gender, IdentificationNumber:identification_number, PassportNumber:passport_number, Mobile:mobile, Email:email, Username:username, Password:password, Level:level, AccessControl:access_control, TeamLeadID:team_lead_id ? team_lead_id : null, OpTeamLeadID:op_team_lead_id ? op_team_lead_id : null, InsertBy:session_id, InsertDate:current_datetime});
+                        admin.push({CountryCodeID:country_code, Name:name, Gender:gender, IdentificationNumber:identification_number, PassportNumber:passport_number, Mobile:mobile, Email:email, Username:username, Password:password, Level:level, AccessControl:access_control, TeamLeadID:team_lead_id ? team_lead_id : null, OpTeamLeadID:op_team_lead_id ? op_team_lead_id : null, TeamID:team_id ? team_id : null, InsertBy:session_id, InsertDate:current_datetime});
                         Submit_Admin(url, admin, null, lead_dashboard_agents, true, {}, false, {}, false);
                     } else {
                         var dirty_fields = $('#form').dirty('showDirtyFields');
@@ -566,8 +582,8 @@
                             if(key != 'AccessControl') {
                                 var value = key == 'Name' || key == 'PassportNumber' || key == 'Email' || key == 'Password' ? (dirty_fields[i].value).toUpperCase() : dirty_fields[i].value;
 
-                                //Handle TeamLeadID / OpTeamLeadID empty value as null
-                                if((key == 'TeamLeadID' || key == 'OpTeamLeadID') && value == '') {
+                                //Handle TeamLeadID / OpTeamLeadID / TeamID empty value as null
+                                if((key == 'TeamLeadID' || key == 'OpTeamLeadID' || key == 'TeamID') && value == '') {
                                     value = null;
                                 }
 

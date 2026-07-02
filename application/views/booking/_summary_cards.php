@@ -1,10 +1,16 @@
 <?php
+    $this->load->helper('summary_card_roles');
     $card_level = (int) $this->session->userdata('level');
-    $show_tc      = ($card_level == 20 || $card_level == 50);
-    $show_tclead  = ($card_level == 25);
+    // On the booking listing ($sc_owner_as_agent), Owner (10) and TC Lead (25)
+    // see the sales-agent card set scoped to their own bookings, like Sales
+    // Agent (20) / TC (50). On the Owner Dashboard the flag is off, so the Owner
+    // keeps the per-agent matrix. TC Lead's old team-lead cards are retired.
+    $owner_as_agent = isset($sc_owner_as_agent) && $sc_owner_as_agent;
+    $show_tc      = summary_cards_show_agent_set($card_level, $owner_as_agent);
+    $show_tclead  = false; // replaced by the sales-agent card set
     $show_op      = ($card_level == 40 || $card_level == 45); // OP and OP TEAM LEAD share the OP cards
     $show_finance = ($card_level == 30);
-    $show_owner   = ($card_level == 10);
+    $show_owner   = summary_cards_show_owner_matrix($card_level, $owner_as_agent);
     $any_cards    = $show_tc || $show_tclead || $show_op || $show_finance || $show_owner;
 ?>
 <?php if($any_cards) { ?>
@@ -81,7 +87,7 @@
     #booking_summary_cards .sc-owner-matrix tbody tr:first-child td { font-weight:600; }
     #booking_summary_cards .sc-month-filter { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:14px; padding:10px 14px; background:#EEF3FB; border-radius:6px; }
     #booking_summary_cards .sc-month-filter label { margin:0; font-weight:600; color:#3F4254; font-size:13px; }
-    #booking_summary_cards .sc-month-filter input[type=month] { width:auto; max-width:190px; height:auto; padding:6px 10px; font-size:13px; }
+    #booking_summary_cards .sc-month-filter input[type=date] { width:auto; max-width:190px; height:auto; padding:6px 10px; font-size:13px; }
     #booking_summary_cards .sc-month-filter-hint { font-size:12px; color:#7E8299; }
     #booking_summary_cards .sc-bars { margin-top:10px; }
     #booking_summary_cards .sc-bar-row { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
@@ -185,9 +191,10 @@
         <?php if($show_tc) { ?>
             <div class="col-md-12">
                 <div class="sc-month-filter">
-                    <label for="sc-month-picker">Viewing month</label>
-                    <input type="month" id="sc-month-picker" class="form-control">
-                    <span class="sc-month-filter-hint">Re-scopes every &ldquo;(Month)&rdquo; card below; the Year card follows the selected year.</span>
+                    <label for="sc-day-picker">Viewing day</label>
+                    <input type="date" id="sc-day-picker" class="form-control">
+                    <button type="button" id="sc-day-clear" class="btn btn-sm btn-outline-secondary" style="display:none;" title="Clear the day filter and view the whole current month">Clear day</button>
+                    <span class="sc-month-filter-hint">Pick a day to scope the &ldquo;(Month)&rdquo; cards to that single date; the Year card follows its year. Leave empty for the whole current month.</span>
                 </div>
             </div>
             <div class="col-md-3 sc-pos-13">
@@ -1302,16 +1309,20 @@ $(function() {
         window._ownerPeriod = p;
         $('#booking_summary_cards .sc-owner-tab').removeClass('is-active');
         $(this).addClass('is-active');
-        var mp = document.getElementById('sc-month-picker');
-        loadSummaryCards(mp ? mp.value : null, p);
+        var dp = document.getElementById('sc-day-picker');
+        loadSummaryCards(p, dp ? dp.value : null);
     });
 
-    function loadSummaryCards(month, ownerPeriod) {
+    function loadSummaryCards(ownerPeriod, day) {
         var url = '<?php echo base_url("Booking/ajax_summary_cards"); ?>';
         var params = [];
-        if(month) { params.push('month=' + encodeURIComponent(month)); }
+        if(day) { params.push('day=' + encodeURIComponent(day)); }
         var op = ownerPeriod || window._ownerPeriod;
         if(op) { params.push('owner_period=' + encodeURIComponent(op)); }
+        <?php /* Owner/TC Lead get the sales-agent payload here. Keep this on one
+                 PHP tag with no trailing // comment: PHP eats the newline after
+                 ?>, which would fold the next line into a // comment. */ ?>
+        <?php if($owner_as_agent) { ?>params.push('owner_as_agent=1');<?php } ?>
         if(params.length) { url += '?' + params.join('&'); }
         $.getJSON(url, function(resp) {
         if(!resp || resp.error) return;
@@ -1322,11 +1333,14 @@ $(function() {
         if(m.last_ghl_sync_display) {
             setText('ghl-last-sync', m.last_ghl_sync_display);
         }
-        // Reflect the server-resolved period back into the picker (covers the
-        // first load and any fallback when a bad month was requested).
-        var scPick = document.getElementById('sc-month-picker');
-        if(scPick && m.selected_month && scPick.value !== m.selected_month) {
-            scPick.value = m.selected_month;
+        // Round-trip the day filter: reflect the server-resolved day (or clear it
+        // when a bad day fell back to the whole month) and toggle the Clear btn.
+        var scDay = document.getElementById('sc-day-picker');
+        if(scDay) {
+            var dv = m.selected_day || '';
+            if(scDay.value !== dv) { scDay.value = dv; }
+            var clr = document.getElementById('sc-day-clear');
+            if(clr) { clr.style.display = dv ? '' : 'none'; }
         }
 
         // TC cards
@@ -1841,12 +1855,20 @@ $(function() {
         });
     }
 
-    // Month filter: re-fetch all cards scoped to the chosen month. The Year
-    // card follows the selected year. Only present for TC (level 20/50).
-    var scMonthPicker = document.getElementById('sc-month-picker');
-    if(scMonthPicker) {
-        scMonthPicker.addEventListener('change', function() {
-            loadSummaryCards(scMonthPicker.value);
+    // Day filter: pick a date to scope the "(Month)" cards to that single day
+    // (the Year card follows its year); empty = whole current month. Only present
+    // for the sales-agent card set (TC 20/50, Sales Agent, Owner/TC Lead listing).
+    var scDayPicker = document.getElementById('sc-day-picker');
+    var scDayClear  = document.getElementById('sc-day-clear');
+    if(scDayPicker) {
+        scDayPicker.addEventListener('change', function() {
+            loadSummaryCards(null, scDayPicker.value);
+        });
+    }
+    if(scDayClear) {
+        scDayClear.addEventListener('click', function() {
+            scDayPicker.value = '';
+            loadSummaryCards();
         });
     }
     loadSummaryCards();

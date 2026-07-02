@@ -148,7 +148,7 @@
                                     <th style="text-align:center;">Password</th>
                                 <?php } ?>
                                 <th style="text-align:center;">Level</th>
-                                <th style="text-align:center;">Team Lead</th>
+                                <th style="text-align:center;">Team</th>
                                 <th class="status" style="text-align:center;">Status</th>
                                 <th class="action" style="text-align:center;">Action</th>
                             </tr>
@@ -173,7 +173,7 @@
                                             </td>
                                         <?php } ?>
                                         <td style="text-align:center;"><?php echo $admin->Level; ?></td>
-                                        <td style="text-align:center;"><?php echo !empty($admin->TeamLeadName) ? $admin->TeamLeadName : ''; ?></td>
+                                        <td style="text-align:center;"><?php echo !empty($admin->TeamName) ? $admin->TeamName : ''; ?></td>
                                         <td style="text-align:center;"><?php echo $admin->StatusIcon; ?></td>
                                         <td style="text-align:center;">
                                             <div class="btn-group">

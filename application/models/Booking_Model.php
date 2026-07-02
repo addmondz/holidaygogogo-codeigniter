@@ -2026,14 +2026,39 @@ class Booking_Model extends CI_Model
 	/**
 	 * Apply filters to the query builder (shared logic for pagination methods)
 	 */
+	// Resolve the admin IDs of the logged-in user's Team (shared admin.TeamID),
+	// used to scope the listing for a TEAM LEAD (25) / OP TEAM LEAD (45). Uses a
+	// raw query() so it does NOT flush the query-builder state that
+	// apply_booking_filters is mid-way through building.
+	private function team_member_ids()
+	{
+		$this->load->helper('team_scope');
+		$admins = $this->db->query('SELECT AdminID, TeamID, Status FROM admin')->result();
+		return team_member_admin_ids($this->session->userdata('admin_id'), $admins);
+	}
+
 	private function apply_booking_filters()
 	{
+		$level    = (int) $this->session->userdata('level');
+		$admin_id = $this->session->userdata('admin_id');
+
 		if(in_array($this->session->userdata('level'), [20, 50])) {
-			$admin_id = $this->session->userdata('admin_id');
 			$this->db->group_start();
 			$this->db->where('SalesAgent', $admin_id);
 			$this->db->or_where('SalesAgent2', $admin_id);
 			$this->db->group_end();
+		}
+
+		// Team-based listing scope (shared admin.TeamID):
+		//   TEAM LEAD (25)    -> all team members' bookings (by booking.SalesAgent)
+		//   OP TEAM LEAD (45) -> all team members' bookings (by booking.BookingOP)
+		//   OP (40)           -> only own bookings (by booking.BookingOP)
+		if($level === 25) {
+			$this->db->where_in('booking.SalesAgent', $this->team_member_ids());
+		} elseif($level === 45) {
+			$this->db->where_in('booking.BookingOP', $this->team_member_ids());
+		} elseif($level === 40) {
+			$this->db->where('booking.BookingOP', $admin_id);
 		}
 
 		// Hide completed bookings from TC only (SA can view in listing; detail page still blocks via Booking::View / Payment guards)

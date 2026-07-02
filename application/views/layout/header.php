@@ -428,9 +428,11 @@ $is_dev_env = ($app_env !== 'prod');
 								$can_product  = admin_can_access_setting_module('product',  $sm_level, $sm_ac);
 								$can_customer = admin_can_access_setting_module('customer', $sm_level, $sm_ac);
 								$can_guests   = admin_can_access_setting_module('guests',   $sm_level, $sm_ac, $this->config->item('show_guest_list'));
+								// OP (level 40) only needs the Footer setting; hide all other Setting items.
+								$op_footer_only = ((int)$this->session->level === 40);
 							?>
 							<?php if(!in_array((int)$this->session->level, [20, 60]) || $can_product || $can_customer || $can_guests) { ?>
-								<li class="menu-item menu-item-submenu <?php if($this->router->class == 'Category_Code' || $this->router->class == 'Category' || $this->router->class == 'Supplier' || $this->router->class == 'Product' || $this->router->class == 'Footer' || $this->router->class == 'Country_Code' || $this->router->class == 'Tag' || $this->router->class == 'Source' || $this->router->class == 'Package_Checklist' || $this->router->class == 'Product_Package_Checklist' || $this->router->class == 'Cancellation_Reason' || $this->router->class == 'Slow_Conversion_Reason' || $this->router->class == 'Customer_Type' || $this->router->class == 'Guests' || $this->router->class == 'Campaign' || $this->router->class == 'Quick_Filter' || $this->router->class == 'Agent_Score_Setting' || $this->router->class == 'Card_Visibility_Setting') { echo 'menu-item-active menu-item-open'; } ?>">
+								<li class="menu-item menu-item-submenu <?php if($this->router->class == 'Category_Code' || $this->router->class == 'Category' || $this->router->class == 'Supplier' || $this->router->class == 'Product' || $this->router->class == 'Footer' || $this->router->class == 'Country_Code' || $this->router->class == 'Tag' || $this->router->class == 'Source' || $this->router->class == 'Package_Checklist' || $this->router->class == 'Product_Package_Checklist' || $this->router->class == 'Cancellation_Reason' || $this->router->class == 'Slow_Conversion_Reason' || $this->router->class == 'Customer_Type' || $this->router->class == 'Guests' || $this->router->class == 'Campaign' || $this->router->class == 'Quick_Filter' || $this->router->class == 'Agent_Score_Setting' || $this->router->class == 'Card_Visibility_Setting' || $this->router->class == 'Team') { echo 'menu-item-active menu-item-open'; } ?>">
 									<a href="javascript:;" class="menu-link menu-toggle">
 										<span class="svg-icon menu-icon">
 											<svg>
@@ -463,8 +465,16 @@ $is_dev_env = ($app_env !== 'prod');
 													<span class="menu-text">Card Visibility</span>
 												</a>
 											</li>
+											<li class="menu-item <?php if($this->router->class == 'Team') { echo 'menu-item-active'; } ?>">
+												<a href="<?php echo base_url('Team'); ?>" class="menu-link">
+													<i class="menu-bullet menu-bullet-dot">
+														<span></span>
+													</i>
+													<span class="menu-text">Team</span>
+												</a>
+											</li>
 											<?php } ?>
-											<?php if(!in_array((int)$this->session->level, [20, 60])) { ?>
+											<?php if(!in_array((int)$this->session->level, [20, 60]) && !$op_footer_only) { ?>
 											<li class="menu-item <?php if($this->router->class == 'Category_Code') { echo 'menu-item-active'; } ?>">
 												<a href="<?php echo base_url('Category_Code'); ?>" class="menu-link">
 													<i class="menu-bullet menu-bullet-dot">
@@ -482,7 +492,7 @@ $is_dev_env = ($app_env !== 'prod');
 												</a>
 											</li>
 											<?php } ?>
-											<?php if ($this->session->level == '10' || $this->session->level == '30' || $this->session->level == '40') { ?>
+											<?php if (($this->session->level == '10' || $this->session->level == '30' || $this->session->level == '40') && !$op_footer_only) { ?>
 												<li class="menu-item <?php if($this->router->class == 'Supplier') { echo 'menu-item-active'; } ?>">
 													<a href="<?php echo base_url('Supplier'); ?>" class="menu-link">
 														<i class="menu-bullet menu-bullet-dot">
@@ -492,7 +502,7 @@ $is_dev_env = ($app_env !== 'prod');
 													</a>
 												</li>
 											<?php } ?>
-											<?php if ($can_customer) { ?>
+											<?php if ($can_customer && !$op_footer_only) { ?>
 												<li class="menu-item <?php if($this->router->class == 'Customer') { echo 'menu-item-active'; } ?>">
 													<a href="<?php echo base_url('Customer'); ?>" class="menu-link">
 														<i class="menu-bullet menu-bullet-dot">
@@ -502,7 +512,7 @@ $is_dev_env = ($app_env !== 'prod');
 													</a>
 												</li>
 											<?php } ?>
-											<?php if ($can_guests) { ?>
+											<?php if ($can_guests && !$op_footer_only) { ?>
 											<li class="menu-item <?php if($this->router->class == 'Guests') { echo 'menu-item-active'; } ?>">
 												<a href="<?php echo base_url('Guests'); ?>" class="menu-link">
 													<i class="menu-bullet menu-bullet-dot">
@@ -522,7 +532,7 @@ $is_dev_env = ($app_env !== 'prod');
 											</li>
 											<?php } ?>
 											<?php } ?>
-											<?php if($can_product) { ?>
+											<?php if($can_product && !$op_footer_only) { ?>
 												<li class="menu-item <?php if($this->router->class == 'Product') { echo 'menu-item-active'; } ?>">
 													<a href="<?php echo base_url('Product'); ?>" class="menu-link">
 														<i class="menu-bullet menu-bullet-dot">
@@ -559,6 +569,7 @@ $is_dev_env = ($app_env !== 'prod');
 													<span class="menu-text">Footer</span>
 												</a>
 											</li>
+											<?php if(!$op_footer_only) { ?>
 											<li class="menu-item <?php if($this->router->class == 'Country_Code') { echo 'menu-item-active'; } ?>">
 												<a href="<?php echo base_url('Country_Code'); ?>" class="menu-link">
 													<i class="menu-bullet menu-bullet-dot">
@@ -623,6 +634,7 @@ $is_dev_env = ($app_env !== 'prod');
 													<span class="menu-text">Quick Filter</span>
 												</a>
 											</li>
+											<?php } ?>
 												<?php } ?>
 										</ul>
 									</div>

@@ -63,4 +63,34 @@ assert_eq('month 00 -> today',      '2026-06', summary_resolve_month('2026-00', 
 assert_eq('year 1999 -> today',     '2026-06', summary_resolve_month('1999-05', $today)['value']);
 assert_eq('unpadded -> today',      '2026-06', summary_resolve_month('2026-6', $today)['value']);
 
+// ---- month-only keeps is_day false / day empty ----------------------------
+$r = summary_resolve_month('2026-03', $today);
+assert_eq('month-only is_day',   false, $r['is_day']);
+assert_eq('month-only day',      '',    $r['day']);
+
+// ---- day filter: month range collapses to the single selected day ---------
+$r = summary_resolve_month('2026-03', $today, '2026-03-14');
+assert_eq('day is_day',          true,          $r['is_day']);
+assert_eq('day value',           '2026-03-14',  $r['day']);
+assert_eq('day month_start',     '2026-03-14',  $r['month_start']);
+assert_eq('day month_end',       '2026-03-14',  $r['month_end']);
+assert_eq('day year_start',      '2026-01-01',  $r['year_start']);
+assert_eq('day year_end',        '2026-12-31',  $r['year_end']);
+assert_eq('day picker value',    '2026-03',     $r['value']);
+assert_eq('day label',           '14 March 2026', $r['label']);
+
+// ---- day derives its own month/year (ignores mismatched month param) ------
+$r = summary_resolve_month('2026-03', $today, '2025-11-02');
+assert_eq('day derives year',    2025,          $r['year']);
+assert_eq('day derives month',   11,            $r['month']);
+assert_eq('day derives value',   '2025-11',     $r['value']);
+assert_eq('day derives y_start', '2025-01-01',  $r['year_start']);
+
+// ---- day filter falls back cleanly when the day is invalid ----------------
+assert_eq('bad day -> month',    false, summary_resolve_month('2026-03', $today, 'not-a-day')['is_day']);
+assert_eq('bad day month_start', '2026-03-01', summary_resolve_month('2026-03', $today, 'not-a-day')['month_start']);
+assert_eq('empty day -> month',  false, summary_resolve_month('2026-03', $today, '')['is_day']);
+assert_eq('impossible day',      false, summary_resolve_month('2026-03', $today, '2026-02-30')['is_day']);
+assert_eq('year 1999 day',       false, summary_resolve_month('2026-03', $today, '1999-05-01')['is_day']);
+
 echo "\nAll assertions passed.\n";

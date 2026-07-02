@@ -157,7 +157,11 @@
 </style>
 <div class="d-flex flex-column-fluid">
     <div class="container-fluid">
-        <?php if(!in_array((int)$this->session->userdata('level'), [10, 60])) { $this->load->view('booking/_summary_cards'); } ?>
+        <?php /* Owner (10) + TC Lead (25) see the sales-agent card set here; the
+                 sc_owner_as_agent flag scopes the Owner to agent cards on the
+                 listing while keeping the matrix on the Dashboard. Marketing (60)
+                 stays excluded. */ ?>
+        <?php if(!in_array((int)$this->session->userdata('level'), [60])) { $this->load->view('booking/_summary_cards', ['sc_owner_as_agent' => true]); } ?>
         <div class="card card-custom mb-5">
             <div class="card-header flex-wrap py-3" style="background-color:#D7E2F2;">
                 <div class="card-title">

@@ -703,12 +703,42 @@ return $query->result_array(); // instead of result()
 	// Server-Side DataTables Methods
 	// ============================================
 
+	// Resolve the admin IDs of the logged-in user's Team (shared admin.TeamID),
+	// used to scope the payment listing for a TEAM LEAD (25) / OP TEAM LEAD (45).
+	// Uses a raw query() so it does NOT flush the query-builder state the caller
+	// is mid-way through building.
+	private function team_member_ids()
+	{
+		$this->load->helper('team_scope');
+		$admins = $this->db->query('SELECT AdminID, TeamID, Status FROM admin')->result();
+		return team_member_admin_ids($this->session->userdata('admin_id'), $admins);
+	}
+
+	// Role-based row scope shared by the paginated listing + filtered count.
+	//   SALES AGENT (20)  -> own payments        (booking.SalesAgent = self)
+	//   TEAM LEAD (25)    -> team's payments      (booking.SalesAgent IN team)
+	//   OP (40)           -> own payments        (booking.BookingOP  = self)
+	//   OP TEAM LEAD (45) -> team's payments      (booking.BookingOP  IN team)
+	private function apply_role_payment_scope()
+	{
+		$level    = (int) $this->session->userdata('level');
+		$admin_id = $this->session->userdata('admin_id');
+
+		if($level === 20) {
+			$this->db->where('SalesAgent', $admin_id);
+		} elseif($level === 25) {
+			$this->db->where_in('booking.SalesAgent', $this->team_member_ids());
+		} elseif($level === 40) {
+			$this->db->where('booking.BookingOP', $admin_id);
+		} elseif($level === 45) {
+			$this->db->where_in('booking.BookingOP', $this->team_member_ids());
+		}
+	}
+
 	private function apply_payment_filters()
 	{
-		// Sales agent restriction for level 20 users
-		if($this->session->userdata('level') == 20) {
-			$this->db->where('SalesAgent', $this->session->userdata('admin_id'));
-		}
+		// Role-based row scope (self / team by SalesAgent or BookingOP)
+		$this->apply_role_payment_scope();
 
 		// Supplier filter
 		if(!empty($this->input->get('supplier'))) {
@@ -852,10 +882,8 @@ return $query->result_array(); // instead of result()
 		$this->db->from('payment');
 		$this->db->join('booking', 'booking.BookingID = payment.BookingID', 'left');
 
-		// Only apply base restrictions
-		if($this->session->userdata('level') == 20) {
-			$this->db->where('SalesAgent', $this->session->userdata('admin_id'));
-		}
+		// Only apply base role scope (self / team) — mirrors apply_role_payment_scope
+		$this->apply_role_payment_scope();
 		$this->db->where('payment.Status !=', 'N');
 
 		return $this->db->count_all_results();

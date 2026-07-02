@@ -23,16 +23,24 @@ if (!function_exists('summary_resolve_month')) {
      * bad query string can never break the dashboard. $today is injectable so
      * the resolver is deterministic under test; production passes date('Y-m-d').
      *
+     * An optional `?day=YYYY-MM-DD` narrows the scope further: when a valid day
+     * is given, every "(Month)" range collapses to that SINGLE day (month_start
+     * == month_end == the day) while the "(Year)" range still follows the day's
+     * year. The day drives its own month/year, so the picker stays in sync even
+     * if the month param disagrees. `is_day` lets callers relabel the cards.
+     *
      * @param string|null $param  Raw `month` query value, e.g. "2026-06".
      * @param string|null $today  Reference date "Y-m-d"; defaults to now.
+     * @param string|null $day    Raw `day` query value, e.g. "2026-06-15".
      * @return array{
      *   year:int, month:int,
      *   month_start:string, month_end:string,
      *   year_start:string,  year_end:string,
-     *   value:string, label:string
+     *   value:string, label:string,
+     *   is_day:bool, day:string
      * }
      */
-    function summary_resolve_month($param, $today = null)
+    function summary_resolve_month($param, $today = null, $day = null)
     {
         if ($today === null) {
             $today = date('Y-m-d');
@@ -51,11 +59,29 @@ if (!function_exists('summary_resolve_month')) {
             }
         }
 
+        // Optional day filter. A valid day drives its own month/year so the
+        // picker follows it, and collapses the "(Month)" range to that day.
+        $is_day  = false;
+        $day_val = '';
+        if (is_string($day) && preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', trim($day), $d)) {
+            $dy = (int) $d[1];
+            $dm = (int) $d[2];
+            $dd = (int) $d[3];
+            // checkdate rejects impossible days (e.g. Feb 30); bound the year too.
+            if ($dy >= 2000 && $dy <= 2100 && checkdate($dm, $dd, $dy)) {
+                $is_day  = true;
+                $day_val = sprintf('%04d-%02d-%02d', $dy, $dm, $dd);
+                $year    = $dy;
+                $month   = $dm;
+            }
+        }
+
         // First/last day of the selected month. Day-28 anchor + 't' avoids any
         // overflow when seeding from a 31-day reference date.
         $first = sprintf('%04d-%02d-01', $year, $month);
-        $month_start = $first;
-        $month_end   = date('Y-m-t', strtotime($first));
+        // Month range collapses to the single day when a day filter is active.
+        $month_start = $is_day ? $day_val : $first;
+        $month_end   = $is_day ? $day_val : date('Y-m-t', strtotime($first));
 
         $year_start = sprintf('%04d-01-01', $year);
         $year_end   = sprintf('%04d-12-31', $year);
@@ -66,6 +92,10 @@ if (!function_exists('summary_resolve_month')) {
             9 => 'September', 10 => 'October', 11 => 'November', 12 => 'December',
         );
 
+        $label = $is_day
+            ? ((int) date('j', strtotime($day_val)) . ' ' . $month_names[$month] . ' ' . $year)
+            : ($month_names[$month] . ' ' . $year);
+
         return array(
             'year'        => $year,
             'month'       => $month,
@@ -74,7 +104,9 @@ if (!function_exists('summary_resolve_month')) {
             'year_start'  => $year_start,
             'year_end'    => $year_end,
             'value'       => sprintf('%04d-%02d', $year, $month),
-            'label'       => $month_names[$month] . ' ' . $year,
+            'label'       => $label,
+            'is_day'      => $is_day,
+            'day'         => $day_val,
         );
     }
 }

@@ -1036,6 +1036,23 @@ if (!function_exists('is_sa_blocked_from_completed_booking')) {
     }
 }
 
+if (!function_exists('is_completed_booking_payment_blocked')) {
+    /**
+     * Whether a role must be denied access to a booking's Payment history
+     * because the trip is finished (Status='Y' AND AfterSalesService='COMPLETE').
+     *
+     * Sales Agent (20), OP (40) and TC (50) lose payment-history access once
+     * the trip completes; higher-level roles (Finance/Owner) keep it.
+     * Mirrors the SA guest-list rule in is_sa_blocked_from_completed_booking().
+     */
+    function is_completed_booking_payment_blocked($level, $status, $after_sales_service)
+    {
+        return in_array((int)$level, [20, 40, 50], true)
+            && $status === 'Y'
+            && $after_sales_service === 'COMPLETE';
+    }
+}
+
 if (!function_exists('is_sa_acting_as_tc2')) {
     /**
      * True when a level-20 Sales Agent matches the booking's SalesAgent2 (TC2)

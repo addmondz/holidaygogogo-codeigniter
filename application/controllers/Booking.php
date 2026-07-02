@@ -792,7 +792,10 @@ class Booking extends MY_Controller
 		$this->load->helper('summary_period_helper');
 		$this->load->helper('guest_list_status_filter');
 		$this->load->helper('cancellation_rate');
-		$period = summary_resolve_month($this->input->get('month'), $today);
+		// Optional ?day=YYYY-MM-DD narrows every "(Month)" card to a single day
+		// (the Year card still follows that day's year). Sales Agent / TC / Owner
+		// & TC Lead (owner_as_agent) share this scope.
+		$period = summary_resolve_month($this->input->get('month'), $today, $this->input->get('day'));
 		// Owner dashboard's global Day/Week/Month/Year toggle (?owner_period=...);
 		// re-scopes the whole owner per-agent matrix at once. Defaults to month.
 		$owner_period = summary_resolve_owner_period($this->input->get('owner_period'), $today);
@@ -805,11 +808,17 @@ class Booking extends MY_Controller
 		$cards  = array();
 		$tables = array();
 
-		$is_tc      = ($level == 20 || $level == 50);
-		$is_tclead  = ($level == 25);
+		// On the booking listing the partial requests owner_as_agent=1 so Owner
+		// (10) and TC Lead (25) receive the sales-agent payload scoped to their
+		// own bookings; the Owner Dashboard omits it and keeps the matrix. Shared
+		// with the view via summary_card_roles_helper so skeleton and payload agree.
+		$this->load->helper('summary_card_roles');
+		$owner_as_agent = ((int) $this->input->get('owner_as_agent') === 1);
+		$is_tc      = summary_cards_show_agent_set($level, $owner_as_agent);
+		$is_tclead  = false; // replaced by the sales-agent card set
 		$is_op      = ($level == 40 || $level == 45); // OP and OP TEAM LEAD share the OP cards
 		$is_finance = ($level == 30);
-		$is_owner   = ($level == 10);
+		$is_owner   = summary_cards_show_owner_matrix($level, $owner_as_agent);
 
 		// ---------- TC / TC2 (own bookings) ----------
 		// Credited-slot rule: a booking counts for this TC only when they hold
@@ -2645,6 +2654,10 @@ class Booking extends MY_Controller
 		$meta = array();
 		$meta['selected_month']       = $period['value'];
 		$meta['selected_month_label'] = $period['label'];
+		// Day filter: '' when scoped to the whole month, else the resolved day.
+		// Lets the front-end round-trip the date picker and re-label the cards.
+		$meta['selected_day']         = $period['day'];
+		$meta['is_day']               = $period['is_day'];
 		if($is_owner) {
 			// Echo the resolved toggle back so the front-end can highlight the
 			// active period tab (covers both the default and the bad-input fallback).
@@ -3486,6 +3499,11 @@ class Booking extends MY_Controller
 		)->result() as $r) {
 			$hidden_admins[(int)$r->AdminID] = true;
 		}
+		// The logged-in viewer is never hidden from their OWN card: an Owner (10)
+		// or TC Lead (25) viewing the sales-agent cards on the booking listing must
+		// see their own score/rank and appear (as "You") on their leaderboard. They
+		// stay hidden on every other agent's board (only the viewer is revealed).
+		unset($hidden_admins[(int)$admin_id]);
 
 		// 5. Fold everything into one row per AdminID. Reply/pickup are
 		//    lead-weighted so a TC owning several GHL inboxes aggregates fairly.
