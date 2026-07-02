@@ -23,11 +23,14 @@ if (!function_exists('summary_resolve_month')) {
      * bad query string can never break the dashboard. $today is injectable so
      * the resolver is deterministic under test; production passes date('Y-m-d').
      *
-     * An optional `?day=YYYY-MM-DD` narrows the scope further: when a valid day
-     * is given, every "(Month)" range collapses to that SINGLE day (month_start
-     * == month_end == the day) while the "(Year)" range still follows the day's
-     * year. The day drives its own month/year, so the picker stays in sync even
-     * if the month param disagrees. `is_day` lets callers relabel the cards.
+     * The `?day=YYYY-MM-DD` picker defaults to today when absent/invalid, so
+     * `day` is always a concrete date the front-end can show. Viewing TODAY is
+     * the whole-month default (`is_day` false, month range stays the whole
+     * month). Any OTHER valid day collapses every "(Month)" range to that SINGLE
+     * day (month_start == month_end == the day) while the "(Year)" range still
+     * follows the day's year, and drives its own month/year so the picker stays
+     * in sync even if the month param disagrees. `is_day` (true only for a
+     * specific non-today day) lets callers relabel / gate the Clear control.
      *
      * @param string|null $param  Raw `month` query value, e.g. "2026-06".
      * @param string|null $today  Reference date "Y-m-d"; defaults to now.
@@ -59,20 +62,28 @@ if (!function_exists('summary_resolve_month')) {
             }
         }
 
-        // Optional day filter. A valid day drives its own month/year so the
-        // picker follows it, and collapses the "(Month)" range to that day.
+        // Day filter. Defaults to today so the picker always shows a concrete
+        // date. Viewing TODAY is the live whole-month default: is_day stays false
+        // and the "(Month)" range keeps the whole month. Any OTHER valid day sets
+        // is_day, drives its own month/year (so the picker and Year card follow
+        // it), and collapses the "(Month)" range to that single day. Invalid /
+        // missing input falls back to today.
         $is_day  = false;
-        $day_val = '';
+        $day_val = $today;
         if (is_string($day) && preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', trim($day), $d)) {
             $dy = (int) $d[1];
             $dm = (int) $d[2];
             $dd = (int) $d[3];
             // checkdate rejects impossible days (e.g. Feb 30); bound the year too.
             if ($dy >= 2000 && $dy <= 2100 && checkdate($dm, $dd, $dy)) {
-                $is_day  = true;
                 $day_val = sprintf('%04d-%02d-%02d', $dy, $dm, $dd);
-                $year    = $dy;
-                $month   = $dm;
+                // Only a day OTHER than today collapses the month cards; today is
+                // the whole-month default.
+                if ($day_val !== $today) {
+                    $is_day = true;
+                    $year   = $dy;
+                    $month  = $dm;
+                }
             }
         }
 
@@ -107,6 +118,46 @@ if (!function_exists('summary_resolve_month')) {
             'label'       => $label,
             'is_day'      => $is_day,
             'day'         => $day_val,
+        );
+    }
+}
+
+if (!function_exists('summary_agent_triplet_ranges')) {
+    /**
+     * Resolve the Today / Week / Month triplet ranges for the sales-agent
+     * summary cards around an anchor day.
+     *
+     * The sales-agent card set (New Leads, Daily Handle, Avg Reply Time,
+     * Outbound) shows three rolling columns. When the day picker (?day=) is
+     * active the controller passes the picked day as the anchor, so:
+     *   - Today  = the picked day
+     *   - Week   = Monday..Sunday of the picked day's week
+     *   - Month  = 1st..last day of the picked day's month
+     * With no day picked the controller passes today, keeping the triplet live.
+     *
+     * Pure date math (no CI/DB) so it can be unit tested under SQLite :memory:
+     * (see tests/helpers/SummaryAgentTripletRangesTest.php).
+     *
+     * @param string $anchor_day  "Y-m-d" the triplet is centred on.
+     * @return array{
+     *   day:string,
+     *   week_start:string, week_end:string,
+     *   month_start:string, month_end:string
+     * }
+     */
+    function summary_agent_triplet_ranges($anchor_day)
+    {
+        $ts = strtotime($anchor_day);
+
+        return array(
+            'day'         => date('Y-m-d', $ts),
+            // ISO week: Monday..Sunday containing the anchor. 'monday this week'
+            // resolves to the same Monday mid-week or on the trailing Sunday.
+            'week_start'  => date('Y-m-d', strtotime('monday this week', $ts)),
+            'week_end'    => date('Y-m-d', strtotime('sunday this week', $ts)),
+            // Day-1 anchor + 't' avoids overflow when seeding from a 31-day date.
+            'month_start' => date('Y-m-01', $ts),
+            'month_end'   => date('Y-m-t', $ts),
         );
     }
 }

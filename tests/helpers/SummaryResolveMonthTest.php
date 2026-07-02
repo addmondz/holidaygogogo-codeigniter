@@ -63,10 +63,27 @@ assert_eq('month 00 -> today',      '2026-06', summary_resolve_month('2026-00', 
 assert_eq('year 1999 -> today',     '2026-06', summary_resolve_month('1999-05', $today)['value']);
 assert_eq('unpadded -> today',      '2026-06', summary_resolve_month('2026-6', $today)['value']);
 
-// ---- month-only keeps is_day false / day empty ----------------------------
+// ---- month-only keeps is_day false; day defaults to today -----------------
+// The picker defaults to today so it always shows a concrete date; a month-only
+// selection still leaves is_day false (whole month).
 $r = summary_resolve_month('2026-03', $today);
-assert_eq('month-only is_day',   false, $r['is_day']);
-assert_eq('month-only day',      '',    $r['day']);
+assert_eq('month-only is_day',   false,        $r['is_day']);
+assert_eq('month-only day',      '2026-06-15', $r['day']); // defaults to today
+
+// ---- no day + no month: day defaults to today, whole current month --------
+$r = summary_resolve_month(null, $today);
+assert_eq('default is_day',      false,        $r['is_day']);
+assert_eq('default day',         '2026-06-15', $r['day']);
+assert_eq('default month_start', '2026-06-01', $r['month_start']);
+assert_eq('default month_end',   '2026-06-30', $r['month_end']);
+
+// ---- day == today is the whole-month default (no collapse) ----------------
+$r = summary_resolve_month(null, $today, '2026-06-15');
+assert_eq('today is_day',        false,        $r['is_day']); // today never collapses
+assert_eq('today day',           '2026-06-15', $r['day']);
+assert_eq('today month_start',   '2026-06-01', $r['month_start']);
+assert_eq('today month_end',     '2026-06-30', $r['month_end']);
+assert_eq('today label',         'June 2026',  $r['label']);
 
 // ---- day filter: month range collapses to the single selected day ---------
 $r = summary_resolve_month('2026-03', $today, '2026-03-14');

@@ -2053,15 +2053,12 @@ class Booking_Model extends CI_Model
 		}
 
 		// Team-based listing scope (shared admin.TeamID):
-		//   TEAM LEAD (25)    -> all team members' bookings (by booking.SalesAgent)
-		//   OP TEAM LEAD (45) -> all team members' bookings (by booking.BookingOP)
-		//   OP (40)           -> only own bookings (by booking.BookingOP)
+		//   TEAM LEAD (25)         -> all team members' bookings (by booking.SalesAgent)
+		//   OP (40) / OP TEAM LEAD (45) -> all team members' bookings (by booking.BookingOP)
 		if($level === 25) {
 			$this->db->where_in('booking.SalesAgent', $this->team_member_ids());
-		} elseif($level === 45) {
+		} elseif($level === 45 || $level === 40) {
 			$this->db->where_in('booking.BookingOP', $this->team_member_ids());
-		} elseif($level === 40) {
-			$this->db->where('booking.BookingOP', $admin_id);
 		}
 
 		// Hide completed bookings from TC only (SA can view in listing; detail page still blocks via Booking::View / Payment guards)

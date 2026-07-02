@@ -829,14 +829,25 @@ class Booking extends MY_Controller
 			$this->load->helper('lead_conversion_credit');
 			$credit_clause = lead_conversion_credit_booking_clause();
 
-			// Re-scope every TC "(Month)" card to the selected period. Keep the
-			// live current month for the rolling Today/Week/Month cards below.
-			$cur_month_start = $month_start;
-			$cur_month_end   = $month_end;
+			// Re-scope every TC "(Month)" card to the selected period.
 			$month_start = $period['month_start'];
 			$month_end   = $period['month_end'];
 			$year_start  = $period['year_start'];
 			$year_end    = $period['year_end'];
+
+			// Anchor for the rolling Today/Week/Month triplet cards (New Leads,
+			// Daily Handle, Avg Reply Time, Outbound). A picked day (?day=)
+			// rebases the triplet: Today = the picked day, Week = its Mon–Sun
+			// week, Month = its full calendar month; no day picked keeps the live
+			// today / this week / this month. The single "(Month)" cards above
+			// still collapse to the picked day via $month_start/$month_end.
+			$anchor_day      = $period['is_day'] ? $period['day'] : $today;
+			$triplet         = summary_agent_triplet_ranges($anchor_day);
+			$tc_day          = $triplet['day'];
+			$tc_week_start   = $triplet['week_start'];
+			$tc_week_end     = $triplet['week_end'];
+			$cur_month_start = $triplet['month_start'];
+			$cur_month_end   = $triplet['month_end'];
 
 			$row = $this->db->query(
 				"SELECT COUNT(*) AS cnt FROM booking
@@ -1189,11 +1200,11 @@ class Booking extends MY_Controller
 			if(!empty($my_ghl_uids)) {
 				$mine_day   = $this->Report_Model->Lead_Dashboard_Summary(array(
 					'agent_id'   => $my_ghl_uids,
-					'start_date' => $today,       'end_date' => $today,
+					'start_date' => $tc_day,       'end_date' => $tc_day,
 				));
 				$mine_week  = $this->Report_Model->Lead_Dashboard_Summary(array(
 					'agent_id'   => $my_ghl_uids,
-					'start_date' => $week_start,  'end_date' => $week_end,
+					'start_date' => $tc_week_start,  'end_date' => $tc_week_end,
 				));
 				$mine_month = $this->Report_Model->Lead_Dashboard_Summary(array(
 					'agent_id'   => $my_ghl_uids,
@@ -1225,21 +1236,21 @@ class Booking extends MY_Controller
 				// first linked GHL uid (matches how the report locks to owner[0]).
 				$handle_owner = !empty($my_ghl_uids) ? (string) $my_ghl_uids[0] : '';
 				$cards['tc_handle_lead_today'] = array(
-					'day'   => $handle_count($today, $today),
-					'week'  => $handle_count($week_start, $week_end),
+					'day'   => $handle_count($tc_day, $tc_day),
+					'week'  => $handle_count($tc_week_start, $tc_week_end),
 					'month' => $handle_count($cur_month_start, $cur_month_end),
 					'link'  => $handle_owner !== ''
 						? base_url('Report/Lead_Reply_Activity_Hourly')
 							. '?owner=' . urlencode($handle_owner)
-							. '&reply_date=' . urlencode($fmt_dmy($today))
+							. '&reply_date=' . urlencode($fmt_dmy($tc_day))
 						: '',
 				);
 				// "Avg Reply Time to Inbound" now uses Message-Log logic: every
 				// inbound->outbound reply pair in the agent's threads (in working
 				// hours, same day) is averaged, windowed by when the REPLY was
 				// sent. This matches the Message Log's "Avg time taken" exactly.
-				$resp_day   = $this->Report_Model->Ghl_Messages_Avg_Reply_Seconds_For_Uids($today, $today, $my_ghl_uids);
-				$resp_week  = $this->Report_Model->Ghl_Messages_Avg_Reply_Seconds_For_Uids($week_start, $week_end, $my_ghl_uids);
+				$resp_day   = $this->Report_Model->Ghl_Messages_Avg_Reply_Seconds_For_Uids($tc_day, $tc_day, $my_ghl_uids);
+				$resp_week  = $this->Report_Model->Ghl_Messages_Avg_Reply_Seconds_For_Uids($tc_week_start, $tc_week_end, $my_ghl_uids);
 				$resp_month = $this->Report_Model->Ghl_Messages_Avg_Reply_Seconds_For_Uids($cur_month_start, $cur_month_end, $my_ghl_uids);
 				$resp_round = function($secs) { return $secs === null ? null : (int) round($secs); };
 				$cards['tc_response_time_dwm'] = array(
@@ -1287,9 +1298,11 @@ class Booking extends MY_Controller
 			}
 
 			// ---------- "Best:" benchmarks for Avg Reply Time & My Leads ----------
-			// Team-wide month-window leaderboard (live current month, matching the
-			// GHL-based cards above). Fastest avg reply time (min-sample 3 leads)
-			// and highest lead volume; "You" when that's the logged-in agent.
+			// Team-wide month-window leaderboard over the anchored month
+			// ($cur_month_* = the picked day's month, else the live current
+			// month), matching the triplet's Month column above. Fastest avg reply
+			// time (min-sample 3 leads) and highest lead volume; "You" when
+			// that's the logged-in agent.
 			$this->load->helper('response_time');
 			$resp_rows = $this->Report_Model->Lead_Dashboard_By_Agent(array(
 				'start_date' => $cur_month_start, 'end_date' => $cur_month_end,
@@ -1338,8 +1351,9 @@ class Booking extends MY_Controller
 
 			// ---------- Outbound Messages (Today / Week / Month) ----------
 			// Agent-sent (outbound) GHL messages by send time. Own counts scoped to
-			// the logged-in TC's GHL uid(s); "Best:" = top sender this month
-			// team-wide. Live current-month windows, matching the cards above.
+			// the logged-in TC's GHL uid(s); "Best:" = top sender over the anchored
+			// month (the picked day's month, else the live current month),
+			// matching the triplet's Month column above.
 			$ob_day = $ob_week = $ob_month = 0;
 			if(!empty($my_ghl_uids)) {
 				$ob_place = implode(',', array_fill(0, count($my_ghl_uids), '?'));
@@ -1353,8 +1367,8 @@ class Booking extends MY_Controller
 					)->row();
 					return $r ? (int)$r->c : 0;
 				};
-				$ob_day   = $ob_count($today, $today);
-				$ob_week  = $ob_count($week_start, $week_end);
+				$ob_day   = $ob_count($tc_day, $tc_day);
+				$ob_week  = $ob_count($tc_week_start, $tc_week_end);
 				$ob_month = $ob_count($cur_month_start, $cur_month_end);
 			}
 			$ob_best = null;
@@ -1385,6 +1399,9 @@ class Booking extends MY_Controller
 			// Reuses the Lead Ownership dashboard's definition: owned leads whose
 			// follow_up_status is sent/completed, over all owned leads. Own scoped
 			// to the TC's GHL uid(s); "Best:" = highest rate (min-sample 3 owned).
+			// Month-granular: scoped to the anchored month ($cur_month_*, = the
+			// picked day's whole month, else the live current month), so the
+			// picker moves it by month rather than to a single day.
 			$fu_rows = $this->Report_Model->Lead_Ownership_By_Agent(array(
 				'start_date' => $cur_month_start, 'end_date' => $cur_month_end,
 			));

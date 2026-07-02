@@ -715,10 +715,9 @@ return $query->result_array(); // instead of result()
 	}
 
 	// Role-based row scope shared by the paginated listing + filtered count.
-	//   SALES AGENT (20)  -> own payments        (booking.SalesAgent = self)
-	//   TEAM LEAD (25)    -> team's payments      (booking.SalesAgent IN team)
-	//   OP (40)           -> own payments        (booking.BookingOP  = self)
-	//   OP TEAM LEAD (45) -> team's payments      (booking.BookingOP  IN team)
+	//   SALES AGENT (20)         -> own payments   (booking.SalesAgent = self)
+	//   TEAM LEAD (25)           -> team's payments (booking.SalesAgent IN team)
+	//   OP (40) / OP TEAM LEAD (45) -> team's payments (booking.BookingOP IN team)
 	private function apply_role_payment_scope()
 	{
 		$level    = (int) $this->session->userdata('level');
@@ -728,9 +727,7 @@ return $query->result_array(); // instead of result()
 			$this->db->where('SalesAgent', $admin_id);
 		} elseif($level === 25) {
 			$this->db->where_in('booking.SalesAgent', $this->team_member_ids());
-		} elseif($level === 40) {
-			$this->db->where('booking.BookingOP', $admin_id);
-		} elseif($level === 45) {
+		} elseif($level === 45 || $level === 40) {
 			$this->db->where_in('booking.BookingOP', $this->team_member_ids());
 		}
 	}

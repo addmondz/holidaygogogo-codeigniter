@@ -192,9 +192,9 @@
             <div class="col-md-12">
                 <div class="sc-month-filter">
                     <label for="sc-day-picker">Viewing day</label>
-                    <input type="date" id="sc-day-picker" class="form-control">
-                    <button type="button" id="sc-day-clear" class="btn btn-sm btn-outline-secondary" style="display:none;" title="Clear the day filter and view the whole current month">Clear day</button>
-                    <span class="sc-month-filter-hint">Pick a day to scope the &ldquo;(Month)&rdquo; cards to that single date; the Year card follows its year. Leave empty for the whole current month.</span>
+                    <input type="date" id="sc-day-picker" class="form-control" value="<?php echo date('Y-m-d'); ?>">
+                    <button type="button" id="sc-day-clear" class="btn btn-sm btn-outline-secondary" style="display:none;" title="Go back to today (whole current month)">Reset to today</button>
+                    <span class="sc-month-filter-hint">Defaults to <strong>today</strong>. The Today&nbsp;/&nbsp;Week&nbsp;/&nbsp;Month cards follow the picked day (Today = the day, Week = its Mon&ndash;Sun week, Month = its month). Pick a past day to also scope the single &ldquo;(Month)&rdquo; cards to that date; today keeps the whole current month.</span>
                 </div>
             </div>
             <div class="col-md-3 sc-pos-13">
@@ -1333,14 +1333,15 @@ $(function() {
         if(m.last_ghl_sync_display) {
             setText('ghl-last-sync', m.last_ghl_sync_display);
         }
-        // Round-trip the day filter: reflect the server-resolved day (or clear it
-        // when a bad day fell back to the whole month) and toggle the Clear btn.
+        // Round-trip the day filter: reflect the server-resolved day (which
+        // defaults to today) into the picker. The Clear/"Reset to today" button
+        // only matters for a specific non-today day, so gate it on is_day.
         var scDay = document.getElementById('sc-day-picker');
         if(scDay) {
             var dv = m.selected_day || '';
-            if(scDay.value !== dv) { scDay.value = dv; }
+            if(dv && scDay.value !== dv) { scDay.value = dv; }
             var clr = document.getElementById('sc-day-clear');
-            if(clr) { clr.style.display = dv ? '' : 'none'; }
+            if(clr) { clr.style.display = m.is_day ? '' : 'none'; }
         }
 
         // TC cards
@@ -1855,9 +1856,12 @@ $(function() {
         });
     }
 
-    // Day filter: pick a date to scope the "(Month)" cards to that single day
-    // (the Year card follows its year); empty = whole current month. Only present
-    // for the sales-agent card set (TC 20/50, Sales Agent, Owner/TC Lead listing).
+    // Day filter: defaults to today. The Today/Week/Month triplet cards follow
+    // the picked day (Today = the day, Week = its Mon–Sun week, Month = its
+    // month); a past day also scopes the single "(Month)" cards to that day,
+    // while today keeps the whole current month. "Reset to today" clears a
+    // specific day. Only present for the sales-agent card set (TC 20/50, Sales
+    // Agent, Owner/TC Lead listing).
     var scDayPicker = document.getElementById('sc-day-picker');
     var scDayClear  = document.getElementById('sc-day-clear');
     if(scDayPicker) {
@@ -1867,8 +1871,7 @@ $(function() {
     }
     if(scDayClear) {
         scDayClear.addEventListener('click', function() {
-            scDayPicker.value = '';
-            loadSummaryCards();
+            loadSummaryCards(); // no day -> server resolves to today (whole month)
         });
     }
     loadSummaryCards();
