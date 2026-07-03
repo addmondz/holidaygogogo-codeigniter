@@ -99,10 +99,10 @@
                                         </div>
                                         <div class="col-md-3">
                                             <div class="form-group">
-                                                <label>Team Leader</label>
-                                                <select name="team_lead[]" data-live-search="true" class="form-control selectpicker" multiple data-actions-box="true" title="--ALL TEAM LEADERS--">
+                                                <label>Team</label>
+                                                <select name="team_lead[]" data-live-search="true" class="form-control selectpicker" multiple data-actions-box="true" title="--ALL TEAMS--">
                                                     <?php foreach($reply_activity_detail_team_leads as $tl) { ?>
-                                                        <option data-icon="la la-user-tie font-size-lg bs-icon" value="<?php echo html_escape($tl->AdminID); ?>" <?php if(in_array((string) $tl->AdminID, $reply_activity_detail_filters['team_lead'], true)) { echo 'selected'; } ?>>
+                                                        <option data-icon="la la-user-tie font-size-lg bs-icon" value="<?php echo html_escape($tl->TeamID); ?>" <?php if(in_array((string) $tl->TeamID, $reply_activity_detail_filters['team_lead'], true)) { echo 'selected'; } ?>>
                                                             <?php echo html_escape($tl->Name); ?>
                                                         </option>
                                                     <?php } ?>

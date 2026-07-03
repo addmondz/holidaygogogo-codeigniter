@@ -4,9 +4,9 @@
  *
  * Locks the SQL behind the Finance "Sales by Team (Month)" summary card.
  * Each row aggregates NetTotal for confirmations created this month, grouped
- * by the team-lead admin (admin.TeamLeadID -> admin.AdminID). Bookings whose
- * SalesAgent doesn't roll up to any team lead fall into a single "Unassigned"
- * bucket so totals always reconcile to the team-wide total.
+ * by the SalesAgent's Team (admin.TeamID -> team.TeamID). Bookings whose
+ * SalesAgent has no Team fall into a single "Unassigned" bucket so totals
+ * always reconcile to the team-wide total.
  *
  * Invariant: SUM(per-team totals) = SUM(NetTotal for all valid bookings this
  * month). If team-assignment changes silently drop bookings, the team
@@ -32,20 +32,23 @@ $pdo->exec("CREATE TABLE booking (
 $pdo->exec("CREATE TABLE admin (
     AdminID INTEGER PRIMARY KEY,
     Name TEXT,
-    TeamLeadID INTEGER
+    TeamID INTEGER
+)");
+$pdo->exec("CREATE TABLE team (
+    TeamID INTEGER PRIMARY KEY,
+    Name TEXT
 )");
 
 $month_start = '2026-05-01';
 $month_end   = '2026-05-31';
 
-// Team A = admin 10 (lead). Team B = admin 20 (lead).
-// Agents 11, 12 under team A. Agent 21 under team B. Agent 99 has no team.
+// Team 1 = "Team A", Team 2 = "Team B".
+// Agents 11, 12 in Team A. Agent 21 in Team B. Agent 99 has no team.
+$pdo->exec("INSERT INTO team VALUES (1, 'Team A'), (2, 'Team B')");
 $pdo->exec("INSERT INTO admin VALUES
-    (10, 'Lead A',   NULL),
-    (11, 'Agent A1', 10),
-    (12, 'Agent A2', 10),
-    (20, 'Lead B',   NULL),
-    (21, 'Agent B1', 20),
+    (11, 'Agent A1', 1),
+    (12, 'Agent A2', 1),
+    (21, 'Agent B1', 2),
     (99, 'Solo',     NULL)
 ");
 
@@ -61,23 +64,23 @@ $pdo->exec("INSERT INTO booking VALUES
     (9, 21,  500.00, 'BOOKING CONFIRMATION', 'N', 'P',  '2026-05-25')
 ");
 
-// Per-team aggregation. COALESCE on the team lead's AdminID groups any agent
-// without a TeamLeadID under "Unassigned" (id 0) so SUM(totals) reconciles
-// with the team-wide total below.
+// Per-team aggregation. COALESCE on the team's TeamID groups any agent without
+// a Team under "Unassigned" (id 0) so SUM(totals) reconciles with the
+// team-wide total below.
 $sql = "
     SELECT
-        COALESCE(tl.AdminID, 0) AS team_lead_id,
-        COALESCE(tl.Name, 'Unassigned') AS team_lead_name,
+        COALESCE(t.TeamID, 0) AS team_id,
+        COALESCE(t.Name, 'Unassigned') AS team_name,
         COUNT(*) AS bc_count,
         COALESCE(SUM(booking.NetTotal), 0) AS total
     FROM booking
     LEFT JOIN admin agent ON agent.AdminID = booking.SalesAgent
-    LEFT JOIN admin tl ON tl.AdminID = agent.TeamLeadID
+    LEFT JOIN team t ON t.TeamID = agent.TeamID
     WHERE booking.BookingConfirmationTitle = 'BOOKING CONFIRMATION'
       AND booking.CancelStatus = 'N'
       AND booking.Status != 'N'
       AND booking.InsertDate BETWEEN :ms AND :me
-    GROUP BY team_lead_id, team_lead_name
+    GROUP BY team_id, team_name
     ORDER BY total DESC
 ";
 $stmt = $pdo->prepare($sql);
@@ -108,14 +111,14 @@ function assert_eq($label, $expected, $actual) {
 
 $by_team = array();
 foreach ($rows as $r) {
-    $by_team[(int) $r['team_lead_id']] = $r;
+    $by_team[(int) $r['team_id']] = $r;
 }
 
 assert_eq('team count', 3, count($rows));
-assert_eq('Team A total (1000+1500)',  2500.0, (float) $by_team[10]['total']);
-assert_eq('Team A count',              2,       (int)   $by_team[10]['bc_count']);
-assert_eq('Team B total (800+500)',    1300.0, (float) $by_team[20]['total']);
-assert_eq('Team B count',              2,       (int)   $by_team[20]['bc_count']);
+assert_eq('Team A total (1000+1500)',  2500.0, (float) $by_team[1]['total']);
+assert_eq('Team A count',              2,       (int)   $by_team[1]['bc_count']);
+assert_eq('Team B total (800+500)',    1300.0, (float) $by_team[2]['total']);
+assert_eq('Team B count',              2,       (int)   $by_team[2]['bc_count']);
 assert_eq('Unassigned total (600)',     600.0, (float) $by_team[0]['total']);
 assert_eq('Unassigned count',           1,      (int)   $by_team[0]['bc_count']);
 

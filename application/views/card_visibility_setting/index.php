@@ -5,7 +5,9 @@
 		$groups[$card['group']][$slug] = $card;
 	}
 	// Readable role label per Level for the column sub-text.
-	$role_labels = array('20' => 'TC', '50' => 'TC2', '25' => 'Team Lead', '30' => 'Finance', '40' => 'OP', '45' => 'OP Lead');
+	$role_labels = array('10' => 'Owner', '20' => 'TC', '50' => 'TC2', '25' => 'Team Lead', '30' => 'Finance', '40' => 'OP', '45' => 'OP Lead');
+	// Canonical level display order for the section title (roles joined by " / ").
+	$level_order = array('10', '20', '50', '25', '30', '40', '45');
 ?>
 <div class="d-flex flex-column-fluid">
 	<div class="container-fluid">
@@ -39,11 +41,19 @@
 						foreach($cards as $c) { foreach($c['levels'] as $lv) { $group_levels[(int)$lv] = true; } }
 						$group_users = array();
 						foreach($users as $u) { if(isset($group_levels[(int)$u->Level])) { $group_users[] = $u; } }
+						// Section title = every role/level that shares this card set,
+						// joined by " / " (e.g. "Owner / TC / TC2 / Team Lead"). Some card
+						// sets are seen by several levels, so the title spells them all out.
+						$section_roles = array();
+						foreach($level_order as $lv) {
+							if(isset($group_levels[(int)$lv]) && isset($role_labels[$lv])) { $section_roles[] = $role_labels[$lv]; }
+						}
+						$section_title = !empty($section_roles) ? implode(' / ', $section_roles) : $group_name;
 					?>
 						<div class="mb-3">
-							<h5 style="color:#6082B6;"><strong><?php echo htmlspecialchars($group_name); ?></strong></h5>
+							<h5 style="color:#6082B6;"><strong><?php echo htmlspecialchars($section_title); ?></strong></h5>
 							<?php if(empty($group_users)): ?>
-								<div class="text-muted" style="padding:6px 0;">No active <?php echo htmlspecialchars($group_name); ?> users.</div>
+								<div class="text-muted" style="padding:6px 0;">No active users for this section.</div>
 							<?php else: ?>
 							<div class="table-responsive" style="overflow-x:auto;">
 								<table class="table table-bordered table-head-custom" style="min-width:560px;">

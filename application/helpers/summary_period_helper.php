@@ -231,3 +231,70 @@ if (!function_exists('summary_resolve_owner_period')) {
         );
     }
 }
+
+if (!function_exists('summary_prior_year_window')) {
+    /**
+     * Resolve the "same period last year" comparison window for a sales card.
+     *
+     * The sales cards' current figure is effectively "to date": the actual is
+     * summed over the whole selected period, but no bookings exist in the
+     * future, so a current month/year figure only covers up to today. To keep
+     * the year-over-year comparison apples-to-apples we shift the SAME to-date
+     * span back exactly one year:
+     *   - effective end = min(period end, today)  (clamp the future off)
+     *   - last-year window = [start - 1yr, effective end - 1yr]
+     *
+     * Examples (today = 2026-07-03):
+     *   month card, current July  -> current span 2026-07-01..2026-07-03,
+     *                                last year     2025-07-01..2025-07-03
+     *   year card, current 2026   -> current span 2026-01-01..2026-07-03,
+     *                                last year     2025-01-01..2025-07-03
+     *   a fully-past month (May)  -> full month vs full same month last year
+     *
+     * Shifting back a year keeps the month/day and subtracts 1 from the year;
+     * Feb 29 (no such day the prior year) clamps to Feb 28 so the window stays
+     * valid. Pure date math (no CI/DB) so it unit tests under SQLite :memory:
+     * (see tests/helpers/SummaryPriorYearWindowTest.php).
+     *
+     * @param string $start  Current period start "Y-m-d".
+     * @param string $end    Current period end   "Y-m-d".
+     * @param string $today  Reference date       "Y-m-d".
+     * @return array{start:string, end:string}
+     */
+    function summary_prior_year_window($start, $end, $today)
+    {
+        // Clamp the current window to today so a partway-through month/year is
+        // compared against the same number of days last year, not the full one.
+        $eff_end = ($end < $today) ? $end : $today;
+
+        return array(
+            'start' => summary_shift_back_one_year($start),
+            'end'   => summary_shift_back_one_year($eff_end),
+        );
+    }
+}
+
+if (!function_exists('summary_shift_back_one_year')) {
+    /**
+     * Subtract exactly one year from a "Y-m-d" date, keeping the month/day.
+     * Feb 29 clamps to Feb 28 (the prior year has no 29th). Pure helper for
+     * summary_prior_year_window(); not a general date library.
+     *
+     * @param string $date  "Y-m-d"
+     * @return string       "Y-m-d" one year earlier
+     */
+    function summary_shift_back_one_year($date)
+    {
+        $y = (int) substr($date, 0, 4);
+        $m = (int) substr($date, 5, 2);
+        $d = (int) substr($date, 8, 2);
+        $py = $y - 1;
+
+        if (!checkdate($m, $d, $py)) {
+            // Only reachable for Feb 29 -> clamp to last day of Feb that year.
+            $d = (int) date('t', strtotime(sprintf('%04d-%02d-01', $py, $m)));
+        }
+
+        return sprintf('%04d-%02d-%02d', $py, $m, $d);
+    }
+}

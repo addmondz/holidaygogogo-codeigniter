@@ -7,8 +7,11 @@ defined('BASEPATH') OR exit('No direct script access allowed');
  *
  * Model: cards are VISIBLE BY DEFAULT to their normal role. The owner hides a
  * specific card from a specific user by storing one (AdminID, CardSlug) row;
- * presence of a row => that user does NOT see that card. The OWNER (Level 10) is
- * never card-gated — they get the per-agent matrix, not these cards.
+ * presence of a row => that user does NOT see that card. There can be several
+ * Owner (Level 10) accounts, and on the booking listing an Owner sees the same
+ * sales-agent card set as TC — so the TC cards are gate-able per owner-user too
+ * (the managing owner toggles them). The Owner-Dashboard per-agent matrix is not
+ * a registry card and is never gated.
  *
  * The card catalogue (card_visibility_registry) is the single source of truth,
  * shared by three places:
@@ -32,7 +35,8 @@ if (!function_exists('card_visibility_registry')) {
 	 * Every configurable summary card, keyed by stable slug.
 	 *
 	 * Each entry:
-	 *   'group'  => UI heading + role bucket ('TC' | 'TC Lead' | 'OP' | 'Finance')
+	 *   'group'  => UI heading + role bucket ('TC' | 'OP' | 'Finance'). TC Lead
+	 *               (25) shares the 'TC' bucket — it sees the TC agent card set.
 	 *   'title'  => human-readable card name
 	 *   'levels' => admin.Level values whose users see this card (eligibility)
 	 *   'anchor' => a DOM id that exists inside the card's column (for CSS hide)
@@ -43,34 +47,27 @@ if (!function_exists('card_visibility_registry')) {
 	function card_visibility_registry()
 	{
 		return array(
-			// ---------- TC / TC2 (level 20 / 50) ----------
-			'tc_bc_created'            => array('group' => 'TC', 'title' => 'BC Created',                         'levels' => array(20, 50), 'anchor' => 'sc-bc-month-count',                 'keys' => array('bc_month', 'bc_year')),
-			'tc_sales_month'           => array('group' => 'TC', 'title' => 'Month Sales vs Target',              'levels' => array(20, 50), 'anchor' => 'sc-sales-month-value',              'keys' => array('sales_month')),
-			'tc_sales_year'            => array('group' => 'TC', 'title' => 'Year Sales vs Target',               'levels' => array(20, 50), 'anchor' => 'sc-sales-year-value',               'keys' => array('sales_year')),
-			'tc_cancellation_rate'     => array('group' => 'TC', 'title' => 'Cancellation Rate (Month)',          'levels' => array(20, 50), 'anchor' => 'sc-cancel-rate-value',              'keys' => array('cancellation_rate')),
-			'tc_conversion_rate_ytd'   => array('group' => 'TC', 'title' => 'Conversion Rate (YTD)',             'levels' => array(20, 50), 'anchor' => 'sc-conv-rate-value',                'keys' => array('conversion_rate_ytd')),
-			'tc_new_leads'             => array('group' => 'TC', 'title' => 'New Leads',                          'levels' => array(20, 50), 'anchor' => 'sc-tc-leads-month',                 'keys' => array('tc_leads_dwm')),
-			'tc_handle_lead'           => array('group' => 'TC', 'title' => 'Daily Handle Lead Count',            'levels' => array(20, 50), 'anchor' => 'sc-tc-handle-month',                'keys' => array('tc_handle_lead_today')),
-			'tc_response_time'         => array('group' => 'TC', 'title' => 'Avg Reply Time to Inbound',          'levels' => array(20, 50), 'anchor' => 'sc-tc-resp-month',                  'keys' => array('tc_response_time_dwm')),
-			'tc_pickup_speed'          => array('group' => 'TC', 'title' => 'Lead Pickup Speed (Month)',          'levels' => array(20, 50), 'anchor' => 'sc-tc-pickup-value',                'keys' => array('tc_pickup_speed_month')),
-			'tc_outbound_msgs'         => array('group' => 'TC', 'title' => 'Outbound Messages',                  'levels' => array(20, 50), 'anchor' => 'sc-tc-outbound-month',              'keys' => array('outbound_msgs_dwm')),
-			'tc_followup_rate'         => array('group' => 'TC', 'title' => 'Follow-up % (Month)',                'levels' => array(20, 50), 'anchor' => 'sc-tc-followup-value',              'keys' => array('followup_rate')),
-			'tc_agent_score'           => array('group' => 'TC', 'title' => 'Agent Score (Month)',                'levels' => array(20, 50), 'anchor' => 'sc-agent-score-value',              'keys' => array('agent_score_month')),
-			'tc_upcoming_not_ready_7'  => array('group' => 'TC', 'title' => 'Travel in 7 Days – Not Yet Ready',   'levels' => array(20, 50), 'anchor' => 'sc-upcoming-not-ready-op-count',    'keys' => array('upcoming_travel_not_ready_op')),
-			'tc_upcoming_not_ready_14' => array('group' => 'TC', 'title' => 'Travel in 14 Days – Not Yet Ready',  'levels' => array(20, 50), 'anchor' => 'sc-upcoming-not-ready-op-14-count', 'keys' => array('upcoming_travel_not_ready_op_14')),
-			'tc_customer_payment_due'  => array('group' => 'TC', 'title' => 'Payment From Customer Due Soon',     'levels' => array(20, 50), 'anchor' => 'sc-customer-payment-due-soon-body', 'keys' => array('customer_payment_due_soon')),
-
-			// ---------- TC LEAD (level 25) ----------
-			'tl_leads'                 => array('group' => 'TC Lead', 'title' => 'Leads',                                  'levels' => array(25), 'anchor' => 'sc-leads-month',                  'keys' => array('leads_dwm')),
-			'tl_active_leads'          => array('group' => 'TC Lead', 'title' => 'Active Leads',                           'levels' => array(25), 'anchor' => 'sc-active-leads-month',           'keys' => array('active_leads_dwm')),
-			'tl_conv_response'         => array('group' => 'TC Lead', 'title' => 'Conversion & Response',                  'levels' => array(25), 'anchor' => 'sc-leads-conv',                   'keys' => array('conversion_rate_ytd', 'tc_response_time_dwm')),
-			'tl_bc_created'            => array('group' => 'TC Lead', 'title' => 'BC Created',                             'levels' => array(25), 'anchor' => 'sc-bc-month-tl',                  'keys' => array('bc_week_month')),
-			'tl_cancellation_rate'     => array('group' => 'TC Lead', 'title' => 'Cancellation Rate (Month)',             'levels' => array(25), 'anchor' => 'sc-cancel-rate-tl-value',         'keys' => array('cancellation_rate')),
-			'tl_agent_conversion'      => array('group' => 'TC Lead', 'title' => 'Top Agents – Conversion',               'levels' => array(25), 'anchor' => 'sc-agent-conversion-body',        'keys' => array('agent_conversion')),
-			'tl_destination_closed'    => array('group' => 'TC Lead', 'title' => 'Top Destinations – Closed Sales',       'levels' => array(25), 'anchor' => 'sc-destination-closed-sales-body', 'keys' => array('destination_closed_sales')),
-			'tl_active_leads_by_tag'   => array('group' => 'TC Lead', 'title' => 'Active Leads by Tag',                   'levels' => array(25), 'anchor' => 'sc-active-leads-by-tag-body',     'keys' => array('active_leads_by_tag')),
-			'tl_source_split'          => array('group' => 'TC Lead', 'title' => 'Self Gen vs Company',                   'levels' => array(25), 'anchor' => 'sc-source-selfgen-count',         'keys' => array('lead_source_split')),
-			'tl_agent_source_split'    => array('group' => 'TC Lead', 'title' => 'Sales by Agent – Self Gen vs Company',  'levels' => array(25), 'anchor' => 'sc-agent-source-split-body',      'keys' => array('agent_source_split')),
+			// ---------- TC / TC2 / TC LEAD / OWNER (level 20 / 50 / 25 / 10) ----------
+			// TC Lead (25) and Owner (10) both show the same sales-agent card set as
+			// TC scoped to their own bookings (summary_cards_show_agent_set + $show_tc
+			// on the booking listing), so every card here is toggleable for them too.
+			// The old team-lead-only card set (group "TC Lead") was retired when
+			// $show_tclead was hard-set to false.
+			'tc_bc_created'            => array('group' => 'TC', 'title' => 'BC Created',                         'levels' => array(10, 20, 50, 25), 'anchor' => 'sc-bc-month-count',                 'keys' => array('bc_month', 'bc_year')),
+			'tc_sales_month'           => array('group' => 'TC', 'title' => 'Month Sales vs Target',              'levels' => array(10, 20, 50, 25), 'anchor' => 'sc-sales-month-value',              'keys' => array('sales_month')),
+			'tc_sales_year'            => array('group' => 'TC', 'title' => 'Year Sales vs Target',               'levels' => array(10, 20, 50, 25), 'anchor' => 'sc-sales-year-value',               'keys' => array('sales_year')),
+			'tc_cancellation_rate'     => array('group' => 'TC', 'title' => 'Cancellation Rate (Month)',          'levels' => array(10, 20, 50, 25), 'anchor' => 'sc-cancel-rate-value',              'keys' => array('cancellation_rate')),
+			'tc_conversion_rate_ytd'   => array('group' => 'TC', 'title' => 'Conversion Rate (YTD)',             'levels' => array(10, 20, 50, 25), 'anchor' => 'sc-conv-rate-value',                'keys' => array('conversion_rate_ytd')),
+			'tc_new_leads'             => array('group' => 'TC', 'title' => 'New Leads',                          'levels' => array(10, 20, 50, 25), 'anchor' => 'sc-tc-leads-month',                 'keys' => array('tc_leads_dwm')),
+			'tc_handle_lead'           => array('group' => 'TC', 'title' => 'Daily Handle Lead Count',            'levels' => array(10, 20, 50, 25), 'anchor' => 'sc-tc-handle-month',                'keys' => array('tc_handle_lead_today')),
+			'tc_response_time'         => array('group' => 'TC', 'title' => 'Avg Reply Time to Inbound',          'levels' => array(10, 20, 50, 25), 'anchor' => 'sc-tc-resp-month',                  'keys' => array('tc_response_time_dwm')),
+			'tc_pickup_speed'          => array('group' => 'TC', 'title' => 'Lead Pickup Speed (Month)',          'levels' => array(10, 20, 50, 25), 'anchor' => 'sc-tc-pickup-value',                'keys' => array('tc_pickup_speed_month')),
+			'tc_outbound_msgs'         => array('group' => 'TC', 'title' => 'Outbound Messages',                  'levels' => array(10, 20, 50, 25), 'anchor' => 'sc-tc-outbound-month',              'keys' => array('outbound_msgs_dwm')),
+			'tc_followup_rate'         => array('group' => 'TC', 'title' => 'Follow-up % (Month)',                'levels' => array(10, 20, 50, 25), 'anchor' => 'sc-tc-followup-value',              'keys' => array('followup_rate')),
+			'tc_agent_score'           => array('group' => 'TC', 'title' => 'Agent Score (Month)',                'levels' => array(10, 20, 50, 25), 'anchor' => 'sc-agent-score-value',              'keys' => array('agent_score_month')),
+			'tc_upcoming_not_ready_7'  => array('group' => 'TC', 'title' => 'Travel in 7 Days – Not Yet Ready',   'levels' => array(10, 20, 50, 25), 'anchor' => 'sc-upcoming-not-ready-op-count',    'keys' => array('upcoming_travel_not_ready_op')),
+			'tc_upcoming_not_ready_14' => array('group' => 'TC', 'title' => 'Travel in 14 Days – Not Yet Ready',  'levels' => array(10, 20, 50, 25), 'anchor' => 'sc-upcoming-not-ready-op-14-count', 'keys' => array('upcoming_travel_not_ready_op_14')),
+			'tc_customer_payment_due'  => array('group' => 'TC', 'title' => 'Payment From Customer Due Soon',     'levels' => array(10, 20, 50, 25), 'anchor' => 'sc-customer-payment-due-soon-body', 'keys' => array('customer_payment_due_soon')),
 
 			// ---------- OP (level 40 / 45) ----------
 			'op_pending_bc'             => array('group' => 'OP', 'title' => 'Pending BC',                                 'levels' => array(40, 45), 'anchor' => 'sc-pending-bc-op-count',                'keys' => array('pending_bc_op')),

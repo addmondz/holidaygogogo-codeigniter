@@ -166,6 +166,7 @@ $is_dev_env = ($app_env !== 'prod');
 										<span class="menu-text">Dashboard</span>
 									</a>
 								</li>
+								<?php if($this->session->level != 25) { ?>
 								<li class="menu-item <?php if($this->router->class == 'Admin') { echo 'menu-item-active'; } ?>">
 									<a href="<?php echo base_url('Admin'); ?>" class="menu-link">
 										<span class="svg-icon menu-icon">
@@ -179,6 +180,7 @@ $is_dev_env = ($app_env !== 'prod');
 										<span class="menu-text">Admin</span>
 									</a>
 								</li>
+								<?php } ?>
 								<?php } ?>
 								<?php if($this->session->level == 10 || in_array('FV', (array)$this->session->access_control)) { ?>
 								<li class="menu-item menu-item-submenu <?php if($this->router->class == 'Faq' || $this->router->class == 'Faq_Tag') { echo 'menu-item-active menu-item-open'; } ?>">
@@ -386,6 +388,14 @@ $is_dev_env = ($app_env !== 'prod');
 															<span class="menu-text">Lead Ownership</span>
 														</a>
 													</li>
+													<li class="menu-item <?php if($this->router->method == 'Leads_By_Hour') { echo 'menu-item-active'; } ?>">
+														<a href="<?php echo base_url('Report/Leads_By_Hour'); ?>" class="menu-link">
+															<i class="menu-bullet menu-bullet-dot">
+																<span></span>
+															</i>
+															<span class="menu-text">Leads By Hour</span>
+														</a>
+													</li>
 													<!-- <li class="menu-item <?php if($this->router->method == 'Lead_Ownership_Data') { echo 'menu-item-active'; } ?>">
 														<a href="<?php echo base_url('Report/Lead_Ownership_Data'); ?>" class="menu-link">
 															<i class="menu-bullet menu-bullet-dot">
@@ -465,7 +475,6 @@ $is_dev_env = ($app_env !== 'prod');
 													<span class="menu-text">Card Visibility</span>
 												</a>
 											</li>
-<?php /* Team function DISABLED — menu hidden
 											<li class="menu-item <?php if($this->router->class == 'Team') { echo 'menu-item-active'; } ?>">
 												<a href="<?php echo base_url('Team'); ?>" class="menu-link">
 													<i class="menu-bullet menu-bullet-dot">
@@ -474,7 +483,6 @@ $is_dev_env = ($app_env !== 'prod');
 													<span class="menu-text">Team</span>
 												</a>
 											</li>
-*/ ?>
 											<?php } ?>
 											<?php if(!in_array((int)$this->session->level, [20, 60]) && !$op_footer_only) { ?>
 											<li class="menu-item <?php if($this->router->class == 'Category_Code') { echo 'menu-item-active'; } ?>">

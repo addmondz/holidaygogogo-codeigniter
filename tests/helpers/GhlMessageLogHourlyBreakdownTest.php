@@ -29,24 +29,34 @@ function assert_eq($label, $expected, $actual) {
 
 // --- Always 24 ordered hour buckets, even from a single populated hour. ---
 $out = ghl_message_log_hourly_breakdown(array(
-    array('hour_of_day' => 9, 'inbound_count' => 3, 'outbound_count' => 5),
+    array('hour_of_day' => 9, 'inbound_count' => 3, 'outbound_count' => 5, 'leads_count' => 2),
 ));
 assert_eq('full 24-hour series', 24, count($out['hours']));
 assert_eq('first bucket is hour 0', 0, $out['hours'][0]['hour']);
 assert_eq('last bucket is hour 23', 23, $out['hours'][23]['hour']);
 assert_eq('empty hour 0 inbound = 0', 0, $out['hours'][0]['inbound']);
+assert_eq('empty hour 0 leads = 0', 0, $out['hours'][0]['leads']);
 assert_eq('hour 9 inbound', 3, $out['hours'][9]['inbound']);
 assert_eq('hour 9 outbound', 5, $out['hours'][9]['outbound']);
 assert_eq('hour 9 total', 8, $out['hours'][9]['total']);
+assert_eq('hour 9 leads', 2, $out['hours'][9]['leads']);
 
 // --- Day totals sum across every hour. ---
 $out = ghl_message_log_hourly_breakdown(array(
-    array('hour_of_day' => 7, 'inbound_count' => 2, 'outbound_count' => 4),
-    array('hour_of_day' => 22, 'inbound_count' => 1, 'outbound_count' => 6),
+    array('hour_of_day' => 7, 'inbound_count' => 2, 'outbound_count' => 4, 'leads_count' => 3),
+    array('hour_of_day' => 22, 'inbound_count' => 1, 'outbound_count' => 6, 'leads_count' => 2),
 ));
 assert_eq('total inbound', 3, $out['total_inbound']);
 assert_eq('total outbound', 10, $out['total_outbound']);
 assert_eq('grand total', 13, $out['total']);
+assert_eq('total leads (lead-hours)', 5, $out['total_leads']);
+
+// --- Missing leads_count defaults to zero (old callers stay safe). ---
+$out = ghl_message_log_hourly_breakdown(array(
+    array('hour_of_day' => 10, 'inbound_count' => 1, 'outbound_count' => 1),
+));
+assert_eq('hour 10 leads default', 0, $out['hours'][10]['leads']);
+assert_eq('total leads default', 0, $out['total_leads']);
 
 // --- 12-hour clock labels. ---
 $out = ghl_message_log_hourly_breakdown(array());
@@ -58,11 +68,12 @@ assert_eq('range label', '09:00 - 09:59', $out['hours'][9]['range_label']);
 
 // --- Two rows on the same hour accumulate (defensive against un-grouped input). ---
 $out = ghl_message_log_hourly_breakdown(array(
-    array('hour_of_day' => 14, 'inbound_count' => 1, 'outbound_count' => 1),
-    array('hour_of_day' => 14, 'inbound_count' => 2, 'outbound_count' => 3),
+    array('hour_of_day' => 14, 'inbound_count' => 1, 'outbound_count' => 1, 'leads_count' => 1),
+    array('hour_of_day' => 14, 'inbound_count' => 2, 'outbound_count' => 3, 'leads_count' => 2),
 ));
 assert_eq('same-hour inbound merged', 3, $out['hours'][14]['inbound']);
 assert_eq('same-hour outbound merged', 4, $out['hours'][14]['outbound']);
+assert_eq('same-hour leads merged', 3, $out['hours'][14]['leads']);
 
 // --- Out-of-range / malformed hours are ignored. ---
 $out = ghl_message_log_hourly_breakdown(array(

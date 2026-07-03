@@ -1584,6 +1584,7 @@ class Report_Model extends CI_Model
         $assignedRows = $this->Lead_Reply_Activity_Assigned_New_Leads_By_Agent($filters);
         $replyCreatedRows = $this->Lead_Reply_Activity_Reply_Created_By_Agent($filters);
         $respondedRows = $this->Lead_Reply_Activity_Responded_By_Agent($filters);
+        $responseTimeRows = $this->Lead_Reply_Activity_Response_Time_By_Agent($filters);
         $results = array();
 
         foreach ($assignedRows as $ownerId => $assignedRow) {
@@ -1600,6 +1601,7 @@ class Report_Model extends CI_Model
                 'total_productivity_leads' => $assignedLeads,
                 'first_reply_created_at' => null,
                 'last_reply_created_at' => null,
+                'avg_response_seconds' => null,
             );
         }
 
@@ -1617,6 +1619,7 @@ class Report_Model extends CI_Model
                     'total_productivity_leads' => 0,
                     'first_reply_created_at' => null,
                     'last_reply_created_at' => null,
+                    'avg_response_seconds' => null,
                 );
             }
 
@@ -1646,10 +1649,20 @@ class Report_Model extends CI_Model
                     'total_productivity_leads' => 0,
                     'first_reply_created_at' => null,
                     'last_reply_created_at' => null,
+                    'avg_response_seconds' => null,
                 );
             }
 
             $results[$ownerId]['lead_responded'] = (int) $respondedRow['lead_responded'];
+        }
+
+        // Avg Response Time stands beside Lead Responded: an owner only carries a
+        // figure when at least one responded lead had a measurable response time.
+        foreach ($responseTimeRows as $ownerId => $responseTimeRow) {
+            if (!isset($results[$ownerId])) {
+                continue;
+            }
+            $results[$ownerId]['avg_response_seconds'] = $responseTimeRow['avg_response_seconds'];
         }
 
         foreach ($results as $ownerId => $row) {
@@ -1731,6 +1744,78 @@ class Report_Model extends CI_Model
     }
 
     /**
+     * "Avg Response Time" per owner: the mean of the per-lead response times
+     * (ghl_processed_leads.avg_first_5_response_seconds -- the same figure the Lead
+     * Dashboard reports) across the DISTINCT leads the owner replied to. Shares the
+     * exact reply-activity universe as "Lead Responded" (outbound reply owned by the
+     * agent, inside the lead's ownership window and the 07:00-22:00 gate) so the two
+     * columns describe the same set of leads.
+     *
+     * The inner DISTINCT collapses the one-row-per-reply message join to one row per
+     * lead, so a lead replied to many times contributes its response time ONCE
+     * rather than weighting the average by reply count. AVG() then ignores the
+     * response-time NULLs (leads with no measured response time), matching
+     * lead_reply_activity_avg_response_seconds().
+     */
+    private function Lead_Reply_Activity_Response_Time_By_Agent($filters = array())
+    {
+        $where = $this->build_lead_reply_created_where_clause($filters);
+        if (trim($where['sql']) === 'WHERE 1=0') {
+            return array();
+        }
+
+        $extraJoins = isset($where['extra_joins']) ? $where['extra_joins'] : '';
+        $messageTimeColumn = $this->escape_identifier($this->get_message_time_column());
+        $businessHours = $this->lead_reply_business_hours_sql("gm.{$messageTimeColumn}");
+        $start = !empty($filters['start_date']) ? $filters['start_date'] . ' 00:00:00' : '1970-01-01 00:00:00';
+        $end = !empty($filters['end_date']) ? $filters['end_date'] . ' 23:59:59' : '9999-12-31 23:59:59';
+
+        $sql = "
+            SELECT
+                owner_user_id,
+                AVG(response_seconds) AS avg_response_seconds
+            FROM (
+                SELECT DISTINCT
+                    glo.owner_user_id AS owner_user_id,
+                    glo.processed_lead_id AS processed_lead_id,
+                    pl.avg_first_5_response_seconds AS response_seconds
+                FROM ghl_lead_ownership glo
+                INNER JOIN ghl_messages gm
+                    ON gm.conversation_id = glo.conversation_id
+                   AND gm.user_id = glo.owner_user_id
+                   AND gm.direction = 'outbound'
+                   AND gm.{$messageTimeColumn} >= glo.lead_started_at
+                   AND (
+                        glo.lead_ended_at IS NULL
+                        OR gm.{$messageTimeColumn} < glo.lead_ended_at
+                   )
+                INNER JOIN ghl_processed_leads pl ON pl.id = glo.processed_lead_id
+                {$extraJoins}
+                {$where['sql']}
+                  AND gm.{$messageTimeColumn} BETWEEN ? AND ?
+                  AND {$businessHours}
+                  AND pl.avg_first_5_response_seconds IS NOT NULL
+            ) responded_leads
+            GROUP BY owner_user_id
+        ";
+
+        $params = array_merge($where['params'], array($start, $end));
+        $rows = $this->db->query($sql, $params)->result_array();
+        $results = array();
+
+        foreach ($rows as $row) {
+            $results[(string) $row['owner_user_id']] = array(
+                'owner_user_id' => (string) $row['owner_user_id'],
+                'avg_response_seconds' => ($row['avg_response_seconds'] !== null)
+                    ? (int) round((float) $row['avg_response_seconds'])
+                    : null,
+            );
+        }
+
+        return $results;
+    }
+
+    /**
      * "Lead Responded" for a single agent who may own MORE THAN ONE GHL inbox:
      * the DISTINCT leads replied to across ALL the given owner uids, counted once
      * even when a lead was handled by two of the agent's inboxes (e.g. transferred
@@ -1805,7 +1890,8 @@ class Report_Model extends CI_Model
             SELECT
                 HOUR(gm.{$messageTimeColumn}) AS hour_of_day,
                 COUNT(DISTINCT CASE WHEN gm.direction = 'inbound' THEN gm.id END) AS inbound_count,
-                COUNT(DISTINCT CASE WHEN gm.direction = 'outbound' AND gm.user_id = glo.owner_user_id THEN gm.id END) AS outbound_count
+                COUNT(DISTINCT CASE WHEN gm.direction = 'outbound' AND gm.user_id = glo.owner_user_id THEN gm.id END) AS outbound_count,
+                COUNT(DISTINCT glo.conversation_id) AS leads_count
             FROM ghl_lead_ownership glo
             INNER JOIN ghl_messages gm
                 ON gm.conversation_id = glo.conversation_id
@@ -3260,6 +3346,38 @@ class Report_Model extends CI_Model
         return $report->result();
     }
 
+    /**
+     * New leads grouped by capture DATE + HOUR, for the "Leads By Hour" report.
+     * Uses lead_started_at (when the lead actually landed / first inbound), NOT
+     * created_at (the cron insert time). Reuses the shared lead-dashboard WHERE
+     * builder so date/agent/team filters and non-owner scoping match the rest
+     * of the lead reports. Returns sparse rows (only hours that had leads);
+     * leads_by_hour_build_matrix() fills the gaps.
+     *
+     * @param array $filters see build_lead_dashboard_where_clause()
+     * @return array of arrays: [ ['lead_date'=>'Y-m-d','hour_of_day'=>int,'lead_count'=>int], ... ]
+     */
+    function Leads_By_Hour($filters = array())
+    {
+        $where = $this->build_lead_dashboard_where_clause($filters);
+        $extraJoins = isset($where['extra_joins']) ? $where['extra_joins'] : '';
+
+        $sql = "
+            SELECT
+                DATE(pl.lead_started_at) AS lead_date,
+                HOUR(pl.lead_started_at) AS hour_of_day,
+                COUNT(*) AS lead_count
+            FROM ghl_processed_leads pl
+            LEFT JOIN ghl_conversations gc ON gc.conversation_id = pl.conversation_id
+            {$extraJoins}
+            {$where['sql']}
+            GROUP BY lead_date, hour_of_day
+            ORDER BY lead_date ASC, hour_of_day ASC
+        ";
+
+        return $this->db->query($sql, $where['params'])->result_array();
+    }
+
     private function build_lead_dashboard_where_clause($filters = array())
     {
         $clauses = array();
@@ -3315,7 +3433,7 @@ class Report_Model extends CI_Model
                 $extraJoins .= " LEFT JOIN admin tl_admin ON tl_admin.AdminID = tl_alda.AdminID AND tl_admin.Status = 'Y' ";
 
                 $placeholders = implode(',', array_fill(0, count($teamLeadIds), '?'));
-                $clauses[] = "tl_admin.TeamLeadID IN ({$placeholders})";
+                $clauses[] = "tl_admin.TeamID IN ({$placeholders})";
                 foreach ($teamLeadIds as $id) { $params[] = $id; }
             }
         }
@@ -3433,7 +3551,7 @@ class Report_Model extends CI_Model
                 $extraJoins .= " LEFT JOIN admin tl_admin ON tl_admin.AdminID = tl_alda.AdminID AND tl_admin.Status = 'Y' ";
 
                 $placeholders = implode(',', array_fill(0, count($teamLeadIds), '?'));
-                $clauses[] = "tl_admin.TeamLeadID IN ({$placeholders})";
+                $clauses[] = "tl_admin.TeamID IN ({$placeholders})";
                 foreach ($teamLeadIds as $id) { $params[] = $id; }
             }
         }
@@ -3562,7 +3680,7 @@ class Report_Model extends CI_Model
                 $extraJoins .= " LEFT JOIN admin tl_admin ON tl_admin.AdminID = tl_alda.AdminID AND tl_admin.Status = 'Y' ";
 
                 $placeholders = implode(',', array_fill(0, count($teamLeadIds), '?'));
-                $clauses[] = "tl_admin.TeamLeadID IN ({$placeholders})";
+                $clauses[] = "tl_admin.TeamID IN ({$placeholders})";
                 foreach ($teamLeadIds as $id) { $params[] = $id; }
             }
         }
@@ -3632,7 +3750,7 @@ class Report_Model extends CI_Model
                 $extraJoins .= " LEFT JOIN admin tl_admin ON tl_admin.AdminID = tl_alda.AdminID AND tl_admin.Status = 'Y' ";
 
                 $placeholders = implode(',', array_fill(0, count($teamLeadIds), '?'));
-                $clauses[] = "tl_admin.TeamLeadID IN ({$placeholders})";
+                $clauses[] = "tl_admin.TeamID IN ({$placeholders})";
                 foreach ($teamLeadIds as $id) { $params[] = $id; }
             }
         }
@@ -3685,7 +3803,7 @@ class Report_Model extends CI_Model
                 $extraJoins .= " LEFT JOIN admin tl_admin ON tl_admin.AdminID = tl_alda.AdminID AND tl_admin.Status = 'Y' ";
 
                 $placeholders = implode(',', array_fill(0, count($teamLeadIds), '?'));
-                $clauses[] = "tl_admin.TeamLeadID IN ({$placeholders})";
+                $clauses[] = "tl_admin.TeamID IN ({$placeholders})";
                 foreach ($teamLeadIds as $id) { $params[] = $id; }
             }
         }
@@ -3754,12 +3872,14 @@ class Report_Model extends CI_Model
         );
     }
 
-    function Lead_Dashboard_Team_Leads()
+    // Active Teams for the lead-dashboard "Team" filter. The filter (see the
+    // team_lead blocks above) matches each GHL lead's owning admin.TeamID against
+    // the selected TeamIDs. Param key stays 'team_lead' for historical reasons.
+    function Lead_Dashboard_Teams()
     {
-        $this->db->select('AdminID, Name');
-        $this->db->where('Level', '25');
+        $this->db->select('TeamID, Name');
         $this->db->where('Status', 'Y');
         $this->db->order_by('Name', 'ASC');
-        return $this->db->get('admin')->result();
+        return $this->db->get('team')->result();
     }
 }

@@ -1832,7 +1832,7 @@ class Payment extends MY_Controller
 
 	private function is_completed_booking_blocked()
 	{
-		if(in_array($this->session->userdata('level'), [20, 40, 50]) && !empty($this->input->get('booking_number'))) {
+		if(in_array($this->session->userdata('level'), [20, 25, 40, 50]) && !empty($this->input->get('booking_number'))) {
 			$booking_data = $this->Booking_Model->Read_Booking_ID();
 			if(!empty($booking_data)) {
 				$this->db->select('Status, AfterSalesService');

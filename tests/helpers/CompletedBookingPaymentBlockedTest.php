@@ -6,9 +6,9 @@
  * must be blocked from a booking's Payment history because the trip is
  * finished (Status='Y' AND AfterSalesService='COMPLETE').
  *
- * Sales Agent (20), OP (40) and TC (50) lose access once the trip completes;
- * Finance/Owner keep it. Used by Payment::is_completed_booking_blocked()
- * (index, ajax_list, ajax_summary).
+ * Sales Agent (20), Team Lead (25), OP (40) and TC (50) lose access once the
+ * trip completes; Finance/Owner keep it. Used by
+ * Payment::is_completed_booking_blocked() (index, ajax_list, ajax_summary).
  */
 
 if (!defined('BASEPATH')) {
@@ -22,6 +22,8 @@ $assertions = [];
 // Blocked roles on a fully-completed booking -> blocked
 $assertions['SA (20) + Status=Y + COMPLETE -> blocked'] =
     is_completed_booking_payment_blocked(20, 'Y', 'COMPLETE') === true;
+$assertions['Team Lead (25) + Status=Y + COMPLETE -> blocked'] =
+    is_completed_booking_payment_blocked(25, 'Y', 'COMPLETE') === true;
 $assertions['OP (40) + Status=Y + COMPLETE -> blocked'] =
     is_completed_booking_payment_blocked(40, 'Y', 'COMPLETE') === true;
 $assertions['TC (50) + Status=Y + COMPLETE -> blocked'] =

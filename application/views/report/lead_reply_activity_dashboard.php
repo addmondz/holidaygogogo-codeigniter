@@ -65,10 +65,10 @@
                                         </div>
                                         <div class="col-md-4">
                                             <div class="form-group">
-                                                <label>Team Leader</label>
-                                                <select name="team_lead[]" data-live-search="true" class="form-control selectpicker" multiple data-actions-box="true" title="--ALL TEAM LEADERS--">
+                                                <label>Team</label>
+                                                <select name="team_lead[]" data-live-search="true" class="form-control selectpicker" multiple data-actions-box="true" title="--ALL TEAMS--">
                                                     <?php foreach($lead_reply_activity_team_leads as $tl) { ?>
-                                                        <option data-icon="la la-user-tie font-size-lg bs-icon" value="<?php echo html_escape($tl->AdminID); ?>" <?php if(in_array((string) $tl->AdminID, $lead_reply_activity_filters['team_lead'], true)) { echo 'selected'; } ?>>
+                                                        <option data-icon="la la-user-tie font-size-lg bs-icon" value="<?php echo html_escape($tl->TeamID); ?>" <?php if(in_array((string) $tl->TeamID, $lead_reply_activity_filters['team_lead'], true)) { echo 'selected'; } ?>>
                                                             <?php echo html_escape($tl->Name); ?>
                                                         </option>
                                                     <?php } ?>
@@ -88,7 +88,7 @@
                                         <div class="form-group mb-0">
                                             <label>Export Date Range
                                                 <i class="la la-info-circle ml-1" style="cursor:help; color:#2f506f;" data-toggle="tooltip"
-                                                   title="The on-screen table is for one day. The Excel download instead covers this whole range, with each date as a row and one column group per owner (max 92 days). Owner and Team Leader filters above are applied."></i>
+                                                   title="The on-screen table is for one day. The Excel download instead covers this whole range, with each date as a row and one column group per owner (max 92 days). Owner and Team filters above are applied."></i>
                                             </label>
                                             <div id="lead_reply_export_daterangepicker" class="input-icon">
                                                 <input readonly type="text" id="lead-reply-export-range" autocomplete="off" class="form-control" placeholder="Select date range">
@@ -132,13 +132,18 @@
                                     <i class="la la-info-circle ml-1" style="cursor:help; color:#2f506f;" data-toggle="tooltip"
                                        title="Leads still being handled today: Lead Responded minus Transfer Out Lead (never below zero)."></i>
                                 </th>
+                                <th style="text-align:center;">
+                                    Avg Response Time
+                                    <i class="la la-info-circle ml-1" style="cursor:help; color:#2f506f;" data-toggle="tooltip"
+                                       title="Average first-response time across the leads this owner replied to in the window (same measure as the Lead Dashboard). Leads with no measured response time are ignored; a dash means none qualified."></i>
+                                </th>
                                 <th style="text-align:center;">Hourly</th>
                             </tr>
                         </thead>
                         <tbody id="lead-reply-activity-table-body">
                             <?php if(empty($lead_reply_activity_rows)) { ?>
                                 <tr>
-                                    <td colspan="6" class="text-center py-10">Lead reply activity not found for the selected filters.</td>
+                                    <td colspan="7" class="text-center py-10">Lead reply activity not found for the selected filters.</td>
                                 </tr>
                             <?php } else { ?>
                                 <?php $count = 1; ?>
@@ -151,6 +156,7 @@
                                         <td class="text-center"><?php echo number_format($row['lead_responded']); ?></td>
                                         <td class="text-center"><?php echo number_format($row['transfer_out_leads']); ?></td>
                                         <td class="text-center font-weight-bold text-dark"><?php echo number_format($row['today_handling_leads']); ?></td>
+                                        <td class="text-center"><?php echo html_escape($row['avg_response_time_label']); ?></td>
                                         <td class="text-center">
                                             <a href="<?php echo html_escape($hourlyUrl); ?>" class="btn btn-sm btn-light-primary font-weight-bold" data-toggle="tooltip" title="View inbound/outbound per hour for this owner">
                                                 <i class="la la-clock-o"></i> Hourly
@@ -218,7 +224,7 @@
     applyLeadReplyExportRange(leadReplyExportStart, leadReplyExportEnd);
 
     $('#lead-reply-export-btn').click(function() {
-        // Carry the same Owner / Team Leader filters shown above; only the date
+        // Carry the same Owner / Team filters shown above; only the date
         // window differs (range here vs. single day in the form).
         var params = $('#lead-reply-activity-form')
             .serializeArray()
@@ -240,7 +246,7 @@
         var html = '';
 
         if (!rows || rows.length === 0) {
-            $('#lead-reply-activity-table-body').html('<tr><td colspan="6" class="text-center py-10">Lead reply activity not found for the selected filters.</td></tr>');
+            $('#lead-reply-activity-table-body').html('<tr><td colspan="7" class="text-center py-10">Lead reply activity not found for the selected filters.</td></tr>');
             return;
         }
 
@@ -257,6 +263,7 @@
             html += '<td class="text-center">' + leadResponded + '</td>';
             html += '<td class="text-center">' + transferOutLeads + '</td>';
             html += '<td class="text-center font-weight-bold text-dark">' + todayHandlingLeads + '</td>';
+            html += '<td class="text-center">' + escapeHtml(row.avg_response_time_label || '-') + '</td>';
             html += '<td class="text-center"><a href="' + hourlyUrl + '" class="btn btn-sm btn-light-primary font-weight-bold" data-toggle="tooltip" title="View inbound/outbound per hour for this owner"><i class="la la-clock-o"></i> Hourly</a></td>';
             html += '</tr>';
         });

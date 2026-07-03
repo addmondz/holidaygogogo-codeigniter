@@ -4,9 +4,11 @@ class Team extends MY_Controller
 	function __construct()
 	{
 		parent::__construct();
-		// Team function DISABLED — the whole feature (management page + listing
-		// scope) has been turned off. Block all access to the controller.
-		redirect('Dashboard');
+		// Team settings are OWNER-only (Level 10): they drive the booking/payment
+		// listing scope, so managing them stays with the Owner.
+		if((int)$this->session->level !== 10) {
+			redirect('Dashboard');
+		}
 		$this->load->model('Team_Model');
 		$this->load->model('Universal_Model');
 	}

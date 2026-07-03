@@ -124,6 +124,42 @@ if (!function_exists('lead_reply_activity_today_handling')) {
     }
 }
 
+if (!function_exists('lead_reply_activity_avg_response_seconds')) {
+    /**
+     * "Avg Response Time" for the Lead Reply Activity dashboard: the mean of an
+     * owner's per-lead response times (ghl_processed_leads.avg_first_5_response_seconds
+     * -- the same figure the Lead Dashboard reports), taken across the DISTINCT
+     * leads the owner replied to. The caller passes one value per lead, so a lead
+     * replied to many times still contributes its response time once.
+     *
+     * Leads with no measurable response time (null) or a negative gap are ignored
+     * rather than counted as zero, so a single un-timed lead can't drag the mean
+     * down. Returns null when nothing qualifies, so the column renders a dash.
+     *
+     * @param array $perLeadSeconds One response-time value per distinct lead.
+     * @return int|null Mean seconds rounded to a whole second, or null.
+     */
+    function lead_reply_activity_avg_response_seconds(array $perLeadSeconds)
+    {
+        $total = 0;
+        $count = 0;
+
+        foreach ($perLeadSeconds as $seconds) {
+            if ($seconds === null || $seconds === '') {
+                continue;
+            }
+            $seconds = (int) $seconds;
+            if ($seconds < 0) {
+                continue;
+            }
+            $total += $seconds;
+            $count++;
+        }
+
+        return $count > 0 ? (int) round($total / $count) : null;
+    }
+}
+
 if (!function_exists('ghl_message_log_reply_pair_seconds')) {
     /**
      * Seconds an agent took to answer a customer: the gap from an INBOUND message
@@ -477,9 +513,10 @@ if (!function_exists('ghl_message_log_hourly_breakdown')) {
      * @param string $hourKey     Key holding the 0-23 hour value.
      * @param string $inboundKey  Key holding the inbound count for that hour.
      * @param string $outboundKey Key holding the outbound count for that hour.
-     * @return array{hours: array, total_inbound: int, total_outbound: int, total: int}
+     * @param string $leadsKey    Key holding the distinct-leads count for that hour.
+     * @return array{hours: array, total_inbound: int, total_outbound: int, total: int, total_leads: int}
      */
-    function ghl_message_log_hourly_breakdown(array $rows, $hourKey = 'hour_of_day', $inboundKey = 'inbound_count', $outboundKey = 'outbound_count')
+    function ghl_message_log_hourly_breakdown(array $rows, $hourKey = 'hour_of_day', $inboundKey = 'inbound_count', $outboundKey = 'outbound_count', $leadsKey = 'leads_count')
     {
         $byHour = array();
         foreach ($rows as $row) {
@@ -492,21 +529,26 @@ if (!function_exists('ghl_message_log_hourly_breakdown')) {
             }
             $inbound = isset($row[$inboundKey]) ? (int) $row[$inboundKey] : 0;
             $outbound = isset($row[$outboundKey]) ? (int) $row[$outboundKey] : 0;
+            $leads = isset($row[$leadsKey]) ? (int) $row[$leadsKey] : 0;
             if (!isset($byHour[$hour])) {
-                $byHour[$hour] = array('inbound' => 0, 'outbound' => 0);
+                $byHour[$hour] = array('inbound' => 0, 'outbound' => 0, 'leads' => 0);
             }
             $byHour[$hour]['inbound'] += $inbound;
             $byHour[$hour]['outbound'] += $outbound;
+            $byHour[$hour]['leads'] += $leads;
         }
 
         $hours = array();
         $totalInbound = 0;
         $totalOutbound = 0;
+        $totalLeads = 0;
         for ($hour = 0; $hour <= 23; $hour++) {
             $inbound = isset($byHour[$hour]) ? $byHour[$hour]['inbound'] : 0;
             $outbound = isset($byHour[$hour]) ? $byHour[$hour]['outbound'] : 0;
+            $leads = isset($byHour[$hour]) ? $byHour[$hour]['leads'] : 0;
             $totalInbound += $inbound;
             $totalOutbound += $outbound;
+            $totalLeads += $leads;
 
             $suffix = $hour < 12 ? 'AM' : 'PM';
             $display = $hour % 12;
@@ -520,6 +562,7 @@ if (!function_exists('ghl_message_log_hourly_breakdown')) {
                 'range_label' => sprintf('%02d:00 - %02d:59', $hour, $hour),
                 'inbound' => $inbound,
                 'outbound' => $outbound,
+                'leads' => $leads,
                 'total' => $inbound + $outbound,
             );
         }
@@ -528,6 +571,7 @@ if (!function_exists('ghl_message_log_hourly_breakdown')) {
             'hours' => $hours,
             'total_inbound' => $totalInbound,
             'total_outbound' => $totalOutbound,
+            'total_leads' => $totalLeads,
             'total' => $totalInbound + $totalOutbound,
         );
     }

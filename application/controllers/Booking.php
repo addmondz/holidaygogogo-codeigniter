@@ -418,6 +418,10 @@ class Booking extends MY_Controller
 			// Row number
 			$row['row_number'] = $count;
 
+			// Raw booking id (not a column) — lets the client collect the ids on the
+			// current page to scope the agent "chase" summary cards to visible rows.
+			$row['booking_id'] = (int) $booking->BookingID;
+
 			// Sales agent, Sales agent 2 and OP
 			$row['sales_agent'] = $booking->SalesAgentName;
 			$row['sales_agent_2'] = $booking->SalesAgent2Name;
@@ -641,11 +645,11 @@ class Booking extends MY_Controller
 			if(in_array('GB', $this->session->access_control)) {
 				$html .= '<a href="' . (strpos($current_url, '?') ? base_url('Booking/Duplicate?booking_id=') . $booking->BookingID . '&' . explode('?', $current_url)[1] : base_url('Booking/Duplicate?booking_id=') . $booking->BookingID) . '" class="dropdown-item" style="font-size:11px;">Duplicate Booking</a>';
 			}
-			// Edit Checklist - AB users, SA viewing own booking, the sales Team
-			// Lead (level 25), or the OP TEAM LEAD (level 45). The modal/save
-			// flow further scopes via can_user_modify_booking_checklist() so
-			// only the matching TC1/OP TL can actually tick; non-matching leads
-			// see a read-only modal.
+			// Edit Checklist - AB users, SA viewing own booking, a TEAM LEAD
+			// (level 25) or an OP TEAM LEAD (level 45). The modal/save flow
+			// further scopes via can_user_modify_booking_checklist() so only a
+			// lead sharing a Team with the booking's TC/TC2/OP (or an assignee)
+			// can actually tick; non-matching leads see a read-only modal.
 			$is_team_lead_user = (int)$this->session->userdata('level') === 25;
 			$is_op_team_lead_user = (int)$this->session->userdata('level') === 45;
 			if(in_array('AB', $access_control) || ($is_sales_agent && !empty($booking->SalesAgentID) && $booking->SalesAgentID == $this->session->userdata('admin_id')) || $is_team_lead_user || $is_op_team_lead_user) {
@@ -754,6 +758,199 @@ class Booking extends MY_Controller
 	 * AJAX endpoint for role-based summary cards rendered above the booking listing.
 	 * Returns counts/values/links keyed per card; the view partial fills placeholders.
 	 */
+	// Builds the three sales-agent "chase" cards shared by the full summary-card
+	// payload and the listing's page-scoped refresh:
+	//   - upcoming_travel_not_ready_op     (Travel in 7 Days  – Not Yet Ready)
+	//   - upcoming_travel_not_ready_op_14  (Travel in 14 Days – Not Yet Ready)
+	//   - customer_payment_due_soon        (Payment From Customer Due Soon)
+	//
+	// $scope_ids: null  -> no row scope (whole-DB own bookings, e.g. dashboard).
+	//             array -> count only these booking ids (the rows visible on the
+	//                      current listing page); an empty array counts nothing.
+	// The id list is always an extra AND on top of the existing status / date /
+	// own-slot conditions, never a replacement for them.
+	private function _agent_upcoming_cards($admin_id, $scope_ids = null)
+	{
+		$admin_id = (int) $admin_id;
+		$this->load->helper('lead_conversion_credit');
+		$credit_clause = lead_conversion_credit_booking_clause();
+
+		$today   = date('Y-m-d');
+		$base    = base_url('Booking');
+		$fmt_dmy = function($d) { return date('d/m/Y', strtotime($d)); };
+		$money   = function($v) { return 'RM ' . number_format((float)$v, 2, '.', ','); };
+		$qs      = function($params) { return '?' . http_build_query($params); };
+
+		$next7_start  = date('Y-m-d', strtotime('+1 day'));
+		$next7_end    = date('Y-m-d', strtotime('+7 days'));
+		// Cumulative 14-day window shares the 7-day start (tomorrow).
+		$next14_start = $next7_start;
+		$next14_end   = date('Y-m-d', strtotime('+14 days'));
+
+		// Restrict every card to the visible page rows when an id list is given.
+		// null -> no restriction; empty array -> impossible clause (count nothing);
+		// otherwise AND booking.BookingID IN (...sanitised ints...). Ints are cast
+		// and interpolated (safe) so the IN list needs no bound parameters.
+		$id_clause = '';
+		if(is_array($scope_ids)) {
+			$ids = array_values(array_unique(array_filter(array_map('intval', $scope_ids), function($v) { return $v > 0; })));
+			$id_clause = empty($ids) ? ' AND 1=0' : ' AND booking.BookingID IN (' . implode(',', $ids) . ')';
+		}
+
+		$cards  = array();
+		$tables = array();
+
+		// "Travel in N Days – Not Yet Ready" counts confirmed BCs this agent is
+		// *credited* for (TC1 pre-cutoff, TC2 on/after) — the same credited-slot
+		// rule the ?upcoming_not_ready drill-down applies for level 20/50, so the
+		// card and its listing agree. No sales_agent param on the link: the
+		// listing self-scopes by the credited slot for this level.
+		foreach(array(
+			array('key' => 'upcoming_travel_not_ready_op',    's' => $next7_start,  'e' => $next7_end),
+			array('key' => 'upcoming_travel_not_ready_op_14', 's' => $next14_start, 'e' => $next14_end),
+		) as $w) {
+			$row = $this->db->query(
+				"SELECT
+				   SUM(CASE WHEN Status='P'   THEN 1 ELSE 0 END) AS s_p,
+				   SUM(CASE WHEN Status='PBO' THEN 1 ELSE 0 END) AS s_pbo,
+				   SUM(CASE WHEN Status='PGL' THEN 1 ELSE 0 END) AS s_pgl,
+				   SUM(CASE WHEN Status='PTV' THEN 1 ELSE 0 END) AS s_ptv
+				 FROM booking
+				 WHERE BookingConfirmationTitle='BOOKING CONFIRMATION'
+				   AND CancelStatus='N'
+				   AND Status IN ('P','PBO','PGL','PTV')
+				   AND StartDate BETWEEN ? AND ?
+				   AND {$credit_clause}{$id_clause}",
+				array($w['s'], $w['e'], $admin_id, $admin_id)
+			)->row();
+			$cards[$w['key']] = array(
+				'count'  => (int)$row->s_p + (int)$row->s_pbo + (int)$row->s_pgl + (int)$row->s_ptv,
+				'by_p'   => (int)$row->s_p,
+				'by_pbo' => (int)$row->s_pbo,
+				'by_pgl' => (int)$row->s_pgl,
+				'by_ptv' => (int)$row->s_ptv,
+				'link'   => $base . $qs(array(
+					'upcoming_not_ready' => 1,
+					'travel_date'        => $fmt_dmy($w['s']) . ' - ' . $fmt_dmy($w['e']),
+				)),
+			);
+		}
+
+		// "Payment From Customer Due Soon" — own BCs still owing a scheduled
+		// customer payment, bucketed Overdue / Today / Tomorrow. Scoped to the
+		// agent's own bookings via the broad SalesAgent/SalesAgent2 slot the TC
+		// listing applies by default, so the card matches the ?customer_payment
+		// drill-down (which relies on that same default scope — no sales_agent
+		// param).
+		$cust_due_end   = date('Y-m-d', strtotime('+1 day'));  // tomorrow — window upper bound
+		$cust_due_start = date('Y') . '-03-01';                // overdue lookback floor: 1 March, current year
+		$cust_nd  = "(CASE WHEN booking.Status = 'P' THEN COALESCE(booking.DepositDeadline, booking.FullPaymentDeadline) ELSE booking.FullPaymentDeadline END)";
+		$cust_out = "(booking.NetTotal - COALESCE((SELECT SUM(p.Credit) FROM payment p"
+			. " WHERE p.BookingID = booking.BookingID"
+			. " AND p.Status = 'Y' AND p.Credit > 0"
+			. " AND (p.Type IS NULL OR p.Type != 'AGENT COMMISSION FROM SUPPLIER')), 0))";
+		$tc_own = "(booking.SalesAgent = ? OR booking.SalesAgent2 = ?)";
+		$row = $this->db->query(
+			"SELECT
+			    SUM(CASE WHEN t.nd <  ? THEN 1 ELSE 0 END) AS overdue_cnt,
+			    COALESCE(SUM(CASE WHEN t.nd <  ? THEN t.outstanding ELSE 0 END), 0) AS overdue_due,
+			    SUM(CASE WHEN t.nd =  ? THEN 1 ELSE 0 END) AS today_cnt,
+			    COALESCE(SUM(CASE WHEN t.nd =  ? THEN t.outstanding ELSE 0 END), 0) AS today_due,
+			    SUM(CASE WHEN t.nd =  ? THEN 1 ELSE 0 END) AS tomorrow_cnt,
+			    COALESCE(SUM(CASE WHEN t.nd =  ? THEN t.outstanding ELSE 0 END), 0) AS tomorrow_due
+			 FROM (
+			    SELECT {$cust_nd} AS nd, {$cust_out} AS outstanding
+			    FROM booking
+			    WHERE booking.CancelStatus = 'N'
+			      AND booking.Status IN ('P','PP')
+			      AND {$tc_own}{$id_clause}
+			 ) t
+			 WHERE t.nd BETWEEN ? AND ?
+			   AND t.outstanding > 0",
+			array($today, $today, $today, $today, $cust_due_end, $cust_due_end, $admin_id, $admin_id, $cust_due_start, $cust_due_end)
+		)->row();
+		$cards['customer_payment_due_soon'] = array(
+			'overdue'  => array('count' => (int)$row->overdue_cnt,  'total_due' => $money($row->overdue_due),  'link' => $base . $qs(array('customer_payment' => 'overdue',  'status' => 'A'))),
+			'today'    => array('count' => (int)$row->today_cnt,    'total_due' => $money($row->today_due),    'link' => $base . $qs(array('customer_payment' => 'today',    'status' => 'A'))),
+			'tomorrow' => array('count' => (int)$row->tomorrow_cnt, 'total_due' => $money($row->tomorrow_due), 'link' => $base . $qs(array('customer_payment' => 'tomorrow', 'status' => 'A'))),
+		);
+
+		$cust_rows = $this->db->query(
+			"SELECT t.BookingNumber AS booking_number, t.Customer AS customer,
+			        t.nd AS earliest_deadline, t.outstanding AS total_due
+			 FROM (
+			    SELECT booking.BookingNumber AS BookingNumber, booking.Customer AS Customer,
+			           {$cust_nd} AS nd, {$cust_out} AS outstanding
+			    FROM booking
+			    WHERE booking.CancelStatus = 'N'
+			      AND booking.Status IN ('P','PP')
+			      AND {$tc_own}{$id_clause}
+			 ) t
+			 WHERE t.nd BETWEEN ? AND ?
+			   AND t.outstanding > 0
+			 ORDER BY t.nd ASC, t.outstanding DESC
+			 LIMIT 5",
+			array($admin_id, $admin_id, $cust_due_start, $cust_due_end)
+		)->result();
+		$cust_out_rows = array();
+		foreach($cust_rows as $r) {
+			$cust_out_rows[] = array(
+				'booking_number'    => $r->booking_number,
+				'customer'          => $r->customer,
+				'total_due'         => $money($r->total_due),
+				'earliest_deadline' => $r->earliest_deadline ? $fmt_dmy($r->earliest_deadline) : '-',
+			);
+		}
+		$tables['customer_payment_due_soon'] = $cust_out_rows;
+
+		return array('cards' => $cards, 'tables' => $tables);
+	}
+
+	// Listing-only endpoint: recomputes the three sales-agent chase cards scoped
+	// to the booking ids visible on the current DataTables page. Posted by
+	// refreshAgentVisibleCards() on every table draw so the counts follow what
+	// the user actually sees below the listing, never the whole DB.
+	function ajax_agent_visible_cards()
+	{
+		$this->begin_json_endpoint();
+
+		try {
+			$access_control = $this->session->access_control ?? array();
+			if(!in_array('VB', $access_control)) {
+				$this->send_json(array('error' => 'Access denied'));
+				return;
+			}
+
+			$level    = (int) $this->session->userdata('level');
+			$admin_id = (int) $this->session->userdata('admin_id');
+
+			$this->load->helper('summary_card_roles');
+			$owner_as_agent = ((int) $this->input->post('owner_as_agent') === 1);
+			// Only the sales-agent card set owns these three cards; anyone else gets
+			// an empty payload so a stray call never leaks whole-DB numbers.
+			if(!summary_cards_show_agent_set($level, $owner_as_agent)) {
+				$this->send_json(array('cards' => new stdClass(), 'tables' => new stdClass()));
+				return;
+			}
+
+			// Visible booking ids from the current listing page. Always treated as a
+			// scope (empty -> count nothing), never a whole-DB fallback.
+			$ids_raw = $this->input->post('ids');
+			$scope_ids = array();
+			if(is_array($ids_raw)) {
+				$scope_ids = $ids_raw;
+			} elseif(is_string($ids_raw) && $ids_raw !== '') {
+				$scope_ids = explode(',', $ids_raw);
+			}
+
+			$r = $this->_agent_upcoming_cards($admin_id, $scope_ids);
+			$this->send_json(array('cards' => $r['cards'], 'tables' => $r['tables']));
+		} catch (\Throwable $e) {
+			log_message('error', 'Booking ajax_agent_visible_cards error: ' . $e->getMessage());
+			$this->send_json(array('error' => 'An error occurred while loading cards'));
+		}
+	}
+
 	function ajax_summary_cards()
 	{
 		$this->begin_json_endpoint();
@@ -904,6 +1101,45 @@ class Booking extends MY_Controller
 			)->row();
 			$sales_year_actual = (float)$row_year->total;
 
+			// ---------- "vs same period last year" comparison ----------
+			// Own sales this period against the SAME to-date span last year, so a
+			// partway-through month/year compares against the same number of days
+			// a year earlier (not the full prior period). Reuses the exact BC-only
+			// sales SQL — just a shifted date window. For 2025 bookings the
+			// credited slot resolves to the main sales person (pre-2026-06-01
+			// rule), matching how those bookings are actually credited.
+			$ly_month = summary_prior_year_window($month_start, $month_end, $today);
+			$ly_year  = summary_prior_year_window($year_start, $year_end, $today);
+			$sales_month_ly = (float)$this->db->query(
+				$bc_sales_sql,
+				array($admin_id, $admin_id, $ly_month['start'], $ly_month['end'])
+			)->row()->total;
+			$sales_year_ly = (float)$this->db->query(
+				$bc_sales_sql,
+				array($admin_id, $admin_id, $ly_year['start'], $ly_year['end'])
+			)->row()->total;
+
+			// Comparison sub-object the front-end renders as a sub-line. percent
+			// is null when there's no prior-year baseline (last year was RM 0 — a
+			// percent change would be meaningless); dir drives the ▲/▼ arrow.
+			$year_ago_cmp = function($current, $prior) use ($money) {
+				$pct = null;
+				$dir = 'flat';
+				if($prior > 0) {
+					$change = round((($current - $prior) / $prior) * 100, 1);
+					$pct = ($change > 0 ? '+' : '') . $change . '%';
+					$dir = $change > 0 ? 'up' : ($change < 0 ? 'down' : 'flat');
+				} else {
+					$dir = $current > 0 ? 'up' : 'flat';
+				}
+				return array(
+					'value'     => $money($prior),
+					'percent'   => $pct,
+					'dir'       => $dir,
+					'has_prior' => $prior > 0,
+				);
+			};
+
 			// Target lookups for the selected period — set by Owner / Team Lead
 			// via Admin (sales_targets monthly, sales_target_year yearly).
 			// Missing row => target 0 => percent rendered "—".
@@ -932,6 +1168,7 @@ class Booking extends MY_Controller
 				'has_target' => $target_amount > 0,
 				'raw'        => $sales_month_actual,
 				'raw_target' => $target_amount,
+				'yoy'        => $year_ago_cmp($sales_month_actual, $sales_month_ly),
 			);
 			$cards['sales_year'] = array(
 				'value'      => $money($sales_year_actual),
@@ -940,6 +1177,7 @@ class Booking extends MY_Controller
 				'has_target' => $year_target_amount > 0,
 				'raw'        => $sales_year_actual,
 				'raw_target' => $year_target_amount,
+				'yoy'        => $year_ago_cmp($sales_year_actual, $sales_year_ly),
 			);
 
 			$row = $this->db->query(
@@ -1165,10 +1403,13 @@ class Booking extends MY_Controller
 					? round(($own_converted / $own_total_leads) * 100, 1)
 					: null;
 			}
-			// "Best:" compares only against the SALES AGENT role: restrict the
-			// leaderboard pool to GHL users mapping to a level-20 admin. The
-			// agent's own rate above is unaffected (it filters by $my_ghl_uids).
-			$sales_uid_set = $this->sales_agent_ghl_uids();
+			// "Best:" compares against SALES AGENTS plus TC LEADS: restrict the
+			// leaderboard pool to GHL users mapping to a level-20 or level-25
+			// admin. Including TC Leads (25) lets a logged-in TC Lead who
+			// out-converts every sales agent show up as "Best: You" instead of
+			// sitting above a lower sales-agent number. The agent's own rate
+			// above is unaffected (it filters by $my_ghl_uids).
+			$sales_uid_set = $this->sales_agent_ghl_uids(array('20', '25'));
 			$conv_pool = array_values(array_filter($by_agent, function($a) use ($sales_uid_set) {
 				return isset($sales_uid_set[(string)$a['agent_id']]);
 			}));
@@ -1450,108 +1691,15 @@ class Booking extends MY_Controller
 			// ids as the OP cards (TC and OP levels never render together), so the
 			// existing JS populates them with no extra wiring.
 			//
-			// "Travel in N Days – Not Yet Ready" counts confirmed BCs this agent is
-			// *credited* for (TC1 pre-cutoff, TC2 on/after) — the same credited-slot
-			// rule the ?upcoming_not_ready drill-down applies for level 20/50, so the
-			// card and its listing agree. No sales_agent param on the link: the
-			// listing self-scopes by the credited slot for this level.
-			foreach(array(
-				array('key' => 'upcoming_travel_not_ready_op',    's' => $next7_start,  'e' => $next7_end),
-				array('key' => 'upcoming_travel_not_ready_op_14', 's' => $next14_start, 'e' => $next14_end),
-			) as $w) {
-				$row = $this->db->query(
-					"SELECT
-					   SUM(CASE WHEN Status='P'   THEN 1 ELSE 0 END) AS s_p,
-					   SUM(CASE WHEN Status='PBO' THEN 1 ELSE 0 END) AS s_pbo,
-					   SUM(CASE WHEN Status='PGL' THEN 1 ELSE 0 END) AS s_pgl,
-					   SUM(CASE WHEN Status='PTV' THEN 1 ELSE 0 END) AS s_ptv
-					 FROM booking
-					 WHERE BookingConfirmationTitle='BOOKING CONFIRMATION'
-					   AND CancelStatus='N'
-					   AND Status IN ('P','PBO','PGL','PTV')
-					   AND StartDate BETWEEN ? AND ?
-					   AND {$credit_clause}",
-					array($w['s'], $w['e'], $admin_id, $admin_id)
-				)->row();
-				$cards[$w['key']] = array(
-					'count'  => (int)$row->s_p + (int)$row->s_pbo + (int)$row->s_pgl + (int)$row->s_ptv,
-					'by_p'   => (int)$row->s_p,
-					'by_pbo' => (int)$row->s_pbo,
-					'by_pgl' => (int)$row->s_pgl,
-					'by_ptv' => (int)$row->s_ptv,
-					'link'   => $base . $qs(array(
-						'upcoming_not_ready' => 1,
-						'travel_date'        => $fmt_dmy($w['s']) . ' - ' . $fmt_dmy($w['e']),
-					)),
-				);
-			}
-
-			// "Payment From Customer Due Soon" — own BCs still owing a scheduled
-			// customer payment, bucketed Overdue / Today / Tomorrow. Scoped to the
-			// agent's own bookings via the broad SalesAgent/SalesAgent2 slot the TC
-			// listing applies by default, so the card matches the ?customer_payment
-			// drill-down (which relies on that same default scope — no sales_agent
-			// param). Mirrors the OP query body verbatim, only the scope differs.
-			$cust_due_end   = date('Y-m-d', strtotime('+1 day'));  // tomorrow — window upper bound
-			$cust_due_start = date('Y') . '-03-01';                // overdue lookback floor: 1 March, current year
-			$cust_nd  = "(CASE WHEN booking.Status = 'P' THEN COALESCE(booking.DepositDeadline, booking.FullPaymentDeadline) ELSE booking.FullPaymentDeadline END)";
-			$cust_out = "(booking.NetTotal - COALESCE((SELECT SUM(p.Credit) FROM payment p"
-				. " WHERE p.BookingID = booking.BookingID"
-				. " AND p.Status = 'Y' AND p.Credit > 0"
-				. " AND (p.Type IS NULL OR p.Type != 'AGENT COMMISSION FROM SUPPLIER')), 0))";
-			$tc_own = "(booking.SalesAgent = ? OR booking.SalesAgent2 = ?)";
-			$row = $this->db->query(
-				"SELECT
-				    SUM(CASE WHEN t.nd <  ? THEN 1 ELSE 0 END) AS overdue_cnt,
-				    COALESCE(SUM(CASE WHEN t.nd <  ? THEN t.outstanding ELSE 0 END), 0) AS overdue_due,
-				    SUM(CASE WHEN t.nd =  ? THEN 1 ELSE 0 END) AS today_cnt,
-				    COALESCE(SUM(CASE WHEN t.nd =  ? THEN t.outstanding ELSE 0 END), 0) AS today_due,
-				    SUM(CASE WHEN t.nd =  ? THEN 1 ELSE 0 END) AS tomorrow_cnt,
-				    COALESCE(SUM(CASE WHEN t.nd =  ? THEN t.outstanding ELSE 0 END), 0) AS tomorrow_due
-				 FROM (
-				    SELECT {$cust_nd} AS nd, {$cust_out} AS outstanding
-				    FROM booking
-				    WHERE booking.CancelStatus = 'N'
-				      AND booking.Status IN ('P','PP')
-				      AND {$tc_own}
-				 ) t
-				 WHERE t.nd BETWEEN ? AND ?
-				   AND t.outstanding > 0",
-				array($today, $today, $today, $today, $cust_due_end, $cust_due_end, $admin_id, $admin_id, $cust_due_start, $cust_due_end)
-			)->row();
-			$cards['customer_payment_due_soon'] = array(
-				'overdue'  => array('count' => (int)$row->overdue_cnt,  'total_due' => $money($row->overdue_due),  'link' => $base . $qs(array('customer_payment' => 'overdue',  'status' => 'A'))),
-				'today'    => array('count' => (int)$row->today_cnt,    'total_due' => $money($row->today_due),    'link' => $base . $qs(array('customer_payment' => 'today',    'status' => 'A'))),
-				'tomorrow' => array('count' => (int)$row->tomorrow_cnt, 'total_due' => $money($row->tomorrow_due), 'link' => $base . $qs(array('customer_payment' => 'tomorrow', 'status' => 'A'))),
-			);
-
-			$cust_rows = $this->db->query(
-				"SELECT t.BookingNumber AS booking_number, t.Customer AS customer,
-				        t.nd AS earliest_deadline, t.outstanding AS total_due
-				 FROM (
-				    SELECT booking.BookingNumber AS BookingNumber, booking.Customer AS Customer,
-				           {$cust_nd} AS nd, {$cust_out} AS outstanding
-				    FROM booking
-				    WHERE booking.CancelStatus = 'N'
-				      AND booking.Status IN ('P','PP')
-				      AND {$tc_own}
-				 ) t
-				 WHERE t.nd BETWEEN ? AND ?
-				   AND t.outstanding > 0
-				 ORDER BY t.nd ASC, t.outstanding DESC
-				 LIMIT 5",
-				array($admin_id, $admin_id, $cust_due_start, $cust_due_end)
-			)->result();
-			$cust_out_rows = array();
-			foreach($cust_rows as $r) {
-				$cust_out_rows[] = array(
-					'booking_number'    => $r->booking_number,
-					'customer'          => $r->customer,
-					'total_due'         => $money($r->total_due),
-					'earliest_deadline' => $r->earliest_deadline ? $fmt_dmy($r->earliest_deadline) : '-',
-				);
-			}
-			$tables['customer_payment_due_soon'] = $cust_out_rows;
+			// These three cards (Travel in 7 / 14 Days – Not Yet Ready, Payment From
+			// Customer Due Soon) share one builder so the booking listing can re-run
+			// them scoped to just the rows visible on the current DataTables page
+			// (see _agent_upcoming_cards() + ajax_agent_visible_cards()). On the full
+			// card load here we pass no id scope, keeping the whole-DB own-bookings
+			// counts used on the dashboard.
+			$upcoming = $this->_agent_upcoming_cards($admin_id);
+			$cards    = array_merge($cards, $upcoming['cards']);
+			$tables   = array_merge($tables, $upcoming['tables']);
 		}
 
 		// ---------- TC LEAD (team-wide lead + booking metrics) ----------
@@ -1757,15 +1905,15 @@ class Booking extends MY_Controller
 
 			// Sales by Agent — Self Gen vs Company (Month). One row per
 			// SalesAgent that created at least one BC this month; ordered so
-			// agents sharing a team lead appear in consecutive rows (agents
-			// without a TeamLeadID sort last). Used as the per-agent / per-team
-			// breakdown for the headline Self Gen vs Company card.
+			// agents in the same Team appear in consecutive rows (agents with no
+			// Team sort last). Used as the per-agent / per-team breakdown for the
+			// headline Self Gen vs Company card.
 			$agent_rows = $this->db->query(
 				"SELECT
 				   a.AdminID,
 				   a.Name AS agent_name,
-				   a.TeamLeadID,
-				   tl.Name AS team_lead_name,
+				   a.TeamID,
+				   t.Name AS team_name,
 				   SUM(CASE WHEN UPPER(TRIM(s.Name)) = ? THEN 1 ELSE 0 END) AS self_gen_cnt,
 				   COALESCE(SUM(CASE WHEN UPPER(TRIM(s.Name)) = ? THEN b.NetTotal ELSE 0 END), 0) AS self_gen_total,
 				   SUM(CASE WHEN UPPER(TRIM(s.Name)) <> ? OR s.Name IS NULL THEN 1 ELSE 0 END) AS company_cnt,
@@ -1773,14 +1921,14 @@ class Booking extends MY_Controller
 				   COUNT(*) AS total_cnt
 				 FROM booking b
 				 INNER JOIN admin a ON a.AdminID = b.SalesAgent
-				 LEFT JOIN admin tl ON tl.AdminID = a.TeamLeadID
+				 LEFT JOIN team t ON t.TeamID = a.TeamID
 				 LEFT JOIN source s ON s.SourceID = b.Source
 				 WHERE b.BookingConfirmationTitle='BOOKING CONFIRMATION'
 				   AND b.CancelStatus='N' AND b.Status!='N'
 				   AND CAST(b.InsertDate AS DATE) BETWEEN ? AND ?
 				   AND b.SalesAgent IS NOT NULL AND b.SalesAgent > 0
-				 GROUP BY a.AdminID, a.Name, a.TeamLeadID, tl.Name
-				 ORDER BY (tl.Name IS NULL), tl.Name ASC, a.Name ASC",
+				 GROUP BY a.AdminID, a.Name, a.TeamID, t.Name
+				 ORDER BY (t.Name IS NULL), t.Name ASC, a.Name ASC",
 				array($self_gen, $self_gen, $self_gen, $self_gen, $month_start, $month_end)
 			)->result();
 			$rows_out = array();
@@ -1789,7 +1937,7 @@ class Booking extends MY_Controller
 				$sg_pct = $tot > 0 ? round(((int)$r->self_gen_cnt / $tot) * 100, 1) : 0;
 				$rows_out[] = array(
 					'agent_name'      => $r->agent_name,
-					'team_lead_name'  => $r->team_lead_name ?: 'Unassigned',
+					'team_name'       => $r->team_name ?: 'Unassigned',
 					'self_gen_count'  => (int)$r->self_gen_cnt,
 					'self_gen_total'  => $money($r->self_gen_total),
 					'company_count'   => (int)$r->company_cnt,
@@ -1815,17 +1963,15 @@ class Booking extends MY_Controller
 		// trigger this block.
 		if($is_op) {
 			// Team scope: every OP card except "Pending BC" is scoped to the BCs
-			// of the user's whole OP team (everyone under the same OP TEAM LEAD,
-			// admin.OpTeamLeadID) as TC1 (booking.SalesAgent) — so e.g. a lead and
-			// their members all see each other's BCs. $op_sa_in is the inlined
-			// "SalesAgent IN (...)" predicate (admin ids are ints from the admin
-			// table, so safe to inline); $op_team_csv backs the drill-down links.
-			$this->load->helper('op_team');
-			$op_admins   = $this->db->select('AdminID, Level, OpTeamLeadID')
-				->where_in('Level', array('40', '45'))
-				->where('Status', 'Y')
-				->get('admin')->result();
-			$op_team_ids = op_team_admin_ids($admin_id, $level, $op_admins);
+			// of the user's whole Team (everyone sharing admin.TeamID) as TC1
+			// (booking.SalesAgent) — so e.g. a lead and their members all see each
+			// other's BCs. $op_sa_in is the inlined "SalesAgent IN (...)" predicate
+			// (admin ids are ints from the admin table, so safe to inline);
+			// $op_team_csv backs the drill-down links (sales_agent=<team csv>), so
+			// card counts and the filtered listing stay in agreement.
+			$this->load->helper('team_scope');
+			$team_admins = $this->db->query('SELECT AdminID, TeamID, Status FROM admin')->result();
+			$op_team_ids = team_member_admin_ids($admin_id, $team_admins);
 			$op_team_csv = implode(',', $op_team_ids);
 			$op_sa_in    = "booking.SalesAgent IN ({$op_team_csv})";
 
@@ -2594,32 +2740,32 @@ class Booking extends MY_Controller
 			}
 			$tables['product_sales'] = $prod_out;
 
-			// Sales by Team (Month) — group NetTotal by team-lead admin via
-			// SalesAgent -> admin.TeamLeadID -> admin.AdminID. Agents with no
-			// team lead collapse into a single "Unassigned" row so the
-			// breakdown reconciles to the team-wide total.
+			// Sales by Team (Month) — group NetTotal by the SalesAgent's Team via
+			// SalesAgent -> admin.TeamID -> team.TeamID. Agents with no Team
+			// collapse into a single "Unassigned" row so the breakdown reconciles
+			// to the team-wide total.
 			$team_rows = $this->db->query(
-				"SELECT COALESCE(tl.AdminID, 0) AS team_lead_id,
-				        COALESCE(tl.Name, 'Unassigned') AS team_lead_name,
+				"SELECT COALESCE(t.TeamID, 0) AS team_id,
+				        COALESCE(t.Name, 'Unassigned') AS team_name,
 				        COUNT(*) AS cnt,
 				        COALESCE(SUM(booking.NetTotal), 0) AS total
 				 FROM booking
 				 LEFT JOIN admin agent ON agent.AdminID = booking.SalesAgent
-				 LEFT JOIN admin tl    ON tl.AdminID    = agent.TeamLeadID
+				 LEFT JOIN team t       ON t.TeamID      = agent.TeamID
 				 WHERE booking.BookingConfirmationTitle='BOOKING CONFIRMATION'
 				   AND booking.CancelStatus='N' AND booking.Status!='N'
 				   AND CAST(booking.InsertDate AS DATE) BETWEEN ? AND ?
-				 GROUP BY team_lead_id, team_lead_name
+				 GROUP BY team_id, team_name
 				 ORDER BY total DESC",
 				array($month_start, $month_end)
 			)->result();
 			$team_out = array();
 			foreach($team_rows as $r) {
 				$team_out[] = array(
-					'team_lead_id'   => (int)$r->team_lead_id,
-					'team_lead_name' => $r->team_lead_name,
-					'count'          => (int)$r->cnt,
-					'total'          => $money($r->total),
+					'team_id'   => (int)$r->team_id,
+					'team_name' => $r->team_name,
+					'count'     => (int)$r->cnt,
+					'total'     => $money($r->total),
 				);
 			}
 			$tables['sales_by_team'] = $team_out;
@@ -3343,16 +3489,24 @@ class Booking extends MY_Controller
 	 * first (canonical), email match as fallback -- same bridge as the Agent
 	 * Score card and the logged-in TC's own resolution.
 	 *
+	 * @param array $levels admin.Level values to include. Defaults to sales
+	 *                      agent (20) only; pass e.g. array('20','25') to also
+	 *                      count TC Leads so a TC Lead can be their own "Best".
 	 * @return array associative set { ghl_user_id => true } for O(1) membership.
 	 */
-	private function sales_agent_ghl_uids()
+	private function sales_agent_ghl_uids($levels = array('20'))
 	{
+		$levels = array_values(array_map('strval', (array)$levels));
+		if(empty($levels)) { return array(); }
+		$in = implode(',', array_fill(0, count($levels), '?'));
+
 		$uids = array();
 		foreach($this->db->query(
 			"SELECT alda.GhlUserID
 			 FROM admin_lead_dashboard_agents alda
 			 INNER JOIN admin a ON a.AdminID = alda.AdminID
-			 WHERE a.Level = '20' AND NULLIF(alda.GhlUserID,'') IS NOT NULL"
+			 WHERE a.Level IN ({$in}) AND NULLIF(alda.GhlUserID,'') IS NOT NULL",
+			$levels
 		)->result() as $r) {
 			$uids[(string)$r->GhlUserID] = true;
 		}
@@ -3360,7 +3514,8 @@ class Booking extends MY_Controller
 			"SELECT gu.UserID
 			 FROM admin a
 			 INNER JOIN ghl_users gu ON LOWER(TRIM(gu.Email)) = LOWER(TRIM(a.Email))
-			 WHERE a.Level = '20'"
+			 WHERE a.Level IN ({$in})",
+			$levels
 		)->result() as $r) {
 			$uid = (string)$r->UserID;
 			if($uid !== '') { $uids[$uid] = true; }
@@ -4541,14 +4696,12 @@ class Booking extends MY_Controller
 					$this->load->helper('booking_flow');
 					$has_deposit_deadline_detail = !empty($array['DepositDeadline']);
 					$array['deposit_complete'] = compute_deposit_complete($deposit_total, $total_credit_approved, $has_deposit_deadline_detail);
-					$checklist_tl_ids = resolve_booking_checklist_team_leads($array);
+					$checklist_lead_ids = resolve_booking_checklist_team_lead_ids($array);
 					$array['can_modify_checklist'] = can_user_modify_booking_checklist(
 						$array,
 						$this->session->userdata('admin_id'),
 						$this->session->userdata('level'),
-						$checklist_tl_ids['tc1_tl'],
-						$checklist_tl_ids['op_tl'],
-						$checklist_tl_ids['tc1_op_tl']
+						$checklist_lead_ids
 					);
 					// Calculate deposit status and format Deposit Paid display
 					$deposit_difference = $deposit_paid - $deposit_total;
@@ -4896,14 +5049,16 @@ class Booking extends MY_Controller
 				$array['sources'] = $this->Booking_Model->Read_Sources_With_Inactive($array['Source']);
 
 				// Get Destination Name
+				$array['DestinationName'] = '';
 				foreach($array['categories'] as $category) {
 					if($category->CategoryID == $array['Destination']) {
 						$array['DestinationName'] = $category->Name;
 						break;
 					}
 				}
-				
+
 				// Get Source Name
+				$array['SourceName'] = '';
 				foreach($array['sources'] as $source) {
 					if($source->SourceID == $array['Source']) {
 						$array['SourceName'] = $source->Name;
@@ -7249,19 +7404,17 @@ class Booking extends MY_Controller
 			}
 		}
 
-		// Strict whitelist: only TC1 (booking SalesAgent), OP (BookingOP), the
-		// SalesAgent's sales Team Lead, the BookingOP's OP TEAM LEAD, and the
-		// SalesAgent's own OP TEAM LEAD may mutate this booking's checklist. The
+		// Strict whitelist: only an assignee — TC (SalesAgent), TC2 (SalesAgent2)
+		// or OP (BookingOP) — or an active TEAM LEAD (25) / OP TEAM LEAD (45)
+		// sharing a Team with one of them may mutate this booking's checklist. The
 		// modal can still load read-only for everyone else with AB access.
 		$this->load->helper('booking_flow');
-		$tl_ids = resolve_booking_checklist_team_leads($booking);
+		$lead_ids = resolve_booking_checklist_team_lead_ids($booking);
 		$can_modify = can_user_modify_booking_checklist(
 			$booking,
 			$this->session->userdata('admin_id'),
 			$this->session->userdata('level'),
-			$tl_ids['tc1_tl'],
-			$tl_ids['op_tl'],
-			$tl_ids['tc1_op_tl']
+			$lead_ids
 		);
 
 		// Get booking products (need ProductID and Name for checklist grouping)
@@ -7541,16 +7694,14 @@ class Booking extends MY_Controller
 		$this->load->helper('booking_flow');
 		$booking = $this->Booking_Model->getBookingById($booking_id);
 
-		$tl_ids = $booking
-			? resolve_booking_checklist_team_leads($booking)
-			: array('tc1_tl' => null, 'op_tl' => null, 'tc1_op_tl' => null);
+		$lead_ids = $booking
+			? resolve_booking_checklist_team_lead_ids($booking)
+			: array();
 		$allowed = $booking && can_user_modify_booking_checklist(
 			$booking,
 			$admin_id,
 			$this->session->userdata('level'),
-			$tl_ids['tc1_tl'],
-			$tl_ids['op_tl'],
-			$tl_ids['tc1_op_tl']
+			$lead_ids
 		);
 
 		if (!$allowed) {

@@ -2029,20 +2029,45 @@ class Booking_Model extends CI_Model
 	/**
 	 * Apply filters to the query builder (shared logic for pagination methods)
 	 */
+	// Resolve the admin IDs of the logged-in user's Team (shared admin.TeamID),
+	// used to scope the listing for a TEAM LEAD (25) / OP TEAM LEAD (45). Uses a
+	// raw query() so it does NOT flush the query-builder state that
+	// apply_booking_filters is mid-way through building.
+	private function team_member_ids()
+	{
+		$this->load->helper('team_scope');
+		$admins = $this->db->query('SELECT AdminID, TeamID, Status FROM admin')->result();
+		return team_member_admin_ids($this->session->userdata('admin_id'), $admins);
+	}
+
 	private function apply_booking_filters()
 	{
-		$admin_id = $this->session->userdata('admin_id');
+		$level    = (int) $this->session->userdata('level');
+		$admin_id = (int) $this->session->userdata('admin_id');
 
-		if(in_array($this->session->userdata('level'), [20, 50])) {
+		// Role-based row scope, driven by team structure (shared admin.TeamID). A
+		// booking is "assigned" to three people: TC = booking.SalesAgent,
+		// TC2 = booking.SalesAgent2, OP = booking.BookingOP.
+		//   Individual roles — SALES AGENT (20) / TC (50): only bookings they are
+		//     personally assigned to, in ANY of the three slots.
+		//   Team roles — TEAM LEAD (25) / OP (40) / OP TEAM LEAD (45): every booking
+		//     whose TC, TC2 or OP belongs to their team. Cross-team: a booking whose
+		//     people span teams is visible to each involved team's lead/OP.
+		//   Everyone else (Owner 10, Finance 30, Marketing 60): unscoped.
+		if(in_array($level, [20, 50])) {
 			$this->db->group_start();
-			$this->db->where('SalesAgent', $admin_id);
-			$this->db->or_where('SalesAgent2', $admin_id);
+			$this->db->where('booking.SalesAgent', $admin_id);
+			$this->db->or_where('booking.SalesAgent2', $admin_id);
+			$this->db->or_where('booking.BookingOP', $admin_id);
+			$this->db->group_end();
+		} elseif(in_array($level, [25, 40, 45])) {
+			$team = $this->team_member_ids();
+			$this->db->group_start();
+			$this->db->where_in('booking.SalesAgent', $team);
+			$this->db->or_where_in('booking.SalesAgent2', $team);
+			$this->db->or_where_in('booking.BookingOP', $team);
 			$this->db->group_end();
 		}
-
-		// Team function DISABLED — the team-based listing scope for
-		// TEAM LEAD (25) / OP (40) / OP TEAM LEAD (45) has been removed, so these
-		// roles now see all bookings unscoped (self-scope for 20/50 stays above).
 
 		// Hide completed bookings from TC only (SA can view in listing; detail page still blocks via Booking::View / Payment guards)
 		if($this->session->userdata('level') == 50) {
@@ -2058,6 +2083,7 @@ class Booking_Model extends CI_Model
 			$this->db->or_like('customer.CustomerCode', $search_value);
 			$this->db->or_like('category.Name', $search_value);
 			$this->db->or_like('admin.Name', $search_value);
+			$this->db->or_like('op_admin.Name', $search_value);
 			$this->db->or_like('booking.Mobile', $search_value);
 			$this->db->group_end();
 		}
@@ -2360,6 +2386,7 @@ class Booking_Model extends CI_Model
 	{
 		$this->db->from('booking');
 		$this->db->join('admin', 'admin.AdminID = booking.SalesAgent', 'left');
+		$this->db->join('admin AS op_admin', 'op_admin.AdminID = booking.BookingOP', 'left');
 		$this->db->join('category', 'category.CategoryID = booking.Destination', 'left');
 		$this->db->join('country_code', 'country_code.CountryCodeID = booking.CountryCodeID', 'left');
 		$this->db->join('customer', 'customer.CustomerID = booking.CustomerID', 'left');
@@ -2381,6 +2408,7 @@ class Booking_Model extends CI_Model
 		$this->db->select('booking.BookingID, booking.NetTotal');
 		$this->db->from('booking');
 		$this->db->join('admin', 'admin.AdminID = booking.SalesAgent', 'left');
+		$this->db->join('admin AS op_admin', 'op_admin.AdminID = booking.BookingOP', 'left');
 		$this->db->join('category', 'category.CategoryID = booking.Destination', 'left');
 		$this->db->join('country_code', 'country_code.CountryCodeID = booking.CountryCodeID', 'left');
 		$this->db->join('customer', 'customer.CustomerID = booking.CustomerID', 'left');

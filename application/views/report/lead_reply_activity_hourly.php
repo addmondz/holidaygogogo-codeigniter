@@ -134,13 +134,18 @@ foreach ($hours as $h) {
                                     <span class="reply-hourly-legend-dot" style="background:#1bc5bd;"></span>Outbound
                                 </th>
                                 <th style="text-align:center; width:100px;">Total</th>
+                                <th style="text-align:center; width:130px;">
+                                    Leads Handled
+                                    <i class="la la-info-circle ml-1" style="cursor:help; color:#2f506f;" data-toggle="tooltip"
+                                       title="Distinct leads this owner had inbound or outbound activity with during this hour. The same lead can appear in more than one hour, so hourly values do not add up to the day total."></i>
+                                </th>
                                 <th>Activity</th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php if($breakdown['total'] === 0) { ?>
                                 <tr>
-                                    <td colspan="5" class="text-center py-10">No inbound or outbound messages found for this owner on the selected day.</td>
+                                    <td colspan="6" class="text-center py-10">No inbound or outbound messages found for this owner on the selected day.</td>
                                 </tr>
                             <?php } else { ?>
                                 <?php foreach($hours as $hour) { ?>
@@ -153,6 +158,7 @@ foreach ($hours as $h) {
                                         <td class="text-center"><?php echo number_format($hour['inbound']); ?></td>
                                         <td class="text-center"><?php echo number_format($hour['outbound']); ?></td>
                                         <td class="text-center font-weight-bold text-dark"><?php echo number_format($hour['total']); ?></td>
+                                        <td class="text-center"><?php echo $hour['leads'] > 0 ? number_format($hour['leads']) : '<span class="text-muted">&mdash;</span>'; ?></td>
                                         <td>
                                             <?php if($hour['total'] > 0) { ?>
                                                 <div class="reply-hourly-bar-wrap">

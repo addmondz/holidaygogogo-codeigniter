@@ -170,37 +170,8 @@
                         </div>
                         <div class="col-md-6">
                             <div class="form-group">
-                                <label>Team Lead</label>
-                                <select id="TeamLeadID" class="form-control selectpicker">
-                                    <option selected data-icon="la la-users font-size-lg bs-icon" value="">--SELECT TEAM LEAD--</option>
-                                    <?php if(!empty($team_leads)) {
-                                        foreach($team_leads as $team_lead) { ?>
-                                            <option <?php if($Action == 'U' && $TeamLeadID == $team_lead->AdminID) { echo 'selected'; } ?> data-icon="la la-user-tie font-size-lg bs-icon" value="<?php echo $team_lead->AdminID; ?>"><?php echo $team_lead->Name; ?></option>
-                                        <?php }
-                                    } ?>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="form-group">
-                                <label>OP Team Lead
-                                    <small class="text-muted d-block">The OP TEAM LEAD who may tick this OP's booking checklists. Used for OP-side staff.</small>
-                                </label>
-                                <select id="OpTeamLeadID" class="form-control selectpicker">
-                                    <option selected data-icon="la la-users font-size-lg bs-icon" value="">--SELECT OP TEAM LEAD--</option>
-                                    <?php if(!empty($op_team_leads)) {
-                                        foreach($op_team_leads as $op_team_lead) { ?>
-                                            <option <?php if($Action == 'U' && $OpTeamLeadID == $op_team_lead->AdminID) { echo 'selected'; } ?> data-icon="la la-user-tie font-size-lg bs-icon" value="<?php echo $op_team_lead->AdminID; ?>"><?php echo $op_team_lead->Name; ?></option>
-                                        <?php }
-                                    } ?>
-                                </select>
-                            </div>
-                        </div>
-<?php /* Team function DISABLED — Team assignment field hidden
-                        <div class="col-md-6">
-                            <div class="form-group">
                                 <label>Team
-                                    <small class="text-muted d-block">The Team this admin belongs to. A TEAM LEAD / OP TEAM LEAD sees all their team members' bookings &amp; payments; Sales Agent / OP see only their own.</small>
+                                    <small class="text-muted d-block">The Team this admin belongs to. A TEAM LEAD (25), OP TEAM LEAD (45) &amp; OP (40) see every booking &amp; payment whose TC, TC2 or OP is in their team (cross-team included); Sales Agent (20) &amp; TC (50) see only what they're personally assigned to.</small>
                                 </label>
                                 <select id="TeamID" class="form-control selectpicker">
                                     <option selected data-icon="la la-users font-size-lg bs-icon" value="">--SELECT TEAM--</option>
@@ -212,7 +183,6 @@
                                 </select>
                             </div>
                         </div>
-*/ ?>
                         <div class="col-md-12">
                             <div class="form-group">
                                 <label>Lead Dashboard Agents
@@ -542,8 +512,6 @@
                 var password = ($('#Password').val()).toUpperCase();
                 var level = $('#Level').val();
                 var access_control = ($('#AccessControl').val()).toString();
-                var team_lead_id = $('#TeamLeadID').val();
-                var op_team_lead_id = $('#OpTeamLeadID').val();
                 var team_id = $('#TeamID').val();
                 var lead_dashboard_agents = $('#LeadDashboardAgents').val() || [];
                 var lda_initial_str = '<?php echo implode(",", $lead_dashboard_agents); ?>'.split(',').filter(Boolean).sort().join(',');
@@ -561,7 +529,7 @@
                     if(action == 'C') {
                         var admin = [];
                         var url = '<?php echo base_url('Admin/Create') ?>';
-                        admin.push({CountryCodeID:country_code, Name:name, Gender:gender, IdentificationNumber:identification_number, PassportNumber:passport_number, Mobile:mobile, Email:email, Username:username, Password:password, Level:level, AccessControl:access_control, TeamLeadID:team_lead_id ? team_lead_id : null, OpTeamLeadID:op_team_lead_id ? op_team_lead_id : null, TeamID:team_id ? team_id : null, InsertBy:session_id, InsertDate:current_datetime});
+                        admin.push({CountryCodeID:country_code, Name:name, Gender:gender, IdentificationNumber:identification_number, PassportNumber:passport_number, Mobile:mobile, Email:email, Username:username, Password:password, Level:level, AccessControl:access_control, TeamID:team_id ? team_id : null, InsertBy:session_id, InsertDate:current_datetime});
                         Submit_Admin(url, admin, null, lead_dashboard_agents, true, {}, false, {}, false);
                     } else {
                         var dirty_fields = $('#form').dirty('showDirtyFields');
@@ -584,8 +552,8 @@
                             if(key != 'AccessControl') {
                                 var value = key == 'Name' || key == 'PassportNumber' || key == 'Email' || key == 'Password' ? (dirty_fields[i].value).toUpperCase() : dirty_fields[i].value;
 
-                                //Handle TeamLeadID / OpTeamLeadID / TeamID empty value as null
-                                if((key == 'TeamLeadID' || key == 'OpTeamLeadID' || key == 'TeamID') && value == '') {
+                                //Handle TeamID empty value as null
+                                if(key == 'TeamID' && value == '') {
                                     value = null;
                                 }
 

@@ -560,6 +560,108 @@ class Report extends MY_Controller
             )));
     }
 
+    /**
+     * "Leads By Hour" report -- new leads plotted on a DATE x HOUR grid so the
+     * owner can see what time of day leads land. Date-range filtered (defaults
+     * to the last 30 days). Owner-only in the menu; still passes the shared
+     * 'VR' gate in the constructor.
+     */
+    function Leads_By_Hour()
+    {
+        $filters = $this->lead_dashboard_filters();
+        $data = $this->leads_by_hour_data($filters);
+
+        $titles = array(
+            'tab_title' => 'HolidayGoGoGo | Report',
+            'breadcrumb_title' => 'Report >> Leads By Hour'
+        );
+
+        $array = array(
+            'leads_by_hour_matrix' => $data['matrix'],
+            'leads_by_hour_date_label' => $filters['lead_date'],
+            'leads_by_hour_updated_at' => $data['updated_at'],
+        );
+
+        $this->load->view('layout/header', $titles);
+        $this->load->view('report/leads_by_hour', $array);
+        $this->load->view('layout/footer');
+    }
+
+    /** Stream the Leads By Hour grid as an .xlsx download (same filters). */
+    function Leads_By_Hour_Export()
+    {
+        $filters = $this->lead_dashboard_filters();
+        $data = $this->leads_by_hour_data($filters);
+        $matrix = $data['matrix'];
+
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Leads By Hour');
+        $spreadsheet->getProperties()->setCreator('HolidayGoGoGo');
+
+        // Hours occupy columns B..Y (2..25); Total lands in column Z (26).
+        $totalColIndex = 2 + count($matrix['hours']);
+        $totalCol = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($totalColIndex);
+
+        // Header row.
+        $sheet->setCellValue('A1', 'DATE');
+        foreach ($matrix['hours'] as $i => $hour) {
+            $col = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex(2 + $i);
+            $sheet->setCellValue($col . '1', strtoupper($hour['label']));
+        }
+        $sheet->setCellValue($totalCol . '1', 'TOTAL');
+        $headerRange = 'A1:' . $totalCol . '1';
+        $sheet->getStyle($headerRange)->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_BLACK);
+        $sheet->getStyle($headerRange)->getFont()->getColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_WHITE);
+        $sheet->getStyle($headerRange)->getFont()->setBold(true);
+
+        // One row per day.
+        $row = 2;
+        foreach ($matrix['rows'] as $r) {
+            $sheet->setCellValueExplicit('A' . $row, $r['date_label'], \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+            foreach ($r['counts'] as $i => $count) {
+                $col = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex(2 + $i);
+                $sheet->setCellValue($col . $row, $count);
+            }
+            $sheet->setCellValue($totalCol . $row, $r['total']);
+            $row++;
+        }
+
+        // Grand-total row (column totals per hour + overall).
+        $sheet->setCellValueExplicit('A' . $row, 'TOTAL', \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+        foreach ($matrix['hour_totals'] as $i => $count) {
+            $col = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex(2 + $i);
+            $sheet->setCellValue($col . $row, $count);
+        }
+        $sheet->setCellValue($totalCol . $row, $matrix['grand_total']);
+        $totalRowRange = 'A' . $row . ':' . $totalCol . $row;
+        $sheet->getStyle($totalRowRange)->getFont()->setBold(true);
+        $sheet->getStyle($totalRowRange)->getBorders()->getTop()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+
+        $sheet->getColumnDimension('A')->setWidth(22);
+        $sheet->freezePaneByColumnAndRow(2, 2);
+
+        $report = 'LEADS_BY_HOUR_' . date('Ymd') . '.xlsx';
+        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        header('Content-Disposition: attachment;filename="' . $report . '"');
+        header('Cache-Control: max-age=0');
+        $writer = \PhpOffice\PhpSpreadsheet\IOFactory::createWriter($spreadsheet, 'Xlsx');
+        $writer->save('php://output');
+    }
+
+    /** Shared data build for the Leads By Hour page + export. */
+    private function leads_by_hour_data($filters)
+    {
+        $this->load->helper('leads_by_hour');
+        $dates = leads_by_hour_expand_dates($filters['start_date'], $filters['end_date']);
+        $rows = $this->Report_Model->Leads_By_Hour($filters);
+
+        return array(
+            'matrix' => leads_by_hour_build_matrix($rows, $dates),
+            'updated_at' => date('d M Y h:i A'),
+        );
+    }
+
 	function Destination_Sales()
 	{
         $titles = array('tab_title' => 'HolidayGoGoGo | Report', 'breadcrumb_title' => 'Report >> Destination Sales');
@@ -1106,7 +1208,7 @@ class Report extends MY_Controller
             'summary' => $this->format_lead_dashboard_summary($this->Report_Model->Lead_Dashboard_Summary($filters)),
             'rows' => $this->format_lead_dashboard_rows($this->Report_Model->Lead_Dashboard_By_Agent($filters)),
             'agents' => $this->Report_Model->Lead_Dashboard_Agents($restrict),
-            'team_leads' => $this->Report_Model->Lead_Dashboard_Team_Leads(),
+            'team_leads' => $this->Report_Model->Lead_Dashboard_Teams(),
             'updated_at' => date('Y-m-d H:i:s'),
         );
     }
@@ -1119,7 +1221,7 @@ class Report extends MY_Controller
             'summary' => $this->format_lead_ownership_summary($this->Report_Model->Lead_Ownership_Summary($filters)),
             'rows' => $this->format_lead_ownership_rows($this->Report_Model->Lead_Ownership_By_Agent($filters)),
             'agents' => $this->Report_Model->Lead_Ownership_Agents($restrict),
-            'team_leads' => $this->Report_Model->Lead_Dashboard_Team_Leads(),
+            'team_leads' => $this->Report_Model->Lead_Dashboard_Teams(),
             'updated_at' => $this->Report_Model->Lead_Ownership_Last_Calculated_At(),
         );
     }
@@ -1148,7 +1250,7 @@ class Report extends MY_Controller
             'summary' => $this->format_lead_reply_activity_summary($this->Report_Model->Lead_Reply_Activity_Summary($filters)),
             'rows' => $this->format_lead_reply_activity_rows($this->Report_Model->Lead_Reply_Activity_By_Agent($filters)),
             'agents' => $this->Report_Model->Lead_Ownership_Agents($restrict),
-            'team_leads' => $this->Report_Model->Lead_Dashboard_Team_Leads(),
+            'team_leads' => $this->Report_Model->Lead_Dashboard_Teams(),
             'updated_at' => date('Y-m-d H:i:s'),
         );
     }
@@ -1162,7 +1264,7 @@ class Report extends MY_Controller
             'summary' => $this->format_lead_reply_activity_detail_summary($this->Report_Model->Lead_Reply_Activity_Details_Summary($filters)),
             'rows' => $this->format_lead_reply_activity_detail_rows($this->Report_Model->Lead_Reply_Activity_Details_Rows($filters)),
             'agents' => $this->Report_Model->Lead_Ownership_Agents($restrict),
-            'team_leads' => $this->Report_Model->Lead_Dashboard_Team_Leads(),
+            'team_leads' => $this->Report_Model->Lead_Dashboard_Teams(),
             'mobile_search' => array(
                 'mobile' => $mobile,
                 'summary' => $mobile !== '' ? $this->format_lead_reply_activity_mobile_summary($this->Report_Model->Lead_Reply_Activity_Mobile_Summary($mobile, $filters)) : null,
@@ -1834,12 +1936,17 @@ class Report extends MY_Controller
         foreach ($rows as $row) {
             $responded = (int) $row['lead_responded'];
             $transferOut = (int) $row['reply_created_leads'];
+            $avgResponseSeconds = isset($row['avg_response_seconds']) && $row['avg_response_seconds'] !== null
+                ? (int) $row['avg_response_seconds']
+                : null;
             $formatted[] = array(
                 'owner_user_id' => $row['owner_user_id'],
                 'owner_name' => $row['owner_name'],
                 'lead_responded' => $responded,
                 'transfer_out_leads' => $transferOut,
                 'today_handling_leads' => (int) $row['today_handling_leads'],
+                'avg_response_time_seconds' => $avgResponseSeconds,
+                'avg_response_time_label' => $this->format_duration_label($avgResponseSeconds),
             );
         }
 

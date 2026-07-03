@@ -17,13 +17,13 @@ class Admin_Model extends CI_Model
 			case 'Admin':
 				switch($this->router->method) {
 					case 'index':
-						// Team function DISABLED — no TeamID column / team join.
-						$select = 'a.AdminID, a.Name, a.Username, a.Level, a.Status';
+						$select = 'a.AdminID, a.Name, a.Username, a.Level, a.Status, a.TeamID, t.Name as TeamName';
 						if($this->session->level == 10) {
 							$select .= ', a.Password';
 						}
 						$this->db->select($select);
 						$this->db->from('admin a');
+						$this->db->join('team t', 'a.TeamID = t.TeamID AND t.Status = "Y"', 'left');
 						$this->db->where('a.AdminID !=', $this->session->admin_id);
 						$this->db->where('a.AdminID !=', 8);
 
@@ -72,7 +72,7 @@ class Admin_Model extends CI_Model
 							return false;
 						}
 					case 'Update':
-						$this->db->select('AdminID, CountryCodeID, Name, Gender, IdentificationNumber, PassportNumber, Mobile, Email, Username, Level, AccessControl, TeamLeadID, OpTeamLeadID');
+						$this->db->select('AdminID, CountryCodeID, Name, Gender, IdentificationNumber, PassportNumber, Mobile, Email, Username, Level, AccessControl, TeamID');
 						$this->db->where('AdminID', $this->input->get('admin_id'));
 						$this->db->limit(1);
 						$admin = $this->db->get('admin');
@@ -93,26 +93,6 @@ class Admin_Model extends CI_Model
 		$this->db->where('Status', 'Y');
 		$this->db->order_by('Country', 'ASC');
 		return $this->db->get('country_code')->result();
-	}
-
-	function Read_Team_Leads()
-	{
-		$this->db->select('AdminID, Name');
-		$this->db->where('Level', '25');
-		$this->db->where('Status', 'Y');
-		$this->db->order_by('Name', 'ASC');
-		return $this->db->get('admin')->result();
-	}
-
-	// Active OP TEAM LEADs (Level 45). Populates the "OP Team Lead" dropdown so
-	// an OP can be assigned to the lead who may tick that OP's booking checklists.
-	function Read_Op_Team_Leads()
-	{
-		$this->db->select('AdminID, Name');
-		$this->db->where('Level', '45');
-		$this->db->where('Status', 'Y');
-		$this->db->order_by('Name', 'ASC');
-		return $this->db->get('admin')->result();
 	}
 
 	// Active Teams (see Team settings entity). Populates the "Team" dropdown so an

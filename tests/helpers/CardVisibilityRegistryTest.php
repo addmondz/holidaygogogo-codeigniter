@@ -36,7 +36,7 @@ function eq($label, $expected, $actual) {
 $reg = card_visibility_registry();
 check('registry non-empty', count($reg) > 0);
 
-$valid_levels = array(20, 25, 30, 40, 45, 50);
+$valid_levels = array(10, 20, 25, 30, 40, 45, 50);
 $seen_anchor = array();
 $reg_ok = true;
 foreach ($reg as $slug => $c) {
@@ -55,11 +55,55 @@ foreach ($reg as $slug => $c) {
 }
 check('every card well-formed (group/title/levels/anchor/keys)', $reg_ok);
 
-// Group buckets are exactly the four non-owner roles.
+// Group buckets are exactly the three non-owner roles that still render cards.
+// The old "TC Lead" team-lead card set was retired ($show_tclead = false); TC
+// Lead (25) now shares the TC agent card set, so it has no group of its own.
 $groups = array();
 foreach ($reg as $c) { $groups[$c['group']] = true; }
 ksort($groups);
-eq('groups present', array('Finance', 'OP', 'TC', 'TC Lead'), array_keys($groups));
+eq('groups present', array('Finance', 'OP', 'TC'), array_keys($groups));
+
+// The retired team-lead cards are gone — no dead tl_* slugs linger in the
+// registry (they pointed at anchors that no longer render).
+$has_tl = false;
+foreach ($reg as $slug => $c) { if (strpos($slug, 'tl_') === 0) { $has_tl = true; } }
+check('no retired tl_* cards remain', $has_tl === false);
+
+// TC Lead (25) sees the whole TC agent card set, so every TC-group card must
+// offer a switch for level 25 (otherwise the owner cannot hide it from a Lead).
+$tc_missing_25 = array();
+foreach ($reg as $slug => $c) {
+	if ($c['group'] !== 'TC') { continue; }
+	if (!in_array(25, array_map('intval', $c['levels']), true)) { $tc_missing_25[] = $slug; }
+}
+check('every TC card is toggleable for TC Lead (level 25)', empty($tc_missing_25));
+if (!empty($tc_missing_25)) { echo '    missing 25: ' . implode(', ', $tc_missing_25) . "\n"; }
+
+// A level-25 user is offered a pair for a TC card (end-to-end eligibility).
+$lead = array((object) array('AdminID' => 9, 'Name' => 'Lead', 'Level' => '25'));
+$lead_pairs = card_visibility_eligible_pairs(array(
+	'tc_bc_created' => $reg['tc_bc_created'],
+), $lead);
+eq('TC Lead eligible for a TC card', array('tc_bc_created|9'), $lead_pairs);
+
+// Owner (10) sees the SAME sales-agent card set on the booking listing
+// (summary_cards_show_agent_set with $owner_as_agent), so every TC-group card
+// must offer a switch for level 10 too — otherwise an owner-level user's own
+// listing card can never be hidden by the managing owner.
+$tc_missing_10 = array();
+foreach ($reg as $slug => $c) {
+	if ($c['group'] !== 'TC') { continue; }
+	if (!in_array(10, array_map('intval', $c['levels']), true)) { $tc_missing_10[] = $slug; }
+}
+check('every TC card is toggleable for Owner (level 10)', empty($tc_missing_10));
+if (!empty($tc_missing_10)) { echo '    missing 10: ' . implode(', ', $tc_missing_10) . "\n"; }
+
+// A level-10 (Owner) user is offered a pair for a TC card (end-to-end).
+$owner = array((object) array('AdminID' => 3, 'Name' => 'Owner', 'Level' => '10'));
+$owner_pairs = card_visibility_eligible_pairs(array(
+	'tc_bc_created' => $reg['tc_bc_created'],
+), $owner);
+eq('Owner eligible for a TC card', array('tc_bc_created|3'), $owner_pairs);
 
 // ---------------------------------------------------------------------------
 // Eligibility — only role-eligible users get a pair per card.

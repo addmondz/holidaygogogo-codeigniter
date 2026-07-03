@@ -45,6 +45,14 @@
     #booking_summary_cards .summary-best .best-name { color:#3F4254; }
     #booking_summary_cards .summary-best .best-name.is-you { color:#6082B6; }
     #booking_summary_cards .summary-best .best-fig { color:#2F6F4F; font-weight:700; background:#E5F3EC; padding:1px 7px; border-radius:4px; }
+    /* "Same period last year" comparison line on the sales cards. The delta
+       chip is green when up, red when down, grey when flat / no baseline. */
+    #booking_summary_cards .summary-yoy { color:#5C6473; font-weight:600; margin-top:6px; }
+    #booking_summary_cards .summary-yoy .yoy-fig { color:#3F4254; font-weight:700; }
+    #booking_summary_cards .summary-yoy .yoy-delta { font-weight:700; padding:1px 7px; border-radius:4px; margin-left:4px; white-space:nowrap; }
+    #booking_summary_cards .summary-yoy .yoy-delta.is-up { color:#2F6F4F; background:#E5F3EC; }
+    #booking_summary_cards .summary-yoy .yoy-delta.is-down { color:#C0392B; background:#FBEAEA; }
+    #booking_summary_cards .summary-yoy .yoy-delta.is-flat { color:#5C6473; background:#EDEFF3; }
     /* Agent Score card: score/rank on the left, Top-5 leaderboard on the right. */
     #booking_summary_cards .agent-score-split { display:flex; gap:16px; align-items:flex-start; }
     #booking_summary_cards .agent-score-main { flex:1 1 0; min-width:0; }
@@ -217,8 +225,8 @@
             <div class="col-md-3 sc-pos-2">
                 <div class="card card-custom">
                     <div class="card-header border-0 summary-card-header" style="background-color:#F5E6CD;">
-                        <h3>Month Sales vs Target</h3>
-                        <i id="pop-sales-month" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>What it shows:</strong> Your total sales this month compared against your monthly target.<br><br><strong>Sales total:</strong> adds up the value of all your Booking Confirmations created this month, <strong>regardless of payment status</strong>. Quotations, proforma invoices and cancelled bookings are not included.<br><br><strong>Credit:</strong> same rule as &ldquo;BC Created&rdquo; (main sales person before 1 Jun 2026, second sales agent after).<br><br><strong>Target:</strong> set for each agent under Admin &rarr; Sales Targets. The percentage is your sales divided by your target."></i>
+                        <h3>Month to date sales vs target</h3>
+                        <i id="pop-sales-month" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>What it shows:</strong> Your total sales this month compared against your monthly target.<br><br><strong>Sales total:</strong> adds up the value of all your Booking Confirmations created this month, <strong>regardless of payment status</strong>. Quotations, proforma invoices and cancelled bookings are not included.<br><br><strong>Credit:</strong> same rule as &ldquo;BC Created&rdquo; (main sales person before 1 Jun 2026, second sales agent after).<br><br><strong>Target:</strong> set for each agent under Admin &rarr; Sales Targets. The percentage is your sales divided by your target.<br><br><strong>Same period last year:</strong> your sales for the matching month a year ago, up to the same day (e.g. the 1st&ndash;3rd this month vs the 1st&ndash;3rd last year), so the comparison is fair. The chip shows the change: green &#9650; up, red &#9660; down."></i>
                     </div>
                     <div class="card-body summary-card-body">
                         <div class="summary-value-sm" id="sc-sales-month-value">...</div>
@@ -241,6 +249,7 @@
                         <div class="summary-sub" id="sc-sales-month-empty-target" style="color:#7E8299;display:none;">
                             Ask your team lead to set a monthly target.
                         </div>
+                        <div class="summary-sub summary-yoy" id="sc-sales-month-yoy">Same period last year: —</div>
                         <div class="summary-sub summary-best" id="sc-sales-month-best">Best: —</div>
                     </div>
                 </div>
@@ -248,8 +257,8 @@
             <div class="col-md-3 sc-pos-3">
                 <div class="card card-custom">
                     <div class="card-header border-0 summary-card-header" style="background-color:#F5E6CD;">
-                        <h3>Year Sales vs Target</h3>
-                        <i id="pop-sales-year" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>What it shows:</strong> Your total sales for the selected year compared against your yearly target.<br><br><strong>Sales total:</strong> adds up the value of all your Booking Confirmations created this year, <strong>regardless of payment status</strong>. Quotations, proforma invoices and cancelled bookings are not included. Same rule as the Month card, just over the full year.<br><br><strong>Target:</strong> set for each agent under Admin &rarr; Yearly Target. The percentage is your sales divided by your target."></i>
+                        <h3>Year to date sales vs target</h3>
+                        <i id="pop-sales-year" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>What it shows:</strong> Your total sales for the selected year compared against your yearly target.<br><br><strong>Sales total:</strong> adds up the value of all your Booking Confirmations created this year, <strong>regardless of payment status</strong>. Quotations, proforma invoices and cancelled bookings are not included. Same rule as the Month card, just over the full year.<br><br><strong>Target:</strong> set for each agent under Admin &rarr; Yearly Target. The percentage is your sales divided by your target.<br><br><strong>Same period last year:</strong> your year-to-date sales a year ago, up to the same day (Jan&nbsp;1 to today, one year back), so the comparison is fair. The chip shows the change: green &#9650; up, red &#9660; down."></i>
                     </div>
                     <div class="card-body summary-card-body">
                         <div class="summary-value-sm" id="sc-sales-year-value">...</div>
@@ -272,6 +281,7 @@
                         <div class="summary-sub" id="sc-sales-year-empty-target" style="color:#7E8299;display:none;">
                             Ask your team lead to set a yearly target.
                         </div>
+                        <div class="summary-sub summary-yoy" id="sc-sales-year-yoy">Same period last year: —</div>
                         <div class="summary-sub summary-best" id="sc-sales-year-best">Best: —</div>
                     </div>
                 </div>
@@ -343,7 +353,7 @@
                 <div class="card card-custom">
                     <div class="card-header border-0 summary-card-header" style="background-color:#D7E2F2;">
                         <h3>Avg Reply Time to Inbound</h3>
-                        <i id="pop-tc-resp" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>What it shows:</strong> On average, how quickly you reply to an inbound message from your leads (from GHL).<br><br><strong>How it&rsquo;s measured:</strong> every inbound customer message answered by your next reply in the same chat is timed, and all those reply times are averaged &mdash; the same as the Message Log&rsquo;s &lsquo;Avg time taken&rsquo;. Shown in seconds, minutes, or hours.<br><br><strong>Working hours only:</strong> only time during working hours (everyday, 7:00am&ndash;10:00pm Malaysia time) is counted, so replies left overnight don&rsquo;t make the number look worse.<br><br><strong>By period</strong> (based on when the reply was sent): Today, Week (Mon&ndash;Sun), and Month.<br><br><strong>Best:</strong> the fastest agent across the team this month (minimum 3 chats replied to).<br>A dash (&mdash;) means you sent no qualifying replies in that period."></i>
+                        <i id="pop-tc-resp" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>What it shows:</strong> On average, how quickly you reply to an inbound message from your leads (from GHL).<br><br><strong>How it&rsquo;s measured:</strong> every inbound customer message answered by your next reply in the same chat is timed, and all those reply times are averaged &mdash; the same as the Message Log&rsquo;s &lsquo;Avg time taken&rsquo;. Shown in seconds, minutes, or hours.<br><br><strong>Calculation hours:</strong> Everyday, 7:00am&ndash;10:00pm Malaysia time is counted, so replies left overnight don&rsquo;t make the number look worse.<br><br><strong>By period</strong> (based on when the reply was sent): Today, Week (Mon&ndash;Sun), and Month.<br><br><strong>Best:</strong> the fastest agent across the team this month (minimum 3 chats replied to).<br>A dash (&mdash;) means you sent no qualifying replies in that period."></i>
                     </div>
                     <div class="card-body summary-card-body">
                         <div class="summary-row-3">
@@ -1102,7 +1112,7 @@
                     <div class="card-body summary-card-body">
                         <div class="summary-sub mb-2">Sales credited to each team this month, grouped by the agent's team lead.</div>
                         <table class="table table-sm summary-table">
-                            <thead><tr><th>Team Lead</th><th class="text-right">BC</th><th class="text-right">Sales</th></tr></thead>
+                            <thead><tr><th>Team</th><th class="text-right">BC</th><th class="text-right">Sales</th></tr></thead>
                             <tbody id="sc-sales-by-team-body"><tr><td colspan="3" class="text-center text-muted">Loading…</td></tr></tbody>
                         </table>
                     </div>
@@ -1270,6 +1280,22 @@ $(function() {
         html += '<span class="best-fig">' + escapeHtml(best.value) + '</span>';
         el.innerHTML = html;
     }
+    // "Same period last year" line: last year's figure + a coloured delta chip
+    // (▲ up / ▼ down / no arrow when flat). No percent when there's no prior-
+    // year baseline (last year was RM 0), just "no sales last year".
+    function setYoy(id, yoy) {
+        var el = document.getElementById(id);
+        if(!el || !yoy) return;
+        var html = 'Same period last year: <span class="yoy-fig">' + escapeHtml(yoy.value) + '</span>';
+        if(yoy.percent != null) {
+            var cls = yoy.dir === 'up' ? 'is-up' : (yoy.dir === 'down' ? 'is-down' : 'is-flat');
+            var arrow = yoy.dir === 'up' ? '▲ ' : (yoy.dir === 'down' ? '▼ ' : '');
+            html += '<span class="yoy-delta ' + cls + '">' + arrow + escapeHtml(yoy.percent) + '</span>';
+        } else if(!yoy.has_prior) {
+            html += ' <span class="yoy-delta is-flat">no sales last year</span>';
+        }
+        el.innerHTML = html;
+    }
     // Agent Score card: render the stashed (month) payload. Empty payload ->
     // em-dash, leaderboard "Top:" stays.
     function renderAgentScore() {
@@ -1312,6 +1338,77 @@ $(function() {
         var dp = document.getElementById('sc-day-picker');
         loadSummaryCards(p, dp ? dp.value : null);
     });
+
+    // Renders the three sales-agent "chase" cards (Travel in 7/14 Days – Not Yet
+    // Ready, Payment From Customer Due Soon) from a cards/tables payload. Shared
+    // by the full summary load and the listing's page-scoped refresh below.
+    function applyAgentVisibleCards(c, t) {
+        c = c || {}; t = t || {};
+        if(c.upcoming_travel_not_ready_op) {
+            setText('sc-upcoming-not-ready-op-count', c.upcoming_travel_not_ready_op.count);
+            setLink('sc-upcoming-not-ready-op-link',  c.upcoming_travel_not_ready_op.link);
+        }
+        if(c.upcoming_travel_not_ready_op_14) {
+            setText('sc-upcoming-not-ready-op-14-count', c.upcoming_travel_not_ready_op_14.count);
+            setLink('sc-upcoming-not-ready-op-14-link',  c.upcoming_travel_not_ready_op_14.link);
+        }
+        if(c.customer_payment_due_soon) {
+            var cds = c.customer_payment_due_soon;
+            ['overdue', 'today', 'tomorrow'].forEach(function(b) {
+                if(!cds[b]) return;
+                setText('sc-customer-payment-due-soon-' + b + '-count', cds[b].count);
+                setText('sc-customer-payment-due-soon-' + b + '-total', cds[b].total_due);
+                setLink('sc-customer-payment-due-soon-' + b + '-link', cds[b].link);
+            });
+        }
+        var custDueBody = document.getElementById('sc-customer-payment-due-soon-body');
+        // Only touch the table when this payload actually carries it. An empty
+        // refresh (e.g. an OP draw, which the server answers with no agent keys)
+        // leaves the value undefined -> we skip and keep the existing rows.
+        if(custDueBody && t.customer_payment_due_soon !== undefined) {
+            var custDue = t.customer_payment_due_soon;
+            if(custDue && custDue.length) {
+                custDueBody.innerHTML = custDue.map(function(r) {
+                    return '<tr>' +
+                        '<td>' + escapeHtml(r.booking_number || '—') + '</td>' +
+                        '<td>' + escapeHtml(r.customer || '—') + '</td>' +
+                        '<td class="text-right">' + escapeHtml(r.total_due) + '</td>' +
+                        '<td>' + escapeHtml(r.earliest_deadline) + '</td>' +
+                    '</tr>';
+                }).join('');
+            } else {
+                custDueBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No customer payments due between 1 March and tomorrow</td></tr>';
+            }
+        }
+    }
+
+    // Called by the booking listing after each DataTables draw with the booking
+    // ids visible on the current page. Re-scopes the three agent cards to just
+    // those rows. POST because a 500-row page carries many ids; an empty list is
+    // sent as a flag so the server counts nothing (never falls back to whole DB).
+    window.refreshAgentVisibleCards = function(ids) {
+        $.ajax({
+            url: '<?php echo base_url("Booking/ajax_agent_visible_cards"); ?>',
+            type: 'POST',
+            dataType: 'json',
+            data: {
+                // Default (bracket) serialization -> ids[]=1&ids[]=3 so PHP reads an
+                // array. Empty string when no rows -> server counts nothing.
+                ids: (ids && ids.length) ? ids : '',
+                owner_as_agent: <?php echo $owner_as_agent ? 1 : 0; ?>
+            },
+            success: function(resp) {
+                if(!resp || resp.error) return;
+                var cards = resp.cards || {};
+                // Only the agent card set returns these keys; when present, latch so
+                // the full-payload loader stops overwriting the page-scoped counts.
+                if(cards.upcoming_travel_not_ready_op || cards.customer_payment_due_soon) {
+                    window._agentCardsPageScoped = true;
+                }
+                applyAgentVisibleCards(cards, resp.tables || {});
+            }
+        });
+    };
 
     function loadSummaryCards(ownerPeriod, day) {
         var url = '<?php echo base_url("Booking/ajax_summary_cards"); ?>';
@@ -1363,6 +1460,7 @@ $(function() {
             setText('sc-sales-month-target-2', c.sales_month.has_target ? c.sales_month.target : '—');
             setBars('sc-sales-month-bar-actual', 'sc-sales-month-bar-target', c.sales_month.raw, c.sales_month.raw_target);
             setBestFigure('sc-sales-month-best', c.sales_month.best);
+            setYoy('sc-sales-month-yoy', c.sales_month.yoy);
             var emptyEl = document.getElementById('sc-sales-month-empty-target');
             if(emptyEl) {
                 emptyEl.style.display = c.sales_month.has_target ? 'none' : '';
@@ -1376,6 +1474,7 @@ $(function() {
             setText('sc-sales-year-target-2', c.sales_year.has_target ? c.sales_year.target : '—');
             setBars('sc-sales-year-bar-actual', 'sc-sales-year-bar-target', c.sales_year.raw, c.sales_year.raw_target);
             setBestFigure('sc-sales-year-best', c.sales_year.best);
+            setYoy('sc-sales-year-yoy', c.sales_year.yoy);
             var emptyElY = document.getElementById('sc-sales-year-empty-target');
             if(emptyElY) {
                 emptyElY.style.display = c.sales_year.has_target ? 'none' : '';
@@ -1449,13 +1548,14 @@ $(function() {
             setText('sc-conv-rate-detail', c.conversion_rate_ytd.detail);
             setBestFigure('sc-conv-rate-best',   c.conversion_rate_ytd.best);
         }
-        if(c.upcoming_travel_not_ready_op) {
-            setText('sc-upcoming-not-ready-op-count', c.upcoming_travel_not_ready_op.count);
-            setLink('sc-upcoming-not-ready-op-link',  c.upcoming_travel_not_ready_op.link);
-        }
-        if(c.upcoming_travel_not_ready_op_14) {
-            setText('sc-upcoming-not-ready-op-14-count', c.upcoming_travel_not_ready_op_14.count);
-            setLink('sc-upcoming-not-ready-op-14-link',  c.upcoming_travel_not_ready_op_14.link);
+        // Travel 7/14-day + Payment-due-soon cards. On the booking listing the
+        // agent card set scopes these to the rows on the current DataTables page
+        // via refreshAgentVisibleCards(); once that has taken over (latch below)
+        // we skip them here so a late whole-DB response can't clobber the
+        // page-scoped counts. OP (same DOM ids) and the dashboard keep the payload
+        // values — their refresh returns empty and never sets the latch.
+        if(!window._agentCardsPageScoped) {
+            applyAgentVisibleCards(c, t);
         }
         // OP operational queue cards.
         if(c.pending_bc_op) {
@@ -1526,15 +1626,8 @@ $(function() {
                 setLink('sc-supplier-due-soon-' + b + '-link', ds[b].link);
             });
         }
-        if(c.customer_payment_due_soon) {
-            var cds = c.customer_payment_due_soon;
-            ['overdue', 'today', 'tomorrow'].forEach(function(b) {
-                if(!cds[b]) return;
-                setText('sc-customer-payment-due-soon-' + b + '-count', cds[b].count);
-                setText('sc-customer-payment-due-soon-' + b + '-total', cds[b].total_due);
-                setLink('sc-customer-payment-due-soon-' + b + '-link', cds[b].link);
-            });
-        }
+        // customer_payment_due_soon card + table are handled by
+        // applyAgentVisibleCards() (page-scoped on the listing).
         if(c.checklist_payout_due_soon) {
             var cp = c.checklist_payout_due_soon;
             ['overdue', 'today', 'tomorrow'].forEach(function(b) {
@@ -1708,7 +1801,7 @@ $(function() {
             if(teams && teams.length) {
                 teamBody.innerHTML = teams.map(function(r) {
                     return '<tr>' +
-                        '<td>' + escapeHtml(r.team_lead_name || '—') + '</td>' +
+                        '<td>' + escapeHtml(r.team_name || '—') + '</td>' +
                         '<td class="text-right">' + escapeHtml(r.count) + '</td>' +
                         '<td class="text-right">' + escapeHtml(r.total) + '</td>' +
                     '</tr>';
@@ -1726,9 +1819,9 @@ $(function() {
             setText('sc-source-company-total', c.lead_source_split.company_total);
         }
 
-        // Per-agent Self Gen vs Company table. Team Lead cell uses rowspan so a
-        // run of agents under the same team lead is visually grouped (the rows
-        // arrive already sorted by team lead from the server).
+        // Per-agent Self Gen vs Company table. Team cell uses rowspan so a
+        // run of agents in the same team is visually grouped (the rows
+        // arrive already sorted by team from the server).
         var agentSrc = t.agent_source_split;
         var agentSrcBody = document.getElementById('sc-agent-source-split-body');
         if(agentSrcBody) {
@@ -1736,7 +1829,7 @@ $(function() {
                 var groups = {};
                 var order  = [];
                 agentSrc.forEach(function(r) {
-                    var key = r.team_lead_name || '—';
+                    var key = r.team_name || '—';
                     if(!groups[key]) {
                         groups[key] = [];
                         order.push(key);
@@ -1800,22 +1893,7 @@ $(function() {
             }
         }
 
-        var custDue = t.customer_payment_due_soon;
-        var custDueBody = document.getElementById('sc-customer-payment-due-soon-body');
-        if(custDueBody) {
-            if(custDue && custDue.length) {
-                custDueBody.innerHTML = custDue.map(function(r) {
-                    return '<tr>' +
-                        '<td>' + escapeHtml(r.booking_number || '—') + '</td>' +
-                        '<td>' + escapeHtml(r.customer || '—') + '</td>' +
-                        '<td class="text-right">' + escapeHtml(r.total_due) + '</td>' +
-                        '<td>' + escapeHtml(r.earliest_deadline) + '</td>' +
-                    '</tr>';
-                }).join('');
-            } else {
-                custDueBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No customer payments due between 1 March and tomorrow</td></tr>';
-            }
-        }
+        // customer_payment_due_soon table is rendered by applyAgentVisibleCards().
 
         var cpay = t.checklist_payout_due_soon;
         var cpayBody = document.getElementById('sc-checklist-payout-due-soon-body');

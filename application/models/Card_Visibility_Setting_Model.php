@@ -13,15 +13,16 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 class Card_Visibility_Setting_Model extends CI_Model
 {
 	/**
-	 * Every non-owner active admin — the population the owner toggles on the
-	 * settings page (owners are never card-gated, so they are excluded).
+	 * Every active admin the owner can toggle on the settings page. This now
+	 * INCLUDES Owner (Level 10) accounts: on the booking listing an owner sees the
+	 * sales-agent card set, so those cards are gate-able per owner-user just like
+	 * any other role. The registry decides which cards each level is eligible for.
 	 *
 	 * @return array list of {AdminID, Name, Level}
 	 */
 	function Configurable_Users()
 	{
 		$this->db->select('AdminID, Name, Level');
-		$this->db->where('Level !=', '10');
 		$this->db->where('Status', 'Y');
 		$this->db->order_by('Name', 'ASC');
 		return $this->db->get('admin')->result();
