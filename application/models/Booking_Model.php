@@ -1200,7 +1200,14 @@ class Booking_Model extends CI_Model
 				}
 			}
 		}
-		
+
+		// Nullable int FK columns (BookingOP, SalesAgent2) can be cleared from the
+		// form. The browser serialises a cleared value as '' which
+		// STRICT_TRANS_TABLES rejects for an int column ("Incorrect integer value:
+		// ''"), so coerce empty strings back to NULL before writing.
+		$this->load->helper('booking_sanitize');
+		$booking_data = nullify_empty_booking_fk($booking_data);
+
 		// Check for critical changes that require status revert to PBC
 		$needs_revert = false;
 		$revert_reason = '';
