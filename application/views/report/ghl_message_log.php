@@ -8,6 +8,12 @@ $log_show_reply_time = !empty($log_show_reply_time);
 $log_avg_reply = isset($log_avg_reply) ? $log_avg_reply : '';
 $log_table_colspan = $log_show_reply_time ? 7 : 6;
 
+// Feed the picker unambiguous Y-m-d bounds so it opens on the correct month
+// with today directly selectable (parsing the DD/MM/YYYY text field alone made
+// the widget misread the month and refuse today until another date was picked).
+$log_start_date = isset($log_filters['start_date']) ? $log_filters['start_date'] : date('Y-m-d');
+$log_end_date = isset($log_filters['end_date']) ? $log_filters['end_date'] : date('Y-m-d');
+
 /** Build a page URL keeping the current date, contact and agent filters. */
 $page_url = function ($page) use ($log_filters, $log_contact, $log_agent) {
     return base_url('Report/Ghl_Message_Log?log_date=' . urlencode($log_filters['log_date'])
@@ -176,6 +182,10 @@ $page_url = function ($page) use ($log_filters, $log_contact, $log_agent) {
 
 <script>
     $('#ghl_message_log_daterangepicker').daterangepicker({
+        locale: { format: 'DD/MM/YYYY', separator: ' - ' },
+        startDate: moment('<?php echo $log_start_date; ?>', 'YYYY-MM-DD'),
+        endDate: moment('<?php echo $log_end_date; ?>', 'YYYY-MM-DD'),
+        maxDate: moment(),
         buttonClasses: ' btn',
         applyClass: 'btn-primary',
         cancelClass: 'btn-secondary',

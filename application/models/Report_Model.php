@@ -1744,18 +1744,20 @@ class Report_Model extends CI_Model
     }
 
     /**
-     * "Avg Response Time" per owner: the mean of the per-lead response times
-     * (ghl_processed_leads.avg_first_5_response_seconds -- the same figure the Lead
-     * Dashboard reports) across the DISTINCT leads the owner replied to. Shares the
-     * exact reply-activity universe as "Lead Responded" (outbound reply owned by the
-     * agent, inside the lead's ownership window and the 07:00-22:00 gate) so the two
-     * columns describe the same set of leads.
+     * "Avg Response Time" per owner: the mean of EVERY inbound->outbound reply the
+     * owner made, computed with the SAME per-pair logic as the Lead Reply Hourly
+     * card (ghl_message_log_average_reply_seconds_by_group / ...seconds). Each
+     * consecutive inbound-customer-message -> owner-outbound-reply pair inside a
+     * thread contributes its in-hours gap; out-of-hours, cross-day and
+     * cross-conversation pairs never count, and the mean is SUM(gap)/COUNT(pairs).
      *
-     * The inner DISTINCT collapses the one-row-per-reply message join to one row per
-     * lead, so a lead replied to many times contributes its response time ONCE
-     * rather than weighting the average by reply count. AVG() then ignores the
-     * response-time NULLs (leads with no measured response time), matching
-     * lead_reply_activity_avg_response_seconds().
+     * Shares the reply-activity universe with the Hourly page: the owner's leads
+     * via ghl_lead_ownership, bounded to each lead's ownership window, inbound =
+     * every customer message, outbound = the owner's own replies. Raw messages are
+     * pulled grouped by owner, then conversation, then time ascending so the
+     * pairing helper's boundaries hold. Unlike the retired per-lead figure, a lead
+     * replied to many times now weights the average by each reply, so the dashboard
+     * column and the Hourly card report the identical number for the same owner/day.
      */
     private function Lead_Reply_Activity_Response_Time_By_Agent($filters = array())
     {
@@ -1764,51 +1766,46 @@ class Report_Model extends CI_Model
             return array();
         }
 
+        $this->load->helper('ghl_messages_log');
         $extraJoins = isset($where['extra_joins']) ? $where['extra_joins'] : '';
         $messageTimeColumn = $this->escape_identifier($this->get_message_time_column());
-        $businessHours = $this->lead_reply_business_hours_sql("gm.{$messageTimeColumn}");
         $start = !empty($filters['start_date']) ? $filters['start_date'] . ' 00:00:00' : '1970-01-01 00:00:00';
         $end = !empty($filters['end_date']) ? $filters['end_date'] . ' 23:59:59' : '9999-12-31 23:59:59';
 
         $sql = "
             SELECT
-                owner_user_id,
-                AVG(response_seconds) AS avg_response_seconds
-            FROM (
-                SELECT DISTINCT
-                    glo.owner_user_id AS owner_user_id,
-                    glo.processed_lead_id AS processed_lead_id,
-                    pl.avg_first_5_response_seconds AS response_seconds
-                FROM ghl_lead_ownership glo
-                INNER JOIN ghl_messages gm
-                    ON gm.conversation_id = glo.conversation_id
-                   AND gm.user_id = glo.owner_user_id
-                   AND gm.direction = 'outbound'
-                   AND gm.{$messageTimeColumn} >= glo.lead_started_at
-                   AND (
-                        glo.lead_ended_at IS NULL
-                        OR gm.{$messageTimeColumn} < glo.lead_ended_at
-                   )
-                INNER JOIN ghl_processed_leads pl ON pl.id = glo.processed_lead_id
-                {$extraJoins}
-                {$where['sql']}
-                  AND gm.{$messageTimeColumn} BETWEEN ? AND ?
-                  AND {$businessHours}
-                  AND pl.avg_first_5_response_seconds IS NOT NULL
-            ) responded_leads
-            GROUP BY owner_user_id
+                glo.owner_user_id AS owner_user_id,
+                gm.conversation_id AS conversation_id,
+                gm.direction AS direction,
+                gm.{$messageTimeColumn} AS ts
+            FROM ghl_lead_ownership glo
+            INNER JOIN ghl_messages gm
+                ON gm.conversation_id = glo.conversation_id
+               AND gm.{$messageTimeColumn} >= glo.lead_started_at
+               AND (
+                    glo.lead_ended_at IS NULL
+                    OR gm.{$messageTimeColumn} < glo.lead_ended_at
+               )
+            {$extraJoins}
+            {$where['sql']}
+              AND gm.{$messageTimeColumn} BETWEEN ? AND ?
+              AND (
+                    gm.direction = 'inbound'
+                    OR (gm.direction = 'outbound' AND gm.user_id = glo.owner_user_id)
+              )
+            ORDER BY glo.owner_user_id ASC, gm.conversation_id ASC, gm.{$messageTimeColumn} ASC, gm.id ASC
         ";
 
         $params = array_merge($where['params'], array($start, $end));
         $rows = $this->db->query($sql, $params)->result_array();
+        $byOwner = ghl_message_log_average_reply_seconds_by_group($rows, 'owner_user_id', 'ts');
         $results = array();
 
-        foreach ($rows as $row) {
-            $results[(string) $row['owner_user_id']] = array(
-                'owner_user_id' => (string) $row['owner_user_id'],
-                'avg_response_seconds' => ($row['avg_response_seconds'] !== null)
-                    ? (int) round((float) $row['avg_response_seconds'])
-                    : null,
+        foreach ($byOwner as $ownerId => $stat) {
+            $avg = $stat['avg_seconds'];
+            $results[(string) $ownerId] = array(
+                'owner_user_id' => (string) $ownerId,
+                'avg_response_seconds' => ($avg !== null) ? (int) round((float) $avg) : null,
             );
         }
 

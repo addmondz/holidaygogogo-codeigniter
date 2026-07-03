@@ -124,42 +124,6 @@ if (!function_exists('lead_reply_activity_today_handling')) {
     }
 }
 
-if (!function_exists('lead_reply_activity_avg_response_seconds')) {
-    /**
-     * "Avg Response Time" for the Lead Reply Activity dashboard: the mean of an
-     * owner's per-lead response times (ghl_processed_leads.avg_first_5_response_seconds
-     * -- the same figure the Lead Dashboard reports), taken across the DISTINCT
-     * leads the owner replied to. The caller passes one value per lead, so a lead
-     * replied to many times still contributes its response time once.
-     *
-     * Leads with no measurable response time (null) or a negative gap are ignored
-     * rather than counted as zero, so a single un-timed lead can't drag the mean
-     * down. Returns null when nothing qualifies, so the column renders a dash.
-     *
-     * @param array $perLeadSeconds One response-time value per distinct lead.
-     * @return int|null Mean seconds rounded to a whole second, or null.
-     */
-    function lead_reply_activity_avg_response_seconds(array $perLeadSeconds)
-    {
-        $total = 0;
-        $count = 0;
-
-        foreach ($perLeadSeconds as $seconds) {
-            if ($seconds === null || $seconds === '') {
-                continue;
-            }
-            $seconds = (int) $seconds;
-            if ($seconds < 0) {
-                continue;
-            }
-            $total += $seconds;
-            $count++;
-        }
-
-        return $count > 0 ? (int) round($total / $count) : null;
-    }
-}
-
 if (!function_exists('ghl_message_log_reply_pair_seconds')) {
     /**
      * Seconds an agent took to answer a customer: the gap from an INBOUND message

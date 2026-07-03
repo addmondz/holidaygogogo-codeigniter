@@ -132,6 +132,9 @@ if ( ! function_exists('leads_by_hour_build_matrix'))
             );
         }
 
+        // Show the most recent day at the top of the grid.
+        $outRows = array_reverse($outRows);
+
         return array(
             'hours' => $hours,
             'rows' => $outRows,

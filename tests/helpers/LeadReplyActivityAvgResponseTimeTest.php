@@ -2,16 +2,17 @@
 /**
  * Run with: php tests/helpers/LeadReplyActivityAvgResponseTimeTest.php
  *
- * Pins the new "Avg Response Time" column on the Lead Reply Activity dashboard.
- * It reuses the SAME response-time figure the Lead Dashboard already reports
- * (ghl_processed_leads.avg_first_5_response_seconds) and averages it, per owner,
- * across the DISTINCT leads that owner replied to inside the reply-activity
- * universe (outbound reply, 07:00-22:00 everyday window).
+ * Pins the "Avg Response Time" column on the Lead Reply Activity dashboard AFTER
+ * it was unified with the Lead Reply Hourly page: BOTH now count EVERY
+ * inbound->outbound reply pair with identical logic
+ * (ghl_message_log_average_reply_seconds_by_group / ...seconds). The dashboard no
+ * longer reads the precomputed ghl_processed_leads.avg_first_5_response_seconds
+ * column and no longer collapses a lead to a single per-lead figure.
  *
- * The averaging math is a pure helper (null/negative response times ignored, no
- * qualifying lead -> null). The DISTINCT-lead scoping is exercised against a
- * SQLite mirror of the model query so a lead replied to many times contributes
- * its response time ONCE (message rows must not weight the average).
+ * Every consecutive inbound->owner-outbound pair inside a thread contributes its
+ * in-hours gap; out-of-hours / cross-day / cross-conversation pairs never count;
+ * the per-owner mean is SUM(gap) / COUNT(pairs) -- so a lead replied to many times
+ * now weights the average by each reply, exactly like the Hourly card.
  */
 
 if (!defined('BASEPATH')) {
@@ -30,86 +31,75 @@ function assert_eq($label, $expected, $actual) {
     }
 }
 
-// --- Pure averaging helper: mean of the per-lead response seconds. ---
-assert_eq('mean of two leads',            200, lead_reply_activity_avg_response_seconds(array(100, 300)));
-assert_eq('rounds to nearest second',      67, lead_reply_activity_avg_response_seconds(array(100, 100, 0)));
-assert_eq('nulls ignored, not zero',      300, lead_reply_activity_avg_response_seconds(array(null, 300)));
-assert_eq('negative gaps ignored',        300, lead_reply_activity_avg_response_seconds(array(-5, 300)));
-assert_eq('no qualifying lead -> null',   null, lead_reply_activity_avg_response_seconds(array(null, -1)));
-assert_eq('empty -> null',                null, lead_reply_activity_avg_response_seconds(array()));
-assert_eq('coerces numeric strings',      150, lead_reply_activity_avg_response_seconds(array('100', '200')));
-
-// --- SQLite mirror of the per-owner avg-response query. ---
+// --- SQLite mirror of the per-owner avg-response query (same universe as the
+//     Hourly page, minus the single-owner filter, grouped per owner). ---
 $pdo = new PDO('sqlite::memory:');
 $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 $pdo->exec("CREATE TABLE ghl_lead_ownership (
-    owner_user_id TEXT, processed_lead_id INTEGER, conversation_id TEXT,
+    owner_user_id TEXT, conversation_id TEXT,
     lead_started_at TEXT, lead_ended_at TEXT
 )");
 $pdo->exec("CREATE TABLE ghl_messages (
     id INTEGER PRIMARY KEY, conversation_id TEXT, user_id TEXT,
     direction TEXT, date_added TEXT
 )");
-$pdo->exec("CREATE TABLE ghl_processed_leads (
-    id INTEGER PRIMARY KEY, avg_first_5_response_seconds INTEGER
-)");
 
 // Owner u1:
-//   lead 100 (conv a) response 100s, replied 3x in-hours -> counted ONCE (100).
-//   lead 101 (conv b) response 300s, replied 1x in-hours  -> 300.  u1 avg = 200.
-//   lead 102 (conv d) response NULL  -> excluded (no measured response time).
-//   lead 103 (conv e) response 999s, replied only out-of-hours -> excluded.
+//   conv a: two in-hours replies (40s, 20s) -- BOTH count now (per-pair).
+//   conv b: one in-hours reply (120s).
+//   conv e: an out-of-hours pair (23:30) -- excluded.
+//   u1 avg = (40 + 20 + 120) / 3 = 60.
 // Owner u2:
-//   lead 200 (conv c) response 50s, one in-hours reply -> u2 avg = 50.
+//   conv c: one in-hours reply (50s). u2 avg = 50.
 $pdo->exec("INSERT INTO ghl_lead_ownership
-    (owner_user_id, processed_lead_id, conversation_id, lead_started_at, lead_ended_at) VALUES
-    ('u1', 100, 'a', '2026-06-19 00:00:00', NULL),
-    ('u1', 101, 'b', '2026-06-19 00:00:00', NULL),
-    ('u1', 102, 'd', '2026-06-19 00:00:00', NULL),
-    ('u1', 103, 'e', '2026-06-19 00:00:00', NULL),
-    ('u2', 200, 'c', '2026-06-19 00:00:00', NULL)");
-$pdo->exec("INSERT INTO ghl_processed_leads (id, avg_first_5_response_seconds) VALUES
-    (100, 100), (101, 300), (102, NULL), (103, 999), (200, 50)");
+    (owner_user_id, conversation_id, lead_started_at, lead_ended_at) VALUES
+    ('u1', 'a', '2026-06-19 00:00:00', NULL),
+    ('u1', 'b', '2026-06-19 00:00:00', NULL),
+    ('u1', 'e', '2026-06-19 00:00:00', NULL),
+    ('u2', 'c', '2026-06-19 00:00:00', NULL)");
 $pdo->exec("INSERT INTO ghl_messages (id, conversation_id, user_id, direction, date_added) VALUES
-    (1, 'a', 'u1', 'outbound', '2026-06-19 09:10:00'),
-    (2, 'a', 'u1', 'outbound', '2026-06-19 10:10:00'),
-    (3, 'a', 'u1', 'outbound', '2026-06-19 11:10:00'),
-    (4, 'b', 'u1', 'outbound', '2026-06-19 14:00:00'),
-    (5, 'd', 'u1', 'outbound', '2026-06-19 15:00:00'),
-    (6, 'e', 'u1', 'outbound', '2026-06-19 23:30:00'),
-    (7, 'c', 'u2', 'outbound', '2026-06-19 16:00:00')");
+    (1,  'a', 'cust', 'inbound',  '2026-06-19 09:00:00'),
+    (2,  'a', 'u1',   'outbound', '2026-06-19 09:00:40'),
+    (3,  'a', 'cust', 'inbound',  '2026-06-19 10:00:00'),
+    (4,  'a', 'u1',   'outbound', '2026-06-19 10:00:20'),
+    (5,  'b', 'cust', 'inbound',  '2026-06-19 14:00:00'),
+    (6,  'b', 'u1',   'outbound', '2026-06-19 14:02:00'),
+    (7,  'e', 'cust', 'inbound',  '2026-06-19 23:30:00'),
+    (8,  'e', 'u1',   'outbound', '2026-06-19 23:30:30'),
+    (9,  'c', 'cust', 'inbound',  '2026-06-19 16:00:00'),
+    (10, 'c', 'u2',   'outbound', '2026-06-19 16:00:50')");
 
-// Mirror of the model query: DISTINCT (owner, lead, response_seconds) collapses
-// the message multiplication, then the pure helper averages per owner.
+// Mirror of the model query: raw inbound + owner-outbound messages, ordered by
+// owner then conversation then time, fed to the SAME grouping helper the Hourly
+// page's per-agent variant uses.
 $sql = "
-    SELECT DISTINCT
+    SELECT
         glo.owner_user_id AS owner_user_id,
-        glo.processed_lead_id AS processed_lead_id,
-        pl.avg_first_5_response_seconds AS response_seconds
+        gm.conversation_id AS conversation_id,
+        gm.direction AS direction,
+        gm.date_added AS ts
     FROM ghl_lead_ownership glo
     INNER JOIN ghl_messages gm
         ON gm.conversation_id = glo.conversation_id
-       AND gm.user_id = glo.owner_user_id
-       AND gm.direction = 'outbound'
        AND gm.date_added >= glo.lead_started_at
        AND (glo.lead_ended_at IS NULL OR gm.date_added < glo.lead_ended_at)
-    INNER JOIN ghl_processed_leads pl ON pl.id = glo.processed_lead_id
     WHERE gm.date_added BETWEEN '2026-06-19 00:00:00' AND '2026-06-19 23:59:59'
-      AND time(gm.date_added) BETWEEN '07:00:00' AND '22:00:00'
-      AND pl.avg_first_5_response_seconds IS NOT NULL
+      AND (
+            gm.direction = 'inbound'
+            OR (gm.direction = 'outbound' AND gm.user_id = glo.owner_user_id)
+      )
+    ORDER BY glo.owner_user_id ASC, gm.conversation_id ASC, gm.date_added ASC, gm.id ASC
 ";
 $rows = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
 
-$byOwner = array();
-foreach ($rows as $r) {
-    $byOwner[$r['owner_user_id']][] = $r['response_seconds'];
-}
+$byOwner = ghl_message_log_average_reply_seconds_by_group($rows, 'owner_user_id', 'ts');
 
-$u1 = isset($byOwner['u1']) ? lead_reply_activity_avg_response_seconds($byOwner['u1']) : null;
-$u2 = isset($byOwner['u2']) ? lead_reply_activity_avg_response_seconds($byOwner['u2']) : null;
+$u1 = isset($byOwner['u1']['avg_seconds']) ? $byOwner['u1']['avg_seconds'] : null;
+$u2 = isset($byOwner['u2']['avg_seconds']) ? $byOwner['u2']['avg_seconds'] : null;
 
-assert_eq('u1: (100 + 300) / 2, replies-per-lead do not skew', 200, $u1);
-assert_eq('u2: single lead response time',                      50, $u2);
-assert_eq('out-of-hours-only lead 103 excluded',              false, in_array('999', array_map('strval', isset($byOwner['u1']) ? $byOwner['u1'] : array()), true));
+assert_eq('u1: (40 + 20 + 120) / 3, every reply pair counts', 60.0, $u1);
+assert_eq('u2: single reply pair',                            50.0, $u2);
+assert_eq('u1 lead_count = distinct convs with a pair (a, b)',   2, $byOwner['u1']['lead_count']);
+assert_eq('out-of-hours conv e pair excluded (u1 unaffected)', 60.0, $u1);
 
 echo "\nAll assertions passed.\n";

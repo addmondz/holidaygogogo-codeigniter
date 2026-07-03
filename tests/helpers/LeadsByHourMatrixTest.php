@@ -62,11 +62,13 @@ $matrix = leads_by_hour_build_matrix(array(
 assert_eq('24 hour columns', 24, count($matrix['hours']));
 assert_eq('first hour col label', '12 AM', $matrix['hours'][0]['label']);
 assert_eq('two date rows', 2, count($matrix['rows']));
-assert_eq('row 1 date label', '01 Jun 2026 (Mon)', $matrix['rows'][0]['date_label']);
-assert_eq('row 1 hour 9 count', 4, $matrix['rows'][0]['counts'][9]);
+// Rows are ordered most-recent-first, so 02 Jun sits above 01 Jun.
+assert_eq('row 1 date label', '02 Jun 2026 (Tue)', $matrix['rows'][0]['date_label']);
+assert_eq('row 1 hour 9 count', 3, $matrix['rows'][0]['counts'][9]);
 assert_eq('row 1 empty hour 0', 0, $matrix['rows'][0]['counts'][0]);
-assert_eq('row 1 total', 11, $matrix['rows'][0]['total']);
-assert_eq('row 2 total', 3, $matrix['rows'][1]['total']);
+assert_eq('row 1 total', 3, $matrix['rows'][0]['total']);
+assert_eq('row 2 date label', '01 Jun 2026 (Mon)', $matrix['rows'][1]['date_label']);
+assert_eq('row 2 total', 11, $matrix['rows'][1]['total']);
 
 // ---------------------------------------------------------------------------
 // 4. Totals: per-hour column totals + grand total

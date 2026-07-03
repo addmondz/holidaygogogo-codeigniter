@@ -2061,7 +2061,15 @@ class Booking_Model extends CI_Model
 		//     whose TC, TC2 or OP belongs to their team. Cross-team: a booking whose
 		//     people span teams is visible to each involved team's lead/OP.
 		//   Everyone else (Owner 10, Finance 30, Marketing 60): unscoped.
-		if(in_array($level, [20, 50])) {
+		// TC Lead (25) "Payment From Customer Due Soon" card is scoped to the
+		// lead's OWN bookings (same as a TC), so its ?customer_payment drill-down
+		// must scope to own bookings too — otherwise the team-scoped listing
+		// below shows the whole team and disagrees with the card count. Treat
+		// level 25 like a TC (own scope) ONLY for this drill-down; the normal
+		// TC Lead listing keeps the team scope. See CustomerPaymentTcLeadScopeParityTest.
+		$tclead_own_payment = ($level === 25 && !empty($this->input->get('customer_payment')));
+
+		if(in_array($level, [20, 50]) || $tclead_own_payment) {
 			$this->db->group_start();
 			$this->db->where('booking.SalesAgent', $admin_id);
 			$this->db->or_where('booking.SalesAgent2', $admin_id);

@@ -173,6 +173,19 @@ foreach ($hours as $h) {
                                 <?php } ?>
                             <?php } ?>
                         </tbody>
+                        <?php if($breakdown['total'] > 0) { ?>
+                            <tfoot>
+                                <tr style="background:#eef2f7; font-weight:700;">
+                                    <td class="text-dark">Total</td>
+                                    <td class="text-center" style="color:#2f6fed;"><?php echo number_format($breakdown['total_inbound']); ?></td>
+                                    <td class="text-center" style="color:#1bc5bd;"><?php echo number_format($breakdown['total_outbound']); ?></td>
+                                    <td class="text-center text-dark"><?php echo number_format($breakdown['total']); ?></td>
+                                    <td class="text-center text-muted" data-toggle="tooltip"
+                                        title="Not summed: the same lead can be handled in more than one hour, so hourly Leads Handled values do not add up to a day total.">&mdash;</td>
+                                    <td></td>
+                                </tr>
+                            </tfoot>
+                        <?php } ?>
                     </table>
                 </div>
             </div>
