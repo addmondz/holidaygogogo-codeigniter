@@ -552,7 +552,7 @@ $is_dev_env = ($app_env !== 'prod');
 													</a>
 												</li>
 											<?php } ?>
-												<?php if($this->session->level == 10) { ?>
+												<?php if($this->session->level == 10 || (int)$this->session->admin_id === 28 /* Ema */) { ?>
 													<li class="menu-item <?php if($this->router->class == 'Costing' && $this->router->method != 'Currency') { echo 'menu-item-active'; } ?>">
 														<a href="<?php echo base_url('Costing'); ?>" class="menu-link">
 															<i class="menu-bullet menu-bullet-dot">
