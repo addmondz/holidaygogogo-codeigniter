@@ -2322,6 +2322,25 @@ class Booking_Model extends CI_Model
 				}
 				$level2Ignore = 1;
 			}
+			// Credited-slot scope for the agent "BC Created" card drill-down. The
+			// card counts BCs the viewer is *credited* for under the TC1/TC2 cutoff
+			// rule (SalesAgent pre-2026-06-01, SalesAgent2 on/after), but the
+			// listing's default level scope is broader: unscoped for the Owner (10),
+			// any-slot for a TC (20/50), whole team for a TC Lead (25). Without this
+			// the drill-down disagrees with the count — e.g. the Owner sees every
+			// agent's bookings. ANDing the exact credited predicate collapses the
+			// listing to the card's set. Mirrors lead_conversion_credit_booking_clause()
+			// byte-for-byte so count and list stay in step.
+			if(!empty($this->input->get('credited_agent'))) {
+				$ca     = (int) $this->input->get('credited_agent');
+				$cutoff = defined('LEAD_CONVERSION_TC2_CUTOFF_DATE') ? LEAD_CONVERSION_TC2_CUTOFF_DATE : '2026-06-01';
+				$this->db->where(
+					"((booking.InsertDate < '{$cutoff}' AND booking.SalesAgent = {$ca})"
+					. " OR (booking.InsertDate >= '{$cutoff}' AND booking.SalesAgent2 = {$ca}))",
+					null, false
+				);
+				$level2Ignore = 1;
+			}
 			$this->apply_status_filter();
 			if(!empty($this->input->get('status'))) {
 				$level2Ignore = 1;

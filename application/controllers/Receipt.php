@@ -217,7 +217,7 @@ class Receipt extends CI_Controller
         // need to loop back over HTTP to fetch them.
         $this->load->helper('voucher_image');
         if (!empty($array['BookingConfirmationFooter'])) {
-            $array['BookingConfirmationFooter'] = inline_voucher_images_html($array['BookingConfirmationFooter']);
+            $array['BookingConfirmationFooter'] = inline_voucher_images_html(sanitize_voucher_content_html($array['BookingConfirmationFooter']));
         }
 
         // Set Text variable for footer

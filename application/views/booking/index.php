@@ -729,7 +729,7 @@ $(document).ready(function() {
         var filterParams = {};
         ['customer', 'booking_number', 'reservation_number', 'mobile', 'destination', 'travel_date', 'travel_start_date',
          'deadline', 'source', 'chat_language', 'booking_date', 'status', 'exclude_status', 'booking_confirmation_title',
-         'tag', 'sales_agent', 'sales_agent_2', 'booking_op', 'autocount_status', 'guest_list_status', 'checklist_filter', 'cancellation_reason', 'einvoice_status', 'customer_type', 'upcoming_not_ready', 'supplier_payout', 'checklist_payout', 'customer_payment', 'exclude_finished', 'slow_conversion', 'lead_month'].forEach(function(param) {
+         'tag', 'sales_agent', 'sales_agent_2', 'credited_agent', 'booking_op', 'autocount_status', 'guest_list_status', 'checklist_filter', 'cancellation_reason', 'einvoice_status', 'customer_type', 'upcoming_not_ready', 'supplier_payout', 'checklist_payout', 'customer_payment', 'exclude_finished', 'slow_conversion', 'lead_month'].forEach(function(param) {
             if (urlParams.has(param)) {
                 filterParams[param] = urlParams.get(param);
             }
@@ -814,7 +814,7 @@ function loadSummaryTotals() {
     var params = [];
     ['customer', 'booking_number', 'reservation_number', 'mobile', 'destination', 'travel_date', 'travel_start_date',
      'deadline', 'source', 'chat_language', 'booking_date', 'status', 'exclude_status', 'booking_confirmation_title',
-     'tag', 'sales_agent', 'sales_agent_2', 'booking_op', 'autocount_status', 'guest_list_status', 'checklist_filter', 'cancellation_reason', 'einvoice_status', 'customer_type', 'upcoming_not_ready', 'supplier_payout', 'checklist_payout', 'customer_payment', 'slow_conversion', 'lead_month'].forEach(function(param) {
+     'tag', 'sales_agent', 'sales_agent_2', 'credited_agent', 'booking_op', 'autocount_status', 'guest_list_status', 'checklist_filter', 'cancellation_reason', 'einvoice_status', 'customer_type', 'upcoming_not_ready', 'supplier_payout', 'checklist_payout', 'customer_payment', 'slow_conversion', 'lead_month'].forEach(function(param) {
         if (urlParams.has(param)) {
             params.push(param + '=' + encodeURIComponent(urlParams.get(param)));
         }

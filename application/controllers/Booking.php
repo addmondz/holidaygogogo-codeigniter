@@ -801,10 +801,11 @@ class Booking extends MY_Controller
 		$tables = array();
 
 		// "Travel in N Days – Not Yet Ready" counts confirmed BCs this agent is
-		// *credited* for (TC1 pre-cutoff, TC2 on/after) — the same credited-slot
-		// rule the ?upcoming_not_ready drill-down applies for level 20/50, so the
-		// card and its listing agree. No sales_agent param on the link: the
-		// listing self-scopes by the credited slot for this level.
+		// *credited* for (TC1 pre-cutoff, TC2 on/after). The ?upcoming_not_ready
+		// drill-down only self-applies that credited scope for levels 20/50, so
+		// the link carries ?credited_agent=<me> to scope the OTHER agent-card
+		// roles too — Owner (10, unscoped listing) and TC Lead (25, team-scoped
+		// listing) — otherwise their drill-down leaks every agent's bookings.
 		foreach(array(
 			array('key' => 'upcoming_travel_not_ready_op',    's' => $next7_start,  'e' => $next7_end),
 			array('key' => 'upcoming_travel_not_ready_op_14', 's' => $next14_start, 'e' => $next14_end),
@@ -832,6 +833,7 @@ class Booking extends MY_Controller
 				'link'   => $base . $qs(array(
 					'upcoming_not_ready' => 1,
 					'travel_date'        => $fmt_dmy($w['s']) . ' - ' . $fmt_dmy($w['e']),
+					'credited_agent'     => $admin_id,
 				)),
 			);
 		}
@@ -1056,7 +1058,15 @@ class Booking extends MY_Controller
 			)->row();
 			$cards['bc_month'] = array(
 				'count' => (int)$row->cnt,
-				'link'  => $base . $qs(array('booking_date' => $fmt_dmy($month_start) . ' - ' . $fmt_dmy($month_end))),
+				// credited_agent + BC-title + status=A make the drill-down match the
+				// count exactly (own credited BCs, no cancelled/draft/quotation),
+				// regardless of the viewer's broader default listing scope.
+				'link'  => $base . $qs(array(
+					'booking_date'               => $fmt_dmy($month_start) . ' - ' . $fmt_dmy($month_end),
+					'credited_agent'             => $admin_id,
+					'booking_confirmation_title' => 'BOOKING CONFIRMATION',
+					'status'                     => 'A',
+				)),
 			);
 
 			// BC Created (Year) — same confirmed-BC rule (excludes QUOTATION /
@@ -1072,7 +1082,16 @@ class Booking extends MY_Controller
 			)->row();
 			$cards['bc_year'] = array(
 				'count' => (int)$row_y->cnt,
-				'link'  => $base . $qs(array('booking_date' => $fmt_dmy($year_start) . ' - ' . $fmt_dmy($year_end))),
+				// Same credited-slot drill-down as bc_month. The year window straddles
+				// the TC1/TC2 cutoff, so only the credited_agent predicate (which
+				// switches slot by InsertDate) matches the count — a plain
+				// sales_agent / sales_agent_2 filter would not.
+				'link'  => $base . $qs(array(
+					'booking_date'               => $fmt_dmy($year_start) . ' - ' . $fmt_dmy($year_end),
+					'credited_agent'             => $admin_id,
+					'booking_confirmation_title' => 'BOOKING CONFIRMATION',
+					'status'                     => 'A',
+				)),
 			);
 
 			// Sales card "Actual" (both Month and Year): counts ALL credited

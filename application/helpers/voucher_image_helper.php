@@ -98,6 +98,68 @@ if (!function_exists('inline_voucher_images_html')) {
     }
 }
 
+if (!function_exists('sanitize_voucher_content_html')) {
+    /**
+     * Strip layout-breaking inline styles from stored voucher HTML before it is
+     * handed to DomPDF (or shown anywhere the raw content renders).
+     *
+     * Itineraries are frequently pasted from web page builders (Elementor),
+     * PDFs, Word or Google Docs. That markup carries two layout-breaking things:
+     *   1. a pixel `line-height` (e.g. `line-height: 1.4px`) — on 10pt text this
+     *      collapses every line onto the next, so lines overlap and become
+     *      unreadable in the generated PDF. This is the common real cause.
+     *   2. absolute positioning (position/top/left/right/bottom/z-index) — DomPDF
+     *      honours it and stacks blocks on top of each other.
+     * Both are stripped. A `px` line-height is removed (falls back to normal
+     * spacing) while a sane unitless/em line-height is kept. Fonts, colours,
+     * margins and image sizing are left intact.
+     *
+     * @param string|null $html
+     * @return string
+     */
+    function sanitize_voucher_content_html($html)
+    {
+        if (empty($html) || stripos($html, 'style') === false) {
+            return (string) $html;
+        }
+
+        $blocked = ['position', 'top', 'left', 'right', 'bottom', 'z-index'];
+
+        return preg_replace_callback(
+            '/\bstyle\s*=\s*(["\'])(.*?)\1/is',
+            function ($m) use ($blocked) {
+                $quote = $m[1];
+                $decls = explode(';', $m[2]);
+                $kept  = [];
+
+                foreach ($decls as $decl) {
+                    if (trim($decl) === '') {
+                        continue;
+                    }
+                    $prop  = strtolower(trim(strtok($decl, ':')));
+                    $value = trim(substr($decl, strlen($prop) + 1));
+
+                    if (in_array($prop, $blocked, true)) {
+                        continue; // positioning -> always drop
+                    }
+                    // A px line-height is what makes pasted lines overlap; drop
+                    // it so text falls back to normal spacing. Keep unitless/em/%.
+                    if ($prop === 'line-height' && stripos($value, 'px') !== false) {
+                        continue;
+                    }
+                    $kept[] = trim($decl);
+                }
+
+                if (empty($kept)) {
+                    return 'style=' . $quote . $quote;
+                }
+                return 'style=' . $quote . implode('; ', $kept) . $quote;
+            },
+            $html
+        );
+    }
+}
+
 if (!function_exists('_voucher_image_flatten_to_jpeg')) {
     /**
      * Read an image from disk, composite onto a white background, return
