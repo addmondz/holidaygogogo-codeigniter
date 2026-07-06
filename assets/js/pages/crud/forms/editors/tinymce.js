@@ -60,8 +60,8 @@ var KTTinymce = function () {
         var voucherEditorConfig = {
             toolbar: ['styleselect fontselect fontsizeselect',
                 'undo redo | bold italic underline | forecolor backcolor | link image | alignleft aligncenter alignright alignjustify',
-                'bullist numlist | preview'],
-            plugins: 'link lists preview image',
+                'bullist numlist | removeformat | preview'],
+            plugins: 'link lists preview image paste',
             images_upload_url: voucherUploadUrl,
             images_upload_handler: voucherImageHandler,
             images_upload_credentials: true,
@@ -72,6 +72,18 @@ var KTTinymce = function () {
             convert_urls: true,
             file_picker_types: 'image',
             paste_data_images: true,
+            // Itineraries are often pasted from PDFs / Word / Google Docs, whose
+            // source markup carries absolute positioning and Word (mso-*) styles.
+            // Those make lines render on top of each other in the editor and the
+            // printed voucher. Clean the paste and drop positioning styles so text
+            // always flows normally. Applied on load too, so existing broken
+            // vouchers self-correct when reopened.
+            paste_merge_formats: true,
+            paste_webkit_styles: 'none',
+            paste_remove_styles_if_webkit: true,
+            invalid_styles: {
+                '*': 'position top left right bottom z-index'
+            },
             content_style: 'img { max-width: 100%; height: auto; }'
         };
 

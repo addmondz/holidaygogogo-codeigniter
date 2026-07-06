@@ -3693,9 +3693,27 @@ class Booking extends MY_Controller
 					'leads' => 0, 'converted' => 0, 'sales' => 0.0,
 					'fu_owned' => 0, 'fu_followed' => 0,
 					'has_leads' => false, 'has_sales' => false, 'has_fu' => false,
+					'is_pool' => false,
 				);
 			}
 		};
+
+		// Seed the full eligible pool so every active sales agent counts toward the
+		// "of N agents" total even with zero activity this period. Without this, an
+		// agent who logged no leads/sales/follow-ups vanishes from the leaderboard
+		// (its denominator shrinks); with it they still rank — bottom, score 0 —
+		// which is the fair reading of "ranked against the whole team". The score
+		// helper still drops excluded/hidden members, so the visible pool is
+		// unchanged apart from these otherwise-missing zero-activity agents.
+		foreach($this->db->query(
+			"SELECT AdminID, Name FROM admin WHERE Level IN ('20','10','25') AND Status='Y'"
+		)->result() as $r) {
+			$aid = (int)$r->AdminID;
+			if(!isset($name_by_admin[$aid])) { $name_by_admin[$aid] = $r->Name; }
+			$ensure($u, $aid);
+			$u[$aid]['name']    = ($u[$aid]['name'] !== '') ? $u[$aid]['name'] : $r->Name;
+			$u[$aid]['is_pool'] = true;
+		}
 		foreach($by_agent as $a) {
 			$uid = (string)$a['agent_id'];
 			if($uid === '__unassigned__' || !isset($map[$uid])) { continue; }
@@ -3748,10 +3766,12 @@ class Booking extends MY_Controller
 			if($u[$aid]['name'] === '' && !empty($fr['owner_name'])) { $u[$aid]['name'] = $fr['owner_name']; }
 		}
 
-		// 6. Eligible = had leads OR sales OR owned leads. Derive per-agent metric values.
+		// 6. Eligible = a pool member (seeded above) OR had leads/sales/owned leads.
+		//    Derive per-agent metric values. Zero-activity pool members fall through
+		//    with null metrics, score 0, and rank last — still counted in the total.
 		$agents = array();
 		foreach($u as $aid => $row) {
-			if(!$row['has_leads'] && !$row['has_sales'] && !$row['has_fu']) { continue; }
+			if(!$row['is_pool'] && !$row['has_leads'] && !$row['has_sales'] && !$row['has_fu']) { continue; }
 			$agents[] = array(
 				'admin_id'      => $aid,
 				'name'          => $row['name'] !== '' ? $row['name'] : '#' . $aid,
