@@ -84,7 +84,15 @@ class Dashboard extends MY_Controller
 
 		//Owner / Finance
 
+		$level = (int) $this->session->userdata('level');
+
 		$array['sales_agents'] = $this->Dashboard_Model->Sales_Agents();
+
+		// The Owner (Level 10) dashboard was reworked to a lean KPI layout, so the
+		// old travel/payment reminder cards, Leading SA and the ApexCharts are no
+		// longer rendered for the Owner. Skip building their (expensive) data for
+		// the Owner; every other non-SA role (Finance, etc.) keeps the old view.
+		if($level != 10) {
 
 		$array['upcoming_travels'] = $this->Dashboard_Model->Upcoming_Travels($start_date, $end_date);
 
@@ -178,7 +186,85 @@ class Dashboard extends MY_Controller
 
 		}
 
-		
+		} // end if(level != 10)
+
+		// ---------- Owner (Level 10) lean KPI cards ----------
+		if($level == 10) {
+
+			$this->load->model('Team_Model');
+			$this->load->helper('summary_period_helper');
+			$today_ymd = date('Y-m-d');
+
+			// Five date windows the Owner KPI cards report over.
+			$windows = array(
+				'yesterday' => array(date('Y-m-d', strtotime('-1 day')), date('Y-m-d', strtotime('-1 day'))),
+				'today'     => array(date('Y-m-d'), date('Y-m-d')),
+				'week'      => array(date('Y-m-d', strtotime('monday this week')), date('Y-m-d', strtotime('sunday this week'))),
+				'month'     => array(date('Y-m-01'), date('Y-m-t')),
+				'year'      => array(date('Y-01-01'), date('Y-12-31')),
+			);
+
+			// Same-period-last-year windows: the same span shifted back one year,
+			// clamped to "today last year" so a partly-elapsed month/year compares
+			// like-for-like (reuses the summary cards' YoY math).
+			$ly_windows = array();
+			foreach($windows as $key => $range) {
+				$prior = summary_prior_year_window($range[0], $range[1], $today_ymd);
+				$ly_windows[$key] = array($prior['start'], $prior['end']);
+			}
+
+			// Total sales by team — one row per active team, a column per window,
+			// each with its same-period-last-year figure for comparison.
+			$teams = $this->Team_Model->Read_Teams();
+			$team_rows = array();
+			foreach($teams as $team) {
+				$team_rows[$team->TeamID] = array(
+					'name' => $team->Name,
+					'cur'  => array('yesterday' => 0, 'today' => 0, 'week' => 0, 'month' => 0, 'year' => 0),
+					'ly'   => array('yesterday' => 0, 'today' => 0, 'week' => 0, 'month' => 0, 'year' => 0),
+				);
+			}
+			foreach($windows as $key => $range) {
+				foreach($this->Dashboard_Model->Team_Sales($range[0], $range[1]) as $row) {
+					if(isset($team_rows[$row->TeamID])) {
+						$team_rows[$row->TeamID]['cur'][$key] = (float) $row->Sales;
+					}
+				}
+			}
+			foreach($ly_windows as $key => $range) {
+				foreach($this->Dashboard_Model->Team_Sales($range[0], $range[1]) as $row) {
+					if(isset($team_rows[$row->TeamID])) {
+						$team_rows[$row->TeamID]['ly'][$key] = (float) $row->Sales;
+					}
+				}
+			}
+			$array['owner_team_sales'] = $team_rows;
+
+			// Total new leads (GHL) — company-wide count per window.
+			$array['owner_new_leads'] = array();
+			foreach($windows as $key => $range) {
+				$array['owner_new_leads'][$key] = $this->Dashboard_Model->New_Leads_Count($range[0], $range[1]);
+			}
+
+			// Top 5 cancellation reasons this year.
+			$array['owner_cancellation_reasons'] = $this->Dashboard_Model->Top_Cancellation_Reasons(
+				$windows['year'][0], $windows['year'][1], 5
+			);
+
+			// Approved payment OUT (to suppliers) — today & this week.
+			$array['owner_payment_out'] = array(
+				'today' => $this->Dashboard_Model->Approved_Payment_Out($windows['today'][0], $windows['today'][1]),
+				'week'  => $this->Dashboard_Model->Approved_Payment_Out($windows['week'][0], $windows['week'][1]),
+			);
+
+			// Approved payment IN (from customers) — this week, month & year.
+			$array['owner_payment_in'] = array(
+				'week'  => $this->Dashboard_Model->Approved_Payment_In($windows['week'][0], $windows['week'][1]),
+				'month' => $this->Dashboard_Model->Approved_Payment_In($windows['month'][0], $windows['month'][1]),
+				'year'  => $this->Dashboard_Model->Approved_Payment_In($windows['year'][0], $windows['year'][1]),
+			);
+
+		}
 
 		$this->load->view('layout/header', $titles);
 

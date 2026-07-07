@@ -203,4 +203,29 @@ assert_eq('hidden: two rows remain (Ben, Carol)', 2, count($matrixH));
 assert_eq('hidden: Ben scored vs pool incl. hidden Jane',   $by[11]['agent_score'], $byH[11]['agent_score']);
 assert_eq('hidden: Carol scored vs pool incl. hidden Jane', $by[12]['agent_score'], $byH[12]['agent_score']);
 
+// --- Served display override: when a 'responded' source is supplied, the SERVED
+//     column shows those distinct-leads-replied counts (Lead Reply Activity
+//     "Lead Responded"), while Follow-up % and the Agent Score keep using
+//     owned-leads (fu_owned) unchanged. Display-only. ---
+$sourcesR = $sources;
+$sourcesR['responded'] = array(
+    array('admin_id' => 10, 'responded_leads' => 33), // Jane: owned 20, replied 33
+    array('admin_id' => 11, 'responded_leads' => 2),  // Ben:  owned 4,  replied 2
+    // Carol (12): no responded row -> Served shows 0 (she replied to nothing).
+);
+$matrixR = owner_agent_matrix_build($sourcesR, $map, $name_by_admin);
+$byR = array(); foreach ($matrixR as $r) { $byR[$r['admin_id']] = $r; }
+assert_eq('responded: Jane Served = responded (not owned)', 33, $byR[10]['served_leads']);
+assert_eq('responded: Ben Served = responded',              2,  $byR[11]['served_leads']);
+assert_eq('responded: Carol Served = 0 (no replies)',       0,  $byR[12]['served_leads']);
+// Follow-up % unchanged — still owned-based (Jane 14/20 = 70%).
+assert_eq('responded: Jane Follow-up % still owned-based',  70.0, $byR[10]['followup_rate']);
+// Agent Score unchanged — served input still owned-leads, so score equals the
+// no-responded build for the same agent.
+assert_eq('responded: Jane Agent Score unchanged', $by[10]['agent_score'], $byR[10]['agent_score']);
+assert_eq('responded: Ben Agent Score unchanged',  $by[11]['agent_score'], $byR[11]['agent_score']);
+
+// Without a 'responded' source, Served falls back to owned-leads (legacy).
+assert_eq('no responded source: Jane Served falls back to owned', 20, $by[10]['served_leads']);
+
 echo "\nAll assertions passed.\n";

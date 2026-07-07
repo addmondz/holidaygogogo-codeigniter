@@ -21,6 +21,12 @@ $page_url = function ($page) use ($log_filters, $log_contact, $log_agent) {
         . '&agent=' . urlencode($log_agent)
         . '&page=' . (int) $page);
 };
+
+/** URL that filters the log to one contact number, keeping the current date range. */
+$contact_url = function ($number) use ($log_filters) {
+    return base_url('Report/Ghl_Message_Log?log_date=' . urlencode($log_filters['log_date'])
+        . '&contact=' . urlencode($number));
+};
 ?>
 <div class="d-flex flex-column-fluid">
     <div class="container-fluid">
@@ -144,8 +150,20 @@ $page_url = function ($page) use ($log_filters, $log_contact, $log_agent) {
                                             <?php } ?>
                                         </td>
                                         <td><?php echo !empty($m['agent']) ? html_escape($m['agent']) : '<span class="text-muted">&mdash;</span>'; ?></td>
-                                        <td class="text-nowrap"><?php echo html_escape($m['from_number']); ?></td>
-                                        <td class="text-nowrap"><?php echo html_escape($m['to_number']); ?></td>
+                                        <td class="text-nowrap">
+                                            <?php if (!empty($m['from_number'])) { ?>
+                                                <a href="<?php echo $contact_url($m['from_number']); ?>" class="font-weight-bold text-primary" data-toggle="tooltip" title="Show only this contact's messages"><?php echo html_escape($m['from_number']); ?></a>
+                                            <?php } else { ?>
+                                                <span class="text-muted">&mdash;</span>
+                                            <?php } ?>
+                                        </td>
+                                        <td class="text-nowrap">
+                                            <?php if (!empty($m['to_number'])) { ?>
+                                                <a href="<?php echo $contact_url($m['to_number']); ?>" class="font-weight-bold text-primary" data-toggle="tooltip" title="Show only this contact's messages"><?php echo html_escape($m['to_number']); ?></a>
+                                            <?php } else { ?>
+                                                <span class="text-muted">&mdash;</span>
+                                            <?php } ?>
+                                        </td>
                                         <td style="white-space:pre-wrap; word-break:break-word;"><?php echo html_escape($m['body']); ?></td>
                                     </tr>
                                 <?php } ?>

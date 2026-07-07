@@ -1006,4 +1006,94 @@ class Dashboard_Model extends CI_Model
 
 	}
 
+	// ---------------------------------------------------------------------
+	// Owner dashboard KPI cards (Level 10 only). Each method is scoped to an
+	// explicit [$start, $end] "Y-m-d" window so the controller can call it once
+	// per period (yesterday / today / week / month / year) and the logic stays
+	// deterministic under test. Query shapes are locked by
+	// tests/helpers/OwnerDashboardKpiTest.php.
+	// ---------------------------------------------------------------------
+
+	// Credited booking-confirmation sales grouped by the sales agent's team, for
+	// one date window. Only active teams; excludes quotation/proforma, cancelled,
+	// draft and zero/negative bookings. Amount = SUM(NetTotal), windowed on the
+	// booking's InsertDate.
+	function Team_Sales($start, $end)
+	{
+		$this->db->select('team.TeamID AS TeamID, team.Name AS TeamName, COALESCE(SUM(booking.NetTotal), 0) AS Sales', false);
+		$this->db->join('admin', 'admin.AdminID = booking.SalesAgent', 'inner');
+		$this->db->join('team', 'team.TeamID = admin.TeamID', 'inner');
+		$this->db->where('booking.BookingConfirmationTitle', 'BOOKING CONFIRMATION');
+		$this->db->where('booking.CancelStatus', 'N');
+		$this->db->where('booking.Status !=', 'N');
+		$this->db->where('booking.NetTotal >', 0);
+		$this->db->where('team.Status', 'Y');
+		$this->db->where('CAST(booking.InsertDate AS DATE) >=', $start);
+		$this->db->where('CAST(booking.InsertDate AS DATE) <=', $end);
+		$this->db->group_by('team.TeamID, team.Name');
+		return $this->db->get('booking')->result();
+	}
+
+	// Company-wide count of new GHL leads whose conversation started in the
+	// window (ghl_processed_leads.lead_started_at). One row per processed lead.
+	function New_Leads_Count($start, $end)
+	{
+		$this->db->where('CAST(lead_started_at AS DATE) >=', $start);
+		$this->db->where('CAST(lead_started_at AS DATE) <=', $end);
+		return (int) $this->db->count_all_results('ghl_processed_leads');
+	}
+
+	// Top cancellation reasons by number of cancelled booking confirmations in
+	// the window (windowed on InsertDate). Excludes quotation/proforma and drafts.
+	function Top_Cancellation_Reasons($start, $end, $limit = 5)
+	{
+		$this->db->select('cancellation_reason.Name AS Name, COUNT(booking.BookingID) AS Total', false);
+		$this->db->join('cancellation_reason', 'cancellation_reason.CancellationReasonID = booking.CancellationReasonID', 'inner');
+		$this->db->where('booking.BookingConfirmationTitle', 'BOOKING CONFIRMATION');
+		$this->db->where('booking.CancelStatus', 'Y');
+		$this->db->where('booking.Status !=', 'N');
+		$this->db->where('CAST(booking.InsertDate AS DATE) >=', $start);
+		$this->db->where('CAST(booking.InsertDate AS DATE) <=', $end);
+		$this->db->group_by('cancellation_reason.CancellationReasonID, cancellation_reason.Name');
+		$this->db->order_by('Total', 'DESC');
+		$this->db->limit($limit);
+		return $this->db->get('booking')->result();
+	}
+
+	// Approved payment OUT (to suppliers) in the window: SUM(Debit) of approved
+	// debit rows (Credit = 0), windowed on payment.Date. Mirrors
+	// Approved_Debit_Payments() but scoped to an explicit range.
+	function Approved_Payment_Out($start, $end)
+	{
+		$this->db->select('COALESCE(SUM(Debit), 0) AS Amount', false);
+		$this->db->join('payment', 'payment.BookingID = booking.BookingID', 'left');
+		$this->db->where('Credit', 0.00);
+		$this->db->where('payment.Status', 'Y');
+		$this->db->where('BookingConfirmationTitle', 'BOOKING CONFIRMATION');
+		$this->db->where('CancelStatus', 'N');
+		$this->db->where('booking.Status !=', 'N');
+		$this->db->where('CAST(payment.Date AS DATE) >=', $start);
+		$this->db->where('CAST(payment.Date AS DATE) <=', $end);
+		$row = $this->db->get('booking')->row();
+		return $row ? (float) $row->Amount : 0.0;
+	}
+
+	// Approved payment IN (from customers) in the window: SUM(Credit) of approved
+	// credit rows (Credit != 0), windowed on payment.Date. Mirrors
+	// Approved_Credit_Payments() but scoped to an explicit range.
+	function Approved_Payment_In($start, $end)
+	{
+		$this->db->select('COALESCE(SUM(Credit), 0) AS Amount', false);
+		$this->db->join('payment', 'payment.BookingID = booking.BookingID', 'left');
+		$this->db->where('Credit !=', 0.00);
+		$this->db->where('payment.Status', 'Y');
+		$this->db->where('BookingConfirmationTitle', 'BOOKING CONFIRMATION');
+		$this->db->where('CancelStatus', 'N');
+		$this->db->where('booking.Status !=', 'N');
+		$this->db->where('CAST(payment.Date AS DATE) >=', $start);
+		$this->db->where('CAST(payment.Date AS DATE) <=', $end);
+		$row = $this->db->get('booking')->row();
+		return $row ? (float) $row->Amount : 0.0;
+	}
+
 }

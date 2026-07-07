@@ -10,7 +10,7 @@
                         <strong>Dashboard</strong>
                     </h3>
                 </div>
-                <?php if($this->session->level != 20) { ?>
+                <?php if($this->session->level != 20 && (int)$this->session->userdata('level') !== 10) { ?>
                     <div class="card-toolbar" style="width:350px;">
                         <label>Sales Agent</label>
                         <select title="--Select Sales Agent--" id="sales_agent" data-live-search="true" class="form-control selectpicker" multiple="multiple">
@@ -22,6 +22,8 @@
                 <?php } ?>
             </div>
             <div class="card-body">
+                <?php // Owner (Level 10) skips the whole travel/payment "reminder" row. ?>
+                <?php if((int)$this->session->userdata('level') !== 10) { ?>
                 <div class="row pt-7 pl-3 pr-3 mb-5" style="background-color:#CCCCFF30;">
                     <?php if($this->session->level == 20) { ?>
                         <div class="col-md-12">
@@ -746,6 +748,7 @@
                         </div>
                     <?php } ?>
                 </div>
+                <?php } // end reminder row (non-Owner) ?>
                 <?php if($this->session->level == 20) { ?>
                     <div class="row pt-7 pl-3 pr-3 mb-5" style="background-color:#B6D0E230;">
                         <div class="col-md-12">
@@ -784,6 +787,185 @@
                                 </div>
                             </div>
                         </div>
+                    </div>
+                <?php } elseif((int)$this->session->userdata('level') === 10) { ?>
+                    <?php
+                        // ---------- Owner (Level 10) lean KPI cards ----------
+                        $rm   = function($v) { return 'RM ' . number_format((float)$v, 2, '.', ','); };
+                        $rm0  = function($v) { return 'RM ' . number_format((float)$v, 0, '.', ','); };
+                        // Same-period-last-year comparison chip for a current vs LY pair.
+                        $yoy  = function($cur, $ly) use ($rm0) {
+                            $cur = (float)$cur; $ly = (float)$ly;
+                            if($ly > 0) {
+                                $d   = round((($cur - $ly) / $ly) * 100);
+                                $cls = $d > 0 ? 'is-up' : ($d < 0 ? 'is-down' : 'is-flat');
+                                $sym = $d > 0 ? '&#9650;' : ($d < 0 ? '&#9660;' : '&#8226;');
+                                return '<span class="okpi-ly">LY ' . $rm0($ly) . ' <span class="okpi-delta ' . $cls . '">' . $sym . ' ' . abs($d) . '%</span></span>';
+                            }
+                            if($cur > 0) { return '<span class="okpi-ly">LY ' . $rm0(0) . ' <span class="okpi-delta is-up">new</span></span>'; }
+                            return '<span class="okpi-ly">LY &mdash;</span>';
+                        };
+                        $period_labels = array('yesterday' => 'Yesterday', 'today' => 'Today', 'week' => 'This Week', 'month' => 'This Month', 'year' => 'This Year');
+                    ?>
+                    <style>
+                        .owner-kpi .card.card-custom > .card-header { min-height:56px; padding-top:8px; padding-bottom:8px; display:flex; align-items:center; justify-content:flex-start; }
+                        .owner-kpi h3 { font-size:14px; margin:0; color:#3F4254; font-weight:700; text-align:left; align-self:center; }
+                        .owner-kpi .kpi-sub { font-size:11px; color:#7E8299; }
+                        .owner-kpi .kpi-strip { display:flex; gap:10px; flex-wrap:wrap; }
+                        .owner-kpi .kpi-cell { flex:1 1 0; min-width:90px; padding:8px 10px; background:#F7F8FA; border-radius:6px; }
+                        .owner-kpi .kpi-cell .lbl { font-size:10px; text-transform:uppercase; letter-spacing:.5px; color:#7E8299; font-weight:600; }
+                        .owner-kpi .kpi-cell .val { font-size:18px; font-weight:700; color:#3F4254; line-height:1.2; }
+                        .owner-kpi table.owner-team { font-size:13px; margin-bottom:0; white-space:nowrap; }
+                        .owner-kpi table.owner-team th { font-size:11px; text-transform:uppercase; color:#7E8299; border-top:none; border-bottom:1px solid #EBEDF3; padding:8px; font-weight:600; }
+                        .owner-kpi table.owner-team td { padding:8px; border-top:1px solid #F3F6F9; vertical-align:top; }
+                        .owner-kpi table.owner-team tfoot td { border-top:2px solid #EBEDF3; font-weight:700; }
+                        .owner-kpi .team-amt { font-weight:700; color:#3F4254; }
+                        .owner-kpi .okpi-ly { display:block; font-size:10px; color:#7E8299; margin-top:2px; }
+                        .owner-kpi .okpi-delta { font-weight:700; padding:0 5px; border-radius:4px; margin-left:2px; }
+                        .owner-kpi .okpi-delta.is-up { color:#2F6F4F; background:#E5F3EC; }
+                        .owner-kpi .okpi-delta.is-down { color:#C0392B; background:#FBEAEA; }
+                        .owner-kpi .okpi-delta.is-flat { color:#5C6473; background:#EDEFF3; }
+                        .owner-kpi .reason-bar { height:8px; border-radius:4px; background:#6082B6; }
+                    </style>
+                    <div class="row pt-7 pl-3 pr-3 mb-5 owner-kpi" style="background-color:#EEF3FB;">
+
+                        <?php // 1. Total sales by team — per period, with same-period-last-year. ?>
+                        <div class="col-md-12">
+                            <div class="card card-custom gutter-b">
+                                <div class="card-header border-0" style="background-color:#B6D0E2;">
+                                    <h3>Total Sales by Team</h3>
+                                </div>
+                                <div class="card-body" style="overflow-x:auto;">
+                                    <table class="table table-sm owner-team">
+                                        <thead>
+                                            <tr>
+                                                <th>Team</th>
+                                                <?php foreach($period_labels as $lbl) { ?><th class="text-right"><?php echo $lbl; ?></th><?php } ?>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <?php
+                                                $team_totals = array('yesterday' => 0, 'today' => 0, 'week' => 0, 'month' => 0, 'year' => 0);
+                                                $team_totals_ly = $team_totals;
+                                                if(empty($owner_team_sales)) { ?>
+                                                    <tr><td colspan="6" class="text-center text-muted">No teams found.</td></tr>
+                                                <?php } else {
+                                                    foreach($owner_team_sales as $team) { ?>
+                                                        <tr>
+                                                            <td class="font-weight-bold"><?php echo htmlspecialchars($team['name']); ?></td>
+                                                            <?php foreach(array_keys($period_labels) as $pk) {
+                                                                $team_totals[$pk]    += $team['cur'][$pk];
+                                                                $team_totals_ly[$pk] += $team['ly'][$pk];
+                                                            ?>
+                                                                <td class="text-right">
+                                                                    <span class="team-amt"><?php echo $rm($team['cur'][$pk]); ?></span>
+                                                                    <?php echo $yoy($team['cur'][$pk], $team['ly'][$pk]); ?>
+                                                                </td>
+                                                            <?php } ?>
+                                                        </tr>
+                                                    <?php }
+                                                } ?>
+                                        </tbody>
+                                        <?php if(!empty($owner_team_sales)) { ?>
+                                        <tfoot>
+                                            <tr>
+                                                <td>All Teams</td>
+                                                <?php foreach(array_keys($period_labels) as $pk) { ?>
+                                                    <td class="text-right">
+                                                        <span class="team-amt"><?php echo $rm($team_totals[$pk]); ?></span>
+                                                        <?php echo $yoy($team_totals[$pk], $team_totals_ly[$pk]); ?>
+                                                    </td>
+                                                <?php } ?>
+                                            </tr>
+                                        </tfoot>
+                                        <?php } ?>
+                                    </table>
+                                    <div class="kpi-sub mt-2">Booking-confirmation value (SUM of NetTotal) by the sales agent's team, by booking date. Excludes quotation, cancelled and drafts. LY = same period last year.</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <?php // 2. Total new leads (GHL). ?>
+                        <div class="col-md-6">
+                            <div class="card card-custom card-stretch gutter-b">
+                                <div class="card-header border-0" style="background-color:#B7E4C7;">
+                                    <h3>Total New Leads (GHL)</h3>
+                                </div>
+                                <div class="card-body">
+                                    <div class="kpi-strip">
+                                        <?php foreach($period_labels as $pk => $lbl) { ?>
+                                            <div class="kpi-cell">
+                                                <div class="lbl"><?php echo $lbl; ?></div>
+                                                <div class="val"><?php echo number_format((int)$owner_new_leads[$pk]); ?></div>
+                                            </div>
+                                        <?php } ?>
+                                    </div>
+                                    <div class="kpi-sub mt-2">New GHL leads company-wide, by the date the conversation started.</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <?php // 3. Top 5 cancellation reasons (this year). ?>
+                        <div class="col-md-6">
+                            <div class="card card-custom card-stretch gutter-b">
+                                <div class="card-header border-0" style="background-color:#FAC898;">
+                                    <h3>Top 5 Cancellation Reasons (<?php echo date('Y'); ?>)</h3>
+                                </div>
+                                <div class="card-body">
+                                    <?php if(empty($owner_cancellation_reasons)) { ?>
+                                        <div class="text-muted" style="font-size:13px;">No cancellations this year.</div>
+                                    <?php } else {
+                                        $reason_max = 0;
+                                        foreach($owner_cancellation_reasons as $r) { $reason_max = max($reason_max, (int)$r->Total); }
+                                        foreach($owner_cancellation_reasons as $r) {
+                                            $w = $reason_max > 0 ? round(((int)$r->Total / $reason_max) * 100) : 0; ?>
+                                            <div class="d-flex align-items-center mb-3">
+                                                <div class="flex-grow-1 mr-3" style="min-width:0;">
+                                                    <div style="font-size:13px; color:#3F4254; font-weight:600;"><?php echo htmlspecialchars($r->Name); ?></div>
+                                                    <div class="reason-bar" style="width:<?php echo $w; ?>%;"></div>
+                                                </div>
+                                                <div style="font-size:16px; font-weight:700; color:#3F4254;"><?php echo (int)$r->Total; ?></div>
+                                            </div>
+                                        <?php }
+                                    } ?>
+                                    <div class="kpi-sub mt-2">Cancelled booking confirmations grouped by reason, by booking date, this year.</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <?php // 4. Approved payment OUT. ?>
+                        <div class="col-md-6">
+                            <div class="card card-custom card-stretch gutter-b">
+                                <div class="card-header border-0" style="background-color:#FAA0A0;">
+                                    <h3>Payment Out &mdash; Approved</h3>
+                                </div>
+                                <div class="card-body">
+                                    <div class="kpi-strip">
+                                        <div class="kpi-cell"><div class="lbl">Today</div><div class="val"><?php echo $rm($owner_payment_out['today']); ?></div></div>
+                                        <div class="kpi-cell"><div class="lbl">This Week</div><div class="val"><?php echo $rm($owner_payment_out['week']); ?></div></div>
+                                    </div>
+                                    <div class="kpi-sub mt-2">Approved supplier pay-outs, by payment date.</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <?php // 5. Approved payment IN. ?>
+                        <div class="col-md-6">
+                            <div class="card card-custom card-stretch gutter-b">
+                                <div class="card-header border-0" style="background-color:#98FB98;">
+                                    <h3>Payment In &mdash; Approved</h3>
+                                </div>
+                                <div class="card-body">
+                                    <div class="kpi-strip">
+                                        <div class="kpi-cell"><div class="lbl">This Week</div><div class="val"><?php echo $rm($owner_payment_in['week']); ?></div></div>
+                                        <div class="kpi-cell"><div class="lbl">This Month</div><div class="val"><?php echo $rm($owner_payment_in['month']); ?></div></div>
+                                        <div class="kpi-cell"><div class="lbl">This Year</div><div class="val"><?php echo $rm($owner_payment_in['year']); ?></div></div>
+                                    </div>
+                                    <div class="kpi-sub mt-2">Approved customer payments received, by payment date.</div>
+                                </div>
+                            </div>
+                        </div>
+
                     </div>
                 <?php } else { ?>
                     <div class="row pt-7 pl-3 pr-3 mb-5" style="background-color:#98FB9830;">
@@ -1004,6 +1186,8 @@
 </div>
 <script src="<?php echo base_url('assets/js/pages/widgets.js'); ?>"></script>
 <script src="<?php echo base_url('assets/js/pages/features/charts/apexcharts.js'); ?>"></script>
+<?php // Owner (Level 10) has no ApexCharts/date-pickers on this page — skip the whole chart script so it fires no needless AJAX. ?>
+<?php if((int)$this->session->userdata('level') !== 10) { ?>
 <script type="text/javascript">
     $(document).ready(function() {
         //SA
@@ -1962,3 +2146,4 @@
         }
     });
 </script>
+<?php } // end old-chart script (skipped for Owner) ?>

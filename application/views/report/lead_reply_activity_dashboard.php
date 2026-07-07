@@ -118,6 +118,11 @@
                                 <th style="text-align:center;">No.</th>
                                 <th>Owner</th>
                                 <th style="text-align:center;">
+                                    New Lead Picked Up
+                                    <i class="la la-info-circle ml-1" style="cursor:help; color:#2f506f;" data-toggle="tooltip"
+                                       title="New leads assigned to this owner on the selected activity date only (distinct leads where the owner is the assigned owner)."></i>
+                                </th>
+                                <th style="text-align:center;">
                                     Lead Responded
                                     <i class="la la-info-circle ml-1" style="cursor:help; color:#2f506f;" data-toggle="tooltip"
                                        title="Distinct leads this owner replied to, counted on any day between 7AM and 10PM only. Replying many times (even more than 3) to the same lead still counts as one."></i>
@@ -143,7 +148,7 @@
                         <tbody id="lead-reply-activity-table-body">
                             <?php if(empty($lead_reply_activity_rows)) { ?>
                                 <tr>
-                                    <td colspan="7" class="text-center py-10">Lead reply activity not found for the selected filters.</td>
+                                    <td colspan="8" class="text-center py-10">Lead reply activity not found for the selected filters.</td>
                                 </tr>
                             <?php } else { ?>
                                 <?php $count = 1; ?>
@@ -153,6 +158,7 @@
                                     <tr>
                                         <td class="text-center"><?php echo $count; ?></td>
                                         <td class="font-weight-bold text-dark"><?php echo html_escape($row['owner_name']); ?></td>
+                                        <td class="text-center"><?php echo number_format($row['new_leads_picked_up']); ?></td>
                                         <td class="text-center"><?php echo number_format($row['lead_responded']); ?></td>
                                         <td class="text-center"><?php echo number_format($row['transfer_out_leads']); ?></td>
                                         <td class="text-center font-weight-bold text-dark"><?php echo number_format($row['today_handling_leads']); ?></td>
@@ -246,13 +252,14 @@
         var html = '';
 
         if (!rows || rows.length === 0) {
-            $('#lead-reply-activity-table-body').html('<tr><td colspan="7" class="text-center py-10">Lead reply activity not found for the selected filters.</td></tr>');
+            $('#lead-reply-activity-table-body').html('<tr><td colspan="8" class="text-center py-10">Lead reply activity not found for the selected filters.</td></tr>');
             return;
         }
 
         var replyDate = $('input[name="reply_date"]').val() || '';
 
         $.each(rows, function(index, row) {
+            var newLeadsPickedUp = Number(row.new_leads_picked_up) || 0;
             var leadResponded = Number(row.lead_responded) || 0;
             var transferOutLeads = Number(row.transfer_out_leads) || 0;
             var todayHandlingLeads = Number(row.today_handling_leads) || 0;
@@ -260,6 +267,7 @@
             html += '<tr>';
             html += '<td class="text-center">' + (index + 1) + '</td>';
             html += '<td class="font-weight-bold text-dark">' + escapeHtml(row.owner_name) + '</td>';
+            html += '<td class="text-center">' + newLeadsPickedUp + '</td>';
             html += '<td class="text-center">' + leadResponded + '</td>';
             html += '<td class="text-center">' + transferOutLeads + '</td>';
             html += '<td class="text-center font-weight-bold text-dark">' + todayHandlingLeads + '</td>';

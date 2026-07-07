@@ -93,6 +93,12 @@
     #booking_summary_cards .sc-owner-tab:not(.is-active):hover { background:#DCE6F5; }
     #booking_summary_cards .sc-owner-matrix th, #booking_summary_cards .sc-owner-matrix td { white-space:nowrap; vertical-align:middle; }
     #booking_summary_cards .sc-owner-matrix tbody tr:first-child td { font-weight:600; }
+    /* Click-to-sort headers: base double-arrow hint, coloured single arrow when active. */
+    #booking_summary_cards .sc-owner-matrix thead th.sc-sortable { cursor:pointer; user-select:none; padding-right:18px; position:relative; }
+    #booking_summary_cards .sc-owner-matrix thead th.sc-sortable:hover { color:#6082B6; }
+    #booking_summary_cards .sc-owner-matrix thead th.sc-sortable::after { content:'\2195'; position:absolute; right:5px; opacity:.35; font-size:11px; font-weight:700; }
+    #booking_summary_cards .sc-owner-matrix thead th.is-sorted-asc::after { content:'\2191'; opacity:1; color:#6082B6; }
+    #booking_summary_cards .sc-owner-matrix thead th.is-sorted-desc::after { content:'\2193'; opacity:1; color:#6082B6; }
     #booking_summary_cards .sc-month-filter { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:14px; padding:10px 14px; background:#EEF3FB; border-radius:6px; }
     #booking_summary_cards .sc-month-filter label { margin:0; font-weight:600; color:#3F4254; font-size:13px; }
     #booking_summary_cards .sc-month-filter input[type=date] { width:auto; max-width:190px; height:auto; padding:6px 10px; font-size:13px; }
@@ -696,32 +702,34 @@
                 <div class="card card-custom">
                     <div class="card-header border-0 summary-card-header" style="background-color:#A7C7E730; display:flex; align-items:center;">
                         <h3 style="margin:0;">Agent Performance &mdash; <span id="sc-owner-period-label">This month</span></h3>
-                        <i id="pop-owner-matrix" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="What each column means" data-content="<strong>Each row is one sales agent</strong>, for the selected period (use the Day / Week / Month / Year toggle).<ul><li><strong>Reply Time:</strong> average time to reply to an inbound message.</li><li><strong>1st Reply:</strong> average time to send the first reply to a new lead.</li><li><strong>New Leads:</strong> leads assigned to them in the period.</li><li><strong>Served:</strong> leads they owned (assigned or replied to).</li><li><strong>Conv % (credited):</strong> their leads that became a booking where they hold the credited sales slot, over their leads.</li><li><strong>Conv % (all):</strong> their leads that became a booking, whoever is credited, over their leads.</li><li><strong>Outbound:</strong> outbound messages they sent.</li><li><strong>Sales:</strong> value of booking confirmations credited to them (no payment gate).</li><li><strong>Follow-up %:</strong> owned leads that received a follow-up.</li><li><strong>Cancel %:</strong> credited booking confirmations later cancelled (duplicate cancellations excluded).</li><li><strong>Score:</strong> weighted 0&ndash;100 composite of reply time, 1st reply, conversion, sales, follow-up and leads served; the period&rsquo;s best on each metric scores 100.</li></ul>Speed and score need a minimum sample to rank fairly. &ldquo;&mdash;&rdquo; means no data for that agent."></i>
+                        <i id="pop-owner-matrix" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="What each column means" data-content="<strong>Each row is one sales agent</strong>, for the selected period (use the Day / Week / Month / Year toggle).<ul><li><strong>Reply Time:</strong> average time to reply to an inbound message.</li><li><strong>1st Reply:</strong> average time to send the first reply to a new lead.</li><li><strong>New Leads:</strong> leads assigned to them in the period.</li><li><strong>Served:</strong> distinct leads they replied to in the period (matches the Lead Reply Activity dashboard&rsquo;s &ldquo;Lead Responded&rdquo;).</li><li><strong>Conv % (credited):</strong> their leads that became a booking where they hold the credited sales slot, over their leads.</li><li><strong>Conv % (all):</strong> their leads that became a booking, whoever is credited, over their leads.</li><li><strong>Outbound:</strong> outbound messages they sent.</li><li><strong>Sales:</strong> value of booking confirmations credited to them (no payment gate).</li><li><strong>Follow-up %:</strong> owned leads that received a follow-up.</li><li><strong>Cancel %:</strong> credited booking confirmations later cancelled (duplicate cancellations excluded).</li><li><strong>Score:</strong> weighted 0&ndash;100 composite of reply time, 1st reply, conversion, sales, follow-up and leads served; the period&rsquo;s best on each metric scores 100.</li></ul>Speed and score need a minimum sample to rank fairly. &ldquo;&mdash;&rdquo; means no data for that agent."></i>
                         <span class="sc-owner-toggle" role="group" aria-label="Performance period">
+                            <button type="button" class="sc-owner-tab" data-owner-period="yesterday">Yesterday</button>
                             <button type="button" class="sc-owner-tab" data-owner-period="day">Day</button>
                             <button type="button" class="sc-owner-tab" data-owner-period="week">Week</button>
                             <button type="button" class="sc-owner-tab is-active" data-owner-period="month">Month</button>
                             <button type="button" class="sc-owner-tab" data-owner-period="year">Year</button>
+                            <button type="button" class="sc-owner-tab" data-owner-period="lastyear">Same Period Last Year</button>
                         </span>
                     </div>
                     <div class="card-body summary-card-body">
-                        <div class="summary-sub mb-2">One row per sales agent across all performance metrics for the selected period, sorted by Agent Score. The Day / Week / Month / Year toggle re-scopes every column at once. Some columns are only reported for certain periods &mdash; a &ldquo;&mdash;&rdquo; means that column doesn&rsquo;t apply to the selected period (e.g. Conversion &amp; Cancellation show only on <strong>Year</strong>; Follow-up &amp; Agent Score only on <strong>Month</strong>; Reply Time / New Leads / Served / Outbound on Day / Week / Month; Sales on Month / Year; 1st Reply on all periods).</div>
+                        <div class="summary-sub mb-2">One row per sales agent across all performance metrics for the selected period, sorted by Agent Score &mdash; <strong>click any column header to re-sort</strong> (click again to reverse). The Yesterday / Day / Week / Month / Year / Same&nbsp;Period&nbsp;Last&nbsp;Year toggle re-scopes every column at once (Yesterday behaves like Day, Same Period Last Year like Year). Some columns are only reported for certain periods &mdash; a &ldquo;&mdash;&rdquo; means that column doesn&rsquo;t apply to the selected period (e.g. Conversion &amp; Cancellation show only on <strong>Year</strong>; Follow-up &amp; Agent Score only on <strong>Month</strong>; Reply Time / New Leads / Served / Outbound on Day / Week / Month; Sales on Month / Year; 1st Reply on all periods).</div>
                         <div class="table-responsive">
                             <table class="table table-sm summary-table sc-owner-matrix">
                                 <thead>
                                     <tr>
-                                        <th>Agent</th>
-                                        <th class="text-right">Reply Time</th>
-                                        <th class="text-right">1st Reply</th>
-                                        <th class="text-right">New Leads</th>
-                                        <th class="text-right">Served</th>
-                                        <th class="text-right">Conv % (credited)</th>
-                                        <th class="text-right">Conv % (all)</th>
-                                        <th class="text-right">Outbound</th>
-                                        <th class="text-right">Sales</th>
-                                        <th class="text-right">Follow-up %</th>
-                                        <th class="text-right">Cancel %</th>
-                                        <th class="text-right">Score</th>
+                                        <th class="sc-sortable" data-sort-col="0" title="Click to sort">Agent</th>
+                                        <th class="text-right sc-sortable" data-sort-col="1" title="Click to sort">Reply Time</th>
+                                        <th class="text-right sc-sortable" data-sort-col="2" title="Click to sort">1st Reply</th>
+                                        <th class="text-right sc-sortable" data-sort-col="3" title="Click to sort">New Leads</th>
+                                        <th class="text-right sc-sortable" data-sort-col="4" title="Click to sort">Served</th>
+                                        <th class="text-right sc-sortable" data-sort-col="5" title="Click to sort">Conv % (credited)</th>
+                                        <th class="text-right sc-sortable" data-sort-col="6" title="Click to sort">Conv % (all)</th>
+                                        <th class="text-right sc-sortable" data-sort-col="7" title="Click to sort">Outbound</th>
+                                        <th class="text-right sc-sortable" data-sort-col="8" title="Click to sort">Sales</th>
+                                        <th class="text-right sc-sortable" data-sort-col="9" title="Click to sort">Follow-up %</th>
+                                        <th class="text-right sc-sortable" data-sort-col="10" title="Click to sort">Cancel %</th>
+                                        <th class="text-right sc-sortable" data-sort-col="11" title="Click to sort">Score</th>
                                     </tr>
                                 </thead>
                                 <tbody id="sc-owner-matrix-body"><tr><td colspan="12" class="text-center text-muted">Loading&hellip;</td></tr></tbody>
@@ -1339,6 +1347,48 @@ $(function() {
         loadSummaryCards(p, dp ? dp.value : null);
     });
 
+    // Owner matrix: client-side click-to-sort on any column header. First click on
+    // a column sorts descending (biggest first — the usual "who's on top" view),
+    // second click flips to ascending. Cells flagged data-empty (column doesn't
+    // apply to the period, or no value) always sink to the bottom either way.
+    // Sorting is view-only and resets whenever the matrix re-renders (period
+    // toggle / refresh), which restores the server's Agent-Score order.
+    $('#booking_summary_cards').on('click', '.sc-owner-matrix thead th.sc-sortable', function() {
+        var th = this;
+        var table = th.closest('table');
+        var tbody = table ? table.querySelector('tbody') : null;
+        if(!tbody) return;
+        var idx = parseInt(th.getAttribute('data-sort-col'), 10);
+        // Only reorder real data rows (skip the "Loading…" / "No data" placeholder).
+        var rows = Array.prototype.slice.call(tbody.querySelectorAll('tr'))
+            .filter(function(tr) { return tr.children.length > 1; });
+        if(rows.length < 2) return;
+        // First click on a fresh column => descending; same column again flips.
+        var dir = th.getAttribute('data-sort-dir') === 'desc' ? 'asc' : 'desc';
+        var headers = th.parentNode.querySelectorAll('th');
+        for(var i = 0; i < headers.length; i++) {
+            headers[i].removeAttribute('data-sort-dir');
+            headers[i].classList.remove('is-sorted-asc', 'is-sorted-desc');
+        }
+        th.setAttribute('data-sort-dir', dir);
+        th.classList.add(dir === 'asc' ? 'is-sorted-asc' : 'is-sorted-desc');
+        var mul = dir === 'asc' ? 1 : -1;
+        rows.sort(function(a, b) {
+            var ca = a.children[idx], cb = b.children[idx];
+            var ea = ca.getAttribute('data-empty') === '1';
+            var eb = cb.getAttribute('data-empty') === '1';
+            if(ea && eb) return 0;
+            if(ea) return 1;              // empties last, regardless of direction
+            if(eb) return -1;
+            var va = ca.getAttribute('data-sort') || '';
+            var vb = cb.getAttribute('data-sort') || '';
+            var na = parseFloat(va), nb = parseFloat(vb);
+            if(va !== '' && vb !== '' && !isNaN(na) && !isNaN(nb)) return (na - nb) * mul;
+            return va.localeCompare(vb) * mul;
+        });
+        rows.forEach(function(tr) { tbody.appendChild(tr); });
+    });
+
     // Renders the three sales-agent "chase" cards (Travel in 7/14 Days – Not Yet
     // Ready, Payment From Customer Due Soon) from a cards/tables payload. Shared
     // by the full summary load and the listing's page-scoped refresh below.
@@ -1759,27 +1809,34 @@ $(function() {
             };
             var ownerP = m.owner_period || window._ownerPeriod || 'month';
             var inP = function(col) { return ownerColPeriods[col].indexOf(ownerP) !== -1; };
-            // cell(applies, rendered-html) -> the html, or a right-aligned em-dash.
-            var oCell = function(col, html) {
-                return '<td class="text-right">' + (inP(col) ? html : '—') + '</td>';
+            // cell(col, rendered-html, raw) -> the html (or a right-aligned em-dash
+            // when the column doesn't apply). `raw` is stashed in data-sort so the
+            // header click-sort compares real numbers, not formatted strings; cells
+            // that don't apply (or have no value) are flagged data-empty so they
+            // always sink to the bottom regardless of sort direction.
+            var oCell = function(col, html, raw) {
+                var applies = inP(col);
+                var empty = !applies || raw === null || raw === undefined || raw === '';
+                return '<td class="text-right" data-sort="' + (empty ? '' : escapeHtml(String(raw))) + '"'
+                    + (empty ? ' data-empty="1"' : '') + '>' + (applies ? html : '—') + '</td>';
             };
             if(ownerMatrix && ownerMatrix.length) {
                 ownerMatrixBody.innerHTML = ownerMatrix.map(function(r) {
                     var score = (r.agent_score === null || r.agent_score === undefined)
                         ? '—' : escapeHtml(r.agent_score);
                     return '<tr>' +
-                        '<td>' + escapeHtml(r.agent_name || '—') + '</td>' +
-                        oCell('reply',    fmtOwnerSecs(r.reply_secs)) +
-                        oCell('pickup',   fmtOwnerSecs(r.pickup_secs)) +
-                        oCell('newleads', escapeHtml(r.new_leads)) +
-                        oCell('served',   escapeHtml(r.served_leads)) +
-                        oCell('convc',    escapeHtml(r.conv_rate_gated) + '%') +
-                        oCell('conva',    escapeHtml(r.conv_rate_ungated) + '%') +
-                        oCell('outbound', escapeHtml(r.outbound_count)) +
-                        oCell('sales',    fmtOwnerMoney(r.sales_total)) +
-                        oCell('followup', escapeHtml(r.followup_rate) + '%') +
-                        oCell('cancel',   escapeHtml(r.cancel_rate) + '%') +
-                        oCell('score',    score) +
+                        '<td data-sort="' + escapeHtml(r.agent_name || '') + '">' + escapeHtml(r.agent_name || '—') + '</td>' +
+                        oCell('reply',    fmtOwnerSecs(r.reply_secs),        r.reply_secs) +
+                        oCell('pickup',   fmtOwnerSecs(r.pickup_secs),       r.pickup_secs) +
+                        oCell('newleads', escapeHtml(r.new_leads),          r.new_leads) +
+                        oCell('served',   escapeHtml(r.served_leads),       r.served_leads) +
+                        oCell('convc',    escapeHtml(r.conv_rate_gated) + '%',   r.conv_rate_gated) +
+                        oCell('conva',    escapeHtml(r.conv_rate_ungated) + '%', r.conv_rate_ungated) +
+                        oCell('outbound', escapeHtml(r.outbound_count),     r.outbound_count) +
+                        oCell('sales',    fmtOwnerMoney(r.sales_total),     r.sales_total) +
+                        oCell('followup', escapeHtml(r.followup_rate) + '%',    r.followup_rate) +
+                        oCell('cancel',   escapeHtml(r.cancel_rate) + '%',      r.cancel_rate) +
+                        oCell('score',    score,                            r.agent_score) +
                     '</tr>';
                 }).join('');
             } else {

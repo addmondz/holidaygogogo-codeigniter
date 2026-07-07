@@ -185,13 +185,26 @@ if (!function_exists('summary_resolve_owner_period')) {
         }
 
         $period = is_string($param) ? strtolower(trim($param)) : '';
-        if (!in_array($period, array('day', 'week', 'month', 'year'), true)) {
+        if (!in_array($period, array('yesterday', 'day', 'week', 'month', 'year', 'lastyear'), true)) {
             $period = 'month'; // default
         }
 
         $ts = strtotime($today);
 
+        // $base is the column-granularity the owner matrix uses to decide which
+        // columns apply (Booking::owner_agent_matrix's $is_dwm/$is_my/$is_year).
+        // The two extra toggles reuse an existing granularity: "Yesterday" acts
+        // like a single Day, "Same period last year" like a Year.
+        $base = $period;
+
         switch ($period) {
+            case 'yesterday':
+                $start = date('Y-m-d', strtotime('-1 day', $ts));
+                $end   = $start;
+                $label = 'Yesterday';
+                $base  = 'day';
+                break;
+
             case 'day':
                 $start = $today;
                 $end   = $today;
@@ -213,6 +226,20 @@ if (!function_exists('summary_resolve_owner_period')) {
                 $label = date('Y', $ts);
                 break;
 
+            case 'lastyear':
+                // "Same period last year": this year's to-date span shifted back
+                // exactly one year (Jan 1 .. today, one year earlier), so the
+                // owner can compare against a like-for-like window. Reuses the
+                // sales cards' prior-year math.
+                $prior = summary_prior_year_window(
+                    date('Y-01-01', $ts), date('Y-12-31', $ts), $today
+                );
+                $start = $prior['start'];
+                $end   = $prior['end'];
+                $label = 'Same Period Last Year (' . date('Y', strtotime('-1 year', $ts)) . ')';
+                $base  = 'year';
+                break;
+
             case 'month':
             default:
                 // Day-1 anchor + 't' avoids any overflow when seeding from a
@@ -225,6 +252,7 @@ if (!function_exists('summary_resolve_owner_period')) {
 
         return array(
             'period'     => $period,
+            'base'       => $base,
             'start_date' => $start,
             'end_date'   => $end,
             'label'      => $label,

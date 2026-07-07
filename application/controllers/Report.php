@@ -1942,6 +1942,7 @@ class Report extends MY_Controller
             $formatted[] = array(
                 'owner_user_id' => $row['owner_user_id'],
                 'owner_name' => $row['owner_name'],
+                'new_leads_picked_up' => (int) $row['assigned_leads'],
                 'lead_responded' => $responded,
                 'transfer_out_leads' => $transferOut,
                 'today_handling_leads' => (int) $row['today_handling_leads'],

@@ -25,6 +25,7 @@ if (!function_exists('owner_agent_matrix_build')) {
      *   reply          rows { agent_id, avg_response_time_seconds, total_leads }
      *   pickup         rows { agent_id, avg_seconds, n }
      *   followup       rows { owner_user_id, owned_leads, follow_up_leads, owner_name }
+     *   responded      rows { admin_id, responded_leads }              (admin-keyed)
      *   outbound       rows { agent_id, outbound_count }
      *   sales          rows { admin_id, agent_name, total_sales }   (admin-keyed)
      *   cancellation   rows { admin_id, total, cancelled }          (admin-keyed)
@@ -54,6 +55,13 @@ if (!function_exists('owner_agent_matrix_build')) {
             return isset($sources[$key]) && is_array($sources[$key]) ? $sources[$key] : array();
         };
 
+        // When the caller supplies a 'responded' source, the displayed Served
+        // column mirrors the Lead Reply Activity "Lead Responded" metric (distinct
+        // leads replied-to in the period) instead of owned-leads. Display-only:
+        // Follow-up % and the Agent Score keep using owned-leads (fu_owned).
+        // Absent (e.g. the unit test / a legacy caller) => Served stays owned-leads.
+        $has_responded_src = array_key_exists('responded', $sources) && is_array($sources['responded']);
+
         $u = array();
         $ensure = function (&$u, $aid) use ($name_by_admin) {
             if (!isset($u[$aid])) {
@@ -66,6 +74,7 @@ if (!function_exists('owner_agent_matrix_build')) {
                     'converted_gated'   => 0,
                     'sales'             => 0.0,
                     'fu_owned'          => 0, 'fu_followed' => 0,
+                    'responded'         => 0,
                     'outbound'          => 0,
                     'cancel_total'      => 0, 'cancel_cancelled' => 0,
                     'has_leads'         => false, 'has_sales' => false, 'has_fu' => false,
@@ -137,6 +146,16 @@ if (!function_exists('owner_agent_matrix_build')) {
             if ($u[$aid]['name'] === '' && !empty($fr['owner_name'])) {
                 $u[$aid]['name'] = $fr['owner_name'];
             }
+        }
+
+        // ---- Admin-keyed: responded (Served display override) ----
+        // Distinct leads replied-to in the period, already de-duplicated across an
+        // agent's GHL inboxes by the controller, so this is admin-keyed.
+        foreach ($src('responded') as $r) {
+            $aid = (int) $r['admin_id'];
+            if ($aid <= 0) { continue; }
+            $ensure($u, $aid);
+            $u[$aid]['responded'] += (int) $r['responded_leads'];
         }
 
         // ---- GHL-keyed: outbound (metric 7) ----
@@ -225,7 +244,7 @@ if (!function_exists('owner_agent_matrix_build')) {
                 'pickup_secs'       => $row['pickup_n'] > 0 ? (int) round($row['pickup_sum'] / $row['pickup_n']) : null,
                 'pickup_n'          => $row['pickup_n'],
                 'new_leads'         => $row['leads'],
-                'served_leads'      => $row['fu_owned'],
+                'served_leads'      => $has_responded_src ? $row['responded'] : $row['fu_owned'],
                 'conv_rate_gated'   => $row['leads'] > 0 ? round($row['converted_gated']   / $row['leads'] * 100, 1) : 0.0,
                 'converted_gated'   => $row['converted_gated'],
                 'conv_rate_ungated' => $row['leads'] > 0 ? round($row['converted_ungated'] / $row['leads'] * 100, 1) : 0.0,

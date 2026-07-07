@@ -1972,8 +1972,13 @@ class Booking extends MY_Controller
 		// scoped to the global Day/Week/Month/Year toggle ($owner_period). Built
 		// by owner_agent_matrix(); rendered as a single matrix table.
 		if($is_owner) {
+			// Pass the column-granularity ($owner_period['base']) — "Yesterday"
+			// behaves like Day and "Same Period Last Year" like Year for which
+			// columns apply. meta.owner_period keeps the raw toggle id so the
+			// active button still highlights.
+			$owner_matrix_base = isset($owner_period['base']) ? $owner_period['base'] : $owner_period['period'];
 			$tables['owner_agent_matrix'] = $this->owner_agent_matrix(
-				$owner_period['start_date'], $owner_period['end_date'], $owner_period['period']
+				$owner_period['start_date'], $owner_period['end_date'], $owner_matrix_base
 			);
 		}
 
@@ -3977,6 +3982,23 @@ class Booking extends MY_Controller
 			if($lvl === '10') { $hidden_admins[(int)$r->AdminID] = true; }
 		}
 
+		// Served mirrors the Lead Reply Activity "Lead Responded" metric: distinct
+		// leads the agent replied to in the period (business-hours gated, keyed by
+		// reply date), de-duplicated across every GHL inbox one agent owns. This is
+		// display-only — Follow-up % and the Agent Score still use owned-leads.
+		// Reported on Day / Week / Month only, same as the owned-leads source.
+		$responded = array();
+		if($is_dwm) {
+			$uids_by_admin = array();
+			foreach($map as $uid => $aid) { $uids_by_admin[(int)$aid][(string)$uid] = true; }
+			foreach($uids_by_admin as $aid => $uid_set) {
+				$responded[] = array(
+					'admin_id'        => (int)$aid,
+					'responded_leads' => (int)$this->Report_Model->Lead_Reply_Activity_Responded_Distinct_For_Uids(array_keys($uid_set), $start, $end),
+				);
+			}
+		}
+
 		// Agent Score is reported on Month only — skip the scoring work (and leave
 		// agent_score null) on every other period so a "-" column does no calc.
 		return owner_agent_matrix_build(array(
@@ -3985,6 +4007,7 @@ class Booking extends MY_Controller
 			'reply'         => $reply,
 			'pickup'        => $pickup,
 			'followup'      => $followup,
+			'responded'     => $responded,
 			'outbound'      => $outbound,
 			'sales'         => $sales_rows,
 			'cancellation'  => $cancellation,

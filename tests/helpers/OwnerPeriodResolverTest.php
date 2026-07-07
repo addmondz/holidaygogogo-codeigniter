@@ -79,6 +79,27 @@ assert_eq('trims whitespace', 'day',   summary_resolve_owner_period('  day ', $t
 assert_eq('null range start', '2026-06-01', summary_resolve_owner_period(null, $today)['start_date']);
 assert_eq('null range end',   '2026-06-30', summary_resolve_owner_period(null, $today)['end_date']);
 
+// ---- yesterday (single day, base = day) -----------------------------------
+$r = summary_resolve_owner_period('yesterday', $today);
+assert_eq('yesterday period', 'yesterday',  $r['period']);
+assert_eq('yesterday base',   'day',        $r['base']);
+assert_eq('yesterday start',  '2026-06-14', $r['start_date']);
+assert_eq('yesterday end',    '2026-06-14', $r['end_date']);
+assert_eq('yesterday label',  'Yesterday',  $r['label']);
+
+// ---- lastyear (this year's to-date span, one year back; base = year) -------
+$r = summary_resolve_owner_period('lastyear', $today);
+assert_eq('lastyear period', 'lastyear',   $r['period']);
+assert_eq('lastyear base',   'year',       $r['base']);
+assert_eq('lastyear start',  '2025-01-01', $r['start_date']);
+assert_eq('lastyear end',    '2025-06-15', $r['end_date']);
+
+// base defaults to the period for the existing toggles.
+assert_eq('day base',   'day',   summary_resolve_owner_period('day',   $today)['base']);
+assert_eq('week base',  'week',  summary_resolve_owner_period('week',  $today)['base']);
+assert_eq('month base', 'month', summary_resolve_owner_period('month', $today)['base']);
+assert_eq('year base',  'year',  summary_resolve_owner_period('year',  $today)['base']);
+
 // ---- labels ---------------------------------------------------------------
 assert_eq('day label',   'Today',     summary_resolve_owner_period('day',   $today)['label']);
 assert_eq('week label',  'This Week', summary_resolve_owner_period('week',  $today)['label']);
