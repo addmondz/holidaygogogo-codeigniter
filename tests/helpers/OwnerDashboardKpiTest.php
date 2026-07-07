@@ -82,6 +82,24 @@ function team_sales(PDO $pdo, $start, $end) {
     $st = $pdo->prepare($sql); $st->execute([':s'=>$start, ':e'=>$end]);
     return $st->fetchAll(PDO::FETCH_ASSOC);
 }
+function unassigned_sales(PDO $pdo, $start, $end) {
+    // Inverse of team_sales(): BC bookings whose agent is outside any active team
+    // (no admin row, admin with no TeamID, or an inactive team). LEFT joins so the
+    // unmatched rows survive; predicate keeps only the "not in an active team" set.
+    $sql = "SELECT COALESCE(SUM(booking.NetTotal),0) AS Sales
+            FROM booking
+            LEFT JOIN admin ON admin.AdminID = booking.SalesAgent
+            LEFT JOIN team  ON team.TeamID = admin.TeamID
+            WHERE booking.BookingConfirmationTitle = 'BOOKING CONFIRMATION'
+              AND booking.CancelStatus = 'N'
+              AND booking.Status != 'N'
+              AND booking.NetTotal > 0
+              AND (team.TeamID IS NULL OR team.Status != 'Y')
+              AND date(booking.InsertDate) >= :s
+              AND date(booking.InsertDate) <= :e";
+    $st = $pdo->prepare($sql); $st->execute([':s'=>$start, ':e'=>$end]);
+    return (float) $st->fetch(PDO::FETCH_ASSOC)['Sales'];
+}
 function new_leads(PDO $pdo, $start, $end) {
     $st = $pdo->prepare("SELECT COUNT(*) c FROM ghl_processed_leads
         WHERE date(lead_started_at) >= :s AND date(lead_started_at) <= :e");
@@ -138,6 +156,22 @@ assert_eq('Beta sales',  3000.0,   (float)$rows[1]['Sales']);
 // Widen to include the 9th -> Alpha picks up +9999.
 $rows = team_sales($pdo, '2026-06-09', '2026-06-10');
 assert_eq('Alpha widened', 11499.0, (float)$rows[0]['Sales']);   // + booking 4 (9999) on 06-09
+
+// ===========================================================================
+// Unassigned_Sales — the "not in an active team" bucket that reconciles the
+// team breakdown to the company total. Add a booking by an agent with NO admin
+// row (agent 99); booking 9 already sits on the inactive "Ghost" team.
+// ===========================================================================
+$pdo->exec("INSERT INTO booking (BookingID,InsertDate,BookingConfirmationTitle,CancelStatus,Status,NetTotal,SalesAgent,CancellationReasonID) VALUES
+    (30,'2026-06-10 12:00:00','BOOKING CONFIRMATION','N','P',250,99,NULL)   -- no admin row -> unassigned
+");
+// Day 06-10: Ghost booking 9 (4000) + no-admin booking 30 (250). The active-team
+// bookings (Alpha 1500, Beta 3000) and the excluded rows must NOT leak in.
+assert_eq('unassigned day', 4250.0, unassigned_sales($pdo, '2026-06-10', '2026-06-10'));
+// Reconciliation: active teams + unassigned == every counted BC booking that day.
+$teamDay = array_sum(array_map(function($r){ return (float)$r['Sales']; }, team_sales($pdo, '2026-06-10', '2026-06-10')));
+assert_eq('company reconciles', 8750.0, $teamDay + unassigned_sales($pdo, '2026-06-10', '2026-06-10'));
+assert_eq('unassigned none', 0.0, unassigned_sales($pdo, '2026-01-01', '2026-01-01'));
 
 // ===========================================================================
 // New_Leads_Count (windowed by lead_started_at, company-wide)

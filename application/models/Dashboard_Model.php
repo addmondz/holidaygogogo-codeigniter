@@ -1034,6 +1034,30 @@ class Dashboard_Model extends CI_Model
 		return $this->db->get('booking')->result();
 	}
 
+	// BC sales in the window by agents who don't land in an active team — the
+	// inverse of Team_Sales()'s inner join (agent has no admin row, admin has no
+	// TeamID, or that team is inactive). This "Unassigned" bucket lets the team
+	// breakdown reconcile to the true company-wide BC total. Same BC filters as
+	// Team_Sales(); no payment filter (value is by booking confirmation, not cash).
+	function Unassigned_Sales($start, $end)
+	{
+		$this->db->select('COALESCE(SUM(booking.NetTotal), 0) AS Sales', false);
+		$this->db->join('admin', 'admin.AdminID = booking.SalesAgent', 'left');
+		$this->db->join('team', 'team.TeamID = admin.TeamID', 'left');
+		$this->db->where('booking.BookingConfirmationTitle', 'BOOKING CONFIRMATION');
+		$this->db->where('booking.CancelStatus', 'N');
+		$this->db->where('booking.Status !=', 'N');
+		$this->db->where('booking.NetTotal >', 0);
+		$this->db->group_start();
+			$this->db->where('team.TeamID IS NULL', null, false);
+			$this->db->or_where('team.Status !=', 'Y');
+		$this->db->group_end();
+		$this->db->where('CAST(booking.InsertDate AS DATE) >=', $start);
+		$this->db->where('CAST(booking.InsertDate AS DATE) <=', $end);
+		$row = $this->db->get('booking')->row();
+		return $row ? (float) $row->Sales : 0.0;
+	}
+
 	// Company-wide count of new GHL leads whose conversation started in the
 	// window (ghl_processed_leads.lead_started_at). One row per processed lead.
 	function New_Leads_Count($start, $end)
@@ -1069,6 +1093,24 @@ class Dashboard_Model extends CI_Model
 		$this->db->join('payment', 'payment.BookingID = booking.BookingID', 'left');
 		$this->db->where('Credit', 0.00);
 		$this->db->where('payment.Status', 'Y');
+		$this->db->where('BookingConfirmationTitle', 'BOOKING CONFIRMATION');
+		$this->db->where('CancelStatus', 'N');
+		$this->db->where('booking.Status !=', 'N');
+		$this->db->where('CAST(payment.Date AS DATE) >=', $start);
+		$this->db->where('CAST(payment.Date AS DATE) <=', $end);
+		$row = $this->db->get('booking')->row();
+		return $row ? (float) $row->Amount : 0.0;
+	}
+
+	// Unapproved payment OUT (to suppliers) in the window: SUM(Debit) of pending
+	// debit rows (Credit = 0, Status = 'P'), windowed on payment.Date — the date
+	// each pay-out is scheduled for. Mirrors Approved_Payment_Out().
+	function Unapproved_Payment_Out($start, $end)
+	{
+		$this->db->select('COALESCE(SUM(Debit), 0) AS Amount', false);
+		$this->db->join('payment', 'payment.BookingID = booking.BookingID', 'left');
+		$this->db->where('Credit', 0.00);
+		$this->db->where('payment.Status', 'P');
 		$this->db->where('BookingConfirmationTitle', 'BOOKING CONFIRMATION');
 		$this->db->where('CancelStatus', 'N');
 		$this->db->where('booking.Status !=', 'N');

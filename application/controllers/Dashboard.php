@@ -238,6 +238,23 @@ class Dashboard extends MY_Controller
 					}
 				}
 			}
+
+			// "Unassigned (No Team)" bucket — BC sales by agents outside any active
+			// team (e.g. the owner's own bookings). Appended last so the per-team
+			// rows plus this reconcile to the true company-wide BC total.
+			$unassigned = array(
+				'name' => 'Unassigned (No Team)',
+				'cur'  => array('yesterday' => 0, 'today' => 0, 'week' => 0, 'month' => 0, 'year' => 0),
+				'ly'   => array('yesterday' => 0, 'today' => 0, 'week' => 0, 'month' => 0, 'year' => 0),
+			);
+			foreach($windows as $key => $range) {
+				$unassigned['cur'][$key] = $this->Dashboard_Model->Unassigned_Sales($range[0], $range[1]);
+			}
+			foreach($ly_windows as $key => $range) {
+				$unassigned['ly'][$key] = $this->Dashboard_Model->Unassigned_Sales($range[0], $range[1]);
+			}
+			$team_rows['unassigned'] = $unassigned;
+
 			$array['owner_team_sales'] = $team_rows;
 
 			// Total new leads (GHL) — company-wide count per window.
@@ -251,14 +268,25 @@ class Dashboard extends MY_Controller
 				$windows['year'][0], $windows['year'][1], 5
 			);
 
-			// Approved payment OUT (to suppliers) — today & this week.
+			// Approved payment OUT (to suppliers) — today, week, month & year.
 			$array['owner_payment_out'] = array(
 				'today' => $this->Dashboard_Model->Approved_Payment_Out($windows['today'][0], $windows['today'][1]),
 				'week'  => $this->Dashboard_Model->Approved_Payment_Out($windows['week'][0], $windows['week'][1]),
+				'month' => $this->Dashboard_Model->Approved_Payment_Out($windows['month'][0], $windows['month'][1]),
+				'year'  => $this->Dashboard_Model->Approved_Payment_Out($windows['year'][0], $windows['year'][1]),
 			);
 
-			// Approved payment IN (from customers) — this week, month & year.
+			// Unapproved (pending) payment OUT — scheduled today, week, month & year.
+			$array['owner_payment_out_pending'] = array(
+				'today' => $this->Dashboard_Model->Unapproved_Payment_Out($windows['today'][0], $windows['today'][1]),
+				'week'  => $this->Dashboard_Model->Unapproved_Payment_Out($windows['week'][0], $windows['week'][1]),
+				'month' => $this->Dashboard_Model->Unapproved_Payment_Out($windows['month'][0], $windows['month'][1]),
+				'year'  => $this->Dashboard_Model->Unapproved_Payment_Out($windows['year'][0], $windows['year'][1]),
+			);
+
+			// Approved payment IN (from customers) — today, week, month & year.
 			$array['owner_payment_in'] = array(
+				'today' => $this->Dashboard_Model->Approved_Payment_In($windows['today'][0], $windows['today'][1]),
 				'week'  => $this->Dashboard_Model->Approved_Payment_In($windows['week'][0], $windows['week'][1]),
 				'month' => $this->Dashboard_Model->Approved_Payment_In($windows['month'][0], $windows['month'][1]),
 				'year'  => $this->Dashboard_Model->Approved_Payment_In($windows['year'][0], $windows['year'][1]),

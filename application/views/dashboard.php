@@ -818,6 +818,7 @@
                         .owner-kpi table.owner-team { font-size:13px; margin-bottom:0; white-space:nowrap; }
                         .owner-kpi table.owner-team th { font-size:11px; text-transform:uppercase; color:#7E8299; border-top:none; border-bottom:1px solid #EBEDF3; padding:8px; font-weight:600; }
                         .owner-kpi table.owner-team td { padding:8px; border-top:1px solid #F3F6F9; vertical-align:top; }
+                        .owner-kpi table.owner-team tbody tr.team-unassigned td { background:#FBFBFD; color:#5C6473; font-style:italic; }
                         .owner-kpi table.owner-team tfoot td { border-top:2px solid #EBEDF3; font-weight:700; }
                         .owner-kpi .team-amt { font-weight:700; color:#3F4254; }
                         .owner-kpi .okpi-ly { display:block; font-size:10px; color:#7E8299; margin-top:2px; }
@@ -850,8 +851,8 @@
                                                 if(empty($owner_team_sales)) { ?>
                                                     <tr><td colspan="6" class="text-center text-muted">No teams found.</td></tr>
                                                 <?php } else {
-                                                    foreach($owner_team_sales as $team) { ?>
-                                                        <tr>
+                                                    foreach($owner_team_sales as $tid => $team) { ?>
+                                                        <tr<?php echo $tid === 'unassigned' ? ' class="team-unassigned"' : ''; ?>>
                                                             <td class="font-weight-bold"><?php echo htmlspecialchars($team['name']); ?></td>
                                                             <?php foreach(array_keys($period_labels) as $pk) {
                                                                 $team_totals[$pk]    += $team['cur'][$pk];
@@ -880,7 +881,7 @@
                                         </tfoot>
                                         <?php } ?>
                                     </table>
-                                    <div class="kpi-sub mt-2">Booking-confirmation value (SUM of NetTotal) by the sales agent's team, by booking date. Excludes quotation, cancelled and drafts. LY = same period last year.</div>
+                                    <div class="kpi-sub mt-2">Booking-confirmation value (SUM of NetTotal) by the sales agent's team, by booking date, regardless of payment received. &ldquo;Unassigned&rdquo; = agents outside any active team (e.g. owner's own bookings), so the rows reconcile to the company total. Excludes quotation, cancelled and drafts. LY = same period last year.</div>
                                 </div>
                             </div>
                         </div>
@@ -943,8 +944,28 @@
                                     <div class="kpi-strip">
                                         <div class="kpi-cell"><div class="lbl">Today</div><div class="val"><?php echo $rm($owner_payment_out['today']); ?></div></div>
                                         <div class="kpi-cell"><div class="lbl">This Week</div><div class="val"><?php echo $rm($owner_payment_out['week']); ?></div></div>
+                                        <div class="kpi-cell"><div class="lbl">This Month</div><div class="val"><?php echo $rm($owner_payment_out['month']); ?></div></div>
+                                        <div class="kpi-cell"><div class="lbl">This Year</div><div class="val"><?php echo $rm($owner_payment_out['year']); ?></div></div>
                                     </div>
                                     <div class="kpi-sub mt-2">Approved supplier pay-outs, by payment date.</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <?php // 4b. Unapproved (pending) payment OUT. ?>
+                        <div class="col-md-6">
+                            <div class="card card-custom card-stretch gutter-b">
+                                <div class="card-header border-0" style="background-color:#FFD27F;">
+                                    <h3>Payment Out &mdash; Unapproved</h3>
+                                </div>
+                                <div class="card-body">
+                                    <div class="kpi-strip">
+                                        <div class="kpi-cell"><div class="lbl">Today</div><div class="val"><?php echo $rm($owner_payment_out_pending['today']); ?></div></div>
+                                        <div class="kpi-cell"><div class="lbl">This Week</div><div class="val"><?php echo $rm($owner_payment_out_pending['week']); ?></div></div>
+                                        <div class="kpi-cell"><div class="lbl">This Month</div><div class="val"><?php echo $rm($owner_payment_out_pending['month']); ?></div></div>
+                                        <div class="kpi-cell"><div class="lbl">This Year</div><div class="val"><?php echo $rm($owner_payment_out_pending['year']); ?></div></div>
+                                    </div>
+                                    <div class="kpi-sub mt-2">Pending supplier pay-outs, scheduled by payment date.</div>
                                 </div>
                             </div>
                         </div>
@@ -957,6 +978,7 @@
                                 </div>
                                 <div class="card-body">
                                     <div class="kpi-strip">
+                                        <div class="kpi-cell"><div class="lbl">Today</div><div class="val"><?php echo $rm($owner_payment_in['today']); ?></div></div>
                                         <div class="kpi-cell"><div class="lbl">This Week</div><div class="val"><?php echo $rm($owner_payment_in['week']); ?></div></div>
                                         <div class="kpi-cell"><div class="lbl">This Month</div><div class="val"><?php echo $rm($owner_payment_in['month']); ?></div></div>
                                         <div class="kpi-cell"><div class="lbl">This Year</div><div class="val"><?php echo $rm($owner_payment_in['year']); ?></div></div>
