@@ -1155,11 +1155,16 @@ class Dashboard_Model extends CI_Model
 	}
 
 	// Unapproved payment OUT (to suppliers): SUM(Debit) of ALL pending debit rows
-	// (Credit = 0, Status = 'P') scheduled on or before $end — i.e. everything
+	// (Credit = 0, Status = 'P') DUE on or before $end — i.e. everything
 	// scheduled-but-not-approved-yet, cumulative up to the window's end. Unlike
 	// Approved_Payment_Out() there is NO lower bound: a pending pay-out is an
-	// outstanding obligation, so overdue ones scheduled before the window must
-	// still count (otherwise the card understates the true backlog).
+	// outstanding obligation, so overdue ones due before the window must still
+	// count (otherwise the card understates the true backlog).
+	//
+	// NOTE: pending pay-outs have NO transaction Date yet (that is only stamped
+	// once the payment is actually made/approved) — they carry a Deadline. So we
+	// window on Deadline here, not Date. Using Date would exclude every pending
+	// row (all NULL) and the card would always read 0.
 	function Unapproved_Payment_Out($end)
 	{
 		$this->db->select('COALESCE(SUM(Debit), 0) AS Amount', false);
@@ -1169,7 +1174,7 @@ class Dashboard_Model extends CI_Model
 		$this->db->where('BookingConfirmationTitle', 'BOOKING CONFIRMATION');
 		$this->db->where('CancelStatus', 'N');
 		$this->db->where('booking.Status !=', 'N');
-		$this->db->where('CAST(payment.Date AS DATE) <=', $end);
+		$this->db->where('CAST(payment.Deadline AS DATE) <=', $end);
 		$row = $this->db->get('booking')->row();
 		return $row ? (float) $row->Amount : 0.0;
 	}

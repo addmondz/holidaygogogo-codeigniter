@@ -48,7 +48,7 @@ $pdo->exec("CREATE TABLE team (TeamID INTEGER PRIMARY KEY, Name TEXT, Status TEX
 $pdo->exec("CREATE TABLE cancellation_reason (CancellationReasonID INTEGER PRIMARY KEY, Name TEXT)");
 $pdo->exec("CREATE TABLE ghl_processed_leads (id INTEGER PRIMARY KEY, lead_started_at TEXT)");
 $pdo->exec("CREATE TABLE payment (
-    PaymentID INTEGER PRIMARY KEY, BookingID INTEGER, Credit REAL, Debit REAL, Status TEXT, Date TEXT
+    PaymentID INTEGER PRIMARY KEY, BookingID INTEGER, Credit REAL, Debit REAL, Status TEXT, Date TEXT, Deadline TEXT
 )");
 $pdo->exec("CREATE TABLE sales_target (AdminID INTEGER, target_year INTEGER, target_month INTEGER, target_amount REAL)");
 $pdo->exec("CREATE TABLE sales_target_year (AdminID INTEGER, target_year INTEGER, target_amount REAL)");
@@ -137,8 +137,11 @@ function pay(PDO $pdo, $col, $creditPred, $start, $end) {
     return (float) $st->fetch(PDO::FETCH_ASSOC)['Amount'];
 }
 // Unapproved (pending) payment OUT — cumulative UP TO :e (no lower bound) so
-// overdue pending pay-outs scheduled before the window are still counted. This
-// mirrors Unapproved_Payment_Out($end): SUM(Debit) where Credit=0, Status='P'.
+// overdue pending pay-outs due before the window are still counted. This mirrors
+// Unapproved_Payment_Out($end): SUM(Debit) where Credit=0, Status='P'.
+// Windows on DEADLINE, not Date: pending pay-outs have no transaction Date yet
+// (only stamped once approved) — they carry a Deadline. Windowing on Date would
+// exclude every pending row (all NULL) and the card would always read 0.
 function unapproved_out(PDO $pdo, $end) {
     $sql = "SELECT COALESCE(SUM(payment.Debit),0) AS Amount
             FROM booking LEFT JOIN payment ON payment.BookingID = booking.BookingID
@@ -147,7 +150,7 @@ function unapproved_out(PDO $pdo, $end) {
               AND booking.BookingConfirmationTitle = 'BOOKING CONFIRMATION'
               AND booking.CancelStatus = 'N'
               AND booking.Status != 'N'
-              AND date(payment.Date) <= :e";
+              AND date(payment.Deadline) <= :e";
     $st = $pdo->prepare($sql); $st->execute([':e'=>$end]);
     return (float) $st->fetch(PDO::FETCH_ASSOC)['Amount'];
 }
@@ -295,18 +298,21 @@ assert_eq('pay out none', 0.0,   pay($pdo,'Debit', "payment.Credit = 0",  '2026-
 // ===========================================================================
 // Unapproved (pending) payment OUT — cumulative "due by :end", captures overdue.
 // ===========================================================================
-$pdo->exec("INSERT INTO payment (PaymentID,BookingID,Credit,Debit,Status,Date) VALUES
-    (10,1,0,100,'P','2026-06-01'),   -- OVERDUE pending out (before any window) -> must count
-    (11,1,0,200,'P','2026-06-15'),   -- pending out today
-    (12,1,0,300,'P','2026-06-20'),   -- pending out future (later this month)
-    (13,1,0,999,'Y','2026-06-15'),   -- approved out -> excluded (Status Y)
-    (14,6,0,400,'P','2026-06-15')    -- pending out on cancelled booking 6 -> excluded
+// Pending pay-outs carry NULL Date (not stamped until approved) + a Deadline.
+$pdo->exec("INSERT INTO payment (PaymentID,BookingID,Credit,Debit,Status,Date,Deadline) VALUES
+    (10,1,0,100,'P',NULL,'2026-06-01'),   -- OVERDUE pending out (before any window) -> must count
+    (11,1,0,200,'P',NULL,'2026-06-15'),   -- pending out due today
+    (12,1,0,300,'P',NULL,'2026-06-20'),   -- pending out due future (later this month)
+    (13,1,0,999,'Y','2026-06-15','2026-06-15'), -- approved out -> excluded (Status Y)
+    (14,6,0,400,'P',NULL,'2026-06-15')    -- pending out on cancelled booking 6 -> excluded
 ");
 // Due by 06-15: overdue 100 + today 200 = 300 (future 300 not yet due).
+// Regression: all pending rows have NULL Date — windowing on Date would drop
+// them all and return 0. Windowing on Deadline keeps them.
 assert_eq('unapproved out to today', 300.0, unapproved_out($pdo, '2026-06-15'));
 // Due by month-end: + future 300 = 600. Overdue still included, none dropped.
 assert_eq('unapproved out to month', 600.0, unapproved_out($pdo, '2026-06-30'));
-// Even a window ending before every scheduled date still catches the 06-01 overdue.
+// Even a window ending before every later deadline still catches the 06-01 overdue.
 assert_eq('unapproved out to 06-01', 100.0, unapproved_out($pdo, '2026-06-01'));
 
 echo "\nAll assertions passed.\n";

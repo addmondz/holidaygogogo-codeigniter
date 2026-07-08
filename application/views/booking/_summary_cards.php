@@ -339,7 +339,7 @@
                 <div class="card card-custom">
                     <div class="card-header border-0 summary-card-header" style="background-color:#D7E2F2;">
                         <h3>New Leads</h3>
-                        <i id="pop-tc-leads" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>What it shows:</strong> New leads assigned to you (from GHL), counted by the date the lead came in.<ul><li><strong>Today:</strong> leads that came in today</li><li><strong>Week:</strong> Monday to Sunday of this week</li><li><strong>Month:</strong> 1st to last day of this month</li></ul>Your leads are matched to you by your account email. <strong>Note:</strong> if your email isn&rsquo;t linked to a GHL user, this card will show zeros."></i>
+                        <i id="pop-tc-leads" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>What it shows:</strong> New leads you picked up (from GHL) &mdash; the same &ldquo;New Lead Picked Up&rdquo; count as the Lead Reply Activity dashboard, scoped to you. Counted by the date you picked the lead up.<ul><li><strong>Today:</strong> leads you picked up today</li><li><strong>Week:</strong> Monday to Sunday of this week</li><li><strong>Month:</strong> 1st to last day of this month</li></ul>Distinct leads you are the assigned owner of; a lead picked up on two of your inboxes still counts once. Your leads are matched to you by your account email. <strong>Note:</strong> if your email isn&rsquo;t linked to a GHL user, this card will show zeros."></i>
                     </div>
                     <div class="card-body summary-card-body">
                         <div class="summary-row-3">
@@ -347,7 +347,7 @@
                             <div><div class="lbl">Week</div><div class="summary-value-sm" id="sc-tc-leads-week">...</div></div>
                             <div><div class="lbl">Month</div><div class="summary-value-sm" id="sc-tc-leads-month">...</div></div>
                         </div>
-                        <div class="summary-sub">New leads assigned to you, by lead creation date.</div>
+                        <div class="summary-sub">New leads you picked up, by pick-up date. Matches the Lead Reply Activity dashboard.</div>
                         <div class="summary-sub summary-best" id="sc-tc-leads-best">Best: —</div>
                     </div>
                 </div>
@@ -1412,8 +1412,8 @@ $(function() {
     });
 
     // Renders the three sales-agent "chase" cards (Travel in 7/14 Days – Not Yet
-    // Ready, Payment From Customer Due Soon) from a cards/tables payload. Shared
-    // by the full summary load and the listing's page-scoped refresh below.
+    // Ready, Payment From Customer Due Soon) from a cards/tables payload. Counts
+    // are whole-DB over the agent's own bookings, matching each card's drill-down.
     function applyAgentVisibleCards(c, t) {
         c = c || {}; t = t || {};
         if(c.upcoming_travel_not_ready_op) {
@@ -1453,34 +1453,6 @@ $(function() {
             }
         }
     }
-
-    // Called by the booking listing after each DataTables draw with the booking
-    // ids visible on the current page. Re-scopes the three agent cards to just
-    // those rows. POST because a 500-row page carries many ids; an empty list is
-    // sent as a flag so the server counts nothing (never falls back to whole DB).
-    window.refreshAgentVisibleCards = function(ids) {
-        $.ajax({
-            url: '<?php echo base_url("Booking/ajax_agent_visible_cards"); ?>',
-            type: 'POST',
-            dataType: 'json',
-            data: {
-                // Default (bracket) serialization -> ids[]=1&ids[]=3 so PHP reads an
-                // array. Empty string when no rows -> server counts nothing.
-                ids: (ids && ids.length) ? ids : '',
-                owner_as_agent: <?php echo $owner_as_agent ? 1 : 0; ?>
-            },
-            success: function(resp) {
-                if(!resp || resp.error) return;
-                var cards = resp.cards || {};
-                // Only the agent card set returns these keys; when present, latch so
-                // the full-payload loader stops overwriting the page-scoped counts.
-                if(cards.upcoming_travel_not_ready_op || cards.customer_payment_due_soon) {
-                    window._agentCardsPageScoped = true;
-                }
-                applyAgentVisibleCards(cards, resp.tables || {});
-            }
-        });
-    };
 
     function loadSummaryCards(ownerPeriod, day) {
         var url = '<?php echo base_url("Booking/ajax_summary_cards"); ?>';
@@ -1620,15 +1592,9 @@ $(function() {
             setText('sc-conv-rate-detail', c.conversion_rate_ytd.detail);
             setBestFigure('sc-conv-rate-best',   c.conversion_rate_ytd.best);
         }
-        // Travel 7/14-day + Payment-due-soon cards. On the booking listing the
-        // agent card set scopes these to the rows on the current DataTables page
-        // via refreshAgentVisibleCards(); once that has taken over (latch below)
-        // we skip them here so a late whole-DB response can't clobber the
-        // page-scoped counts. OP (same DOM ids) and the dashboard keep the payload
-        // values — their refresh returns empty and never sets the latch.
-        if(!window._agentCardsPageScoped) {
-            applyAgentVisibleCards(c, t);
-        }
+        // Travel 7/14-day + Payment-due-soon cards. Whole-DB over the agent's own
+        // bookings, matching each card's drill-down link.
+        applyAgentVisibleCards(c, t);
         // OP operational queue cards.
         if(c.pending_bc_op) {
             setText('sc-pending-bc-op-count', c.pending_bc_op.count);
@@ -1849,8 +1815,11 @@ $(function() {
             var oCell = function(col, html, raw) {
                 var applies = inP(col);
                 var empty = !applies || raw === null || raw === undefined || raw === '';
+                // Any empty cell renders "—": either the column doesn't apply to the
+                // period, or the agent has no value for it (e.g. a quiet agent now
+                // always shown as a row). A genuine measured 0 has raw=0 (not empty).
                 return '<td class="text-right" data-sort="' + (empty ? '' : escapeHtml(String(raw))) + '"'
-                    + (empty ? ' data-empty="1"' : '') + '>' + (applies ? html : '—') + '</td>';
+                    + (empty ? ' data-empty="1"' : '') + '>' + (empty ? '—' : html) + '</td>';
             };
             if(ownerMatrix && ownerMatrix.length) {
                 ownerMatrixBody.innerHTML = ownerMatrix.map(function(r) {

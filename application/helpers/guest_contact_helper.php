@@ -234,6 +234,35 @@ if (!function_exists('guest_list_split_team_leaders')) {
     }
 }
 
+if (!function_exists('guest_list_team_leader_clause')) {
+    /**
+     * Build the row-level WHERE fragment for the Guest List "Team Leader" filter,
+     * a search on the booking customer name (b.Customer) — the group leader named
+     * on the BC form. Returns null when no team_leader is given.
+     *
+     * Two modes so the same param serves both entry points:
+     *   - Typed into the filter box → partial LIKE ("John" also finds "Johnny").
+     *   - Clicked on a Team Leader column name (team_leader_exact set) → EXACT
+     *     equality, so clicking "John Tan" shows only that leader's team members,
+     *     never "Johnny Wong".
+     *
+     * @param array $get The request GET params.
+     * @return array{sql:string,param:string}|null
+     */
+    function guest_list_team_leader_clause($get)
+    {
+        $name = isset($get['team_leader']) ? trim((string) $get['team_leader']) : '';
+        if ($name === '') {
+            return null;
+        }
+        $exact = isset($get['team_leader_exact']) && trim((string) $get['team_leader_exact']) !== '';
+        if ($exact) {
+            return array('sql' => " AND b.Customer = ? ", 'param' => $name);
+        }
+        return array('sql' => " AND b.Customer LIKE ? ", 'param' => '%' . $name . '%');
+    }
+}
+
 if (!function_exists('guest_list_ghl_suppressed_by_filters')) {
     /**
      * GHL leads carry only a name, contact, and lead-captured date — they have
@@ -257,6 +286,7 @@ if (!function_exists('guest_list_ghl_suppressed_by_filters')) {
             'travel_date', 'sales_agent', 'source',
             'customer_type', 'nationality', 'gender', 'language',
             'booking_number', 'destination', 'pax_min', 'pax_max',
+            'team_leader',
         );
         foreach ($booking_only as $k) {
             if (isset($get[$k]) && trim((string) $get[$k]) !== '') {

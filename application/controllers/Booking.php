@@ -758,18 +758,15 @@ class Booking extends MY_Controller
 	 * AJAX endpoint for role-based summary cards rendered above the booking listing.
 	 * Returns counts/values/links keyed per card; the view partial fills placeholders.
 	 */
-	// Builds the three sales-agent "chase" cards shared by the full summary-card
-	// payload and the listing's page-scoped refresh:
+	// Builds the three sales-agent "chase" cards:
 	//   - upcoming_travel_not_ready_op     (Travel in 7 Days  – Not Yet Ready)
 	//   - upcoming_travel_not_ready_op_14  (Travel in 14 Days – Not Yet Ready)
 	//   - customer_payment_due_soon        (Payment From Customer Due Soon)
 	//
-	// $scope_ids: null  -> no row scope (whole-DB own bookings, e.g. dashboard).
-	//             array -> count only these booking ids (the rows visible on the
-	//                      current listing page); an empty array counts nothing.
-	// The id list is always an extra AND on top of the existing status / date /
-	// own-slot conditions, never a replacement for them.
-	private function _agent_upcoming_cards($admin_id, $scope_ids = null)
+	// Always whole-DB over the agent's own bookings so the card count matches its
+	// drill-down link exactly (the drill-down applies the same credited / window /
+	// own-slot filters, never a per-page row scope).
+	private function _agent_upcoming_cards($admin_id)
 	{
 		$admin_id = (int) $admin_id;
 		$this->load->helper('lead_conversion_credit');
@@ -786,16 +783,6 @@ class Booking extends MY_Controller
 		// Cumulative 14-day window shares the 7-day start (tomorrow).
 		$next14_start = $next7_start;
 		$next14_end   = date('Y-m-d', strtotime('+14 days'));
-
-		// Restrict every card to the visible page rows when an id list is given.
-		// null -> no restriction; empty array -> impossible clause (count nothing);
-		// otherwise AND booking.BookingID IN (...sanitised ints...). Ints are cast
-		// and interpolated (safe) so the IN list needs no bound parameters.
-		$id_clause = '';
-		if(is_array($scope_ids)) {
-			$ids = array_values(array_unique(array_filter(array_map('intval', $scope_ids), function($v) { return $v > 0; })));
-			$id_clause = empty($ids) ? ' AND 1=0' : ' AND booking.BookingID IN (' . implode(',', $ids) . ')';
-		}
 
 		$cards  = array();
 		$tables = array();
@@ -821,7 +808,7 @@ class Booking extends MY_Controller
 				   AND CancelStatus='N'
 				   AND Status IN ('P','PBO','PGL','PTV')
 				   AND StartDate BETWEEN ? AND ?
-				   AND {$credit_clause}{$id_clause}",
+				   AND {$credit_clause}",
 				array($w['s'], $w['e'], $admin_id, $admin_id)
 			)->row();
 			$cards[$w['key']] = array(
@@ -849,10 +836,13 @@ class Booking extends MY_Controller
 		// 3pm cutoff: a deadline falling on today is only "today" while the
 		// money-in can still be approved (before 15:00). At/after 15:00 the
 		// same-day deadline has lapsed and moves into "overdue", so overdue
-		// widens to nd <= today and the today bucket empties (sentinel date).
+		// widens to nd <= today and the today bucket empties. The empty-bucket
+		// sentinel must be a MySQL-valid DATE (strict mode / NO_ZERO_DATE
+		// rejects '0000-00-00' with error 1525); '1000-01-01' is the minimum
+		// valid date and sits outside the BETWEEN window, so it never matches.
 		$cust_after3pm  = ((int) date('H') >= 15);
 		$cust_overdue_op = $cust_after3pm ? '<=' : '<';
-		$cust_today_val  = $cust_after3pm ? '0000-00-00' : $today;
+		$cust_today_val  = $cust_after3pm ? '1000-01-01' : $today;
 		$cust_nd  = "(CASE WHEN booking.Status = 'P' THEN COALESCE(booking.DepositDeadline, booking.FullPaymentDeadline) ELSE booking.FullPaymentDeadline END)";
 		$cust_out = "(booking.NetTotal - COALESCE((SELECT SUM(p.Credit) FROM payment p"
 			. " WHERE p.BookingID = booking.BookingID"
@@ -872,7 +862,7 @@ class Booking extends MY_Controller
 			    FROM booking
 			    WHERE booking.CancelStatus = 'N'
 			      AND booking.Status IN ('P','PP')
-			      AND {$tc_own}{$id_clause}
+			      AND {$tc_own}
 			 ) t
 			 WHERE t.nd BETWEEN ? AND ?
 			   AND t.outstanding > 0",
@@ -893,7 +883,7 @@ class Booking extends MY_Controller
 			    FROM booking
 			    WHERE booking.CancelStatus = 'N'
 			      AND booking.Status IN ('P','PP')
-			      AND {$tc_own}{$id_clause}
+			      AND {$tc_own}
 			 ) t
 			 WHERE t.nd BETWEEN ? AND ?
 			   AND t.outstanding > 0
@@ -913,51 +903,6 @@ class Booking extends MY_Controller
 		$tables['customer_payment_due_soon'] = $cust_out_rows;
 
 		return array('cards' => $cards, 'tables' => $tables);
-	}
-
-	// Listing-only endpoint: recomputes the three sales-agent chase cards scoped
-	// to the booking ids visible on the current DataTables page. Posted by
-	// refreshAgentVisibleCards() on every table draw so the counts follow what
-	// the user actually sees below the listing, never the whole DB.
-	function ajax_agent_visible_cards()
-	{
-		$this->begin_json_endpoint();
-
-		try {
-			$access_control = $this->session->access_control ?? array();
-			if(!in_array('VB', $access_control)) {
-				$this->send_json(array('error' => 'Access denied'));
-				return;
-			}
-
-			$level    = (int) $this->session->userdata('level');
-			$admin_id = (int) $this->session->userdata('admin_id');
-
-			$this->load->helper('summary_card_roles');
-			$owner_as_agent = ((int) $this->input->post('owner_as_agent') === 1);
-			// Only the sales-agent card set owns these three cards; anyone else gets
-			// an empty payload so a stray call never leaks whole-DB numbers.
-			if(!summary_cards_show_agent_set($level, $owner_as_agent)) {
-				$this->send_json(array('cards' => new stdClass(), 'tables' => new stdClass()));
-				return;
-			}
-
-			// Visible booking ids from the current listing page. Always treated as a
-			// scope (empty -> count nothing), never a whole-DB fallback.
-			$ids_raw = $this->input->post('ids');
-			$scope_ids = array();
-			if(is_array($ids_raw)) {
-				$scope_ids = $ids_raw;
-			} elseif(is_string($ids_raw) && $ids_raw !== '') {
-				$scope_ids = explode(',', $ids_raw);
-			}
-
-			$r = $this->_agent_upcoming_cards($admin_id, $scope_ids);
-			$this->send_json(array('cards' => $r['cards'], 'tables' => $r['tables']));
-		} catch (\Throwable $e) {
-			log_message('error', 'Booking ajax_agent_visible_cards error: ' . $e->getMessage());
-			$this->send_json(array('error' => 'An error occurred while loading cards'));
-		}
 	}
 
 	function ajax_summary_cards()
@@ -1465,22 +1410,21 @@ class Booking extends MY_Controller
 				return $secs . 's';
 			};
 			if(!empty($my_ghl_uids)) {
-				$mine_day   = $this->Report_Model->Lead_Dashboard_Summary(array(
-					'agent_id'   => $my_ghl_uids,
-					'start_date' => $tc_day,       'end_date' => $tc_day,
-				));
-				$mine_week  = $this->Report_Model->Lead_Dashboard_Summary(array(
-					'agent_id'   => $my_ghl_uids,
-					'start_date' => $tc_week_start,  'end_date' => $tc_week_end,
-				));
-				$mine_month = $this->Report_Model->Lead_Dashboard_Summary(array(
-					'agent_id'   => $my_ghl_uids,
-					'start_date' => $cur_month_start, 'end_date' => $cur_month_end,
-				));
+				// "New Leads" = "New Lead Picked Up" from the Lead Reply Activity
+				// dashboard, scoped to the logged-in TC's GHL uid(s). Counts DISTINCT
+				// leads she is the real assignee of (ghl_lead_ownership), windowed by
+				// the PICK-UP time (assigned_at) -- not by when the conversation
+				// started -- so the card equals that report's column exactly. DISTINCT
+				// across her inboxes keeps a lead picked up on two of them counted once.
+				$leads_count = function($start, $end) use ($my_ghl_uids) {
+					return $this->Report_Model->Lead_Reply_Activity_Assigned_New_Leads_For_Uids(
+						$my_ghl_uids, $start, $end
+					);
+				};
 				$cards['tc_leads_dwm'] = array(
-					'day'   => (int)$mine_day['total_leads'],
-					'week'  => (int)$mine_week['total_leads'],
-					'month' => (int)$mine_month['total_leads'],
+					'day'   => $leads_count($tc_day, $tc_day),
+					'week'  => $leads_count($tc_week_start, $tc_week_end),
+					'month' => $leads_count($cur_month_start, $cur_month_end),
 				);
 
 				// "Daily Handle Lead Count" card (Today / Week / Month). Each period
@@ -1571,14 +1515,23 @@ class Booking extends MY_Controller
 			// time (min-sample 3 leads) and highest lead volume; "You" when
 			// that's the logged-in agent.
 			$this->load->helper('response_time');
-			$resp_rows = $this->Report_Model->Lead_Dashboard_By_Agent(array(
+			// "New Leads" best uses the SAME "New Lead Picked Up" universe as the
+			// card's own value (ghl_lead_ownership, windowed by pick-up time) so the
+			// two are apples-to-apples. Reshaped to the {agent_id, agent_name,
+			// total_leads} shape pick_ghl_best expects.
+			$leads_best_rows = array();
+			foreach($this->Report_Model->Lead_Reply_Activity_By_Agent(array(
 				'start_date' => $cur_month_start, 'end_date' => $cur_month_end,
-			));
-			// "Best:" compares only against the SALES AGENT role: keep rows whose
-			// GHL user maps to a level-20 admin ($sales_uid_set built above).
-			$resp_rows = array_values(array_filter($resp_rows, function($r) use ($sales_uid_set) {
-				return isset($sales_uid_set[(string)$r['agent_id']]);
-			}));
+			)) as $r) {
+				// "Best:" compares only against the SALES AGENT role: keep owners
+				// whose GHL user maps to a level-20 admin ($sales_uid_set above).
+				if(!isset($sales_uid_set[(string)$r['owner_user_id']])) { continue; }
+				$leads_best_rows[] = array(
+					'agent_id'    => (string)$r['owner_user_id'],
+					'agent_name'  => $r['owner_name'],
+					'total_leads' => (int)$r['assigned_leads'],
+				);
+			}
 			$pick_ghl_best = function($rows, $field, $sort_desc, $min_leads) use ($my_ghl_uids) {
 				$f = array();
 				foreach($rows as $r) {
@@ -1611,7 +1564,7 @@ class Booking extends MY_Controller
 			$cards['tc_response_time_dwm']['best'] = $best_resp
 				? array('name' => $best_resp['agent_name'], 'value' => format_response_duration((int)round((float)$best_resp['avg_response_time_seconds'])))
 				: null;
-			$best_leads = $pick_ghl_best($resp_rows, 'total_leads', true, 1);
+			$best_leads = $pick_ghl_best($leads_best_rows, 'total_leads', true, 1);
 			$cards['tc_leads_dwm']['best'] = $best_leads
 				? array('name' => $best_leads['agent_name'], 'value' => (string)(int)$best_leads['total_leads'])
 				: null;
@@ -1718,11 +1671,8 @@ class Booking extends MY_Controller
 			// existing JS populates them with no extra wiring.
 			//
 			// These three cards (Travel in 7 / 14 Days – Not Yet Ready, Payment From
-			// Customer Due Soon) share one builder so the booking listing can re-run
-			// them scoped to just the rows visible on the current DataTables page
-			// (see _agent_upcoming_cards() + ajax_agent_visible_cards()). On the full
-			// card load here we pass no id scope, keeping the whole-DB own-bookings
-			// counts used on the dashboard.
+			// Customer Due Soon) are whole-DB over the agent's own bookings (see
+			// _agent_upcoming_cards()), so each count matches its drill-down link.
 			$upcoming = $this->_agent_upcoming_cards($admin_id);
 			$cards    = array_merge($cards, $upcoming['cards']);
 			$tables   = array_merge($tables, $upcoming['tables']);
@@ -2463,9 +2413,12 @@ class Booking extends MY_Controller
 			// 3pm cutoff: a today deadline is only "today" while the money-in
 			// can still be approved (before 15:00); at/after 15:00 it lapses
 			// into "overdue" (overdue widens to nd <= today, today empties).
+			// Empty-bucket sentinel must be a MySQL-valid DATE ('0000-00-00'
+			// trips strict mode / NO_ZERO_DATE with error 1525); '1000-01-01'
+			// is the min valid date and falls outside the window, never matching.
 			$cust_after3pm  = ((int) date('H') >= 15);
 			$cust_overdue_op = $cust_after3pm ? '<=' : '<';
-			$cust_today_val  = $cust_after3pm ? '0000-00-00' : $today;
+			$cust_today_val  = $cust_after3pm ? '1000-01-01' : $today;
 			$cust_nd  = "(CASE WHEN booking.Status = 'P' THEN COALESCE(booking.DepositDeadline, booking.FullPaymentDeadline) ELSE booking.FullPaymentDeadline END)";
 			$cust_out = "(booking.NetTotal - COALESCE((SELECT SUM(p.Credit) FROM payment p"
 				. " WHERE p.BookingID = booking.BookingID"

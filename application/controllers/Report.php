@@ -561,10 +561,11 @@ class Report extends MY_Controller
     }
 
     /**
-     * "Leads By Hour" report -- new leads plotted on a DATE x HOUR grid so the
-     * owner can see what time of day leads land. Date-range filtered (defaults
-     * to the last 30 days). Owner-only in the menu; still passes the shared
-     * 'VR' gate in the constructor.
+     * "Leads By Hour" report -- picked-up leads (same universe as the dashboard
+     * "New Lead Picked Up" column) plotted on a DATE x HOUR grid so the owner can
+     * see what time of day leads get picked up. Date-range filtered (defaults to
+     * the last 30 days). Owner-only in the menu; still passes the shared 'VR'
+     * gate in the constructor.
      */
     function Leads_By_Hour()
     {

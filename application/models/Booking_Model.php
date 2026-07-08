@@ -840,44 +840,67 @@ class Booking_Model extends CI_Model
 		return $this->db->get('booking')->row_array();
 	}
 
-	// Freeze each row's point-in-time TeamID: the team the credited agent
-	// (SalesAgent / TC1) is in RIGHT NOW is snapshotted onto booking.TeamID when
-	// the agent is first set or actually changes, and left untouched otherwise.
-	// This keeps a sale attributed to the team that earned it even after the
-	// agent later switches team or leaves. See booking_team_snapshot_helper.php.
+	// Freeze each row's point-in-time TeamID: the team the CREDITED agent is in
+	// RIGHT NOW is snapshotted onto booking.TeamID when that agent is first set or
+	// actually changes, and left untouched otherwise. The credited agent follows
+	// the TC1/TC2 Jun-1 cutoff — TC1 (SalesAgent) pre-cutoff, TC2 (SalesAgent2)
+	// on/after — so a post-cutoff sale is frozen to the TC2's team, and editing
+	// TC1 on it does not re-team the sale. See booking_team_snapshot_helper.php
+	// and lead_conversion_credit_helper.php.
 	private function _apply_team_snapshot(&$booking_data)
 	{
 		if (empty($booking_data) || !is_array($booking_data)) {
 			return;
 		}
 		$this->load->helper('booking_team_snapshot');
+		$this->load->helper('lead_conversion_credit');
 
 		foreach ($booking_data as $key => $row) {
-			// SalesAgent absent from this write -> leave the frozen TeamID as-is.
-			if (!is_array($row) || !array_key_exists('SalesAgent', $row)) {
+			if (!is_array($row)) {
 				continue;
 			}
-			$new_sa = (int) $row['SalesAgent'];
 
-			// Previously stored credited agent (null when this is a fresh insert).
-			$prev_sa = null;
+			// The stored row (updates only): supplies fields the write omits and
+			// the previously-credited agent used to detect a change.
+			$stored = null;
 			if (!empty($row['BookingID'])) {
-				$cur = $this->db->select('SalesAgent')
+				$stored = $this->db->select('SalesAgent, SalesAgent2, InsertDate')
 					->where('BookingID', $row['BookingID'])
 					->get('booking')->row();
-				$prev_sa = $cur ? $cur->SalesAgent : null;
 			}
 
-			// The new agent's CURRENT team — the snapshot source.
+			// A write that touches neither credited slot cannot change attribution
+			// (InsertDate is fixed after creation) -> leave the frozen TeamID as-is.
+			$touches_slot = array_key_exists('SalesAgent', $row)
+				|| array_key_exists('SalesAgent2', $row);
+			if ($stored !== null && !$touches_slot) {
+				continue;
+			}
+
+			// Effective new values: the write wins, else fall back to the stored row.
+			$new_sa  = array_key_exists('SalesAgent', $row)  ? $row['SalesAgent']  : ($stored ? $stored->SalesAgent  : 0);
+			$new_sa2 = array_key_exists('SalesAgent2', $row) ? $row['SalesAgent2'] : ($stored ? $stored->SalesAgent2 : 0);
+			// InsertDate is never edited via this form; a fresh insert lands "now".
+			$insert_date = array_key_exists('InsertDate', $row) ? $row['InsertDate']
+				: ($stored ? $stored->InsertDate : date('Y-m-d H:i:s'));
+
+			// The agent credited under the cutoff, and their CURRENT team.
+			$new_credit = lead_conversion_credited_admin_id($insert_date, $new_sa, $new_sa2);
 			$team_id = null;
-			if ($new_sa > 0) {
+			if ((int) $new_credit > 0) {
 				$a = $this->db->select('TeamID')
-					->where('AdminID', $new_sa)
+					->where('AdminID', (int) $new_credit)
 					->get('admin')->row();
 				$team_id = $a ? $a->TeamID : null;
 			}
 
-			$decision = booking_team_snapshot($new_sa, $prev_sa, $team_id);
+			$prev = $stored ? array(
+				'InsertDate'  => $stored->InsertDate,
+				'SalesAgent'  => $stored->SalesAgent,
+				'SalesAgent2' => $stored->SalesAgent2,
+			) : null;
+
+			$decision = booking_team_snapshot_by_credit($insert_date, $new_sa, $new_sa2, $prev, $team_id);
 			if ($decision['write']) {
 				$booking_data[$key]['TeamID'] = $decision['team_id'];
 			}
@@ -2268,6 +2291,12 @@ class Booking_Model extends CI_Model
 			if(!empty($this->input->get('booking_confirmation_title'))) {
 				$this->db->where_in('booking.BookingConfirmationTitle', explode(',', $this->input->get('booking_confirmation_title')));
 				$level2Ignore = 1;
+			} else {
+				// Default: the listing shows only Booking Confirmations (BC) for
+				// every level. Users must pick the BC Title filter to see
+				// QUOTATION / PROFORMA INVOICE rows. Not a "level 2" filter, so
+				// the default 14-day window still applies.
+				$this->db->where('booking.BookingConfirmationTitle', 'BOOKING CONFIRMATION');
 			}
 			if(!empty($this->input->get('autocount_status'))) {
 				$this->db->where_in('booking.AutocountSyncStatus', explode(',', $this->input->get('autocount_status')));

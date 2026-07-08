@@ -4,9 +4,10 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 /**
  * Pure layout logic behind the "Leads By Hour" report (Report/Leads_By_Hour).
  *
- * The report answers "what time of day do new leads land?". The SQL groups
- * ghl_processed_leads.lead_started_at by DATE + HOUR and only returns hours
- * that actually had leads, so these DB-free helpers:
+ * The report answers "what time of day do new leads get picked up?". The SQL
+ * groups picked-up leads (ghl_lead_ownership, owner = assignee) by the DATE +
+ * HOUR they were picked up and only returns hours that actually had leads, so
+ * these DB-free helpers:
  *   - expand the picked range into every day (so empty days still show),
  *   - stitch the sparse (date, hour, count) rows into a date x 24-hour grid,
  *   - carry per-day totals, per-hour totals and a grand total,

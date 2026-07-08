@@ -786,20 +786,6 @@ $(document).ready(function() {
                 
                 // Re-attach checkbox event listeners
                 attachCheckboxListeners();
-
-                // Scope the agent "chase" cards to the rows on this page: collect
-                // the visible booking ids and let the summary-card partial recount
-                // Travel in 7/14 Days + Payment Due Soon over just those rows.
-                // Gated on the card existing so other roles never fire the request.
-                if (window.refreshAgentVisibleCards && document.getElementById('sc-upcoming-not-ready-op-count')) {
-                    var api = new $.fn.dataTable.Api(settings);
-                    var visibleIds = [];
-                    api.rows({ page: 'current' }).every(function() {
-                        var d = this.data();
-                        if (d && d.booking_id) { visibleIds.push(d.booking_id); }
-                    });
-                    window.refreshAgentVisibleCards(visibleIds);
-                }
             }
         });
 

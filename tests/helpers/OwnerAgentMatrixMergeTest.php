@@ -15,6 +15,11 @@
  *   - Unmapped GHL uid and '__unassigned__' rows are dropped.
  *   - Gated vs ungated conversion are tracked independently and can differ.
  *   - An admin-keyed-only agent (sales/cancellation, no GHL leads) still appears.
+ *   - Every included agent named in $name_by_admin shows a row even with NO
+ *     activity in the window; metrics with no underlying source fold to null so
+ *     the view renders "—" (a genuine measured 0 still shows as 0).
+ *   - Owner-excluded agents are DROPPED from the rows entirely (like hidden),
+ *     matching their removal from the TC leaderboard.
  *   - agent_score equals agent_score_compute() for the same derived inputs.
  *   - Rows sorted by agent_score DESC, then name ASC.
  */
@@ -119,14 +124,15 @@ assert_eq('Jane conv gated',    30.0,   $by[10]['conv_rate_gated']);    // (4+2)
 assert_eq('Jane followup',      70.0,   $by[10]['followup_rate']);      // 14/20
 assert_eq('Jane cancel',        5.0,    $by[10]['cancel_rate']);        // 1/20
 
-// --- Carol: admin-keyed only, still present with null GHL metrics ---
+// --- Carol: admin-keyed only, still present; no-data metrics dash (null) but
+//     her measured 0 cancellation (0 of 5) still shows as 0.0 ---
 assert_eq('Carol name from sales row', 'Carol', $by[12]['agent_name']);
-assert_eq('Carol new_leads zero',  0,    $by[12]['new_leads']);
+assert_eq('Carol new_leads null (no leads source)', null, $by[12]['new_leads']);
 assert_eq('Carol reply null',      null, $by[12]['reply_secs']);
 assert_eq('Carol pickup null',     null, $by[12]['pickup_secs']);
-assert_eq('Carol conv ungated 0',  0.0,  $by[12]['conv_rate_ungated']);
+assert_eq('Carol conv ungated null (no leads)', null, $by[12]['conv_rate_ungated']);
 assert_eq('Carol sales',           30000.0, $by[12]['sales_total']);
-assert_eq('Carol cancel 0 (0/5)',  0.0,  $by[12]['cancel_rate']);
+assert_eq('Carol cancel 0 (0/5, source present)',  0.0,  $by[12]['cancel_rate']);
 
 // --- agent_score must equal agent_score_compute() on the same derived inputs ---
 $expected = agent_score_compute(array(
@@ -176,15 +182,14 @@ $nsBy = array(); foreach ($matrixNS as $r) { $nsBy[$r['admin_id']] = $r; }
 assert_eq('no-score: New Leads still computed', 20, $nsBy[10]['new_leads']);
 assert_eq('no-score: Outbound still computed',  500, $nsBy[10]['outbound_count']);
 
-// --- owner exclusion: Jane (10) is on the owner's exclude list. She stays a
-//     matrix row (all other metrics intact) but gets a null Agent Score and no
-//     longer anchors the benchmark — so Carol's 30000 becomes the sales anchor
-//     and the remaining agents score exactly as if Jane were absent. ---
+// --- owner exclusion: Jane (10) is on the owner's exclude list. She is DROPPED
+//     from the matrix rows entirely (like the TC leaderboard) and no longer
+//     anchors the benchmark — so Carol's 30000 becomes the sales anchor and the
+//     remaining agents score exactly as if Jane were absent. ---
 $matrixX = owner_agent_matrix_build($sources, $map, $name_by_admin, null, true, array(10 => true));
 $byX = array(); foreach ($matrixX as $r) { $byX[$r['admin_id']] = $r; }
-assert_eq('exclusion: all three rows still present', 3, count($matrixX));
-assert_eq('exclusion: Jane row kept (other metrics intact)', 20, $byX[10]['new_leads']);
-assert_eq('exclusion: Jane Agent Score nulled', null, $byX[10]['agent_score']);
+assert_eq('exclusion: Jane dropped from rows', false, isset($byX[10]));
+assert_eq('exclusion: two rows remain (Ben, Carol)', 2, count($matrixX));
 $expectedX = agent_score_compute(array(
     array('admin_id' => 11, 'name' => 'Ben',   'reply_secs' => 50,  'pickup_secs' => 60,  'conv_rate' => 25.0, 'sales' => 10000, 'followup_rate' => 25.0, 'served_leads' => 4,  'pickup_n' => 2,  'leads_n' => 4,  'owned_n' => 4),
     array('admin_id' => 12, 'name' => 'Carol', 'reply_secs' => null,'pickup_secs' => null,'conv_rate' => null, 'sales' => 30000, 'followup_rate' => null, 'served_leads' => null,'pickup_n' => 0,  'leads_n' => 0,  'owned_n' => 0),
@@ -212,13 +217,13 @@ $sourcesR = $sources;
 $sourcesR['responded'] = array(
     array('admin_id' => 10, 'responded_leads' => 33), // Jane: owned 20, replied 33
     array('admin_id' => 11, 'responded_leads' => 2),  // Ben:  owned 4,  replied 2
-    // Carol (12): no responded row -> Served shows 0 (she replied to nothing).
+    // Carol (12): no responded row -> Served dashes (null, she replied to nothing).
 );
 $matrixR = owner_agent_matrix_build($sourcesR, $map, $name_by_admin);
 $byR = array(); foreach ($matrixR as $r) { $byR[$r['admin_id']] = $r; }
 assert_eq('responded: Jane Served = responded (not owned)', 33, $byR[10]['served_leads']);
 assert_eq('responded: Ben Served = responded',              2,  $byR[11]['served_leads']);
-assert_eq('responded: Carol Served = 0 (no replies)',       0,  $byR[12]['served_leads']);
+assert_eq('responded: Carol Served = null (no replies)',    null, $byR[12]['served_leads']);
 // Follow-up % unchanged — still owned-based (Jane 14/20 = 70%).
 assert_eq('responded: Jane Follow-up % still owned-based',  70.0, $byR[10]['followup_rate']);
 // Agent Score unchanged — served input still owned-leads, so score equals the
@@ -241,8 +246,29 @@ $matrixDW = owner_agent_matrix_build($sourcesDW, $map, $name_by_admin, null, tru
 $dwBy = array(); foreach ($matrixDW as $r) { $dwBy[$r['admin_id']] = $r; }
 assert_eq('day/week: Jane Agent Score is non-null', true, $dwBy[10]['agent_score'] !== null);
 assert_eq('day/week: Jane score exceeds the sales-less 55 ceiling', true, (float) $dwBy[10]['agent_score'] > 55.0);
-// Gated conversion / cancellation columns render 0 (no source), score still real.
-assert_eq('day/week: gated conversion 0 without source', 0.0, $dwBy[10]['conv_rate_gated']);
-assert_eq('day/week: cancellation 0 without source',      0.0, $dwBy[10]['cancel_rate']);
+// Gated conversion still 0 (leads source present, just no gated conv); cancellation
+// dashes (null) because its source is absent. Score stays real either way.
+assert_eq('day/week: gated conversion 0 (leads present, no conv)', 0.0, $dwBy[10]['conv_rate_gated']);
+assert_eq('day/week: cancellation dash without source',           null, $dwBy[10]['cancel_rate']);
+
+// --- Full roster: an INCLUDED agent with NO activity in the window still shows a
+//     row so the matrix lists the same agents every period; every metric folds to
+//     null (=> the view renders "—") and, being ineligible, the agent is not scored.
+//     Dave (13) is named in the scored pool but appears in none of the sources. ---
+$nameRoster = array(10 => 'Jane', 11 => 'Ben', 13 => 'Dave');
+$matrixFull = owner_agent_matrix_build($sources, $map, $nameRoster);
+$byFull = array(); foreach ($matrixFull as $r) { $byFull[$r['admin_id']] = $r; }
+assert_eq('roster: zero-activity Dave still shown', true, isset($byFull[13]));
+assert_eq('roster: Dave name',            'Dave', $byFull[13]['agent_name']);
+assert_eq('roster: Dave new_leads dash',  null,   $byFull[13]['new_leads']);
+assert_eq('roster: Dave served dash',     null,   $byFull[13]['served_leads']);
+assert_eq('roster: Dave sales dash',      null,   $byFull[13]['sales_total']);
+assert_eq('roster: Dave cancel dash',     null,   $byFull[13]['cancel_rate']);
+assert_eq('roster: Dave outbound dash',   null,   $byFull[13]['outbound_count']);
+assert_eq('roster: Dave reply dash',      null,   $byFull[13]['reply_secs']);
+assert_eq('roster: Dave Agent Score dash (not scored)', null, $byFull[13]['agent_score']);
+// Carol (12) still appears via her admin-keyed sales/cancellation source even
+// though she is not named in this roster.
+assert_eq('roster: Carol still present via source', true, isset($byFull[12]));
 
 echo "\nAll assertions passed.\n";

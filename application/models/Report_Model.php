@@ -1863,6 +1863,49 @@ class Report_Model extends CI_Model
     }
 
     /**
+     * "New Lead Picked Up" count for a set of GHL owner uids over a date range,
+     * matching the Lead Reply Activity dashboard's "New Lead Picked Up" column
+     * exactly (build_lead_reply_assignment_where_clause). Powers the sales-agent
+     * "New Leads" summary card so the card and that report agree.
+     *
+     * Counts DISTINCT leads the owner is the real assignee of (is_assigned_owner
+     * = 1 AND assigned owner = owner), windowed by the PICK-UP time
+     * (COALESCE(assigned_at, lead_started_at)) rather than when the conversation
+     * started. COUNT(DISTINCT processed_lead_id) across the whole uid set de-dupes
+     * a lead a TC picked up on two of her own inboxes; a single-inbox TC equals
+     * her dashboard row exactly.
+     *
+     * @param array  $uids   GHL owner user ids linked to the agent
+     * @param string $start  inclusive date 'Y-m-d'
+     * @param string $end    inclusive date 'Y-m-d'
+     * @return int   distinct picked-up leads across the uid set
+     */
+    public function Lead_Reply_Activity_Assigned_New_Leads_For_Uids($uids, $start, $end)
+    {
+        $uids = array_values(array_filter(array_map('strval', (array) $uids), 'strlen'));
+        if (empty($uids)) {
+            return 0;
+        }
+
+        $assignmentDate = $this->lead_reply_assignment_date_expression('glo');
+        $placeholders = implode(',', array_fill(0, count($uids), '?'));
+
+        $sql = "
+            SELECT COUNT(DISTINCT glo.processed_lead_id) AS assigned_new_leads
+            FROM ghl_lead_ownership glo
+            WHERE glo.is_assigned_owner = 1
+              AND NULLIF(glo.assigned_to_user_id, '') = glo.owner_user_id
+              AND glo.owner_user_id IN ({$placeholders})
+              AND {$assignmentDate} BETWEEN ? AND ?
+        ";
+
+        $params = array_merge($uids, array($start . ' 00:00:00', $end . ' 23:59:59'));
+        $row = $this->db->query($sql, $params)->row_array();
+
+        return !empty($row['assigned_new_leads']) ? (int) $row['assigned_new_leads'] : 0;
+    }
+
+    /**
      * Hourly inbound/outbound message counts for a single owner on one day. Powers
      * the per-owner "Lead Reply Hourly" drill-down. Scoped to the owner's leads via
      * ghl_lead_ownership (same reply-activity universe as the dashboard), bounded to
@@ -3344,28 +3387,44 @@ class Report_Model extends CI_Model
     }
 
     /**
-     * New leads grouped by capture DATE + HOUR, for the "Leads By Hour" report.
-     * Uses lead_started_at (when the lead actually landed / first inbound), NOT
-     * created_at (the cron insert time). Reuses the shared lead-dashboard WHERE
-     * builder so date/agent/team filters and non-owner scoping match the rest
-     * of the lead reports. Returns sparse rows (only hours that had leads);
-     * leads_by_hour_build_matrix() fills the gaps.
+     * PICKED-UP leads grouped by DATE + HOUR, for the "Leads By Hour" report.
+     * Same universe as the dashboard "New Lead Picked Up" column: rows in
+     * ghl_lead_ownership where the owner is the real assignee (is_assigned_owner
+     * = 1 AND assigned_to_user_id = owner_user_id), so the grid answers "what
+     * time of day do agents pick up leads?". The bucket uses the pick-up time
+     * (COALESCE(assigned_at, lead_started_at)) -- the exact date expression the
+     * column filters on -- and COUNT(DISTINCT owner:lead) keeps the grand total
+     * in step with the column total (a lead picked up by two owners counts per
+     * owner, matching the summary). Reuses build_lead_reply_assignment_where_clause
+     * so date/agent/team filters and non-owner scoping match the dashboard;
+     * the lead-dashboard agent filter (sales_agent/agent_id) is mapped onto its
+     * owner_user_id key. Returns sparse rows; leads_by_hour_build_matrix() fills
+     * the gaps.
      *
-     * @param array $filters see build_lead_dashboard_where_clause()
+     * @param array $filters lead-dashboard filters (see lead_dashboard_filters())
      * @return array of arrays: [ ['lead_date'=>'Y-m-d','hour_of_day'=>int,'lead_count'=>int], ... ]
      */
     function Leads_By_Hour($filters = array())
     {
-        $where = $this->build_lead_dashboard_where_clause($filters);
+        // Map the lead-dashboard agent filter onto the assignment builder's key.
+        if (empty($filters['owner_user_id'])) {
+            $agentIds = !empty($filters['agent_id']) ? $filters['agent_id']
+                      : (!empty($filters['sales_agent']) ? $filters['sales_agent'] : array());
+            if (!empty($agentIds)) {
+                $filters['owner_user_id'] = $agentIds;
+            }
+        }
+
+        $where = $this->build_lead_reply_assignment_where_clause($filters);
         $extraJoins = isset($where['extra_joins']) ? $where['extra_joins'] : '';
+        $pickupDate = $this->lead_reply_assignment_date_expression('glo');
 
         $sql = "
             SELECT
-                DATE(pl.lead_started_at) AS lead_date,
-                HOUR(pl.lead_started_at) AS hour_of_day,
-                COUNT(*) AS lead_count
-            FROM ghl_processed_leads pl
-            LEFT JOIN ghl_conversations gc ON gc.conversation_id = pl.conversation_id
+                DATE({$pickupDate}) AS lead_date,
+                HOUR({$pickupDate}) AS hour_of_day,
+                COUNT(DISTINCT CONCAT(glo.owner_user_id, ':', glo.processed_lead_id)) AS lead_count
+            FROM ghl_lead_ownership glo
             {$extraJoins}
             {$where['sql']}
             GROUP BY lead_date, hour_of_day

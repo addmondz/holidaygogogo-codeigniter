@@ -40,9 +40,9 @@ if (!function_exists('owner_agent_matrix_build')) {
      *        periods where the Score column isn't reported (Day / Week) so no
      *        scoring work happens for a column that would only render "-".
      * @param array|null $excluded_admins  AdminID => true for agents the owner has
-     *        excluded from the Agent Score. They still appear as matrix rows (with
-     *        every other metric intact) but get a null Agent Score and never anchor
-     *        the benchmark — matching their absence from the TC leaderboard.
+     *        excluded from the Agent Score. They never anchor the benchmark AND are
+     *        dropped from the matrix rows entirely — matching their absence from the
+     *        TC leaderboard. null => no agent is excluded.
      * @param array|null $hidden_admins  AdminID => true for agents included in the
      *        Agent Score CALCULATION but not shown — they set the 100-anchors
      *        (respecting $benchmark_admins) yet are omitted from the returned matrix
@@ -190,7 +190,19 @@ if (!function_exists('owner_agent_matrix_build')) {
             $u[$aid]['has_cancel']        = true;
         }
 
+        // ---- Seed the full included roster ----
+        // Every AdminID named in $name_by_admin (the controller's complete scored
+        // pool: Level 20/50 sales agents + Owner + TC Lead) gets a row even with no
+        // activity in the window, so the owner sees the SAME agents every period.
+        // Zero-activity agents fold to null metrics below and render as "—".
+        // (Hidden / owner-excluded agents are seeded too but dropped from the rows.)
+        foreach ($name_by_admin as $aid => $nm) {
+            $ensure($u, (int) $aid);
+        }
+
         // Eligible = any activity in the window across any of the seven sources.
+        // Still gates the Agent Score: a seeded zero-activity agent is shown as a
+        // row but not scored (their Score column dashes).
         $eligible = function ($row) {
             return $row['has_leads'] || $row['has_sales'] || $row['has_fu']
                 || $row['has_outbound'] || $row['has_cancel'];
@@ -231,29 +243,35 @@ if (!function_exists('owner_agent_matrix_build')) {
         }
 
         // ---- Build the matrix rows ----
+        // NO eligibility gate here: every included agent shows a row (even with no
+        // activity) so the roster is stable across periods. Hidden agents (Owner)
+        // anchored the score above but never show; owner-excluded agents are dropped
+        // from the rows entirely too — matching their removal from the TC leaderboard.
+        // Count / rate metrics fold to null (=> the view renders "—") when their own
+        // source contributed nothing for this agent; a genuine measured 0 (source
+        // present, value 0) still shows as 0.
         $matrix = array();
         foreach ($u as $aid => $row) {
-            if (!$eligible($row)) { continue; }
-            // Hidden agents (Owner / TC Lead) anchored the score above but are not
-            // shown as rows — included in the calculation, not displayed.
-            if (($hidden_admins !== null) && isset($hidden_admins[$aid])) { continue; }
+            if (($hidden_admins   !== null) && isset($hidden_admins[$aid]))   { continue; }
+            if (($excluded_admins !== null) && isset($excluded_admins[$aid])) { continue; }
+            $served_val = $has_responded_src ? $row['responded'] : $row['fu_owned'];
             $matrix[] = array(
                 'admin_id'          => $aid,
                 'agent_name'        => $row['name'] !== '' ? $row['name'] : '#' . $aid,
                 'reply_secs'        => $row['reply_n']  > 0 ? (int) round($row['reply_sum']  / $row['reply_n'])  : null,
                 'pickup_secs'       => $row['pickup_n'] > 0 ? (int) round($row['pickup_sum'] / $row['pickup_n']) : null,
                 'pickup_n'          => $row['pickup_n'],
-                'new_leads'         => $row['leads'],
-                'served_leads'      => $has_responded_src ? $row['responded'] : $row['fu_owned'],
-                'conv_rate_gated'   => $row['leads'] > 0 ? round($row['converted_gated']   / $row['leads'] * 100, 1) : 0.0,
+                'new_leads'         => $row['has_leads'] ? $row['leads'] : null,
+                'served_leads'      => $served_val > 0 ? (int) $served_val : null,
+                'conv_rate_gated'   => $row['has_leads'] ? ($row['leads'] > 0 ? round($row['converted_gated']   / $row['leads'] * 100, 1) : 0.0) : null,
                 'converted_gated'   => $row['converted_gated'],
-                'conv_rate_ungated' => $row['leads'] > 0 ? round($row['converted_ungated'] / $row['leads'] * 100, 1) : 0.0,
+                'conv_rate_ungated' => $row['has_leads'] ? ($row['leads'] > 0 ? round($row['converted_ungated'] / $row['leads'] * 100, 1) : 0.0) : null,
                 'converted_ungated' => $row['converted_ungated'],
-                'outbound_count'    => $row['outbound'],
-                'sales_total'       => $row['sales'],
-                'followup_rate'     => $row['fu_owned'] > 0 ? round($row['fu_followed'] / $row['fu_owned'] * 100, 1) : 0.0,
+                'outbound_count'    => $row['has_outbound'] ? $row['outbound'] : null,
+                'sales_total'       => $row['has_sales'] ? $row['sales'] : null,
+                'followup_rate'     => $row['has_fu'] ? ($row['fu_owned'] > 0 ? round($row['fu_followed'] / $row['fu_owned'] * 100, 1) : 0.0) : null,
                 'followup_leads'    => $row['fu_followed'],
-                'cancel_rate'       => $row['cancel_total'] > 0 ? round($row['cancel_cancelled'] / $row['cancel_total'] * 100, 1) : 0.0,
+                'cancel_rate'       => $row['has_cancel'] ? ($row['cancel_total'] > 0 ? round($row['cancel_cancelled'] / $row['cancel_total'] * 100, 1) : 0.0) : null,
                 'cancel_total'      => $row['cancel_total'],
                 'cancel_cancelled'  => $row['cancel_cancelled'],
                 'agent_score'       => isset($score['by_admin'][$aid]) ? $score['by_admin'][$aid]['composite'] : null,

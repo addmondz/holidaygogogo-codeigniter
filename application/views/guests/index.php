@@ -193,6 +193,15 @@ div.kt-datatable__pager-container {
 									<div class="row">
 										<div class="col-md-3">
 											<div class="form-group">
+												<label>Team Leader</label>
+												<div class="input-icon">
+													<input type="text" name="team_leader" value="<?php if(!empty($this->input->get('team_leader'))) { echo htmlspecialchars($this->input->get('team_leader'), ENT_QUOTES); } ?>" autocomplete="off" class="form-control" placeholder="e.g. John Tan">
+													<span><i class="la la-user-friends"></i></span>
+												</div>
+											</div>
+										</div>
+										<div class="col-md-3">
+											<div class="form-group">
 												<label>Booking Number</label>
 												<div class="input-icon">
 													<input type="text" name="booking_number" value="<?php if(!empty($this->input->get('booking_number'))) { echo htmlspecialchars($this->input->get('booking_number'), ENT_QUOTES); } ?>" autocomplete="off" class="form-control" placeholder="e.g. 2606-001-0001">
@@ -283,8 +292,17 @@ div.kt-datatable__pager-container {
 											<?php
 												$leaders = guest_list_split_team_leaders(isset($g->TeamLeader) ? $g->TeamLeader : '');
 												if(!empty($leaders)) {
+													$tl_base    = base_url($list_base);
 													$leader_out = array();
-													foreach($leaders as $ln) { $leader_out[] = htmlspecialchars($ln); }
+													foreach($leaders as $ln) {
+														// Click a team leader name to reload the list filtered
+														// to that exact leader — showing everyone on their team.
+														$href = $tl_base . '?team_leader=' . urlencode($ln) . '&team_leader_exact=1';
+														$leader_out[] = '<a href="' . htmlspecialchars($href, ENT_QUOTES) . '" '
+															. 'title="Show all team members under this leader" '
+															. 'style="color:#3699FF; text-decoration:none; border-bottom:1px dashed #3699FF;">'
+															. htmlspecialchars($ln) . '</a>';
+													}
 													echo implode('<br>', $leader_out);
 												} else {
 													echo '<span class="text-muted">&mdash;</span>';
@@ -375,31 +393,16 @@ div.kt-datatable__pager-container {
 										<td style="text-align:center; white-space:nowrap;">
 											<?php
 												if(!empty($g->TravelDates)) {
-													$td_out   = array();
-													$td_base  = base_url($list_base);
+													$td_out = array();
 													foreach(array_map('trim', explode(',', $g->TravelDates)) as $it) {
-														$p     = explode('|', $it);
-														$s     = isset($p[0]) ? trim($p[0]) : '';
-														$e     = isset($p[1]) ? trim($p[1]) : '';
-														$s_ts  = ($s !== '' && $s !== '0000-00-00') ? strtotime($s) : false;
-														$e_ts  = ($e !== '' && $e !== '0000-00-00') ? strtotime($e) : false;
-														if($s_ts && $e_ts)   { $label = date('d M Y', $s_ts) . ' - ' . date('d M Y', $e_ts); }
-														elseif($s_ts)        { $label = date('d M Y', $s_ts); }
-														elseif($e_ts)        { $label = date('d M Y', $e_ts); }
-														else                 { continue; }
-
-														// Click a travel date to reload the list filtered to that
-														// travel window — grouping everyone travelling then together.
-														$filter_val = guest_list_travel_date_filter_value($s, $e);
-														if($filter_val !== '') {
-															$href = $td_base . '?travel_date=' . urlencode($filter_val);
-															$td_out[] = '<a href="' . htmlspecialchars($href, ENT_QUOTES) . '" '
-																. 'title="Show everyone travelling on this date" '
-																. 'style="color:#3699FF; text-decoration:none; border-bottom:1px dashed #3699FF;">'
-																. htmlspecialchars($label) . '</a>';
-														} else {
-															$td_out[] = htmlspecialchars($label);
-														}
+														$p    = explode('|', $it);
+														$s    = isset($p[0]) ? trim($p[0]) : '';
+														$e    = isset($p[1]) ? trim($p[1]) : '';
+														$s_ts = ($s !== '' && $s !== '0000-00-00') ? strtotime($s) : false;
+														$e_ts = ($e !== '' && $e !== '0000-00-00') ? strtotime($e) : false;
+														if($s_ts && $e_ts)   { $td_out[] = htmlspecialchars(date('d M Y', $s_ts) . ' - ' . date('d M Y', $e_ts)); }
+														elseif($s_ts)        { $td_out[] = htmlspecialchars(date('d M Y', $s_ts)); }
+														elseif($e_ts)        { $td_out[] = htmlspecialchars(date('d M Y', $e_ts)); }
 													}
 													echo implode('<br>', $td_out);
 												}
@@ -452,7 +455,7 @@ div.kt-datatable__pager-container {
 
 <script>
 	<?php
-		$expanded_keys = array('q', 'booking_number', 'contact_number', 'email', 'destination', 'role', 'pax_min', 'pax_max', 'sales_agent', 'source', 'customer_type', 'nationality', 'gender', 'language', 'booking_date', 'travel_date');
+		$expanded_keys = array('q', 'booking_number', 'contact_number', 'email', 'destination', 'role', 'pax_min', 'pax_max', 'sales_agent', 'source', 'customer_type', 'nationality', 'gender', 'language', 'booking_date', 'travel_date', 'team_leader');
 		$expand = false;
 		foreach($expanded_keys as $k) {
 			if($this->input->get($k) !== null && $this->input->get($k) !== '') { $expand = true; break; }

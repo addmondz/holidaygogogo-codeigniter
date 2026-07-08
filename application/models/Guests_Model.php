@@ -83,6 +83,11 @@ class Guests_Model extends CI_Model
 				$where     .= " AND gl.Mobile LIKE ? ";
 				$b_params[] = '%' . $contact_number . '%';
 			}
+			$tl_clause = guest_list_team_leader_clause($this->input->get());
+			if($tl_clause !== null) {
+				$where     .= $tl_clause['sql'];
+				$b_params[] = $tl_clause['param'];
+			}
 			$email = trim((string)$this->input->get('email'));
 			if($email !== '') {
 				$where     .= " AND gl.Email LIKE ? ";

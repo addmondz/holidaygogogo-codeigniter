@@ -51,12 +51,22 @@ class Agent_Score_Setting extends MY_Controller
 			return;
 		}
 
-		// Checkbox set: posted excluded[] holds the AdminIDs to exclude. An
-		// unchecked agent simply isn't in the array, so they get re-included.
-		$ids = (array) $this->input->post('excluded');
-		$this->Agent_Score_Setting_Model->Set_Excluded($ids, (int) $this->session->admin_id);
+		// Switch semantics: ON (blue, checked) = INCLUDE, OFF (grey) = exclude.
+		// The form posts included[] (the ON agents); everyone on the settings roster
+		// NOT switched on is excluded. We still store the EXCLUDED set (the table's
+		// meaning is unchanged) — we just invert the checkboxes to derive it.
+		$included = array();
+		foreach ((array) $this->input->post('included') as $id) {
+			$included[(int) $id] = true;
+		}
+		$excluded = array();
+		foreach ($this->Agent_Score_Setting_Model->Sales_Agents() as $agent) {
+			$aid = (int) $agent->AdminID;
+			if (!isset($included[$aid])) { $excluded[] = $aid; }
+		}
+		$this->Agent_Score_Setting_Model->Set_Excluded($excluded, (int) $this->session->admin_id);
 
-		$this->session->set_flashdata('agent_score_setting_success', 'Agent Score exclusions saved.');
+		$this->session->set_flashdata('agent_score_setting_success', 'Agent Score settings saved.');
 		redirect(base_url('Agent_Score_Setting'));
 	}
 }
