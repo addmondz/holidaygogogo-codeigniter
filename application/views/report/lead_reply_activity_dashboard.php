@@ -173,6 +173,52 @@
                                 <?php } ?>
                             <?php } ?>
                         </tbody>
+                        <?php if(!empty($lead_reply_activity_rows)) { ?>
+                            <?php
+                                $totalNewLeads = 0; $totalResponded = 0; $totalTransfer = 0; $totalHandling = 0;
+                                $weightedSeconds = 0; $weightedLeads = 0;
+                                foreach($lead_reply_activity_rows as $totalRow) {
+                                    $totalNewLeads += (int) $totalRow['new_leads_picked_up'];
+                                    $totalResponded += (int) $totalRow['lead_responded'];
+                                    $totalTransfer += (int) $totalRow['transfer_out_leads'];
+                                    $totalHandling += (int) $totalRow['today_handling_leads'];
+                                    if($totalRow['avg_response_time_seconds'] !== null && (int) $totalRow['lead_responded'] > 0) {
+                                        $weightedSeconds += (int) $totalRow['avg_response_time_seconds'] * (int) $totalRow['lead_responded'];
+                                        $weightedLeads += (int) $totalRow['lead_responded'];
+                                    }
+                                }
+                                $avgTotalSeconds = $weightedLeads > 0 ? (int) round($weightedSeconds / $weightedLeads) : null;
+                                // Match the per-row Avg Response Time label formatting.
+                                if($avgTotalSeconds === null) {
+                                    $avgTotalLabel = '-';
+                                } elseif($avgTotalSeconds < 60) {
+                                    $avgTotalLabel = $avgTotalSeconds . ' sec';
+                                } elseif($avgTotalSeconds < 3600) {
+                                    $avgTotalLabel = floor($avgTotalSeconds / 60) . ' min';
+                                } elseif($avgTotalSeconds < 86400) {
+                                    $h = floor($avgTotalSeconds / 3600); $m = floor(($avgTotalSeconds % 3600) / 60);
+                                    $avgTotalLabel = $m === 0.0 ? $h . ' hr' : $h . ' hr ' . $m . ' min';
+                                } else {
+                                    $d = floor($avgTotalSeconds / 86400); $h = floor(($avgTotalSeconds % 86400) / 3600);
+                                    $avgTotalLabel = $h === 0.0 ? $d . ' day' : $d . ' day ' . $h . ' hr';
+                                }
+                            ?>
+                            <tfoot id="lead-reply-activity-table-foot">
+                                <tr style="background:#e4edf5; font-weight:bold; color:#2f506f;">
+                                    <td class="text-right" colspan="2">Total</td>
+                                    <td class="text-center"><?php echo number_format($totalNewLeads); ?></td>
+                                    <td class="text-center"><?php echo number_format($totalResponded); ?></td>
+                                    <td class="text-center"><?php echo number_format($totalTransfer); ?></td>
+                                    <td class="text-center"><?php echo number_format($totalHandling); ?></td>
+                                    <td class="text-center">
+                                        <?php echo html_escape($avgTotalLabel); ?>
+                                        <i class="la la-info-circle ml-1" style="cursor:help; color:#2f506f;" data-toggle="tooltip"
+                                           title="Average response time across all owners, weighted by each owner's Lead Responded count (owners with no measured response time are ignored)."></i>
+                                    </td>
+                                    <td></td>
+                                </tr>
+                            </tfoot>
+                        <?php } ?>
                     </table>
                 </div>
             </div>
@@ -248,8 +294,25 @@
 
     var leadReplyHourlyBase = '<?php echo base_url('Report/Lead_Reply_Activity_Hourly'); ?>';
 
+    // Mirror of the PHP format_duration_label used for the per-row Avg Response Time.
+    function formatLeadReplyDuration(seconds) {
+        if (seconds === null || seconds === undefined || seconds === '') { return '-'; }
+        seconds = parseInt(seconds, 10);
+        if (isNaN(seconds)) { return '-'; }
+        if (seconds < 60) { return seconds + ' sec'; }
+        if (seconds < 3600) { return Math.floor(seconds / 60) + ' min'; }
+        if (seconds < 86400) {
+            var h = Math.floor(seconds / 3600), m = Math.floor((seconds % 3600) / 60);
+            return m === 0 ? h + ' hr' : h + ' hr ' + m + ' min';
+        }
+        var d = Math.floor(seconds / 86400), rh = Math.floor((seconds % 86400) / 3600);
+        return rh === 0 ? d + ' day' : d + ' day ' + rh + ' hr';
+    }
+
     function renderLeadReplyActivityRows(rows) {
         var html = '';
+
+        $('#lead-reply-activity-table-foot').remove();
 
         if (!rows || rows.length === 0) {
             $('#lead-reply-activity-table-body').html('<tr><td colspan="8" class="text-center py-10">Lead reply activity not found for the selected filters.</td></tr>');
@@ -258,11 +321,22 @@
 
         var replyDate = $('input[name="reply_date"]').val() || '';
 
+        var totalNewLeads = 0, totalResponded = 0, totalTransfer = 0, totalHandling = 0;
+        var weightedSeconds = 0, weightedLeads = 0;
+
         $.each(rows, function(index, row) {
             var newLeadsPickedUp = Number(row.new_leads_picked_up) || 0;
             var leadResponded = Number(row.lead_responded) || 0;
             var transferOutLeads = Number(row.transfer_out_leads) || 0;
             var todayHandlingLeads = Number(row.today_handling_leads) || 0;
+            totalNewLeads += newLeadsPickedUp;
+            totalResponded += leadResponded;
+            totalTransfer += transferOutLeads;
+            totalHandling += todayHandlingLeads;
+            if (row.avg_response_time_seconds !== null && row.avg_response_time_seconds !== undefined && leadResponded > 0) {
+                weightedSeconds += Number(row.avg_response_time_seconds) * leadResponded;
+                weightedLeads += leadResponded;
+            }
             var hourlyUrl = leadReplyHourlyBase + '?owner=' + encodeURIComponent(row.owner_user_id) + '&reply_date=' + encodeURIComponent(replyDate);
             html += '<tr>';
             html += '<td class="text-center">' + (index + 1) + '</td>';
@@ -277,7 +351,20 @@
         });
 
         $('#lead-reply-activity-table-body').html(html);
-        $('#lead-reply-activity-table-body [data-toggle="tooltip"]').tooltip({ container: 'body', boundary: 'viewport', trigger: 'hover' });
+
+        var avgTotalSeconds = weightedLeads > 0 ? Math.round(weightedSeconds / weightedLeads) : null;
+        var footHtml = '<tr style="background:#e4edf5; font-weight:bold; color:#2f506f;">';
+        footHtml += '<td class="text-right" colspan="2">Total</td>';
+        footHtml += '<td class="text-center">' + totalNewLeads.toLocaleString() + '</td>';
+        footHtml += '<td class="text-center">' + totalResponded.toLocaleString() + '</td>';
+        footHtml += '<td class="text-center">' + totalTransfer.toLocaleString() + '</td>';
+        footHtml += '<td class="text-center">' + totalHandling.toLocaleString() + '</td>';
+        footHtml += '<td class="text-center">' + escapeHtml(formatLeadReplyDuration(avgTotalSeconds)) + ' <i class="la la-info-circle ml-1" style="cursor:help; color:#2f506f;" data-toggle="tooltip" title="Average response time across all owners, weighted by each owner\'s Lead Responded count (owners with no measured response time are ignored)."></i></td>';
+        footHtml += '<td></td>';
+        footHtml += '</tr>';
+        $('#lead-reply-activity-table').append('<tfoot id="lead-reply-activity-table-foot">' + footHtml + '</tfoot>');
+
+        $('#lead-reply-activity-table [data-toggle="tooltip"]').tooltip({ container: 'body', boundary: 'viewport', trigger: 'hover' });
     }
 
     function refreshLeadReplyActivityDashboard() {

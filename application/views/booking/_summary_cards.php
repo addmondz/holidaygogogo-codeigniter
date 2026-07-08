@@ -91,6 +91,8 @@
     #booking_summary_cards .sc-owner-tab + .sc-owner-tab { border-left:1px solid #B8C7E0; }
     #booking_summary_cards .sc-owner-tab.is-active { background:#6082B6; color:#fff; }
     #booking_summary_cards .sc-owner-tab:not(.is-active):hover { background:#DCE6F5; }
+    /* Description "See more" toggle: mobile-only (revealed in the media query). */
+    #booking_summary_cards .sc-owner-desc-toggle { display:none; }
     #booking_summary_cards .sc-owner-matrix th, #booking_summary_cards .sc-owner-matrix td { white-space:nowrap; vertical-align:middle; }
     #booking_summary_cards .sc-owner-matrix tbody tr:first-child td { font-weight:600; }
     /* Click-to-sort headers: base double-arrow hint, coloured single arrow when active. */
@@ -178,6 +180,19 @@
         /* Agent Score: stack score above the Top-5 list on narrow screens. */
         #booking_summary_cards .agent-score-split { flex-direction: column; gap: 10px; }
         #booking_summary_cards .agent-score-board { border-left: none; padding-left: 0; border-top: 1px dashed #EBEDF3; padding-top: 10px; }
+        /* Owner Agent-Performance period toggle: the 6-option segmented control
+           overflows the card header on phones and clips "Year" / "Same Period
+           Last Year". Let the header wrap so the toggle drops to its own
+           full-width line, and turn the joined segments into wrapping pills so
+           every option stays visible without side-scrolling. */
+        #booking_summary_cards .summary-card-header { flex-wrap: wrap; }
+        #booking_summary_cards .sc-owner-toggle { width: 100%; margin: 8px 0 0; gap: 6px; border: none; border-radius: 0; overflow: visible; flex-wrap: wrap; }
+        #booking_summary_cards .sc-owner-tab { flex: 1 1 auto; text-align: center; border: 1px solid #B8C7E0; border-radius: 5px; white-space: nowrap; }
+        /* Owner matrix description: long on phones, so clamp to 3 lines with a
+           "See more / See less" toggle. Expanded state lifts the clamp. */
+        #booking_summary_cards .sc-owner-desc { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
+        #booking_summary_cards .sc-owner-desc.is-expanded { -webkit-line-clamp: unset; display: block; overflow: visible; }
+        #booking_summary_cards .sc-owner-desc-toggle { display: inline-block; background: none; border: none; color: #6082B6; font-weight: 600; font-size: 13px; padding: 0 0 4px; cursor: pointer; }
     }
 </style>
 <?php
@@ -713,7 +728,8 @@
                         </span>
                     </div>
                     <div class="card-body summary-card-body">
-                        <div class="summary-sub mb-2">One row per sales agent across all performance metrics for the selected period, sorted by Agent Score &mdash; <strong>click any column header to re-sort</strong> (click again to reverse). The Yesterday / Day / Week / Month / Year / Same&nbsp;Period&nbsp;Last&nbsp;Year toggle re-scopes every column at once (Yesterday behaves like Day, Same Period Last Year like Year). Some columns are only reported for certain periods &mdash; a &ldquo;&mdash;&rdquo; means that column doesn&rsquo;t apply to the selected period (e.g. Conversion &amp; Cancellation show only on <strong>Year</strong>; Follow-up &amp; Agent Score only on <strong>Month</strong>; Reply Time / New Leads / Served / Outbound on Day / Week / Month; Sales on Month / Year; 1st Reply on all periods).</div>
+                        <div class="summary-sub mb-2 sc-owner-desc" id="sc-owner-desc">One row per sales agent across all performance metrics for the selected period, sorted by Agent Score &mdash; <strong>click any column header to re-sort</strong> (click again to reverse). The Yesterday / Day / Week / Month / Year / Same&nbsp;Period&nbsp;Last&nbsp;Year toggle re-scopes every column at once (Yesterday behaves like Day, Same Period Last Year like Year). Some columns are only reported for certain periods &mdash; a &ldquo;&mdash;&rdquo; means that column doesn&rsquo;t apply to the selected period. Every column reports on all periods <em>except</em> <strong>Reply Time</strong> &amp; <strong>Served</strong> (Day / Week / Month only &mdash; a Year window scans too many message rows) and <strong>Agent Score</strong> (Day / Week / Month only). Note that Conversion &amp; Cancellation on very short windows read low because a lead / booking needs time to convert or cancel.</div>
+                        <button type="button" class="sc-owner-desc-toggle" data-target="sc-owner-desc" aria-expanded="false">See more</button>
                         <div class="table-responsive">
                             <table class="table table-sm summary-table sc-owner-matrix">
                                 <thead>
@@ -1336,6 +1352,12 @@ $(function() {
     $('#booking_summary_cards .ghl-last-sync').on('click', function(e) {
         e.stopPropagation();
     });
+    // Mobile "See more / See less" for the owner matrix description (clamped to
+    // 3 lines by CSS on phones). Toggles the clamp and swaps the label.
+    $('#booking_summary_cards').on('click', '.sc-owner-desc-toggle', function() {
+        var expanded = $('#' + $(this).data('target')).toggleClass('is-expanded').hasClass('is-expanded');
+        $(this).text(expanded ? 'See less' : 'See more').attr('aria-expanded', expanded);
+    });
     // Owner matrix: global Day/Week/Month/Year toggle. Re-requests the whole
     // matrix scoped to the chosen period (remembered in window._ownerPeriod).
     $('#booking_summary_cards').on('click', '.sc-owner-tab', function() {
@@ -1795,20 +1817,30 @@ $(function() {
         if(ownerMatrixBody) {
             // Periods each column is defined for (everything else renders "—").
             var ownerColPeriods = {
+                // Reply, Served and Score dash on Year (Reply/Served scan raw message
+                // rows — a Year window OOMs / runs long; Year has no fair Score inputs).
+                // Every other column is reported on all periods.
                 reply:    ['day','week','month'],
                 pickup:   ['day','week','month','year'],
-                newleads: ['day','week','month'],
+                newleads: ['day','week','month','year'],
                 served:   ['day','week','month'],
-                convc:    ['year'],
-                conva:    ['year'],
-                outbound: ['day','week','month'],
-                sales:    ['month','year'],
-                followup: ['month'],
-                cancel:   ['year'],
-                score:    ['month']
+                convc:    ['day','week','month','year'],
+                conva:    ['day','week','month','year'],
+                outbound: ['day','week','month','year'],
+                sales:    ['day','week','month','year'],
+                followup: ['day','week','month','year'],
+                cancel:   ['day','week','month','year'],
+                score:    ['day','week','month']
             };
             var ownerP = m.owner_period || window._ownerPeriod || 'month';
-            var inP = function(col) { return ownerColPeriods[col].indexOf(ownerP) !== -1; };
+            // Gate columns off the base granularity the server actually computed at,
+            // not the raw toggle id: "Yesterday" folds to Day and "Same Period Last
+            // Year" to Year (mirrors summary_resolve_owner_period). Without this the
+            // yesterday/lastyear toggles match no column list and every cell renders
+            // "—" despite the server returning real data.
+            var ownerBase = m.owner_period_base
+                || (ownerP === 'yesterday' ? 'day' : (ownerP === 'lastyear' ? 'year' : ownerP));
+            var inP = function(col) { return ownerColPeriods[col].indexOf(ownerBase) !== -1; };
             // cell(col, rendered-html, raw) -> the html (or a right-aligned em-dash
             // when the column doesn't apply). `raw` is stashed in data-sort so the
             // header click-sort compares real numbers, not formatted strings; cells

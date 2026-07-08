@@ -123,9 +123,15 @@ class Booking_Model extends CI_Model
 		$tomorrow = date('Y-m-d', strtotime('+1 day'));
 		$floor    = date('Y') . '-03-01';
 
-		$range = function($col) use ($bucket, $today, $tomorrow, $floor) {
-			if($bucket === 'overdue')  return "{$col} >= '{$floor}' AND {$col} < '{$today}'";
-			if($bucket === 'today')    return "{$col} = '{$today}'";
+		// 3pm cutoff (mirrors the card in Booking::ajax_summary_cards): a today
+		// deadline is "today" only before 15:00; at/after 15:00 it lapses into
+		// "overdue" (overdue widens to <= today, today matches nothing).
+		$after3pm = ((int) date('H') >= 15);
+		$range = function($col) use ($bucket, $today, $tomorrow, $floor, $after3pm) {
+			if($bucket === 'overdue')  return $after3pm
+				? "{$col} >= '{$floor}' AND {$col} <= '{$today}'"
+				: "{$col} >= '{$floor}' AND {$col} < '{$today}'";
+			if($bucket === 'today')    return $after3pm ? "1 = 0" : "{$col} = '{$today}'";
 			if($bucket === 'tomorrow') return "{$col} = '{$tomorrow}'";
 			return null;
 		};
@@ -834,6 +840,50 @@ class Booking_Model extends CI_Model
 		return $this->db->get('booking')->row_array();
 	}
 
+	// Freeze each row's point-in-time TeamID: the team the credited agent
+	// (SalesAgent / TC1) is in RIGHT NOW is snapshotted onto booking.TeamID when
+	// the agent is first set or actually changes, and left untouched otherwise.
+	// This keeps a sale attributed to the team that earned it even after the
+	// agent later switches team or leaves. See booking_team_snapshot_helper.php.
+	private function _apply_team_snapshot(&$booking_data)
+	{
+		if (empty($booking_data) || !is_array($booking_data)) {
+			return;
+		}
+		$this->load->helper('booking_team_snapshot');
+
+		foreach ($booking_data as $key => $row) {
+			// SalesAgent absent from this write -> leave the frozen TeamID as-is.
+			if (!is_array($row) || !array_key_exists('SalesAgent', $row)) {
+				continue;
+			}
+			$new_sa = (int) $row['SalesAgent'];
+
+			// Previously stored credited agent (null when this is a fresh insert).
+			$prev_sa = null;
+			if (!empty($row['BookingID'])) {
+				$cur = $this->db->select('SalesAgent')
+					->where('BookingID', $row['BookingID'])
+					->get('booking')->row();
+				$prev_sa = $cur ? $cur->SalesAgent : null;
+			}
+
+			// The new agent's CURRENT team — the snapshot source.
+			$team_id = null;
+			if ($new_sa > 0) {
+				$a = $this->db->select('TeamID')
+					->where('AdminID', $new_sa)
+					->get('admin')->row();
+				$team_id = $a ? $a->TeamID : null;
+			}
+
+			$decision = booking_team_snapshot($new_sa, $prev_sa, $team_id);
+			if ($decision['write']) {
+				$booking_data[$key]['TeamID'] = $decision['team_id'];
+			}
+		}
+	}
+
 	function Create()
 	{
 		// Load booking flow helper
@@ -868,6 +918,9 @@ class Booking_Model extends CI_Model
 			}
 		}
 		
+		// Freeze the point-in-time team of the credited agent onto each row.
+		$this->_apply_team_snapshot($booking_data);
+
 		$this->db->insert_batch('booking', json_decode(json_encode($booking_data)));
 		$booking_id = $this->db->insert_id();
 
@@ -1312,6 +1365,10 @@ class Booking_Model extends CI_Model
 				}
 			}
 		}
+
+		// Re-snapshot the team only if the credited agent (TC1) actually changed;
+		// an unrelated edit leaves the frozen booking.TeamID untouched.
+		$this->_apply_team_snapshot($booking_data);
 
 		$this->db->update_batch('booking', json_decode(json_encode($booking_data)), 'BookingID');
 

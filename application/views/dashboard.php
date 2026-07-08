@@ -806,6 +806,24 @@
                             return '<span class="okpi-ly">LY &mdash;</span>';
                         };
                         $period_labels = array('yesterday' => 'Yesterday', 'today' => 'Today', 'week' => 'This Week', 'month' => 'This Month', 'year' => 'This Year');
+                        // Actual-vs-target cell: amount / target + % and a bar.
+                        // The bar caps at 100% visually but the % label keeps the
+                        // true figure (over-achievement allowed). No target => plain
+                        // amount with a "no target" note.
+                        $tgt_cell = function($actual, $target) use ($rm) {
+                            $actual = (float)$actual; $target = (float)$target;
+                            if($target <= 0) {
+                                return '<div class="tgt-line"><span class="team-amt">' . $rm($actual) . '</span></div>'
+                                     . '<div class="kpi-sub">No target set</div>';
+                            }
+                            $pct = round(($actual / $target) * 100);
+                            $w   = max(0, min(100, ($actual / $target) * 100));
+                            $hit = $actual >= $target;
+                            return '<div class="tgt-line"><span class="team-amt">' . $rm($actual) . '</span>'
+                                 . ' <span class="text-muted">/ ' . $rm($target) . '</span>'
+                                 . ' <span class="tgt-pct ' . ($hit ? 'is-hit' : 'is-miss') . '">' . $pct . '%</span></div>'
+                                 . '<div class="tgt-track"><div class="tgt-fill' . ($hit ? ' is-hit' : '') . '" style="width:' . $w . '%;"></div></div>';
+                        };
                     ?>
                     <style>
                         .owner-kpi .card.card-custom > .card-header { min-height:56px; padding-top:8px; padding-bottom:8px; display:flex; align-items:center; justify-content:flex-start; }
@@ -827,6 +845,13 @@
                         .owner-kpi .okpi-delta.is-down { color:#C0392B; background:#FBEAEA; }
                         .owner-kpi .okpi-delta.is-flat { color:#5C6473; background:#EDEFF3; }
                         .owner-kpi .reason-bar { height:8px; border-radius:4px; background:#6082B6; }
+                        .owner-kpi .tgt-line { font-size:12px; color:#3F4254; white-space:nowrap; }
+                        .owner-kpi .tgt-track { height:8px; border-radius:4px; background:#E4E9F2; overflow:hidden; margin-top:4px; }
+                        .owner-kpi .tgt-fill { height:100%; border-radius:4px; background:#3699FF; }
+                        .owner-kpi .tgt-fill.is-hit { background:#2F6F4F; }
+                        .owner-kpi .tgt-pct { font-weight:700; margin-left:4px; }
+                        .owner-kpi .tgt-pct.is-hit { color:#2F6F4F; }
+                        .owner-kpi .tgt-pct.is-miss { color:#C0392B; }
                     </style>
                     <div class="row pt-7 pl-3 pr-3 mb-5 owner-kpi" style="background-color:#EEF3FB;">
 
@@ -882,6 +907,56 @@
                                         <?php } ?>
                                     </table>
                                     <div class="kpi-sub mt-2">Booking-confirmation value (SUM of NetTotal) by the sales agent's team, by booking date, regardless of payment received. &ldquo;Unassigned&rdquo; = agents outside any active team (e.g. owner's own bookings), so the rows reconcile to the company total. Excludes quotation, cancelled and drafts. LY = same period last year.</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <?php // 1b. Total sales vs target by team — this month & this year. ?>
+                        <div class="col-md-12">
+                            <div class="card card-custom gutter-b">
+                                <div class="card-header border-0" style="background-color:#C3B1E1;">
+                                    <h3>Total Sales vs Target by Team</h3>
+                                </div>
+                                <div class="card-body" style="overflow-x:auto;">
+                                    <table class="table table-sm owner-team">
+                                        <thead>
+                                            <tr>
+                                                <th>Team</th>
+                                                <th>This Month (<?php echo date('M Y'); ?>)</th>
+                                                <th>This Year (<?php echo date('Y'); ?>)</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <?php
+                                                $tgt_sum = array('m_a' => 0, 'm_t' => 0, 'y_a' => 0, 'y_t' => 0);
+                                                if(empty($owner_team_sales)) { ?>
+                                                    <tr><td colspan="3" class="text-center text-muted">No teams found.</td></tr>
+                                                <?php } else {
+                                                    foreach($owner_team_sales as $tid => $team) {
+                                                        $mt = isset($owner_team_targets[$tid]['month']) ? $owner_team_targets[$tid]['month'] : 0;
+                                                        $yt = isset($owner_team_targets[$tid]['year'])  ? $owner_team_targets[$tid]['year']  : 0;
+                                                        $tgt_sum['m_a'] += $team['cur']['month']; $tgt_sum['m_t'] += $mt;
+                                                        $tgt_sum['y_a'] += $team['cur']['year'];  $tgt_sum['y_t'] += $yt;
+                                                    ?>
+                                                        <tr<?php echo $tid === 'unassigned' ? ' class="team-unassigned"' : ''; ?>>
+                                                            <td class="font-weight-bold"><?php echo htmlspecialchars($team['name']); ?></td>
+                                                            <td><?php echo $tgt_cell($team['cur']['month'], $mt); ?></td>
+                                                            <td><?php echo $tgt_cell($team['cur']['year'], $yt); ?></td>
+                                                        </tr>
+                                                    <?php }
+                                                } ?>
+                                        </tbody>
+                                        <?php if(!empty($owner_team_sales)) { ?>
+                                        <tfoot>
+                                            <tr>
+                                                <td>All Teams</td>
+                                                <td><?php echo $tgt_cell($tgt_sum['m_a'], $tgt_sum['m_t']); ?></td>
+                                                <td><?php echo $tgt_cell($tgt_sum['y_a'], $tgt_sum['y_t']); ?></td>
+                                            </tr>
+                                        </tfoot>
+                                        <?php } ?>
+                                    </table>
+                                    <div class="kpi-sub mt-2">Actual booking-confirmation sales vs target, for the current month and year. A team's target is the sum of its members' sales targets (set in Admin). Green = target met. &ldquo;Unassigned&rdquo; agents have no team target.</div>
                                 </div>
                             </div>
                         </div>
@@ -965,7 +1040,7 @@
                                         <div class="kpi-cell"><div class="lbl">This Month</div><div class="val"><?php echo $rm($owner_payment_out_pending['month']); ?></div></div>
                                         <div class="kpi-cell"><div class="lbl">This Year</div><div class="val"><?php echo $rm($owner_payment_out_pending['year']); ?></div></div>
                                     </div>
-                                    <div class="kpi-sub mt-2">Pending supplier pay-outs, scheduled by payment date.</div>
+                                    <div class="kpi-sub mt-2">All pending supplier pay-outs due by each date (overdue included), awaiting approval.</div>
                                 </div>
                             </div>
                         </div>

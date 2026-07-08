@@ -11,6 +11,14 @@
  *   - today    : next_deadline  =  today
  *   - tomorrow : next_deadline  =  today+1
  *
+ * 3pm cutoff: a deadline falling on TODAY is only "today" while there is
+ * still time to approve the money-in (before 15:00). At/after 15:00 the
+ * same-day deadline has effectively lapsed, so it moves into "overdue".
+ * The window/scope are unchanged — only the today/overdue boundary shifts:
+ *   - before 15:00 : overdue = nd < today            , today = nd = today
+ *   - at/after 15:00: overdue = nd <= today (swallows), today = (empty)
+ * "tomorrow" (nd = today+1) is never affected by the cutoff.
+ *
  * Unlike supplier payouts (whose deadline lives on the payment row),
  * customer payment deadlines live on the BOOKING. The operative "next
  * due" deadline depends on where the BC is in the payment flow:
@@ -115,26 +123,35 @@ $out = "(booking.NetTotal - COALESCE((SELECT SUM(p.Credit) FROM payment p"
      . " AND (p.Type IS NULL OR p.Type != 'AGENT COMMISSION FROM SUPPLIER')), 0))";
 
 // Three buckets, computed in one pass — mirrors the controller's CASE
-// aggregation so the headline reconciles with the windowed table.
-$bucketStmt = $pdo->prepare("
-    SELECT
-        SUM(CASE WHEN t.nd <  :today THEN 1 ELSE 0 END)                          AS overdue_cnt,
-        COALESCE(SUM(CASE WHEN t.nd <  :today THEN t.outstanding ELSE 0 END), 0) AS overdue_due,
-        SUM(CASE WHEN t.nd =  :today THEN 1 ELSE 0 END)                          AS today_cnt,
-        COALESCE(SUM(CASE WHEN t.nd =  :today THEN t.outstanding ELSE 0 END), 0) AS today_due,
-        SUM(CASE WHEN t.nd =  :tmr   THEN 1 ELSE 0 END)                          AS tomorrow_cnt,
-        COALESCE(SUM(CASE WHEN t.nd =  :tmr   THEN t.outstanding ELSE 0 END), 0) AS tomorrow_due
-    FROM (
-        SELECT {$nd} AS nd, {$out} AS outstanding
-        FROM booking
-        WHERE booking.CancelStatus = 'N'
-          AND booking.Status IN ('P','PP')
-    ) t
-    WHERE t.nd BETWEEN :start AND :tmr2
-      AND t.outstanding > 0
-");
-$bucketStmt->execute(array(':today' => $today, ':tmr' => $tomorrow, ':start' => $win_start, ':tmr2' => $tomorrow));
-$b = $bucketStmt->fetch(PDO::FETCH_ASSOC);
+// aggregation so the headline reconciles with the windowed table. The 3pm
+// cutoff only shifts the overdue/today boundary, so the query is
+// parameterised by the overdue comparison operator and the today match
+// value (a sentinel date empties the today bucket after the cutoff),
+// exactly as the controller does.
+$runBuckets = function($overdue_op, $today_val) use ($pdo, $nd, $out, $today, $tomorrow, $win_start) {
+    $stmt = $pdo->prepare("
+        SELECT
+            SUM(CASE WHEN t.nd {$overdue_op} :today THEN 1 ELSE 0 END)                          AS overdue_cnt,
+            COALESCE(SUM(CASE WHEN t.nd {$overdue_op} :today THEN t.outstanding ELSE 0 END), 0) AS overdue_due,
+            SUM(CASE WHEN t.nd =  :todayval THEN 1 ELSE 0 END)                          AS today_cnt,
+            COALESCE(SUM(CASE WHEN t.nd =  :todayval THEN t.outstanding ELSE 0 END), 0) AS today_due,
+            SUM(CASE WHEN t.nd =  :tmr   THEN 1 ELSE 0 END)                          AS tomorrow_cnt,
+            COALESCE(SUM(CASE WHEN t.nd =  :tmr   THEN t.outstanding ELSE 0 END), 0) AS tomorrow_due
+        FROM (
+            SELECT {$nd} AS nd, {$out} AS outstanding
+            FROM booking
+            WHERE booking.CancelStatus = 'N'
+              AND booking.Status IN ('P','PP')
+        ) t
+        WHERE t.nd BETWEEN :start AND :tmr2
+          AND t.outstanding > 0
+    ");
+    $stmt->execute(array(':today' => $today, ':todayval' => $today_val, ':tmr' => $tomorrow, ':start' => $win_start, ':tmr2' => $tomorrow));
+    return $stmt->fetch(PDO::FETCH_ASSOC);
+};
+
+// Before 15:00 — overdue = nd < today, today = nd = today.
+$b = $runBuckets('<', $today);
 
 // Per-booking breakdown across the whole window, earliest deadline first
 // (most overdue leads), ties broken by largest outstanding.
@@ -206,5 +223,22 @@ assert_eq('buckets partition: total amount', 5000.0,  $bucket_total);
 $sum = 0.0;
 foreach ($rows as $r) { $sum += (float) $r['total_due']; }
 assert_eq('partition: per-booking sums to windowed total', $bucket_total, $sum);
+
+// ---- 3pm cutoff: today-deadline BCs lapse into overdue ----------------
+// At/after 15:00 the controller widens overdue to nd <= today and empties
+// the today bucket (sentinel date). BC2 (1500) + BC9 (1000), both due today,
+// join BC1 (1000) + BC8 (700) in overdue; tomorrow (BC3) is untouched.
+$a = $runBuckets('<=', '0000-00-00');
+assert_eq('after-cut overdue count (BC1+BC8+BC2+BC9)', 4,      (int)   $a['overdue_cnt']);
+assert_eq('after-cut overdue total (1700+2500)',       4200.0, (float) $a['overdue_due']);
+assert_eq('after-cut today count (empty)',             0,      (int)   $a['today_cnt']);
+assert_eq('after-cut today total (empty)',             0.0,    (float) $a['today_due']);
+assert_eq('after-cut tomorrow count (BC3 unchanged)',  1,      (int)   $a['tomorrow_cnt']);
+assert_eq('after-cut tomorrow total (800 unchanged)',  800.0,  (float) $a['tomorrow_due']);
+// Still a clean partition of the same windowed set.
+$a_cnt   = (int)$a['overdue_cnt'] + (int)$a['today_cnt'] + (int)$a['tomorrow_cnt'];
+$a_total = (float)$a['overdue_due'] + (float)$a['today_due'] + (float)$a['tomorrow_due'];
+assert_eq('after-cut buckets partition: total count',  5,      $a_cnt);
+assert_eq('after-cut buckets partition: total amount', 5000.0, $a_total);
 
 echo "\nAll assertions passed.\n";

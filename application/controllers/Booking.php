@@ -846,6 +846,13 @@ class Booking extends MY_Controller
 		// param).
 		$cust_due_end   = date('Y-m-d', strtotime('+1 day'));  // tomorrow — window upper bound
 		$cust_due_start = date('Y') . '-03-01';                // overdue lookback floor: 1 March, current year
+		// 3pm cutoff: a deadline falling on today is only "today" while the
+		// money-in can still be approved (before 15:00). At/after 15:00 the
+		// same-day deadline has lapsed and moves into "overdue", so overdue
+		// widens to nd <= today and the today bucket empties (sentinel date).
+		$cust_after3pm  = ((int) date('H') >= 15);
+		$cust_overdue_op = $cust_after3pm ? '<=' : '<';
+		$cust_today_val  = $cust_after3pm ? '0000-00-00' : $today;
 		$cust_nd  = "(CASE WHEN booking.Status = 'P' THEN COALESCE(booking.DepositDeadline, booking.FullPaymentDeadline) ELSE booking.FullPaymentDeadline END)";
 		$cust_out = "(booking.NetTotal - COALESCE((SELECT SUM(p.Credit) FROM payment p"
 			. " WHERE p.BookingID = booking.BookingID"
@@ -854,8 +861,8 @@ class Booking extends MY_Controller
 		$tc_own = "(booking.SalesAgent = ? OR booking.SalesAgent2 = ?)";
 		$row = $this->db->query(
 			"SELECT
-			    SUM(CASE WHEN t.nd <  ? THEN 1 ELSE 0 END) AS overdue_cnt,
-			    COALESCE(SUM(CASE WHEN t.nd <  ? THEN t.outstanding ELSE 0 END), 0) AS overdue_due,
+			    SUM(CASE WHEN t.nd {$cust_overdue_op} ? THEN 1 ELSE 0 END) AS overdue_cnt,
+			    COALESCE(SUM(CASE WHEN t.nd {$cust_overdue_op} ? THEN t.outstanding ELSE 0 END), 0) AS overdue_due,
 			    SUM(CASE WHEN t.nd =  ? THEN 1 ELSE 0 END) AS today_cnt,
 			    COALESCE(SUM(CASE WHEN t.nd =  ? THEN t.outstanding ELSE 0 END), 0) AS today_due,
 			    SUM(CASE WHEN t.nd =  ? THEN 1 ELSE 0 END) AS tomorrow_cnt,
@@ -869,7 +876,7 @@ class Booking extends MY_Controller
 			 ) t
 			 WHERE t.nd BETWEEN ? AND ?
 			   AND t.outstanding > 0",
-			array($today, $today, $today, $today, $cust_due_end, $cust_due_end, $admin_id, $admin_id, $cust_due_start, $cust_due_end)
+			array($today, $today, $cust_today_val, $cust_today_val, $cust_due_end, $cust_due_end, $admin_id, $admin_id, $cust_due_start, $cust_due_end)
 		)->row();
 		$cards['customer_payment_due_soon'] = array(
 			'overdue'  => array('count' => (int)$row->overdue_cnt,  'total_due' => $money($row->overdue_due),  'link' => $base . $qs(array('customer_payment' => 'overdue',  'status' => 'A'))),
@@ -2453,6 +2460,12 @@ class Booking extends MY_Controller
 			// drill-down (?customer_payment=...&status=A) agrees with the card.
 			$cust_due_end   = date('Y-m-d', strtotime('+1 day'));  // tomorrow — window upper bound
 			$cust_due_start = date('Y') . '-03-01';                // overdue lookback floor: 1 March, current year
+			// 3pm cutoff: a today deadline is only "today" while the money-in
+			// can still be approved (before 15:00); at/after 15:00 it lapses
+			// into "overdue" (overdue widens to nd <= today, today empties).
+			$cust_after3pm  = ((int) date('H') >= 15);
+			$cust_overdue_op = $cust_after3pm ? '<=' : '<';
+			$cust_today_val  = $cust_after3pm ? '0000-00-00' : $today;
 			$cust_nd  = "(CASE WHEN booking.Status = 'P' THEN COALESCE(booking.DepositDeadline, booking.FullPaymentDeadline) ELSE booking.FullPaymentDeadline END)";
 			$cust_out = "(booking.NetTotal - COALESCE((SELECT SUM(p.Credit) FROM payment p"
 				. " WHERE p.BookingID = booking.BookingID"
@@ -2460,8 +2473,8 @@ class Booking extends MY_Controller
 				. " AND (p.Type IS NULL OR p.Type != 'AGENT COMMISSION FROM SUPPLIER')), 0))";
 			$row = $this->db->query(
 				"SELECT
-				    SUM(CASE WHEN t.nd <  ? THEN 1 ELSE 0 END) AS overdue_cnt,
-				    COALESCE(SUM(CASE WHEN t.nd <  ? THEN t.outstanding ELSE 0 END), 0) AS overdue_due,
+				    SUM(CASE WHEN t.nd {$cust_overdue_op} ? THEN 1 ELSE 0 END) AS overdue_cnt,
+				    COALESCE(SUM(CASE WHEN t.nd {$cust_overdue_op} ? THEN t.outstanding ELSE 0 END), 0) AS overdue_due,
 				    SUM(CASE WHEN t.nd =  ? THEN 1 ELSE 0 END) AS today_cnt,
 				    COALESCE(SUM(CASE WHEN t.nd =  ? THEN t.outstanding ELSE 0 END), 0) AS today_due,
 				    SUM(CASE WHEN t.nd =  ? THEN 1 ELSE 0 END) AS tomorrow_cnt,
@@ -2475,7 +2488,7 @@ class Booking extends MY_Controller
 				 ) t
 				 WHERE t.nd BETWEEN ? AND ?
 				   AND t.outstanding > 0",
-				array($today, $today, $today, $today, $cust_due_end, $cust_due_end, $cust_due_start, $cust_due_end)
+				array($today, $today, $cust_today_val, $cust_today_val, $cust_due_end, $cust_due_end, $cust_due_start, $cust_due_end)
 			)->row();
 			// status=A scopes the linked list to live BCs and suppresses the
 			// no-status default (AfterSalesService='PENDING') that would otherwise
@@ -2764,18 +2777,17 @@ class Booking extends MY_Controller
 			}
 			$tables['product_sales'] = $prod_out;
 
-			// Sales by Team (Month) — group NetTotal by the SalesAgent's Team via
-			// SalesAgent -> admin.TeamID -> team.TeamID. Agents with no Team
-			// collapse into a single "Unassigned" row so the breakdown reconciles
-			// to the team-wide total.
+			// Sales by Team (Month) — group NetTotal by the FROZEN booking.TeamID snapshot
+			// (team the sale was credited under), NOT the agent's live admin.TeamID, so
+			// an agent moving team later doesn't rewrite past team totals; NULL or
+			// inactive-team snapshots collapse into a single "Unassigned" row.
 			$team_rows = $this->db->query(
 				"SELECT COALESCE(t.TeamID, 0) AS team_id,
 				        COALESCE(t.Name, 'Unassigned') AS team_name,
 				        COUNT(*) AS cnt,
 				        COALESCE(SUM(booking.NetTotal), 0) AS total
 				 FROM booking
-				 LEFT JOIN admin agent ON agent.AdminID = booking.SalesAgent
-				 LEFT JOIN team t       ON t.TeamID      = agent.TeamID
+				 LEFT JOIN team t ON t.TeamID = booking.TeamID AND t.Status='Y'
 				 WHERE booking.BookingConfirmationTitle='BOOKING CONFIRMATION'
 				   AND booking.CancelStatus='N' AND booking.Status!='N'
 				   AND CAST(booking.InsertDate AS DATE) BETWEEN ? AND ?
@@ -2853,6 +2865,12 @@ class Booking extends MY_Controller
 			// Echo the resolved toggle back so the front-end can highlight the
 			// active period tab (covers both the default and the bad-input fallback).
 			$meta['owner_period']       = $owner_period['period'];
+			// Column-granularity the matrix was actually computed at: "Yesterday"
+			// folds to Day and "Same Period Last Year" to Year (see
+			// summary_resolve_owner_period). The front-end gates which columns apply
+			// off THIS base, not the raw toggle id — otherwise the yesterday/lastyear
+			// toggles match no column list and render an all-"—" row.
+			$meta['owner_period_base']  = isset($owner_period['base']) ? $owner_period['base'] : $owner_period['period'];
 			$meta['owner_period_label'] = $owner_period['label'];
 
 			$row = $this->db
@@ -3689,21 +3707,10 @@ class Booking extends MY_Controller
 			if(!isset($name_by_admin[(int)$r->AdminID])) { $name_by_admin[(int)$r->AdminID] = $r->Name; }
 		}
 
-		// Owner (10) and TC Lead (25) are included in the calculation but NOT shown:
-		// their metrics still set the 100-anchors (so sales agents are benchmarked
-		// against them), but they are omitted from the ranked leaderboard via the
-		// 'hidden' flag below. Level-20 sales agents are the only visible rows.
-		$hidden_admins = array();
-		foreach($this->db->query(
-			"SELECT AdminID FROM admin WHERE Level IN ('10','25') AND Status='Y'"
-		)->result() as $r) {
-			$hidden_admins[(int)$r->AdminID] = true;
-		}
-		// The logged-in viewer is never hidden from their OWN card: an Owner (10)
-		// or TC Lead (25) viewing the sales-agent cards on the booking listing must
-		// see their own score/rank and appear (as "You") on their leaderboard. They
-		// stay hidden on every other agent's board (only the viewer is revealed).
-		unset($hidden_admins[(int)$admin_id]);
+		// Everyone in the race is shown on the leaderboard — Sales Agent (20),
+		// Owner (10) and TC Lead (25) alike — so the "of N agents" total is
+		// identical for every viewer, no matter who is looking. The only thing
+		// that removes someone from the race is the owner-managed excluded list.
 
 		// 5. Fold everything into one row per AdminID. Reply/pickup are
 		//    lead-weighted so a TC owning several GHL inboxes aggregates fairly.
@@ -3808,9 +3815,9 @@ class Booking extends MY_Controller
 				'pickup_n'      => $row['pickup_n'],
 				'leads_n'       => $row['leads'],
 				'owned_n'       => $row['fu_owned'],
-				// Owner (10) / TC Lead (25) anchor the benchmark but are kept off the
-				// leaderboard — included in the calculation, not displayed.
-				'hidden'        => isset($hidden_admins[$aid]),
+				// Nobody is hidden here — every level is shown, so the total is the
+				// same for all viewers. Only the excluded list removes an agent.
+				'hidden'        => false,
 				// Owner-excluded agents drop out of the benchmark + leaderboard.
 				'excluded'      => isset($excluded[$aid]),
 			);
@@ -3883,9 +3890,10 @@ class Booking extends MY_Controller
 		$this->load->model('Report_Model');
 
 		$filters = array('start_date' => $start, 'end_date' => $end);
+		// Only Reply time and Served stay Day / Week / Month (they scan raw message
+		// rows — a Year window would OOM / run long); every other column is fetched
+		// on all periods. $is_dwm gates just those two heavy sources.
 		$is_dwm = in_array($period, array('day', 'week', 'month'), true);
-		$is_my  = in_array($period, array('month', 'year'), true);
-		$is_year = ($period === 'year');
 
 		// Ungated ('1=1') gives new-lead totals (D/W/M) + ungated conversion (Year)
 		// + the Month score's conversion input — needed on every period, and it is a
@@ -3895,46 +3903,46 @@ class Booking extends MY_Controller
 
 		// Reply time uses the Message-Log reply-pair metric (SAME source as the TC
 		// "Avg Reply Time to Inbound" card). It loads every message row in the window
-		// and pairs them in PHP, so a full YEAR (~250k rows) exhausts memory — and
-		// there is no year reply card to match anyway. Reported on Day / Week / Month
-		// only; skipped on Year.
+		// and pairs them in PHP, so a full YEAR (~290k rows) exhausts the PHP memory
+		// limit (measured OOM) — the one column that MUST stay Day / Week / Month and
+		// dash on Year. All other columns open on every period.
 		$reply         = $is_dwm ? $this->Report_Model->Ghl_Messages_Avg_Reply_By_Agent($start, $end) : array();
-		// Follow-up source feeds Served (D/W/M), Follow-up % (Month) and the Month
-		// score only — never Year, so skip it there.
-		$followup      = $is_dwm ? $this->Report_Model->Lead_Ownership_By_Agent($filters) : array();
+		// Follow-up source (Follow-up % + Served fallback). A grouped per-agent query
+		// (~17k ownership rows/year), so it is cheap enough to run on every period.
+		$followup      = $this->Report_Model->Lead_Ownership_By_Agent($filters);
 
-		// Period-gated: skip the query entirely when the column would only show "-".
-		// Gated conversion (Conv % credited) is reported on Year only.
-		$leads_gated   = $is_year ? $this->Report_Model->Lead_Dashboard_By_Agent($filters) : array();
-		// Outbound is reported on Day / Week / Month only.
-		$outbound      = $is_dwm  ? $this->Report_Model->Outbound_Messages_By_Agent($start, $end) : array();
-		// Cancellation is reported on Year only.
-		$cancellation  = $is_year ? $this->Report_Model->Cancellation_By_Agent($start, $end) : array();
+		// Gated conversion (Conv % credited) — same cheap grouped shape as the ungated
+		// leads query above, so run it on every period (not Year-only).
+		$leads_gated   = $this->Report_Model->Lead_Dashboard_By_Agent($filters);
+		// Outbound is reported on every period — a DB-side grouped COUNT over
+		// ghl_messages, so even the Year window is a single cheap aggregate (unlike
+		// Reply, which loads raw rows into PHP). Fetched for Day / Week / Month / Year.
+		$outbound      = $this->Report_Model->Outbound_Messages_By_Agent($start, $end);
+		// Cancellation — grouped per-agent aggregate over booking, reported every period.
+		$cancellation  = $this->Report_Model->Cancellation_By_Agent($start, $end);
 
 		// Admin-keyed credited sales — actual BC value, NO fully-paid gate (mirrors
-		// the TC Sales-Actual rule). Reported (and used by the score) on Month /
-		// Year only; skipped on Day / Week. Scoped to the TC sales-agent role
+		// the TC Sales-Actual rule). Fetched on every period: it is the Agent Score's
+		// biggest input (Sales = 45% of the composite), so the short-window score has a
+		// real value instead of capping at ~55. Scoped to the TC sales-agent role
 		// (Level 20/50) via the same credited-slot expression used everywhere else.
-		$sales_rows = array();
-		if($is_my) {
-			$agent_expr  = lead_conversion_credit_agent_expr();
-			$sales_rows  = $this->db->query(
-				"SELECT
-				   {$agent_expr} AS admin_id,
-				   admin.Name AS agent_name,
-				   COALESCE(SUM(booking.NetTotal), 0) AS total_sales
-				 FROM booking
-				 INNER JOIN admin ON admin.AdminID = {$agent_expr} AND admin.Level IN ('20','50','10','25') AND admin.Status='Y'
-				 WHERE booking.BookingConfirmationTitle='BOOKING CONFIRMATION'
-				   AND booking.CancelStatus='N'
-				   AND booking.Status!='N'
-				   AND booking.NetTotal > 0
-				   AND CAST(booking.InsertDate AS DATE) BETWEEN ? AND ?
-				 GROUP BY admin_id, agent_name
-				 HAVING admin_id IS NOT NULL AND admin_id > 0",
-				array($start, $end)
-			)->result_array();
-		}
+		$agent_expr  = lead_conversion_credit_agent_expr();
+		$sales_rows  = $this->db->query(
+			"SELECT
+			   {$agent_expr} AS admin_id,
+			   admin.Name AS agent_name,
+			   COALESCE(SUM(booking.NetTotal), 0) AS total_sales
+			 FROM booking
+			 INNER JOIN admin ON admin.AdminID = {$agent_expr} AND admin.Level IN ('20','50','10','25') AND admin.Status='Y'
+			 WHERE booking.BookingConfirmationTitle='BOOKING CONFIRMATION'
+			   AND booking.CancelStatus='N'
+			   AND booking.Status!='N'
+			   AND booking.NetTotal > 0
+			   AND CAST(booking.InsertDate AS DATE) BETWEEN ? AND ?
+			 GROUP BY admin_id, agent_name
+			 HAVING admin_id IS NOT NULL AND admin_id > 0",
+			array($start, $end)
+		)->result_array();
 
 		// Bridge GHL uid -> AdminID, restricted to the scored population — the TC
 		// sales-agent role (Level 20/50) plus the Owner (10) and TC Lead (25):
@@ -3999,8 +4007,12 @@ class Booking extends MY_Controller
 			}
 		}
 
-		// Agent Score is reported on Month only — skip the scoring work (and leave
-		// agent_score null) on every other period so a "-" column does no calc.
+		// Agent Score is reported on Day / Week / Month — every one of its six inputs
+		// (reply, pickup, conversion, sales, follow-up, served) is now fetched for
+		// those windows. Year is skipped: it has no reply / follow-up / served source,
+		// so a year score would silently zero 35% of the composite. Skipping the
+		// scoring work there leaves agent_score null and the "-" column does no calc.
+		$compute_score = in_array($period, array('day', 'week', 'month'), true);
 		return owner_agent_matrix_build(array(
 			'leads_ungated' => $leads_ungated,
 			'leads_gated'   => $leads_gated,
@@ -4011,7 +4023,7 @@ class Booking extends MY_Controller
 			'outbound'      => $outbound,
 			'sales'         => $sales_rows,
 			'cancellation'  => $cancellation,
-		), $map, $name_by_admin, $benchmark_admins, ($period === 'month'), $this->agent_score_excluded_ids(), $hidden_admins);
+		), $map, $name_by_admin, $benchmark_admins, $compute_score, $this->agent_score_excluded_ids(), $hidden_admins);
 	}
 
 	function Create()

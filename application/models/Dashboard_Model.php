@@ -1014,15 +1014,17 @@ class Dashboard_Model extends CI_Model
 	// tests/helpers/OwnerDashboardKpiTest.php.
 	// ---------------------------------------------------------------------
 
-	// Credited booking-confirmation sales grouped by the sales agent's team, for
-	// one date window. Only active teams; excludes quotation/proforma, cancelled,
-	// draft and zero/negative bookings. Amount = SUM(NetTotal), windowed on the
-	// booking's InsertDate.
+	// Credited booking-confirmation sales grouped by the team the sale was made
+	// under, for one date window. Groups on the FROZEN booking.TeamID snapshot
+	// (the team the credited agent belonged to at the time of the sale), NOT the
+	// agent's live admin.TeamID — so an agent who later moves team or leaves does
+	// not retroactively pull an old sale out of the team that earned it. Only
+	// active teams; excludes quotation/proforma, cancelled, draft and
+	// zero/negative bookings. Amount = SUM(NetTotal), windowed on InsertDate.
 	function Team_Sales($start, $end)
 	{
 		$this->db->select('team.TeamID AS TeamID, team.Name AS TeamName, COALESCE(SUM(booking.NetTotal), 0) AS Sales', false);
-		$this->db->join('admin', 'admin.AdminID = booking.SalesAgent', 'inner');
-		$this->db->join('team', 'team.TeamID = admin.TeamID', 'inner');
+		$this->db->join('team', 'team.TeamID = booking.TeamID', 'inner');
 		$this->db->where('booking.BookingConfirmationTitle', 'BOOKING CONFIRMATION');
 		$this->db->where('booking.CancelStatus', 'N');
 		$this->db->where('booking.Status !=', 'N');
@@ -1034,28 +1036,63 @@ class Dashboard_Model extends CI_Model
 		return $this->db->get('booking')->result();
 	}
 
-	// BC sales in the window by agents who don't land in an active team — the
-	// inverse of Team_Sales()'s inner join (agent has no admin row, admin has no
-	// TeamID, or that team is inactive). This "Unassigned" bucket lets the team
+	// BC sales in the window whose frozen snapshot doesn't land in an active team
+	// — the inverse of Team_Sales()'s inner join (booking.TeamID is NULL, or the
+	// snapshotted team is inactive). This "Unassigned" bucket lets the team
 	// breakdown reconcile to the true company-wide BC total. Same BC filters as
 	// Team_Sales(); no payment filter (value is by booking confirmation, not cash).
 	function Unassigned_Sales($start, $end)
 	{
 		$this->db->select('COALESCE(SUM(booking.NetTotal), 0) AS Sales', false);
-		$this->db->join('admin', 'admin.AdminID = booking.SalesAgent', 'left');
-		$this->db->join('team', 'team.TeamID = admin.TeamID', 'left');
+		$this->db->join('team', 'team.TeamID = booking.TeamID', 'left');
 		$this->db->where('booking.BookingConfirmationTitle', 'BOOKING CONFIRMATION');
 		$this->db->where('booking.CancelStatus', 'N');
 		$this->db->where('booking.Status !=', 'N');
 		$this->db->where('booking.NetTotal >', 0);
 		$this->db->group_start();
-			$this->db->where('team.TeamID IS NULL', null, false);
+			$this->db->where('booking.TeamID IS NULL', null, false);
 			$this->db->or_where('team.Status !=', 'Y');
 		$this->db->group_end();
 		$this->db->where('CAST(booking.InsertDate AS DATE) >=', $start);
 		$this->db->where('CAST(booking.InsertDate AS DATE) <=', $end);
 		$row = $this->db->get('booking')->row();
 		return $row ? (float) $row->Sales : 0.0;
+	}
+
+	// Sum of member agents' sales targets per active team: the monthly target
+	// from sales_target (year + month) and the yearly target from
+	// sales_target_year (year). Team membership = admin.TeamID on an active team.
+	// Returns keyed by TeamID => array('month' => float, 'year' => float). Backs
+	// the Owner "Total Sales vs Target by Team" card; teams (or agents) with no
+	// target row simply contribute 0 and are absent from the returned array.
+	function Team_Targets($year, $month)
+	{
+		$out = array();
+
+		// Monthly targets (sales_target: one row per agent per year+month).
+		$this->db->select('admin.TeamID AS TeamID, COALESCE(SUM(sales_target.target_amount), 0) AS Amount', false);
+		$this->db->join('admin', 'admin.AdminID = sales_target.AdminID', 'inner');
+		$this->db->join('team', 'team.TeamID = admin.TeamID', 'inner');
+		$this->db->where('sales_target.target_year', (int) $year);
+		$this->db->where('sales_target.target_month', (int) $month);
+		$this->db->where('team.Status', 'Y');
+		$this->db->group_by('admin.TeamID');
+		foreach($this->db->get('sales_target')->result() as $r) {
+			$out[$r->TeamID]['month'] = (float) $r->Amount;
+		}
+
+		// Yearly targets (sales_target_year: one row per agent per year).
+		$this->db->select('admin.TeamID AS TeamID, COALESCE(SUM(sales_target_year.target_amount), 0) AS Amount', false);
+		$this->db->join('admin', 'admin.AdminID = sales_target_year.AdminID', 'inner');
+		$this->db->join('team', 'team.TeamID = admin.TeamID', 'inner');
+		$this->db->where('sales_target_year.target_year', (int) $year);
+		$this->db->where('team.Status', 'Y');
+		$this->db->group_by('admin.TeamID');
+		foreach($this->db->get('sales_target_year')->result() as $r) {
+			$out[$r->TeamID]['year'] = (float) $r->Amount;
+		}
+
+		return $out;
 	}
 
 	// Company-wide count of new GHL leads whose conversation started in the
@@ -1102,10 +1139,13 @@ class Dashboard_Model extends CI_Model
 		return $row ? (float) $row->Amount : 0.0;
 	}
 
-	// Unapproved payment OUT (to suppliers) in the window: SUM(Debit) of pending
-	// debit rows (Credit = 0, Status = 'P'), windowed on payment.Date — the date
-	// each pay-out is scheduled for. Mirrors Approved_Payment_Out().
-	function Unapproved_Payment_Out($start, $end)
+	// Unapproved payment OUT (to suppliers): SUM(Debit) of ALL pending debit rows
+	// (Credit = 0, Status = 'P') scheduled on or before $end — i.e. everything
+	// scheduled-but-not-approved-yet, cumulative up to the window's end. Unlike
+	// Approved_Payment_Out() there is NO lower bound: a pending pay-out is an
+	// outstanding obligation, so overdue ones scheduled before the window must
+	// still count (otherwise the card understates the true backlog).
+	function Unapproved_Payment_Out($end)
 	{
 		$this->db->select('COALESCE(SUM(Debit), 0) AS Amount', false);
 		$this->db->join('payment', 'payment.BookingID = booking.BookingID', 'left');
@@ -1114,7 +1154,6 @@ class Dashboard_Model extends CI_Model
 		$this->db->where('BookingConfirmationTitle', 'BOOKING CONFIRMATION');
 		$this->db->where('CancelStatus', 'N');
 		$this->db->where('booking.Status !=', 'N');
-		$this->db->where('CAST(payment.Date AS DATE) >=', $start);
 		$this->db->where('CAST(payment.Date AS DATE) <=', $end);
 		$row = $this->db->get('booking')->row();
 		return $row ? (float) $row->Amount : 0.0;

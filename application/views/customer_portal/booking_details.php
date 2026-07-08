@@ -1222,12 +1222,17 @@
 
             // Check payments
             $has_any_payment = false;
+            $has_pending_review_payment = false; // customer submitted a payment, not yet approved
             $payment_date = null;
             $full_payment_date = null;
             $latest_credit_date = null;
             $payment_details = [];
             if (!empty($booking['payments'])) {
                 foreach ($booking['payments'] as $payment) {
+                    // Track submitted-but-unapproved credit payments awaiting staff approval (Status 'P')
+                    if (!empty($payment['Credit']) && $payment['Credit'] > 0 && $payment['Status'] == 'P') {
+                        $has_pending_review_payment = true;
+                    }
                     if (
                         !empty($payment['Credit']) && $payment['Credit'] > 0 &&
                         $payment['Status'] == 'Y'
@@ -1463,6 +1468,10 @@
                     : (($full_payment_complete || $has_any_payment) ? get_relative_time($payment_date) : ''),
                 'expected_date' => $payment_deadline,
                 'status' => $payment_step_status,
+                // Reassure customers whose payment is submitted but still awaiting approval
+                'note' => ($payment_step_status != 'completed' && $has_pending_review_payment)
+                    ? 'If you\'ve already made payment, please note it can take 1–2 working days to be verified and reflected here.'
+                    : null,
                 'icon' => 'dollar-sign',
                 'payment_details' => $has_deposit_deadline ? $deposit_payments : $payment_details,
                 'show_payment_list' => $has_deposit_deadline && $deposit_count > 0,
@@ -1494,6 +1503,9 @@
                     'relative_time' => $full_payment_complete ? get_relative_time($full_payment_date ?: $payment_date) : '',
                     'expected_date' => $full_payment_deadline,
                     'status' => $full_payment_step_status,
+                    'note' => ($full_payment_step_status != 'completed' && $has_pending_review_payment)
+                        ? 'If you\'ve already made payment, please note it can take 1–2 working days to be verified and reflected here.'
+                        : null,
                     'icon' => 'credit-card',
                     'payment_details' => $payment_details,
                     // CTA: Download Receipt (available only when full payment is completed)
@@ -1524,6 +1536,9 @@
                     'relative_time' => $additional_payment_complete ? get_relative_time($additional_payment_date) : '',
                     'expected_date' => $additional_payment_deadline,
                     'status' => $additional_payment_step_status,
+                    'note' => ($additional_payment_step_status != 'completed' && $has_pending_review_payment)
+                        ? 'If you\'ve already made payment, please note it can take 1–2 working days to be verified and reflected here.'
+                        : null,
                     'icon' => 'dollar-sign',
                     'payment_details' => $payment_details,
                     // CTA: Download Receipt (available only when additional payment is completed)
@@ -1841,6 +1856,15 @@
                                                 </span>
                                             <?php endif; ?>
                                         </div>
+
+                                        <?php if (!empty($step['note'])): ?>
+                                            <div class="mt-2 flex items-start gap-1.5 rounded-md bg-blue-50 border border-blue-100 px-2.5 py-1.5 text-xs text-blue-800">
+                                                <svg class="w-4 h-4 flex-shrink-0 mt-px text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                                </svg>
+                                                <span><?php echo htmlspecialchars($step['note']); ?></span>
+                                            </div>
+                                        <?php endif; ?>
 
                                         <?php if (!empty($step['show_payment_list']) && !empty($step['payment_details'])): ?>
                                             <ul class="mt-3 space-y-1 text-xs">

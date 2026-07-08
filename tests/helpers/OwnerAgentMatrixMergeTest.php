@@ -162,8 +162,9 @@ assert_eq('benchmark scope: Ben score',                   $expectedB['by_admin']
 // Sales anchor now excludes Jane's 50000 -> Carol's 30000 is the anchor (norm 100).
 assert_eq('benchmark scope: Jane excluded from sales anchor (capped 100)', 100.0, $byB[10]['agent_score'] === null ? null : $expectedB['by_admin'][10]['norm']['sales']);
 
-// --- compute_score = false (Day / Week periods): no scoring is done, every
-//     agent_score is null, and rows fall back to name-ASC order. ---
+// --- compute_score = false (the Year period, which has no reply / follow-up /
+//     served source): no scoring is done, every agent_score is null, and rows
+//     fall back to name-ASC order. ---
 $matrixNS = owner_agent_matrix_build($sources, $map, $name_by_admin, null, false);
 $nsScores = array_map(function ($r) { return $r['agent_score']; }, $matrixNS);
 $nsNames  = array_map(function ($r) { return $r['agent_name']; }, $matrixNS);
@@ -227,5 +228,21 @@ assert_eq('responded: Ben Agent Score unchanged',  $by[11]['agent_score'], $byR[
 
 // Without a 'responded' source, Served falls back to owned-leads (legacy).
 assert_eq('no responded source: Jane Served falls back to owned', 20, $by[10]['served_leads']);
+
+// --- Day / Week shape: those windows carry NO gated-conversion or cancellation
+//     source (both Year-only), but DO carry sales now, and score is computed. The
+//     Agent Score must still be a real (non-null) number for eligible agents, and
+//     since Sales (45% of the composite) is present it must not collapse to the
+//     ~55 ceiling a sales-less build would hit. Guards the "Score on Day/Week"
+//     behaviour that the Booking controller now enables. ---
+$sourcesDW = $sources;
+unset($sourcesDW['leads_gated'], $sourcesDW['cancellation']); // absent on Day/Week
+$matrixDW = owner_agent_matrix_build($sourcesDW, $map, $name_by_admin, null, true);
+$dwBy = array(); foreach ($matrixDW as $r) { $dwBy[$r['admin_id']] = $r; }
+assert_eq('day/week: Jane Agent Score is non-null', true, $dwBy[10]['agent_score'] !== null);
+assert_eq('day/week: Jane score exceeds the sales-less 55 ceiling', true, (float) $dwBy[10]['agent_score'] > 55.0);
+// Gated conversion / cancellation columns render 0 (no source), score still real.
+assert_eq('day/week: gated conversion 0 without source', 0.0, $dwBy[10]['conv_rate_gated']);
+assert_eq('day/week: cancellation 0 without source',      0.0, $dwBy[10]['cancel_rate']);
 
 echo "\nAll assertions passed.\n";

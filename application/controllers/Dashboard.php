@@ -257,6 +257,14 @@ class Dashboard extends MY_Controller
 
 			$array['owner_team_sales'] = $team_rows;
 
+			// Monthly & yearly sales targets per team (sum of member agents'
+			// targets, set in Admin) for the current period — feeds the
+			// "Total Sales vs Target by Team" card, compared against the month
+			// & year actuals already in $team_rows above.
+			$array['owner_team_targets'] = $this->Dashboard_Model->Team_Targets(
+				(int) date('Y'), (int) date('n')
+			);
+
 			// Total new leads (GHL) — company-wide count per window.
 			$array['owner_new_leads'] = array();
 			foreach($windows as $key => $range) {
@@ -276,12 +284,13 @@ class Dashboard extends MY_Controller
 				'year'  => $this->Dashboard_Model->Approved_Payment_Out($windows['year'][0], $windows['year'][1]),
 			);
 
-			// Unapproved (pending) payment OUT — scheduled today, week, month & year.
+			// Unapproved (pending) payment OUT — ALL pending pay-outs scheduled but not
+			// approved yet, cumulative up to each window's end (overdue ones included).
 			$array['owner_payment_out_pending'] = array(
-				'today' => $this->Dashboard_Model->Unapproved_Payment_Out($windows['today'][0], $windows['today'][1]),
-				'week'  => $this->Dashboard_Model->Unapproved_Payment_Out($windows['week'][0], $windows['week'][1]),
-				'month' => $this->Dashboard_Model->Unapproved_Payment_Out($windows['month'][0], $windows['month'][1]),
-				'year'  => $this->Dashboard_Model->Unapproved_Payment_Out($windows['year'][0], $windows['year'][1]),
+				'today' => $this->Dashboard_Model->Unapproved_Payment_Out($windows['today'][1]),
+				'week'  => $this->Dashboard_Model->Unapproved_Payment_Out($windows['week'][1]),
+				'month' => $this->Dashboard_Model->Unapproved_Payment_Out($windows['month'][1]),
+				'year'  => $this->Dashboard_Model->Unapproved_Payment_Out($windows['year'][1]),
 			);
 
 			// Approved payment IN (from customers) — today, week, month & year.
