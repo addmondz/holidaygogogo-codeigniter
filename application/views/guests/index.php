@@ -44,13 +44,19 @@ div.kt-datatable__pager-container {
 }
 </style>
 
+<?php
+	// Shared by the Guest List (Guests) and GHL Leads (Ghl_Leads) pages — each
+	// passes the controller base and heading, defaulting to the Guest List page.
+	$list_base  = isset($list_base)  ? $list_base  : 'Guests';
+	$page_title = isset($page_title) ? $page_title : 'Guest List Records';
+?>
 <div class="d-flex flex-column-fluid">
 	<div class="container-fluid">
 		<div class="card card-custom mb-5">
 			<div class="card-header flex-wrap py-3" style="background-color:#D7E2F2;">
 				<div class="card-title">
 					<h3 class="card-label" style="color:#6082B6;">
-						<strong>Guest List Records</strong>
+						<strong><?php echo htmlspecialchars($page_title); ?></strong>
 					</h3>
 				</div>
 			</div>
@@ -62,7 +68,7 @@ div.kt-datatable__pager-container {
 						</div>
 						<div id="guests_info" class="collapse">
 							<div class="card-body">
-								<form action="<?php echo base_url('Guests') ?>" method="get" class="form">
+								<form action="<?php echo base_url($list_base) ?>" method="get" class="form">
 									<div class="row">
 										<div class="col-md-3">
 											<div class="form-group">
@@ -138,16 +144,6 @@ div.kt-datatable__pager-container {
 													<?php if(!empty($languages)) { foreach($languages as $l) { ?>
 														<option data-icon="la la-language font-size-lg bs-icon" value="<?php echo htmlspecialchars($l->value, ENT_QUOTES); ?>" <?php if($this->input->get('language') === $l->value) echo 'selected'; ?>><?php echo htmlspecialchars($l->value); ?></option>
 													<?php } } ?>
-												</select>
-											</div>
-										</div>
-										<div class="col-md-3">
-											<div class="form-group">
-												<label>Type</label>
-												<select name="type" class="form-control selectpicker">
-													<option selected value="">--ALL TYPES--</option>
-													<option value="guest" <?php if($this->input->get('type') === 'guest') echo 'selected'; ?>>Booking Guest</option>
-													<option value="ghl"   <?php if($this->input->get('type') === 'ghl')   echo 'selected'; ?>>GHL</option>
 												</select>
 											</div>
 										</div>
@@ -255,7 +251,8 @@ div.kt-datatable__pager-container {
 						<thead>
 							<tr>
 								<th style="text-align:center;">No.</th>
-								<th style="text-align:center;">Name</th>
+								<th style="text-align:center;">First Name</th>
+								<th style="text-align:center;">Team Leader</th>
 								<th style="text-align:center;">Contact Num</th>
 								<th style="text-align:center;">Email</th>
 								<th style="text-align:center;">Language</th>
@@ -266,7 +263,6 @@ div.kt-datatable__pager-container {
 								<th style="text-align:center;">Nationality</th>
 								<th style="text-align:center;">Gender</th>
 								<th style="text-align:center;">DOB</th>
-								<th style="text-align:center;">Type</th>
 								<th style="text-align:center;">Guest Role</th>
 								<th style="text-align:center;">Num of Pax</th>
 								<th style="text-align:center;">Total Sales (RM)</th>
@@ -283,6 +279,18 @@ div.kt-datatable__pager-container {
 									<tr>
 										<td style="text-align:center; padding-top:15px; padding-bottom:15px;"><?php echo $count; ?></td>
 										<td style="text-align:center;"><?php echo htmlspecialchars($g->Name); ?></td>
+										<td style="text-align:center; white-space:nowrap;">
+											<?php
+												$leaders = guest_list_split_team_leaders(isset($g->TeamLeader) ? $g->TeamLeader : '');
+												if(!empty($leaders)) {
+													$leader_out = array();
+													foreach($leaders as $ln) { $leader_out[] = htmlspecialchars($ln); }
+													echo implode('<br>', $leader_out);
+												} else {
+													echo '<span class="text-muted">&mdash;</span>';
+												}
+											?>
+										</td>
 										<?php
 											$is_ghl_row      = isset($g->Type) && $g->Type === 'GHL';
 											$calling_code    = isset($g->CallingCode) ? (string)$g->CallingCode : '';
@@ -310,7 +318,18 @@ div.kt-datatable__pager-container {
 										<td style="text-align:center;"><?php echo htmlspecialchars($g->AgentName); ?></td>
 										<td style="text-align:center;"><?php echo htmlspecialchars($g->Source); ?></td>
 										<td style="text-align:center;"><?php echo htmlspecialchars($g->CustomerType); ?></td>
-										<td style="text-align:center;"><?php echo htmlspecialchars($g->Destination); ?></td>
+										<td style="text-align:center; white-space:nowrap;">
+											<?php
+												if(!empty($g->Destination)) {
+													$dest_out = array();
+													foreach(explode('||', $g->Destination) as $d) {
+														$d = trim($d);
+														if($d !== '') { $dest_out[] = htmlspecialchars($d); }
+													}
+													echo implode('<br>', $dest_out);
+												}
+											?>
+										</td>
 										<td style="text-align:center;"><?php echo htmlspecialchars($g->Nationality); ?></td>
 										<td style="text-align:center;"><?php echo htmlspecialchars($g->Gender); ?></td>
 										<td style="text-align:center;">
@@ -320,16 +339,7 @@ div.kt-datatable__pager-container {
 												}
 											?>
 										</td>
-										<td style="text-align:center; white-space:nowrap;">
-											<?php
-												$is_ghl  = isset($g->Type) && $g->Type === 'GHL';
-												$cls     = $is_ghl ? 'label-light-warning' : 'label-light-success';
-												$txt     = $is_ghl ? 'GHL' : 'Booking Guest';
-											?>
-											<span class="label label-inline label-pill <?php echo $cls; ?> font-weight-bold" style="white-space:nowrap;">
-												<?php echo $txt; ?>
-											</span>
-										</td>
+										<?php $is_ghl = isset($g->Type) && $g->Type === 'GHL'; ?>
 										<td style="text-align:center; white-space:nowrap;">
 											<?php
 												$role = isset($g->Role) ? $g->Role : '';
@@ -365,16 +375,31 @@ div.kt-datatable__pager-container {
 										<td style="text-align:center; white-space:nowrap;">
 											<?php
 												if(!empty($g->TravelDates)) {
-													$td_out = array();
+													$td_out   = array();
+													$td_base  = base_url($list_base);
 													foreach(array_map('trim', explode(',', $g->TravelDates)) as $it) {
 														$p     = explode('|', $it);
 														$s     = isset($p[0]) ? trim($p[0]) : '';
 														$e     = isset($p[1]) ? trim($p[1]) : '';
 														$s_ts  = ($s !== '' && $s !== '0000-00-00') ? strtotime($s) : false;
 														$e_ts  = ($e !== '' && $e !== '0000-00-00') ? strtotime($e) : false;
-														if($s_ts && $e_ts)   { $td_out[] = htmlspecialchars(date('d M Y', $s_ts) . ' - ' . date('d M Y', $e_ts)); }
-														elseif($s_ts)        { $td_out[] = htmlspecialchars(date('d M Y', $s_ts)); }
-														elseif($e_ts)        { $td_out[] = htmlspecialchars(date('d M Y', $e_ts)); }
+														if($s_ts && $e_ts)   { $label = date('d M Y', $s_ts) . ' - ' . date('d M Y', $e_ts); }
+														elseif($s_ts)        { $label = date('d M Y', $s_ts); }
+														elseif($e_ts)        { $label = date('d M Y', $e_ts); }
+														else                 { continue; }
+
+														// Click a travel date to reload the list filtered to that
+														// travel window — grouping everyone travelling then together.
+														$filter_val = guest_list_travel_date_filter_value($s, $e);
+														if($filter_val !== '') {
+															$href = $td_base . '?travel_date=' . urlencode($filter_val);
+															$td_out[] = '<a href="' . htmlspecialchars($href, ENT_QUOTES) . '" '
+																. 'title="Show everyone travelling on this date" '
+																. 'style="color:#3699FF; text-decoration:none; border-bottom:1px dashed #3699FF;">'
+																. htmlspecialchars($label) . '</a>';
+														} else {
+															$td_out[] = htmlspecialchars($label);
+														}
 													}
 													echo implode('<br>', $td_out);
 												}
@@ -427,7 +452,7 @@ div.kt-datatable__pager-container {
 
 <script>
 	<?php
-		$expanded_keys = array('q', 'booking_number', 'contact_number', 'email', 'destination', 'role', 'pax_min', 'pax_max', 'sales_agent', 'source', 'customer_type', 'nationality', 'gender', 'language', 'booking_date', 'travel_date', 'type');
+		$expanded_keys = array('q', 'booking_number', 'contact_number', 'email', 'destination', 'role', 'pax_min', 'pax_max', 'sales_agent', 'source', 'customer_type', 'nationality', 'gender', 'language', 'booking_date', 'travel_date');
 		$expand = false;
 		foreach($expanded_keys as $k) {
 			if($this->input->get($k) !== null && $this->input->get($k) !== '') { $expand = true; break; }
@@ -438,13 +463,13 @@ div.kt-datatable__pager-container {
 	<?php } ?>
 
 	$('#reset').click(function() {
-		Reset('<?php echo base_url('Guests'); ?>');
+		Reset('<?php echo base_url($list_base); ?>');
 	});
 
 	<?php if(!empty($guests)): ?>
 		$(function() {
 			$.ajax({
-				url: '<?php echo base_url('Guests/Count'); ?>' + (window.location.search || ''),
+				url: '<?php echo base_url($list_base . '/Count'); ?>' + (window.location.search || ''),
 				dataType: 'json',
 				timeout: 60000
 			}).done(function(data) {

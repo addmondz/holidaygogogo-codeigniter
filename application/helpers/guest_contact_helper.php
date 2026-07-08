@@ -158,6 +158,82 @@ if (!function_exists('guest_list_parse_date_range')) {
     }
 }
 
+if (!function_exists('guest_list_travel_date_filter_value')) {
+    /**
+     * Build the travel_date filter value ("DD/MM/YYYY - DD/MM/YYYY") for a
+     * booking's travel window, so clicking a rendered travel date on the Guest
+     * List reloads it filtered to that window — grouping everyone travelling
+     * then together. The output is the exact daterangepicker format the filter
+     * expects and round-trips through guest_list_parse_date_range().
+     *
+     * When only one side is known the range collapses to that single day (the
+     * parser requires a two-sided range). Empty / zero dates yield '' (no
+     * usable filter).
+     *
+     * @param string $start_ymd Booking StartDate as Y-m-d (or '' / 0000-00-00).
+     * @param string $end_ymd   Booking EndDate as Y-m-d (or '' / 0000-00-00).
+     * @return string "DD/MM/YYYY - DD/MM/YYYY", or '' when neither date is set.
+     */
+    function guest_list_travel_date_filter_value($start_ymd, $end_ymd)
+    {
+        $norm = function ($d) {
+            $d = trim((string) $d);
+            if ($d === '' || $d === '0000-00-00') {
+                return '';
+            }
+            $ts = strtotime($d);
+            return $ts ? date('d/m/Y', $ts) : '';
+        };
+
+        $start = $norm($start_ymd);
+        $end   = $norm($end_ymd);
+
+        if ($start === '' && $end === '') {
+            return '';
+        }
+        if ($start === '') {
+            $start = $end;
+        }
+        if ($end === '') {
+            $end = $start;
+        }
+        return $start . ' - ' . $end;
+    }
+}
+
+if (!function_exists('guest_list_split_team_leaders')) {
+    /**
+     * Split the GROUP_CONCAT'd booking customer names — the "booking name as per
+     * BC form", i.e. the team leader of each booking a guest belongs to — into a
+     * clean, de-duplicated, display-ready list. Blank / whitespace-only names are
+     * dropped and duplicates collapsed (case-insensitively, first-seen order).
+     *
+     * Backs the Guest List "Team Leader" column so every team member row shows
+     * the leader name(s) from their booking(s).
+     *
+     * @param string $concat Raw GROUP_CONCAT value, '||'-separated.
+     * @return string[] Trimmed, de-duplicated, non-empty names in first-seen order.
+     */
+    function guest_list_split_team_leaders($concat)
+    {
+        $out  = array();
+        $seen = array();
+        foreach (explode('||', (string) $concat) as $name) {
+            $name = trim($name);
+            if ($name === '') {
+                continue;
+            }
+            $key = function_exists('mb_strtolower') ? mb_strtolower($name) : strtolower($name);
+            if (isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+            $out[]      = $name;
+        }
+        return $out;
+    }
+}
+
 if (!function_exists('guest_list_ghl_suppressed_by_filters')) {
     /**
      * GHL leads carry only a name, contact, and lead-captured date — they have
@@ -209,6 +285,32 @@ if (!function_exists('guest_list_bookings_suppressed_by_filters')) {
     {
         $role = isset($get['role']) ? trim((string) $get['role']) : '';
         return $role === 'Lead';
+    }
+}
+
+if (!function_exists('guest_list_branches_to_run')) {
+    /**
+     * Decide which branch(es) a Guest List page reads. The listing is now split
+     * into two pages, each locked to ONE source:
+     *   - mode 'guest' → the Guest List page (booking guests only)
+     *   - mode 'ghl'   → the GHL Leads page (GHL leads only)
+     *
+     * The active filters can still drop the page's own branch to empty when they
+     * can never match it (e.g. a booking-only Destination filter on the GHL page,
+     * or Guest Role = Lead on the Guest List page) — reusing the same suppression
+     * predicates the merged listing used, so the two pages stay consistent.
+     *
+     * @param string $mode 'guest' or 'ghl' (anything else falls back to 'guest').
+     * @param array  $get  The request GET params.
+     * @return array{bookings:bool,ghl:bool}
+     */
+    function guest_list_branches_to_run($mode, $get)
+    {
+        $mode = ($mode === 'ghl') ? 'ghl' : 'guest';
+        return array(
+            'bookings' => ($mode === 'guest') && !guest_list_bookings_suppressed_by_filters($get),
+            'ghl'      => ($mode === 'ghl')   && !guest_list_ghl_suppressed_by_filters($get),
+        );
     }
 }
 

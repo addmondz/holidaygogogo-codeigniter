@@ -20,10 +20,13 @@ class Guests extends MY_Controller
 		$limit  = 30;
 		$offset = ($page - 1) * $limit;
 
+		$this->Guests_Model->Set_Mode('guest');
 		$data['guests']         = $this->Guests_Model->Read_Guests($limit, $offset);
 		$data['total']          = null;
 		$data['page']           = $page;
 		$data['limit']          = $limit;
+		$data['list_base']      = 'Guests';
+		$data['page_title']     = 'Guest List Records';
 		$data['admins']         = $this->Booking_Model->Read_Admins();
 		$data['sources']        = $this->Booking_Model->Read_Sources();
 		$data['destinations']   = $this->Booking_Model->Read_Categories();
@@ -39,6 +42,7 @@ class Guests extends MY_Controller
 	{
 		$page  = max(1, (int) $this->input->get('page'));
 		$limit = 30;
+		$this->Guests_Model->Set_Mode('guest');
 		$total = (int) $this->Guests_Model->Count_Guests();
 
 		$pagination_html = $this->load->view('guests/_pagination', array(

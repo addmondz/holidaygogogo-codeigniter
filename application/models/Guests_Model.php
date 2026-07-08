@@ -1,6 +1,20 @@
 <?php
 class Guests_Model extends CI_Model
 {
+	// Which single source this page reads: 'guest' (Guest List, booking guests)
+	// or 'ghl' (GHL Leads). Set once per request by the controller.
+	private $mode = 'guest';
+
+	/**
+	 * Lock the listing to one source. Controllers call this before Read/Count so
+	 * the Guest List and GHL Leads pages each read only their own branch.
+	 */
+	function Set_Mode($mode)
+	{
+		$this->mode = ($mode === 'ghl') ? 'ghl' : 'guest';
+		return $this;
+	}
+
 	private function Dedup_Key_Expr()
 	{
 		return "gl.dedup_key";
@@ -16,22 +30,17 @@ class Guests_Model extends CI_Model
 		$dedup     = $this->Dedup_Key_Expr();
 		$gc_dedup  = $this->Ghl_Dedup_Key_Expr();
 
-		$type      = $this->input->get('type');
 		$q_raw     = trim((string)$this->input->get('q'));
 		$has_q     = $q_raw !== '';
 		$like      = $has_q ? '%' . $q_raw . '%' : null;
 
 		$this->load->helper('guest_contact');
 
-		// Guest Role = Lead selects GHL leads only, so it drops the booking
-		// branch (mirror of the GHL suppression below).
-		$run_bookings = ($type !== 'ghl')
-			&& !guest_list_bookings_suppressed_by_filters($this->input->get());
-		// GHL leads carry no booking-only attributes (sales agent, source,
-		// travel dates, destination, pax, etc.), so any such filter drops them
-		// from the listing.
-		$run_ghl      = ($type !== 'guest')
-			&& !guest_list_ghl_suppressed_by_filters($this->input->get());
+		// Each page reads ONE source (see Set_Mode); a filter that can never match
+		// that source still drops it to empty via the shared suppression predicates.
+		$run       = guest_list_branches_to_run($this->mode, $this->input->get());
+		$run_bookings = $run['bookings'];
+		$run_ghl      = $run['ghl'];
 
 		$booking = null;
 		if($run_bookings) {
@@ -192,15 +201,12 @@ class Guests_Model extends CI_Model
 				$g_params[] = '%' . $email . '%';
 			}
 
+			// GHL Leads is its own page now, so the query reads ghl_contacts only —
+			// no booking/guest_list scan. (The old merged listing anti-joined the
+			// two to avoid showing one person twice; separate pages don't need it.)
 			$from_joins_where = "
 FROM ghl_contacts gc
-LEFT JOIN (
-	SELECT DISTINCT {$dedup} AS dk
-	FROM booking b
-	STRAIGHT_JOIN guest_list gl ON gl.BookingID = b.BookingID AND gl.Status = 'Y'
-	WHERE b.Status != 'N' AND b.CancelStatus = 'N'
-) bg_keys ON bg_keys.dk = {$gc_dedup}
-WHERE bg_keys.dk IS NULL
+WHERE 1 = 1
 {$ghl_where}
 			";
 
@@ -226,12 +232,13 @@ WHERE bg_keys.dk IS NULL
 		return "
 	SELECT
 		{$dedup} AS dedup_key,
-		TRIM(CONCAT_WS(' ', NULLIF(gl.Name, ''), NULLIF(gl.LastName, ''))) AS display_name,
+		TRIM(gl.Name) AS display_name,
 		gl.Mobile        AS ContactNum,
 		ccp.CountryCode  AS CallingCode,
 		gl.Email,
 		COALESCE(c.ChatLanguage, b.ChatLanguage) AS ChatLanguage,
 		a.Name           AS SalesAgentName,
+		b.Customer       AS BookingCustomer,
 		s.Name           AS SourceName,
 		c.customer_type  AS customer_type,
 		cat.Name         AS Destination,
@@ -273,6 +280,7 @@ WHERE bg_keys.dk IS NULL
 SELECT
 	dedup_key,
 	CONVERT(MAX(CASE WHEN rn = 1 THEN display_name   END) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Name,
+	CONVERT(GROUP_CONCAT(DISTINCT CASE WHEN booking_rn = 1 THEN NULLIF(TRIM(BookingCustomer), '') END SEPARATOR '||') USING utf8mb4) COLLATE utf8mb4_unicode_ci AS TeamLeader,
 	CONVERT(MAX(CASE WHEN rn = 1 THEN ContactNum     END) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS ContactNum,
 	CONVERT(MAX(CASE WHEN rn = 1 THEN CallingCode    END) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS CallingCode,
 	CONVERT(MAX(CASE WHEN rn = 1 THEN Email          END) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Email,
@@ -280,7 +288,7 @@ SELECT
 	CONVERT(MAX(CASE WHEN rn = 1 THEN SalesAgentName END) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS AgentName,
 	CONVERT(MAX(CASE WHEN rn = 1 THEN SourceName     END) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Source,
 	CONVERT(MAX(CASE WHEN rn = 1 THEN customer_type  END) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS CustomerType,
-	CONVERT(MAX(CASE WHEN rn = 1 THEN Destination    END) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Destination,
+	CONVERT(GROUP_CONCAT(CASE WHEN booking_rn = 1 THEN COALESCE(Destination, '-') END ORDER BY DATE(BookingDate) SEPARATOR '||') USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Destination,
 	CONVERT(MAX(CASE WHEN rn = 1 THEN Nationality    END) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Nationality,
 	CONVERT(MAX(CASE WHEN rn = 1 THEN Gender         END) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Gender,
 	MAX(CASE WHEN rn = 1 THEN DateOfBirth END) AS DOB,
@@ -305,7 +313,8 @@ GROUP BY dedup_key
 			$parts[] = "
 SELECT
 	{$gc_dedup} AS dedup_key,
-	CONVERT(TRIM(CONCAT_WS(' ', NULLIF(gc.first_name, ''), NULLIF(gc.last_name, ''))) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Name,
+	CONVERT(TRIM(gc.first_name) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Name,
+	CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS TeamLeader,
 	CONVERT(gc.phone USING utf8mb4) COLLATE utf8mb4_unicode_ci AS ContactNum,
 	CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS CallingCode,
 	CONVERT(gc.email USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Email,

@@ -1121,6 +1121,21 @@ class Dashboard_Model extends CI_Model
 		return $this->db->get('booking')->result();
 	}
 
+	// Total cancelled booking confirmations in the window (windowed on
+	// InsertDate). Same filters as Top_Cancellation_Reasons but without the
+	// reason grouping — used as the denominator for each reason's share.
+	function Total_Cancellations($start, $end)
+	{
+		$this->db->select('COUNT(booking.BookingID) AS Total', false);
+		$this->db->where('booking.BookingConfirmationTitle', 'BOOKING CONFIRMATION');
+		$this->db->where('booking.CancelStatus', 'Y');
+		$this->db->where('booking.Status !=', 'N');
+		$this->db->where('CAST(booking.InsertDate AS DATE) >=', $start);
+		$this->db->where('CAST(booking.InsertDate AS DATE) <=', $end);
+		$row = $this->db->get('booking')->row();
+		return $row ? (int)$row->Total : 0;
+	}
+
 	// Approved payment OUT (to suppliers) in the window: SUM(Debit) of approved
 	// debit rows (Credit = 0), windowed on payment.Date. Mirrors
 	// Approved_Debit_Payments() but scoped to an explicit range.

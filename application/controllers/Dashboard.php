@@ -275,6 +275,10 @@ class Dashboard extends MY_Controller
 			$array['owner_cancellation_reasons'] = $this->Dashboard_Model->Top_Cancellation_Reasons(
 				$windows['year'][0], $windows['year'][1], 5
 			);
+			// Total cancellations this year — denominator for each reason's %.
+			$array['owner_cancellation_total'] = $this->Dashboard_Model->Total_Cancellations(
+				$windows['year'][0], $windows['year'][1]
+			);
 
 			// Approved payment OUT (to suppliers) — today, week, month & year.
 			$array['owner_payment_out'] = array(
