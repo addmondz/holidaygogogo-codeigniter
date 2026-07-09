@@ -17,6 +17,38 @@ defined('BASEPATH') OR exit('No direct script access allowed');
  * so a zero-leads / zero-BC agent never divides by zero.
  */
 
+if (!function_exists('owner_agent_matrix_hidden_owner_ids')) {
+    /**
+     * Which OWNER (Level-10) admins are anchored-but-HIDDEN on the owner matrix.
+     *
+     * Owners set the Agent Score benchmark but are normally dropped from the
+     * rendered rows (anchored-but-hidden). EXCEPTION: an owner who personally sold
+     * in the window — their AdminID appears in $sold_admin_ids (own-account
+     * credited sales only; a disabled duplicate account never joins the sales
+     * query) — is shown as a normal agent row, like the TC Lead. Owners with no
+     * own sales in the window stay hidden. Only Level '10' is ever hidden here;
+     * sales agents (20 / 50) and the TC Lead (25) are never hidden by this rule.
+     *
+     * Pure (no DB / CI) so it is unit-testable — see
+     * tests/helpers/OwnerAgentMatrixHiddenOwnerTest.php.
+     *
+     * @param array $roster         scored-pool rows, each with ->AdminID and ->Level
+     * @param array $sold_admin_ids AdminID => true for admins with own sales in window
+     * @return array AdminID => true for owners to hide
+     */
+    function owner_agent_matrix_hidden_owner_ids(array $roster, array $sold_admin_ids)
+    {
+        $hidden = array();
+        foreach ($roster as $r) {
+            $aid = (int) $r->AdminID;
+            if ((string) $r->Level === '10' && !isset($sold_admin_ids[$aid])) {
+                $hidden[$aid] = true;
+            }
+        }
+        return $hidden;
+    }
+}
+
 if (!function_exists('owner_agent_matrix_build')) {
     /**
      * @param array $sources keyed:

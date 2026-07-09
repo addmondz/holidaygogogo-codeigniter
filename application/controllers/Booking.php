@@ -3939,19 +3939,25 @@ class Booking extends MY_Controller
 		// (10) and TC Lead (25), so an L20 agent's matrix Score equals their Agent
 		// Score card (L50 rows are scored against this pool but never anchor).
 		// $hidden_admins (Owner only) anchor the score but are dropped from the
-		// rendered rows. TC Lead (25) anchors AND shows as a row on this owner matrix.
+		// rendered rows — EXCEPT an owner who personally sold in the window, who is
+		// shown as a normal agent row (owner-account sales only; a disabled duplicate
+		// account never joins $sales_rows). TC Lead (25) always anchors AND shows.
+		$sold_admin_ids = array();
+		foreach($sales_rows as $s) {
+			if((float)$s['total_sales'] > 0) { $sold_admin_ids[(int)$s['admin_id']] = true; }
+		}
 		$benchmark_admins = array();
-		$hidden_admins = array();
-		foreach($this->db->query(
+		$roster_rows = $this->db->query(
 			"SELECT AdminID, Name, Level FROM admin WHERE Level IN ('20','50','10','25') AND Status='Y'"
-		)->result() as $r) {
+		)->result();
+		foreach($roster_rows as $r) {
 			if(!isset($name_by_admin[(int)$r->AdminID])) { $name_by_admin[(int)$r->AdminID] = $r->Name; }
 			$lvl = (string)$r->Level;
 			if($lvl === '20' || $lvl === '10' || $lvl === '25') { $benchmark_admins[(int)$r->AdminID] = true; }
-			// Owner (10) is anchored-but-hidden; TC Lead (25) is anchored AND shown as
-			// a matrix row (owner-facing view — they want the TC Lead visible here).
-			if($lvl === '10') { $hidden_admins[(int)$r->AdminID] = true; }
 		}
+		// Owners with no own sales this window stay anchored-but-hidden; selling
+		// owners drop out of the hidden set and render as rows (see helper test).
+		$hidden_admins = owner_agent_matrix_hidden_owner_ids($roster_rows, $sold_admin_ids);
 
 		// Served mirrors the Lead Reply Activity "Lead Responded" metric: distinct
 		// leads the agent replied to in the period (business-hours gated, keyed by

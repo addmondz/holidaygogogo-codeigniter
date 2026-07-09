@@ -211,8 +211,8 @@ div.kt-datatable__pager-container {
 										</div>
 										<div class="col-md-3">
 											<div class="form-group">
-												<label>Booking Date
-													<a onclick="Reset_Booking_Date()" class="btn btn-icon btn-light-warning btn-xs" data-toggle="tooltip" title="Clear booking date">
+												<label><?php echo ($list_base === 'Ghl_Leads') ? 'Lead Capture Date' : 'Booking Date'; ?>
+													<a onclick="Reset_Booking_Date()" class="btn btn-icon btn-light-warning btn-xs" data-toggle="tooltip" title="<?php echo ($list_base === 'Ghl_Leads') ? 'Clear lead capture date' : 'Clear booking date'; ?>">
 														<i class="la la-undo"></i>
 													</a>
 												</label>

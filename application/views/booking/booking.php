@@ -254,7 +254,11 @@
 
                             <div class="form-group">
 
-                                <label>Sales Agent 2 (Pre Sales)</label>
+                                <label>Sales Agent 2 (Pre Sales)
+
+                                    <?php if(current_url() == base_url('Booking/Create')) { ?><span style="color:red;">*</span><?php } ?>
+
+                                </label>
 
                                 <select id="SalesAgent2" data-live-search="true" class="form-control selectpicker">
 
@@ -3672,6 +3676,7 @@
                     'Travel date': travel_date,
                     'Destination': destination,
                     'Sales agent': sales_agent,
+                    'Sales agent 2': sales_agent_2,
                     'Chat language': chat_language,
                     'Source': source,
                     'BC title': bc_title,
