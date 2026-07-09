@@ -91,6 +91,10 @@
     #booking_summary_cards .sc-owner-tab + .sc-owner-tab { border-left:1px solid #B8C7E0; }
     #booking_summary_cards .sc-owner-tab.is-active { background:#6082B6; color:#fff; }
     #booking_summary_cards .sc-owner-tab:not(.is-active):hover { background:#DCE6F5; }
+    /* Export-to-Excel button: sits to the right of the period toggle. */
+    #booking_summary_cards .sc-owner-export { margin-left:12px; border:1px solid #1D7044; background:#1D7044; color:#fff; font-size:12px; font-weight:600; padding:5px 14px; border-radius:5px; cursor:pointer; line-height:1.4; display:inline-flex; align-items:center; gap:6px; }
+    #booking_summary_cards .sc-owner-export:hover { background:#155c37; }
+    #booking_summary_cards .sc-owner-export .la { font-size:15px; }
     /* Description "See more" toggle: mobile-only (revealed in the media query). */
     #booking_summary_cards .sc-owner-desc-toggle { display:none; }
     #booking_summary_cards .sc-owner-matrix th, #booking_summary_cards .sc-owner-matrix td { white-space:nowrap; vertical-align:middle; }
@@ -726,9 +730,10 @@
                             <button type="button" class="sc-owner-tab" data-owner-period="year">Year</button>
                             <button type="button" class="sc-owner-tab" data-owner-period="lastyear">Same Period Last Year</button>
                         </span>
+                        <button type="button" id="sc-owner-export" class="sc-owner-export"><i class="la la-file-excel-o"></i>Export to Excel</button>
                     </div>
                     <div class="card-body summary-card-body">
-                        <div class="summary-sub mb-2 sc-owner-desc" id="sc-owner-desc">One row per sales agent across all performance metrics for the selected period, sorted by Agent Score &mdash; <strong>click any column header to re-sort</strong> (click again to reverse). The Yesterday / Day / Week / Month / Year / Same&nbsp;Period&nbsp;Last&nbsp;Year toggle re-scopes every column at once (Yesterday behaves like Day, Same Period Last Year like Year). Some columns are only reported for certain periods &mdash; a &ldquo;&mdash;&rdquo; means that column doesn&rsquo;t apply to the selected period. Every column reports on all periods <em>except</em> <strong>Reply Time</strong> &amp; <strong>Served</strong> (Day / Week / Month only &mdash; a Year window scans too many message rows) and <strong>Agent Score</strong> (Day / Week / Month only). Note that Conversion &amp; Cancellation on very short windows read low because a lead / booking needs time to convert or cancel.</div>
+                        <div class="summary-sub mb-2 sc-owner-desc" id="sc-owner-desc">One row per sales agent across all performance metrics for the selected period, sorted by Agent Score &mdash; <strong>click any column header to re-sort</strong> (click again to reverse). The Yesterday / Day / Week / Month / Year / Same&nbsp;Period&nbsp;Last&nbsp;Year toggle re-scopes every column at once (Yesterday behaves like Day, Same Period Last Year like Year). Some columns only apply to certain periods, and any column with no data for the selected range is hidden automatically. <strong>Reply Time</strong>, <strong>Served</strong> &amp; <strong>Agent Score</strong> show on Day / Week / Month only (a Year window scans too many message rows), while <strong>Conversion</strong> shows on Year / Same&nbsp;Period&nbsp;Last&nbsp;Year only (a lead needs time to convert, so short windows read misleadingly low). Use the green <strong>Export to Excel</strong> button to download the visible table. Note that Cancellation on very short windows reads low because a booking needs time to cancel.</div>
                         <button type="button" class="sc-owner-desc-toggle" data-target="sc-owner-desc" aria-expanded="false">See more</button>
                         <div class="table-responsive">
                             <table class="table table-sm summary-table sc-owner-matrix">
@@ -1427,6 +1432,74 @@ $(function() {
         rows.forEach(function(tr) { tbody.appendChild(tr); });
     });
 
+    // Hide any metric column that has no data for the selected range. A column is
+    // dropped when every rendered cell is empty (data-empty="1") — the column
+    // doesn't apply to the period (e.g. Reply Time / Served / Score on a Year
+    // window) or no agent has a value. The Agent column (0) is never hidden. The
+    // set of hidden columns is remembered so the Excel export skips them too.
+    function applyOwnerColVisibility(tbody) {
+        var table = document.querySelector('#booking_summary_cards .sc-owner-matrix');
+        if(!table) return;
+        var headers = table.querySelectorAll('thead th');
+        var hidden = {};
+        if(tbody) {
+            var rows = Array.prototype.slice.call(tbody.querySelectorAll('tr'))
+                .filter(function(tr) { return tr.children.length > 1; });
+            for(var ci = 1; ci < headers.length; ci++) {
+                var anyData = false;
+                for(var ri = 0; ri < rows.length; ri++) {
+                    var cell = rows[ri].children[ci];
+                    if(cell && cell.getAttribute('data-empty') !== '1') { anyData = true; break; }
+                }
+                if(rows.length && !anyData) hidden[ci] = true;
+            }
+        }
+        window._ownerHiddenCols = hidden;
+        for(var h = 0; h < headers.length; h++) { headers[h].style.display = hidden[h] ? 'none' : ''; }
+        var bodyRows = table.querySelectorAll('tbody tr');
+        for(var r = 0; r < bodyRows.length; r++) {
+            var cells = bodyRows[r].children;
+            if(cells.length <= 1) continue; // skip the Loading / No-data placeholder row
+            for(var c = 0; c < cells.length; c++) { cells[c].style.display = hidden[c] ? 'none' : ''; }
+        }
+    }
+
+    // Download the currently displayed matrix as a CSV that Excel opens directly.
+    // Respects the visible columns (hidden empty columns are skipped) and the
+    // current sort order; em-dashes become blank cells.
+    function exportOwnerMatrix() {
+        var table = document.querySelector('#booking_summary_cards .sc-owner-matrix');
+        if(!table) return;
+        var hidden = window._ownerHiddenCols || {};
+        var out = [];
+        var trs = table.querySelectorAll('tr');
+        for(var i = 0; i < trs.length; i++) {
+            var cells = trs[i].children;
+            if(cells.length <= 1) continue; // skip Loading / No-data placeholder
+            var line = [];
+            for(var j = 0; j < cells.length; j++) {
+                if(hidden[j]) continue;
+                var txt = (cells[j].textContent || '').replace(/—/g, '').trim(); // em-dash -> blank
+                line.push('"' + txt.replace(/"/g, '""') + '"');
+            }
+            out.push(line.join(','));
+        }
+        if(out.length < 2) return; // header only — nothing to export
+        var lblEl = document.getElementById('sc-owner-period-label');
+        var label = ((lblEl && lblEl.textContent) || 'period').replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'period';
+        var csv = String.fromCharCode(0xFEFF) + out.join('\r\n'); // BOM so Excel reads UTF-8
+        var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'Agent_Performance_' + label + '.csv';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+    $('#booking_summary_cards').on('click', '#sc-owner-export', function() { exportOwnerMatrix(); });
+
     // Renders the three sales-agent "chase" cards (Travel in 7/14 Days – Not Yet
     // Ready, Payment From Customer Due Soon) from a cards/tables payload. Counts
     // are whole-DB over the agent's own bookings, matching each card's drill-down.
@@ -1806,8 +1879,11 @@ $(function() {
                 pickup:   ['day','week','month','year'],
                 newleads: ['day','week','month','year'],
                 served:   ['day','week','month'],
-                convc:    ['day','week','month','year'],
-                conva:    ['day','week','month','year'],
+                // Conversion is a yearly measure — a lead needs time to convert,
+                // so short windows read misleadingly low. Report it on Year only;
+                // on shorter ranges the whole column is hidden (all cells dash).
+                convc:    ['year'],
+                conva:    ['year'],
                 outbound: ['day','week','month','year'],
                 sales:    ['day','week','month','year'],
                 followup: ['day','week','month','year'],
@@ -1859,6 +1935,13 @@ $(function() {
             } else {
                 ownerMatrixBody.innerHTML = '<tr><td colspan="12" class="text-center text-muted">No data for this period</td></tr>';
             }
+            // Hide whole columns that carry no data for this range. A column is
+            // dropped when every rendered cell is empty (the column doesn't apply
+            // to the period, or no agent has a value) — e.g. Reply Time / Served /
+            // Score all dash on a Year window, so those columns disappear rather
+            // than showing a wall of "—". Agent (col 0) is always kept. Recomputed
+            // on every render, so columns reappear when a range does have data.
+            applyOwnerColVisibility(ownerMatrix && ownerMatrix.length ? ownerMatrixBody : null);
         }
         // Reflect the server-resolved owner period onto the active toggle tab and
         // header label (covers the default and the bad-input fallback).
