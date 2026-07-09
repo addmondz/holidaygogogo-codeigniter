@@ -275,8 +275,12 @@ class Dashboard extends MY_Controller
 			$array['owner_cancellation_reasons'] = $this->Dashboard_Model->Top_Cancellation_Reasons(
 				$windows['year'][0], $windows['year'][1], 5
 			);
-			// Total cancellations this year — denominator for each reason's %.
+			// Total cancellations this year — shown in the card subtext.
 			$array['owner_cancellation_total'] = $this->Dashboard_Model->Total_Cancellations(
+				$windows['year'][0], $windows['year'][1]
+			);
+			// Total bookings this year — denominator for each reason's % share.
+			$array['owner_booking_total'] = $this->Dashboard_Model->Total_Bookings(
 				$windows['year'][0], $windows['year'][1]
 			);
 

@@ -992,24 +992,25 @@
                                         <div class="text-muted" style="font-size:13px;">No cancellations this year.</div>
                                     <?php } else {
                                         $reason_total = isset($owner_cancellation_total) ? (int)$owner_cancellation_total : 0;
+                                        $booking_total = isset($owner_booking_total) ? (int)$owner_booking_total : 0;
                                         $reason_max = 0;
                                         foreach($owner_cancellation_reasons as $r) { $reason_max = max($reason_max, (int)$r->Total); }
                                         foreach($owner_cancellation_reasons as $r) {
                                             $w = $reason_max > 0 ? round(((int)$r->Total / $reason_max) * 100) : 0;
-                                            $pct = $reason_total > 0 ? round(((int)$r->Total / $reason_total) * 100) : 0; ?>
+                                            $pct = $booking_total > 0 ? round(((int)$r->Total / $booking_total) * 100) : 0; ?>
                                             <div class="d-flex align-items-center mb-3">
                                                 <div class="flex-grow-1 mr-3" style="min-width:0;">
                                                     <div style="font-size:13px; color:#3F4254; font-weight:600;"><?php echo htmlspecialchars($r->Name); ?></div>
                                                     <div class="reason-bar" style="width:<?php echo $w; ?>%;"></div>
                                                 </div>
                                                 <div class="text-right" style="min-width:64px;">
-                                                    <div style="font-size:16px; font-weight:700; color:#3F4254;"><?php echo (int)$r->Total; ?></div>
-                                                    <div style="font-size:12px; color:#B5B5C3; font-weight:600;"><?php echo $pct; ?>%</div>
+                                                    <div style="font-size:18px; font-weight:700; color:#3F4254;"><?php echo $pct; ?>%</div>
+                                                    <div style="font-size:12px; color:#7E8299; font-weight:600;"><?php echo (int)$r->Total; ?> bookings</div>
                                                 </div>
                                             </div>
                                         <?php }
                                     } ?>
-                                    <div class="kpi-sub mt-2">Cancelled booking confirmations grouped by reason, by booking date, this year. % is share of all <?php echo isset($owner_cancellation_total) ? (int)$owner_cancellation_total : 0; ?> cancellations this year.</div>
+                                    <div class="kpi-sub mt-2">Cancelled booking confirmations grouped by reason, by booking date, this year. % is cancelled bookings for that reason out of all <?php echo isset($owner_booking_total) ? (int)$owner_booking_total : 0; ?> bookings this year (<?php echo isset($owner_cancellation_total) ? (int)$owner_cancellation_total : 0; ?> cancelled total).</div>
                                 </div>
                             </div>
                         </div>
