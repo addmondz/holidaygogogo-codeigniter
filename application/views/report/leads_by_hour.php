@@ -4,7 +4,7 @@ $date_label = isset($leads_by_hour_date_label) ? $leads_by_hour_date_label : '';
 $updated_at = isset($leads_by_hour_updated_at) ? $leads_by_hour_updated_at : '';
 
 // Peak scaling: the busiest single cell sets the deepest shade so the grid
-// reads like a heatmap of when leads get picked up.
+// reads like a heatmap of when leads land.
 $max_cell = 0;
 foreach ($matrix['rows'] as $r) {
     foreach ($r['counts'] as $c) {
@@ -34,7 +34,7 @@ $export_url = base_url('Report/Leads_By_Hour_Export?lead_date=') . urlencode($da
                             <strong>Leads By Hour</strong>
                         </h3>
                         <div class="text-muted font-size-sm">
-                            What time of day new leads get picked up &mdash; each lead counted at the hour its owner was assigned.
+                            What time of day new leads land &mdash; each lead counted at the hour it started.
                         </div>
                     </div>
                 </div>
@@ -121,7 +121,7 @@ $export_url = base_url('Report/Leads_By_Hour_Export?lead_date=') . urlencode($da
                 </div>
 
                 <?php if ($updated_at !== '') { ?>
-                    <div class="text-muted font-size-sm mt-3">Generated at <?php echo html_escape($updated_at); ?>. Counted by the hour each lead was picked up (assigned owner).</div>
+                    <div class="text-muted font-size-sm mt-3">Generated at <?php echo html_escape($updated_at); ?>. Counted by the hour each lead first landed.</div>
                 <?php } ?>
             </div>
         </div>

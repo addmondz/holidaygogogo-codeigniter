@@ -1095,15 +1095,6 @@ class Dashboard_Model extends CI_Model
 		return $out;
 	}
 
-	// Company-wide count of new GHL leads whose conversation started in the
-	// window (ghl_processed_leads.lead_started_at). One row per processed lead.
-	function New_Leads_Count($start, $end)
-	{
-		$this->db->where('CAST(lead_started_at AS DATE) >=', $start);
-		$this->db->where('CAST(lead_started_at AS DATE) <=', $end);
-		return (int) $this->db->count_all_results('ghl_processed_leads');
-	}
-
 	// Top cancellation reasons by number of cancelled booking confirmations in
 	// the window (windowed on InsertDate). Excludes quotation/proforma and drafts.
 	function Top_Cancellation_Reasons($start, $end, $limit = 5)
@@ -1168,18 +1159,18 @@ class Dashboard_Model extends CI_Model
 		return $row ? (float) $row->Amount : 0.0;
 	}
 
-	// Unapproved payment OUT (to suppliers): SUM(Debit) of ALL pending debit rows
-	// (Credit = 0, Status = 'P') DUE on or before $end — i.e. everything
-	// scheduled-but-not-approved-yet, cumulative up to the window's end. Unlike
-	// Approved_Payment_Out() there is NO lower bound: a pending pay-out is an
-	// outstanding obligation, so overdue ones due before the window must still
-	// count (otherwise the card understates the true backlog).
+	// Unapproved payment OUT (to suppliers): SUM(Debit) of pending debit rows
+	// (Credit = 0, Status = 'P') whose Deadline falls WITHIN [$start, $end] — a
+	// bounded per-period range, so each card cell matches the Payment listing's
+	// "Total Payment Out" filtered by deadline range + pending + payment-out.
+	// Overdue pay-outs whose deadline is before $start are NOT counted here
+	// (they belong to an earlier period, not this window).
 	//
 	// NOTE: pending pay-outs have NO transaction Date yet (that is only stamped
 	// once the payment is actually made/approved) — they carry a Deadline. So we
 	// window on Deadline here, not Date. Using Date would exclude every pending
 	// row (all NULL) and the card would always read 0.
-	function Unapproved_Payment_Out($end)
+	function Unapproved_Payment_Out($start, $end)
 	{
 		$this->db->select('COALESCE(SUM(Debit), 0) AS Amount', false);
 		$this->db->join('payment', 'payment.BookingID = booking.BookingID', 'left');
@@ -1188,6 +1179,7 @@ class Dashboard_Model extends CI_Model
 		$this->db->where('BookingConfirmationTitle', 'BOOKING CONFIRMATION');
 		$this->db->where('CancelStatus', 'N');
 		$this->db->where('booking.Status !=', 'N');
+		$this->db->where('CAST(payment.Deadline AS DATE) >=', $start);
 		$this->db->where('CAST(payment.Deadline AS DATE) <=', $end);
 		$row = $this->db->get('booking')->row();
 		return $row ? (float) $row->Amount : 0.0;

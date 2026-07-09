@@ -95,11 +95,12 @@ if (!function_exists('owner_agent_matrix_build')) {
         }
 
         // ---- GHL-keyed: reply time (metric 1) ----
-        // Uses the Message-Log reply-pair metric (Ghl_Messages_Avg_Reply_By_Agent),
-        // the SAME source as the TC "Avg Reply Time to Inbound" card and its "Best:"
-        // leaderboard — so the owner matrix agrees with each agent's own card.
-        // Weighted by the reply sample (total_leads = conversations replied to) so a
-        // TC owning several GHL inboxes aggregates fairly.
+        // Uses the point-in-time lead-ownership reply-pair metric
+        // (Ghl_Ownership_Avg_Reply_By_Owner) — the SAME source as the "Lead Reply
+        // Hourly" page's "Avg Response Time" card — so an agent's matrix reply time
+        // equals their number on that report. Keyed by GHL owner user id. Weighted by
+        // the reply sample (total_leads = conversations replied to) so a TC owning
+        // several GHL inboxes aggregates fairly.
         foreach ($src('reply') as $r) {
             $uid = (string) $r['agent_id'];
             if (!isset($map[$uid])) { continue; }

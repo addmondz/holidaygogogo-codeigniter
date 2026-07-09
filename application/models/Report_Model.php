@@ -5,7 +5,6 @@ class Report_Model extends CI_Model
 
     // Request-level caches so the same expensive work is not repeated within one page load.
     protected $replyCreatedBaseRowsCache = array();
-    protected $assignmentDateExpressionCache = null;
 
     private function get_processed_lead_response_slot_select($alias = 'pl')
     {
@@ -1744,6 +1743,153 @@ class Report_Model extends CI_Model
     }
 
     /**
+     * Per-lead breakdown behind the dashboard's "New Lead Picked Up" number, for
+     * the drill-down modal. Reuses build_lead_reply_assignment_where_clause() —
+     * the SAME universe the count comes from — so the list length equals the
+     * count exactly (see LeadReplyActivityLeadsModalTest). One row per distinct
+     * picked-up lead (deduped by processed_lead_id, matching COUNT(DISTINCT ...)),
+     * carrying the conversation id and its ownership window so the modal can load
+     * the message thread via Lead_Data_Messages(). message_count is every message
+     * inside that window. Caller passes owner_user_id + start/end (single day).
+     */
+    public function Lead_Reply_Activity_Picked_Up_Leads($filters = array())
+    {
+        $where = $this->build_lead_reply_assignment_where_clause($filters);
+        if (trim($where['sql']) === 'WHERE 1=0') {
+            return array();
+        }
+
+        $extraJoins = isset($where['extra_joins']) ? $where['extra_joins'] : '';
+        $messageTimeColumn = $this->escape_identifier($this->get_message_time_column());
+
+        $sql = "
+            SELECT
+                glo.processed_lead_id,
+                glo.conversation_id,
+                glo.contact_id,
+                COALESCE(NULLIF(gc.contact_name, ''), NULLIF(gc.full_name, ''), 'Unknown Contact') AS contact_name,
+                gc.phone,
+                COALESCE(NULLIF(gu.Name, ''), glo.owner_user_id) AS owner_name,
+                glo.lead_started_at,
+                glo.lead_ended_at,
+                (
+                    SELECT COUNT(*)
+                    FROM ghl_messages gm_count
+                    WHERE gm_count.conversation_id = glo.conversation_id
+                      AND gm_count.{$messageTimeColumn} >= glo.lead_started_at
+                      AND (
+                          glo.lead_ended_at IS NULL
+                          OR gm_count.{$messageTimeColumn} < glo.lead_ended_at
+                      )
+                ) AS message_count
+            FROM ghl_lead_ownership glo
+            LEFT JOIN ghl_conversations gc ON gc.conversation_id = glo.conversation_id
+            LEFT JOIN ghl_users gu ON gu.UserID = glo.owner_user_id
+            {$extraJoins}
+            {$where['sql']}
+            ORDER BY glo.lead_started_at DESC
+        ";
+
+        $rows = $this->db->query($sql, $where['params'])->result_array();
+
+        // Dedupe by lead so the list matches COUNT(DISTINCT processed_lead_id) even
+        // if a lead ever carried more than one qualifying ownership row.
+        $seen = array();
+        $leads = array();
+        foreach ($rows as $row) {
+            $leadId = (string) $row['processed_lead_id'];
+            if (isset($seen[$leadId])) {
+                continue;
+            }
+            $seen[$leadId] = true;
+            $leads[] = $row;
+        }
+
+        return $leads;
+    }
+
+    /**
+     * Per-lead breakdown behind the dashboard's "Lead Responded" number, for the
+     * drill-down modal. Reuses build_lead_reply_created_where_clause() plus the
+     * SAME outbound-reply join, in-window bound, date range and 07:00-22:00
+     * business-hours filter the count uses, GROUP-BY-lead so the row count equals
+     * COUNT(DISTINCT processed_lead_id). Each row carries first_reply_at (the
+     * owner's earliest in-window reply) and reply_count, plus the conversation id
+     * and ownership window for the message-thread drill.
+     */
+    public function Lead_Reply_Activity_Responded_Leads($filters = array())
+    {
+        $where = $this->build_lead_reply_created_where_clause($filters);
+        if (trim($where['sql']) === 'WHERE 1=0') {
+            return array();
+        }
+
+        $extraJoins = isset($where['extra_joins']) ? $where['extra_joins'] : '';
+        $messageTimeColumn = $this->escape_identifier($this->get_message_time_column());
+        $businessHours = $this->lead_reply_business_hours_sql("gm.{$messageTimeColumn}");
+        $start = !empty($filters['start_date']) ? $filters['start_date'] . ' 00:00:00' : '1970-01-01 00:00:00';
+        $end = !empty($filters['end_date']) ? $filters['end_date'] . ' 23:59:59' : '9999-12-31 23:59:59';
+
+        $sql = "
+            SELECT
+                glo.processed_lead_id,
+                glo.conversation_id,
+                glo.contact_id,
+                COALESCE(NULLIF(gc.contact_name, ''), NULLIF(gc.full_name, ''), 'Unknown Contact') AS contact_name,
+                gc.phone,
+                COALESCE(NULLIF(gu.Name, ''), glo.owner_user_id) AS owner_name,
+                glo.lead_started_at,
+                glo.lead_ended_at,
+                MIN(gm.{$messageTimeColumn}) AS first_reply_at,
+                COUNT(*) AS reply_count
+            FROM ghl_lead_ownership glo
+            INNER JOIN ghl_messages gm
+                ON gm.conversation_id = glo.conversation_id
+               AND gm.user_id = glo.owner_user_id
+               AND gm.direction = 'outbound'
+               AND gm.{$messageTimeColumn} >= glo.lead_started_at
+               AND (
+                    glo.lead_ended_at IS NULL
+                    OR gm.{$messageTimeColumn} < glo.lead_ended_at
+               )
+            LEFT JOIN ghl_conversations gc ON gc.conversation_id = glo.conversation_id
+            LEFT JOIN ghl_users gu ON gu.UserID = glo.owner_user_id
+            {$extraJoins}
+            {$where['sql']}
+              AND gm.{$messageTimeColumn} BETWEEN ? AND ?
+              AND {$businessHours}
+            GROUP BY
+                glo.processed_lead_id,
+                glo.conversation_id,
+                glo.contact_id,
+                contact_name,
+                gc.phone,
+                owner_name,
+                glo.lead_started_at,
+                glo.lead_ended_at
+            ORDER BY first_reply_at ASC
+        ";
+
+        $params = array_merge($where['params'], array($start, $end));
+
+        return $this->db->query($sql, $params)->result_array();
+    }
+
+    /**
+     * Per-lead breakdown behind the dashboard's "Transfer Out Lead" number, for
+     * the drill-down modal. These are the reply-created leads (the owner's 4th
+     * outbound reply lands in the window) — the SAME universe the Transfer Out
+     * count comes from, so it reuses Lead_Reply_Activity_Reply_Created_Detail_Rows()
+     * and the modal's row count equals the number on screen. Each row carries
+     * reply_created_at as its activity timestamp. Caller passes owner_user_id +
+     * start/end so it is scoped to the clicked owner and day.
+     */
+    public function Lead_Reply_Activity_Transfer_Out_Leads($filters = array())
+    {
+        return $this->Lead_Reply_Activity_Reply_Created_Detail_Rows($filters);
+    }
+
+    /**
      * "Avg Response Time" per owner: the mean of EVERY inbound->outbound reply the
      * owner made, computed with the SAME per-pair logic as the Lead Reply Hourly
      * card (ghl_message_log_average_reply_seconds_by_group / ...seconds). Each
@@ -1869,11 +2015,13 @@ class Report_Model extends CI_Model
      * "New Leads" summary card so the card and that report agree.
      *
      * Counts DISTINCT leads the owner is the real assignee of (is_assigned_owner
-     * = 1 AND assigned owner = owner), windowed by the PICK-UP time
-     * (COALESCE(assigned_at, lead_started_at)) rather than when the conversation
-     * started. COUNT(DISTINCT processed_lead_id) across the whole uid set de-dupes
-     * a lead a TC picked up on two of her own inboxes; a single-inbox TC equals
-     * her dashboard row exactly.
+     * = 1 AND assigned owner = owner) whose conversation FIRST landed in the
+     * window (lead_reply_pickup_date_expression() = lead_started_at) -- a lead is
+     * "new" by when the customer first contacted us, not when it was later
+     * assigned, so a days-old conversation reassigned today does not resurface as
+     * a fresh pick-up. COUNT(DISTINCT processed_lead_id) across the whole uid set
+     * de-dupes a lead a TC picked up on two of her own inboxes; a single-inbox TC
+     * equals her dashboard row exactly.
      *
      * @param array  $uids   GHL owner user ids linked to the agent
      * @param string $start  inclusive date 'Y-m-d'
@@ -1887,7 +2035,8 @@ class Report_Model extends CI_Model
             return 0;
         }
 
-        $assignmentDate = $this->lead_reply_assignment_date_expression('glo');
+        $pickupDate = $this->lead_reply_pickup_date_expression('glo');
+        $firstContactOnly = $this->lead_reply_first_contact_only_sql('glo');
         $placeholders = implode(',', array_fill(0, count($uids), '?'));
 
         $sql = "
@@ -1895,8 +2044,9 @@ class Report_Model extends CI_Model
             FROM ghl_lead_ownership glo
             WHERE glo.is_assigned_owner = 1
               AND NULLIF(glo.assigned_to_user_id, '') = glo.owner_user_id
+              AND {$firstContactOnly}
               AND glo.owner_user_id IN ({$placeholders})
-              AND {$assignmentDate} BETWEEN ? AND ?
+              AND {$pickupDate} BETWEEN ? AND ?
         ";
 
         $params = array_merge($uids, array($start . ' 00:00:00', $end . ' 23:59:59'));
@@ -2019,6 +2169,26 @@ class Report_Model extends CI_Model
     private function lead_reply_business_hours_sql($expr)
     {
         return "(TIME({$expr}) BETWEEN '07:00:00' AND '22:00:00')";
+    }
+
+    /**
+     * Company-wide "New Lead Picked Up" total for a date range, matching the
+     * Lead Reply Activity dashboard's tfoot total exactly (distinct owner:lead
+     * pairs windowed by the pick-up time). Powers the owner dashboard's
+     * "Total New Leads (GHL)" card so the two figures always agree — it reuses
+     * the very same summary query the dashboard total is built from, so they
+     * cannot drift.
+     *
+     * @param string $start Inclusive start date (Y-m-d).
+     * @param string $end   Inclusive end date (Y-m-d).
+     * @return int
+     */
+    public function Lead_Reply_Activity_Picked_Up_Total($start, $end)
+    {
+        return $this->Lead_Reply_Activity_Assigned_New_Leads_Summary(array(
+            'start_date' => $start,
+            'end_date'   => $end,
+        ));
     }
 
     private function Lead_Reply_Activity_Assigned_New_Leads_Summary($filters = array())
@@ -2144,7 +2314,7 @@ class Report_Model extends CI_Model
         $where = $this->build_lead_reply_created_where_clause($filters);
         $extraJoins = isset($where['extra_joins']) ? $where['extra_joins'] : '';
         $messageTimeColumn = $this->escape_identifier($this->get_message_time_column());
-        $assignmentDate = $this->lead_reply_assignment_date_expression('glo');
+        $pickupDate = $this->lead_reply_pickup_date_expression('glo');
         $start = !empty($filters['start_date']) ? $filters['start_date'] . ' 00:00:00' : '1970-01-01 00:00:00';
         $end = !empty($filters['end_date']) ? $filters['end_date'] . ' 23:59:59' : '9999-12-31 23:59:59';
 
@@ -2172,7 +2342,7 @@ class Report_Model extends CI_Model
                     glo.processed_lead_id,
                     glo.is_assigned_owner,
                     glo.assigned_to_user_id,
-                    {$assignmentDate} AS assigned_activity_at,
+                    {$pickupDate} AS pickup_at,
                     SUBSTRING_INDEX(
                         SUBSTRING_INDEX(GROUP_CONCAT(gm.{$messageTimeColumn} ORDER BY gm.{$messageTimeColumn} ASC, gm.id ASC), ',', 4),
                         ',',
@@ -2198,13 +2368,13 @@ class Report_Model extends CI_Model
                     glo.processed_lead_id,
                     glo.is_assigned_owner,
                     glo.assigned_to_user_id,
-                    assigned_activity_at
+                    pickup_at
                 HAVING COUNT(*) > 3
             ) reply_created
             WHERE reply_created.reply_created_at BETWEEN ? AND ?
               AND NOT (
                   NULLIF(reply_created.assigned_to_user_id, '') = reply_created.owner_user_id
-                  AND reply_created.assigned_activity_at BETWEEN ? AND ?
+                  AND reply_created.pickup_at BETWEEN ? AND ?
               )
         ";
 
@@ -2256,12 +2426,12 @@ class Report_Model extends CI_Model
         $where = $this->build_lead_reply_assignment_where_clause($filters);
         $extraJoins = isset($where['extra_joins']) ? $where['extra_joins'] : '';
         $messageTimeColumn = $this->escape_identifier($this->get_message_time_column());
-        $assignmentDate = $this->lead_reply_assignment_date_expression('glo');
+        $pickupDate = $this->lead_reply_pickup_date_expression('glo');
 
         $sql = "
             SELECT
                 'Assigned Lead' AS activity_type,
-                {$assignmentDate} AS activity_at,
+                {$pickupDate} AS activity_at,
                 glo.processed_lead_id,
                 glo.conversation_id,
                 glo.contact_id,
@@ -2304,7 +2474,7 @@ class Report_Model extends CI_Model
         $where = $this->build_lead_reply_created_where_clause($filters);
         $extraJoins = isset($where['extra_joins']) ? $where['extra_joins'] : '';
         $messageTimeColumn = $this->escape_identifier($this->get_message_time_column());
-        $assignmentDate = $this->lead_reply_assignment_date_expression('glo');
+        $pickupDate = $this->lead_reply_pickup_date_expression('glo');
         $start = !empty($filters['start_date']) ? $filters['start_date'] . ' 00:00:00' : '1970-01-01 00:00:00';
         $end = !empty($filters['end_date']) ? $filters['end_date'] . ' 23:59:59' : '9999-12-31 23:59:59';
 
@@ -2326,7 +2496,7 @@ class Report_Model extends CI_Model
                     glo.owner_user_id,
                     COALESCE(NULLIF(gu.Name, ''), glo.owner_user_id) AS owner_name,
                     glo.assigned_to_user_id,
-                    {$assignmentDate} AS assigned_activity_at,
+                    {$pickupDate} AS pickup_at,
                     COALESCE(NULLIF(assigned_gu.Name, ''), NULLIF(glo.assigned_to_user_id, ''), 'Unassigned') AS assigned_name,
                     glo.lead_started_at,
                     SUBSTRING_INDEX(
@@ -2374,7 +2544,7 @@ class Report_Model extends CI_Model
                     glo.owner_user_id,
                     owner_name,
                     glo.assigned_to_user_id,
-                    assigned_activity_at,
+                    pickup_at,
                     assigned_name,
                     glo.lead_started_at,
                     glo.lead_ended_at,
@@ -2387,7 +2557,7 @@ class Report_Model extends CI_Model
             WHERE reply_created.reply_created_at BETWEEN ? AND ?
               AND NOT (
                   NULLIF(reply_created.assigned_to_user_id, '') = reply_created.owner_user_id
-                  AND reply_created.assigned_activity_at BETWEEN ? AND ?
+                  AND reply_created.pickup_at BETWEEN ? AND ?
               )
         ";
 
@@ -3129,6 +3299,85 @@ class Report_Model extends CI_Model
     }
 
     /**
+     * Per-OWNER average reply time built from the SAME point-in-time
+     * lead-ownership source as the "Lead Reply Hourly" page's "Avg Response Time"
+     * card (Lead_Reply_Activity_Hourly_Avg_Reply_Seconds_By_Owner), but computed
+     * for EVERY owner in one pass so the Owner dashboard "Agent Performance"
+     * matrix REPLY TIME column agrees with that report to the second.
+     *
+     * A message counts for the owner who HELD the lead when it was sent
+     * (glo.lead_started_at .. lead_ended_at, gated to glo.is_reply_owner = 1 like
+     * the report's build_lead_reply_created_where_clause) -- not whoever is
+     * assigned now -- and only the owner's OWN outbound replies pair with inbound
+     * customer messages (the report's direction rule). This is why it differs from the
+     * older Ghl_Messages_Avg_Reply_By_Agent(), which keyed off the live
+     * ghl_conversations.assigned_to / message sender and so drifted from the
+     * report whenever a lead was reassigned.
+     *
+     * Rows come out shaped exactly like Ghl_Messages_Avg_Reply_By_Agent so the
+     * matrix fold (owner_agent_matrix_build) consumes them unchanged: 'agent_id'
+     * (GHL owner user id), 'total_leads' (distinct conversations that produced a
+     * counted reply -- the weight when one admin owns several GHL inboxes) and
+     * 'avg_response_time_seconds'. Ordered owner -> conversation -> time so the
+     * in-hours inbound->outbound pairing in
+     * ghl_message_log_average_reply_seconds_by_group() is sound.
+     *
+     * Loads raw message rows and pairs them in PHP (like the older source), so
+     * the caller keeps it Day / Week / Month only -- a full Year window would
+     * exhaust PHP memory.
+     *
+     * @param string $startDate 'Y-m-d' inclusive lower bound (message date).
+     * @param string $endDate   'Y-m-d' inclusive upper bound (message date).
+     * @return array List of owner rows (unscoped; caller restricts to a role pool).
+     */
+    function Ghl_Ownership_Avg_Reply_By_Owner($startDate, $endDate)
+    {
+        $this->load->helper('ghl_messages_log');
+        $messageTimeColumn = $this->escape_identifier($this->get_message_time_column());
+
+        $params = array($startDate . ' 00:00:00', $endDate . ' 23:59:59');
+        $rows = $this->db->query(
+            "SELECT glo.owner_user_id AS agent_id,
+                    gm.conversation_id AS conversation_id,
+                    gm.direction AS direction,
+                    gm.{$messageTimeColumn} AS ts
+               FROM ghl_lead_ownership glo
+               INNER JOIN ghl_messages gm
+                   ON gm.conversation_id = glo.conversation_id
+                  AND gm.{$messageTimeColumn} >= glo.lead_started_at
+                  AND (glo.lead_ended_at IS NULL OR gm.{$messageTimeColumn} < glo.lead_ended_at)
+              WHERE glo.is_reply_owner = 1
+                AND gm.{$messageTimeColumn} >= ?
+                AND gm.{$messageTimeColumn} <= ?
+                AND (
+                      gm.direction = 'inbound'
+                      OR (gm.direction = 'outbound' AND gm.user_id = glo.owner_user_id)
+                )
+              ORDER BY agent_id ASC, gm.conversation_id ASC, gm.{$messageTimeColumn} ASC, gm.id ASC",
+            $params
+        )->result_array();
+
+        $byGroup = ghl_message_log_average_reply_seconds_by_group($rows, 'agent_id', 'ts');
+
+        $results = array();
+        foreach ($byGroup as $aid => $stat) {
+            $aid = (string) $aid;
+            if ($aid === '') {
+                continue;
+            }
+            $results[] = array(
+                'agent_id'   => $aid,
+                'total_leads' => (int) $stat['lead_count'],
+                'avg_response_time_seconds' => $stat['avg_seconds'] !== null
+                    ? (int) round($stat['avg_seconds'])
+                    : null,
+            );
+        }
+
+        return $results;
+    }
+
+    /**
      * Distinct agent names available to the Message Log agent filter. Restricted
      * to agents that actually appear in the log -- either as a message sender
      * (ghl_messages.user_id) or as a chatroom assignee (ghl_conversations.
@@ -3387,44 +3636,28 @@ class Report_Model extends CI_Model
     }
 
     /**
-     * PICKED-UP leads grouped by DATE + HOUR, for the "Leads By Hour" report.
-     * Same universe as the dashboard "New Lead Picked Up" column: rows in
-     * ghl_lead_ownership where the owner is the real assignee (is_assigned_owner
-     * = 1 AND assigned_to_user_id = owner_user_id), so the grid answers "what
-     * time of day do agents pick up leads?". The bucket uses the pick-up time
-     * (COALESCE(assigned_at, lead_started_at)) -- the exact date expression the
-     * column filters on -- and COUNT(DISTINCT owner:lead) keeps the grand total
-     * in step with the column total (a lead picked up by two owners counts per
-     * owner, matching the summary). Reuses build_lead_reply_assignment_where_clause
-     * so date/agent/team filters and non-owner scoping match the dashboard;
-     * the lead-dashboard agent filter (sales_agent/agent_id) is mapped onto its
-     * owner_user_id key. Returns sparse rows; leads_by_hour_build_matrix() fills
-     * the gaps.
+     * New leads grouped by capture DATE + HOUR, for the "Leads By Hour" report.
+     * Uses lead_started_at (when the lead actually landed / first inbound), NOT
+     * created_at (the cron insert time). Reuses the shared lead-dashboard WHERE
+     * builder so date/agent/team filters and non-owner scoping match the rest
+     * of the lead reports. Returns sparse rows (only hours that had leads);
+     * leads_by_hour_build_matrix() fills the gaps.
      *
-     * @param array $filters lead-dashboard filters (see lead_dashboard_filters())
+     * @param array $filters see build_lead_dashboard_where_clause()
      * @return array of arrays: [ ['lead_date'=>'Y-m-d','hour_of_day'=>int,'lead_count'=>int], ... ]
      */
     function Leads_By_Hour($filters = array())
     {
-        // Map the lead-dashboard agent filter onto the assignment builder's key.
-        if (empty($filters['owner_user_id'])) {
-            $agentIds = !empty($filters['agent_id']) ? $filters['agent_id']
-                      : (!empty($filters['sales_agent']) ? $filters['sales_agent'] : array());
-            if (!empty($agentIds)) {
-                $filters['owner_user_id'] = $agentIds;
-            }
-        }
-
-        $where = $this->build_lead_reply_assignment_where_clause($filters);
+        $where = $this->build_lead_dashboard_where_clause($filters);
         $extraJoins = isset($where['extra_joins']) ? $where['extra_joins'] : '';
-        $pickupDate = $this->lead_reply_assignment_date_expression('glo');
 
         $sql = "
             SELECT
-                DATE({$pickupDate}) AS lead_date,
-                HOUR({$pickupDate}) AS hour_of_day,
-                COUNT(DISTINCT CONCAT(glo.owner_user_id, ':', glo.processed_lead_id)) AS lead_count
-            FROM ghl_lead_ownership glo
+                DATE(pl.lead_started_at) AS lead_date,
+                HOUR(pl.lead_started_at) AS hour_of_day,
+                COUNT(*) AS lead_count
+            FROM ghl_processed_leads pl
+            LEFT JOIN ghl_conversations gc ON gc.conversation_id = pl.conversation_id
             {$extraJoins}
             {$where['sql']}
             GROUP BY lead_date, hour_of_day
@@ -3758,10 +3991,11 @@ class Report_Model extends CI_Model
         $clauses = array();
         $params = array();
         $extraJoins = '';
-        $assignmentDate = $this->lead_reply_assignment_date_expression('glo');
+        $pickupDate = $this->lead_reply_pickup_date_expression('glo');
 
         $clauses[] = 'glo.is_assigned_owner = 1';
         $clauses[] = "NULLIF(glo.assigned_to_user_id, '') = glo.owner_user_id";
+        $clauses[] = $this->lead_reply_first_contact_only_sql('glo');
 
         if (array_key_exists('_restrict_agent_ids', $filters)) {
             $allowed = array_values(array_filter(
@@ -3777,12 +4011,12 @@ class Report_Model extends CI_Model
         }
 
         if (!empty($filters['start_date'])) {
-            $clauses[] = "{$assignmentDate} >= ?";
+            $clauses[] = "{$pickupDate} >= ?";
             $params[] = $filters['start_date'] . ' 00:00:00';
         }
 
         if (!empty($filters['end_date'])) {
-            $clauses[] = "{$assignmentDate} <= ?";
+            $clauses[] = "{$pickupDate} <= ?";
             $params[] = $filters['end_date'] . ' 23:59:59';
         }
 
@@ -3871,20 +4105,43 @@ class Report_Model extends CI_Model
         );
     }
 
-    private function lead_reply_assignment_date_expression($alias)
+    /**
+     * The timestamp that decides which reporting window a "New Lead Picked Up"
+     * lead falls into. A lead is "new" when its conversation FIRST landed
+     * (lead_started_at = the customer's first inbound message), NOT when it was
+     * later assigned to an agent. So a customer who first wrote days ago but was
+     * only assigned yesterday belongs to the day they first contacted us, and a
+     * days-old conversation already worked by CS/TC that merely gets reassigned
+     * does not resurface as a brand-new pick-up.
+     */
+    private function lead_reply_pickup_date_expression($alias)
     {
         $alias = preg_replace('/[^A-Za-z0-9_]/', '', (string) $alias);
 
-        // field_exists() hits the schema; cache the boolean for the rest of the request.
-        if ($this->assignmentDateExpressionCache === null) {
-            $this->assignmentDateExpressionCache = $this->db->field_exists('assigned_at', 'ghl_lead_ownership');
-        }
-
-        if ($this->assignmentDateExpressionCache) {
-            return "COALESCE({$alias}.assigned_at, {$alias}.lead_started_at)";
-        }
-
         return "{$alias}.lead_started_at";
+    }
+
+    /**
+     * SQL predicate (no bind params) that keeps only leads whose customer has
+     * NEVER contacted us before this lead started -- i.e. the contact has no
+     * inbound message earlier than the lead's first-contact time. This is what
+     * makes "New Lead Picked Up" mean a brand-new customer: a returning customer
+     * who goes quiet and re-engages opens a fresh lead cycle (a new
+     * lead_started_at), but their earlier inbound messages disqualify that cycle
+     * from counting as new. Pairs with lead_reply_pickup_date_expression().
+     */
+    private function lead_reply_first_contact_only_sql($alias)
+    {
+        $alias = preg_replace('/[^A-Za-z0-9_]/', '', (string) $alias);
+        $messageTimeColumn = $this->escape_identifier($this->get_message_time_column());
+
+        return "NOT EXISTS (
+            SELECT 1
+            FROM ghl_messages gm_prior
+            WHERE gm_prior.contact_id = {$alias}.contact_id
+              AND gm_prior.direction = 'inbound'
+              AND gm_prior.{$messageTimeColumn} < {$alias}.lead_started_at
+        )";
     }
 
     private function build_mobile_search_where_clause($mobile, $filters, $phoneColumn, $ownerColumn)

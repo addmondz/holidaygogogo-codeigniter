@@ -226,6 +226,30 @@
 
                                 <?php } ?>
 
+                                <?php
+                                // "Booking PIC" ticks: whoever is ticked prints on the BC & TV
+                                // PIC line. Default = Sales Agent 1 only. On edit, reflect the
+                                // stored ticks; a legacy booking (both unset) keeps the default.
+                                $is_pic_edit_form = (current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate'));
+                                $sa1_pic_checked = true;
+                                $sa2_pic_checked = false;
+                                if ($is_pic_edit_form) {
+                                    if (isset($SalesAgentIsPIC) && $SalesAgentIsPIC !== null && $SalesAgentIsPIC !== '') {
+                                        $sa1_pic_checked = ((int)$SalesAgentIsPIC === 1);
+                                    }
+                                    if (isset($SalesAgent2IsPIC) && $SalesAgent2IsPIC !== null && $SalesAgent2IsPIC !== '') {
+                                        $sa2_pic_checked = ((int)$SalesAgent2IsPIC === 1);
+                                    }
+                                }
+                                ?>
+
+                                <div class="mt-2">
+                                    <label style="font-size:13px; color:#1c3d5a; font-weight:600; cursor:pointer;">
+                                        <input type="checkbox" id="SalesAgentIsPIC" style="vertical-align:middle; width:16px; height:16px; margin-right:6px;" <?php echo $sa1_pic_checked ? 'checked' : ''; ?> data-initial="<?php echo $sa1_pic_checked ? 1 : 0; ?>">
+                                        Show as Booking PIC on BC &amp; TV
+                                    </label>
+                                </div>
+
                             </div>
 
                             <div class="form-group">
@@ -246,6 +270,13 @@
                                     <?php } ?>
 
                                 </select>
+
+                                <div class="mt-2">
+                                    <label style="font-size:13px; color:#1c3d5a; font-weight:600; cursor:pointer;">
+                                        <input type="checkbox" id="SalesAgent2IsPIC" style="vertical-align:middle; width:16px; height:16px; margin-right:6px;" <?php echo $sa2_pic_checked ? 'checked' : ''; ?> data-initial="<?php echo $sa2_pic_checked ? 1 : 0; ?>">
+                                        Show as Booking PIC on BC &amp; TV
+                                    </label>
+                                </div>
 
                             </div>
 
@@ -3766,6 +3797,11 @@
 
                                     }
 
+                                    // Booking PIC ticks (who prints on BC & TV). Always stored
+                                    // on create so the booking starts in explicit manual mode.
+                                    booking[0]['SalesAgentIsPIC'] = $('#SalesAgentIsPIC').is(':checked') ? 1 : 0;
+                                    booking[0]['SalesAgent2IsPIC'] = $('#SalesAgent2IsPIC').is(':checked') ? 1 : 0;
+
                                     if(customer_2 !== '') { booking[0]['Customer2'] = customer_2; }
                                     if(CustomerID2) { booking[0]['CustomerID2'] = CustomerID2; }
                                     if(mobile_2 !== '') { booking[0]['Mobile2'] = mobile_2; }
@@ -4220,6 +4256,28 @@
                                     if (current_country_code_id_2 !== initial_country_code_id_2) {
                                         booking[0]['CountryCodeID2'] = current_country_code_id_2 === '' ? null : current_country_code_id_2;
                                         booking_log.push({BookingID:<?php echo $BookingID ?>, Column:'CountryCodeID2', CurrentData:initial_country_code_id_2, NewData:current_country_code_id_2, InsertBy:<?php echo $this->session->userdata('admin_id') ?>, InsertDate:'<?php echo date('Y-m-d H:i:s') ?>'});
+                                    }
+
+                                    // Booking
+
+                                    // Action : Update Booking PIC ticks (Sales Agent 1 / 2)
+                                    // Checkboxes aren't tracked by the dirty plugin, so diff
+                                    // against the initial rendered state. When either tick
+                                    // changes, materialise BOTH flags so a legacy booking never
+                                    // ends up half-set (which would confuse the fallback logic).
+                                    var initial_sa1_pic = '<?php echo $sa1_pic_checked ? 1 : 0; ?>';
+                                    var initial_sa2_pic = '<?php echo $sa2_pic_checked ? 1 : 0; ?>';
+                                    var current_sa1_pic = $('#SalesAgentIsPIC').is(':checked') ? '1' : '0';
+                                    var current_sa2_pic = $('#SalesAgent2IsPIC').is(':checked') ? '1' : '0';
+                                    if (current_sa1_pic !== initial_sa1_pic || current_sa2_pic !== initial_sa2_pic) {
+                                        booking[0]['SalesAgentIsPIC'] = parseInt(current_sa1_pic);
+                                        booking[0]['SalesAgent2IsPIC'] = parseInt(current_sa2_pic);
+                                        if (current_sa1_pic !== initial_sa1_pic) {
+                                            booking_log.push({BookingID:<?php echo $BookingID ?>, Column:'SalesAgentIsPIC', CurrentData:initial_sa1_pic, NewData:current_sa1_pic, InsertBy:<?php echo $this->session->userdata('admin_id') ?>, InsertDate:'<?php echo date('Y-m-d H:i:s') ?>'});
+                                        }
+                                        if (current_sa2_pic !== initial_sa2_pic) {
+                                            booking_log.push({BookingID:<?php echo $BookingID ?>, Column:'SalesAgent2IsPIC', CurrentData:initial_sa2_pic, NewData:current_sa2_pic, InsertBy:<?php echo $this->session->userdata('admin_id') ?>, InsertDate:'<?php echo date('Y-m-d H:i:s') ?>'});
+                                        }
                                     }
 
                                     // Booking

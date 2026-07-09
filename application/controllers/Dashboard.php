@@ -265,10 +265,13 @@ class Dashboard extends MY_Controller
 				(int) date('Y'), (int) date('n')
 			);
 
-			// Total new leads (GHL) — company-wide count per window.
+			// Total new leads (GHL) — company-wide "New Lead Picked Up" total per
+			// window, reusing the same query as the Lead Reply Activity dashboard
+			// tfoot so the card and that dashboard always match.
+			$this->load->model('Report_Model');
 			$array['owner_new_leads'] = array();
 			foreach($windows as $key => $range) {
-				$array['owner_new_leads'][$key] = $this->Dashboard_Model->New_Leads_Count($range[0], $range[1]);
+				$array['owner_new_leads'][$key] = $this->Report_Model->Lead_Reply_Activity_Picked_Up_Total($range[0], $range[1]);
 			}
 
 			// Top 5 cancellation reasons this year.
@@ -292,13 +295,14 @@ class Dashboard extends MY_Controller
 				'year'  => $this->Dashboard_Model->Approved_Payment_Out($windows['year'][0], $windows['year'][1]),
 			);
 
-			// Unapproved (pending) payment OUT — ALL pending pay-outs scheduled but not
-			// approved yet, cumulative up to each window's end (overdue ones included).
+			// Unapproved (pending) payment OUT — pending pay-outs whose Deadline falls
+			// within each window (bounded range), matching the Payment listing's
+			// "Total Payment Out" filtered by deadline range + pending + payment-out.
 			$array['owner_payment_out_pending'] = array(
-				'today' => $this->Dashboard_Model->Unapproved_Payment_Out($windows['today'][1]),
-				'week'  => $this->Dashboard_Model->Unapproved_Payment_Out($windows['week'][1]),
-				'month' => $this->Dashboard_Model->Unapproved_Payment_Out($windows['month'][1]),
-				'year'  => $this->Dashboard_Model->Unapproved_Payment_Out($windows['year'][1]),
+				'today' => $this->Dashboard_Model->Unapproved_Payment_Out($windows['today'][0], $windows['today'][1]),
+				'week'  => $this->Dashboard_Model->Unapproved_Payment_Out($windows['week'][0], $windows['week'][1]),
+				'month' => $this->Dashboard_Model->Unapproved_Payment_Out($windows['month'][0], $windows['month'][1]),
+				'year'  => $this->Dashboard_Model->Unapproved_Payment_Out($windows['year'][0], $windows['year'][1]),
 			);
 
 			// Approved payment IN (from customers) — today, week, month & year.

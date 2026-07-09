@@ -1,3 +1,32 @@
+<style>
+    .lra-count-link {
+        color: #2f506f;
+        text-decoration: underline;
+        text-decoration-style: dotted;
+        cursor: pointer;
+    }
+    .lra-count-link:hover { color: #1b3550; }
+
+    .lra-leads-table tbody tr { transition: background-color .15s ease; }
+    .lra-leads-table tbody tr:hover { background-color: #e4edf5; }
+
+    .lra-chat-modal .modal-dialog { max-width: 820px; }
+    .lra-chat-modal .modal-content { border-radius: 14px; overflow: hidden; }
+    .lra-chat-modal .modal-header {
+        background: linear-gradient(135deg, #e4edf5 0%, #f5f8fb 100%);
+        border-bottom: 1px solid #d6e0ec;
+    }
+    .lra-chat-modal .modal-body { background: #f6f8fb; max-height: 72vh; overflow-y: auto; }
+
+    .lra-chat-empty {
+        max-width: 520px; margin: 0 auto; font-size: 12px; color: #7b7b7b;
+        text-align: center; padding: 12px 10px; background: #fff;
+        border: 1px dashed #cdd8e4; border-radius: 12px;
+    }
+
+    body.lra-modal-scroll-lock, body.modal-open { overflow: hidden !important; }
+</style>
+
 <div class="d-flex flex-column-fluid">
     <div class="container-fluid">
         <div class="card card-custom mb-5">
@@ -120,7 +149,7 @@
                                 <th style="text-align:center;">
                                     New Lead Picked Up
                                     <i class="la la-info-circle ml-1" style="cursor:help; color:#2f506f;" data-toggle="tooltip"
-                                       title="New leads assigned to this owner on the selected activity date only (distinct leads where the owner is the assigned owner)."></i>
+                                       title="Brand-new leads assigned to this owner whose conversation FIRST landed within the selected date range (counted by the customer's first-contact date, not the assignment date). A days-old conversation reassigned in the range is not counted here. Distinct leads where the owner is the assigned owner."></i>
                                 </th>
                                 <th style="text-align:center;">
                                     Lead Responded
@@ -158,10 +187,26 @@
                                     <tr>
                                         <td class="text-center"><?php echo $count; ?></td>
                                         <td class="font-weight-bold text-dark"><?php echo html_escape($row['owner_name']); ?></td>
-                                        <td class="text-center"><?php echo number_format($row['new_leads_picked_up']); ?></td>
-                                        <td class="text-center"><?php echo number_format($row['lead_responded']); ?></td>
-                                        <td class="text-center"><?php echo number_format($row['transfer_out_leads']); ?></td>
-                                        <td class="text-center font-weight-bold text-dark"><?php echo number_format($row['today_handling_leads']); ?></td>
+                                        <td class="text-center">
+                                            <?php if((int) $row['new_leads_picked_up'] > 0) { ?>
+                                                <a class="lra-count-link font-weight-bold" data-owner="<?php echo html_escape($row['owner_user_id']); ?>" data-owner-name="<?php echo html_escape($row['owner_name']); ?>" data-metric="picked_up" data-toggle="tooltip" title="Show the leads behind this number"><?php echo number_format($row['new_leads_picked_up']); ?></a>
+                                            <?php } else { echo number_format($row['new_leads_picked_up']); } ?>
+                                        </td>
+                                        <td class="text-center">
+                                            <?php if((int) $row['lead_responded'] > 0) { ?>
+                                                <a class="lra-count-link font-weight-bold" data-owner="<?php echo html_escape($row['owner_user_id']); ?>" data-owner-name="<?php echo html_escape($row['owner_name']); ?>" data-metric="responded" data-toggle="tooltip" title="Show the leads behind this number"><?php echo number_format($row['lead_responded']); ?></a>
+                                            <?php } else { echo number_format($row['lead_responded']); } ?>
+                                        </td>
+                                        <td class="text-center">
+                                            <?php if((int) $row['transfer_out_leads'] > 0) { ?>
+                                                <a class="lra-count-link font-weight-bold" data-owner="<?php echo html_escape($row['owner_user_id']); ?>" data-owner-name="<?php echo html_escape($row['owner_name']); ?>" data-metric="transfer_out" data-toggle="tooltip" title="Show the leads behind this number"><?php echo number_format($row['transfer_out_leads']); ?></a>
+                                            <?php } else { echo number_format($row['transfer_out_leads']); } ?>
+                                        </td>
+                                        <td class="text-center font-weight-bold text-dark">
+                                            <?php if((int) $row['today_handling_leads'] > 0) { ?>
+                                                <a class="lra-count-link" data-owner="<?php echo html_escape($row['owner_user_id']); ?>" data-owner-name="<?php echo html_escape($row['owner_name']); ?>" data-metric="today_handling" data-toggle="tooltip" title="Show the leads behind this number"><?php echo number_format($row['today_handling_leads']); ?></a>
+                                            <?php } else { echo number_format($row['today_handling_leads']); } ?>
+                                        </td>
                                         <td class="text-center"><?php echo html_escape($row['avg_response_time_label']); ?></td>
                                         <td class="text-center">
                                             <a href="<?php echo html_escape($hourlyUrl); ?>" class="btn btn-sm btn-light-primary font-weight-bold" data-toggle="tooltip" title="View inbound/outbound per hour for this owner">
@@ -226,8 +271,116 @@
     </div>
 </div>
 
+<div class="modal fade lra-chat-modal" id="lraLeadsModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h5 class="modal-title mb-1" id="lra-modal-title">Leads</h5>
+                    <div class="text-muted font-size-sm" id="lra-modal-subtitle"></div>
+                </div>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div id="lra-leads-content">
+                    <div class="lra-chat-empty">Loading leads...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
     $('<style>.lead-refresh-link:hover{text-decoration:underline;}#lead-reply-activity-table tbody tr{transition:background-color .15s ease;}#lead-reply-activity-table tbody tr:hover{background-color:#e4edf5;cursor:pointer;}</style>').appendTo('head');
+
+    var lraLeadsEndpoint = '<?php echo base_url('Report/Lead_Reply_Activity_Leads'); ?>';
+
+    var lraMetricLabels = {
+        picked_up: 'New Leads Picked Up',
+        responded: 'Leads Responded',
+        transfer_out: 'Transfer Out Leads',
+        today_handling: 'Today Handling Leads'
+    };
+    var lraActivityHeaders = {
+        picked_up: 'First Contact',
+        responded: 'First Reply',
+        transfer_out: 'Transferred Out',
+        today_handling: 'First Reply'
+    };
+
+    // Build a clickable count cell (link only when > 0 -- nothing to drill on 0).
+    function lraCountCell(value, ownerId, ownerName, metric) {
+        var n = Number(value) || 0;
+        if (n <= 0) { return String(n); }
+        return '<a class="lra-count-link font-weight-bold" data-owner="' + escapeHtml(ownerId) +
+            '" data-owner-name="' + escapeHtml(ownerName) + '" data-metric="' + metric +
+            '" data-toggle="tooltip" title="Show the leads behind this number">' + n + '</a>';
+    }
+
+    function lraRenderLeads(metric, leads) {
+        if (!leads || leads.length === 0) {
+            $('#lra-leads-content').html('<div class="lra-chat-empty">No leads found behind this number.</div>');
+            return;
+        }
+        var activityHeader = lraActivityHeaders[metric] || 'Activity';
+        var html = '<div class="table-responsive"><table class="table table-bordered table-head-custom lra-leads-table">';
+        html += '<thead><tr>' +
+            '<th style="text-align:center;">No.</th>' +
+            '<th>Contact</th>' +
+            '<th>' + escapeHtml(activityHeader) + '</th>' +
+            '</tr></thead><tbody>';
+        $.each(leads, function(index, lead) {
+            html += '<tr>';
+            html += '<td class="text-center align-middle">' + (index + 1) + '</td>';
+            html += '<td class="align-middle">' +
+                '<div class="font-weight-bold text-dark">' + escapeHtml(lead.contact_name) + '</div>' +
+                '<div class="text-muted font-size-sm">' + escapeHtml(lead.phone) + '</div>' +
+                '<div class="text-muted font-size-sm">' + escapeHtml(lead.conversation_id) + '</div>' +
+                '</td>';
+            html += '<td class="align-middle">' + escapeHtml(lead.activity_label) + '</td>';
+            html += '</tr>';
+        });
+        html += '</tbody></table></div>';
+        $('#lra-leads-content').html(html);
+    }
+
+    function lraOpenLeads(link) {
+        var ownerId = link.data('owner');
+        var ownerName = link.data('owner-name') || ownerId;
+        var metric = link.data('metric');
+        var replyDate = $('input[name="reply_date"]').val() || '';
+
+        $('#lra-modal-title').text(lraMetricLabels[metric] || 'Leads');
+        $('#lra-modal-subtitle').text((ownerName || '') + (replyDate ? ' | ' + replyDate : ''));
+        $('#lra-leads-content').html('<div class="lra-chat-empty">Loading leads...</div>');
+        $('#lraLeadsModal').modal('show');
+
+        $.getJSON(lraLeadsEndpoint, { owner: ownerId, reply_date: replyDate, metric: metric })
+            .done(function(response) {
+                if (!response || !response.success) {
+                    $('#lra-leads-content').html('<div class="lra-chat-empty text-danger">Failed to load leads.</div>');
+                    return;
+                }
+                lraRenderLeads(metric, response.leads);
+            })
+            .fail(function() {
+                $('#lra-leads-content').html('<div class="lra-chat-empty text-danger">Failed to load leads.</div>');
+            });
+    }
+
+    $(document).on('click', '.lra-count-link', function() {
+        lraOpenLeads($(this));
+    });
+
+    $('#lraLeadsModal').on('shown.bs.modal', function() {
+        $('body').addClass('lra-modal-scroll-lock');
+    });
+
+    $('#lraLeadsModal').on('hidden.bs.modal', function() {
+        $('body').removeClass('lra-modal-scroll-lock');
+    });
 
     var leadReplyActivityEndpoint = '<?php echo base_url('Report/Lead_Reply_Activity_Dashboard_Data'); ?>';
     $('#lead_reply_activity_daterangepicker').daterangepicker({
@@ -341,10 +494,10 @@
             html += '<tr>';
             html += '<td class="text-center">' + (index + 1) + '</td>';
             html += '<td class="font-weight-bold text-dark">' + escapeHtml(row.owner_name) + '</td>';
-            html += '<td class="text-center">' + newLeadsPickedUp + '</td>';
-            html += '<td class="text-center">' + leadResponded + '</td>';
-            html += '<td class="text-center">' + transferOutLeads + '</td>';
-            html += '<td class="text-center font-weight-bold text-dark">' + todayHandlingLeads + '</td>';
+            html += '<td class="text-center">' + lraCountCell(newLeadsPickedUp, row.owner_user_id, row.owner_name, 'picked_up') + '</td>';
+            html += '<td class="text-center">' + lraCountCell(leadResponded, row.owner_user_id, row.owner_name, 'responded') + '</td>';
+            html += '<td class="text-center">' + lraCountCell(transferOutLeads, row.owner_user_id, row.owner_name, 'transfer_out') + '</td>';
+            html += '<td class="text-center font-weight-bold text-dark">' + lraCountCell(todayHandlingLeads, row.owner_user_id, row.owner_name, 'today_handling') + '</td>';
             html += '<td class="text-center">' + escapeHtml(row.avg_response_time_label || '-') + '</td>';
             html += '<td class="text-center"><a href="' + hourlyUrl + '" class="btn btn-sm btn-light-primary font-weight-bold" data-toggle="tooltip" title="View inbound/outbound per hour for this owner"><i class="la la-clock-o"></i> Hourly</a></td>';
             html += '</tr>';

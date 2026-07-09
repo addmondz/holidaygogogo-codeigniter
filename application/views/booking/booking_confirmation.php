@@ -149,9 +149,9 @@
 				<td>No. Of Guests</td>
 				<td> : </td>
 				<td><?php echo $PaxNumber; ?></td>
-				<td><?php echo !empty($ShowBookingPIC) ? 'Booking PIC' : 'Sales Agent'; ?></td>
+				<td><?php echo $PICLabel; ?></td>
 				<td> : </td>
-				<td><?php echo $SalesAgentName . ' (' . $SalesAgentMobile . ')'; ?></td>
+				<td><?php echo $PICText; ?></td>
 			</tr>
 		</table>
 		<hr style="margin-bottom:0px;">

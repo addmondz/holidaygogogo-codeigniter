@@ -339,7 +339,7 @@
                 <div class="card card-custom">
                     <div class="card-header border-0 summary-card-header" style="background-color:#D7E2F2;">
                         <h3>New Leads</h3>
-                        <i id="pop-tc-leads" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>What it shows:</strong> New leads you picked up (from GHL) &mdash; the same &ldquo;New Lead Picked Up&rdquo; count as the Lead Reply Activity dashboard, scoped to you. Counted by the date you picked the lead up.<ul><li><strong>Today:</strong> leads you picked up today</li><li><strong>Week:</strong> Monday to Sunday of this week</li><li><strong>Month:</strong> 1st to last day of this month</li></ul>Distinct leads you are the assigned owner of; a lead picked up on two of your inboxes still counts once. Your leads are matched to you by your account email. <strong>Note:</strong> if your email isn&rsquo;t linked to a GHL user, this card will show zeros."></i>
+                        <i id="pop-tc-leads" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>What it shows:</strong> Brand-new leads assigned to you (from GHL) &mdash; the same &ldquo;New Lead Picked Up&rdquo; count as the Lead Reply Activity dashboard, scoped to you. Counted by the customer&rsquo;s first-contact date (when the conversation first landed), not the assignment date.<ul><li><strong>Today:</strong> leads that first landed today</li><li><strong>Week:</strong> Monday to Sunday of this week</li><li><strong>Month:</strong> 1st to last day of this month</li></ul>Distinct leads you are the assigned owner of; a lead across two of your inboxes still counts once. A days-old conversation reassigned to you is not counted here. Your leads are matched to you by your account email. <strong>Note:</strong> if your email isn&rsquo;t linked to a GHL user, this card will show zeros."></i>
                     </div>
                     <div class="card-body summary-card-body">
                         <div class="summary-row-3">
@@ -347,7 +347,7 @@
                             <div><div class="lbl">Week</div><div class="summary-value-sm" id="sc-tc-leads-week">...</div></div>
                             <div><div class="lbl">Month</div><div class="summary-value-sm" id="sc-tc-leads-month">...</div></div>
                         </div>
-                        <div class="summary-sub">New leads you picked up, by pick-up date. Matches the Lead Reply Activity dashboard.</div>
+                        <div class="summary-sub">New leads assigned to you, by first-contact date. Matches the Lead Reply Activity dashboard.</div>
                         <div class="summary-sub summary-best" id="sc-tc-leads-best">Best: —</div>
                     </div>
                 </div>
@@ -1256,6 +1256,22 @@ $(function() {
         if(s >= 60)   return (s / 60).toFixed(1) + 'm';
         return Math.round(s) + 's';
     }
+    // Reply time uses the SAME "Xm Ys" style as the Lead Reply Hourly report's
+    // "Avg Response Time" card (PHP ghl_message_log_format_duration), so an
+    // agent's REPLY TIME reads identically on both screens (e.g. "22m 11s", not
+    // the decimal "22.2m"). Mirrors that helper's rounding and unit breaks.
+    function fmtOwnerDuration(s) {
+        if(s === null || s === undefined) return '—';
+        s = Math.round(Number(s));
+        if(s < 0) return '—';
+        if(s < 60) return s + 's';
+        if(s < 3600) {
+            var m = Math.floor(s / 60), r = s % 60;
+            return r > 0 ? m + 'm ' + r + 's' : m + 'm';
+        }
+        var h = Math.floor(s / 3600), hm = Math.floor((s % 3600) / 60);
+        return hm > 0 ? h + 'h ' + hm + 'm' : h + 'h';
+    }
     function fmtOwnerMoney(v) {
         v = Number(v) || 0;
         return 'RM ' + v.toLocaleString('en-MY', {minimumFractionDigits: 2, maximumFractionDigits: 2});
@@ -1827,7 +1843,7 @@ $(function() {
                         ? '—' : escapeHtml(r.agent_score);
                     return '<tr>' +
                         '<td data-sort="' + escapeHtml(r.agent_name || '') + '">' + escapeHtml(r.agent_name || '—') + '</td>' +
-                        oCell('reply',    fmtOwnerSecs(r.reply_secs),        r.reply_secs) +
+                        oCell('reply',    fmtOwnerDuration(r.reply_secs),    r.reply_secs) +
                         oCell('pickup',   fmtOwnerSecs(r.pickup_secs),       r.pickup_secs) +
                         oCell('newleads', escapeHtml(r.new_leads),          r.new_leads) +
                         oCell('served',   escapeHtml(r.served_leads),       r.served_leads) +

@@ -862,6 +862,7 @@ class Booking extends MY_Controller
 			    FROM booking
 			    WHERE booking.CancelStatus = 'N'
 			      AND booking.Status IN ('P','PP')
+			      AND booking.BookingConfirmationTitle = 'BOOKING CONFIRMATION'
 			      AND {$tc_own}
 			 ) t
 			 WHERE t.nd BETWEEN ? AND ?
@@ -883,6 +884,7 @@ class Booking extends MY_Controller
 			    FROM booking
 			    WHERE booking.CancelStatus = 'N'
 			      AND booking.Status IN ('P','PP')
+			      AND booking.BookingConfirmationTitle = 'BOOKING CONFIRMATION'
 			      AND {$tc_own}
 			 ) t
 			 WHERE t.nd BETWEEN ? AND ?
@@ -3598,10 +3600,13 @@ class Booking extends MY_Controller
 		$by_agent = $this->Report_Model->Lead_Dashboard_By_Agent(
 			array('start_date' => $start, 'end_date' => $end), '1=1'
 		);
-		// 1b. GHL-keyed reply time — the Message-Log reply-pair metric, the SAME
-		//     source as the "Avg Reply Time to Inbound" card, so the Agent Score's
-		//     reply component matches the reply figure each agent actually sees.
-		$reply = $this->Report_Model->Ghl_Messages_Avg_Reply_By_Agent($start, $end);
+		// 1b. GHL-keyed reply time — the point-in-time lead-ownership reply-pair
+		//     metric (Ghl_Ownership_Avg_Reply_By_Owner), the SAME source as the
+		//     "Lead Reply Hourly" page's "Avg Response Time" card and the Owner
+		//     matrix's REPLY TIME column, so the Agent Score's reply component is
+		//     consistent everywhere reply time is shown — and this standalone card
+		//     score stays equal to the same agent's row in the Owner matrix.
+		$reply = $this->Report_Model->Ghl_Ownership_Avg_Reply_By_Owner($start, $end);
 		// 2. GHL-keyed pickup speed (one row per agent).
 		$pickup = $this->Report_Model->Lead_Pickup_Speed_By_Agent($start, $end);
 
@@ -3707,8 +3712,9 @@ class Booking extends MY_Controller
 			$u[$aid]['converted'] += (int)$a['converted_leads'];
 			$u[$aid]['has_leads']  = true;
 		}
-		// Reply time: Message-Log metric, weighted by the reply sample (total_leads
-		// = conversations replied to), matching the Avg Reply Time to Inbound card.
+		// Reply time: point-in-time lead-ownership metric, weighted by the reply
+		// sample (total_leads = conversations replied to), matching the Lead Reply
+		// Hourly "Avg Response Time" card and the Owner matrix REPLY TIME column.
 		foreach($reply as $r) {
 			$uid = (string)$r['agent_id'];
 			if(!isset($map[$uid])) { continue; }
@@ -3854,12 +3860,16 @@ class Booking extends MY_Controller
 		$leads_ungated = $this->Report_Model->Lead_Dashboard_By_Agent($filters, '1=1');
 		$pickup        = $this->Report_Model->Lead_Pickup_Speed_By_Agent($start, $end);
 
-		// Reply time uses the Message-Log reply-pair metric (SAME source as the TC
-		// "Avg Reply Time to Inbound" card). It loads every message row in the window
-		// and pairs them in PHP, so a full YEAR (~290k rows) exhausts the PHP memory
-		// limit (measured OOM) — the one column that MUST stay Day / Week / Month and
-		// dash on Year. All other columns open on every period.
-		$reply         = $is_dwm ? $this->Report_Model->Ghl_Messages_Avg_Reply_By_Agent($start, $end) : array();
+		// Reply time uses the point-in-time lead-ownership reply-pair metric — the
+		// SAME source as the "Lead Reply Hourly" page's "Avg Response Time" card
+		// (Ghl_Ownership_Avg_Reply_By_Owner) — so an agent's matrix reply time equals
+		// their number on that report to the second. It credits the reply to whoever
+		// OWNED the lead when the message was sent (not whoever is assigned now), and
+		// counts only the owner's own outbound replies. Loads every message row in the
+		// window and pairs them in PHP, so a full YEAR (~290k rows) exhausts the PHP
+		// memory limit (measured OOM) — the one column that MUST stay Day / Week /
+		// Month and dash on Year. All other columns open on every period.
+		$reply         = $is_dwm ? $this->Report_Model->Ghl_Ownership_Avg_Reply_By_Owner($start, $end) : array();
 		// Follow-up source (Follow-up % + Served fallback). A grouped per-agent query
 		// (~17k ownership rows/year), so it is cheap enough to run on every period.
 		$followup      = $this->Report_Model->Lead_Ownership_By_Agent($filters);

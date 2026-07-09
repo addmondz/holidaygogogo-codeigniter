@@ -468,6 +468,62 @@ class Report extends MY_Controller
         $this->load->view('layout/footer');
     }
 
+    /**
+     * JSON: the individual leads behind one owner's "New Lead Picked Up" or
+     * "Lead Responded" number, powering the dashboard's drill-down modal. Reuses
+     * lead_reply_activity_filters() so the same owner/date scoping AND the level-20
+     * self-restriction that gate the dashboard also gate this list (a restricted
+     * agent asking for another owner ends up with an empty owner => empty list).
+     * The list queries share the count's where-clause builders, so the modal's
+     * row count equals the number on screen.
+     */
+    function Lead_Reply_Activity_Leads()
+    {
+        $filters = $this->lead_reply_activity_filters();
+        $metric = strtolower(trim((string) $this->input->get('metric')));
+        if (!in_array($metric, array('picked_up', 'responded', 'transfer_out', 'today_handling'), true)) {
+            $metric = 'picked_up';
+        }
+
+        // The modal is always scoped to one owner; with no resolvable owner there
+        // is nothing to list (and nothing another agent could fish for).
+        if (empty($filters['owner_user_id'])) {
+            return $this->output
+                ->set_content_type('application/json')
+                ->set_output(json_encode(array('success' => true, 'metric' => $metric, 'leads' => array())));
+        }
+
+        $this->load->helper('lead_reply_activity_leads');
+
+        switch ($metric) {
+            case 'responded':
+                $rows = $this->Report_Model->Lead_Reply_Activity_Responded_Leads($filters);
+                break;
+            case 'transfer_out':
+                $rows = $this->Report_Model->Lead_Reply_Activity_Transfer_Out_Leads($filters);
+                break;
+            case 'today_handling':
+                // Still-handling = replied-to leads that were NOT transferred out.
+                $rows = lead_reply_activity_today_handling_leads(
+                    $this->Report_Model->Lead_Reply_Activity_Responded_Leads($filters),
+                    $this->Report_Model->Lead_Reply_Activity_Transfer_Out_Leads($filters)
+                );
+                break;
+            case 'picked_up':
+            default:
+                $rows = $this->Report_Model->Lead_Reply_Activity_Picked_Up_Leads($filters);
+                break;
+        }
+
+        $this->output
+            ->set_content_type('application/json')
+            ->set_output(json_encode(array(
+                'success' => true,
+                'metric' => $metric,
+                'leads' => lead_reply_activity_leads_format($rows, $metric),
+            )));
+    }
+
     function Lead_Reply_Activity_Hourly()
     {
         $filters = $this->lead_reply_activity_filters();
@@ -561,11 +617,13 @@ class Report extends MY_Controller
     }
 
     /**
-     * "Leads By Hour" report -- picked-up leads (same universe as the dashboard
-     * "New Lead Picked Up" column) plotted on a DATE x HOUR grid so the owner can
-     * see what time of day leads get picked up. Date-range filtered (defaults to
-     * the last 30 days). Owner-only in the menu; still passes the shared 'VR'
-     * gate in the constructor.
+     * "Leads By Hour" report -- every landed lead plotted on a DATE x HOUR grid by
+     * the hour its conversation first landed (pl.lead_started_at), so the owner can
+     * see what time of day leads come in. This is the LANDING-TIME universe (one
+     * row per ghl_processed_leads lead), distinct from the dashboard "New Lead
+     * Picked Up" column, which additionally requires an assigned owner and a
+     * brand-new customer. Date-range filtered (defaults to the last 30 days).
+     * Owner-only in the menu; still passes the shared 'VR' gate in the constructor.
      */
     function Leads_By_Hour()
     {

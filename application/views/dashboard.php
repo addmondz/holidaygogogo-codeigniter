@@ -976,7 +976,7 @@
                                             </div>
                                         <?php } ?>
                                     </div>
-                                    <div class="kpi-sub mt-2">New GHL leads company-wide, by the date the conversation started.</div>
+                                    <div class="kpi-sub mt-2">New leads picked up company-wide, by pick-up date. Matches the Lead Reply Activity dashboard&rsquo;s &ldquo;New Lead Picked Up&rdquo; total.</div>
                                 </div>
                             </div>
                         </div>
@@ -1046,7 +1046,7 @@
                                         <div class="kpi-cell"><div class="lbl">This Month</div><div class="val"><?php echo $rm($owner_payment_out_pending['month']); ?></div></div>
                                         <div class="kpi-cell"><div class="lbl">This Year</div><div class="val"><?php echo $rm($owner_payment_out_pending['year']); ?></div></div>
                                     </div>
-                                    <div class="kpi-sub mt-2">All pending supplier pay-outs due by each date (overdue included), awaiting approval.</div>
+                                    <div class="kpi-sub mt-2">Pending supplier pay-outs with a deadline within each period, awaiting approval.</div>
                                 </div>
                             </div>
                         </div>

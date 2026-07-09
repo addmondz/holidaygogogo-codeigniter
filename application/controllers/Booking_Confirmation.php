@@ -126,9 +126,6 @@ class Booking_Confirmation extends CI_Controller
 
                 $array['SalesAgentMobile'] = $country_code . $array['SalesAgentMobile'];
 
-                // From 2026-06-01 onward the BC shows a "Booking PIC" line for TC1
-                // (SalesAgent) and moves "Sales Agent" to TC2 (SalesAgent2).
-                $array['ShowBookingPIC'] = pdf_show_booking_pic_for_date($RawBookingInsertDate);
                 if (!empty($array['SalesAgent2Name'])) {
                     $sales_agent_2_country_code = $this->Universal_Model->Read_Country_Code($array['SalesAgent2CountryCode']);
                     $array['SalesAgent2Mobile'] = $sales_agent_2_country_code . $array['SalesAgent2Mobile'];
@@ -136,6 +133,21 @@ class Booking_Confirmation extends CI_Controller
                     $array['SalesAgent2Name'] = '';
                     $array['SalesAgent2Mobile'] = '';
                 }
+
+                // Booking PIC line: staff tick Sales Agent 1 / 2 on the form.
+                // Ticked agents print; unset ticks fall back to the 2026-06-01
+                // date rule (Sales Agent 1 only).
+                $pic = booking_pic_display(array(
+                    'sales_agent_is_pic'   => isset($array['SalesAgentIsPIC'])   ? $array['SalesAgentIsPIC']   : null,
+                    'sales_agent_2_is_pic' => isset($array['SalesAgent2IsPIC']) ? $array['SalesAgent2IsPIC'] : null,
+                    'sales_agent_name'     => $array['SalesAgentName'],
+                    'sales_agent_mobile'   => $array['SalesAgentMobile'],
+                    'sales_agent_2_name'   => $array['SalesAgent2Name'],
+                    'sales_agent_2_mobile' => $array['SalesAgent2Mobile'],
+                    'insert_date'          => $RawBookingInsertDate,
+                ));
+                $array['PICLabel'] = $pic['label'];
+                $array['PICText']  = $pic['text'];
 
                 $array['Title'] = str_replace(' ', '_', $array['BookingNumber'] . '_' . $array['Customer'] . '_' . $array['TravelDate']);
 

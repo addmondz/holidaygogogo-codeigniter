@@ -493,6 +493,9 @@ $is_dev_env = ($app_env !== 'prod');
 													<span class="menu-text">Category Code</span>
 												</a>
 											</li>
+											<?php } ?>
+											<?php // OP (40) is allowed Category (Footer-only otherwise); still hidden from Sales Agent (20) and Marketing (60) ?>
+											<?php if(!in_array((int)$this->session->level, [20, 60])) { ?>
 											<li class="menu-item <?php if($this->router->class == 'Category') { echo 'menu-item-active'; } ?>">
 												<a href="<?php echo base_url('Category'); ?>" class="menu-link">
 													<i class="menu-bullet menu-bullet-dot">

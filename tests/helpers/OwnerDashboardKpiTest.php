@@ -5,7 +5,12 @@
  * Locks the SQL behind the Owner-dashboard (Level 10) KPI cards, added in
  * Dashboard_Model:
  *   - Team_Sales($s,$e)             — SUM(NetTotal) per active team, window on InsertDate
- *   - New_Leads_Count($s,$e)        — count ghl_processed_leads by lead_started_at
+ *   - New leads picked up ($s,$e)   — company-wide "New Lead Picked Up" total from
+ *                                     ghl_lead_ownership, matching the Lead Reply
+ *                                     Activity dashboard tfoot (distinct owner:lead
+ *                                     pairs, windowed by pick-up time). This is
+ *                                     Report_Model::Lead_Reply_Activity_Picked_Up_Total,
+ *                                     surfaced on the owner card as owner_new_leads.
  *   - Top_Cancellation_Reasons(...) — cancelled BCs grouped by reason, top N
  *   - Approved_Payment_Out($s,$e)   — SUM(Debit)  where Credit=0, Status='Y'
  *   - Approved_Payment_In($s,$e)    — SUM(Credit) where Credit!=0, Status='Y'
@@ -46,7 +51,14 @@ $pdo->exec("CREATE TABLE booking (
 $pdo->exec("CREATE TABLE admin (AdminID INTEGER PRIMARY KEY, TeamID INTEGER)");
 $pdo->exec("CREATE TABLE team (TeamID INTEGER PRIMARY KEY, Name TEXT, Status TEXT)");
 $pdo->exec("CREATE TABLE cancellation_reason (CancellationReasonID INTEGER PRIMARY KEY, Name TEXT)");
-$pdo->exec("CREATE TABLE ghl_processed_leads (id INTEGER PRIMARY KEY, lead_started_at TEXT)");
+$pdo->exec("CREATE TABLE ghl_lead_ownership (
+    owner_user_id       TEXT,
+    processed_lead_id   INTEGER,
+    is_assigned_owner   INTEGER,
+    assigned_to_user_id TEXT,
+    assigned_at         TEXT,
+    lead_started_at     TEXT
+)");
 $pdo->exec("CREATE TABLE payment (
     PaymentID INTEGER PRIMARY KEY, BookingID INTEGER, Credit REAL, Debit REAL, Status TEXT, Date TEXT, Deadline TEXT
 )");
@@ -104,9 +116,18 @@ function unassigned_sales(PDO $pdo, $start, $end) {
     return (float) $st->fetch(PDO::FETCH_ASSOC)['Sales'];
 }
 function new_leads(PDO $pdo, $start, $end) {
-    $st = $pdo->prepare("SELECT COUNT(*) c FROM ghl_processed_leads
-        WHERE date(lead_started_at) >= :s AND date(lead_started_at) <= :e");
-    $st->execute([':s'=>$start, ':e'=>$end]);
+    // Company-wide "New Lead Picked Up" total: the same universe as the Lead
+    // Reply Activity dashboard's tfoot — distinct owner:lead pairs (a lead
+    // picked up by two owners counts for each, matching the sum of the per-agent
+    // rows), windowed by the pick-up time COALESCE(assigned_at, lead_started_at).
+    $st = $pdo->prepare("
+        SELECT COUNT(DISTINCT (glo.owner_user_id || ':' || glo.processed_lead_id)) AS c
+        FROM ghl_lead_ownership glo
+        WHERE glo.is_assigned_owner = 1
+          AND NULLIF(glo.assigned_to_user_id, '') = glo.owner_user_id
+          AND COALESCE(glo.assigned_at, glo.lead_started_at) >= :s
+          AND COALESCE(glo.assigned_at, glo.lead_started_at) <= :e");
+    $st->execute([':s'=>$start . ' 00:00:00', ':e'=>$end . ' 23:59:59']);
     return (int) $st->fetch(PDO::FETCH_ASSOC)['c'];
 }
 function top_reasons(PDO $pdo, $start, $end, $limit) {
@@ -136,13 +157,15 @@ function pay(PDO $pdo, $col, $creditPred, $start, $end) {
     $st = $pdo->prepare($sql); $st->execute([':s'=>$start, ':e'=>$end]);
     return (float) $st->fetch(PDO::FETCH_ASSOC)['Amount'];
 }
-// Unapproved (pending) payment OUT — cumulative UP TO :e (no lower bound) so
-// overdue pending pay-outs due before the window are still counted. This mirrors
-// Unapproved_Payment_Out($end): SUM(Debit) where Credit=0, Status='P'.
+// Unapproved (pending) payment OUT — deadlines that fall WITHIN the window
+// [:s, :e] only (bounded range, NOT cumulative), so the card matches the Payment
+// listing's "Total Payment Out" filtered by deadline range. Overdue pay-outs whose
+// deadline is before the window start are NOT counted here. Mirrors
+// Unapproved_Payment_Out($start,$end): SUM(Debit) where Credit=0, Status='P'.
 // Windows on DEADLINE, not Date: pending pay-outs have no transaction Date yet
 // (only stamped once approved) — they carry a Deadline. Windowing on Date would
 // exclude every pending row (all NULL) and the card would always read 0.
-function unapproved_out(PDO $pdo, $end) {
+function unapproved_out(PDO $pdo, $start, $end) {
     $sql = "SELECT COALESCE(SUM(payment.Debit),0) AS Amount
             FROM booking LEFT JOIN payment ON payment.BookingID = booking.BookingID
             WHERE payment.Credit = 0
@@ -150,8 +173,8 @@ function unapproved_out(PDO $pdo, $end) {
               AND booking.BookingConfirmationTitle = 'BOOKING CONFIRMATION'
               AND booking.CancelStatus = 'N'
               AND booking.Status != 'N'
-              AND date(payment.Deadline) <= :e";
-    $st = $pdo->prepare($sql); $st->execute([':e'=>$end]);
+              AND date(payment.Deadline) >= :s AND date(payment.Deadline) <= :e";
+    $st = $pdo->prepare($sql); $st->execute([':s'=>$start, ':e'=>$end]);
     return (float) $st->fetch(PDO::FETCH_ASSOC)['Amount'];
 }
 
@@ -248,16 +271,33 @@ assert_eq('no month key when unset', false,   isset($tg1[1]['month']));
 assert_eq('year still present',      18000.0, $tg1[1]['year']);
 
 // ===========================================================================
-// New_Leads_Count (windowed by lead_started_at, company-wide)
+// New leads picked up — company-wide "New Lead Picked Up" total
+// (ghl_lead_ownership, windowed by pick-up time, distinct owner:lead)
 // ===========================================================================
-$pdo->exec("INSERT INTO ghl_processed_leads (id,lead_started_at) VALUES
-    (1,'2026-06-15 08:00:00'),
-    (2,'2026-06-15 23:30:00'),
-    (3,'2026-06-14 10:00:00'),
-    (4,'2026-06-16 10:00:00')");
-assert_eq('leads today',   2, new_leads($pdo, '2026-06-15', '2026-06-15'));
-assert_eq('leads 3 days',  4, new_leads($pdo, '2026-06-14', '2026-06-16'));
-assert_eq('leads none',    0, new_leads($pdo, '2026-01-01', '2026-01-01'));
+// pl 1  u1: picked up 06-15 (assigned_at in window)                     COUNT
+// pl 2  u1: assigned_at NULL -> falls back to lead_started_at 06-15     COUNT (COALESCE)
+// pl 3  u1: started 06-14 (before window) but PICKED UP 06-15           COUNT (pick-up drives window)
+// pl 4  u1: started 06-15 (in window) but PICKED UP 06-16 (after)       EXCLUDED for the 06-15 day
+// pl 5  u1: is_assigned_owner = 0 (reply owner only)                    EXCLUDED
+// pl 6  u1: is_assigned_owner=1 BUT assigned_to_user_id=u2 (owner!=assignee) EXCLUDED
+// pl 7  u2: picked up 06-15, different owner                            COUNT (company-wide)
+// pl 8  u1 + u2: same lead picked up by two DIFFERENT owners 06-15      COUNT TWICE (owner:lead)
+$pdo->exec("INSERT INTO ghl_lead_ownership
+    (owner_user_id, processed_lead_id, is_assigned_owner, assigned_to_user_id, assigned_at, lead_started_at) VALUES
+    ('u1', 1, 1, 'u1', '2026-06-15 08:00:00', '2026-06-15 07:00:00'),
+    ('u1', 2, 1, 'u1', NULL,                  '2026-06-15 23:30:00'),
+    ('u1', 3, 1, 'u1', '2026-06-15 14:00:00', '2026-06-14 10:00:00'),
+    ('u1', 4, 1, 'u1', '2026-06-16 10:00:00', '2026-06-15 10:00:00'),
+    ('u1', 5, 0, 'u1', '2026-06-15 10:00:00', '2026-06-15 10:00:00'),
+    ('u1', 6, 1, 'u2', '2026-06-15 11:00:00', '2026-06-15 11:00:00'),
+    ('u2', 7, 1, 'u2', '2026-06-15 12:00:00', '2026-06-15 12:00:00'),
+    ('u1', 8, 1, 'u1', '2026-06-15 15:00:00', '2026-06-15 15:00:00'),
+    ('u2', 8, 1, 'u2', '2026-06-15 16:00:00', '2026-06-15 16:00:00')");
+// Day 06-15: u1 leads 1,2,3,8 (4) + u2 leads 7,8 (2) = 6 owner:lead pairs.
+assert_eq('picked up today', 6, new_leads($pdo, '2026-06-15', '2026-06-15'));
+// Widen to 06-14..06-16: also picks up lead 4 (u1, assigned 06-16) -> 7.
+assert_eq('picked up 3 days', 7, new_leads($pdo, '2026-06-14', '2026-06-16'));
+assert_eq('picked up none',   0, new_leads($pdo, '2026-01-01', '2026-01-01'));
 
 // ===========================================================================
 // Top_Cancellation_Reasons
@@ -296,23 +336,25 @@ assert_eq('pay out day',  200.0, pay($pdo,'Debit', "payment.Credit = 0",  '2026-
 assert_eq('pay out none', 0.0,   pay($pdo,'Debit', "payment.Credit = 0",  '2026-06-16','2026-06-16'));
 
 // ===========================================================================
-// Unapproved (pending) payment OUT — cumulative "due by :end", captures overdue.
+// Unapproved (pending) payment OUT — bounded deadline range (matches listing).
 // ===========================================================================
 // Pending pay-outs carry NULL Date (not stamped until approved) + a Deadline.
 $pdo->exec("INSERT INTO payment (PaymentID,BookingID,Credit,Debit,Status,Date,Deadline) VALUES
-    (10,1,0,100,'P',NULL,'2026-06-01'),   -- OVERDUE pending out (before any window) -> must count
-    (11,1,0,200,'P',NULL,'2026-06-15'),   -- pending out due today
-    (12,1,0,300,'P',NULL,'2026-06-20'),   -- pending out due future (later this month)
+    (10,1,0,100,'P',NULL,'2026-06-01'),   -- pending out due 06-01
+    (11,1,0,200,'P',NULL,'2026-06-15'),   -- pending out due 06-15
+    (12,1,0,300,'P',NULL,'2026-06-20'),   -- pending out due 06-20
     (13,1,0,999,'Y','2026-06-15','2026-06-15'), -- approved out -> excluded (Status Y)
     (14,6,0,400,'P',NULL,'2026-06-15')    -- pending out on cancelled booking 6 -> excluded
 ");
-// Due by 06-15: overdue 100 + today 200 = 300 (future 300 not yet due).
+// Single day 06-15: only the 06-15 deadline (200). This is the "Today" cell shape.
 // Regression: all pending rows have NULL Date — windowing on Date would drop
 // them all and return 0. Windowing on Deadline keeps them.
-assert_eq('unapproved out to today', 300.0, unapproved_out($pdo, '2026-06-15'));
-// Due by month-end: + future 300 = 600. Overdue still included, none dropped.
-assert_eq('unapproved out to month', 600.0, unapproved_out($pdo, '2026-06-30'));
-// Even a window ending before every later deadline still catches the 06-01 overdue.
-assert_eq('unapproved out to 06-01', 100.0, unapproved_out($pdo, '2026-06-01'));
+assert_eq('unapproved out day 06-15', 200.0, unapproved_out($pdo, '2026-06-15', '2026-06-15'));
+// Whole month 06-01..06-30: all three in range = 100 + 200 + 300 = 600.
+assert_eq('unapproved out month', 600.0, unapproved_out($pdo, '2026-06-01', '2026-06-30'));
+// Window starting 06-10: the 06-01 deadline is BEFORE the window -> excluded (200+300).
+assert_eq('unapproved out no overdue', 500.0, unapproved_out($pdo, '2026-06-10', '2026-06-30'));
+// Single day 06-01: just that day's deadline.
+assert_eq('unapproved out day 06-01', 100.0, unapproved_out($pdo, '2026-06-01', '2026-06-01'));
 
 echo "\nAll assertions passed.\n";
