@@ -2372,14 +2372,16 @@ class Report_Model extends CI_Model
                 HAVING COUNT(*) > 3
             ) reply_created
             WHERE reply_created.reply_created_at BETWEEN ? AND ?
-              AND NOT (
-                  NULLIF(reply_created.assigned_to_user_id, '') = reply_created.owner_user_id
-                  AND reply_created.pickup_at BETWEEN ? AND ?
-              )
+              AND NULLIF(reply_created.assigned_to_user_id, '') <> reply_created.owner_user_id
         ";
 
+        // "Transfer Out" = a lead that actually LEFT this owner's queue, i.e. it is
+        // no longer assigned to the owner (reassigned to a different agent/inbox). A
+        // lead still assigned to the owner is never a transfer out regardless of the
+        // day it first arrived, so we key purely off the live assignment and no
+        // longer compare the lead's start date to the viewed window.
         // Param order matches placeholder order: inner WHERE, then EXISTS window, then outer WHERE.
-        $params = array_merge($where['params'], array($start, $end), array($start, $end, $start, $end));
+        $params = array_merge($where['params'], array($start, $end), array($start, $end));
         $rows = $this->db->query($sql, $params)->result_array();
 
         $this->replyCreatedBaseRowsCache[$cacheKey] = $rows;
@@ -2555,13 +2557,13 @@ class Report_Model extends CI_Model
                 HAVING COUNT(*) > 3
             ) reply_created
             WHERE reply_created.reply_created_at BETWEEN ? AND ?
-              AND NOT (
-                  NULLIF(reply_created.assigned_to_user_id, '') = reply_created.owner_user_id
-                  AND reply_created.pickup_at BETWEEN ? AND ?
-              )
+              AND NULLIF(reply_created.assigned_to_user_id, '') <> reply_created.owner_user_id
         ";
 
-        $params = array_merge($where['params'], array($start, $end, $start, $end));
+        // Matches Lead_Reply_Activity_Reply_Created_Base_Rows: a lead only counts as
+        // transferred out once it is no longer assigned to this owner. Keeps the
+        // drill-down list identical to the card's count.
+        $params = array_merge($where['params'], array($start, $end));
         return $this->db->query($sql, $params)->result_array();
     }
 

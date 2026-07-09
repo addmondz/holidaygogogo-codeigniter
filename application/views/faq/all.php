@@ -249,6 +249,14 @@
 		}
 		.search-count strong { color: var(--accent-deep); font-weight: 600; }
 
+		/* Search keyword highlight inside questions/answers */
+		mark.faq-hl {
+			background: #ffe58a;
+			color: inherit;
+			padding: 0 1px;
+			border-radius: 3px;
+		}
+
 		/* ---- FAQ section ---- */
 		.faq-section {
 			margin-top: clamp(20px, 4vw, 30px);
@@ -573,6 +581,52 @@
 				return false;
 			}
 
+			// ---- Keyword highlight ----
+			// Wrap every occurrence of the query in <mark> across an element's text
+			// nodes only, so we never break the answer's <br> markup. Clearing first
+			// makes it idempotent as the user types.
+			function escapeRx(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+			function clearHl(el) {
+				var marks = el.querySelectorAll('mark.faq-hl');
+				for (var i = 0; i < marks.length; i++) {
+					var m = marks[i];
+					m.parentNode.replaceChild(document.createTextNode(m.textContent), m);
+				}
+				el.normalize();
+			}
+			function highlight(el, q) {
+				clearHl(el);
+				if (!q) return;
+				var rx = new RegExp(escapeRx(q), 'gi');
+				var walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null, false);
+				var nodes = [], n;
+				while ((n = walker.nextNode())) nodes.push(n);
+				nodes.forEach(function (node) {
+					var text = node.nodeValue;
+					rx.lastIndex = 0;
+					if (!rx.test(text)) return;
+					rx.lastIndex = 0;
+					var frag = document.createDocumentFragment(), last = 0, m;
+					while ((m = rx.exec(text)) !== null) {
+						if (m.index > last) frag.appendChild(document.createTextNode(text.slice(last, m.index)));
+						var mark = document.createElement('mark');
+						mark.className = 'faq-hl';
+						mark.textContent = m[0];
+						frag.appendChild(mark);
+						last = m.index + m[0].length;
+						if (m[0].length === 0) rx.lastIndex++;
+					}
+					if (last < text.length) frag.appendChild(document.createTextNode(text.slice(last)));
+					node.parentNode.replaceChild(frag, node);
+				});
+			}
+			function highlightFields(root, selector, q) {
+				var fields = root.querySelectorAll(selector);
+				for (var f = 0; f < fields.length; f++) {
+					if (q !== '') highlight(fields[f], q); else clearHl(fields[f]);
+				}
+			}
+
 			function runSearch() {
 				var q = input.value.trim().toLowerCase();
 				wrap.classList.toggle('has-value', q !== '');
@@ -588,6 +642,8 @@
 						// Auto-expand on a text query so answers are visible; tag-only
 						// filtering keeps items collapsed. Collapse when nothing applies.
 						if (hit && q !== '') openItem(item); else closeItem(item);
+						// Highlight the keyword in visible hits; strip highlights otherwise.
+						highlightFields(item, '.a-q, .a-a', hit && q !== '' ? q : '');
 						if (hit) visibleItems++;
 					});
 
@@ -600,6 +656,8 @@
 						sectionHit = activeTags.length === 0 && (q === '' || section.getAttribute('data-search').indexOf(q) !== -1);
 					}
 					section.classList.toggle('is-hidden', !sectionHit);
+					// Highlight the section title on a visible text match too.
+					highlightFields(section, '.faq-section-title', sectionHit && q !== '' ? q : '');
 					if (sectionHit) matches += (sectionItems.length > 0 ? visibleItems : 1);
 				});
 

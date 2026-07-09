@@ -57,7 +57,7 @@
                                 <i class="la la-info-circle"></i>
                             </div>
                             <div class="alert-text font-weight-bold" style="line-height:1.45;">
-                                Counts only replies made on any day between 7AM and 10PM. Lead Responded is the distinct leads the owner replied to in that window (replying many times to one lead still counts once). Transfer Out Lead uses the date the owner crossed the reply-created threshold. Today Handling Lead = Lead Responded &minus; Transfer Out Lead.
+                                Counts only replies made on any day between 7AM and 10PM. Lead Responded is the distinct leads the owner replied to in that window (replying many times to one lead still counts once). Transfer Out Lead counts worked leads that are no longer assigned to the owner (reassigned to another agent); leads still under the owner never count. Today Handling Lead = Lead Responded &minus; Transfer Out Lead.
                             </div>
                         </div>
                         <div id="lead_reply_activity_filters" class="collapse show">
@@ -159,7 +159,7 @@
                                 <th style="text-align:center;">
                                     Transfer Out Lead
                                     <i class="la la-info-circle ml-1" style="cursor:help; color:#2f506f;" data-toggle="tooltip"
-                                       title="Leads the owner crossed the reply-created threshold on (their 4th outbound reply lands in the selected window). These are handed off / transferred out of the owner's active queue."></i>
+                                       title="Leads this owner worked (their 4th outbound reply lands in the selected window) that are no longer assigned to them -- reassigned to another agent/inbox. Leads still assigned to this owner never count, whichever day they first arrived."></i>
                                 </th>
                                 <th style="text-align:center;">
                                     Today Handling Lead
