@@ -93,7 +93,9 @@ class Ghl_Lead_Ownership_Model extends CI_Model
         )->result_array();
     }
 
-    public function get_reply_owners_for_leads($leadIds, $replyThreshold = 3)
+    // $replyThreshold is used as "HAVING COUNT(*) > N": N = 0 means an agent is a
+    // reply owner as soon as they send 1+ outbound replies in the lead's window.
+    public function get_reply_owners_for_leads($leadIds, $replyThreshold = 0)
     {
         $leadIds = array_values(array_filter(array_map('intval', (array) $leadIds), function($id) {
             return $id > 0;

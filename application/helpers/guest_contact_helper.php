@@ -68,6 +68,78 @@ if (!function_exists('guest_contact_validate_mobile')) {
     }
 }
 
+if (!function_exists('guest_field_validate_name')) {
+    /**
+     * Validate a First Name inline-edited on the Guest List dashboard before it
+     * is written back to guest_list.Name. Required and length-capped; otherwise
+     * permissive (names carry spaces, apostrophes, dots, non-Latin letters).
+     *
+     * @param string $name Raw input.
+     * @return array{ok:bool,error:string,value:string} value is the trimmed name.
+     */
+    function guest_field_validate_name($name)
+    {
+        $name = trim((string) $name);
+        if ($name === '') {
+            return array('ok' => false, 'error' => 'Name is required.', 'value' => '');
+        }
+        $len = function_exists('mb_strlen') ? mb_strlen($name) : strlen($name);
+        if ($len > 100) {
+            return array('ok' => false, 'error' => 'Name is too long.', 'value' => '');
+        }
+        return array('ok' => true, 'error' => '', 'value' => $name);
+    }
+}
+
+if (!function_exists('guest_field_validate_email')) {
+    /**
+     * Validate an Email inline-edited on the Guest List dashboard before it is
+     * written back to guest_list.Email. An empty value is allowed (clears the
+     * email); a non-empty value must be a well-formed address.
+     *
+     * @param string $email Raw input.
+     * @return array{ok:bool,error:string,value:string} value is the trimmed email ('' when cleared).
+     */
+    function guest_field_validate_email($email)
+    {
+        $email = trim((string) $email);
+        if ($email === '') {
+            return array('ok' => true, 'error' => '', 'value' => '');
+        }
+        if (strlen($email) > 255) {
+            return array('ok' => false, 'error' => 'Email is too long.', 'value' => '');
+        }
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return array('ok' => false, 'error' => 'Enter a valid email address.', 'value' => '');
+        }
+        return array('ok' => true, 'error' => '', 'value' => $email);
+    }
+}
+
+if (!function_exists('guest_field_validate_language')) {
+    /**
+     * Validate a Language inline-edited on the Guest List dashboard before it is
+     * written back to booking.ChatLanguage / customer.ChatLanguage. The value
+     * must be one of the allowed codes (the ENUM set, e.g. CN/EN/ML), so a free
+     * value can never reach the ChatLanguage columns.
+     *
+     * @param string   $value   Raw input.
+     * @param string[] $allowed Allowed language codes.
+     * @return array{ok:bool,error:string,value:string}
+     */
+    function guest_field_validate_language($value, $allowed)
+    {
+        $value = trim((string) $value);
+        if ($value === '') {
+            return array('ok' => false, 'error' => 'Select a language.', 'value' => '');
+        }
+        if (!is_array($allowed) || !in_array($value, $allowed, true)) {
+            return array('ok' => false, 'error' => 'Invalid language.', 'value' => '');
+        }
+        return array('ok' => true, 'error' => '', 'value' => $value);
+    }
+}
+
 if (!function_exists('guest_contact_format_display')) {
     /**
      * Render a contact number for display WITH its international calling code.
@@ -201,6 +273,41 @@ if (!function_exists('guest_list_travel_date_filter_value')) {
     }
 }
 
+if (!function_exists('guest_list_multi_values')) {
+    /**
+     * Normalize a filter value that may arrive as a single string OR an array
+     * (a multi-select filter submits `name[]=a&name[]=b`) into a clean list of
+     * trimmed, non-empty, de-duplicated strings. Returns [] when nothing usable.
+     *
+     * Shared by every multi-select dropdown on the Guest List so the model
+     * (IN clause), the suppression predicates, and the tests all read the raw
+     * request value the same way.
+     *
+     * @param mixed $raw Request value: string, array of strings, or null.
+     * @return string[] Trimmed, non-empty, first-seen-order unique values.
+     */
+    function guest_list_multi_values($raw)
+    {
+        if ($raw === null) {
+            return array();
+        }
+        if (!is_array($raw)) {
+            $raw = array($raw);
+        }
+        $out  = array();
+        $seen = array();
+        foreach ($raw as $v) {
+            $v = trim((string) $v);
+            if ($v === '' || isset($seen[$v])) {
+                continue;
+            }
+            $seen[$v] = true;
+            $out[]    = $v;
+        }
+        return $out;
+    }
+}
+
 if (!function_exists('guest_list_split_team_leaders')) {
     /**
      * Split the GROUP_CONCAT'd booking customer names — the "booking name as per
@@ -229,6 +336,48 @@ if (!function_exists('guest_list_split_team_leaders')) {
             }
             $seen[$key] = true;
             $out[]      = $name;
+        }
+        return $out;
+    }
+}
+
+if (!function_exists('guest_list_team_leader_links')) {
+    /**
+     * Parse the GROUP_CONCAT'd "BookingID:LeaderName" pairs into a display-ready
+     * list of leader links. Each pair maps a leader name (booking.Customer, the
+     * name on the BC form) to the BookingID it led. Because a guest is grouped
+     * across all their bookings, the same leader can appear on more than one
+     * booking, so pairs are grouped by leader name (first-seen order,
+     * case-insensitive) and their BookingIDs collected together.
+     *
+     * Backs the Guest List "Team Leader" column: clicking a leader reloads the
+     * list filtered to those exact BookingIDs, so it shows only that booking's
+     * team members — not every booking the leader has ever run.
+     *
+     * @param string $concat Raw GROUP_CONCAT value, '||'-separated "id:name" pairs.
+     * @return array<int,array{name:string,booking_ids:string[]}> First-seen order.
+     */
+    function guest_list_team_leader_links($concat)
+    {
+        $out     = array();
+        $by_name = array();
+        foreach (explode('||', (string) $concat) as $pair) {
+            $sep = strpos($pair, ':');
+            if ($sep === false) {
+                continue; // no BookingID prefix -> unusable
+            }
+            $id   = trim(substr($pair, 0, $sep));
+            $name = trim(substr($pair, $sep + 1));
+            if ($id === '' || $name === '') {
+                continue;
+            }
+            $key = function_exists('mb_strtolower') ? mb_strtolower($name) : strtolower($name);
+            if (!isset($by_name[$key])) {
+                $by_name[$key] = count($out);
+                $out[]         = array('name' => $name, 'booking_ids' => array($id));
+            } elseif (!in_array($id, $out[$by_name[$key]]['booking_ids'], true)) {
+                $out[$by_name[$key]]['booking_ids'][] = $id;
+            }
         }
         return $out;
     }
@@ -286,15 +435,17 @@ if (!function_exists('guest_list_ghl_suppressed_by_filters')) {
             'travel_date', 'sales_agent', 'source',
             'customer_type', 'nationality', 'gender', 'language',
             'booking_number', 'destination', 'pax_min', 'pax_max',
-            'team_leader',
+            'team_leader', 'booking_id', 'dob',
         );
         foreach ($booking_only as $k) {
-            if (isset($get[$k]) && trim((string) $get[$k]) !== '') {
+            if (isset($get[$k]) && count(guest_list_multi_values($get[$k])) > 0) {
                 return true;
             }
         }
-        $role = isset($get['role']) ? trim((string) $get['role']) : '';
-        if ($role === 'Team Leader' || $role === 'Team Member') {
+        // Guest Role is multi-select: a lead only ever holds the "Lead" role, so
+        // any role filter that does NOT include "Lead" can never match a lead.
+        $roles = isset($get['role']) ? guest_list_multi_values($get['role']) : array();
+        if (!empty($roles) && !in_array('Lead', $roles, true)) {
             return true;
         }
         return false;
@@ -313,8 +464,49 @@ if (!function_exists('guest_list_bookings_suppressed_by_filters')) {
      */
     function guest_list_bookings_suppressed_by_filters($get)
     {
-        $role = isset($get['role']) ? trim((string) $get['role']) : '';
-        return $role === 'Lead';
+        // Multi-select role: a booking guest is never a "Lead", so the booking
+        // branch drops out only when the role filter is set and selects LEAD
+        // exclusively (no "Team Leader" / "Team Member" alongside it).
+        $roles = isset($get['role']) ? guest_list_multi_values($get['role']) : array();
+        return !empty($roles)
+            && !in_array('Team Leader', $roles, true)
+            && !in_array('Team Member', $roles, true);
+    }
+}
+
+if (!function_exists('guest_list_leader_fallback_suppressed_by_filters')) {
+    /**
+     * The "leader fallback" branch synthesizes a Team Leader row straight from a
+     * booking's own contact (booking.Mobile / customer.phone_number + name) for
+     * bookings whose guest list was never filled in — so every booking's leader
+     * stays pickable for a campaign even before anyone types the guest details.
+     *
+     * Such a row exists ONLY at the booking level: it has no per-guest
+     * nationality, gender, date of birth, e-mail or pax breakdown. So any of
+     * those guest-only filters can never match it and must drop the branch
+     * (otherwise the count would include leaders the filter should have removed).
+     * Booking-level filters (sales agent, source, dates, destination, …) are fine
+     * — the leader carries them — so they do NOT suppress it.
+     *
+     * Guest Role: the branch is leaders-only, so a role filter that does not
+     * include "Team Leader" (Team Member only, or Lead only) drops it too.
+     *
+     * @param array $get The request GET params.
+     * @return bool True when the leader fallback must be suppressed.
+     */
+    function guest_list_leader_fallback_suppressed_by_filters($get)
+    {
+        $guest_only = array('nationality', 'gender', 'dob', 'email', 'pax_min', 'pax_max');
+        foreach ($guest_only as $k) {
+            if (isset($get[$k]) && count(guest_list_multi_values($get[$k])) > 0) {
+                return true;
+            }
+        }
+        $roles = isset($get['role']) ? guest_list_multi_values($get['role']) : array();
+        if (!empty($roles) && !in_array('Team Leader', $roles, true)) {
+            return true;
+        }
+        return false;
     }
 }
 

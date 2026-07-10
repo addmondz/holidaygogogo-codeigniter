@@ -157,12 +157,20 @@
 								<span><i class="la la-search"></i></span>
 							</div>
 						</div>
-						<div class="col-md-3">
+						<div class="col-md-2">
 							<label>Type</label>
 							<select id="guest_search_type" class="form-control selectpicker">
 								<option value="">--ALL TYPES--</option>
 								<option value="guest">Booking Guest</option>
 								<option value="ghl">GHL</option>
+							</select>
+						</div>
+						<div class="col-md-2">
+							<label>Role</label>
+							<select id="guest_search_role" class="form-control selectpicker">
+								<option value="">--ALL ROLES--</option>
+								<option value="Team Leader">Team Leader</option>
+								<option value="Team Member">Team Member</option>
 							</select>
 						</div>
 						<div class="col-md-3">
@@ -381,6 +389,7 @@
 					page: currentPage,
 					q: $('#guest_search_q').val(),
 					type: $('#guest_search_type').val(),
+					role: $('#guest_search_role').val(),
 					nationality: $('#guest_search_nationality').val()
 				},
 				dataType: 'json',

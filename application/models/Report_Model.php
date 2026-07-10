@@ -1690,8 +1690,8 @@ class Report_Model extends CI_Model
     /**
      * "Lead Responded" per owner: the DISTINCT leads an owner replied to whose
      * qualifying outbound reply lands on any day between 07:00 and 22:00. Many
-     * replies (incl. more than three) to the same lead collapse to a single
-     * count via COUNT(DISTINCT processed_lead_id). Shares the reply-activity
+     * replies to the same lead collapse to a single count via
+     * COUNT(DISTINCT processed_lead_id). Shares the reply-activity
      * universe (is_reply_owner = 1) and owner/team filters with Transfer Out so
      * Today Handling (responded - transfer out) stays meaningful.
      */
@@ -1877,7 +1877,7 @@ class Report_Model extends CI_Model
 
     /**
      * Per-lead breakdown behind the dashboard's "Transfer Out Lead" number, for
-     * the drill-down modal. These are the reply-created leads (the owner's 4th
+     * the drill-down modal. These are the reply-created leads (the owner's FIRST
      * outbound reply lands in the window) — the SAME universe the Transfer Out
      * count comes from, so it reuses Lead_Reply_Activity_Reply_Created_Detail_Rows()
      * and the modal's row count equals the number on screen. Each row carries
@@ -2015,13 +2015,12 @@ class Report_Model extends CI_Model
      * "New Leads" summary card so the card and that report agree.
      *
      * Counts DISTINCT leads the owner is the real assignee of (is_assigned_owner
-     * = 1 AND assigned owner = owner) whose conversation FIRST landed in the
-     * window (lead_reply_pickup_date_expression() = lead_started_at) -- a lead is
-     * "new" by when the customer first contacted us, not when it was later
-     * assigned, so a days-old conversation reassigned today does not resurface as
-     * a fresh pick-up. COUNT(DISTINCT processed_lead_id) across the whole uid set
-     * de-dupes a lead a TC picked up on two of her own inboxes; a single-inbox TC
-     * equals her dashboard row exactly.
+     * = 1 AND assigned owner = owner) whose conversation landed in the window
+     * (lead_reply_pickup_date_expression() = lead_started_at). Follows the
+     * "Total New Leads (GHL)" card logic: NO brand-new / never-contacted-before
+     * filter, so re-engaged customers count too. COUNT(DISTINCT processed_lead_id)
+     * across the whole uid set de-dupes a lead a TC picked up on two of her own
+     * inboxes; a single-inbox TC equals her dashboard row exactly.
      *
      * @param array  $uids   GHL owner user ids linked to the agent
      * @param string $start  inclusive date 'Y-m-d'
@@ -2036,7 +2035,6 @@ class Report_Model extends CI_Model
         }
 
         $pickupDate = $this->lead_reply_pickup_date_expression('glo');
-        $firstContactOnly = $this->lead_reply_first_contact_only_sql('glo');
         $placeholders = implode(',', array_fill(0, count($uids), '?'));
 
         $sql = "
@@ -2044,7 +2042,6 @@ class Report_Model extends CI_Model
             FROM ghl_lead_ownership glo
             WHERE glo.is_assigned_owner = 1
               AND NULLIF(glo.assigned_to_user_id, '') = glo.owner_user_id
-              AND {$firstContactOnly}
               AND glo.owner_user_id IN ({$placeholders})
               AND {$pickupDate} BETWEEN ? AND ?
         ";
@@ -2318,8 +2315,8 @@ class Report_Model extends CI_Model
         $start = !empty($filters['start_date']) ? $filters['start_date'] . ' 00:00:00' : '1970-01-01 00:00:00';
         $end = !empty($filters['end_date']) ? $filters['end_date'] . ' 23:59:59' : '9999-12-31 23:59:59';
 
-        // A lead only qualifies when its 4th outbound message (reply_created_at) lands inside
-        // the requested window, which means the conversation MUST have an owner outbound message
+        // A lead qualifies as reply-created on the owner's FIRST outbound reply
+        // (reply_created_at), which means the conversation MUST have an owner outbound message
         // in that window. Pre-filtering to those leads lets MySQL skip aggregating the entire
         // ghl_lead_ownership / ghl_messages history just to discard it in the outer WHERE.
         $datePreFilter = "
@@ -2344,7 +2341,7 @@ class Report_Model extends CI_Model
                     glo.assigned_to_user_id,
                     {$pickupDate} AS pickup_at,
                     SUBSTRING_INDEX(
-                        SUBSTRING_INDEX(GROUP_CONCAT(gm.{$messageTimeColumn} ORDER BY gm.{$messageTimeColumn} ASC, gm.id ASC), ',', 4),
+                        SUBSTRING_INDEX(GROUP_CONCAT(gm.{$messageTimeColumn} ORDER BY gm.{$messageTimeColumn} ASC, gm.id ASC), ',', 1),
                         ',',
                         -1
                     ) AS reply_created_at
@@ -2369,7 +2366,7 @@ class Report_Model extends CI_Model
                     glo.is_assigned_owner,
                     glo.assigned_to_user_id,
                     pickup_at
-                HAVING COUNT(*) > 3
+                HAVING COUNT(*) > 0
             ) reply_created
             WHERE reply_created.reply_created_at BETWEEN ? AND ?
               AND NULLIF(reply_created.assigned_to_user_id, '') <> reply_created.owner_user_id
@@ -2486,7 +2483,7 @@ class Report_Model extends CI_Model
                 SELECT
                     'Reply-Created Lead' AS activity_type,
                     SUBSTRING_INDEX(
-                        SUBSTRING_INDEX(GROUP_CONCAT(gm.{$messageTimeColumn} ORDER BY gm.{$messageTimeColumn} ASC, gm.id ASC), ',', 4),
+                        SUBSTRING_INDEX(GROUP_CONCAT(gm.{$messageTimeColumn} ORDER BY gm.{$messageTimeColumn} ASC, gm.id ASC), ',', 1),
                         ',',
                         -1
                     ) AS activity_at,
@@ -2502,7 +2499,7 @@ class Report_Model extends CI_Model
                     COALESCE(NULLIF(assigned_gu.Name, ''), NULLIF(glo.assigned_to_user_id, ''), 'Unassigned') AS assigned_name,
                     glo.lead_started_at,
                     SUBSTRING_INDEX(
-                        SUBSTRING_INDEX(GROUP_CONCAT(gm.{$messageTimeColumn} ORDER BY gm.{$messageTimeColumn} ASC, gm.id ASC), ',', 4),
+                        SUBSTRING_INDEX(GROUP_CONCAT(gm.{$messageTimeColumn} ORDER BY gm.{$messageTimeColumn} ASC, gm.id ASC), ',', 1),
                         ',',
                         -1
                     ) AS reply_created_at,
@@ -2554,7 +2551,7 @@ class Report_Model extends CI_Model
                     glo.is_converted,
                     glo.booking_id,
                     b.BookingNumber
-                HAVING COUNT(*) > 3
+                HAVING COUNT(*) > 0
             ) reply_created
             WHERE reply_created.reply_created_at BETWEEN ? AND ?
               AND NULLIF(reply_created.assigned_to_user_id, '') <> reply_created.owner_user_id
@@ -3638,6 +3635,39 @@ class Report_Model extends CI_Model
     }
 
     /**
+     * Company-wide count of every lead that LANDED in a date range — the exact
+     * same universe as the "Leads By Hour" report: all rows in
+     * ghl_processed_leads windowed by lead_started_at (the first-inbound landing
+     * time), with NO pick-up / assignment / first-contact filter. A lead counts
+     * the moment it lands, whether or not an agent has picked it up yet. Powers
+     * the owner dashboard's "Total New Leads (GHL)" card and reuses the same
+     * build_lead_dashboard_where_clause() the Leads By Hour grid is built from,
+     * so the card total and that grid can never drift.
+     *
+     * @param string $start Inclusive start date (Y-m-d).
+     * @param string $end   Inclusive end date (Y-m-d).
+     * @return int
+     */
+    public function Leads_Landed_Total($start, $end)
+    {
+        $where = $this->build_lead_dashboard_where_clause(array(
+            'start_date' => $start,
+            'end_date'   => $end,
+        ));
+        $extraJoins = isset($where['extra_joins']) ? $where['extra_joins'] : '';
+
+        $sql = "
+            SELECT COUNT(*) AS landed
+            FROM ghl_processed_leads pl
+            {$extraJoins}
+            {$where['sql']}
+        ";
+
+        $row = $this->db->query($sql, $where['params'])->row_array();
+        return !empty($row['landed']) ? (int) $row['landed'] : 0;
+    }
+
+    /**
      * New leads grouped by capture DATE + HOUR, for the "Leads By Hour" report.
      * Uses lead_started_at (when the lead actually landed / first inbound), NOT
      * created_at (the cron insert time). Reuses the shared lead-dashboard WHERE
@@ -3995,9 +4025,15 @@ class Report_Model extends CI_Model
         $extraJoins = '';
         $pickupDate = $this->lead_reply_pickup_date_expression('glo');
 
+        // "New Lead Picked Up" now follows the "Total New Leads (GHL)" card logic:
+        // count EVERY lead the owner is the real assignee of that landed in the
+        // window, with NO brand-new / never-contacted-before filter (re-engaged
+        // customers count too). The only thing that keeps this below the company
+        // card is the unavoidable per-owner assignment: a lead nobody has picked
+        // up yet has no owner row to sit in. Window stays lead_started_at (landing
+        // time) via lead_reply_pickup_date_expression().
         $clauses[] = 'glo.is_assigned_owner = 1';
         $clauses[] = "NULLIF(glo.assigned_to_user_id, '') = glo.owner_user_id";
-        $clauses[] = $this->lead_reply_first_contact_only_sql('glo');
 
         if (array_key_exists('_restrict_agent_ids', $filters)) {
             $allowed = array_values(array_filter(
@@ -4121,29 +4157,6 @@ class Report_Model extends CI_Model
         $alias = preg_replace('/[^A-Za-z0-9_]/', '', (string) $alias);
 
         return "{$alias}.lead_started_at";
-    }
-
-    /**
-     * SQL predicate (no bind params) that keeps only leads whose customer has
-     * NEVER contacted us before this lead started -- i.e. the contact has no
-     * inbound message earlier than the lead's first-contact time. This is what
-     * makes "New Lead Picked Up" mean a brand-new customer: a returning customer
-     * who goes quiet and re-engages opens a fresh lead cycle (a new
-     * lead_started_at), but their earlier inbound messages disqualify that cycle
-     * from counting as new. Pairs with lead_reply_pickup_date_expression().
-     */
-    private function lead_reply_first_contact_only_sql($alias)
-    {
-        $alias = preg_replace('/[^A-Za-z0-9_]/', '', (string) $alias);
-        $messageTimeColumn = $this->escape_identifier($this->get_message_time_column());
-
-        return "NOT EXISTS (
-            SELECT 1
-            FROM ghl_messages gm_prior
-            WHERE gm_prior.contact_id = {$alias}.contact_id
-              AND gm_prior.direction = 'inbound'
-              AND gm_prior.{$messageTimeColumn} < {$alias}.lead_started_at
-        )";
     }
 
     private function build_mobile_search_where_clause($mobile, $filters, $phoneColumn, $ownerColumn)

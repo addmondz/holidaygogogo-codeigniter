@@ -265,13 +265,14 @@ class Dashboard extends MY_Controller
 				(int) date('Y'), (int) date('n')
 			);
 
-			// Total new leads (GHL) — company-wide "New Lead Picked Up" total per
-			// window, reusing the same query as the Lead Reply Activity dashboard
-			// tfoot so the card and that dashboard always match.
+			// Total new leads (GHL) — company-wide count of every lead that LANDED
+			// per window (ghl_processed_leads by lead_started_at), regardless of
+			// whether it has been picked up. Reuses the Leads By Hour report's
+			// query universe so the card total and that grid always match.
 			$this->load->model('Report_Model');
 			$array['owner_new_leads'] = array();
 			foreach($windows as $key => $range) {
-				$array['owner_new_leads'][$key] = $this->Report_Model->Lead_Reply_Activity_Picked_Up_Total($range[0], $range[1]);
+				$array['owner_new_leads'][$key] = $this->Report_Model->Leads_Landed_Total($range[0], $range[1]);
 			}
 
 			// Top 5 cancellation reasons this year.

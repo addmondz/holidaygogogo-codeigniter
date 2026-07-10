@@ -4,9 +4,9 @@
  *
  * Locks the reply-owner threshold and the assigned-vs-reply dashboard rule.
  *
- * Reply-owner rule: an agent who sends MORE THAN 3 outbound replies in a lead's
- * window is a reply owner. So:
- *   1-2 replies -> No,  3 replies -> No,  4 replies -> Yes,  5+ -> Yes.
+ * Reply-owner rule: an agent who sends AT LEAST 1 outbound reply in a lead's
+ * window is a reply owner. The query is "HAVING COUNT(*) > N" with N = 0, so:
+ *   0 replies -> No,  1 reply -> Yes,  2+ -> Yes.
  *
  * Dashboard rule (no double counting):
  *   - The assigned owner counts as assigned_lead = 1 and is NEVER also counted
@@ -15,7 +15,7 @@
  *   - A non-assigned agent at/below the threshold counts as nothing.
  *
  * This mirrors:
- *   - Ghl_Lead_Ownership_Model::get_reply_owners_for_leads  (HAVING COUNT(*) > 3)
+ *   - Ghl_Lead_Ownership_Model::get_reply_owners_for_leads  (HAVING COUNT(*) > 0)
  *   - Report_Model dashboard SUM(CASE WHEN is_assigned_owner = 0
  *                                       AND is_reply_owner = 1 ...)
  *
@@ -28,7 +28,7 @@ if (!defined('BASEPATH')) {
     define('BASEPATH', __DIR__);
 }
 
-const REPLY_THRESHOLD = 3; // "more than N" replies => reply owner (so 4+)
+const REPLY_THRESHOLD = 0; // "more than N" replies => reply owner (so 1+)
 
 $pdo = new PDO('sqlite::memory:');
 $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -36,10 +36,10 @@ $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 $pdo->exec("CREATE TABLE messages (lead_id INT, user_id TEXT, direction TEXT)");
 
 // Lead 1 assigned to agent-A.
-//   agent-A: assignee + 5 replies   -> assigned only (never double-counted)
-//   agent-B: not assigned + 4 replies -> reply owner (above threshold)
-//   agent-C: not assigned + 3 replies -> nothing (AT threshold, not above)
-//   agent-D: not assigned + 1 reply   -> nothing (below threshold)
+//   agent-A: assignee + 5 replies    -> assigned only (never double-counted)
+//   agent-B: not assigned + 4 replies -> reply owner (1+ replies)
+//   agent-C: not assigned + 3 replies -> reply owner (1+ replies)
+//   agent-D: not assigned + 1 reply   -> reply owner (1+ replies)
 $rows = array(
     array(1, 'agent-A', 'outbound'), array(1, 'agent-A', 'outbound'), array(1, 'agent-A', 'outbound'),
     array(1, 'agent-A', 'outbound'), array(1, 'agent-A', 'outbound'),
@@ -92,11 +92,11 @@ function assert_eq($label, $expected, $actual) {
     }
 }
 
-// --- threshold behaviour ---
+// --- threshold behaviour (1+ replies => reply owner) ---
 assert_eq('agent-A (assignee, 5 replies) is a raw reply owner', true, isset($replyOwnerIds['agent-A']));
-assert_eq('agent-B (4 replies) is above threshold',             true, isset($replyOwnerIds['agent-B']));
-assert_eq('agent-C (3 replies) is NOT above threshold',         false, isset($replyOwnerIds['agent-C']));
-assert_eq('agent-D (1 reply) is NOT above threshold',           false, isset($replyOwnerIds['agent-D']));
+assert_eq('agent-B (4 replies) is a reply owner',               true, isset($replyOwnerIds['agent-B']));
+assert_eq('agent-C (3 replies) is a reply owner',               true, isset($replyOwnerIds['agent-C']));
+assert_eq('agent-D (1 reply) is a reply owner',                 true, isset($replyOwnerIds['agent-D']));
 
 // --- dashboard counting (no double counting) ---
 list($aA, $rA) = dashboard_counts($owners['agent-A']);
@@ -107,16 +107,18 @@ list($aB, $rB) = dashboard_counts($owners['agent-B']);
 assert_eq('agent-B assigned_lead', 0, $aB);
 assert_eq('agent-B reply_lead', 1, $rB);
 
-// agent-C / agent-D produced no ownership row at all.
-assert_eq('agent-C has no ownership row', false, isset($owners['agent-C']));
-assert_eq('agent-D has no ownership row', false, isset($owners['agent-D']));
+// agent-C (3) and agent-D (1) now DO produce reply-owner rows.
+list($aC, $rC) = dashboard_counts($owners['agent-C']);
+assert_eq('agent-C reply_lead', 1, $rC);
+list($aD, $rD) = dashboard_counts($owners['agent-D']);
+assert_eq('agent-D reply_lead', 1, $rD);
 
-// --- boundary: exactly 3 replies by a non-assignee must NOT become a reply owner ---
-$three = $pdo->prepare("SELECT COUNT(*) FROM (
+// --- boundary: exactly 1 reply by a non-assignee IS now a reply owner ---
+$one = $pdo->prepare("SELECT COUNT(*) FROM (
     SELECT user_id FROM messages WHERE lead_id=1 AND direction='outbound'
     GROUP BY user_id HAVING COUNT(*) > CAST(? AS INTEGER)
-) t WHERE user_id = 'agent-C'");
-$three->execute(array(REPLY_THRESHOLD));
-assert_eq('boundary: exactly 3 replies excluded', 0, (int) $three->fetchColumn());
+) t WHERE user_id = 'agent-D'");
+$one->execute(array(REPLY_THRESHOLD));
+assert_eq('boundary: exactly 1 reply included', 1, (int) $one->fetchColumn());
 
 echo "\nAll assertions passed.\n";

@@ -42,6 +42,39 @@ div.kt-datatable__pager-container {
 	font-weight: 600;
 	white-space: normal;
 }
+
+/* Generic inline field edit (First Name / Email / Language) */
+.gl-edit-btn {
+	opacity: 0;
+	transition: opacity .15s ease;
+	vertical-align: middle;
+}
+.gl-editable:hover .gl-edit-btn,
+.gl-edit-btn:focus {
+	opacity: 1;
+}
+.gl-editor {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+}
+.gl-editor .gl-input {
+	width: 150px;
+	height: 30px;
+	padding: 2px 8px;
+	font-size: 12px;
+}
+.gl-editor select.gl-input {
+	width: 90px;
+}
+.gl-cell .gl-error {
+	display: block;
+	margin-top: 4px;
+	color: #f64e60;
+	font-size: 11px;
+	font-weight: 600;
+	white-space: normal;
+}
 </style>
 
 <?php
@@ -74,7 +107,7 @@ div.kt-datatable__pager-container {
 											<div class="form-group">
 												<label>Search Name</label>
 												<div class="input-icon">
-													<input type="text" name="q" value="<?php if(!empty($this->input->get('q'))) { echo htmlspecialchars($this->input->get('q'), ENT_QUOTES); } ?>" autocomplete="off" class="form-control">
+													<input type="text" name="q" value="<?php if(!empty($this->input->get('q'))) { echo htmlspecialchars($this->input->get('q'), ENT_QUOTES); } ?>" autocomplete="off" class="form-control" placeholder="Guest or team leader name">
 													<span><i class="la la-user"></i></span>
 												</div>
 											</div>
@@ -82,10 +115,10 @@ div.kt-datatable__pager-container {
 										<div class="col-md-3">
 											<div class="form-group">
 												<label>Sales Agent</label>
-												<select name="sales_agent" class="form-control selectpicker" data-live-search="true">
-													<option selected data-icon="la la-user-tie font-size-lg bs-icon" value="">--SELECT SALES AGENT--</option>
+												<?php $sel_sales_agent = guest_list_multi_values($this->input->get('sales_agent')); ?>
+												<select name="sales_agent[]" class="form-control selectpicker" data-live-search="true" multiple data-actions-box="true" title="--SELECT SALES AGENT--">
 													<?php if(!empty($admins)) { foreach($admins as $a) { ?>
-														<option data-icon="la la-user-tie font-size-lg bs-icon" value="<?php echo $a->AdminID; ?>" <?php if($this->input->get('sales_agent') == $a->AdminID) echo 'selected'; ?>><?php echo $a->Name; ?></option>
+														<option data-icon="la la-user-tie font-size-lg bs-icon" value="<?php echo $a->AdminID; ?>" <?php if(in_array((string)$a->AdminID, $sel_sales_agent, true)) echo 'selected'; ?>><?php echo $a->Name; ?></option>
 													<?php } } ?>
 												</select>
 											</div>
@@ -93,10 +126,10 @@ div.kt-datatable__pager-container {
 										<div class="col-md-3">
 											<div class="form-group">
 												<label>Source</label>
-												<select name="source" class="form-control selectpicker" data-live-search="true">
-													<option selected data-icon="la la-stream font-size-lg bs-icon" value="">--SELECT SOURCE--</option>
+												<?php $sel_source = guest_list_multi_values($this->input->get('source')); ?>
+												<select name="source[]" class="form-control selectpicker" data-live-search="true" multiple data-actions-box="true" title="--SELECT SOURCE--">
 													<?php if(!empty($sources)) { foreach($sources as $s) { ?>
-														<option data-icon="la la-stream font-size-lg bs-icon" value="<?php echo $s->SourceID; ?>" <?php if($this->input->get('source') == $s->SourceID) echo 'selected'; ?>><?php echo $s->Name; ?></option>
+														<option data-icon="la la-stream font-size-lg bs-icon" value="<?php echo $s->SourceID; ?>" <?php if(in_array((string)$s->SourceID, $sel_source, true)) echo 'selected'; ?>><?php echo $s->Name; ?></option>
 													<?php } } ?>
 												</select>
 											</div>
@@ -104,10 +137,10 @@ div.kt-datatable__pager-container {
 										<div class="col-md-3">
 											<div class="form-group">
 												<label>Customer Type</label>
-												<select name="customer_type" class="form-control selectpicker">
-													<option selected data-icon="la la-users font-size-lg bs-icon" value="">--SELECT CUSTOMER TYPE--</option>
+												<?php $sel_customer_type = guest_list_multi_values($this->input->get('customer_type')); ?>
+												<select name="customer_type[]" class="form-control selectpicker" data-live-search="true" multiple data-actions-box="true" title="--SELECT CUSTOMER TYPE--">
 													<?php if(!empty($customer_types)) { foreach($customer_types as $ct) { ?>
-														<option data-icon="la la-user-tag font-size-lg bs-icon" value="<?php echo $ct->Name; ?>" <?php if($this->input->get('customer_type') == $ct->Name) echo 'selected'; ?>><?php echo $ct->Name; ?></option>
+														<option data-icon="la la-user-tag font-size-lg bs-icon" value="<?php echo htmlspecialchars($ct->Name, ENT_QUOTES); ?>" <?php if(in_array((string)$ct->Name, $sel_customer_type, true)) echo 'selected'; ?>><?php echo $ct->Name; ?></option>
 													<?php } } ?>
 												</select>
 											</div>
@@ -117,10 +150,10 @@ div.kt-datatable__pager-container {
 										<div class="col-md-3">
 											<div class="form-group">
 												<label>Nationality</label>
-												<select name="nationality" class="form-control selectpicker" data-live-search="true">
-													<option selected data-icon="la la-globe font-size-lg bs-icon" value="">--SELECT NATIONALITY--</option>
+												<?php $sel_nationality = guest_list_multi_values($this->input->get('nationality')); ?>
+												<select name="nationality[]" class="form-control selectpicker" data-live-search="true" multiple data-actions-box="true" title="--SELECT NATIONALITY--">
 													<?php if(!empty($nationalities)) { foreach($nationalities as $n) { ?>
-														<option data-icon="la la-globe font-size-lg bs-icon" value="<?php echo htmlspecialchars($n->value, ENT_QUOTES); ?>" <?php if($this->input->get('nationality') === $n->value) echo 'selected'; ?>><?php echo htmlspecialchars($n->value); ?></option>
+														<option data-icon="la la-globe font-size-lg bs-icon" value="<?php echo htmlspecialchars($n->value, ENT_QUOTES); ?>" <?php if(in_array((string)$n->value, $sel_nationality, true)) echo 'selected'; ?>><?php echo htmlspecialchars($n->value); ?></option>
 													<?php } } ?>
 												</select>
 											</div>
@@ -128,21 +161,21 @@ div.kt-datatable__pager-container {
 										<div class="col-md-3">
 											<div class="form-group">
 												<label>Gender</label>
-												<select name="gender" class="form-control selectpicker">
-													<option selected data-icon="la la-venus-mars font-size-lg bs-icon" value="">--SELECT GENDER--</option>
-													<option data-icon="la la-mars font-size-lg bs-icon" value="Male"   <?php if($this->input->get('gender') === 'Male')   echo 'selected'; ?>>Male</option>
-													<option data-icon="la la-venus font-size-lg bs-icon" value="Female" <?php if($this->input->get('gender') === 'Female') echo 'selected'; ?>>Female</option>
-													<option data-icon="la la-genderless font-size-lg bs-icon" value="Other"  <?php if($this->input->get('gender') === 'Other')  echo 'selected'; ?>>Other</option>
+												<?php $sel_gender = guest_list_multi_values($this->input->get('gender')); ?>
+												<select name="gender[]" class="form-control selectpicker" multiple data-actions-box="true" title="--SELECT GENDER--">
+													<option data-icon="la la-mars font-size-lg bs-icon" value="Male"   <?php if(in_array('Male', $sel_gender, true))   echo 'selected'; ?>>Male</option>
+													<option data-icon="la la-venus font-size-lg bs-icon" value="Female" <?php if(in_array('Female', $sel_gender, true)) echo 'selected'; ?>>Female</option>
+													<option data-icon="la la-genderless font-size-lg bs-icon" value="Other"  <?php if(in_array('Other', $sel_gender, true))  echo 'selected'; ?>>Other</option>
 												</select>
 											</div>
 										</div>
 										<div class="col-md-3">
 											<div class="form-group">
 												<label>Language</label>
-												<select name="language" class="form-control selectpicker" data-live-search="true">
-													<option selected data-icon="la la-language font-size-lg bs-icon" value="">--SELECT LANGUAGE--</option>
+												<?php $sel_language = guest_list_multi_values($this->input->get('language')); ?>
+												<select name="language[]" class="form-control selectpicker" data-live-search="true" multiple data-actions-box="true" title="--SELECT LANGUAGE--">
 													<?php if(!empty($languages)) { foreach($languages as $l) { ?>
-														<option data-icon="la la-language font-size-lg bs-icon" value="<?php echo htmlspecialchars($l->value, ENT_QUOTES); ?>" <?php if($this->input->get('language') === $l->value) echo 'selected'; ?>><?php echo htmlspecialchars($l->value); ?></option>
+														<option data-icon="la la-language font-size-lg bs-icon" value="<?php echo htmlspecialchars($l->value, ENT_QUOTES); ?>" <?php if(in_array((string)$l->value, $sel_language, true)) echo 'selected'; ?>><?php echo htmlspecialchars($l->value); ?></option>
 													<?php } } ?>
 												</select>
 											</div>
@@ -170,10 +203,10 @@ div.kt-datatable__pager-container {
 										<div class="col-md-3">
 											<div class="form-group">
 												<label>Destination</label>
-												<select name="destination" class="form-control selectpicker" data-live-search="true">
-													<option selected data-icon="la la-map-marker font-size-lg bs-icon" value="">--SELECT DESTINATION--</option>
+												<?php $sel_destination = guest_list_multi_values($this->input->get('destination')); ?>
+												<select name="destination[]" class="form-control selectpicker" data-live-search="true" multiple data-actions-box="true" title="--SELECT DESTINATION--">
 													<?php if(!empty($destinations)) { foreach($destinations as $d) { ?>
-														<option data-icon="la la-map-marker font-size-lg bs-icon" value="<?php echo $d->CategoryID; ?>" <?php if($this->input->get('destination') == $d->CategoryID) echo 'selected'; ?>><?php echo htmlspecialchars($d->Name); ?></option>
+														<option data-icon="la la-map-marker font-size-lg bs-icon" value="<?php echo $d->CategoryID; ?>" <?php if(in_array((string)$d->CategoryID, $sel_destination, true)) echo 'selected'; ?>><?php echo htmlspecialchars($d->Name); ?></option>
 													<?php } } ?>
 												</select>
 											</div>
@@ -181,11 +214,11 @@ div.kt-datatable__pager-container {
 										<div class="col-md-3">
 											<div class="form-group">
 												<label>Guest Role</label>
-												<select name="role" class="form-control selectpicker">
-													<option selected data-icon="la la-user-friends font-size-lg bs-icon" value="">--SELECT ROLE--</option>
-													<option data-icon="la la-user-friends font-size-lg bs-icon" value="Team Leader" <?php if($this->input->get('role') === 'Team Leader') echo 'selected'; ?>>Team Leader</option>
-													<option data-icon="la la-user-friends font-size-lg bs-icon" value="Team Member" <?php if($this->input->get('role') === 'Team Member') echo 'selected'; ?>>Team Member</option>
-													<option data-icon="la la-user-friends font-size-lg bs-icon" value="Lead"        <?php if($this->input->get('role') === 'Lead')        echo 'selected'; ?>>Lead (GHL)</option>
+												<?php $sel_role = guest_list_multi_values($this->input->get('role')); ?>
+												<select name="role[]" class="form-control selectpicker" multiple data-actions-box="true" title="--SELECT ROLE--">
+													<option data-icon="la la-user-friends font-size-lg bs-icon" value="Team Leader" <?php if(in_array('Team Leader', $sel_role, true)) echo 'selected'; ?>>Team Leader</option>
+													<option data-icon="la la-user-friends font-size-lg bs-icon" value="Team Member" <?php if(in_array('Team Member', $sel_role, true)) echo 'selected'; ?>>Team Member</option>
+													<option data-icon="la la-user-friends font-size-lg bs-icon" value="Lead"        <?php if(in_array('Lead', $sel_role, true))        echo 'selected'; ?>>Lead (GHL)</option>
 												</select>
 											</div>
 										</div>
@@ -245,6 +278,19 @@ div.kt-datatable__pager-container {
 												</div>
 											</div>
 										</div>
+										<div class="col-md-3">
+											<div class="form-group">
+												<label>Date of Birth
+													<a onclick="Reset_Dob()" class="btn btn-icon btn-light-warning btn-xs" data-toggle="tooltip" title="Clear date of birth">
+														<i class="la la-undo"></i>
+													</a>
+												</label>
+												<div id="kt_daterangepicker_guests_dob" class="input-icon">
+													<input readonly type="text" name="dob" value="<?php if(!empty($this->input->get('dob'))) { echo $this->input->get('dob'); } ?>" autocomplete="off" class="form-control" placeholder="Born between…">
+													<span><i class="la la-birthday-cake"></i></span>
+												</div>
+											</div>
+										</div>
 									</div>
 									<input type="submit" value="Filter" class="btn btn-light-success font-weight-bold" style="width:80px;">
 									<input type="button" id="reset" value="Reset" class="btn btn-light-primary font-weight-bold" style="width:80px;">
@@ -260,7 +306,7 @@ div.kt-datatable__pager-container {
 						<thead>
 							<tr>
 								<th style="text-align:center;">No.</th>
-								<th style="text-align:center;">First Name</th>
+								<th style="text-align:center;">Guest First Name</th>
 								<th style="text-align:center;">Team Leader</th>
 								<th style="text-align:center;">Contact Num</th>
 								<th style="text-align:center;">Email</th>
@@ -285,23 +331,37 @@ div.kt-datatable__pager-container {
 								<tr><td colspan="19" style="text-align:center; padding-top:10px; padding-bottom:10px;">Guest Records Not Found</td></tr>
 							<?php } else { ?>
 								<?php $count = 1; foreach($guests as $g) { ?>
+									<?php $is_ghl_row = isset($g->Type) && $g->Type === 'GHL'; ?>
 									<tr>
 										<td style="text-align:center; padding-top:15px; padding-bottom:15px;"><?php echo $count; ?></td>
-										<td style="text-align:center;"><?php echo htmlspecialchars($g->Name); ?></td>
+										<?php $name_val = (string) $g->Name; ?>
+										<td class="gl-cell<?php if(!$is_ghl_row) echo ' gl-editable'; ?>" style="text-align:center;"<?php if(!$is_ghl_row) { ?> data-field="name" data-dedup-key="<?php echo htmlspecialchars($g->dedup_key, ENT_QUOTES); ?>" data-value="<?php echo htmlspecialchars($name_val, ENT_QUOTES); ?>"<?php } ?>>
+											<span class="gl-display">
+												<span class="gl-text"><?php if($name_val !== '') { echo htmlspecialchars($name_val); } else { echo '<span class="text-muted">&mdash;</span>'; } ?></span>
+												<?php if(!$is_ghl_row) { ?>
+													<button type="button" class="btn btn-icon btn-light-primary btn-xs gl-edit-btn ml-1" data-toggle="tooltip" title="Edit first name"><i class="la la-pencil"></i></button>
+												<?php } ?>
+											</span>
+										</td>
 										<td style="text-align:center; white-space:nowrap;">
 											<?php
-												$leaders = guest_list_split_team_leaders(isset($g->TeamLeader) ? $g->TeamLeader : '');
+												$leaders = guest_list_team_leader_links(isset($g->TeamLeaderBookings) ? $g->TeamLeaderBookings : '');
 												if(!empty($leaders)) {
 													$tl_base    = base_url($list_base);
 													$leader_out = array();
-													foreach($leaders as $ln) {
+													foreach($leaders as $lead) {
 														// Click a team leader name to reload the list filtered
-														// to that exact leader — showing everyone on their team.
-														$href = $tl_base . '?team_leader=' . urlencode($ln) . '&team_leader_exact=1';
+														// to that leader's exact booking(s) — showing only that
+														// booking's team members, not every booking they've led.
+														$qs = array();
+														foreach($lead['booking_ids'] as $bid) {
+															$qs[] = 'booking_id[]=' . urlencode($bid);
+														}
+														$href = $tl_base . '?' . implode('&', $qs);
 														$leader_out[] = '<a href="' . htmlspecialchars($href, ENT_QUOTES) . '" '
-															. 'title="Show all team members under this leader" '
+															. 'title="Show only this booking\'s team members" '
 															. 'style="color:#3699FF; text-decoration:none; border-bottom:1px dashed #3699FF;">'
-															. htmlspecialchars($ln) . '</a>';
+															. htmlspecialchars($lead['name']) . '</a>';
 													}
 													echo implode('<br>', $leader_out);
 												} else {
@@ -310,7 +370,6 @@ div.kt-datatable__pager-container {
 											?>
 										</td>
 										<?php
-											$is_ghl_row      = isset($g->Type) && $g->Type === 'GHL';
 											$calling_code    = isset($g->CallingCode) ? (string)$g->CallingCode : '';
 											$contact_display = guest_contact_format_display($calling_code, (string)$g->ContactNum);
 											$wa_number       = guest_contact_wa_digits($calling_code, (string)$g->ContactNum);
@@ -331,8 +390,24 @@ div.kt-datatable__pager-container {
 												<?php } ?>
 											</span>
 										</td>
-										<td style="text-align:center;"><?php echo htmlspecialchars($g->Email); ?></td>
-										<td style="text-align:center;"><?php echo htmlspecialchars($g->Language); ?></td>
+										<?php $email_val = (string) $g->Email; ?>
+										<td class="gl-cell<?php if(!$is_ghl_row) echo ' gl-editable'; ?>" style="text-align:center;"<?php if(!$is_ghl_row) { ?> data-field="email" data-dedup-key="<?php echo htmlspecialchars($g->dedup_key, ENT_QUOTES); ?>" data-value="<?php echo htmlspecialchars($email_val, ENT_QUOTES); ?>"<?php } ?>>
+											<span class="gl-display">
+												<span class="gl-text"><?php if($email_val !== '') { echo htmlspecialchars($email_val); } else { echo '<span class="text-muted">&mdash;</span>'; } ?></span>
+												<?php if(!$is_ghl_row) { ?>
+													<button type="button" class="btn btn-icon btn-light-primary btn-xs gl-edit-btn ml-1" data-toggle="tooltip" title="Edit email"><i class="la la-pencil"></i></button>
+												<?php } ?>
+											</span>
+										</td>
+										<?php $lang_val = (string) $g->Language; ?>
+										<td class="gl-cell<?php if(!$is_ghl_row) echo ' gl-editable'; ?>" style="text-align:center;"<?php if(!$is_ghl_row) { ?> data-field="language" data-dedup-key="<?php echo htmlspecialchars($g->dedup_key, ENT_QUOTES); ?>" data-value="<?php echo htmlspecialchars($lang_val, ENT_QUOTES); ?>"<?php } ?>>
+											<span class="gl-display">
+												<span class="gl-text"><?php if($lang_val !== '') { echo htmlspecialchars($lang_val); } else { echo '<span class="text-muted">&mdash;</span>'; } ?></span>
+												<?php if(!$is_ghl_row) { ?>
+													<button type="button" class="btn btn-icon btn-light-primary btn-xs gl-edit-btn ml-1" data-toggle="tooltip" title="Edit language"><i class="la la-pencil"></i></button>
+												<?php } ?>
+											</span>
+										</td>
 										<td style="text-align:center;"><?php echo htmlspecialchars($g->AgentName); ?></td>
 										<td style="text-align:center;"><?php echo htmlspecialchars($g->Source); ?></td>
 										<td style="text-align:center;"><?php echo htmlspecialchars($g->CustomerType); ?></td>
@@ -357,7 +432,6 @@ div.kt-datatable__pager-container {
 												}
 											?>
 										</td>
-										<?php $is_ghl = isset($g->Type) && $g->Type === 'GHL'; ?>
 										<td style="text-align:center; white-space:nowrap;">
 											<?php
 												$role = isset($g->Role) ? $g->Role : '';
@@ -382,7 +456,7 @@ div.kt-datatable__pager-container {
 														}
 													}
 													if(!empty($bd_out)) {
-														if($is_ghl) {
+														if($is_ghl_row) {
 															echo '<span class="text-muted font-weight-bold d-block">Lead captured</span>';
 														}
 														echo implode('<br>', $bd_out);
@@ -409,7 +483,7 @@ div.kt-datatable__pager-container {
 											?>
 										</td>
 										<td style="text-align:center;">
-											<?php if(!$is_ghl) { ?>
+											<?php if(!$is_ghl_row) { ?>
 												<div class="btn-group">
 													<button type="button" data-toggle="dropdown" class="btn btn-light-primary btn-sm dropdown-toggle" style="padding-left:3px;"></button>
 													<div class="dropdown-menu">
@@ -455,7 +529,7 @@ div.kt-datatable__pager-container {
 
 <script>
 	<?php
-		$expanded_keys = array('q', 'booking_number', 'contact_number', 'email', 'destination', 'role', 'pax_min', 'pax_max', 'sales_agent', 'source', 'customer_type', 'nationality', 'gender', 'language', 'booking_date', 'travel_date', 'team_leader');
+		$expanded_keys = array('q', 'booking_number', 'contact_number', 'email', 'destination', 'role', 'pax_min', 'pax_max', 'sales_agent', 'source', 'customer_type', 'nationality', 'gender', 'language', 'booking_date', 'travel_date', 'team_leader', 'dob');
 		$expand = false;
 		foreach($expanded_keys as $k) {
 			if($this->input->get($k) !== null && $this->input->get($k) !== '') { $expand = true; break; }
@@ -497,6 +571,9 @@ div.kt-datatable__pager-container {
 	function Reset_Travel_Date() {
 		$('#kt_daterangepicker_guests_travel input').val('');
 	}
+	function Reset_Dob() {
+		$('#kt_daterangepicker_guests_dob input').val('');
+	}
 
 	$('#kt_daterangepicker_guests_booking').daterangepicker({
 		buttonClasses: ' btn',
@@ -514,6 +591,22 @@ div.kt-datatable__pager-container {
 		autoApply: true
 	}, function(start, end, label) {
 		$('#kt_daterangepicker_guests_travel .form-control').val(start.format('DD/MM/YYYY') + ' - ' + end.format('DD/MM/YYYY'));
+	});
+
+	// DOB spans decades, so show month/year dropdowns and cap the range at today
+	// (nobody is born in the future). Opens on a sensible past year, not this month.
+	$('#kt_daterangepicker_guests_dob').daterangepicker({
+		buttonClasses: ' btn',
+		applyClass: 'btn-primary',
+		cancelClass: 'btn-secondary',
+		autoApply: true,
+		showDropdowns: true,
+		minYear: 1920,
+		maxDate: moment(),
+		startDate: moment().subtract(30, 'years'),
+		endDate: moment()
+	}, function(start, end, label) {
+		$('#kt_daterangepicker_guests_dob .form-control').val(start.format('DD/MM/YYYY') + ' - ' + end.format('DD/MM/YYYY'));
 	});
 
 	$('[data-toggle="tooltip"]').tooltip();
@@ -611,6 +704,99 @@ div.kt-datatable__pager-container {
 				renderDisplay($cell);
 			} else {
 				$error.text((res && res.message) ? res.message : 'Could not update contact number.').show();
+				$btn.prop('disabled', false).find('i').attr('class', 'la la-check');
+			}
+		}).fail(function() {
+			$error.text('Network error. Please try again.').show();
+			$btn.prop('disabled', false).find('i').attr('class', 'la la-check');
+		});
+	});
+
+	// ----- Generic inline field edit (First Name / Email / Language) -----
+	var GL_FIELD_UPDATE_URL = '<?php echo base_url('Guests/Update_Field'); ?>';
+	var GL_LANGUAGES = <?php echo json_encode(isset($edit_languages) ? array_values($edit_languages) : array('CN', 'EN', 'ML')); ?>;
+
+	var GL_TITLES = { name: 'Edit first name', email: 'Edit email', language: 'Edit language' };
+
+	function glEscape(v) { return $('<span>').text(v == null ? '' : v).html(); }
+
+	function glRenderDisplay($cell) {
+		$cell.find('[data-toggle="tooltip"]').tooltip('dispose');
+		var field = $cell.attr('data-field');
+		var val   = $cell.attr('data-value') || '';
+		var text  = val === '' ? '<span class="text-muted">&mdash;</span>' : glEscape(val);
+		$cell.html(
+			'<span class="gl-display"><span class="gl-text">' + text + '</span>' +
+			'<button type="button" class="btn btn-icon btn-light-primary btn-xs gl-edit-btn ml-1" data-toggle="tooltip" title="' + (GL_TITLES[field] || 'Edit') + '">' +
+			'<i class="la la-pencil"></i></button></span>'
+		);
+		$cell.find('[data-toggle="tooltip"]').tooltip();
+	}
+
+	$('#kt_datatable').on('click', '.gl-edit-btn', function() {
+		var $cell = $(this).closest('.gl-cell');
+		if ($cell.find('.gl-editor').length) { return; }
+		var field   = $cell.attr('data-field');
+		var current = $cell.attr('data-value') || '';
+		$cell.find('[data-toggle="tooltip"]').tooltip('dispose');
+
+		var control;
+		if (field === 'language') {
+			var opts = '<option value=""></option>';
+			for (var i = 0; i < GL_LANGUAGES.length; i++) {
+				var code = GL_LANGUAGES[i];
+				opts += '<option value="' + glEscape(code) + '"' + (code === current ? ' selected' : '') + '>' + glEscape(code) + '</option>';
+			}
+			control = '<select class="form-control gl-input">' + opts + '</select>';
+		} else {
+			control = '<input type="' + (field === 'email' ? 'email' : 'text') + '" class="form-control gl-input" value="' + glEscape(current) + '" autocomplete="off">';
+		}
+
+		$cell.html(
+			'<span class="gl-editor">' + control +
+				'<button type="button" class="btn btn-icon btn-light-success btn-xs gl-save" data-toggle="tooltip" title="Save"><i class="la la-check"></i></button>' +
+				'<button type="button" class="btn btn-icon btn-light-danger btn-xs gl-cancel" data-toggle="tooltip" title="Cancel"><i class="la la-times"></i></button>' +
+			'</span>' +
+			'<span class="gl-error" style="display:none;"></span>'
+		);
+		$cell.find('[data-toggle="tooltip"]').tooltip();
+		var $input = $cell.find('.gl-input').focus();
+		if (field !== 'language') { $input.select(); }
+	});
+
+	$('#kt_datatable').on('click', '.gl-cancel', function() {
+		glRenderDisplay($(this).closest('.gl-cell'));
+	});
+
+	$('#kt_datatable').on('keydown', '.gl-editor input.gl-input', function(e) {
+		if (e.which === 13) { e.preventDefault(); $(this).closest('.gl-cell').find('.gl-save').click(); }
+		else if (e.which === 27) { e.preventDefault(); glRenderDisplay($(this).closest('.gl-cell')); }
+	});
+
+	$('#kt_datatable').on('click', '.gl-save', function() {
+		var $btn   = $(this);
+		var $cell  = $btn.closest('.gl-cell');
+		var $input = $cell.find('.gl-input');
+		var $error = $cell.find('.gl-error');
+		var field  = $cell.attr('data-field');
+		var value  = $.trim($input.val());
+
+		$btn.tooltip('hide');
+		$error.hide().text('');
+		$btn.prop('disabled', true).find('i').attr('class', 'la la-spinner la-spin');
+
+		$.ajax({
+			url: GL_FIELD_UPDATE_URL,
+			method: 'POST',
+			dataType: 'json',
+			data: { dedup_key: $cell.attr('data-dedup-key'), field: field, value: value },
+			timeout: 30000
+		}).done(function(res) {
+			if (res && res.ok) {
+				$cell.attr('data-value', (res.value != null) ? res.value : value);
+				glRenderDisplay($cell);
+			} else {
+				$error.text((res && res.message) ? res.message : 'Could not update.').show();
 				$btn.prop('disabled', false).find('i').attr('class', 'la la-check');
 			}
 		}).fail(function() {

@@ -20,6 +20,25 @@ class Guests_Model extends CI_Model
 		return "gl.dedup_key";
 	}
 
+	/**
+	 * Append a multi-select filter as an " AND {$column} IN (?, ?, …) " fragment
+	 * to $where and push its values onto $params. No-op when nothing is selected.
+	 * $column is a trusted, code-supplied SQL expression (never user input);
+	 * every value is bound as a placeholder.
+	 */
+	private function Append_In_Clause(&$where, &$params, $column, $raw)
+	{
+		$values = guest_list_multi_values($raw);
+		if(empty($values)) {
+			return;
+		}
+		$placeholders = implode(',', array_fill(0, count($values), '?'));
+		$where .= " AND {$column} IN ({$placeholders}) ";
+		foreach($values as $v) {
+			$params[] = $v;
+		}
+	}
+
 	private function Ghl_Dedup_Key_Expr()
 	{
 		return "(COALESCE(gc.dedup_key, CONCAT('ghl:', gc.id)) COLLATE utf8mb4_unicode_ci)";
@@ -73,6 +92,16 @@ class Guests_Model extends CI_Model
 				$b_params[] = $travel_range[0];
 			}
 
+			// DOB is a booking-only, born-between calendar range on the guest's
+			// date of birth. DateOfBirth is a DATE column, so an inclusive
+			// >= start AND <= end matches exactly (NULL / 0000-00-00 never match).
+			$dob_range = guest_list_parse_date_range($this->input->get('dob'));
+			if($dob_range !== null) {
+				$where     .= " AND gl.DateOfBirth >= ? AND gl.DateOfBirth <= ? ";
+				$b_params[] = $dob_range[0];
+				$b_params[] = $dob_range[1];
+			}
+
 			$booking_number = trim((string)$this->input->get('booking_number'));
 			if($booking_number !== '') {
 				$where     .= " AND b.BookingNumber LIKE ? ";
@@ -88,41 +117,30 @@ class Guests_Model extends CI_Model
 				$where     .= $tl_clause['sql'];
 				$b_params[] = $tl_clause['param'];
 			}
+			// Clicking a Team Leader name drills into that leader's exact
+			// booking(s) by BookingID, so the list shows only that booking's
+			// team members — not every booking the leader has ever run.
+			$this->Append_In_Clause($where, $b_params, 'b.BookingID', $this->input->get('booking_id'));
 			$email = trim((string)$this->input->get('email'));
 			if($email !== '') {
 				$where     .= " AND gl.Email LIKE ? ";
 				$b_params[] = '%' . $email . '%';
 			}
-			if(!empty($this->input->get('destination'))) {
-				$where     .= " AND b.Destination = ? ";
-				$b_params[] = $this->input->get('destination');
-			}
-			if(!empty($this->input->get('sales_agent'))) {
-				$where     .= " AND b.SalesAgent = ? ";
-				$b_params[] = $this->input->get('sales_agent');
-			}
-			if(!empty($this->input->get('source'))) {
-				$where     .= " AND b.Source = ? ";
-				$b_params[] = $this->input->get('source');
-			}
-			if(!empty($this->input->get('customer_type'))) {
-				$where     .= " AND c.customer_type = ? ";
-				$b_params[] = $this->input->get('customer_type');
-			}
-			if(!empty($this->input->get('nationality'))) {
-				$where     .= " AND cn.Country = ? ";
-				$b_params[] = $this->input->get('nationality');
-			}
-			if(!empty($this->input->get('gender'))) {
-				$where     .= " AND gl.Gender = ? ";
-				$b_params[] = $this->input->get('gender');
-			}
-			if(!empty($this->input->get('language'))) {
-				$where     .= " AND COALESCE(c.ChatLanguage, b.ChatLanguage) = ? ";
-				$b_params[] = $this->input->get('language');
-			}
+			// Dropdown filters are multi-select (see views/guests/index.php): each
+			// may arrive as several values, so they filter via an IN (...) list.
+			$this->Append_In_Clause($where, $b_params, 'b.Destination',                    $this->input->get('destination'));
+			$this->Append_In_Clause($where, $b_params, 'b.SalesAgent',                     $this->input->get('sales_agent'));
+			$this->Append_In_Clause($where, $b_params, 'b.Source',                         $this->input->get('source'));
+			$this->Append_In_Clause($where, $b_params, 'c.customer_type',                  $this->input->get('customer_type'));
+			$this->Append_In_Clause($where, $b_params, 'cn.Country',                       $this->input->get('nationality'));
+			$this->Append_In_Clause($where, $b_params, 'gl.Gender',                        $this->input->get('gender'));
+			$this->Append_In_Clause($where, $b_params, 'COALESCE(c.ChatLanguage, b.ChatLanguage)', $this->input->get('language'));
 			if($has_q) {
-				$where     .= " AND ( gl.Name LIKE ? OR gl.LastName LIKE ? OR CONCAT_WS(' ', gl.Name, gl.LastName) LIKE ? ) ";
+				// Search Name matches the guest's own name OR their booking's team
+				// leader (b.Customer, the name on the BC form), so searching a
+				// leader surfaces everyone on their team.
+				$where     .= " AND ( gl.Name LIKE ? OR gl.LastName LIKE ? OR CONCAT_WS(' ', gl.Name, gl.LastName) LIKE ? OR b.Customer LIKE ? ) ";
+				$b_params[] = $like;
 				$b_params[] = $like;
 				$b_params[] = $like;
 				$b_params[] = $like;
@@ -147,9 +165,14 @@ class Guests_Model extends CI_Model
 			$having        = array();
 			$having_params = array();
 
-			$role = trim((string)$this->input->get('role'));
-			if($role === 'Team Leader')     { $having[] = "MAX(IsLeader) = 1"; }
-			elseif($role === 'Team Member') { $having[] = "MAX(IsLeader) = 0"; }
+			// Guest Role is multi-select. "Lead" only affects the GHL branch, so
+			// here we look at the two booking roles: picking exactly one narrows
+			// the result; picking both (or neither) leaves booking guests unfiltered.
+			$roles       = guest_list_multi_values($this->input->get('role'));
+			$want_leader = in_array('Team Leader', $roles, true);
+			$want_member = in_array('Team Member', $roles, true);
+			if($want_leader && !$want_member)     { $having[] = "MAX(IsLeader) = 1"; }
+			elseif($want_member && !$want_leader) { $having[] = "MAX(IsLeader) = 0"; }
 
 			$pax_expr = "COALESCE(SUM(CASE WHEN booking_rn = 1 THEN BookingPax END), 0)";
 			$pax_min  = trim((string)$this->input->get('pax_min'));
@@ -244,6 +267,7 @@ WHERE 1 = 1
 		COALESCE(c.ChatLanguage, b.ChatLanguage) AS ChatLanguage,
 		a.Name           AS SalesAgentName,
 		b.Customer       AS BookingCustomer,
+		b.BookingID      AS BookingID,
 		s.Name           AS SourceName,
 		c.customer_type  AS customer_type,
 		cat.Name         AS Destination,
@@ -272,9 +296,144 @@ WHERE 1 = 1
 		";
 	}
 
+	/**
+	 * The "leader fallback" branch: a Team Leader row built straight from the
+	 * booking's own contact for every active booking whose leader phone is NOT
+	 * already a filled guest_list row. This surfaces the leaders of bookings whose
+	 * guest list was never filled in (blank rows → NULL dedup_key → invisible to
+	 * the normal branch) so they stay pickable for a campaign. The NOT EXISTS
+	 * anti-join against the whole filled set guarantees a leader is never shown
+	 * twice — if their phone already belongs to a real guest anywhere, that guest
+	 * carries them instead. Returns null when the branch is off (wrong mode /
+	 * bookings suppressed / a guest-only filter that a leader can't satisfy).
+	 */
+	private function Build_Leader_Fallback_Branch()
+	{
+		$this->load->helper('guest_contact');
+		$run = guest_list_branches_to_run($this->mode, $this->input->get());
+		if(!$run['bookings']) {
+			return null;
+		}
+		if(guest_list_leader_fallback_suppressed_by_filters($this->input->get())) {
+			return null;
+		}
+
+		$key = $this->Booking_Leader_Key_Expr();
+
+		$where = " WHERE b.Status != 'N' AND b.CancelStatus = 'N'
+			AND {$key} IS NOT NULL
+			AND NOT EXISTS (
+				SELECT 1 FROM guest_list glx
+				WHERE glx.Status = 'Y' AND glx.dedup_key = {$key}
+			) ";
+		$params = array();
+
+		if(in_array($this->session->userdata('level'), array(20, 50))) {
+			$where     .= " AND b.SalesAgent = ? ";
+			$params[]   = $this->session->userdata('admin_id');
+		}
+
+		$booking_range = guest_list_parse_date_range($this->input->get('booking_date'));
+		if($booking_range !== null) {
+			$where   .= " AND b.InsertDate >= ? AND b.InsertDate < DATE_ADD(?, INTERVAL 1 DAY) ";
+			$params[] = $booking_range[0];
+			$params[] = $booking_range[1];
+		}
+
+		$travel_range = guest_list_parse_date_range($this->input->get('travel_date'));
+		if($travel_range !== null) {
+			$where   .= " AND b.StartDate <= ? AND b.EndDate >= ? ";
+			$params[] = $travel_range[1];
+			$params[] = $travel_range[0];
+		}
+
+		$booking_number = trim((string)$this->input->get('booking_number'));
+		if($booking_number !== '') {
+			$where   .= " AND b.BookingNumber LIKE ? ";
+			$params[] = '%' . $booking_number . '%';
+		}
+
+		// Contact Number matches the leader's own booking phone (there is no
+		// guest_list row yet), so it filters the booking/customer contact.
+		$contact_number = trim((string)$this->input->get('contact_number'));
+		if($contact_number !== '') {
+			$where   .= " AND COALESCE(b.Mobile, c.phone_number) LIKE ? ";
+			$params[] = '%' . $contact_number . '%';
+		}
+
+		$tl_clause = guest_list_team_leader_clause($this->input->get());
+		if($tl_clause !== null) {
+			$where   .= $tl_clause['sql'];
+			$params[] = $tl_clause['param'];
+		}
+
+		$this->Append_In_Clause($where, $params, 'b.BookingID',   $this->input->get('booking_id'));
+		$this->Append_In_Clause($where, $params, 'b.Destination', $this->input->get('destination'));
+		$this->Append_In_Clause($where, $params, 'b.SalesAgent',  $this->input->get('sales_agent'));
+		$this->Append_In_Clause($where, $params, 'b.Source',      $this->input->get('source'));
+		$this->Append_In_Clause($where, $params, 'c.customer_type', $this->input->get('customer_type'));
+		$this->Append_In_Clause($where, $params, "COALESCE(c.ChatLanguage, b.ChatLanguage)", $this->input->get('language'));
+
+		$q_raw = trim((string)$this->input->get('q'));
+		if($q_raw !== '') {
+			$where   .= " AND b.Customer LIKE ? ";
+			$params[] = '%' . $q_raw . '%';
+		}
+
+		$from = "
+	FROM booking b
+	LEFT JOIN customer     c   ON c.CustomerID     = b.CustomerID
+	LEFT JOIN admin        a   ON a.AdminID        = b.SalesAgent
+	LEFT JOIN source       s   ON s.SourceID       = b.Source
+	LEFT JOIN category     cat ON cat.CategoryID   = b.Destination
+	LEFT JOIN country_code cc  ON cc.CountryCodeID = b.CountryCodeID
+	{$where}
+		";
+
+		return array('key' => $key, 'from' => $from, 'params' => $params);
+	}
+
+	/**
+	 * The merged-listing SELECT for one leader-fallback group (one row per leader
+	 * phone key). Column order MUST match the booking and GHL branch SELECTs so
+	 * the UNION ALL lines up. Every non-key column is aggregated because a leader
+	 * may run several unfilled bookings.
+	 */
+	private function Leader_Fallback_Select($key, $from)
+	{
+		return "
+	SELECT
+		{$key} AS dedup_key,
+		CONVERT(MAX(b.Customer) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Name,
+		CONVERT(GROUP_CONCAT(DISTINCT NULLIF(TRIM(b.Customer), '') SEPARATOR '||') USING utf8mb4) COLLATE utf8mb4_unicode_ci AS TeamLeader,
+		CONVERT(GROUP_CONCAT(DISTINCT CASE WHEN NULLIF(TRIM(b.Customer), '') IS NOT NULL THEN CONCAT(b.BookingID, ':', TRIM(b.Customer)) END SEPARATOR '||') USING utf8mb4) COLLATE utf8mb4_unicode_ci AS TeamLeaderBookings,
+		CONVERT(MAX(COALESCE(b.Mobile, c.phone_number)) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS ContactNum,
+		CONVERT(MAX(cc.CountryCode) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS CallingCode,
+		CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS Email,
+		CONVERT(MAX(COALESCE(c.ChatLanguage, b.ChatLanguage)) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Language,
+		CONVERT(MAX(a.Name) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS AgentName,
+		CONVERT(MAX(s.Name) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Source,
+		CONVERT(MAX(c.customer_type) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS CustomerType,
+		CONVERT(GROUP_CONCAT(COALESCE(cat.Name, '-') ORDER BY DATE(b.InsertDate) SEPARATOR '||') USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Destination,
+		CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS Nationality,
+		CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS Gender,
+		CAST(NULL AS DATE) AS DOB,
+		COALESCE(SUM(COALESCE(b.Adult, 0) + COALESCE(b.Children, 0) + COALESCE(b.Infant, 0)), 0) AS TotalPax,
+		COALESCE(SUM(COALESCE(b.NetTotal, 0)), 0) AS TotalSales,
+		CAST('Booking Guest' AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS Type,
+		CONVERT(MAX(b.Token) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Token,
+		CONVERT('Team Leader' USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Role,
+		CONVERT(GROUP_CONCAT(DISTINCT DATE(b.InsertDate) ORDER BY DATE(b.InsertDate) SEPARATOR ',') USING utf8mb4) COLLATE utf8mb4_unicode_ci AS BookingDates,
+		CONVERT(GROUP_CONCAT(DISTINCT CONCAT(DATE(b.StartDate), '|', IFNULL(DATE(b.EndDate), '')) ORDER BY CONCAT(DATE(b.StartDate), '|', IFNULL(DATE(b.EndDate), '')) SEPARATOR ',') USING utf8mb4) COLLATE utf8mb4_unicode_ci AS TravelDates
+	{$from}
+	GROUP BY {$key}
+		";
+	}
+
 	private function Build_Merged_Sql_And_Params()
 	{
 		list($booking, $ghl) = $this->Build_Branches();
+		$fallback = $this->Build_Leader_Fallback_Branch();
 
 		$parts  = array();
 		$params = array();
@@ -286,6 +445,7 @@ SELECT
 	dedup_key,
 	CONVERT(MAX(CASE WHEN rn = 1 THEN display_name   END) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Name,
 	CONVERT(GROUP_CONCAT(DISTINCT CASE WHEN booking_rn = 1 THEN NULLIF(TRIM(BookingCustomer), '') END SEPARATOR '||') USING utf8mb4) COLLATE utf8mb4_unicode_ci AS TeamLeader,
+	CONVERT(GROUP_CONCAT(DISTINCT CASE WHEN booking_rn = 1 AND NULLIF(TRIM(BookingCustomer), '') IS NOT NULL THEN CONCAT(BookingID, ':', TRIM(BookingCustomer)) END SEPARATOR '||') USING utf8mb4) COLLATE utf8mb4_unicode_ci AS TeamLeaderBookings,
 	CONVERT(MAX(CASE WHEN rn = 1 THEN ContactNum     END) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS ContactNum,
 	CONVERT(MAX(CASE WHEN rn = 1 THEN CallingCode    END) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS CallingCode,
 	CONVERT(MAX(CASE WHEN rn = 1 THEN Email          END) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Email,
@@ -320,6 +480,7 @@ SELECT
 	{$gc_dedup} AS dedup_key,
 	CONVERT(TRIM(gc.first_name) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Name,
 	CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS TeamLeader,
+	CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS TeamLeaderBookings,
 	CONVERT(gc.phone USING utf8mb4) COLLATE utf8mb4_unicode_ci AS ContactNum,
 	CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS CallingCode,
 	CONVERT(gc.email USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Email,
@@ -341,6 +502,11 @@ SELECT
 {$ghl['from']}
 			";
 			$params = array_merge($params, $ghl['params']);
+		}
+
+		if($fallback !== null) {
+			$parts[] = $this->Leader_Fallback_Select($fallback['key'], $fallback['from']);
+			$params  = array_merge($params, $fallback['params']);
 		}
 
 		if(empty($parts)) {
@@ -391,6 +557,14 @@ SELECT
 			if($row) { $total += (int)$row->cnt; }
 		}
 
+		$fallback = $this->Build_Leader_Fallback_Branch();
+		if($fallback !== null) {
+			// One synthesized row per leader phone key (no HAVING on this branch).
+			$sql = "SELECT COUNT(DISTINCT {$fallback['key']}) AS cnt {$fallback['from']}";
+			$row = $this->db->query($sql, $fallback['params'])->row();
+			if($row) { $total += (int)$row->cnt; }
+		}
+
 		return $total;
 	}
 
@@ -414,25 +588,113 @@ SELECT
 	}
 
 	/**
-	 * Overwrite Mobile on every active guest_list row that shares
-	 * $current_dedup_key (this person's records across bookings), keeping them
-	 * grouped under the new key. When $scope_admin_id is set (levels 20/50) the
-	 * update is confined to that agent's own bookings. Returns affected rows.
+	 * The booking "leader phone key" — the last-9 digits of the booking's own
+	 * Mobile, falling back to the linked customer's phone. A guest whose
+	 * dedup_key equals this is the booking's team leader (mirrors the IsLeader
+	 * expression in Booking_Windowed_Select). Used to decide which bookings a
+	 * dashboard edit should reflect back onto (booking.Mobile / ChatLanguage).
 	 */
-	function Update_Guest_Contact($current_dedup_key, $new_mobile, $admin_id, $scope_admin_id = null)
+	private function Booking_Leader_Key_Expr()
+	{
+		return "COALESCE(
+			NULLIF(RIGHT(REGEXP_REPLACE(IFNULL(b.Mobile, ''),       '[^0-9]', ''), 9), ''),
+			NULLIF(RIGHT(REGEXP_REPLACE(IFNULL(c.phone_number, ''), '[^0-9]', ''), 9), '')
+		)";
+	}
+
+	/**
+	 * Overwrite a plain guest_list column (Name / Mobile / Email) on every active
+	 * row that shares $current_dedup_key — this person's records across bookings —
+	 * keeping them grouped under the same key. When $scope_admin_id is set (levels
+	 * 20/50) the update is confined to that agent's own bookings. Returns affected
+	 * rows. $column is whitelisted by the callers below, never taken from input.
+	 */
+	private function Update_Guest_List_Column($column, $current_dedup_key, $value, $admin_id, $scope_admin_id = null)
 	{
 		$sql = "UPDATE guest_list gl
 			JOIN booking b ON b.BookingID = gl.BookingID
-			SET gl.Mobile = ?, gl.UpdateBy = ?, gl.UpdateDate = ?
+			SET gl.{$column} = ?, gl.UpdateBy = ?, gl.UpdateDate = ?
 			WHERE gl.Status = 'Y' AND b.Status != 'N' AND b.CancelStatus = 'N'
 				AND gl.dedup_key = ?";
-		$params = array($new_mobile, $admin_id, date('Y-m-d H:i:s'), $current_dedup_key);
+		$params = array($value, $admin_id, date('Y-m-d H:i:s'), $current_dedup_key);
 
 		if ($scope_admin_id !== null) {
 			$sql      .= " AND b.SalesAgent = ?";
 			$params[]  = $scope_admin_id;
 		}
 
+		$this->db->query($sql, $params);
+		return $this->db->affected_rows();
+	}
+
+	/**
+	 * Contact number edit. Writes Mobile onto every active guest_list row sharing
+	 * $current_dedup_key, then reflects the new number back onto booking.Mobile
+	 * for the bookings this person LEADS (so the BC / booking contact stays in
+	 * sync). The leader match uses the OLD key, since the new Mobile would change
+	 * the generated dedup_key. Returns guest_list rows affected.
+	 */
+	function Update_Guest_Contact($current_dedup_key, $new_mobile, $admin_id, $scope_admin_id = null)
+	{
+		$affected = $this->Update_Guest_List_Column('Mobile', $current_dedup_key, $new_mobile, $admin_id, $scope_admin_id);
+
+		$key_expr = $this->Booking_Leader_Key_Expr();
+		$sql = "UPDATE booking b
+			LEFT JOIN customer c ON c.CustomerID = b.CustomerID
+			SET b.Mobile = ?
+			WHERE b.Status != 'N' AND b.CancelStatus = 'N'
+				AND {$key_expr} = ?";
+		$params = array($new_mobile, $current_dedup_key);
+		if ($scope_admin_id !== null) {
+			$sql      .= " AND b.SalesAgent = ?";
+			$params[]  = $scope_admin_id;
+		}
+		$this->db->query($sql, $params);
+
+		return $affected;
+	}
+
+	/**
+	 * First Name edit → guest_list.Name on all of the person's active rows. The
+	 * booking's own leader name (booking.Customer) is intentionally NOT touched:
+	 * it holds the full BC name, so rewriting it with just the first name would
+	 * drop the surname. Returns rows affected.
+	 */
+	function Update_Guest_Name($current_dedup_key, $name, $admin_id, $scope_admin_id = null)
+	{
+		return $this->Update_Guest_List_Column('Name', $current_dedup_key, $name, $admin_id, $scope_admin_id);
+	}
+
+	/**
+	 * Email edit → guest_list.Email on all of the person's active rows. Booking
+	 * has no dedicated guest-email column (it reads MAX(guest_list.Email)), so the
+	 * guest_list write already reflects onto the booking. Returns rows affected.
+	 */
+	function Update_Guest_Email($current_dedup_key, $email, $admin_id, $scope_admin_id = null)
+	{
+		return $this->Update_Guest_List_Column('Email', $current_dedup_key, $email, $admin_id, $scope_admin_id);
+	}
+
+	/**
+	 * Language edit. ChatLanguage lives on booking / customer, not guest_list, and
+	 * the dashboard shows COALESCE(customer, booking) — so to be visible the value
+	 * is written to BOTH on the bookings this person LEADS. Only ChatLanguage is
+	 * touched (not the AutoCount sync flags), so no debtor re-sync is queued.
+	 * Returns bookings affected (0 when the person leads none — a pure team member).
+	 */
+	function Update_Guest_Language($current_dedup_key, $language, $admin_id, $scope_admin_id = null)
+	{
+		$key_expr = $this->Booking_Leader_Key_Expr();
+		$sql = "UPDATE booking b
+			LEFT JOIN customer c ON c.CustomerID = b.CustomerID
+			SET b.ChatLanguage = ?, c.ChatLanguage = ?
+			WHERE b.Status != 'N' AND b.CancelStatus = 'N'
+				AND {$key_expr} = ?";
+		$params = array($language, $language, $current_dedup_key);
+		if ($scope_admin_id !== null) {
+			$sql      .= " AND b.SalesAgent = ?";
+			$params[]  = $scope_admin_id;
+		}
 		$this->db->query($sql, $params);
 		return $this->db->affected_rows();
 	}

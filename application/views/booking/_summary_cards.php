@@ -343,7 +343,7 @@
                 <div class="card card-custom">
                     <div class="card-header border-0 summary-card-header" style="background-color:#D7E2F2;">
                         <h3>New Leads</h3>
-                        <i id="pop-tc-leads" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>What it shows:</strong> Brand-new leads assigned to you (from GHL) &mdash; the same &ldquo;New Lead Picked Up&rdquo; count as the Lead Reply Activity dashboard, scoped to you. Counted by the customer&rsquo;s first-contact date (when the conversation first landed), not the assignment date.<ul><li><strong>Today:</strong> leads that first landed today</li><li><strong>Week:</strong> Monday to Sunday of this week</li><li><strong>Month:</strong> 1st to last day of this month</li></ul>Distinct leads you are the assigned owner of; a lead across two of your inboxes still counts once. A days-old conversation reassigned to you is not counted here. Your leads are matched to you by your account email. <strong>Note:</strong> if your email isn&rsquo;t linked to a GHL user, this card will show zeros."></i>
+                        <i id="pop-tc-leads" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>What it shows:</strong> Leads assigned to you (from GHL) &mdash; the same &ldquo;New Lead Picked Up&rdquo; count as the Lead Reply Activity dashboard, scoped to you. Counted by the landing date (when the conversation first landed). Re-engaged customers count too.<ul><li><strong>Today:</strong> leads that landed today</li><li><strong>Week:</strong> Monday to Sunday of this week</li><li><strong>Month:</strong> 1st to last day of this month</li></ul>Distinct leads you are the assigned owner of; a lead across two of your inboxes still counts once. Your leads are matched to you by your account email. <strong>Note:</strong> if your email isn&rsquo;t linked to a GHL user, this card will show zeros."></i>
                     </div>
                     <div class="card-body summary-card-body">
                         <div class="summary-row-3">
@@ -351,7 +351,7 @@
                             <div><div class="lbl">Week</div><div class="summary-value-sm" id="sc-tc-leads-week">...</div></div>
                             <div><div class="lbl">Month</div><div class="summary-value-sm" id="sc-tc-leads-month">...</div></div>
                         </div>
-                        <div class="summary-sub">New leads assigned to you, by first-contact date. Matches the Lead Reply Activity dashboard.</div>
+                        <div class="summary-sub">New leads assigned to you, by landing date. Matches the Lead Reply Activity dashboard.</div>
                         <div class="summary-sub summary-best" id="sc-tc-leads-best">Best: —</div>
                     </div>
                 </div>

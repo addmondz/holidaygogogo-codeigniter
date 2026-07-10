@@ -31,7 +31,7 @@ $buildOwnershipDataUrl = function($ownerId, $ownershipType = null) use ($lead_ow
                             <strong>Lead Ownership Dashboard</strong>
                         </h3>
                         <div class="text-muted font-size-sm">
-                            Lead credit separated by current assigned owner and non-assigned users who replied more than 3 times inside the conversation window.
+                            Lead credit separated by current assigned owner and non-assigned users who replied at least once inside the conversation window.
                         </div>
                     </div>
                 </div>

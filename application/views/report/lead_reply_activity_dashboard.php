@@ -149,17 +149,17 @@
                                 <th style="text-align:center;">
                                     New Lead Picked Up
                                     <i class="la la-info-circle ml-1" style="cursor:help; color:#2f506f;" data-toggle="tooltip"
-                                       title="Brand-new leads assigned to this owner whose conversation FIRST landed within the selected date range (counted by the customer's first-contact date, not the assignment date). A days-old conversation reassigned in the range is not counted here. Distinct leads where the owner is the assigned owner."></i>
+                                       title="Distinct leads assigned to this owner whose conversation landed within the selected date range (counted by the landing date, same as the Total New Leads GHL card). Re-engaged customers count too. Only leads actually picked up (assigned) appear here, so the per-owner total sits below the company-wide card by however many landed leads nobody has picked up yet."></i>
                                 </th>
                                 <th style="text-align:center;">
                                     Lead Responded
                                     <i class="la la-info-circle ml-1" style="cursor:help; color:#2f506f;" data-toggle="tooltip"
-                                       title="Distinct leads this owner replied to, counted on any day between 7AM and 10PM only. Replying many times (even more than 3) to the same lead still counts as one."></i>
+                                       title="Distinct leads this owner replied to, counted on any day between 7AM and 10PM only. Replying many times to the same lead still counts as one."></i>
                                 </th>
                                 <th style="text-align:center;">
                                     Transfer Out Lead
                                     <i class="la la-info-circle ml-1" style="cursor:help; color:#2f506f;" data-toggle="tooltip"
-                                       title="Leads this owner worked (their 4th outbound reply lands in the selected window) that are no longer assigned to them -- reassigned to another agent/inbox. Leads still assigned to this owner never count, whichever day they first arrived."></i>
+                                       title="Leads this owner worked (their first outbound reply lands in the selected window) that are no longer assigned to them -- reassigned to another agent/inbox. Leads still assigned to this owner never count, whichever day they first arrived."></i>
                                 </th>
                                 <th style="text-align:center;">
                                     Today Handling Lead
@@ -304,7 +304,7 @@
         today_handling: 'Today Handling Leads'
     };
     var lraActivityHeaders = {
-        picked_up: 'First Contact',
+        picked_up: 'Customer\'s First Inbound Message',
         responded: 'First Reply',
         transfer_out: 'Transferred Out',
         today_handling: 'First Reply'

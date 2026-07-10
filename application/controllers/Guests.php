@@ -33,6 +33,7 @@ class Guests extends MY_Controller
 		$data['customer_types'] = $this->Customer_Type_Model->Read_Customer_Types();
 		$data['nationalities']  = $this->Guests_Model->Read_Distinct('Nationality');
 		$data['languages']      = $this->Guests_Model->Read_Distinct('ChatLanguage');
+		$data['edit_languages'] = $this->Guest_Languages();
 		$this->load->view('layout/header', $titles);
 		$this->load->view('guests/index', $data);
 		$this->load->view('layout/footer');
@@ -109,6 +110,85 @@ class Guests extends MY_Controller
 			'mobile'    => $mobile,
 			'dedup_key' => $new_key !== '' ? $new_key : $dedup_key,
 		));
+	}
+
+	/**
+	 * Inline edit for the Guest List dashboard's First Name / Email / Language
+	 * columns (Contact number has its own endpoint, Update_Contact). Each field
+	 * validates via the pure guest_field_validate_* helpers, then writes back —
+	 * guest_list for Name/Email, booking + customer ChatLanguage for Language.
+	 * Levels 20/50 are confined to their own bookings, mirroring the read side.
+	 */
+	function Update_Field()
+	{
+		$out = function ($data) {
+			$this->output
+				->set_content_type('application/json')
+				->set_output(json_encode($data));
+		};
+
+		$dedup_key = (string) $this->input->post('dedup_key');
+		$field     = (string) $this->input->post('field');
+		$value     = (string) $this->input->post('value');
+
+		if ($dedup_key === '') {
+			return $out(array('ok' => false, 'message' => 'Missing guest reference.'));
+		}
+
+		$scope_admin_id = in_array($this->session->userdata('level'), array(20, 50))
+			? $this->session->userdata('admin_id')
+			: null;
+		$admin_id = $this->session->userdata('admin_id');
+
+		if ($field === 'name') {
+			$valid = guest_field_validate_name($value);
+			if (!$valid['ok']) {
+				return $out(array('ok' => false, 'message' => $valid['error']));
+			}
+			$affected = $this->Guests_Model->Update_Guest_Name($dedup_key, $valid['value'], $admin_id, $scope_admin_id);
+			if ($affected < 1) {
+				return $out(array('ok' => false, 'message' => 'Guest not found or you are not allowed to edit it.'));
+			}
+			return $out(array('ok' => true, 'value' => $valid['value']));
+		}
+
+		if ($field === 'email') {
+			$valid = guest_field_validate_email($value);
+			if (!$valid['ok']) {
+				return $out(array('ok' => false, 'message' => $valid['error']));
+			}
+			$affected = $this->Guests_Model->Update_Guest_Email($dedup_key, $valid['value'], $admin_id, $scope_admin_id);
+			if ($affected < 1) {
+				return $out(array('ok' => false, 'message' => 'Guest not found or you are not allowed to edit it.'));
+			}
+			return $out(array('ok' => true, 'value' => $valid['value']));
+		}
+
+		if ($field === 'language') {
+			$valid = guest_field_validate_language($value, $this->Guest_Languages());
+			if (!$valid['ok']) {
+				return $out(array('ok' => false, 'message' => $valid['error']));
+			}
+			$affected = $this->Guests_Model->Update_Guest_Language($dedup_key, $valid['value'], $admin_id, $scope_admin_id);
+			if ($affected < 1) {
+				// Language lives on the booking/customer, so it only lands on a
+				// guest who leads a booking — a pure team member has nowhere to store it.
+				return $out(array('ok' => false, 'message' => 'Language can only be set on the guest who leads a booking.'));
+			}
+			return $out(array('ok' => true, 'value' => $valid['value']));
+		}
+
+		return $out(array('ok' => false, 'message' => 'Unknown field.'));
+	}
+
+	/**
+	 * Allowed ChatLanguage codes (the booking/customer ENUM set). Single source
+	 * for both the inline-edit dropdown and the server-side validation gate.
+	 * Private so it is not exposed as a routable action.
+	 */
+	private function Guest_Languages()
+	{
+		return array('CN', 'EN', 'ML');
 	}
 
 	function View()

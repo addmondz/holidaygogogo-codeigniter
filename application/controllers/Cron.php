@@ -415,7 +415,9 @@ class Cron extends CI_Controller
 		$this->syncPayments();
 		$this->syncDeletedPayments();
 
-		$this->syncGhlModules();
+		// GHL sync intentionally NOT called here. It runs on its own dedicated
+		// cron (Cron syncGhlModules) so a hang in the AutoCount steps above can
+		// no longer block it. See crontab: */10 * * * * ... Cron syncGhlModules
 	}
 
 	public function syncGhlModules()
@@ -758,6 +760,16 @@ class Cron extends CI_Controller
 
 		$upperBound = $this->resolve_ghl_processing_upper_bound($until);
 
+		// When invoked as `... <method> --rebuild` (no numeric chunk), CodeIgniter
+		// binds the "--rebuild" segment to the $chunkSize param. Casting that to
+		// int gives 0 -> null -> "ALL" -> the whole table in one batch, which
+		// exhausts PHP memory on a full rebuild. If the caller never gave a real
+		// numeric chunk, fall back to the safe default so the flag alone can't
+		// force an all-in-one batch.
+		if (!$chunkSizeResolved && !is_numeric($chunkSize)) {
+			$chunkSize = 1000;
+		}
+
 		if ($chunkSize !== null) {
 			$chunkSize = (int) $chunkSize;
 			if ($chunkSize <= 0) {
@@ -962,6 +974,16 @@ class Cron extends CI_Controller
 			}
 		}
 
+		// When invoked as `... <method> --rebuild` (no numeric chunk), CodeIgniter
+		// binds the "--rebuild" segment to the $chunkSize param. Casting that to
+		// int gives 0 -> null -> "ALL" -> the whole table in one batch, which
+		// exhausts PHP memory on a full rebuild. If the caller never gave a real
+		// numeric chunk, fall back to the safe default so the flag alone can't
+		// force an all-in-one batch.
+		if (!$chunkSizeResolved && !is_numeric($chunkSize)) {
+			$chunkSize = 1000;
+		}
+
 		if ($chunkSize !== null) {
 			$chunkSize = (int) $chunkSize;
 			if ($chunkSize <= 0) {
@@ -974,7 +996,10 @@ class Cron extends CI_Controller
 			|| in_array('--reset', $flags, true)
 			|| $forceRebuild;
 
-		$replyThreshold = 3;
+		// Reply-owner rule: an agent who sends AT LEAST 1 outbound reply in a
+		// lead's window is a reply owner. The query is "HAVING COUNT(*) > N", so
+		// N = 0 means "more than 0" = 1+ replies. (Previously 3, i.e. 4+ replies.)
+		$replyThreshold = 0;
 		$summary = array(
 			'leads_scanned' => 0,
 			'ownership_rows' => 0,

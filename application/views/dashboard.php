@@ -976,7 +976,7 @@
                                             </div>
                                         <?php } ?>
                                     </div>
-                                    <div class="kpi-sub mt-2">New leads picked up company-wide, by pick-up date. Matches the Lead Reply Activity dashboard&rsquo;s &ldquo;New Lead Picked Up&rdquo; total.</div>
+                                    <div class="kpi-sub mt-2">Every new lead that landed company-wide, by the time it came in &mdash; counted whether or not an agent has picked it up yet. Matches the Leads By Hour report total.</div>
                                 </div>
                             </div>
                         </div>

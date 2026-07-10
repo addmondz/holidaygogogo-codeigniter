@@ -5,11 +5,11 @@
  * Locks the SQL behind the Owner-dashboard (Level 10) KPI cards, added in
  * Dashboard_Model:
  *   - Team_Sales($s,$e)             — SUM(NetTotal) per active team, window on InsertDate
- *   - New leads picked up ($s,$e)   — company-wide "New Lead Picked Up" total from
- *                                     ghl_lead_ownership, matching the Lead Reply
- *                                     Activity dashboard tfoot (distinct owner:lead
- *                                     pairs, windowed by pick-up time). This is
- *                                     Report_Model::Lead_Reply_Activity_Picked_Up_Total,
+ *   - New leads landed ($s,$e)      — company-wide count of every lead that LANDED
+ *                                     (ghl_processed_leads windowed by
+ *                                     lead_started_at), regardless of pick-up or
+ *                                     reply. Same universe as the Leads By Hour
+ *                                     report. This is Report_Model::Leads_Landed_Total,
  *                                     surfaced on the owner card as owner_new_leads.
  *   - Top_Cancellation_Reasons(...) — cancelled BCs grouped by reason, top N
  *   - Approved_Payment_Out($s,$e)   — SUM(Debit)  where Credit=0, Status='Y'
@@ -45,18 +45,17 @@ $pdo->exec("CREATE TABLE booking (
     Status TEXT,
     NetTotal REAL,
     SalesAgent INTEGER,
+    SalesAgent2 INTEGER,
     TeamID INTEGER,
     CancellationReasonID INTEGER
 )");
 $pdo->exec("CREATE TABLE admin (AdminID INTEGER PRIMARY KEY, TeamID INTEGER)");
 $pdo->exec("CREATE TABLE team (TeamID INTEGER PRIMARY KEY, Name TEXT, Status TEXT)");
 $pdo->exec("CREATE TABLE cancellation_reason (CancellationReasonID INTEGER PRIMARY KEY, Name TEXT)");
-$pdo->exec("CREATE TABLE ghl_lead_ownership (
-    owner_user_id       TEXT,
-    processed_lead_id   INTEGER,
-    is_assigned_owner   INTEGER,
+$pdo->exec("CREATE TABLE ghl_processed_leads (
+    id                  INTEGER PRIMARY KEY,
+    conversation_id     TEXT,
     assigned_to_user_id TEXT,
-    assigned_at         TEXT,
     lead_started_at     TEXT
 )");
 $pdo->exec("CREATE TABLE payment (
@@ -116,17 +115,15 @@ function unassigned_sales(PDO $pdo, $start, $end) {
     return (float) $st->fetch(PDO::FETCH_ASSOC)['Sales'];
 }
 function new_leads(PDO $pdo, $start, $end) {
-    // Company-wide "New Lead Picked Up" total: the same universe as the Lead
-    // Reply Activity dashboard's tfoot — distinct owner:lead pairs (a lead
-    // picked up by two owners counts for each, matching the sum of the per-agent
-    // rows), windowed by the pick-up time COALESCE(assigned_at, lead_started_at).
+    // Company-wide count of every lead that LANDED in the window — the same
+    // universe as the Leads By Hour report: all ghl_processed_leads rows
+    // windowed by lead_started_at, with NO pick-up / reply / first-contact
+    // filter. A lead counts the moment it lands, picked up or not.
     $st = $pdo->prepare("
-        SELECT COUNT(DISTINCT (glo.owner_user_id || ':' || glo.processed_lead_id)) AS c
-        FROM ghl_lead_ownership glo
-        WHERE glo.is_assigned_owner = 1
-          AND NULLIF(glo.assigned_to_user_id, '') = glo.owner_user_id
-          AND COALESCE(glo.assigned_at, glo.lead_started_at) >= :s
-          AND COALESCE(glo.assigned_at, glo.lead_started_at) <= :e");
+        SELECT COUNT(*) AS c
+        FROM ghl_processed_leads pl
+        WHERE pl.lead_started_at >= :s
+          AND pl.lead_started_at <= :e");
     $st->execute([':s'=>$start . ' 00:00:00', ':e'=>$end . ' 23:59:59']);
     return (int) $st->fetch(PDO::FETCH_ASSOC)['c'];
 }
@@ -271,33 +268,27 @@ assert_eq('no month key when unset', false,   isset($tg1[1]['month']));
 assert_eq('year still present',      18000.0, $tg1[1]['year']);
 
 // ===========================================================================
-// New leads picked up — company-wide "New Lead Picked Up" total
-// (ghl_lead_ownership, windowed by pick-up time, distinct owner:lead)
+// New leads landed — company-wide count of every lead that came in
+// (ghl_processed_leads, windowed by lead_started_at), regardless of pick-up
+// or reply. No pick-up filter, no 3-reply threshold, no first-contact rule.
 // ===========================================================================
-// pl 1  u1: picked up 06-15 (assigned_at in window)                     COUNT
-// pl 2  u1: assigned_at NULL -> falls back to lead_started_at 06-15     COUNT (COALESCE)
-// pl 3  u1: started 06-14 (before window) but PICKED UP 06-15           COUNT (pick-up drives window)
-// pl 4  u1: started 06-15 (in window) but PICKED UP 06-16 (after)       EXCLUDED for the 06-15 day
-// pl 5  u1: is_assigned_owner = 0 (reply owner only)                    EXCLUDED
-// pl 6  u1: is_assigned_owner=1 BUT assigned_to_user_id=u2 (owner!=assignee) EXCLUDED
-// pl 7  u2: picked up 06-15, different owner                            COUNT (company-wide)
-// pl 8  u1 + u2: same lead picked up by two DIFFERENT owners 06-15      COUNT TWICE (owner:lead)
-$pdo->exec("INSERT INTO ghl_lead_ownership
-    (owner_user_id, processed_lead_id, is_assigned_owner, assigned_to_user_id, assigned_at, lead_started_at) VALUES
-    ('u1', 1, 1, 'u1', '2026-06-15 08:00:00', '2026-06-15 07:00:00'),
-    ('u1', 2, 1, 'u1', NULL,                  '2026-06-15 23:30:00'),
-    ('u1', 3, 1, 'u1', '2026-06-15 14:00:00', '2026-06-14 10:00:00'),
-    ('u1', 4, 1, 'u1', '2026-06-16 10:00:00', '2026-06-15 10:00:00'),
-    ('u1', 5, 0, 'u1', '2026-06-15 10:00:00', '2026-06-15 10:00:00'),
-    ('u1', 6, 1, 'u2', '2026-06-15 11:00:00', '2026-06-15 11:00:00'),
-    ('u2', 7, 1, 'u2', '2026-06-15 12:00:00', '2026-06-15 12:00:00'),
-    ('u1', 8, 1, 'u1', '2026-06-15 15:00:00', '2026-06-15 15:00:00'),
-    ('u2', 8, 1, 'u2', '2026-06-15 16:00:00', '2026-06-15 16:00:00')");
-// Day 06-15: u1 leads 1,2,3,8 (4) + u2 leads 7,8 (2) = 6 owner:lead pairs.
-assert_eq('picked up today', 6, new_leads($pdo, '2026-06-15', '2026-06-15'));
-// Widen to 06-14..06-16: also picks up lead 4 (u1, assigned 06-16) -> 7.
-assert_eq('picked up 3 days', 7, new_leads($pdo, '2026-06-14', '2026-06-16'));
-assert_eq('picked up none',   0, new_leads($pdo, '2026-01-01', '2026-01-01'));
+// pl 1  landed 06-15 07:00, picked up by u1                    COUNT
+// pl 2  landed 06-15 23:30 (late in the day, still 06-15)      COUNT
+// pl 3  landed 06-14 (before window)                           EXCLUDED for 06-15 day
+// pl 4  landed 06-16 (after window)                            EXCLUDED for 06-15 day
+// pl 5  landed 06-15, NEVER picked up (assignee NULL)          COUNT (pick-up irrelevant)
+$pdo->exec("INSERT INTO ghl_processed_leads
+    (id, conversation_id, assigned_to_user_id, lead_started_at) VALUES
+    (1, 'c1', 'u1', '2026-06-15 07:00:00'),
+    (2, 'c2', 'u1', '2026-06-15 23:30:00'),
+    (3, 'c3', 'u1', '2026-06-14 10:00:00'),
+    (4, 'c4', 'u1', '2026-06-16 10:00:00'),
+    (5, 'c5', NULL, '2026-06-15 12:00:00')");
+// Day 06-15: leads 1,2,5 landed = 3 (the un-picked-up lead 5 still counts).
+assert_eq('landed today', 3, new_leads($pdo, '2026-06-15', '2026-06-15'));
+// Widen to 06-14..06-16: all 5 land -> 5.
+assert_eq('landed 3 days', 5, new_leads($pdo, '2026-06-14', '2026-06-16'));
+assert_eq('landed none',   0, new_leads($pdo, '2026-01-01', '2026-01-01'));
 
 // ===========================================================================
 // Top_Cancellation_Reasons
