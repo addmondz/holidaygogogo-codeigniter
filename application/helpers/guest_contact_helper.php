@@ -230,6 +230,57 @@ if (!function_exists('guest_list_parse_date_range')) {
     }
 }
 
+if (!function_exists('guest_list_birthday_clause')) {
+    /**
+     * Build a recurring-birthday SQL clause on gl.DateOfBirth that matches the
+     * month/day regardless of birth year — for the Guest List "Birthday"
+     * dropdown. Unlike the DOB "born between" range (which pins a full Y-m-d
+     * window), this ignores the year so it surfaces guests whose birthday falls
+     * now / this month / in a chosen month.
+     *
+     * Accepted values:
+     *   'today'      → birthday is today   (MONTH & DAY both = today's)
+     *   'this_month' → birthday this month (MONTH = current month)
+     *   '1'..'12'    → birthday in that specific calendar month
+     * Any other / empty value returns null (no filter applied).
+     *
+     * DateOfBirth is a DATE column: NULL / '0000-00-00' give MONTH() = 0, which
+     * never equals a real 1-12 month, so placeholder birthdays never match.
+     *
+     * @param string $raw Raw dropdown value from the request.
+     * @return array{sql:string,params:array}|null
+     */
+    function guest_list_birthday_clause($raw)
+    {
+        $raw = trim((string) $raw);
+        if ($raw === '') {
+            return null;
+        }
+        if ($raw === 'today') {
+            return array(
+                'sql'    => " AND MONTH(gl.DateOfBirth) = MONTH(CURDATE()) AND DAY(gl.DateOfBirth) = DAY(CURDATE()) ",
+                'params' => array(),
+            );
+        }
+        if ($raw === 'this_month') {
+            return array(
+                'sql'    => " AND MONTH(gl.DateOfBirth) = MONTH(CURDATE()) ",
+                'params' => array(),
+            );
+        }
+        if (ctype_digit($raw)) {
+            $month = (int) $raw;
+            if ($month >= 1 && $month <= 12) {
+                return array(
+                    'sql'    => " AND MONTH(gl.DateOfBirth) = ? ",
+                    'params' => array($month),
+                );
+            }
+        }
+        return null;
+    }
+}
+
 if (!function_exists('guest_list_travel_date_filter_value')) {
     /**
      * Build the travel_date filter value ("DD/MM/YYYY - DD/MM/YYYY") for a
@@ -435,7 +486,7 @@ if (!function_exists('guest_list_ghl_suppressed_by_filters')) {
             'travel_date', 'sales_agent', 'source',
             'customer_type', 'nationality', 'gender', 'language',
             'booking_number', 'destination', 'pax_min', 'pax_max',
-            'team_leader', 'booking_id', 'dob',
+            'team_leader', 'booking_id', 'dob', 'birthday',
         );
         foreach ($booking_only as $k) {
             if (isset($get[$k]) && count(guest_list_multi_values($get[$k])) > 0) {
@@ -496,7 +547,7 @@ if (!function_exists('guest_list_leader_fallback_suppressed_by_filters')) {
      */
     function guest_list_leader_fallback_suppressed_by_filters($get)
     {
-        $guest_only = array('nationality', 'gender', 'dob', 'email', 'pax_min', 'pax_max');
+        $guest_only = array('nationality', 'gender', 'dob', 'birthday', 'email', 'pax_min', 'pax_max');
         foreach ($guest_only as $k) {
             if (isset($get[$k]) && count(guest_list_multi_values($get[$k])) > 0) {
                 return true;

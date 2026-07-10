@@ -102,6 +102,17 @@ class Guests_Model extends CI_Model
 				$b_params[] = $dob_range[1];
 			}
 
+			// Birthday is a recurring month/day match on gl.DateOfBirth that
+			// ignores the birth year (today / this month / a chosen month), so
+			// it surfaces guests to greet regardless of how old they turn.
+			$birthday = guest_list_birthday_clause($this->input->get('birthday'));
+			if($birthday !== null) {
+				$where    .= $birthday['sql'];
+				foreach($birthday['params'] as $bp) {
+					$b_params[] = $bp;
+				}
+			}
+
 			$booking_number = trim((string)$this->input->get('booking_number'));
 			if($booking_number !== '') {
 				$where     .= " AND b.BookingNumber LIKE ? ";
@@ -109,19 +120,14 @@ class Guests_Model extends CI_Model
 			}
 			$contact_number = trim((string)$this->input->get('contact_number'));
 			if($contact_number !== '') {
-				// Match the guest's own mobile OR the booking's contact (b.Mobile /
-				// customer phone). A filled booking usually stores each member's own
-				// number in gl.Mobile while the leader/booking contact lives on the
-				// booking — that contact is skipped by the leader-fallback branch
-				// (it only fires for unfilled bookings), so without b.Mobile /
-				// c.phone_number here it would be searchable by no branch at all.
-				// Matching it surfaces that booking's team members, mirroring how the
-				// name search also matches b.Customer to surface a whole team.
-				$where     .= " AND ( gl.Mobile LIKE ? OR b.Mobile LIKE ? OR c.phone_number LIKE ? ) ";
-				$like_cn    = '%' . $contact_number . '%';
-				$b_params[] = $like_cn;
-				$b_params[] = $like_cn;
-				$b_params[] = $like_cn;
+				// Match ONLY the guest's own gl.Mobile — the exact number shown in
+				// the Contact Num column — so every returned row visibly contains
+				// the searched digits. (A booking's leader/contact number that lives
+				// only on b.Mobile / c.phone_number is intentionally NOT matched
+				// here; the leader-fallback branch still surfaces such contacts when
+				// the booking's guest list is empty.)
+				$where     .= " AND gl.Mobile LIKE ? ";
+				$b_params[] = '%' . $contact_number . '%';
 			}
 			$tl_clause = guest_list_team_leader_clause($this->input->get());
 			if($tl_clause !== null) {

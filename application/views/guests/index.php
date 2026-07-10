@@ -293,6 +293,22 @@ div.kt-datatable__pager-container {
 												</div>
 											</div>
 										</div>
+										<div class="col-md-3">
+											<div class="form-group">
+												<label>Birthday</label>
+												<?php $birthday_sel = (string) $this->input->get('birthday'); ?>
+												<select name="birthday" class="form-control">
+													<option value="">Any birthday</option>
+													<option value="today"      <?php if($birthday_sel === 'today')      { echo 'selected'; } ?>>🎂 Birthday today</option>
+													<option value="this_month" <?php if($birthday_sel === 'this_month') { echo 'selected'; } ?>>Birthday this month</option>
+													<optgroup label="Birthday in month">
+														<?php foreach(array(1=>'January',2=>'February',3=>'March',4=>'April',5=>'May',6=>'June',7=>'July',8=>'August',9=>'September',10=>'October',11=>'November',12=>'December') as $mnum => $mname) { ?>
+															<option value="<?php echo $mnum; ?>" <?php if($birthday_sel === (string)$mnum) { echo 'selected'; } ?>><?php echo $mname; ?></option>
+														<?php } ?>
+													</optgroup>
+												</select>
+											</div>
+										</div>
 									</div>
 									<input type="submit" value="Filter" class="btn btn-light-success font-weight-bold" style="width:80px;">
 									<input type="button" id="reset" value="Reset" class="btn btn-light-primary font-weight-bold" style="width:80px;">
@@ -538,7 +554,7 @@ div.kt-datatable__pager-container {
 
 <script>
 	<?php
-		$expanded_keys = array('q', 'booking_number', 'contact_number', 'email', 'destination', 'role', 'pax_min', 'pax_max', 'sales_agent', 'source', 'customer_type', 'nationality', 'gender', 'language', 'booking_date', 'travel_date', 'team_leader', 'dob');
+		$expanded_keys = array('q', 'booking_number', 'contact_number', 'email', 'destination', 'role', 'pax_min', 'pax_max', 'sales_agent', 'source', 'customer_type', 'nationality', 'gender', 'language', 'booking_date', 'travel_date', 'team_leader', 'dob', 'birthday');
 		$expand = false;
 		foreach($expanded_keys as $k) {
 			if($this->input->get($k) !== null && $this->input->get($k) !== '') { $expand = true; break; }

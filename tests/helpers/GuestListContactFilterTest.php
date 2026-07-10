@@ -4,18 +4,16 @@
  *
  * Locks the Guest List "Contact Number" filter on the booking branch.
  *
- * Bug: the filter used to match ONLY the per-guest gl.Mobile. But a filled
- * booking usually stores each member's OWN number in gl.Mobile, while the
- * booking's main contact (the leader) lives in booking.Mobile /
- * customer.phone_number. Those filled bookings are skipped by the leader
- * fallback branch (it only fires when the guest list is empty), so the
- * booking's own contact number was searchable by NO branch — ~1.5k bookings
- * on prod could not be found by their contact number.
+ * The filter matches ONLY the per-guest gl.Mobile — the exact number shown in
+ * the Contact Num column. This keeps search honest: every returned row visibly
+ * contains the searched digits.
  *
- * Fix: the booking-branch contact clause matches gl.Mobile OR b.Mobile OR
- * c.phone_number, so searching either a member's own number or the booking's
- * contact surfaces the booking's guests — mirroring how the name search also
- * matches b.Customer to surface a whole team.
+ * A booking's leader/contact number lives on booking.Mobile /
+ * customer.phone_number, which the Contact Num column never displays. Matching
+ * those here surfaced a whole team of members whose OWN displayed numbers did
+ * NOT contain the searched digits, so it was deliberately dropped. (Filled
+ * bookings whose contact lives only on the booking/customer are still reachable
+ * by name; the leader-fallback branch covers bookings with an empty guest list.)
  */
 
 if (!defined('BASEPATH')) {
@@ -51,7 +49,7 @@ $pdo->exec("INSERT INTO customer VALUES (200, '0111222333')");
 $pdo->exec("INSERT INTO guest_list VALUES (2,'g2a','0123456789')");
 
 // Count distinct guests the booking branch returns for a contact search.
-// $columns is the list of columns the clause LIKE-matches (the fix widens it).
+// $columns is the list of columns the clause LIKE-matches.
 $search = function ($needle, array $columns) use ($pdo) {
     $ors    = array();
     $params = array();
@@ -69,23 +67,19 @@ $search = function ($needle, array $columns) use ($pdo) {
     return (int) $stmt->fetchColumn();
 };
 
-$OLD = array('gl.Mobile');                              // buggy: guest mobile only
-$NEW = array('gl.Mobile', 'b.Mobile', 'c.phone_number'); // fixed: + booking contact
+$CLAUSE = array('gl.Mobile'); // the live clause: guest's own displayed number only
 
-// The bug: the booking's own contact number finds nothing under the old clause.
-assert_eq('OLD: booking contact 192281850 -> none (bug)', 0, $search('192281850', $OLD));
+// The booking's leader/contact number matches NOBODY's displayed Contact Num,
+// so it returns nothing — no rows whose visible number fails to match.
+assert_eq('booking contact 192281850 -> none (not a displayed number)', 0, $search('192281850', $CLAUSE));
 
-// The fix: the booking's contact surfaces that booking's 3 guests.
-assert_eq('NEW: booking contact 192281850 -> 3 guests', 3, $search('192281850', $NEW));
+// A member's own mobile resolves to exactly that one member.
+assert_eq('member mobile 0123456789 -> 1', 1, $search('0123456789', $CLAUSE));
 
-// A member's own mobile still resolves to exactly that member, under both.
-assert_eq('OLD: member mobile 0123456789 -> 1', 1, $search('0123456789', $OLD));
-assert_eq('NEW: member mobile 0123456789 -> 1', 1, $search('0123456789', $NEW));
-
-// Partial (trunk-0 stripped, as shown in the UI) still matches the fix.
-assert_eq('NEW: partial 92281850 -> 3 guests', 3, $search('92281850', $NEW));
+// A member's own number matches that member (partial substring).
+assert_eq('member partial 93874576 -> 1', 1, $search('93874576', $CLAUSE));
 
 // A number belonging to nobody matches nothing.
-assert_eq('NEW: unknown 555000 -> none', 0, $search('555000', $NEW));
+assert_eq('unknown 555000 -> none', 0, $search('555000', $CLAUSE));
 
 echo "\nAll assertions passed.\n";
