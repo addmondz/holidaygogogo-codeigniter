@@ -309,6 +309,18 @@ class Booking extends MY_Controller
 		$count = $start + 1;
 		$current_url = base_url($_SERVER['REQUEST_URI']);
 
+		// Which contacts have a stored WhatsApp conversation, so the mobile cell
+		// only shows a "message log" icon when a log exists (keyed by digits).
+		$this->load->model('Ghl_Messages_Model');
+		$msg_log_lookup = array();
+		foreach($bookings as $b) {
+			$digits = preg_replace('/\D+/', '', (string) $b->CountryCode . (string) $b->CustomerMobile);
+			if($digits !== '') {
+				$msg_log_lookup[] = $digits;
+			}
+		}
+		$msg_log_phones = $this->Ghl_Messages_Model->Phones_With_Messages($msg_log_lookup);
+
 		foreach($bookings as $booking) {
 			// SA-as-TC2 gating: when current SA is only the TC2 (SalesAgent2) of this
 			// booking, hide BC link, GL actions, and Customer actions in the row.
@@ -456,8 +468,12 @@ class Booking extends MY_Controller
 			// Chat Language
 			$row['chat_language'] = $booking->ChatLanguage;
 
-			// Mobile (WhatsApp link)
-			$row['mobile'] = '<a href="https://wa.me/' . $booking->CustomerMobile . '" target="_blank" class="btn btn-light-success d-inline-flex align-items-center btn-sm"><i class="la la-whatsapp"></i></a>';
+			// Mobile (WhatsApp link + message-log icon when a stored chat exists)
+			$row['mobile'] = '<a href="https://wa.me/' . $booking->CustomerMobile . '" target="_blank" title="Open WhatsApp chat" class="btn btn-light-success d-inline-flex align-items-center btn-sm"><i class="la la-whatsapp"></i></a>';
+			$mobile_digits = preg_replace('/\D+/', '', (string) $booking->CustomerMobile);
+			if($mobile_digits !== '' && !empty($msg_log_phones[$mobile_digits])) {
+				$row['mobile'] .= ' <a href="javascript:;" title="View message log" class="btn btn-light-primary d-inline-flex align-items-center btn-sm js-msg-log" data-phone="' . htmlspecialchars($mobile_digits, ENT_QUOTES) . '" data-name="' . htmlspecialchars($booking->Customer, ENT_QUOTES) . '"><i class="la la-comments"></i></a>';
+			}
 
 			// Start Date
 			$row['start_date'] = $start_date_formatted;

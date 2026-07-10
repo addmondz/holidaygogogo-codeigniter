@@ -82,6 +82,8 @@ div.kt-datatable__pager-container {
 	// passes the controller base and heading, defaulting to the Guest List page.
 	$list_base  = isset($list_base)  ? $list_base  : 'Guests';
 	$page_title = isset($page_title) ? $page_title : 'Guest List Records';
+	// wa-digits => true for contacts that have a stored WhatsApp conversation.
+	$msg_log_phones = isset($msg_log_phones) && is_array($msg_log_phones) ? $msg_log_phones : array();
 ?>
 <div class="d-flex flex-column-fluid">
 	<div class="container-fluid">
@@ -383,6 +385,11 @@ div.kt-datatable__pager-container {
 												<?php } else { ?>
 													<span class="contact-num"><?php echo htmlspecialchars($contact_display); ?></span>
 												<?php } ?>
+												<?php if(!empty($wa_number) && !empty($msg_log_phones[$wa_number])) { ?>
+													<button type="button" class="btn btn-icon btn-light-success btn-xs js-msg-log ml-1" data-toggle="tooltip" title="View message log" data-phone="<?php echo htmlspecialchars($wa_number, ENT_QUOTES); ?>" data-name="<?php echo htmlspecialchars($g->Name, ENT_QUOTES); ?>">
+														<i class="la la-comments"></i>
+													</button>
+												<?php } ?>
 												<?php if(!$is_ghl_row) { ?>
 													<button type="button" class="btn btn-icon btn-light-primary btn-xs contact-edit-btn ml-1" data-toggle="tooltip" title="Edit contact number">
 														<i class="la la-pencil"></i>
@@ -526,6 +533,8 @@ div.kt-datatable__pager-container {
 		</div>
 	</div>
 </div>
+
+<?php $this->load->view('partials/message_log_modal'); ?>
 
 <script>
 	<?php

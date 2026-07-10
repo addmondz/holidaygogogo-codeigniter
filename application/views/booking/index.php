@@ -313,6 +313,8 @@
     </div>
 </div>
 
+<?php $this->load->view('partials/message_log_modal'); ?>
+
 <script>
     var current_date = (new Date()).toLocaleDateString();
 

@@ -22,6 +22,8 @@ class Guests extends MY_Controller
 
 		$this->Guests_Model->Set_Mode('guest');
 		$data['guests']         = $this->Guests_Model->Read_Guests($limit, $offset);
+		$this->load->model('Ghl_Messages_Model');
+		$data['msg_log_phones'] = $this->Ghl_Messages_Model->Phones_With_Messages_For_Guests($data['guests']);
 		$data['total']          = null;
 		$data['page']           = $page;
 		$data['limit']          = $limit;
