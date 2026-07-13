@@ -151,6 +151,7 @@ class Guests_Model extends CI_Model
 			$this->Append_In_Clause($where, $b_params, 'c.customer_type',                  $this->input->get('customer_type'));
 			$this->Append_In_Clause($where, $b_params, 'cn.Country',                       $this->input->get('nationality'));
 			$this->Append_In_Clause($where, $b_params, 'gl.Gender',                        $this->input->get('gender'));
+			$this->Append_In_Clause($where, $b_params, 'gl.Type',                          $this->input->get('guest_type'));
 			$this->Append_In_Clause($where, $b_params, 'COALESCE(c.ChatLanguage, b.ChatLanguage)', $this->input->get('language'));
 			if($has_q) {
 				// Search Name matches the guest's own name OR their booking's team
@@ -290,6 +291,7 @@ WHERE 1 = 1
 		cat.Name         AS Destination,
 		cn.Country       AS Nationality,
 		gl.Gender,
+		gl.Type          AS GuestType,
 		gl.DateOfBirth,
 		b.Token          AS Token,
 		b.InsertDate     AS BookingDate,
@@ -434,6 +436,7 @@ WHERE 1 = 1
 		CONVERT(GROUP_CONCAT(COALESCE(cat.Name, '-') ORDER BY DATE(b.InsertDate) SEPARATOR '||') USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Destination,
 		CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS Nationality,
 		CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS Gender,
+		CONVERT('ADULT' USING utf8mb4) COLLATE utf8mb4_unicode_ci AS GuestType,
 		CAST(NULL AS DATE) AS DOB,
 		COALESCE(SUM(COALESCE(b.Adult, 0) + COALESCE(b.Children, 0) + COALESCE(b.Infant, 0)), 0) AS TotalPax,
 		COALESCE(SUM(COALESCE(b.NetTotal, 0)), 0) AS TotalSales,
@@ -473,6 +476,7 @@ SELECT
 	CONVERT(GROUP_CONCAT(CASE WHEN booking_rn = 1 THEN COALESCE(Destination, '-') END ORDER BY DATE(BookingDate) SEPARATOR '||') USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Destination,
 	CONVERT(MAX(CASE WHEN rn = 1 THEN Nationality    END) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Nationality,
 	CONVERT(MAX(CASE WHEN rn = 1 THEN Gender         END) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Gender,
+	CONVERT(MAX(CASE WHEN rn = 1 THEN GuestType      END) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS GuestType,
 	MAX(CASE WHEN rn = 1 THEN DateOfBirth END) AS DOB,
 	COALESCE(SUM(CASE WHEN booking_rn = 1 THEN BookingPax      END), 0) AS TotalPax,
 	COALESCE(SUM(CASE WHEN booking_rn = 1 THEN BookingNetTotal END), 0) AS TotalSales,
@@ -508,6 +512,7 @@ SELECT
 	NULL AS Destination,
 	NULL AS Nationality,
 	NULL AS Gender,
+	NULL AS GuestType,
 	NULL AS DOB,
 	0    AS TotalPax,
 	0    AS TotalSales,
@@ -757,6 +762,86 @@ SELECT
 		}
 
 		return $this->db->query($sql)->result();
+	}
+
+	/**
+	 * Add a dated remark for a guest (keyed by dedup_key, so it follows the
+	 * person across all their bookings — same key the inline edits use). The
+	 * datetime and text are already validated/normalized by the caller. Returns
+	 * the new RemarkID.
+	 */
+	function Add_Guest_Remark($dedup_key, $remark_at, $remark, $admin_id)
+	{
+		$this->db->insert('guest_remarks', array(
+			'dedup_key' => (string) $dedup_key,
+			'RemarkAt'  => $remark_at,
+			'Remark'    => $remark,
+			'Status'    => 'Y',
+			'CreatedBy' => $admin_id,
+			'CreatedAt' => date('Y-m-d H:i:s'),
+		));
+		return (int) $this->db->insert_id();
+	}
+
+	/**
+	 * All active remarks for a guest, newest RemarkAt first, with the author's
+	 * name for display. CanDelete flags the rows the current user may remove
+	 * (their own remarks — pass $viewer_admin_id).
+	 */
+	function Read_Guest_Remarks($dedup_key, $viewer_admin_id = null)
+	{
+		$sql = "SELECT gr.RemarkID, gr.RemarkAt, gr.Remark, gr.CreatedBy, gr.CreatedAt,
+				a.Name AS CreatedByName
+			FROM guest_remarks gr
+			LEFT JOIN admin a ON a.AdminID = gr.CreatedBy
+			WHERE gr.Status = 'Y' AND gr.dedup_key = ?
+			ORDER BY gr.RemarkAt DESC, gr.RemarkID DESC";
+		$rows = $this->db->query($sql, array((string) $dedup_key))->result();
+
+		foreach ($rows as $r) {
+			$r->CanDelete = ($viewer_admin_id !== null && (int) $r->CreatedBy === (int) $viewer_admin_id);
+		}
+		return $rows;
+	}
+
+	/**
+	 * Active-remark counts for a set of dedup_keys, keyed by dedup_key — used to
+	 * badge the listing's Action menu without a per-row query. Returns [] when
+	 * no keys are given.
+	 */
+	function Read_Remark_Counts($dedup_keys)
+	{
+		$keys = array();
+		foreach ((array) $dedup_keys as $k) {
+			$k = (string) $k;
+			if ($k !== '' && !in_array($k, $keys, true)) { $keys[] = $k; }
+		}
+		if (empty($keys)) {
+			return array();
+		}
+		$placeholders = implode(',', array_fill(0, count($keys), '?'));
+		$sql = "SELECT dedup_key, COUNT(*) AS cnt
+			FROM guest_remarks
+			WHERE Status = 'Y' AND dedup_key IN ({$placeholders})
+			GROUP BY dedup_key";
+		$out = array();
+		foreach ($this->db->query($sql, $keys)->result() as $row) {
+			$out[$row->dedup_key] = (int) $row->cnt;
+		}
+		return $out;
+	}
+
+	/**
+	 * Soft-delete a remark. Confined to the author (CreatedBy) so one user can't
+	 * remove another's note. Returns rows affected (0 when not theirs / missing).
+	 */
+	function Delete_Guest_Remark($remark_id, $admin_id)
+	{
+		$this->db->query(
+			"UPDATE guest_remarks SET Status = 'N' WHERE RemarkID = ? AND CreatedBy = ? AND Status = 'Y'",
+			array((int) $remark_id, $admin_id)
+		);
+		return $this->db->affected_rows();
 	}
 
 	function Read_Guest_Detail($dedup_key)

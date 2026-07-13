@@ -84,6 +84,8 @@ div.kt-datatable__pager-container {
 	$page_title = isset($page_title) ? $page_title : 'Guest List Records';
 	// wa-digits => true for contacts that have a stored WhatsApp conversation.
 	$msg_log_phones = isset($msg_log_phones) && is_array($msg_log_phones) ? $msg_log_phones : array();
+	// dedup_key => active-remark count, to badge each row's Remarks action.
+	$remark_counts  = isset($remark_counts) && is_array($remark_counts) ? $remark_counts : array();
 ?>
 <div class="d-flex flex-column-fluid">
 	<div class="container-fluid">
@@ -182,6 +184,19 @@ div.kt-datatable__pager-container {
 												</select>
 											</div>
 										</div>
+										<?php if($list_base !== 'Ghl_Leads') { ?>
+										<div class="col-md-3">
+											<div class="form-group">
+												<label>Guest Type</label>
+												<?php $sel_guest_type = guest_list_multi_values($this->input->get('guest_type')); ?>
+												<select name="guest_type[]" class="form-control selectpicker" multiple data-actions-box="true" title="--SELECT GUEST TYPE--">
+													<option data-icon="la la-user font-size-lg bs-icon" value="ADULT"  <?php if(in_array('ADULT', $sel_guest_type, true))  echo 'selected'; ?>>Adult</option>
+													<option data-icon="la la-child font-size-lg bs-icon" value="CHILD"  <?php if(in_array('CHILD', $sel_guest_type, true))  echo 'selected'; ?>>Child</option>
+													<option data-icon="la la-baby font-size-lg bs-icon" value="INFANT" <?php if(in_array('INFANT', $sel_guest_type, true)) echo 'selected'; ?>>Infant</option>
+												</select>
+											</div>
+										</div>
+										<?php } ?>
 									</div>
 									<div class="row">
 										<div class="col-md-3">
@@ -335,6 +350,7 @@ div.kt-datatable__pager-container {
 								<th style="text-align:center;">Destination</th>
 								<th style="text-align:center;">Nationality</th>
 								<th style="text-align:center;">Gender</th>
+								<th style="text-align:center;">Guest Type</th>
 								<th style="text-align:center;">DOB</th>
 								<th style="text-align:center;">Guest Role</th>
 								<th style="text-align:center;">Num of Pax</th>
@@ -346,7 +362,7 @@ div.kt-datatable__pager-container {
 						</thead>
 						<tbody>
 							<?php if(empty($guests)) { ?>
-								<tr><td colspan="19" style="text-align:center; padding-top:10px; padding-bottom:10px;">Guest Records Not Found</td></tr>
+								<tr><td colspan="20" style="text-align:center; padding-top:10px; padding-bottom:10px;">Guest Records Not Found</td></tr>
 							<?php } else { ?>
 								<?php $count = 1; foreach($guests as $g) { ?>
 									<?php $is_ghl_row = isset($g->Type) && $g->Type === 'GHL'; ?>
@@ -448,6 +464,20 @@ div.kt-datatable__pager-container {
 										</td>
 										<td style="text-align:center;"><?php echo htmlspecialchars($g->Nationality); ?></td>
 										<td style="text-align:center;"><?php echo htmlspecialchars($g->Gender); ?></td>
+										<td style="text-align:center; white-space:nowrap;">
+											<?php
+												$gtype = isset($g->GuestType) ? (string) $g->GuestType : '';
+												if($gtype === 'ADULT')       { $gt_cls = 'label-light-primary'; $gt_txt = 'Adult'; }
+												elseif($gtype === 'CHILD')   { $gt_cls = 'label-light-info';    $gt_txt = 'Child'; }
+												elseif($gtype === 'INFANT')  { $gt_cls = 'label-light-warning'; $gt_txt = 'Infant'; }
+												else                         { $gt_cls = '';                    $gt_txt = ''; }
+											?>
+											<?php if($gt_txt !== ''): ?>
+												<span class="label label-inline label-pill <?php echo $gt_cls; ?> font-weight-bold"><?php echo $gt_txt; ?></span>
+											<?php else: ?>
+												<span class="text-muted">&mdash;</span>
+											<?php endif; ?>
+										</td>
 										<td style="text-align:center;">
 											<?php
 												if(!empty($g->DOB) && $g->DOB !== '0000-00-00') {
@@ -511,6 +541,8 @@ div.kt-datatable__pager-container {
 													<button type="button" data-toggle="dropdown" class="btn btn-light-primary btn-sm dropdown-toggle" style="padding-left:3px;"></button>
 													<div class="dropdown-menu">
 														<a href="<?php echo base_url('Guests/View?key=') . urlencode($g->dedup_key); ?>" class="dropdown-item" style="font-size:11px;">View Trip History</a>
+														<?php $rc = isset($remark_counts[$g->dedup_key]) ? (int) $remark_counts[$g->dedup_key] : 0; ?>
+														<a href="javascript:;" class="dropdown-item js-remarks" style="font-size:11px;" data-dedup-key="<?php echo htmlspecialchars($g->dedup_key, ENT_QUOTES); ?>" data-name="<?php echo htmlspecialchars($g->Name, ENT_QUOTES); ?>">Remarks<?php if($rc > 0) { echo ' (' . $rc . ')'; } ?></a>
 														<?php if(!empty($g->Token)) { ?>
 															<div class="dropdown-divider"></div>
 															<a href="<?php echo base_url('Guest_List?gl=') . urlencode($g->Token); ?>" target="_blank" class="dropdown-item" style="font-size:11px;">Guest List</a>
@@ -552,9 +584,47 @@ div.kt-datatable__pager-container {
 
 <?php $this->load->view('partials/message_log_modal'); ?>
 
+<!-- Guest remarks modal: a dated remark log per guest (multiple entries). -->
+<div class="modal fade" id="guest_remarks_modal" tabindex="-1" role="dialog" aria-hidden="true">
+	<div class="modal-dialog modal-dialog-centered modal-lg" role="document">
+		<div class="modal-content">
+			<div class="modal-header" style="background-color:#D7E2F2;">
+				<h5 class="modal-title" style="color:#6082B6;">
+					<i class="la la-sticky-note"></i> Remarks &mdash; <span id="gr_guest_name" class="font-weight-bold"></span>
+				</h5>
+				<button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+			</div>
+			<div class="modal-body">
+				<!-- Add form -->
+				<div class="form-group row mb-2">
+					<div class="col-md-4">
+						<label class="font-weight-bold" style="font-size:12px;">Date &amp; Time</label>
+						<input type="datetime-local" id="gr_datetime" class="form-control">
+					</div>
+					<div class="col-md-6">
+						<label class="font-weight-bold" style="font-size:12px;">Remark</label>
+						<input type="text" id="gr_remark" class="form-control" maxlength="1000" placeholder="e.g. Called guest, will decide next week">
+					</div>
+					<div class="col-md-2 d-flex align-items-end">
+						<button type="button" id="gr_add" class="btn btn-light-success font-weight-bold btn-block">
+							<i class="la la-plus"></i> Add
+						</button>
+					</div>
+				</div>
+				<div id="gr_error" class="text-danger font-weight-bold mb-2" style="font-size:12px; display:none;"></div>
+				<hr>
+				<!-- Existing remarks -->
+				<div id="gr_list">
+					<div class="text-muted text-center py-3"><i class="la la-spinner la-spin"></i>&nbsp; Loading remarks…</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+
 <script>
 	<?php
-		$expanded_keys = array('q', 'booking_number', 'contact_number', 'email', 'destination', 'role', 'pax_min', 'pax_max', 'sales_agent', 'source', 'customer_type', 'nationality', 'gender', 'language', 'booking_date', 'travel_date', 'team_leader', 'dob', 'birthday');
+		$expanded_keys = array('q', 'booking_number', 'contact_number', 'email', 'destination', 'role', 'pax_min', 'pax_max', 'sales_agent', 'source', 'customer_type', 'nationality', 'gender', 'guest_type', 'language', 'booking_date', 'travel_date', 'team_leader', 'dob', 'birthday');
 		$expand = false;
 		foreach($expanded_keys as $k) {
 			if($this->input->get($k) !== null && $this->input->get($k) !== '') { $expand = true; break; }
@@ -619,16 +689,23 @@ div.kt-datatable__pager-container {
 	});
 
 	// DOB spans decades, so show month/year dropdowns and cap the range at today
-	// (nobody is born in the future). Opens on a sensible past year, not this month.
+	// (nobody is born in the future). The plugin floors the end-year dropdown at the
+	// current start date's year, so open the picker on the full 1920..today span and
+	// unlink the two calendars — that way either side's year can be picked freely.
+	// autoUpdateInput:false keeps the input empty (placeholder) until a range is chosen.
 	$('#kt_daterangepicker_guests_dob').daterangepicker({
 		buttonClasses: ' btn',
 		applyClass: 'btn-primary',
 		cancelClass: 'btn-secondary',
 		autoApply: true,
 		showDropdowns: true,
+		linkedCalendars: false,
+		autoUpdateInput: false,
 		minYear: 1920,
+		maxYear: moment().year(),
+		minDate: moment('1920-01-01'),
 		maxDate: moment(),
-		startDate: moment().subtract(30, 'years'),
+		startDate: moment('1920-01-01'),
 		endDate: moment()
 	}, function(start, end, label) {
 		$('#kt_daterangepicker_guests_dob .form-control').val(start.format('DD/MM/YYYY') + ' - ' + end.format('DD/MM/YYYY'));
@@ -828,5 +905,140 @@ div.kt-datatable__pager-container {
 			$error.text('Network error. Please try again.').show();
 			$btn.prop('disabled', false).find('i').attr('class', 'la la-check');
 		});
+	});
+
+	// ----- Guest remarks (dated remark log, multiple per guest) -----
+	// Endpoints always live on the Guests controller — the Remarks action only
+	// renders on booking-guest rows, never on the GHL Leads page.
+	var GR_LIST_URL   = '<?php echo base_url('Guests/Remarks'); ?>';
+	var GR_ADD_URL    = '<?php echo base_url('Guests/Add_Remark'); ?>';
+	var GR_DELETE_URL = '<?php echo base_url('Guests/Delete_Remark'); ?>';
+	var GR_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+	var grDedupKey = '';
+
+	function grEscape(v) { return $('<span>').text(v == null ? '' : v).html(); }
+
+	function grPad(n) { return (n < 10 ? '0' : '') + n; }
+
+	// Pretty-print a "YYYY-MM-DD HH:MM:SS" datetime as "13 Jul 2026 15:30".
+	function grFormatDateTime(raw) {
+		var m = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/.exec(raw || '');
+		if (!m) { return grEscape(raw); }
+		return grPad(parseInt(m[3], 10)) + ' ' + GR_MONTHS[parseInt(m[2], 10) - 1] + ' ' + m[1] + ' ' + m[4] + ':' + m[5];
+	}
+
+	// Local "now" as the value a datetime-local input expects.
+	function grNowLocal() {
+		var d = new Date();
+		return d.getFullYear() + '-' + grPad(d.getMonth() + 1) + '-' + grPad(d.getDate()) +
+			'T' + grPad(d.getHours()) + ':' + grPad(d.getMinutes());
+	}
+
+	function grRenderList(remarks) {
+		var $list = $('#gr_list');
+		if (!remarks || !remarks.length) {
+			$list.html('<div class="text-muted text-center py-3">No remarks yet.</div>');
+			return;
+		}
+		var html = '<div>';
+		for (var i = 0; i < remarks.length; i++) {
+			var r = remarks[i];
+			html += '<div class="d-flex align-items-start border-bottom py-2" data-remark-id="' + r.id + '">' +
+				'<div class="flex-grow-1">' +
+					'<div class="font-weight-bold text-dark-75" style="font-size:12px;">' +
+						'<i class="la la-clock text-primary"></i> ' + grFormatDateTime(r.remark_at) +
+						(r.created_by ? ' <span class="text-muted font-weight-normal">— ' + grEscape(r.created_by) + '</span>' : '') +
+					'</div>' +
+					'<div class="text-dark-75" style="font-size:13px; white-space:pre-wrap;">' + grEscape(r.remark) + '</div>' +
+				'</div>' +
+				(r.can_delete ?
+					'<button type="button" class="btn btn-icon btn-light-danger btn-xs gr-delete ml-2" data-id="' + r.id + '" data-toggle="tooltip" title="Delete remark"><i class="la la-trash"></i></button>' : '') +
+			'</div>';
+		}
+		html += '</div>';
+		$list.html(html);
+		$list.find('[data-toggle="tooltip"]').tooltip();
+	}
+
+	function grLoad() {
+		$('#gr_list').html('<div class="text-muted text-center py-3"><i class="la la-spinner la-spin"></i>&nbsp; Loading remarks…</div>');
+		$.ajax({ url: GR_LIST_URL, method: 'GET', dataType: 'json', data: { dedup_key: grDedupKey }, timeout: 30000 })
+			.done(function(res) {
+				if (res && res.ok) { grRenderList(res.remarks); }
+				else { $('#gr_list').html('<div class="text-danger text-center py-3">' + grEscape((res && res.message) || 'Could not load remarks.') + '</div>'); }
+			})
+			.fail(function() { $('#gr_list').html('<div class="text-danger text-center py-3">Network error. Please try again.</div>'); });
+	}
+
+	// Bump the "(n)" badge on the row's Remarks action by $delta.
+	function grBumpBadge(delta) {
+		var $link = $('.js-remarks[data-dedup-key="' + grDedupKey.replace(/"/g, '\\"') + '"]');
+		$link.each(function() {
+			var $a = $(this);
+			var n = parseInt(($a.text().match(/\((\d+)\)/) || [0, 0])[1], 10) + delta;
+			$a.text('Remarks' + (n > 0 ? ' (' + n + ')' : ''));
+		});
+	}
+
+	// Bound on document (not #kt_datatable) because this link lives inside a
+	// Bootstrap dropdown menu, which Popper can reposition out of the table.
+	$(document).on('click', '.js-remarks', function() {
+		grDedupKey = $(this).attr('data-dedup-key') || '';
+		$('#gr_guest_name').text($(this).attr('data-name') || '');
+		$('#gr_error').hide().text('');
+		$('#gr_datetime').val(grNowLocal());
+		$('#gr_remark').val('');
+		$('#guest_remarks_modal').modal('show');
+		grLoad();
+	});
+
+	$('#gr_add').on('click', function() {
+		var $btn    = $(this);
+		var $error  = $('#gr_error');
+		var datetime = $('#gr_datetime').val();
+		var remark   = $.trim($('#gr_remark').val());
+
+		$error.hide().text('');
+		$btn.prop('disabled', true);
+
+		$.ajax({
+			url: GR_ADD_URL, method: 'POST', dataType: 'json', timeout: 30000,
+			data: { dedup_key: grDedupKey, remark_at: datetime, remark: remark }
+		}).done(function(res) {
+			$btn.prop('disabled', false);
+			if (res && res.ok) {
+				$('#gr_remark').val('');
+				grBumpBadge(1);
+				grLoad();
+			} else {
+				$error.text((res && res.message) || 'Could not add remark.').show();
+			}
+		}).fail(function() {
+			$btn.prop('disabled', false);
+			$error.text('Network error. Please try again.').show();
+		});
+	});
+
+	// Enter in the remark box submits the add form.
+	$('#gr_remark').on('keydown', function(e) {
+		if (e.which === 13) { e.preventDefault(); $('#gr_add').click(); }
+	});
+
+	$('#gr_list').on('click', '.gr-delete', function() {
+		var $btn = $(this);
+		var id   = $btn.attr('data-id');
+		$btn.tooltip('hide').prop('disabled', true).find('i').attr('class', 'la la-spinner la-spin');
+		$.ajax({ url: GR_DELETE_URL, method: 'POST', dataType: 'json', data: { id: id }, timeout: 30000 })
+			.done(function(res) {
+				if (res && res.ok) { grBumpBadge(-1); grLoad(); }
+				else {
+					$('#gr_error').text((res && res.message) || 'Could not delete remark.').show();
+					$btn.prop('disabled', false).find('i').attr('class', 'la la-trash');
+				}
+			})
+			.fail(function() {
+				$('#gr_error').text('Network error. Please try again.').show();
+				$btn.prop('disabled', false).find('i').attr('class', 'la la-trash');
+			});
 	});
 </script>

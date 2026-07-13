@@ -24,6 +24,7 @@ class Guests extends MY_Controller
 		$data['guests']         = $this->Guests_Model->Read_Guests($limit, $offset);
 		$this->load->model('Ghl_Messages_Model');
 		$data['msg_log_phones'] = $this->Ghl_Messages_Model->Phones_With_Messages_For_Guests($data['guests']);
+		$data['remark_counts']  = $this->Remark_Counts_For_Guests($data['guests']);
 		$data['total']          = null;
 		$data['page']           = $page;
 		$data['limit']          = $limit;
@@ -181,6 +182,114 @@ class Guests extends MY_Controller
 		}
 
 		return $out(array('ok' => false, 'message' => 'Unknown field.'));
+	}
+
+	/**
+	 * Build the dedup_key => active-remark-count map for the rows on this page,
+	 * so the listing can badge each Action menu with "Remarks (n)". GHL rows have
+	 * no Action menu, so only the booking-guest rows are looked up.
+	 */
+	private function Remark_Counts_For_Guests($guests)
+	{
+		$keys = array();
+		foreach ((array) $guests as $g) {
+			$is_ghl = isset($g->Type) && $g->Type === 'GHL';
+			if (!$is_ghl && !empty($g->dedup_key)) {
+				$keys[] = $g->dedup_key;
+			}
+		}
+		return $this->Guests_Model->Read_Remark_Counts($keys);
+	}
+
+	/**
+	 * List a guest's remarks as JSON (for the Remarks modal on the listing).
+	 * Keyed by dedup_key so it spans all of that person's bookings.
+	 */
+	function Remarks()
+	{
+		$dedup_key = (string) $this->input->get('dedup_key');
+		if ($dedup_key === '') {
+			$this->output->set_content_type('application/json')
+				->set_output(json_encode(array('ok' => false, 'message' => 'Missing guest reference.')));
+			return;
+		}
+
+		$admin_id = $this->session->userdata('admin_id');
+		$rows     = $this->Guests_Model->Read_Guest_Remarks($dedup_key, $admin_id);
+
+		$out = array();
+		foreach ($rows as $r) {
+			$out[] = array(
+				'id'         => (int) $r->RemarkID,
+				'remark_at'  => $r->RemarkAt,
+				'remark'     => $r->Remark,
+				'created_by' => $r->CreatedByName !== null ? $r->CreatedByName : '',
+				'can_delete' => (bool) $r->CanDelete,
+			);
+		}
+
+		$this->output->set_content_type('application/json')
+			->set_output(json_encode(array('ok' => true, 'remarks' => $out)));
+	}
+
+	/**
+	 * Add a dated remark to a guest (datetime + text). Both fields validate via
+	 * the pure guest_remark_validate_* helpers before the model stores them.
+	 */
+	function Add_Remark()
+	{
+		$out = function ($data) {
+			$this->output->set_content_type('application/json')->set_output(json_encode($data));
+		};
+
+		$dedup_key = (string) $this->input->post('dedup_key');
+		if ($dedup_key === '') {
+			return $out(array('ok' => false, 'message' => 'Missing guest reference.'));
+		}
+
+		$dt = guest_remark_validate_datetime((string) $this->input->post('remark_at'));
+		if (!$dt['ok']) {
+			return $out(array('ok' => false, 'message' => $dt['error']));
+		}
+		$rm = guest_remark_validate_remark((string) $this->input->post('remark'));
+		if (!$rm['ok']) {
+			return $out(array('ok' => false, 'message' => $rm['error']));
+		}
+
+		$admin_id = $this->session->userdata('admin_id');
+		$id = $this->Guests_Model->Add_Guest_Remark($dedup_key, $dt['value'], $rm['value'], $admin_id);
+
+		return $out(array(
+			'ok'     => true,
+			'remark' => array(
+				'id'         => (int) $id,
+				'remark_at'  => $dt['value'],
+				'remark'     => $rm['value'],
+				'created_by' => (string) $this->session->userdata('name'),
+				'can_delete' => true,
+			),
+		));
+	}
+
+	/**
+	 * Soft-delete a remark. The model confines this to the remark's author.
+	 */
+	function Delete_Remark()
+	{
+		$out = function ($data) {
+			$this->output->set_content_type('application/json')->set_output(json_encode($data));
+		};
+
+		$remark_id = (int) $this->input->post('id');
+		if ($remark_id < 1) {
+			return $out(array('ok' => false, 'message' => 'Missing remark reference.'));
+		}
+
+		$affected = $this->Guests_Model->Delete_Guest_Remark($remark_id, $this->session->userdata('admin_id'));
+		if ($affected < 1) {
+			return $out(array('ok' => false, 'message' => 'You can only delete your own remark.'));
+		}
+		return $out(array('ok' => true));
 	}
 
 	/**

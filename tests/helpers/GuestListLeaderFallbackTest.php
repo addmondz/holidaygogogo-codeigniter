@@ -56,6 +56,13 @@ assert_eq('role Team Leader keeps fallback',  false, guest_list_leader_fallback_
 assert_eq('role TL+TM keeps fallback',        false, guest_list_leader_fallback_suppressed_by_filters(array('role' => array('Team Leader', 'Team Member'))));
 assert_eq('role Team Member drops fallback',  true, guest_list_leader_fallback_suppressed_by_filters(array('role' => array('Team Member'))));
 assert_eq('role Lead drops fallback',         true, guest_list_leader_fallback_suppressed_by_filters(array('role' => array('Lead'))));
+// Guest Type: a synthesized leader is always an ADULT, so a type filter that
+// includes ADULT keeps it; one that excludes ADULT (child/infant only) drops it.
+assert_eq('type Adult keeps fallback',        false, guest_list_leader_fallback_suppressed_by_filters(array('guest_type' => array('ADULT'))));
+assert_eq('type Adult+Child keeps fallback',  false, guest_list_leader_fallback_suppressed_by_filters(array('guest_type' => array('ADULT', 'CHILD'))));
+assert_eq('type Child drops fallback',        true, guest_list_leader_fallback_suppressed_by_filters(array('guest_type' => array('CHILD'))));
+assert_eq('type Infant drops fallback',       true, guest_list_leader_fallback_suppressed_by_filters(array('guest_type' => array('INFANT'))));
+assert_eq('empty type keeps fallback',        false, guest_list_leader_fallback_suppressed_by_filters(array('guest_type' => array())));
 
 // ---- 2. anti-join core (portable SQL mirrors the model's fallback WHERE) -----
 $pdo = new PDO('sqlite::memory:');

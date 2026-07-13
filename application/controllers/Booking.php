@@ -501,7 +501,11 @@ class Booking extends MY_Controller
 
 			// Status
 			if($booking->CancelStatus == 'Y' && !empty($booking->CancellationReasonName)) {
-				$row['status'] = '<span class="font-weight-bold" style="color:' . $status_color . ';" data-toggle="tooltip" data-placement="top" title="Reason: ' . htmlspecialchars($booking->CancellationReasonName) . '">' . $status_text . '</span>';
+				$cancel_tooltip = 'Reason: ' . $booking->CancellationReasonName;
+				if(!empty($booking->CancellationRemark)) {
+					$cancel_tooltip .= ' - ' . $booking->CancellationRemark;
+				}
+				$row['status'] = '<span class="font-weight-bold" style="color:' . $status_color . ';" data-toggle="tooltip" data-placement="top" title="' . htmlspecialchars($cancel_tooltip) . '">' . $status_text . '</span>';
 			} else {
 				$row['status'] = '<span class="font-weight-bold" style="color:' . $status_color . ';">' . $status_text . '</span>';
 			}

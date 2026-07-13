@@ -573,7 +573,8 @@
                   '<select id="swal_cancellation_reason" class="form-control" style="text-align:center;">' +
                   '<option value="">-- SELECT CANCELLATION REASON --</option>' +
                   reasonOptions +
-                  '</select>',
+                  '</select>' +
+                  '<textarea id="swal_cancellation_remark" class="form-control mt-3" rows="2" placeholder="Extra remark (optional)"></textarea>',
             confirmButtonText: 'Confirm',
             cancelButtonText: 'Cancel',
             showCancelButton: true,
@@ -583,7 +584,10 @@
                     Swal.showValidationMessage('Please select a cancellation reason');
                     return false;
                 }
-                return reason;
+                return {
+                    reason: reason,
+                    remark: document.getElementById('swal_cancellation_remark').value
+                };
             }
         }).then((action) => {
             if(action.isConfirmed) {
@@ -592,7 +596,8 @@
                     type: 'post',
                     data: {
                         booking_id: bookingId,
-                        cancellation_reason_id: action.value
+                        cancellation_reason_id: action.value.reason,
+                        cancellation_remark: action.value.remark
                     },
                     success: function() {
                         Display_Message(background, 'Booking ' + bookingNumber + ' Successfully Cancelled', window.location.href);
@@ -629,7 +634,8 @@
                   '<select id="swal_partial_refund_reason" class="form-control" style="text-align:center;">' +
                   '<option value="">-- SELECT CANCELLATION REASON --</option>' +
                   reasonOptions +
-                  '</select>',
+                  '</select>' +
+                  '<textarea id="swal_partial_refund_remark" class="form-control mt-3" rows="2" placeholder="Extra remark (optional)"></textarea>',
             confirmButtonText: 'Confirm',
             cancelButtonText: 'Cancel',
             showCancelButton: true,
@@ -639,7 +645,10 @@
                     Swal.showValidationMessage('Please select a cancellation reason');
                     return false;
                 }
-                return reason;
+                return {
+                    reason: reason,
+                    remark: document.getElementById('swal_partial_refund_remark').value
+                };
             }
         }).then((action) => {
             if(action.isConfirmed) {
@@ -648,7 +657,8 @@
                     type: 'post',
                     data: {
                         booking_id: bookingId,
-                        cancellation_reason_id: action.value
+                        cancellation_reason_id: action.value.reason,
+                        cancellation_remark: action.value.remark
                     },
                     success: function() {
                         Display_Message(background, 'Booking ' + bookingNumber + ' Successfully Marked As Partial Refund', window.location.href);

@@ -1561,6 +1561,7 @@ class Booking_Model extends CI_Model
 		$array = array(
 			'CancelStatus' => $this->input->get('new_cancel_status'),
 			'CancellationReasonID' => NULL,
+			'CancellationRemark' => NULL,
 			'UpdateBy' => $this->session->userdata('admin_id'),
 			'UpdateDate' => date('Y-m-d H:i:s')
 		);
@@ -1573,6 +1574,7 @@ class Booking_Model extends CI_Model
 		$array = array(
 			'CancelStatus' => 'Y',
 			'CancellationReasonID' => $this->input->post('cancellation_reason_id'),
+			'CancellationRemark' => $this->input->post('cancellation_remark') ?: NULL,
 			'UpdateBy' => $this->session->userdata('admin_id'),
 			'UpdateDate' => date('Y-m-d H:i:s')
 		);
@@ -1601,6 +1603,7 @@ class Booking_Model extends CI_Model
 			'PartialRefund' => $this->input->get('new_partial_refund_status'),
 			'CancelStatus' => $this->input->get('new_partial_refund_status'),
 			'CancellationReasonID' => NULL,
+			'CancellationRemark' => NULL,
 			'UpdateBy' => $this->session->userdata('admin_id'),
 			'UpdateDate' => date('Y-m-d H:i:s')
 		);
@@ -1617,6 +1620,7 @@ class Booking_Model extends CI_Model
 			'PartialRefund' => 'Y',
 			'CancelStatus' => 'Y',
 			'CancellationReasonID' => $this->input->post('cancellation_reason_id'),
+			'CancellationRemark' => $this->input->post('cancellation_remark') ?: NULL,
 			'UpdateBy' => $this->session->userdata('admin_id'),
 			'UpdateDate' => date('Y-m-d H:i:s')
 		);
@@ -2449,7 +2453,7 @@ class Booking_Model extends CI_Model
 	 */
 	function Read_Bookings_Paginated($start, $length, $order_column, $order_dir)
 	{
-		$this->db->select('booking.BookingID, BookingNumber, DepositDeadline, FullPaymentDeadline, Customer, booking.Mobile As CustomerMobile, StartDate, EndDate, NetTotal, booking.ChatLanguage, Token, booking.BookingConfirmationTitle, CancelStatus, booking.PartialRefund, LockStatus, booking.is_submitted, AfterSalesService, booking.Status, booking.bc_approved, booking.bc_approval_admin_id, booking.bc_approval_date, booking.InsertDate, admin.Name As SalesAgentName, admin.AdminID AS SalesAgentID, booking.BookingOP, op_admin.Name As BookingOPName, category.Name As DestinationName, CountryCode, booking.AutocountSyncStatus, booking.AutocountSyncMessage, booking.AutocountSyncAction, booking.CustomerAutocountSyncStatus, booking.CustomerAutocountSyncMessage, booking.CustomerAutocountSyncAction, customer.CustomerCode, booking.CustomerID, source.Name AS SourceName, cancellation_reason.Name AS CancellationReasonName, booking.SalesAgent2, sa2_admin.Name As SalesAgent2Name');
+		$this->db->select('booking.BookingID, BookingNumber, DepositDeadline, FullPaymentDeadline, Customer, booking.Mobile As CustomerMobile, StartDate, EndDate, NetTotal, booking.ChatLanguage, Token, booking.BookingConfirmationTitle, CancelStatus, booking.PartialRefund, LockStatus, booking.is_submitted, AfterSalesService, booking.Status, booking.bc_approved, booking.bc_approval_admin_id, booking.bc_approval_date, booking.InsertDate, admin.Name As SalesAgentName, admin.AdminID AS SalesAgentID, booking.BookingOP, op_admin.Name As BookingOPName, category.Name As DestinationName, CountryCode, booking.AutocountSyncStatus, booking.AutocountSyncMessage, booking.AutocountSyncAction, booking.CustomerAutocountSyncStatus, booking.CustomerAutocountSyncMessage, booking.CustomerAutocountSyncAction, customer.CustomerCode, booking.CustomerID, source.Name AS SourceName, cancellation_reason.Name AS CancellationReasonName, booking.CancellationRemark, booking.SalesAgent2, sa2_admin.Name As SalesAgent2Name');
 		$this->db->select("(SELECT COUNT(*) FROM invoice_split_pax WHERE invoice_split_pax.BookingID = booking.BookingID AND invoice_split_pax.Status = 'Y') AS has_einvoice", FALSE);
 		$this->db->select("(CASE WHEN booking.CancelStatus = 'Y' THEN 10 WHEN booking.DepositDeadline IS NOT NULL AND ((booking.DepositDeadline < CURDATE() AND booking.Status = 'P') OR (booking.FullPaymentDeadline < CURDATE() AND booking.Status IN ('P','PP'))) THEN 1 WHEN booking.DepositDeadline IS NULL AND booking.FullPaymentDeadline < CURDATE() AND booking.Status IN ('P','PP') THEN 1 WHEN booking.Status = 'P' THEN 2 WHEN booking.Status = 'PP' THEN 3 WHEN booking.Status = 'PBC' THEN 4 WHEN booking.Status = 'PBO' THEN 5 WHEN booking.LockStatus = 'N' AND booking.Status = 'PTV' THEN 6 WHEN booking.LockStatus = 'Y' AND booking.Status = 'PTV' THEN 7 WHEN booking.Status = 'PT' THEN 8 WHEN booking.Status = 'OG' THEN 9 WHEN booking.AfterSalesService = 'PENDING' AND booking.Status = 'Y' THEN 11 WHEN booking.Status = 'Y' THEN 12 ELSE 99 END) AS status_sort_priority", FALSE);
 		// Net profit / margin are computed per row in the controller from payments

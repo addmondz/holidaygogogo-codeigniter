@@ -46,6 +46,13 @@ assert_eq('destination empties ghl page', false, $hd['ghl']);
 $hp = guest_list_branches_to_run('ghl', array('pax_min' => '2'));
 assert_eq('pax_min empties ghl page',     false, $hp['ghl']);
 
+// ---- Guest Type is booking-guest-only: it empties the GHL page but keeps ----
+// ---- the Guest List page on its booking branch. -----------------------------
+$ht = guest_list_branches_to_run('ghl', array('guest_type' => array('CHILD')));
+assert_eq('guest_type empties ghl page',  false, $ht['ghl']);
+$gt = guest_list_branches_to_run('guest', array('guest_type' => array('CHILD')));
+assert_eq('guest_type keeps guest page',  true,  $gt['bookings']);
+
 // ---- Guest Role = Lead empties the Guest List page (a guest isn't a Lead) --
 $gl = guest_list_branches_to_run('guest', array('role' => 'Lead'));
 assert_eq('role=Lead empties guest page', false, $gl['bookings']);

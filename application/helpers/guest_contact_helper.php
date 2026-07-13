@@ -140,6 +140,54 @@ if (!function_exists('guest_field_validate_language')) {
     }
 }
 
+if (!function_exists('guest_remark_validate_datetime')) {
+    /**
+     * Validate the date & time of a Guest List remark (Guests::Add_Remark)
+     * before it is stored in guest_remarks.RemarkAt. Accepts the HTML5
+     * datetime-local form ("YYYY-MM-DDTHH:MM") as well as a plain "Y-m-d H:i"
+     * and normalizes it to a MySQL DATETIME string. Required.
+     *
+     * @param string $raw Raw input.
+     * @return array{ok:bool,error:string,value:string} value is 'Y-m-d H:i:s'.
+     */
+    function guest_remark_validate_datetime($raw)
+    {
+        $raw = trim((string) $raw);
+        if ($raw === '') {
+            return array('ok' => false, 'error' => 'Date & time is required.', 'value' => '');
+        }
+        // datetime-local uses a "T" separator; MySQL wants a space.
+        $normalized = str_replace('T', ' ', $raw);
+        $ts = strtotime($normalized);
+        if ($ts === false) {
+            return array('ok' => false, 'error' => 'Enter a valid date & time.', 'value' => '');
+        }
+        return array('ok' => true, 'error' => '', 'value' => date('Y-m-d H:i:s', $ts));
+    }
+}
+
+if (!function_exists('guest_remark_validate_remark')) {
+    /**
+     * Validate the text of a Guest List remark before it is stored in
+     * guest_remarks.Remark. Required and length-capped; otherwise permissive.
+     *
+     * @param string $raw Raw input.
+     * @return array{ok:bool,error:string,value:string} value is the trimmed remark.
+     */
+    function guest_remark_validate_remark($raw)
+    {
+        $raw = trim((string) $raw);
+        if ($raw === '') {
+            return array('ok' => false, 'error' => 'Remark is required.', 'value' => '');
+        }
+        $len = function_exists('mb_strlen') ? mb_strlen($raw) : strlen($raw);
+        if ($len > 1000) {
+            return array('ok' => false, 'error' => 'Remark is too long.', 'value' => '');
+        }
+        return array('ok' => true, 'error' => '', 'value' => $raw);
+    }
+}
+
 if (!function_exists('guest_contact_format_display')) {
     /**
      * Render a contact number for display WITH its international calling code.
@@ -486,7 +534,7 @@ if (!function_exists('guest_list_ghl_suppressed_by_filters')) {
             'travel_date', 'sales_agent', 'source',
             'customer_type', 'nationality', 'gender', 'language',
             'booking_number', 'destination', 'pax_min', 'pax_max',
-            'team_leader', 'booking_id', 'dob', 'birthday',
+            'team_leader', 'booking_id', 'dob', 'birthday', 'guest_type',
         );
         foreach ($booking_only as $k) {
             if (isset($get[$k]) && count(guest_list_multi_values($get[$k])) > 0) {
@@ -555,6 +603,12 @@ if (!function_exists('guest_list_leader_fallback_suppressed_by_filters')) {
         }
         $roles = isset($get['role']) ? guest_list_multi_values($get['role']) : array();
         if (!empty($roles) && !in_array('Team Leader', $roles, true)) {
+            return true;
+        }
+        // A synthesized leader row is always an ADULT (the booking's own contact),
+        // so a Guest Type filter that does not include ADULT can never match it.
+        $types = isset($get['guest_type']) ? guest_list_multi_values($get['guest_type']) : array();
+        if (!empty($types) && !in_array('ADULT', $types, true)) {
             return true;
         }
         return false;
