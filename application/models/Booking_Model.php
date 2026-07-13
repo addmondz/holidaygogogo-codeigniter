@@ -2648,8 +2648,14 @@ class Booking_Model extends CI_Model
 			}
 		}
 
+		// Seed the group leader (first ADULT row) from the booking customer so
+		// the Guest List / room management form opens pre-filled rather than
+		// blank. Later adults, children and infants stay blank.
+		$leader_seed = $this->Leader_Seed_From_Booking($booking_id);
+
 		for ($i = 0; $i < $adult_total; $i++) {
-			$this->Guest_List_Model->Create($booking_id, 'ADULT');
+			$seed = ($i === 0) ? $leader_seed : array();
+			$this->Guest_List_Model->Create($booking_id, 'ADULT', $seed);
 		}
 		for ($i = 0; $i < $child_total; $i++) {
 			$this->Guest_List_Model->Create($booking_id, 'CHILD');
@@ -2659,6 +2665,40 @@ class Booking_Model extends CI_Model
 		}
 
 		$this->Guest_List_Model->Auto_Assign_Rooms($booking_id);
+	}
+
+	// Build the guest_list column overrides used to pre-fill the group leader
+	// row from the booking customer (name, mobile, mobile country code) plus
+	// the linked customer's email when one exists.
+	function Leader_Seed_From_Booking($booking_id)
+	{
+		$this->load->helper('guest_leader_helper');
+
+		$booking = $this->db
+			->select('Customer, Mobile, CountryCodeID, CustomerID')
+			->where('BookingID', $booking_id)
+			->get('booking')->row();
+		if (!$booking) {
+			return array();
+		}
+
+		$email = '';
+		if (!empty($booking->CustomerID)) {
+			$customer = $this->db
+				->select('PrimaryEmail')
+				->where('CustomerID', $booking->CustomerID)
+				->get('customer')->row();
+			if ($customer && !empty($customer->PrimaryEmail)) {
+				$email = $customer->PrimaryEmail;
+			}
+		}
+
+		return guest_leader_seed_fields(
+			$booking->Customer,
+			$booking->Mobile,
+			$booking->CountryCodeID,
+			$email
+		);
 	}
 
 	function Sync_GL_From_Rooms($booking_id)
@@ -2689,9 +2729,13 @@ class Booking_Model extends CI_Model
 			$current_count = count($existing);
 
 			if ($current_count < $needed) {
-				// Create missing GL entries
+				// Create missing GL entries. When a booking gains its very first
+				// ADULT row (e.g. a draft that had no rooms until now), seed that
+				// row from the booking customer so the leader shows pre-filled.
+				$seed_first_adult = ($type === 'ADULT' && $current_count === 0);
 				for ($i = 0; $i < ($needed - $current_count); $i++) {
-					$this->Guest_List_Model->Create($booking_id, $type);
+					$seed = ($seed_first_adult && $i === 0) ? $this->Leader_Seed_From_Booking($booking_id) : array();
+					$this->Guest_List_Model->Create($booking_id, $type, $seed);
 				}
 			} elseif ($current_count > $needed) {
 				// Soft-delete excess GL entries (from the end, preferring blank ones)

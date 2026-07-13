@@ -2042,6 +2042,12 @@ class Report_Model extends CI_Model
             FROM ghl_lead_ownership glo
             WHERE glo.is_assigned_owner = 1
               AND NULLIF(glo.assigned_to_user_id, '') = glo.owner_user_id
+              AND NOT EXISTS (
+                  SELECT 1 FROM ghl_processed_leads conv_pl
+                  WHERE conv_pl.conversation_id = glo.conversation_id
+                    AND conv_pl.is_converted = 1
+                    AND conv_pl.lead_started_at < glo.lead_started_at
+              )
               AND glo.owner_user_id IN ({$placeholders})
               AND {$pickupDate} BETWEEN ? AND ?
         ";
@@ -4034,6 +4040,21 @@ class Report_Model extends CI_Model
         // time) via lead_reply_pickup_date_expression().
         $clauses[] = 'glo.is_assigned_owner = 1';
         $clauses[] = "NULLIF(glo.assigned_to_user_id, '') = glo.owner_user_id";
+
+        // ...but a customer who ALREADY converted is not a new lead. The 24h
+        // post-conversion split (ghl_lead_segmentation_helper) opens a fresh lead
+        // window whenever an already-booked customer keeps chatting, which would
+        // otherwise resurface them here as a brand-new pick-up. Exclude any window
+        // whose conversation has an EARLIER converted window: that window belongs
+        // to an existing customer, not a newly acquired lead. The first (genuinely
+        // new) window that later converts has no earlier converted window, so it
+        // still counts on its own landing day.
+        $clauses[] = "NOT EXISTS (
+            SELECT 1 FROM ghl_processed_leads conv_pl
+            WHERE conv_pl.conversation_id = glo.conversation_id
+              AND conv_pl.is_converted = 1
+              AND conv_pl.lead_started_at < glo.lead_started_at
+        )";
 
         if (array_key_exists('_restrict_agent_ids', $filters)) {
             $allowed = array_values(array_filter(

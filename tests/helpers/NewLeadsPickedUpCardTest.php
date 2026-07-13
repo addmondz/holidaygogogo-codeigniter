@@ -50,7 +50,18 @@ $pdo->exec("CREATE TABLE ghl_lead_ownership (
     assigned_to_user_id TEXT,
     assigned_at         TEXT,
     lead_started_at     TEXT,
+    conversation_id     TEXT,
     contact_id          TEXT
+)");
+
+// A lead window does NOT count as a new pick-up if its conversation already had
+// an EARLIER converted window -- the customer had already booked before this
+// window opened, so their post-conversion follow-up chatter is not a new lead.
+$pdo->exec("CREATE TABLE ghl_processed_leads (
+    id               INTEGER,
+    conversation_id  TEXT,
+    lead_started_at  TEXT,
+    is_converted     INTEGER
 )");
 
 // June window = 2026-06-01 .. 2026-06-30. Counted = any lead the owner is the
@@ -65,17 +76,32 @@ $pdo->exec("CREATE TABLE ghl_lead_ownership (
 // pl 8  u1 + u1b cH: same lead on two inboxes 06-19                  COUNT ONCE (DISTINCT lead)
 // pl 9  u1 cI: landed 05-20 (before window)                          EXCLUDED from June (belongs to May)
 $pdo->exec("INSERT INTO ghl_lead_ownership
-    (owner_user_id, processed_lead_id, is_assigned_owner, assigned_to_user_id, assigned_at, lead_started_at, contact_id) VALUES
-    ('u1',  1, 1, 'u1',  '2026-06-19 09:15:00', '2026-06-19 09:00:00', 'cA'),
-    ('u1',  2, 1, 'u1',  NULL,                  '2026-06-19 09:45:00', 'cB'),
-    ('u1',  3, 1, 'u1',  '2026-06-19 15:00:00', '2026-06-19 14:30:00', 'cC'),
-    ('u1',  4, 1, 'u1',  '2026-07-05 10:00:00', '2026-06-19 10:00:00', 'cD'),
-    ('u1',  5, 0, 'u1',  '2026-06-19 10:00:00', '2026-06-19 10:00:00', 'cE'),
-    ('u1',  6, 1, 'u2',  '2026-06-19 11:00:00', '2026-06-19 11:00:00', 'cF'),
-    ('u2',  7, 1, 'u2',  '2026-06-19 12:00:00', '2026-06-19 12:00:00', 'cG'),
-    ('u1',  8, 1, 'u1',  '2026-06-19 16:00:00', '2026-06-19 15:00:00', 'cH'),
-    ('u1b', 8, 1, 'u1b', '2026-06-19 16:00:00', '2026-06-19 15:00:00', 'cH'),
-    ('u1',  9, 1, 'u1',  '2026-06-19 18:00:00', '2026-05-20 08:00:00', 'cI')");
+    (owner_user_id, processed_lead_id, is_assigned_owner, assigned_to_user_id, assigned_at, lead_started_at, conversation_id, contact_id) VALUES
+    ('u1',  1, 1, 'u1',  '2026-06-19 09:15:00', '2026-06-19 09:00:00', 'convA', 'cA'),
+    ('u1',  2, 1, 'u1',  NULL,                  '2026-06-19 09:45:00', 'convB', 'cB'),
+    ('u1',  3, 1, 'u1',  '2026-06-19 15:00:00', '2026-06-19 14:30:00', 'convC', 'cC'),
+    ('u1',  4, 1, 'u1',  '2026-07-05 10:00:00', '2026-06-19 10:00:00', 'convD', 'cD'),
+    ('u1',  5, 0, 'u1',  '2026-06-19 10:00:00', '2026-06-19 10:00:00', 'convE', 'cE'),
+    ('u1',  6, 1, 'u2',  '2026-06-19 11:00:00', '2026-06-19 11:00:00', 'convF', 'cF'),
+    ('u2',  7, 1, 'u2',  '2026-06-19 12:00:00', '2026-06-19 12:00:00', 'convG', 'cG'),
+    ('u1',  8, 1, 'u1',  '2026-06-19 16:00:00', '2026-06-19 15:00:00', 'convH', 'cH'),
+    ('u1b', 8, 1, 'u1b', '2026-06-19 16:00:00', '2026-06-19 15:00:00', 'convH', 'cH'),
+    ('u1',  9, 1, 'u1',  '2026-06-19 18:00:00', '2026-05-20 08:00:00', 'convI', 'cI')");
+
+// Post-conversion re-engagement (the Mei Yi PANG / +601111428126 case):
+// conversation convJ has TWO windows -- window 10 converted on 06-05 (a genuine
+// new lead that became a booking), then window 11 opened 06-19 after 24h of
+// post-conversion silence. Window 11 is the SAME already-booked customer chatting
+// again, so it must NOT count as a new pick-up. Window 10 still counts on its own
+// landing day (no earlier converted window precedes it).
+$pdo->exec("INSERT INTO ghl_lead_ownership
+    (owner_user_id, processed_lead_id, is_assigned_owner, assigned_to_user_id, assigned_at, lead_started_at, conversation_id, contact_id) VALUES
+    ('u1', 10, 1, 'u1', '2026-06-05 09:00:00', '2026-06-05 09:00:00', 'convJ', 'cJ'),
+    ('u1', 11, 1, 'u1', '2026-06-19 13:50:00', '2026-06-19 13:50:00', 'convJ', 'cJ')");
+
+$pdo->exec("INSERT INTO ghl_processed_leads (id, conversation_id, lead_started_at, is_converted) VALUES
+    (10, 'convJ', '2026-06-05 09:00:00', 1),
+    (11, 'convJ', '2026-06-19 13:50:00', 0)");
 
 // SQLite mirror of the landed-lead universe (no never-contacted-before filter).
 function count_new_leads(PDO $pdo, array $uids, $start, $end) {
@@ -89,6 +115,12 @@ function count_new_leads(PDO $pdo, array $uids, $start, $end) {
         FROM ghl_lead_ownership glo
         WHERE glo.is_assigned_owner = 1
           AND NULLIF(glo.assigned_to_user_id, '') = glo.owner_user_id
+          AND NOT EXISTS (
+              SELECT 1 FROM ghl_processed_leads conv_pl
+              WHERE conv_pl.conversation_id = glo.conversation_id
+                AND conv_pl.is_converted = 1
+                AND conv_pl.lead_started_at < glo.lead_started_at
+          )
           AND glo.owner_user_id IN ({$placeholders})
           AND glo.lead_started_at BETWEEN ? AND ?
     ";
@@ -99,19 +131,32 @@ function count_new_leads(PDO $pdo, array $uids, $start, $end) {
 }
 
 echo "[single inbox u1, June window]\n";
-// Counts leads 1, 2, 3, 4, 8 -> 5. Lead 3 (re-engaged customer cC) now COUNTS.
-// Lead 4 counts even though assigned in July (it landed in June). Lead 9 excluded
+// Counts leads 1, 2, 3, 4, 8, 10 -> 6. Lead 3 (re-engaged customer cC) COUNTS.
+// Lead 4 counts even though assigned in July (it landed in June). Lead 10 is a
+// genuine new lead that later converted -> counts on its landing day. Lead 11
+// (post-conversion chatter on the same convJ) is EXCLUDED. Lead 9 excluded
 // (landed in May). 5 (reply owner), 6 (owner != assignee), 7 (u2) all excluded.
-assert_eq('u1 landed leads in June', 5,
+assert_eq('u1 landed leads in June', 6,
     count_new_leads($pdo, array('u1'), '2026-06-01', '2026-06-30'));
 
+echo "[post-conversion re-engagement does not count as new]\n";
+// Window 11 (convJ) landed 06-19 but its conversation already converted on a
+// window that started 06-05 -> excluded. Without the fix June would be 7, not 6.
+assert_eq('June excludes post-conversion window 11', 6,
+    count_new_leads($pdo, array('u1'), '2026-06-01', '2026-06-30'));
+
+echo "[the original converted window still counts on its own landing day]\n";
+// Window 10 (convJ) landed 06-05 with no earlier converted window -> genuine new lead.
+assert_eq('first converted window counts on 06-05', 1,
+    count_new_leads($pdo, array('u1'), '2026-06-05', '2026-06-05'));
+
 echo "[TC with two inboxes u1 + u1b]\n";
-// Lead 8 is held by both inboxes; DISTINCT lead id keeps it one -> still 5.
-assert_eq('two inboxes do not double-count lead 8', 5,
+// Lead 8 is held by both inboxes; DISTINCT lead id keeps it one -> still 6.
+assert_eq('two inboxes do not double-count lead 8', 6,
     count_new_leads($pdo, array('u1', 'u1b'), '2026-06-01', '2026-06-30'));
 
 echo "[narrow to the single landing day 2026-06-19]\n";
-// Leads 1,2,3,4,8 all landed on 06-19; lead 9 landed 05-20.
+// Leads 1,2,3,4,8 land on 06-19 (11 excluded as post-conversion); lead 9 landed 05-20.
 assert_eq('same 5 land on 06-19', 5,
     count_new_leads($pdo, array('u1'), '2026-06-19', '2026-06-19'));
 

@@ -311,10 +311,14 @@ class Booking extends MY_Controller
 
 		// Which contacts have a stored WhatsApp conversation, so the mobile cell
 		// only shows a "message log" icon when a log exists (keyed by digits).
+		// Digits are built with guest_contact_wa_digits() (same as the Guest
+		// List) so the national trunk "0" is dropped — GHL stores E.164
+		// ("+601111200223"), so keeping the "0" ("6001111200223") never matches.
+		$this->load->helper('guest_contact');
 		$this->load->model('Ghl_Messages_Model');
 		$msg_log_lookup = array();
 		foreach($bookings as $b) {
-			$digits = preg_replace('/\D+/', '', (string) $b->CountryCode . (string) $b->CustomerMobile);
+			$digits = guest_contact_wa_digits((string) $b->CountryCode, (string) $b->CustomerMobile);
 			if($digits !== '') {
 				$msg_log_lookup[] = $digits;
 			}
@@ -331,8 +335,10 @@ class Booking extends MY_Controller
 				$booking->SalesAgentID
 			);
 
-			// Format mobile
-			$booking->CustomerMobile = $booking->CountryCode . str_replace([' ', '-'], '', $booking->CustomerMobile);
+			// Format mobile as E.164 (drops the national trunk "0") so the
+			// wa.me link and message-log match agree with GHL's stored number.
+			$wa_digits = guest_contact_wa_digits((string) $booking->CountryCode, (string) $booking->CustomerMobile);
+			$booking->CustomerMobile = $wa_digits !== '' ? '+' . $wa_digits : '';
 
 			// Format dates
 			$start_date_formatted = !empty($booking->StartDate) ? strtoupper(date('j M Y', strtotime($booking->StartDate))) : null;
