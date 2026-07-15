@@ -178,7 +178,11 @@ class PaymentSync {
 				$param['paymentDetails'][] = [
 					'paymentMethod' => 'BANK',
 					'chequeNo'      => arr_get($data, 'ReferenceNumber', ''),
-					'paymentAmt'    => (float)$amount,
+					// Payment is expressed in document currency; AutoCount requires
+					// toBankRate to equal the document rate (foreign docs pay in the
+					// foreign amount, converted to home at the doc rate).
+					'paymentAmt'    => $this->line_amount($data),
+					'toBankRate'    => (float)arr_get($data, 'currency_rate', 1),
 				];
 			}
 
@@ -326,7 +330,11 @@ class PaymentSync {
 				$body['paymentDetails'][] = [
 					'paymentMethod' => 'BANK',
 					'chequeNo'      => arr_get($data, 'ReferenceNumber', ''),
-					'paymentAmt'    => (float)$amount,
+					// Payment is expressed in document currency; AutoCount requires
+					// toBankRate to equal the document rate (foreign docs pay in the
+					// foreign amount, converted to home at the doc rate).
+					'paymentAmt'    => $this->line_amount($data),
+					'toBankRate'    => (float)arr_get($data, 'currency_rate', 1),
 				];
 			}
 
