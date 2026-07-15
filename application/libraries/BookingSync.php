@@ -69,6 +69,8 @@ class BookingSync {
 				'remark3'         => arr_get($data, 'remark3', null),
 				'remark4'         => arr_get($data, 'remark4', null),
 				'currencyRate'    => arr_get($data, 'currency_rate', 1),
+				// AutoCount requires the tax currency rate to equal the document rate.
+				'toTaxCurrencyRate' => (float)arr_get($data, 'currency_rate', 1),
 				'inclusiveTax'    => arr_get($data, 'inclusive_tax', false),
 				'isRoundAdj'      => arr_get($data, 'is_round_adj', false),
 				'yourRef'         => $this->clip(arr_get($data, 'yourRef', null), self::MAX_YOUR_REF),
@@ -166,6 +168,8 @@ class BookingSync {
 				'remark3'         => arr_get($data, 'remark3', null),
 				'remark4'         => arr_get($data, 'remark4', null),
 				'currencyRate'    => arr_get($data, 'currency_rate', 1),
+				// AutoCount requires the tax currency rate to equal the document rate.
+				'toTaxCurrencyRate' => (float)arr_get($data, 'currency_rate', 1),
 				'inclusiveTax'    => arr_get($data, 'inclusive_tax', false),
 				'isRoundAdj'      => arr_get($data, 'is_round_adj', false),
 				'yourRef'         => $this->clip(arr_get($data, 'yourRef', null), self::MAX_YOUR_REF),
