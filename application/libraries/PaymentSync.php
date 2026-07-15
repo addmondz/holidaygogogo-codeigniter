@@ -41,6 +41,21 @@ class PaymentSync {
 		];
 	}
 
+	/**
+	 * Detail account conversion rate (document currency -> account currency).
+	 * A foreign doc posts to a home-currency (MYR) account, so the line converts
+	 * at the document rate. AutoCount also derives ToTaxCurrencyRate from this and
+	 * requires it to equal currencyRate, so foreign docs must send the doc rate
+	 * here, not 1. Local docs keep their existing default.
+	 */
+	protected function to_account_rate($data, $default = 1)
+	{
+		if (arr_get($data, 'foreign_amount', null) !== null) {
+			return (float)arr_get($data, 'currency_rate', 1);
+		}
+		return $default;
+	}
+
     public function autocount_create($data = [], $config = [])
 	{
 		try {
@@ -92,7 +107,7 @@ class PaymentSync {
 
 					$param['details'][] = [
 						'accNo'              => $acc_no,
-						'toAccountRate'      => arr_get($detail, 'toAccountRate', 1),
+						'toAccountRate'      => $this->to_account_rate($data, arr_get($detail, 'toAccountRate', 1)),
 						'description'        => arr_get($detail, 'description', ''),
 						'furtherDescription' => arr_get($detail, 'ReservationNumber', ''),
 						// Foreign-currency doc: line amount is in document (foreign) currency.
@@ -133,7 +148,7 @@ class PaymentSync {
 					'accNo'  => $acc_no,
 					// Foreign-currency doc: line amount is in document (foreign) currency.
 					'amount' => (float)(arr_get($data, 'foreign_amount', null) !== null ? $data['foreign_amount'] : $amount),
-					'toAccountRate'      => arr_get($data, 'toAccountRate', 1),       // Default to 1
+					'toAccountRate'      => $this->to_account_rate($data, arr_get($data, 'toAccountRate', 1)),
 					'salesAgent' => arr_get($data, 'salesAgent', ''),
 					'description'        => arr_get($data, 'description', ''),
 					'furtherDescription' => arr_get($data, 'ReservationNumber', ''),
@@ -237,7 +252,7 @@ class PaymentSync {
 					}
 					$body['details'][] = [
 						'accNo'              => $acc_no,        // account_no -> accNo
-						'toAccountRate'      => arr_get($detail, 'toAccountRate', 1),       // Default to 1
+						'toAccountRate'      => $this->to_account_rate($data, arr_get($detail, 'toAccountRate', 1)),
 						'description'        => arr_get($detail, 'description', ''),
 						'furtherDescription' => arr_get($detail, 'ReservationNumber', ''),
 						// Foreign-currency doc: line amount is in document (foreign) currency.
@@ -278,7 +293,7 @@ class PaymentSync {
 					'accNo'  => $acc_no,
 					// Foreign-currency doc: line amount is in document (foreign) currency.
 					'amount' => (float)(arr_get($data, 'foreign_amount', null) !== null ? $data['foreign_amount'] : $amount),
-					'toAccountRate'      => arr_get($data, 'toAccountRate', 1),       // Default to 1
+					'toAccountRate'      => $this->to_account_rate($data, arr_get($data, 'toAccountRate', 1)),
 					'salesAgent' => arr_get($data, 'salesAgent', ''),
 					'description'        => arr_get($data, 'description', ''),
 					'furtherDescription' => arr_get($data, 'ReservationNumber', ''),
