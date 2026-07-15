@@ -65,18 +65,19 @@
                         <div class="col-md-6">
                             <div class="form-group">
                                 <label>Customer Code</label>
-                                <?php if (current_url() == base_url('Customer/Update') && !empty($CustomerCode)) { ?> 
+                                <?php if (current_url() == base_url('Customer/Update') && !empty($CustomerCode) && !can_edit_customer_code($this->session->userdata('admin_id'))) { ?>
                                     <div class="input-icon">
                                         <div class="form-control bg-light" style="cursor:not-allowed;">
                                             <?php echo !empty($CustomerCode) ? htmlspecialchars($CustomerCode, ENT_QUOTES) : ''; ?>
                                         </div>
                                         <span><i class="la la-clipboard-list"></i></span>
                                     </div>
-                                <?php } else { ?> 
+                                <?php } else { ?>
                                     <div class="input-icon">
-                                        <input type="text" 
-                                            id="CustomerCode" 
+                                        <input type="text"
+                                            id="CustomerCode"
                                             name="CustomerCode"
+                                            value="<?php echo (current_url() == base_url('Customer/Update') && !empty($CustomerCode)) ? htmlspecialchars($CustomerCode, ENT_QUOTES) : ''; ?>"
                                             class="form-control"
                                             autocomplete="off"
                                             placeholder="Enter customer code">

@@ -303,7 +303,36 @@ class Customer_Model extends CI_Model
 
 	function Update()
 	{
-		$this->db->update_batch('customer', json_decode(json_encode($this->input->post('customer'))), 'CustomerID');
+		$rows = json_decode(json_encode($this->input->post('customer')), true);
+
+		// Server-side guard: only ERNIDA may change an already-set CustomerCode.
+		// The read-only form field is front-end only, so re-check here before the
+		// blind batch write in case a code slips into the payload.
+		$this->load->helper('customer_code');
+		$admin_id = $this->session->userdata('admin_id');
+		if (is_array($rows)) {
+			foreach ($rows as $i => $row) {
+				if (!is_array($row) || !array_key_exists('CustomerCode', $row) || empty($row['CustomerID'])) {
+					continue;
+				}
+				$current = $this->find($row['CustomerID']);
+				$stored  = $current ? $current->CustomerCode : null;
+				if (!customer_code_change_allowed($admin_id, $stored, $row['CustomerCode'])) {
+					unset($rows[$i]['CustomerCode']); // drop the disallowed change, keep stored value
+				}
+				// Only the CustomerID left after stripping -> nothing to update.
+				if (count($rows[$i]) <= 1) {
+					unset($rows[$i]);
+				}
+			}
+			$rows = array_values($rows);
+		}
+
+		if (empty($rows)) {
+			return; // nothing left to write after the guard
+		}
+
+		$this->db->update_batch('customer', json_decode(json_encode($rows)), 'CustomerID');
 
 		$this->db->set('phone_number', null);
 		$this->db->where('CustomerID', $this->input->post('customer_id'));

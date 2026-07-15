@@ -324,6 +324,34 @@ div.kt-datatable__pager-container {
 												</select>
 											</div>
 										</div>
+										<?php if($list_base !== 'Ghl_Leads') { ?>
+										<div class="col-md-3">
+											<div class="form-group">
+												<label>Campaign Date
+													<a onclick="Reset_Campaign_Date()" class="btn btn-icon btn-light-warning btn-xs" data-toggle="tooltip" title="Clear campaign date">
+														<i class="la la-undo"></i>
+													</a>
+												</label>
+												<div id="kt_daterangepicker_guests_campaign" class="input-icon">
+													<input readonly type="text" name="campaign_date" value="<?php if(!empty($this->input->get('campaign_date'))) { echo $this->input->get('campaign_date'); } ?>" autocomplete="off" class="form-control" placeholder="Remark campaign date…">
+													<span><i class="la la-bullhorn"></i></span>
+												</div>
+											</div>
+										</div>
+										<div class="col-md-3">
+											<div class="form-group">
+												<label>Follow Date
+													<a onclick="Reset_Follow_Date()" class="btn btn-icon btn-light-warning btn-xs" data-toggle="tooltip" title="Clear follow date">
+														<i class="la la-undo"></i>
+													</a>
+												</label>
+												<div id="kt_daterangepicker_guests_follow" class="input-icon">
+													<input readonly type="text" name="follow_date" value="<?php if(!empty($this->input->get('follow_date'))) { echo $this->input->get('follow_date'); } ?>" autocomplete="off" class="form-control" placeholder="Remark follow-up date…">
+													<span><i class="la la-bell"></i></span>
+												</div>
+											</div>
+										</div>
+										<?php } ?>
 									</div>
 									<input type="submit" value="Filter" class="btn btn-light-success font-weight-bold" style="width:80px;">
 									<input type="button" id="reset" value="Reset" class="btn btn-light-primary font-weight-bold" style="width:80px;">
@@ -598,10 +626,25 @@ div.kt-datatable__pager-container {
 				<!-- Add form -->
 				<div class="form-group row mb-2">
 					<div class="col-md-4">
-						<label class="font-weight-bold" style="font-size:12px;">Date &amp; Time</label>
-						<input type="datetime-local" id="gr_datetime" class="form-control">
+						<label class="font-weight-bold" style="font-size:12px;">Campaign Date</label>
+						<input type="date" id="gr_campaign_date" class="form-control">
 					</div>
-					<div class="col-md-6">
+					<div class="col-md-4">
+						<label class="font-weight-bold" style="font-size:12px;">Destination</label>
+						<select id="gr_destination" class="form-control">
+							<option value="">--No destination--</option>
+							<?php if(!empty($destinations)) { foreach($destinations as $d) { ?>
+								<option value="<?php echo (int)$d->CategoryID; ?>"><?php echo htmlspecialchars($d->Name); ?></option>
+							<?php } } ?>
+						</select>
+					</div>
+					<div class="col-md-4">
+						<label class="font-weight-bold" style="font-size:12px;">Follow Date</label>
+						<input type="date" id="gr_follow_date" class="form-control">
+					</div>
+				</div>
+				<div class="form-group row mb-2">
+					<div class="col-md-10">
 						<label class="font-weight-bold" style="font-size:12px;">Remark</label>
 						<input type="text" id="gr_remark" class="form-control" maxlength="1000" placeholder="e.g. Called guest, will decide next week">
 					</div>
@@ -624,7 +667,7 @@ div.kt-datatable__pager-container {
 
 <script>
 	<?php
-		$expanded_keys = array('q', 'booking_number', 'contact_number', 'email', 'destination', 'role', 'pax_min', 'pax_max', 'sales_agent', 'source', 'customer_type', 'nationality', 'gender', 'guest_type', 'language', 'booking_date', 'travel_date', 'team_leader', 'dob', 'birthday');
+		$expanded_keys = array('q', 'booking_number', 'contact_number', 'email', 'destination', 'role', 'pax_min', 'pax_max', 'sales_agent', 'source', 'customer_type', 'nationality', 'gender', 'guest_type', 'language', 'booking_date', 'travel_date', 'team_leader', 'dob', 'birthday', 'campaign_date', 'follow_date');
 		$expand = false;
 		foreach($expanded_keys as $k) {
 			if($this->input->get($k) !== null && $this->input->get($k) !== '') { $expand = true; break; }
@@ -669,6 +712,12 @@ div.kt-datatable__pager-container {
 	function Reset_Dob() {
 		$('#kt_daterangepicker_guests_dob input').val('');
 	}
+	function Reset_Campaign_Date() {
+		$('#kt_daterangepicker_guests_campaign input').val('');
+	}
+	function Reset_Follow_Date() {
+		$('#kt_daterangepicker_guests_follow input').val('');
+	}
 
 	$('#kt_daterangepicker_guests_booking').daterangepicker({
 		buttonClasses: ' btn',
@@ -686,6 +735,28 @@ div.kt-datatable__pager-container {
 		autoApply: true
 	}, function(start, end, label) {
 		$('#kt_daterangepicker_guests_travel .form-control').val(start.format('DD/MM/YYYY') + ' - ' + end.format('DD/MM/YYYY'));
+	});
+
+	// Campaign / Follow date are remark ranges (Guest List page only). autoUpdateInput
+	// keeps the input blank until a range is picked, so an untouched picker sends nothing.
+	$('#kt_daterangepicker_guests_campaign').daterangepicker({
+		buttonClasses: ' btn',
+		applyClass: 'btn-primary',
+		cancelClass: 'btn-secondary',
+		autoApply: true,
+		autoUpdateInput: false
+	}, function(start, end, label) {
+		$('#kt_daterangepicker_guests_campaign .form-control').val(start.format('DD/MM/YYYY') + ' - ' + end.format('DD/MM/YYYY'));
+	});
+
+	$('#kt_daterangepicker_guests_follow').daterangepicker({
+		buttonClasses: ' btn',
+		applyClass: 'btn-primary',
+		cancelClass: 'btn-secondary',
+		autoApply: true,
+		autoUpdateInput: false
+	}, function(start, end, label) {
+		$('#kt_daterangepicker_guests_follow .form-control').val(start.format('DD/MM/YYYY') + ' - ' + end.format('DD/MM/YYYY'));
 	});
 
 	// DOB spans decades, so show month/year dropdowns and cap the range at today
@@ -920,18 +991,17 @@ div.kt-datatable__pager-container {
 
 	function grPad(n) { return (n < 10 ? '0' : '') + n; }
 
-	// Pretty-print a "YYYY-MM-DD HH:MM:SS" datetime as "13 Jul 2026 15:30".
-	function grFormatDateTime(raw) {
-		var m = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/.exec(raw || '');
-		if (!m) { return grEscape(raw); }
-		return grPad(parseInt(m[3], 10)) + ' ' + GR_MONTHS[parseInt(m[2], 10) - 1] + ' ' + m[1] + ' ' + m[4] + ':' + m[5];
+	// Pretty-print a "YYYY-MM-DD" date as "13 Jul 2026". Returns '' for blanks.
+	function grFormatDate(raw) {
+		var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(raw || '');
+		if (!m) { return ''; }
+		return grPad(parseInt(m[3], 10)) + ' ' + GR_MONTHS[parseInt(m[2], 10) - 1] + ' ' + m[1];
 	}
 
-	// Local "now" as the value a datetime-local input expects.
-	function grNowLocal() {
+	// Local "today" as the value an HTML5 date input expects.
+	function grTodayLocal() {
 		var d = new Date();
-		return d.getFullYear() + '-' + grPad(d.getMonth() + 1) + '-' + grPad(d.getDate()) +
-			'T' + grPad(d.getHours()) + ':' + grPad(d.getMinutes());
+		return d.getFullYear() + '-' + grPad(d.getMonth() + 1) + '-' + grPad(d.getDate());
 	}
 
 	function grRenderList(remarks) {
@@ -943,12 +1013,19 @@ div.kt-datatable__pager-container {
 		var html = '<div>';
 		for (var i = 0; i < remarks.length; i++) {
 			var r = remarks[i];
+			var meta = '<i class="la la-bullhorn text-primary"></i> ' + grEscape(grFormatDate(r.campaign_date));
+			if (r.destination_name) {
+				meta += ' <span class="text-muted font-weight-normal"><i class="la la-map-marker"></i> ' + grEscape(r.destination_name) + '</span>';
+			}
+			if (r.follow_date) {
+				meta += ' <span class="text-danger font-weight-normal"><i class="la la-bell"></i> Follow: ' + grEscape(grFormatDate(r.follow_date)) + '</span>';
+			}
+			if (r.created_by) {
+				meta += ' <span class="text-muted font-weight-normal">— ' + grEscape(r.created_by) + '</span>';
+			}
 			html += '<div class="d-flex align-items-start border-bottom py-2" data-remark-id="' + r.id + '">' +
 				'<div class="flex-grow-1">' +
-					'<div class="font-weight-bold text-dark-75" style="font-size:12px;">' +
-						'<i class="la la-clock text-primary"></i> ' + grFormatDateTime(r.remark_at) +
-						(r.created_by ? ' <span class="text-muted font-weight-normal">— ' + grEscape(r.created_by) + '</span>' : '') +
-					'</div>' +
+					'<div class="font-weight-bold text-dark-75" style="font-size:12px;">' + meta + '</div>' +
 					'<div class="text-dark-75" style="font-size:13px; white-space:pre-wrap;">' + grEscape(r.remark) + '</div>' +
 				'</div>' +
 				(r.can_delete ?
@@ -986,16 +1063,20 @@ div.kt-datatable__pager-container {
 		grDedupKey = $(this).attr('data-dedup-key') || '';
 		$('#gr_guest_name').text($(this).attr('data-name') || '');
 		$('#gr_error').hide().text('');
-		$('#gr_datetime').val(grNowLocal());
+		$('#gr_campaign_date').val(grTodayLocal());
+		$('#gr_destination').val('');
+		$('#gr_follow_date').val('');
 		$('#gr_remark').val('');
 		$('#guest_remarks_modal').modal('show');
 		grLoad();
 	});
 
 	$('#gr_add').on('click', function() {
-		var $btn    = $(this);
-		var $error  = $('#gr_error');
-		var datetime = $('#gr_datetime').val();
+		var $btn     = $(this);
+		var $error   = $('#gr_error');
+		var campaign = $('#gr_campaign_date').val();
+		var dest     = $('#gr_destination').val();
+		var follow   = $('#gr_follow_date').val();
 		var remark   = $.trim($('#gr_remark').val());
 
 		$error.hide().text('');
@@ -1003,7 +1084,7 @@ div.kt-datatable__pager-container {
 
 		$.ajax({
 			url: GR_ADD_URL, method: 'POST', dataType: 'json', timeout: 30000,
-			data: { dedup_key: grDedupKey, remark_at: datetime, remark: remark }
+			data: { dedup_key: grDedupKey, campaign_date: campaign, destination_id: dest, follow_date: follow, remark: remark }
 		}).done(function(res) {
 			$btn.prop('disabled', false);
 			if (res && res.ok) {

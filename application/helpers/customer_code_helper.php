@@ -71,6 +71,57 @@ if (!function_exists('next_customer_code')) {
     }
 }
 
+if (!defined('CUSTOMER_CODE_EDITOR_ADMIN_ID')) {
+    // ERNIDA (Finance) is the only account allowed to change an existing
+    // customer code. Keep this here (not in a controller) so the view, the
+    // model guard and the tests all agree on one source of truth.
+    define('CUSTOMER_CODE_EDITOR_ADMIN_ID', 7);
+}
+
+if (!function_exists('can_edit_customer_code')) {
+    /**
+     * Whether this admin may edit an already-set customer.CustomerCode.
+     *
+     * @param int|string|null $admin_id Logged-in admin id (session 'admin_id').
+     * @return bool
+     */
+    function can_edit_customer_code($admin_id)
+    {
+        return $admin_id !== null
+            && (int) $admin_id === CUSTOMER_CODE_EDITOR_ADMIN_ID;
+    }
+}
+
+if (!function_exists('customer_code_change_allowed')) {
+    /**
+     * Whether a CustomerCode write should be accepted for this admin.
+     *
+     * Rules:
+     *   - No actual change (same value, ignoring surrounding spaces) -> allowed.
+     *   - Setting a code for the first time (stored blank) -> allowed for all.
+     *   - Overwriting/clearing an existing code -> only can_edit_customer_code().
+     *
+     * @param int|string|null $admin_id
+     * @param string|null     $stored_code   Code currently in the DB.
+     * @param string|null     $incoming_code Code being posted.
+     * @return bool
+     */
+    function customer_code_change_allowed($admin_id, $stored_code, $incoming_code)
+    {
+        $stored   = trim((string) $stored_code);
+        $incoming = trim((string) $incoming_code);
+
+        if ($stored === $incoming) {
+            return true; // nothing is changing
+        }
+        if ($stored === '') {
+            return true; // first-time set stays open to everyone
+        }
+
+        return can_edit_customer_code($admin_id);
+    }
+}
+
 if (!function_exists('is_customer_code_clash')) {
     /**
      * Whether an AutoCount sync error means the AccNo we sent already exists in

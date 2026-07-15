@@ -220,11 +220,14 @@ class Guests extends MY_Controller
 		$out = array();
 		foreach ($rows as $r) {
 			$out[] = array(
-				'id'         => (int) $r->RemarkID,
-				'remark_at'  => $r->RemarkAt,
-				'remark'     => $r->Remark,
-				'created_by' => $r->CreatedByName !== null ? $r->CreatedByName : '',
-				'can_delete' => (bool) $r->CanDelete,
+				'id'               => (int) $r->RemarkID,
+				'campaign_date'    => $r->CampaignDate,
+				'destination_id'   => $r->DestinationID !== null ? (int) $r->DestinationID : 0,
+				'destination_name' => $r->DestinationName !== null ? $r->DestinationName : '',
+				'follow_date'      => $r->FollowDate !== null ? $r->FollowDate : '',
+				'remark'           => $r->Remark,
+				'created_by'       => $r->CreatedByName !== null ? $r->CreatedByName : '',
+				'can_delete'       => (bool) $r->CanDelete,
 			);
 		}
 
@@ -233,8 +236,10 @@ class Guests extends MY_Controller
 	}
 
 	/**
-	 * Add a dated remark to a guest (datetime + text). Both fields validate via
-	 * the pure guest_remark_validate_* helpers before the model stores them.
+	 * Add a campaign remark to a guest (campaign date + destination + follow date
+	 * + text). Every field validates via the pure guest_remark_validate_* helpers
+	 * before the model stores it. Campaign date and remark are required;
+	 * destination and follow date are optional.
 	 */
 	function Add_Remark()
 	{
@@ -247,27 +252,34 @@ class Guests extends MY_Controller
 			return $out(array('ok' => false, 'message' => 'Missing guest reference.'));
 		}
 
-		$dt = guest_remark_validate_datetime((string) $this->input->post('remark_at'));
-		if (!$dt['ok']) {
-			return $out(array('ok' => false, 'message' => $dt['error']));
+		$cd = guest_remark_validate_date((string) $this->input->post('campaign_date'), true, 'Campaign date');
+		if (!$cd['ok']) {
+			return $out(array('ok' => false, 'message' => $cd['error']));
+		}
+		$de = guest_remark_validate_destination((string) $this->input->post('destination_id'));
+		if (!$de['ok']) {
+			return $out(array('ok' => false, 'message' => $de['error']));
 		}
 		$rm = guest_remark_validate_remark((string) $this->input->post('remark'));
 		if (!$rm['ok']) {
 			return $out(array('ok' => false, 'message' => $rm['error']));
 		}
+		$fd = guest_remark_validate_date((string) $this->input->post('follow_date'), false, 'Follow date');
+		if (!$fd['ok']) {
+			return $out(array('ok' => false, 'message' => $fd['error']));
+		}
 
 		$admin_id = $this->session->userdata('admin_id');
-		$id = $this->Guests_Model->Add_Guest_Remark($dedup_key, $dt['value'], $rm['value'], $admin_id);
+		$id = $this->Guests_Model->Add_Guest_Remark(
+			$dedup_key, $cd['value'], $de['value'], $rm['value'], $fd['value'], $admin_id
+		);
 
+		// The modal reloads the list after a successful add (grLoad), which
+		// re-reads the destination name via the category join — so the response
+		// only needs to confirm the insert, not resolve the name here.
 		return $out(array(
 			'ok'     => true,
-			'remark' => array(
-				'id'         => (int) $id,
-				'remark_at'  => $dt['value'],
-				'remark'     => $rm['value'],
-				'created_by' => (string) $this->session->userdata('name'),
-				'can_delete' => true,
-			),
+			'remark' => array('id' => (int) $id),
 		));
 	}
 

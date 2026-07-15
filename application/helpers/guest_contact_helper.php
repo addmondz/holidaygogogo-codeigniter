@@ -140,29 +140,56 @@ if (!function_exists('guest_field_validate_language')) {
     }
 }
 
-if (!function_exists('guest_remark_validate_datetime')) {
+if (!function_exists('guest_remark_validate_date')) {
     /**
-     * Validate the date & time of a Guest List remark (Guests::Add_Remark)
-     * before it is stored in guest_remarks.RemarkAt. Accepts the HTML5
-     * datetime-local form ("YYYY-MM-DDTHH:MM") as well as a plain "Y-m-d H:i"
-     * and normalizes it to a MySQL DATETIME string. Required.
+     * Validate a plain calendar date on a Guest List remark (Campaign Date /
+     * Follow Date) before it is stored in guest_remarks. Accepts the HTML5 date
+     * form ("YYYY-MM-DD") and normalizes it to a MySQL DATE string. When
+     * $required is false an empty value is allowed and returns value '' (the
+     * caller stores NULL); a non-empty value must still parse.
      *
-     * @param string $raw Raw input.
-     * @return array{ok:bool,error:string,value:string} value is 'Y-m-d H:i:s'.
+     * @param string $raw      Raw input.
+     * @param bool   $required  Reject an empty value when true.
+     * @param string $label     Field name used in the error messages.
+     * @return array{ok:bool,error:string,value:string} value is 'Y-m-d' or ''.
      */
-    function guest_remark_validate_datetime($raw)
+    function guest_remark_validate_date($raw, $required = true, $label = 'Date')
     {
         $raw = trim((string) $raw);
         if ($raw === '') {
-            return array('ok' => false, 'error' => 'Date & time is required.', 'value' => '');
+            if ($required) {
+                return array('ok' => false, 'error' => $label . ' is required.', 'value' => '');
+            }
+            return array('ok' => true, 'error' => '', 'value' => '');
         }
-        // datetime-local uses a "T" separator; MySQL wants a space.
-        $normalized = str_replace('T', ' ', $raw);
-        $ts = strtotime($normalized);
+        $ts = strtotime($raw);
         if ($ts === false) {
-            return array('ok' => false, 'error' => 'Enter a valid date & time.', 'value' => '');
+            return array('ok' => false, 'error' => 'Enter a valid ' . strtolower($label) . '.', 'value' => '');
         }
-        return array('ok' => true, 'error' => '', 'value' => date('Y-m-d H:i:s', $ts));
+        return array('ok' => true, 'error' => '', 'value' => date('Y-m-d', $ts));
+    }
+}
+
+if (!function_exists('guest_remark_validate_destination')) {
+    /**
+     * Validate the optional Destination select on a Guest List remark. Empty is
+     * allowed and returns value 0 (the caller stores NULL). Otherwise the value
+     * must be a positive integer category id — the modal only ever submits ids
+     * from the destination list, so this rejects anything non-numeric.
+     *
+     * @param string|int $raw Raw input (a category id, or '' for none).
+     * @return array{ok:bool,error:string,value:int} value 0 means "no destination".
+     */
+    function guest_remark_validate_destination($raw)
+    {
+        $raw = trim((string) $raw);
+        if ($raw === '') {
+            return array('ok' => true, 'error' => '', 'value' => 0);
+        }
+        if (!ctype_digit($raw) || (int) $raw < 1) {
+            return array('ok' => false, 'error' => 'Choose a valid destination.', 'value' => 0);
+        }
+        return array('ok' => true, 'error' => '', 'value' => (int) $raw);
     }
 }
 
@@ -535,6 +562,9 @@ if (!function_exists('guest_list_ghl_suppressed_by_filters')) {
             'customer_type', 'nationality', 'gender', 'language',
             'booking_number', 'destination', 'pax_min', 'pax_max',
             'team_leader', 'booking_id', 'dob', 'birthday', 'guest_type',
+            // Remark-based filters: a GHL lead has no guest remarks, so a
+            // Campaign/Follow date range can never match one.
+            'campaign_date', 'follow_date',
         );
         foreach ($booking_only as $k) {
             if (isset($get[$k]) && count(guest_list_multi_values($get[$k])) > 0) {
@@ -595,7 +625,10 @@ if (!function_exists('guest_list_leader_fallback_suppressed_by_filters')) {
      */
     function guest_list_leader_fallback_suppressed_by_filters($get)
     {
-        $guest_only = array('nationality', 'gender', 'dob', 'birthday', 'email', 'pax_min', 'pax_max');
+        // A leader-fallback row exists only where the guest list was never
+        // filled, so it can never carry a per-guest remark either — Campaign /
+        // Follow date ranges must drop it just like the guest-only filters.
+        $guest_only = array('nationality', 'gender', 'dob', 'birthday', 'email', 'pax_min', 'pax_max', 'campaign_date', 'follow_date');
         foreach ($guest_only as $k) {
             if (isset($get[$k]) && count(guest_list_multi_values($get[$k])) > 0) {
                 return true;

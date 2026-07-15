@@ -57,6 +57,22 @@ assert_eq('guest_type keeps guest page',  true,  $gt['bookings']);
 $gl = guest_list_branches_to_run('guest', array('role' => 'Lead'));
 assert_eq('role=Lead empties guest page', false, $gl['bookings']);
 
+// ---- Campaign / Follow date are remark ranges: a GHL lead carries no guest --
+// ---- remark, so either empties the GHL page but keeps the Guest List page. ---
+$hcamp = guest_list_branches_to_run('ghl', array('campaign_date' => '01/07/2026 - 31/07/2026'));
+assert_eq('campaign_date empties ghl page', false, $hcamp['ghl']);
+$hfol = guest_list_branches_to_run('ghl', array('follow_date' => '01/07/2026 - 31/07/2026'));
+assert_eq('follow_date empties ghl page',   false, $hfol['ghl']);
+$gcamp = guest_list_branches_to_run('guest', array('campaign_date' => '01/07/2026 - 31/07/2026'));
+assert_eq('campaign_date keeps guest page', true,  $gcamp['bookings']);
+
+// ---- The leader-fallback branch (unfilled bookings) also can't hold a remark,
+// ---- so a Campaign / Follow range must suppress it. -------------------------
+assert_eq('campaign_date suppresses leader fallback', true,
+    guest_list_leader_fallback_suppressed_by_filters(array('campaign_date' => '01/07/2026 - 31/07/2026')));
+assert_eq('follow_date suppresses leader fallback', true,
+    guest_list_leader_fallback_suppressed_by_filters(array('follow_date' => '01/07/2026 - 31/07/2026')));
+
 // ---- a shared filter (contact) leaves each page on its own branch ----------
 $gc = guest_list_branches_to_run('guest', array('contact_number' => '012'));
 assert_eq('contact keeps guest page', true, $gc['bookings']);

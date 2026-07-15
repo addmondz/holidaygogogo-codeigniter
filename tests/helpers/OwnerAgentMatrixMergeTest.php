@@ -271,4 +271,52 @@ assert_eq('roster: Dave Agent Score dash (not scored)', null, $byFull[13]['agent
 // though she is not named in this roster.
 assert_eq('roster: Carol still present via source', true, isset($byFull[12]));
 
+// --- Score breakdown: each scored row carries the six normalised 0-100 criteria
+//     (score_norm) that the owner's Score-cell popover renders. It must equal the
+//     norm agent_score_compute() produced, and an unscored agent's breakdown is
+//     null (nothing to show). ---
+assert_eq('breakdown: Jane score_norm equals compute norm',
+    $expected['by_admin'][10]['norm'], $by[10]['score_norm']);
+assert_eq('breakdown: Jane norm has six criteria', 6, count($by[10]['score_norm']));
+assert_eq('breakdown: Jane weighted norm sums to composite',
+    $by[10]['agent_score'],
+    round(
+        0.15 * $by[10]['score_norm']['reply']
+      + 0.10 * $by[10]['score_norm']['pickup']
+      + 0.10 * $by[10]['score_norm']['conv']
+      + 0.45 * $by[10]['score_norm']['sales']
+      + 0.10 * $by[10]['score_norm']['followup']
+      + 0.10 * $by[10]['score_norm']['served'],
+    1));
+// Zero-activity Dave (unscored) has no breakdown to render.
+assert_eq('breakdown: unscored Dave score_norm null', null, $byFull[13]['score_norm']);
+// Score skipped entirely (Year): breakdown null even for active agents.
+assert_eq('breakdown: no-score build score_norm null', null, $nsBy[10]['score_norm']);
+
+// --- Score calc: each scored row also carries the RAW value + benchmark (best)
+//     per criterion, so the popover can show the numbers and the arithmetic. The
+//     value is the exact score input (served = owned-leads), and best equals the
+//     anchors agent_score_compute() reported. ---
+assert_eq('calc: Jane reply value = weighted avg reply', 150.0, $by[10]['score_calc']['reply']['value']);
+assert_eq('calc: Jane served value = owned-leads (not displayed Served)', 20, $by[10]['score_calc']['served']['value']);
+assert_eq('calc: Jane sales value', 50000.0, $by[10]['score_calc']['sales']['value']);
+// Best anchors: reply is the fastest (min) time; sales/served the highest (max).
+assert_eq('calc: reply best = fastest (Ben 50)',  $expected['anchors']['reply'],  $by[10]['score_calc']['reply']['best']);
+assert_eq('calc: sales best = highest (Jane 50000)', $expected['anchors']['sales'], $by[10]['score_calc']['sales']['best']);
+assert_eq('calc: served best = highest (Jane 20)',   $expected['anchors']['served'], $by[10]['score_calc']['served']['best']);
+// value ÷ best × 100 (higher-better) reproduces the shown norm for sales.
+assert_eq('calc: sales value/best*100 = norm',
+    $by[10]['score_norm']['sales'],
+    round($by[10]['score_calc']['sales']['value'] / $by[10]['score_calc']['sales']['best'] * 100, 1));
+// best ÷ value × 100 (lower-better) reproduces the shown norm for reply.
+assert_eq('calc: reply best/value*100 = norm',
+    $by[10]['score_norm']['reply'],
+    round($by[10]['score_calc']['reply']['best'] / $by[10]['score_calc']['reply']['value'] * 100, 1));
+// Carol has no reply data -> value null, but sales value present.
+assert_eq('calc: Carol reply value null (no data)', null, $by[12]['score_calc']['reply']['value']);
+assert_eq('calc: Carol sales value', 30000.0, $by[12]['score_calc']['sales']['value']);
+// Unscored / no-score builds carry no calc either.
+assert_eq('calc: unscored Dave score_calc null', null, $byFull[13]['score_calc']);
+assert_eq('calc: no-score build score_calc null', null, $nsBy[10]['score_calc']);
+
 echo "\nAll assertions passed.\n";

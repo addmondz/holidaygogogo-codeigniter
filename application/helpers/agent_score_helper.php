@@ -202,6 +202,19 @@ if (!function_exists('agent_score_compute')) {
             'by_admin' => $by_admin,
             'total'    => count($ranked),
             'top'      => count($ranked) ? $ranked[0] : null,
+            // The benchmark anchors (the "best performer = 100" reference on each
+            // metric). Exposed so callers can show HOW a 0-100 was derived — e.g.
+            // the owner's Score-breakdown popover renders "yours vs best". null on a
+            // metric no min-sample agent qualified for. reply/pickup are the fastest
+            // (min) time; the rest are the highest (max) value.
+            'anchors'  => array(
+                'reply'    => $best_reply,
+                'pickup'   => $best_pickup,
+                'conv'     => $best_conv,
+                'sales'    => $best_sales,
+                'followup' => $best_followup,
+                'served'   => $best_served,
+            ),
         );
     }
 }

@@ -12,6 +12,7 @@ class Customer extends MY_Controller
 		$this->load->model('Customer_Model');
 		$this->load->model('Universal_Model');
 		$this->load->model('Customer_Type_Model');
+		$this->load->helper('customer_code'); // can_edit_customer_code() for the form + guard
 	}
 
 	function index()

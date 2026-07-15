@@ -37,6 +37,32 @@
     .summary-popover .popover-body { font-size:12px; line-height:1.5; color:#3F4254; }
     .summary-popover .popover-body strong { color:#6082B6; }
     .summary-popover .popover-body ul { padding-left:18px; margin:4px 0; }
+    /* Owner Agent-Score cell: a clickable number that opens the 6-criteria breakdown. */
+    .sc-owner-matrix .sc-owner-score { color:#3699FF; font-weight:600; text-decoration:none; cursor:pointer; border-bottom:1px dashed #3699FF; outline:none; }
+    .sc-owner-matrix .sc-owner-score:hover,
+    .sc-owner-matrix .sc-owner-score:focus { color:#187DE4; border-bottom-color:#187DE4; }
+    .sc-owner-score-popover { max-width:340px; }
+    .sc-score-bd { font-size:12px; color:#3F4254; }
+    .sc-score-bd-lead { font-size:12px; color:#5E6278; line-height:1.45; white-space:normal; margin-bottom:9px; }
+    .sc-score-bd-lead strong { color:#6082B6; }
+    .sc-score-crit { padding:7px 0; border-top:1px solid #EBEDF3; }
+    .sc-score-crit:first-of-type { border-top:none; }
+    .sc-score-crit-top { display:flex; justify-content:space-between; align-items:baseline; gap:8px; }
+    .sc-score-crit-label { font-weight:600; color:#3F4254; }
+    .sc-score-crit-hint { font-weight:400; color:#8C93A6; font-size:11.5px; }
+    .sc-score-crit-pts { font-weight:700; color:#3F4254; white-space:nowrap; font-variant-numeric:tabular-nums; }
+    .sc-score-crit-wt { font-weight:400; color:#8C93A6; }
+    .sc-score-crit-bar { display:flex; align-items:center; gap:8px; margin:4px 0 3px; }
+    .sc-score-bar { display:inline-block; flex:1; height:9px; background:#EBEDF3; border-radius:5px; overflow:hidden; }
+    .sc-score-bar-fill { display:block; height:100%; background:#6082B6; border-radius:5px; }
+    .sc-score-bar-num { font-weight:600; color:#3F4254; font-variant-numeric:tabular-nums; white-space:nowrap; }
+    .sc-score-bar-max { font-weight:400; color:#8C93A6; }
+    .sc-score-crit-calc { color:#5E6278; white-space:normal; line-height:1.4; }
+    .sc-score-crit-calc strong { color:#3F4254; }
+    .sc-score-crit-calc em { font-style:normal; color:#8C93A6; }
+    .sc-score-nodata { color:#8C93A6; }
+    .sc-score-total { display:flex; justify-content:space-between; align-items:center; margin-top:8px; padding-top:8px; border-top:2px solid #6082B6; font-weight:700; }
+    .sc-score-total strong { color:#6082B6; font-size:15px; }
     #booking_summary_cards .summary-card-body { padding:10px 14px 12px; }
     #booking_summary_cards .summary-value { font-size:24px; font-weight:700; color:#3F4254; line-height:1.1; }
     #booking_summary_cards .summary-value-sm { font-size:18px; font-weight:700; color:#3F4254; line-height:1.1; }
@@ -721,7 +747,7 @@
                 <div class="card card-custom">
                     <div class="card-header border-0 summary-card-header" style="background-color:#A7C7E730; display:flex; align-items:center;">
                         <h3 style="margin:0;">Agent Performance &mdash; <span id="sc-owner-period-label">This month</span></h3>
-                        <i id="pop-owner-matrix" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="What each column means" data-content="<strong>Each row is one sales agent</strong>, for the selected period (use the Day / Week / Month / Year toggle).<ul><li><strong>Reply Time:</strong> average time to reply to an inbound message.</li><li><strong>1st Reply:</strong> average time to send the first reply to a new lead.</li><li><strong>New Leads:</strong> leads assigned to them in the period.</li><li><strong>Served:</strong> distinct leads they replied to in the period (matches the Lead Reply Activity dashboard&rsquo;s &ldquo;Lead Responded&rdquo;).</li><li><strong>Conv % (credited):</strong> their leads that became a booking where they hold the credited sales slot, over their leads.</li><li><strong>Conv % (all):</strong> their leads that became a booking, whoever is credited, over their leads.</li><li><strong>Outbound:</strong> outbound messages they sent.</li><li><strong>Sales:</strong> value of booking confirmations credited to them (no payment gate).</li><li><strong>Follow-up %:</strong> owned leads that received a follow-up.</li><li><strong>Cancel %:</strong> credited booking confirmations later cancelled (duplicate cancellations excluded).</li><li><strong>Score:</strong> weighted 0&ndash;100 composite of reply time, 1st reply, conversion, sales, follow-up and leads served; the period&rsquo;s best on each metric scores 100.</li></ul>Speed and score need a minimum sample to rank fairly. &ldquo;&mdash;&rdquo; means no data for that agent."></i>
+                        <i id="pop-owner-matrix" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="What each column means" data-content="<strong>Each row is one sales agent</strong>, for the selected period (use the Day / Week / Month / Year toggle).<ul><li><strong>Reply Time:</strong> average time to reply to an inbound message.</li><li><strong>1st Reply:</strong> average time to send the first reply to a new lead.</li><li><strong>New Leads:</strong> leads assigned to them in the period.</li><li><strong>Served:</strong> distinct leads they replied to in the period (matches the Lead Reply Activity dashboard&rsquo;s &ldquo;Lead Responded&rdquo;).</li><li><strong>Conv % (credited):</strong> their leads that became a booking where they hold the credited sales slot, over their leads.</li><li><strong>Conv % (all):</strong> their leads that became a booking, whoever is credited, over their leads.</li><li><strong>Outbound:</strong> outbound messages they sent.</li><li><strong>Sales:</strong> value of booking confirmations credited to them (no payment gate).</li><li><strong>Follow-up %:</strong> owned leads that received a follow-up.</li><li><strong>Cancel %:</strong> credited booking confirmations later cancelled (duplicate cancellations excluded).</li><li><strong>Score:</strong> weighted 0&ndash;100 composite of reply time, 1st reply, conversion, sales, follow-up and leads served; the period&rsquo;s best on each metric scores 100. <strong>Click any Score</strong> to see the per-agent breakdown of all six criteria.</li></ul>Speed and score need a minimum sample to rank fairly. &ldquo;&mdash;&rdquo; means no data for that agent."></i>
                         <span class="sc-owner-toggle" role="group" aria-label="Performance period">
                             <button type="button" class="sc-owner-tab" data-owner-period="yesterday">Yesterday</button>
                             <button type="button" class="sc-owner-tab" data-owner-period="day">Day</button>
@@ -1280,6 +1306,97 @@ $(function() {
     function fmtOwnerMoney(v) {
         v = Number(v) || 0;
         return 'RM ' + v.toLocaleString('en-MY', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    }
+    // The six weighted criteria behind the Agent Score, in matrix-column order.
+    // Weights mirror agent_score_weights() (server) and MUST sum to 1.0. lower:true
+    // marks the two "faster is better" speed metrics (score = best ÷ yours); the
+    // rest are "higher is better" (score = yours ÷ best).
+    var OWNER_SCORE_CRITERIA = [
+        {key:'reply',    label:'Reply Time', wt:0.15, lower:true,  better:'faster is better'},
+        {key:'pickup',   label:'1st Reply',  wt:0.10, lower:true,  better:'faster is better'},
+        {key:'conv',     label:'Conversion', wt:0.10, lower:false, better:'higher is better'},
+        {key:'sales',    label:'Sales',      wt:0.45, lower:false, better:'higher is better'},
+        {key:'followup', label:'Follow-up',  wt:0.10, lower:false, better:'higher is better'},
+        {key:'served',   label:'Served',     wt:0.10, lower:false, better:'higher is better'}
+    ];
+    // Format a criterion's raw value in its own units (duration / seconds / % /
+    // money / lead count). Null/undefined -> em-dash.
+    function fmtOwnerCritVal(key, v) {
+        if(v === null || v === undefined) return '—';
+        v = Number(v);
+        switch(key) {
+            case 'reply':    return fmtOwnerDuration(v);
+            case 'pickup':   return fmtOwnerSecs(v);
+            case 'conv':     return (Math.round(v * 10) / 10) + '%';
+            case 'followup': return (Math.round(v * 10) / 10) + '%';
+            case 'sales':    return fmtOwnerMoney(v);
+            case 'served':   return Math.round(v) + (Math.round(v) === 1 ? ' lead' : ' leads');
+            default:         return String(v);
+        }
+    }
+    // Build the per-agent Score-breakdown popover: one block per criterion showing
+    // the agent's ACTUAL value, the period's best (=100), the arithmetic that turns
+    // that into the 0–100 score (a mini bar), and the points it contributes
+    // (score × weight). Footed by the composite (r.agent_score). Returns '' when the
+    // agent carries no breakdown (unscored).
+    function ownerScoreBreakdownHtml(r) {
+        var n = r.score_norm, calc = r.score_calc || {};
+        if(!n) return '';
+        var blocks = OWNER_SCORE_CRITERIA.map(function(c) {
+            var norm = Number(n[c.key] || 0);
+            var w    = Math.max(0, Math.min(100, norm));
+            var pts  = (c.wt * norm).toFixed(1);
+            var cv   = calc[c.key] || {};
+            var val  = cv.value, best = cv.best;
+            var hasData = val !== null && val !== undefined && Number(val) > 0
+                        && best !== null && best !== undefined && Number(best) > 0;
+            var how;
+            if(!hasData) {
+                how = '<span class="sc-score-nodata">No data this period &rarr; 0</span>';
+            } else {
+                // The real formula: faster-better divides best by yours, higher-better
+                // divides yours by best. Then × 100 (capped at 100).
+                var num = c.lower ? best : val;
+                var den = c.lower ? val  : best;
+                var raw = (Number(num) / Number(den)) * 100;
+                var capped = raw > 100.5;
+                how = 'You <strong>' + escapeHtml(fmtOwnerCritVal(c.key, val)) + '</strong>'
+                    + ' &divide; best <strong>' + escapeHtml(fmtOwnerCritVal(c.key, best)) + '</strong>'
+                    + ' &times;100 = ' + norm.toFixed(0) + (capped ? ' <em>(capped)</em>' : '');
+            }
+            return '<div class="sc-score-crit">'
+                + '<div class="sc-score-crit-top">'
+                +   '<span class="sc-score-crit-label">' + escapeHtml(c.label)
+                +     ' <span class="sc-score-crit-hint">&middot; ' + c.better + '</span></span>'
+                +   '<span class="sc-score-crit-pts">' + pts + ' pts <span class="sc-score-crit-wt">(&times;' + Math.round(c.wt * 100) + '%)</span></span>'
+                + '</div>'
+                + '<div class="sc-score-crit-bar">'
+                +   '<span class="sc-score-bar"><span class="sc-score-bar-fill" style="width:' + w.toFixed(0) + '%"></span></span>'
+                +   '<span class="sc-score-bar-num">' + norm.toFixed(0) + '<span class="sc-score-bar-max">/100</span></span>'
+                + '</div>'
+                + '<div class="sc-score-crit-calc">' + how + '</div>'
+            + '</div>';
+        }).join('');
+        return '<div class="sc-score-bd">'
+            + '<div class="sc-score-bd-lead">Six criteria, each scored <strong>0&ndash;100</strong> against the period&rsquo;s best performer, then weighted. <strong>Points = score &times; weight</strong>; the six points add up to the Agent Score.</div>'
+            + blocks
+            + '<div class="sc-score-total"><span>Total Agent Score</span><strong>' + escapeHtml(r.agent_score) + '</strong></div>'
+            + '</div>';
+    }
+    // Click-to-open popover for a Score cell. Uses trigger:focus so a click opens
+    // it and clicking anywhere else dismisses it (the score is the rightmost
+    // column, so it opens to the left). Owner-only — this matrix is owner-gated.
+    function initOwnerScorePopover(el) {
+        var $el = $(el);
+        $el.popover('dispose').popover({
+            customClass: 'summary-popover sc-owner-score-popover',
+            container: 'body',
+            boundary: 'window',
+            html: true,
+            trigger: 'focus',
+            placement: 'left'
+        });
+        $el.off('click.scscore').on('click.scscore', function(e) { e.preventDefault(); });
     }
     function setLink(id, href) {
         var el = document.getElementById(id);
@@ -1913,10 +2030,29 @@ $(function() {
                 return '<td class="text-right" data-sort="' + (empty ? '' : escapeHtml(String(raw))) + '"'
                     + (empty ? ' data-empty="1"' : '') + '>' + (empty ? '—' : html) + '</td>';
             };
+            // Score cell: like oCell, but when the agent has a score AND a criteria
+            // breakdown, the number becomes a clickable link that opens the per-agent
+            // 6-criteria popover. Falls back to a plain "—" when Score doesn't apply
+            // to the period or the agent isn't scored (matching oCell's empty rule).
+            var oScoreCell = function(r) {
+                var applies = inP('score');
+                var raw = r.agent_score;
+                var empty = !applies || raw === null || raw === undefined || raw === '';
+                if(empty) {
+                    return '<td class="text-right" data-sort="" data-empty="1">—</td>';
+                }
+                var body = ownerScoreBreakdownHtml(r);
+                if(!body) { // scored but no breakdown shipped — show the number plainly
+                    return '<td class="text-right" data-sort="' + escapeHtml(String(raw)) + '">' + escapeHtml(raw) + '</td>';
+                }
+                return '<td class="text-right" data-sort="' + escapeHtml(String(raw)) + '">'
+                    + '<a href="#" class="sc-owner-score" role="button" tabindex="0"'
+                    + ' title="Score breakdown &mdash; ' + escapeHtml(r.agent_name || '') + '"'
+                    + ' data-html="true" data-content="' + escapeHtml(body) + '">'
+                    + escapeHtml(raw) + '</a></td>';
+            };
             if(ownerMatrix && ownerMatrix.length) {
                 ownerMatrixBody.innerHTML = ownerMatrix.map(function(r) {
-                    var score = (r.agent_score === null || r.agent_score === undefined)
-                        ? '—' : escapeHtml(r.agent_score);
                     return '<tr>' +
                         '<td data-sort="' + escapeHtml(r.agent_name || '') + '">' + escapeHtml(r.agent_name || '—') + '</td>' +
                         oCell('reply',    fmtOwnerDuration(r.reply_secs),    r.reply_secs) +
@@ -1929,9 +2065,16 @@ $(function() {
                         oCell('sales',    fmtOwnerMoney(r.sales_total),     r.sales_total) +
                         oCell('followup', escapeHtml(r.followup_rate) + '%',    r.followup_rate) +
                         oCell('cancel',   escapeHtml(r.cancel_rate) + '%',      r.cancel_rate) +
-                        oCell('score',    score,                            r.agent_score) +
+                        oScoreCell(r) +
                     '</tr>';
                 }).join('');
+                // The Score is clickable: open a popover breaking the composite into
+                // its six weighted criteria (owner-only, since this whole matrix is
+                // owner-gated). Init after the rows exist in the DOM.
+                var scoreLinks = ownerMatrixBody.querySelectorAll('.sc-owner-score');
+                for(var si = 0; si < scoreLinks.length; si++) {
+                    initOwnerScorePopover(scoreLinks[si]);
+                }
             } else {
                 ownerMatrixBody.innerHTML = '<tr><td colspan="12" class="text-center text-muted">No data for this period</td></tr>';
             }

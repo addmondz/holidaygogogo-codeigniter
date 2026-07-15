@@ -102,6 +102,28 @@ class Guests_Model extends CI_Model
 				$b_params[] = $dob_range[1];
 			}
 
+			// Campaign / Follow date ranges match the guest's remark log: a guest
+			// appears when ANY of their active remarks (keyed by dedup_key, so it
+			// spans all their bookings) falls in the picked range. EXISTS keeps it
+			// a row-level predicate the GROUP BY never has to see.
+			$campaign_range = guest_list_parse_date_range($this->input->get('campaign_date'));
+			if($campaign_range !== null) {
+				$where     .= " AND EXISTS (SELECT 1 FROM guest_remarks gr
+					WHERE gr.Status = 'Y' AND gr.dedup_key = gl.dedup_key
+					AND gr.CampaignDate >= ? AND gr.CampaignDate <= ?) ";
+				$b_params[] = $campaign_range[0];
+				$b_params[] = $campaign_range[1];
+			}
+
+			$follow_range = guest_list_parse_date_range($this->input->get('follow_date'));
+			if($follow_range !== null) {
+				$where     .= " AND EXISTS (SELECT 1 FROM guest_remarks gr
+					WHERE gr.Status = 'Y' AND gr.dedup_key = gl.dedup_key
+					AND gr.FollowDate >= ? AND gr.FollowDate <= ?) ";
+				$b_params[] = $follow_range[0];
+				$b_params[] = $follow_range[1];
+			}
+
 			// Birthday is a recurring month/day match on gl.DateOfBirth that
 			// ignores the birth year (today / this month / a chosen month), so
 			// it surfaces guests to greet regardless of how old they turn.
@@ -765,37 +787,43 @@ SELECT
 	}
 
 	/**
-	 * Add a dated remark for a guest (keyed by dedup_key, so it follows the
+	 * Add a campaign remark for a guest (keyed by dedup_key, so it follows the
 	 * person across all their bookings — same key the inline edits use). The
-	 * datetime and text are already validated/normalized by the caller. Returns
-	 * the new RemarkID.
+	 * campaign date, destination id, follow date and text are already validated
+	 * /normalized by the caller ($destination_id / $follow_date may be empty →
+	 * stored NULL). Returns the new RemarkID.
 	 */
-	function Add_Guest_Remark($dedup_key, $remark_at, $remark, $admin_id)
+	function Add_Guest_Remark($dedup_key, $campaign_date, $destination_id, $remark, $follow_date, $admin_id)
 	{
 		$this->db->insert('guest_remarks', array(
-			'dedup_key' => (string) $dedup_key,
-			'RemarkAt'  => $remark_at,
-			'Remark'    => $remark,
-			'Status'    => 'Y',
-			'CreatedBy' => $admin_id,
-			'CreatedAt' => date('Y-m-d H:i:s'),
+			'dedup_key'     => (string) $dedup_key,
+			'CampaignDate'  => $campaign_date,
+			'DestinationID' => ((int) $destination_id > 0) ? (int) $destination_id : null,
+			'Remark'        => $remark,
+			'FollowDate'    => ($follow_date !== '') ? $follow_date : null,
+			'Status'        => 'Y',
+			'CreatedBy'     => $admin_id,
+			'CreatedAt'     => date('Y-m-d H:i:s'),
 		));
 		return (int) $this->db->insert_id();
 	}
 
 	/**
-	 * All active remarks for a guest, newest RemarkAt first, with the author's
-	 * name for display. CanDelete flags the rows the current user may remove
-	 * (their own remarks — pass $viewer_admin_id).
+	 * All active remarks for a guest, newest Campaign Date first, with the
+	 * author's name and the chosen destination's name for display. CanDelete
+	 * flags the rows the current user may remove (their own — pass
+	 * $viewer_admin_id).
 	 */
 	function Read_Guest_Remarks($dedup_key, $viewer_admin_id = null)
 	{
-		$sql = "SELECT gr.RemarkID, gr.RemarkAt, gr.Remark, gr.CreatedBy, gr.CreatedAt,
-				a.Name AS CreatedByName
+		$sql = "SELECT gr.RemarkID, gr.CampaignDate, gr.DestinationID, gr.FollowDate,
+				gr.Remark, gr.CreatedBy, gr.CreatedAt,
+				cat.Name AS DestinationName, a.Name AS CreatedByName
 			FROM guest_remarks gr
-			LEFT JOIN admin a ON a.AdminID = gr.CreatedBy
+			LEFT JOIN admin    a   ON a.AdminID     = gr.CreatedBy
+			LEFT JOIN category cat ON cat.CategoryID = gr.DestinationID
 			WHERE gr.Status = 'Y' AND gr.dedup_key = ?
-			ORDER BY gr.RemarkAt DESC, gr.RemarkID DESC";
+			ORDER BY gr.CampaignDate DESC, gr.RemarkID DESC";
 		$rows = $this->db->query($sql, array((string) $dedup_key))->result();
 
 		foreach ($rows as $r) {

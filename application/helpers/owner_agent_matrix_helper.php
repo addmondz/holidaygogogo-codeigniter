@@ -244,12 +244,17 @@ if (!function_exists('owner_agent_matrix_build')) {
         // ---- Metric 11: composite Agent Score over the eligible population ----
         // Skipped entirely when $compute_score is false (Day / Week), so no scoring
         // work is done for a column that would only render "-".
-        $score = array('by_admin' => array());
+        $score = array('by_admin' => array(), 'anchors' => array());
         $score_inputs = array();
+        // Keep each agent's raw score inputs keyed by AdminID so the built row can
+        // carry the exact value that fed the score (e.g. the served criterion uses
+        // owned-leads, which can differ from the displayed Served column). Pairs with
+        // the benchmark anchors to explain HOW each 0-100 was derived.
+        $inputs_by_admin = array();
         if ($compute_score) {
         foreach ($u as $aid => $row) {
             if (!$eligible($row)) { continue; }
-            $score_inputs[] = array(
+            $in = array(
                 'admin_id'      => $aid,
                 'name'          => $row['name'] !== '' ? $row['name'] : '#' . $aid,
                 'reply_secs'    => $row['reply_n']  > 0 ? $row['reply_sum']  / $row['reply_n']  : null,
@@ -271,9 +276,12 @@ if (!function_exists('owner_agent_matrix_build')) {
                 // matrix rows below — included in the calc, not displayed.
                 'hidden'        => ($hidden_admins !== null) && isset($hidden_admins[$aid]),
             );
+            $score_inputs[] = $in;
+            $inputs_by_admin[$aid] = $in;
         }
         $score = agent_score_compute($score_inputs);
         }
+        $anchors = isset($score['anchors']) ? $score['anchors'] : array();
 
         // ---- Build the matrix rows ----
         // NO eligibility gate here: every included agent shows a row (even with no
@@ -308,6 +316,26 @@ if (!function_exists('owner_agent_matrix_build')) {
                 'cancel_total'      => $row['cancel_total'],
                 'cancel_cancelled'  => $row['cancel_cancelled'],
                 'agent_score'       => isset($score['by_admin'][$aid]) ? $score['by_admin'][$aid]['composite'] : null,
+                // The six normalised 0-100 criteria that build the composite, so the
+                // owner can open a per-agent breakdown from the Score cell. null when
+                // the agent isn't scored (zero-activity, or scoring skipped on Year).
+                // Weights are constant (agent_score_weights) and applied in the view.
+                'score_norm'        => isset($score['by_admin'][$aid]) ? $score['by_admin'][$aid]['norm'] : null,
+                // The RAW value that fed each criterion + the benchmark (best=100) it
+                // was measured against, so the breakdown popover can show the actual
+                // numbers and the arithmetic ("yours vs best -> score"). Uses the exact
+                // score input (e.g. served = owned-leads, not the displayed Served), so
+                // it always reconciles with score_norm. null when the agent isn't scored.
+                'score_calc'        => isset($score['by_admin'][$aid], $inputs_by_admin[$aid])
+                    ? array(
+                        'reply'    => array('value' => $inputs_by_admin[$aid]['reply_secs'],    'best' => isset($anchors['reply'])    ? $anchors['reply']    : null),
+                        'pickup'   => array('value' => $inputs_by_admin[$aid]['pickup_secs'],   'best' => isset($anchors['pickup'])   ? $anchors['pickup']   : null),
+                        'conv'     => array('value' => $inputs_by_admin[$aid]['conv_rate'],     'best' => isset($anchors['conv'])     ? $anchors['conv']     : null),
+                        'sales'    => array('value' => $inputs_by_admin[$aid]['sales'],         'best' => isset($anchors['sales'])    ? $anchors['sales']    : null),
+                        'followup' => array('value' => $inputs_by_admin[$aid]['followup_rate'], 'best' => isset($anchors['followup']) ? $anchors['followup'] : null),
+                        'served'   => array('value' => $inputs_by_admin[$aid]['served_leads'],  'best' => isset($anchors['served'])   ? $anchors['served']   : null),
+                    )
+                    : null,
             );
         }
 
