@@ -1878,6 +1878,17 @@ class Cron extends CI_Controller
 						$result = ['error' => 'ERROR Autocount Sync Action'];
 				}
 
+				// Nothing to post (zero-amount payment): mark resolved so it
+				// leaves the queue instead of failing on every run.
+				if (!empty($result['skipped'])) {
+					$this->Payment_Model->update_by_id($payment['PaymentID'], [
+						'AutocountSyncStatus'  => 'S',
+						'AutocountSyncMessage' => json_encode($result)
+					]);
+					echo "SKIPPED: " . ($result['message'] ?? 'zero amount') . "\n";
+					continue;
+				}
+
 				if (isset($result['status']) && ($result['status'] == 201 || $result['status'] == 204) && $result['error'] === null) {
 					$updateData = [
 						'AutocountSyncStatus'  => 'S',
@@ -2040,6 +2051,30 @@ class Cron extends CI_Controller
 			if (!empty($supplier)) {
 				if (!empty($supplier->SupplierCode) && $supplier->SupplierCode != null) {
 					$payment['SupplierCode'] = $supplier->SupplierCode;
+				}
+			}
+		}
+
+		// Foreign-currency handling. The AutoCount document follows the payment's
+		// currency; a MYR-forced payload makes AutoCount's tax-currency-rate math
+		// fail ("ToTaxCurrencyRate should be 1"). The row stores Currency as a
+		// costing_currencies ID + ForeignCurrency as the amount in that currency.
+		// For a foreign doc we send the real currency code, the foreign->MYR rate,
+		// and the foreign amount (AutoCount line amounts are in document currency).
+		$payment['currency_code']  = 'MYR';
+		$payment['currency_rate']  = 1;
+		$payment['foreign_amount'] = null;
+		if (!empty($payment['Currency']) && (float)$payment['ForeignCurrency'] > 0) {
+			$currency = $this->db->select('code')
+				->get_where('costing_currencies', ['id' => $payment['Currency']])
+				->row();
+			if ($currency && strtoupper($currency->code) !== 'MYR') {
+				$localAmt   = ((float)$payment['Credit'] != 0.00) ? (float)$payment['Credit'] : (float)$payment['Debit'];
+				$foreignAmt = (float)$payment['ForeignCurrency'];
+				if ($localAmt > 0 && $foreignAmt > 0) {
+					$payment['currency_code']  = strtoupper($currency->code);
+					$payment['currency_rate']  = round($localAmt / $foreignAmt, 8);
+					$payment['foreign_amount'] = $foreignAmt;
 				}
 			}
 		}

@@ -11,9 +11,43 @@ class PaymentSync {
         $this->CI =& get_instance();
     }
 
+    /**
+	 * Effective journal line amount (document currency). Foreign docs carry the
+	 * amount in foreign_amount; local docs use Credit (OR) or Debit (PV).
+	 */
+	protected function line_amount($data)
+	{
+		if (arr_get($data, 'foreign_amount', null) !== null) {
+			return (float)$data['foreign_amount'];
+		}
+		if ((float)arr_get($data, 'Credit', 0) != 0.00) {
+			return (float)$data['Credit'];
+		}
+		return (float)arr_get($data, 'Debit', 0);
+	}
+
+	/**
+	 * A payment with no amount (Credit == Debit == 0) has nothing to post.
+	 * AutoCount rejects the empty line with "Detail line [1] missing value in
+	 * Amount field.", so we skip the API call and let the caller mark it done.
+	 */
+	protected function skip_zero_amount()
+	{
+		return [
+			'status'  => 200,
+			'error'   => null,
+			'skipped' => true,
+			'message' => 'Zero-amount payment skipped (no journal posted)',
+		];
+	}
+
     public function autocount_create($data = [], $config = [])
 	{
 		try {
+			if ($this->line_amount($data) == 0.00) {
+				return $this->skip_zero_amount();
+			}
+
 			// Master (single row only)
 			$param = [
 				'master' => [
@@ -25,7 +59,6 @@ class PaymentSync {
 					'taxDate'         => null,  // Date -> taxDate
 					'currencyCode'    => arr_get($data, 'currency_code', 'MYR'),
 					'currencyRate'    => arr_get($data, 'currency_rate', 1),
-					'toTaxRate'       => arr_get($data, 'to_tax_rate', 1), // local doc: tax currency rate must be 1
 					'journalType'     => 'GENERAL',
 					'dealWith'        => arr_get($data, 'dealWith', null),
 					'description'     => arr_get($data, 'description', ''),
@@ -62,7 +95,8 @@ class PaymentSync {
 						'toAccountRate'      => arr_get($detail, 'toAccountRate', 1),
 						'description'        => arr_get($detail, 'description', ''),
 						'furtherDescription' => arr_get($detail, 'ReservationNumber', ''),
-						'amount'             => (float)$amount,
+						// Foreign-currency doc: line amount is in document (foreign) currency.
+						'amount'             => (float)(arr_get($data, 'foreign_amount', null) !== null ? $data['foreign_amount'] : $amount),
 						'taxCode'            => arr_get($detail, 'taxCode', ''),
 						'taxAdjustment'      => arr_get($detail, 'taxAdjustment', 0),
 						'localTaxAdjustment' => arr_get($detail, 'localTaxAdjustment', 0),
@@ -97,7 +131,8 @@ class PaymentSync {
 
 				$param['details'][] = [
 					'accNo'  => $acc_no,
-					'amount' => (float)$amount,
+					// Foreign-currency doc: line amount is in document (foreign) currency.
+					'amount' => (float)(arr_get($data, 'foreign_amount', null) !== null ? $data['foreign_amount'] : $amount),
 					'toAccountRate'      => arr_get($data, 'toAccountRate', 1),       // Default to 1
 					'salesAgent' => arr_get($data, 'salesAgent', ''),
 					'description'        => arr_get($data, 'description', ''),
@@ -161,6 +196,9 @@ class PaymentSync {
     public function autocount_update($data = [], $config = [])
 	{
 		try {
+			if ($this->line_amount($data) == 0.00) {
+				return $this->skip_zero_amount();
+			}
 
 			$body = [];
 
@@ -174,7 +212,6 @@ class PaymentSync {
 				'taxDate'         => null,//date('Y-m-d', strtotime(arr_get($data, 'tax_date'))),  // Date -> taxDate
 				'currencyCode'    => arr_get($data, 'currency_code', 'MYR'),      // Currency -> currencyCode
 				'currencyRate'    => (float)arr_get($data, 'currency_rate', 1),   // Foreign Currency -> currencyRate
-				'toTaxRate'       => (float)arr_get($data, 'to_tax_rate', 1),     // local doc: tax currency rate must be 1
 				'journalType'     => 'GENERAL',                               // Journal Type
 				'dealWith'        => arr_get($data, 'dealWith', null),      // Supplier -> dealWith
 				'description'     => arr_get($data, 'description', ''),    // Payment Remark -> description
@@ -203,7 +240,8 @@ class PaymentSync {
 						'toAccountRate'      => arr_get($detail, 'toAccountRate', 1),       // Default to 1
 						'description'        => arr_get($detail, 'description', ''),
 						'furtherDescription' => arr_get($detail, 'ReservationNumber', ''),
-						'amount'             => (float)$amount,        // Debit -> amount
+						// Foreign-currency doc: line amount is in document (foreign) currency.
+						'amount'             => (float)(arr_get($data, 'foreign_amount', null) !== null ? $data['foreign_amount'] : $amount),        // Debit -> amount
 						'taxCode'            => arr_get($detail, 'taxCode', ''),
 						'taxAdjustment'      => arr_get($detail, 'taxAdjustment', 0),
 						'localTaxAdjustment' => arr_get($detail, 'localTaxAdjustment', 0),
@@ -238,7 +276,8 @@ class PaymentSync {
 
 				$body['details'][] = [
 					'accNo'  => $acc_no,
-					'amount' => (float)$amount,
+					// Foreign-currency doc: line amount is in document (foreign) currency.
+					'amount' => (float)(arr_get($data, 'foreign_amount', null) !== null ? $data['foreign_amount'] : $amount),
 					'toAccountRate'      => arr_get($data, 'toAccountRate', 1),       // Default to 1
 					'salesAgent' => arr_get($data, 'salesAgent', ''),
 					'description'        => arr_get($data, 'description', ''),
