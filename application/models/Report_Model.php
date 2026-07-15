@@ -2996,7 +2996,7 @@ class Report_Model extends CI_Model
      * @return array Rows keyed: message_timestamp, direction, from_number,
      *               to_number, agent, body.
      */
-    function Ghl_Messages_Log($startDate, $endDate, $limit, $offset, $contact = '', $agent = '')
+    function Ghl_Messages_Log($startDate, $endDate, $limit, $offset, $contact = '', $agent = '', $hour = null)
     {
         $messageTimeColumn = $this->escape_identifier($this->get_message_time_column());
 
@@ -3006,6 +3006,7 @@ class Report_Model extends CI_Model
         );
         $contactClause = $this->ghl_message_contact_clause($contact, $params);
         $agentClause = $this->ghl_message_agent_clause($agent, $params);
+        $hourClause = $this->ghl_message_hour_clause($hour, $messageTimeColumn, $params);
         $params[] = (int) $limit;
         $params[] = (int) $offset;
 
@@ -3025,6 +3026,7 @@ class Report_Model extends CI_Model
               AND gm.{$messageTimeColumn} <= ?
               {$contactClause}
               {$agentClause}
+              {$hourClause}
             ORDER BY gm.{$messageTimeColumn} DESC, gm.id DESC
             LIMIT ? OFFSET ?
         ";
@@ -3052,7 +3054,7 @@ class Report_Model extends CI_Model
      * @return array Rows keyed: contact_name, message_timestamp, direction,
      *               from_number, to_number, agent, body.
      */
-    function Ghl_Messages_Log_Export($startDate, $endDate, $limit, $offset, $contact = '', $agent = '')
+    function Ghl_Messages_Log_Export($startDate, $endDate, $limit, $offset, $contact = '', $agent = '', $hour = null)
     {
         $messageTimeColumn = $this->escape_identifier($this->get_message_time_column());
 
@@ -3062,6 +3064,7 @@ class Report_Model extends CI_Model
         );
         $contactClause = $this->ghl_message_contact_clause($contact, $params);
         $agentClause = $this->ghl_message_agent_clause($agent, $params);
+        $hourClause = $this->ghl_message_hour_clause($hour, $messageTimeColumn, $params);
         $params[] = (int) $limit;
         $params[] = (int) $offset;
 
@@ -3082,6 +3085,7 @@ class Report_Model extends CI_Model
               AND gm.{$messageTimeColumn} <= ?
               {$contactClause}
               {$agentClause}
+              {$hourClause}
             ORDER BY COALESCE(gc.contact_id, gm.conversation_id, '') ASC,
                      gm.conversation_id ASC,
                      gm.{$messageTimeColumn} ASC,
@@ -3102,13 +3106,14 @@ class Report_Model extends CI_Model
      *                          thread for that number when set.
      * @return int
      */
-    function Ghl_Messages_Log_Count($startDate, $endDate, $contact = '', $agent = '')
+    function Ghl_Messages_Log_Count($startDate, $endDate, $contact = '', $agent = '', $hour = null)
     {
         $messageTimeColumn = $this->escape_identifier($this->get_message_time_column());
 
         $params = array($startDate . ' 00:00:00', $endDate . ' 23:59:59');
         $contactClause = $this->ghl_message_contact_clause($contact, $params);
         $agentClause = $this->ghl_message_agent_clause($agent, $params);
+        $hourClause = $this->ghl_message_hour_clause($hour, $messageTimeColumn, $params);
 
         // The agent filter compares the resolved agent name, so the user/conversation
         // joins are only needed -- and only added -- when an agent is selected. They
@@ -3126,7 +3131,8 @@ class Report_Model extends CI_Model
               WHERE gm.{$messageTimeColumn} >= ?
                 AND gm.{$messageTimeColumn} <= ?
                 {$contactClause}
-                {$agentClause}",
+                {$agentClause}
+                {$hourClause}",
             $params
         )->row_array();
 
@@ -3151,13 +3157,14 @@ class Report_Model extends CI_Model
      * @param string $agent     Optional resolved agent-name filter.
      * @return float|null Average seconds, or null when nothing qualifies.
      */
-    function Ghl_Messages_Log_Avg_Reply_Seconds($startDate, $endDate, $contact = '', $agent = '')
+    function Ghl_Messages_Log_Avg_Reply_Seconds($startDate, $endDate, $contact = '', $agent = '', $hour = null)
     {
         $messageTimeColumn = $this->escape_identifier($this->get_message_time_column());
 
         $params = array($startDate . ' 00:00:00', $endDate . ' 23:59:59');
         $contactClause = $this->ghl_message_contact_clause($contact, $params);
         $agentClause = $this->ghl_message_agent_clause($agent, $params);
+        $hourClause = $this->ghl_message_hour_clause($hour, $messageTimeColumn, $params);
 
         // Joins are needed only when filtering by the resolved agent name.
         $agentJoins = $agentClause !== ''
@@ -3176,6 +3183,7 @@ class Report_Model extends CI_Model
                 AND gm.{$messageTimeColumn} <= ?
                 {$contactClause}
                 {$agentClause}
+                {$hourClause}
               ORDER BY gm.conversation_id ASC, gm.{$messageTimeColumn} ASC, gm.id ASC",
             $params
         )->result_array();
@@ -3455,6 +3463,34 @@ class Report_Model extends CI_Model
         $params[] = $agent;
 
         return " AND COALESCE(NULLIF(gu.Name, ''), NULLIF(gu_assigned.Name, '')) = ?";
+    }
+
+    /**
+     * Build the optional hour-of-day WHERE fragment (and append its bound param)
+     * for the Message Log queries. Drives the "Leads Handled" drill-down from Lead
+     * Reply Hourly, which lands on the Message Log narrowed to one hour of the day.
+     * The hour is re-validated to a whole 0-23 here, so nothing but an integer can
+     * reach the HOUR() comparison even if a caller skips normalisation.
+     *
+     * @param mixed  $hour              Hour-of-day 0-23, or null/'' for no filter.
+     * @param string $messageTimeColumn Backtick-escaped message-time column.
+     * @param array  $params            Query params, appended to in place.
+     * @return string SQL fragment beginning with ' AND ...', or '' when no filter.
+     */
+    protected function ghl_message_hour_clause($hour, $messageTimeColumn, array &$params)
+    {
+        if ($hour === null || $hour === '' || !is_numeric($hour)) {
+            return '';
+        }
+
+        $hour = (int) $hour;
+        if ($hour < 0 || $hour > 23) {
+            return '';
+        }
+
+        $params[] = $hour;
+
+        return " AND HOUR(gm.{$messageTimeColumn}) = ?";
     }
 
     /**

@@ -8,17 +8,24 @@ $log_show_reply_time = !empty($log_show_reply_time);
 $log_avg_reply = isset($log_avg_reply) ? $log_avg_reply : '';
 $log_table_colspan = $log_show_reply_time ? 7 : 6;
 
+// Optional hour-of-day filter (0-23), carried from the Lead Reply Hourly
+// "Leads Handled" drill-down. When set, the log shows just that hour of the day.
+$log_hour = isset($log_filters['hour']) && $log_filters['hour'] !== null ? (int) $log_filters['hour'] : null;
+$log_hour_label = isset($log_filters['hour_label']) ? (string) $log_filters['hour_label'] : '';
+$log_hour_param = $log_hour === null ? '' : '&hour=' . $log_hour;
+
 // Feed the picker unambiguous Y-m-d bounds so it opens on the correct month
 // with today directly selectable (parsing the DD/MM/YYYY text field alone made
 // the widget misread the month and refuse today until another date was picked).
 $log_start_date = isset($log_filters['start_date']) ? $log_filters['start_date'] : date('Y-m-d');
 $log_end_date = isset($log_filters['end_date']) ? $log_filters['end_date'] : date('Y-m-d');
 
-/** Build a page URL keeping the current date, contact and agent filters. */
-$page_url = function ($page) use ($log_filters, $log_contact, $log_agent) {
+/** Build a page URL keeping the current date, contact, agent and hour filters. */
+$page_url = function ($page) use ($log_filters, $log_contact, $log_agent, $log_hour_param) {
     return base_url('Report/Ghl_Message_Log?log_date=' . urlencode($log_filters['log_date'])
         . '&contact=' . urlencode($log_contact)
         . '&agent=' . urlencode($log_agent)
+        . $log_hour_param
         . '&page=' . (int) $page);
 };
 
@@ -50,6 +57,20 @@ $contact_url = function ($number) use ($log_filters) {
                                title="Average time this agent takes to reply to a customer: from each incoming message to the agent's next reply in the same chat. Only replies where both the customer's message and the reply land on the same day between 7AM and 10PM are counted &mdash; overnight and after-hours gaps are skipped."></i>
                         </span>
                     <?php } ?>
+                    <?php if ($log_hour !== null && $log_hour_label !== '') { ?>
+                        <?php
+                            // Clear-hour link drops just the hour filter, keeping the
+                            // current day, agent and contact so the reader can widen
+                            // back to the whole day in one click.
+                            $clear_hour_url = base_url('Report/Ghl_Message_Log?log_date=' . urlencode($log_filters['log_date'])
+                                . '&contact=' . urlencode($log_contact)
+                                . '&agent=' . urlencode($log_agent));
+                        ?>
+                        <span class="label label-light-warning label-inline font-weight-bold mr-2">
+                            Hour: <?php echo html_escape($log_hour_label); ?>
+                            <a href="<?php echo html_escape($clear_hour_url); ?>" class="text-dark ml-2" data-toggle="tooltip" title="Show the whole day">&times;</a>
+                        </span>
+                    <?php } ?>
                     <span class="label label-light-primary label-inline font-weight-bold">
                         <?php echo number_format($p['total_rows']); ?> messages
                     </span>
@@ -57,6 +78,9 @@ $contact_url = function ($number) use ($log_filters) {
             </div>
             <div class="card-body">
                 <form id="ghl-message-log-form" action="<?php echo base_url('Report/Ghl_Message_Log'); ?>" method="get" class="form mb-6">
+                    <?php if ($log_hour !== null) { ?>
+                        <input type="hidden" name="hour" value="<?php echo (int) $log_hour; ?>">
+                    <?php } ?>
                     <div class="row align-items-end">
                         <div class="col-md-3">
                             <div class="form-group mb-0">
@@ -87,7 +111,7 @@ $contact_url = function ($number) use ($log_filters) {
                         <div class="col-md-3">
                             <input type="submit" value="Filter" class="btn btn-light-success font-weight-bold" style="width:80px;">
                             <input type="button" id="ghl-message-log-reset" value="Reset" class="btn btn-light-primary font-weight-bold" style="width:80px;">
-                            <a href="<?php echo base_url('Report/Ghl_Message_Log_Export?log_date=') . urlencode($log_filters['log_date']) . '&contact=' . urlencode($log_contact) . '&agent=' . urlencode($log_agent); ?>" class="btn btn-light-info font-weight-bold float-right">
+                            <a href="<?php echo base_url('Report/Ghl_Message_Log_Export?log_date=') . urlencode($log_filters['log_date']) . '&contact=' . urlencode($log_contact) . '&agent=' . urlencode($log_agent) . $log_hour_param; ?>" class="btn btn-light-info font-weight-bold float-right">
                                 <i class="la la-download"></i> Export CSV
                             </a>
                         </div>

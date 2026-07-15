@@ -8,6 +8,17 @@ foreach ($hours as $h) {
         $peak = $h['total'];
     }
 }
+
+// Drill-down from a "Leads Handled" cell into the Message Log, narrowed to this
+// owner (matched on the resolved agent name) and the clicked hour on this day.
+// The Message Log date range expects a "dd/mm/yyyy - dd/mm/yyyy" span, so the
+// single day is passed as both bounds.
+$ownerName = isset($lead_reply_hourly_owner_name) ? (string) $lead_reply_hourly_owner_name : '';
+$dayLabel = isset($lead_reply_hourly_date_label) ? (string) $lead_reply_hourly_date_label : '';
+$msgLogBase = base_url('Report/Ghl_Message_Log')
+    . '?log_date=' . urlencode($dayLabel . ' - ' . $dayLabel)
+    . '&agent=' . urlencode($ownerName);
+$canLinkMsgLog = ($ownerName !== '' && $dayLabel !== '');
 ?>
 <style>
     .reply-hourly-summary {
@@ -158,7 +169,19 @@ foreach ($hours as $h) {
                                         <td class="text-center"><?php echo number_format($hour['inbound']); ?></td>
                                         <td class="text-center"><?php echo number_format($hour['outbound']); ?></td>
                                         <td class="text-center font-weight-bold text-dark"><?php echo number_format($hour['total']); ?></td>
-                                        <td class="text-center"><?php echo $hour['leads'] > 0 ? number_format($hour['leads']) : '<span class="text-muted">&mdash;</span>'; ?></td>
+                                        <td class="text-center">
+                                            <?php if($hour['leads'] > 0 && $canLinkMsgLog) { ?>
+                                                <a href="<?php echo html_escape($msgLogBase . '&hour=' . $hour['hour']); ?>"
+                                                   class="font-weight-bold text-primary" data-toggle="tooltip"
+                                                   title="View this owner's messages at <?php echo html_escape($hour['label']); ?> in the Message Log">
+                                                    <?php echo number_format($hour['leads']); ?>
+                                                </a>
+                                            <?php } elseif($hour['leads'] > 0) { ?>
+                                                <?php echo number_format($hour['leads']); ?>
+                                            <?php } else { ?>
+                                                <span class="text-muted">&mdash;</span>
+                                            <?php } ?>
+                                        </td>
                                         <td>
                                             <?php if($hour['total'] > 0) { ?>
                                                 <div class="reply-hourly-bar-wrap">

@@ -82,10 +82,15 @@ class Report extends MY_Controller
         $range = $this->ghl_message_log_range(trim((string) $this->input->get('log_date')));
         $contact = trim((string) $this->input->get('contact'));
         $agent = trim((string) $this->input->get('agent'));
+        // Optional hour-of-day (0-23), set by the Lead Reply Hourly "Leads Handled"
+        // drill-down so the log opens on exactly that hour of the chosen day.
+        $hour = ghl_message_log_normalize_hour($this->input->get('hour'));
         $range['contact'] = $contact;
         $range['agent'] = $agent;
+        $range['hour'] = $hour;
+        $range['hour_label'] = $hour === null ? '' : ghl_message_log_hour_label($hour);
 
-        $total = $this->Report_Model->Ghl_Messages_Log_Count($range['start_date'], $range['end_date'], $contact, $agent);
+        $total = $this->Report_Model->Ghl_Messages_Log_Count($range['start_date'], $range['end_date'], $contact, $agent, $hour);
         $pagination = ghl_messages_log_pagination($total, (int) $this->input->get('page'), 50);
 
         // The "Time Taken" column only makes sense when the stream is a single
@@ -104,7 +109,8 @@ class Report extends MY_Controller
                 $pagination['per_page'] + 1,
                 $pagination['offset'],
                 $contact,
-                $agent
+                $agent,
+                $hour
             );
             $messages = ghl_message_log_attach_reply_gaps($rows, $pagination['per_page']);
 
@@ -113,7 +119,8 @@ class Report extends MY_Controller
                     $range['start_date'],
                     $range['end_date'],
                     $contact,
-                    $agent
+                    $agent,
+                    $hour
                 )
             );
         } else {
@@ -123,7 +130,8 @@ class Report extends MY_Controller
                 $pagination['per_page'],
                 $pagination['offset'],
                 $contact,
-                $agent
+                $agent,
+                $hour
             );
         }
 
@@ -160,6 +168,7 @@ class Report extends MY_Controller
         $range = $this->ghl_message_log_range(trim((string) $this->input->get('log_date')));
         $contact = trim((string) $this->input->get('contact'));
         $agent = trim((string) $this->input->get('agent'));
+        $hour = ghl_message_log_normalize_hour($this->input->get('hour'));
 
         $filename = ghl_message_log_export_filename($range['start_date'], $range['end_date']);
 
@@ -184,7 +193,8 @@ class Report extends MY_Controller
                 $chunk,
                 $offset,
                 $contact,
-                $agent
+                $agent,
+                $hour
             );
 
             foreach ($rows as $row) {

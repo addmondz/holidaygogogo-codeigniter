@@ -540,3 +540,58 @@ if (!function_exists('ghl_message_log_hourly_breakdown')) {
         );
     }
 }
+
+if (!function_exists('ghl_message_log_normalize_hour')) {
+    /**
+     * Sanitise the `hour` filter carried by the Lead Reply Hourly drill-down link
+     * into the Message Log. A valid value is a whole hour-of-day 0-23; anything
+     * else -- blank, out of range, decimal, or non-numeric -- means "no hour
+     * filter" and returns null so the log falls back to the whole day. Kept
+     * strict (digits only) so nothing but an integer can ever reach the HOUR()
+     * comparison.
+     *
+     * @param mixed $value Raw `hour` input.
+     * @return int|null 0-23, or null when absent/invalid.
+     */
+    function ghl_message_log_normalize_hour($value)
+    {
+        if (is_int($value)) {
+            return ($value >= 0 && $value <= 23) ? $value : null;
+        }
+
+        $value = trim((string) $value);
+        if ($value === '' || !ctype_digit($value)) {
+            return null;
+        }
+
+        $hour = (int) $value;
+
+        return ($hour >= 0 && $hour <= 23) ? $hour : null;
+    }
+}
+
+if (!function_exists('ghl_message_log_hour_label')) {
+    /**
+     * Render an hour-of-day as the same 12-hour label the Lead Reply Hourly table
+     * uses ("12 AM", "1 PM", ...), for the Message Log's active-hour filter chip.
+     * Returns '' for anything that is not a valid 0-23 hour.
+     *
+     * @param mixed $hour Hour value (int or numeric string).
+     * @return string Label, or '' when the hour is invalid.
+     */
+    function ghl_message_log_hour_label($hour)
+    {
+        $hour = ghl_message_log_normalize_hour($hour);
+        if ($hour === null) {
+            return '';
+        }
+
+        $suffix = $hour < 12 ? 'AM' : 'PM';
+        $display = $hour % 12;
+        if ($display === 0) {
+            $display = 12;
+        }
+
+        return $display . ' ' . $suffix;
+    }
+}
