@@ -1623,6 +1623,7 @@ class Payment extends MY_Controller
 					'taxDate'         => arr_get($data, 'tax_date', date('Y-m-d')),
 					'currencyCode'    => arr_get($data, 'currency_code', 'MYR'),
 					'currencyRate'    => arr_get($data, 'currency_rate', 1),
+					'toTaxRate'       => arr_get($data, 'to_tax_rate', 1), // local doc: tax currency rate must be 1
 					'journalType'     => 'GENERAL',
 					'dealWith'        => arr_get($data, 'supplier_name', ''),
 					'description'     => arr_get($data, 'PaymentRemark', ''),
@@ -1718,7 +1719,8 @@ class Payment extends MY_Controller
 					'docDate'         => arr_get($data, 'Date', date('Y-m-d')),  // Date -> docDate
 					'taxDate'         => arr_get($data, 'tax_date', date('Y-m-d')),
 					'currencyCode'    => arr_get($data, 'Currency', 'MYR'),      // Currency -> currencyCode
-					'currencyRate'    => arr_get($data, 'ForeignCurrency', '1'),   // Foreign Currency -> currencyRate
+					'currencyRate'    => arr_get($data, 'currency_rate', 1),      // exchange rate (NOT the foreign amount); local doc = 1
+					'toTaxRate'       => arr_get($data, 'to_tax_rate', 1),        // local doc: tax currency rate must be 1
 					'journalType'     => 'GENERAL',                               // Journal Type
 					'dealWith'        => arr_get($data, 'SupplierID', ''),       // Supplier -> dealWith
 					'description'     => arr_get($data, 'PaymentRemark', ''),    // Payment Remark -> description

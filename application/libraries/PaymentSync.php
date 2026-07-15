@@ -25,6 +25,7 @@ class PaymentSync {
 					'taxDate'         => null,  // Date -> taxDate
 					'currencyCode'    => arr_get($data, 'currency_code', 'MYR'),
 					'currencyRate'    => arr_get($data, 'currency_rate', 1),
+					'toTaxRate'       => arr_get($data, 'to_tax_rate', 1), // local doc: tax currency rate must be 1
 					'journalType'     => 'GENERAL',
 					'dealWith'        => arr_get($data, 'dealWith', null),
 					'description'     => arr_get($data, 'description', ''),
@@ -173,6 +174,7 @@ class PaymentSync {
 				'taxDate'         => null,//date('Y-m-d', strtotime(arr_get($data, 'tax_date'))),  // Date -> taxDate
 				'currencyCode'    => arr_get($data, 'currency_code', 'MYR'),      // Currency -> currencyCode
 				'currencyRate'    => (float)arr_get($data, 'currency_rate', 1),   // Foreign Currency -> currencyRate
+				'toTaxRate'       => (float)arr_get($data, 'to_tax_rate', 1),     // local doc: tax currency rate must be 1
 				'journalType'     => 'GENERAL',                               // Journal Type
 				'dealWith'        => arr_get($data, 'dealWith', null),      // Supplier -> dealWith
 				'description'     => arr_get($data, 'description', ''),    // Payment Remark -> description
