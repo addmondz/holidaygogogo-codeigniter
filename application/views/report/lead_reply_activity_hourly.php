@@ -148,7 +148,7 @@ $canLinkMsgLog = ($ownerName !== '' && $dayLabel !== '');
                                 <th style="text-align:center; width:130px;">
                                     Leads Handled
                                     <i class="la la-info-circle ml-1" style="cursor:help; color:#2f506f;" data-toggle="tooltip"
-                                       title="Distinct leads this owner had inbound or outbound activity with during this hour. The same lead can appear in more than one hour, so hourly values do not add up to the day total."></i>
+                                       title="Distinct leads this owner replied to during this hour (sent at least one outbound message). Leads that only messaged in with no reply are not counted. The same lead can appear in more than one hour, so hourly values do not add up to the day total."></i>
                                 </th>
                                 <th>Activity</th>
                             </tr>

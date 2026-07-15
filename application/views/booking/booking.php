@@ -246,7 +246,7 @@
                                 <div class="mt-2">
                                     <label style="font-size:13px; color:#1c3d5a; font-weight:600; cursor:pointer;">
                                         <input type="checkbox" id="SalesAgentIsPIC" style="vertical-align:middle; width:16px; height:16px; margin-right:6px;" <?php echo $sa1_pic_checked ? 'checked' : ''; ?> data-initial="<?php echo $sa1_pic_checked ? 1 : 0; ?>">
-                                        Show as Booking PIC on BC &amp; TV
+                                        Show as Booking PIC on BC, TV &amp; Guest List
                                     </label>
                                 </div>
 
@@ -278,7 +278,7 @@
                                 <div class="mt-2">
                                     <label style="font-size:13px; color:#1c3d5a; font-weight:600; cursor:pointer;">
                                         <input type="checkbox" id="SalesAgent2IsPIC" style="vertical-align:middle; width:16px; height:16px; margin-right:6px;" <?php echo $sa2_pic_checked ? 'checked' : ''; ?> data-initial="<?php echo $sa2_pic_checked ? 1 : 0; ?>">
-                                        Show as Booking PIC on BC &amp; TV
+                                        Show as Booking PIC on BC, TV &amp; Guest List
                                     </label>
                                 </div>
 

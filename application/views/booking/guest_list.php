@@ -201,7 +201,7 @@
 							<a href="<?php echo base_url('Travel_Voucher?token=') . $this->input->get('gl'); ?>" target="_blank"><?php echo $guest_lists[0]->BookingNumber; ?></a>
 						</p>
                 		<p>Customer : <?php echo $guest_lists[0]->Customer; ?> (<?php echo $guest_lists[0]->CustomerMobile; ?>)</p>
-						<p>Sales Agent : <?php echo $guest_lists[0]->SalesAgent; ?> (<?php echo $guest_lists[0]->SalesAgentMobile; ?>)</p>
+						<p><?php echo $guest_lists[0]->PICLabel; ?> : <?php echo $guest_lists[0]->PICText; ?></p>
                 	</div>
                 	<div class="col-md-6">
                 		<p>Destination : 

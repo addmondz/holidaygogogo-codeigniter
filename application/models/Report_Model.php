@@ -2084,7 +2084,10 @@ class Report_Model extends CI_Model
                 HOUR(gm.{$messageTimeColumn}) AS hour_of_day,
                 COUNT(DISTINCT CASE WHEN gm.direction = 'inbound' THEN gm.id END) AS inbound_count,
                 COUNT(DISTINCT CASE WHEN gm.direction = 'outbound' AND gm.user_id = glo.owner_user_id THEN gm.id END) AS outbound_count,
-                COUNT(DISTINCT glo.conversation_id) AS leads_count
+                -- Leads Handled = leads this owner actually REPLIED to this hour:
+                -- distinct conversations where the owner sent an outbound message.
+                -- A lead that only sent inbound and got no reply is NOT counted.
+                COUNT(DISTINCT CASE WHEN gm.direction = 'outbound' AND gm.user_id = glo.owner_user_id THEN glo.conversation_id END) AS leads_count
             FROM ghl_lead_ownership glo
             INNER JOIN ghl_messages gm
                 ON gm.conversation_id = glo.conversation_id

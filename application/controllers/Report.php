@@ -360,8 +360,12 @@ class Report extends MY_Controller
 
         // --- Header rows ---------------------------------------------------
         // Dates run DOWN the left as rows; each owner is a column group across
-        // the top. Row 1: owner-name group header (merged over 3 columns).
-        // Row 2: the Responded / Transfer Out / Handling sub-headers.
+        // the top. Row 1: owner-name group header (merged over the metric cols).
+        // Row 2: the per-owner sub-headers, matching the on-screen dashboard
+        // columns exactly (New Lead Picked Up / Responded / Transfer Out /
+        // Handling / Avg Response Time).
+        $metricHeaders = array('New Lead Picked Up', 'Responded', 'Transfer Out', 'Handling', 'Avg Response Time');
+        $metricSpan = count($metricHeaders);
         $sheet->setCellValue('A1', 'Date');
         $sheet->mergeCells('A1:A2');
 
@@ -369,14 +373,14 @@ class Report extends MY_Controller
         $colIndex = 2; // first owner's first metric column (B)
         foreach ($owners as &$owner) {
             $startCol = $stringFromCol($colIndex);
-            $endCol = $stringFromCol($colIndex + 2);
+            $endCol = $stringFromCol($colIndex + $metricSpan - 1);
             $sheet->setCellValue($startCol . '1', $owner['owner_name']);
             $sheet->mergeCells($startCol . '1:' . $endCol . '1');
-            $sheet->setCellValue($stringFromCol($colIndex) . '2', 'Responded');
-            $sheet->setCellValue($stringFromCol($colIndex + 1) . '2', 'Transfer Out');
-            $sheet->setCellValue($stringFromCol($colIndex + 2) . '2', 'Handling');
+            foreach ($metricHeaders as $offset => $label) {
+                $sheet->setCellValue($stringFromCol($colIndex + $offset) . '2', $label);
+            }
             $owner['_col'] = $colIndex; // remember where this owner starts
-            $colIndex += 3;
+            $colIndex += $metricSpan;
         }
         unset($owner);
 
@@ -405,11 +409,14 @@ class Report extends MY_Controller
                 foreach ($owners as $owner) {
                     $cell = isset($matrix['lookup'][$owner['owner_user_id']][$date])
                         ? $matrix['lookup'][$owner['owner_user_id']][$date]
-                        : array(0, 0, 0);
+                        : array(0, 0, 0, 0, '-');
                     $col = $owner['_col'];
-                    $sheet->setCellValue($stringFromCol($col) . $rowNum, $cell[0]);
-                    $sheet->setCellValue($stringFromCol($col + 1) . $rowNum, $cell[1]);
-                    $sheet->setCellValue($stringFromCol($col + 2) . $rowNum, $cell[2]);
+                    // [picked_up, responded, transfer_out, handling, avg_label]
+                    $sheet->setCellValue($stringFromCol($col) . $rowNum, (int) $cell[0]);
+                    $sheet->setCellValue($stringFromCol($col + 1) . $rowNum, (int) $cell[1]);
+                    $sheet->setCellValue($stringFromCol($col + 2) . $rowNum, (int) $cell[2]);
+                    $sheet->setCellValue($stringFromCol($col + 3) . $rowNum, (int) $cell[3]);
+                    $sheet->setCellValueExplicit($stringFromCol($col + 4) . $rowNum, (string) $cell[4], \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
                 }
                 $rowNum++;
             }
@@ -419,15 +426,11 @@ class Report extends MY_Controller
             $sheet->setCellValue('A' . $totalRow, 'RANGE TOTAL');
             foreach ($owners as $owner) {
                 $col = $owner['_col'];
-                $handlingTotal = 0;
-                if (isset($matrix['lookup'][$owner['owner_user_id']])) {
-                    foreach ($matrix['lookup'][$owner['owner_user_id']] as $cell) {
-                        $handlingTotal += $cell[2];
-                    }
-                }
-                $sheet->setCellValue($stringFromCol($col) . $totalRow, (int) $owner['total_responded']);
-                $sheet->setCellValue($stringFromCol($col + 1) . $totalRow, (int) $owner['total_transfer_out']);
-                $sheet->setCellValue($stringFromCol($col + 2) . $totalRow, (int) $handlingTotal);
+                $sheet->setCellValue($stringFromCol($col) . $totalRow, (int) $owner['total_picked_up']);
+                $sheet->setCellValue($stringFromCol($col + 1) . $totalRow, (int) $owner['total_responded']);
+                $sheet->setCellValue($stringFromCol($col + 2) . $totalRow, (int) $owner['total_transfer_out']);
+                $sheet->setCellValue($stringFromCol($col + 3) . $totalRow, (int) $owner['total_handling']);
+                $sheet->setCellValueExplicit($stringFromCol($col + 4) . $totalRow, (string) $owner['avg_response_time_label'], \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
             }
             $sheet->getStyle('A' . $totalRow . ':' . $lastCol . $totalRow)->getFont()->setBold(true);
             $sheet->getStyle('A' . $totalRow . ':' . $lastCol . $totalRow)->getBorders()->getTop()

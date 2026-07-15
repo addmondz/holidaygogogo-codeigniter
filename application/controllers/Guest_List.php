@@ -196,6 +196,24 @@ class Guest_List extends CI_Controller
 							$array['guest_lists'][0]->CustomerMobile = $array['guest_lists'][0]->CountryCode . $array['guest_lists'][0]->CustomerMobile;
 							$country_code = $this->Universal_Model->Read_Country_Code($array['guest_lists'][0]->SalesAgentCountryCode);
 							$array['guest_lists'][0]->SalesAgentMobile = $country_code . $array['guest_lists'][0]->SalesAgentMobile;
+							if (!empty($array['guest_lists'][0]->SalesAgent2)) {
+								$sales_agent_2_country_code = $this->Universal_Model->Read_Country_Code($array['guest_lists'][0]->SalesAgent2CountryCode);
+								$array['guest_lists'][0]->SalesAgent2Mobile = $sales_agent_2_country_code . $array['guest_lists'][0]->SalesAgent2Mobile;
+							}
+							// Booking PIC line: mirrors the BC / Travel Voucher. Ticked agents
+							// print (both can show); unset ticks fall back to the 2026-06-01
+							// date rule (Sales Agent 1 only).
+							$gl_pic = booking_pic_display(array(
+								'sales_agent_is_pic'   => $array['guest_lists'][0]->SalesAgentIsPIC,
+								'sales_agent_2_is_pic' => $array['guest_lists'][0]->SalesAgent2IsPIC,
+								'sales_agent_name'     => $array['guest_lists'][0]->SalesAgent,
+								'sales_agent_mobile'   => $array['guest_lists'][0]->SalesAgentMobile,
+								'sales_agent_2_name'   => $array['guest_lists'][0]->SalesAgent2,
+								'sales_agent_2_mobile' => $array['guest_lists'][0]->SalesAgent2Mobile,
+								'insert_date'          => $array['guest_lists'][0]->InsertDate,
+							));
+							$array['guest_lists'][0]->PICLabel = $gl_pic['label'];
+							$array['guest_lists'][0]->PICText  = $gl_pic['text'];
 							$array['country_codes'] = $this->Guest_List_Model->Read_Country_Codes();
 
 							// Get booking products with category country
@@ -316,7 +334,7 @@ class Guest_List extends CI_Controller
 		$spreadsheet->getActiveSheet()->setCellValue('F1', 'CHAT LANGUAGE');
 		$spreadsheet->getActiveSheet()->setCellValue('G1', 'TRAVEL DATE');
 		$spreadsheet->getActiveSheet()->setCellValue('H1', 'DESTINATION');
-		$spreadsheet->getActiveSheet()->setCellValue('I1', 'SALES AGENT');
+		$spreadsheet->getActiveSheet()->setCellValue('I1', 'BOOKING PIC');
 		$spreadsheet->getActiveSheet()->setCellValue('J1', 'GUEST TYPE');
 		$spreadsheet->getActiveSheet()->setCellValue('K1', 'GUEST');
 		$spreadsheet->getActiveSheet()->setCellValue('L1', 'GENDER');
@@ -387,7 +405,17 @@ class Guest_List extends CI_Controller
 			$spreadsheet->getActiveSheet()->setCellValueExplicit('F' . $row, $guest->ChatLanguage, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 			$spreadsheet->getActiveSheet()->setCellValueExplicit('G' . $row, $guest->TravelDate, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 			$spreadsheet->getActiveSheet()->setCellValueExplicit('H' . $row, $guest->Destination, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-			$spreadsheet->getActiveSheet()->setCellValueExplicit('I' . $row, $guest->SalesAgent, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			// Booking PIC: ticked agent(s), mirrors the BC / Travel Voucher.
+			// Falls back to Sales Agent 1 for legacy bookings (unset ticks).
+			$gl_pic = booking_pic_display(array(
+				'sales_agent_is_pic'   => $guest->SalesAgentIsPIC,
+				'sales_agent_2_is_pic' => $guest->SalesAgent2IsPIC,
+				'sales_agent_name'     => $guest->SalesAgent,
+				'sales_agent_2_name'   => $guest->SalesAgent2,
+				'insert_date'          => $guest->InsertDate,
+			));
+			$guest->BookingPIC = implode(', ', array_column($gl_pic['entries'], 'name'));
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('I' . $row, $guest->BookingPIC, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 			$spreadsheet->getActiveSheet()->setCellValueExplicit('J' . $row, $guest->Type, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 			$spreadsheet->getActiveSheet()->setCellValueExplicit('K' . $row, $guest->Guest, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 			$spreadsheet->getActiveSheet()->setCellValueExplicit('L' . $row, $guest->Gender, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
@@ -512,7 +540,7 @@ class Guest_List extends CI_Controller
 		$spreadsheet->getActiveSheet()->setCellValue('F1', 'CHAT LANGUAGE');
 		$spreadsheet->getActiveSheet()->setCellValue('G1', 'TRAVEL DATE');
 		$spreadsheet->getActiveSheet()->setCellValue('H1', 'DESTINATION');
-		$spreadsheet->getActiveSheet()->setCellValue('I1', 'SALES AGENT');
+		$spreadsheet->getActiveSheet()->setCellValue('I1', 'BOOKING PIC');
 		$spreadsheet->getActiveSheet()->setCellValue('J1', 'GUEST TYPE');
 		$spreadsheet->getActiveSheet()->setCellValue('K1', 'GUEST');
 		$spreadsheet->getActiveSheet()->setCellValue('L1', 'GENDER');
@@ -590,7 +618,17 @@ class Guest_List extends CI_Controller
 			$spreadsheet->getActiveSheet()->setCellValueExplicit('F' . $row, $guest->ChatLanguage, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 			$spreadsheet->getActiveSheet()->setCellValueExplicit('G' . $row, $guest->TravelDate, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 			$spreadsheet->getActiveSheet()->setCellValueExplicit('H' . $row, $guest->Destination, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-			$spreadsheet->getActiveSheet()->setCellValueExplicit('I' . $row, $guest->SalesAgent, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			// Booking PIC: ticked agent(s), mirrors the BC / Travel Voucher.
+			// Falls back to Sales Agent 1 for legacy bookings (unset ticks).
+			$gl_pic = booking_pic_display(array(
+				'sales_agent_is_pic'   => $guest->SalesAgentIsPIC,
+				'sales_agent_2_is_pic' => $guest->SalesAgent2IsPIC,
+				'sales_agent_name'     => $guest->SalesAgent,
+				'sales_agent_2_name'   => $guest->SalesAgent2,
+				'insert_date'          => $guest->InsertDate,
+			));
+			$guest->BookingPIC = implode(', ', array_column($gl_pic['entries'], 'name'));
+			$spreadsheet->getActiveSheet()->setCellValueExplicit('I' . $row, $guest->BookingPIC, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 			$spreadsheet->getActiveSheet()->setCellValueExplicit('J' . $row, $guest->Type, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 			$spreadsheet->getActiveSheet()->setCellValueExplicit('K' . $row, $guest->Guest, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 			$spreadsheet->getActiveSheet()->setCellValueExplicit('L' . $row, $guest->Gender, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
