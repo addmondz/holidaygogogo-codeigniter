@@ -567,8 +567,8 @@
 			var countEl = document.getElementById('searchCount');
 			var noResults = document.getElementById('noResults');
 
-			// Active tag ids (as strings). Empty = no tag filter. OR semantics:
-			// an item shows if it carries ANY active tag.
+			// Active tag ids (as strings). Empty = no tag filter. AND semantics:
+			// an item shows only if it carries EVERY active tag.
 			var activeTags = [];
 			function matchesTags(item) {
 				if (activeTags.length === 0) return true;
@@ -576,9 +576,9 @@
 				if (raw === '') return false;
 				var ids = raw.split(' ');
 				for (var i = 0; i < activeTags.length; i++) {
-					if (ids.indexOf(activeTags[i]) !== -1) return true;
+					if (ids.indexOf(activeTags[i]) === -1) return false;
 				}
-				return false;
+				return true;
 			}
 
 			// ---- Keyword highlight ----
