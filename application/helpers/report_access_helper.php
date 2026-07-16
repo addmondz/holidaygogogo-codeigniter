@@ -16,6 +16,7 @@ if ( ! function_exists('report_reply_activity_self_methods'))
             'Lead_Reply_Activity_Dashboard',
             'Lead_Reply_Activity_Dashboard_Data',
             'Lead_Reply_Activity_Hourly',
+            'Lead_Reply_Activity_Hourly_All',
             'Lead_Reply_Activity_Export',
         );
     }

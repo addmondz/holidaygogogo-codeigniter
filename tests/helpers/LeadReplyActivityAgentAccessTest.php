@@ -39,6 +39,10 @@ assert_eq('agent reaches reply dashboard data (ajax)', false,
     report_route_requires_redirect('Lead_Reply_Activity_Dashboard_Data', '20', array()));
 assert_eq('agent reaches reply hourly chart', false,
     report_route_requires_redirect('Lead_Reply_Activity_Hourly', '20', array()));
+// The all-agents hourly grid shares the same self-scope (a level-20 agent only
+// ever sees their own row via _restrict_agent_ids), so it is reachable too.
+assert_eq('agent reaches all-agents hourly grid', false,
+    report_route_requires_redirect('Lead_Reply_Activity_Hourly_All', '20', array()));
 // The export shares the dashboard's self-scope, so an agent may download their
 // own range without VR.
 assert_eq('agent reaches reply excel export', false,

@@ -888,7 +888,10 @@ SELECT
 	b.BookingID, b.BookingNumber, b.Customer, b.Mobile AS BookingMobile,
 	b.CountryCodeID, b.CustomerID, b.StartDate, b.EndDate, b.InsertDate,
 	b.ChatLanguage AS BookingLanguage,
+	b.Adult, b.Children, b.Infant, b.NetTotal,
 	cat.Name AS DestinationName,
+	s.Name AS SourceName,
+	c.customer_type AS CustomerType,
 	cc.CountryCode AS LeaderCountryCode,
 	c.name AS LeaderMasterName,
 	c.phone_number AS LeaderMasterPhone,
@@ -900,6 +903,7 @@ SELECT
 FROM booking b
 LEFT JOIN category     cat ON cat.CategoryID    = b.Destination
 LEFT JOIN customer     c   ON c.CustomerID      = b.CustomerID
+LEFT JOIN source       s   ON s.SourceID        = b.Source
 LEFT JOIN country_code cc  ON cc.CountryCodeID  = b.CountryCodeID
 WHERE b.Status != 'N' AND b.CancelStatus = 'N'
 	AND EXISTS (
@@ -993,15 +997,24 @@ ORDER BY gl.BookingID ASC, gl.GuestListID ASC
 		if($profile_candidate !== null) {
 			$r = $profile_candidate['row'];
 			$b = $profile_candidate['booking'];
+			// Source / Customer Type / Num of Pax / Total Sales are relocated from
+			// the listing to this page — aggregated across all of the guest's
+			// bookings (which arrive newest-first) by the pure profile helper.
+			$this->load->helper('guest_profile');
+			$summary = guest_profile_summary($bookings);
 			$profile = (object)array(
-				'Name'        => trim(trim($r->Name) . ' ' . trim($r->LastName)),
-				'ContactNum' => $r->Mobile,
-				'Email'       => $r->Email,
-				'Language'    => !empty($b->CustomerLanguage) ? $b->CustomerLanguage : $b->BookingLanguage,
-				'Nationality' => $r->Nationality,
-				'Gender'      => $r->Gender,
-				'DOB'         => $r->DateOfBirth,
-				'dedup_key'   => $r->dedup_key,
+				'Name'         => trim(trim($r->Name) . ' ' . trim($r->LastName)),
+				'ContactNum'   => $r->Mobile,
+				'Email'        => $r->Email,
+				'Language'     => !empty($b->CustomerLanguage) ? $b->CustomerLanguage : $b->BookingLanguage,
+				'Nationality'  => $r->Nationality,
+				'Gender'       => $r->Gender,
+				'DOB'          => $r->DateOfBirth,
+				'Source'       => $summary['source'],
+				'CustomerType' => $summary['customer_type'],
+				'TotalPax'     => $summary['total_pax'],
+				'TotalSales'   => $summary['total_sales'],
+				'dedup_key'    => $r->dedup_key,
 			);
 		}
 

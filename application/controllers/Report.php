@@ -85,12 +85,18 @@ class Report extends MY_Controller
         // Optional hour-of-day (0-23), set by the Lead Reply Hourly "Leads Handled"
         // drill-down so the log opens on exactly that hour of the chosen day.
         $hour = ghl_message_log_normalize_hour($this->input->get('hour'));
+        // Optional time-of-day range (clock filter), applied on top of the date
+        // window so it repeats across every day in range (e.g. 09:00-18:00 daily).
+        $timeFrom = ghl_message_log_normalize_time($this->input->get('time_from'));
+        $timeTo = ghl_message_log_normalize_time($this->input->get('time_to'));
         $range['contact'] = $contact;
         $range['agent'] = $agent;
         $range['hour'] = $hour;
         $range['hour_label'] = $hour === null ? '' : ghl_message_log_hour_label($hour);
+        $range['time_from'] = $timeFrom;
+        $range['time_to'] = $timeTo;
 
-        $total = $this->Report_Model->Ghl_Messages_Log_Count($range['start_date'], $range['end_date'], $contact, $agent, $hour);
+        $total = $this->Report_Model->Ghl_Messages_Log_Count($range['start_date'], $range['end_date'], $contact, $agent, $hour, $timeFrom, $timeTo);
         $pagination = ghl_messages_log_pagination($total, (int) $this->input->get('page'), 50);
 
         // The "Time Taken" column only makes sense when the stream is a single
@@ -110,7 +116,9 @@ class Report extends MY_Controller
                 $pagination['offset'],
                 $contact,
                 $agent,
-                $hour
+                $hour,
+                $timeFrom,
+                $timeTo
             );
             $messages = ghl_message_log_attach_reply_gaps($rows, $pagination['per_page']);
 
@@ -120,7 +128,9 @@ class Report extends MY_Controller
                     $range['end_date'],
                     $contact,
                     $agent,
-                    $hour
+                    $hour,
+                    $timeFrom,
+                    $timeTo
                 )
             );
         } else {
@@ -131,7 +141,9 @@ class Report extends MY_Controller
                 $pagination['offset'],
                 $contact,
                 $agent,
-                $hour
+                $hour,
+                $timeFrom,
+                $timeTo
             );
         }
 
@@ -169,6 +181,8 @@ class Report extends MY_Controller
         $contact = trim((string) $this->input->get('contact'));
         $agent = trim((string) $this->input->get('agent'));
         $hour = ghl_message_log_normalize_hour($this->input->get('hour'));
+        $timeFrom = ghl_message_log_normalize_time($this->input->get('time_from'));
+        $timeTo = ghl_message_log_normalize_time($this->input->get('time_to'));
 
         $filename = ghl_message_log_export_filename($range['start_date'], $range['end_date']);
 
@@ -194,7 +208,9 @@ class Report extends MY_Controller
                 $offset,
                 $contact,
                 $agent,
-                $hour
+                $hour,
+                $timeFrom,
+                $timeTo
             );
 
             foreach ($rows as $row) {
@@ -558,6 +574,27 @@ class Report extends MY_Controller
 
         $this->load->view('layout/header', $titles);
         $this->load->view('report/lead_reply_activity_hourly', $array);
+        $this->load->view('layout/footer');
+    }
+
+    function Lead_Reply_Activity_Hourly_All()
+    {
+        $filters = $this->lead_reply_activity_filters();
+        $payload = $this->lead_reply_activity_hourly_all_payload($filters);
+
+        $titles = array(
+            'tab_title' => 'HolidayGoGoGo | Report',
+            'breadcrumb_title' => 'Report >> Lead Reply Hourly (All Agents)'
+        );
+
+        $array = array(
+            'lead_reply_hourly_all_date_label' => $filters['reply_date'],
+            'lead_reply_hourly_all_matrix' => $payload['matrix'],
+            'lead_reply_hourly_all_updated_at' => $payload['updated_at'],
+        );
+
+        $this->load->view('layout/header', $titles);
+        $this->load->view('report/lead_reply_activity_hourly_all', $array);
         $this->load->view('layout/footer');
     }
 
@@ -1377,6 +1414,26 @@ class Report extends MY_Controller
             'owner_name' => $ownerName,
             'breakdown' => ghl_message_log_hourly_breakdown($rows),
             'avg_reply_label' => ghl_message_log_format_duration($avgReplySeconds),
+            'updated_at' => date('Y-m-d H:i:s'),
+        );
+    }
+
+    private function lead_reply_activity_hourly_all_payload($filters)
+    {
+        $this->load->helper('ghl_messages_log');
+
+        // Whole-team roll-up: never lock to a single owner. Any owner id the URL
+        // carried is dropped; the level-20 self-restriction (_restrict_agent_ids)
+        // and the team_lead filter still apply, so a restricted user only ever
+        // sees their own row.
+        $allAgentFilters = $filters;
+        $allAgentFilters['owner'] = array();
+        $allAgentFilters['owner_user_id'] = array();
+
+        $rows = $this->Report_Model->Lead_Reply_Activity_Hourly_By_Agent($allAgentFilters);
+
+        return array(
+            'matrix' => ghl_message_log_hourly_agent_matrix($rows),
             'updated_at' => date('Y-m-d H:i:s'),
         );
     }

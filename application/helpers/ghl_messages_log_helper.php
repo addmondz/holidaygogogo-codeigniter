@@ -595,3 +595,163 @@ if (!function_exists('ghl_message_log_hour_label')) {
         return $display . ' ' . $suffix;
     }
 }
+
+if (!function_exists('ghl_message_log_normalize_time')) {
+    /**
+     * Sanitise one end of the Message Log "time of day" range filter into a
+     * canonical 'HH:MM' string, or '' when absent/invalid. Accepts a bare hour
+     * ('9', '09' -> '09:00') or an hour:minute ('9:30' -> '09:30'); the hour must
+     * be 0-23 and the minute 0-59. Anything else -- blank, out of range,
+     * non-numeric, or an injection attempt -- returns '' so nothing but a real
+     * clock value can ever reach the TIME() comparison.
+     *
+     * @param mixed $value Raw time input from the filter form.
+     * @return string 'HH:MM', or '' when absent/invalid.
+     */
+    function ghl_message_log_normalize_time($value)
+    {
+        $value = trim((string) $value);
+        if ($value === '') {
+            return '';
+        }
+
+        if (!preg_match('/^(\d{1,2})(?::(\d{2}))?$/', $value, $m)) {
+            return '';
+        }
+
+        $hour = (int) $m[1];
+        $minute = isset($m[2]) ? (int) $m[2] : 0;
+
+        if ($hour < 0 || $hour > 23 || $minute < 0 || $minute > 59) {
+            return '';
+        }
+
+        return sprintf('%02d:%02d', $hour, $minute);
+    }
+}
+
+if (!function_exists('ghl_message_log_hourly_agent_matrix')) {
+    /**
+     * Build the "Lead Reply Hourly — All Agents" matrix: every agent as a row,
+     * split into an Inbound and an Outbound sub-series across all 24 hours, so
+     * the whole team's per-hour message activity reads as one heatmap grid.
+     *
+     * The SQL only returns (owner, hour) buckets that actually had traffic, so
+     * this DB-free helper stitches the sparse rows into a full agent x 24-hour
+     * grid, fills the gaps with zeros, carries per-agent / per-hour / grand
+     * totals, and reports the busiest single cell so the view can scale shading.
+     * Agents are ordered by total messages (busiest first); ties fall back to
+     * the agent name so the order is stable.
+     *
+     * @param array  $rows        Sparse rows, each with keys owner_user_id,
+     *                            owner_name, hour_of_day (0-23), inbound_count,
+     *                            outbound_count.
+     * @param string $ownerKey    Key holding the agent id.
+     * @param string $nameKey     Key holding the agent display name.
+     * @param string $hourKey     Key holding the 0-23 hour value.
+     * @param string $inboundKey  Key holding the inbound count for that bucket.
+     * @param string $outboundKey Key holding the outbound count for that bucket.
+     * @return array{
+     *   hours: array,
+     *   agents: array,
+     *   hour_totals_inbound: array,
+     *   hour_totals_outbound: array,
+     *   grand_inbound: int,
+     *   grand_outbound: int,
+     *   grand_total: int,
+     *   max_cell: int
+     * }
+     */
+    function ghl_message_log_hourly_agent_matrix(array $rows, $ownerKey = 'owner_user_id', $nameKey = 'owner_name', $hourKey = 'hour_of_day', $inboundKey = 'inbound_count', $outboundKey = 'outbound_count')
+    {
+        $byOwner = array();
+        foreach ($rows as $row) {
+            $row = (array) $row;
+            $ownerId = isset($row[$ownerKey]) ? (string) $row[$ownerKey] : '';
+            if ($ownerId === '') {
+                continue;
+            }
+            $hour = isset($row[$hourKey]) ? (int) $row[$hourKey] : -1;
+            if ($hour < 0 || $hour > 23) {
+                continue;
+            }
+
+            if (!isset($byOwner[$ownerId])) {
+                $name = isset($row[$nameKey]) ? trim((string) $row[$nameKey]) : '';
+                $byOwner[$ownerId] = array(
+                    'owner_id' => $ownerId,
+                    'owner_name' => $name !== '' ? $name : $ownerId,
+                    'inbound' => array_fill(0, 24, 0),
+                    'outbound' => array_fill(0, 24, 0),
+                );
+            }
+
+            $byOwner[$ownerId]['inbound'][$hour] += isset($row[$inboundKey]) ? (int) $row[$inboundKey] : 0;
+            $byOwner[$ownerId]['outbound'][$hour] += isset($row[$outboundKey]) ? (int) $row[$outboundKey] : 0;
+        }
+
+        $hours = array();
+        for ($h = 0; $h < 24; $h++) {
+            $suffix = $h < 12 ? 'AM' : 'PM';
+            $display = $h % 12;
+            if ($display === 0) {
+                $display = 12;
+            }
+            $hours[] = array('hour' => $h, 'label' => $display . ' ' . $suffix);
+        }
+
+        $hourTotalsInbound = array_fill(0, 24, 0);
+        $hourTotalsOutbound = array_fill(0, 24, 0);
+        $grandInbound = 0;
+        $grandOutbound = 0;
+        $maxCell = 0;
+
+        $agents = array();
+        foreach ($byOwner as $owner) {
+            $totalInbound = 0;
+            $totalOutbound = 0;
+            for ($h = 0; $h < 24; $h++) {
+                $in = $owner['inbound'][$h];
+                $out = $owner['outbound'][$h];
+                $totalInbound += $in;
+                $totalOutbound += $out;
+                $hourTotalsInbound[$h] += $in;
+                $hourTotalsOutbound[$h] += $out;
+                if ($in > $maxCell) { $maxCell = $in; }
+                if ($out > $maxCell) { $maxCell = $out; }
+            }
+
+            $agents[] = array(
+                'owner_id' => $owner['owner_id'],
+                'owner_name' => $owner['owner_name'],
+                'inbound' => $owner['inbound'],
+                'outbound' => $owner['outbound'],
+                'total_inbound' => $totalInbound,
+                'total_outbound' => $totalOutbound,
+                'total' => $totalInbound + $totalOutbound,
+            );
+
+            $grandInbound += $totalInbound;
+            $grandOutbound += $totalOutbound;
+        }
+
+        // Busiest agent first; stable tie-break on name keeps the order sane.
+        usort($agents, function ($a, $b) {
+            if ($a['total'] !== $b['total']) {
+                return $b['total'] - $a['total'];
+            }
+            return strcasecmp($a['owner_name'], $b['owner_name']);
+        });
+
+        return array(
+            'hours' => $hours,
+            'agents' => $agents,
+            'hour_totals_inbound' => $hourTotalsInbound,
+            'hour_totals_outbound' => $hourTotalsOutbound,
+            'grand_inbound' => $grandInbound,
+            'grand_outbound' => $grandOutbound,
+            'grand_total' => $grandInbound + $grandOutbound,
+            'max_cell' => $maxCell,
+        );
+    }
+}

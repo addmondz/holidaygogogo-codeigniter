@@ -39,6 +39,9 @@
                     </div>
                 </div>
                 <div class="card-toolbar">
+                    <a href="<?php echo base_url('Report/Lead_Reply_Activity_Hourly_All') . '?reply_date=' . urlencode($lead_reply_activity_filters['reply_date']); ?>" class="btn btn-light-primary font-weight-bold mr-3" data-toggle="tooltip" title="See every agent's inbound/outbound per hour on one page">
+                        <i class="la la-clock-o"></i> All Agents Hourly
+                    </a>
                     <div class="text-right">
                         <span class="label label-light-primary label-inline font-weight-bold" id="lead-reply-activity-last-updated">
                             Updated <?php echo !empty($lead_reply_activity_updated_at) ? html_escape($lead_reply_activity_updated_at) : 'Not available'; ?>

@@ -325,7 +325,7 @@ class Guests extends MY_Controller
 			return;
 		}
 
-		$titles = array('tab_title' => 'HolidayGoGoGo | Guest List >> View', 'breadcrumb_title' => 'Guest List >> View');
+		$titles = array('tab_title' => 'HolidayGoGoGo | Customer Profile', 'breadcrumb_title' => 'Guest List >> Customer Profile');
 		$this->load->view('layout/header', $titles);
 		$this->load->view('guests/view', $detail);
 		$this->load->view('layout/footer');

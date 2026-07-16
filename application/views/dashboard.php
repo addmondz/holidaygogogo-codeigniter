@@ -1,8 +1,15 @@
 <div class="d-flex flex-column-fluid">
 	<div class="container-fluid">
-		<?php if((int)$this->session->userdata('level') === 10) { ?>
+		<?php // Owner (10) and Team Lead (25) render the per-agent performance
+		      // matrix here (Team Lead's is team-scoped by the controller). Both
+		      // get the same lean, matrix-only dashboard. ?>
+		<?php $level_dash = (int)$this->session->userdata('level'); ?>
+		<?php if($level_dash === 10 || $level_dash === 25) { ?>
 			<?php $this->load->view('booking/_summary_cards'); ?>
 		<?php } ?>
+		<?php // The Team Lead's lean dashboard is JUST the matrix above — skip the
+		      // whole "Dashboard" card (reminders, charts, top-agent widgets). ?>
+		<?php if($level_dash !== 25) { ?>
 		<div class="card card-custom mb-5">
             <div class="card-header flex-wrap py-3" style="background-color:#D7E2F2;">
                 <div class="card-title">
@@ -988,6 +995,17 @@
                                     <h3>Top 5 Cancellation Reasons (<?php echo date('Y'); ?>)</h3>
                                 </div>
                                 <div class="card-body">
+                                    <?php
+                                        $cancel_total = isset($owner_cancellation_total) ? (int)$owner_cancellation_total : 0;
+                                        $book_total   = isset($owner_booking_total) ? (int)$owner_booking_total : 0;
+                                        $overall_pct  = $book_total > 0 ? round(($cancel_total / $book_total) * 100, 1) : 0;
+                                    ?>
+                                    <div class="d-flex align-items-baseline mb-4 pb-3" style="border-bottom:1px solid #EBEDF3;">
+                                        <div style="font-size:32px; font-weight:700; color:#F64E60;"><?php echo $overall_pct; ?>%</div>
+                                        <div class="ml-3" style="font-size:13px; color:#7E8299; font-weight:600;">Total cancellation rate<br><?php echo $cancel_total; ?> of <?php echo $book_total; ?> bookings this year</div>
+                                        <?php $rev_lost = isset($owner_cancellation_revenue_lost) ? (float)$owner_cancellation_revenue_lost : 0.0; ?>
+                                        <div class="ml-auto text-right"><div style="font-size:20px; font-weight:700; color:#F64E60;"><?php echo $rm($rev_lost); ?></div><div style="font-size:12px; color:#7E8299; font-weight:600;">Revenue lost</div></div>
+                                    </div>
                                     <?php if(empty($owner_cancellation_reasons)) { ?>
                                         <div class="text-muted" style="font-size:13px;">No cancellations this year.</div>
                                     <?php } else {
@@ -1010,7 +1028,7 @@
                                             </div>
                                         <?php }
                                     } ?>
-                                    <div class="kpi-sub mt-2">Cancelled booking confirmations grouped by reason, by booking date, this year. % is cancelled bookings for that reason out of all <?php echo isset($owner_booking_total) ? (int)$owner_booking_total : 0; ?> bookings this year (<?php echo isset($owner_cancellation_total) ? (int)$owner_cancellation_total : 0; ?> cancelled total).</div>
+                                    <div class="kpi-sub mt-2">Cancelled booking confirmations grouped by reason, by booking date, this year. % is cancelled bookings for that reason out of all <?php echo isset($owner_booking_total) ? (int)$owner_booking_total : 0; ?> bookings this year (<?php echo isset($owner_cancellation_total) ? (int)$owner_cancellation_total : 0; ?> cancelled total). Revenue lost = total booking value (NetTotal) of those cancelled bookings.</div>
                                 </div>
                             </div>
                         </div>
@@ -1285,12 +1303,14 @@
                 <?php } ?>
             </div>
         </div>
+		<?php } // end Dashboard card (hidden for Team Lead's matrix-only view) ?>
 	</div>
 </div>
 <script src="<?php echo base_url('assets/js/pages/widgets.js'); ?>"></script>
 <script src="<?php echo base_url('assets/js/pages/features/charts/apexcharts.js'); ?>"></script>
-<?php // Owner (Level 10) has no ApexCharts/date-pickers on this page — skip the whole chart script so it fires no needless AJAX. ?>
-<?php if((int)$this->session->userdata('level') !== 10) { ?>
+<?php // Owner (10) and Team Lead (25) have no ApexCharts/date-pickers on this
+      // lean page — skip the whole chart script so it fires no needless AJAX. ?>
+<?php if((int)$this->session->userdata('level') !== 10 && (int)$this->session->userdata('level') !== 25) { ?>
 <script type="text/javascript">
     $(document).ready(function() {
         //SA

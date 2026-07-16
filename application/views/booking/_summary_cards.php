@@ -11,7 +11,12 @@
     $show_op      = ($card_level == 40 || $card_level == 45); // OP and OP TEAM LEAD share the OP cards
     $show_finance = ($card_level == 30);
     $show_owner   = summary_cards_show_owner_matrix($card_level, $owner_as_agent);
-    $any_cards    = $show_tc || $show_tclead || $show_op || $show_finance || $show_owner;
+    // Team Lead (25) on the dashboard sees the SAME per-agent matrix as the Owner,
+    // scoped to their own team members by the controller. $show_matrix drives the
+    // shared matrix skeleton so one block serves both roles.
+    $show_team_lead = summary_cards_show_team_lead_matrix($card_level, $owner_as_agent);
+    $show_matrix    = $show_owner || $show_team_lead;
+    $any_cards    = $show_tc || $show_tclead || $show_op || $show_finance || $show_matrix;
 ?>
 <?php if($any_cards) { ?>
 <style>
@@ -238,7 +243,7 @@
 <div id="booking_summary_cards" class="mb-4">
     <div class="panel-toggle" data-toggle="collapse" data-target="#booking_summary_cards_body" aria-expanded="true" aria-controls="booking_summary_cards_body">
         <span class="panel-title">Summary</span>
-        <?php if($show_owner) { ?>
+        <?php if($show_matrix) { ?>
         <span class="ghl-last-sync">Last synced from GHL: <span id="ghl-last-sync">…</span></span>
         <?php } ?>
         <i class="la la-angle-down panel-caret"></i>
@@ -741,8 +746,10 @@
             </div>
         <?php } ?>
 
-        <?php /* ---------- OWNER (level 10) per-agent performance matrix ---------- */ ?>
-        <?php if($show_owner) { ?>
+        <?php /* ---------- OWNER (10) / TEAM LEAD (25) per-agent performance matrix ----------
+                 Owner sees every agent; Team Lead sees only their own team (scoped
+                 by the controller). Same skeleton, JS and export for both. */ ?>
+        <?php if($show_matrix) { ?>
             <div class="col-md-12">
                 <div class="card card-custom">
                     <div class="card-header border-0 summary-card-header" style="background-color:#A7C7E730; display:flex; align-items:center;">
@@ -1103,6 +1110,36 @@
                             <thead><tr><th>Code</th><th>Product</th><th class="text-right">Qty</th><th class="text-right">Sales</th></tr></thead>
                             <tbody id="sc-product-sales-body"><tr><td colspan="4" class="text-center text-muted">Loading…</td></tr></tbody>
                         </table>
+                    </div>
+                </div>
+            </div>
+            <?php /* View-only monthly cancellations — OP / OP TEAM LEAD pick any month. */ ?>
+            <div class="col-md-6">
+                <div class="card card-custom">
+                    <div class="card-header border-0 summary-card-header" style="background-color:#F1AEB530;">
+                        <h3>Cancellations (Month)</h3>
+                        <div class="d-flex align-items-center" style="gap:6px;">
+                            <select id="sc-op-cancel-month" class="form-control form-control-sm" style="width:auto; min-width:150px;" title="Pick a month to view its cancellations">
+                                <?php
+                                    // Last 18 months, newest first; current month selected.
+                                    $_cur = date('Y-m');
+                                    for($_i = 0; $_i < 18; $_i++) {
+                                        $_ts  = strtotime("first day of -{$_i} month");
+                                        $_val = date('Y-m', $_ts);
+                                        $_lbl = date('F Y', $_ts);
+                                        $_sel = ($_val === $_cur) ? ' selected' : '';
+                                        echo '<option value="' . $_val . '"' . $_sel . '>' . $_lbl . '</option>';
+                                    }
+                                ?>
+                            </select>
+                            <i id="pop-op-cancel-month" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>What it shows:</strong> How many of the team&rsquo;s bookings created in the chosen month were later cancelled, and the cancellation rate.<br><br><strong>How it&rsquo;s worked out:</strong> cancelled bookings divided by all bookings created that month.<ul><li><strong>Top number:</strong> the cancellation rate</li><li><strong>Below:</strong> cancelled &divide; total bookings created that month</li><li><strong>Revenue lost:</strong> total booking value (NetTotal) of those cancelled bookings</li></ul><strong>Scope:</strong> the whole OP team&rsquo;s bookings. Confirmed bookings only (drafts and quotations are left out). Bookings cancelled as a <strong>duplicate</strong> are left out of both numbers &mdash; they are data-entry copies, not lost sales.<br><br><strong>Note:</strong> based on when the booking was <strong>created</strong>, not when it was cancelled. Pick a different month to compare."></i>
+                        </div>
+                    </div>
+                    <div class="card-body summary-card-body">
+                        <div class="summary-value" id="sc-op-cancel-value" style="color:#F64E60;">...</div>
+                        <div class="summary-sub"><span id="sc-op-cancel-detail">—</span> of the team&rsquo;s bookings created in <span id="sc-op-cancel-label">this month</span> were cancelled.</div>
+                        <div class="summary-sub mt-2">Revenue lost: <strong id="sc-op-cancel-revenue" style="color:#F64E60;">—</strong></div>
+                        <div class="summary-sub mt-2"><a href="#" id="sc-op-cancel-link" target="_blank" rel="noopener">View cancelled bookings &rarr;</a></div>
                     </div>
                 </div>
             </div>
@@ -2253,6 +2290,28 @@ $(function() {
         });
     }
     loadSummaryCards();
+
+    // View-only "Cancellations (Month)" card (OP / OP TEAM LEAD). Own month
+    // picker + own endpoint so flipping months never reloads the whole summary.
+    var scOpCancelMonth = document.getElementById('sc-op-cancel-month');
+    if(scOpCancelMonth) {
+        var opCancelUrl = '<?php echo base_url("Booking/ajax_op_monthly_cancellation"); ?>';
+        var loadOpCancellation = function() {
+            var valueEl  = document.getElementById('sc-op-cancel-value');
+            if(valueEl) { valueEl.textContent = '...'; }
+            setText('sc-op-cancel-revenue', '...');
+            $.getJSON(opCancelUrl, { month: scOpCancelMonth.value }, function(resp) {
+                if(!resp || resp.error) { if(valueEl) { valueEl.textContent = '—'; } return; }
+                setText('sc-op-cancel-value',   resp.rate);
+                setText('sc-op-cancel-detail',  resp.detail);
+                setText('sc-op-cancel-label',   resp.label);
+                setText('sc-op-cancel-revenue', resp.revenue_lost);
+                setLink('sc-op-cancel-link',    resp.link);
+            }).fail(function() { if(valueEl) { valueEl.textContent = '—'; } });
+        };
+        scOpCancelMonth.addEventListener('change', loadOpCancellation);
+        loadOpCancellation();
+    }
 })();
 </script>
 <?php } ?>

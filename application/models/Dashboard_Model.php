@@ -1127,6 +1127,21 @@ class Dashboard_Model extends CI_Model
 		return $row ? (int)$row->Total : 0;
 	}
 
+	// Revenue lost to cancellation in the window (windowed on InsertDate):
+	// SUM(NetTotal) of the cancelled booking confirmations counted by
+	// Total_Cancellations. Same filters, so the money always matches that count.
+	function Total_Cancellation_Revenue_Lost($start, $end)
+	{
+		$this->db->select('COALESCE(SUM(booking.NetTotal), 0) AS Amount', false);
+		$this->db->where('booking.BookingConfirmationTitle', 'BOOKING CONFIRMATION');
+		$this->db->where('booking.CancelStatus', 'Y');
+		$this->db->where('booking.Status !=', 'N');
+		$this->db->where('CAST(booking.InsertDate AS DATE) >=', $start);
+		$this->db->where('CAST(booking.InsertDate AS DATE) <=', $end);
+		$row = $this->db->get('booking')->row();
+		return $row ? (float)$row->Amount : 0.0;
+	}
+
 	// Total booking confirmations in the window (windowed on InsertDate),
 	// cancelled or not — drafts and quotations excluded. Used as the denominator
 	// for each cancellation reason's share: cancelled-for-reason / all bookings.

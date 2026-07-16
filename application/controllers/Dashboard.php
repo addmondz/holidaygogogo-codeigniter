@@ -88,11 +88,12 @@ class Dashboard extends MY_Controller
 
 		$array['sales_agents'] = $this->Dashboard_Model->Sales_Agents();
 
-		// The Owner (Level 10) dashboard was reworked to a lean KPI layout, so the
-		// old travel/payment reminder cards, Leading SA and the ApexCharts are no
-		// longer rendered for the Owner. Skip building their (expensive) data for
-		// the Owner; every other non-SA role (Finance, etc.) keeps the old view.
-		if($level != 10) {
+		// The Owner (Level 10) dashboard was reworked to a lean KPI layout, and the
+		// Team Lead (25) now gets an even leaner matrix-only view — so the old
+		// travel/payment reminder cards, Leading SA and the ApexCharts are not
+		// rendered for either. Skip building their (expensive) data for both; every
+		// other non-SA role (Finance, etc.) keeps the old view.
+		if($level != 10 && $level != 25) {
 
 		$array['upcoming_travels'] = $this->Dashboard_Model->Upcoming_Travels($start_date, $end_date);
 
@@ -281,6 +282,10 @@ class Dashboard extends MY_Controller
 			);
 			// Total cancellations this year — shown in the card subtext.
 			$array['owner_cancellation_total'] = $this->Dashboard_Model->Total_Cancellations(
+				$windows['year'][0], $windows['year'][1]
+			);
+			// Revenue lost to those cancellations this year — SUM(NetTotal).
+			$array['owner_cancellation_revenue_lost'] = $this->Dashboard_Model->Total_Cancellation_Revenue_Lost(
 				$windows['year'][0], $windows['year'][1]
 			);
 			// Total bookings this year — denominator for each reason's % share.

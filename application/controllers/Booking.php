@@ -998,6 +998,9 @@ class Booking extends MY_Controller
 		$is_op      = ($level == 40 || $level == 45); // OP and OP TEAM LEAD share the OP cards
 		$is_finance = ($level == 30);
 		$is_owner   = summary_cards_show_owner_matrix($level, $owner_as_agent);
+		// Team Lead (25) gets the SAME per-agent matrix as the Owner on the
+		// dashboard, but scoped to their own team members (see the matrix block).
+		$is_team_lead = summary_cards_show_team_lead_matrix($level, $owner_as_agent);
 
 		// ---------- TC / TC2 (own bookings) ----------
 		// Credited-slot rule: a booking counts for this TC only when they hold
@@ -1956,14 +1959,23 @@ class Booking extends MY_Controller
 		// One row per TC sales agent (Level 20/50) across all 11 owner metrics,
 		// scoped to the global Day/Week/Month/Year toggle ($owner_period). Built
 		// by owner_agent_matrix(); rendered as a single matrix table.
-		if($is_owner) {
+		if($is_owner || $is_team_lead) {
 			// Pass the column-granularity ($owner_period['base']) — "Yesterday"
 			// behaves like Day and "Same Period Last Year" like Year for which
 			// columns apply. meta.owner_period keeps the raw toggle id so the
 			// active button still highlights.
 			$owner_matrix_base = isset($owner_period['base']) ? $owner_period['base'] : $owner_period['period'];
+			// Team Lead: restrict the matrix (rows, benchmark AND Agent Score) to
+			// the lead's own team — every active admin sharing their admin.TeamID.
+			// Owner passes null => company-wide, unchanged.
+			$restrict_ids = null;
+			if($is_team_lead) {
+				$this->load->helper('team_scope');
+				$admins = $this->db->query('SELECT AdminID, TeamID, Status FROM admin')->result();
+				$restrict_ids = team_member_admin_ids($admin_id, $admins);
+			}
 			$tables['owner_agent_matrix'] = $this->owner_agent_matrix(
-				$owner_period['start_date'], $owner_period['end_date'], $owner_matrix_base
+				$owner_period['start_date'], $owner_period['end_date'], $owner_matrix_base, $restrict_ids
 			);
 		}
 
@@ -2842,7 +2854,7 @@ class Booking extends MY_Controller
 		// Lets the front-end round-trip the date picker and re-label the cards.
 		$meta['selected_day']         = $period['day'];
 		$meta['is_day']               = $period['is_day'];
-		if($is_owner) {
+		if($is_owner || $is_team_lead) {
 			// Echo the resolved toggle back so the front-end can highlight the
 			// active period tab (covers both the default and the bad-input fallback).
 			$meta['owner_period']       = $owner_period['period'];
@@ -3505,6 +3517,84 @@ class Booking extends MY_Controller
 	}
 
 	/**
+	 * View-only "Cancellations (Month)" card for OP (40) and OP TEAM LEAD (45).
+	 *
+	 * Its own endpoint (not part of ajax_summary_cards) because the card carries
+	 * its own month picker: OP can flip to any month without reloading the whole
+	 * summary. Returns the OP team's cancelled BC count and rate for the picked
+	 * month, plus a drill-down link to that month's cancelled list.
+	 *
+	 * Scope + counting rule mirror the other OP cards and the TC cancellation
+	 * card: team-wide by booking.SalesAgent, confirmed BCs only, duplicate
+	 * cancellations excluded, counted by when the booking was created.
+	 */
+	function ajax_op_monthly_cancellation()
+	{
+		$this->begin_json_endpoint();
+
+		try {
+			$level = (int) $this->session->userdata('level');
+			// Gate to OP / OP TEAM LEAD only (matches the card's display gate).
+			if(!in_array('VB', $this->session->access_control) || !in_array($level, array(40, 45), true)) {
+				$this->send_json(array('error' => 'Access denied'));
+				return;
+			}
+
+			$this->load->helper(array('summary_period', 'cancellation_rate', 'op_cancellation', 'team_scope'));
+
+			$admin_id = (int) $this->session->userdata('admin_id');
+			$today    = date('Y-m-d');
+
+			// ?month=YYYY-MM picks the reporting month; invalid/missing falls back
+			// to the current month (summary_resolve_month bounds it).
+			$period      = summary_resolve_month($this->input->get('month'), $today);
+			$month_start = $period['month_start'];
+			$month_end   = $period['month_end'];
+
+			// Same OP-team scope as the other OP cards: everyone sharing the
+			// user's admin.TeamID, matched on booking.SalesAgent (TC1).
+			$team_admins = $this->db->query('SELECT AdminID, TeamID, Status FROM admin')->result();
+			$op_team_ids = team_member_admin_ids($admin_id, $team_admins);
+			$op_team_csv = implode(',', $op_team_ids);
+			$op_sa_in    = "booking.SalesAgent IN ({$op_team_csv})";
+
+			$row = $this->db->query(
+				op_monthly_cancellation_sql($op_sa_in),
+				array($month_start, $month_end)
+			)->row();
+
+			$total        = $row ? (int) $row->total : 0;
+			$cancelled    = $row ? (int) $row->cancelled : 0;
+			$revenue_lost = $row ? (float) $row->revenue_lost : 0.0;
+			$rate         = op_cancellation_rate($cancelled, $total);
+
+			$base    = base_url('Booking');
+			$fmt_dmy = function($d) { return date('d/m/Y', strtotime($d)); };
+			// Drill-down: the cancelled (status=C) BCs created in the picked
+			// month, scoped to the OP team so the list matches the count.
+			$link = $base . '?' . http_build_query(array(
+				'status'       => 'C',
+				'booking_date' => $fmt_dmy($month_start) . ' - ' . $fmt_dmy($month_end),
+				'sales_agent'  => $op_team_csv,
+			));
+
+			$this->send_json(array(
+				'month'        => $period['value'],
+				'label'        => $period['label'],
+				'cancelled'    => $cancelled,
+				'total'        => $total,
+				'rate'         => $rate . '%',
+				'detail'       => $cancelled . ' / ' . $total,
+				'revenue_lost' => 'RM ' . number_format($revenue_lost, 2, '.', ','),
+				'link'         => $link,
+			));
+		} catch (\Throwable $e) {
+			log_message('error', 'Booking ajax_op_monthly_cancellation error: ' . $e->getMessage());
+			$this->send_json(array('error' => 'An error occurred while loading cancellations'));
+		}
+	}
+
+	/**
 	 * Set of GHL UserIDs that belong to a SALES AGENT (admin.Level = 20). Used
 	 * to restrict the GHL-user-keyed "Best:" leaderboards (Reply Time, Leads,
 	 * Conversion, Pickup Speed) to the sales-agent role only, mirroring the
@@ -3867,12 +3957,30 @@ class Booking extends MY_Controller
 	 * @param string $start  'Y-m-d' period start
 	 * @param string $end    'Y-m-d' period end
 	 * @param string $period day|week|month|year (drives the skip rules above)
+	 * @param int[]|null $restrict_admin_ids  When a non-empty id list, the matrix
+	 *        is scoped to exactly these admins — every admin-keyed source (roster,
+	 *        GHL bridge, credited sales, cancellation) is filtered to the set, so
+	 *        the rendered rows, the 100-anchors AND the Agent Score are all computed
+	 *        WITHIN that group. Used by the Team Lead (25) to see only their own
+	 *        team. null => company-wide (the Owner view), unchanged.
 	 * @return array list of matrix rows (see owner_agent_matrix_helper.php)
 	 */
-	private function owner_agent_matrix($start, $end, $period)
+	private function owner_agent_matrix($start, $end, $period, $restrict_admin_ids = null)
 	{
 		$this->load->helper(array('agent_score', 'owner_agent_matrix', 'lead_conversion_credit'));
 		$this->load->model('Report_Model');
+
+		// Optional team scope. Build a safe inlined "IN (...)" of ints once, plus a
+		// fast lookup for the PHP-side cancellation filter. A null / empty list
+		// leaves every clause blank => the query is company-wide (Owner view).
+		$restrict = null;
+		if(is_array($restrict_admin_ids) && !empty($restrict_admin_ids)) {
+			$restrict = array_values(array_unique(array_filter(array_map('intval', $restrict_admin_ids), function($v) { return $v > 0; })));
+		}
+		$restrict_lookup = $restrict ? array_flip($restrict) : null;
+		$in_list  = $restrict ? implode(',', $restrict) : '';
+		$scope_admin = $restrict ? (' AND admin.AdminID IN (' . $in_list . ')') : ''; // tables aliased "admin"/unaliased
+		$scope_a     = $restrict ? (' AND a.AdminID IN (' . $in_list . ')') : '';     // tables aliased "a"
 
 		$filters = array('start_date' => $start, 'end_date' => $end);
 		// Only Reply time and Served stay Day / Week / Month (they scan raw message
@@ -3909,6 +4017,14 @@ class Booking extends MY_Controller
 		$outbound      = $this->Report_Model->Outbound_Messages_By_Agent($start, $end);
 		// Cancellation — grouped per-agent aggregate over booking, reported every period.
 		$cancellation  = $this->Report_Model->Cancellation_By_Agent($start, $end);
+		// Cancellation is admin-keyed and folds via $ensure() (it would otherwise
+		// seed a row for any agent), so — unlike the GHL-bridged / SQL-scoped
+		// sources — it is the one source the team restriction must trim in PHP.
+		if($restrict_lookup !== null) {
+			$cancellation = array_values(array_filter($cancellation, function($c) use ($restrict_lookup) {
+				return isset($restrict_lookup[(int)$c['admin_id']]);
+			}));
+		}
 
 		// Admin-keyed credited sales — actual BC value, NO fully-paid gate (mirrors
 		// the TC Sales-Actual rule). Fetched on every period: it is the Agent Score's
@@ -3927,7 +4043,7 @@ class Booking extends MY_Controller
 			   AND booking.CancelStatus='N'
 			   AND booking.Status!='N'
 			   AND booking.NetTotal > 0
-			   AND CAST(booking.InsertDate AS DATE) BETWEEN ? AND ?
+			   AND CAST(booking.InsertDate AS DATE) BETWEEN ? AND ?{$scope_admin}
 			 GROUP BY admin_id, agent_name
 			 HAVING admin_id IS NOT NULL AND admin_id > 0",
 			array($start, $end)
@@ -3941,7 +4057,7 @@ class Booking extends MY_Controller
 			"SELECT alda.GhlUserID, alda.AdminID, a.Name
 			 FROM admin_lead_dashboard_agents alda
 			 INNER JOIN admin a ON a.AdminID = alda.AdminID
-			 WHERE a.Level IN ('20','50','10','25') AND a.Status='Y' AND NULLIF(alda.GhlUserID,'') IS NOT NULL"
+			 WHERE a.Level IN ('20','50','10','25') AND a.Status='Y' AND NULLIF(alda.GhlUserID,'') IS NOT NULL{$scope_a}"
 		)->result() as $r) {
 			$map[(string)$r->GhlUserID] = (int)$r->AdminID;
 			$name_by_admin[(int)$r->AdminID] = $r->Name;
@@ -3950,7 +4066,7 @@ class Booking extends MY_Controller
 			"SELECT gu.UserID, a.AdminID, a.Name
 			 FROM admin a
 			 INNER JOIN ghl_users gu ON LOWER(TRIM(gu.Email)) = LOWER(TRIM(a.Email))
-			 WHERE a.Level IN ('20','50','10','25') AND a.Status='Y'"
+			 WHERE a.Level IN ('20','50','10','25') AND a.Status='Y'{$scope_a}"
 		)->result() as $r) {
 			$uid = (string)$r->UserID;
 			if($uid !== '' && !isset($map[$uid])) { $map[$uid] = (int)$r->AdminID; }
@@ -3974,7 +4090,7 @@ class Booking extends MY_Controller
 		}
 		$benchmark_admins = array();
 		$roster_rows = $this->db->query(
-			"SELECT AdminID, Name, Level FROM admin WHERE Level IN ('20','50','10','25') AND Status='Y'"
+			"SELECT AdminID, Name, Level FROM admin WHERE Level IN ('20','50','10','25') AND Status='Y'{$scope_admin}"
 		)->result();
 		foreach($roster_rows as $r) {
 			if(!isset($name_by_admin[(int)$r->AdminID])) { $name_by_admin[(int)$r->AdminID] = $r->Name; }

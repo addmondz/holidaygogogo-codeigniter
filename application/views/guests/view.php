@@ -18,7 +18,7 @@
 			<div class="card-header flex-wrap py-3" style="background-color:#D7E2F2;">
 				<div class="card-title">
 					<h3 class="card-label" style="color:#6082B6;">
-						<strong>Guest Trip History<?php if(!empty($profile->Name)) { echo ' &mdash; ' . htmlspecialchars($profile->Name); } ?></strong>
+						<strong>Customer Profile<?php if(!empty($profile->Name)) { echo ' &mdash; ' . htmlspecialchars($profile->Name); } ?></strong>
 					</h3>
 				</div>
 				<div class="card-toolbar">
@@ -40,6 +40,8 @@
 								<div class="gd-field-label">Contact Num</div>   <div><?php echo htmlspecialchars($profile->ContactNum); ?></div>
 								<div class="gd-field-label">Email</div>         <div><?php echo htmlspecialchars($profile->Email); ?></div>
 								<div class="gd-field-label">Language</div>      <div><?php echo htmlspecialchars($profile->Language); ?></div>
+								<div class="gd-field-label">Source</div>        <div><?php echo !empty($profile->Source) ? htmlspecialchars($profile->Source) : '<span class="text-muted">&mdash;</span>'; ?></div>
+								<div class="gd-field-label">Customer Type</div> <div><?php echo !empty($profile->CustomerType) ? htmlspecialchars($profile->CustomerType) : '<span class="text-muted">&mdash;</span>'; ?></div>
 								<div class="gd-field-label">Nationality</div>   <div><?php echo htmlspecialchars($profile->Nationality); ?></div>
 								<div class="gd-field-label">Gender</div>        <div><?php echo htmlspecialchars($profile->Gender); ?></div>
 								<div class="gd-field-label">DOB</div>
@@ -50,6 +52,8 @@
 										}
 									?>
 								</div>
+								<div class="gd-field-label">Num of Pax</div>   <div><?php echo (int) $profile->TotalPax; ?></div>
+								<div class="gd-field-label">Total Sales (RM)</div> <div><?php echo number_format((float) $profile->TotalSales, 2); ?></div>
 							</div>
 						</div>
 					</div>

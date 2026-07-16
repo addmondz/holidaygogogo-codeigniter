@@ -340,7 +340,7 @@ div.kt-datatable__pager-container {
 										</div>
 										<div class="col-md-3">
 											<div class="form-group">
-												<label>Follow Date
+												<label>Follow Up Date
 													<a onclick="Reset_Follow_Date()" class="btn btn-icon btn-light-warning btn-xs" data-toggle="tooltip" title="Clear follow date">
 														<i class="la la-undo"></i>
 													</a>
@@ -373,24 +373,13 @@ div.kt-datatable__pager-container {
 								<th style="text-align:center;">Email</th>
 								<th style="text-align:center;">Language</th>
 								<th style="text-align:center;">Agent Name</th>
-								<th style="text-align:center;">Source</th>
-								<th style="text-align:center;">Customer Type</th>
-								<th style="text-align:center;">Destination</th>
-								<th style="text-align:center;">Nationality</th>
-								<th style="text-align:center;">Gender</th>
 								<th style="text-align:center;">Guest Type</th>
-								<th style="text-align:center;">DOB</th>
-								<th style="text-align:center;">Guest Role</th>
-								<th style="text-align:center;">Num of Pax</th>
-								<th style="text-align:center;">Total Sales (RM)</th>
-								<th style="text-align:center;">Booking Date(s)</th>
-								<th style="text-align:center;">Travel Date(s)</th>
 								<th class="action" style="text-align:center;">Action</th>
 							</tr>
 						</thead>
 						<tbody>
 							<?php if(empty($guests)) { ?>
-								<tr><td colspan="20" style="text-align:center; padding-top:10px; padding-bottom:10px;">Guest Records Not Found</td></tr>
+								<tr><td colspan="9" style="text-align:center; padding-top:10px; padding-bottom:10px;">Guest Records Not Found</td></tr>
 							<?php } else { ?>
 								<?php $count = 1; foreach($guests as $g) { ?>
 									<?php $is_ghl_row = isset($g->Type) && $g->Type === 'GHL'; ?>
@@ -476,22 +465,6 @@ div.kt-datatable__pager-container {
 											</span>
 										</td>
 										<td style="text-align:center;"><?php echo htmlspecialchars($g->AgentName); ?></td>
-										<td style="text-align:center;"><?php echo htmlspecialchars($g->Source); ?></td>
-										<td style="text-align:center;"><?php echo htmlspecialchars($g->CustomerType); ?></td>
-										<td style="text-align:center; white-space:nowrap;">
-											<?php
-												if(!empty($g->Destination)) {
-													$dest_out = array();
-													foreach(explode('||', $g->Destination) as $d) {
-														$d = trim($d);
-														if($d !== '') { $dest_out[] = htmlspecialchars($d); }
-													}
-													echo implode('<br>', $dest_out);
-												}
-											?>
-										</td>
-										<td style="text-align:center;"><?php echo htmlspecialchars($g->Nationality); ?></td>
-										<td style="text-align:center;"><?php echo htmlspecialchars($g->Gender); ?></td>
 										<td style="text-align:center; white-space:nowrap;">
 											<?php
 												$gtype = isset($g->GuestType) ? (string) $g->GuestType : '';
@@ -507,68 +480,11 @@ div.kt-datatable__pager-container {
 											<?php endif; ?>
 										</td>
 										<td style="text-align:center;">
-											<?php
-												if(!empty($g->DOB) && $g->DOB !== '0000-00-00') {
-													echo date('d M Y', strtotime($g->DOB));
-												}
-											?>
-										</td>
-										<td style="text-align:center; white-space:nowrap;">
-											<?php
-												$role = isset($g->Role) ? $g->Role : '';
-												if($role === 'Team Leader')      { $rcls = 'label-light-primary'; }
-												elseif($role === 'Team Member')  { $rcls = 'label-light-info'; }
-												elseif($role === 'Lead')         { $rcls = 'label-light-warning'; }
-												else                             { $rcls = 'label-light-dark'; }
-											?>
-											<?php if($role !== ''): ?>
-												<span class="label label-inline label-pill <?php echo $rcls; ?> font-weight-bold" style="white-space:nowrap;"><?php echo htmlspecialchars($role); ?></span>
-											<?php endif; ?>
-										</td>
-										<td style="text-align:center;"><?php echo (int) $g->TotalPax; ?></td>
-										<td style="text-align:right;"><?php echo number_format((float) $g->TotalSales, 2); ?></td>
-										<td style="text-align:center; white-space:nowrap;">
-											<?php
-												if(!empty($g->BookingDates)) {
-													$bd_out = array();
-													foreach(array_map('trim', explode(',', $g->BookingDates)) as $d) {
-														if($d !== '' && $d !== '0000-00-00' && ($ts = strtotime($d))) {
-															$bd_out[] = htmlspecialchars(date('d M Y', $ts));
-														}
-													}
-													if(!empty($bd_out)) {
-														if($is_ghl_row) {
-															echo '<span class="text-muted font-weight-bold d-block">Lead captured</span>';
-														}
-														echo implode('<br>', $bd_out);
-													}
-												}
-											?>
-										</td>
-										<td style="text-align:center; white-space:nowrap;">
-											<?php
-												if(!empty($g->TravelDates)) {
-													$td_out = array();
-													foreach(array_map('trim', explode(',', $g->TravelDates)) as $it) {
-														$p    = explode('|', $it);
-														$s    = isset($p[0]) ? trim($p[0]) : '';
-														$e    = isset($p[1]) ? trim($p[1]) : '';
-														$s_ts = ($s !== '' && $s !== '0000-00-00') ? strtotime($s) : false;
-														$e_ts = ($e !== '' && $e !== '0000-00-00') ? strtotime($e) : false;
-														if($s_ts && $e_ts)   { $td_out[] = htmlspecialchars(date('d M Y', $s_ts) . ' - ' . date('d M Y', $e_ts)); }
-														elseif($s_ts)        { $td_out[] = htmlspecialchars(date('d M Y', $s_ts)); }
-														elseif($e_ts)        { $td_out[] = htmlspecialchars(date('d M Y', $e_ts)); }
-													}
-													echo implode('<br>', $td_out);
-												}
-											?>
-										</td>
-										<td style="text-align:center;">
 											<?php if(!$is_ghl_row) { ?>
 												<div class="btn-group">
 													<button type="button" data-toggle="dropdown" class="btn btn-light-primary btn-sm dropdown-toggle" style="padding-left:3px;"></button>
 													<div class="dropdown-menu">
-														<a href="<?php echo base_url('Guests/View?key=') . urlencode($g->dedup_key); ?>" class="dropdown-item" style="font-size:11px;">View Trip History</a>
+														<a href="<?php echo base_url('Guests/View?key=') . urlencode($g->dedup_key); ?>" class="dropdown-item" style="font-size:11px;">Customer Profile</a>
 														<?php $rc = isset($remark_counts[$g->dedup_key]) ? (int) $remark_counts[$g->dedup_key] : 0; ?>
 														<a href="javascript:;" class="dropdown-item js-remarks" style="font-size:11px;" data-dedup-key="<?php echo htmlspecialchars($g->dedup_key, ENT_QUOTES); ?>" data-name="<?php echo htmlspecialchars($g->Name, ENT_QUOTES); ?>">Remarks<?php if($rc > 0) { echo ' (' . $rc . ')'; } ?></a>
 														<?php if(!empty($g->Token)) { ?>
@@ -639,7 +555,7 @@ div.kt-datatable__pager-container {
 						</select>
 					</div>
 					<div class="col-md-4">
-						<label class="font-weight-bold" style="font-size:12px;">Follow Date</label>
+						<label class="font-weight-bold" style="font-size:12px;">Follow Up Date</label>
 						<input type="date" id="gr_follow_date" class="form-control">
 					</div>
 				</div>

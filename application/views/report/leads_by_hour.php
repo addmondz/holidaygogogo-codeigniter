@@ -39,6 +39,11 @@ $export_url = base_url('Report/Leads_By_Hour_Export?lead_date=') . urlencode($da
                     </div>
                 </div>
                 <div class="card-toolbar">
+                    <?php if ($this->session->level == 10 || $this->session->level == 20) { ?>
+                        <a href="<?php echo base_url('Report/Lead_Reply_Activity_Hourly_All'); ?>" class="btn btn-light-primary font-weight-bold mr-3" data-toggle="tooltip" title="See every agent's inbound/outbound messages per hour on one page">
+                            <i class="la la-comments"></i> Lead Reply Hourly (All Agents)
+                        </a>
+                    <?php } ?>
                     <?php if ($peak_hour_label !== '' && $peak_hour_total > 0) { ?>
                         <span class="label label-light-warning label-inline font-weight-bold mr-2">
                             Busiest hour: <?php echo html_escape($peak_hour_label); ?> (<?php echo number_format($peak_hour_total); ?>)
