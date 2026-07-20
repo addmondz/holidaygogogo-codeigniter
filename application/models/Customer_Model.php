@@ -366,16 +366,6 @@ class Customer_Model extends CI_Model
 	}
 
 
-	function Detect()
-	{
-		$this->db->where('name', $this->input->post('name'));
-		if($this->db->get('customer')->row()) {
-			return true;
-		} else {
-			return false;
-		}
-	}
-
 	public function find($customer_id)
     {
         return $this->db->get_where('customer', ['CustomerID' => $customer_id])->row();

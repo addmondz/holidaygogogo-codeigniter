@@ -181,15 +181,6 @@ class Customer extends MY_Controller
 		$writer->save('php://output');
 	}
 
-	function Detect() {
-		$redundant_name = $this->Customer_Model->Detect();
-		if($redundant_name) {
-			echo json_encode(true);
-		} else {
-			echo json_encode(false);
-		}
-	}
-
 	public function search1()
 	{
 		$q = $this->input->get('q');

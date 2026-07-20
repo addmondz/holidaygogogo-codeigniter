@@ -116,22 +116,6 @@
 
 
 <script>
-    $('#name').change(function() {
-        var name = ($('#name').val()).toUpperCase();
-        $.ajax({
-            url: '<?php echo base_url('Customer/Detect') ?>',
-            type: 'post',
-            data: { name: name },
-            dataType: 'json',
-            success: function(redundant_name) {
-                if(redundant_name) {
-                    Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', 'Redundant Name Detected', null);
-                    $('#name').val('');
-                }
-            }
-        });
-    });
-
     $('input[type="button"]').click(function() {
         const swalWithBootstrapButtons = Swal.mixin({
             customClass: {
