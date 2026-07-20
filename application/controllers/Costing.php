@@ -32,9 +32,12 @@ class Costing extends MY_Controller
 
         $booking_id_input = $this->input->get('booking_id', true);
         $booking_id = (int) $booking_id_input;
-        $selected_booking_id = $booking_id_input !== null && $booking_id > 0 ? $booking_id : 0;
-        $force_new_snapshot = $this->input->get('new_snapshot', true) === '1';
         $active_tab = $this->Normalize_Package_Tab($this->input->get('tab', true));
+        $selected_booking_id = $booking_id_input !== null && $booking_id > 0 ? $booking_id : 0;
+        $snapshot_mode = $this->Normalize_Snapshot_Mode($this->input->get('mode', true), $selected_booking_id);
+        $force_new_snapshot = $snapshot_mode === 'create'
+            || ($active_tab === 'bookings' && $selected_booking_id <= 0)
+            || $this->input->get('new_snapshot', true) === '1';
         $array = $this->Costing_Model->Read_Package_Workspace_Data($package_id, $booking_id, 'MYR', $force_new_snapshot);
 
         if (empty($array['package']['id'])) {
@@ -46,6 +49,7 @@ class Costing extends MY_Controller
         $array['selected_booking_id'] = $selected_booking_id;
         $array['is_selected_booking'] = $selected_booking_id > 0 && !empty($array['booking']['id']) && (int) $array['booking']['id'] === $selected_booking_id;
         $array['active_tab'] = $active_tab;
+        $array['snapshot_mode'] = $active_tab === 'bookings' ? $snapshot_mode : 'list';
 
         $titles = array(
             'tab_title' => 'HolidayGoGoGo | Costing Package Details',
@@ -86,8 +90,10 @@ class Costing extends MY_Controller
     {
         $package_id = (int) $this->input->post('package_id');
         if ($package_id > 0) {
-            $this->Costing_Model->Delete_Package($package_id);
-            $this->session->set_flashdata('message_success', 'Package deleted successfully.');
+            $success = $this->Costing_Model->Delete_Package($package_id);
+            $this->session->set_flashdata($success ? 'message_success' : 'message_error', $success
+                ? 'Package deleted successfully.'
+                : 'Unable to delete package.');
         }
 
         redirect('Costing');
@@ -137,19 +143,21 @@ class Costing extends MY_Controller
             'child_count' => $this->input->post('child_count'),
             'status' => $this->input->post('status'),
             'selected_package_item_ids' => $this->input->post('selected_package_item_ids'),
+            'rows' => $this->input->post('rows'),
             'margin_percentage' => $this->input->post('margin_percentage'),
             'commissionable_per_pax' => $this->input->post('commissionable_per_pax'),
             'ad_hoc_per_pax' => $this->input->post('ad_hoc_per_pax'),
+            'selling_price_per_pax' => $this->input->post('selling_price_per_pax'),
         ));
 
         if ($booking_id > 0) {
-            $this->session->set_flashdata('message_success', 'Booking snapshot generated from the selected template items.');
+            $this->session->set_flashdata('message_success', 'Booking snapshot created from the selected Cost Templates.');
             redirect('Costing/Package/' . $package_id . '?tab=bookings&booking_id=' . $booking_id);
             return;
         }
 
-        $this->session->set_flashdata('message_error', 'Choose at least one template item and make sure total pax is greater than zero.');
-        redirect('Costing/Package/' . $package_id . '?tab=bookings');
+        $this->session->set_flashdata('message_error', 'Choose at least one Cost Template and make sure total pax is greater than zero.');
+        redirect('Costing/Package/' . $package_id . '?tab=bookings&mode=create_snapshot');
     }
 
     public function Save_Booking_Snapshot()
@@ -164,6 +172,7 @@ class Costing extends MY_Controller
             'margin_percentage' => $this->input->post('margin_percentage'),
             'commissionable_per_pax' => $this->input->post('commissionable_per_pax'),
             'ad_hoc_per_pax' => $this->input->post('ad_hoc_per_pax'),
+            'selling_price_per_pax' => $this->input->post('selling_price_per_pax'),
             'rows' => $this->input->post('rows'),
         ));
 
@@ -326,5 +335,15 @@ class Costing extends MY_Controller
     {
         $tab = strtolower(trim((string) $tab));
         return in_array($tab, array('details', 'costing', 'bookings'), true) ? $tab : 'details';
+    }
+
+    private function Normalize_Snapshot_Mode($mode, $booking_id)
+    {
+        $mode = strtolower(trim((string) $mode));
+        if ($mode === 'create_snapshot') {
+            return 'create';
+        }
+
+        return (int) $booking_id > 0 ? 'view' : 'list';
     }
 }

@@ -173,9 +173,7 @@ $packages = isset($packages) ? $packages : array();
                 swalWithBootstrapButtons.fire({
                     title: 'Delete Package: ' + packageName + '?',
                     text: 'This will delete the package and all related costing records.',
-                    imageUrl: <?php echo json_encode(base_url('assets/image/sweetalert.jpg')); ?>,
-                    imageWidth: 350,
-                    imageHeight: 200,
+                    icon: 'warning',
                     showCancelButton: true,
                     confirmButtonText: 'Yes, Delete',
                     cancelButtonText: 'Cancel',

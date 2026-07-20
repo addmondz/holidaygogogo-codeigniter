@@ -176,6 +176,7 @@ class Costing_Model extends CI_Model
             'rate_filters' => $rate_filters,
             'currencies' => $this->Read_Currencies($currency_filters),
             'exchange_rates' => $this->Read_Latest_Exchange_Rates($rate_filters),
+            'exchange_rate_histories' => $this->Read_Exchange_Rate_History(),
             'currency_options' => $this->Read_Currencies(),
         );
     }
@@ -205,7 +206,36 @@ class Costing_Model extends CI_Model
 
     public function Delete_Package($package_id)
     {
-        return $this->db->where('id', (int) $package_id)->delete('costing_packages');
+        $package_id = (int) $package_id;
+        if ($package_id <= 0 || !$this->Read_Package($package_id)) {
+            return false;
+        }
+
+        $booking_ids = array();
+        $booking_rows = $this->db
+            ->select('id')
+            ->where('package_id', $package_id)
+            ->get('costing_bookings')
+            ->result_array();
+
+        foreach ($booking_rows as $booking_row) {
+            $booking_ids[] = (int) $booking_row['id'];
+        }
+
+        $this->db->trans_start();
+
+        if (!empty($booking_ids)) {
+            $this->db->where_in('booking_id', $booking_ids)->delete('costing_booking_financials');
+            $this->db->where_in('booking_id', $booking_ids)->delete('costing_booking_items');
+        }
+
+        $this->db->where('package_id', $package_id)->delete('costing_bookings');
+        $this->db->where('package_id', $package_id)->delete('costing_package_items');
+        $this->db->where('id', $package_id)->delete('costing_packages');
+
+        $this->db->trans_complete();
+
+        return (bool) $this->db->trans_status();
     }
 
     public function Save_Package_Item($item)
@@ -246,6 +276,7 @@ class Costing_Model extends CI_Model
     {
         $package_id = (int) $package_id;
         $selected_package_item_ids = array_values(array_unique(array_filter(array_map('intval', isset($payload['selected_package_item_ids']) ? (array) $payload['selected_package_item_ids'] : array()))));
+        $posted_rows = isset($payload['rows']) ? (array) $payload['rows'] : array();
         $adult_count = max(0, (int) $payload['adult_count']);
         $child_count = max(0, (int) $payload['child_count']);
         $total_pax = $adult_count + $child_count;
@@ -253,12 +284,30 @@ class Costing_Model extends CI_Model
         $booking_status = $this->Normalize_Status($payload['status']);
         $booking_id = (int) $payload['booking_id'];
 
-        if ($package_id <= 0 || $total_pax <= 0 || empty($selected_package_item_ids)) {
+        if ($package_id <= 0 || $total_pax <= 0) {
             return 0;
         }
 
-        $package_items = $this->Read_Package_Items_By_Ids($package_id, $selected_package_item_ids);
-        if (empty($package_items)) {
+        $snapshot_rows = array();
+        if (!empty($posted_rows)) {
+            $selected_rows = array();
+            foreach ($posted_rows as $row) {
+                if (!empty($row['include'])) {
+                    $selected_rows[] = $row;
+                }
+            }
+            $snapshot_rows = $this->Normalize_Booking_Rows($selected_rows);
+        } else {
+            $package_items = empty($selected_package_item_ids)
+                ? $this->Read_Package_Items($package_id)
+                : $this->Read_Package_Items_By_Ids($package_id, $selected_package_item_ids);
+
+            foreach ($package_items as $item) {
+                $snapshot_rows[] = $this->Build_Snapshot_Row_From_Template($item, $adult_count, $child_count, $total_pax);
+            }
+        }
+
+        if (empty($snapshot_rows)) {
             return 0;
         }
 
@@ -282,16 +331,17 @@ class Costing_Model extends CI_Model
 
         $this->db->where('booking_id', $booking_id)->delete('costing_booking_items');
 
-        foreach ($package_items as $item) {
-            $snapshot = $this->Build_Snapshot_Row_From_Template($item, $adult_count, $child_count, $total_pax);
-            $snapshot['booking_id'] = $booking_id;
-            $this->db->insert('costing_booking_items', $snapshot);
+        foreach ($snapshot_rows as $row) {
+            $row['booking_id'] = $booking_id;
+            $row['total_amount'] = round((float) $row['quantity'] * (float) $row['unit_count'] * (float) $row['unit_price'], 2);
+            $this->db->insert('costing_booking_items', $row);
         }
 
         $this->Upsert_Booking_Financials($booking_id, array(
             'margin_percentage' => isset($payload['margin_percentage']) ? $payload['margin_percentage'] : 0,
             'commissionable_per_pax' => isset($payload['commissionable_per_pax']) ? $payload['commissionable_per_pax'] : 0,
             'ad_hoc_per_pax' => isset($payload['ad_hoc_per_pax']) ? $payload['ad_hoc_per_pax'] : 0,
+            'selling_price_per_pax' => isset($payload['selling_price_per_pax']) ? $payload['selling_price_per_pax'] : 0,
         ));
 
         $this->db->trans_complete();
@@ -343,6 +393,7 @@ class Costing_Model extends CI_Model
             'margin_percentage' => $payload['margin_percentage'],
             'commissionable_per_pax' => $payload['commissionable_per_pax'],
             'ad_hoc_per_pax' => $payload['ad_hoc_per_pax'],
+            'selling_price_per_pax' => isset($payload['selling_price_per_pax']) ? $payload['selling_price_per_pax'] : 0,
         ));
 
         $this->db->trans_complete();
@@ -780,6 +831,27 @@ class Costing_Model extends CI_Model
         ", $params)->result_array();
     }
 
+    private function Read_Exchange_Rate_History()
+    {
+        return $this->db->query("
+            SELECT
+                cer.id,
+                cer.from_currency_id,
+                cer.to_currency_id,
+                cer.unit_amount,
+                cer.rate,
+                ROUND(cer.unit_amount * cer.rate, 8) AS converted_amount,
+                cer.valid_from,
+                from_currency.code AS from_currency_code,
+                to_currency.code AS to_currency_code
+            FROM costing_exchange_rates cer
+            INNER JOIN costing_currencies from_currency ON from_currency.id = cer.from_currency_id
+            INNER JOIN costing_currencies to_currency ON to_currency.id = cer.to_currency_id
+            WHERE cer.from_currency_id <> cer.to_currency_id
+            ORDER BY from_currency.code ASC, to_currency.code ASC, cer.valid_from DESC, cer.id DESC
+        ")->result_array();
+    }
+
     private function Run_Safe_Delete($table, $key, $value, $fallback_message)
     {
         $original_db_debug = $this->db->db_debug;
@@ -924,6 +996,7 @@ class Costing_Model extends CI_Model
             'margin_percentage' => round(max(0, (float) $data['margin_percentage']), 2),
             'commissionable_per_pax' => round(max(0, (float) $data['commissionable_per_pax']), 2),
             'ad_hoc_per_pax' => round(max(0, (float) $data['ad_hoc_per_pax']), 2),
+            'selling_price_per_pax' => round(max(0, (float) $data['selling_price_per_pax']), 2),
         );
 
         $exists = $this->db
@@ -935,7 +1008,7 @@ class Costing_Model extends CI_Model
         if ($exists) {
             $this->db->where('booking_id', (int) $booking_id)->update('costing_booking_financials', $payload);
         } else {
-            $payload = array_merge($payload, $this->Empty_Financials());
+            $payload = array_merge($this->Empty_Financials(), $payload);
             $this->db->insert('costing_booking_financials', $payload);
         }
     }
@@ -947,7 +1020,7 @@ class Costing_Model extends CI_Model
             ->get('costing_booking_financials')
             ->row_array();
 
-        $margin_percentage = $existing ? (float) $existing['margin_percentage'] : 0;
+        $margin_percentage = $existing ? min(99.99, (float) $existing['margin_percentage']) : 0;
         $commissionable_per_pax = $existing ? (float) $existing['commissionable_per_pax'] : 0;
         $ad_hoc_per_pax = $existing ? (float) $existing['ad_hoc_per_pax'] : 0;
         $total_pax = max(1, (int) $booking['total_pax']);
@@ -959,10 +1032,15 @@ class Costing_Model extends CI_Model
 
         $total_cost = round($total_cost, 2);
         $cost_per_pax = round($total_cost / $total_pax, 2);
-        $markup_amount_total = round($total_cost * ($margin_percentage / 100), 2);
-        $price_per_pax = round(($total_cost + $markup_amount_total) / $total_pax, 2);
-        $total_per_pax = round($price_per_pax + $commissionable_per_pax + $ad_hoc_per_pax, 2);
-        $selling_price_per_pax = round($total_per_pax, 2);
+        $margin_rate = $margin_percentage / 100;
+        $price_per_pax = $margin_rate >= 1
+            ? 0
+            : round($cost_per_pax / (1 - $margin_rate), 2);
+        $markup_amount_total = round(($price_per_pax * $total_pax) - $total_cost, 2);
+        $total_per_pax = $price_per_pax;
+        $selling_price_per_pax = $existing && (float) $existing['selling_price_per_pax'] > 0
+            ? round((float) $existing['selling_price_per_pax'], 2)
+            : $price_per_pax;
         $total_revenue = round($selling_price_per_pax * $total_pax, 2);
         $gross_profit = round($total_revenue - $total_cost, 2);
 

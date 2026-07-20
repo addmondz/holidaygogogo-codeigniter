@@ -30,14 +30,14 @@ WHERE NOT EXISTS (
 );
 
 INSERT INTO `costing_exchange_rates` (`from_currency_id`, `to_currency_id`, `unit_amount`, `rate`, `valid_from`)
-SELECT @thb_id, @myr_id, 100.00000000, 12.85000000, '2026-07-01 00:00:00'
+SELECT @thb_id, @myr_id, 1.00000000, 0.12850000, '2026-07-01 00:00:00'
 WHERE NOT EXISTS (
   SELECT 1 FROM `costing_exchange_rates`
   WHERE `from_currency_id` = @thb_id AND `to_currency_id` = @myr_id AND `valid_from` = '2026-07-01 00:00:00'
 );
 
 INSERT INTO `costing_exchange_rates` (`from_currency_id`, `to_currency_id`, `unit_amount`, `rate`, `valid_from`)
-SELECT @idr_id, @myr_id, 10000.00000000, 2.88000000, '2026-07-01 00:00:00'
+SELECT @idr_id, @myr_id, 1.00000000, 0.00028800, '2026-07-01 00:00:00'
 WHERE NOT EXISTS (
   SELECT 1 FROM `costing_exchange_rates`
   WHERE `from_currency_id` = @idr_id AND `to_currency_id` = @myr_id AND `valid_from` = '2026-07-01 00:00:00'
