@@ -2289,13 +2289,11 @@ class Booking_Model extends CI_Model
 			if(!empty($this->input->get('booking_confirmation_title'))) {
 				$this->db->where_in('booking.BookingConfirmationTitle', explode(',', $this->input->get('booking_confirmation_title')));
 				$level2Ignore = 1;
-			} else {
-				// Default: the listing shows only Booking Confirmations (BC) for
-				// every level. Users must pick the BC Title filter to see
-				// QUOTATION / PROFORMA INVOICE rows. Not a "level 2" filter, so
-				// the default 14-day window still applies.
-				$this->db->where('booking.BookingConfirmationTitle', 'BOOKING CONFIRMATION');
 			}
+			// No default BC-Title restriction on the listing: it shows every
+			// confirmation title (BC / QUOTATION / PROFORMA INVOICE) unless the
+			// user picks the BC Title filter above. The BOOKING CONFIRMATION rule
+			// stays only on the KPI cards' own count queries.
 			if(!empty($this->input->get('autocount_status'))) {
 				$this->db->where_in('booking.AutocountSyncStatus', explode(',', $this->input->get('autocount_status')));
 				$level2Ignore = 1;
