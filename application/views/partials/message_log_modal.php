@@ -22,9 +22,14 @@
 						<div id="messageLogPhone" class="text-truncate" style="color:#cfe9e2; font-size:12px; line-height:1.2;"></div>
 					</div>
 				</div>
-				<button type="button" class="close text-white" data-dismiss="modal" aria-label="Close" style="opacity:.9;">
-					<span aria-hidden="true">&times;</span>
-				</button>
+				<div class="d-flex align-items-center">
+					<a href="javascript:;" id="messageLogCsv" class="btn btn-sm btn-light d-inline-flex align-items-center mr-2" title="Download chat as CSV" style="display:none;">
+						<i class="la la-download"></i>
+					</a>
+					<button type="button" class="close text-white" data-dismiss="modal" aria-label="Close" style="opacity:.9;">
+						<span aria-hidden="true">&times;</span>
+					</button>
+				</div>
 			</div>
 			<div class="modal-body p-4" id="messageLogBody" style="background:#ece5dd; min-height:220px; max-height:60vh;">
 				<div id="messageLogLoading" class="text-center text-muted py-5" style="font-size:14px;">
@@ -87,6 +92,8 @@
 		$('#messageLogPhone').text(phone ? '+' + String(phone).replace(/^\+/, '') : '');
 		$('#messageLogList').empty();
 		$('#messageLogEmpty').hide();
+		$('#messageLogCsv').hide().attr('href',
+			'<?php echo base_url('message-log-csv'); ?>?phone=' + encodeURIComponent(phone) + '&name=' + encodeURIComponent(name));
 		$('#messageLogLoading').show();
 		$('#messageLogModal').modal('show');
 
@@ -96,6 +103,7 @@
 				$('#messageLogLoading').hide();
 				var msgs = (res && res.messages) || [];
 				if (!msgs.length) { $('#messageLogEmpty').show(); return; }
+				$('#messageLogCsv').show();
 				$('#messageLogList').html(render(msgs));
 				var body = document.getElementById('messageLogBody');
 				body.scrollTop = body.scrollHeight; // jump to latest

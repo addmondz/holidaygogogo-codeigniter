@@ -978,9 +978,9 @@
                 <div class="customer-detail-item">
                     <span class="customer-detail-label">WhatsApp</span>
                     <span class="customer-detail-value">
-                        <a href="https://wa.me/<?php echo preg_replace('/[^0-9]/', '', $customer['phone_number']); ?>" target="_blank" style="color: #25D366; text-decoration: none; display: inline-flex; align-items: center; gap: 5px;">
+                        <a href="https://wa.me/<?php echo !empty($customer['phone_wa']) ? $customer['phone_wa'] : preg_replace('/[^0-9]/', '', $customer['phone_number']); ?>" target="_blank" style="color: #25D366; text-decoration: none; display: inline-flex; align-items: center; gap: 5px;">
                             <i class="la la-whatsapp" style="font-size: 18px;"></i>
-                            <?php echo htmlspecialchars($customer['phone_number']); ?>
+                            <?php echo htmlspecialchars(!empty($customer['phone_display']) ? $customer['phone_display'] : $customer['phone_number']); ?>
                         </a>
                     </span>
                 </div>

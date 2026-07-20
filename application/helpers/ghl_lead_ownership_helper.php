@@ -105,6 +105,7 @@ if (!function_exists('ghl_build_lead_ownership_rows')) {
                 'is_converted' => isset($lead['is_converted']) ? (int) $lead['is_converted'] : 0,
                 'booking_id' => !empty($lead['booking_id']) ? (int) $lead['booking_id'] : null,
                 'converted_at' => !empty($lead['converted_at']) ? (string) $lead['converted_at'] : null,
+                'is_bot_bounce' => isset($lead['is_bot_bounce']) ? (int) $lead['is_bot_bounce'] : 0,
                 'calculated_at' => (string) $calculatedAt,
             );
         }

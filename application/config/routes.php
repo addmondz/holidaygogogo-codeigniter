@@ -78,6 +78,7 @@ $route['customer/search'] = 'customer/search';
 $route['customer/check_duplicate'] = 'customer/check_duplicate';
 $route['ghl-details'] = 'Ghl_Details';
 $route['message-log'] = 'Message_Log';
+$route['message-log-csv'] = 'Message_Log/csv';
 
 // Map lowercase CLI URIs to the mixed-case controller class so they resolve on
 // case-sensitive (Linux) prod filesystems, not just case-insensitive local ones.

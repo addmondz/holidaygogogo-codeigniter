@@ -50,7 +50,7 @@ $pdo->exec("INSERT INTO booking VALUES
     (4,  'BOOKING CONFIRMATION', 'N', 'PT',  'PENDING',  '{$tomorrow}'),  /* tomorrow, PT (ready)             */
     (5,  'BOOKING CONFIRMATION', 'N', 'PBO', 'PENDING',  '{$tomorrow}'),  /* tomorrow, not ready (PBO)        */
     (6,  'BOOKING CONFIRMATION', 'Y', 'P',   'PENDING',  '{$tomorrow}'),  /* tomorrow but cancelled -> none   */
-    (7,  'BOOKING CONFIRMATION', 'N', 'PBO', 'PENDING',  '{$today}'),     /* travels TODAY -> none            */
+    (7,  'BOOKING CONFIRMATION', 'N', 'PBO', 'PENDING',  '{$today}'),     /* travels TODAY -> today card      */
     (8,  'BOOKING CONFIRMATION', 'N', 'PBO', 'PENDING',  '{$dayAfter}'),  /* day after tomorrow -> none       */
     (9,  'QUOTATION',            'N', 'PBO', 'PENDING',  '{$tomorrow}'),  /* quotation -> none                */
     (10, 'BOOKING CONFIRMATION', 'N', 'N',   'PENDING',  '{$tomorrow}'),  /* draft (Status=N) -> none         */
@@ -69,6 +69,7 @@ $count = function($where) use ($pdo) {
 
 $pending_bc              = $count("CancelStatus='N' AND Status='PB'");
 $pending_bc_confirmation = $count("CancelStatus='N' AND Status='PBC'");
+$travel_today            = $count("BookingConfirmationTitle='BOOKING CONFIRMATION' AND CancelStatus='N' AND Status!='N' AND StartDate='{$today}'");
 $travel_tomorrow         = $count("BookingConfirmationTitle='BOOKING CONFIRMATION' AND CancelStatus='N' AND Status!='N' AND StartDate='{$tomorrow}'");
 $travel_tomorrow_nr      = $count("BookingConfirmationTitle='BOOKING CONFIRMATION' AND CancelStatus='N' AND Status!='N' AND Status!='PT' AND StartDate='{$tomorrow}'");
 $pending_review          = $count("BookingConfirmationTitle='BOOKING CONFIRMATION' AND CancelStatus='N' AND AfterSalesService='PENDING' AND Status='Y'");
@@ -87,6 +88,12 @@ $ids = function($where) use ($pdo) {
 $dd_pending_bc = $ids("CancelStatus='N' AND Status='PB'");
 // status=PBC ->  CancelStatus='N' AND Status='PBC'
 $dd_pending_bc_confirmation = $ids("CancelStatus='N' AND Status='PBC'");
+// status=A + travel_start_date=today..today + title=BOOKING CONFIRMATION
+$dd_travel_today = $ids(
+    "(CancelStatus='N' AND Status!='N')"
+    . " AND StartDate>='{$today}' AND StartDate<='{$today}'"
+    . " AND BookingConfirmationTitle='BOOKING CONFIRMATION'"
+);
 // status=A + travel_start_date=tomorrow..tomorrow + title=BOOKING CONFIRMATION
 $dd_travel_tomorrow = $ids(
     "(CancelStatus='N' AND Status!='N')"
@@ -121,6 +128,7 @@ function assert_true($label, $cond) {
 // Card counts.
 assert_eq('pending BC count',                1, $pending_bc);
 assert_eq('pending BC confirmation count',   1, $pending_bc_confirmation);
+assert_eq('travelling today count',          1, $travel_today);
 assert_eq('travelling tomorrow count',       3, $travel_tomorrow);
 assert_eq('travelling tomorrow NOT ready',   1, $travel_tomorrow_nr);
 assert_eq('pending review count',            1, $pending_review);
@@ -128,6 +136,7 @@ assert_eq('pending review count',            1, $pending_review);
 // Drill-down BC sets — must align with the counts above.
 assert_eq('pending BC drill-down',              array(1),       $dd_pending_bc);
 assert_eq('pending BC confirmation drill-down', array(2),       $dd_pending_bc_confirmation);
+assert_eq('travelling today drill-down',        array(7),        $dd_travel_today);
 assert_eq('travelling tomorrow drill-down',     array(4, 5, 14),$dd_travel_tomorrow);
 assert_eq('travelling tomorrow NR drill-down',  array(5),       $dd_travel_tomorrow_nr);
 assert_eq('pending review drill-down',          array(11),      $dd_pending_review);
@@ -135,6 +144,7 @@ assert_eq('pending review drill-down',          array(11),      $dd_pending_revi
 // Count vs drill-down agreement (the parity contract).
 assert_eq('pending BC parity',              $pending_bc,              count($dd_pending_bc));
 assert_eq('pending BC confirmation parity', $pending_bc_confirmation, count($dd_pending_bc_confirmation));
+assert_eq('travelling today parity',        $travel_today,            count($dd_travel_today));
 assert_eq('travelling tomorrow parity',     $travel_tomorrow,         count($dd_travel_tomorrow));
 assert_eq('travelling tomorrow NR parity',  $travel_tomorrow_nr,      count($dd_travel_tomorrow_nr));
 assert_eq('pending review parity',          $pending_review,          count($dd_pending_review));
@@ -156,6 +166,8 @@ assert_true('controller builds pending_bc_op card',
     strpos($controller, "\$cards['pending_bc_op']") !== false);
 assert_true('controller builds pending_bc_confirmation_op card',
     strpos($controller, "\$cards['pending_bc_confirmation_op']") !== false);
+assert_true('controller builds travel_today_op card',
+    strpos($controller, "\$cards['travel_today_op']") !== false);
 assert_true('controller builds travel_tomorrow_op card',
     strpos($controller, "\$cards['travel_tomorrow_op']") !== false);
 assert_true('controller builds travel_tomorrow_not_ready_op card',
@@ -183,6 +195,14 @@ assert_true('travel_tomorrow link carries travel_start_date',
 assert_true('travel_tomorrow link carries status=A',
     strpos($link_block3, "'status'") !== false && strpos($link_block3, "'A'") !== false);
 
+// Travelling Today link mirrors card 3: travel_start_date + status=A + title.
+$startTd = strpos($controller, "\$cards['travel_today_op']");
+$link_blockTd = $startTd !== false ? substr($controller, $startTd, 500) : '';
+assert_true('travel_today link carries travel_start_date',
+    strpos($link_blockTd, "'travel_start_date'") !== false);
+assert_true('travel_today link carries status=A',
+    strpos($link_blockTd, "'status'") !== false && strpos($link_blockTd, "'A'") !== false);
+
 // Pending BC / Confirmation / Review links use the shared status filter.
 $startPb = strpos($controller, "\$cards['pending_bc_op']");
 $lb = substr($controller, $startPb, 300);
@@ -198,6 +218,7 @@ $view = file_get_contents(__DIR__ . '/../../application/views/booking/_summary_c
 foreach (array(
     'sc-pending-bc-op-count', 'sc-pending-bc-op-link',
     'sc-pending-bc-confirmation-op-count', 'sc-pending-bc-confirmation-op-link',
+    'sc-travel-today-op-count', 'sc-travel-today-op-link',
     'sc-travel-tomorrow-op-count', 'sc-travel-tomorrow-op-link',
     'sc-travel-tomorrow-not-ready-op-count', 'sc-travel-tomorrow-not-ready-op-link',
     'sc-pending-review-op-count', 'sc-pending-review-op-link',
@@ -209,6 +230,8 @@ assert_true('view marks the not-ready card as a red card',
 assert_true('view wires the five OP queue cards in JS',
     strpos($view, 'c.travel_tomorrow_not_ready_op') !== false
     && strpos($view, 'c.pending_review_op') !== false);
+assert_true('view wires the travel_today_op card in JS',
+    strpos($view, 'c.travel_today_op') !== false);
 
 // The booking list forwards only an allowlist of URL params into its DataTables
 // AJAX (ajax_list) and summary-totals AJAX (ajax_summary). Both new drill-down

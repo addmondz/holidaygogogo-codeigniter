@@ -666,12 +666,13 @@ class Booking_Model extends CI_Model
 	function Read_Bookings_With_Guest_Lists($group_by_booking_id)
 	{
 		if($group_by_booking_id == 'Y') {
-			$this->db->select('booking.BookingID, BookingNumber, ReservationNumber, DepositDeadline, FullPaymentDeadline, Customer, booking.Mobile As CustomerMobile, StartDate, EndDate, Adult, Children, Infant, BookingRemark, Subtotal, Discount, NetTotal, booking.ChatLanguage As ChatLanguage, CancelStatus, booking.PartialRefund, LockStatus, booking.is_submitted, AfterSalesService, booking.Status, booking.InsertDate, MAX(guest_list.CountryCodeID) As GuestCountryCode, MAX(Type) As Type, MAX(guest_list.Name) As GuestName, MAX(guest_list.Gender) As Gender, MAX(DateOfBirth) As DateOfBirth, MAX(Nationality) As Nationality, MAX(guest_list.IdentificationNumber) As IdentificationNumber, MAX(guest_list.PassportNumber) As PassportNumber, MAX(guest_list.Mobile) As GuestMobile, MAX(guest_list.Email) As Email, MAX(MaritalStatus) As MaritalStatus, MAX(Employment) As Employment, MAX(guest_list.Address) As Address, MAX(Postcode) As Postcode, MAX(guest_list.City) As City, MAX(guest_list.State) As State, MAX(guest_list.Country) As Country, MAX(Nominee) As Nominee, MAX(NomineeIdentificationNumber) As NomineeIdentificationNumber, MAX(Relationship) As Relationship, admin.Name As SalesAgentName, category.Name As DestinationName, CountryCode, source.Name As SourceName', FALSE);
+			$this->db->select('booking.BookingID, BookingNumber, ReservationNumber, DepositDeadline, FullPaymentDeadline, Customer, booking.Mobile As CustomerMobile, StartDate, EndDate, Adult, Children, Infant, BookingRemark, Subtotal, Discount, NetTotal, booking.ChatLanguage As ChatLanguage, CancelStatus, booking.PartialRefund, LockStatus, booking.is_submitted, AfterSalesService, booking.Status, booking.InsertDate, MAX(guest_list.CountryCodeID) As GuestCountryCode, MAX(Type) As Type, MAX(guest_list.Name) As GuestName, MAX(guest_list.Gender) As Gender, MAX(DateOfBirth) As DateOfBirth, MAX(Nationality) As Nationality, MAX(guest_list.IdentificationNumber) As IdentificationNumber, MAX(guest_list.PassportNumber) As PassportNumber, MAX(guest_list.Mobile) As GuestMobile, MAX(guest_list.Email) As Email, MAX(MaritalStatus) As MaritalStatus, MAX(Employment) As Employment, MAX(guest_list.Address) As Address, MAX(Postcode) As Postcode, MAX(guest_list.City) As City, MAX(guest_list.State) As State, MAX(guest_list.Country) As Country, MAX(Nominee) As Nominee, MAX(NomineeIdentificationNumber) As NomineeIdentificationNumber, MAX(Relationship) As Relationship, admin.Name As SalesAgentName, sa2_admin.Name As SalesAgent2Name, category.Name As DestinationName, CountryCode, source.Name As SourceName', FALSE);
 		} else {
-			$this->db->select('booking.BookingID, BookingNumber, ReservationNumber, DepositDeadline, FullPaymentDeadline, Customer, booking.Mobile As CustomerMobile, StartDate, EndDate, Adult, Children, Infant, BookingRemark, Subtotal, Discount, NetTotal, booking.ChatLanguage As ChatLanguage, CancelStatus, booking.PartialRefund, LockStatus, booking.is_submitted, AfterSalesService, booking.Status, booking.InsertDate, guest_list.CountryCodeID As GuestCountryCode, Type, guest_list.Name As GuestName, guest_list.Gender, DateOfBirth, Nationality, guest_list.IdentificationNumber, guest_list.PassportNumber, guest_list.Mobile As GuestMobile, guest_list.Email, MaritalStatus, Employment, guest_list.Address, Postcode, guest_list.City, guest_list.State, guest_list.Country, Nominee, NomineeIdentificationNumber, Relationship, admin.Name As SalesAgentName, category.Name As DestinationName, CountryCode, source.Name As SourceName');
+			$this->db->select('booking.BookingID, BookingNumber, ReservationNumber, DepositDeadline, FullPaymentDeadline, Customer, booking.Mobile As CustomerMobile, StartDate, EndDate, Adult, Children, Infant, BookingRemark, Subtotal, Discount, NetTotal, booking.ChatLanguage As ChatLanguage, CancelStatus, booking.PartialRefund, LockStatus, booking.is_submitted, AfterSalesService, booking.Status, booking.InsertDate, guest_list.CountryCodeID As GuestCountryCode, Type, guest_list.Name As GuestName, guest_list.Gender, DateOfBirth, Nationality, guest_list.IdentificationNumber, guest_list.PassportNumber, guest_list.Mobile As GuestMobile, guest_list.Email, MaritalStatus, Employment, guest_list.Address, Postcode, guest_list.City, guest_list.State, guest_list.Country, Nominee, NomineeIdentificationNumber, Relationship, admin.Name As SalesAgentName, sa2_admin.Name As SalesAgent2Name, category.Name As DestinationName, CountryCode, source.Name As SourceName');
 		}
 		$this->db->join('guest_list', 'guest_list.BookingID = booking.BookingID', 'left');
 		$this->db->join('admin', 'admin.AdminID = booking.SalesAgent', 'left');
+		$this->db->join('admin AS sa2_admin', 'sa2_admin.AdminID = booking.SalesAgent2', 'left');
 		$this->db->join('category', 'category.CategoryID = booking.Destination', 'left');
 		$this->db->join('country_code', 'country_code.CountryCodeID = booking.CountryCodeID', 'left');
 		$this->db->join('source', 'source.SourceID = booking.Source', 'left');
@@ -2191,9 +2192,11 @@ class Booking_Model extends CI_Model
 		$ignore = 0;
 
 		// TRIM() both sides so leading/trailing whitespace in either the
-		// stored customer / booking.Customer / guest_list name, or in the
-		// user's input, does not hide bookings. Mirrors the customer-list
-		// filter via customer_name_search_helper.
+		// stored customer / booking.Customer name, or in the user's input,
+		// does not hide bookings. Mirrors the customer-list filter via
+		// customer_name_search_helper. Matches the customer name only (not
+		// guest-list names) so a guest sharing the search term does not pull
+		// in an unrelated booking.
 		$customer_raw = $this->input->get('customer');
 		$customer_q = trim((string) $customer_raw);
 		if ($customer_q !== '') {
@@ -2201,15 +2204,6 @@ class Booking_Model extends CI_Model
 			$this->db->group_start();
 				$this->db->where(customer_name_trim_like_fragment('booking.Customer', $like, 'both'), null, false);
 				$this->db->or_where(customer_name_trim_like_fragment('customer.name', $like, 'both'), null, false);
-				$this->db->or_where(
-					"EXISTS (SELECT 1 FROM guest_list gl
-						WHERE gl.BookingID = booking.BookingID
-						  AND gl.Status = 'Y'
-						  AND (TRIM(gl.Name) LIKE '%{$like}%'
-							OR TRIM(gl.LastName) LIKE '%{$like}%'
-							OR TRIM(CONCAT_WS(' ', gl.Name, gl.LastName)) LIKE '%{$like}%'))",
-					null, false
-				);
 			$this->db->group_end();
 			$ignore = 1;
 		}

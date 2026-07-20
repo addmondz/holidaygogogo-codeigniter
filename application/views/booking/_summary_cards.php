@@ -840,6 +840,20 @@
                 </a>
             </div>
             <div class="col-md-3">
+                <a class="summary-card" id="sc-travel-today-op-link" href="#">
+                    <div class="card card-custom">
+                        <div class="card-header border-0 summary-card-header" style="background-color:#A0D8EF30;">
+                            <h3>Travelling Today</h3>
+                            <i id="pop-travel-today-op" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>What it shows:</strong> All confirmed bookings whose travel starts today, whatever stage they&rsquo;re at.<br><br><strong>Counted when:</strong><ul><li>Travel starts today</li><li>It is a confirmed booking, not cancelled or draft</li></ul>Based on the departure date (trips that merely pass through today are not included). Click to view them."></i>
+                        </div>
+                        <div class="card-body summary-card-body">
+                            <div class="summary-value" id="sc-travel-today-op-count">...</div>
+                            <div class="summary-sub">All BCs whose travel starts today, regardless of status. Click to view the list.</div>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            <div class="col-md-3">
                 <a class="summary-card" id="sc-travel-tomorrow-op-link" href="#">
                     <div class="card card-custom">
                         <div class="card-header border-0 summary-card-header" style="background-color:#A0D8EF30;">
@@ -1846,6 +1860,10 @@ $(function() {
         if(c.pending_bc_confirmation_op) {
             setText('sc-pending-bc-confirmation-op-count', c.pending_bc_confirmation_op.count);
             setLink('sc-pending-bc-confirmation-op-link',  c.pending_bc_confirmation_op.link);
+        }
+        if(c.travel_today_op) {
+            setText('sc-travel-today-op-count', c.travel_today_op.count);
+            setLink('sc-travel-today-op-link',  c.travel_today_op.link);
         }
         if(c.travel_tomorrow_op) {
             setText('sc-travel-tomorrow-op-count', c.travel_tomorrow_op.count);

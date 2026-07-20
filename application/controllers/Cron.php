@@ -1219,6 +1219,7 @@ class Cron extends CI_Controller
 	{
 		$this->load->helper('duty_hours');
 		$this->load->helper('ghl_lead_segmentation');
+		$this->load->helper('ghl_bot_autoreply');
 
 		$messages = $this->Ghl_Processed_Leads_Model->get_conversation_messages($conversationId, $messageUpdatedBefore);
 		$existingConversions = $this->Ghl_Processed_Leads_Model->get_existing_conversion_map($conversationId);
@@ -1236,6 +1237,7 @@ class Cron extends CI_Controller
 		$currentLead = null;
 		$fallbackContactId = null;
 		$lastMessageTimestamp = null;
+		$lastMessageDirection = null;
 		$now = date('Y-m-d H:i:s');
 
 		foreach ($messages as $message) {
@@ -1287,6 +1289,13 @@ class Cron extends CI_Controller
 						'is_converted' => 0,
 						'booking_id' => null,
 						'converted_at' => null,
+						// Instant inbound right after our outbound blast = bot auto-reply,
+						// not a real new lead. Flag it so reports can exclude it.
+						'is_bot_bounce' => (int) ghl_is_bot_autoreply_bounce(
+							$lastMessageDirection,
+							$lastMessageTimestamp,
+							$messageTimestamp
+						),
 						'created_at' => $now,
 						'updated_at' => $now,
 						'_response_history' => array(),
@@ -1363,6 +1372,7 @@ class Cron extends CI_Controller
 			}
 
 			$lastMessageTimestamp = $messageTimestamp;
+			$lastMessageDirection = $message['direction'];
 		}
 
 		if ($currentLead !== null) {

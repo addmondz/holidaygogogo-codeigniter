@@ -83,7 +83,8 @@ class Ghl_Lead_Ownership_Model extends CI_Model
                 pl.follow_up_status,
                 pl.is_converted,
                 pl.booking_id,
-                pl.converted_at
+                pl.converted_at,
+                pl.is_bot_bounce
             FROM ghl_processed_leads pl
             LEFT JOIN ghl_conversations gc ON gc.conversation_id = pl.conversation_id
             WHERE " . implode(' AND ', $clauses) . "
@@ -299,6 +300,12 @@ class Ghl_Lead_Ownership_Model extends CI_Model
             if (!$this->db->field_exists('assigned_at', 'ghl_lead_ownership')) {
                 foreach ($ownershipRows as &$ownershipRow) {
                     unset($ownershipRow['assigned_at']);
+                }
+                unset($ownershipRow);
+            }
+            if (!$this->db->field_exists('is_bot_bounce', 'ghl_lead_ownership')) {
+                foreach ($ownershipRows as &$ownershipRow) {
+                    unset($ownershipRow['is_bot_bounce']);
                 }
                 unset($ownershipRow);
             }

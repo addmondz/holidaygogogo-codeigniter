@@ -21,6 +21,7 @@ class Customer_Portal extends CI_Controller
         $this->load->model('Notification_Model');
         $this->load->helper('utils');
         $this->load->helper('booking_flow');
+        $this->load->helper('guest_contact');
         $this->load->library('session');
     }
 
@@ -77,6 +78,20 @@ class Customer_Portal extends CI_Controller
             $booking['PaxInfo'] = $this->format_pax_info($pax['adult'], $pax['child'], $pax['infant']);
             $booking['status_display'] = $this->get_booking_status_display_for_list($booking);
         }
+
+        // The customer's phone_number is stored as a raw local number with no
+        // calling code (the code lives on the booking). Derive the calling code
+        // from the customer's bookings so the WhatsApp number displays and links
+        // in proper international form (e.g. "+60 169546738" / wa.me/60169546738).
+        $calling_code = '';
+        foreach (array_merge($bookings_data['upcoming'], $bookings_data['completed'], $bookings_data['cancelled']) as $b) {
+            if (!empty($b['CountryCode'])) {
+                $calling_code = $b['CountryCode'];
+                break;
+            }
+        }
+        $customer['phone_display'] = guest_contact_format_display($calling_code, $customer['phone_number']);
+        $customer['phone_wa']      = guest_contact_wa_digits($calling_code, $customer['phone_number']);
 
         // Prepare data for view
         $data = [

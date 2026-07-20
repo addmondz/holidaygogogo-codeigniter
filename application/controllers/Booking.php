@@ -1798,7 +1798,8 @@ class Booking extends MY_Controller
 				   SUM(CASE WHEN pl.lead_started_at BETWEEN ? AND ? THEN 1 ELSE 0 END) AS week_active,
 				   SUM(CASE WHEN pl.lead_started_at BETWEEN ? AND ? THEN 1 ELSE 0 END) AS month_active
 				 FROM ghl_processed_leads pl
-				 WHERE pl.is_converted = 0",
+				 WHERE pl.is_converted = 0
+				   AND pl.is_bot_bounce = 0",
 				array(
 					$today       . ' 00:00:00', $today       . ' 23:59:59',
 					$week_start  . ' 00:00:00', $week_end    . ' 23:59:59',
@@ -2152,6 +2153,26 @@ class Booking extends MY_Controller
 			$cards['pending_bc_confirmation_op'] = array(
 				'count' => (int)$row->cnt,
 				'link'  => $op_link(array('status' => 'PBC')),
+			);
+
+			// Travelling Today (regardless of status) — BCs whose travel STARTS
+			// today, any workflow status. Same shape as Travelling Tomorrow below,
+			// scoped to today's departure date.
+			$row = $this->db->query(
+				"SELECT COUNT(*) AS cnt FROM booking
+				 WHERE BookingConfirmationTitle='BOOKING CONFIRMATION'
+				   AND CancelStatus='N' AND Status!='N'
+				   AND StartDate BETWEEN ? AND ?
+				   AND {$op_sa_in}",
+				array($today, $today)
+			)->row();
+			$cards['travel_today_op'] = array(
+				'count' => (int)$row->cnt,
+				'link'  => $op_link(array(
+					'travel_start_date'          => $fmt_dmy($today) . ' - ' . $fmt_dmy($today),
+					'status'                     => 'A',
+					'booking_confirmation_title' => 'BOOKING CONFIRMATION',
+				)),
 			);
 
 			// Travelling Tomorrow (regardless of status) — BCs whose travel STARTS
@@ -3206,6 +3227,19 @@ class Booking extends MY_Controller
 				'<strong>Team-wide live list &middot; as of ' . $fmt_disp($today) . '</strong> &mdash; no date limit.<br>' .
 				'<strong>This card:</strong> ' . $n . ' ' . $plural($n, 'booking') . ' &rarr; <strong>' . $n . '</strong><br><br>' .
 				'<strong>What to do:</strong> click to view and approve the booking confirmation.';
+		}
+		if(isset($cards['travel_today_op'])) {
+			$n = (int)$cards['travel_today_op']['count'];
+			$popovers['pop-travel-today-op'] =
+				'<strong>What it shows:</strong> All confirmed bookings whose travel starts today, whatever stage they&rsquo;re at.<br><br>' .
+				'<strong>Counted when:</strong>' .
+				'<ul>' .
+				'<li>Travel <strong>starts today</strong> (' . $fmt_disp($today) . ')</li>' .
+				'<li>It is a confirmed booking, not cancelled or draft</li>' .
+				'<li><strong>Any</strong> stage</li>' .
+				'</ul>' .
+				'<strong>This card (team-wide):</strong> ' . $n . ' ' . $plural($n, 'booking') . ' &rarr; <strong>' . $n . '</strong><br><br>' .
+				'<strong>Note:</strong> based on the departure date (trips that merely pass through today are not included).';
 		}
 		if(isset($cards['travel_tomorrow_op'])) {
 			$n = (int)$cards['travel_tomorrow_op']['count'];
@@ -5736,34 +5770,35 @@ class Booking extends MY_Controller
 		$spreadsheet->getActiveSheet()->setTitle('Booking Records');
 		$spreadsheet->getProperties()->setCreator('HolidayGoGoGo');
 		$spreadsheet->getActiveSheet()->setCellValue('A1', 'BOOKING DATE');
-		$spreadsheet->getActiveSheet()->setCellValue('B1', 'SALES AGENT');
-		$spreadsheet->getActiveSheet()->setCellValue('C1', 'BOOKING NUMBER');
-		$spreadsheet->getActiveSheet()->setCellValue('D1', 'RESERVATION NUMBER');
-		$spreadsheet->getActiveSheet()->setCellValue('E1', 'CUSTOMER');
-		$spreadsheet->getActiveSheet()->setCellValue('F1', 'MOBILE');
-		$spreadsheet->getActiveSheet()->setCellValue('G1', 'TRAVEL DATE');
-		$spreadsheet->getActiveSheet()->setCellValue('H1', 'PAX NUMBER');
-		$spreadsheet->getActiveSheet()->setCellValue('I1', 'DEPOSIT DEADLINE');
-		$spreadsheet->getActiveSheet()->setCellValue('J1', 'FULL PAYMENT DEADLINE');
-		$spreadsheet->getActiveSheet()->setCellValue('K1', 'DESTINATION');
-		$spreadsheet->getActiveSheet()->setCellValue('L1', 'SUBTOTAL');
-		$spreadsheet->getActiveSheet()->setCellValue('M1', 'DISCOUNT');
-		$spreadsheet->getActiveSheet()->setCellValue('N1', 'NET TOTAL');
+		$spreadsheet->getActiveSheet()->setCellValue('B1', 'SALES AGENT 1');
+		$spreadsheet->getActiveSheet()->setCellValue('C1', 'SALES AGENT 2');
+		$spreadsheet->getActiveSheet()->setCellValue('D1', 'BOOKING NUMBER');
+		$spreadsheet->getActiveSheet()->setCellValue('E1', 'RESERVATION NUMBER');
+		$spreadsheet->getActiveSheet()->setCellValue('F1', 'CUSTOMER');
+		$spreadsheet->getActiveSheet()->setCellValue('G1', 'MOBILE');
+		$spreadsheet->getActiveSheet()->setCellValue('H1', 'TRAVEL DATE');
+		$spreadsheet->getActiveSheet()->setCellValue('I1', 'PAX NUMBER');
+		$spreadsheet->getActiveSheet()->setCellValue('J1', 'DEPOSIT DEADLINE');
+		$spreadsheet->getActiveSheet()->setCellValue('K1', 'FULL PAYMENT DEADLINE');
+		$spreadsheet->getActiveSheet()->setCellValue('L1', 'DESTINATION');
+		$spreadsheet->getActiveSheet()->setCellValue('M1', 'SUBTOTAL');
+		$spreadsheet->getActiveSheet()->setCellValue('N1', 'DISCOUNT');
+		$spreadsheet->getActiveSheet()->setCellValue('O1', 'NET TOTAL');
 		if(!$hide_profit) {
-			$spreadsheet->getActiveSheet()->setCellValue('O1', 'PROFIT');
+			$spreadsheet->getActiveSheet()->setCellValue('P1', 'PROFIT');
 		}
-		$spreadsheet->getActiveSheet()->setCellValue('P1', 'STATUS');
-		$spreadsheet->getActiveSheet()->setCellValue('Q1', 'REMARK');
-		$spreadsheet->getActiveSheet()->setCellValue('R1', 'CHAT LANGUAGE');
-		$spreadsheet->getActiveSheet()->setCellValue('S1', 'SOURCE');
+		$spreadsheet->getActiveSheet()->setCellValue('Q1', 'STATUS');
+		$spreadsheet->getActiveSheet()->setCellValue('R1', 'REMARK');
+		$spreadsheet->getActiveSheet()->setCellValue('S1', 'CHAT LANGUAGE');
+		$spreadsheet->getActiveSheet()->setCellValue('T1', 'SOURCE');
 		$row = 2;
 		$bookings = $this->Booking_Model->Read_Bookings_With_Guest_Lists('Y');
 		if(isset($_GET['nick'])) {
 			print_r($this->db->last_query());exit;
 		}
-		$spreadsheet->getActiveSheet()->getStyle('A1:S1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_BLACK);
-		$spreadsheet->getActiveSheet()->getStyle('A1:S1')->getFont()->getColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_WHITE);
-		$spreadsheet->getActiveSheet()->getStyle('A1:S1')->getFont()->setBold(true);
+		$spreadsheet->getActiveSheet()->getStyle('A1:T1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_BLACK);
+		$spreadsheet->getActiveSheet()->getStyle('A1:T1')->getFont()->getColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_WHITE);
+		$spreadsheet->getActiveSheet()->getStyle('A1:T1')->getFont()->setBold(true);
 		if(!empty($bookings)) {
 			$total_subtotal = 0;
 			$total_discount = 0;
@@ -5893,48 +5928,49 @@ class Booking extends MY_Controller
 				$total_profit += $net_profit;
 				$spreadsheet->getActiveSheet()->setCellValueExplicit('A' . $row, $booking->InsertDate, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 				$spreadsheet->getActiveSheet()->setCellValueExplicit('B' . $row, $booking->SalesAgentName, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-				$spreadsheet->getActiveSheet()->setCellValueExplicit('C' . $row, $booking->BookingNumber, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-				$spreadsheet->getActiveSheet()->setCellValueExplicit('D' . $row, $booking->ReservationNumber, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-				$spreadsheet->getActiveSheet()->setCellValueExplicit('E' . $row, $booking->Customer, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-				$spreadsheet->getActiveSheet()->setCellValueExplicit('F' . $row, $booking->CustomerMobile, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-				$spreadsheet->getActiveSheet()->setCellValueExplicit('G' . $row, $booking->TravelDate, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-				$spreadsheet->getActiveSheet()->setCellValueExplicit('H' . $row, $booking->PaxNumber, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-				$spreadsheet->getActiveSheet()->setCellValueExplicit('I' . $row, $booking->DepositDeadline, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-				$spreadsheet->getActiveSheet()->setCellValueExplicit('J' . $row, $booking->FullPaymentDeadline, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-				$spreadsheet->getActiveSheet()->setCellValueExplicit('K' . $row, $booking->DestinationName, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-				$spreadsheet->getActiveSheet()->setCellValue('L' . $row, $booking->Subtotal);
-				$spreadsheet->getActiveSheet()->setCellValue('M' . $row, $booking->Discount);
-				$spreadsheet->getActiveSheet()->setCellValue('N' . $row, $booking->NetTotal);
+				$spreadsheet->getActiveSheet()->setCellValueExplicit('C' . $row, $booking->SalesAgent2Name, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+				$spreadsheet->getActiveSheet()->setCellValueExplicit('D' . $row, $booking->BookingNumber, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+				$spreadsheet->getActiveSheet()->setCellValueExplicit('E' . $row, $booking->ReservationNumber, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+				$spreadsheet->getActiveSheet()->setCellValueExplicit('F' . $row, $booking->Customer, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+				$spreadsheet->getActiveSheet()->setCellValueExplicit('G' . $row, $booking->CustomerMobile, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+				$spreadsheet->getActiveSheet()->setCellValueExplicit('H' . $row, $booking->TravelDate, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+				$spreadsheet->getActiveSheet()->setCellValueExplicit('I' . $row, $booking->PaxNumber, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+				$spreadsheet->getActiveSheet()->setCellValueExplicit('J' . $row, $booking->DepositDeadline, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+				$spreadsheet->getActiveSheet()->setCellValueExplicit('K' . $row, $booking->FullPaymentDeadline, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+				$spreadsheet->getActiveSheet()->setCellValueExplicit('L' . $row, $booking->DestinationName, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+				$spreadsheet->getActiveSheet()->setCellValue('M' . $row, $booking->Subtotal);
+				$spreadsheet->getActiveSheet()->setCellValue('N' . $row, $booking->Discount);
+				$spreadsheet->getActiveSheet()->setCellValue('O' . $row, $booking->NetTotal);
 				if(!$hide_profit) {
-					$spreadsheet->getActiveSheet()->setCellValue('O' . $row, $booking->Profit);
+					$spreadsheet->getActiveSheet()->setCellValue('P' . $row, $booking->Profit);
 				}
-				$spreadsheet->getActiveSheet()->setCellValueExplicit('P' . $row, $booking->Status, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-				$spreadsheet->getActiveSheet()->setCellValueExplicit('Q' . $row, $booking->BookingRemark, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-				$spreadsheet->getActiveSheet()->setCellValueExplicit('R' . $row, $booking->ChatLanguage, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-				$spreadsheet->getActiveSheet()->setCellValueExplicit('S' . $row, $booking->SourceName, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+				$spreadsheet->getActiveSheet()->setCellValueExplicit('Q' . $row, $booking->Status, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+				$spreadsheet->getActiveSheet()->setCellValueExplicit('R' . $row, $booking->BookingRemark, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+				$spreadsheet->getActiveSheet()->setCellValueExplicit('S' . $row, $booking->ChatLanguage, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+				$spreadsheet->getActiveSheet()->setCellValueExplicit('T' . $row, $booking->SourceName, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 				$row++;
 			}
 			$total_profit = $total_profit != 0 && $total_net_total != 0 ? number_format($total_profit, 2, '.', ',') . ' (' . round(($total_profit / $total_net_total) * 100) . '%)' : number_format($total_profit, 2, '.', ',') . ' (0%)';
-			$spreadsheet->getActiveSheet()->getStyle('L')->getNumberFormat()->setFormatCode('"RM "#,##0.00_-');
 			$spreadsheet->getActiveSheet()->getStyle('M')->getNumberFormat()->setFormatCode('"RM "#,##0.00_-');
 			$spreadsheet->getActiveSheet()->getStyle('N')->getNumberFormat()->setFormatCode('"RM "#,##0.00_-');
+			$spreadsheet->getActiveSheet()->getStyle('O')->getNumberFormat()->setFormatCode('"RM "#,##0.00_-');
 			if(!$hide_profit) {
-				$spreadsheet->getActiveSheet()->getStyle('O')->getNumberFormat()->setFormatCode('"RM "#,##0.00_-');
+				$spreadsheet->getActiveSheet()->getStyle('P')->getNumberFormat()->setFormatCode('"RM "#,##0.00_-');
 			}
-			$spreadsheet->getActiveSheet()->getCell('K' . ($row + 2))->setValue('Total');
-			$spreadsheet->getActiveSheet()->getStyle('L' . ($row + 2) . ':' . 'O' . ($row + 2))->getBorders()->getTop()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-			$spreadsheet->getActiveSheet()->setCellValue('L' . ($row + 2), $total_subtotal);
-			$spreadsheet->getActiveSheet()->setCellValue('M' . ($row + 2), $total_discount);
-			$spreadsheet->getActiveSheet()->setCellValue('N' . ($row + 2), $total_net_total);
+			$spreadsheet->getActiveSheet()->getCell('L' . ($row + 2))->setValue('Total');
+			$spreadsheet->getActiveSheet()->getStyle('M' . ($row + 2) . ':' . 'P' . ($row + 2))->getBorders()->getTop()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+			$spreadsheet->getActiveSheet()->setCellValue('M' . ($row + 2), $total_subtotal);
+			$spreadsheet->getActiveSheet()->setCellValue('N' . ($row + 2), $total_discount);
+			$spreadsheet->getActiveSheet()->setCellValue('O' . ($row + 2), $total_net_total);
 			if(!$hide_profit) {
-				$spreadsheet->getActiveSheet()->setCellValue('O' . ($row + 2), $total_profit);
+				$spreadsheet->getActiveSheet()->setCellValue('P' . ($row + 2), $total_profit);
 			}
-			$spreadsheet->getActiveSheet()->getStyle('L' . ($row + 2) . ':' . 'O' . ($row + 2))->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_DOUBLE);
-			$spreadsheet->getActiveSheet()->getStyle('A:S')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_RIGHT);
+			$spreadsheet->getActiveSheet()->getStyle('M' . ($row + 2) . ':' . 'P' . ($row + 2))->getBorders()->getBottom()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_DOUBLE);
+			$spreadsheet->getActiveSheet()->getStyle('A:T')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_RIGHT);
 		} else {
-			$spreadsheet->getActiveSheet()->mergeCells('A2:S2');
+			$spreadsheet->getActiveSheet()->mergeCells('A2:T2');
 			$spreadsheet->getActiveSheet()->getCell('A2')->setValue('Booking Records Not Found');
-			$spreadsheet->getActiveSheet()->getStyle('A:S')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
+			$spreadsheet->getActiveSheet()->getStyle('A:T')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
 		}
 		$spreadsheet->getActiveSheet()->getColumnDimension('A')->setWidth(35);
 		$spreadsheet->getActiveSheet()->getColumnDimension('B')->setWidth(35);
@@ -5955,10 +5991,11 @@ class Booking extends MY_Controller
 		$spreadsheet->getActiveSheet()->getColumnDimension('Q')->setWidth(35);
 		$spreadsheet->getActiveSheet()->getColumnDimension('R')->setWidth(35);
 		$spreadsheet->getActiveSheet()->getColumnDimension('S')->setWidth(35);
+		$spreadsheet->getActiveSheet()->getColumnDimension('T')->setWidth(35);
 		if($hide_profit) {
 			// Profit column left empty for Sales Agents / Marketing — hide it so the
 			// sheet reads NET TOTAL -> STATUS with no blank gap.
-			$spreadsheet->getActiveSheet()->getColumnDimension('O')->setVisible(false);
+			$spreadsheet->getActiveSheet()->getColumnDimension('P')->setVisible(false);
 		}
 
 		if($this->input->get('checkbox') == 'ON') {

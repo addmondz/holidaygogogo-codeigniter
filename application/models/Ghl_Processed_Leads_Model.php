@@ -363,6 +363,14 @@ class Ghl_Processed_Leads_Model extends CI_Model
             }
             unset($lead);
 
+            // Drop is_bot_bounce for DBs that have not run the 20260717 migration.
+            if (!$this->db->field_exists('is_bot_bounce', 'ghl_processed_leads')) {
+                foreach ($leads as &$lead) {
+                    unset($lead['is_bot_bounce']);
+                }
+                unset($lead);
+            }
+
             $this->db->insert_batch('ghl_processed_leads', $leads);
         }
 

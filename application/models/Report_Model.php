@@ -1997,6 +1997,7 @@ class Report_Model extends CI_Model
                     OR gm.{$messageTimeColumn} < glo.lead_ended_at
                )
             WHERE glo.is_reply_owner = 1
+              AND glo.is_bot_bounce = 0
               AND glo.owner_user_id IN ({$placeholders})
               AND gm.{$messageTimeColumn} BETWEEN ? AND ?
               AND {$businessHours}
@@ -2041,6 +2042,7 @@ class Report_Model extends CI_Model
             SELECT COUNT(DISTINCT glo.processed_lead_id) AS assigned_new_leads
             FROM ghl_lead_ownership glo
             WHERE glo.is_assigned_owner = 1
+              AND glo.is_bot_bounce = 0
               AND NULLIF(glo.assigned_to_user_id, '') = glo.owner_user_id
               AND NOT EXISTS (
                   SELECT 1 FROM ghl_processed_leads conv_pl
@@ -2079,14 +2081,27 @@ class Report_Model extends CI_Model
         $start = !empty($filters['start_date']) ? $filters['start_date'] . ' 00:00:00' : '1970-01-01 00:00:00';
         $end = !empty($filters['end_date']) ? $filters['end_date'] . ' 23:59:59' : '9999-12-31 23:59:59';
 
+        // Inbound is attributed to the RESPONDER (whoever sent the next outbound reply in
+        // that conversation), not to every co-owner -- a conversation carries one
+        // ghl_lead_ownership row per agent who ever replied, so per-owner counting would
+        // credit this owner with a thread another agent is actually working. Inbound nobody
+        // answered is credited to no one. "Leads Handled" (leads_count) = distinct
+        // conversations the owner actually replied to this hour (outbound only; an inbound
+        // that got no reply is not counted). Keep SQL comments OUT of the string below --
+        // CodeIgniter flattens the query to one line, so a "--" comment would eat the rest.
         $sql = "
             SELECT
                 HOUR(gm.{$messageTimeColumn}) AS hour_of_day,
-                COUNT(DISTINCT CASE WHEN gm.direction = 'inbound' THEN gm.id END) AS inbound_count,
+                COUNT(DISTINCT CASE WHEN gm.direction = 'inbound'
+                     AND glo.owner_user_id = (
+                         SELECT o.user_id FROM ghl_messages o
+                         WHERE o.conversation_id = gm.conversation_id
+                           AND o.direction = 'outbound' AND o.user_id IS NOT NULL AND o.user_id <> ''
+                           AND (o.{$messageTimeColumn} > gm.{$messageTimeColumn}
+                                OR (o.{$messageTimeColumn} = gm.{$messageTimeColumn} AND o.id > gm.id))
+                         ORDER BY o.{$messageTimeColumn} ASC, o.id ASC LIMIT 1)
+                     THEN gm.id END) AS inbound_count,
                 COUNT(DISTINCT CASE WHEN gm.direction = 'outbound' AND gm.user_id = glo.owner_user_id THEN gm.id END) AS outbound_count,
-                -- Leads Handled = leads this owner actually REPLIED to this hour:
-                -- distinct conversations where the owner sent an outbound message.
-                -- A lead that only sent inbound and got no reply is NOT counted.
                 COUNT(DISTINCT CASE WHEN gm.direction = 'outbound' AND gm.user_id = glo.owner_user_id THEN glo.conversation_id END) AS leads_count
             FROM ghl_lead_ownership glo
             INNER JOIN ghl_messages gm
@@ -2132,12 +2147,30 @@ class Report_Model extends CI_Model
         $start = !empty($filters['start_date']) ? $filters['start_date'] . ' 00:00:00' : '1970-01-01 00:00:00';
         $end = !empty($filters['end_date']) ? $filters['end_date'] . ' 23:59:59' : '9999-12-31 23:59:59';
 
+        // A conversation carries one ghl_lead_ownership row per agent who ever replied to
+        // it (all is_reply_owner = 1). Counting inbound per owner row credits EVERY co-owner
+        // with the whole thread's inbound stream, so an agent who merely shares a lead
+        // another agent is actively working gets phantom inbound activity. So inbound is
+        // attributed to exactly ONE agent: the RESPONDER, whoever sent the next outbound
+        // reply in that conversation. Inbound nobody answered is credited to no one.
+        // Outbound stays with its own sender, so In and Out describe the same agent's work.
+        // NOTE: keep SQL comments OUT of the string below -- CodeIgniter flattens the query
+        // to one line, which turns any "--" comment into a trailing comment that eats the
+        // rest of the statement.
         $sql = "
             SELECT
                 glo.owner_user_id AS owner_user_id,
                 COALESCE(NULLIF(gu.Name, ''), glo.owner_user_id) AS owner_name,
                 HOUR(gm.{$messageTimeColumn}) AS hour_of_day,
-                COUNT(DISTINCT CASE WHEN gm.direction = 'inbound' THEN gm.id END) AS inbound_count,
+                COUNT(DISTINCT CASE WHEN gm.direction = 'inbound'
+                     AND glo.owner_user_id = (
+                         SELECT o.user_id FROM ghl_messages o
+                         WHERE o.conversation_id = gm.conversation_id
+                           AND o.direction = 'outbound' AND o.user_id IS NOT NULL AND o.user_id <> ''
+                           AND (o.{$messageTimeColumn} > gm.{$messageTimeColumn}
+                                OR (o.{$messageTimeColumn} = gm.{$messageTimeColumn} AND o.id > gm.id))
+                         ORDER BY o.{$messageTimeColumn} ASC, o.id ASC LIMIT 1)
+                     THEN gm.id END) AS inbound_count,
                 COUNT(DISTINCT CASE WHEN gm.direction = 'outbound' AND gm.user_id = glo.owner_user_id THEN gm.id END) AS outbound_count
             FROM ghl_lead_ownership glo
             INNER JOIN ghl_messages gm
@@ -3423,6 +3456,7 @@ class Report_Model extends CI_Model
                   AND gm.{$messageTimeColumn} >= glo.lead_started_at
                   AND (glo.lead_ended_at IS NULL OR gm.{$messageTimeColumn} < glo.lead_ended_at)
               WHERE glo.is_reply_owner = 1
+                AND glo.is_bot_bounce = 0
                 AND gm.{$messageTimeColumn} >= ?
                 AND gm.{$messageTimeColumn} <= ?
                 AND (
@@ -3886,6 +3920,10 @@ class Report_Model extends CI_Model
         $params = array();
         $extraJoins = '';
 
+        // Instant auto-replies bounced back by our blast are not real leads
+        // (see ghl_bot_autoreply_helper). Exclude them from every lead figure.
+        $clauses[] = 'pl.is_bot_bounce = 0';
+
         // Server-only restriction set by the controller for non-OWNER users.
         // Empty list => zero rows. Never sourced from request input.
         if (array_key_exists('_restrict_agent_ids', $filters)) {
@@ -3997,6 +4035,9 @@ class Report_Model extends CI_Model
         $clauses = array();
         $params = array();
         $extraJoins = '';
+
+        // Blast bot-bounce auto-replies are not real leads.
+        $clauses[] = 'glo.is_bot_bounce = 0';
 
         if (array_key_exists('_restrict_agent_ids', $filters)) {
             $allowed = array_values(array_filter(
@@ -4215,6 +4256,8 @@ class Report_Model extends CI_Model
         // time) via lead_reply_pickup_date_expression().
         $clauses[] = 'glo.is_assigned_owner = 1';
         $clauses[] = "NULLIF(glo.assigned_to_user_id, '') = glo.owner_user_id";
+        // Instant blast bot-bounces are not real new leads.
+        $clauses[] = 'glo.is_bot_bounce = 0';
 
         // ...but a customer who ALREADY converted is not a new lead. The 24h
         // post-conversion split (ghl_lead_segmentation_helper) opens a fresh lead
@@ -4293,6 +4336,8 @@ class Report_Model extends CI_Model
         $extraJoins = '';
 
         $clauses[] = 'glo.is_reply_owner = 1';
+        // Instant blast bot-bounces are not real leads.
+        $clauses[] = 'glo.is_bot_bounce = 0';
 
         if (array_key_exists('_restrict_agent_ids', $filters)) {
             $allowed = array_values(array_filter(
