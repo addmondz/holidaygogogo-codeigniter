@@ -1,0 +1,1 @@
+ALTER TABLE `booking_log` ADD COLUMN `SnapshotPDF` VARCHAR(255) DEFAULT NULL AFTER `NewData`;

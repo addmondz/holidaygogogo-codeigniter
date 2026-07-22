@@ -12,9 +12,14 @@
                         <i class="la la-product-hunt"></i>Create Product
                     </a>
                     <?php $current_url = base_url($_SERVER['REQUEST_URI']); ?>
-                    <a href="<?php if(strpos($current_url, '?') == true) { echo base_url('Product/Download?') . (explode('?', $current_url))[1]; } else { echo base_url('Product/Download'); } ?>" class="btn btn-light-warning font-weight-bold mb-2" style="width:180px;">
+                    <a href="<?php if(strpos($current_url, '?') == true) { echo base_url('Product/Download?') . (explode('?', $current_url))[1]; } else { echo base_url('Product/Download'); } ?>" class="btn btn-light-warning font-weight-bold mr-1 mb-2" style="width:180px;">
                         <i class="las la-arrow-circle-down"></i>Product Records
                     </a>
+                    <?php if(!empty($products)) { ?>
+                    <button type="button" id="btn_bulk_add_checklist" class="btn btn-light-success font-weight-bold mb-2" style="width:200px;">
+                        <i class="las la-check-square"></i>Add Checklist to All
+                    </button>
+                    <?php } ?>
                 </div>
             </div>
             <div class="card-body">
@@ -98,7 +103,7 @@
                             <?php } else { ?>
                                 <?php $count = 1; ?>
                                 <?php foreach($products as $product) { ?>
-                                    <tr>
+                                    <tr data-product-id="<?php echo $product->ProductID; ?>">
                                         <td style="text-align:center; padding-top:15px; padding-bottom:15px;"><?php echo $count; ?></td>
                                         <td style="text-align:center;"><?php echo $product->ProductCode; ?></td>
                                         <td style="text-align:center;"><?php echo $product->Product; ?></td>
@@ -132,5 +137,105 @@
     
     $('#reset').click(function() {
         Reset('<?php echo base_url('Product'); ?>');
+    });
+
+    $('#btn_bulk_add_checklist').click(function() {
+        var product_ids = [];
+        $('#kt_datatable tbody tr[data-product-id]').each(function() {
+            product_ids.push($(this).data('product-id'));
+        });
+
+        if(product_ids.length === 0) {
+            Display_Message('<?php echo base_url('assets/image/sweetalert.jpg'); ?>', 'No products found', null);
+            return;
+        }
+
+        var checklist_options = '';
+        <?php if(!empty($checklists)) { ?>
+            <?php foreach($checklists as $checklist) { ?>
+                checklist_options += '<option value="<?php echo $checklist->ID; ?>"><?php echo addslashes($checklist->name); ?><?php echo $checklist->is_required == 1 ? ' (Required)' : ''; ?></option>';
+            <?php } ?>
+        <?php } ?>
+
+        var checklist_checkboxes = '';
+        <?php if(!empty($checklists)) { ?>
+            <?php foreach($checklists as $checklist) { ?>
+                checklist_checkboxes += '<div class="checkbox-inline" style="display:block; text-align:left; margin-bottom:8px;">' +
+                    '<label class="checkbox checkbox-success">' +
+                    '<input type="checkbox" class="swal-checklist-cb" value="<?php echo $checklist->ID; ?>">' +
+                    '<span></span>&nbsp;<?php echo addslashes($checklist->name); ?>' +
+                    '</label></div>';
+            <?php } ?>
+        <?php } ?>
+
+        Swal.fire({
+            title: 'Add Checklist to All Products',
+            html: '<p>This will add the selected checklist(s) to <strong>' + product_ids.length + '</strong> product(s).</p>' +
+                  '<div style="max-height:300px; overflow-y:auto; padding:10px;">' + checklist_checkboxes + '</div>',
+            background: 'url(<?php echo base_url('assets/image/sweetalert.jpg'); ?>)',
+            showCancelButton: true,
+            confirmButtonText: 'Add Checklist',
+            cancelButtonText: 'Cancel',
+            confirmButtonColor: '#1BC5BD',
+            preConfirm: function() {
+                var selected = [];
+                document.querySelectorAll('.swal-checklist-cb:checked').forEach(function(cb) {
+                    selected.push(cb.value);
+                });
+                if(selected.length === 0) {
+                    Swal.showValidationMessage('Please select at least one checklist');
+                    return false;
+                }
+                return selected;
+            }
+        }).then(function(result) {
+            if(result.isConfirmed) {
+                var checklist_ids = result.value;
+
+                Swal.fire({
+                    title: 'Processing...',
+                    text: 'Adding checklist to ' + product_ids.length + ' product(s)',
+                    allowOutsideClick: false,
+                    didOpen: function() {
+                        Swal.showLoading();
+                    }
+                });
+
+                $.ajax({
+                    url: '<?php echo base_url('Product/BulkAddChecklist'); ?>',
+                    type: 'POST',
+                    data: {
+                        checklist_ids: checklist_ids,
+                        product_ids: product_ids
+                    },
+                    dataType: 'json',
+                    success: function(response) {
+                        if(response.success) {
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Success',
+                                text: response.message,
+                                background: 'url(<?php echo base_url('assets/image/sweetalert.jpg'); ?>)'
+                            });
+                        } else {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Error',
+                                text: response.message,
+                                background: 'url(<?php echo base_url('assets/image/sweetalert.jpg'); ?>)'
+                            });
+                        }
+                    },
+                    error: function() {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: 'An error occurred. Please try again.',
+                            background: 'url(<?php echo base_url('assets/image/sweetalert.jpg'); ?>)'
+                        });
+                    }
+                });
+            }
+        });
     });
 </script>

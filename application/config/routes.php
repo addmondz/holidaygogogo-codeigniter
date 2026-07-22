@@ -50,8 +50,21 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 |		my-controller/my-method	-> my_controller/my_method
 */
 
+$env = [];
+if (file_exists(FCPATH . '.env')) {
+    $lines = file(FCPATH . '.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    foreach ($lines as $line) {
+        if (strpos(trim($line), '#') === 0) continue;
+        list($key, $value) = explode('=', $line, 2);
+        $env[trim($key)] = trim($value);
+    }
+}
+
+$baseUrl = $env['BASE_URL'];
+$domain = parse_url($baseUrl, PHP_URL_HOST);
+
 if(isset($_SERVER['SERVER_NAME'])){
-	if($_SERVER['SERVER_NAME'] == 'gl.holidaygogogo.com') {
+    if ( $_SERVER['SERVER_NAME'] === $domain && isset($_GET['gl']) ) {
 		$route['default_controller'] = 'Guest_List';
 	} else {
 		$route['default_controller'] = 'Dashboard';
@@ -61,3 +74,41 @@ if(isset($_SERVER['SERVER_NAME'])){
 
 $route['404_override'] = '';
 $route['translate_uri_dashes'] = FALSE;
+$route['customer/search'] = 'customer/search';
+$route['customer/check_duplicate'] = 'customer/check_duplicate';
+$route['ghl-details'] = 'Ghl_Details';
+$route['message-log'] = 'Message_Log';
+$route['message-log-csv'] = 'Message_Log/csv';
+
+// Map lowercase CLI URIs to the mixed-case controller class so they resolve on
+// case-sensitive (Linux) prod filesystems, not just case-insensitive local ones.
+$route['backfill_team_snapshot_cutoff'] = 'Backfill_Team_Snapshot_Cutoff';
+$route['backfill_team_snapshot_cutoff/(:any)'] = 'Backfill_Team_Snapshot_Cutoff/$1';
+
+
+
+/*
+|--------------------------------------------------------------------------
+| Customer Portal
+|--------------------------------------------------------------------------
+|
+*/
+$route['customer/booking/(:any)/invoice-split/save'] = 'Customer_Portal/save_invoice_split/$1';
+$route['customer/booking/(:any)/invoice-split/submit'] = 'Customer_Portal/submit_invoice_split/$1';
+$route['customer/booking/(:any)/invoice-split'] = 'Customer_Portal/get_invoice_split/$1';
+$route['customer/booking/(:any)/review'] = 'Customer_Portal/submit_review/$1';
+$route['customer/booking/(:any)/remarks'] = 'Customer_Portal/get_customer_remarks/$1';
+$route['customer/booking/(:any)/remark'] = 'Customer_Portal/add_customer_remark/$1';
+$route['customer/booking/(:any)'] = 'Customer_Portal/booking_details/$1';
+$route['customer/(:any)/verify'] = 'Customer_Portal/verify_phone/$1';
+$route['customer/(:any)'] = 'Customer_Portal/dashboard/$1';
+
+/*
+|--------------------------------------------------------------------------
+| FAQ per-FAQ page
+|--------------------------------------------------------------------------
+| Each FAQ gets its own page at /faq/<slug>, served by Faq::Page() and
+| login-protected via MY_Controller. The admin actions live under capital-F
+| /Faq/... and are unaffected by this lowercase catch-all.
+*/
+$route['faq/(:any)'] = 'Faq/Page/$1';

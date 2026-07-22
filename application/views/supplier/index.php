@@ -8,13 +8,16 @@
                     </h3>
                 </div>
                 <div class="card-toolbar">
-                    <a href="<?php echo base_url('Supplier/Create'); ?>" class="btn btn-primary font-weight-bold mr-1 mb-2" style="width:180px;">
+                    <a href="<?php echo base_url('Supplier/Create'); ?>" class="btn btn-primary font-weight-bold mr-2 mb-2">
                         <i class="la la-user-alt"></i>Create Supplier
                     </a>
                     <?php $current_url = base_url($_SERVER['REQUEST_URI']); ?>
-                    <a href="<?php if(strpos($current_url, '?') == true) { echo base_url('Supplier/Download?') . (explode('?', $current_url))[1]; } else { echo base_url('Supplier/Download'); } ?>" class="btn btn-light-warning font-weight-bold mb-2" style="width:180px;">
+                    <a href="<?php if(strpos($current_url, '?') == true) { echo base_url('Supplier/Download?') . (explode('?', $current_url))[1]; } else { echo base_url('Supplier/Download'); } ?>" class="btn btn-light-warning font-weight-bold mr-1 mb-2" style="width:180px;">
                         <i class="las la-arrow-circle-down"></i>Supplier Records
                     </a>
+                    <!-- <a href="<?php echo base_url('Supplier/MapSupplierCodes'); ?>" class="btn btn-light-info font-weight-bold mb-2" style="width:200px;">
+                        <i class="la la-file-upload"></i>import supplier code
+                    </a> -->
                 </div>
             </div>
             <div class="card-body">
@@ -157,6 +160,10 @@
                                 <th style="text-align:center;">No.</th>
                                 <th style="text-align:center;">Name</th>
                                 <th style="text-align:center;">Phone</th>
+                                <th style="text-align:center;">Supplier Code (Autocount Creditor Code)</th>
+                                <?php if(in_array((int)$this->session->userdata('level'), [10, 30])) { ?>
+                                <th style="text-align:center;">Autocount Status</th>
+                                <?php } ?>
                                 <th class="action" style="text-align:center;">Action</th>
                             </tr>
                         </thead>
@@ -170,11 +177,61 @@
                                         <td style="text-align:center; padding-top:15px; padding-bottom:15px;"><?php echo $count; ?></td>
                                         <td style="text-align:center;"><?php echo $supplier->Name; ?></td>
                                         <td style="text-align:center;"><?php echo $supplier->Phone; ?></td>
+                                        <td style="text-align:center;"><?php echo $supplier->SupplierCode; ?></td>
+                                        <?php if(in_array((int)$this->session->userdata('level'), [10, 30])) { ?>
+                                        <td style="text-align:center;">
+                                            <?php
+                                                // default
+                                                $statusColor = '#000000';
+                                                $statusText  = 'UNKNOWN';
+
+                                                // only handle P, S, F
+                                                switch ($supplier->AutocountSyncStatus) {
+                                                    case 'P': $statusColor = '#808080'; $statusText = 'Pending'; break;
+                                                    case 'S': $statusColor = '#50C878'; $statusText = 'Synced'; break;
+                                                    case 'F': $statusColor = '#FF4500'; $statusText = 'Failed'; break;
+                                                }
+
+                                                // tooltip
+                                                $tooltipAttr = '';
+                                                if (!empty($supplier->AutocountSyncMessage)) {
+                                                    $decoded = json_decode($supplier->AutocountSyncMessage, true);
+
+                                                    if (json_last_error() === JSON_ERROR_NONE) {
+                                                        if (isset($decoded['error']) && $decoded['error'] === null) {
+                                                            $tooltipText = "SUCCESS";
+                                                        } elseif (isset($decoded['error']) && $decoded['error'] !== null) {
+                                                            $tooltipText = "ERROR: " . (is_string($decoded['error']) ? $decoded['error'] : json_encode($decoded['error']));
+                                                        } else {
+                                                            $tooltipText = $supplier->AutocountSyncMessage; // raw JSON
+                                                        }
+                                                    } else {
+                                                        $tooltipText = $supplier->AutocountSyncMessage;
+                                                    }
+
+                                                    $tooltipAttr = ' data-toggle="tooltip" data-placement="top" title="' . htmlspecialchars($tooltipText) . '"';
+                                                }
+                                            ?>
+                                            <span class="font-weight-bold" style="color:<?= $statusColor ?>;" <?= $tooltipAttr ?>>
+                                                <?= $statusText ?>
+                                            </span>
+                                        </td>
+                                        <?php } ?>
                                         <td style="text-align:center;">
                                             <div class="btn-group">
                                                 <button type="button" data-toggle="dropdown" class="btn btn-light-primary btn-sm dropdown-toggle" style="padding-left:3px;"></button>
                                                 <div class="dropdown-menu">
-                                                    <button onclick="Delete_Record('<?php echo base_url('assets/image/sweetalert.jpg'); ?>', '<?php echo 'Supplier Record : ' . str_replace('\'', '', $supplier->Name); ?>', '<?php echo base_url('Supplier/Delete'); ?>', 'supplier_id', <?php echo $supplier->SupplierID; ?>, '<?php echo $supplier->Status; ?>', '<?php if(strpos($current_url, '?') == true) { echo base_url('Supplier?') . (explode('?', $current_url))[1]; } else { echo base_url('Supplier'); } ?>')" class="dropdown-item" style="color:#E37383; font-size:11px;">Delete Supplier</button>
+                                                    <?php if($this->session->level == 10) { ?>
+                                                    <button onclick="Delete_Record(
+                                                        '<?php echo base_url('assets/image/sweetalert.jpg'); ?>',
+                                                        '<?php echo 'Supplier Record : ' . str_replace('\'', '', $supplier->Name); ?>',
+                                                        '<?php echo base_url('Supplier/Delete'); ?>',
+                                                        'supplier_id',
+                                                        <?php echo $supplier->SupplierID; ?>,
+                                                        '<?php echo $supplier->Status; ?>',
+                                                        '<?php if(strpos($current_url, '?') == true) { echo base_url('Supplier?') . (explode('?', $current_url))[1]; } else { echo base_url('Supplier'); } ?>'
+                                                    )" class="dropdown-item" style="color:#E37383; font-size:11px;">Delete Supplier</button>
+                                                    <?php } ?>
                                                     <a href="<?php echo base_url('Supplier/Update?supplier_id=') . $supplier->SupplierID; ?>" class="dropdown-item" style="font-size:11px;">Update Supplier</a>
                                                 </div>
                                             </div>

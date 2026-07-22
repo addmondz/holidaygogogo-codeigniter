@@ -84,7 +84,14 @@
 	<header>
 		<table>
 			<tr>
-				<td style="width:15%"><img src="<?php echo base_url('assets/image/pdflogo.png'); ?>" style="width:160px;"></td>
+				<?php
+					$logoPath = FCPATH.'assets/image/pdflogo-new.jpeg';
+					$imgData  = base64_encode(file_get_contents($logoPath));
+					$imgSrc   = 'data:image/jpeg;base64,'.$imgData;
+				?>
+				<td style="width:15%">
+					<img src="<?= $imgSrc ?>" style="width:160px;">
+				</td>
 				<td style="width:85%; text-align: center;">
 					<h1><?php echo $CompanyName; ?></h1>
 					<small>(Co. Reg. No. - <?php echo $CompanyRegistrationNumber; ?> | Travel Agent License No. - <?php echo $CompanyLicenseNumber; ?>)</small>
@@ -142,17 +149,9 @@
 				<td>No. Of Guests</td>
 				<td> : </td>
 				<td><?php echo $PaxNumber; ?></td>
-				<td>Sales Agent</td>
+				<td><?php echo $PICLabel; ?></td>
 				<td> : </td>
-				<td><?php echo $SalesAgentName . ' (' . $SalesAgentMobile . ')'; ?></td>
-			</tr>
-			<tr>
-				<td>Deposit By</td>
-				<td> : </td>
-				<td><?php echo $DepositDeadline; ?></td>
-				<td>Full Payment By</td>
-				<td> : </td>
-				<td><?php echo $FullPaymentDeadline; ?></td>
+				<td><?php echo $PICText; ?></td>
 			</tr>
 		</table>
 		<hr style="margin-bottom:0px;">
@@ -189,11 +188,13 @@
 	</div>
 	<div style="position: absolute; top: auto; bottom: 0; ">
 		<footer style="">
+			<p style="font-size:12px; margin-bottom:5px;">Check your booking status and request E Invoice - <?php echo $CustomerProfileURL; ?></p>
+			<p style="font-size:12px; margin-bottom:5px;">E Invoice request must be submitted on/before end of trip.</p>
 			<hr style="margin-bottom:5px;">
 			<table style="width:100%; margin-bottom:10px;">
 				<?php if($Discount != 0.00){ ?>
 				<tr>
-					<td style="width:32%">Deposit By : <?php echo $DepositDeadline; ?></td>
+					<td style="width:32%"><?php if($DepositDeadline !== '-'){ ?>Deposit By : <?php echo $DepositDeadline; ?><br>Deposit Amount : RM <?php echo number_format($DepositAmount, 2, '.', ','); ?><?php } ?></td>
 					<td style="width:42%">Full Payment By : <?php echo $FullPaymentDeadline; ?></td>
 					<td style="width:16%; border-bottom: 1px solid black;">Subtotal (RM):</td>
 					<td style="width:12%; text-align:right; float: left; border-bottom: 1px solid black;"><label><?php echo number_format($Subtotal, 2, '.', ','); ?></label></td>
@@ -212,17 +213,27 @@
 				</tr>
 				<?php }else{ ?>
 					<tr style="font-weight:bold;">
-						<td style="width:32%">Deposit By : <?php echo $DepositDeadline; ?></td>
+						<td style="width:32%"><?php if($DepositDeadline !== '-'){ ?>Deposit By : <?php echo $DepositDeadline; ?><br>Deposit Amount : RM <?php echo number_format($DepositAmount, 2, '.', ','); ?><?php } ?></td>
 						<td style="width:42%">Full Payment By : <?php echo $FullPaymentDeadline; ?></td>
 						<td style="width:20%;">Total (RM):</td>
 						<td style="width:8%; text-align:right; float: left;"><label><?php echo number_format($NetTotal, 2, '.', ','); ?></label></td>
 					</tr>
 				<?php } ?>
 				<tr>
+					<td>&nbsp;</td>
+					<td>&nbsp;</td>
+					<td style="border-bottom: 1px solid black;">Total Paid (RM):</td>
+					<td style="text-align:right; float: left; border-bottom: 1px solid black;"><label><?php echo number_format(isset($TotalPaid) ? $TotalPaid : 0, 2, '.', ','); ?></label></td>
+				</tr>
+				<tr>
+					<td>&nbsp;</td>
+					<td>&nbsp;</td>
+					<td style="border-bottom: 1px solid black;">Outstanding (RM):</td>
+					<td style="text-align:right; float: left; border-bottom: 1px solid black;"><label><?php echo number_format(isset($OutstandingBalance) ? $OutstandingBalance : $NetTotal, 2, '.', ','); ?></label></td>
+				</tr>
+				<tr>
 					<td colspan="2"><p style="margin-top:10px;">MayBank 5128-4851-0541 "HolidayGoGoGo Tours Sdn Bhd"</p></td>
-					<td>
-						&nbsp;
-					</td>
+					<td>&nbsp;</td>
 					<td>&nbsp;</td>
 				</tr>
 			</table>

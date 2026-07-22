@@ -1,6 +1,66 @@
+# === Security: block sensitive files from direct web access ===
+# NOTE: This is a denylist stopgap. The durable fix is to point the web server's
+# document root at a dedicated public/ folder so non-public files are physically
+# unreachable. These rules also only apply under Apache/LiteSpeed with
+# AllowOverride enabled — do not treat them as the only line of defense.
+
+# Never list directory contents.
+Options -Indexes
+
+# Deny dotfiles and dot-directories (.env, .git, .htaccess, .user.ini, ...),
+# except ACME's /.well-known used for TLS challenges.
+RedirectMatch 403 (?i)(^|/)\.(?!well-known/)[^/]+
+
+# Deny sensitive/non-public file types and dumps even if not dot-prefixed.
+# Covers configs, DB dumps, archives, data exports, scripts, and editor/backup
+# leftovers. Static assets (css/js/images/fonts/pdf) are intentionally absent.
+<FilesMatch "(?i)\.(env|ini|sh|bash|sql|sqlite|db|dump|bak|backup|old|orig|save|swp|swo|tmp|dist|lock|log|inc|phps|json|yml|yaml|csv|tsv|xls|xlsx|gz|tgz|zip|tar|rar|7z)$">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+  </IfModule>
+</FilesMatch>
+
+# Security response headers.
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "SAMEORIGIN"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  # HSTS: only safe if the whole site is HTTPS (it is — booking.* is https).
+  Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+</IfModule>
+
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
   RewriteRule ^(.*)$ index.php/$1 [L]
+</IfModule>
+
+# PHP runtime limits — only applied under mod_php.
+# On PHP-FPM/CGI/FastCGI these IfModule guards skip the block;
+# .user.ini in document root covers those SAPIs instead.
+<IfModule mod_php.c>
+  php_value max_input_vars 10000
+  php_value post_max_size 64M
+  php_value upload_max_filesize 32M
+  php_value max_execution_time 300
+  php_value memory_limit 256M
+</IfModule>
+<IfModule mod_php7.c>
+  php_value max_input_vars 10000
+  php_value post_max_size 64M
+  php_value upload_max_filesize 32M
+  php_value max_execution_time 300
+  php_value memory_limit 256M
+</IfModule>
+<IfModule mod_php8.c>
+  php_value max_input_vars 10000
+  php_value post_max_size 64M
+  php_value upload_max_filesize 32M
+  php_value max_execution_time 300
+  php_value memory_limit 256M
 </IfModule>

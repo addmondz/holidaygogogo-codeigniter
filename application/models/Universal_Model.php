@@ -5,14 +5,16 @@ class Universal_Model extends CI_Model
 	{
 		$this->db->select('Country');
 		$this->db->where('CountryCodeID', $country_code_id);
-		return $this->db->get('country_code')->row()->Country;
+		$row = $this->db->get('country_code')->row();
+		return $row ? $row->Country : null;
 	}
-	
+
 	function Read_Country_Code($country_code_id)
 	{
 		$this->db->select('CountryCode');
 		$this->db->where('CountryCodeID', $country_code_id);
-		return $this->db->get('country_code')->row()->CountryCode;
+		$row = $this->db->get('country_code')->row();
+		return $row ? $row->CountryCode : '';
 	}
 
 	function Delete($column, $value, $table)

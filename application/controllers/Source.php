@@ -50,9 +50,14 @@ class Source extends MY_Controller
 		}
 	}
 	
-	function Delete() 
+	function Delete()
 	{
 		$this->Universal_Model->Delete('SourceID', $this->input->get('source_id'), 'source');
+	}
+
+	function Toggle_Status()
+	{
+		$this->Source_Model->Toggle_Status($this->input->get('source_id'));
 	}
 
 	function Detect() {

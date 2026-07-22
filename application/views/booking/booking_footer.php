@@ -95,7 +95,14 @@
 	<header>
 		<table>
 			<tr>
-				<td style="width:15%"><img src="<?php echo base_url('assets/image/pdflogo.png'); ?>" style="width:160px;"></td>
+				<?php
+					$logoPath = FCPATH.'assets/image/pdflogo.png';
+					$imgData  = base64_encode(file_get_contents($logoPath));
+					$imgSrc   = 'data:image/png;base64,'.$imgData;
+				?>
+				<td style="width:15%">
+					<img src="<?= $imgSrc ?>" style="width:160px;">
+				</td>
 				<td style="width:85%; text-align: center;">
 					<h1><?php echo $CompanyName; ?></h1>
 					<small>(Co. Reg. No. - <?php echo $CompanyRegistrationNumber; ?> | Travel Agent License No. - <?php echo $CompanyLicenseNumber; ?>)</small>
@@ -153,17 +160,9 @@
 				<td>No. Of Guests</td>
 				<td> : </td>
 				<td><?php echo $PaxNumber; ?></td>
-				<td>Sales Agent</td>
+				<td><?php echo $PICLabel; ?></td>
 				<td> : </td>
-				<td><?php echo $SalesAgentName . ' (' . $SalesAgentMobile . ')'; ?></td>
-			</tr>
-			<tr>
-				<td>Deposit By</td>
-				<td> : </td>
-				<td><?php echo $DepositDeadline; ?></td>
-				<td>Full Payment By</td>
-				<td> : </td>
-				<td><?php echo $FullPaymentDeadline; ?></td>
+				<td><?php echo $PICText; ?></td>
 			</tr>
 		</table>
 		<hr style="margin-bottom:0px;">

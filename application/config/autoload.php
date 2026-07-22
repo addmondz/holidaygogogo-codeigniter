@@ -89,7 +89,7 @@ $autoload['drivers'] = array();
 |
 |	$autoload['helper'] = array('url', 'file');
 */
-$autoload['helper'] = array('url');
+$autoload['helper'] = array('url', 'autocount', 'utils', 'upload_cleanup', 'customer_name_search', 'company_address', 'booking_pic_pdf', 'setting_module_access', 'profit_visibility');
 
 /*
 | -------------------------------------------------------------------
@@ -103,7 +103,7 @@ $autoload['helper'] = array('url');
 | config files.  Otherwise, leave it blank.
 |
 */
-$autoload['config'] = array();
+$autoload['config'] = array('features');
 
 /*
 | -------------------------------------------------------------------

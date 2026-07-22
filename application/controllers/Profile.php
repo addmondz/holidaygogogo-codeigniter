@@ -26,6 +26,9 @@ class Profile extends MY_Controller
 					case 30:
 						$array['Level'] = 'FINANCE';
 						break;
+					case 60:
+						$array['Level'] = 'MARKETING';
+						break;
 					default:
 				}
 				$array['country_codes'] = $this->Admin_Model->Read_Country_Codes();

@@ -20,8 +20,17 @@ class Login extends CI_Controller
 					case 20:
 						$priviledge = 'SALES AGENT';
 						break;
+					case 25:
+						$priviledge = 'TEAM LEAD';
+						break;
 					case 30:
 						$priviledge = 'FINANCE';
+						break;
+					case 45:
+						$priviledge = 'OP TEAM LEAD';
+						break;
+					case 60:
+						$priviledge = 'MARKETING';
 						break;
 					default:
 				}
@@ -35,7 +44,7 @@ class Login extends CI_Controller
 				);
 				$this->activity_log('Login Success - Username:'.$_POST["username"].', Password:'.$_POST["password"], 'Y', $login->AdminID);
 				$this->session->set_userdata($session);
-				redirect('Dashboard');
+				redirect(in_array($login->Level, [20, 40, 45, 60]) ? 'Booking' : 'Dashboard');
 			} else {
 				$this->activity_log('Login Fail - Username:'.$_POST["username"].', Password:'.$_POST["password"], 'N', null);
 				$array = array('error_message' => 'Invalid Login');
