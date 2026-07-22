@@ -165,6 +165,19 @@ class Guests_Model extends CI_Model
 				$where     .= " AND gl.Email LIKE ? ";
 				$b_params[] = '%' . $email . '%';
 			}
+			// Customer Code / Date Creation live on the linked customer master
+			// (c.CustomerCode / c.created_at), so they filter the customer row.
+			$customer_code = trim((string)$this->input->get('customer_code'));
+			if($customer_code !== '') {
+				$where     .= " AND c.CustomerCode LIKE ? ";
+				$b_params[] = '%' . $customer_code . '%';
+			}
+			$create_range = guest_list_parse_date_range($this->input->get('create_date'));
+			if($create_range !== null) {
+				$where     .= " AND c.created_at >= ? AND c.created_at < DATE_ADD(?, INTERVAL 1 DAY) ";
+				$b_params[] = $create_range[0];
+				$b_params[] = $create_range[1];
+			}
 			// Dropdown filters are multi-select (see views/guests/index.php): each
 			// may arrive as several values, so they filter via an IN (...) list.
 			$this->Append_In_Clause($where, $b_params, 'b.Destination',                    $this->input->get('destination'));
@@ -175,15 +188,17 @@ class Guests_Model extends CI_Model
 			$this->Append_In_Clause($where, $b_params, 'gl.Gender',                        $this->input->get('gender'));
 			$this->Append_In_Clause($where, $b_params, 'gl.Type',                          $this->input->get('guest_type'));
 			$this->Append_In_Clause($where, $b_params, 'COALESCE(c.ChatLanguage, b.ChatLanguage)', $this->input->get('language'));
-			// "Exclude Campaign" drops guests already in a specific campaign's
-			// roster (the campaign_guests snapshot), so you can build a fresh
-			// audience without re-inviting people who already joined. Keyed on
-			// dedup_key so it matches the same person across all their bookings.
-			$joined_campaign = (int)$this->input->get('joined_campaign');
-			if($joined_campaign > 0) {
-				$where     .= " AND NOT EXISTS (SELECT 1 FROM campaign_guests cg
-					WHERE cg.CampaignID = ? AND cg.DedupKey = gl.dedup_key) ";
-				$b_params[] = $joined_campaign;
+			// "Campaign" filter keys off the campaign_guests roster snapshot.
+			// Multi-select over ANY of the picked campaigns; mode = include keeps
+			// guests who joined them, exclude drops them. Keyed on dedup_key so it
+			// matches the same person across every one of their bookings.
+			$joined_campaigns = guest_list_multi_values($this->input->get('joined_campaign'));
+			if(!empty($joined_campaigns)) {
+				$ph  = implode(',', array_fill(0, count($joined_campaigns), '?'));
+				$neg = $this->input->get('campaign_mode') === 'exclude' ? 'NOT ' : '';
+				$where .= " AND {$neg}EXISTS (SELECT 1 FROM campaign_guests cg
+					WHERE cg.CampaignID IN ({$ph}) AND cg.DedupKey = gl.dedup_key) ";
+				foreach($joined_campaigns as $cid) { $b_params[] = (int)$cid; }
 			}
 			if($has_q) {
 				// Search Name matches the guest's own name OR their booking's team
@@ -279,12 +294,15 @@ class Guests_Model extends CI_Model
 				$g_params[] = '%' . $email . '%';
 			}
 
-			// "Exclude Campaign" drops leads already in a campaign roster.
-			$joined_campaign = (int)$this->input->get('joined_campaign');
-			if($joined_campaign > 0) {
-				$ghl_where .= " AND NOT EXISTS (SELECT 1 FROM campaign_guests cg
-					WHERE cg.CampaignID = ? AND cg.DedupKey = {$gc_dedup}) ";
-				$g_params[] = $joined_campaign;
+			// "Campaign" filter over leads in a campaign roster; multi-select over
+			// any of the picked campaigns, include/exclude via campaign_mode.
+			$joined_campaigns = guest_list_multi_values($this->input->get('joined_campaign'));
+			if(!empty($joined_campaigns)) {
+				$ph  = implode(',', array_fill(0, count($joined_campaigns), '?'));
+				$neg = $this->input->get('campaign_mode') === 'exclude' ? 'NOT ' : '';
+				$ghl_where .= " AND {$neg}EXISTS (SELECT 1 FROM campaign_guests cg
+					WHERE cg.CampaignID IN ({$ph}) AND cg.DedupKey = {$gc_dedup}) ";
+				foreach($joined_campaigns as $cid) { $g_params[] = (int)$cid; }
 			}
 
 			// GHL Leads is its own page now, so the query reads ghl_contacts only —
@@ -354,6 +372,8 @@ WHERE 1 = 1
 		gl.DateOfBirth,
 		b.Token          AS Token,
 		b.InsertDate     AS BookingDate,
+		c.CustomerCode   AS CustomerCode,
+		c.created_at     AS CustomerCreatedAt,
 		b.StartDate      AS TravelStart,
 		b.EndDate        AS TravelEnd,
 		CASE WHEN gl.dedup_key = COALESCE(
@@ -445,6 +465,19 @@ WHERE 1 = 1
 			$params[] = $tl_clause['param'];
 		}
 
+		// Customer Code / Date Creation on the leader's linked customer master.
+		$customer_code = trim((string)$this->input->get('customer_code'));
+		if($customer_code !== '') {
+			$where   .= " AND c.CustomerCode LIKE ? ";
+			$params[] = '%' . $customer_code . '%';
+		}
+		$create_range = guest_list_parse_date_range($this->input->get('create_date'));
+		if($create_range !== null) {
+			$where   .= " AND c.created_at >= ? AND c.created_at < DATE_ADD(?, INTERVAL 1 DAY) ";
+			$params[] = $create_range[0];
+			$params[] = $create_range[1];
+		}
+
 		$this->Append_In_Clause($where, $params, 'b.BookingID',   $this->input->get('booking_id'));
 		$this->Append_In_Clause($where, $params, 'b.Destination', $this->input->get('destination'));
 		$this->Append_In_Clause($where, $params, 'b.SalesAgent',  $this->input->get('sales_agent'));
@@ -452,13 +485,16 @@ WHERE 1 = 1
 		$this->Append_In_Clause($where, $params, 'c.customer_type', $this->input->get('customer_type'));
 		$this->Append_In_Clause($where, $params, "COALESCE(c.ChatLanguage, b.ChatLanguage)", $this->input->get('language'));
 
-		// "Exclude Campaign" drops leaders already in a campaign roster; the
+		// "Campaign" filter over leaders in a campaign roster; multi-select over
+		// any of the picked campaigns, include/exclude via campaign_mode. The
 		// synthesized leader row is keyed on the booking's leader phone key.
-		$joined_campaign = (int)$this->input->get('joined_campaign');
-		if($joined_campaign > 0) {
-			$where   .= " AND NOT EXISTS (SELECT 1 FROM campaign_guests cg
-				WHERE cg.CampaignID = ? AND cg.DedupKey = {$key}) ";
-			$params[] = $joined_campaign;
+		$joined_campaigns = guest_list_multi_values($this->input->get('joined_campaign'));
+		if(!empty($joined_campaigns)) {
+			$ph  = implode(',', array_fill(0, count($joined_campaigns), '?'));
+			$neg = $this->input->get('campaign_mode') === 'exclude' ? 'NOT ' : '';
+			$where .= " AND {$neg}EXISTS (SELECT 1 FROM campaign_guests cg
+				WHERE cg.CampaignID IN ({$ph}) AND cg.DedupKey = {$key}) ";
+			foreach($joined_campaigns as $cid) { $params[] = (int)$cid; }
 		}
 
 		$q_raw = trim((string)$this->input->get('q'));
@@ -514,7 +550,9 @@ WHERE 1 = 1
 		CONVERT(GROUP_CONCAT(DISTINCT DATE(b.InsertDate) ORDER BY DATE(b.InsertDate) SEPARATOR ',') USING utf8mb4) COLLATE utf8mb4_unicode_ci AS BookingDates,
 		CONVERT(GROUP_CONCAT(DISTINCT CONCAT(DATE(b.StartDate), '|', IFNULL(DATE(b.EndDate), '')) ORDER BY CONCAT(DATE(b.StartDate), '|', IFNULL(DATE(b.EndDate), '')) SEPARATOR ',') USING utf8mb4) COLLATE utf8mb4_unicode_ci AS TravelDates,
 		CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS IC,
-		CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS Tags
+		CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS Tags,
+		CONVERT(MAX(c.CustomerCode) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS CustomerCode,
+		MAX(c.created_at) AS CustomerCreatedAt
 	{$from}
 	GROUP BY {$key}
 		";
@@ -556,7 +594,9 @@ SELECT
 	CONVERT(GROUP_CONCAT(DISTINCT DATE(BookingDate) ORDER BY DATE(BookingDate) SEPARATOR ',') USING utf8mb4) COLLATE utf8mb4_unicode_ci AS BookingDates,
 	CONVERT(GROUP_CONCAT(DISTINCT CONCAT(DATE(TravelStart), '|', IFNULL(DATE(TravelEnd), '')) ORDER BY CONCAT(DATE(TravelStart), '|', IFNULL(DATE(TravelEnd), '')) SEPARATOR ',') USING utf8mb4) COLLATE utf8mb4_unicode_ci AS TravelDates,
 	CONVERT(MAX(CASE WHEN rn = 1 THEN IdentificationNumber END) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS IC,
-	CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS Tags
+	CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS Tags,
+	CONVERT(MAX(CASE WHEN rn = 1 THEN CustomerCode END) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS CustomerCode,
+	MAX(CASE WHEN rn = 1 THEN CustomerCreatedAt END) AS CustomerCreatedAt
 FROM (
 	{$this->Booking_Windowed_Select($dedup, $booking['from'])}
 ) t
@@ -598,7 +638,9 @@ SELECT
 	CONVERT(DATE(COALESCE(gc.date_added, gc.created_at)) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS BookingDates,
 	CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS TravelDates,
 	CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS IC,
-	CONVERT(gt.tags_concat USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Tags
+	CONVERT(gt.tags_concat USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Tags,
+	CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS CustomerCode,
+	CAST(NULL AS DATETIME) AS CustomerCreatedAt
 {$ghl['from']}
 			";
 			$params = array_merge($params, $ghl['params']);
@@ -676,7 +718,9 @@ SELECT
 	CONVERT(GROUP_CONCAT(mm.BookingDates SEPARATOR ',') USING utf8mb4) COLLATE utf8mb4_unicode_ci AS BookingDates,
 	CONVERT(GROUP_CONCAT(mm.TravelDates  SEPARATOR ',') USING utf8mb4) COLLATE utf8mb4_unicode_ci AS TravelDates,
 	MAX(CASE WHEN mm.rep_rn = 1 THEN mm.IC   END) AS IC,
-	MAX(CASE WHEN mm.rep_rn = 1 THEN mm.Tags END) AS Tags
+	MAX(CASE WHEN mm.rep_rn = 1 THEN mm.Tags END) AS Tags,
+	MAX(CASE WHEN mm.rep_rn = 1 THEN mm.CustomerCode      END) AS CustomerCode,
+	MAX(CASE WHEN mm.rep_rn = 1 THEN mm.CustomerCreatedAt END) AS CustomerCreatedAt
 FROM (
 	SELECT m.*,
 		{$mk} AS merge_key,
@@ -790,6 +834,19 @@ GROUP BY mm.merge_key";
 		if ($email !== '') {
 			$where   .= " AND c.PrimaryEmail LIKE ? ";
 			$params[] = '%' . $email . '%';
+		}
+
+		$customer_code = trim((string) $this->input->get('customer_code'));
+		if ($customer_code !== '') {
+			$where   .= " AND c.CustomerCode LIKE ? ";
+			$params[] = '%' . $customer_code . '%';
+		}
+
+		$create_range = guest_list_parse_date_range($this->input->get('create_date'));
+		if ($create_range !== null) {
+			$where   .= " AND c.created_at >= ? AND c.created_at < DATE_ADD(?, INTERVAL 1 DAY) ";
+			$params[] = $create_range[0];
+			$params[] = $create_range[1];
 		}
 
 		$this->Append_In_Clause($where, $params, 'c.ChatLanguage',  $this->input->get('language'));
@@ -1024,7 +1081,9 @@ GROUP BY mm.merge_key";
 		COALESCE(bagg.TotalPax, 0) AS TotalPax,
 		CAST('Booking Guest' AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS Type,
 		CONVERT(blatest.Token USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Token,
-		CONVERT(CASE WHEN bagg.AnyLeader = 1 THEN 'Team Leader' ELSE 'Team Member' END USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Role
+		CONVERT(CASE WHEN bagg.AnyLeader = 1 THEN 'Team Leader' ELSE 'Team Member' END USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Role,
+		CONVERT(c.CustomerCode USING utf8mb4) COLLATE utf8mb4_unicode_ci AS CustomerCode,
+		c.created_at AS CustomerCreatedAt
 	FROM customer c
 	LEFT JOIN {$blat} blatest ON blatest.CustomerID = c.CustomerID
 	LEFT JOIN country_code ccp ON ccp.CountryCodeID = blatest.CountryCodeID

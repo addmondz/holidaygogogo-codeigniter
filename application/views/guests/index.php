@@ -117,6 +117,7 @@ div.kt-datatable__pager-container {
 						<div id="guests_info" class="collapse">
 							<div class="card-body">
 								<form action="<?php echo base_url($list_base) ?>" method="get" class="form">
+										<?php if($list_base !== 'Ghl_Leads') { ?>
 									<div class="row">
 										<div class="col-md-3">
 											<div class="form-group">
@@ -362,9 +363,75 @@ div.kt-datatable__pager-container {
 												</div>
 											</div>
 										</div>
+										<div class="col-md-3">
+											<div class="form-group">
+												<label>Customer Code</label>
+												<div class="input-icon">
+													<input type="text" name="customer_code" value="<?php if(!empty($this->input->get('customer_code'))) { echo htmlspecialchars($this->input->get('customer_code'), ENT_QUOTES); } ?>" autocomplete="off" class="form-control" placeholder="e.g. HGG-A0001">
+													<span><i class="la la-id-card"></i></span>
+												</div>
+											</div>
+										</div>
+										<div class="col-md-3">
+											<div class="form-group">
+												<label>Date Creation
+													<a onclick="Reset_Create_Date()" class="btn btn-icon btn-light-warning btn-xs" data-toggle="tooltip" title="Clear date creation">
+														<i class="la la-undo"></i>
+													</a>
+												</label>
+												<div id="kt_daterangepicker_guests_create" class="input-icon">
+													<input readonly type="text" name="create_date" value="<?php if(!empty($this->input->get('create_date'))) { echo $this->input->get('create_date'); } ?>" autocomplete="off" class="form-control" placeholder="Customer created between…">
+													<span><i class="la la-calendar-plus"></i></span>
+												</div>
+											</div>
+										</div>
 										<?php } ?>
 									</div>
-									<input type="submit" value="Filter" class="btn btn-light-success font-weight-bold" style="width:80px;">
+									<?php } else { ?>
+										<div class="row">
+											<div class="col-md-3">
+												<div class="form-group">
+													<label>Search Name</label>
+													<div class="input-icon">
+														<input type="text" name="q" value="<?php if(!empty($this->input->get('q'))) { echo htmlspecialchars($this->input->get('q'), ENT_QUOTES); } ?>" autocomplete="off" class="form-control" placeholder="Lead name">
+														<span><i class="la la-user"></i></span>
+													</div>
+												</div>
+											</div>
+											<div class="col-md-3">
+												<div class="form-group">
+													<label>Contact Number</label>
+													<div class="input-icon">
+														<input type="text" name="contact_number" value="<?php if(!empty($this->input->get('contact_number'))) { echo htmlspecialchars($this->input->get('contact_number'), ENT_QUOTES); } ?>" autocomplete="off" class="form-control" placeholder="e.g. 0123456789">
+														<span><i class="la la-phone"></i></span>
+													</div>
+												</div>
+											</div>
+											<div class="col-md-3">
+												<div class="form-group">
+													<label>Email</label>
+													<div class="input-icon">
+														<input type="text" name="email" value="<?php if(!empty($this->input->get('email'))) { echo htmlspecialchars($this->input->get('email'), ENT_QUOTES); } ?>" autocomplete="off" class="form-control" placeholder="e.g. name@email.com">
+														<span><i class="la la-envelope"></i></span>
+													</div>
+												</div>
+											</div>
+											<div class="col-md-3">
+												<div class="form-group">
+													<label>Lead Capture Date
+														<a onclick="Reset_Booking_Date()" class="btn btn-icon btn-light-warning btn-xs" data-toggle="tooltip" title="Clear lead capture date">
+															<i class="la la-undo"></i>
+														</a>
+													</label>
+													<div id="kt_daterangepicker_guests_booking" class="input-icon">
+														<input readonly type="text" name="booking_date" value="<?php if(!empty($this->input->get('booking_date'))) { echo $this->input->get('booking_date'); } ?>" autocomplete="off" class="form-control">
+														<span><i class="la la-calendar"></i></span>
+													</div>
+												</div>
+											</div>
+										</div>
+										<?php } ?>
+										<input type="submit" value="Filter" class="btn btn-light-success font-weight-bold" style="width:80px;">
 									<input type="button" id="reset" value="Reset" class="btn btn-light-primary font-weight-bold" style="width:80px;">
 								</form>
 							</div>
@@ -379,24 +446,32 @@ div.kt-datatable__pager-container {
 							<tr>
 								<th style="text-align:center;">No.</th>
 								<th style="text-align:center;">Guest First Name</th>
-								<th style="text-align:center;">Team Leader</th>
+								<?php if($list_base !== 'Ghl_Leads') { ?>
+									<th style="text-align:center;">Team Leader</th>
+								<?php } ?>
 								<th style="text-align:center;">Contact Num</th>
-								<th style="text-align:center;">Email</th>
+								<?php if($list_base !== 'Ghl_Leads') { ?>
+									<th style="text-align:center;">Email</th>
+								<?php } ?>
 								<?php if($list_base === 'Ghl_Leads') { ?>
 									<th style="text-align:center;">Tags</th>
 								<?php } ?>
-								<th style="text-align:center;">Language</th>
-								<th style="text-align:center;">Agent Name</th>
-								<th style="text-align:center;">Guest Type</th>
 								<?php if($list_base !== 'Ghl_Leads') { ?>
+									<th style="text-align:center;">Language</th>
+									<th style="text-align:center;">Agent Name</th>
+									<th style="text-align:center;">Guest Type</th>
 									<th style="text-align:center;">Destination</th>
+									<th style="text-align:center;">Customer Code</th>
+									<th style="text-align:center;">Date Creation</th>
 								<?php } ?>
-								<th class="action" style="text-align:center;">Action</th>
+								<?php if($list_base !== 'Ghl_Leads') { ?>
+									<th class="action" style="text-align:center;">Action</th>
+								<?php } ?>
 							</tr>
 						</thead>
 						<tbody>
 							<?php if(empty($guests)) { ?>
-								<tr><td colspan="10" style="text-align:center; padding-top:10px; padding-bottom:10px;">Guest Records Not Found</td></tr>
+								<tr><td colspan="<?php echo ($list_base !== 'Ghl_Leads') ? 12 : 4; ?>" style="text-align:center; padding-top:10px; padding-bottom:10px;">Guest Records Not Found</td></tr>
 							<?php } else { ?>
 								<?php $count = 1; foreach($guests as $g) { ?>
 									<?php $is_ghl_row = isset($g->Type) && $g->Type === 'GHL'; ?>
@@ -411,6 +486,7 @@ div.kt-datatable__pager-container {
 												<?php } ?>
 											</span>
 										</td>
+										<?php if($list_base !== 'Ghl_Leads') { ?>
 										<td style="text-align:center; white-space:nowrap;">
 											<?php
 												$leaders = guest_list_team_leader_links(isset($g->TeamLeaderBookings) ? $g->TeamLeaderBookings : '');
@@ -437,6 +513,7 @@ div.kt-datatable__pager-container {
 												}
 											?>
 										</td>
+										<?php } ?>
 										<?php
 											$calling_code = isset($g->CallingCode) ? (string)$g->CallingCode : '';
 											// A merged row (same Name + IC across bookings) packs every distinct
@@ -483,6 +560,7 @@ div.kt-datatable__pager-container {
 												<?php } ?>
 											</span>
 										</td>
+										<?php if($list_base !== 'Ghl_Leads') { ?>
 										<?php $email_val = (string) $g->Email; ?>
 										<td class="gl-cell<?php if(!$is_ghl_row) echo ' gl-editable'; ?>" style="text-align:center;"<?php if(!$is_ghl_row) { ?> data-field="email" data-dedup-key="<?php echo htmlspecialchars($g->dedup_key, ENT_QUOTES); ?>" data-value="<?php echo htmlspecialchars($email_val, ENT_QUOTES); ?>"<?php } ?>>
 											<span class="gl-display">
@@ -492,6 +570,7 @@ div.kt-datatable__pager-container {
 												<?php } ?>
 											</span>
 										</td>
+										<?php } ?>
 										<?php if($list_base === 'Ghl_Leads') { ?>
 											<td style="text-align:center; max-width:220px;">
 												<?php
@@ -507,6 +586,7 @@ div.kt-datatable__pager-container {
 												?>
 											</td>
 										<?php } ?>
+										<?php if($list_base !== 'Ghl_Leads') { ?>
 										<?php $lang_val = (string) $g->Language; ?>
 										<td class="gl-cell<?php if(!$is_ghl_row) echo ' gl-editable'; ?>" style="text-align:center;"<?php if(!$is_ghl_row) { ?> data-field="language" data-dedup-key="<?php echo htmlspecialchars($g->dedup_key, ENT_QUOTES); ?>" data-value="<?php echo htmlspecialchars($lang_val, ENT_QUOTES); ?>"<?php } ?>>
 											<span class="gl-display">
@@ -531,6 +611,7 @@ div.kt-datatable__pager-container {
 												<span class="text-muted">&mdash;</span>
 											<?php endif; ?>
 										</td>
+										<?php } ?>
 										<?php if($list_base !== 'Ghl_Leads') { ?>
 											<td style="text-align:center;">
 												<?php
@@ -549,7 +630,19 @@ div.kt-datatable__pager-container {
 													}
 												?>
 											</td>
+											<td style="text-align:center; white-space:nowrap;">
+												<?php $cust_code = isset($g->CustomerCode) ? trim((string)$g->CustomerCode) : ''; ?>
+												<?php if($cust_code !== '') { echo htmlspecialchars($cust_code); } else { echo '<span class="text-muted">&mdash;</span>'; } ?>
+											</td>
+											<td style="text-align:center; white-space:nowrap;">
+												<?php
+													$created_raw = isset($g->CustomerCreatedAt) ? (string)$g->CustomerCreatedAt : '';
+													$created_ts  = ($created_raw !== '' && strpos($created_raw, '0000-00-00') !== 0) ? strtotime($created_raw) : false;
+													if($created_ts) { echo date('d M Y', $created_ts); } else { echo '<span class="text-muted">&mdash;</span>'; }
+												?>
+											</td>
 										<?php } ?>
+										<?php if($list_base !== 'Ghl_Leads') { ?>
 										<td style="text-align:center;">
 											<?php if(!$is_ghl_row) { ?>
 												<div class="btn-group">
@@ -584,6 +677,7 @@ div.kt-datatable__pager-container {
 												<span class="text-muted">&mdash;</span>
 											<?php } ?>
 										</td>
+										<?php } ?>
 									</tr>
 									<?php $count++; ?>
 								<?php } ?>
@@ -669,7 +763,7 @@ div.kt-datatable__pager-container {
 
 <script>
 	<?php
-		$expanded_keys = array('q', 'booking_number', 'contact_number', 'email', 'destination', 'role', 'pax_min', 'pax_max', 'sales_agent', 'source', 'customer_type', 'nationality', 'gender', 'guest_type', 'language', 'booking_date', 'travel_date', 'team_leader', 'dob', 'birthday', 'campaign_date', 'follow_date');
+		$expanded_keys = array('q', 'booking_number', 'contact_number', 'email', 'destination', 'role', 'pax_min', 'pax_max', 'sales_agent', 'source', 'customer_type', 'nationality', 'gender', 'guest_type', 'language', 'booking_date', 'travel_date', 'team_leader', 'dob', 'birthday', 'campaign_date', 'follow_date', 'customer_code', 'create_date');
 		$expand = false;
 		foreach($expanded_keys as $k) {
 			if($this->input->get($k) !== null && $this->input->get($k) !== '') { $expand = true; break; }
@@ -720,6 +814,9 @@ div.kt-datatable__pager-container {
 	function Reset_Follow_Date() {
 		$('#kt_daterangepicker_guests_follow input').val('');
 	}
+	function Reset_Create_Date() {
+		$('#kt_daterangepicker_guests_create input').val('');
+	}
 
 	$('#kt_daterangepicker_guests_booking').daterangepicker({
 		buttonClasses: ' btn',
@@ -759,6 +856,18 @@ div.kt-datatable__pager-container {
 		autoUpdateInput: false
 	}, function(start, end, label) {
 		$('#kt_daterangepicker_guests_follow .form-control').val(start.format('DD/MM/YYYY') + ' - ' + end.format('DD/MM/YYYY'));
+	});
+
+	// Date Creation = when the customer master row was created. autoUpdateInput:false
+	// keeps the input blank until a range is picked, so an untouched picker sends nothing.
+	$('#kt_daterangepicker_guests_create').daterangepicker({
+		buttonClasses: ' btn',
+		applyClass: 'btn-primary',
+		cancelClass: 'btn-secondary',
+		autoApply: true,
+		autoUpdateInput: false
+	}, function(start, end, label) {
+		$('#kt_daterangepicker_guests_create .form-control').val(start.format('DD/MM/YYYY') + ' - ' + end.format('DD/MM/YYYY'));
 	});
 
 	// DOB spans decades, so show month/year dropdowns and cap the range at today

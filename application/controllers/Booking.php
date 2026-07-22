@@ -514,8 +514,21 @@ class Booking extends MY_Controller
 			// Chat Language
 			$row['chat_language'] = $booking->ChatLanguage;
 
-			// Mobile (WhatsApp link)
+			// Mobile (WhatsApp link + message-log icon).
+			// The "message log" icon is rendered HIDDEN for every row (no per-row DB
+			// lookup here — that scan of the 400k-row ghl_messages table was the old
+			// ~1.5s cost). After the table draws, the page asks ajax_message_log_icons
+			// which of the visible phones actually have a stored chat and reveals just
+			// those icons (see loadMessageLogIcons() in the view). Same button, same
+			// modal — only the "does a log exist?" check moved off the critical path.
 			$row['mobile'] = '<a href="https://wa.me/' . $booking->CustomerMobile . '" target="_blank" title="Open WhatsApp chat" class="btn btn-light-success d-inline-flex align-items-center btn-sm"><i class="la la-whatsapp"></i></a>';
+			$mobile_digits = preg_replace('/\D+/', '', (string) $booking->CustomerMobile);
+			if($mobile_digits !== '') {
+				// Hidden via the msg-log-hidden class (display:none !important, defined in
+				// the view) which beats Bootstrap's d-inline-flex !important. The view
+				// removes that class for phones that actually have a chat.
+				$row['mobile'] .= ' <a href="javascript:;" title="View message log" class="btn btn-light-primary d-inline-flex align-items-center btn-sm js-msg-log js-msg-log-lazy msg-log-hidden" data-phone="' . htmlspecialchars($mobile_digits, ENT_QUOTES) . '" data-name="' . htmlspecialchars($booking->Customer, ENT_QUOTES) . '"><i class="la la-comments"></i></a>';
+			}
 
 			// Start Date
 			$row['start_date'] = $start_date_formatted;
@@ -816,6 +829,56 @@ class Booking extends MY_Controller
 		} catch (\Throwable $e) {
 			log_message('error', 'Booking ajax_summary error: ' . $e->getMessage());
 			$this->send_json(array('error' => 'An error occurred while loading summary'));
+		}
+	}
+
+	/**
+	 * AJAX endpoint: given the phone digits visible on the current listing page,
+	 * return the subset that have at least one stored WhatsApp message. The view
+	 * reveals the (pre-rendered, hidden) "message log" icon for those rows.
+	 *
+	 * This is the message-log lookup that used to run inside ajax_list per page
+	 * load and cost ~1.5s (it scans the 400k-row ghl_messages table, whose indexes
+	 * exceed the DB buffer pool). Moving it here keeps it OFF the table's critical
+	 * path — the rows render immediately and the icons appear when this returns.
+	 */
+	function ajax_message_log_icons()
+	{
+		$this->begin_json_endpoint();
+
+		try {
+			if(!in_array('VB', $this->session->access_control ?? array())) {
+				$this->send_json(array('phones' => array()));
+				return;
+			}
+
+			// Read-only + intentionally slow: drop the session lock so it can't block
+			// other requests (see release_session_lock()).
+			$this->release_session_lock();
+
+			$phones = $this->input->post('phones');
+			if(!is_array($phones)) {
+				$phones = array();
+			}
+			$clean = array();
+			foreach($phones as $p) {
+				$digits = preg_replace('/\D+/', '', (string) $p);
+				if($digits !== '') {
+					$clean[] = $digits;
+				}
+			}
+
+			if(empty($clean)) {
+				$this->send_json(array('phones' => array()));
+				return;
+			}
+
+			$this->load->model('Ghl_Messages_Model');
+			$have = $this->Ghl_Messages_Model->Phones_With_Messages($clean);
+			$this->send_json(array('phones' => $have));
+		} catch (\Throwable $e) {
+			log_message('error', 'Booking ajax_message_log_icons error: ' . $e->getMessage());
+			$this->send_json(array('phones' => array()));
 		}
 	}
 

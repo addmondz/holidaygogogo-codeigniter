@@ -315,6 +315,13 @@
 
 <?php $this->load->view('partials/message_log_modal'); ?>
 
+<style>
+/* Hides the lazily-loaded "message log" icon until the page confirms the phone
+   has a stored chat. !important is required to beat Bootstrap's d-inline-flex
+   (also !important) on the same button. */
+.msg-log-hidden { display: none !important; }
+</style>
+
 <script>
     var current_date = (new Date()).toLocaleDateString();
 
@@ -798,6 +805,11 @@ $(document).ready(function() {
                 
                 // Re-attach checkbox event listeners
                 attachCheckboxListeners();
+
+                // Reveal "message log" icons for the phones on this page that actually
+                // have a stored WhatsApp chat. Done after the draw (not per-row during
+                // the server query) so the table renders immediately.
+                loadMessageLogIcons();
             }
         });
 
@@ -805,6 +817,33 @@ $(document).ready(function() {
         loadSummaryTotals();
     }, 100); // Small delay to ensure column-rendering.js runs first
 });
+
+// Reveal the "View message log" icon only for phones that have a stored chat.
+// The icons are rendered hidden in every row (see Booking::ajax_list); this asks
+// the server which of the current page's phones have messages and shows those,
+// keeping the heavy ghl_messages lookup off the table's render path.
+function loadMessageLogIcons() {
+    var $icons = $('#kt_datatable tbody .js-msg-log-lazy');
+    if (!$icons.length) return;
+    var digits = [];
+    $icons.each(function() {
+        var p = String($(this).data('phone') || '');
+        if (p) digits.push(p);
+    });
+    if (!digits.length) return;
+    $.ajax({
+        url: '<?php echo base_url("Booking/ajax_message_log_icons"); ?>',
+        type: 'POST',
+        data: { phones: digits },
+        dataType: 'json'
+    }).done(function(res) {
+        var have = (res && res.phones) || {};
+        $icons.each(function() {
+            var p = String($(this).data('phone') || '');
+            if (have[p]) $(this).removeClass('msg-log-hidden');
+        });
+    });
+}
 
 // Function to load summary totals via AJAX
 function loadSummaryTotals() {

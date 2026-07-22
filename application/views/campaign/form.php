@@ -204,9 +204,14 @@
 							</select>
 						</div>
 						<div class="col-md-3">
-							<label>Exclude Campaign</label>
-							<select id="guest_search_joined_campaign" class="form-control selectpicker" data-live-search="true">
-								<option value="">--NONE--</option>
+							<div class="d-flex justify-content-between align-items-center">
+								<label class="mb-0">Campaign</label>
+								<select id="guest_search_campaign_mode" class="form-control form-control-sm w-auto" style="height:auto;padding:2px 22px 2px 8px;">
+									<option value="include">Include</option>
+									<option value="exclude">Exclude</option>
+								</select>
+							</div>
+							<select id="guest_search_joined_campaign" class="form-control selectpicker" data-live-search="true" multiple data-actions-box="true" title="--ANY CAMPAIGN--">
 								<?php if(!empty($campaigns)) { foreach($campaigns as $cp) { ?>
 									<option value="<?php echo (int)$cp->CampaignID; ?>"><?php echo htmlspecialchars($cp->Name); ?></option>
 								<?php } } ?>
@@ -441,7 +446,8 @@
 				nationality: $('#guest_search_nationality').val(),
 				booking_date: $('#guest_search_booking_date input').val(),
 				destination: $('#guest_search_destination').val() || [],
-				joined_campaign: $('#guest_search_joined_campaign').val()
+				joined_campaign: $('#guest_search_joined_campaign').val() || [],
+				campaign_mode: $('#guest_search_campaign_mode').val()
 			};
 		}
 

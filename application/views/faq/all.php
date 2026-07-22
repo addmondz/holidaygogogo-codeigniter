@@ -207,7 +207,29 @@
 			align-items: center;
 			gap: 7px;
 			margin-top: 14px;
+			overflow: hidden;
+			transition: max-height .25s ease;
 		}
+		/* Collapse the tag bar to 2 rows by default; JS sets the exact height. */
+		.tag-toggle {
+			display: none;
+			align-items: center;
+			gap: 5px;
+			margin-top: 10px;
+			font-family: 'Outfit', sans-serif;
+			font-size: 12.5px;
+			font-weight: 600;
+			color: var(--accent-deep);
+			background: transparent;
+			border: none;
+			padding: 2px 0;
+			cursor: pointer;
+		}
+		.tag-toggle.is-shown { display: inline-flex; }
+		.tag-toggle:hover { color: var(--accent); }
+		.tag-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+		.tag-toggle-icon { width: 14px; height: 14px; stroke: currentColor; transition: transform .25s ease; }
+		.tag-toggle[aria-expanded="true"] .tag-toggle-icon { transform: rotate(180deg); }
 		.tag-filter-label {
 			display: inline-flex;
 			align-items: center;
@@ -422,8 +444,12 @@
 						<?php foreach($present_tags as $tid => $tname) { ?>
 							<button type="button" class="tag-filter-chip" data-tag="<?php echo (int)$tid; ?>" aria-pressed="false"><?php echo htmlspecialchars($tname); ?></button>
 						<?php } ?>
-					</div>
-				<?php } ?>
+						</div>
+						<button type="button" class="tag-toggle" id="tagToggle" aria-expanded="false">
+							<span class="tag-toggle-text">Show more tags</span>
+							<svg class="tag-toggle-icon" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+						</button>
+					<?php } ?>
 				<div class="search-count" id="searchCount" aria-live="polite"></div>
 			</section>
 
@@ -700,6 +726,59 @@
 						});
 						syncAll();
 						runSearch();
+					});
+				}
+
+				// ---- Collapse the tag bar to 1 row with a Show more/fewer toggle ----
+				// Chips wrap into many rows once there are lots of tags. Measure the
+				// natural layout, cap the height at the bottom of the 1st row, and only
+				// show the toggle when a 2nd row actually exists. The +3px buffer keeps
+				// chip borders from being clipped by sub-pixel rounding.
+				var tagToggle = document.getElementById('tagToggle');
+				if (tagToggle) {
+					var collapsed = true, tagResizeTimer;
+					function oneRowHeight() {
+						var chips = Array.prototype.slice.call(tagBar.children);
+						if (!chips.length) return -1;
+						var contTop = tagBar.getBoundingClientRect().top;
+						var rowTops = [], row1Bottom = 0;
+						chips.forEach(function (c) {
+							var top = Math.round(c.getBoundingClientRect().top);
+							if (rowTops.indexOf(top) === -1) rowTops.push(top);
+						});
+						rowTops.sort(function (a, b) { return a - b; });
+						if (rowTops.length <= 1) return -1; // fits in 1 row already
+						chips.forEach(function (c) {
+							var r = c.getBoundingClientRect();
+							if (Math.round(r.top) === rowTops[0]) {
+								row1Bottom = Math.max(row1Bottom, r.bottom - contTop);
+							}
+						});
+						return Math.ceil(row1Bottom) + 3;
+					}
+					function applyCollapse() {
+						tagBar.style.maxHeight = 'none';
+						var h2 = oneRowHeight();
+						if (h2 < 0) { tagToggle.classList.remove('is-shown'); return; }
+						tagToggle.classList.add('is-shown');
+						if (collapsed) {
+							tagBar.style.maxHeight = h2 + 'px';
+							tagToggle.querySelector('.tag-toggle-text').textContent = 'Show more tags';
+							tagToggle.setAttribute('aria-expanded', 'false');
+						} else {
+							tagBar.style.maxHeight = tagBar.scrollHeight + 'px';
+							tagToggle.querySelector('.tag-toggle-text').textContent = 'Show fewer tags';
+							tagToggle.setAttribute('aria-expanded', 'true');
+						}
+					}
+					tagToggle.addEventListener('click', function () {
+						collapsed = !collapsed;
+						applyCollapse();
+					});
+					applyCollapse();
+					window.addEventListener('resize', function () {
+						clearTimeout(tagResizeTimer);
+						tagResizeTimer = setTimeout(applyCollapse, 150);
 					});
 				}
 			}

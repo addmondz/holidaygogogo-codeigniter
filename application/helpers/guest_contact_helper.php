@@ -641,6 +641,9 @@ if (!function_exists('guest_list_ghl_suppressed_by_filters')) {
             // Remark-based filters: a GHL lead has no guest remarks, so a
             // Campaign/Follow date range can never match one.
             'campaign_date', 'follow_date',
+            // Customer-master filters: a GHL lead has no linked customer row, so
+            // a Customer Code / Date Creation filter can never match one.
+            'customer_code', 'create_date',
         );
         foreach ($booking_only as $k) {
             if (isset($get[$k]) && count(guest_list_multi_values($get[$k])) > 0) {
