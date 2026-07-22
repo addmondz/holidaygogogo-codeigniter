@@ -175,12 +175,13 @@ class Guests_Model extends CI_Model
 			$this->Append_In_Clause($where, $b_params, 'gl.Gender',                        $this->input->get('gender'));
 			$this->Append_In_Clause($where, $b_params, 'gl.Type',                          $this->input->get('guest_type'));
 			$this->Append_In_Clause($where, $b_params, 'COALESCE(c.ChatLanguage, b.ChatLanguage)', $this->input->get('language'));
-			// "Joined Campaign" narrows to guests already in a specific campaign's
-			// roster (the campaign_guests snapshot). Keyed on dedup_key so it matches
-			// the same person across every one of their bookings.
+			// "Exclude Campaign" drops guests already in a specific campaign's
+			// roster (the campaign_guests snapshot), so you can build a fresh
+			// audience without re-inviting people who already joined. Keyed on
+			// dedup_key so it matches the same person across all their bookings.
 			$joined_campaign = (int)$this->input->get('joined_campaign');
 			if($joined_campaign > 0) {
-				$where     .= " AND EXISTS (SELECT 1 FROM campaign_guests cg
+				$where     .= " AND NOT EXISTS (SELECT 1 FROM campaign_guests cg
 					WHERE cg.CampaignID = ? AND cg.DedupKey = gl.dedup_key) ";
 				$b_params[] = $joined_campaign;
 			}
@@ -278,10 +279,10 @@ class Guests_Model extends CI_Model
 				$g_params[] = '%' . $email . '%';
 			}
 
-			// "Joined Campaign" narrows to leads already in a campaign roster.
+			// "Exclude Campaign" drops leads already in a campaign roster.
 			$joined_campaign = (int)$this->input->get('joined_campaign');
 			if($joined_campaign > 0) {
-				$ghl_where .= " AND EXISTS (SELECT 1 FROM campaign_guests cg
+				$ghl_where .= " AND NOT EXISTS (SELECT 1 FROM campaign_guests cg
 					WHERE cg.CampaignID = ? AND cg.DedupKey = {$gc_dedup}) ";
 				$g_params[] = $joined_campaign;
 			}
@@ -451,11 +452,11 @@ WHERE 1 = 1
 		$this->Append_In_Clause($where, $params, 'c.customer_type', $this->input->get('customer_type'));
 		$this->Append_In_Clause($where, $params, "COALESCE(c.ChatLanguage, b.ChatLanguage)", $this->input->get('language'));
 
-		// "Joined Campaign" narrows to leaders already in a campaign roster; the
+		// "Exclude Campaign" drops leaders already in a campaign roster; the
 		// synthesized leader row is keyed on the booking's leader phone key.
 		$joined_campaign = (int)$this->input->get('joined_campaign');
 		if($joined_campaign > 0) {
-			$where   .= " AND EXISTS (SELECT 1 FROM campaign_guests cg
+			$where   .= " AND NOT EXISTS (SELECT 1 FROM campaign_guests cg
 				WHERE cg.CampaignID = ? AND cg.DedupKey = {$key}) ";
 			$params[] = $joined_campaign;
 		}

@@ -204,9 +204,9 @@
 							</select>
 						</div>
 						<div class="col-md-3">
-							<label>Joined Campaign</label>
+							<label>Exclude Campaign</label>
 							<select id="guest_search_joined_campaign" class="form-control selectpicker" data-live-search="true">
-								<option value="">--ANY CAMPAIGN--</option>
+								<option value="">--NONE--</option>
 								<?php if(!empty($campaigns)) { foreach($campaigns as $cp) { ?>
 									<option value="<?php echo (int)$cp->CampaignID; ?>"><?php echo htmlspecialchars($cp->Name); ?></option>
 								<?php } } ?>
