@@ -175,6 +175,15 @@ class Guests_Model extends CI_Model
 			$this->Append_In_Clause($where, $b_params, 'gl.Gender',                        $this->input->get('gender'));
 			$this->Append_In_Clause($where, $b_params, 'gl.Type',                          $this->input->get('guest_type'));
 			$this->Append_In_Clause($where, $b_params, 'COALESCE(c.ChatLanguage, b.ChatLanguage)', $this->input->get('language'));
+			// "Joined Campaign" narrows to guests already in a specific campaign's
+			// roster (the campaign_guests snapshot). Keyed on dedup_key so it matches
+			// the same person across every one of their bookings.
+			$joined_campaign = (int)$this->input->get('joined_campaign');
+			if($joined_campaign > 0) {
+				$where     .= " AND EXISTS (SELECT 1 FROM campaign_guests cg
+					WHERE cg.CampaignID = ? AND cg.DedupKey = gl.dedup_key) ";
+				$b_params[] = $joined_campaign;
+			}
 			if($has_q) {
 				// Search Name matches the guest's own name OR their booking's team
 				// leader (b.Customer, the name on the BC form), so searching a
@@ -269,11 +278,37 @@ class Guests_Model extends CI_Model
 				$g_params[] = '%' . $email . '%';
 			}
 
+			// "Joined Campaign" narrows to leads already in a campaign roster.
+			$joined_campaign = (int)$this->input->get('joined_campaign');
+			if($joined_campaign > 0) {
+				$ghl_where .= " AND EXISTS (SELECT 1 FROM campaign_guests cg
+					WHERE cg.CampaignID = ? AND cg.DedupKey = {$gc_dedup}) ";
+				$g_params[] = $joined_campaign;
+			}
+
 			// GHL Leads is its own page now, so the query reads ghl_contacts only —
 			// no booking/guest_list scan. (The old merged listing anti-joined the
 			// two to avoid showing one person twice; separate pages don't need it.)
+			// Tags and a name fallback both live per-conversation in
+			// ghl_conversations and a contact can hold several conversations, so
+			// pre-aggregate per contact to keep this one-row-per-contact:
+			//  - tags_concat: every tag array newline-joined (flattened + de-duped
+			//    in PHP by ghl_lead_tags_parse).
+			//  - conv_full_name / conv_contact_name: a name for the ~contacts whose
+			//    ghl_contacts.first_name is blank (often a business, e.g.
+			//    "BERDAYA MARKETING SDN BHD"). The REGEXP '[A-Za-z]' guard drops
+			//    GHL's phone-formatted contact_name ("012-710 3413") which would
+			//    just duplicate the phone column.
 			$from_joins_where = "
 FROM ghl_contacts gc
+LEFT JOIN (
+	SELECT contact_id,
+		GROUP_CONCAT(CASE WHEN tags_json IS NOT NULL AND JSON_LENGTH(tags_json) > 0 THEN tags_json END SEPARATOR '\n') AS tags_concat,
+		MAX(CASE WHEN full_name    REGEXP '[A-Za-z]' THEN NULLIF(TRIM(full_name), '')    END) AS conv_full_name,
+		MAX(CASE WHEN contact_name REGEXP '[A-Za-z]' THEN NULLIF(TRIM(contact_name), '') END) AS conv_contact_name
+	FROM ghl_conversations
+	GROUP BY contact_id
+) gt ON gt.contact_id = gc.contact_id
 WHERE 1 = 1
 {$ghl_where}
 			";
@@ -313,6 +348,7 @@ WHERE 1 = 1
 		cat.Name         AS Destination,
 		cn.Country       AS Nationality,
 		gl.Gender,
+		gl.IdentificationNumber AS IdentificationNumber,
 		gl.Type          AS GuestType,
 		gl.DateOfBirth,
 		b.Token          AS Token,
@@ -415,6 +451,15 @@ WHERE 1 = 1
 		$this->Append_In_Clause($where, $params, 'c.customer_type', $this->input->get('customer_type'));
 		$this->Append_In_Clause($where, $params, "COALESCE(c.ChatLanguage, b.ChatLanguage)", $this->input->get('language'));
 
+		// "Joined Campaign" narrows to leaders already in a campaign roster; the
+		// synthesized leader row is keyed on the booking's leader phone key.
+		$joined_campaign = (int)$this->input->get('joined_campaign');
+		if($joined_campaign > 0) {
+			$where   .= " AND EXISTS (SELECT 1 FROM campaign_guests cg
+				WHERE cg.CampaignID = ? AND cg.DedupKey = {$key}) ";
+			$params[] = $joined_campaign;
+		}
+
 		$q_raw = trim((string)$this->input->get('q'));
 		if($q_raw !== '') {
 			$where   .= " AND b.Customer LIKE ? ";
@@ -466,7 +511,9 @@ WHERE 1 = 1
 		CONVERT(MAX(b.Token) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Token,
 		CONVERT('Team Leader' USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Role,
 		CONVERT(GROUP_CONCAT(DISTINCT DATE(b.InsertDate) ORDER BY DATE(b.InsertDate) SEPARATOR ',') USING utf8mb4) COLLATE utf8mb4_unicode_ci AS BookingDates,
-		CONVERT(GROUP_CONCAT(DISTINCT CONCAT(DATE(b.StartDate), '|', IFNULL(DATE(b.EndDate), '')) ORDER BY CONCAT(DATE(b.StartDate), '|', IFNULL(DATE(b.EndDate), '')) SEPARATOR ',') USING utf8mb4) COLLATE utf8mb4_unicode_ci AS TravelDates
+		CONVERT(GROUP_CONCAT(DISTINCT CONCAT(DATE(b.StartDate), '|', IFNULL(DATE(b.EndDate), '')) ORDER BY CONCAT(DATE(b.StartDate), '|', IFNULL(DATE(b.EndDate), '')) SEPARATOR ',') USING utf8mb4) COLLATE utf8mb4_unicode_ci AS TravelDates,
+		CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS IC,
+		CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS Tags
 	{$from}
 	GROUP BY {$key}
 		";
@@ -506,7 +553,9 @@ SELECT
 	CONVERT(MAX(CASE WHEN rn = 1 THEN Token END) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Token,
 	CONVERT(CASE WHEN MAX(IsLeader) = 1 THEN 'Team Leader' ELSE 'Team Member' END USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Role,
 	CONVERT(GROUP_CONCAT(DISTINCT DATE(BookingDate) ORDER BY DATE(BookingDate) SEPARATOR ',') USING utf8mb4) COLLATE utf8mb4_unicode_ci AS BookingDates,
-	CONVERT(GROUP_CONCAT(DISTINCT CONCAT(DATE(TravelStart), '|', IFNULL(DATE(TravelEnd), '')) ORDER BY CONCAT(DATE(TravelStart), '|', IFNULL(DATE(TravelEnd), '')) SEPARATOR ',') USING utf8mb4) COLLATE utf8mb4_unicode_ci AS TravelDates
+	CONVERT(GROUP_CONCAT(DISTINCT CONCAT(DATE(TravelStart), '|', IFNULL(DATE(TravelEnd), '')) ORDER BY CONCAT(DATE(TravelStart), '|', IFNULL(DATE(TravelEnd), '')) SEPARATOR ',') USING utf8mb4) COLLATE utf8mb4_unicode_ci AS TravelDates,
+	CONVERT(MAX(CASE WHEN rn = 1 THEN IdentificationNumber END) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS IC,
+	CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS Tags
 FROM (
 	{$this->Booking_Windowed_Select($dedup, $booking['from'])}
 ) t
@@ -521,7 +570,11 @@ GROUP BY dedup_key
 			$parts[] = "
 SELECT
 	{$gc_dedup} AS dedup_key,
-	CONVERT(TRIM(gc.first_name) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Name,
+	CONVERT(COALESCE(
+		NULLIF(TRIM(CONCAT_WS(' ', gc.first_name, gc.last_name)), ''),
+		gt.conv_full_name,
+		gt.conv_contact_name
+	) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Name,
 	CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS TeamLeader,
 	CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS TeamLeaderBookings,
 	CONVERT(gc.phone USING utf8mb4) COLLATE utf8mb4_unicode_ci AS ContactNum,
@@ -542,7 +595,9 @@ SELECT
 	CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS Token,
 	CAST('Lead' AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS Role,
 	CONVERT(DATE(COALESCE(gc.date_added, gc.created_at)) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS BookingDates,
-	CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS TravelDates
+	CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS TravelDates,
+	CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS IC,
+	CONVERT(gt.tags_concat USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Tags
 {$ghl['from']}
 			";
 			$params = array_merge($params, $ghl['params']);
@@ -561,6 +616,75 @@ SELECT
 		return array($inner, $params);
 	}
 
+	/**
+	 * The display-merge key over the merged listing rows (alias $a). Mirrors the
+	 * pure guest_list_merge_key() (see GuestListMergeKeyTest): rows that share the
+	 * same Name + IdentificationNumber collapse into ONE listing row even when
+	 * their phone numbers (and dedup_key) differ; rows with no IC keep their own
+	 * dedup_key so nothing merges unless it is provably the same person. Both
+	 * branches are coerced to utf8mb4_unicode_ci so GROUP BY on the key can't hit
+	 * an illegal-mix-of-collations error.
+	 */
+	private function Merge_Key_Expr($a)
+	{
+		$ic = "REGEXP_REPLACE(IFNULL({$a}.IC, ''), '[^0-9A-Za-z]', '')";
+		return "CASE
+			WHEN NULLIF(UPPER({$ic}), '') IS NOT NULL
+				THEN CONVERT(CONCAT('ic:', LOWER(TRIM(IFNULL({$a}.Name, ''))), '|', UPPER({$ic})) USING utf8mb4) COLLATE utf8mb4_unicode_ci
+			ELSE CONVERT({$a}.dedup_key USING utf8mb4) COLLATE utf8mb4_unicode_ci
+		END";
+	}
+
+	/**
+	 * Wrap the per-dedup merged rows in the name+IC display merge. Most rows have
+	 * no IC, so their merge_key is their own dedup_key and they pass through
+	 * unchanged (one group, one row). Rows that DO share Name + IC collapse: the
+	 * representative (rep_rn = 1, newest dedup_key) supplies the scalar columns
+	 * and the edit/remarks dedup_key, pax/sales SUM across the group, and every
+	 * distinct phone of the group is packed into ContactNumbers ("code\x1fmobile"
+	 * units, \x1e-separated) so the listing can show all of them on the one row.
+	 */
+	private function Merged_Wrapped_Sql($inner)
+	{
+		$mk = $this->Merge_Key_Expr('m');
+		return "
+SELECT
+	mm.merge_key,
+	MAX(CASE WHEN mm.rep_rn = 1 THEN mm.dedup_key   END) AS dedup_key,
+	MAX(CASE WHEN mm.rep_rn = 1 THEN mm.Name        END) AS Name,
+	CONVERT(GROUP_CONCAT(mm.TeamLeader         SEPARATOR '||') USING utf8mb4) COLLATE utf8mb4_unicode_ci AS TeamLeader,
+	CONVERT(GROUP_CONCAT(mm.TeamLeaderBookings SEPARATOR '||') USING utf8mb4) COLLATE utf8mb4_unicode_ci AS TeamLeaderBookings,
+	MAX(CASE WHEN mm.rep_rn = 1 THEN mm.ContactNum  END) AS ContactNum,
+	MAX(CASE WHEN mm.rep_rn = 1 THEN mm.CallingCode END) AS CallingCode,
+	CONVERT(GROUP_CONCAT(DISTINCT CONCAT(COALESCE(mm.CallingCode, ''), 0x1f, COALESCE(mm.ContactNum, '')) SEPARATOR 0x1e) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS ContactNumbers,
+	MAX(CASE WHEN mm.rep_rn = 1 THEN mm.Email        END) AS Email,
+	MAX(CASE WHEN mm.rep_rn = 1 THEN mm.Language     END) AS Language,
+	MAX(CASE WHEN mm.rep_rn = 1 THEN mm.AgentName    END) AS AgentName,
+	MAX(CASE WHEN mm.rep_rn = 1 THEN mm.Source       END) AS Source,
+	MAX(CASE WHEN mm.rep_rn = 1 THEN mm.CustomerType END) AS CustomerType,
+	CONVERT(GROUP_CONCAT(mm.Destination SEPARATOR '||') USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Destination,
+	MAX(CASE WHEN mm.rep_rn = 1 THEN mm.Nationality  END) AS Nationality,
+	MAX(CASE WHEN mm.rep_rn = 1 THEN mm.Gender       END) AS Gender,
+	MAX(CASE WHEN mm.rep_rn = 1 THEN mm.GuestType    END) AS GuestType,
+	MAX(CASE WHEN mm.rep_rn = 1 THEN mm.DOB          END) AS DOB,
+	COALESCE(SUM(mm.TotalPax), 0)   AS TotalPax,
+	COALESCE(SUM(mm.TotalSales), 0) AS TotalSales,
+	MAX(CASE WHEN mm.rep_rn = 1 THEN mm.Type  END) AS Type,
+	MAX(CASE WHEN mm.rep_rn = 1 THEN mm.Token END) AS Token,
+	MAX(CASE WHEN mm.rep_rn = 1 THEN mm.Role  END) AS Role,
+	CONVERT(GROUP_CONCAT(mm.BookingDates SEPARATOR ',') USING utf8mb4) COLLATE utf8mb4_unicode_ci AS BookingDates,
+	CONVERT(GROUP_CONCAT(mm.TravelDates  SEPARATOR ',') USING utf8mb4) COLLATE utf8mb4_unicode_ci AS TravelDates,
+	MAX(CASE WHEN mm.rep_rn = 1 THEN mm.IC   END) AS IC,
+	MAX(CASE WHEN mm.rep_rn = 1 THEN mm.Tags END) AS Tags
+FROM (
+	SELECT m.*,
+		{$mk} AS merge_key,
+		ROW_NUMBER() OVER (PARTITION BY {$mk} ORDER BY m.dedup_key DESC) AS rep_rn
+	FROM ({$inner}) m
+) mm
+GROUP BY mm.merge_key";
+	}
+
 	function Read_Guests($limit, $offset)
 	{
 		list($inner, $params) = $this->Build_Merged_Sql_And_Params();
@@ -568,48 +692,369 @@ SELECT
 			return array();
 		}
 
-		$sql = $inner . " ORDER BY CASE WHEN Type = 'Booking Guest' THEN 0 ELSE 1 END, Name ASC LIMIT " . (int)$limit . " OFFSET " . (int)$offset;
+		// Named rows first, then alphabetical. Contacts with no name anywhere
+		// (NULL/blank Name — e.g. a bare GHL phone lead) would otherwise sort to
+		// the very top and fill page 1 with blank "—" rows, hiding the thousands
+		// of real names below them.
+		//
+		// Wrap the grouped merge in an outer SELECT so ORDER BY resolves to the
+		// aggregated output columns (Type/Name) — referencing them directly on the
+		// grouped query makes MySQL bind to the non-aggregated mm.Type/mm.Name and
+		// trip only_full_group_by.
+		$sql = "SELECT * FROM (" . $this->Merged_Wrapped_Sql($inner) . ") final"
+			. " ORDER BY CASE WHEN Type = 'Booking Guest' THEN 0 ELSE 1 END, (Name IS NULL OR Name = '') ASC, Name ASC LIMIT " . (int)$limit . " OFFSET " . (int)$offset;
 		return $this->db->query($sql, $params)->result();
 	}
 
 	function Count_Guests()
 	{
-		list($booking, $ghl) = $this->Build_Branches();
-
-		$total = 0;
-
-		if($booking !== null) {
-			if($booking['having'] !== '') {
-				// Role / pax filter on a per-guest aggregate: count the grouped
-				// rows that survive the same HAVING the listing applies.
-				$inner = $this->Booking_Windowed_Select($booking['dedup'], $booking['from']);
-				$sql   = "SELECT COUNT(*) AS cnt FROM (
-					SELECT dedup_key FROM ({$inner}) t GROUP BY dedup_key {$booking['having']}
-				) z";
-				$params = array_merge($booking['params'], $booking['having_params']);
-				$row    = $this->db->query($sql, $params)->row();
-			} else {
-				$sql = "SELECT COUNT(DISTINCT {$booking['dedup']}) AS cnt {$booking['from']}";
-				$row = $this->db->query($sql, $booking['params'])->row();
-			}
-			if($row) { $total += (int)$row->cnt; }
+		// Count the SAME rows the listing renders — one per merge_key — so
+		// pagination matches after the name+IC display merge collapses rows.
+		// (For a GHL / no-IC page merge_key is just the dedup_key, so this stays
+		// the old distinct-contact count.) Reuses the merged UNION so Read and
+		// Count can never disagree.
+		list($inner, $params) = $this->Build_Merged_Sql_And_Params();
+		if($inner === null) {
+			return 0;
 		}
 
-		if($ghl !== null) {
-			$sql = "SELECT COUNT(DISTINCT {$ghl['dedup']}) AS cnt {$ghl['from']}";
-			$row = $this->db->query($sql, $ghl['params'])->row();
-			if($row) { $total += (int)$row->cnt; }
+		$mk  = $this->Merge_Key_Expr('m');
+		$sql = "SELECT COUNT(*) AS cnt FROM (
+			SELECT {$mk} AS merge_key FROM ({$inner}) m GROUP BY merge_key
+		) z";
+		$row = $this->db->query($sql, $params)->row();
+		return $row ? (int)$row->cnt : 0;
+	}
+
+	// ===================================================================
+	// Customer List — the Guest List's twin, but anchored on the customer
+	// master table (one row per customer) instead of guest_list rows. It
+	// reuses the same shared view/filters/columns; the booking-derived
+	// columns (Team Leader / Agent / Guest Type / …) are pulled in per
+	// customer via LEFT JOINs, and the 21 filters attach in three tiers
+	// (customer / booking / guest) as EXISTS so the anchor never fans out.
+	// Kept separate from Read_Guests/Count_Guests (which UNION booking +
+	// GHL + leader-fallback) so those paths are untouched.
+	// ===================================================================
+
+	/**
+	 * The customer's own phone key — the last 9 digits of c.phone_number, the
+	 * same normalization dedup_key uses. Correlates to the outer `customer c`.
+	 */
+	private function Customer_Dedup_Key_Expr()
+	{
+		return "NULLIF(RIGHT(REGEXP_REPLACE(IFNULL(c.phone_number, ''), '[^0-9]', ''), 9), '')";
+	}
+
+	/**
+	 * Build the shared WHERE + params for the Customer List. Anchored on
+	 * `customer c`; every booking/guest/remark predicate is an EXISTS so the
+	 * result stays exactly one row per customer (no GROUP BY, so Count and Read
+	 * agree). Returns ['where','params','needs_pax_join'] — the pax filter is the
+	 * only predicate that needs the `bagg` aggregate join, flagged for the count.
+	 */
+	private function Build_Customer_Branch()
+	{
+		$this->load->helper('guest_contact');
+		$get = $this->input->get();
+		$key = $this->Customer_Dedup_Key_Expr();
+
+		$where  = " WHERE c.Status = 'Y'
+			AND NULLIF(TRIM(c.name), '')         IS NOT NULL
+			AND NULLIF(TRIM(c.phone_number), '') IS NOT NULL ";
+		$params = array();
+		$needs_pax_join = false;
+
+		// ---- Tier 1: customer-level (filter the anchor row directly) ----
+		$q_raw = trim((string) $this->input->get('q'));
+		if ($q_raw !== '') {
+			// Match the customer's own name OR any of their bookings' team-leader
+			// name (b.Customer) so searching a leader still surfaces the customer.
+			$where .= " AND ( c.name LIKE ? OR EXISTS (
+				SELECT 1 FROM booking b
+				WHERE b.CustomerID = c.CustomerID AND b.Status != 'N' AND b.CancelStatus = 'N'
+					AND b.Customer LIKE ?
+			) ) ";
+			$params[] = '%' . $q_raw . '%';
+			$params[] = '%' . $q_raw . '%';
 		}
 
-		$fallback = $this->Build_Leader_Fallback_Branch();
-		if($fallback !== null) {
-			// One synthesized row per leader phone key (no HAVING on this branch).
-			$sql = "SELECT COUNT(DISTINCT {$fallback['key']}) AS cnt {$fallback['from']}";
-			$row = $this->db->query($sql, $fallback['params'])->row();
-			if($row) { $total += (int)$row->cnt; }
+		$contact_number = trim((string) $this->input->get('contact_number'));
+		if ($contact_number !== '') {
+			$where   .= " AND c.phone_number LIKE ? ";
+			$params[] = '%' . $contact_number . '%';
 		}
 
-		return $total;
+		$email = trim((string) $this->input->get('email'));
+		if ($email !== '') {
+			$where   .= " AND c.PrimaryEmail LIKE ? ";
+			$params[] = '%' . $email . '%';
+		}
+
+		$this->Append_In_Clause($where, $params, 'c.ChatLanguage',  $this->input->get('language'));
+		$this->Append_In_Clause($where, $params, 'c.customer_type', $this->input->get('customer_type'));
+
+		// ---- Tier 2: booking-level (EXISTS on the customer's bookings) ----
+		$bstr  = '';
+		$bpar  = array();
+
+		// Levels 20/50 see only customers they've sold to — mirrors the read-side
+		// scoping in Read_Guests (b.SalesAgent = own admin_id).
+		if (in_array($this->session->userdata('level'), array(20, 50))) {
+			$bstr  .= " AND b.SalesAgent = ? ";
+			$bpar[] = $this->session->userdata('admin_id');
+		}
+
+		$booking_range = guest_list_parse_date_range($this->input->get('booking_date'));
+		if ($booking_range !== null) {
+			$bstr  .= " AND b.InsertDate >= ? AND b.InsertDate < DATE_ADD(?, INTERVAL 1 DAY) ";
+			$bpar[] = $booking_range[0];
+			$bpar[] = $booking_range[1];
+		}
+
+		$travel_range = guest_list_parse_date_range($this->input->get('travel_date'));
+		if ($travel_range !== null) {
+			$bstr  .= " AND b.StartDate <= ? AND b.EndDate >= ? ";
+			$bpar[] = $travel_range[1];
+			$bpar[] = $travel_range[0];
+		}
+
+		$booking_number = trim((string) $this->input->get('booking_number'));
+		if ($booking_number !== '') {
+			$bstr  .= " AND b.BookingNumber LIKE ? ";
+			$bpar[] = '%' . $booking_number . '%';
+		}
+
+		$tl_clause = guest_list_team_leader_clause($get);
+		if ($tl_clause !== null) {
+			$bstr  .= $tl_clause['sql'];
+			$bpar[] = $tl_clause['param'];
+		}
+
+		$this->Append_In_Clause($bstr, $bpar, 'b.Destination', $this->input->get('destination'));
+		$this->Append_In_Clause($bstr, $bpar, 'b.SalesAgent',  $this->input->get('sales_agent'));
+		$this->Append_In_Clause($bstr, $bpar, 'b.Source',      $this->input->get('source'));
+		$this->Append_In_Clause($bstr, $bpar, 'b.BookingID',   $this->input->get('booking_id'));
+
+		if ($bstr !== '') {
+			$where   .= " AND EXISTS (
+				SELECT 1 FROM booking b
+				WHERE b.CustomerID = c.CustomerID AND b.Status != 'N' AND b.CancelStatus = 'N'
+				{$bstr} ) ";
+			$params = array_merge($params, $bpar);
+		}
+
+		// Guest Role: a customer "leads" a booking when that booking's own contact
+		// phone key equals the customer's key (mirrors the IsLeader expression).
+		// "Team Leader" keeps customers who lead ≥1 booking; "Team Member" keeps
+		// customers who never lead. Selecting both (or neither) applies no filter.
+		$roles       = guest_list_multi_values($this->input->get('role'));
+		$want_leader = in_array('Team Leader', $roles, true);
+		$want_member = in_array('Team Member', $roles, true);
+		if ($want_leader !== $want_member) {
+			$leads_expr = " EXISTS (
+				SELECT 1 FROM booking b
+				WHERE b.CustomerID = c.CustomerID AND b.Status != 'N' AND b.CancelStatus = 'N'
+					AND COALESCE(
+						NULLIF(RIGHT(REGEXP_REPLACE(IFNULL(b.Mobile, ''), '[^0-9]', ''), 9), ''),
+						{$key}
+					) = {$key} ) ";
+			$where .= $want_leader ? " AND {$leads_expr} " : " AND NOT {$leads_expr} ";
+		}
+
+		// Num of Pax is the SUM across the customer's bookings, so it filters the
+		// `bagg` aggregate (not an EXISTS). A customer with no bookings has NULL
+		// TotalPax and is correctly dropped by a >= filter.
+		$pax_min = trim((string) $this->input->get('pax_min'));
+		$pax_max = trim((string) $this->input->get('pax_max'));
+		if ($pax_min !== '' && is_numeric($pax_min)) {
+			$needs_pax_join = true;
+			$where   .= " AND bagg.TotalPax >= ? ";
+			$params[] = (int) $pax_min;
+		}
+		if ($pax_max !== '' && is_numeric($pax_max)) {
+			$needs_pax_join = true;
+			$where   .= " AND bagg.TotalPax <= ? ";
+			$params[] = (int) $pax_max;
+		}
+
+		// ---- Tier 3: guest-level (EXISTS on the customer's own guest_list rows) ----
+		$gstr = '';
+		$gpar = array();
+
+		$dob_range = guest_list_parse_date_range($this->input->get('dob'));
+		if ($dob_range !== null) {
+			$gstr  .= " AND gl.DateOfBirth >= ? AND gl.DateOfBirth <= ? ";
+			$gpar[] = $dob_range[0];
+			$gpar[] = $dob_range[1];
+		}
+
+		$birthday = guest_list_birthday_clause($this->input->get('birthday'));
+		if ($birthday !== null) {
+			$gstr .= $birthday['sql'];
+			foreach ($birthday['params'] as $bp) { $gpar[] = $bp; }
+		}
+
+		$this->Append_In_Clause($gstr, $gpar, 'gl.Gender', $this->input->get('gender'));
+		$this->Append_In_Clause($gstr, $gpar, 'gl.Type',   $this->input->get('guest_type'));
+		$this->Append_In_Clause($gstr, $gpar, 'cn.Country', $this->input->get('nationality'));
+
+		if ($gstr !== '') {
+			$where .= " AND EXISTS (
+				SELECT 1 FROM guest_list gl
+				LEFT JOIN country_code cn ON cn.CountryCodeID = gl.Nationality
+				WHERE gl.Status = 'Y' AND gl.dedup_key = {$key}
+				{$gstr} ) ";
+			$params = array_merge($params, $gpar);
+		}
+
+		// ---- Remark tier: EXISTS on the customer's remark log (by dedup_key) ----
+		$campaign_range = guest_list_parse_date_range($this->input->get('campaign_date'));
+		if ($campaign_range !== null) {
+			$where   .= " AND EXISTS (SELECT 1 FROM guest_remarks gr
+				WHERE gr.Status = 'Y' AND gr.dedup_key = {$key}
+				AND gr.CampaignDate >= ? AND gr.CampaignDate <= ?) ";
+			$params[] = $campaign_range[0];
+			$params[] = $campaign_range[1];
+		}
+
+		$follow_range = guest_list_parse_date_range($this->input->get('follow_date'));
+		if ($follow_range !== null) {
+			$where   .= " AND EXISTS (SELECT 1 FROM guest_remarks gr
+				WHERE gr.Status = 'Y' AND gr.dedup_key = {$key}
+				AND gr.FollowDate >= ? AND gr.FollowDate <= ?) ";
+			$params[] = $follow_range[0];
+			$params[] = $follow_range[1];
+		}
+
+		return array('where' => $where, 'params' => $params, 'needs_pax_join' => $needs_pax_join);
+	}
+
+	/**
+	 * The `bagg` derived table: per-customer booking aggregate — team-leader
+	 * names (for the Team Leader column), total pax (for the Num of Pax filter
+	 * and column), and AnyLeader (Team Leader vs Member for the Role column).
+	 */
+	private function Customer_Booking_Aggregate_Subquery()
+	{
+		return "(
+			SELECT b.CustomerID,
+				CONVERT(GROUP_CONCAT(DISTINCT NULLIF(TRIM(b.Customer), '') SEPARATOR '||') USING utf8mb4) COLLATE utf8mb4_unicode_ci AS TeamLeaders,
+				CONVERT(GROUP_CONCAT(DISTINCT CASE WHEN NULLIF(TRIM(b.Customer), '') IS NOT NULL THEN CONCAT(b.BookingID, ':', TRIM(b.Customer)) END SEPARATOR '||') USING utf8mb4) COLLATE utf8mb4_unicode_ci AS TeamLeaderBookings,
+				COALESCE(SUM(COALESCE(b.Adult, 0) + COALESCE(b.Children, 0) + COALESCE(b.Infant, 0)), 0) AS TotalPax,
+				MAX(CASE WHEN COALESCE(
+						NULLIF(RIGHT(REGEXP_REPLACE(IFNULL(b.Mobile, ''), '[^0-9]', ''), 9), ''),
+						NULLIF(RIGHT(REGEXP_REPLACE(IFNULL(cust.phone_number, ''), '[^0-9]', ''), 9), '')
+					) = NULLIF(RIGHT(REGEXP_REPLACE(IFNULL(cust.phone_number, ''), '[^0-9]', ''), 9), '')
+					THEN 1 ELSE 0 END) AS AnyLeader
+			FROM booking b
+			LEFT JOIN customer cust ON cust.CustomerID = b.CustomerID
+			WHERE b.Status != 'N' AND b.CancelStatus = 'N'
+			GROUP BY b.CustomerID
+		)";
+	}
+
+	/**
+	 * The `blatest` derived table: the customer's most recent active booking
+	 * (same ordering as Booking_Windowed_Select's rn = 1), for the single-value
+	 * Agent / Source / Destination / Token columns.
+	 */
+	private function Customer_Latest_Booking_Subquery()
+	{
+		return "(
+			SELECT CustomerID, SalesAgent, Source, Destination, Token, CountryCodeID FROM (
+				SELECT b.CustomerID, b.SalesAgent, b.Source, b.Destination, b.Token, b.CountryCodeID,
+					ROW_NUMBER() OVER (PARTITION BY b.CustomerID ORDER BY b.InsertDate DESC, b.BookingID DESC) AS rn
+				FROM booking b
+				WHERE b.Status != 'N' AND b.CancelStatus = 'N'
+			) w WHERE w.rn = 1
+		)";
+	}
+
+	/**
+	 * The `glself` derived table: one guest_list row per phone key (the customer's
+	 * own guest record where they appear as a guest), for the Gender / Nationality
+	 * / DOB / Guest Type columns. Guest Type defaults to ADULT when absent.
+	 */
+	private function Customer_Self_Guest_Subquery()
+	{
+		return "(
+			SELECT dedup_key, Gender, Nationality, DateOfBirth, Type FROM (
+				SELECT gl.dedup_key, gl.Gender, gl.Nationality, gl.DateOfBirth, gl.Type,
+					ROW_NUMBER() OVER (PARTITION BY gl.dedup_key ORDER BY gl.GuestListID) AS rn
+				FROM guest_list gl
+				WHERE gl.Status = 'Y' AND gl.dedup_key IS NOT NULL
+			) z WHERE z.rn = 1
+		)";
+	}
+
+	/**
+	 * The Customer List page: one row per active customer, enriched with the same
+	 * columns the Guest List shows, ordered by name. See Build_Customer_Branch for
+	 * the filter tiers.
+	 */
+	function Read_Customers_Rich($limit, $offset)
+	{
+		$branch = $this->Build_Customer_Branch();
+		$key    = $this->Customer_Dedup_Key_Expr();
+		$bagg   = $this->Customer_Booking_Aggregate_Subquery();
+		$blat   = $this->Customer_Latest_Booking_Subquery();
+		$glf    = $this->Customer_Self_Guest_Subquery();
+
+		$sql = "
+	SELECT
+		{$key} AS dedup_key,
+		c.CustomerID AS CustomerID,
+		CONVERT(c.name USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Name,
+		bagg.TeamLeaders        AS TeamLeader,
+		bagg.TeamLeaderBookings AS TeamLeaderBookings,
+		CONVERT(c.phone_number USING utf8mb4) COLLATE utf8mb4_unicode_ci AS ContactNum,
+		CONVERT(ccp.CountryCode USING utf8mb4) COLLATE utf8mb4_unicode_ci AS CallingCode,
+		CONVERT(c.PrimaryEmail USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Email,
+		CONVERT(c.ChatLanguage USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Language,
+		CONVERT(a.Name USING utf8mb4) COLLATE utf8mb4_unicode_ci AS AgentName,
+		CONVERT(s.Name USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Source,
+		CONVERT(c.customer_type USING utf8mb4) COLLATE utf8mb4_unicode_ci AS CustomerType,
+		CONVERT(cat.Name USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Destination,
+		CONVERT(cn.Country USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Nationality,
+		CONVERT(glself.Gender USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Gender,
+		CONVERT(COALESCE(glself.Type, 'ADULT') USING utf8mb4) COLLATE utf8mb4_unicode_ci AS GuestType,
+		glself.DateOfBirth AS DOB,
+		COALESCE(bagg.TotalPax, 0) AS TotalPax,
+		CAST('Booking Guest' AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS Type,
+		CONVERT(blatest.Token USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Token,
+		CONVERT(CASE WHEN bagg.AnyLeader = 1 THEN 'Team Leader' ELSE 'Team Member' END USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Role
+	FROM customer c
+	LEFT JOIN {$blat} blatest ON blatest.CustomerID = c.CustomerID
+	LEFT JOIN country_code ccp ON ccp.CountryCodeID = blatest.CountryCodeID
+	LEFT JOIN admin    a   ON a.AdminID   = blatest.SalesAgent
+	LEFT JOIN source   s   ON s.SourceID  = blatest.Source
+	LEFT JOIN category cat ON cat.CategoryID = blatest.Destination
+	LEFT JOIN {$bagg} bagg ON bagg.CustomerID = c.CustomerID
+	LEFT JOIN {$glf} glself ON glself.dedup_key = {$key}
+	LEFT JOIN country_code cn ON cn.CountryCodeID = glself.Nationality
+	{$branch['where']}
+	ORDER BY c.name ASC
+	LIMIT " . (int) $limit . " OFFSET " . (int) $offset;
+
+		return $this->db->query($sql, $branch['params'])->result();
+	}
+
+	/**
+	 * Total customers matching the current filters — shares Build_Customer_Branch
+	 * with Read_Customers_Rich, so the count and the listing return the same set.
+	 * Only the `bagg` aggregate is joined, and only when a pax filter needs it.
+	 */
+	function Count_Customers_Rich()
+	{
+		$branch   = $this->Build_Customer_Branch();
+		$pax_join = $branch['needs_pax_join']
+			? " LEFT JOIN " . $this->Customer_Booking_Aggregate_Subquery() . " bagg ON bagg.CustomerID = c.CustomerID "
+			: "";
+
+		$sql = "SELECT COUNT(*) AS cnt FROM customer c {$pax_join} {$branch['where']}";
+		$row = $this->db->query($sql, $branch['params'])->row();
+		return $row ? (int) $row->cnt : 0;
 	}
 
 	/**

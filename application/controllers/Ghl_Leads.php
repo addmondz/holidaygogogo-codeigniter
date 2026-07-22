@@ -16,6 +16,7 @@ class Ghl_Leads extends MY_Controller
 		$this->load->model('Booking_Model');
 		$this->load->model('Customer_Type_Model');
 		$this->load->helper('guest_contact');
+		$this->load->helper('ghl_lead_tags');
 	}
 
 	function index()

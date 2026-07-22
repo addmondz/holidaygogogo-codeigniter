@@ -78,6 +78,30 @@ assert_eq('missing keys -> blanks',
     array('', '', '', '', '', '', ''),
     ghl_message_log_export_row(array()));
 
+// Media-only row (empty body, an image + a voice note) -> the Message cell
+// carries the attachment URLs instead of exporting blank.
+$media = array(
+    'contact_name'      => 'Lim Wei Jian',
+    'message_timestamp' => '2026-06-20 11:20:00',
+    'direction'         => 'outbound',
+    'agent'             => 'Hani OP Team',
+    'from_number'       => '+60 10-295 6786',
+    'to_number'         => '+6591852988',
+    'body'              => '',
+    'attachments_json'  => '["https://cdn.test/a.png","https://cdn.test/v.ogg"]',
+);
+$media_cells = ghl_message_log_export_row($media);
+assert_eq('media row message cell',
+    "[image] https://cdn.test/a.png\n[audio] https://cdn.test/v.ogg",
+    $media_cells[6]);
+
+// Text + attachment -> text kept, attachment appended below it.
+$mixed = array('body' => 'see this', 'attachments_json' => '["https://cdn.test/a.png"]');
+$mixed_cells = ghl_message_log_export_row($mixed);
+assert_eq('text plus attachment',
+    "see this\n[image] https://cdn.test/a.png",
+    $mixed_cells[6]);
+
 assert_eq('filename encodes window',
     'ghl_message_log_2026-06-15_to_2026-06-22.csv',
     ghl_message_log_export_filename('2026-06-15', '2026-06-22'));

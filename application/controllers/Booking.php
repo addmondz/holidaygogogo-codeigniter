@@ -77,8 +77,15 @@ class Booking extends MY_Controller
 			// Load utils helper for date formatting
 			$this->load->helper('utils');
 			
-			// Update status for all bookings (this runs before the AJAX calls)
+			// Update status for all bookings (this runs before the AJAX calls).
+			// Same booking set as before; the old N+1 was one payment query per booking
+			// on every page load — now the payment lookup is skipped unless the row's
+			// status could actually be reset to PBC (see below), which is the only
+			// thing that read used it for.
 			$bookings = $this->Booking_Model->Read_All_Bookings();
+			// Statuses already in a recognised flow are never reset to PBC, so the
+			// payment lookup is skipped for them entirely.
+			$pbc_reset_excluded = ['PBC', 'PB', 'P', 'PBO', 'PTV', 'PT', 'Y', 'OG', 'SAD'];
 			foreach($bookings as $booking) {
 				if((date('Y-m-d') >= $booking->StartDate && date('Y-m-d') <= $booking->EndDate) && ($booking->Status == 'PT')) {
 					$this->Booking_Model->Update_After_Sales_Service2($booking->BookingID);
@@ -104,18 +111,17 @@ class Booking extends MY_Controller
 				// Payment-based status transitions (respecting new flow)
 				// Note: Payment approval status history is now handled in Payment controller
 				// when payment status is changed to 'Y' (approved)
-				$payments = $this->Booking_Model->Read_Payments($booking->BookingID);
-				if(empty($payments)) {
-					// No payments at all, set to PBC if not already in flow
-					if($booking->Status != 'PBC' && $booking->Status != 'P') {
-						// Only reset if not already in a recognised flow status. SAD
-						// (Save as Draft) is the draft anchor and PB (Pending BC) is
-						// an early flow status — neither must be silently flipped to
-						// PBC by this sweep.
-						if(!in_array($booking->Status, ['PBC', 'PB', 'P', 'PBO', 'PTV', 'PT', 'Y', 'OG', 'SAD'])) {
-							$this->Booking_Model->Update_Status('PBC', $booking->BookingID);
-							$this->Booking_Model->Create_Booking_Log2($booking->Status, 'PBC', $booking->BookingID);
-						}
+				//
+				// Only statuses outside the recognised-flow list can be reset to PBC. SAD
+				// (Save as Draft) is the draft anchor and PB (Pending BC) is an early flow
+				// status — neither must be silently flipped to PBC by this sweep. Reading
+				// payments only when a reset is actually possible avoids a query per row.
+				if(!in_array($booking->Status, $pbc_reset_excluded)) {
+					$payments = $this->Booking_Model->Read_Payments($booking->BookingID);
+					if(empty($payments)) {
+						// No payments at all, set to PBC
+						$this->Booking_Model->Update_Status('PBC', $booking->BookingID);
+						$this->Booking_Model->Create_Booking_Log2($booking->Status, 'PBC', $booking->BookingID);
 					}
 				}
 			}
@@ -212,6 +218,27 @@ class Booking extends MY_Controller
 		echo json_encode($data);
 	}
 
+	/**
+	 * Release the PHP session file lock for a read-only AJAX endpoint.
+	 *
+	 * The booking listing fires three requests at once — ajax_list, ajax_summary
+	 * and ajax_summary_cards. CI's 'files' session driver holds an exclusive lock
+	 * on the session file for the whole request, so these otherwise-independent
+	 * requests SERIALISE: the slow summary-cards request (~9s) blocks the fast
+	 * table request behind it, and the user waits ~9s to see any rows.
+	 *
+	 * None of these endpoints WRITE to the session, so we close (and unlock) it as
+	 * soon as the needed values have been read. $_SESSION stays populated in memory,
+	 * so later $this->session->userdata() reads keep working — only writes (which
+	 * don't happen here) would be lost. This lets the three requests run in parallel.
+	 */
+	private function release_session_lock()
+	{
+		if (session_status() === PHP_SESSION_ACTIVE) {
+			session_write_close();
+		}
+	}
+
 	function ajax_list()
 	{
 		$this->begin_json_endpoint(intval($this->input->get('draw')));
@@ -229,6 +256,10 @@ class Booking extends MY_Controller
 			// Marketing (60). Kept separate from $is_sales_agent, which also drives
 			// sales-agent-only row behaviour that must NOT apply to Marketing.
 			$hide_profit = admin_hides_profit($this->session->userdata('level'));
+
+			// Read-only endpoint: drop the session lock so it doesn't queue behind
+			// the slow summary-cards request (see release_session_lock()).
+			$this->release_session_lock();
 
 		$this->load->helper('booking_flow');
 
@@ -309,21 +340,30 @@ class Booking extends MY_Controller
 		$count = $start + 1;
 		$current_url = base_url($_SERVER['REQUEST_URI']);
 
-		// Which contacts have a stored WhatsApp conversation, so the mobile cell
-		// only shows a "message log" icon when a log exists (keyed by digits).
-		// Digits are built with guest_contact_wa_digits() (same as the Guest
-		// List) so the national trunk "0" is dropped — GHL stores E.164
-		// ("+601111200223"), so keeping the "0" ("6001111200223") never matches.
+		// Mobile numbers still render as an E.164 wa.me link below (national trunk "0"
+		// dropped), so the guest_contact helper is needed for that formatting.
 		$this->load->helper('guest_contact');
-		$this->load->model('Ghl_Messages_Model');
-		$msg_log_lookup = array();
+
+		// NOTE: the per-page "message log" icon lookup (Ghl_Messages_Model::
+		// Phones_With_Messages) was removed from the listing. It scanned the 400k-row
+		// ghl_messages table on every page load and, because that table's indexes are
+		// far larger than the MySQL buffer pool, cost ~1.5s per request. The chat log
+		// is still reachable from the customer/booking pages; it just no longer gates
+		// an icon in this listing.
+
+		// Prefetch payments and guest-list locks for the whole page in one query each,
+		// instead of one query per row (N+1). Keyed by BookingID / Token for O(1) lookup
+		// inside the row loop below.
+		$page_booking_ids = array();
+		$page_lock_hashes = array();
 		foreach($bookings as $b) {
-			$digits = guest_contact_wa_digits((string) $b->CountryCode, (string) $b->CustomerMobile);
-			if($digits !== '') {
-				$msg_log_lookup[] = $digits;
+			$page_booking_ids[] = $b->BookingID;
+			if(!empty($b->Token)) {
+				$page_lock_hashes[] = $b->Token;
 			}
 		}
-		$msg_log_phones = $this->Ghl_Messages_Model->Phones_With_Messages($msg_log_lookup);
+		$payments_by_booking = $this->Booking_Model->Read_Payments_For_Bookings($page_booking_ids);
+		$locks_by_hash = $this->Guest_list_lock_model->getByHashes($page_lock_hashes);
 
 		foreach($bookings as $booking) {
 			// SA-as-TC2 gating: when current SA is only the TC2 (SalesAgent2) of this
@@ -354,8 +394,8 @@ class Booking extends MY_Controller
 				$bc_title = 'PI';
 			}
 
-			// Calculate profit
-			$payments = $this->Booking_Model->Read_Payments($booking->BookingID);
+			// Calculate profit (payments prefetched above, keyed by BookingID)
+			$payments = isset($payments_by_booking[$booking->BookingID]) ? $payments_by_booking[$booking->BookingID] : array();
 			$total_credit = 0;
 			$total_debit = 0;
 			$net_profit = 0;
@@ -474,12 +514,8 @@ class Booking extends MY_Controller
 			// Chat Language
 			$row['chat_language'] = $booking->ChatLanguage;
 
-			// Mobile (WhatsApp link + message-log icon when a stored chat exists)
+			// Mobile (WhatsApp link)
 			$row['mobile'] = '<a href="https://wa.me/' . $booking->CustomerMobile . '" target="_blank" title="Open WhatsApp chat" class="btn btn-light-success d-inline-flex align-items-center btn-sm"><i class="la la-whatsapp"></i></a>';
-			$mobile_digits = preg_replace('/\D+/', '', (string) $booking->CustomerMobile);
-			if($mobile_digits !== '' && !empty($msg_log_phones[$mobile_digits])) {
-				$row['mobile'] .= ' <a href="javascript:;" title="View message log" class="btn btn-light-primary d-inline-flex align-items-center btn-sm js-msg-log" data-phone="' . htmlspecialchars($mobile_digits, ENT_QUOTES) . '" data-name="' . htmlspecialchars($booking->Customer, ENT_QUOTES) . '"><i class="la la-comments"></i></a>';
-			}
 
 			// Start Date
 			$row['start_date'] = $start_date_formatted;
@@ -527,9 +563,9 @@ class Booking extends MY_Controller
 			} else {
 				$has_active_editor_lock = false;
 
-				// 2) Active soft lock (someone is filling)
+				// 2) Active soft lock (someone is filling) — from prefetched map
 				if (!empty($booking->Token)) {
-					$lock = $this->Guest_list_lock_model->getByHash($booking->Token);
+					$lock = isset($locks_by_hash[$booking->Token]) ? $locks_by_hash[$booking->Token] : null;
 					if (!empty($lock)) {
 						$is_expired = $this->Guest_list_lock_model->isExpired($lock);
 						if (!$is_expired) {
@@ -749,6 +785,9 @@ class Booking extends MY_Controller
 			// Net profit is hidden from Sales Agents (20) and Marketing (60).
 			$hide_profit = admin_hides_profit($this->session->userdata('level'));
 
+			// Read-only endpoint: drop the session lock (see release_session_lock()).
+			$this->release_session_lock();
+
 			$summary = $this->Booking_Model->Calculate_Summary();
 
 			$total_sales = $summary['total_sales'];
@@ -945,6 +984,11 @@ class Booking extends MY_Controller
 
 		$level    = (int) $this->session->userdata('level');
 		$admin_id = (int) $this->session->userdata('admin_id');
+
+		// Read-only endpoint, but the slowest of the three the listing fires: drop the
+		// session lock immediately so it stops blocking ajax_list/ajax_summary behind
+		// it (see release_session_lock()).
+		$this->release_session_lock();
 
 		$today        = date('Y-m-d');
 		$month_start  = date('Y-m-01');

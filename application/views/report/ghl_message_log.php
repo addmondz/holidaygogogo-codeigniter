@@ -207,7 +207,37 @@ $contact_url = function ($number) use ($log_filters) {
                                                 <span class="text-muted">&mdash;</span>
                                             <?php } ?>
                                         </td>
-                                        <td style="white-space:pre-wrap; word-break:break-word;"><?php echo html_escape($m['body']); ?></td>
+                                        <td style="white-space:pre-wrap; word-break:break-word;">
+                                            <?php
+                                                $body_text  = trim((string) (isset($m['body']) ? $m['body'] : ''));
+                                                $attachments = ghl_message_log_attachments(isset($m['attachments_json']) ? $m['attachments_json'] : '');
+                                            ?>
+                                            <?php if ($body_text !== '') { ?><?php echo html_escape($body_text); ?><?php } ?>
+                                            <?php foreach ($attachments as $att) {
+                                                $url = html_escape($att['url']);
+                                            ?>
+                                                <div class="mt-2">
+                                                    <?php if ($att['kind'] === 'image') { ?>
+                                                        <a href="<?php echo $url; ?>" target="_blank" rel="noopener">
+                                                            <img src="<?php echo $url; ?>" alt="image" style="max-width:180px; max-height:180px; border-radius:6px; border:1px solid #ebedf3;" loading="lazy" />
+                                                        </a>
+                                                    <?php } elseif ($att['kind'] === 'audio') { ?>
+                                                        <audio controls preload="none" style="max-width:260px; vertical-align:middle;">
+                                                            <source src="<?php echo $url; ?>">
+                                                        </audio>
+                                                    <?php } elseif ($att['kind'] === 'video') { ?>
+                                                        <video controls preload="none" style="max-width:260px; max-height:200px; border-radius:6px;">
+                                                            <source src="<?php echo $url; ?>">
+                                                        </video>
+                                                    <?php } else { ?>
+                                                        <a href="<?php echo $url; ?>" target="_blank" rel="noopener" class="font-weight-bold text-primary">
+                                                            <i class="la la-paperclip mr-1"></i><?php echo html_escape($att['name']); ?>
+                                                        </a>
+                                                    <?php } ?>
+                                                </div>
+                                            <?php } ?>
+                                            <?php if ($body_text === '' && empty($attachments)) { ?><span class="text-muted">&mdash;</span><?php } ?>
+                                        </td>
                                     </tr>
                                 <?php } ?>
                             <?php } ?>

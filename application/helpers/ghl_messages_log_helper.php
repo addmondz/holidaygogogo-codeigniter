@@ -47,6 +47,68 @@ if (!function_exists('ghl_message_log_direction_label')) {
     }
 }
 
+if (!function_exists('ghl_message_log_attachments')) {
+    /**
+     * Turn a stored `ghl_messages.attachments_json` value (a JSON array of URLs)
+     * into a typed list so the Message Log can show the actual media instead of a
+     * blank cell -- images/voice-notes/videos are the common WhatsApp payloads
+     * that arrive with an empty text body.
+     *
+     * Each entry: ['url'=>string, 'kind'=>'image|audio|video|file', 'name'=>basename].
+     * Only http(s) URLs are kept (guards the view against javascript:/data: URLs).
+     * Kind is decided by file extension, ignoring any "?alt=media&token=..." query
+     * that GHL's firebase URLs carry.
+     *
+     * @param string|null $attachments_json Raw JSON array string, or null/''.
+     * @return array<int,array{url:string,kind:string,name:string}>
+     */
+    function ghl_message_log_attachments($attachments_json)
+    {
+        $raw = trim((string) $attachments_json);
+        if ($raw === '' || $raw === '[]') {
+            return array();
+        }
+
+        $decoded = json_decode($raw, true);
+        if (!is_array($decoded)) {
+            return array();
+        }
+
+        $image = array('jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg');
+        $audio = array('ogg', 'opus', 'mp3', 'm4a', 'wav', 'aac', 'amr');
+        $video = array('mp4', 'mov', 'webm', '3gp', 'm4v');
+
+        $out = array();
+        foreach ($decoded as $url) {
+            if (!is_string($url)) {
+                continue;
+            }
+            $url = trim($url);
+            if ($url === '' || !preg_match('#^https?://#i', $url)) {
+                continue;
+            }
+
+            $path = (string) parse_url($url, PHP_URL_PATH);
+            $name = $path !== '' ? rawurldecode(basename($path)) : basename($url);
+            $ext  = strtolower(pathinfo($path !== '' ? $path : $url, PATHINFO_EXTENSION));
+
+            if (in_array($ext, $image, true)) {
+                $kind = 'image';
+            } elseif (in_array($ext, $audio, true)) {
+                $kind = 'audio';
+            } elseif (in_array($ext, $video, true)) {
+                $kind = 'video';
+            } else {
+                $kind = 'file';
+            }
+
+            $out[] = array('url' => $url, 'kind' => $kind, 'name' => $name);
+        }
+
+        return $out;
+    }
+}
+
 if (!function_exists('ghl_message_log_format_duration')) {
     /**
      * Render a whole-second duration as a compact, reader-friendly string:
@@ -382,6 +444,15 @@ if (!function_exists('ghl_message_log_export_row')) {
             return isset($row[$key]) && $row[$key] !== null ? (string) $row[$key] : '';
         };
 
+        // Media messages arrive with an empty text body -- fold each attachment
+        // into the Message column ("[image] <url>") so the CSV mirrors what the
+        // on-screen log shows instead of exporting a blank cell.
+        $message = trim($cell('body'));
+        foreach (ghl_message_log_attachments($cell('attachments_json')) as $att) {
+            $message = ($message === '' ? '' : $message . "\n")
+                . '[' . $att['kind'] . '] ' . $att['url'];
+        }
+
         return array(
             $cell('contact_name'),
             $cell('message_timestamp'),
@@ -389,7 +460,7 @@ if (!function_exists('ghl_message_log_export_row')) {
             $cell('agent'),
             $cell('from_number'),
             $cell('to_number'),
-            $cell('body'),
+            $message,
         );
     }
 }

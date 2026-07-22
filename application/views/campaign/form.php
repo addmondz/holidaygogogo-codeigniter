@@ -182,14 +182,49 @@
 								<?php } } ?>
 							</select>
 						</div>
-						<div class="col-md-2 d-flex align-items-end">
+					</div>
+					<div class="row mb-4">
+						<div class="col-md-3">
+							<label>Date of Bookings
+								<a onclick="Reset_Guest_Booking_Date()" class="btn btn-icon btn-light-warning btn-xs" data-toggle="tooltip" title="Clear booking date">
+									<i class="la la-undo"></i>
+								</a>
+							</label>
+							<div id="guest_search_booking_date" class="input-icon">
+								<input readonly type="text" autocomplete="off" class="form-control" placeholder="DD/MM/YYYY - DD/MM/YYYY">
+								<span><i class="la la-calendar"></i></span>
+							</div>
+						</div>
+						<div class="col-md-3">
+							<label>Destination</label>
+							<select id="guest_search_destination" class="form-control selectpicker" data-live-search="true" multiple data-actions-box="true" title="--ALL DESTINATIONS--">
+								<?php if(!empty($destinations)) { foreach($destinations as $d) { ?>
+									<option value="<?php echo (int)$d->CategoryID; ?>"><?php echo htmlspecialchars($d->Name); ?></option>
+								<?php } } ?>
+							</select>
+						</div>
+						<div class="col-md-3">
+							<label>Joined Campaign</label>
+							<select id="guest_search_joined_campaign" class="form-control selectpicker" data-live-search="true">
+								<option value="">--ANY CAMPAIGN--</option>
+								<?php if(!empty($campaigns)) { foreach($campaigns as $cp) { ?>
+									<option value="<?php echo (int)$cp->CampaignID; ?>"><?php echo htmlspecialchars($cp->Name); ?></option>
+								<?php } } ?>
+							</select>
+						</div>
+						<div class="col-md-3 d-flex align-items-end">
 							<button type="button" id="guest_search_btn" class="btn btn-light-success font-weight-bold w-100">Search</button>
 						</div>
 					</div>
 
 					<div class="row">
 						<div class="col-md-7">
-							<div class="picker-section-title">Available Guests</div>
+							<div class="d-flex justify-content-between align-items-center mb-2">
+								<div class="picker-section-title" style="margin-bottom:0;">Available Guests</div>
+								<button type="button" id="picker_pick_all" class="btn btn-light-primary btn-sm font-weight-bold" data-toggle="tooltip" title="Add every guest matching the current filters (all pages)" disabled>
+									<i class="la la-check-double"></i>Pick All Matching
+								</button>
+							</div>
 							<div class="picker-results">
 								<table class="table table-bordered table-head-custom">
 									<thead>
@@ -215,7 +250,12 @@
 							</div>
 						</div>
 						<div class="col-md-5">
-							<div class="picker-section-title">Selected Guests</div>
+							<div class="d-flex justify-content-between align-items-center mb-2">
+								<div class="picker-section-title" style="margin-bottom:0;">Selected Guests</div>
+								<button type="button" id="picker_clear_all" class="btn btn-light-danger btn-sm font-weight-bold" data-toggle="tooltip" title="Remove all selected guests">
+									<i class="la la-times-circle"></i>Clear All
+								</button>
+							</div>
 							<div class="picker-selected">
 								<table class="table table-bordered table-head-custom">
 									<thead>
@@ -230,11 +270,6 @@
 										<tr><td colspan="4" class="picker-empty">No guests selected yet.</td></tr>
 									</tbody>
 								</table>
-							</div>
-							<div class="mt-2 text-right">
-								<button type="button" id="picker_clear_all" class="btn btn-light-danger btn-sm" data-toggle="tooltip" title="Remove all selected guests">
-									<i class="la la-times-circle"></i>Clear All
-								</button>
 							</div>
 						</div>
 					</div>
@@ -273,6 +308,23 @@
 	});
 	function Reset_Campaign_Date() { $('#kt_datepicker_campaign input').val(''); }
 
+	// Guest-picker "Date of Bookings" range. autoUpdateInput:false so the box
+	// stays empty (= no filter) until a range is applied; Clear empties it again.
+	$('#guest_search_booking_date').daterangepicker({
+		autoUpdateInput: false,
+		locale: { format: 'DD/MM/YYYY', cancelLabel: 'Clear' },
+		buttonClasses: ' btn',
+		applyClass: 'btn-primary',
+		cancelClass: 'btn-secondary'
+	});
+	$('#guest_search_booking_date').on('apply.daterangepicker', function(ev, picker) {
+		$(this).find('input').val(picker.startDate.format('DD/MM/YYYY') + ' - ' + picker.endDate.format('DD/MM/YYYY'));
+	});
+	$('#guest_search_booking_date').on('cancel.daterangepicker', function(ev, picker) {
+		$(this).find('input').val('');
+	});
+	function Reset_Guest_Booking_Date() { $('#guest_search_booking_date input').val(''); }
+
 	$('[data-toggle="tooltip"]').tooltip();
 
 	(function() {
@@ -284,6 +336,8 @@
 		var currentPage   = 1;
 		var totalPages    = 0;
 		var currentRows   = [];
+		var lastTotal     = 0;
+		var searched      = false;
 
 		function escapeHtml(s) {
 			if(s === null || s === undefined) return '';
@@ -379,28 +433,37 @@
 			});
 		}
 
+		function currentFilterData() {
+			return {
+				q: $('#guest_search_q').val(),
+				type: $('#guest_search_type').val(),
+				role: $('#guest_search_role').val(),
+				nationality: $('#guest_search_nationality').val(),
+				booking_date: $('#guest_search_booking_date input').val(),
+				destination: $('#guest_search_destination').val() || [],
+				joined_campaign: $('#guest_search_joined_campaign').val()
+			};
+		}
+
 		function loadResults(page) {
 			currentPage = page || 1;
 			$('#picker_results_body').html('<tr><td colspan="5" class="picker-empty">Loading...</td></tr>');
 			$.ajax({
 				url: SEARCH_URL,
 				type: 'get',
-				data: {
-					page: currentPage,
-					q: $('#guest_search_q').val(),
-					type: $('#guest_search_type').val(),
-					role: $('#guest_search_role').val(),
-					nationality: $('#guest_search_nationality').val()
-				},
+				data: $.extend({ page: currentPage }, currentFilterData()),
 				dataType: 'json',
 				success: function(resp) {
 					totalPages = resp.total_pages;
+					lastTotal  = resp.total;
+					searched   = true;
 					renderResults(resp.rows);
 					$('#picker_results_info').text(
 						'Found ' + resp.total + ' (page ' + resp.page + ' of ' + (resp.total_pages || 1) + ')'
 					);
 					$('#picker_prev').prop('disabled', currentPage <= 1);
 					$('#picker_next').prop('disabled', currentPage >= totalPages);
+					$('#picker_pick_all').prop('disabled', resp.total <= 0);
 				},
 				error: function() {
 					$('#picker_results_body').html('<tr><td colspan="5" class="picker-empty" style="color:#f64e60;">Failed to load guests.</td></tr>');
@@ -408,7 +471,63 @@
 			});
 		}
 
+		function addRowsToSelected(rows) {
+			var added = 0;
+			(rows || []).forEach(function(r) {
+				if(!r.DedupKey || selected[r.DedupKey]) { return; }
+				selected[r.DedupKey] = {
+					name:    r.GuestName  || '',
+					contact: r.ContactNum || '',
+					email:   r.Email      || '',
+					type:    r.GuestType  || ''
+				};
+				added++;
+			});
+			return added;
+		}
+
+		function pickAllMatching() {
+			if(!searched || lastTotal <= 0) { return; }
+			var $btn = $('#picker_pick_all');
+			Swal.fire({
+				title: 'Add all matching guests?',
+				text: 'This adds every guest matching the current filters (' + lastTotal + ') to the campaign.',
+				icon: 'question',
+				showCancelButton: true,
+				confirmButtonText: 'Yes, add all',
+				cancelButtonText: 'Cancel'
+			}).then(function(r) {
+				if(!r.isConfirmed) { return; }
+				$btn.prop('disabled', true).html('<i class="la la-spinner la-spin"></i>Adding...');
+				$.ajax({
+					url: SEARCH_URL,
+					type: 'get',
+					data: $.extend({ all: 1 }, currentFilterData()),
+					dataType: 'json',
+					success: function(resp) {
+						var added   = addRowsToSelected(resp.rows);
+						var fetched = (resp.rows || []).length;
+						renderSelected();
+						var msg = 'Added ' + added + ' guest' + (added === 1 ? '' : 's') + '.';
+						if(resp.total > fetched) {
+							msg += ' Only the first ' + fetched + ' of ' + resp.total +
+								' were added — narrow the filters to reach the rest.';
+						}
+						Swal.fire({ icon: 'success', title: 'Done', text: msg, timer: 2600, showConfirmButton: false });
+					},
+					error: function() {
+						Swal.fire({ icon: 'error', title: 'Failed to add guests', timer: 2000, showConfirmButton: false });
+					},
+					complete: function() {
+						$btn.prop('disabled', false).html('<i class="la la-check-double"></i>Pick All Matching');
+						$('[data-toggle="tooltip"]').tooltip();
+					}
+				});
+			});
+		}
+
 		$('#guest_search_btn').on('click', function() { loadResults(1); });
+		$('#picker_pick_all').on('click', pickAllMatching);
 		$('#guest_search_q').on('keydown', function(e) { if(e.which === 13) { e.preventDefault(); loadResults(1); } });
 		$('#picker_prev').on('click', function() { if(currentPage > 1) { loadResults(currentPage - 1); } });
 		$('#picker_next').on('click', function() { if(currentPage < totalPages) { loadResults(currentPage + 1); } });

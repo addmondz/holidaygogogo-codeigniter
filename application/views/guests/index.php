@@ -96,6 +96,17 @@ div.kt-datatable__pager-container {
 						<strong><?php echo htmlspecialchars($page_title); ?></strong>
 					</h3>
 				</div>
+				<?php if($list_base === 'Customer') { ?>
+					<div class="card-toolbar">
+						<a href="<?php echo base_url('Customer/Create'); ?>" class="btn btn-primary font-weight-bold mr-1 mb-2" style="width:180px;">
+							<i class="la la-user-alt"></i>Create Customer
+						</a>
+						<?php $current_url = base_url($_SERVER['REQUEST_URI']); ?>
+						<a href="<?php if(strpos($current_url, '?') == true) { echo base_url('Customer/Download?') . (explode('?', $current_url))[1]; } else { echo base_url('Customer/Download'); } ?>" class="btn btn-light-warning font-weight-bold mb-2" style="width:180px;">
+							<i class="las la-arrow-circle-down"></i>Customer Records
+						</a>
+					</div>
+				<?php } ?>
 			</div>
 			<div class="card-body">
 				<div class="accordion accordion-solid accordion-toggle-plus">
@@ -371,15 +382,21 @@ div.kt-datatable__pager-container {
 								<th style="text-align:center;">Team Leader</th>
 								<th style="text-align:center;">Contact Num</th>
 								<th style="text-align:center;">Email</th>
+								<?php if($list_base === 'Ghl_Leads') { ?>
+									<th style="text-align:center;">Tags</th>
+								<?php } ?>
 								<th style="text-align:center;">Language</th>
 								<th style="text-align:center;">Agent Name</th>
 								<th style="text-align:center;">Guest Type</th>
+								<?php if($list_base !== 'Ghl_Leads') { ?>
+									<th style="text-align:center;">Destination</th>
+								<?php } ?>
 								<th class="action" style="text-align:center;">Action</th>
 							</tr>
 						</thead>
 						<tbody>
 							<?php if(empty($guests)) { ?>
-								<tr><td colspan="9" style="text-align:center; padding-top:10px; padding-bottom:10px;">Guest Records Not Found</td></tr>
+								<tr><td colspan="10" style="text-align:center; padding-top:10px; padding-bottom:10px;">Guest Records Not Found</td></tr>
 							<?php } else { ?>
 								<?php $count = 1; foreach($guests as $g) { ?>
 									<?php $is_ghl_row = isset($g->Type) && $g->Type === 'GHL'; ?>
@@ -421,26 +438,46 @@ div.kt-datatable__pager-container {
 											?>
 										</td>
 										<?php
-											$calling_code    = isset($g->CallingCode) ? (string)$g->CallingCode : '';
-											$contact_display = guest_contact_format_display($calling_code, (string)$g->ContactNum);
-											$wa_number       = guest_contact_wa_digits($calling_code, (string)$g->ContactNum);
+											$calling_code = isset($g->CallingCode) ? (string)$g->CallingCode : '';
+											// A merged row (same Name + IC across bookings) packs every distinct
+											// phone into ContactNumbers so we can show them all; pages that don't
+											// merge (Customer list) just carry the single ContactNum. The first
+											// entry is the representative — the one the inline editor edits
+											// (data-mobile below matches $g->ContactNum).
+											if(isset($g->ContactNumbers) && (string)$g->ContactNumbers !== '') {
+												$phones = guest_contact_parse_multi($g->ContactNumbers);
+											} else {
+												$phones = array();
+												if((string)$g->ContactNum !== '') {
+													$phones[] = array('calling_code' => $calling_code, 'mobile' => (string)$g->ContactNum);
+												}
+											}
 										?>
 										<td class="contact-cell<?php if(!$is_ghl_row) echo ' contact-editable'; ?>" style="text-align:center; white-space:nowrap;"<?php if(!$is_ghl_row) { ?> data-dedup-key="<?php echo htmlspecialchars($g->dedup_key, ENT_QUOTES); ?>" data-mobile="<?php echo htmlspecialchars((string)$g->ContactNum, ENT_QUOTES); ?>" data-calling-code="<?php echo htmlspecialchars($calling_code, ENT_QUOTES); ?>"<?php } ?>>
 											<span class="contact-display">
-												<?php if(!empty($wa_number)) { ?>
-													<a class="contact-wa" href="https://wa.me/<?php echo $wa_number; ?>" target="_blank" rel="noopener" style="color:#25D366; text-decoration:none; display:inline-flex; align-items:center; gap:5px;" title="Open WhatsApp chat">
-														<i class="la la-whatsapp" style="font-size:16px;"></i><span class="contact-num"><?php echo htmlspecialchars($contact_display); ?></span>
-													</a>
-												<?php } else { ?>
-													<span class="contact-num"><?php echo htmlspecialchars($contact_display); ?></span>
-												<?php } ?>
-												<?php if(!empty($wa_number) && !empty($msg_log_phones[$wa_number])) { ?>
-													<button type="button" class="btn btn-icon btn-light-success btn-xs js-msg-log ml-1" data-toggle="tooltip" title="View message log" data-phone="<?php echo htmlspecialchars($wa_number, ENT_QUOTES); ?>" data-name="<?php echo htmlspecialchars($g->Name, ENT_QUOTES); ?>">
-														<i class="la la-comments"></i>
-													</button>
-												<?php } ?>
+												<?php if(empty($phones)) { ?>
+													<span class="contact-num"><span class="text-muted">&mdash;</span></span>
+												<?php } else { foreach($phones as $pi => $ph) {
+													$contact_display = guest_contact_format_display($ph['calling_code'], $ph['mobile']);
+													$wa_number       = guest_contact_wa_digits($ph['calling_code'], $ph['mobile']);
+												?>
+													<span class="contact-line"<?php if($pi > 0) echo ' style="display:block; margin-top:4px;"'; ?>>
+														<?php if(!empty($wa_number)) { ?>
+															<a class="contact-wa" href="https://wa.me/<?php echo $wa_number; ?>" target="_blank" rel="noopener" style="color:#25D366; text-decoration:none; display:inline-flex; align-items:center; gap:5px;" title="Open WhatsApp chat">
+																<i class="la la-whatsapp" style="font-size:16px;"></i><span class="contact-num"><?php echo htmlspecialchars($contact_display); ?></span>
+															</a>
+														<?php } else { ?>
+															<span class="contact-num"><?php echo htmlspecialchars($contact_display); ?></span>
+														<?php } ?>
+														<?php if(!empty($wa_number) && !empty($msg_log_phones[$wa_number])) { ?>
+															<button type="button" class="btn btn-icon btn-light-success btn-xs js-msg-log ml-1" data-toggle="tooltip" title="View message log" data-phone="<?php echo htmlspecialchars($wa_number, ENT_QUOTES); ?>" data-name="<?php echo htmlspecialchars($g->Name, ENT_QUOTES); ?>">
+																<i class="la la-comments"></i>
+															</button>
+														<?php } ?>
+													</span>
+												<?php } } ?>
 												<?php if(!$is_ghl_row) { ?>
-													<button type="button" class="btn btn-icon btn-light-primary btn-xs contact-edit-btn ml-1" data-toggle="tooltip" title="Edit contact number">
+													<button type="button" class="btn btn-icon btn-light-primary btn-xs contact-edit-btn ml-1" data-toggle="tooltip" title="<?php echo (count($phones) > 1) ? 'Edit primary contact number' : 'Edit contact number'; ?>">
 														<i class="la la-pencil"></i>
 													</button>
 												<?php } ?>
@@ -455,6 +492,21 @@ div.kt-datatable__pager-container {
 												<?php } ?>
 											</span>
 										</td>
+										<?php if($list_base === 'Ghl_Leads') { ?>
+											<td style="text-align:center; max-width:220px;">
+												<?php
+													$lead_tags = $is_ghl_row ? ghl_lead_tags_parse(isset($g->Tags) ? $g->Tags : null) : array();
+													if(!empty($lead_tags)) {
+														foreach($lead_tags as $tag) {
+															echo '<span class="label label-inline label-light-primary font-weight-bold mr-1 mb-1" style="white-space:normal;">'
+																. htmlspecialchars($tag) . '</span>';
+														}
+													} else {
+														echo '<span class="text-muted">&mdash;</span>';
+													}
+												?>
+											</td>
+										<?php } ?>
 										<?php $lang_val = (string) $g->Language; ?>
 										<td class="gl-cell<?php if(!$is_ghl_row) echo ' gl-editable'; ?>" style="text-align:center;"<?php if(!$is_ghl_row) { ?> data-field="language" data-dedup-key="<?php echo htmlspecialchars($g->dedup_key, ENT_QUOTES); ?>" data-value="<?php echo htmlspecialchars($lang_val, ENT_QUOTES); ?>"<?php } ?>>
 											<span class="gl-display">
@@ -479,14 +531,48 @@ div.kt-datatable__pager-container {
 												<span class="text-muted">&mdash;</span>
 											<?php endif; ?>
 										</td>
+										<?php if($list_base !== 'Ghl_Leads') { ?>
+											<td style="text-align:center;">
+												<?php
+													$dests = array();
+													foreach(explode('||', isset($g->Destination) ? (string)$g->Destination : '') as $d) {
+														$d = trim($d);
+														if($d === '' || $d === '-') { continue; }
+														if(!in_array($d, $dests, true)) { $dests[] = $d; }
+													}
+													if(!empty($dests)) {
+														$dest_out = array();
+														foreach($dests as $d) { $dest_out[] = htmlspecialchars($d); }
+														echo implode('<br>', $dest_out);
+													} else {
+														echo '<span class="text-muted">&mdash;</span>';
+													}
+												?>
+											</td>
+										<?php } ?>
 										<td style="text-align:center;">
 											<?php if(!$is_ghl_row) { ?>
 												<div class="btn-group">
 													<button type="button" data-toggle="dropdown" class="btn btn-light-primary btn-sm dropdown-toggle" style="padding-left:3px;"></button>
 													<div class="dropdown-menu">
+														<?php if($list_base === 'Customer' && !empty($g->CustomerID)) { ?>
+															<a href="<?php echo base_url('Customer/Update?customer_id=') . $g->CustomerID; ?>" class="dropdown-item" style="font-size:11px;">Update Customer</a>
+															<a href="#" class="dropdown-item copy-customer-link" data-customer-id="<?php echo $g->CustomerID; ?>" style="font-size:11px;">Copy Customer Link</a>
+															<?php
+																$this->load->helper('utils');
+																$portal_hash = generate_customer_portal_slug($g->CustomerID);
+																if(!empty($portal_hash) && $portal_hash !== false):
+															?>
+																<a href="<?php echo base_url('customer/' . urlencode($portal_hash)); ?>" target="_blank" class="dropdown-item" style="font-size:11px;">Customer Portal</a>
+															<?php endif; ?>
+															<div class="dropdown-divider"></div>
+														<?php } ?>
 														<a href="<?php echo base_url('Guests/View?key=') . urlencode($g->dedup_key); ?>" class="dropdown-item" style="font-size:11px;">Customer Profile</a>
 														<?php $rc = isset($remark_counts[$g->dedup_key]) ? (int) $remark_counts[$g->dedup_key] : 0; ?>
 														<a href="javascript:;" class="dropdown-item js-remarks" style="font-size:11px;" data-dedup-key="<?php echo htmlspecialchars($g->dedup_key, ENT_QUOTES); ?>" data-name="<?php echo htmlspecialchars($g->Name, ENT_QUOTES); ?>">Remarks<?php if($rc > 0) { echo ' (' . $rc . ')'; } ?></a>
+														<?php if($list_base === 'Customer' && !empty($g->CustomerID) && (int)$this->session->userdata('level') === 10) { ?>
+															<a href="#" class="dropdown-item delete-customer text-danger" data-customer-id="<?php echo $g->CustomerID; ?>" data-customer-name="<?php echo htmlspecialchars($g->Name, ENT_QUOTES); ?>" style="font-size:11px;">Delete Customer</a>
+														<?php } ?>
 														<?php if(!empty($g->Token)) { ?>
 															<div class="dropdown-divider"></div>
 															<a href="<?php echo base_url('Guest_List?gl=') . urlencode($g->Token); ?>" target="_blank" class="dropdown-item" style="font-size:11px;">Guest List</a>
@@ -1038,4 +1124,95 @@ div.kt-datatable__pager-container {
 				$btn.prop('disabled', false).find('i').attr('class', 'la la-trash');
 			});
 	});
+
+	<?php if($list_base === 'Customer') { ?>
+	// ----- Customer master actions (Customer List page only) -----
+	// Copy Customer Portal Link: fetch the portal URL and copy to clipboard.
+	$(document).on('click', '.copy-customer-link', function(e) {
+		e.preventDefault();
+		var $button = $(this);
+		var customerId = $button.data('customer-id');
+		var originalText = $button.html();
+		$button.prop('disabled', true).html('<i class="la la-spinner la-spin"></i> Generating...');
+		$.ajax({
+			url: '<?php echo base_url('Customer/GeneratePortalUrl'); ?>',
+			method: 'GET',
+			data: { customer_id: customerId },
+			dataType: 'json',
+			success: function(response) {
+				if (response.success && response.portal_url) {
+					var urlToCopy = response.portal_url;
+					if (navigator.clipboard && window.isSecureContext) {
+						navigator.clipboard.writeText(urlToCopy).then(function() {
+							showCopySuccess($button, originalText);
+						}).catch(function() {
+							fallbackCopy(urlToCopy, $button, originalText);
+						});
+					} else {
+						fallbackCopy(urlToCopy, $button, originalText);
+					}
+				} else {
+					alert('Failed to generate portal link: ' + (response.message || 'Unknown error'));
+					$button.prop('disabled', false).html(originalText);
+				}
+			},
+			error: function() {
+				alert('Error generating portal link. Please try again.');
+				$button.prop('disabled', false).html(originalText);
+			}
+		});
+	});
+
+	// Soft-delete customer (Status='N') via the existing Customer/Delete endpoint.
+	$(document).on('click', '.delete-customer', function(e) {
+		e.preventDefault();
+		var $link = $(this);
+		var customerId = $link.data('customer-id');
+		var customerName = $link.data('customer-name');
+		Swal.fire({
+			title: 'Delete this customer?',
+			html: 'You are about to delete <strong>' + $('<div>').text(customerName).html() + '</strong>.<br>The record will be hidden from all lists.',
+			icon: 'warning',
+			showCancelButton: true,
+			confirmButtonText: 'Yes, delete',
+			cancelButtonText: 'Cancel',
+			confirmButtonColor: '#d33',
+			cancelButtonColor: '#3085d6'
+		}).then(function(result) {
+			if (!result.isConfirmed) return;
+			$.ajax({
+				url: '<?php echo base_url('Customer/Delete'); ?>',
+				method: 'GET',
+				data: { customer_id: customerId },
+				success: function() {
+					if (typeof toastr !== 'undefined') { toastr.success('Customer deleted.'); }
+					window.location.reload();
+				},
+				error: function() {
+					Swal.fire({ icon: 'error', title: 'Delete failed', text: 'Could not delete the customer. Please try again.' });
+				}
+			});
+		});
+	});
+
+	function fallbackCopy(text, $button, originalText) {
+		var tempInput = $('<input>');
+		$('body').append(tempInput);
+		tempInput.val(text).select();
+		try {
+			document.execCommand('copy');
+			showCopySuccess($button, originalText);
+		} catch (err) {
+			alert('Failed to copy. Please copy manually: ' + text);
+			$button.prop('disabled', false).html(originalText);
+		}
+		tempInput.remove();
+	}
+
+	function showCopySuccess($button, originalText) {
+		$button.html('<i class="la la-check"></i> Copied!');
+		setTimeout(function() { $button.prop('disabled', false).html(originalText); }, 2000);
+		if (typeof toastr !== 'undefined') { toastr.success('Customer portal link copied to clipboard!'); }
+	}
+	<?php } ?>
 </script>

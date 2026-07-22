@@ -700,6 +700,33 @@ class Booking_Model extends CI_Model
 		$this->db->where('payment.Status !=', 'N');
 		return $this->db->get('payment')->result();
 	}
+
+	/**
+	 * Batch version of Read_Payments for a page of bookings.
+	 *
+	 * Returns payments for all given booking IDs in a single query, grouped as
+	 * [BookingID => [payment rows]]. Used by the listing (Booking::ajax_list) to
+	 * avoid one payment query per row (N+1). Each row's shape matches
+	 * Read_Payments so callers can reuse the same profit calculation.
+	 *
+	 * @param int[] $booking_ids
+	 * @return array<int, object[]>
+	 */
+	function Read_Payments_For_Bookings($booking_ids)
+	{
+		$grouped = array();
+		if(empty($booking_ids)) {
+			return $grouped;
+		}
+		$this->db->select('payment.BookingID, payment.PaymentID, Type, Credit, Debit, payment.Status');
+		$this->db->where_in('payment.BookingID', $booking_ids);
+		$this->db->where('payment.Status !=', 'N');
+		$rows = $this->db->get('payment')->result();
+		foreach($rows as $row) {
+			$grouped[$row->BookingID][] = $row;
+		}
+		return $grouped;
+	}
 	
 	function Read_Admins()
 	{
@@ -2538,11 +2565,19 @@ class Booking_Model extends CI_Model
 		$total_sales = 0;
 		$total_net_profit = 0;
 
+		// Prefetch every filtered booking's payments in one query instead of one
+		// query per booking (N+1). Grouped by BookingID; the per-booking maths below
+		// is unchanged.
+		$booking_ids = array();
+		foreach($bookings as $booking) {
+			$booking_ids[] = $booking->BookingID;
+		}
+		$payments_by_booking = $this->Read_Payments_For_Bookings($booking_ids);
+
 		foreach($bookings as $booking) {
 			$total_sales += $booking->NetTotal;
 
-			// Get payments for this booking
-			$payments = $this->Read_Payments($booking->BookingID);
+			$payments = isset($payments_by_booking[$booking->BookingID]) ? $payments_by_booking[$booking->BookingID] : array();
 			$total_credit = 0;
 			$total_debit = 0;
 

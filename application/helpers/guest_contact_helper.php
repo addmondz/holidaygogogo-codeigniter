@@ -215,6 +215,82 @@ if (!function_exists('guest_remark_validate_remark')) {
     }
 }
 
+if (!function_exists('guest_contact_parse_multi')) {
+    /**
+     * Split a merged row's packed phone list into display-ready entries.
+     *
+     * A Guest List row can now merge several records that share the same
+     * Name + IdentificationNumber but carry DIFFERENT phone numbers (see
+     * Guests_Model merge_key). The model packs every distinct phone of the
+     * group as "callingcode<US>mobile" units joined by a record separator, e.g.
+     *   "+60\x1f0169546738\x1e+60\x1f0198887777"
+     * so the listing can show both numbers on the one row.
+     *
+     * Entries are de-duplicated by their WhatsApp digits (so the same number
+     * stored with different formatting — "0169546738" vs "016-954-6738" — shows
+     * once, satisfying "duplicate mobile numbers need not display"); blank
+     * numbers are dropped; first-seen order is kept.
+     *
+     * @param string $packed Packed list ("code\x1fmobile" units, \x1e-separated).
+     * @return array<int,array{calling_code:string,mobile:string}>
+     */
+    function guest_contact_parse_multi($packed)
+    {
+        $out  = array();
+        $seen = array();
+        foreach (explode("\x1e", (string) $packed) as $unit) {
+            if ($unit === '') {
+                continue;
+            }
+            $parts        = explode("\x1f", $unit, 2);
+            $calling_code = trim(isset($parts[0]) ? $parts[0] : '');
+            $mobile       = trim(isset($parts[1]) ? $parts[1] : '');
+            if ($mobile === '') {
+                continue;
+            }
+            $wa  = guest_contact_wa_digits($calling_code, $mobile);
+            $key = $wa !== '' ? $wa : ($calling_code . '|' . $mobile);
+            if (isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+            $out[]      = array('calling_code' => $calling_code, 'mobile' => $mobile);
+        }
+        return $out;
+    }
+}
+
+if (!function_exists('guest_list_merge_key')) {
+    /**
+     * Compute the Guest List display-merge key for one contact row — the PHP
+     * mirror of Guests_Model::Merge_Key_Expr() (kept in lock-step by
+     * GuestListMergeKeyTest, the way guest_contact_normalize_key mirrors the
+     * dedup_key column).
+     *
+     * When a real identification number is present the key is
+     * "ic:<lower(name)>|<UPPER(alphanumeric ic)>", so two records with the same
+     * person's Name + IC collapse into one listing row even when their phone
+     * numbers (and therefore their dedup_key) differ. When there is no IC the
+     * row keeps its own dedup_key, so nothing merges that we are not sure is the
+     * same person.
+     *
+     * @param string $name      The row's display name.
+     * @param string $ic        guest_list.IdentificationNumber (may be blank/formatted).
+     * @param string $dedup_key The row's existing phone/email dedup key.
+     * @return string
+     */
+    function guest_list_merge_key($name, $ic, $dedup_key)
+    {
+        $ic_norm = preg_replace('/[^0-9A-Za-z]/', '', (string) $ic);
+        if ($ic_norm !== '' && $ic_norm !== null) {
+            $name  = trim((string) $name);
+            $lname = function_exists('mb_strtolower') ? mb_strtolower($name) : strtolower($name);
+            return 'ic:' . $lname . '|' . strtoupper($ic_norm);
+        }
+        return (string) $dedup_key;
+    }
+}
+
 if (!function_exists('guest_contact_format_display')) {
     /**
      * Render a contact number for display WITH its international calling code.

@@ -12,20 +12,39 @@ class Customer extends MY_Controller
 		$this->load->model('Customer_Model');
 		$this->load->model('Universal_Model');
 		$this->load->model('Customer_Type_Model');
-		$this->load->helper('customer_code'); // can_edit_customer_code() for the form + guard
+		$this->load->model('Guests_Model');       // customer-anchored Guest List parity list
+		$this->load->model('Booking_Model');       // filter dropdowns (admins/sources/destinations)
+		$this->load->model('Ghl_Messages_Model');  // WhatsApp message-log badges
+		$this->load->helper('customer_code');      // can_edit_customer_code() for the form + guard
+		$this->load->helper('guest_contact');      // filter/format helpers used by the shared view
 	}
 
+	/**
+	 * Customer List — reuses the shared Guest List view (views/guests/index.php)
+	 * with the same layout, 21 filters, and columns, but anchored on the customer
+	 * master table (one row per customer). Mirrors Ghl_Leads::index()'s wiring.
+	 */
 	function index()
 	{
 		$page   = max(1, (int) $this->input->get('page'));
 		$limit  = 30; // rows per page
 		$offset = ($page - 1) * $limit;
 
-		$data['customers'] = $this->Customer_Model->Read_Customers1($limit, $offset);
-		$data['total']     = $this->Customer_Model->Count_Customers();
-		$data['page']      = $page;
-		$data['limit']     = $limit;
-		$data['customer_types'] = $this->Customer_Type_Model->Read_Customer_Types();
+		$data['guests']         = $this->Guests_Model->Read_Customers_Rich($limit, $offset);
+		$data['msg_log_phones'] = $this->Ghl_Messages_Model->Phones_With_Messages_For_Guests($data['guests']);
+		$data['remark_counts']  = $this->Remark_Counts_For_Guests($data['guests']);
+		$data['total']          = null; // AJAX-loaded via Count(), like Guests/Ghl_Leads
+		$data['page']           = $page;
+		$data['limit']          = $limit;
+		$data['list_base']      = 'Customer';
+		$data['page_title']     = 'Customer List Records';
+		$data['admins']         = $this->Booking_Model->Read_Admins();
+		$data['sources']        = $this->Booking_Model->Read_Sources();
+		$data['destinations']   = $this->Booking_Model->Read_Categories();
+		$data['customer_types']  = $this->Customer_Type_Model->Read_Customer_Types();
+		$data['nationalities']  = $this->Guests_Model->Read_Distinct('Nationality');
+		$data['languages']      = $this->Guests_Model->Read_Distinct('ChatLanguage');
+		$data['edit_languages'] = array('CN', 'EN', 'ML');
 
 		$titles = [
 			'tab_title' => 'HolidayGoGoGo | Customer',
@@ -33,8 +52,49 @@ class Customer extends MY_Controller
 		];
 
 		$this->load->view('layout/header', $titles);
-		$this->load->view('customer/index', $data);
+		$this->load->view('guests/index', $data);
 		$this->load->view('layout/footer');
+	}
+
+	/**
+	 * AJAX total-count + pagination for the Customer List (mirrors
+	 * Ghl_Leads::Count()). The shared view calls base_url('Customer/Count').
+	 */
+	function Count()
+	{
+		$page  = max(1, (int) $this->input->get('page'));
+		$limit = 30;
+		$total = (int) $this->Guests_Model->Count_Customers_Rich();
+
+		$pagination_html = $this->load->view('guests/_pagination', array(
+			'total' => $total,
+			'page'  => $page,
+			'limit' => $limit,
+			'query' => $this->input->get(),
+		), true);
+
+		$this->output
+			->set_content_type('application/json')
+			->set_output(json_encode(array(
+				'total'           => $total,
+				'pagination_html' => $pagination_html,
+			)));
+	}
+
+	/**
+	 * dedup_key => active-remark count for the rows on this page, so the shared
+	 * view can badge each Action menu with "Remarks (n)". Mirrors the private
+	 * helper of the same name on the Guests controller.
+	 */
+	private function Remark_Counts_For_Guests($guests)
+	{
+		$keys = array();
+		foreach ((array) $guests as $g) {
+			if (!empty($g->dedup_key)) {
+				$keys[] = $g->dedup_key;
+			}
+		}
+		return $this->Guests_Model->Read_Remark_Counts($keys);
 	}
 
 	function Create()

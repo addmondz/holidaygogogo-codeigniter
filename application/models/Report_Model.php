@@ -3106,7 +3106,8 @@ class Report_Model extends CI_Model
                 gm.from_number AS from_number,
                 gm.to_number AS to_number,
                 COALESCE(NULLIF(gu.Name, ''), NULLIF(gu_assigned.Name, '')) AS agent,
-                gm.body AS body
+                gm.body AS body,
+                gm.attachments_json AS attachments_json
             FROM ghl_messages gm
             LEFT JOIN ghl_users gu ON gu.UserID = gm.user_id
             LEFT JOIN ghl_conversations gc ON gc.conversation_id = gm.conversation_id
@@ -3167,7 +3168,8 @@ class Report_Model extends CI_Model
                 gm.from_number AS from_number,
                 gm.to_number AS to_number,
                 COALESCE(NULLIF(gu.Name, ''), NULLIF(gu_assigned.Name, '')) AS agent,
-                gm.body AS body
+                gm.body AS body,
+                gm.attachments_json AS attachments_json
             FROM ghl_messages gm
             LEFT JOIN ghl_users gu ON gu.UserID = gm.user_id
             LEFT JOIN ghl_conversations gc ON gc.conversation_id = gm.conversation_id

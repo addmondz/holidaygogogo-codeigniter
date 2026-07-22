@@ -184,8 +184,12 @@ class Campaign extends MY_Controller
 
 	function Search_Guests()
 	{
-		$page   = max(1, (int)$this->input->get('page'));
-		$limit  = 15;
+		// "Pick All Matching" asks for every guest under the current filters in one
+		// shot (all=1). Cap it so a filter-less request can't pull the whole guest
+		// base into the browser; the frontend warns when total exceeds what we send.
+		$fetch_all = (int)$this->input->get('all') === 1;
+		$page   = $fetch_all ? 1 : max(1, (int)$this->input->get('page'));
+		$limit  = $fetch_all ? 2000 : 15;
 		$offset = ($page - 1) * $limit;
 
 		$rows  = $this->Guests_Model->Read_Guests($limit, $offset);
@@ -219,6 +223,8 @@ class Campaign extends MY_Controller
 			'customer_types' => $this->Customer_Type_Model->Read_Customer_Types(),
 			'nationalities'  => $this->Guests_Model->Read_Distinct('Nationality'),
 			'languages'      => $this->Guests_Model->Read_Distinct('ChatLanguage'),
+			'destinations'   => $this->Booking_Model->Read_Categories(),
+			'campaigns'      => $this->Campaign_Model->Read_Campaigns(),
 		);
 	}
 

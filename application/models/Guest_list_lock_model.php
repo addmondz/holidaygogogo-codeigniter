@@ -34,6 +34,31 @@ class Guest_list_lock_model extends CI_Model
 	}
 
 	/**
+	 * Batch version of getByHash for a page of guest list hashes.
+	 *
+	 * Returns one query's worth of locks keyed by guest_list_hash, so the booking
+	 * listing (Booking::ajax_list) can resolve every row's lock without a query
+	 * per row (N+1). Hashes with no lock are simply absent from the map.
+	 *
+	 * @param string[] $hashes
+	 * @return array<string, object> map of hash => lock record
+	 */
+	function getByHashes($hashes)
+	{
+		$map = array();
+		$hashes = array_values(array_unique(array_filter($hashes, 'strlen')));
+		if (empty($hashes)) {
+			return $map;
+		}
+		$this->db->where_in('guest_list_hash', $hashes);
+		$rows = $this->db->get('guest_list_locks')->result();
+		foreach ($rows as $row) {
+			$map[$row->guest_list_hash] = $row;
+		}
+		return $map;
+	}
+
+	/**
 	 * Check if lock is expired
 	 * 
 	 * Lock is expired if:

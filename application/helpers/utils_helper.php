@@ -292,19 +292,38 @@ if (!function_exists('generate_customer_portal_slug')) {
 
         $base_slug = build_customer_slug($customer['name'], $customer['phone_number'], 2);
 
-        // Check for duplicate slugs among customers with a lower ID
-        $others = $CI->db->select('name, phone_number')
-            ->where('Status', 'Y')
-            ->where('CustomerID <', $customer_id)
-            ->get('customer')
-            ->result_array();
-
-        foreach ($others as $other) {
-            if (!empty($other['name']) && !empty($other['phone_number'])) {
-                if (build_customer_slug($other['name'], $other['phone_number'], 2) === $base_slug) {
-                    return build_customer_slug($customer['name'], $customer['phone_number'], 3);
+        // Duplicate check: a slug collides when some ACTIVE customer with a lower ID
+        // produces the same 2-digit slug (then this one uses 3 phone digits).
+        //
+        // Previously this re-queried every lower-ID active customer and re-built their
+        // slug on every call. The booking (and customer) listings call this once per
+        // row, turning it into an N+1 with an inner near-full scan of the customer
+        // table — the dominant cost of building each row's action menu.
+        //
+        // Instead, build once per request a map of 2-digit-slug => smallest active
+        // CustomerID that produces it. A collision then exists iff that smallest id is
+        // below the current customer's id — an O(1) check with identical output.
+        static $first_id_for_slug = null;
+        if ($first_id_for_slug === null) {
+            $first_id_for_slug = array();
+            $all = $CI->db->select('CustomerID, name, phone_number')
+                ->where('Status', 'Y')
+                ->order_by('CustomerID', 'ASC')
+                ->get('customer')
+                ->result_array();
+            foreach ($all as $row) {
+                if (empty($row['name']) || empty($row['phone_number'])) {
+                    continue;
+                }
+                $s = build_customer_slug($row['name'], $row['phone_number'], 2);
+                if (!isset($first_id_for_slug[$s])) {
+                    $first_id_for_slug[$s] = (int) $row['CustomerID'];
                 }
             }
+        }
+
+        if (isset($first_id_for_slug[$base_slug]) && $first_id_for_slug[$base_slug] < (int) $customer_id) {
+            return build_customer_slug($customer['name'], $customer['phone_number'], 3);
         }
 
         return $base_slug;
