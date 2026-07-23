@@ -814,9 +814,10 @@ GROUP BY mm.merge_key";
 		$get = $this->input->get();
 		$key = $this->Customer_Dedup_Key_Expr();
 
+		// Anchor only requires a name; phone is optional so name-only customers
+		// (e.g. bulk-imported with no contact) still surface in the Customer List.
 		$where  = " WHERE c.Status = 'Y'
-			AND NULLIF(TRIM(c.name), '')         IS NOT NULL
-			AND NULLIF(TRIM(c.phone_number), '') IS NOT NULL ";
+			AND NULLIF(TRIM(c.name), '') IS NOT NULL ";
 		$params = array();
 		$needs_pax_join = false;
 
