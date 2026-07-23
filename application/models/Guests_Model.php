@@ -824,13 +824,15 @@ GROUP BY mm.merge_key";
 		// ---- Tier 1: customer-level (filter the anchor row directly) ----
 		$q_raw = trim((string) $this->input->get('q'));
 		if ($q_raw !== '') {
-			// Match the customer's own name OR any of their bookings' team-leader
-			// name (b.Customer) so searching a leader still surfaces the customer.
-			$where .= " AND ( c.name LIKE ? OR EXISTS (
+			// Match the customer's own name (or alternate name) OR any of their
+			// bookings' team-leader name (b.Customer) so searching a leader still
+			// surfaces the customer.
+			$where .= " AND ( c.name LIKE ? OR c.AltName LIKE ? OR EXISTS (
 				SELECT 1 FROM booking b
 				WHERE b.CustomerID = c.CustomerID AND b.Status != 'N' AND b.CancelStatus = 'N'
 					AND b.Customer LIKE ?
 			) ) ";
+			$params[] = '%' . $q_raw . '%';
 			$params[] = '%' . $q_raw . '%';
 			$params[] = '%' . $q_raw . '%';
 		}

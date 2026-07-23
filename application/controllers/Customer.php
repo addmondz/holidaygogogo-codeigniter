@@ -380,8 +380,9 @@ class Customer extends MY_Controller
 	{
 		$q = $this->input->get('q');
 
-		$this->db->group_start(); 
+		$this->db->group_start();
 			$this->db->like('name', $q);
+			$this->db->or_like('AltName', $q);
 			$this->db->or_like('CustomerCode', $q);
 			$this->db->or_like('phone_number', $q);
 		$this->db->group_end();
@@ -418,6 +419,7 @@ class Customer extends MY_Controller
 
 		$this->db->group_start();
 			$this->db->like('name', $q, 'after');          // q%
+			$this->db->or_like('AltName', $q, 'after');    // q%
 			$this->db->or_like('CustomerCode', $q, 'after');
 			$this->db->or_like('phone_number', $q, 'after');
 		$this->db->group_end();
