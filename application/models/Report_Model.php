@@ -3084,9 +3084,24 @@ class Report_Model extends CI_Model
      * @return array Rows keyed: message_timestamp, direction, from_number,
      *               to_number, agent, body.
      */
-    function Ghl_Messages_Log($startDate, $endDate, $limit, $offset, $contact = '', $agent = '', $hour = null, $timeFrom = '', $timeTo = '')
+    function Ghl_Messages_Log($startDate, $endDate, $limit, $offset, $contact = '', $agent = '', $hour = null, $timeFrom = '', $timeTo = '', $sort = 'desc', $sortColumn = 'date')
     {
         $messageTimeColumn = $this->escape_identifier($this->get_message_time_column());
+        // Column sort toggle: default newest-first by timestamp; an explicit
+        // 'asc' flips to oldest-first, and 'direction' groups rows by
+        // Inbound/Outbound instead. Both inputs are normalised to fixed literals
+        // so they are safe to interpolate straight into the ORDER BY.
+        $sortDir = strtolower(trim((string) $sort)) === 'asc' ? 'ASC' : 'DESC';
+        $sortColumn = strtolower(trim((string) $sortColumn)) === 'direction' ? 'direction' : 'date';
+        if ($sortColumn === 'direction') {
+            // Group by direction (ASC = Inbound first, DESC = Outbound first),
+            // then newest-first within each group so each block reads top-down.
+            $orderBy = "gm.direction {$sortDir}, gm.{$messageTimeColumn} DESC, gm.id DESC";
+        } else {
+            // Timestamp AND id tiebreak flip together to keep same-second rows
+            // stably ordered.
+            $orderBy = "gm.{$messageTimeColumn} {$sortDir}, gm.id {$sortDir}";
+        }
 
         $params = array(
             $startDate . ' 00:00:00',
@@ -3118,7 +3133,7 @@ class Report_Model extends CI_Model
               {$agentClause}
               {$hourClause}
               {$timeClause}
-            ORDER BY gm.{$messageTimeColumn} DESC, gm.id DESC
+            ORDER BY {$orderBy}
             LIMIT ? OFFSET ?
         ";
 

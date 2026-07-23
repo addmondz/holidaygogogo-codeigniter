@@ -28,14 +28,42 @@ $log_time_param = ($log_time_from !== '' ? '&time_from=' . urlencode($log_time_f
 $log_start_date = isset($log_filters['start_date']) ? $log_filters['start_date'] : date('Y-m-d');
 $log_end_date = isset($log_filters['end_date']) ? $log_filters['end_date'] : date('Y-m-d');
 
-/** Build a page URL keeping the current date, contact, agent and hour filters. */
-$page_url = function ($page) use ($log_filters, $log_contact, $log_agent, $log_hour_param, $log_time_param) {
-    return base_url('Report/Ghl_Message_Log?log_date=' . urlencode($log_filters['log_date'])
-        . '&contact=' . urlencode($log_contact)
-        . '&agent=' . urlencode($log_agent)
-        . $log_hour_param
-        . $log_time_param
-        . '&page=' . (int) $page);
+// Sort state: which column ('date' default, or 'direction') and which way
+// ('desc' default / 'asc'). Both carry through pagination and the header links.
+$log_sort_col = isset($log_filters['sort']) && $log_filters['sort'] === 'direction' ? 'direction' : 'date';
+$log_sort_dir = isset($log_filters['dir']) && $log_filters['dir'] === 'asc' ? 'asc' : 'desc';
+$log_sort_param = '&sort=' . $log_sort_col . '&dir=' . $log_sort_dir;
+
+/** Base query string shared by the sort-header links (every filter except sort). */
+$log_filter_qs = 'log_date=' . urlencode($log_filters['log_date'])
+    . '&contact=' . urlencode($log_contact)
+    . '&agent=' . urlencode($log_agent)
+    . $log_hour_param
+    . $log_time_param;
+
+/** Build a page URL keeping the current date, contact, agent, hour and sort filters. */
+$page_url = function ($page) use ($log_filter_qs, $log_sort_param) {
+    return base_url('Report/Ghl_Message_Log?' . $log_filter_qs . $log_sort_param . '&page=' . (int) $page);
+};
+
+// Each sortable header links to itself: clicking the active column flips its
+// direction; clicking an inactive one opens it at its natural default (date =
+// newest-first/desc, direction = Inbound-first/asc). Resets to page 1.
+$sort_defaults = array('date' => 'desc', 'direction' => 'asc');
+$sort_header_url = function ($col) use ($log_filter_qs, $log_sort_col, $log_sort_dir, $sort_defaults) {
+    $next_dir = $col === $log_sort_col
+        ? ($log_sort_dir === 'asc' ? 'desc' : 'asc')
+        : $sort_defaults[$col];
+    return base_url('Report/Ghl_Message_Log?' . $log_filter_qs . '&sort=' . $col . '&dir=' . $next_dir);
+};
+/** Caret shown only on the active sort column. */
+$sort_caret = function ($col) use ($log_sort_col, $log_sort_dir) {
+    if ($col !== $log_sort_col) {
+        return '';
+    }
+    return $log_sort_dir === 'asc'
+        ? ' <i class="la la-arrow-up ml-1"></i>'
+        : ' <i class="la la-arrow-down ml-1"></i>';
 };
 
 /** URL that filters the log to one contact number, keeping the current date range. */
@@ -59,7 +87,7 @@ $contact_url = function ($number) use ($log_filters) {
                     </div>
                 </div>
                 <div class="card-toolbar">
-                    <?php if ($log_show_reply_time && $log_avg_reply !== '') { ?>
+                    <?php if ($log_avg_reply !== '') { ?>
                         <span class="label label-light-info label-inline font-weight-bold mr-2">
                             Avg time taken: <?php echo html_escape($log_avg_reply); ?>
                             <i class="la la-info-circle ml-1" style="cursor:help;" data-toggle="tooltip"
@@ -89,6 +117,12 @@ $contact_url = function ($number) use ($log_filters) {
                 <form id="ghl-message-log-form" action="<?php echo base_url('Report/Ghl_Message_Log'); ?>" method="get" class="form mb-6">
                     <?php if ($log_hour !== null) { ?>
                         <input type="hidden" name="hour" value="<?php echo (int) $log_hour; ?>">
+                    <?php } ?>
+                    <?php if ($log_sort_col !== 'date') { ?>
+                        <input type="hidden" name="sort" value="<?php echo html_escape($log_sort_col); ?>">
+                    <?php } ?>
+                    <?php if ($log_sort_dir !== 'desc') { ?>
+                        <input type="hidden" name="dir" value="<?php echo html_escape($log_sort_dir); ?>">
                     <?php } ?>
                     <div class="row align-items-end">
                         <div class="col-md-3">
@@ -141,11 +175,29 @@ $contact_url = function ($number) use ($log_filters) {
                     <table class="table table-bordered table-head-custom">
                         <thead>
                             <tr>
-                                <th style="width:170px;">Date / Time</th>
+                                <?php
+                                    $date_active = $log_sort_col === 'date';
+                                    $date_tip = $date_active
+                                        ? 'Sorted ' . ($log_sort_dir === 'asc' ? 'oldest first' : 'newest first') . ' &mdash; click to show ' . ($log_sort_dir === 'asc' ? 'newest first' : 'oldest first')
+                                        : 'Click to sort by date (newest first)';
+                                    $dir_active = $log_sort_col === 'direction';
+                                    $dir_tip = $dir_active
+                                        ? 'Grouped ' . ($log_sort_dir === 'asc' ? 'Inbound first' : 'Outbound first') . ' &mdash; click to show ' . ($log_sort_dir === 'asc' ? 'Outbound first' : 'Inbound first')
+                                        : 'Click to group by direction (Inbound first)';
+                                ?>
+                                <th style="width:170px;">
+                                    <a href="<?php echo html_escape($sort_header_url('date')); ?>" class="<?php echo $date_active ? 'text-primary' : 'text-dark'; ?> font-weight-bolder text-hover-primary" data-toggle="tooltip" title="<?php echo $date_tip; ?>">
+                                        Date / Time<?php echo $sort_caret('date'); ?>
+                                    </a>
+                                </th>
                                 <?php if ($log_show_reply_time) { ?>
                                     <th style="width:110px;">Time Taken</th>
                                 <?php } ?>
-                                <th style="width:110px;">Direction</th>
+                                <th style="width:110px;">
+                                    <a href="<?php echo html_escape($sort_header_url('direction')); ?>" class="<?php echo $dir_active ? 'text-primary' : 'text-dark'; ?> font-weight-bolder text-hover-primary" data-toggle="tooltip" title="<?php echo $dir_tip; ?>">
+                                        Direction<?php echo $sort_caret('direction'); ?>
+                                    </a>
+                                </th>
                                 <th style="width:150px;">Agent</th>
                                 <th style="width:150px;">From</th>
                                 <th style="width:150px;">To</th>
@@ -207,12 +259,12 @@ $contact_url = function ($number) use ($log_filters) {
                                                 <span class="text-muted">&mdash;</span>
                                             <?php } ?>
                                         </td>
-                                        <td style="white-space:pre-wrap; word-break:break-word;">
+                                        <td style="word-break:break-word;">
                                             <?php
                                                 $body_text  = trim((string) (isset($m['body']) ? $m['body'] : ''));
                                                 $attachments = ghl_message_log_attachments(isset($m['attachments_json']) ? $m['attachments_json'] : '');
                                             ?>
-                                            <?php if ($body_text !== '') { ?><?php echo html_escape($body_text); ?><?php } ?>
+                                            <?php if ($body_text !== '') { ?><div style="white-space:pre-wrap;"><?php echo html_escape($body_text); ?></div><?php } ?>
                                             <?php foreach ($attachments as $att) {
                                                 $url = html_escape($att['url']);
                                             ?>

@@ -89,12 +89,19 @@ class Report extends MY_Controller
         // window so it repeats across every day in range (e.g. 09:00-18:00 daily).
         $timeFrom = ghl_message_log_normalize_time($this->input->get('time_from'));
         $timeTo = ghl_message_log_normalize_time($this->input->get('time_to'));
+        // Sort controls, flipped from the clickable table headers: 'sort' picks
+        // the column ('date' default, or 'direction' to group Inbound/Outbound)
+        // and 'dir' the direction ('desc' default / 'asc').
+        $sortCol = ghl_message_log_normalize_sort_column($this->input->get('sort'));
+        $sortDir = ghl_message_log_normalize_sort($this->input->get('dir'));
         $range['contact'] = $contact;
         $range['agent'] = $agent;
         $range['hour'] = $hour;
         $range['hour_label'] = $hour === null ? '' : ghl_message_log_hour_label($hour);
         $range['time_from'] = $timeFrom;
         $range['time_to'] = $timeTo;
+        $range['sort'] = $sortCol;
+        $range['dir'] = $sortDir;
 
         $total = $this->Report_Model->Ghl_Messages_Log_Count($range['start_date'], $range['end_date'], $contact, $agent, $hour, $timeFrom, $timeTo);
         $pagination = ghl_messages_log_pagination($total, (int) $this->input->get('page'), 50);
@@ -103,9 +110,38 @@ class Report extends MY_Controller
         // coherent thread -- one agent's, or one contact's conversation -- so it
         // (and the average) is computed when either of those filters is applied.
         $show_reply_time = ($agent !== '' || $contact !== '');
+        // The per-row gap reads the message directly above/below, so it only
+        // holds on a time-ordered page; grouping by direction scatters the
+        // thread, so the column is suppressed there (the average still shows).
+        $show_reply_time_column = $show_reply_time && $sortCol === 'date';
         $avg_reply_label = '';
 
-        if ($show_reply_time) {
+        if ($show_reply_time_column && $sortDir === 'asc') {
+            // Oldest-first page: each row's "Time Taken" is still measured
+            // against its OLDER predecessor, which now sits one row BEFORE the
+            // page. Fetch that extra leading row (unless the page starts at the
+            // very first message), then reuse the newest-first gap annotator by
+            // flipping the slice to DESC and back.
+            $lead = $pagination['offset'] > 0 ? 1 : 0;
+            $rows = $this->Report_Model->Ghl_Messages_Log(
+                $range['start_date'],
+                $range['end_date'],
+                $pagination['per_page'] + $lead,
+                $pagination['offset'] - $lead,
+                $contact,
+                $agent,
+                $hour,
+                $timeFrom,
+                $timeTo,
+                'asc',
+                'date'
+            );
+            // Reverse -> newest-first with the extra (older) row at the bottom,
+            // annotate, slice, then reverse back to oldest-first.
+            $messages = array_reverse(
+                ghl_message_log_attach_reply_gaps(array_reverse($rows), $pagination['per_page'])
+            );
+        } elseif ($show_reply_time_column) {
             // Fetch one extra older row so even the bottom visible row has a
             // predecessor to measure its gap against; attach_reply_gaps slices
             // the result back to the displayed page size.
@@ -118,21 +154,11 @@ class Report extends MY_Controller
                 $agent,
                 $hour,
                 $timeFrom,
-                $timeTo
+                $timeTo,
+                'desc',
+                'date'
             );
             $messages = ghl_message_log_attach_reply_gaps($rows, $pagination['per_page']);
-
-            $avg_reply_label = ghl_message_log_format_duration(
-                $this->Report_Model->Ghl_Messages_Log_Avg_Reply_Seconds(
-                    $range['start_date'],
-                    $range['end_date'],
-                    $contact,
-                    $agent,
-                    $hour,
-                    $timeFrom,
-                    $timeTo
-                )
-            );
         } else {
             $messages = $this->Report_Model->Ghl_Messages_Log(
                 $range['start_date'],
@@ -143,7 +169,25 @@ class Report extends MY_Controller
                 $agent,
                 $hour,
                 $timeFrom,
-                $timeTo
+                $timeTo,
+                $sortDir,
+                $sortCol
+            );
+        }
+
+        // The average reply time is order-independent, so it is shown for any
+        // single-thread view regardless of which column the reader sorts by.
+        if ($show_reply_time) {
+            $avg_reply_label = ghl_message_log_format_duration(
+                $this->Report_Model->Ghl_Messages_Log_Avg_Reply_Seconds(
+                    $range['start_date'],
+                    $range['end_date'],
+                    $contact,
+                    $agent,
+                    $hour,
+                    $timeFrom,
+                    $timeTo
+                )
             );
         }
 
@@ -157,7 +201,7 @@ class Report extends MY_Controller
             'log_pagination' => $pagination,
             'log_filters' => $range,
             'log_agents' => $this->Report_Model->Ghl_Message_Log_Agents(),
-            'log_show_reply_time' => $show_reply_time,
+            'log_show_reply_time' => $show_reply_time_column,
             'log_avg_reply' => $avg_reply_label,
         );
 

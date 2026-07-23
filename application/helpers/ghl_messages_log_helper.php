@@ -701,6 +701,41 @@ if (!function_exists('ghl_message_log_normalize_time')) {
     }
 }
 
+if (!function_exists('ghl_message_log_normalize_sort')) {
+    /**
+     * Sanitise the Message Log date/time sort direction into a canonical 'asc'
+     * or 'desc'. The table defaults to newest-first ('desc'); only an explicit,
+     * case-insensitive 'asc' flips it to oldest-first. Anything else -- blank,
+     * junk, or an injection attempt -- falls back to 'desc', so the value handed
+     * to the ORDER BY is always one of two safe literals.
+     *
+     * @param mixed $value Raw sort input from the header link / form.
+     * @return string 'asc' or 'desc'.
+     */
+    function ghl_message_log_normalize_sort($value)
+    {
+        return strtolower(trim((string) $value)) === 'asc' ? 'asc' : 'desc';
+    }
+}
+
+if (!function_exists('ghl_message_log_normalize_sort_column')) {
+    /**
+     * Sanitise which Message Log column drives the sort into a canonical key.
+     * The table sorts by 'date' (the timestamp) by default; only an explicit,
+     * case-insensitive 'direction' groups the rows by Inbound/Outbound instead.
+     * Anything else -- blank, junk, or an injection attempt -- falls back to
+     * 'date', so the key reaching the ORDER BY builder is always one of two safe
+     * literals.
+     *
+     * @param mixed $value Raw column key from the header link / form.
+     * @return string 'date' or 'direction'.
+     */
+    function ghl_message_log_normalize_sort_column($value)
+    {
+        return strtolower(trim((string) $value)) === 'direction' ? 'direction' : 'date';
+    }
+}
+
 if (!function_exists('ghl_message_log_hourly_agent_matrix')) {
     /**
      * Build the "Lead Reply Hourly — All Agents" matrix: every agent as a row,
