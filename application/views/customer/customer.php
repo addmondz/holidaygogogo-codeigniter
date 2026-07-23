@@ -26,6 +26,15 @@
                         </div>
                         <div class="col-md-6">
                             <div class="form-group">
+                                <label>Alt Name</label>
+                                <div class="input-icon">
+                                    <input type="text" id="AltName" <?php if(current_url() == base_url('Customer/Update')) { ?> value="<?php echo htmlspecialchars(isset($AltName) ? $AltName : '', ENT_QUOTES); ?>" <?php } ?> autocomplete="off" class="form-control" placeholder="Enter alternate name">
+                                    <span><i class="la la-user-friends"></i></span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
                                 <label>Phone</label>
                                 <div class="input-icon">
                                     <input type="text" id="phone_number" <?php if(current_url() == base_url('Customer/Update')) { ?> value="<?php echo $phone_number; ?>" <?php } ?> autocomplete="off" class="form-control">
@@ -136,6 +145,7 @@
         }).then((action) => {
             if(action.isConfirmed) {
                 var name = ($('#name').val()).toUpperCase();
+                var AltName = ($('#AltName').val()).toUpperCase();
                 var phone_number = $('#phone_number').val();
                 var ChatLanguage = $('#ChatLanguage').val();
                 var CustomerCode = $('#CustomerCode').val();
@@ -150,6 +160,7 @@
                     if(window.location.href == '<?php echo base_url('Customer/Create'); ?>') {
                         var customer = [{
                             name: name,
+                            AltName: AltName,
                             phone_number: phone_number,
                             ChatLanguage: ChatLanguage,
                             CustomerCode: CustomerCode,

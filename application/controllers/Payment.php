@@ -631,7 +631,7 @@ class Payment extends MY_Controller
 			$payment->ReferenceNumber = empty($payment->ReferenceNumber) ? '-' : $payment->ReferenceNumber;
 			$payment->Debit = $payment->Credit != 0.00 ? '' : number_format($payment->Debit, 2, '.', ',');
 			$payment->PaymentRemark = empty($payment->PaymentRemark) ? '-' : $payment->PaymentRemark;
-			if($payment->Type == 'DEPOSIT' || $payment->Type == 'FULL' || $payment->Type == 'SUPPLIER REFUND' || $payment->Type == 'ADDITIONAL PAYMENT' || $payment->Type == 'AGENT COMMISSION FROM SUPPLIER') {
+			if($payment->Type == 'DEPOSIT' || $payment->Type == 'FULL' || $payment->Type == 'SUPPLIER REFUND' || $payment->Type == 'ADDITIONAL PAYMENT') {
 				array_push($array['credit_payments'], $payment);
 			} else {
 				$payment->Deadline = strtoupper(date('j M Y', strtotime($payment->Deadline)));

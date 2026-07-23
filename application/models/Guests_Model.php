@@ -187,7 +187,7 @@ class Guests_Model extends CI_Model
 			$this->Append_In_Clause($where, $b_params, 'cn.Country',                       $this->input->get('nationality'));
 			$this->Append_In_Clause($where, $b_params, 'gl.Gender',                        $this->input->get('gender'));
 			$this->Append_In_Clause($where, $b_params, 'gl.Type',                          $this->input->get('guest_type'));
-			$this->Append_In_Clause($where, $b_params, 'COALESCE(c.ChatLanguage, b.ChatLanguage)', $this->input->get('language'));
+			$this->Append_In_Clause($where, $b_params, 'COALESCE(gl.ChatLanguage, c.ChatLanguage, b.ChatLanguage)', $this->input->get('language'));
 			// "Campaign" filter keys off the campaign_guests roster snapshot.
 			// Multi-select over ANY of the picked campaigns; mode = include keeps
 			// guests who joined them, exclude drops them. Keyed on dedup_key so it
@@ -358,7 +358,7 @@ WHERE 1 = 1
 		gl.Mobile        AS ContactNum,
 		ccp.CountryCode  AS CallingCode,
 		gl.Email,
-		COALESCE(c.ChatLanguage, b.ChatLanguage) AS ChatLanguage,
+		COALESCE(gl.ChatLanguage, c.ChatLanguage, b.ChatLanguage) AS ChatLanguage,
 		a.Name           AS SalesAgentName,
 		b.Customer       AS BookingCustomer,
 		b.BookingID      AS BookingID,
@@ -373,6 +373,8 @@ WHERE 1 = 1
 		b.Token          AS Token,
 		b.InsertDate     AS BookingDate,
 		c.CustomerCode   AS CustomerCode,
+		c.AltName        AS AltName,
+		c.CustomerID     AS CustomerID,
 		c.created_at     AS CustomerCreatedAt,
 		b.StartDate      AS TravelStart,
 		b.EndDate        AS TravelEnd,
@@ -552,6 +554,8 @@ WHERE 1 = 1
 		CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS IC,
 		CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS Tags,
 		CONVERT(MAX(c.CustomerCode) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS CustomerCode,
+		CONVERT(MAX(c.AltName) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS AltName,
+		MAX(c.CustomerID) AS CustomerID,
 		MAX(c.created_at) AS CustomerCreatedAt
 	{$from}
 	GROUP BY {$key}
@@ -596,6 +600,8 @@ SELECT
 	CONVERT(MAX(CASE WHEN rn = 1 THEN IdentificationNumber END) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS IC,
 	CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS Tags,
 	CONVERT(MAX(CASE WHEN rn = 1 THEN CustomerCode END) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS CustomerCode,
+	CONVERT(MAX(CASE WHEN rn = 1 THEN AltName END) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS AltName,
+	MAX(CASE WHEN rn = 1 THEN CustomerID END) AS CustomerID,
 	MAX(CASE WHEN rn = 1 THEN CustomerCreatedAt END) AS CustomerCreatedAt
 FROM (
 	{$this->Booking_Windowed_Select($dedup, $booking['from'])}
@@ -640,6 +646,8 @@ SELECT
 	CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS IC,
 	CONVERT(gt.tags_concat USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Tags,
 	CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS CustomerCode,
+	CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS AltName,
+	CAST(NULL AS UNSIGNED) AS CustomerID,
 	CAST(NULL AS DATETIME) AS CustomerCreatedAt
 {$ghl['from']}
 			";
@@ -720,6 +728,8 @@ SELECT
 	MAX(CASE WHEN mm.rep_rn = 1 THEN mm.IC   END) AS IC,
 	MAX(CASE WHEN mm.rep_rn = 1 THEN mm.Tags END) AS Tags,
 	MAX(CASE WHEN mm.rep_rn = 1 THEN mm.CustomerCode      END) AS CustomerCode,
+	MAX(CASE WHEN mm.rep_rn = 1 THEN mm.AltName           END) AS AltName,
+	MAX(CASE WHEN mm.rep_rn = 1 THEN mm.CustomerID        END) AS CustomerID,
 	MAX(CASE WHEN mm.rep_rn = 1 THEN mm.CustomerCreatedAt END) AS CustomerCreatedAt
 FROM (
 	SELECT m.*,
@@ -1083,6 +1093,9 @@ GROUP BY mm.merge_key";
 		CONVERT(blatest.Token USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Token,
 		CONVERT(CASE WHEN bagg.AnyLeader = 1 THEN 'Team Leader' ELSE 'Team Member' END USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Role,
 		CONVERT(c.CustomerCode USING utf8mb4) COLLATE utf8mb4_unicode_ci AS CustomerCode,
+		CONVERT(c.AltName USING utf8mb4) COLLATE utf8mb4_unicode_ci AS AltName,
+		c.AutocountSyncStatus  AS AutocountSyncStatus,
+		CONVERT(c.AutocountSyncMessage USING utf8mb4) COLLATE utf8mb4_unicode_ci AS AutocountSyncMessage,
 		c.created_at AS CustomerCreatedAt
 	FROM customer c
 	LEFT JOIN {$blat} blatest ON blatest.CustomerID = c.CustomerID
@@ -1181,7 +1194,9 @@ GROUP BY mm.merge_key";
 	 * $current_dedup_key, then reflects the new number back onto booking.Mobile
 	 * for the bookings this person LEADS (so the BC / booking contact stays in
 	 * sync). The leader match uses the OLD key, since the new Mobile would change
-	 * the generated dedup_key. Returns guest_list rows affected.
+	 * the generated dedup_key. Returns guest_list rows affected PLUS booking rows
+	 * affected — so a "leader fallback" row (a booking with no guest_list record)
+	 * still reports success off the booking write alone.
 	 */
 	function Update_Guest_Contact($current_dedup_key, $new_mobile, $admin_id, $scope_admin_id = null)
 	{
@@ -1200,7 +1215,7 @@ GROUP BY mm.merge_key";
 		}
 		$this->db->query($sql, $params);
 
-		return $affected;
+		return $affected + $this->db->affected_rows();
 	}
 
 	/**
@@ -1225,14 +1240,20 @@ GROUP BY mm.merge_key";
 	}
 
 	/**
-	 * Language edit. ChatLanguage lives on booking / customer, not guest_list, and
-	 * the dashboard shows COALESCE(customer, booking) — so to be visible the value
-	 * is written to BOTH on the bookings this person LEADS. Only ChatLanguage is
-	 * touched (not the AutoCount sync flags), so no debtor re-sync is queued.
-	 * Returns bookings affected (0 when the person leads none — a pure team member).
+	 * Language edit. ChatLanguage is a PER-GUEST field on guest_list, so the value
+	 * is written to every active guest_list row sharing $current_dedup_key — this
+	 * lets ANY guest (leader or plain team member) carry their own language, and
+	 * the dashboard shows COALESCE(gl, customer, booking). On top of that, when the
+	 * person LEADS a booking the value also flows down to booking + customer, so
+	 * the leader's master record stays in sync (only ChatLanguage is touched — the
+	 * AutoCount sync flags are left alone, so no debtor re-sync is queued). Returns
+	 * guest_list rows affected PLUS booking/customer rows affected, so a "leader
+	 * fallback" row (a booking with no guest_list record) still reports success.
 	 */
 	function Update_Guest_Language($current_dedup_key, $language, $admin_id, $scope_admin_id = null)
 	{
+		$affected = $this->Update_Guest_List_Column('ChatLanguage', $current_dedup_key, $language, $admin_id, $scope_admin_id);
+
 		$key_expr = $this->Booking_Leader_Key_Expr();
 		$sql = "UPDATE booking b
 			LEFT JOIN customer c ON c.CustomerID = b.CustomerID
@@ -1245,7 +1266,35 @@ GROUP BY mm.merge_key";
 			$params[]  = $scope_admin_id;
 		}
 		$this->db->query($sql, $params);
-		return $this->db->affected_rows();
+
+		return $affected + $this->db->affected_rows();
+	}
+
+	/**
+	 * Alt Name edit → customer.AltName for one customer. Alt Name is a customer-
+	 * level attribute (the same field shown on the BC form and Customer form), so
+	 * it is keyed by CustomerID, not the guest dedup_key. An empty value clears it
+	 * (stored NULL). Returns 1 when the customer exists (even if the value is
+	 * unchanged, so re-saving the same Alt Name is not treated as "not found"),
+	 * else 0.
+	 */
+	function Update_Customer_AltName($customer_id, $alt_name)
+	{
+		$customer_id = (int) $customer_id;
+		if ($customer_id < 1) {
+			return 0;
+		}
+		$exists = $this->db->select('CustomerID')
+			->get_where('customer', array('CustomerID' => $customer_id))->row();
+		if (!$exists) {
+			return 0;
+		}
+		$this->db->where('CustomerID', $customer_id);
+		$this->db->update('customer', array(
+			'AltName'    => ($alt_name === '' ? null : $alt_name),
+			'updated_at' => date('Y-m-d H:i:s'),
+		));
+		return 1;
 	}
 
 	function Read_Distinct($col)

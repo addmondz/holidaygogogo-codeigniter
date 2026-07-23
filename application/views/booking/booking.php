@@ -450,6 +450,22 @@
                             </div>
 
                             <div class="form-group">
+                                <label>Alt Name</label>
+                                <div class="input-icon">
+                                    <input type="text"
+                                        id="AltName"
+                                        name="AltName"
+                                        <?php if (current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) { ?>
+                                            value="<?php echo htmlspecialchars(isset($CustomerAltName) ? $CustomerAltName : '', ENT_QUOTES); ?>"
+                                        <?php } ?>
+                                        autocomplete="off"
+                                        class="form-control"
+                                        placeholder="Enter alternate name">
+                                    <span><i class="la la-user-friends"></i></span>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
 
                                 <label>Mobile <span style="color:red;">*</span></label>
 
@@ -4689,6 +4705,8 @@
 
                 tin_no: ($('#tin_no').val() || '').toUpperCase(),
 
+                AltName: ($('#AltName').val() || '').toUpperCase(),
+
                 customer_type: $('#customer_type').val() || [],
 
             };
@@ -5152,6 +5170,7 @@ $(document).ready(function() {
                     data-id="${c.CustomerID}"
                     data-name="${c.name}"
                     data-phone="${c.phone_number}"
+                    data-altname="${c.AltName ?? ''}"
                     data-code="${c.CustomerCode ?? ''}">
                     ${c.name} (${c.phone_number})${c.CustomerCode ? ' - ' + c.CustomerCode : ''}
                 </button>
@@ -5201,9 +5220,11 @@ $(document).ready(function() {
         const id = $(this).data('id');
         const code = $(this).data('code');
         const phone = $(this).data('phone');
+        const altName = $(this).data('altname');
 
         $('#Customer').val(name);
         $('#Customer').data('selectedCode', code || '');
+        $('#AltName').val(altName || '');
         hiddenCustomerId.val(id);
         container.hide();
 

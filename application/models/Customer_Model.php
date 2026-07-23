@@ -264,6 +264,8 @@ class Customer_Model extends CI_Model
 		$data = [
 			'CustomerCode'  => $customer['CustomerCode'] ? $customer['CustomerCode'] : null,
 			'name'          => $customer['name'] ? $customer['name'] : null,
+			// Alternate/secondary customer name, optional.
+			'AltName'       => !empty($customer['AltName']) ? trim($customer['AltName']) : null,
 			'phone_number'  => $customer['phone_number'] ? $customer['phone_number'] : null,
 			'ChatLanguage'  => $customer['ChatLanguage'] ? $customer['ChatLanguage'] : null,
 			// Identity fields synced to AutoCount (IC -> registerNo, TIN -> taxRegisterNo).
@@ -337,6 +339,11 @@ class Customer_Model extends CI_Model
 		$this->db->set('phone_number', null);
 		$this->db->where('CustomerID', $this->input->post('customer_id'));
 		$this->db->where('phone_number', '');
+		$this->db->update('customer');
+
+		$this->db->set('AltName', null);
+		$this->db->where('CustomerID', $this->input->post('customer_id'));
+		$this->db->where('AltName', '');
 		$this->db->update('customer');
 
 		$this->db->set('ChatLanguage', null);
@@ -576,6 +583,227 @@ class Customer_Model extends CI_Model
 		$this->db->limit($customer_qty_cront);
 
 		return $this->db->get()->result_array();
+	}
+
+	// ------------------------------------------------------------------
+	// Bulk create via Excel (download template -> fill rows -> re-upload)
+	// ------------------------------------------------------------------
+
+	// Column order of the import/template sheet. The header labels below must
+	// match Customer::Import_Template() exactly, and the 0-based index is how
+	// PhpSpreadsheet's toArray(null,true,true,false) hands each row back.
+	const IMPORT_COLUMNS = array(
+		0 => 'CUSTOMER CODE',
+		1 => 'NAME',
+		2 => 'PHONE NUMBER',
+		3 => 'CHAT LANGUAGE',
+		4 => 'IC / PASSPORT NO',
+		5 => 'TIN',
+		6 => 'EMAIL',
+		7 => 'BILLING ADDRESS',
+	);
+
+	/**
+	 * Turn raw uploaded sheet rows into normalized customer entries, applying the
+	 * same casing rules as the single-create form (name/IC/TIN uppercased; email
+	 * and billing address kept as typed). Pure + DB-free so it can be unit-tested
+	 * and so the controller only handles I/O.
+	 *
+	 * Each returned entry is:
+	 *   array('line' => <1-based sheet row>, 'error' => null|string,
+	 *         'CustomerCode','name','phone_number','ChatLanguage',
+	 *         'ic_passport_no','tin_no','PrimaryEmail','Address')
+	 * The header row and fully-blank rows are dropped. A row with no name is
+	 * kept with error set, so the caller can report the exact line.
+	 *
+	 * @param array $rows      0-indexed row arrays (PhpSpreadsheet toArray()).
+	 * @param array $languages Allowed ChatLanguage codes (e.g. CN/EN/ML).
+	 * @return array
+	 */
+	public static function Parse_Import_Rows($rows, $languages = array('CN', 'EN', 'ML'))
+	{
+		if (!is_array($rows)) {
+			return array();
+		}
+		$allowed_lang = array();
+		foreach ($languages as $l) {
+			$allowed_lang[strtoupper(trim((string) $l))] = true;
+		}
+
+		$out  = array();
+		$line = 0;
+		foreach ($rows as $row) {
+			$line++;
+			if (!is_array($row)) {
+				continue;
+			}
+			$cell = function ($i) use ($row) {
+				return isset($row[$i]) ? trim((string) $row[$i]) : '';
+			};
+
+			$code  = $cell(0);
+			$name  = $cell(1);
+			$phone = $cell(2);
+			$lang  = strtoupper($cell(3));
+			$ic    = $cell(4);
+			$tin   = $cell(5);
+			$email = $cell(6);
+			$addr  = $cell(7);
+
+			// Drop the header row wherever it sits (matches the template labels).
+			if (strtoupper($code) === 'CUSTOMER CODE' && strtoupper($name) === 'NAME') {
+				continue;
+			}
+			// Skip a fully-blank row (trailing empty rows Excel leaves behind).
+			if ($code === '' && $name === '' && $phone === '' && $lang === ''
+				&& $ic === '' && $tin === '' && $email === '' && $addr === '') {
+				continue;
+			}
+
+			// Unknown language codes are dropped (kept optional, never a failure).
+			if ($lang !== '' && !isset($allowed_lang[$lang])) {
+				$lang = '';
+			}
+
+			$out[] = array(
+				'line'          => $line,
+				'error'         => ($name === '') ? 'Missing name' : null,
+				'CustomerCode'  => $code !== '' ? strtoupper($code) : null,
+				'name'          => $name !== '' ? strtoupper($name) : null,
+				'phone_number'  => $phone !== '' ? $phone : null,
+				'ChatLanguage'  => $lang !== '' ? $lang : null,
+				'ic_passport_no'=> $ic !== '' ? strtoupper($ic) : null,
+				'tin_no'        => $tin !== '' ? strtoupper($tin) : null,
+				// Email + billing address are case-sensitive; keep as typed.
+				'PrimaryEmail'  => $email !== '' ? $email : null,
+				'Address'       => $addr !== '' ? $addr : null,
+			);
+		}
+		return $out;
+	}
+
+	/**
+	 * Decide which uploaded import files to delete so only the newest $keep are
+	 * kept as backups. Mirrors Faq_Model::Prune_Backups: recency is read from the
+	 * unix stamp in the filename (customer_import_<unix>.xlsx). Pure so it can be
+	 * unit tested; the controller does the unlink. Returns names to DELETE.
+	 */
+	public static function Prune_Import_Backups($filenames, $keep = 3)
+	{
+		if (!is_array($filenames)) {
+			return array();
+		}
+		$keep = max(0, (int) $keep);
+		$stamped = array();
+		foreach ($filenames as $name) {
+			$ts = 0;
+			if (preg_match('/customer_import_(\d+)\./', (string) $name, $m)) {
+				$ts = (int) $m[1];
+			}
+			$stamped[] = array('name' => (string) $name, 'ts' => $ts);
+		}
+		usort($stamped, function ($a, $b) {
+			if ($a['ts'] === $b['ts']) { return 0; }
+			return ($a['ts'] < $b['ts']) ? 1 : -1; // newest first
+		});
+		$prune = array_reverse(array_slice($stamped, $keep)); // oldest first
+		$out = array();
+		foreach ($prune as $entry) {
+			$out[] = $entry['name'];
+		}
+		return $out;
+	}
+
+	/**
+	 * Whether an active customer with this exact name + phone already exists, so
+	 * a re-import doesn't create a duplicate master record. Name is compared as
+	 * stored (the importer uppercases it, matching the single-create form).
+	 */
+	public function exists_by_name_phone($name, $phone)
+	{
+		$this->db->where('name', $name);
+		if ($phone === null || $phone === '') {
+			$this->db->where('(phone_number IS NULL OR phone_number = "")', null, false);
+		} else {
+			$this->db->where('phone_number', $phone);
+		}
+		$this->db->where('Status', 'Y');
+		return $this->db->count_all_results('customer') > 0;
+	}
+
+	/**
+	 * Create one customer per parsed entry. Blank CustomerCode -> auto-generated
+	 * collision-free code (create_with_generated_code); a supplied code is used
+	 * as-is but skipped if already taken. Existing name+phone rows are skipped.
+	 * Every created row is flagged for AutoCount sync (action C / status P), the
+	 * same as the single-create path.
+	 *
+	 * @param array $parsed Entries from Parse_Import_Rows().
+	 * @return array Summary: created, skipped_duplicate, failed (each with line + reason).
+	 */
+	public function Bulk_Import(array $parsed)
+	{
+		$summary = array(
+			'created'          => array(), // ['line'=>, 'name'=>, 'code'=>]
+			'skipped_duplicate'=> array(), // ['line'=>, 'name'=>]
+			'failed'           => array(), // ['line'=>, 'name'=>, 'reason'=>]
+		);
+
+		foreach ($parsed as $entry) {
+			$line = isset($entry['line']) ? (int) $entry['line'] : 0;
+			$name = isset($entry['name']) ? $entry['name'] : null;
+
+			if (!empty($entry['error'])) {
+				$summary['failed'][] = array('line' => $line, 'name' => $name, 'reason' => $entry['error']);
+				continue;
+			}
+			if ($this->exists_by_name_phone($name, isset($entry['phone_number']) ? $entry['phone_number'] : null)) {
+				$summary['skipped_duplicate'][] = array('line' => $line, 'name' => $name);
+				continue;
+			}
+
+			$now  = date('Y-m-d H:i:s');
+			$data = array(
+				'name'           => $name,
+				'phone_number'   => isset($entry['phone_number']) ? $entry['phone_number'] : null,
+				'ChatLanguage'   => isset($entry['ChatLanguage']) ? $entry['ChatLanguage'] : null,
+				'ic_passport_no' => isset($entry['ic_passport_no']) ? $entry['ic_passport_no'] : null,
+				'tin_no'         => isset($entry['tin_no']) ? $entry['tin_no'] : null,
+				'Address'        => isset($entry['Address']) ? $entry['Address'] : null,
+				'PrimaryEmail'   => isset($entry['PrimaryEmail']) ? $entry['PrimaryEmail'] : null,
+				'AutocountSyncAction' => 'C',
+				'AutocountSyncStatus' => 'P',
+				'created_at'     => $now,
+				'updated_at'     => $now,
+			);
+
+			$supplied_code = isset($entry['CustomerCode']) ? $entry['CustomerCode'] : null;
+			if (!empty($supplied_code)) {
+				if ($this->code_exists($supplied_code)) {
+					$summary['failed'][] = array('line' => $line, 'name' => $name,
+						'reason' => 'Customer code ' . $supplied_code . ' already in use');
+					continue;
+				}
+				$data['CustomerCode'] = $supplied_code;
+				$ok = $this->db->insert('customer', $data) && $this->db->affected_rows() > 0;
+				if ($ok) {
+					$summary['created'][] = array('line' => $line, 'name' => $name, 'code' => $supplied_code);
+				} else {
+					$summary['failed'][] = array('line' => $line, 'name' => $name, 'reason' => 'Insert failed');
+				}
+			} else {
+				$new_id = $this->create_with_generated_code($data);
+				if ($new_id) {
+					$row = $this->find($new_id);
+					$summary['created'][] = array('line' => $line, 'name' => $name,
+						'code' => $row ? $row->CustomerCode : null);
+				} else {
+					$summary['failed'][] = array('line' => $line, 'name' => $name, 'reason' => 'Could not generate code');
+				}
+			}
+		}
+
+		return $summary;
 	}
 
 

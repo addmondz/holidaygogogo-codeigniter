@@ -101,6 +101,12 @@ div.kt-datatable__pager-container {
 						<a href="<?php echo base_url('Customer/Create'); ?>" class="btn btn-primary font-weight-bold mr-1 mb-2" style="width:180px;">
 							<i class="la la-user-alt"></i>Create Customer
 						</a>
+						<a href="<?php echo base_url('Customer/Import_Template'); ?>" class="btn btn-light-info font-weight-bold mr-1 mb-2" style="width:180px;" data-toggle="tooltip" title="Download the blank Excel template to bulk-create customers">
+							<i class="la la-file-download"></i>Import Template
+						</a>
+						<button type="button" class="btn btn-light-success font-weight-bold mr-1 mb-2" style="width:180px;" data-toggle="modal" data-target="#customer_import_modal" title="Upload a filled template to bulk-create customers">
+							<i class="la la-file-import"></i>Bulk Import
+						</button>
 						<?php $current_url = base_url($_SERVER['REQUEST_URI']); ?>
 						<a href="<?php if(strpos($current_url, '?') == true) { echo base_url('Customer/Download?') . (explode('?', $current_url))[1]; } else { echo base_url('Customer/Download'); } ?>" class="btn btn-light-warning font-weight-bold mb-2" style="width:180px;">
 							<i class="las la-arrow-circle-down"></i>Customer Records
@@ -109,6 +115,16 @@ div.kt-datatable__pager-container {
 				<?php } ?>
 			</div>
 			<div class="card-body">
+				<?php if($list_base === 'Customer' && $this->session->flashdata('customer_import_success')) { ?>
+					<div class="alert alert-light-success font-weight-bold" role="alert" style="border-left:4px solid #1bc5bd;">
+						<?php echo htmlspecialchars($this->session->flashdata('customer_import_success')); ?>
+					</div>
+				<?php } ?>
+				<?php if($list_base === 'Customer' && $this->session->flashdata('customer_import_error')) { ?>
+					<div class="alert alert-light-danger font-weight-bold" role="alert" style="border-left:4px solid #f64e60;">
+						<?php echo htmlspecialchars($this->session->flashdata('customer_import_error')); ?>
+					</div>
+				<?php } ?>
 				<div class="accordion accordion-solid accordion-toggle-plus">
 					<div class="card">
 						<div class="card-header">
@@ -253,15 +269,6 @@ div.kt-datatable__pager-container {
 										</div>
 									</div>
 									<div class="row">
-										<div class="col-md-3">
-											<div class="form-group">
-												<label>Team Leader</label>
-												<div class="input-icon">
-													<input type="text" name="team_leader" value="<?php if(!empty($this->input->get('team_leader'))) { echo htmlspecialchars($this->input->get('team_leader'), ENT_QUOTES); } ?>" autocomplete="off" class="form-control" placeholder="e.g. John Tan">
-													<span><i class="la la-user-friends"></i></span>
-												</div>
-											</div>
-										</div>
 										<div class="col-md-3">
 											<div class="form-group">
 												<label>Booking Number</label>
@@ -429,6 +436,63 @@ div.kt-datatable__pager-container {
 													</div>
 												</div>
 											</div>
+											<div class="row">
+												<div class="col-md-3">
+													<div class="form-group">
+														<label>Gender</label>
+														<?php $sel_gender = guest_list_multi_values($this->input->get('gender')); ?>
+														<select name="gender[]" class="form-control selectpicker" multiple data-actions-box="true" title="--SELECT GENDER--">
+															<option data-icon="la la-mars font-size-lg bs-icon" value="Male"   <?php if(in_array('Male', $sel_gender, true))   echo 'selected'; ?>>Male</option>
+															<option data-icon="la la-venus font-size-lg bs-icon" value="Female" <?php if(in_array('Female', $sel_gender, true)) echo 'selected'; ?>>Female</option>
+															<option data-icon="la la-genderless font-size-lg bs-icon" value="Other"  <?php if(in_array('Other', $sel_gender, true))  echo 'selected'; ?>>Other</option>
+														</select>
+													</div>
+												</div>
+												<div class="col-md-3">
+													<div class="form-group">
+														<label>Language</label>
+														<?php $sel_language = guest_list_multi_values($this->input->get('language')); ?>
+														<select name="language[]" class="form-control selectpicker" data-live-search="true" multiple data-actions-box="true" title="--SELECT LANGUAGE--">
+															<?php if(!empty($languages)) { foreach($languages as $l) { ?>
+																<option data-icon="la la-language font-size-lg bs-icon" value="<?php echo htmlspecialchars($l->value, ENT_QUOTES); ?>" <?php if(in_array((string)$l->value, $sel_language, true)) echo 'selected'; ?>><?php echo htmlspecialchars($l->value); ?></option>
+															<?php } } ?>
+														</select>
+													</div>
+												</div>
+												<div class="col-md-3">
+													<div class="form-group">
+														<label>Race</label>
+														<div class="input-icon">
+															<input type="text" name="race" value="<?php if(!empty($this->input->get('race'))) { echo htmlspecialchars($this->input->get('race'), ENT_QUOTES); } ?>" autocomplete="off" class="form-control" placeholder="e.g. Muslim">
+															<span><i class="la la-users"></i></span>
+														</div>
+													</div>
+												</div>
+												<div class="col-md-3">
+													<div class="form-group">
+														<label>Nationality</label>
+														<?php $sel_nationality = guest_list_multi_values($this->input->get('nationality')); ?>
+														<select name="nationality[]" class="form-control selectpicker" data-live-search="true" multiple data-actions-box="true" title="--SELECT NATIONALITY--">
+															<?php if(!empty($nationalities)) { foreach($nationalities as $n) { ?>
+																<option data-icon="la la-globe font-size-lg bs-icon" value="<?php echo htmlspecialchars($n->value, ENT_QUOTES); ?>" <?php if(in_array((string)$n->value, $sel_nationality, true)) echo 'selected'; ?>><?php echo htmlspecialchars($n->value); ?></option>
+															<?php } } ?>
+														</select>
+													</div>
+												</div>
+												<div class="col-md-3">
+													<div class="form-group">
+														<label>Date of Birth
+															<a onclick="Reset_Dob()" class="btn btn-icon btn-light-warning btn-xs" data-toggle="tooltip" title="Clear date of birth">
+																<i class="la la-undo"></i>
+															</a>
+														</label>
+														<div id="kt_daterangepicker_guests_dob" class="input-icon">
+															<input readonly type="text" name="dob" value="<?php if(!empty($this->input->get('dob'))) { echo $this->input->get('dob'); } ?>" autocomplete="off" class="form-control" placeholder="Born between…">
+															<span><i class="la la-birthday-cake"></i></span>
+														</div>
+													</div>
+												</div>
+											</div>
 										</div>
 										<?php } ?>
 										<input type="submit" value="Filter" class="btn btn-light-success font-weight-bold" style="width:80px;">
@@ -445,24 +509,31 @@ div.kt-datatable__pager-container {
 						<thead>
 							<tr>
 								<th style="text-align:center;">No.</th>
-								<th style="text-align:center;">Guest First Name</th>
 								<?php if($list_base !== 'Ghl_Leads') { ?>
-									<th style="text-align:center;">Team Leader</th>
+									<th style="text-align:center;">Alt Name</th>
 								<?php } ?>
+								<th style="text-align:center;">Guest First Name</th>
 								<th style="text-align:center;">Contact Num</th>
 								<?php if($list_base !== 'Ghl_Leads') { ?>
 									<th style="text-align:center;">Email</th>
 								<?php } ?>
 								<?php if($list_base === 'Ghl_Leads') { ?>
 									<th style="text-align:center;">Tags</th>
+									<th style="text-align:center;">Gender</th>
+									<th style="text-align:center;">Language</th>
+									<th style="text-align:center;">Race</th>
+									<th style="text-align:center;">Nationality</th>
+									<th style="text-align:center;">Date of Birth</th>
 								<?php } ?>
 								<?php if($list_base !== 'Ghl_Leads') { ?>
 									<th style="text-align:center;">Language</th>
-									<th style="text-align:center;">Agent Name</th>
 									<th style="text-align:center;">Guest Type</th>
 									<th style="text-align:center;">Destination</th>
 									<th style="text-align:center;">Customer Code</th>
 									<th style="text-align:center;">Date Creation</th>
+								<?php } ?>
+								<?php if($list_base === 'Customer') { ?>
+									<th style="text-align:center;">AutoCount Sync</th>
 								<?php } ?>
 								<?php if($list_base !== 'Ghl_Leads') { ?>
 									<th class="action" style="text-align:center;">Action</th>
@@ -471,12 +542,28 @@ div.kt-datatable__pager-container {
 						</thead>
 						<tbody>
 							<?php if(empty($guests)) { ?>
-								<tr><td colspan="<?php echo ($list_base !== 'Ghl_Leads') ? 12 : 4; ?>" style="text-align:center; padding-top:10px; padding-bottom:10px;">Guest Records Not Found</td></tr>
+								<tr><td colspan="<?php echo ($list_base === 'Customer') ? 12 : (($list_base !== 'Ghl_Leads') ? 11 : 9); ?>" style="text-align:center; padding-top:10px; padding-bottom:10px;">Guest Records Not Found</td></tr>
 							<?php } else { ?>
 								<?php $count = 1; foreach($guests as $g) { ?>
 									<?php $is_ghl_row = isset($g->Type) && $g->Type === 'GHL'; ?>
 									<tr>
 										<td style="text-align:center; padding-top:15px; padding-bottom:15px;"><?php echo $count; ?></td>
+										<?php if($list_base !== 'Ghl_Leads') {
+											$altname_val = isset($g->AltName) ? (string) $g->AltName : '';
+											$alt_customer_id = isset($g->CustomerID) ? (int) $g->CustomerID : 0;
+											// Editable only when the row maps to a real customer (GHL/leader-
+											// fallback rows without a customer stay read-only).
+											$altname_editable = !$is_ghl_row && $alt_customer_id > 0;
+										?>
+											<td class="gl-cell<?php if($altname_editable) echo ' gl-editable'; ?>" style="text-align:center;"<?php if($altname_editable) { ?> data-field="altname" data-customer-id="<?php echo $alt_customer_id; ?>" data-value="<?php echo htmlspecialchars($altname_val, ENT_QUOTES); ?>"<?php } ?>>
+												<span class="gl-display">
+													<span class="gl-text"><?php if($altname_val !== '') { echo htmlspecialchars($altname_val); } else { echo '<span class="text-muted">&mdash;</span>'; } ?></span>
+													<?php if($altname_editable) { ?>
+														<button type="button" class="btn btn-icon btn-light-primary btn-xs gl-edit-btn ml-1" data-toggle="tooltip" title="Edit alt name"><i class="la la-pencil"></i></button>
+													<?php } ?>
+												</span>
+											</td>
+										<?php } ?>
 										<?php $name_val = (string) $g->Name; ?>
 										<td class="gl-cell<?php if(!$is_ghl_row) echo ' gl-editable'; ?>" style="text-align:center;"<?php if(!$is_ghl_row) { ?> data-field="name" data-dedup-key="<?php echo htmlspecialchars($g->dedup_key, ENT_QUOTES); ?>" data-value="<?php echo htmlspecialchars($name_val, ENT_QUOTES); ?>"<?php } ?>>
 											<span class="gl-display">
@@ -486,34 +573,6 @@ div.kt-datatable__pager-container {
 												<?php } ?>
 											</span>
 										</td>
-										<?php if($list_base !== 'Ghl_Leads') { ?>
-										<td style="text-align:center; white-space:nowrap;">
-											<?php
-												$leaders = guest_list_team_leader_links(isset($g->TeamLeaderBookings) ? $g->TeamLeaderBookings : '');
-												if(!empty($leaders)) {
-													$tl_base    = base_url($list_base);
-													$leader_out = array();
-													foreach($leaders as $lead) {
-														// Click a team leader name to reload the list filtered
-														// to that leader's exact booking(s) — showing only that
-														// booking's team members, not every booking they've led.
-														$qs = array();
-														foreach($lead['booking_ids'] as $bid) {
-															$qs[] = 'booking_id[]=' . urlencode($bid);
-														}
-														$href = $tl_base . '?' . implode('&', $qs);
-														$leader_out[] = '<a href="' . htmlspecialchars($href, ENT_QUOTES) . '" '
-															. 'title="Show only this booking\'s team members" '
-															. 'style="color:#3699FF; text-decoration:none; border-bottom:1px dashed #3699FF;">'
-															. htmlspecialchars($lead['name']) . '</a>';
-													}
-													echo implode('<br>', $leader_out);
-												} else {
-													echo '<span class="text-muted">&mdash;</span>';
-												}
-											?>
-										</td>
-										<?php } ?>
 										<?php
 											$calling_code = isset($g->CallingCode) ? (string)$g->CallingCode : '';
 											// A merged row (same Name + IC across bookings) packs every distinct
@@ -585,6 +644,11 @@ div.kt-datatable__pager-container {
 													}
 												?>
 											</td>
+											<td style="text-align:center;"><span class="text-muted">&mdash;</span></td>
+											<td style="text-align:center;"><span class="text-muted">&mdash;</span></td>
+											<td style="text-align:center;"><span class="text-muted">&mdash;</span></td>
+											<td style="text-align:center;"><span class="text-muted">&mdash;</span></td>
+											<td style="text-align:center;"><span class="text-muted">&mdash;</span></td>
 										<?php } ?>
 										<?php if($list_base !== 'Ghl_Leads') { ?>
 										<?php $lang_val = (string) $g->Language; ?>
@@ -596,7 +660,6 @@ div.kt-datatable__pager-container {
 												<?php } ?>
 											</span>
 										</td>
-										<td style="text-align:center;"><?php echo htmlspecialchars($g->AgentName); ?></td>
 										<td style="text-align:center; white-space:nowrap;">
 											<?php
 												$gtype = isset($g->GuestType) ? (string) $g->GuestType : '';
@@ -642,6 +705,34 @@ div.kt-datatable__pager-container {
 												?>
 											</td>
 										<?php } ?>
+										<?php if($list_base === 'Customer') { ?>
+											<td style="text-align:center; white-space:nowrap;">
+												<?php
+													$sync_status = isset($g->AutocountSyncStatus) ? (string)$g->AutocountSyncStatus : '';
+													if($sync_status === '' && $is_ghl_row) {
+														echo '<span class="text-muted">&mdash;</span>';
+													} else {
+														$sync_map = mapAutocountSyncStatus($sync_status !== '' ? $sync_status : null);
+
+														// Tooltip from the stored sync message (JSON or raw), matching supplier view.
+														$sync_tip_attr = '';
+														$sync_msg = isset($g->AutocountSyncMessage) ? (string)$g->AutocountSyncMessage : '';
+														if($sync_msg !== '') {
+															$decoded = json_decode($sync_msg, true);
+															if(json_last_error() === JSON_ERROR_NONE && is_array($decoded) && array_key_exists('error', $decoded)) {
+																$sync_tip = ($decoded['error'] === null)
+																	? 'SUCCESS'
+																	: 'ERROR: ' . (is_string($decoded['error']) ? $decoded['error'] : json_encode($decoded['error']));
+															} else {
+																$sync_tip = $sync_msg;
+															}
+															$sync_tip_attr = ' data-toggle="tooltip" data-placement="top" title="' . htmlspecialchars($sync_tip, ENT_QUOTES) . '"';
+														}
+												?>
+													<span class="font-weight-bold" style="color:<?php echo $sync_map['color']; ?>;"<?php echo $sync_tip_attr; ?>><?php echo $sync_map['text']; ?></span>
+												<?php } ?>
+											</td>
+										<?php } ?>
 										<?php if($list_base !== 'Ghl_Leads') { ?>
 										<td style="text-align:center;">
 											<?php if(!$is_ghl_row) { ?>
@@ -660,7 +751,6 @@ div.kt-datatable__pager-container {
 															<?php endif; ?>
 															<div class="dropdown-divider"></div>
 														<?php } ?>
-														<a href="<?php echo base_url('Guests/View?key=') . urlencode($g->dedup_key); ?>" class="dropdown-item" style="font-size:11px;">Customer Profile</a>
 														<?php $rc = isset($remark_counts[$g->dedup_key]) ? (int) $remark_counts[$g->dedup_key] : 0; ?>
 														<a href="javascript:;" class="dropdown-item js-remarks" style="font-size:11px;" data-dedup-key="<?php echo htmlspecialchars($g->dedup_key, ENT_QUOTES); ?>" data-name="<?php echo htmlspecialchars($g->Name, ENT_QUOTES); ?>">Remarks<?php if($rc > 0) { echo ' (' . $rc . ')'; } ?></a>
 														<?php if($list_base === 'Customer' && !empty($g->CustomerID) && (int)$this->session->userdata('level') === 10) { ?>
@@ -763,7 +853,7 @@ div.kt-datatable__pager-container {
 
 <script>
 	<?php
-		$expanded_keys = array('q', 'booking_number', 'contact_number', 'email', 'destination', 'role', 'pax_min', 'pax_max', 'sales_agent', 'source', 'customer_type', 'nationality', 'gender', 'guest_type', 'language', 'booking_date', 'travel_date', 'team_leader', 'dob', 'birthday', 'campaign_date', 'follow_date', 'customer_code', 'create_date');
+		$expanded_keys = array('q', 'booking_number', 'contact_number', 'email', 'destination', 'role', 'pax_min', 'pax_max', 'sales_agent', 'source', 'customer_type', 'nationality', 'gender', 'guest_type', 'language', 'booking_date', 'travel_date', 'dob', 'birthday', 'campaign_date', 'follow_date', 'customer_code', 'create_date');
 		$expand = false;
 		foreach($expanded_keys as $k) {
 			if($this->input->get($k) !== null && $this->input->get($k) !== '') { $expand = true; break; }
@@ -895,6 +985,16 @@ div.kt-datatable__pager-container {
 
 	$('[data-toggle="tooltip"]').tooltip();
 
+	// Success feedback for the GHL push. Only reached on ok:true, and by then a
+	// GHL failure has already aborted the save (surfaced as an inline error), so
+	// we only confirm a real sync. 'skipped' (guest not in GHL / GHL off) is silent.
+	function glNotifyGhlSync(status) {
+		if (typeof toastr === 'undefined') { return; }
+		if (status === 'updated') {
+			toastr.success('Synced to GHL.');
+		}
+	}
+
 	// ----- Inline contact-number edit -----
 	var GUEST_CONTACT_UPDATE_URL = '<?php echo base_url('Guests/Update_Contact'); ?>';
 
@@ -986,6 +1086,7 @@ div.kt-datatable__pager-container {
 				$cell.attr('data-mobile', res.mobile);
 				if (res.dedup_key) { $cell.attr('data-dedup-key', res.dedup_key); }
 				renderDisplay($cell);
+				glNotifyGhlSync(res.ghl_sync);
 			} else {
 				$error.text((res && res.message) ? res.message : 'Could not update contact number.').show();
 				$btn.prop('disabled', false).find('i').attr('class', 'la la-check');
@@ -1000,7 +1101,7 @@ div.kt-datatable__pager-container {
 	var GL_FIELD_UPDATE_URL = '<?php echo base_url('Guests/Update_Field'); ?>';
 	var GL_LANGUAGES = <?php echo json_encode(isset($edit_languages) ? array_values($edit_languages) : array('CN', 'EN', 'ML')); ?>;
 
-	var GL_TITLES = { name: 'Edit first name', email: 'Edit email', language: 'Edit language' };
+	var GL_TITLES = { name: 'Edit first name', email: 'Edit email', language: 'Edit language', altname: 'Edit alt name' };
 
 	function glEscape(v) { return $('<span>').text(v == null ? '' : v).html(); }
 
@@ -1073,12 +1174,13 @@ div.kt-datatable__pager-container {
 			url: GL_FIELD_UPDATE_URL,
 			method: 'POST',
 			dataType: 'json',
-			data: { dedup_key: $cell.attr('data-dedup-key'), field: field, value: value },
+			data: { dedup_key: $cell.attr('data-dedup-key'), customer_id: $cell.attr('data-customer-id'), field: field, value: value },
 			timeout: 30000
 		}).done(function(res) {
 			if (res && res.ok) {
 				$cell.attr('data-value', (res.value != null) ? res.value : value);
 				glRenderDisplay($cell);
+				glNotifyGhlSync(res.ghl_sync);
 			} else {
 				$error.text((res && res.message) ? res.message : 'Could not update.').show();
 				$btn.prop('disabled', false).find('i').attr('class', 'la la-check');
@@ -1325,3 +1427,51 @@ div.kt-datatable__pager-container {
 	}
 	<?php } ?>
 </script>
+
+<?php if($list_base === 'Customer') { ?>
+<!-- Bulk-import modal: upload a filled Import Template to create many customers
+     at once. Unlike the FAQ importer this is purely additive — it never edits
+     or removes existing customers; duplicate name+phone rows are skipped. -->
+<div class="modal fade" id="customer_import_modal" tabindex="-1" role="dialog" aria-labelledby="customer_import_label" aria-hidden="true">
+	<div class="modal-dialog modal-dialog-centered" role="document">
+		<form action="<?php echo base_url('Customer/Import'); ?>" method="post" enctype="multipart/form-data" id="customer_import_form">
+			<div class="modal-content">
+				<div class="modal-header" style="background-color:#D7E2F2;">
+					<h5 class="modal-title" id="customer_import_label" style="color:#6082B6;"><strong>Bulk Create Customers from Excel</strong></h5>
+					<button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+				</div>
+				<div class="modal-body">
+					<div class="alert alert-light-primary" role="alert" style="border-left:4px solid #6082B6;">
+						Download <strong>Import Template</strong> first, fill one customer per row, then upload it here. Each row becomes a new customer.
+					</div>
+					<div class="form-group">
+						<label>Excel File <span class="text-danger">*</span></label>
+						<div class="custom-file">
+							<input type="file" name="import_file" class="custom-file-input" id="customer_import_file" accept=".xlsx,.xls" required>
+							<label class="custom-file-label" for="customer_import_file" id="customer_import_file_label">Choose .xlsx / .xls file</label>
+						</div>
+						<span class="form-text text-muted">Only <strong>Name</strong> is required. Leave <strong>Customer Code</strong> blank to auto-generate. Rows matching an existing name + phone are skipped. The last 3 uploads are kept as backups.</span>
+					</div>
+				</div>
+				<div class="modal-footer">
+					<button type="button" class="btn btn-light font-weight-bold" data-dismiss="modal">Cancel</button>
+					<button type="submit" class="btn btn-success font-weight-bold" id="customer_import_submit">
+						<i class="la la-file-import"></i>Create Customers
+					</button>
+				</div>
+			</div>
+		</form>
+	</div>
+</div>
+<script>
+	$('[data-toggle="tooltip"]').tooltip();
+	// Show the picked filename, and lock the button while the import runs.
+	$('#customer_import_file').on('change', function() {
+		var name = (this.files && this.files.length) ? this.files[0].name : 'Choose .xlsx / .xls file';
+		$('#customer_import_file_label').text(name);
+	});
+	$('#customer_import_form').on('submit', function() {
+		$('#customer_import_submit').prop('disabled', true).html('<i class="la la-spinner la-spin"></i>Creating...');
+	});
+</script>
+<?php } ?>

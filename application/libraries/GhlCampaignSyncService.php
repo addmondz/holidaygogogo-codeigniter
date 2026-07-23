@@ -559,6 +559,85 @@ class GhlCampaignSyncService
     }
 
     /**
+     * Best-effort push of a single Guest List inline edit (mobile / name /
+     * email) back to the matching GHL contact. Resolves the contact by the
+     * guest's CURRENT phone key — for a mobile edit that's the pre-edit
+     * (old) number, which still matches ghl_contacts.phone — or by email,
+     * then PUTs only the changed field(s) via update_contact().
+     *
+     *   $lookup = array('phone_key' => '123456789', 'email' => 'a@b.com')  // either may be ''
+     *   $row    = array('ContactNum' => ..., 'GuestName' => ..., 'Email' => ...)  // only changed keys
+     *
+     * On success the local ghl_contacts row is refreshed too, so the merged
+     * Guest List view keeps matching the same contact. Never throws — a
+     * failed push must not undo the local save the caller already committed.
+     *
+     * Returns array(action, reason, contact_id, http_status, message) where:
+     *   'updated' — PUT succeeded
+     *   'failed'  — PUT returned an error
+     *   'skipped' — no PUT was attempted; `reason` distinguishes why so the
+     *               caller can decide whether to still save locally:
+     *                 'not_configured'  — GHL creds absent (block the save)
+     *                 'nothing_to_sync' — no GHL-mapped field changed
+     *                 'no_contact'      — guest is not a GHL contact (safe to save)
+     */
+    public function push_guest_edit($lookup, $row, $config = null)
+    {
+        if ($config === null) {
+            $config = $this->getConfig();
+        }
+
+        if (empty($config['token']) || empty($config['location_id'])) {
+            return array('action' => 'skipped', 'reason' => 'not_configured', 'contact_id' => null, 'http_status' => 0, 'message' => 'GHL not configured.');
+        }
+
+        $payload = self::build_update_contact_payload($row);
+        if (empty($payload)) {
+            return array('action' => 'skipped', 'reason' => 'nothing_to_sync', 'contact_id' => null, 'http_status' => 0, 'message' => 'No syncable fields.');
+        }
+
+        $phone_key = isset($lookup['phone_key']) ? (string) $lookup['phone_key'] : '';
+        $email     = isset($lookup['email']) ? strtolower(trim((string) $lookup['email'])) : '';
+
+        $contact_id = $this->lookup_existing_ghl_contact($phone_key, $email);
+        if ($contact_id === null) {
+            return array('action' => 'skipped', 'reason' => 'no_contact', 'contact_id' => null, 'http_status' => 0, 'message' => 'Guest is not a GHL contact.');
+        }
+
+        $result = $this->update_contact($contact_id, $row, $config);
+        if (!empty($result['ok'])) {
+            $this->apply_local_contact_edit($contact_id, $payload);
+            return array('action' => 'updated', 'contact_id' => $contact_id, 'http_status' => $result['http_status'], 'message' => null);
+        }
+
+        return array('action' => 'failed', 'contact_id' => $contact_id, 'http_status' => $result['http_status'], 'message' => $result['message']);
+    }
+
+    /**
+     * Mirror an accepted GHL contact edit onto the local ghl_contacts cache so
+     * the merged Guest List view keeps resolving to the same contact before the
+     * next pull sync runs. No-op when there is no DB handle (unit tests).
+     */
+    protected function apply_local_contact_edit($contact_id, $payload)
+    {
+        if (!$this->CI || empty($this->CI->db)) {
+            return;
+        }
+
+        $update = array();
+        if (isset($payload['phone']))     { $update['phone']      = (string) $payload['phone']; }
+        if (isset($payload['email']))     { $update['email']      = (string) $payload['email']; }
+        if (isset($payload['firstName'])) { $update['first_name'] = (string) $payload['firstName']; }
+        if (isset($payload['lastName']))  { $update['last_name']  = (string) $payload['lastName']; }
+        if (empty($update)) {
+            return;
+        }
+        $update['updated_at'] = $this->getCodeDateTime();
+
+        $this->CI->db->where('contact_id', (string) $contact_id)->update('ghl_contacts', $update);
+    }
+
+    /**
      * POST /contacts/{contact_id}/tags
      */
     public function apply_tag($contact_id, $tag, $config)

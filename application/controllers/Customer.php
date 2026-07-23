@@ -241,6 +241,141 @@ class Customer extends MY_Controller
 		$writer->save('php://output');
 	}
 
+	/**
+	 * Download the blank bulk-create template: one header row in the exact
+	 * columns Import() reads back, plus a sample row to show the expected format.
+	 * The user fills rows and re-uploads via Import(). CUSTOMER CODE is optional —
+	 * leave it blank to let the app generate a collision-free code per customer.
+	 */
+	function Import_Template()
+	{
+		$spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+		$sheet = $spreadsheet->getActiveSheet();
+		$sheet->setTitle('Customer Template');
+		$spreadsheet->getProperties()->setCreator('HolidayGoGoGo');
+
+		$headers = Customer_Model::IMPORT_COLUMNS; // 0-based index => label
+		$col = 'A';
+		foreach ($headers as $label) {
+			$sheet->setCellValueExplicit($col . '1', $label, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$sheet->getColumnDimension($col)->setWidth(24);
+			$col++;
+		}
+		$last_col = chr(ord('A') + count($headers) - 1); // e.g. 'H'
+		$sheet->getStyle('A1:' . $last_col . '1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_BLACK);
+		$sheet->getStyle('A1:' . $last_col . '1')->getFont()->getColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_WHITE);
+		$sheet->getStyle('A1:' . $last_col . '1')->getFont()->setBold(true);
+
+		// One greyed sample row so the format is obvious; delete before importing.
+		$sample = array('', 'ALI BIN ABU', '0123456789', 'EN', 'A12345678', '', 'ali@example.com', 'No 1, Jalan Besar, 50000 KL');
+		$col = 'A';
+		foreach ($sample as $val) {
+			$sheet->setCellValueExplicit($col . '2', $val, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$col++;
+		}
+		$sheet->getStyle('A2:' . $last_col . '2')->getFont()->getColor()->setARGB('FF999999');
+
+		$filename = 'CUSTOMER_IMPORT_TEMPLATE_' . date('Ymd') . '.xlsx';
+		header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+		header('Content-Disposition: attachment;filename="' . $filename . '"');
+		header('Cache-Control: max-age=0');
+		$writer = \PhpOffice\PhpSpreadsheet\IOFactory::createWriter($spreadsheet, 'Xlsx');
+		$writer->save('php://output');
+	}
+
+	/**
+	 * Bulk-create customers from an uploaded template (the file Import_Template()
+	 * produced, with data rows filled in). Each row becomes one customer; a blank
+	 * CUSTOMER CODE is auto-generated, a supplied one is used as-is (skipped if
+	 * taken). Rows matching an existing name+phone are skipped and reported. The
+	 * upload is stored under assets/upload/customer_import/ and the newest 3 are
+	 * kept as backups. Mirrors Faq::Import()'s upload/backup handling.
+	 */
+	function Import()
+	{
+		if ($this->input->server('REQUEST_METHOD') !== 'POST' || empty($_FILES['import_file']['name'])) {
+			redirect(base_url('Customer'));
+			return;
+		}
+
+		$file = $_FILES['import_file'];
+		if ($file['error'] !== UPLOAD_ERR_OK) {
+			$this->session->set_flashdata('customer_import_error', 'Upload failed. Please try again.');
+			redirect(base_url('Customer'));
+			return;
+		}
+		$ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+		if (!in_array($ext, array('xlsx', 'xls'), true)) {
+			$this->session->set_flashdata('customer_import_error', 'Please upload an Excel file (.xlsx or .xls).');
+			redirect(base_url('Customer'));
+			return;
+		}
+		if ($file['size'] > 10 * 1024 * 1024) {
+			$this->session->set_flashdata('customer_import_error', 'File too large. Maximum size is 10MB.');
+			redirect(base_url('Customer'));
+			return;
+		}
+
+		// Save the upload as a backup, then keep only the newest 3.
+		$dir = FCPATH . 'assets/upload/customer_import/';
+		if (!is_dir($dir)) {
+			mkdir($dir, 0755, true);
+		}
+		$dest = $dir . 'customer_import_' . time() . '.' . $ext;
+		if (!move_uploaded_file($file['tmp_name'], $dest)) {
+			$this->session->set_flashdata('customer_import_error', 'Could not save the uploaded file.');
+			redirect(base_url('Customer'));
+			return;
+		}
+		$existing = array();
+		foreach (glob($dir . 'customer_import_*') as $path) {
+			$existing[] = basename($path);
+		}
+		foreach (Customer_Model::Prune_Import_Backups($existing, 3) as $old) {
+			@unlink($dir . $old);
+		}
+
+		try {
+			$spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($dest);
+			$rows = $spreadsheet->getActiveSheet()->toArray(null, true, true, false);
+		} catch (\Exception $e) {
+			$this->session->set_flashdata('customer_import_error', 'Could not read the Excel file. Please use the downloaded template.');
+			redirect(base_url('Customer'));
+			return;
+		}
+
+		$parsed = Customer_Model::Parse_Import_Rows($rows, array('CN', 'EN', 'ML'));
+		if (empty($parsed)) {
+			$this->session->set_flashdata('customer_import_error', 'No customer rows found in the file. Nothing was created.');
+			redirect(base_url('Customer'));
+			return;
+		}
+
+		$summary = $this->Customer_Model->Bulk_Import($parsed);
+
+		$msg = count($summary['created']) . ' customer(s) created.';
+		if (!empty($summary['skipped_duplicate'])) {
+			$lines = array();
+			foreach ($summary['skipped_duplicate'] as $s) {
+				$lines[] = 'row ' . $s['line'] . ' (' . $s['name'] . ')';
+			}
+			$msg .= ' Skipped ' . count($lines) . ' existing customer(s): ' . implode(', ', $lines) . '.';
+		}
+		if (!empty($summary['failed'])) {
+			$lines = array();
+			foreach ($summary['failed'] as $f) {
+				$lines[] = 'row ' . $f['line'] . ' — ' . $f['reason'];
+			}
+			$msg .= ' Failed ' . count($lines) . ' row(s): ' . implode('; ', $lines) . '.';
+		}
+
+		// Any successful create -> success banner (with any skip/fail notes
+		// appended); nothing created -> error banner.
+		$key = !empty($summary['created']) ? 'customer_import_success' : 'customer_import_error';
+		$this->session->set_flashdata($key, $msg);
+		redirect(base_url('Customer'));
+	}
+
 	public function search1()
 	{
 		$q = $this->input->get('q');

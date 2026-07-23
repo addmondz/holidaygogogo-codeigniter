@@ -97,6 +97,15 @@ class Guests extends MY_Controller
 			? $this->session->userdata('admin_id')
 			: null;
 
+		// GHL-first: push the new number to the matching GHL contact, resolved by
+		// the OLD key (ghl_contacts still holds the pre-edit number). The local
+		// save only proceeds when GHL succeeds — the sole exception is a guest
+		// who isn't a GHL contact (nothing to sync), so local can't get ahead of GHL.
+		$ghl = $this->Push_Guest_Edit_To_Ghl($dedup_key, array('ContactNum' => $mobile));
+		if ($this->Ghl_Sync_Blocks_Save($ghl)) {
+			return $out(array('ok' => false, 'message' => 'Could not sync to GHL — contact number not saved. Please try again.'));
+		}
+
 		$affected = $this->Guests_Model->Update_Guest_Contact(
 			$dedup_key,
 			$mobile,
@@ -112,7 +121,53 @@ class Guests extends MY_Controller
 			'ok'        => true,
 			'mobile'    => $mobile,
 			'dedup_key' => $new_key !== '' ? $new_key : $dedup_key,
+			'ghl_sync'  => $ghl['action'],
 		));
+	}
+
+	/**
+	 * GHL-first push of an inline edit to the matching GHL contact, called
+	 * BEFORE the local write so the caller can abort and keep local in step
+	 * with GHL. $row carries only the changed field(s) in the keys the sync
+	 * service expects (ContactNum / GuestName / Email); $lookup_key is the
+	 * guest's pre-edit dedup_key, which still matches ghl_contacts.phone.
+	 * Returns array(action, reason, ...) — pass it to Ghl_Sync_Blocks_Save().
+	 * Any thrown error is normalized to 'failed' so a caught exception blocks
+	 * the save.
+	 */
+	private function Push_Guest_Edit_To_Ghl($lookup_key, $row)
+	{
+		try {
+			$this->load->library('GhlCampaignSyncService');
+			return $this->ghlcampaignsyncservice->push_guest_edit(
+				array('phone_key' => (string) $lookup_key),
+				$row
+			);
+		} catch (Exception $e) {
+			return array('action' => 'failed', 'reason' => 'error', 'contact_id' => null, 'http_status' => 0, 'message' => $e->getMessage());
+		}
+	}
+
+	/**
+	 * Whether a GHL push result must block the local save. The local DB may
+	 * only move once GHL has (per user directive 2026-07-23): the save proceeds
+	 * only on a real 'updated', or when there was genuinely nothing to sync —
+	 * the guest isn't a GHL contact ('no_contact') or the change maps to no GHL
+	 * field ('nothing_to_sync', e.g. clearing an email, which we never push as a
+	 * blank). Everything else — a push 'failed' or GHL not configured — blocks,
+	 * so a value can't sit locally that GHL never accepted.
+	 */
+	private function Ghl_Sync_Blocks_Save($ghl)
+	{
+		if ($ghl['action'] === 'updated') {
+			return false;
+		}
+		if ($ghl['action'] === 'skipped'
+			&& isset($ghl['reason'])
+			&& in_array($ghl['reason'], array('no_contact', 'nothing_to_sync'), true)) {
+			return false;
+		}
+		return true;
 	}
 
 	/**
@@ -134,6 +189,25 @@ class Guests extends MY_Controller
 		$field     = (string) $this->input->post('field');
 		$value     = (string) $this->input->post('value');
 
+		// Alt Name is a customer-level attribute (customer.AltName), keyed by the
+		// row's CustomerID rather than the guest dedup_key, so it is handled before
+		// the guest-reference guard below. Kept in sync with the BC / Customer form.
+		if ($field === 'altname') {
+			$customer_id = (int) $this->input->post('customer_id');
+			if ($customer_id < 1) {
+				return $out(array('ok' => false, 'message' => 'Missing customer reference.'));
+			}
+			$valid = guest_field_validate_altname($value);
+			if (!$valid['ok']) {
+				return $out(array('ok' => false, 'message' => $valid['error']));
+			}
+			$affected = $this->Guests_Model->Update_Customer_AltName($customer_id, $valid['value']);
+			if ($affected < 1) {
+				return $out(array('ok' => false, 'message' => 'Customer not found.'));
+			}
+			return $out(array('ok' => true, 'value' => $valid['value']));
+		}
+
 		if ($dedup_key === '') {
 			return $out(array('ok' => false, 'message' => 'Missing guest reference.'));
 		}
@@ -148,11 +222,15 @@ class Guests extends MY_Controller
 			if (!$valid['ok']) {
 				return $out(array('ok' => false, 'message' => $valid['error']));
 			}
+			$ghl = $this->Push_Guest_Edit_To_Ghl($dedup_key, array('GuestName' => $valid['value']));
+			if ($this->Ghl_Sync_Blocks_Save($ghl)) {
+				return $out(array('ok' => false, 'message' => 'Could not sync to GHL — name not saved. Please try again.'));
+			}
 			$affected = $this->Guests_Model->Update_Guest_Name($dedup_key, $valid['value'], $admin_id, $scope_admin_id);
 			if ($affected < 1) {
 				return $out(array('ok' => false, 'message' => 'Guest not found or you are not allowed to edit it.'));
 			}
-			return $out(array('ok' => true, 'value' => $valid['value']));
+			return $out(array('ok' => true, 'value' => $valid['value'], 'ghl_sync' => $ghl['action']));
 		}
 
 		if ($field === 'email') {
@@ -160,11 +238,15 @@ class Guests extends MY_Controller
 			if (!$valid['ok']) {
 				return $out(array('ok' => false, 'message' => $valid['error']));
 			}
+			$ghl = $this->Push_Guest_Edit_To_Ghl($dedup_key, array('Email' => $valid['value']));
+			if ($this->Ghl_Sync_Blocks_Save($ghl)) {
+				return $out(array('ok' => false, 'message' => 'Could not sync to GHL — email not saved. Please try again.'));
+			}
 			$affected = $this->Guests_Model->Update_Guest_Email($dedup_key, $valid['value'], $admin_id, $scope_admin_id);
 			if ($affected < 1) {
 				return $out(array('ok' => false, 'message' => 'Guest not found or you are not allowed to edit it.'));
 			}
-			return $out(array('ok' => true, 'value' => $valid['value']));
+			return $out(array('ok' => true, 'value' => $valid['value'], 'ghl_sync' => $ghl['action']));
 		}
 
 		if ($field === 'language') {
@@ -174,9 +256,7 @@ class Guests extends MY_Controller
 			}
 			$affected = $this->Guests_Model->Update_Guest_Language($dedup_key, $valid['value'], $admin_id, $scope_admin_id);
 			if ($affected < 1) {
-				// Language lives on the booking/customer, so it only lands on a
-				// guest who leads a booking — a pure team member has nowhere to store it.
-				return $out(array('ok' => false, 'message' => 'Language can only be set on the guest who leads a booking.'));
+				return $out(array('ok' => false, 'message' => 'Guest not found or you are not allowed to edit it.'));
 			}
 			return $out(array('ok' => true, 'value' => $valid['value']));
 		}

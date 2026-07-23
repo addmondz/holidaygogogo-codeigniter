@@ -140,6 +140,31 @@ if (!function_exists('guest_field_validate_language')) {
     }
 }
 
+if (!function_exists('guest_field_validate_altname')) {
+    /**
+     * Validate an Alt Name inline-edited on the Guest/Customer dashboard before
+     * it is written back to customer.AltName. Alt Name is a secondary/alternate
+     * name (nickname, English name, etc.) and is optional: an empty value is
+     * allowed and clears the field; a non-empty value is trimmed and length
+     * capped to the customer.AltName column width.
+     *
+     * @param string $value Raw input.
+     * @return array{ok:bool,error:string,value:string} value is the trimmed alt name ('' when cleared).
+     */
+    function guest_field_validate_altname($value)
+    {
+        $value = trim((string) $value);
+        if ($value === '') {
+            return array('ok' => true, 'error' => '', 'value' => '');
+        }
+        $len = function_exists('mb_strlen') ? mb_strlen($value) : strlen($value);
+        if ($len > 255) {
+            return array('ok' => false, 'error' => 'Alt Name is too long.', 'value' => '');
+        }
+        return array('ok' => true, 'error' => '', 'value' => $value);
+    }
+}
+
 if (!function_exists('guest_remark_validate_date')) {
     /**
      * Validate a plain calendar date on a Guest List remark (Campaign Date /
