@@ -344,16 +344,6 @@ class Booking extends MY_Controller
 		// dropped), so the guest_contact helper is needed for that formatting.
 		$this->load->helper('guest_contact');
 
-		// The Customer name links to that customer's dashboard (Customer/Update),
-		// but only when this viewer may actually open it — same gate as the menu.
-		$this->load->helper(array('booking_customer_link', 'setting_module_access'));
-		$can_view_customer = admin_can_access_setting_module(
-			'customer',
-			$this->session->userdata('level'),
-			(array) $this->session->userdata('access_control')
-		);
-		$site_base_url = base_url();
-
 		// NOTE: the per-page "message log" icon lookup (Ghl_Messages_Model::
 		// Phones_With_Messages) was removed from the listing. It scanned the 400k-row
 		// ghl_messages table on every page load and, because that table's indexes are
@@ -508,8 +498,8 @@ class Booking extends MY_Controller
 			// BC Title
 			$row['bc_title'] = $bc_title;
 
-			// Customer (name links to the customer dashboard when viewable)
-			$row['customer'] = booking_customer_profile_link($booking->Customer, $booking->CustomerID, $can_view_customer, $site_base_url);
+			// Customer
+			$row['customer'] = $booking->Customer;
 			$row['has_einvoice'] = $booking->has_einvoice > 0;
 
 			// Source

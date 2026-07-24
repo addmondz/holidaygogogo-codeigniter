@@ -800,8 +800,7 @@ div.kt-datatable__pager-container {
 													<div class="dropdown-menu">
 														<?php if($list_base === 'Customer' && !empty($g->CustomerID)) { ?>
 															<a href="<?php echo base_url('Customer/Update?customer_id=') . $g->CustomerID; ?>" class="dropdown-item" style="font-size:11px;">Update Customer</a>
-															<a href="#" class="dropdown-item copy-customer-link" data-customer-id="<?php echo $g->CustomerID; ?>" style="font-size:11px;">Copy Customer Link</a>
-															<?php
+																														<?php
 																$this->load->helper('utils');
 																$portal_hash = generate_customer_portal_slug($g->CustomerID);
 																if(!empty($portal_hash) && $portal_hash !== false):
@@ -1397,42 +1396,6 @@ div.kt-datatable__pager-container {
 
 	<?php if($list_base === 'Customer') { ?>
 	// ----- Customer master actions (Customer List page only) -----
-	// Copy Customer Portal Link: fetch the portal URL and copy to clipboard.
-	$(document).on('click', '.copy-customer-link', function(e) {
-		e.preventDefault();
-		var $button = $(this);
-		var customerId = $button.data('customer-id');
-		var originalText = $button.html();
-		$button.prop('disabled', true).html('<i class="la la-spinner la-spin"></i> Generating...');
-		$.ajax({
-			url: '<?php echo base_url('Customer/GeneratePortalUrl'); ?>',
-			method: 'GET',
-			data: { customer_id: customerId },
-			dataType: 'json',
-			success: function(response) {
-				if (response.success && response.portal_url) {
-					var urlToCopy = response.portal_url;
-					if (navigator.clipboard && window.isSecureContext) {
-						navigator.clipboard.writeText(urlToCopy).then(function() {
-							showCopySuccess($button, originalText);
-						}).catch(function() {
-							fallbackCopy(urlToCopy, $button, originalText);
-						});
-					} else {
-						fallbackCopy(urlToCopy, $button, originalText);
-					}
-				} else {
-					alert('Failed to generate portal link: ' + (response.message || 'Unknown error'));
-					$button.prop('disabled', false).html(originalText);
-				}
-			},
-			error: function() {
-				alert('Error generating portal link. Please try again.');
-				$button.prop('disabled', false).html(originalText);
-			}
-		});
-	});
-
 	// Soft-delete customer (Status='N') via the existing Customer/Delete endpoint.
 	$(document).on('click', '.delete-customer', function(e) {
 		e.preventDefault();
@@ -1465,25 +1428,6 @@ div.kt-datatable__pager-container {
 		});
 	});
 
-	function fallbackCopy(text, $button, originalText) {
-		var tempInput = $('<input>');
-		$('body').append(tempInput);
-		tempInput.val(text).select();
-		try {
-			document.execCommand('copy');
-			showCopySuccess($button, originalText);
-		} catch (err) {
-			alert('Failed to copy. Please copy manually: ' + text);
-			$button.prop('disabled', false).html(originalText);
-		}
-		tempInput.remove();
-	}
-
-	function showCopySuccess($button, originalText) {
-		$button.html('<i class="la la-check"></i> Copied!');
-		setTimeout(function() { $button.prop('disabled', false).html(originalText); }, 2000);
-		if (typeof toastr !== 'undefined') { toastr.success('Customer portal link copied to clipboard!'); }
-	}
 	<?php } ?>
 </script>
 
