@@ -1037,11 +1037,31 @@ GROUP BY mm.merge_key";
 	private function Customer_Latest_Booking_Subquery()
 	{
 		return "(
-			SELECT CustomerID, SalesAgent, Source, Destination, Token, CountryCodeID FROM (
-				SELECT b.CustomerID, b.SalesAgent, b.Source, b.Destination, b.Token, b.CountryCodeID,
+			SELECT CustomerID, SalesAgent, Source, Destination, Token FROM (
+				SELECT b.CustomerID, b.SalesAgent, b.Source, b.Destination, b.Token,
 					ROW_NUMBER() OVER (PARTITION BY b.CustomerID ORDER BY b.InsertDate DESC, b.BookingID DESC) AS rn
 				FROM booking b
 				WHERE b.Status != 'N' AND b.CancelStatus = 'N'
+			) w WHERE w.rn = 1
+		)";
+	}
+
+	/**
+	 * The `bcc` derived table: the calling code for the customer's phone. The
+	 * customer row stores only a raw local number, so the code is borrowed from
+	 * their bookings. Unlike the latest-booking table above this INCLUDES
+	 * cancelled bookings (active preferred, then most recent) so a customer whose
+	 * only booking was cancelled still shows a code — matching the Customer Portal.
+	 */
+	private function Customer_Calling_Code_Subquery()
+	{
+		return "(
+			SELECT CustomerID, CountryCodeID FROM (
+				SELECT b.CustomerID, b.CountryCodeID,
+					ROW_NUMBER() OVER (PARTITION BY b.CustomerID
+						ORDER BY (CASE WHEN b.CancelStatus = 'N' THEN 0 ELSE 1 END), b.InsertDate DESC, b.BookingID DESC) AS rn
+				FROM booking b
+				WHERE b.Status != 'N' AND b.CountryCodeID IS NOT NULL
 			) w WHERE w.rn = 1
 		)";
 	}
@@ -1078,6 +1098,7 @@ GROUP BY mm.merge_key";
 		$key    = $this->Customer_Dedup_Key_Expr();
 		$bagg   = $this->Customer_Booking_Aggregate_Subquery();
 		$blat   = $this->Customer_Latest_Booking_Subquery();
+		$bcc    = $this->Customer_Calling_Code_Subquery();
 		$glf    = $this->Customer_Self_Guest_Subquery();
 
 		$sql = "
@@ -1110,7 +1131,8 @@ GROUP BY mm.merge_key";
 		c.created_at AS CustomerCreatedAt
 	FROM customer c
 	LEFT JOIN {$blat} blatest ON blatest.CustomerID = c.CustomerID
-	LEFT JOIN country_code ccp ON ccp.CountryCodeID = blatest.CountryCodeID
+	LEFT JOIN {$bcc} bcc ON bcc.CustomerID = c.CustomerID
+	LEFT JOIN country_code ccp ON ccp.CountryCodeID = bcc.CountryCodeID
 	LEFT JOIN admin    a   ON a.AdminID   = blatest.SalesAgent
 	LEFT JOIN source   s   ON s.SourceID  = blatest.Source
 	LEFT JOIN category cat ON cat.CategoryID = blatest.Destination
