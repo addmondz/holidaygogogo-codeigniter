@@ -76,7 +76,7 @@
 <script src="<?php echo base_url('assets/js/prismjs-bundle.js'); ?>"></script>
 <script src="<?php echo base_url('assets/js/scripts-bundle.js'); ?>"></script>
 <script src="<?php echo base_url('assets/js/datatables-bundle.js'); ?>"></script>
-<script src="<?php echo base_url('assets/js/column-rendering.js?param=qiqi2'); ?>"></script>
+<script src="<?php echo base_url('assets/js/column-rendering.js?param=qiqi3'); ?>"></script>
 <script src="<?php echo base_url('assets/js/bootstrap-daterangepicker.js?param=qiqi'); ?>"></script>
 <script src="<?php echo base_url('assets/js/bootstrap-datepicker.js?param=angie'); ?>"></script>
 <script src="<?php echo base_url('assets/plugins/custom/tinymce/tinymce.bundle.js'); ?>"></script>

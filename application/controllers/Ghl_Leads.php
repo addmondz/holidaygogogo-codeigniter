@@ -46,6 +46,39 @@ class Ghl_Leads extends MY_Controller
 		$this->load->view('layout/footer');
 	}
 
+	/**
+	 * Create a hand-entered ("Manual") lead from the GHL Leads page's Create
+	 * Lead modal. Stored in ghl_contacts with a synthetic "manual:<uid>" id and
+	 * lead_source = 'manual' so it lists beside the synced leads yet the GHL API
+	 * sync never touches it. Redirects back to the listing with a flash message.
+	 */
+	function Create()
+	{
+		$this->load->helper('ghl_manual_lead');
+		$this->load->model('Ghl_Contacts_Model');
+
+		// Unique suffix for the synthetic "manual:<uid>" contact_id (the helper
+		// adds the prefix). uniqid(more_entropy) is unique enough for hand entry.
+		$uid = uniqid('', true);
+		$now = date('Y-m-d H:i:s');
+
+		$prepared = ghl_manual_lead_prepare($this->input->post(), $uid, $now);
+
+		if (!$prepared['ok']) {
+			$this->session->set_flashdata('ghl_lead_error', implode(' ', $prepared['errors']));
+			redirect(base_url('Ghl_Leads'));
+			return;
+		}
+
+		$new_id = $this->Ghl_Contacts_Model->create_manual_lead($prepared['row']);
+		if ($new_id) {
+			$this->session->set_flashdata('ghl_lead_success', 'Manual lead created.');
+		} else {
+			$this->session->set_flashdata('ghl_lead_error', 'Could not save the lead. Please try again.');
+		}
+		redirect(base_url('Ghl_Leads'));
+	}
+
 	function Count()
 	{
 		$page  = max(1, (int) $this->input->get('page'));

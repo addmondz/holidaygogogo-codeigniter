@@ -113,8 +113,25 @@ div.kt-datatable__pager-container {
 						</a>
 					</div>
 				<?php } ?>
+				<?php if($list_base === 'Ghl_Leads') { ?>
+					<div class="card-toolbar">
+						<button type="button" class="btn btn-primary font-weight-bold mb-2" style="width:180px;" data-toggle="modal" data-target="#ghl_lead_create_modal" title="Add a lead by hand (stored as a Manual lead)">
+							<i class="la la-user-plus"></i>Create Lead
+						</button>
+					</div>
+				<?php } ?>
 			</div>
 			<div class="card-body">
+				<?php if($list_base === 'Ghl_Leads' && $this->session->flashdata('ghl_lead_success')) { ?>
+					<div class="alert alert-light-success font-weight-bold" role="alert" style="border-left:4px solid #1bc5bd;">
+						<?php echo htmlspecialchars($this->session->flashdata('ghl_lead_success')); ?>
+					</div>
+				<?php } ?>
+				<?php if($list_base === 'Ghl_Leads' && $this->session->flashdata('ghl_lead_error')) { ?>
+					<div class="alert alert-light-danger font-weight-bold" role="alert" style="border-left:4px solid #f64e60;">
+						<?php echo htmlspecialchars($this->session->flashdata('ghl_lead_error')); ?>
+					</div>
+				<?php } ?>
 				<?php if($list_base === 'Customer' && $this->session->flashdata('customer_import_success')) { ?>
 					<div class="alert alert-light-success font-weight-bold" role="alert" style="border-left:4px solid #1bc5bd;">
 						<?php echo htmlspecialchars($this->session->flashdata('customer_import_success')); ?>
@@ -505,7 +522,7 @@ div.kt-datatable__pager-container {
 
 				<br><br>
 				<div class="dataTables_wrapper dt-bootstrap4 no-footer" <?php if(empty($guests)) { echo 'style="overflow-x:auto;"'; } ?>>
-					<table id="kt_datatable" class="table table-bordered table-head-custom table-checkable dataTable no-footer dtr-inline">
+					<table id="kt_datatable" class="table table-bordered table-head-custom table-checkable dataTable no-footer dtr-inline"<?php if($list_base === 'Customer') { echo ' data-no-datatable="1"'; } ?>>
 						<thead>
 							<tr>
 								<th style="text-align:center;">No.</th>
@@ -519,6 +536,7 @@ div.kt-datatable__pager-container {
 								<?php } ?>
 								<?php if($list_base === 'Ghl_Leads') { ?>
 									<th style="text-align:center;">Tags</th>
+									<th style="text-align:center;">Type</th>
 									<th style="text-align:center;">Gender</th>
 									<th style="text-align:center;">Language</th>
 									<th style="text-align:center;">Race</th>
@@ -530,7 +548,29 @@ div.kt-datatable__pager-container {
 									<th style="text-align:center;">Guest Type</th>
 									<th style="text-align:center;">Destination</th>
 									<th style="text-align:center;">Customer Code</th>
-									<th style="text-align:center;">Date Creation</th>
+									<?php if($list_base === 'Customer') {
+										// Server-side sort toggle on customer Date Creation. Preserve all
+										// current filters, drop page (jump back to page 1 on re-sort).
+										$cur_dir  = (isset($sort_dir) && strtoupper($sort_dir) === 'ASC') ? 'ASC' : 'DESC';
+										$next_dir = ($cur_dir === 'ASC') ? 'DESC' : 'ASC';
+										$q = $this->input->get();
+										unset($q['page']);
+										$q['dir'] = $next_dir;
+										// Relative query-string only (same as _pagination.php) so the click
+										// navigates the CURRENT URL and never hits a trailing-slash / index.php
+										// redirect that would drop the ?dir= param.
+										$sort_url  = '?' . http_build_query($q);
+										$caret     = ($cur_dir === 'ASC') ? 'la-arrow-up' : 'la-arrow-down';
+										$sort_hint = ($next_dir === 'ASC') ? 'Sort oldest first' : 'Sort newest first';
+									?>
+										<th style="text-align:center;">
+											<a href="<?php echo htmlspecialchars($sort_url, ENT_QUOTES); ?>" class="js-customer-sort text-dark font-weight-bold" title="<?php echo $sort_hint; ?>" style="white-space:nowrap;">
+												Date Creation <i class="la <?php echo $caret; ?>"></i>
+											</a>
+										</th>
+									<?php } else { ?>
+										<th style="text-align:center;">Date Creation</th>
+									<?php } ?>
 								<?php } ?>
 								<?php if($list_base === 'Customer') { ?>
 									<th style="text-align:center;">AutoCount Sync</th>
@@ -542,10 +582,10 @@ div.kt-datatable__pager-container {
 						</thead>
 						<tbody>
 							<?php if(empty($guests)) { ?>
-								<tr><td colspan="<?php echo ($list_base === 'Customer') ? 12 : (($list_base !== 'Ghl_Leads') ? 11 : 9); ?>" style="text-align:center; padding-top:10px; padding-bottom:10px;">Guest Records Not Found</td></tr>
+								<tr><td colspan="<?php echo ($list_base === 'Customer') ? 12 : (($list_base !== 'Ghl_Leads') ? 11 : 10); ?>" style="text-align:center; padding-top:10px; padding-bottom:10px;">Guest Records Not Found</td></tr>
 							<?php } else { ?>
 								<?php $count = 1; foreach($guests as $g) { ?>
-									<?php $is_ghl_row = isset($g->Type) && $g->Type === 'GHL'; ?>
+									<?php $is_ghl_row = isset($g->Type) && ($g->Type === 'GHL' || $g->Type === 'Manual'); ?>
 									<tr>
 										<td style="text-align:center; padding-top:15px; padding-bottom:15px;"><?php echo $count; ?></td>
 										<?php if($list_base !== 'Ghl_Leads') {
@@ -589,7 +629,7 @@ div.kt-datatable__pager-container {
 												}
 											}
 										?>
-										<td class="contact-cell<?php if(!$is_ghl_row) echo ' contact-editable'; ?>" style="text-align:center; white-space:nowrap;"<?php if(!$is_ghl_row) { ?> data-dedup-key="<?php echo htmlspecialchars($g->dedup_key, ENT_QUOTES); ?>" data-mobile="<?php echo htmlspecialchars((string)$g->ContactNum, ENT_QUOTES); ?>" data-calling-code="<?php echo htmlspecialchars($calling_code, ENT_QUOTES); ?>"<?php } ?>>
+										<td class="contact-cell<?php if(!$is_ghl_row) echo ' contact-editable'; ?>" style="text-align:center; white-space:nowrap;"<?php if(!$is_ghl_row) { ?> data-dedup-key="<?php echo htmlspecialchars($g->dedup_key, ENT_QUOTES); ?>" data-mobile="<?php echo htmlspecialchars((string)$g->ContactNum, ENT_QUOTES); ?>" data-calling-code="<?php echo htmlspecialchars($calling_code, ENT_QUOTES); ?>"<?php if($list_base === 'Customer' && !empty($g->CustomerID)) { ?> data-customer-id="<?php echo (int)$g->CustomerID; ?>"<?php } ?><?php } ?>>
 											<span class="contact-display">
 												<?php if(empty($phones)) { ?>
 													<span class="contact-num"><span class="text-muted">&mdash;</span></span>
@@ -644,11 +684,30 @@ div.kt-datatable__pager-container {
 													}
 												?>
 											</td>
-											<td style="text-align:center;"><span class="text-muted">&mdash;</span></td>
-											<td style="text-align:center;"><span class="text-muted">&mdash;</span></td>
-											<td style="text-align:center;"><span class="text-muted">&mdash;</span></td>
-											<td style="text-align:center;"><span class="text-muted">&mdash;</span></td>
-											<td style="text-align:center;"><span class="text-muted">&mdash;</span></td>
+											<?php
+												$lead_type = (isset($g->Type) && $g->Type === 'Manual') ? 'Manual' : 'GHL';
+												$type_cls  = $lead_type === 'Manual' ? 'label-light-warning' : 'label-light-info';
+											?>
+											<td style="text-align:center;">
+												<span class="label label-inline font-weight-bold <?php echo $type_cls; ?>"><?php echo $lead_type; ?></span>
+											</td>
+											<?php
+												// Gender / Language / Race / Nationality / DOB are stored only for
+												// manual leads; synced GHL contacts leave them blank (shown "—").
+												$gl_dash = '<span class="text-muted">&mdash;</span>';
+												$gender_val = isset($g->Gender)      ? trim((string) $g->Gender)      : '';
+												$lang_val   = isset($g->Language)    ? trim((string) $g->Language)    : '';
+												$race_val   = isset($g->Race)        ? trim((string) $g->Race)        : '';
+												$nat_val    = isset($g->Nationality) ? trim((string) $g->Nationality) : '';
+												$dob_val    = isset($g->DOB)         ? trim((string) $g->DOB)         : '';
+												$dob_show   = ($dob_val !== '' && $dob_val !== '0000-00-00' && strtotime($dob_val) !== false)
+													? date('d M Y', strtotime($dob_val)) : '';
+											?>
+											<td style="text-align:center;"><?php echo $gender_val !== '' ? htmlspecialchars($gender_val) : $gl_dash; ?></td>
+											<td style="text-align:center;"><?php echo $lang_val   !== '' ? htmlspecialchars($lang_val)   : $gl_dash; ?></td>
+											<td style="text-align:center;"><?php echo $race_val   !== '' ? htmlspecialchars($race_val)   : $gl_dash; ?></td>
+											<td style="text-align:center;"><?php echo $nat_val    !== '' ? htmlspecialchars($nat_val)    : $gl_dash; ?></td>
+											<td style="text-align:center;"><?php echo $dob_show   !== '' ? htmlspecialchars($dob_show)   : $gl_dash; ?></td>
 										<?php } ?>
 										<?php if($list_base !== 'Ghl_Leads') { ?>
 										<?php $lang_val = (string) $g->Language; ?>
@@ -756,7 +815,7 @@ div.kt-datatable__pager-container {
 														<?php if($list_base === 'Customer' && !empty($g->CustomerID) && (int)$this->session->userdata('level') === 10) { ?>
 															<a href="#" class="dropdown-item delete-customer text-danger" data-customer-id="<?php echo $g->CustomerID; ?>" data-customer-name="<?php echo htmlspecialchars($g->Name, ENT_QUOTES); ?>" style="font-size:11px;">Delete Customer</a>
 														<?php } ?>
-														<?php if(!empty($g->Token)) { ?>
+														<?php if($list_base !== 'Customer' && !empty($g->Token)) { ?>
 															<div class="dropdown-divider"></div>
 															<a href="<?php echo base_url('Guest_List?gl=') . urlencode($g->Token); ?>" target="_blank" class="dropdown-item" style="font-size:11px;">Guest List</a>
 															<a href="<?php echo base_url('Booking_Confirmation?token=') . urlencode($g->Token); ?>" target="_blank" class="dropdown-item" style="font-size:11px;">Booking Confirmation</a>
@@ -1079,7 +1138,7 @@ div.kt-datatable__pager-container {
 			url: GUEST_CONTACT_UPDATE_URL,
 			method: 'POST',
 			dataType: 'json',
-			data: { dedup_key: $cell.attr('data-dedup-key'), mobile: mobile },
+			data: { dedup_key: $cell.attr('data-dedup-key'), customer_id: $cell.attr('data-customer-id'), mobile: mobile },
 			timeout: 30000
 		}).done(function(res) {
 			if (res && res.ok) {
@@ -1450,7 +1509,7 @@ div.kt-datatable__pager-container {
 							<input type="file" name="import_file" class="custom-file-input" id="customer_import_file" accept=".xlsx,.xls" required>
 							<label class="custom-file-label" for="customer_import_file" id="customer_import_file_label">Choose .xlsx / .xls file</label>
 						</div>
-						<span class="form-text text-muted">Only <strong>Name</strong> is required. Leave <strong>Customer Code</strong> blank to auto-generate. Rows matching an existing name + phone are skipped. The last 3 uploads are kept as backups.</span>
+						<span class="form-text text-muted"><strong>Alt Name</strong>, <strong>Name</strong>, <strong>Phone Number</strong> and <strong>Chat Language</strong> are required. Leave <strong>Customer Code</strong> blank to auto-generate. Rows matching an existing name + phone are skipped. The last 3 uploads are kept as backups.</span>
 					</div>
 				</div>
 				<div class="modal-footer">
@@ -1474,4 +1533,128 @@ div.kt-datatable__pager-container {
 		$('#customer_import_submit').prop('disabled', true).html('<i class="la la-spinner la-spin"></i>Creating...');
 	});
 </script>
+<?php } ?>
+
+<?php if($list_base === 'Ghl_Leads') { ?>
+<!-- Create Lead modal: add one lead by hand. It is stored in the same table as
+     the API-synced leads but flagged "Manual" (Type column) with a synthetic id
+     the GHL sync never touches. Fields mirror the GHL Leads columns. -->
+<style>
+	/* This theme's .modal-lg/.modal-xl widths sit behind @media(min-width:1200px),
+	   so below 1200px they collapse to the default 500px. Widen this one modal
+	   with a viewport-independent, ID-scoped rule (same pattern as #passportModal
+	   / .lra-chat-modal elsewhere in the app). Plain block .modal-dialog +
+	   max-width + margin:auto = a centered wide modal at every width. */
+	#ghl_lead_create_modal .modal-dialog {
+		max-width: 750px !important;
+		width: auto !important;
+		margin: 1.75rem auto !important;
+	}
+</style>
+<div class="modal fade" id="ghl_lead_create_modal" tabindex="-1" role="dialog" aria-labelledby="ghl_lead_create_label" aria-hidden="true">
+	<div class="modal-dialog" role="document">
+		<form action="<?php echo base_url('Ghl_Leads/Create'); ?>" method="post" id="ghl_lead_create_form">
+			<div class="modal-content">
+				<div class="modal-header" style="background-color:#D7E2F2;">
+					<h5 class="modal-title" id="ghl_lead_create_label" style="color:#6082B6;"><strong>Create Manual Lead</strong></h5>
+					<button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+				</div>
+				<div class="modal-body">
+						<div class="alert alert-light-danger font-weight-bold d-none" role="alert" id="ghl_lead_create_error" style="border-left:4px solid #f64e60;">
+					</div>
+					<div class="form-group row">
+						<div class="col-md-6">
+							<label>First Name <span class="text-danger">*</span></label>
+							<input type="text" name="first_name" class="form-control" autocomplete="off">
+						</div>
+						<div class="col-md-6">
+							<label>Last Name</label>
+							<input type="text" name="last_name" class="form-control" autocomplete="off">
+						</div>
+					</div>
+					<div class="form-group row">
+						<div class="col-md-6">
+							<label>Contact Number <span class="text-danger">*</span></label>
+							<input type="text" name="phone" class="form-control" autocomplete="off" placeholder="e.g. +60 12-345 6789">
+						</div>
+						<div class="col-md-6">
+							<label>Email <span class="text-danger">*</span></label>
+							<input type="email" name="email" class="form-control" autocomplete="off">
+						</div>
+					</div>
+					<div class="form-group row">
+						<div class="col-md-6">
+							<label>Gender</label>
+							<select name="gender" class="form-control">
+								<option value="">-- Select --</option>
+								<option value="Male">Male</option>
+								<option value="Female">Female</option>
+								<option value="Other">Other</option>
+							</select>
+						</div>
+						<div class="col-md-6">
+							<label>Language</label>
+							<input type="text" name="chat_language" class="form-control" autocomplete="off">
+						</div>
+					</div>
+					<div class="form-group row">
+						<div class="col-md-6">
+							<label>Race</label>
+							<input type="text" name="race" class="form-control" autocomplete="off">
+						</div>
+						<div class="col-md-6">
+							<label>Nationality</label>
+							<input type="text" name="nationality" class="form-control" autocomplete="off">
+						</div>
+					</div>
+					<div class="form-group row">
+						<div class="col-md-6">
+							<label>Date of Birth</label>
+							<input type="date" name="date_of_birth" class="form-control" autocomplete="off">
+						</div>
+						<div class="col-md-6">
+							<label>Tags</label>
+							<input type="text" name="tags" class="form-control" autocomplete="off" placeholder="Comma-separated, e.g. Redang, VIP">
+						</div>
+					</div>
+				</div>
+				<div class="modal-footer">
+					<button type="button" class="btn btn-light font-weight-bold" data-dismiss="modal">Cancel</button>
+					<button type="submit" class="btn btn-primary font-weight-bold" id="ghl_lead_create_submit">
+						<i class="la la-user-plus"></i>Create Lead
+					</button>
+				</div>
+			</div>
+		</form>
+	</div>
+</div>
+<script>
+	$('[data-toggle="tooltip"]').tooltip();
+	$('#ghl_lead_create_form').on('submit', function(e) {
+		var $form = $(this);
+		var val = function(name) { return $.trim($form.find('[name="' + name + '"]').val() || ''); };
+		var first = val('first_name'), last = val('last_name'), phone = val('phone'), email = val('email');
+		var $err = $('#ghl_lead_create_error');
+		var problems = [];
+
+		// Mirror the server rule: a lead needs at least one identifying value.
+		if (first === '' && last === '' && phone === '' && email === '') {
+			problems.push('Enter at least a name, contact number or email.');
+		}
+		// Validate email shape when provided (server double-checks too).
+		if (email !== '' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+			problems.push('Email address is not valid.');
+		}
+
+		if (problems.length) {
+			e.preventDefault();
+			$err.html(problems.join('<br>')).removeClass('d-none');
+			return false;
+		}
+
+		$err.addClass('d-none');
+		$('#ghl_lead_create_submit').prop('disabled', true).html('<i class="la la-spinner la-spin"></i>Creating...');
+	});
+</script>
+
 <?php } ?>

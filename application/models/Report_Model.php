@@ -3084,7 +3084,7 @@ class Report_Model extends CI_Model
      * @return array Rows keyed: message_timestamp, direction, from_number,
      *               to_number, agent, body.
      */
-    function Ghl_Messages_Log($startDate, $endDate, $limit, $offset, $contact = '', $agent = '', $hour = null, $timeFrom = '', $timeTo = '', $sort = 'desc', $sortColumn = 'date')
+    function Ghl_Messages_Log($startDate, $endDate, $limit, $offset, $contact = '', $agent = '', $hour = null, $timeFrom = '', $timeTo = '', $sort = 'desc', $sortColumn = 'date', $direction = '')
     {
         $messageTimeColumn = $this->escape_identifier($this->get_message_time_column());
         // Column sort toggle: default newest-first by timestamp; an explicit
@@ -3111,6 +3111,7 @@ class Report_Model extends CI_Model
         $agentClause = $this->ghl_message_agent_clause($agent, $params);
         $hourClause = $this->ghl_message_hour_clause($hour, $messageTimeColumn, $params);
         $timeClause = $this->ghl_message_time_range_clause($timeFrom, $timeTo, $messageTimeColumn, $params);
+        $directionClause = $this->ghl_message_direction_clause($direction, $params);
         $params[] = (int) $limit;
         $params[] = (int) $offset;
 
@@ -3133,6 +3134,7 @@ class Report_Model extends CI_Model
               {$agentClause}
               {$hourClause}
               {$timeClause}
+              {$directionClause}
             ORDER BY {$orderBy}
             LIMIT ? OFFSET ?
         ";
@@ -3160,7 +3162,7 @@ class Report_Model extends CI_Model
      * @return array Rows keyed: contact_name, message_timestamp, direction,
      *               from_number, to_number, agent, body.
      */
-    function Ghl_Messages_Log_Export($startDate, $endDate, $limit, $offset, $contact = '', $agent = '', $hour = null, $timeFrom = '', $timeTo = '')
+    function Ghl_Messages_Log_Export($startDate, $endDate, $limit, $offset, $contact = '', $agent = '', $hour = null, $timeFrom = '', $timeTo = '', $direction = '')
     {
         $messageTimeColumn = $this->escape_identifier($this->get_message_time_column());
 
@@ -3172,6 +3174,7 @@ class Report_Model extends CI_Model
         $agentClause = $this->ghl_message_agent_clause($agent, $params);
         $hourClause = $this->ghl_message_hour_clause($hour, $messageTimeColumn, $params);
         $timeClause = $this->ghl_message_time_range_clause($timeFrom, $timeTo, $messageTimeColumn, $params);
+        $directionClause = $this->ghl_message_direction_clause($direction, $params);
         $params[] = (int) $limit;
         $params[] = (int) $offset;
 
@@ -3195,6 +3198,7 @@ class Report_Model extends CI_Model
               {$agentClause}
               {$hourClause}
               {$timeClause}
+              {$directionClause}
             ORDER BY COALESCE(gc.contact_id, gm.conversation_id, '') ASC,
                      gm.conversation_id ASC,
                      gm.{$messageTimeColumn} ASC,
@@ -3215,7 +3219,7 @@ class Report_Model extends CI_Model
      *                          thread for that number when set.
      * @return int
      */
-    function Ghl_Messages_Log_Count($startDate, $endDate, $contact = '', $agent = '', $hour = null, $timeFrom = '', $timeTo = '')
+    function Ghl_Messages_Log_Count($startDate, $endDate, $contact = '', $agent = '', $hour = null, $timeFrom = '', $timeTo = '', $direction = '')
     {
         $messageTimeColumn = $this->escape_identifier($this->get_message_time_column());
 
@@ -3224,6 +3228,7 @@ class Report_Model extends CI_Model
         $agentClause = $this->ghl_message_agent_clause($agent, $params);
         $hourClause = $this->ghl_message_hour_clause($hour, $messageTimeColumn, $params);
         $timeClause = $this->ghl_message_time_range_clause($timeFrom, $timeTo, $messageTimeColumn, $params);
+        $directionClause = $this->ghl_message_direction_clause($direction, $params);
 
         // The agent filter compares the resolved agent name, so the user/conversation
         // joins are only needed -- and only added -- when an agent is selected. They
@@ -3243,7 +3248,8 @@ class Report_Model extends CI_Model
                 {$contactClause}
                 {$agentClause}
                 {$hourClause}
-                {$timeClause}",
+                {$timeClause}
+                {$directionClause}",
             $params
         )->row_array();
 
@@ -3577,6 +3583,29 @@ class Report_Model extends CI_Model
         $params[] = $agent;
 
         return " AND COALESCE(NULLIF(gu.Name, ''), NULLIF(gu_assigned.Name, '')) = ?";
+    }
+
+    /**
+     * Build the optional direction WHERE fragment (and append its bound param)
+     * for the Message Log queries. Narrows the log to just Inbound or just
+     * Outbound messages. The value is re-normalised to one of three safe literals
+     * ('inbound' / 'outbound' / '' = no filter) here, so nothing else can reach
+     * the comparison even if a caller skips normalisation.
+     *
+     * @param string $direction 'inbound', 'outbound', or '' for no filter.
+     * @param array  $params    Query params, appended to in place.
+     * @return string SQL fragment beginning with ' AND ...', or '' when no filter.
+     */
+    protected function ghl_message_direction_clause($direction, array &$params)
+    {
+        $direction = strtolower(trim((string) $direction));
+        if ($direction !== 'inbound' && $direction !== 'outbound') {
+            return '';
+        }
+
+        $params[] = $direction;
+
+        return " AND gm.direction = ?";
     }
 
     /**

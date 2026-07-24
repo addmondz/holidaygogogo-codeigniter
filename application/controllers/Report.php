@@ -89,6 +89,10 @@ class Report extends MY_Controller
         // window so it repeats across every day in range (e.g. 09:00-18:00 daily).
         $timeFrom = ghl_message_log_normalize_time($this->input->get('time_from'));
         $timeTo = ghl_message_log_normalize_time($this->input->get('time_to'));
+        // Direction filter: narrows the log to just Inbound or just Outbound
+        // messages ('' = all directions). Distinct from the direction SORT, which
+        // only groups; this drops the other side entirely.
+        $direction = ghl_message_log_normalize_direction($this->input->get('direction'));
         // Sort controls, flipped from the clickable table headers: 'sort' picks
         // the column ('date' default, or 'direction' to group Inbound/Outbound)
         // and 'dir' the direction ('desc' default / 'asc').
@@ -100,10 +104,11 @@ class Report extends MY_Controller
         $range['hour_label'] = $hour === null ? '' : ghl_message_log_hour_label($hour);
         $range['time_from'] = $timeFrom;
         $range['time_to'] = $timeTo;
+        $range['direction'] = $direction;
         $range['sort'] = $sortCol;
         $range['dir'] = $sortDir;
 
-        $total = $this->Report_Model->Ghl_Messages_Log_Count($range['start_date'], $range['end_date'], $contact, $agent, $hour, $timeFrom, $timeTo);
+        $total = $this->Report_Model->Ghl_Messages_Log_Count($range['start_date'], $range['end_date'], $contact, $agent, $hour, $timeFrom, $timeTo, $direction);
         $pagination = ghl_messages_log_pagination($total, (int) $this->input->get('page'), 50);
 
         // The "Time Taken" column only makes sense when the stream is a single
@@ -134,7 +139,8 @@ class Report extends MY_Controller
                 $timeFrom,
                 $timeTo,
                 'asc',
-                'date'
+                'date',
+                $direction
             );
             // Reverse -> newest-first with the extra (older) row at the bottom,
             // annotate, slice, then reverse back to oldest-first.
@@ -156,7 +162,8 @@ class Report extends MY_Controller
                 $timeFrom,
                 $timeTo,
                 'desc',
-                'date'
+                'date',
+                $direction
             );
             $messages = ghl_message_log_attach_reply_gaps($rows, $pagination['per_page']);
         } else {
@@ -171,7 +178,8 @@ class Report extends MY_Controller
                 $timeFrom,
                 $timeTo,
                 $sortDir,
-                $sortCol
+                $sortCol,
+                $direction
             );
         }
 
@@ -227,6 +235,7 @@ class Report extends MY_Controller
         $hour = ghl_message_log_normalize_hour($this->input->get('hour'));
         $timeFrom = ghl_message_log_normalize_time($this->input->get('time_from'));
         $timeTo = ghl_message_log_normalize_time($this->input->get('time_to'));
+        $direction = ghl_message_log_normalize_direction($this->input->get('direction'));
 
         $filename = ghl_message_log_export_filename($range['start_date'], $range['end_date']);
 
@@ -254,7 +263,8 @@ class Report extends MY_Controller
                 $agent,
                 $hour,
                 $timeFrom,
-                $timeTo
+                $timeTo,
+                $direction
             );
 
             foreach ($rows as $row) {

@@ -290,13 +290,10 @@ class Guest_List_Model extends CI_Model
 			return false;
 		}
 
+		$this->load->helper('guest_complete');
 		foreach ($guests as $guest) {
-			if (empty($guest->Name) || empty($guest->LastName) || empty($guest->Gender) ||
-				empty($guest->DateOfBirth) ||
-				empty($guest->Email) || empty($guest->Mobile) || empty($guest->CountryCodeID)) {
-				return false;
-			}
-			if (strtolower($guest->Nationality) == 'malaysian' && empty($guest->IdentificationNumber)) {
+			// Contact (Email/Mobile/CountryCode) is optional for child guests.
+			if (!guest_row_is_complete($guest)) {
 				return false;
 			}
 		}

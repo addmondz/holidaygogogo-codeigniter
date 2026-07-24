@@ -4,6 +4,13 @@ var KTDatatablesAdvancedColumnRendering = function() {
 	var init = function() {
 		var table = $("#kt_datatable");
 
+		// Pages that sort + paginate entirely on the server opt out of the client
+		// DataTable (it would only re-sort the current page and fight the server
+		// order). Opt out by putting data-no-datatable on the table element.
+		if (!table.length || table.data('no-datatable')) {
+			return;
+		}
+
 		// begin first table
 		table.DataTable({
 			deferRender: true,

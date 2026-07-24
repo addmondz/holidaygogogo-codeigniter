@@ -30,7 +30,10 @@ class Customer extends MY_Controller
 		$limit  = 30; // rows per page
 		$offset = ($page - 1) * $limit;
 
-		$data['guests']         = $this->Guests_Model->Read_Customers_Rich($limit, $offset);
+		// Date Creation sort toggle: DESC (newest first) by default, ASC oldest first.
+		$sort_dir               = (strtoupper((string) $this->input->get('dir')) === 'ASC') ? 'ASC' : 'DESC';
+		$data['sort_dir']       = $sort_dir;
+		$data['guests']         = $this->Guests_Model->Read_Customers_Rich($limit, $offset, $sort_dir);
 		$data['msg_log_phones'] = $this->Ghl_Messages_Model->Phones_With_Messages_For_Guests($data['guests']);
 		$data['remark_counts']  = $this->Remark_Counts_For_Guests($data['guests']);
 		$data['total']          = null; // AJAX-loaded via Count(), like Guests/Ghl_Leads
@@ -190,48 +193,51 @@ class Customer extends MY_Controller
 		$spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
 		$spreadsheet->getActiveSheet()->setTitle('Customer Records');
 		$spreadsheet->getProperties()->setCreator('HolidayGoGoGo');
-		$spreadsheet->getActiveSheet()->setCellValue('A1', 'CUSTOMER CODE');
+		// Columns A–F mirror the Customer dashboard order (Alt Name, Name, Contact,
+		// Email, Language, Customer Code); G is Date Creation (created_at). The
+		// AutoCount sync columns + Updated At are kept after for operational use.
+		// Dashboard's Guest Type / Destination are booking-derived, not on the
+		// customer master, so they aren't part of this record export.
+		$spreadsheet->getActiveSheet()->setCellValue('A1', 'ALT NAME');
 		$spreadsheet->getActiveSheet()->setCellValue('B1', 'NAME');
 		$spreadsheet->getActiveSheet()->setCellValue('C1', 'PHONE NUMBER');
-		$spreadsheet->getActiveSheet()->setCellValue('D1', 'CHAT LANGUAGE');
-		$spreadsheet->getActiveSheet()->setCellValue('E1', 'AUTOCOUNT SYNC ACTION');
-		$spreadsheet->getActiveSheet()->setCellValue('F1', 'AUTOCOUNT SYNC STATUS');
-		$spreadsheet->getActiveSheet()->setCellValue('G1', 'AUTOCOUNT SYNC MESSAGE');
-		$spreadsheet->getActiveSheet()->setCellValue('H1', 'CREATED AT');
-		$spreadsheet->getActiveSheet()->setCellValue('I1', 'UPDATED AT');
+		$spreadsheet->getActiveSheet()->setCellValue('D1', 'EMAIL');
+		$spreadsheet->getActiveSheet()->setCellValue('E1', 'CHAT LANGUAGE');
+		$spreadsheet->getActiveSheet()->setCellValue('F1', 'CUSTOMER CODE');
+		$spreadsheet->getActiveSheet()->setCellValue('G1', 'DATE CREATION');
+		$spreadsheet->getActiveSheet()->setCellValue('H1', 'AUTOCOUNT SYNC ACTION');
+		$spreadsheet->getActiveSheet()->setCellValue('I1', 'AUTOCOUNT SYNC STATUS');
+		$spreadsheet->getActiveSheet()->setCellValue('J1', 'AUTOCOUNT SYNC MESSAGE');
+		$spreadsheet->getActiveSheet()->setCellValue('K1', 'UPDATED AT');
 		$row = 2;
 		$customers = $this->Customer_Model->Read_Customers_For_Export();
-		$spreadsheet->getActiveSheet()->getStyle('A1:I1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_BLACK);
-		$spreadsheet->getActiveSheet()->getStyle('A1:I1')->getFont()->getColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_WHITE);
-		$spreadsheet->getActiveSheet()->getStyle('A1:I1')->getFont()->setBold(true);
+		$spreadsheet->getActiveSheet()->getStyle('A1:K1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_BLACK);
+		$spreadsheet->getActiveSheet()->getStyle('A1:K1')->getFont()->getColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_WHITE);
+		$spreadsheet->getActiveSheet()->getStyle('A1:K1')->getFont()->setBold(true);
 		if(!empty($customers)) {
 			foreach($customers as $customer) {
-				$spreadsheet->getActiveSheet()->setCellValueExplicit('A' . $row, $customer->CustomerCode, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+				$spreadsheet->getActiveSheet()->setCellValueExplicit('A' . $row, isset($customer->AltName) ? $customer->AltName : '', \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 				$spreadsheet->getActiveSheet()->setCellValueExplicit('B' . $row, $customer->name, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 				$spreadsheet->getActiveSheet()->setCellValueExplicit('C' . $row, $customer->phone_number, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-				$spreadsheet->getActiveSheet()->setCellValueExplicit('D' . $row, $customer->ChatLanguage, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-				$spreadsheet->getActiveSheet()->setCellValueExplicit('E' . $row, $customer->AutocountSyncAction, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-				$spreadsheet->getActiveSheet()->setCellValueExplicit('F' . $row, $customer->AutocountSyncStatus, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-				$spreadsheet->getActiveSheet()->setCellValueExplicit('G' . $row, $customer->AutocountSyncMessage, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-				$spreadsheet->getActiveSheet()->setCellValueExplicit('H' . $row, $customer->created_at, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-				$spreadsheet->getActiveSheet()->setCellValueExplicit('I' . $row, $customer->updated_at, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+				$spreadsheet->getActiveSheet()->setCellValueExplicit('D' . $row, isset($customer->PrimaryEmail) ? $customer->PrimaryEmail : '', \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+				$spreadsheet->getActiveSheet()->setCellValueExplicit('E' . $row, $customer->ChatLanguage, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+				$spreadsheet->getActiveSheet()->setCellValueExplicit('F' . $row, $customer->CustomerCode, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+				$spreadsheet->getActiveSheet()->setCellValueExplicit('G' . $row, $customer->created_at, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+				$spreadsheet->getActiveSheet()->setCellValueExplicit('H' . $row, $customer->AutocountSyncAction, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+				$spreadsheet->getActiveSheet()->setCellValueExplicit('I' . $row, $customer->AutocountSyncStatus, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+				$spreadsheet->getActiveSheet()->setCellValueExplicit('J' . $row, $customer->AutocountSyncMessage, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+				$spreadsheet->getActiveSheet()->setCellValueExplicit('K' . $row, $customer->updated_at, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 				$row++;
 			}
-			$spreadsheet->getActiveSheet()->getStyle('A:I')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_RIGHT);
+			$spreadsheet->getActiveSheet()->getStyle('A:K')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_RIGHT);
 		} else {
-			$spreadsheet->getActiveSheet()->mergeCells('A2:I2');
+			$spreadsheet->getActiveSheet()->mergeCells('A2:K2');
 			$spreadsheet->getActiveSheet()->getCell('A2')->setValue('Customer Records Not Found');
-			$spreadsheet->getActiveSheet()->getStyle('A:I')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
+			$spreadsheet->getActiveSheet()->getStyle('A:K')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
 		}
-		$spreadsheet->getActiveSheet()->getColumnDimension('A')->setWidth(35);
-		$spreadsheet->getActiveSheet()->getColumnDimension('B')->setWidth(35);
-		$spreadsheet->getActiveSheet()->getColumnDimension('C')->setWidth(35);
-		$spreadsheet->getActiveSheet()->getColumnDimension('D')->setWidth(35);
-		$spreadsheet->getActiveSheet()->getColumnDimension('E')->setWidth(35);
-		$spreadsheet->getActiveSheet()->getColumnDimension('F')->setWidth(35);
-		$spreadsheet->getActiveSheet()->getColumnDimension('G')->setWidth(35);
-		$spreadsheet->getActiveSheet()->getColumnDimension('H')->setWidth(35);
-		$spreadsheet->getActiveSheet()->getColumnDimension('I')->setWidth(35);
+		foreach (array('A','B','C','D','E','F','G','H','I','J','K') as $c) {
+			$spreadsheet->getActiveSheet()->getColumnDimension($c)->setWidth(35);
+		}
 		$customer_records = 'CUSTOMER_RECORDS_' . date('Ymd') . '.xlsx';
 		header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 		header('Content-Disposition: attachment;filename="' . $customer_records . '"');
@@ -243,9 +249,11 @@ class Customer extends MY_Controller
 
 	/**
 	 * Download the blank bulk-create template: one header row in the exact
-	 * columns Import() reads back, plus a sample row to show the expected format.
-	 * The user fills rows and re-uploads via Import(). CUSTOMER CODE is optional —
-	 * leave it blank to let the app generate a collision-free code per customer.
+	 * columns Import() reads back (same order as the Customer dashboard), plus a
+	 * sample row to show the expected format. The user fills rows and re-uploads
+	 * via Import(). ALT NAME, NAME, PHONE NUMBER and CHAT LANGUAGE are mandatory;
+	 * CUSTOMER CODE is optional — leave it blank to let the app generate a
+	 * collision-free code per customer.
 	 */
 	function Import_Template()
 	{
@@ -267,7 +275,9 @@ class Customer extends MY_Controller
 		$sheet->getStyle('A1:' . $last_col . '1')->getFont()->setBold(true);
 
 		// One greyed sample row so the format is obvious; delete before importing.
-		$sample = array('', 'ALI BIN ABU', '0123456789', 'EN', 'A12345678', '', 'ali@example.com', 'No 1, Jalan Besar, 50000 KL');
+		// Columns: ALT NAME | NAME | PHONE | EMAIL | CHAT LANGUAGE | CUSTOMER CODE
+		//          | IC / PASSPORT | TIN | BILLING ADDRESS. First four are mandatory.
+		$sample = array('ALI', 'ALI BIN ABU', '0123456789', 'ali@example.com', 'EN', '', 'A12345678', '', 'No 1, Jalan Besar, 50000 KL');
 		$col = 'A';
 		foreach ($sample as $val) {
 			$sheet->setCellValueExplicit($col . '2', $val, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);

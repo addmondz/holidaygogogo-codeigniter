@@ -542,6 +542,7 @@ WHERE 1 = 1
 		CONVERT(GROUP_CONCAT(COALESCE(cat.Name, '-') ORDER BY DATE(b.InsertDate) SEPARATOR '||') USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Destination,
 		CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS Nationality,
 		CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS Gender,
+		CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS Race,
 		CONVERT('ADULT' USING utf8mb4) COLLATE utf8mb4_unicode_ci AS GuestType,
 		CAST(NULL AS DATE) AS DOB,
 		COALESCE(SUM(COALESCE(b.Adult, 0) + COALESCE(b.Children, 0) + COALESCE(b.Infant, 0)), 0) AS TotalPax,
@@ -588,6 +589,7 @@ SELECT
 	CONVERT(GROUP_CONCAT(CASE WHEN booking_rn = 1 THEN COALESCE(Destination, '-') END ORDER BY DATE(BookingDate) SEPARATOR '||') USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Destination,
 	CONVERT(MAX(CASE WHEN rn = 1 THEN Nationality    END) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Nationality,
 	CONVERT(MAX(CASE WHEN rn = 1 THEN Gender         END) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Gender,
+	CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS Race,
 	CONVERT(MAX(CASE WHEN rn = 1 THEN GuestType      END) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS GuestType,
 	MAX(CASE WHEN rn = 1 THEN DateOfBirth END) AS DOB,
 	COALESCE(SUM(CASE WHEN booking_rn = 1 THEN BookingPax      END), 0) AS TotalPax,
@@ -627,24 +629,25 @@ SELECT
 	CONVERT(gc.phone USING utf8mb4) COLLATE utf8mb4_unicode_ci AS ContactNum,
 	CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS CallingCode,
 	CONVERT(gc.email USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Email,
-	NULL AS Language,
+	CONVERT(gc.chat_language USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Language,
 	NULL AS AgentName,
 	NULL AS Source,
 	NULL AS CustomerType,
 	NULL AS Destination,
-	NULL AS Nationality,
-	NULL AS Gender,
+	CONVERT(gc.nationality USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Nationality,
+	CONVERT(gc.gender USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Gender,
+	CONVERT(gc.race USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Race,
 	NULL AS GuestType,
-	NULL AS DOB,
+	gc.date_of_birth AS DOB,
 	0    AS TotalPax,
 	0    AS TotalSales,
-	CAST('GHL' AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS Type,
+	CONVERT(CASE WHEN gc.lead_source = 'manual' THEN 'Manual' ELSE 'GHL' END USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Type,
 	CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS Token,
 	CAST('Lead' AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS Role,
 	CONVERT(DATE(COALESCE(gc.date_added, gc.created_at)) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS BookingDates,
 	CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS TravelDates,
 	CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS IC,
-	CONVERT(gt.tags_concat USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Tags,
+	CONVERT(COALESCE(gt.tags_concat, gc.tags_json) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Tags,
 	CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS CustomerCode,
 	CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS AltName,
 	CAST(NULL AS UNSIGNED) AS CustomerID,
@@ -716,6 +719,7 @@ SELECT
 	CONVERT(GROUP_CONCAT(mm.Destination SEPARATOR '||') USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Destination,
 	MAX(CASE WHEN mm.rep_rn = 1 THEN mm.Nationality  END) AS Nationality,
 	MAX(CASE WHEN mm.rep_rn = 1 THEN mm.Gender       END) AS Gender,
+	MAX(CASE WHEN mm.rep_rn = 1 THEN mm.Race         END) AS Race,
 	MAX(CASE WHEN mm.rep_rn = 1 THEN mm.GuestType    END) AS GuestType,
 	MAX(CASE WHEN mm.rep_rn = 1 THEN mm.DOB          END) AS DOB,
 	COALESCE(SUM(mm.TotalPax), 0)   AS TotalPax,
@@ -1061,11 +1065,15 @@ GROUP BY mm.merge_key";
 
 	/**
 	 * The Customer List page: one row per active customer, enriched with the same
-	 * columns the Guest List shows, ordered by name. See Build_Customer_Branch for
-	 * the filter tiers.
+	 * columns the Guest List shows, ordered by customer Date Creation. $sort_dir
+	 * ('DESC' newest-first default, or 'ASC' oldest-first) drives the header sort
+	 * toggle; customers with no creation date always sort last either way. See
+	 * Build_Customer_Branch for the filter tiers.
 	 */
-	function Read_Customers_Rich($limit, $offset)
+	function Read_Customers_Rich($limit, $offset, $sort_dir = 'DESC')
 	{
+		// Whitelist the direction — this is interpolated straight into the SQL.
+		$dir = (strtoupper((string) $sort_dir) === 'ASC') ? 'ASC' : 'DESC';
 		$branch = $this->Build_Customer_Branch();
 		$key    = $this->Customer_Dedup_Key_Expr();
 		$bagg   = $this->Customer_Booking_Aggregate_Subquery();
@@ -1110,7 +1118,7 @@ GROUP BY mm.merge_key";
 	LEFT JOIN {$glf} glself ON glself.dedup_key = {$key}
 	LEFT JOIN country_code cn ON cn.CountryCodeID = glself.Nationality
 	{$branch['where']}
-	ORDER BY c.name ASC
+	ORDER BY (c.created_at IS NULL) ASC, c.created_at {$dir}, c.name ASC
 	LIMIT " . (int) $limit . " OFFSET " . (int) $offset;
 
 		return $this->db->query($sql, $branch['params'])->result();
@@ -1296,6 +1304,34 @@ GROUP BY mm.merge_key";
 		$this->db->update('customer', array(
 			'AltName'    => ($alt_name === '' ? null : $alt_name),
 			'updated_at' => date('Y-m-d H:i:s'),
+		));
+		return 1;
+	}
+
+	/**
+	 * Contact-number edit for a Customer List row → customer.phone_number, keyed
+	 * by CustomerID. The customer table is the authoritative record for that
+	 * screen, and a name-only / bulk-imported customer has no guest_list rows and
+	 * leads no booking, so the dedup_key-based Update_Guest_Contact touches
+	 * nothing — this write is what actually persists their number. Like
+	 * Update_Customer_AltName it returns 1 whenever the customer exists (even if
+	 * the number is unchanged, so re-saving is not treated as "not found"), else 0.
+	 */
+	function Update_Customer_Contact($customer_id, $new_mobile)
+	{
+		$customer_id = (int) $customer_id;
+		if ($customer_id < 1) {
+			return 0;
+		}
+		$exists = $this->db->select('CustomerID')
+			->get_where('customer', array('CustomerID' => $customer_id))->row();
+		if (!$exists) {
+			return 0;
+		}
+		$this->db->where('CustomerID', $customer_id);
+		$this->db->update('customer', array(
+			'phone_number' => $new_mobile,
+			'updated_at'   => date('Y-m-d H:i:s'),
 		));
 		return 1;
 	}

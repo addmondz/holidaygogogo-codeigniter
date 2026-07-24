@@ -4,6 +4,12 @@ $p = $log_pagination;
 $log_contact = isset($log_filters['contact']) ? $log_filters['contact'] : '';
 $log_agent = isset($log_filters['agent']) ? $log_filters['agent'] : '';
 $log_agents = isset($log_agents) ? $log_agents : array();
+
+// Direction filter: '', 'inbound', or 'outbound'. Narrows the log to one side of
+// the conversation; travels with pagination, the sort headers, and the export.
+$log_direction = isset($log_filters['direction']) && ($log_filters['direction'] === 'inbound' || $log_filters['direction'] === 'outbound')
+    ? $log_filters['direction'] : '';
+$log_direction_param = $log_direction !== '' ? '&direction=' . urlencode($log_direction) : '';
 $log_show_reply_time = !empty($log_show_reply_time);
 $log_avg_reply = isset($log_avg_reply) ? $log_avg_reply : '';
 $log_table_colspan = $log_show_reply_time ? 7 : 6;
@@ -39,7 +45,8 @@ $log_filter_qs = 'log_date=' . urlencode($log_filters['log_date'])
     . '&contact=' . urlencode($log_contact)
     . '&agent=' . urlencode($log_agent)
     . $log_hour_param
-    . $log_time_param;
+    . $log_time_param
+    . $log_direction_param;
 
 /** Build a page URL keeping the current date, contact, agent, hour and sort filters. */
 $page_url = function ($page) use ($log_filter_qs, $log_sort_param) {
@@ -145,7 +152,17 @@ $contact_url = function ($number) use ($log_filters) {
                             </div>
                         </div>
                         <div class="col-md-2">
-                            <div class="form-group mb-0">
+                            <div class="form-group mb-2">
+                                <label>Direction</label>
+                                <select name="direction" class="form-control">
+                                    <option value="" <?php if ($log_direction === '') { echo 'selected'; } ?>>All</option>
+                                    <option value="inbound" <?php if ($log_direction === 'inbound') { echo 'selected'; } ?>>Inbound</option>
+                                    <option value="outbound" <?php if ($log_direction === 'outbound') { echo 'selected'; } ?>>Outbound</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="form-group mb-2">
                                 <label>Contact Number</label>
                                 <input type="text" name="contact" value="<?php echo html_escape($log_contact); ?>" autocomplete="off" placeholder="e.g. 0123456789" class="form-control">
                             </div>
@@ -164,7 +181,7 @@ $contact_url = function ($number) use ($log_filters) {
                         <div class="col-md-2">
                             <input type="submit" value="Filter" class="btn btn-light-success font-weight-bold btn-block mb-2">
                             <input type="button" id="ghl-message-log-reset" value="Reset" class="btn btn-light-primary font-weight-bold btn-block mb-2">
-                            <a href="<?php echo base_url('Report/Ghl_Message_Log_Export?log_date=') . urlencode($log_filters['log_date']) . '&contact=' . urlencode($log_contact) . '&agent=' . urlencode($log_agent) . $log_hour_param . $log_time_param; ?>" class="btn btn-light-info font-weight-bold btn-block">
+                            <a href="<?php echo base_url('Report/Ghl_Message_Log_Export?log_date=') . urlencode($log_filters['log_date']) . '&contact=' . urlencode($log_contact) . '&agent=' . urlencode($log_agent) . $log_hour_param . $log_time_param . $log_direction_param; ?>" class="btn btn-light-info font-weight-bold btn-block">
                                 <i class="la la-download"></i> Export CSV
                             </a>
                         </div>

@@ -57,6 +57,44 @@ class Ghl_Contacts_Model extends CI_Model
         return $inserted ? 'inserted' : false;
     }
 
+    /**
+     * Insert a hand-entered ("Manual") lead. $row is the whitelisted array from
+     * ghl_manual_lead_prepare() (synthetic contact_id, lead_source = 'manual',
+     * the visible-column fields + tags_json). Never updates: a manual lead's
+     * synthetic contact_id is unique, so this is always a fresh insert. Returns
+     * the new row id, or false on failure.
+     */
+    public function create_manual_lead($row)
+    {
+        if (empty($row['contact_id'])) {
+            return false;
+        }
+
+        $now = $this->get_code_datetime();
+
+        $allowed = array(
+            'contact_id', 'first_name', 'last_name', 'email', 'phone',
+            'assigned_to', 'lead_source', 'gender', 'race', 'nationality',
+            'chat_language', 'date_of_birth', 'tags_json', 'date_added',
+        );
+
+        $insert = array();
+        foreach ($allowed as $column) {
+            if (array_key_exists($column, $row)) {
+                $insert[$column] = $row[$column];
+            }
+        }
+
+        $insert['created_at'] = $now;
+        $insert['updated_at'] = $now;
+
+        if (!$this->db->insert('ghl_contacts', $insert)) {
+            return false;
+        }
+
+        return (int) $this->db->insert_id();
+    }
+
     public function get_last_contact_cursor()
     {
         $row = $this->db

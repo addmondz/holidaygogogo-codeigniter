@@ -359,6 +359,8 @@
 								case 'INFANT':
 									$infant++;
 							}
+							// Mobile & Email are optional for child guests (they don't have their own contact)
+							$is_child = ($guest->Type == 'CHILD');
 						?>
 							<input type="hidden" name="guests[]" value="<?php echo $guest->GuestListID; ?>">
 							<input type="hidden" id="<?php echo 'type-' . $guest->GuestListID; ?>" value="<?php echo $guest->Type; ?>">
@@ -514,7 +516,7 @@
 											<input type="hidden" name="dietary_requirements[]" value="<?php echo htmlspecialchars($guest->DietaryRequirement ?? '', ENT_QUOTES); ?>">
 											<div class="row">
 												<div class="col-md-12">
-													<label id="<?php echo 'mobile_label-' . $guest->GuestListID; ?>">Mobile <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>
+													<label id="<?php echo 'mobile_label-' . $guest->GuestListID; ?>">Mobile <?php if(!$is_child && (!empty($guest->Guest) || !empty($guest->GuestLastName))) { echo '<span style="color:red;">*</span>'; } ?></label>
 													<div class="phone-input-wrapper <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?>" id="phone-wrapper-<?php echo $guest->GuestListID; ?>">
 														<div class="phone-country-selector <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?>" id="phone-selector-<?php echo $guest->GuestListID; ?>">
 															<span class="phone-country-flag" id="phone-flag-<?php echo $guest->GuestListID; ?>">🌐</span>
@@ -588,8 +590,8 @@
 											<br>
 											<div class="row">
 												<div class="col-md-6">
-													<label id="<?php echo 'email_label-' . $guest->GuestListID; ?>">Email <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo '<span style="color:red;">*</span>'; } ?></label>
-													<input <?php if(!empty($guest->Guest) || !empty($guest->GuestLastName)) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="emails[]" id="<?php echo 'email-' . $guest->GuestListID; ?>" value="<?php echo $guest->Email; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="form-control">
+													<label id="<?php echo 'email_label-' . $guest->GuestListID; ?>">Email <?php if(!$is_child && (!empty($guest->Guest) || !empty($guest->GuestLastName))) { echo '<span style="color:red;">*</span>'; } ?></label>
+													<input <?php if(!$is_child && (!empty($guest->Guest) || !empty($guest->GuestLastName))) { echo 'required'; } ?> <?php if($guest_lists[0]->LockStatus == 'Y') { echo 'disabled'; } ?> type="text" name="emails[]" id="<?php echo 'email-' . $guest->GuestListID; ?>" value="<?php echo $guest->Email; ?>" onchange="Set_Required_Field(<?php echo $guest->GuestListID; ?>)" autocomplete="off" class="form-control">
 												</div>
 											</div>
 										</div>
@@ -891,6 +893,9 @@
 
 		function Set_Required_Field(guest_list_id)
 		{
+			// Mobile & Email are optional for child guests (they don't have their own contact)
+			var is_child = ($(`#type-${guest_list_id}`).val() == 'CHILD');
+
 			//Basic Details
 			var name = $(`#name-${guest_list_id}`).val();
 			var last_name = $(`#last-name-${guest_list_id}`).val();
@@ -920,12 +925,22 @@
 				$(`#gender-${guest_list_id}`).prop('required', 'true');
 				$(`#date_of_birth_label-${guest_list_id}`).html('Date Of Birth <span style="color:red;">*</span>');
 				$(`#date_of_birth-${guest_list_id}`).prop('required', 'true');
-				$(`#email_label-${guest_list_id}`).html('Email <span style="color:red;">*</span>');
-				$(`#email-${guest_list_id}`).prop('required', 'true');
-				$(`#country_code_label-${guest_list_id}`).html('Country Code <span style="color:red;">*</span>');
-				$(`#country_code-${guest_list_id}`).prop('required', 'true');
-				$(`#mobile_label-${guest_list_id}`).html('Mobile <span style="color:red;">*</span>');
-				$(`#mobile-${guest_list_id}`).prop('required', 'true');
+				if(is_child) {
+					// Child: contact & email stay optional
+					$(`#email_label-${guest_list_id}`).html('Email');
+					$(`#email-${guest_list_id}`).removeAttr('required');
+					$(`#country_code_label-${guest_list_id}`).html('Country Code');
+					$(`#country_code-${guest_list_id}`).removeAttr('required');
+					$(`#mobile_label-${guest_list_id}`).html('Mobile');
+					$(`#mobile-${guest_list_id}`).removeAttr('required');
+				} else {
+					$(`#email_label-${guest_list_id}`).html('Email <span style="color:red;">*</span>');
+					$(`#email-${guest_list_id}`).prop('required', 'true');
+					$(`#country_code_label-${guest_list_id}`).html('Country Code <span style="color:red;">*</span>');
+					$(`#country_code-${guest_list_id}`).prop('required', 'true');
+					$(`#mobile_label-${guest_list_id}`).html('Mobile <span style="color:red;">*</span>');
+					$(`#mobile-${guest_list_id}`).prop('required', 'true');
+				}
 
 				//Nationality and Passport validation
 				if(nationality != null) {
@@ -1198,6 +1213,8 @@
 							var mobile = $(`#mobile-${gid}`).val();
 							var identification_number = $(`#identification_number-${gid}`).val();
 							var nationality_text = $(`#nationality-${gid} option:selected`).text().toUpperCase();
+							// Contact (Email/Mobile/Country Code) is optional for child guests
+							var is_child = ($(`#type-${gid}`).val() == 'CHILD');
 
 							var has_any = (name != '' || last_name != '' || (gender != '' && gender != null) || dob != '' || email != '' || mobile != '');
 
@@ -1207,9 +1224,11 @@
 								if (last_name == '') missing.push('Last Name');
 								if (gender == '' || gender == null) missing.push('Gender');
 								if (dob == '') missing.push('Date Of Birth');
-								if (email == '') missing.push('Email');
-								if (country_code == '' || country_code == null) missing.push('Country Code');
-								if (mobile == '') missing.push('Mobile');
+								if (!is_child) {
+									if (email == '') missing.push('Email');
+									if (country_code == '' || country_code == null) missing.push('Country Code');
+									if (mobile == '') missing.push('Mobile');
+								}
 								if (nationality_text == 'MALAYSIA' && (identification_number == '' || identification_number == null)) missing.push('Identification Number');
 								<?php if($guest_lists[0]->TravelInsuranceStatus == 'Y') { ?>
 								if ($(`#employment-${gid}`).val() == '') missing.push('Employment');
@@ -1240,6 +1259,8 @@
 							var mobile = $(`#mobile-${gid}`).val();
 							var identification_number = $(`#identification_number-${gid}`).val();
 							var nationality_text = $(`#nationality-${gid} option:selected`).text().toUpperCase();
+							// Contact (Email/Mobile/Country Code) is optional for child guests
+							var is_child = ($(`#type-${gid}`).val() == 'CHILD');
 
 							var has_any = (name != '' || last_name != '' || (gender != '' && gender != null) || dob != '' || email != '' || mobile != '');
 
@@ -1249,9 +1270,11 @@
 								if (last_name == '') missing.push('Last Name');
 								if (gender == '' || gender == null) missing.push('Gender');
 								if (dob == '') missing.push('Date Of Birth');
-								if (email == '') missing.push('Email');
-								if (country_code == '' || country_code == null) missing.push('Country Code');
-								if (mobile == '') missing.push('Mobile');
+								if (!is_child) {
+									if (email == '') missing.push('Email');
+									if (country_code == '' || country_code == null) missing.push('Country Code');
+									if (mobile == '') missing.push('Mobile');
+								}
 								if (nationality_text == 'MALAYSIA' && (identification_number == '' || identification_number == null)) missing.push('Identification Number');
 								<?php if($guest_lists[0]->TravelInsuranceStatus == 'Y') { ?>
 								if ($(`#employment-${gid}`).val() == '') missing.push('Employment');

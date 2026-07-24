@@ -72,10 +72,14 @@ class Guests extends MY_Controller
 				->set_output(json_encode($data));
 		};
 
-		$dedup_key = (string) $this->input->post('dedup_key');
-		$mobile    = trim((string) $this->input->post('mobile'));
+		$dedup_key   = (string) $this->input->post('dedup_key');
+		$customer_id = (int) $this->input->post('customer_id');
+		$mobile      = trim((string) $this->input->post('mobile'));
 
-		if ($dedup_key === '') {
+		// A guest row anchors on its dedup_key; a Customer List row can also anchor
+		// on its CustomerID, so a name-only customer (no guest_list rows, leads no
+		// booking) can still have a number set. At least one anchor is required.
+		if ($dedup_key === '' && $customer_id < 1) {
 			return $out(array('ok' => false, 'message' => 'Missing guest reference.'));
 		}
 
@@ -84,7 +88,9 @@ class Guests extends MY_Controller
 			return $out(array('ok' => false, 'message' => $valid['error']));
 		}
 
-		// Block when the new number already belongs to a different person.
+		// Block when the new number already belongs to a different person. With no
+		// old key (a customer getting their first number) this still blocks a number
+		// already used by anyone else — current_dedup_key '' excludes no one.
 		$new_key = guest_contact_normalize_key($mobile);
 		if ($new_key !== '' && $new_key !== $dedup_key
 			&& $this->Guests_Model->Contact_Key_Belongs_To_Other($new_key, $dedup_key)) {
@@ -101,17 +107,30 @@ class Guests extends MY_Controller
 		// the OLD key (ghl_contacts still holds the pre-edit number). The local
 		// save only proceeds when GHL succeeds — the sole exception is a guest
 		// who isn't a GHL contact (nothing to sync), so local can't get ahead of GHL.
-		$ghl = $this->Push_Guest_Edit_To_Ghl($dedup_key, array('ContactNum' => $mobile));
-		if ($this->Ghl_Sync_Blocks_Save($ghl)) {
-			return $out(array('ok' => false, 'message' => 'Could not sync to GHL — contact number not saved. Please try again.'));
+		// With no old key there is no GHL contact to resolve, so the push is skipped.
+		$ghl = array('action' => 'skipped', 'reason' => 'no_contact');
+		if ($dedup_key !== '') {
+			$ghl = $this->Push_Guest_Edit_To_Ghl($dedup_key, array('ContactNum' => $mobile));
+			if ($this->Ghl_Sync_Blocks_Save($ghl)) {
+				return $out(array('ok' => false, 'message' => 'Could not sync to GHL — contact number not saved. Please try again.'));
+			}
 		}
 
-		$affected = $this->Guests_Model->Update_Guest_Contact(
-			$dedup_key,
-			$mobile,
-			$this->session->userdata('admin_id'),
-			$scope_admin_id
-		);
+		// Write the guest-side records (guest_list + led bookings) when we have a
+		// dedup_key, and the customer's own phone_number when a Customer List row
+		// supplied its CustomerID. Either write counts toward "affected".
+		$affected = 0;
+		if ($dedup_key !== '') {
+			$affected += $this->Guests_Model->Update_Guest_Contact(
+				$dedup_key,
+				$mobile,
+				$this->session->userdata('admin_id'),
+				$scope_admin_id
+			);
+		}
+		if ($customer_id > 0) {
+			$affected += $this->Guests_Model->Update_Customer_Contact($customer_id, $mobile);
+		}
 
 		if ($affected < 1) {
 			return $out(array('ok' => false, 'message' => 'Guest not found or you are not allowed to edit it.'));

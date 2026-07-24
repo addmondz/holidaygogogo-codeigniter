@@ -47,6 +47,25 @@ if (!function_exists('ghl_message_log_direction_label')) {
     }
 }
 
+if (!function_exists('ghl_message_log_normalize_direction')) {
+    /**
+     * Sanitise the Message Log "direction" filter into a canonical key: only an
+     * explicit, case-insensitive 'inbound' or 'outbound' narrows the log to that
+     * one direction. Anything else -- blank, junk, or an injection attempt --
+     * falls back to '' ("all directions", no filter), so the value reaching the
+     * WHERE builder is always one of three safe literals.
+     *
+     * @param mixed $value Raw direction input from the filter form.
+     * @return string 'inbound', 'outbound', or '' (no filter).
+     */
+    function ghl_message_log_normalize_direction($value)
+    {
+        $value = strtolower(trim((string) $value));
+
+        return ($value === 'inbound' || $value === 'outbound') ? $value : '';
+    }
+}
+
 if (!function_exists('ghl_message_log_attachments')) {
     /**
      * Turn a stored `ghl_messages.attachments_json` value (a JSON array of URLs)

@@ -592,29 +592,39 @@ class Customer_Model extends CI_Model
 	// Column order of the import/template sheet. The header labels below must
 	// match Customer::Import_Template() exactly, and the 0-based index is how
 	// PhpSpreadsheet's toArray(null,true,true,false) hands each row back.
+	// Order mirrors the Customer dashboard columns (Alt Name, Name, Contact,
+	// Email, Language, Customer Code), then the AutoCount identity fields that
+	// aren't shown on the dashboard. The first four (ALT NAME, NAME, PHONE
+	// NUMBER, CHAT LANGUAGE) are MANDATORY — see IMPORT_REQUIRED / Parse_Import_Rows.
 	const IMPORT_COLUMNS = array(
-		0 => 'CUSTOMER CODE',
+		0 => 'ALT NAME',
 		1 => 'NAME',
 		2 => 'PHONE NUMBER',
-		3 => 'CHAT LANGUAGE',
-		4 => 'IC / PASSPORT NO',
-		5 => 'TIN',
-		6 => 'EMAIL',
-		7 => 'BILLING ADDRESS',
+		3 => 'EMAIL',
+		4 => 'CHAT LANGUAGE',
+		5 => 'CUSTOMER CODE',
+		6 => 'IC / PASSPORT NO',
+		7 => 'TIN',
+		8 => 'BILLING ADDRESS',
 	);
+
+	// Columns a row must supply (non-blank + valid) or it's reported as failed.
+	// Labels here are what the user sees in the "Missing/invalid: ..." message.
+	const IMPORT_REQUIRED = array('Alt Name', 'Name', 'Phone Number', 'Chat Language');
 
 	/**
 	 * Turn raw uploaded sheet rows into normalized customer entries, applying the
-	 * same casing rules as the single-create form (name/IC/TIN uppercased; email
-	 * and billing address kept as typed). Pure + DB-free so it can be unit-tested
-	 * and so the controller only handles I/O.
+	 * same casing rules as the single-create form (name/altname/IC/TIN uppercased;
+	 * email and billing address kept as typed). Pure + DB-free so it can be
+	 * unit-tested and so the controller only handles I/O.
 	 *
 	 * Each returned entry is:
 	 *   array('line' => <1-based sheet row>, 'error' => null|string,
-	 *         'CustomerCode','name','phone_number','ChatLanguage',
+	 *         'CustomerCode','name','AltName','phone_number','ChatLanguage',
 	 *         'ic_passport_no','tin_no','PrimaryEmail','Address')
-	 * The header row and fully-blank rows are dropped. A row with no name is
-	 * kept with error set, so the caller can report the exact line.
+	 * The header row and fully-blank rows are dropped. A row missing any mandatory
+	 * field (Alt Name, Name, Phone Number, a valid Chat Language) is kept with
+	 * error set, so the caller can report the exact line + which fields are bad.
 	 *
 	 * @param array $rows      0-indexed row arrays (PhpSpreadsheet toArray()).
 	 * @param array $languages Allowed ChatLanguage codes (e.g. CN/EN/ML).
@@ -641,37 +651,46 @@ class Customer_Model extends CI_Model
 				return isset($row[$i]) ? trim((string) $row[$i]) : '';
 			};
 
-			$code  = $cell(0);
-			$name  = $cell(1);
-			$phone = $cell(2);
-			$lang  = strtoupper($cell(3));
-			$ic    = $cell(4);
-			$tin   = $cell(5);
-			$email = $cell(6);
-			$addr  = $cell(7);
+			$altname = $cell(0);
+			$name    = $cell(1);
+			$phone   = $cell(2);
+			$email   = $cell(3);
+			$lang    = strtoupper($cell(4));
+			$code    = $cell(5);
+			$ic      = $cell(6);
+			$tin     = $cell(7);
+			$addr    = $cell(8);
 
 			// Drop the header row wherever it sits (matches the template labels).
-			if (strtoupper($code) === 'CUSTOMER CODE' && strtoupper($name) === 'NAME') {
+			if (strtoupper($altname) === 'ALT NAME' && strtoupper($name) === 'NAME') {
 				continue;
 			}
 			// Skip a fully-blank row (trailing empty rows Excel leaves behind).
-			if ($code === '' && $name === '' && $phone === '' && $lang === ''
-				&& $ic === '' && $tin === '' && $email === '' && $addr === '') {
+			if ($altname === '' && $name === '' && $phone === '' && $email === ''
+				&& $lang === '' && $code === '' && $ic === '' && $tin === '' && $addr === '') {
 				continue;
 			}
 
-			// Unknown language codes are dropped (kept optional, never a failure).
-			if ($lang !== '' && !isset($allowed_lang[$lang])) {
-				$lang = '';
-			}
+			// Chat Language is mandatory + must be a known code; an unknown code
+			// clears the stored value AND fails the row via the missing-field check.
+			$lang_ok = ($lang !== '' && isset($allowed_lang[$lang]));
+
+			// Report every mandatory field that is blank/invalid, so the user can
+			// fix them all in one pass rather than one row at a time.
+			$missing = array();
+			if ($altname === '') { $missing[] = 'Alt Name'; }
+			if ($name === '')    { $missing[] = 'Name'; }
+			if ($phone === '')   { $missing[] = 'Phone Number'; }
+			if (!$lang_ok)       { $missing[] = 'Chat Language'; }
 
 			$out[] = array(
 				'line'          => $line,
-				'error'         => ($name === '') ? 'Missing name' : null,
+				'error'         => empty($missing) ? null : ('Missing/invalid: ' . implode(', ', $missing)),
 				'CustomerCode'  => $code !== '' ? strtoupper($code) : null,
 				'name'          => $name !== '' ? strtoupper($name) : null,
+				'AltName'       => $altname !== '' ? strtoupper($altname) : null,
 				'phone_number'  => $phone !== '' ? $phone : null,
-				'ChatLanguage'  => $lang !== '' ? $lang : null,
+				'ChatLanguage'  => $lang_ok ? $lang : null,
 				'ic_passport_no'=> $ic !== '' ? strtoupper($ic) : null,
 				'tin_no'        => $tin !== '' ? strtoupper($tin) : null,
 				// Email + billing address are case-sensitive; keep as typed.
@@ -765,6 +784,7 @@ class Customer_Model extends CI_Model
 			$now  = date('Y-m-d H:i:s');
 			$data = array(
 				'name'           => $name,
+				'AltName'        => isset($entry['AltName']) ? $entry['AltName'] : null,
 				'phone_number'   => isset($entry['phone_number']) ? $entry['phone_number'] : null,
 				'ChatLanguage'   => isset($entry['ChatLanguage']) ? $entry['ChatLanguage'] : null,
 				'ic_passport_no' => isset($entry['ic_passport_no']) ? $entry['ic_passport_no'] : null,
