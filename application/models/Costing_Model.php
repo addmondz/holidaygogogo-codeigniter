@@ -332,6 +332,9 @@ class Costing_Model extends CI_Model
         $this->db->where('booking_id', $booking_id)->delete('costing_booking_items');
 
         foreach ($snapshot_rows as $row) {
+            if (!isset($row['bank_charges_myr'])) {
+                $row['bank_charges_myr'] = $this->Resolve_Bank_Charges_Myr((int) $row['currency_id'], $travel_date);
+            }
             $row['booking_id'] = $booking_id;
             $row['total_amount'] = round((float) $row['quantity'] * (float) $row['unit_count'] * (float) $row['unit_price'], 2);
             $this->db->insert('costing_booking_items', $row);
@@ -384,6 +387,9 @@ class Costing_Model extends CI_Model
         $this->db->where('booking_id', $booking_id)->delete('costing_booking_items');
 
         foreach ($rows as $row) {
+            if (!isset($row['bank_charges_myr'])) {
+                $row['bank_charges_myr'] = $this->Resolve_Bank_Charges_Myr((int) $row['currency_id'], $travel_date);
+            }
             $row['booking_id'] = $booking_id;
             $row['total_amount'] = round($row['quantity'] * $row['unit_count'] * $row['unit_price'], 2);
             $this->db->insert('costing_booking_items', $row);
@@ -470,6 +476,7 @@ class Costing_Model extends CI_Model
 
         $unit_amount = round((float) $exchange_rate['unit_amount'], 8);
         $converted_amount = round((float) $exchange_rate['converted_amount'], 8);
+        $bank_charges_myr = round((float) (isset($exchange_rate['bank_charges_myr']) ? $exchange_rate['bank_charges_myr'] : 0), 2);
         if ($unit_amount <= 0 || $converted_amount <= 0) {
             return false;
         }
@@ -479,6 +486,8 @@ class Costing_Model extends CI_Model
             'to_currency_id' => (int) $exchange_rate['to_currency_id'],
             'unit_amount' => $unit_amount,
             'rate' => round($converted_amount / $unit_amount, 8),
+            'bank_charges_myr' => max(0, $bank_charges_myr),
+            'updated_by_admin_id' => !empty($exchange_rate['updated_by_admin_id']) ? (int) $exchange_rate['updated_by_admin_id'] : null,
             'valid_from' => $exchange_rate['valid_from'],
         );
 
@@ -739,6 +748,7 @@ class Costing_Model extends CI_Model
                 costing_booking_items.unit_price,
                 costing_booking_items.currency_id,
                 costing_booking_items.total_amount,
+                costing_booking_items.bank_charges_myr,
                 COALESCE(costing_booking_items.remark, "") AS remark,
                 costing_currencies.code AS currency
             ')
@@ -749,8 +759,10 @@ class Costing_Model extends CI_Model
             ->result_array();
 
         foreach ($items as &$item) {
-            $item['exchange_rate'] = $this->Resolve_Exchange_Rate((int) $item['currency_id'], $base_currency_id, $travel_date);
-            $item['base_total'] = round((float) $item['total_amount'] * (float) $item['exchange_rate'], 2);
+            $exchange_rate = $this->Resolve_Exchange_Rate_Details((int) $item['currency_id'], $base_currency_id, $travel_date);
+            $item['exchange_rate'] = (float) $exchange_rate['rate'];
+            $item['bank_charges_myr'] = (float) $item['bank_charges_myr'];
+            $item['base_total'] = round(((float) $item['total_amount'] * (float) $item['exchange_rate']) + (float) $item['bank_charges_myr'], 2);
         }
         unset($item);
 
@@ -819,13 +831,17 @@ class Costing_Model extends CI_Model
                 cer.to_currency_id,
                 cer.unit_amount,
                 cer.rate,
+                cer.bank_charges_myr,
+                cer.updated_by_admin_id,
                 ROUND(cer.unit_amount * cer.rate, 8) AS converted_amount,
                 cer.valid_from,
                 from_currency.code AS from_currency_code,
-                to_currency.code AS to_currency_code
+                to_currency.code AS to_currency_code,
+                admin.Name AS updated_by_name
             FROM costing_exchange_rates cer
             INNER JOIN costing_currencies from_currency ON from_currency.id = cer.from_currency_id
             INNER JOIN costing_currencies to_currency ON to_currency.id = cer.to_currency_id
+            LEFT JOIN admin ON admin.AdminID = cer.updated_by_admin_id
             " . $where . "
             ORDER BY from_currency.code ASC, to_currency.code ASC
         ", $params)->result_array();
@@ -840,13 +856,17 @@ class Costing_Model extends CI_Model
                 cer.to_currency_id,
                 cer.unit_amount,
                 cer.rate,
+                cer.bank_charges_myr,
+                cer.updated_by_admin_id,
                 ROUND(cer.unit_amount * cer.rate, 8) AS converted_amount,
                 cer.valid_from,
                 from_currency.code AS from_currency_code,
-                to_currency.code AS to_currency_code
+                to_currency.code AS to_currency_code,
+                admin.Name AS updated_by_name
             FROM costing_exchange_rates cer
             INNER JOIN costing_currencies from_currency ON from_currency.id = cer.from_currency_id
             INNER JOIN costing_currencies to_currency ON to_currency.id = cer.to_currency_id
+            LEFT JOIN admin ON admin.AdminID = cer.updated_by_admin_id
             WHERE cer.from_currency_id <> cer.to_currency_id
             ORDER BY from_currency.code ASC, to_currency.code ASC, cer.valid_from DESC, cer.id DESC
         ")->result_array();
@@ -875,18 +895,24 @@ class Costing_Model extends CI_Model
 
     private function Resolve_Exchange_Rate($from_currency_id, $to_currency_id, $travel_date = null)
     {
+        $exchange_rate = $this->Resolve_Exchange_Rate_Details($from_currency_id, $to_currency_id, $travel_date);
+        return (float) $exchange_rate['rate'];
+    }
+
+    private function Resolve_Exchange_Rate_Details($from_currency_id, $to_currency_id, $travel_date = null)
+    {
         $from_currency_id = (int) $from_currency_id;
         $to_currency_id = (int) $to_currency_id;
 
         if ($from_currency_id <= 0 || $to_currency_id <= 0) {
-            return 0;
+            return array('rate' => 0, 'bank_charges_myr' => 0);
         }
 
         if ($from_currency_id === $to_currency_id) {
-            return 1;
+            return array('rate' => 1, 'bank_charges_myr' => 0);
         }
 
-        $this->db->select('rate');
+        $this->db->select('rate, bank_charges_myr');
         $this->db->where('from_currency_id', $from_currency_id);
         $this->db->where('to_currency_id', $to_currency_id);
 
@@ -899,11 +925,14 @@ class Costing_Model extends CI_Model
         $row = $this->db->get('costing_exchange_rates')->row_array();
 
         if ($row) {
-            return (float) $row['rate'];
+            return array(
+                'rate' => (float) $row['rate'],
+                'bank_charges_myr' => (float) $row['bank_charges_myr'],
+            );
         }
 
         $fallback = $this->db
-            ->select('rate')
+            ->select('rate, bank_charges_myr')
             ->where('from_currency_id', $from_currency_id)
             ->where('to_currency_id', $to_currency_id)
             ->order_by('valid_from', 'DESC')
@@ -911,7 +940,9 @@ class Costing_Model extends CI_Model
             ->get('costing_exchange_rates')
             ->row_array();
 
-        return $fallback ? (float) $fallback['rate'] : 0;
+        return $fallback
+            ? array('rate' => (float) $fallback['rate'], 'bank_charges_myr' => (float) $fallback['bank_charges_myr'])
+            : array('rate' => 0, 'bank_charges_myr' => 0);
     }
 
     private function Build_Snapshot_Row_From_Template($item, $adult_count, $child_count, $total_pax)
@@ -956,6 +987,7 @@ class Costing_Model extends CI_Model
             'unit_price' => round((float) $item['default_unit_price'], 2),
             'currency_id' => (int) $item['currency_id'],
             'total_amount' => $total_amount,
+            'bank_charges_myr' => null,
             'remark' => $remark,
         );
     }
@@ -973,7 +1005,7 @@ class Costing_Model extends CI_Model
                 continue;
             }
 
-            $normalized[] = array(
+            $normalized_row = array(
                 'package_item_id' => !empty($row['package_item_id']) ? (int) $row['package_item_id'] : null,
                 'name' => $name,
                 'category' => $category,
@@ -984,9 +1016,24 @@ class Costing_Model extends CI_Model
                 'currency_id' => $currency_id,
                 'remark' => trim((string) (isset($row['remark']) ? $row['remark'] : '')),
             );
+
+            if (array_key_exists('bank_charges_myr', $row)) {
+                $normalized_row['bank_charges_myr'] = round(max(0, (float) $row['bank_charges_myr']), 2);
+            }
+
+            $normalized[] = $normalized_row;
         }
 
         return $normalized;
+    }
+
+    private function Resolve_Bank_Charges_Myr($currency_id, $travel_date = null)
+    {
+        $base_currency = $this->Read_Base_Currency('MYR');
+        $base_currency_id = $base_currency ? (int) $base_currency['id'] : 0;
+        $exchange_rate = $this->Resolve_Exchange_Rate_Details((int) $currency_id, $base_currency_id, $travel_date);
+
+        return round(max(0, (float) $exchange_rate['bank_charges_myr']), 2);
     }
 
     private function Upsert_Booking_Financials($booking_id, $data)

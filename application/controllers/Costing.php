@@ -251,10 +251,11 @@ class Costing extends MY_Controller
         $to_currency_id = (int) $this->input->post('to_currency_id');
         $unit_amount = (float) $this->input->post('unit_amount');
         $converted_amount = (float) $this->input->post('converted_amount');
+        $bank_charges_myr = (float) $this->input->post('bank_charges_myr');
         $valid_from = trim((string) $this->input->post('valid_from'));
 
-        if ($from_currency_id <= 0 || $to_currency_id <= 0 || $unit_amount <= 0 || $converted_amount <= 0) {
-            $this->session->set_flashdata('message_error', 'From currency, to currency, unit amount, and converted amount are required.');
+        if ($from_currency_id <= 0 || $to_currency_id <= 0 || $unit_amount <= 0 || $converted_amount <= 0 || $bank_charges_myr < 0) {
+            $this->session->set_flashdata('message_error', 'From currency, to currency, unit amount, converted amount, and valid bank charges are required.');
             redirect('Costing/Currency?active_tab=' . $active_tab);
             return;
         }
@@ -277,6 +278,8 @@ class Costing extends MY_Controller
             'to_currency_id' => $to_currency_id,
             'unit_amount' => $unit_amount,
             'converted_amount' => $converted_amount,
+            'bank_charges_myr' => $bank_charges_myr,
+            'updated_by_admin_id' => (int) $this->session->userdata('admin_id'),
             'valid_from' => $valid_from,
         ));
 

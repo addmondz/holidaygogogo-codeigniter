@@ -256,18 +256,18 @@ $achieved_margin_percentage = (float) $financials['selling_price_per_pax'] > 0
                                 <div class="costing-stat-value"><?php echo html_escape($package['status']); ?></div>
                             </div>
                         </div>
-                        <div class="col-md-3 mb-4">
+                        <!-- <div class="col-md-3 mb-4">
                             <div class="costing-stat-box">
                                 <div class="costing-stat-label">Cost Templates</div>
                                 <div class="costing-stat-value"><?php echo count($package_items); ?></div>
                             </div>
-                        </div>
-                        <div class="col-md-3 mb-4">
+                        </div> -->
+                        <!-- <div class="col-md-3 mb-4">
                             <div class="costing-stat-box">
                                 <div class="costing-stat-label">Booking Snapshots</div>
                                 <div class="costing-stat-value"><?php echo count($bookings); ?></div>
                             </div>
-                        </div>
+                        </div> -->
                     </div>
                 </div>
             </div>
@@ -706,7 +706,7 @@ $achieved_margin_percentage = (float) $financials['selling_price_per_pax'] > 0
                                                             <th style="text-align:center;">Qty</th>
                                                             <th style="text-align:center;">Units</th>
                                                             <th style="text-align:center;">Currency</th>
-                                                            <th style="text-align:center;">Rate</th>
+                                                            <th style="text-align:center;">Rate / Bank Charges</th>
                                                             <th style="text-align:center;">Unit Price</th>
                                                             <th style="text-align:center;">Currency Total</th>
                                                             <th style="text-align:center;"><?php echo html_escape($base_currency); ?> Total</th>
@@ -748,7 +748,12 @@ $achieved_margin_percentage = (float) $financials['selling_price_per_pax'] > 0
                                                                         <?php } ?>
                                                                     </select>
                                                                 </td>
-                                                                <td style="text-align:center;"><span class="font-weight-bold row-exchange-rate"><?php echo number_format((float) $item['exchange_rate'], 4, '.', ''); ?></span></td>
+                                                                <td style="text-align:center;">
+                                                                    <span class="font-weight-bold row-exchange-rate"><?php echo number_format((float) $item['exchange_rate'], 4, '.', ''); ?></span>
+                                                                    <div class="mt-2" style="min-width:120px;">
+                                                                        <input type="number" step="0.01" min="0" class="form-control row-bank-charges-myr" name="rows[<?php echo $index; ?>][bank_charges_myr]" value="<?php echo number_format((float) (isset($item['bank_charges_myr']) ? $item['bank_charges_myr'] : 0), 2, '.', ''); ?>">
+                                                                    </div>
+                                                                </td>
                                                                 <td><input type="number" step="0.01" min="0" class="form-control row-unit-price" name="rows[<?php echo $index; ?>][unit_price]" value="<?php echo html_escape($item['unit_price']); ?>"></td>
                                                                 <td style="text-align:center;">
                                                                     <span class="row-total-currency"><?php echo html_escape($item['currency']); ?></span>
@@ -969,7 +974,10 @@ $achieved_margin_percentage = (float) $financials['selling_price_per_pax'] > 0
         });
 
         latestExchangeRates.forEach(function (rateRow) {
-            exchangeRateMap[rateRow.from_currency_id + ':' + rateRow.to_currency_id] = rateRow.rate;
+            exchangeRateMap[rateRow.from_currency_id + ':' + rateRow.to_currency_id] = {
+                rate: rateRow.rate,
+                bank_charges_myr: rateRow.bank_charges_myr || 0
+            };
         });
 
         function asNumber(value) {
@@ -1111,8 +1119,9 @@ $achieved_margin_percentage = (float) $financials['selling_price_per_pax'] > 0
         function resolveExchangeRate(row) {
             var currencyField = row.querySelector('.row-currency-id');
             var rateDisplay = row.querySelector('.row-exchange-rate');
+            var bankChargesField = row.querySelector('.row-bank-charges-myr');
             if (!currencyField || !rateDisplay) {
-                return 0;
+                return { rate: 0, bankChargesMyr: 0 };
             }
 
             var selectedOption = currencyField.options[currencyField.selectedIndex];
@@ -1125,17 +1134,32 @@ $achieved_margin_percentage = (float) $financials['selling_price_per_pax'] > 0
 
             if (selectedCode === baseCurrencyCode) {
                 rateDisplay.textContent = '1.0000';
-                return 1;
+                if (bankChargesField && currencyField.dataset.lastCurrencyId !== String(selectedCurrencyId)) {
+                    bankChargesField.value = '0.00';
+                }
+                currencyField.dataset.lastCurrencyId = String(selectedCurrencyId);
+                return { rate: 1, bankChargesMyr: asNumber(bankChargesField ? bankChargesField.value : 0) };
             }
 
-            var mappedRate = exchangeRateMap[selectedCurrencyId + ':' + baseCurrencyId];
-            if (mappedRate) {
-                rateDisplay.textContent = parseFloat(mappedRate).toFixed(4);
-                return asNumber(mappedRate);
+            var mappedRate = exchangeRateMap[selectedCurrencyId + ':' + baseCurrencyId] || null;
+            if (mappedRate && mappedRate.rate) {
+                rateDisplay.textContent = parseFloat(mappedRate.rate).toFixed(4);
+                if (bankChargesField && currencyField.dataset.lastCurrencyId !== String(selectedCurrencyId)) {
+                    bankChargesField.value = asNumber(mappedRate.bank_charges_myr).toFixed(2);
+                }
+                currencyField.dataset.lastCurrencyId = String(selectedCurrencyId);
+                return {
+                    rate: asNumber(mappedRate.rate),
+                    bankChargesMyr: asNumber(bankChargesField ? bankChargesField.value : mappedRate.bank_charges_myr)
+                };
             }
 
             rateDisplay.textContent = '0.0000';
-            return 0;
+            if (bankChargesField && currencyField.dataset.lastCurrencyId !== String(selectedCurrencyId)) {
+                bankChargesField.value = '0.00';
+            }
+            currencyField.dataset.lastCurrencyId = String(selectedCurrencyId);
+            return { rate: 0, bankChargesMyr: asNumber(bankChargesField ? bankChargesField.value : 0) };
         }
 
         function updateRow(row) {
@@ -1144,7 +1168,7 @@ $achieved_margin_percentage = (float) $financials['selling_price_per_pax'] > 0
             var unitPrice = asNumber(row.querySelector('.row-unit-price').value);
             var exchangeRate = resolveExchangeRate(row);
             var totalAmount = quantity * unitCount * unitPrice;
-            var baseTotal = totalAmount * exchangeRate;
+            var baseTotal = (totalAmount * exchangeRate.rate) + exchangeRate.bankChargesMyr;
 
             row.querySelector('.row-total-amount').textContent = formatAmount(totalAmount);
             row.querySelector('.row-base-total').textContent = formatAmount(baseTotal);
@@ -1200,6 +1224,11 @@ $achieved_margin_percentage = (float) $financials['selling_price_per_pax'] > 0
         }
 
         function bindRow(row) {
+            var currencyField = row.querySelector('.row-currency-id');
+            if (currencyField) {
+                currencyField.dataset.lastCurrencyId = currencyField.value;
+            }
+
             row.querySelectorAll('input, select').forEach(function (field) {
                 field.addEventListener('input', recalculateFinancials);
                 field.addEventListener('change', recalculateFinancials);
@@ -1316,7 +1345,7 @@ $achieved_margin_percentage = (float) $financials['selling_price_per_pax'] > 0
                     + '<td><input type="number" step="0.01" min="0" class="form-control row-quantity" name="rows[' + index + '][quantity]" value="1"></td>'
                     + '<td><input type="number" step="0.01" min="0" class="form-control row-unit-count" name="rows[' + index + '][unit_count]" value="1"></td>'
                     + '<td style="min-width:120px;"><select class="form-control row-currency-id" name="rows[' + index + '][currency_id]">' + currencyOptions + '</select></td>'
-                    + '<td style="text-align:center;"><span class="font-weight-bold row-exchange-rate">1.0000</span></td>'
+                    + '<td style="text-align:center;"><span class="font-weight-bold row-exchange-rate">1.0000</span><div class="mt-2" style="min-width:120px;"><input type="number" step="0.01" min="0" class="form-control row-bank-charges-myr" name="rows[' + index + '][bank_charges_myr]" value="0.00"></div></td>'
                     + '<td><input type="number" step="0.01" min="0" class="form-control row-unit-price" name="rows[' + index + '][unit_price]" value="0"></td>'
                     + '<td style="text-align:center;"><span class="row-total-currency">' + baseCurrencyCode + '</span> <span class="font-weight-bold row-total-amount">0.00</span></td>'
                     + '<td style="text-align:center;"><span class="font-weight-bold row-base-total">0.00</span></td>'

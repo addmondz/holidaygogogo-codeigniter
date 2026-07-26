@@ -193,7 +193,7 @@ if (!function_exists('costing_currency_display_date')) {
                 <div class="d-flex justify-content-between align-items-start flex-wrap mb-6">
                     <div class="mb-3">
                         <div class="font-size-h5 font-weight-bold text-dark mb-2">Currency Setup</div>
-                        <div class="text-muted">Manage each unique currency, its latest MYR rate, and its rate history from one place.</div>
+                        <div class="text-muted">Manage each unique currency, its latest MYR rate, bank charges, and rate history from one place.</div>
                     </div>
                     <div class="currency-summary">
                         <div class="text-muted font-size-sm">Base Currency</div>
@@ -252,7 +252,7 @@ if (!function_exists('costing_currency_display_date')) {
                 <div class="d-flex justify-content-between align-items-center flex-wrap mb-5">
                     <div>
                         <h4 class="mb-1">Currencies</h4>
-                        <div class="text-muted">Latest rate is shown as <strong>1 foreign currency = X MYR</strong>.</div>
+                        <div class="text-muted">Latest rate is shown as <strong>1 foreign currency = X MYR</strong>, with MYR bank charges tracked separately.</div>
                     </div>
                     <div class="text-muted mt-2 mt-md-0">
                         Showing <?php echo number_format($currency_start_row); ?> to <?php echo number_format($currency_end_row); ?> of <?php echo number_format($currency_total_rows); ?> record<?php echo $currency_total_rows === 1 ? '' : 's'; ?>
@@ -268,13 +268,15 @@ if (!function_exists('costing_currency_display_date')) {
                                 <th style="text-align:center;">Currency</th>
                                 <th style="text-align:center; width:120px;">Symbol</th>
                                 <th style="text-align:center; width:210px;">Latest MYR Rate</th>
+                                <th style="text-align:center; width:160px;">Bank Charges</th>
+                                <th style="text-align:center; width:160px;">Updated By</th>
                                 <th class="action" style="text-align:center; min-width:380px;">Action</th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php if (empty($paged_currencies)) { ?>
                                 <tr>
-                                    <td colspan="6" style="text-align:center; padding-top:16px; padding-bottom:16px;">Currency Records Not Found</td>
+                                    <td colspan="8" style="text-align:center; padding-top:16px; padding-bottom:16px;">Currency Records Not Found</td>
                                 </tr>
                             <?php } else { ?>
                                 <?php $count = $currency_start_row; ?>
@@ -303,6 +305,20 @@ if (!function_exists('costing_currency_display_date')) {
                                                 <span class="label label-lg label-light-warning label-inline">No Rate</span>
                                             <?php } ?>
                                         </td>
+                                        <td style="text-align:center;">
+                                            <?php if ($latest_rate) { ?>
+                                                <span class="font-weight-bold text-dark">MYR <?php echo number_format((float) $latest_rate['bank_charges_myr'], 2); ?></span>
+                                            <?php } else { ?>
+                                                <span class="text-muted">-</span>
+                                            <?php } ?>
+                                        </td>
+                                        <td style="text-align:center;">
+                                            <?php if ($latest_rate && !empty($latest_rate['updated_by_name'])) { ?>
+                                                <span class="font-weight-bold text-dark"><?php echo html_escape($latest_rate['updated_by_name']); ?></span>
+                                            <?php } else { ?>
+                                                <span class="text-muted">-</span>
+                                            <?php } ?>
+                                        </td>
                                         <td>
                                             <div class="currency-action-grid">
                                                 <button
@@ -321,6 +337,7 @@ if (!function_exists('costing_currency_display_date')) {
                                                     data-currency-id="<?php echo $currency_id; ?>"
                                                     data-currency-code="<?php echo html_escape($currency['code']); ?>"
                                                     data-rate="<?php echo $latest_rate ? html_escape((string) $latest_rate['rate']) : ''; ?>"
+                                                    data-bank-charges-myr="<?php echo $latest_rate ? html_escape((string) $latest_rate['bank_charges_myr']) : '0'; ?>"
                                                 >Rate</button>
                                                 <button
                                                     type="button"
@@ -433,6 +450,10 @@ if (!function_exists('costing_currency_display_date')) {
                         <input type="number" step="0.00000001" min="0.00000001" name="converted_amount" id="modal_exchange_rate_converted_amount" class="form-control" required>
                     </div>
                     <div class="form-group">
+                        <label>Bank Charges (MYR)</label>
+                        <input type="number" step="0.01" min="0" name="bank_charges_myr" id="modal_exchange_rate_bank_charges_myr" class="form-control" value="0">
+                    </div>
+                    <div class="form-group">
                         <label>Valid From</label>
                         <input type="datetime-local" name="valid_from" id="modal_exchange_rate_valid_from" class="form-control">
                     </div>
@@ -479,6 +500,7 @@ if (!function_exists('costing_currency_display_date')) {
         var modalFromCurrencyId = document.getElementById('modal_from_currency_id');
         var modalExchangeRateConvertedAmount = document.getElementById('modal_exchange_rate_converted_amount');
         var modalExchangeRateUnitAmount = document.getElementById('modal_exchange_rate_unit_amount');
+        var modalExchangeRateBankChargesMyr = document.getElementById('modal_exchange_rate_bank_charges_myr');
         var modalExchangeRateValidFrom = document.getElementById('modal_exchange_rate_valid_from');
         var modalRateCurrencyLabel = document.getElementById('modal_rate_currency_label');
         var ratePreviewText = document.getElementById('rate_preview_text');
@@ -509,7 +531,7 @@ if (!function_exists('costing_currency_display_date')) {
             }
 
             var code = modalRateCurrencyLabel.value || 'Currency';
-            ratePreviewText.textContent = '1 ' + code + ' = ' + formatAmount(modalExchangeRateConvertedAmount.value, 6) + ' MYR';
+            ratePreviewText.textContent = '1 ' + code + ' = ' + formatAmount(modalExchangeRateConvertedAmount.value, 6) + ' MYR + MYR ' + formatAmount(modalExchangeRateBankChargesMyr.value, 2) + ' bank charges';
         }
 
         function confirmDeleteCurrency(button) {
@@ -587,6 +609,8 @@ if (!function_exists('costing_currency_display_date')) {
             return (rows || []).map(function (row) {
                 return {
                     rate: parseFloat(row.rate),
+                    bank_charges_myr: parseFloat(row.bank_charges_myr),
+                    updated_by_name: row.updated_by_name || '',
                     valid_from: row.valid_from || ''
                 };
             }).filter(function (row) {
@@ -596,26 +620,30 @@ if (!function_exists('costing_currency_display_date')) {
 
         function buildHistorySummary(rows) {
             var latest = rows[0] ? rows[0].rate : 0;
+            var latestBankCharges = rows[0] ? rows[0].bank_charges_myr : 0;
+            var latestUpdatedBy = rows[0] && rows[0].updated_by_name ? rows[0].updated_by_name : '-';
             var rates = rows.map(function (row) { return row.rate; });
             var highest = rates.length ? Math.max.apply(Math, rates) : 0;
             var lowest = rates.length ? Math.min.apply(Math, rates) : 0;
 
             return '<div class="rate-history-summary">' +
                 '<div class="rate-history-summary-item"><div class="text-muted font-size-sm">Latest</div><div class="font-weight-bold text-dark">' + formatAmount(latest, 6) + '</div></div>' +
+                '<div class="rate-history-summary-item"><div class="text-muted font-size-sm">Bank Charges</div><div class="font-weight-bold text-dark">MYR ' + formatAmount(latestBankCharges, 2) + '</div></div>' +
+                '<div class="rate-history-summary-item"><div class="text-muted font-size-sm">Updated By</div><div class="font-weight-bold text-dark">' + escapeHtml(latestUpdatedBy) + '</div></div>' +
                 '<div class="rate-history-summary-item"><div class="text-muted font-size-sm">Highest</div><div class="font-weight-bold text-dark">' + formatAmount(highest, 6) + '</div></div>' +
-                '<div class="rate-history-summary-item"><div class="text-muted font-size-sm">Lowest</div><div class="font-weight-bold text-dark">' + formatAmount(lowest, 6) + '</div></div>' +
-                '<div class="rate-history-summary-item"><div class="text-muted font-size-sm">Records</div><div class="font-weight-bold text-dark">' + rows.length + '</div></div>' +
             '</div>';
         }
 
         function buildHistoryTable(rows, currencyCode) {
             var html = '<div class="table-responsive"><table class="table table-bordered table-head-custom mb-0">' +
-                '<thead><tr><th style="text-align:center;">No.</th><th style="text-align:center;">Rate</th><th style="text-align:center;">Valid From</th></tr></thead><tbody>';
+                '<thead><tr><th style="text-align:center;">No.</th><th style="text-align:center;">Rate</th><th style="text-align:center;">Bank Charges</th><th style="text-align:center;">Updated By</th><th style="text-align:center;">Valid From</th></tr></thead><tbody>';
 
             rows.forEach(function (row, index) {
                 html += '<tr>' +
                     '<td style="text-align:center;">' + (index + 1) + '</td>' +
                     '<td style="text-align:center;">1 ' + escapeHtml(currencyCode) + ' = ' + formatAmount(row.rate, 6) + ' MYR</td>' +
+                    '<td style="text-align:center;">MYR ' + formatAmount(row.bank_charges_myr, 2) + '</td>' +
+                    '<td style="text-align:center;">' + escapeHtml(row.updated_by_name || '-') + '</td>' +
                     '<td style="text-align:center;">' + escapeHtml(formatHistoryDate(row.valid_from)) + '</td>' +
                 '</tr>';
             });
@@ -749,6 +777,7 @@ if (!function_exists('costing_currency_display_date')) {
             modalFromCurrencyId.value = '';
             modalExchangeRateUnitAmount.value = '1';
             modalExchangeRateConvertedAmount.value = '';
+            modalExchangeRateBankChargesMyr.value = '0';
             modalExchangeRateValidFrom.value = getCurrentDatetimeLocal();
             modalRateCurrencyLabel.value = '';
             updateRatePreview();
@@ -790,12 +819,15 @@ if (!function_exists('costing_currency_display_date')) {
             modalFromCurrencyId.value = this.getAttribute('data-currency-id') || '';
             modalRateCurrencyLabel.value = this.getAttribute('data-currency-code') || '';
             modalExchangeRateConvertedAmount.value = this.getAttribute('data-rate') || '';
+            modalExchangeRateBankChargesMyr.value = this.getAttribute('data-bank-charges-myr') || '0';
             updateRatePreview();
             $('#exchange_rate_modal').modal('show');
         });
 
         modalExchangeRateConvertedAmount.addEventListener('input', updateRatePreview);
         modalExchangeRateConvertedAmount.addEventListener('change', updateRatePreview);
+        modalExchangeRateBankChargesMyr.addEventListener('input', updateRatePreview);
+        modalExchangeRateBankChargesMyr.addEventListener('change', updateRatePreview);
 
         $('#exchange_rate_modal').on('hidden.bs.modal', function () {
             resetExchangeRateModal();
