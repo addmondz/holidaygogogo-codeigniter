@@ -111,6 +111,15 @@ class Faq_Model extends CI_Model
 							$item['tags'] = $tags;
 						}
 					}
+					// Per-item reference links ({l,u} list). Cleaned + scheme-guarded
+					// on read too, so a legacy/hand-edited row can't smuggle a bad
+					// href; only kept when non-empty so link-less rows decode unchanged.
+					if(isset($row['links'])) {
+						$links = self::Normalize_Links($row['links']);
+						if(!empty($links)) {
+							$item['links'] = $links;
+						}
+					}
 					// Audit fields (created/updated by-name + date) are passed
 					// through only when present, so legacy {q,a} rows decode
 					// unchanged and consumers can isset()-guard the meta.
@@ -147,7 +156,12 @@ class Faq_Model extends CI_Model
 	// $tags (optional) is a parallel array aligned to the posted rows - each
 	// entry a list of FAQTagID ids. A kept row gets a normalised, non-empty
 	// 'tags' key (placed right after 'a'); empty/absent tag sets omit the key.
-	public static function Build_Items($questions, $answers, $meta = null, $actor = '', $now = '', $tags = null)
+	//
+	// $link_labels / $link_urls (optional) are parallel arrays aligned to the
+	// posted rows - each entry is itself a list (that row's sub_link_labels[i][]
+	// and sub_link_urls[i][]). A kept row gets a cleaned, non-empty 'links' key
+	// (placed right after any 'tags'); empty/absent link sets omit the key.
+	public static function Build_Items($questions, $answers, $meta = null, $actor = '', $now = '', $tags = null, $link_labels = null, $link_urls = null)
 	{
 		$questions = is_array($questions) ? array_values($questions) : array();
 		$answers   = is_array($answers)   ? array_values($answers)   : array();
@@ -182,6 +196,14 @@ class Faq_Model extends CI_Model
 				$row_tags = self::Normalize_Ids(isset($tags[$i]) ? $tags[$i] : array());
 				if(!empty($row_tags)) {
 					$item['tags'] = $row_tags;
+				}
+			}
+			if($link_labels !== null || $link_urls !== null) {
+				$row_labels = (is_array($link_labels) && isset($link_labels[$i])) ? $link_labels[$i] : array();
+				$row_urls   = (is_array($link_urls)   && isset($link_urls[$i]))   ? $link_urls[$i]   : array();
+				$row_links  = self::Build_Links($row_labels, $row_urls);
+				if(!empty($row_links)) {
+					$item['links'] = $row_links;
 				}
 			}
 
@@ -267,6 +289,15 @@ class Faq_Model extends CI_Model
 			foreach(array('q', 'a') as $k) {
 				if(isset($item[$k]) && trim((string)$item[$k]) !== '') {
 					$parts[] = trim((string)$item[$k]);
+				}
+			}
+			// Reference-link labels are searchable too, so a listing search can
+			// surface a row by the wording of one of its links.
+			if(isset($item['links']) && is_array($item['links'])) {
+				foreach($item['links'] as $lnk) {
+					if(is_array($lnk) && isset($lnk['l']) && trim((string)$lnk['l']) !== '') {
+						$parts[] = trim((string)$lnk['l']);
+					}
 				}
 			}
 		}
@@ -496,6 +527,64 @@ class Faq_Model extends CI_Model
 			}
 		}
 		return array_values($ids);
+	}
+
+	// Clean a list of reference-link maps ({l:label, u:url}) for a sub-Q&A. Each
+	// kept link is {'l'=>label, 'u'=>url} with both trimmed; a link whose URL is
+	// blank is dropped (a label with no target is nothing to link to). Labels may
+	// be blank - the view falls back to showing the URL. The URL is scheme-guarded
+	// so a stored value can never render a javascript:/data: href: http/https/
+	// mailto or a site-relative "/path" pass through; a bare "example.com/x" is
+	// upgraded to https://; anything else is dropped. Pure + static for unit
+	// testing; both the stored-JSON path (Decode_Items) and the posted-form path
+	// (Build_Links) funnel through here so the two never diverge.
+	public static function Normalize_Links($links)
+	{
+		if(!is_array($links)) {
+			return array();
+		}
+		$out = array();
+		foreach($links as $row) {
+			if(!is_array($row)) {
+				continue;
+			}
+			$u = trim((string)(isset($row['u']) ? $row['u'] : ''));
+			if($u === '') {
+				continue;
+			}
+			if(!preg_match('~^(https?://|mailto:|/)~i', $u)) {
+				// Bare domain like "example.com/path" -> assume https; otherwise the
+				// value has no safe scheme we can trust, so drop it.
+				if(preg_match('~^[a-z0-9.-]+\.[a-z]{2,}(/|\?|#|$)~i', $u)) {
+					$u = 'https://' . $u;
+				} else {
+					continue;
+				}
+			}
+			$l = trim((string)(isset($row['l']) ? $row['l'] : ''));
+			$out[] = array('l' => $l, 'u' => $u);
+		}
+		return $out;
+	}
+
+	// Zip a single sub-Q&A's posted parallel link arrays (sub_link_labels[i][] and
+	// sub_link_urls[i][]) into a cleaned {l,u} list. Labels/URLs are aligned by
+	// index; the pair is validated + scheme-guarded by Normalize_Links (blank-URL
+	// pairs, including the always-posted alignment placeholder, are dropped). Pure
+	// + static for unit testing.
+	public static function Build_Links($labels, $urls)
+	{
+		$labels = is_array($labels) ? array_values($labels) : array();
+		$urls   = is_array($urls)   ? array_values($urls)   : array();
+		$count  = max(count($labels), count($urls));
+		$rows   = array();
+		for($i = 0; $i < $count; $i++) {
+			$rows[] = array(
+				'l' => isset($labels[$i]) ? $labels[$i] : '',
+				'u' => isset($urls[$i])   ? $urls[$i]   : '',
+			);
+		}
+		return self::Normalize_Links($rows);
 	}
 
 	// Turn a free-text Title into a URL-safe slug for the per-FAQ page

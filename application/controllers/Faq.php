@@ -438,7 +438,14 @@ class Faq extends MY_Controller
 		// other parallel sub_* arrays (Build_Items reads them by index).
 		$sub_tags = $this->input->post('sub_tags');
 		$sub_tags = is_array($sub_tags) ? array_values($sub_tags) : array();
-		$built = Faq_Model::Build_Items($this->input->post('sub_questions'), $this->input->post('sub_answers'), $meta, $actor, date('Y-m-d H:i:s'), $sub_tags);
+		// Per-item reference links: each row posts sub_link_labels[<row>][] and
+		// sub_link_urls[<row>][] (an always-present blank pair keeps the row's key
+		// posted so array_values stays aligned with the other parallel sub_* arrays).
+		$link_labels = $this->input->post('sub_link_labels');
+		$link_urls   = $this->input->post('sub_link_urls');
+		$link_labels = is_array($link_labels) ? array_values($link_labels) : array();
+		$link_urls   = is_array($link_urls)   ? array_values($link_urls)   : array();
+		$built = Faq_Model::Build_Items($this->input->post('sub_questions'), $this->input->post('sub_answers'), $meta, $actor, date('Y-m-d H:i:s'), $sub_tags, $link_labels, $link_urls);
 		if($built['error'] !== null) {
 			return $built['error'];
 		}

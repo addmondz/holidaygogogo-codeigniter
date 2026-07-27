@@ -126,6 +126,24 @@
 												<!-- Always-present empty value so a row with no tags still posts its
 												     sub_tags[i] key, keeping the parallel arrays aligned by row. -->
 												<input type="hidden" name="sub_tags[<?php echo (int)$index; ?>][]" value="" class="faq-item-tags-empty">
+												<?php $item_links = (isset($item['links']) && is_array($item['links'])) ? $item['links'] : array(); ?>
+												<label class="text-muted mt-2 mb-1" style="font-size:12.5px;"><i class="la la-link"></i> Reference Links for this Q&amp;A</label>
+												<div class="faq-item-links">
+													<?php foreach($item_links as $lnk) { ?>
+														<div class="faq-link-row d-flex align-items-center mb-2" style="gap:8px;">
+															<input type="text" name="sub_link_labels[<?php echo (int)$index; ?>][]" class="form-control faq-link-label" placeholder="Link label (e.g. Booking Form)" autocomplete="off" value="<?php echo htmlspecialchars((string)(isset($lnk['l']) ? $lnk['l'] : ''), ENT_QUOTES); ?>" style="max-width:240px;">
+															<input type="text" name="sub_link_urls[<?php echo (int)$index; ?>][]" class="form-control faq-link-url" placeholder="https://..." autocomplete="off" value="<?php echo htmlspecialchars((string)(isset($lnk['u']) ? $lnk['u'] : ''), ENT_QUOTES); ?>">
+															<button type="button" class="btn btn-icon btn-light-danger faq-link-remove" data-toggle="tooltip" title="Remove this link"><i class="la la-times"></i></button>
+														</div>
+													<?php } ?>
+												</div>
+												<!-- Always-posted blank pair so a link-less row still sends its
+												     sub_link_* keys, keeping the parallel arrays aligned by row. -->
+												<input type="hidden" name="sub_link_labels[<?php echo (int)$index; ?>][]" value="" class="faq-link-label-empty">
+												<input type="hidden" name="sub_link_urls[<?php echo (int)$index; ?>][]" value="" class="faq-link-url-empty">
+												<div class="mb-1">
+													<button type="button" class="btn btn-light-primary btn-sm faq-link-add"><i class="la la-plus"></i>Add Link</button>
+												</div>
 												<?php
 													// Audit trail carried back so Build_Items can keep created-by/date
 													// and bump updated-by/date only when this row's text changes. oq/oa
@@ -182,6 +200,14 @@
 						<?php } ?>
 					</select>
 					<input type="hidden" name="sub_tags[][]" value="" class="faq-item-tags-empty">
+					<label class="text-muted mt-2 mb-1" style="font-size:12.5px;"><i class="la la-link"></i> Reference Links for this Q&amp;A</label>
+					<div class="faq-item-links"></div>
+					<!-- name indexes re-stamped by renumber() once this row is in the DOM. -->
+					<input type="hidden" name="sub_link_labels[][]" value="" class="faq-link-label-empty">
+					<input type="hidden" name="sub_link_urls[][]" value="" class="faq-link-url-empty">
+					<div class="mb-1">
+						<button type="button" class="btn btn-light-primary btn-sm faq-link-add"><i class="la la-plus"></i>Add Link</button>
+					</div>
 					<!-- Empty audit fields keep new/copied rows aligned with the
 					     parallel hidden arrays; blank cd marks the row as new. -->
 					<input type="hidden" name="sub_cb[]" value="">
@@ -191,6 +217,15 @@
 					<input type="hidden" name="sub_oq[]" value="">
 					<input type="hidden" name="sub_oa[]" value="">
 				</div>
+			</div>
+		</template>
+
+		<template id="faq-link-template">
+			<div class="faq-link-row d-flex align-items-center mb-2" style="gap:8px;">
+				<!-- name indexes re-stamped by renumber() once this row is in the DOM. -->
+				<input type="text" name="sub_link_labels[][]" class="form-control faq-link-label" placeholder="Link label (e.g. Booking Form)" autocomplete="off" style="max-width:240px;">
+				<input type="text" name="sub_link_urls[][]" class="form-control faq-link-url" placeholder="https://..." autocomplete="off">
+				<button type="button" class="btn btn-icon btn-light-danger faq-link-remove" data-toggle="tooltip" title="Remove this link"><i class="la la-times"></i></button>
 			</div>
 		</template>
 	</div>
@@ -283,7 +318,27 @@
 				item.querySelectorAll('select.faq-item-tags, .faq-item-tags-empty').forEach(function (el) {
 					el.name = 'sub_tags[' + i + '][]';
 				});
+				// Same for this row's reference-link inputs: labels and urls each
+				// post as their own parallel array keyed by row (the hidden empty
+				// pair keeps the key present for a link-less row).
+				item.querySelectorAll('.faq-link-label, .faq-link-label-empty').forEach(function (el) {
+					el.name = 'sub_link_labels[' + i + '][]';
+				});
+				item.querySelectorAll('.faq-link-url, .faq-link-url-empty').forEach(function (el) {
+					el.name = 'sub_link_urls[' + i + '][]';
+				});
 			});
+		}
+
+		var linkTemplate = document.getElementById('faq-link-template');
+		function addLink(card) {
+			var wrap = card.querySelector('.faq-item-links');
+			if (!wrap) { return null; }
+			var node = linkTemplate.content.firstElementChild.cloneNode(true);
+			wrap.appendChild(node);
+			renumber();
+			bindTooltips(node);
+			return node;
 		}
 
 		function bindTooltips(scope) {
@@ -335,6 +390,19 @@
 		addBtn.addEventListener('click', addItem);
 
 		list.addEventListener('click', function (e) {
+			var linkAddBtn = e.target.closest('.faq-link-add');
+			if (linkAddBtn) {
+				var card = linkAddBtn.closest('.faq-item');
+				var row  = addLink(card);
+				if (row) { row.querySelector('.faq-link-label').focus(); }
+				return;
+			}
+			var linkRemoveBtn = e.target.closest('.faq-link-remove');
+			if (linkRemoveBtn) {
+				linkRemoveBtn.closest('.faq-link-row').remove();
+				renumber();
+				return;
+			}
 			var removeBtn = e.target.closest('.faq-item-remove');
 			if (removeBtn) {
 				removeBtn.closest('.faq-item').remove();

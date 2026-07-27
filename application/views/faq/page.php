@@ -314,6 +314,25 @@
 		}
 		.a-meta svg { width: 13px; height: 13px; stroke: var(--accent-deep); flex-shrink: 0; }
 		.item-tags { margin-top: 10px; }
+		/* Reference links under an answer */
+		.a-links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+		.a-link {
+			display: inline-flex;
+			align-items: center;
+			gap: 7px;
+			font-size: 13.5px;
+			font-weight: 500;
+			line-height: 1.4;
+			padding: 6px 13px;
+			border-radius: 100px;
+			border: 1px solid var(--line);
+			background: var(--accent-tint);
+			color: var(--accent-deep);
+			text-decoration: none;
+			transition: border-color .2s ease, background .2s ease, box-shadow .2s ease;
+		}
+		.a-link:hover { border-color: var(--accent); background: var(--accent-soft); box-shadow: 0 6px 16px -12px var(--ring); }
+		.a-link svg { width: 14px; height: 14px; stroke: var(--accent-deep); flex-shrink: 0; }
 
 		.empty-body { color: var(--muted); font-style: italic; font-weight: 300; padding: 6px 4px; }
 		.no-results { color: var(--muted); font-weight: 300; padding: 18px 4px; display: none; }
@@ -416,9 +435,13 @@
 					$q_text = trim((string)$item['q']);
 					$a_text = trim((string)$item['a']);
 					$label  = $q_text !== '' ? $q_text : 'Details';
+					// Per-item reference links ({l,u}); labels feed search too.
+					$item_links = (isset($item['links']) && is_array($item['links'])) ? $item['links'] : array();
+					$link_labels = array();
+					foreach($item_links as $lnk) { if(isset($lnk['l']) && trim((string)$lnk['l']) !== '') { $link_labels[] = $lnk['l']; } }
 					// Lowercased haystack the client search filters against:
-					// question + answer + tag names.
-					$search_blob = strtolower($q_text . ' ' . $a_text . ' ' . implode(' ', $item_tags));
+					// question + answer + tag names + link labels.
+					$search_blob = strtolower($q_text . ' ' . $a_text . ' ' . implode(' ', $item_tags) . ' ' . implode(' ', $link_labels));
 					$ud = isset($item['ud']) ? trim((string)$item['ud']) : '';
 				?>
 					<div class="a-item" data-search="<?php echo htmlspecialchars($search_blob, ENT_QUOTES); ?>" data-tags="<?php echo htmlspecialchars(implode(' ', $item_tag_ids), ENT_QUOTES); ?>">
@@ -430,6 +453,21 @@
 							<div class="a-panel-inner">
 								<?php if($a_text !== '') { ?>
 									<div class="a-a"><?php echo nl2br(htmlspecialchars($a_text)); ?></div>
+								<?php } ?>
+								<?php if(!empty($item_links)) { ?>
+									<div class="a-links">
+										<?php foreach($item_links as $lnk) {
+											$u = trim((string)(isset($lnk['u']) ? $lnk['u'] : ''));
+											if($u === '') { continue; }
+											$l = trim((string)(isset($lnk['l']) ? $lnk['l'] : ''));
+											if($l === '') { $l = $u; }
+										?>
+											<a class="a-link" href="<?php echo htmlspecialchars($u, ENT_QUOTES); ?>" target="_blank" rel="noopener">
+												<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.07 0l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.07 0l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+												<span><?php echo htmlspecialchars($l); ?></span>
+											</a>
+										<?php } ?>
+									</div>
 								<?php } ?>
 								<?php if(!empty($item_tags)) { ?>
 									<div class="faq-meta item-tags">
