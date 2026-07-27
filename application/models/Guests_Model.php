@@ -351,8 +351,12 @@ class Guests_Model extends CI_Model
 				$g_params[] = '%' . $email . '%';
 			}
 
-			// Race is a lead-only attribute (gc.race); multi-select IN list.
-			$this->Append_In_Clause($ghl_where, $g_params, 'gc.race', $this->input->get('race'));
+			// These GHL lead attributes may be stored either on ghl_contacts
+			// (manual/native fields) or in synced GHL custom fields.
+			$this->Append_In_Clause($ghl_where, $g_params, "COALESCE(NULLIF(TRIM(gcv.gender), ''), gc.gender)", $this->input->get('gender'));
+			$this->Append_In_Clause($ghl_where, $g_params, "COALESCE(NULLIF(TRIM(gcv.language), ''), gc.chat_language)", $this->input->get('language'));
+			$this->Append_In_Clause($ghl_where, $g_params, "COALESCE(NULLIF(TRIM(gcv.race), ''), gc.race)", $this->input->get('race'));
+			$this->Append_In_Clause($ghl_where, $g_params, "COALESCE(NULLIF(TRIM(gcv.nationality), ''), gc.nationality)", $this->input->get('nationality'));
 
 			// Tag is lead-only too. A tag can live on the contact (gc.tags_json)
 			// or per-conversation (gt.tags_concat, several JSON arrays newline-
@@ -395,6 +399,17 @@ class Guests_Model extends CI_Model
 			//    just duplicate the phone column.
 			$from_joins_where = "
 FROM ghl_contacts gc
+LEFT JOIN (
+	SELECT v.contact_id,
+		MAX(CASE WHEN cf.field_key = 'contact.gender' THEN v.value_text END) AS gender,
+		MAX(CASE WHEN cf.field_key = 'contact.language' THEN v.value_text END) AS language,
+		MAX(CASE WHEN cf.field_key = 'contact.race' THEN v.value_text END) AS race,
+		MAX(CASE WHEN cf.field_key = 'contact.nationality' THEN v.value_text END) AS nationality
+	FROM ghl_contact_custom_field_values v
+	INNER JOIN ghl_custom_fields cf ON cf.field_id = v.field_id
+	WHERE cf.field_key IN ('contact.gender', 'contact.language', 'contact.race', 'contact.nationality')
+	GROUP BY v.contact_id
+) gcv ON gcv.contact_id = gc.contact_id
 LEFT JOIN (
 	SELECT contact_id,
 		GROUP_CONCAT(CASE WHEN tags_json IS NOT NULL AND JSON_LENGTH(tags_json) > 0 THEN tags_json END SEPARATOR '\n') AS tags_concat,
@@ -758,14 +773,14 @@ SELECT
 	CONVERT(gc.phone USING utf8mb4) COLLATE utf8mb4_unicode_ci AS ContactNum,
 	CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS CallingCode,
 	CONVERT(gc.email USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Email,
-	CONVERT(gc.chat_language USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Language,
+	CONVERT(COALESCE(NULLIF(TRIM(gcv.language), ''), gc.chat_language) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Language,
 	NULL AS AgentName,
 	NULL AS Source,
 	NULL AS CustomerType,
 	NULL AS Destination,
-	CONVERT(gc.nationality USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Nationality,
-	CONVERT(gc.gender USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Gender,
-	CONVERT(gc.race USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Race,
+	CONVERT(COALESCE(NULLIF(TRIM(gcv.nationality), ''), gc.nationality) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Nationality,
+	CONVERT(COALESCE(NULLIF(TRIM(gcv.gender), ''), gc.gender) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Gender,
+	CONVERT(COALESCE(NULLIF(TRIM(gcv.race), ''), gc.race) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Race,
 	NULL AS GuestType,
 	gc.date_of_birth AS DOB,
 	0    AS TotalPax,

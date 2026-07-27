@@ -77,6 +77,7 @@ $route['translate_uri_dashes'] = FALSE;
 $route['customer/search'] = 'customer/search';
 $route['customer/check_duplicate'] = 'customer/check_duplicate';
 $route['ghl-details'] = 'Ghl_Details';
+$route['ghl-custom-field-viewer'] = 'Ghl_Custom_Field_Viewer';
 $route['message-log'] = 'Message_Log';
 $route['message-log-csv'] = 'Message_Log/csv';
 

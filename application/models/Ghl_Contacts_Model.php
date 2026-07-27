@@ -7,6 +7,9 @@ class Ghl_Contacts_Model extends CI_Model
     {
         $contactId = isset($data['contact_id']) ? trim((string) $data['contact_id']) : '';
         $now = $this->get_code_datetime();
+        $customFieldValues = isset($data['custom_field_values']) && is_array($data['custom_field_values'])
+            ? $data['custom_field_values']
+            : array();
 
         if ($contactId === '') {
             return false;
@@ -22,12 +25,37 @@ class Ghl_Contacts_Model extends CI_Model
 
         $columns = array(
             'contact_id',
+            'location_id',
+            'contact_name',
             'first_name',
             'last_name',
+            'first_name_raw',
+            'last_name_raw',
+            'company_name',
             'email',
             'phone',
             'assigned_to',
+            'business_id',
+            'contact_type',
+            'source',
+            'dnd',
+            'dnd_settings_json',
+            'city',
+            'state',
+            'postal_code',
+            'address1',
+            'country',
+            'website',
+            'timezone',
+            'profile_photo',
+            'date_of_birth',
             'date_added',
+            'date_updated',
+            'tags_json',
+            'additional_emails_json',
+            'followers_json',
+            'attributions_json',
+            'custom_fields_json',
         );
 
         $insert = array();
@@ -36,25 +64,72 @@ class Ghl_Contacts_Model extends CI_Model
         }
 
         if (!empty($existing['id'])) {
+            $update = $insert;
+            unset($update['contact_id']);
+            $update['updated_at'] = $now;
+
             $updated = $this->db
                 ->where('id', (int) $existing['id'])
-                ->update('ghl_contacts', array(
-                    'first_name' => $insert['first_name'],
-                    'last_name' => $insert['last_name'],
-                    'email' => $insert['email'],
-                    'phone' => $insert['phone'],
-                    'assigned_to' => $insert['assigned_to'],
-                    'date_added' => $insert['date_added'],
-                    'updated_at' => $now,
-                ));
+                ->update('ghl_contacts', $update);
 
-            return $updated ? 'updated' : false;
+            if (!$updated) {
+                return false;
+            }
+
+            $this->replace_custom_field_values($contactId, $customFieldValues);
+            return 'updated';
         }
 
         $insert['created_at'] = $now;
         $insert['updated_at'] = $now;
         $inserted = $this->db->insert('ghl_contacts', $insert);
-        return $inserted ? 'inserted' : false;
+        if (!$inserted) {
+            return false;
+        }
+
+        $this->replace_custom_field_values($contactId, $customFieldValues);
+        return 'inserted';
+    }
+
+    public function replace_custom_field_values($contactId, $values)
+    {
+        $contactId = trim((string) $contactId);
+        if ($contactId === '') {
+            return false;
+        }
+
+        $this->db->where('contact_id', $contactId)->delete('ghl_contact_custom_field_values');
+
+        if (empty($values) || !is_array($values)) {
+            return true;
+        }
+
+        $now = $this->get_code_datetime();
+        $rows = array();
+
+        foreach ($values as $value) {
+            if (!is_array($value) || empty($value['field_identity'])) {
+                continue;
+            }
+
+            $rows[] = array(
+                'contact_id' => $contactId,
+                'field_identity' => (string) $value['field_identity'],
+                'field_id' => isset($value['field_id']) ? $value['field_id'] : null,
+                'field_key' => isset($value['field_key']) ? $value['field_key'] : null,
+                'field_name' => isset($value['field_name']) ? $value['field_name'] : null,
+                'value_text' => isset($value['value_text']) ? $value['value_text'] : null,
+                'value_json' => isset($value['value_json']) ? $value['value_json'] : null,
+                'created_at' => $now,
+                'updated_at' => $now,
+            );
+        }
+
+        if (empty($rows)) {
+            return true;
+        }
+
+        return $this->db->insert_batch('ghl_contact_custom_field_values', $rows) !== false;
     }
 
     /**

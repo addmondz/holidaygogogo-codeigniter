@@ -429,6 +429,7 @@ class Cron extends CI_Controller
 			if($this->allowGhlModuleSync) {
 				$this->customCronLogging('[CRON-00/20/40] syncGhlModules');
 				$this->syncGhlUsers();
+				$this->syncGhlCustomFields();
 				$this->syncGhlContacts();
 				$this->syncGhlConversations();
 				$this->syncGhlMessages();
@@ -2526,6 +2527,41 @@ class Cron extends CI_Controller
 		$this->load->library('GhlContactsSyncService');
 		$result = $this->ghlcontactssyncservice->sync(array(
 			'mode' => in_array('--full', $flags, true) ? 'full' : 'recent',
+		));
+
+		$this->output
+			->set_content_type('application/json')
+			->set_output(json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+	}
+
+	/**
+	 * GHL custom fields sync. CLI only: php index.php Cron syncGhlCustomFields
+	 */
+	public function syncGhlCustomFields()
+	{
+		if (!$this->input->is_cli_request()) {
+			show_error('Not allowed', 403);
+			return;
+		}
+
+		$args = isset($_SERVER['argv']) ? $_SERVER['argv'] : array();
+		$uriSegments = $this->uri->segment_array();
+		$flags = array_merge(
+			array_slice($args, 3),
+			$uriSegments ? array_slice($uriSegments, 2) : array()
+		);
+
+		$model = 'contact';
+		foreach ($flags as $flag) {
+			if (strpos((string) $flag, '--model=') === 0) {
+				$model = substr((string) $flag, 8);
+				break;
+			}
+		}
+
+		$this->load->library('GhlCustomFieldsSyncService');
+		$result = $this->ghlcustomfieldssyncservice->sync(array(
+			'model' => $model,
 		));
 
 		$this->output

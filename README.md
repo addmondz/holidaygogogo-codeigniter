@@ -3,6 +3,8 @@
 Extra Routes
 	- domain/ghl-details
 		show all the conversation without leads, be it (unsynced / missed out)
+	- domain/ghl-custom-field-viewer
+		show all custom fields, user select one to view all contacts with that field and its saved value
 	
 1. Copy the environment file
 	cp .env.example .env
@@ -17,6 +19,7 @@ Extra Routes
 
 4. GoHighLevel sync
 	- Users: full sync on every run via `php index.php Cron syncGhlUsers`
+	- Custom Fields: full sync on every run via `php index.php Cron syncGhlCustomFields`
 	- Contacts recent x days sync: `php index.php Cron syncGhlContacts` | Sync full `php index.php Cron syncGhlContacts --full`. On default is 3 days, but can be changed in the .env file. 3 days is enough just to conver any missed data. 
 	- Conversations recent x days sync: `php index.php Cron syncGhlConversations` | Sync full `php index.php Cron syncGhlConversations --full`. On default is 3 days, but can be changed in the .env file. Currently set as 5 days to check all the updates. 
 	- Messages recent x days sync: `php index.php Cron syncGhlMessages` | Sync full `php index.php Cron syncGhlMessages --full`. On default is 3 days, but can be changed in the .env file.  Currently set as 5 days to check all the updates. 
@@ -48,6 +51,7 @@ Extra Routes
 I. Default Commands & order 
 	php index.php run_sql_patches
 	php index.php Cron syncGhlUsers
+	php index.php Cron syncGhlCustomFields
 	php index.php Cron syncGhlContacts --full
 	php index.php Cron syncGhlConversations --full
 	php index.php Cron syncGhlMessages --full
@@ -60,6 +64,7 @@ II. Default Daily & order
 
 III. Manual Daily Commands & order 
 	php index.php Cron syncGhlUsers
+	php index.php Cron syncGhlCustomFields
 	php index.php Cron syncGhlContacts
 	php index.php Cron syncGhlConversations
 	php index.php Cron syncGhlMessages

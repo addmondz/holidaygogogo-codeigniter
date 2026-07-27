@@ -1,0 +1,42 @@
+CREATE TABLE IF NOT EXISTS `ghl_custom_fields` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `location_id` VARCHAR(100) NOT NULL,
+  `field_id` VARCHAR(100) NOT NULL,
+  `field_key` VARCHAR(255) NULL DEFAULT NULL,
+  `model` VARCHAR(50) NULL DEFAULT NULL,
+  `name` VARCHAR(255) NULL DEFAULT NULL,
+  `data_type` VARCHAR(100) NULL DEFAULT NULL,
+  `placeholder` VARCHAR(255) NULL DEFAULT NULL,
+  `description` TEXT NULL,
+  `position` INT NULL DEFAULT NULL,
+  `show_in_forms` TINYINT(1) NOT NULL DEFAULT 0,
+  `parent_id` VARCHAR(100) NULL DEFAULT NULL,
+  `object_key` VARCHAR(255) NULL DEFAULT NULL,
+  `options_json` JSON NULL,
+  `raw_json` JSON NULL,
+  `date_added` DATETIME NULL DEFAULT NULL,
+  `date_updated` DATETIME NULL DEFAULT NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_ghl_custom_fields_location_field` (`location_id`, `field_id`),
+  KEY `idx_ghl_custom_fields_field_key` (`field_key`),
+  KEY `idx_ghl_custom_fields_model` (`model`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `ghl_contact_custom_field_values` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `contact_id` VARCHAR(100) NOT NULL,
+  `field_identity` VARCHAR(255) NOT NULL,
+  `field_id` VARCHAR(100) NULL DEFAULT NULL,
+  `field_key` VARCHAR(255) NULL DEFAULT NULL,
+  `field_name` VARCHAR(255) NULL DEFAULT NULL,
+  `value_text` TEXT NULL,
+  `value_json` JSON NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_ghl_contact_field_value` (`contact_id`, `field_identity`),
+  KEY `idx_ghl_contact_custom_field_values_field_id` (`field_id`),
+  KEY `idx_ghl_contact_custom_field_values_field_key` (`field_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

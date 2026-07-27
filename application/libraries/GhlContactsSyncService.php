@@ -287,15 +287,167 @@ class GhlContactsSyncService
 
         return array(
             'contact_id' => $contactId,
+            'location_id' => $this->nullableString(isset($contact['locationId']) ? $contact['locationId'] : null),
+            'contact_name' => $this->nullableString(isset($contact['contactName']) ? $contact['contactName'] : null),
             'first_name' => isset($contact['firstName']) ? (string) $contact['firstName'] : null,
             'last_name' => isset($contact['lastName']) ? (string) $contact['lastName'] : null,
+            'first_name_raw' => $this->nullableString(isset($contact['firstNameRaw']) ? $contact['firstNameRaw'] : null),
+            'last_name_raw' => $this->nullableString(isset($contact['lastNameRaw']) ? $contact['lastNameRaw'] : null),
+            'company_name' => $this->nullableString(isset($contact['companyName']) ? $contact['companyName'] : null),
             'email' => isset($contact['email']) ? (string) $contact['email'] : null,
             'phone' => isset($contact['phone']) ? (string) $contact['phone'] : null,
             'assigned_to' => $assignedTo,
+            'business_id' => $this->nullableString(isset($contact['businessId']) ? $contact['businessId'] : null),
+            'contact_type' => $this->nullableString(isset($contact['type']) ? $contact['type'] : null),
+            'source' => $this->nullableString(isset($contact['source']) ? $contact['source'] : null),
+            'dnd' => !empty($contact['dnd']) ? 1 : 0,
+            'dnd_settings_json' => $this->jsonOrNull(isset($contact['dndSettings']) ? $contact['dndSettings'] : null),
+            'city' => $this->nullableString(isset($contact['city']) ? $contact['city'] : null),
+            'state' => $this->nullableString(isset($contact['state']) ? $contact['state'] : null),
+            'postal_code' => $this->nullableString(isset($contact['postalCode']) ? $contact['postalCode'] : null),
+            'address1' => $this->nullableString(isset($contact['address1']) ? $contact['address1'] : null),
+            'country' => $this->nullableString(isset($contact['country']) ? $contact['country'] : null),
+            'website' => $this->nullableString(isset($contact['website']) ? $contact['website'] : null),
+            'timezone' => $this->nullableString(isset($contact['timezone']) ? $contact['timezone'] : null),
+            'profile_photo' => $this->nullableString(isset($contact['profilePhoto']) ? $contact['profilePhoto'] : null),
+            'date_of_birth' => $this->normalizeDate(isset($contact['dateOfBirth']) ? $contact['dateOfBirth'] : null),
             'date_added' => $this->normalizeUtcDateTime(
                 isset($contact['dateAdded']) ? $contact['dateAdded'] : null
             ),
+            'date_updated' => $this->normalizeUtcDateTime(
+                isset($contact['dateUpdated']) ? $contact['dateUpdated'] : null
+            ),
+            'tags_json' => $this->jsonOrNull(isset($contact['tags']) ? $contact['tags'] : null),
+            'additional_emails_json' => $this->jsonOrNull(isset($contact['additionalEmails']) ? $contact['additionalEmails'] : null),
+            'followers_json' => $this->jsonOrNull(isset($contact['followers']) ? $contact['followers'] : null),
+            'attributions_json' => $this->jsonOrNull(isset($contact['attributions']) ? $contact['attributions'] : null),
+            'custom_fields_json' => $this->jsonOrNull(isset($contact['customFields']) ? $contact['customFields'] : null),
+            'custom_field_values' => $this->normalizeContactCustomFields(isset($contact['customFields']) ? $contact['customFields'] : null),
         );
+    }
+
+    protected function normalizeContactCustomFields($customFields)
+    {
+        if (empty($customFields) || !is_array($customFields)) {
+            return array();
+        }
+
+        $values = array();
+
+        foreach ($customFields as $key => $field) {
+            if (is_array($field)) {
+                $fieldId = $this->nullableString(
+                    isset($field['id']) ? $field['id'] : (
+                        isset($field['fieldId']) ? $field['fieldId'] : (
+                            isset($field['customFieldId']) ? $field['customFieldId'] : null
+                        )
+                    )
+                );
+                $fieldKey = $this->nullableString(isset($field['fieldKey']) ? $field['fieldKey'] : null);
+                $fieldName = $this->nullableString(
+                    isset($field['name']) ? $field['name'] : (
+                        isset($field['fieldName']) ? $field['fieldName'] : null
+                    )
+                );
+                $rawValue = $this->extractCustomFieldValue($field);
+            } else {
+                $fieldId = is_string($key) ? $this->nullableString($key) : null;
+                $fieldKey = is_string($key) ? $this->nullableString($key) : null;
+                $fieldName = null;
+                $rawValue = $field;
+            }
+
+            $identity = $this->customFieldIdentity($fieldId, $fieldKey, $fieldName, $key);
+            if ($identity === null) {
+                continue;
+            }
+
+            $values[] = array(
+                'field_identity' => $identity,
+                'field_id' => $fieldId,
+                'field_key' => $fieldKey,
+                'field_name' => $fieldName,
+                'value_text' => $this->customFieldValueText($rawValue),
+                'value_json' => $this->jsonOrNull($rawValue),
+            );
+        }
+
+        return $values;
+    }
+
+    protected function extractCustomFieldValue($field)
+    {
+        foreach (array('value', 'field_value', 'fieldValue', 'values') as $key) {
+            if (array_key_exists($key, $field)) {
+                return $field[$key];
+            }
+        }
+
+        return null;
+    }
+
+    protected function customFieldIdentity($fieldId, $fieldKey, $fieldName, $fallback)
+    {
+        foreach (array($fieldId, $fieldKey, $fieldName) as $candidate) {
+            $candidate = $this->nullableString($candidate);
+            if ($candidate !== null) {
+                return $candidate;
+            }
+        }
+
+        if (is_string($fallback) || is_numeric($fallback)) {
+            return (string) $fallback;
+        }
+
+        return null;
+    }
+
+    protected function customFieldValueText($value)
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        if (is_scalar($value)) {
+            $text = trim((string) $value);
+            return $text === '' ? null : $text;
+        }
+
+        $json = json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        return $json === false ? null : $json;
+    }
+
+    protected function nullableString($value)
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $value = trim((string) $value);
+        return $value === '' ? null : $value;
+    }
+
+    protected function jsonOrNull($value)
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $json = json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        return $json === false ? null : $json;
+    }
+
+    protected function normalizeDate($value)
+    {
+        if (empty($value)) {
+            return null;
+        }
+
+        try {
+            return (new DateTimeImmutable((string) $value))->format('Y-m-d');
+        } catch (Exception $e) {
+            return null;
+        }
     }
 
     protected function logEvent($runId, $moduleName, $meta = array())
