@@ -675,6 +675,11 @@ if (!function_exists('guest_list_ghl_suppressed_by_filters')) {
                 return true;
             }
         }
+        // Campaign-segment filters that only a booking guest can satisfy (a lead
+        // has no bookings / sales / travel gap / cancel status) also drop leads.
+        if (guest_list_any_filter_set($get, guest_list_booking_only_segment_keys())) {
+            return true;
+        }
         // Guest Role is multi-select: a lead only ever holds the "Lead" role, so
         // any role filter that does NOT include "Lead" can never match a lead.
         $roles = isset($get['role']) ? guest_list_multi_values($get['role']) : array();
@@ -697,6 +702,10 @@ if (!function_exists('guest_list_bookings_suppressed_by_filters')) {
      */
     function guest_list_bookings_suppressed_by_filters($get)
     {
+        // Tag / Race live only on GHL leads, so either drops the booking branch.
+        if (guest_list_any_filter_set($get, guest_list_leads_only_segment_keys())) {
+            return true;
+        }
         // Multi-select role: a booking guest is never a "Lead", so the booking
         // branch drops out only when the role filter is set and selects LEAD
         // exclusively (no "Team Leader" / "Team Member" alongside it).
@@ -738,6 +747,11 @@ if (!function_exists('guest_list_leader_fallback_suppressed_by_filters')) {
                 return true;
             }
         }
+        // Tag / Race live only on GHL leads, so either drops the leader-fallback
+        // (a synthesized booking-leader row carries neither).
+        if (guest_list_any_filter_set($get, guest_list_leads_only_segment_keys())) {
+            return true;
+        }
         $roles = isset($get['role']) ? guest_list_multi_values($get['role']) : array();
         if (!empty($roles) && !in_array('Team Leader', $roles, true)) {
             return true;
@@ -754,26 +768,27 @@ if (!function_exists('guest_list_leader_fallback_suppressed_by_filters')) {
 
 if (!function_exists('guest_list_branches_to_run')) {
     /**
-     * Decide which branch(es) a Guest List page reads. The listing is now split
-     * into two pages, each locked to ONE source:
+     * Decide which branch(es) a caller reads. The two standalone pages each lock
+     * to ONE source; the campaign guest picker can read both at once:
      *   - mode 'guest' → the Guest List page (booking guests only)
      *   - mode 'ghl'   → the GHL Leads page (GHL leads only)
+     *   - mode 'all'   → campaign picker (booking guests + leader fallback + leads)
      *
-     * The active filters can still drop the page's own branch to empty when they
-     * can never match it (e.g. a booking-only Destination filter on the GHL page,
-     * or Guest Role = Lead on the Guest List page) — reusing the same suppression
-     * predicates the merged listing used, so the two pages stay consistent.
+     * The active filters can still drop a branch to empty when they can never
+     * match it (e.g. a booking-only Destination filter on the GHL branch, or
+     * Guest Role = Lead on the booking branch) — reusing the same suppression
+     * predicates the merged listing used, so every caller stays consistent.
      *
-     * @param string $mode 'guest' or 'ghl' (anything else falls back to 'guest').
+     * @param string $mode 'guest', 'ghl' or 'all' (anything else → 'guest').
      * @param array  $get  The request GET params.
      * @return array{bookings:bool,ghl:bool}
      */
     function guest_list_branches_to_run($mode, $get)
     {
-        $mode = ($mode === 'ghl') ? 'ghl' : 'guest';
+        $mode = in_array($mode, array('ghl', 'all'), true) ? $mode : 'guest';
         return array(
-            'bookings' => ($mode === 'guest') && !guest_list_bookings_suppressed_by_filters($get),
-            'ghl'      => ($mode === 'ghl')   && !guest_list_ghl_suppressed_by_filters($get),
+            'bookings' => ($mode !== 'ghl')   && !guest_list_bookings_suppressed_by_filters($get),
+            'ghl'      => ($mode !== 'guest') && !guest_list_ghl_suppressed_by_filters($get),
         );
     }
 }
@@ -806,5 +821,178 @@ if (!function_exists('guest_contact_duplicate_key_sql')) {
                 WHERE gc.dedup_key = ? AND gc.dedup_key <> ?
             )
         ) AS dup";
+    }
+}
+
+// ===========================================================================
+// Campaign segmentation filters (Campaign guest picker).
+//
+// These back the extra segmentation dropdowns on the Campaign guest picker
+// (Campaign/Search_Guests → Guests_Model). Each is a PURE helper so the
+// SQL-building logic is unit-testable under SQLite :memory: without booting
+// CodeIgniter (see tests/helpers/CampaignSegmentationFilterTest.php).
+//
+// Two families of new filters:
+//   - Leads-only:  Tag, Race           (data lives only on ghl_contacts)
+//   - Booking-only: purchased 2x+, lifetime value, booking-lead timeline,
+//                   consecutive-years, family-with-kids, cancelled BC
+// The suppression predicates below drop the branch(es) a filter can never
+// match, exactly like the existing booking/GHL-only filters do.
+// ===========================================================================
+
+if (!function_exists('guest_list_purchase_count_min')) {
+    /**
+     * Minimum distinct-booking count for the "purchased N× and above" segment.
+     * Returns the int floor (>= 2) or null when unset / below 2 / non-numeric,
+     * so a stray value can never emit a HAVING that filters nothing.
+     *
+     * @param mixed $raw Raw dropdown value ('2','3',… ).
+     * @return int|null
+     */
+    function guest_list_purchase_count_min($raw)
+    {
+        $raw = trim((string) $raw);
+        if ($raw === '' || !ctype_digit($raw)) {
+            return null;
+        }
+        $n = (int) $raw;
+        return $n >= 2 ? $n : null;
+    }
+}
+
+if (!function_exists('guest_list_parse_bucket_bounds')) {
+    /**
+     * Parse a numeric "bucket" value into a [min, max] pair, min inclusive and
+     * max EXCLUSIVE so adjacent buckets never double-count a boundary value.
+     * Shared by the Lifetime Booking Value buckets (<10k, 10k-20k, …) and the
+     * Booking-Lead timeline (0-1, 1-2, … months).
+     *
+     * Accepted forms:
+     *   'a-b' → array(a, b)      a floor (inclusive), b ceiling (exclusive)
+     *   'b+'  → array(b, null)   open-ended upper bound
+     *   'a-'  → array(a, null)   (same as 'a+')
+     * Any other / empty / reversed (min > max) value returns null (no filter).
+     *
+     * @param mixed $raw Raw dropdown value.
+     * @return array{0:float,1:float|null}|null
+     */
+    function guest_list_parse_bucket_bounds($raw)
+    {
+        $raw = trim((string) $raw);
+        if ($raw === '') {
+            return null;
+        }
+
+        // Open-ended: "50000+" or "50000-"
+        if (preg_match('/^(\d+(?:\.\d+)?)\s*[+\-]$/', $raw, $m)) {
+            return array((float) $m[1], null);
+        }
+
+        // Range: "10000-20000"
+        if (preg_match('/^(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)$/', $raw, $m)) {
+            $min = (float) $m[1];
+            $max = (float) $m[2];
+            if ($max <= $min) {
+                return null;
+            }
+            return array($min, $max);
+        }
+
+        return null;
+    }
+}
+
+if (!function_exists('guest_list_flag_on')) {
+    /**
+     * Read a boolean toggle from the request the same way everywhere: a param is
+     * "on" only when present and equal to '1' (checkbox / hidden input). Anything
+     * else (absent, '0', '', 'false') is off.
+     *
+     * @param array  $get The request GET params.
+     * @param string $key The toggle key.
+     * @return bool
+     */
+    function guest_list_flag_on($get, $key)
+    {
+        return isset($get[$key]) && trim((string) $get[$key]) === '1';
+    }
+}
+
+if (!function_exists('guest_list_cancel_predicate')) {
+    /**
+     * The booking cancel-status predicate. Normally the listing HIDES cancelled
+     * bookings (CancelStatus = 'N'); the "Cancelled BC" segment flips it to show
+     * ONLY cancelled ones (CancelStatus != 'N') so a campaign can target guests
+     * whose booking was cancelled. $col is a trusted, code-supplied column name.
+     *
+     * @param array  $get The request GET params.
+     * @param string $col The cancel-status column (e.g. 'b.CancelStatus').
+     * @return string SQL boolean fragment (no leading AND).
+     */
+    function guest_list_cancel_predicate($get, $col)
+    {
+        return guest_list_flag_on($get, 'cancelled')
+            ? "{$col} != 'N'"
+            : "{$col} = 'N'";
+    }
+}
+
+if (!function_exists('guest_list_booking_only_segment_keys')) {
+    /**
+     * The new campaign-segment filters that only a BOOKING guest can satisfy — a
+     * GHL lead has no bookings, sales, travel window or cancel status, so any of
+     * these drops the GHL branch (added to guest_list_ghl_suppressed_by_filters).
+     *
+     * @return string[]
+     */
+    function guest_list_booking_only_segment_keys()
+    {
+        return array('min_purchases', 'ltv', 'booking_lead', 'consecutive_years', 'family_kids', 'cancelled');
+    }
+}
+
+if (!function_exists('guest_list_leads_only_segment_keys')) {
+    /**
+     * The new campaign-segment filters that only a GHL/manual LEAD can satisfy —
+     * Tag and Race live only on ghl_contacts, so either drops the booking branch
+     * and the leader-fallback branch.
+     *
+     * @return string[]
+     */
+    function guest_list_leads_only_segment_keys()
+    {
+        return array('tags', 'race');
+    }
+}
+
+if (!function_exists('guest_list_any_filter_set')) {
+    /**
+     * True when ANY of $keys is present in $get with at least one usable value
+     * (multi-select aware; a bare toggle counts when equal to '1').
+     *
+     * @param array    $get  The request GET params.
+     * @param string[] $keys Keys to test.
+     * @return bool
+     */
+    function guest_list_any_filter_set($get, $keys)
+    {
+        foreach ($keys as $k) {
+            if (!isset($get[$k])) {
+                continue;
+            }
+            // Bucket / count / toggle values arrive as scalars; multi-values
+            // handles both scalars and arrays and drops blanks. A literal '0'
+            // is the "off" state of a toggle (cancelled=0, family_kids=0) — and
+            // none of these segment values are ever a bare '0' when active — so
+            // it must not count as set.
+            $values = array_filter(
+                guest_list_multi_values($get[$k]),
+                function ($v) { return $v !== '0'; }
+            );
+            if (count($values) > 0) {
+                return true;
+            }
+        }
+        return false;
     }
 }

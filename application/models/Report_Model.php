@@ -1665,9 +1665,12 @@ class Report_Model extends CI_Model
         }
 
         foreach ($results as $ownerId => $row) {
+            // Transfer Out = leads that were once the owner's OWN (is_assigned_owner=1)
+            // and are now reassigned to a different agent; a lead the owner only
+            // helped reply on (never assigned) was never theirs to transfer.
             $results[$ownerId]['today_handling_leads'] = lead_reply_activity_today_handling(
                 $row['lead_responded'],
-                $row['reply_created_leads']
+                $row['assigned_reply_created_leads']
             );
         }
 
@@ -1886,7 +1889,21 @@ class Report_Model extends CI_Model
      */
     public function Lead_Reply_Activity_Transfer_Out_Leads($filters = array())
     {
-        return $this->Lead_Reply_Activity_Reply_Created_Detail_Rows($filters);
+        // Only leads that were once the owner's own (is_assigned_owner=1) and have
+        // since moved to another agent -- matches the dashboard's Transfer Out count.
+        return $this->Lead_Reply_Activity_Reply_Created_Detail_Rows($filters, 'assigned');
+    }
+
+    /**
+     * Per-lead breakdown behind the dashboard's "Helped Reply Lead" number: leads
+     * the owner replied to (reply-created) that were NEVER assigned to them
+     * (is_assigned_owner = 0) -- they helped on another agent's lead. These are the
+     * leads dropped from Transfer Out, surfaced on their own so the count is visible
+     * instead of vanishing. Same window/scoping as the Transfer Out drill-down.
+     */
+    public function Lead_Reply_Activity_Helped_Reply_Leads($filters = array())
+    {
+        return $this->Lead_Reply_Activity_Reply_Created_Detail_Rows($filters, 'helped');
     }
 
     /**
@@ -2562,7 +2579,7 @@ class Report_Model extends CI_Model
         return $this->db->query($sql, $where['params'])->result_array();
     }
 
-    private function Lead_Reply_Activity_Reply_Created_Detail_Rows($filters = array())
+    private function Lead_Reply_Activity_Reply_Created_Detail_Rows($filters = array(), $ownerScope = 'all')
     {
         $where = $this->build_lead_reply_created_where_clause($filters);
         $extraJoins = isset($where['extra_joins']) ? $where['extra_joins'] : '';
@@ -2570,12 +2587,23 @@ class Report_Model extends CI_Model
         $pickupDate = $this->lead_reply_pickup_date_expression('glo');
         $start = !empty($filters['start_date']) ? $filters['start_date'] . ' 00:00:00' : '1970-01-01 00:00:00';
         $end = !empty($filters['end_date']) ? $filters['end_date'] . ' 23:59:59' : '9999-12-31 23:59:59';
+        // Split the reply-created universe by whether the lead was once the owner's
+        // own: 'assigned' = Transfer Out (is_assigned_owner=1), 'helped' = helped on
+        // another agent's lead (is_assigned_owner=0), 'all' = both (details list).
+        if ($ownerScope === 'assigned') {
+            $assignedOwnerClause = ' AND reply_created.is_assigned_owner = 1';
+        } elseif ($ownerScope === 'helped') {
+            $assignedOwnerClause = ' AND reply_created.is_assigned_owner = 0';
+        } else {
+            $assignedOwnerClause = '';
+        }
 
         $sql = "
             SELECT *
             FROM (
                 SELECT
                     'Reply-Created Lead' AS activity_type,
+                    glo.is_assigned_owner,
                     SUBSTRING_INDEX(
                         SUBSTRING_INDEX(GROUP_CONCAT(gm.{$messageTimeColumn} ORDER BY gm.{$messageTimeColumn} ASC, gm.id ASC), ',', 1),
                         ',',
@@ -2637,6 +2665,7 @@ class Report_Model extends CI_Model
                     glo.owner_user_id,
                     owner_name,
                     glo.assigned_to_user_id,
+                    glo.is_assigned_owner,
                     pickup_at,
                     assigned_name,
                     glo.lead_started_at,
@@ -2649,6 +2678,7 @@ class Report_Model extends CI_Model
             ) reply_created
             WHERE reply_created.reply_created_at BETWEEN ? AND ?
               AND NULLIF(reply_created.assigned_to_user_id, '') <> reply_created.owner_user_id
+              {$assignedOwnerClause}
         ";
 
         // Matches Lead_Reply_Activity_Reply_Created_Base_Rows: a lead only counts as
@@ -3547,19 +3577,38 @@ class Report_Model extends CI_Model
      */
     protected function ghl_message_contact_clause($contact, array &$params)
     {
-        $digits = preg_replace('/\D+/', '', (string) $contact);
-        if ($digits === '') {
+        // Accept a single value or a list of numbers (multi-contact filter). Each
+        // entry is reduced to digits so any phone format matches the same lead;
+        // several contacts are OR-ed so the view can thread multiple leads at once.
+        if (is_array($contact)) {
+            $digitsList = array();
+            foreach ($contact as $c) {
+                $d = preg_replace('/\D+/', '', (string) $c);
+                if ($d !== '' && !in_array($d, $digitsList, true)) {
+                    $digitsList[] = $d;
+                }
+            }
+        } else {
+            $d = preg_replace('/\D+/', '', (string) $contact);
+            $digitsList = $d === '' ? array() : array($d);
+        }
+
+        if (empty($digitsList)) {
             return '';
         }
 
         $normFrom = $this->normalize_phone_sql('gm.from_number');
         $normTo = $this->normalize_phone_sql('gm.to_number');
 
-        $like = '%' . $digits . '%';
-        $params[] = $like;
-        $params[] = $like;
+        $ors = array();
+        foreach ($digitsList as $digits) {
+            $like = '%' . $digits . '%';
+            $params[] = $like;
+            $params[] = $like;
+            $ors[] = "({$normFrom} LIKE ? OR {$normTo} LIKE ?)";
+        }
 
-        return " AND ({$normFrom} LIKE ? OR {$normTo} LIKE ?)";
+        return ' AND (' . implode(' OR ', $ors) . ')';
     }
 
     /**
@@ -3575,14 +3624,33 @@ class Report_Model extends CI_Model
      */
     protected function ghl_message_agent_clause($agent, array &$params)
     {
-        $agent = trim((string) $agent);
-        if ($agent === '') {
+        // Accept a single name or a list (multi-agent filter). Names are matched
+        // exactly against the resolved Agent column; several agents become an IN
+        // list so the log can show more than one agent's threads at once.
+        if (is_array($agent)) {
+            $agents = array();
+            foreach ($agent as $a) {
+                $a = trim((string) $a);
+                if ($a !== '' && !in_array($a, $agents, true)) {
+                    $agents[] = $a;
+                }
+            }
+        } else {
+            $a = trim((string) $agent);
+            $agents = $a === '' ? array() : array($a);
+        }
+
+        if (empty($agents)) {
             return '';
         }
 
-        $params[] = $agent;
+        $placeholders = array();
+        foreach ($agents as $a) {
+            $params[] = $a;
+            $placeholders[] = '?';
+        }
 
-        return " AND COALESCE(NULLIF(gu.Name, ''), NULLIF(gu_assigned.Name, '')) = ?";
+        return " AND COALESCE(NULLIF(gu.Name, ''), NULLIF(gu_assigned.Name, '')) IN (" . implode(',', $placeholders) . ")";
     }
 
     /**

@@ -4,7 +4,7 @@ class Faq_Tag_Model extends CI_Model
 	// Admin list. Honours the Name (like) filter posted from the index page.
 	function Read_Faq_Tags()
 	{
-		$this->db->select('t.FAQTagID, t.Name, t.Status, t.InsertDate, a.Name AS InsertByName', false);
+		$this->db->select('t.FAQTagID, t.Name, t.IsDefault, t.Status, t.InsertDate, a.Name AS InsertByName', false);
 		$this->db->from('faq_tag t');
 		$this->db->join('admin a', 'a.AdminID = t.InsertBy', 'left');
 		$this->db->where('t.Status', 'Y');
@@ -19,7 +19,7 @@ class Faq_Tag_Model extends CI_Model
 
 	function Read_Faq_Tag($id)
 	{
-		$this->db->select('FAQTagID, Name, Status');
+		$this->db->select('FAQTagID, Name, IsDefault, Status');
 		$this->db->where('FAQTagID', (int)$id);
 		return $this->db->get('faq_tag')->row();
 	}
@@ -52,6 +52,7 @@ class Faq_Tag_Model extends CI_Model
 
 		$row = array(
 			'Name'       => $data['Name'],
+			'IsDefault'  => (isset($data['IsDefault']) && $data['IsDefault'] === 'Y') ? 'Y' : 'N',
 			'Status'     => 'Y',
 			'InsertBy'   => $admin_id,
 			'InsertDate' => $now,
@@ -66,6 +67,7 @@ class Faq_Tag_Model extends CI_Model
 	{
 		$row = array(
 			'Name'       => $data['Name'],
+			'IsDefault'  => (isset($data['IsDefault']) && $data['IsDefault'] === 'Y') ? 'Y' : 'N',
 			'UpdateBy'   => $this->session->userdata('admin_id'),
 			'UpdateDate' => date('Y-m-d H:i:s'),
 		);

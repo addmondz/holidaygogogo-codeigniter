@@ -29,6 +29,12 @@
 		}
 	}
 	asort($present_tags, SORT_NATURAL | SORT_FLAG_CASE);
+
+	// Split the present tags into curated "default" chips (shown up-front) and
+	// the rest (revealed only when the tag search bar matches them). The set of
+	// default ids comes from faq_tag.IsDefault via the controller.
+	$default_ids = isset($default_tag_ids) ? $default_tag_ids : array();
+	$tag_chips   = Faq_Model::Tag_Chips($present_tags, $default_ids);
 ?>
 <!DOCTYPE html>
 <html lang="en" data-faq-theme="internal">
@@ -201,35 +207,54 @@
 		.faq-search .search-clear svg { width: 15px; height: 15px; stroke: currentColor; }
 		.faq-search.has-value .search-clear { display: flex; }
 
+		.tag-filter-wrap { margin-top: 14px; }
+		.tag-filter-head {
+			display: flex;
+			flex-wrap: wrap;
+			align-items: center;
+			gap: 14px;
+			margin-bottom: 10px;
+		}
+		/* Tag search: filters which chips are shown (default chips up-front, any
+		   tag reachable by typing). Separate from the "Search all FAQs" box. */
+		.tag-search { position: relative; display: inline-flex; align-items: center; }
+		.tag-search .tag-search-icon {
+			position: absolute;
+			left: 12px; top: 50%;
+			transform: translateY(-50%);
+			width: 15px; height: 15px;
+			stroke: var(--muted);
+			pointer-events: none;
+		}
+		.tag-search input {
+			font-family: 'Outfit', sans-serif;
+			font-size: 13px;
+			color: var(--ink);
+			padding: 7px 14px 7px 34px;
+			min-width: 220px;
+			border: 1px solid var(--line);
+			border-radius: 100px;
+			background: var(--card);
+			outline: none;
+			transition: border-color .2s ease, box-shadow .2s ease;
+		}
+		.tag-search input::placeholder { color: var(--muted); }
+		.tag-search input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 		.tag-filter {
 			display: flex;
 			flex-wrap: wrap;
 			align-items: center;
 			gap: 7px;
-			margin-top: 14px;
-			overflow: hidden;
-			transition: max-height .25s ease;
 		}
-		/* Collapse the tag bar to 2 rows by default; JS sets the exact height. */
-		.tag-toggle {
-			display: none;
-			align-items: center;
-			gap: 5px;
-			margin-top: 10px;
+		/* Hidden until the tag search reveals it (or it's an active filter). */
+		.tag-filter-chip.is-tag-hidden { display: none; }
+		.tag-filter-empty {
 			font-family: 'Outfit', sans-serif;
 			font-size: 12.5px;
-			font-weight: 600;
-			color: var(--accent-deep);
-			background: transparent;
-			border: none;
-			padding: 2px 0;
-			cursor: pointer;
+			font-style: italic;
+			color: var(--muted);
 		}
-		.tag-toggle.is-shown { display: inline-flex; }
-		.tag-toggle:hover { color: var(--accent); }
-		.tag-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
-		.tag-toggle-icon { width: 14px; height: 14px; stroke: currentColor; transition: transform .25s ease; }
-		.tag-toggle[aria-expanded="true"] .tag-toggle-icon { transform: rotate(180deg); }
+		.tag-filter-empty.is-tag-hidden { display: none; }
 		.tag-filter-label {
 			display: inline-flex;
 			align-items: center;
@@ -434,22 +459,27 @@
 						<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
 					</button>
 				</div>
-				<?php if(!empty($present_tags)) { ?>
-					<div class="tag-filter" id="tagFilter" role="group" aria-label="Filter by tag">
-						<span class="tag-filter-label">
-							<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
-							Tags
-						</span>
-						<button type="button" class="tag-filter-chip is-active" data-tag-all aria-pressed="true">All</button>
-						<?php foreach($present_tags as $tid => $tname) { ?>
-							<button type="button" class="tag-filter-chip" data-tag="<?php echo (int)$tid; ?>" aria-pressed="false"><?php echo htmlspecialchars($tname); ?></button>
-						<?php } ?>
+				<?php if(!empty($tag_chips)) { ?>
+					<div class="tag-filter-wrap">
+						<div class="tag-filter-head">
+							<span class="tag-filter-label">
+								<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
+								Tags
+							</span>
+							<div class="tag-search" id="tagSearch">
+								<svg class="tag-search-icon" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+								<input type="text" id="tagSearchInput" placeholder="Search tags&hellip;" autocomplete="off" aria-label="Search tags">
+							</div>
 						</div>
-						<button type="button" class="tag-toggle" id="tagToggle" aria-expanded="false">
-							<span class="tag-toggle-text">Show more tags</span>
-							<svg class="tag-toggle-icon" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
-						</button>
-					<?php } ?>
+						<div class="tag-filter" id="tagFilter" role="group" aria-label="Filter by tag">
+							<button type="button" class="tag-filter-chip is-active" data-tag-all aria-pressed="true">All</button>
+							<?php foreach($tag_chips as $chip) { ?>
+								<button type="button" class="tag-filter-chip<?php echo $chip['is_default'] ? '' : ' is-tag-hidden'; ?>" data-tag="<?php echo (int)$chip['id']; ?>" data-tag-default="<?php echo $chip['is_default'] ? '1' : '0'; ?>" data-tag-name="<?php echo htmlspecialchars(strtolower($chip['name']), ENT_QUOTES); ?>" aria-pressed="false"><?php echo htmlspecialchars($chip['name']); ?></button>
+							<?php } ?>
+							<span class="tag-filter-empty is-tag-hidden" id="tagFilterEmpty">No tags match &ldquo;<span id="tagFilterEmptyTerm"></span>&rdquo;</span>
+						</div>
+					</div>
+				<?php } ?>
 				<div class="search-count" id="searchCount" aria-live="polite"></div>
 			</section>
 
@@ -715,6 +745,7 @@
 						chip.setAttribute('aria-pressed', nowActive ? 'true' : 'false');
 						syncAll();
 						runSearch();
+						filterTagChips();
 					});
 				});
 				if (allChip) {
@@ -726,61 +757,45 @@
 						});
 						syncAll();
 						runSearch();
+						filterTagChips();
 					});
 				}
 
-				// ---- Collapse the tag bar to 1 row with a Show more/fewer toggle ----
-				// Chips wrap into many rows once there are lots of tags. Measure the
-				// natural layout, cap the height at the bottom of the 1st row, and only
-				// show the toggle when a 2nd row actually exists. The +3px buffer keeps
-				// chip borders from being clipped by sub-pixel rounding.
-				var tagToggle = document.getElementById('tagToggle');
-				if (tagToggle) {
-					var collapsed = true, tagResizeTimer;
-					function oneRowHeight() {
-						var chips = Array.prototype.slice.call(tagBar.children);
-						if (!chips.length) return -1;
-						var contTop = tagBar.getBoundingClientRect().top;
-						var rowTops = [], row1Bottom = 0;
-						chips.forEach(function (c) {
-							var top = Math.round(c.getBoundingClientRect().top);
-							if (rowTops.indexOf(top) === -1) rowTops.push(top);
-						});
-						rowTops.sort(function (a, b) { return a - b; });
-						if (rowTops.length <= 1) return -1; // fits in 1 row already
-						chips.forEach(function (c) {
-							var r = c.getBoundingClientRect();
-							if (Math.round(r.top) === rowTops[0]) {
-								row1Bottom = Math.max(row1Bottom, r.bottom - contTop);
-							}
-						});
-						return Math.ceil(row1Bottom) + 3;
-					}
-					function applyCollapse() {
-						tagBar.style.maxHeight = 'none';
-						var h2 = oneRowHeight();
-						if (h2 < 0) { tagToggle.classList.remove('is-shown'); return; }
-						tagToggle.classList.add('is-shown');
-						if (collapsed) {
-							tagBar.style.maxHeight = h2 + 'px';
-							tagToggle.querySelector('.tag-toggle-text').textContent = 'Show more tags';
-							tagToggle.setAttribute('aria-expanded', 'false');
-						} else {
-							tagBar.style.maxHeight = tagBar.scrollHeight + 'px';
-							tagToggle.querySelector('.tag-toggle-text').textContent = 'Show fewer tags';
-							tagToggle.setAttribute('aria-expanded', 'true');
-						}
-					}
-					tagToggle.addEventListener('click', function () {
-						collapsed = !collapsed;
-						applyCollapse();
+				// ---- Tag search: reveal / hide chips by name ----
+				// Only the curated (default) chips show up-front. Typing here reveals
+				// ANY matching tag (default or not); clearing hides the non-defaults
+				// again. Active chips always stay visible so they can be toggled off.
+				// When NO tag is flagged default, the bar shows just "All" and every
+				// tag is reached through the search box.
+				var tagSearch    = document.getElementById('tagSearchInput');
+				var tagEmpty     = document.getElementById('tagFilterEmpty');
+				var tagEmptyTerm = document.getElementById('tagFilterEmptyTerm');
+				function filterTagChips() {
+					var q = (tagSearch ? tagSearch.value : '').trim().toLowerCase();
+					var anyVisible = false;
+					tagChips.forEach(function (chip) {
+						var isDefault = chip.getAttribute('data-tag-default') === '1';
+						var isActive  = chip.classList.contains('is-active');
+						var name      = chip.getAttribute('data-tag-name') || '';
+						var show = q === ''
+							? (isDefault || isActive)
+							: (name.indexOf(q) !== -1 || isActive);
+						chip.classList.toggle('is-tag-hidden', !show);
+						if (show) anyVisible = true;
 					});
-					applyCollapse();
-					window.addEventListener('resize', function () {
-						clearTimeout(tagResizeTimer);
-						tagResizeTimer = setTimeout(applyCollapse, 150);
+					if (tagEmpty) {
+						var noHits = q !== '' && !anyVisible;
+						tagEmpty.classList.toggle('is-tag-hidden', !noHits);
+						if (noHits && tagEmptyTerm) tagEmptyTerm.textContent = tagSearch.value.trim();
+					}
+				}
+				if (tagSearch) {
+					tagSearch.addEventListener('input', filterTagChips);
+					tagSearch.addEventListener('keydown', function (e) {
+						if (e.key === 'Escape') { tagSearch.value = ''; filterTagChips(); }
 					});
 				}
+				filterTagChips();
 			}
 
 			if (input) {

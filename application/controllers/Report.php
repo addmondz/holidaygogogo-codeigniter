@@ -80,8 +80,16 @@ class Report extends MY_Controller
         $this->load->helper('ghl_messages_log');
 
         $range = $this->ghl_message_log_range(trim((string) $this->input->get('log_date')));
-        $contact = trim((string) $this->input->get('contact'));
-        $agent = trim((string) $this->input->get('agent'));
+        // Contact + Agent are BOTH multi-value filters. Contact arrives as a single
+        // text field (comma / newline separated) or an array; agent arrives as a
+        // multi-select array (or a single value from the legacy drill-down links).
+        // Normalisers reduce each to a de-duplicated list the model OR/IN-matches.
+        $contactInput = $this->input->get('contact');
+        $contact = ghl_message_log_normalize_contacts($contactInput);
+        $contactRaw = is_array($contactInput)
+            ? implode(', ', array_map('strval', $contactInput))
+            : trim((string) $contactInput);
+        $agent = ghl_message_log_normalize_agents($this->input->get('agent'));
         // Optional hour-of-day (0-23), set by the Lead Reply Hourly "Leads Handled"
         // drill-down so the log opens on exactly that hour of the chosen day.
         $hour = ghl_message_log_normalize_hour($this->input->get('hour'));
@@ -98,7 +106,7 @@ class Report extends MY_Controller
         // and 'dir' the direction ('desc' default / 'asc').
         $sortCol = ghl_message_log_normalize_sort_column($this->input->get('sort'));
         $sortDir = ghl_message_log_normalize_sort($this->input->get('dir'));
-        $range['contact'] = $contact;
+        $range['contact'] = $contactRaw;
         $range['agent'] = $agent;
         $range['hour'] = $hour;
         $range['hour_label'] = $hour === null ? '' : ghl_message_log_hour_label($hour);
@@ -114,7 +122,7 @@ class Report extends MY_Controller
         // The "Time Taken" column only makes sense when the stream is a single
         // coherent thread -- one agent's, or one contact's conversation -- so it
         // (and the average) is computed when either of those filters is applied.
-        $show_reply_time = ($agent !== '' || $contact !== '');
+        $show_reply_time = (!empty($agent) || !empty($contact));
         // The per-row gap reads the message directly above/below, so it only
         // holds on a time-ordered page; grouping by direction scatters the
         // thread, so the column is suppressed there (the average still shows).
@@ -230,8 +238,10 @@ class Report extends MY_Controller
         $this->load->helper('ghl_messages_log');
 
         $range = $this->ghl_message_log_range(trim((string) $this->input->get('log_date')));
-        $contact = trim((string) $this->input->get('contact'));
-        $agent = trim((string) $this->input->get('agent'));
+        // Same multi-value contact + agent filters as the on-screen log so the CSV
+        // export mirrors exactly what the reader is looking at.
+        $contact = ghl_message_log_normalize_contacts($this->input->get('contact'));
+        $agent = ghl_message_log_normalize_agents($this->input->get('agent'));
         $hour = ghl_message_log_normalize_hour($this->input->get('hour'));
         $timeFrom = ghl_message_log_normalize_time($this->input->get('time_from'));
         $timeTo = ghl_message_log_normalize_time($this->input->get('time_to'));
@@ -434,7 +444,7 @@ class Report extends MY_Controller
         // Row 2: the per-owner sub-headers, matching the on-screen dashboard
         // columns exactly (New Lead Picked Up / Responded / Transfer Out /
         // Handling / Avg Response Time).
-        $metricHeaders = array('New Lead Picked Up', 'Responded', 'Transfer Out', 'Handling', 'Avg Response Time');
+        $metricHeaders = array('New Lead Picked Up', 'Responded', 'Transfer Out', 'Helped Reply', 'Handling', 'Avg Response Time');
         $metricSpan = count($metricHeaders);
         $sheet->setCellValue('A1', 'Date');
         $sheet->mergeCells('A1:A2');
@@ -479,14 +489,15 @@ class Report extends MY_Controller
                 foreach ($owners as $owner) {
                     $cell = isset($matrix['lookup'][$owner['owner_user_id']][$date])
                         ? $matrix['lookup'][$owner['owner_user_id']][$date]
-                        : array(0, 0, 0, 0, '-');
+                        : array(0, 0, 0, 0, 0, '-');
                     $col = $owner['_col'];
-                    // [picked_up, responded, transfer_out, handling, avg_label]
+                    // [picked_up, responded, transfer_out, helped, handling, avg_label]
                     $sheet->setCellValue($stringFromCol($col) . $rowNum, (int) $cell[0]);
                     $sheet->setCellValue($stringFromCol($col + 1) . $rowNum, (int) $cell[1]);
                     $sheet->setCellValue($stringFromCol($col + 2) . $rowNum, (int) $cell[2]);
                     $sheet->setCellValue($stringFromCol($col + 3) . $rowNum, (int) $cell[3]);
-                    $sheet->setCellValueExplicit($stringFromCol($col + 4) . $rowNum, (string) $cell[4], \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+                    $sheet->setCellValue($stringFromCol($col + 4) . $rowNum, (int) $cell[4]);
+                    $sheet->setCellValueExplicit($stringFromCol($col + 5) . $rowNum, (string) $cell[5], \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
                 }
                 $rowNum++;
             }
@@ -499,8 +510,9 @@ class Report extends MY_Controller
                 $sheet->setCellValue($stringFromCol($col) . $totalRow, (int) $owner['total_picked_up']);
                 $sheet->setCellValue($stringFromCol($col + 1) . $totalRow, (int) $owner['total_responded']);
                 $sheet->setCellValue($stringFromCol($col + 2) . $totalRow, (int) $owner['total_transfer_out']);
-                $sheet->setCellValue($stringFromCol($col + 3) . $totalRow, (int) $owner['total_handling']);
-                $sheet->setCellValueExplicit($stringFromCol($col + 4) . $totalRow, (string) $owner['avg_response_time_label'], \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+                $sheet->setCellValue($stringFromCol($col + 3) . $totalRow, (int) $owner['total_helped']);
+                $sheet->setCellValue($stringFromCol($col + 4) . $totalRow, (int) $owner['total_handling']);
+                $sheet->setCellValueExplicit($stringFromCol($col + 5) . $totalRow, (string) $owner['avg_response_time_label'], \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
             }
             $sheet->getStyle('A' . $totalRow . ':' . $lastCol . $totalRow)->getFont()->setBold(true);
             $sheet->getStyle('A' . $totalRow . ':' . $lastCol . $totalRow)->getBorders()->getTop()
@@ -564,7 +576,7 @@ class Report extends MY_Controller
     {
         $filters = $this->lead_reply_activity_filters();
         $metric = strtolower(trim((string) $this->input->get('metric')));
-        if (!in_array($metric, array('picked_up', 'responded', 'transfer_out', 'today_handling'), true)) {
+        if (!in_array($metric, array('picked_up', 'responded', 'transfer_out', 'helped_reply', 'today_handling'), true)) {
             $metric = 'picked_up';
         }
 
@@ -584,6 +596,9 @@ class Report extends MY_Controller
                 break;
             case 'transfer_out':
                 $rows = $this->Report_Model->Lead_Reply_Activity_Transfer_Out_Leads($filters);
+                break;
+            case 'helped_reply':
+                $rows = $this->Report_Model->Lead_Reply_Activity_Helped_Reply_Leads($filters);
                 break;
             case 'today_handling':
                 // Still-handling = replied-to leads that were NOT transferred out.
@@ -2118,7 +2133,10 @@ class Report extends MY_Controller
 
         foreach ($rows as $row) {
             $responded = (int) $row['lead_responded'];
-            $transferOut = (int) $row['reply_created_leads'];
+            // Transfer Out counts only leads that were once assigned to this owner
+            // (is_assigned_owner=1) and have since moved to another agent -- not
+            // leads the owner merely helped reply on but was never assigned.
+            $transferOut = (int) $row['assigned_reply_created_leads'];
             $avgResponseSeconds = isset($row['avg_response_seconds']) && $row['avg_response_seconds'] !== null
                 ? (int) $row['avg_response_seconds']
                 : null;
@@ -2128,6 +2146,9 @@ class Report extends MY_Controller
                 'new_leads_picked_up' => (int) $row['assigned_leads'],
                 'lead_responded' => $responded,
                 'transfer_out_leads' => $transferOut,
+                // Leads the owner replied to but was never assigned (helped on
+                // another agent's lead) -- the count dropped from Transfer Out.
+                'helped_reply_leads' => (int) $row['reply_created_not_assigned_leads'],
                 'today_handling_leads' => (int) $row['today_handling_leads'],
                 'avg_response_time_seconds' => $avgResponseSeconds,
                 'avg_response_time_label' => $this->format_duration_label($avgResponseSeconds),

@@ -55,13 +55,13 @@ assert_eq('cap keeps the tail (ends on end date)', '2026-12-31', $capped[2]);
 $dates = array('2026-06-01', '2026-06-02');
 $perDay = array(
     '2026-06-01' => array(
-        array('owner_user_id' => 'U-AMY', 'owner_name' => 'Amy', 'new_leads_picked_up' => 15, 'lead_responded' => 12, 'transfer_out_leads' => 3, 'today_handling_leads' => 9, 'avg_response_time_seconds' => 120, 'avg_response_time_label' => '2 min'),
-        array('owner_user_id' => 'U-BEN', 'owner_name' => 'Ben', 'new_leads_picked_up' => 10, 'lead_responded' => 8,  'transfer_out_leads' => 1, 'today_handling_leads' => 7, 'avg_response_time_seconds' => null, 'avg_response_time_label' => '-'),
+        array('owner_user_id' => 'U-AMY', 'owner_name' => 'Amy', 'new_leads_picked_up' => 15, 'lead_responded' => 12, 'transfer_out_leads' => 3, 'helped_reply_leads' => 4, 'today_handling_leads' => 9, 'avg_response_time_seconds' => 120, 'avg_response_time_label' => '2 min'),
+        array('owner_user_id' => 'U-BEN', 'owner_name' => 'Ben', 'new_leads_picked_up' => 10, 'lead_responded' => 8,  'transfer_out_leads' => 1, 'helped_reply_leads' => 2, 'today_handling_leads' => 7, 'avg_response_time_seconds' => null, 'avg_response_time_label' => '-'),
     ),
     '2026-06-02' => array(
         // Amy again; Ben absent this day; Cara appears only on day 2.
-        array('owner_user_id' => 'U-AMY', 'owner_name' => 'Amy',  'new_leads_picked_up' => 11, 'lead_responded' => 10, 'transfer_out_leads' => 2, 'today_handling_leads' => 8, 'avg_response_time_seconds' => 360, 'avg_response_time_label' => '6 min'),
-        array('owner_user_id' => 'U-CARA', 'owner_name' => 'Cara', 'new_leads_picked_up' => 25, 'lead_responded' => 20, 'transfer_out_leads' => 5, 'today_handling_leads' => 15, 'avg_response_time_seconds' => 90, 'avg_response_time_label' => '1 min'),
+        array('owner_user_id' => 'U-AMY', 'owner_name' => 'Amy',  'new_leads_picked_up' => 11, 'lead_responded' => 10, 'transfer_out_leads' => 2, 'helped_reply_leads' => 1, 'today_handling_leads' => 8, 'avg_response_time_seconds' => 360, 'avg_response_time_label' => '6 min'),
+        array('owner_user_id' => 'U-CARA', 'owner_name' => 'Cara', 'new_leads_picked_up' => 25, 'lead_responded' => 20, 'transfer_out_leads' => 5, 'helped_reply_leads' => 3, 'today_handling_leads' => 15, 'avg_response_time_seconds' => 90, 'avg_response_time_label' => '1 min'),
     ),
 );
 
@@ -75,6 +75,7 @@ assert_eq('owner union + sort by total responded desc', array('U-AMY', 'U-CARA',
 assert_eq('Amy total picked up across range', 26, $matrix['owners'][0]['total_picked_up']);
 assert_eq('Amy total responded across range', 22, $matrix['owners'][0]['total_responded']);
 assert_eq('Amy total transfer out across range', 5, $matrix['owners'][0]['total_transfer_out']);
+assert_eq('Amy total helped reply across range', 5, $matrix['owners'][0]['total_helped']);
 assert_eq('Amy total handling across range', 17, $matrix['owners'][0]['total_handling']);
 // Weighted avg: (120*12 + 360*10) / (12 + 10) = 5040 / 22 = 229.09 -> 229s -> '3 min'
 assert_eq('Amy weighted avg response time label', '3 min', $matrix['owners'][0]['avg_response_time_label']);
@@ -83,16 +84,16 @@ assert_eq('Amy weighted avg response time label', '3 min', $matrix['owners'][0][
 $ben = $matrix['owners'][2];
 assert_eq('Ben avg response time label is dash', '-', $ben['avg_response_time_label']);
 
-// Per-day cells: [picked_up, responded, transfer_out, handling, avg_label].
-assert_eq('Amy day 1 cell', array(15, 12, 3, 9, '2 min'), $matrix['lookup']['U-AMY']['2026-06-01']);
-assert_eq('Amy day 2 cell', array(11, 10, 2, 8, '6 min'), $matrix['lookup']['U-AMY']['2026-06-02']);
+// Per-day cells: [picked_up, responded, transfer_out, helped, handling, avg_label].
+assert_eq('Amy day 1 cell', array(15, 12, 3, 4, 9, '2 min'), $matrix['lookup']['U-AMY']['2026-06-01']);
+assert_eq('Amy day 2 cell', array(11, 10, 2, 1, 8, '6 min'), $matrix['lookup']['U-AMY']['2026-06-02']);
 
 // Ben has no day-2 entry -> writer renders blank/zero for that column group.
 assert_eq('Ben has no day-2 cell', false, isset($matrix['lookup']['U-BEN']['2026-06-02']));
 
 // Cara has no day-1 entry.
 assert_eq('Cara has no day-1 cell', false, isset($matrix['lookup']['U-CARA']['2026-06-01']));
-assert_eq('Cara day 2 cell', array(25, 20, 5, 15, '1 min'), $matrix['lookup']['U-CARA']['2026-06-02']);
+assert_eq('Cara day 2 cell', array(25, 20, 5, 3, 15, '1 min'), $matrix['lookup']['U-CARA']['2026-06-02']);
 
 // ---------------------------------------------------------------------------
 // 3. Filename

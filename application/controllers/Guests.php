@@ -11,6 +11,7 @@ class Guests extends MY_Controller
 		$this->load->model('Booking_Model');
 		$this->load->model('Customer_Type_Model');
 		$this->load->helper('guest_contact');
+		$this->load->helper('chat_history');
 	}
 
 	function index()
@@ -25,6 +26,7 @@ class Guests extends MY_Controller
 		$this->load->model('Ghl_Messages_Model');
 		$data['msg_log_phones'] = $this->Ghl_Messages_Model->Phones_With_Messages_For_Guests($data['guests']);
 		$data['remark_counts']  = $this->Remark_Counts_For_Guests($data['guests']);
+		$data['chat_counts']    = $this->Chat_Counts_For_Guests($data['guests']);
 		$data['total']          = null;
 		$data['page']           = $page;
 		$data['limit']          = $limit;
@@ -399,6 +401,166 @@ class Guests extends MY_Controller
 		$affected = $this->Guests_Model->Delete_Guest_Remark($remark_id, $this->session->userdata('admin_id'));
 		if ($affected < 1) {
 			return $out(array('ok' => false, 'message' => 'You can only delete your own remark.'));
+		}
+		return $out(array('ok' => true));
+	}
+
+	/**
+	 * dedup_key => active chat-file count for the rows on this page, so the shared
+	 * view can badge each Action menu with "Chat History (n)". Every row (incl.
+	 * GHL leads) carries a dedup_key, so all of them get a count here.
+	 */
+	private function Chat_Counts_For_Guests($guests)
+	{
+		$keys = array();
+		foreach ((array) $guests as $g) {
+			if (!empty($g->dedup_key)) {
+				$keys[] = $g->dedup_key;
+			}
+		}
+		return $this->Guests_Model->Read_Chat_History_Counts($keys);
+	}
+
+	/**
+	 * ----- Chat history (uploaded WhatsApp .txt exports) ----------------------
+	 * Same JSON contract + dedup_key keying as the remarks above. These live on
+	 * the Guests controller and the shared view calls them by absolute path
+	 * (base_url('Guests/...')) from every page (Guest List / Customer / GHL).
+	 */
+	function Chat_History()
+	{
+		$dedup_key = (string) $this->input->get('dedup_key');
+		if ($dedup_key === '') {
+			$this->output->set_content_type('application/json')
+				->set_output(json_encode(array('ok' => false, 'message' => 'Missing guest reference.')));
+			return;
+		}
+
+		$admin_id = $this->session->userdata('admin_id');
+		$rows     = $this->Guests_Model->Read_Chat_History($dedup_key, $admin_id);
+
+		$out = array();
+		foreach ($rows as $r) {
+			$out[] = array(
+				'id'            => (int) $r->FileID,
+				'title'         => ($r->Title !== null && $r->Title !== '') ? $r->Title : $r->OriginalName,
+				'original_name' => $r->OriginalName,
+				'created_by'    => $r->CreatedByName !== null ? $r->CreatedByName : '',
+				'created_at'    => $r->CreatedAt,
+				'can_delete'    => (bool) $r->CanDelete,
+			);
+		}
+
+		$this->output->set_content_type('application/json')
+			->set_output(json_encode(array('ok' => true, 'files' => $out)));
+	}
+
+	/**
+	 * Store an uploaded chat .txt (validated by the pure helper) under
+	 * assets/upload/chat_history/ and record it against the guest's dedup_key.
+	 */
+	function Upload_Chat_History()
+	{
+		$out = function ($data) {
+			$this->output->set_content_type('application/json')->set_output(json_encode($data));
+		};
+
+		$dedup_key = (string) $this->input->post('dedup_key');
+		if ($dedup_key === '') {
+			return $out(array('ok' => false, 'message' => 'Missing guest reference.'));
+		}
+		if (!isset($_FILES['chat_file']) || $_FILES['chat_file']['error'] !== UPLOAD_ERR_OK) {
+			return $out(array('ok' => false, 'message' => 'No file was uploaded.'));
+		}
+
+		$original = (string) $_FILES['chat_file']['name'];
+		$size     = (int) $_FILES['chat_file']['size'];
+		$v        = chat_history_validate_upload($original, $size);
+		if (!$v['ok']) {
+			return $out(array('ok' => false, 'message' => $v['error']));
+		}
+
+		$dir = FCPATH . 'assets/upload/chat_history/';
+		if (!is_dir($dir)) {
+			mkdir($dir, 0755, true);
+		}
+		$stored = chat_history_stored_name($original);
+		if (!move_uploaded_file($_FILES['chat_file']['tmp_name'], $dir . $stored)) {
+			return $out(array('ok' => false, 'message' => 'Could not save the file. Please try again.'));
+		}
+
+		$title    = trim((string) $this->input->post('title'));
+		$admin_id = $this->session->userdata('admin_id');
+		$id = $this->Guests_Model->Add_Chat_History($dedup_key, $original, $stored, $title, $admin_id);
+
+		return $out(array('ok' => true, 'file' => array('id' => (int) $id)));
+	}
+
+	/**
+	 * Return one chat file parsed into messages for the in-app bubble viewer.
+	 */
+	function View_Chat_History()
+	{
+		$id  = (int) $this->input->get('id');
+		$row = $this->Guests_Model->Get_Chat_History_File($id);
+		if (!$row) {
+			$this->output->set_content_type('application/json')
+				->set_output(json_encode(array('ok' => false, 'message' => 'File not found.')));
+			return;
+		}
+
+		$path = FCPATH . 'assets/upload/chat_history/' . basename($row->StoredName);
+		$text = is_file($path) ? file_get_contents($path) : '';
+
+		$this->output->set_content_type('application/json')->set_output(json_encode(array(
+			'ok'       => true,
+			'title'    => ($row->Title !== null && $row->Title !== '') ? $row->Title : $row->OriginalName,
+			'messages' => chat_history_parse($text),
+		)));
+	}
+
+	/**
+	 * Stream the raw .txt back to the browser under its original filename.
+	 */
+	function Download_Chat_History()
+	{
+		$id  = (int) $this->input->get('id');
+		$row = $this->Guests_Model->Get_Chat_History_File($id);
+		if (!$row) {
+			show_404();
+			return;
+		}
+		$path = FCPATH . 'assets/upload/chat_history/' . basename($row->StoredName);
+		if (!is_file($path)) {
+			show_404();
+			return;
+		}
+
+		$name = str_replace(array('"', "\r", "\n"), '', $row->OriginalName);
+		header('Content-Type: text/plain; charset=utf-8');
+		header('Content-Disposition: attachment; filename="' . $name . '"');
+		header('Content-Length: ' . filesize($path));
+		readfile($path);
+		exit;
+	}
+
+	/**
+	 * Soft-delete a chat file. The model confines this to the uploader.
+	 */
+	function Delete_Chat_History()
+	{
+		$out = function ($data) {
+			$this->output->set_content_type('application/json')->set_output(json_encode($data));
+		};
+
+		$file_id = (int) $this->input->post('id');
+		if ($file_id < 1) {
+			return $out(array('ok' => false, 'message' => 'Missing file reference.'));
+		}
+
+		$affected = $this->Guests_Model->Delete_Chat_History($file_id, $this->session->userdata('admin_id'));
+		if ($affected < 1) {
+			return $out(array('ok' => false, 'message' => 'You can only delete your own upload.'));
 		}
 		return $out(array('ok' => true));
 	}

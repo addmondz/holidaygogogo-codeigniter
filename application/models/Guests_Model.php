@@ -1,17 +1,19 @@
 <?php
 class Guests_Model extends CI_Model
 {
-	// Which single source this page reads: 'guest' (Guest List, booking guests)
-	// or 'ghl' (GHL Leads). Set once per request by the controller.
+	// Which source(s) this request reads: 'guest' (Guest List, booking guests),
+	// 'ghl' (GHL Leads) or 'all' (campaign picker, both). Set once per request by
+	// the controller.
 	private $mode = 'guest';
 
 	/**
 	 * Lock the listing to one source. Controllers call this before Read/Count so
-	 * the Guest List and GHL Leads pages each read only their own branch.
+	 * the Guest List and GHL Leads pages each read only their own branch; the
+	 * campaign picker passes 'all' to read booking guests and leads together.
 	 */
 	function Set_Mode($mode)
 	{
-		$this->mode = ($mode === 'ghl') ? 'ghl' : 'guest';
+		$this->mode = in_array($mode, array('ghl', 'all'), true) ? $mode : 'guest';
 		return $this;
 	}
 
@@ -57,13 +59,17 @@ class Guests_Model extends CI_Model
 
 		// Each page reads ONE source (see Set_Mode); a filter that can never match
 		// that source still drops it to empty via the shared suppression predicates.
-		$run       = guest_list_branches_to_run($this->mode, $this->input->get());
+		$get       = $this->input->get();
+		$run       = guest_list_branches_to_run($this->mode, $get);
 		$run_bookings = $run['bookings'];
 		$run_ghl      = $run['ghl'];
 
 		$booking = null;
 		if($run_bookings) {
-			$where = " WHERE b.Status != 'N' AND b.CancelStatus = 'N'
+			// Cancelled-BC segment flips the default "hide cancelled" predicate to
+			// "only cancelled" so a campaign can target guests whose booking fell
+			// through (guest_list_cancel_predicate).
+			$where = " WHERE b.Status != 'N' AND " . guest_list_cancel_predicate($get, 'b.CancelStatus') . "
 				AND gl.dedup_key IS NOT NULL
 				AND (
 					NULLIF(TRIM(gl.Name), '')     IS NOT NULL
@@ -132,6 +138,27 @@ class Guests_Model extends CI_Model
 				$where    .= $birthday['sql'];
 				foreach($birthday['params'] as $bp) {
 					$b_params[] = $bp;
+				}
+			}
+
+			// Family-with-kids segment: keep guests on a booking that carries at
+			// least one child or infant (a row-level match — a guest counts when
+			// ANY of their bookings has kids).
+			if(guest_list_flag_on($get, 'family_kids')) {
+				$where .= " AND (COALESCE(b.Children, 0) > 0 OR COALESCE(b.Infant, 0) > 0) ";
+			}
+
+			// Booking-lead timeline: how far ahead the BC was created before the
+			// travel start (bucketed in months, min inclusive / max exclusive).
+			// NULL / zero dates give a NULL diff that fails the comparison, so
+			// placeholder bookings never match.
+			$lead = guest_list_parse_bucket_bounds($this->input->get('booking_lead'));
+			if($lead !== null) {
+				$where     .= " AND TIMESTAMPDIFF(MONTH, b.InsertDate, b.StartDate) >= ? ";
+				$b_params[] = $lead[0];
+				if($lead[1] !== null) {
+					$where     .= " AND TIMESTAMPDIFF(MONTH, b.InsertDate, b.StartDate) < ? ";
+					$b_params[] = $lead[1];
 				}
 			}
 
@@ -251,6 +278,36 @@ class Guests_Model extends CI_Model
 				$having_params[] = (int)$pax_max;
 			}
 
+			// --- Campaign customer-value segments (per-person aggregates) ---
+			// "Purchased N× and above": distinct bookings under this person.
+			$min_purchases = guest_list_purchase_count_min($this->input->get('min_purchases'));
+			if($min_purchases !== null) {
+				$having[]        = "COUNT(DISTINCT BookingID) >= ?";
+				$having_params[] = $min_purchases;
+			}
+
+			// Lifetime Booking Value bucket: the total NetTotal across the
+			// person's bookings (min inclusive, max exclusive).
+			$sales_expr = "COALESCE(SUM(CASE WHEN booking_rn = 1 THEN BookingNetTotal END), 0)";
+			$ltv = guest_list_parse_bucket_bounds($this->input->get('ltv'));
+			if($ltv !== null) {
+				$having[]        = "{$sales_expr} >= ?";
+				$having_params[] = $ltv[0];
+				if($ltv[1] !== null) {
+					$having[]        = "{$sales_expr} < ?";
+					$having_params[] = $ltv[1];
+				}
+			}
+
+			// "Purchased on a yearly basis (2 consecutive years+)": OR each
+			// booking year into a bitmask (base 2000), then two set bits one
+			// position apart mean two adjacent calendar years exist.
+			if(guest_list_flag_on($get, 'consecutive_years')) {
+				$year_mask = "BIT_OR(CASE WHEN booking_rn = 1 AND YEAR(BookingDate) >= 2000
+					THEN (1 << (YEAR(BookingDate) - 2000)) ELSE 0 END)";
+				$having[] = "({$year_mask} & ({$year_mask} << 1)) <> 0";
+			}
+
 			$booking = array(
 				'dedup'         => $dedup,
 				'from'          => $from_joins_where,
@@ -292,6 +349,24 @@ class Guests_Model extends CI_Model
 			if($email !== '') {
 				$ghl_where .= " AND gc.email LIKE ? ";
 				$g_params[] = '%' . $email . '%';
+			}
+
+			// Race is a lead-only attribute (gc.race); multi-select IN list.
+			$this->Append_In_Clause($ghl_where, $g_params, 'gc.race', $this->input->get('race'));
+
+			// Tag is lead-only too. A tag can live on the contact (gc.tags_json)
+			// or per-conversation (gt.tags_concat, several JSON arrays newline-
+			// joined). Match ANY of the picked tags across BOTH: JSON_SEARCH on
+			// the contact array, plus a quoted LIKE on the concatenated text.
+			$tags = guest_list_multi_values($this->input->get('tags'));
+			if(!empty($tags)) {
+				$ors = array();
+				foreach($tags as $t) {
+					$ors[]      = "(JSON_SEARCH(gc.tags_json, 'one', ?, '!') IS NOT NULL OR gt.tags_concat LIKE ? ESCAPE '!')";
+					$g_params[] = $this->db->escape_like_str($t);
+					$g_params[] = '%"' . $this->db->escape_like_str($t) . '"%';
+				}
+				$ghl_where .= " AND (" . implode(' OR ', $ors) . ") ";
 			}
 
 			// "Campaign" filter over leads in a campaign roster; multi-select over
@@ -410,17 +485,18 @@ WHERE 1 = 1
 	private function Build_Leader_Fallback_Branch()
 	{
 		$this->load->helper('guest_contact');
-		$run = guest_list_branches_to_run($this->mode, $this->input->get());
+		$get = $this->input->get();
+		$run = guest_list_branches_to_run($this->mode, $get);
 		if(!$run['bookings']) {
 			return null;
 		}
-		if(guest_list_leader_fallback_suppressed_by_filters($this->input->get())) {
+		if(guest_list_leader_fallback_suppressed_by_filters($get)) {
 			return null;
 		}
 
 		$key = $this->Booking_Leader_Key_Expr();
 
-		$where = " WHERE b.Status != 'N' AND b.CancelStatus = 'N'
+		$where = " WHERE b.Status != 'N' AND " . guest_list_cancel_predicate($get, 'b.CancelStatus') . "
 			AND {$key} IS NOT NULL
 			AND NOT EXISTS (
 				SELECT 1 FROM guest_list glx
@@ -445,6 +521,22 @@ WHERE 1 = 1
 			$where   .= " AND b.StartDate <= ? AND b.EndDate >= ? ";
 			$params[] = $travel_range[1];
 			$params[] = $travel_range[0];
+		}
+
+		// Family-with-kids / booking-lead timeline: row-level booking segments,
+		// same as the main booking branch (a leader counts when ANY of their
+		// unfilled bookings matches).
+		if(guest_list_flag_on($get, 'family_kids')) {
+			$where .= " AND (COALESCE(b.Children, 0) > 0 OR COALESCE(b.Infant, 0) > 0) ";
+		}
+		$lead = guest_list_parse_bucket_bounds($this->input->get('booking_lead'));
+		if($lead !== null) {
+			$where   .= " AND TIMESTAMPDIFF(MONTH, b.InsertDate, b.StartDate) >= ? ";
+			$params[] = $lead[0];
+			if($lead[1] !== null) {
+				$where   .= " AND TIMESTAMPDIFF(MONTH, b.InsertDate, b.StartDate) < ? ";
+				$params[] = $lead[1];
+			}
 		}
 
 		$booking_number = trim((string)$this->input->get('booking_number'));
@@ -505,6 +597,36 @@ WHERE 1 = 1
 			$params[] = '%' . $q_raw . '%';
 		}
 
+		// Per-leader value segments filter the GROUP BY {$key} result via HAVING,
+		// mirroring the booking branch. Each unfilled booking is one row here, so
+		// COUNT(DISTINCT b.BookingID) / SUM(b.NetTotal) / YEAR(b.InsertDate) need
+		// no booking_rn de-dup.
+		$having        = array();
+		$having_params = array();
+
+		$min_purchases = guest_list_purchase_count_min($this->input->get('min_purchases'));
+		if($min_purchases !== null) {
+			$having[]        = "COUNT(DISTINCT b.BookingID) >= ?";
+			$having_params[] = $min_purchases;
+		}
+
+		$sales_expr = "COALESCE(SUM(COALESCE(b.NetTotal, 0)), 0)";
+		$ltv = guest_list_parse_bucket_bounds($this->input->get('ltv'));
+		if($ltv !== null) {
+			$having[]        = "{$sales_expr} >= ?";
+			$having_params[] = $ltv[0];
+			if($ltv[1] !== null) {
+				$having[]        = "{$sales_expr} < ?";
+				$having_params[] = $ltv[1];
+			}
+		}
+
+		if(guest_list_flag_on($get, 'consecutive_years')) {
+			$year_mask = "BIT_OR(CASE WHEN YEAR(b.InsertDate) >= 2000
+				THEN (1 << (YEAR(b.InsertDate) - 2000)) ELSE 0 END)";
+			$having[] = "({$year_mask} & ({$year_mask} << 1)) <> 0";
+		}
+
 		$from = "
 	FROM booking b
 	LEFT JOIN customer     c   ON c.CustomerID     = b.CustomerID
@@ -515,7 +637,13 @@ WHERE 1 = 1
 	{$where}
 		";
 
-		return array('key' => $key, 'from' => $from, 'params' => $params);
+		return array(
+			'key'           => $key,
+			'from'          => $from,
+			'params'        => $params,
+			'having'        => empty($having) ? '' : ' HAVING ' . implode(' AND ', $having),
+			'having_params' => $having_params,
+		);
 	}
 
 	/**
@@ -524,7 +652,7 @@ WHERE 1 = 1
 	 * the UNION ALL lines up. Every non-key column is aggregated because a leader
 	 * may run several unfilled bookings.
 	 */
-	private function Leader_Fallback_Select($key, $from)
+	private function Leader_Fallback_Select($key, $from, $having = '')
 	{
 		return "
 	SELECT
@@ -560,6 +688,7 @@ WHERE 1 = 1
 		MAX(c.created_at) AS CustomerCreatedAt
 	{$from}
 	GROUP BY {$key}
+	{$having}
 		";
 	}
 
@@ -658,8 +787,8 @@ SELECT
 		}
 
 		if($fallback !== null) {
-			$parts[] = $this->Leader_Fallback_Select($fallback['key'], $fallback['from']);
-			$params  = array_merge($params, $fallback['params']);
+			$parts[] = $this->Leader_Fallback_Select($fallback['key'], $fallback['from'], $fallback['having']);
+			$params  = array_merge($params, $fallback['params'], $fallback['having_params']);
 		}
 
 		if(empty($parts)) {
@@ -1402,6 +1531,57 @@ GROUP BY mm.merge_key";
 	}
 
 	/**
+	 * Distinct Race values for the Campaign picker's leads-only Race filter.
+	 * Race lives only on ghl_contacts (synced + manual leads), so this is the
+	 * sole source. Returns rows with a `value` column (matches Read_Distinct).
+	 */
+	function Read_Distinct_Ghl_Races()
+	{
+		$sql = "
+			SELECT DISTINCT TRIM(gc.race) AS value
+			FROM ghl_contacts gc
+			WHERE gc.race IS NOT NULL AND TRIM(gc.race) != ''
+			ORDER BY value ASC
+		";
+		return $this->db->query($sql)->result();
+	}
+
+	/**
+	 * The distinct, cleaned tag list for the Campaign picker's leads-only Tag
+	 * filter. Tags live per-conversation (ghl_conversations.tags_json) and on
+	 * the contact (ghl_contacts.tags_json); both are JSON arrays. We pull every
+	 * non-empty array and flatten them through ghl_lead_tags_parse() (drops the
+	 * bracketed [whatsapp]/[device] system tags, de-dupes case-insensitively).
+	 *
+	 * @return string[] Sorted unique tag strings.
+	 */
+	function Read_Ghl_Tags()
+	{
+		$this->load->helper('ghl_lead_tags');
+
+		$sql = "
+			SELECT tags_json FROM ghl_conversations
+			WHERE tags_json IS NOT NULL AND JSON_LENGTH(tags_json) > 0
+			UNION ALL
+			SELECT tags_json FROM ghl_contacts
+			WHERE tags_json IS NOT NULL AND JSON_LENGTH(tags_json) > 0
+		";
+		$rows = $this->db->query($sql)->result();
+
+		$tags = array();
+		foreach($rows as $r) {
+			// ghl_lead_tags_parse takes a newline-joined blob; one array per call
+			// is fine — it just parses the single JSON line.
+			foreach(ghl_lead_tags_parse(isset($r->tags_json) ? $r->tags_json : null) as $t) {
+				$tags[mb_strtolower($t)] = $t;
+			}
+		}
+		$tags = array_values($tags);
+		usort($tags, 'strcasecmp');
+		return $tags;
+	}
+
+	/**
 	 * Add a campaign remark for a guest (keyed by dedup_key, so it follows the
 	 * person across all their bookings — same key the inline edits use). The
 	 * campaign date, destination id, follow date and text are already validated
@@ -1483,6 +1663,98 @@ GROUP BY mm.merge_key";
 		$this->db->query(
 			"UPDATE guest_remarks SET Status = 'N' WHERE RemarkID = ? AND CreatedBy = ? AND Status = 'Y'",
 			array((int) $remark_id, $admin_id)
+		);
+		return $this->db->affected_rows();
+	}
+
+	/**
+	 * ----- Chat history files (uploaded WhatsApp .txt exports) -----------------
+	 * Keyed by dedup_key like the remarks above, so an uploaded chat follows the
+	 * person across all their bookings/leads. StoredName is the random on-disk
+	 * name; OriginalName is what we show and download as.
+	 */
+	function Add_Chat_History($dedup_key, $original_name, $stored_name, $title, $admin_id)
+	{
+		$this->db->insert('chat_history_files', array(
+			'dedup_key'    => (string) $dedup_key,
+			'OriginalName' => (string) $original_name,
+			'StoredName'   => (string) $stored_name,
+			'Title'        => ($title !== '' && $title !== null) ? (string) $title : null,
+			'Status'       => 'Y',
+			'CreatedBy'    => $admin_id,
+			'CreatedAt'    => date('Y-m-d H:i:s'),
+		));
+		return (int) $this->db->insert_id();
+	}
+
+	/**
+	 * All active chat files for a guest, newest first, with the uploader's name.
+	 * CanDelete flags rows the viewer may remove (their own — pass their admin id).
+	 */
+	function Read_Chat_History($dedup_key, $viewer_admin_id = null)
+	{
+		$sql = "SELECT chf.FileID, chf.OriginalName, chf.StoredName, chf.Title,
+				chf.CreatedBy, chf.CreatedAt, a.Name AS CreatedByName
+			FROM chat_history_files chf
+			LEFT JOIN admin a ON a.AdminID = chf.CreatedBy
+			WHERE chf.Status = 'Y' AND chf.dedup_key = ?
+			ORDER BY chf.CreatedAt DESC, chf.FileID DESC";
+		$rows = $this->db->query($sql, array((string) $dedup_key))->result();
+
+		foreach ($rows as $r) {
+			$r->CanDelete = ($viewer_admin_id !== null && (int) $r->CreatedBy === (int) $viewer_admin_id);
+		}
+		return $rows;
+	}
+
+	/**
+	 * Active chat-file counts for a set of dedup_keys, keyed by dedup_key — used
+	 * to badge the listing's Action menu without a per-row query.
+	 */
+	function Read_Chat_History_Counts($dedup_keys)
+	{
+		$keys = array();
+		foreach ((array) $dedup_keys as $k) {
+			$k = (string) $k;
+			if ($k !== '' && !in_array($k, $keys, true)) { $keys[] = $k; }
+		}
+		if (empty($keys)) {
+			return array();
+		}
+		$placeholders = implode(',', array_fill(0, count($keys), '?'));
+		$sql = "SELECT dedup_key, COUNT(*) AS cnt
+			FROM chat_history_files
+			WHERE Status = 'Y' AND dedup_key IN ({$placeholders})
+			GROUP BY dedup_key";
+		$out = array();
+		foreach ($this->db->query($sql, $keys)->result() as $row) {
+			$out[$row->dedup_key] = (int) $row->cnt;
+		}
+		return $out;
+	}
+
+	/**
+	 * One active chat file (for view/download). Returns the row or null.
+	 */
+	function Get_Chat_History_File($file_id)
+	{
+		$row = $this->db->query(
+			"SELECT FileID, dedup_key, OriginalName, StoredName, Title
+			 FROM chat_history_files WHERE FileID = ? AND Status = 'Y'",
+			array((int) $file_id)
+		)->row();
+		return $row ? $row : null;
+	}
+
+	/**
+	 * Soft-delete a chat file, confined to its uploader (CreatedBy). Returns rows
+	 * affected (0 when not theirs / missing). The disk file is left in place.
+	 */
+	function Delete_Chat_History($file_id, $admin_id)
+	{
+		$this->db->query(
+			"UPDATE chat_history_files SET Status = 'N' WHERE FileID = ? AND CreatedBy = ? AND Status = 'Y'",
+			array((int) $file_id, $admin_id)
 		);
 		return $this->db->affected_rows();
 	}

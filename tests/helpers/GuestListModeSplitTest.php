@@ -39,6 +39,23 @@ $f = guest_list_branches_to_run('', array());
 assert_eq('empty mode runs bookings', true,  $f['bookings']);
 assert_eq('empty mode skips ghl',     false, $f['ghl']);
 
+// ---- 'all' mode (campaign picker): both branches run, no filters -----------
+$a = guest_list_branches_to_run('all', array());
+assert_eq('all mode runs bookings', true, $a['bookings']);
+assert_eq('all mode runs ghl',      true, $a['ghl']);
+
+// ---- 'all' mode still honours per-branch suppression: a booking-only -------
+// ---- Destination drops the GHL branch but keeps the booking branch. ---------
+$ad = guest_list_branches_to_run('all', array('destination' => '7'));
+assert_eq('all mode keeps bookings with destination', true,  $ad['bookings']);
+assert_eq('all mode drops ghl with destination',      false, $ad['ghl']);
+
+// ---- 'all' mode with Guest Role = Team Leader keeps booking guests but ------
+// ---- drops leads (a lead only ever holds the "Lead" role). ------------------
+$al = guest_list_branches_to_run('all', array('role' => 'Team Leader'));
+assert_eq('all mode keeps bookings for Team Leader', true,  $al['bookings']);
+assert_eq('all mode drops ghl for Team Leader',      false, $al['ghl']);
+
 // ---- booking-only filter empties the GHL page (a lead can't match it) ------
 $hd = guest_list_branches_to_run('ghl', array('destination' => '7'));
 assert_eq('destination empties ghl page', false, $hd['ghl']);

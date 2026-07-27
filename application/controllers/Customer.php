@@ -36,6 +36,7 @@ class Customer extends MY_Controller
 		$data['guests']         = $this->Guests_Model->Read_Customers_Rich($limit, $offset, $sort_dir);
 		$data['msg_log_phones'] = $this->Ghl_Messages_Model->Phones_With_Messages_For_Guests($data['guests']);
 		$data['remark_counts']  = $this->Remark_Counts_For_Guests($data['guests']);
+		$data['chat_counts']    = $this->Chat_Counts_For_Guests($data['guests']);
 		$data['total']          = null; // AJAX-loaded via Count(), like Guests/Ghl_Leads
 		$data['page']           = $page;
 		$data['limit']          = $limit;
@@ -98,6 +99,21 @@ class Customer extends MY_Controller
 			}
 		}
 		return $this->Guests_Model->Read_Remark_Counts($keys);
+	}
+
+	/**
+	 * dedup_key => active chat-file count for the rows on this page (badges the
+	 * Action menu with "Chat History (n)"). Mirrors Guests::Chat_Counts_For_Guests.
+	 */
+	private function Chat_Counts_For_Guests($guests)
+	{
+		$keys = array();
+		foreach ((array) $guests as $g) {
+			if (!empty($g->dedup_key)) {
+				$keys[] = $g->dedup_key;
+			}
+		}
+		return $this->Guests_Model->Read_Chat_History_Counts($keys);
 	}
 
 	function Create()

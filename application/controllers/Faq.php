@@ -408,7 +408,8 @@ class Faq extends MY_Controller
 		$data['faqs'] = array_values(array_filter($faqs, function($faq) {
 			return $faq->Type === 'internal';
 		}));
-		$data['tag_names'] = $this->Faq_Model->Tag_Name_Map();
+		$data['tag_names']       = $this->Faq_Model->Tag_Name_Map();
+		$data['default_tag_ids'] = $this->Faq_Model->Default_Tag_Ids();
 		$this->load->view('faq/all', $data);
 	}
 

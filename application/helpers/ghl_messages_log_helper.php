@@ -25,6 +25,71 @@ if (!function_exists('ghl_message_log_normalize_contact')) {
     }
 }
 
+if (!function_exists('ghl_message_log_normalize_contacts')) {
+    /**
+     * Normalise the Message Log "contact" filter into a list of digits-only phone
+     * numbers, so several leads can be threaded together in one view. Accepts
+     * either an array (from a multi-value form field) or a single text field where
+     * the user separated numbers with commas / semicolons / new lines. Internal
+     * spaces, dashes and '+' inside one number are kept as part of that number and
+     * stripped to digits, so "+60 12-345" stays a single "6012345"; only the
+     * comma/semicolon/newline separators split entries. Blanks and duplicates are
+     * dropped, order preserved.
+     *
+     * @param mixed $value Raw contact input (array or delimited string).
+     * @return array List of digits-only strings (empty when nothing usable).
+     */
+    function ghl_message_log_normalize_contacts($value)
+    {
+        if (is_array($value)) {
+            $items = $value;
+        } else {
+            // Split ONLY on comma / semicolon / newline so a single number's own
+            // spaces/dashes are preserved and reduced to digits below.
+            $items = preg_split('/[,;\r\n]+/', (string) $value);
+        }
+
+        $out = array();
+        foreach ($items as $item) {
+            $digits = preg_replace('/\D+/', '', (string) $item);
+            if ($digits === '' || in_array($digits, $out, true)) {
+                continue;
+            }
+            $out[] = $digits;
+        }
+
+        return $out;
+    }
+}
+
+if (!function_exists('ghl_message_log_normalize_agents')) {
+    /**
+     * Normalise the Message Log "agent" filter into a list of trimmed agent names,
+     * so the log can be narrowed to several agents at once. Accepts either an array
+     * (from the multi-select form field) or a single name (kept for the legacy
+     * one-agent drill-down links). Blanks and duplicates are dropped, order
+     * preserved. Each name is matched exactly against the resolved Agent column.
+     *
+     * @param mixed $value Raw agent input (array or single string).
+     * @return array List of agent-name strings (empty when nothing usable).
+     */
+    function ghl_message_log_normalize_agents($value)
+    {
+        $items = is_array($value) ? $value : array($value);
+
+        $out = array();
+        foreach ($items as $item) {
+            $name = trim((string) $item);
+            if ($name === '' || in_array($name, $out, true)) {
+                continue;
+            }
+            $out[] = $name;
+        }
+
+        return $out;
+    }
+}
+
 if (!function_exists('ghl_message_log_direction_label')) {
     /**
      * Normalize a raw `ghl_messages.direction` value into a reader-friendly word

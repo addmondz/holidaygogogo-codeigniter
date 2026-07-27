@@ -145,7 +145,7 @@ div.kt-datatable__pager-container {
 				<div class="accordion accordion-solid accordion-toggle-plus">
 					<div class="card">
 						<div class="card-header">
-							<div id="guests_header" data-toggle="collapse" data-target="#guests_info" class="card-title collapsed" style="font-size:13px;">Filter By Guest Information</div>
+							<div id="guests_header" data-toggle="collapse" data-target="#guests_info" class="card-title collapsed" style="font-size:13px;"><?php echo ($list_base === 'Customer') ? 'Filter By Customer Information' : 'Filter By Guest Information'; ?></div>
 						</div>
 						<div id="guests_info" class="collapse">
 							<div class="card-body">
@@ -154,9 +154,9 @@ div.kt-datatable__pager-container {
 									<div class="row">
 										<div class="col-md-3">
 											<div class="form-group">
-												<label>Search Name</label>
+												<label><?php echo ($list_base === 'Customer') ? 'Customer Name' : 'Search Name'; ?></label>
 												<div class="input-icon">
-													<input type="text" name="q" value="<?php if(!empty($this->input->get('q'))) { echo htmlspecialchars($this->input->get('q'), ENT_QUOTES); } ?>" autocomplete="off" class="form-control" placeholder="Guest or team leader name">
+													<input type="text" name="q" value="<?php if(!empty($this->input->get('q'))) { echo htmlspecialchars($this->input->get('q'), ENT_QUOTES); } ?>" autocomplete="off" class="form-control" placeholder="<?php echo ($list_base === 'Customer') ? 'Search customer name or alt name' : 'Guest or team leader name'; ?>">
 													<span><i class="la la-user"></i></span>
 												</div>
 											</div>
@@ -529,7 +529,7 @@ div.kt-datatable__pager-container {
 								<?php if($list_base !== 'Ghl_Leads') { ?>
 									<th style="text-align:center;">Alt Name</th>
 								<?php } ?>
-								<th style="text-align:center;">Guest First Name</th>
+								<th style="text-align:center;"><?php echo ($list_base === 'Customer') ? 'Customer Name' : 'Guest First Name'; ?></th>
 								<th style="text-align:center;">Contact Num</th>
 								<?php if($list_base !== 'Ghl_Leads') { ?>
 									<th style="text-align:center;">Email</th>
@@ -575,14 +575,12 @@ div.kt-datatable__pager-container {
 								<?php if($list_base === 'Customer') { ?>
 									<th style="text-align:center;">AutoCount Sync</th>
 								<?php } ?>
-								<?php if($list_base !== 'Ghl_Leads') { ?>
-									<th class="action" style="text-align:center;">Action</th>
-								<?php } ?>
+								<th class="action" style="text-align:center;">Action</th>
 							</tr>
 						</thead>
 						<tbody>
 							<?php if(empty($guests)) { ?>
-								<tr><td colspan="<?php echo ($list_base === 'Customer') ? 12 : (($list_base !== 'Ghl_Leads') ? 11 : 10); ?>" style="text-align:center; padding-top:10px; padding-bottom:10px;">Guest Records Not Found</td></tr>
+								<tr><td colspan="<?php echo ($list_base === 'Customer') ? 12 : 11; ?>" style="text-align:center; padding-top:10px; padding-bottom:10px;">Guest Records Not Found</td></tr>
 							<?php } else { ?>
 								<?php $count = 1; foreach($guests as $g) { ?>
 									<?php $is_ghl_row = isset($g->Type) && ($g->Type === 'GHL' || $g->Type === 'Manual'); ?>
@@ -792,12 +790,12 @@ div.kt-datatable__pager-container {
 												<?php } ?>
 											</td>
 										<?php } ?>
-										<?php if($list_base !== 'Ghl_Leads') { ?>
 										<td style="text-align:center;">
-											<?php if(!$is_ghl_row) { ?>
-												<div class="btn-group">
-													<button type="button" data-toggle="dropdown" class="btn btn-light-primary btn-sm dropdown-toggle" style="padding-left:3px;"></button>
-													<div class="dropdown-menu">
+											<?php $chat_c = isset($chat_counts[$g->dedup_key]) ? (int) $chat_counts[$g->dedup_key] : 0; ?>
+											<div class="btn-group">
+												<button type="button" data-toggle="dropdown" class="btn btn-light-primary btn-sm dropdown-toggle" style="padding-left:3px;"></button>
+												<div class="dropdown-menu">
+													<?php if(!$is_ghl_row) { ?>
 														<?php if($list_base === 'Customer' && !empty($g->CustomerID)) { ?>
 															<a href="<?php echo base_url('Customer/Update?customer_id=') . $g->CustomerID; ?>" class="dropdown-item" style="font-size:11px;">Update Customer</a>
 																														<?php
@@ -811,6 +809,9 @@ div.kt-datatable__pager-container {
 														<?php } ?>
 														<?php $rc = isset($remark_counts[$g->dedup_key]) ? (int) $remark_counts[$g->dedup_key] : 0; ?>
 														<a href="javascript:;" class="dropdown-item js-remarks" style="font-size:11px;" data-dedup-key="<?php echo htmlspecialchars($g->dedup_key, ENT_QUOTES); ?>" data-name="<?php echo htmlspecialchars($g->Name, ENT_QUOTES); ?>">Remarks<?php if($rc > 0) { echo ' (' . $rc . ')'; } ?></a>
+													<?php } ?>
+													<a href="javascript:;" class="dropdown-item js-chat-history" style="font-size:11px;" data-dedup-key="<?php echo htmlspecialchars($g->dedup_key, ENT_QUOTES); ?>" data-name="<?php echo htmlspecialchars($g->Name, ENT_QUOTES); ?>">Chat History<?php if($chat_c > 0) { echo ' (' . $chat_c . ')'; } ?></a>
+													<?php if(!$is_ghl_row) { ?>
 														<?php if($list_base === 'Customer' && !empty($g->CustomerID) && (int)$this->session->userdata('level') === 10) { ?>
 															<a href="#" class="dropdown-item delete-customer text-danger" data-customer-id="<?php echo $g->CustomerID; ?>" data-customer-name="<?php echo htmlspecialchars($g->Name, ENT_QUOTES); ?>" style="font-size:11px;">Delete Customer</a>
 														<?php } ?>
@@ -819,13 +820,10 @@ div.kt-datatable__pager-container {
 															<a href="<?php echo base_url('Guest_List?gl=') . urlencode($g->Token); ?>" target="_blank" class="dropdown-item" style="font-size:11px;">Guest List</a>
 															<a href="<?php echo base_url('Booking_Confirmation?token=') . urlencode($g->Token); ?>" target="_blank" class="dropdown-item" style="font-size:11px;">Booking Confirmation</a>
 														<?php } ?>
-													</div>
+													<?php } ?>
 												</div>
-											<?php } else { ?>
-												<span class="text-muted">&mdash;</span>
-											<?php } ?>
+											</div>
 										</td>
-										<?php } ?>
 									</tr>
 									<?php $count++; ?>
 								<?php } ?>
@@ -903,6 +901,79 @@ div.kt-datatable__pager-container {
 				<!-- Existing remarks -->
 				<div id="gr_list">
 					<div class="text-muted text-center py-3"><i class="la la-spinner la-spin"></i>&nbsp; Loading remarks…</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+
+<!-- Chat history modal: upload exported WhatsApp .txt chats per person, then
+     view them as chat bubbles or download the raw file. Multiple files kept. -->
+<style>
+	.ch-bubble-row { display:flex; margin-bottom:8px; }
+	.ch-bubble-row.ch-out { justify-content:flex-end; }
+	.ch-bubble {
+		max-width:78%; padding:8px 12px; border-radius:12px; font-size:13px;
+		line-height:1.45; white-space:pre-wrap; word-break:break-word; text-align:left;
+		box-shadow:0 1px 1px rgba(0,0,0,.08);
+	}
+	.ch-in  .ch-bubble { background:#ffffff; border:1px solid #e4e6ef; border-top-left-radius:2px; }
+	.ch-out .ch-bubble { background:#d9fdd3; border:1px solid #bff0b4; border-top-right-radius:2px; }
+	.ch-sender { font-size:11px; font-weight:700; color:#3699ff; margin-bottom:2px; }
+	.ch-out .ch-sender { color:#128c7e; }
+	.ch-time  { font-size:10px; color:#8f97a5; margin-top:3px; text-align:right; }
+	.ch-system {
+		text-align:center; margin:8px auto; font-size:11px; color:#7e8299;
+		background:#fff8e1; border:1px solid #ffe7a0; border-radius:8px;
+		padding:4px 10px; max-width:90%;
+	}
+	#ch_thread { background:#eae6df; padding:14px; border-radius:8px; max-height:52vh; overflow-y:auto; }
+</style>
+<div class="modal fade" id="chat_history_modal" tabindex="-1" role="dialog" aria-hidden="true">
+	<div class="modal-dialog modal-dialog-centered modal-lg" role="document">
+		<div class="modal-content">
+			<div class="modal-header" style="background-color:#D7E2F2;">
+				<h5 class="modal-title" style="color:#6082B6;">
+					<i class="la la-whatsapp"></i> Chat History &mdash; <span id="ch_guest_name" class="font-weight-bold"></span>
+				</h5>
+				<button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+			</div>
+			<div class="modal-body">
+				<!-- List pane: upload + saved files -->
+				<div id="ch_list_pane">
+					<div class="form-group row mb-2">
+						<div class="col-md-6">
+							<label class="font-weight-bold" style="font-size:12px;">Chat Export File (.txt) <span class="text-danger">*</span></label>
+							<div class="custom-file">
+								<input type="file" id="ch_file" class="custom-file-input" accept=".txt,text/plain">
+								<label class="custom-file-label" for="ch_file" id="ch_file_label">Choose .txt file</label>
+							</div>
+						</div>
+						<div class="col-md-4">
+							<label class="font-weight-bold" style="font-size:12px;">Title (optional)</label>
+							<input type="text" id="ch_title" class="form-control" maxlength="200" placeholder="e.g. WhatsApp Jul 2026">
+						</div>
+						<div class="col-md-2 d-flex align-items-end">
+							<button type="button" id="ch_upload" class="btn btn-light-success font-weight-bold btn-block">
+								<i class="la la-upload"></i> Upload
+							</button>
+						</div>
+					</div>
+					<div class="form-text text-muted mb-2" style="font-size:11px;">Export a WhatsApp chat (without media) and upload the .txt here. Max 5MB.</div>
+					<div id="ch_error" class="text-danger font-weight-bold mb-2" style="font-size:12px; display:none;"></div>
+					<hr>
+					<div id="ch_list">
+						<div class="text-muted text-center py-3"><i class="la la-spinner la-spin"></i>&nbsp; Loading chats…</div>
+					</div>
+				</div>
+				<!-- Viewer pane: parsed chat bubbles -->
+				<div id="ch_viewer_pane" style="display:none;">
+					<div class="d-flex justify-content-between align-items-center mb-2">
+						<button type="button" id="ch_back" class="btn btn-light btn-sm font-weight-bold"><i class="la la-arrow-left"></i> Back</button>
+						<span id="ch_viewer_title" class="font-weight-bold text-dark-75" style="font-size:13px;"></span>
+						<a href="javascript:;" id="ch_viewer_download" class="btn btn-light-primary btn-sm font-weight-bold"><i class="la la-download"></i> Download</a>
+					</div>
+					<div id="ch_thread"></div>
 				</div>
 			</div>
 		</div>
@@ -1392,6 +1463,184 @@ div.kt-datatable__pager-container {
 				$('#gr_error').text('Network error. Please try again.').show();
 				$btn.prop('disabled', false).find('i').attr('class', 'la la-trash');
 			});
+	});
+
+	// ----- Chat history (uploaded WhatsApp .txt exports, multiple per person) -----
+	// Endpoints live on the Guests controller and are called by absolute path so
+	// they work from every page that renders this view (Guest List / Customer / GHL).
+	var CH_LIST_URL     = '<?php echo base_url('Guests/Chat_History'); ?>';
+	var CH_UPLOAD_URL   = '<?php echo base_url('Guests/Upload_Chat_History'); ?>';
+	var CH_VIEW_URL     = '<?php echo base_url('Guests/View_Chat_History'); ?>';
+	var CH_DOWNLOAD_URL = '<?php echo base_url('Guests/Download_Chat_History'); ?>';
+	var CH_DELETE_URL   = '<?php echo base_url('Guests/Delete_Chat_History'); ?>';
+	var chDedupKey = '';
+
+	function chEscape(v) { return $('<span>').text(v == null ? '' : v).html(); }
+
+	// "2026-07-27 13:35:00" -> "27 Jul 2026 13:35" (reuses GR_MONTHS above).
+	function chFormatDate(raw) {
+		var m = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/.exec(raw || '');
+		if (!m) { return raw || ''; }
+		return m[3] + ' ' + GR_MONTHS[parseInt(m[2], 10) - 1] + ' ' + m[1] + ' ' + m[4] + ':' + m[5];
+	}
+
+	function chShowList() { $('#ch_viewer_pane').hide(); $('#ch_list_pane').show(); }
+
+	function chRenderList(files) {
+		var $list = $('#ch_list');
+		if (!files || !files.length) {
+			$list.html('<div class="text-muted text-center py-3">No chat files yet.</div>');
+			return;
+		}
+		var html = '<div>';
+		for (var i = 0; i < files.length; i++) {
+			var f = files[i];
+			var meta = '<i class="la la-file-alt text-primary"></i> ' + chEscape(f.title);
+			var sub  = chEscape(chFormatDate(f.created_at));
+			if (f.created_by) { sub += ' — ' + chEscape(f.created_by); }
+			html += '<div class="d-flex align-items-center border-bottom py-2" data-file-id="' + f.id + '">' +
+				'<div class="flex-grow-1">' +
+					'<div class="font-weight-bold text-dark-75" style="font-size:13px;">' + meta + '</div>' +
+					'<div class="text-muted" style="font-size:11px;">' + sub + '</div>' +
+				'</div>' +
+				'<button type="button" class="btn btn-icon btn-light-primary btn-xs ch-view ml-1" data-id="' + f.id + '" data-title="' + chEscape(f.title) + '" data-toggle="tooltip" title="View chat"><i class="la la-eye"></i></button>' +
+				'<a href="' + CH_DOWNLOAD_URL + '?id=' + f.id + '" class="btn btn-icon btn-light-success btn-xs ml-1" data-toggle="tooltip" title="Download .txt"><i class="la la-download"></i></a>' +
+				(f.can_delete ?
+					'<button type="button" class="btn btn-icon btn-light-danger btn-xs ch-delete ml-1" data-id="' + f.id + '" data-toggle="tooltip" title="Delete"><i class="la la-trash"></i></button>' : '') +
+			'</div>';
+		}
+		html += '</div>';
+		$list.html(html);
+		$list.find('[data-toggle="tooltip"]').tooltip();
+	}
+
+	function chLoad() {
+		$('#ch_list').html('<div class="text-muted text-center py-3"><i class="la la-spinner la-spin"></i>&nbsp; Loading chats…</div>');
+		$.ajax({ url: CH_LIST_URL, method: 'GET', dataType: 'json', data: { dedup_key: chDedupKey }, timeout: 30000 })
+			.done(function(res) {
+				if (res && res.ok) { chRenderList(res.files); }
+				else { $('#ch_list').html('<div class="text-danger text-center py-3">' + chEscape((res && res.message) || 'Could not load chats.') + '</div>'); }
+			})
+			.fail(function() { $('#ch_list').html('<div class="text-danger text-center py-3">Network error. Please try again.</div>'); });
+	}
+
+	// Bump the "(n)" badge on the row's Chat History action by $delta.
+	function chBumpBadge(delta) {
+		var $link = $('.js-chat-history[data-dedup-key="' + chDedupKey.replace(/"/g, '\\"') + '"]');
+		$link.each(function() {
+			var $a = $(this);
+			var n = parseInt(($a.text().match(/\((\d+)\)/) || [0, 0])[1], 10) + delta;
+			$a.text('Chat History' + (n > 0 ? ' (' + n + ')' : ''));
+		});
+	}
+
+	$(document).on('click', '.js-chat-history', function() {
+		chDedupKey = $(this).attr('data-dedup-key') || '';
+		$('#ch_guest_name').text($(this).attr('data-name') || '');
+		$('#ch_error').hide().text('');
+		$('#ch_file').val('');
+		$('#ch_file_label').text('Choose .txt file');
+		$('#ch_title').val('');
+		chShowList();
+		$('#chat_history_modal').modal('show');
+		chLoad();
+	});
+
+	$('#ch_file').on('change', function() {
+		var name = (this.files && this.files.length) ? this.files[0].name : 'Choose .txt file';
+		$('#ch_file_label').text(name);
+	});
+
+	$('#ch_upload').on('click', function() {
+		var $btn = $(this), $error = $('#ch_error');
+		var file = $('#ch_file')[0].files[0];
+		$error.hide().text('');
+		if (!file) { $error.text('Please choose a .txt file.').show(); return; }
+
+		var fd = new FormData();
+		fd.append('dedup_key', chDedupKey);
+		fd.append('title', $('#ch_title').val());
+		fd.append('chat_file', file);
+
+		$btn.prop('disabled', true).html('<i class="la la-spinner la-spin"></i>');
+		$.ajax({ url: CH_UPLOAD_URL, method: 'POST', data: fd, processData: false, contentType: false, dataType: 'json', timeout: 60000 })
+			.done(function(res) {
+				$btn.prop('disabled', false).html('<i class="la la-upload"></i> Upload');
+				if (res && res.ok) {
+					$('#ch_file').val(''); $('#ch_file_label').text('Choose .txt file'); $('#ch_title').val('');
+					chBumpBadge(1);
+					chLoad();
+				} else {
+					$error.text((res && res.message) || 'Could not upload.').show();
+				}
+			})
+			.fail(function() {
+				$btn.prop('disabled', false).html('<i class="la la-upload"></i> Upload');
+				$error.text('Network error. Please try again.').show();
+			});
+	});
+
+	function chRenderThread(messages) {
+		var $t = $('#ch_thread');
+		if (!messages || !messages.length) {
+			$t.html('<div class="text-muted text-center py-3">This chat file has no readable messages.</div>');
+			return;
+		}
+		var html = '';
+		for (var i = 0; i < messages.length; i++) {
+			var m = messages[i];
+			if (m.system) { html += '<div class="ch-system">' + chEscape(m.body) + '</div>'; continue; }
+			var side = m.outbound ? 'ch-out' : 'ch-in';
+			html += '<div class="ch-bubble-row ' + side + '">' +
+				'<div class="ch-bubble">' +
+					(m.sender ? '<div class="ch-sender">' + chEscape(m.sender) + '</div>' : '') +
+					chEscape(m.body) +
+					(m.ts ? '<div class="ch-time">' + chEscape(m.ts) + '</div>' : '') +
+				'</div>' +
+			'</div>';
+		}
+		$t.html(html);
+		$t.scrollTop(0);
+	}
+
+	$('#ch_list').on('click', '.ch-view', function() {
+		var $btn = $(this), id = $btn.attr('data-id');
+		$('#ch_viewer_title').text($btn.attr('data-title') || '');
+		$('#ch_viewer_download').attr('data-id', id);
+		$('#ch_thread').html('<div class="text-muted text-center py-3"><i class="la la-spinner la-spin"></i>&nbsp; Loading…</div>');
+		$('#ch_list_pane').hide();
+		$('#ch_viewer_pane').show();
+		$.ajax({ url: CH_VIEW_URL, method: 'GET', dataType: 'json', data: { id: id }, timeout: 30000 })
+			.done(function(res) {
+				if (res && res.ok) { chRenderThread(res.messages); }
+				else { $('#ch_thread').html('<div class="text-danger text-center py-3">' + chEscape((res && res.message) || 'Could not open chat.') + '</div>'); }
+			})
+			.fail(function() { $('#ch_thread').html('<div class="text-danger text-center py-3">Network error. Please try again.</div>'); });
+	});
+
+	$('#ch_viewer_download').on('click', function() {
+		var id = $(this).attr('data-id');
+		if (id) { window.open(CH_DOWNLOAD_URL + '?id=' + id, '_blank'); }
+	});
+
+	$('#ch_back').on('click', chShowList);
+
+	$('#ch_list').on('click', '.ch-delete', function() {
+		var id = $(this).attr('data-id');
+		Swal.fire({
+			title: 'Delete this chat file?',
+			icon: 'warning', showCancelButton: true,
+			confirmButtonText: 'Yes, delete', cancelButtonText: 'Cancel',
+			confirmButtonColor: '#d33', cancelButtonColor: '#3085d6'
+		}).then(function(result) {
+			if (!result.isConfirmed) return;
+			$.ajax({ url: CH_DELETE_URL, method: 'POST', dataType: 'json', data: { id: id }, timeout: 30000 })
+				.done(function(res) {
+					if (res && res.ok) { chBumpBadge(-1); chLoad(); }
+					else { $('#ch_error').text((res && res.message) || 'Could not delete.').show(); }
+				})
+				.fail(function() { $('#ch_error').text('Network error. Please try again.').show(); });
+		});
 	});
 
 	<?php if($list_base === 'Customer') { ?>

@@ -59,7 +59,7 @@ class Faq_Tag extends MY_Controller
 
 		$titles = array('tab_title' => 'HolidayGoGoGo | FAQ Tag', 'breadcrumb_title' => 'FAQ Tag >> Create');
 		$data['mode'] = 'create';
-		$data['tag']  = (object) array('FAQTagID' => 0, 'Name' => '');
+		$data['tag']  = (object) array('FAQTagID' => 0, 'Name' => '', 'IsDefault' => 'N');
 		$this->load->view('layout/header', $titles);
 		$this->load->view('faq_tag/form', $data);
 		$this->load->view('layout/footer');
@@ -122,7 +122,10 @@ class Faq_Tag extends MY_Controller
 			return 'A FAQ tag with that name already exists.';
 		}
 
-		$data = array('Name' => $name);
+		$data = array(
+			'Name'      => $name,
+			'IsDefault' => $this->input->post('IsDefault') ? 'Y' : 'N',
+		);
 
 		if($id === null) {
 			$this->Faq_Tag_Model->Create($data);

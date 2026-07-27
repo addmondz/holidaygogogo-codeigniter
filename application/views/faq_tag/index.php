@@ -62,17 +62,25 @@
 							<tr>
 								<th style="text-align:center;">No.</th>
 								<th style="text-align:center;">Name</th>
+								<th style="text-align:center;">Default</th>
 								<th style="text-align:center;">Created By</th>
 								<th class="action" style="text-align:center;">Action</th>
 							</tr>
 						</thead>
 						<tbody>
 							<?php if(empty($tags)) { ?>
-								<tr><td colspan="4" style="text-align:center; padding-top:10px; padding-bottom:10px;">FAQ Tag Records Not Found</td></tr>
+								<tr><td colspan="5" style="text-align:center; padding-top:10px; padding-bottom:10px;">FAQ Tag Records Not Found</td></tr>
 							<?php } else { $count = 1; foreach($tags as $tag) { ?>
 								<tr>
 									<td style="text-align:center; padding-top:15px; padding-bottom:15px;"><?php echo $count; ?></td>
 									<td style="text-align:left;"><strong><?php echo htmlspecialchars($tag->Name); ?></strong></td>
+									<td style="text-align:center;">
+										<?php if(isset($tag->IsDefault) && $tag->IsDefault === 'Y') { ?>
+											<span class="label label-inline label-light-primary font-weight-bold">Default</span>
+										<?php } else { ?>
+											<span class="text-muted">&mdash;</span>
+										<?php } ?>
+									</td>
 									<td style="text-align:center;"><?php echo htmlspecialchars((string)$tag->InsertByName); ?></td>
 									<td style="text-align:center;">
 										<div class="btn-group">

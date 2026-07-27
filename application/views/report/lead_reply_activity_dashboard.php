@@ -60,7 +60,7 @@
                                 <i class="la la-info-circle"></i>
                             </div>
                             <div class="alert-text font-weight-bold" style="line-height:1.45;">
-                                Counts only replies made on any day between 7AM and 10PM. Lead Responded is the distinct leads the owner replied to in that window (replying many times to one lead still counts once). Transfer Out Lead counts worked leads that are no longer assigned to the owner (reassigned to another agent); leads still under the owner never count. Today Handling Lead = Lead Responded &minus; Transfer Out Lead.
+                                Counts only replies made on any day between 7AM and 10PM. Lead Responded is the distinct leads the owner replied to in that window (replying many times to one lead still counts once). Transfer Out Lead counts leads that were once assigned to the owner and have since been reassigned to another agent; leads still under the owner, and leads the owner only helped reply on but was never assigned, never count. Today Handling Lead = Lead Responded &minus; Transfer Out Lead.
                             </div>
                         </div>
                         <div id="lead_reply_activity_filters" class="collapse show">
@@ -162,7 +162,12 @@
                                 <th style="text-align:center;">
                                     Transfer Out Lead
                                     <i class="la la-info-circle ml-1" style="cursor:help; color:#2f506f;" data-toggle="tooltip"
-                                       title="Leads this owner worked (their first outbound reply lands in the selected window) that are no longer assigned to them -- reassigned to another agent/inbox. Leads still assigned to this owner never count, whichever day they first arrived."></i>
+                                       title="Leads that were once assigned to this owner and have since been reassigned to another agent/inbox (their first outbound reply lands in the selected window). Leads still assigned to this owner, and leads this owner only helped reply on but was never assigned, never count."></i>
+                                </th>
+                                <th style="text-align:center;">
+                                    Helped Reply Lead
+                                    <i class="la la-info-circle ml-1" style="cursor:help; color:#2f506f;" data-toggle="tooltip"
+                                       title="Leads this owner replied to but was never assigned -- they helped on another agent's lead (their first outbound reply lands in the selected window). These are NOT counted as Transfer Out, since the lead was never this owner's."></i>
                                 </th>
                                 <th style="text-align:center;">
                                     Today Handling Lead
@@ -180,7 +185,7 @@
                         <tbody id="lead-reply-activity-table-body">
                             <?php if(empty($lead_reply_activity_rows)) { ?>
                                 <tr>
-                                    <td colspan="8" class="text-center py-10">Lead reply activity not found for the selected filters.</td>
+                                    <td colspan="9" class="text-center py-10">Lead reply activity not found for the selected filters.</td>
                                 </tr>
                             <?php } else { ?>
                                 <?php $count = 1; ?>
@@ -205,6 +210,11 @@
                                                 <a class="lra-count-link font-weight-bold" data-owner="<?php echo html_escape($row['owner_user_id']); ?>" data-owner-name="<?php echo html_escape($row['owner_name']); ?>" data-metric="transfer_out" data-toggle="tooltip" title="Show the leads behind this number"><?php echo number_format($row['transfer_out_leads']); ?></a>
                                             <?php } else { echo number_format($row['transfer_out_leads']); } ?>
                                         </td>
+                                        <td class="text-center">
+                                            <?php if((int) $row['helped_reply_leads'] > 0) { ?>
+                                                <a class="lra-count-link font-weight-bold" data-owner="<?php echo html_escape($row['owner_user_id']); ?>" data-owner-name="<?php echo html_escape($row['owner_name']); ?>" data-metric="helped_reply" data-toggle="tooltip" title="Show the leads behind this number"><?php echo number_format($row['helped_reply_leads']); ?></a>
+                                            <?php } else { echo number_format($row['helped_reply_leads']); } ?>
+                                        </td>
                                         <td class="text-center font-weight-bold text-dark">
                                             <?php if((int) $row['today_handling_leads'] > 0) { ?>
                                                 <a class="lra-count-link" data-owner="<?php echo html_escape($row['owner_user_id']); ?>" data-owner-name="<?php echo html_escape($row['owner_name']); ?>" data-metric="today_handling" data-toggle="tooltip" title="Show the leads behind this number"><?php echo number_format($row['today_handling_leads']); ?></a>
@@ -223,12 +233,13 @@
                         </tbody>
                         <?php if(!empty($lead_reply_activity_rows)) { ?>
                             <?php
-                                $totalNewLeads = 0; $totalResponded = 0; $totalTransfer = 0; $totalHandling = 0;
+                                $totalNewLeads = 0; $totalResponded = 0; $totalTransfer = 0; $totalHelped = 0; $totalHandling = 0;
                                 $weightedSeconds = 0; $weightedLeads = 0;
                                 foreach($lead_reply_activity_rows as $totalRow) {
                                     $totalNewLeads += (int) $totalRow['new_leads_picked_up'];
                                     $totalResponded += (int) $totalRow['lead_responded'];
                                     $totalTransfer += (int) $totalRow['transfer_out_leads'];
+                                    $totalHelped += (int) $totalRow['helped_reply_leads'];
                                     $totalHandling += (int) $totalRow['today_handling_leads'];
                                     if($totalRow['avg_response_time_seconds'] !== null && (int) $totalRow['lead_responded'] > 0) {
                                         $weightedSeconds += (int) $totalRow['avg_response_time_seconds'] * (int) $totalRow['lead_responded'];
@@ -257,6 +268,7 @@
                                     <td class="text-center"><?php echo number_format($totalNewLeads); ?></td>
                                     <td class="text-center"><?php echo number_format($totalResponded); ?></td>
                                     <td class="text-center"><?php echo number_format($totalTransfer); ?></td>
+                                    <td class="text-center"><?php echo number_format($totalHelped); ?></td>
                                     <td class="text-center"><?php echo number_format($totalHandling); ?></td>
                                     <td class="text-center">
                                         <?php echo html_escape($avgTotalLabel); ?>
@@ -304,12 +316,14 @@
         picked_up: 'New Leads Picked Up',
         responded: 'Leads Responded',
         transfer_out: 'Transfer Out Leads',
+        helped_reply: 'Helped Reply Leads',
         today_handling: 'Today Handling Leads'
     };
     var lraActivityHeaders = {
         picked_up: 'Customer\'s First Inbound Message',
         responded: 'First Reply',
         transfer_out: 'Transferred Out',
+        helped_reply: 'First Reply',
         today_handling: 'First Reply'
     };
 
@@ -471,23 +485,25 @@
         $('#lead-reply-activity-table-foot').remove();
 
         if (!rows || rows.length === 0) {
-            $('#lead-reply-activity-table-body').html('<tr><td colspan="8" class="text-center py-10">Lead reply activity not found for the selected filters.</td></tr>');
+            $('#lead-reply-activity-table-body').html('<tr><td colspan="9" class="text-center py-10">Lead reply activity not found for the selected filters.</td></tr>');
             return;
         }
 
         var replyDate = $('input[name="reply_date"]').val() || '';
 
-        var totalNewLeads = 0, totalResponded = 0, totalTransfer = 0, totalHandling = 0;
+        var totalNewLeads = 0, totalResponded = 0, totalTransfer = 0, totalHelped = 0, totalHandling = 0;
         var weightedSeconds = 0, weightedLeads = 0;
 
         $.each(rows, function(index, row) {
             var newLeadsPickedUp = Number(row.new_leads_picked_up) || 0;
             var leadResponded = Number(row.lead_responded) || 0;
             var transferOutLeads = Number(row.transfer_out_leads) || 0;
+            var helpedReplyLeads = Number(row.helped_reply_leads) || 0;
             var todayHandlingLeads = Number(row.today_handling_leads) || 0;
             totalNewLeads += newLeadsPickedUp;
             totalResponded += leadResponded;
             totalTransfer += transferOutLeads;
+            totalHelped += helpedReplyLeads;
             totalHandling += todayHandlingLeads;
             if (row.avg_response_time_seconds !== null && row.avg_response_time_seconds !== undefined && leadResponded > 0) {
                 weightedSeconds += Number(row.avg_response_time_seconds) * leadResponded;
@@ -500,6 +516,7 @@
             html += '<td class="text-center">' + lraCountCell(newLeadsPickedUp, row.owner_user_id, row.owner_name, 'picked_up') + '</td>';
             html += '<td class="text-center">' + lraCountCell(leadResponded, row.owner_user_id, row.owner_name, 'responded') + '</td>';
             html += '<td class="text-center">' + lraCountCell(transferOutLeads, row.owner_user_id, row.owner_name, 'transfer_out') + '</td>';
+            html += '<td class="text-center">' + lraCountCell(helpedReplyLeads, row.owner_user_id, row.owner_name, 'helped_reply') + '</td>';
             html += '<td class="text-center font-weight-bold text-dark">' + lraCountCell(todayHandlingLeads, row.owner_user_id, row.owner_name, 'today_handling') + '</td>';
             html += '<td class="text-center">' + escapeHtml(row.avg_response_time_label || '-') + '</td>';
             html += '<td class="text-center"><a href="' + hourlyUrl + '" class="btn btn-sm btn-light-primary font-weight-bold" data-toggle="tooltip" title="View inbound/outbound per hour for this owner"><i class="la la-clock-o"></i> Hourly</a></td>';
@@ -514,6 +531,7 @@
         footHtml += '<td class="text-center">' + totalNewLeads.toLocaleString() + '</td>';
         footHtml += '<td class="text-center">' + totalResponded.toLocaleString() + '</td>';
         footHtml += '<td class="text-center">' + totalTransfer.toLocaleString() + '</td>';
+        footHtml += '<td class="text-center">' + totalHelped.toLocaleString() + '</td>';
         footHtml += '<td class="text-center">' + totalHandling.toLocaleString() + '</td>';
         footHtml += '<td class="text-center">' + escapeHtml(formatLeadReplyDuration(avgTotalSeconds)) + ' <i class="la la-info-circle ml-1" style="cursor:help; color:#2f506f;" data-toggle="tooltip" title="Average response time across all owners, weighted by each owner\'s Lead Responded count (owners with no measured response time are ignored)."></i></td>';
         footHtml += '<td></td>';

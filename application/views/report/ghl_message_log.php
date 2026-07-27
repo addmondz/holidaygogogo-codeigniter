@@ -2,8 +2,18 @@
 $p = $log_pagination;
 
 $log_contact = isset($log_filters['contact']) ? $log_filters['contact'] : '';
-$log_agent = isset($log_filters['agent']) ? $log_filters['agent'] : '';
+// Agent is now a MULTI-select: the active filter is a list of names. Kept
+// tolerant of a legacy single string so old drill-down links still light up.
+$log_selected_agents = isset($log_filters['agent']) ? (array) $log_filters['agent'] : array();
 $log_agents = isset($log_agents) ? $log_agents : array();
+
+// Serialise the selected agents as repeated agent[] params so every filter-
+// carrying link (sort headers, pagination, clear-hour, export) keeps the whole
+// multi-agent selection. '%5B%5D' is the url-encoded '[]'.
+$log_agent_param = '';
+foreach ($log_selected_agents as $log_agent_name) {
+    $log_agent_param .= '&agent%5B%5D=' . urlencode($log_agent_name);
+}
 
 // Direction filter: '', 'inbound', or 'outbound'. Narrows the log to one side of
 // the conversation; travels with pagination, the sort headers, and the export.
@@ -43,7 +53,7 @@ $log_sort_param = '&sort=' . $log_sort_col . '&dir=' . $log_sort_dir;
 /** Base query string shared by the sort-header links (every filter except sort). */
 $log_filter_qs = 'log_date=' . urlencode($log_filters['log_date'])
     . '&contact=' . urlencode($log_contact)
-    . '&agent=' . urlencode($log_agent)
+    . $log_agent_param
     . $log_hour_param
     . $log_time_param
     . $log_direction_param;
@@ -108,7 +118,7 @@ $contact_url = function ($number) use ($log_filters) {
                             // back to the whole day in one click.
                             $clear_hour_url = base_url('Report/Ghl_Message_Log?log_date=' . urlencode($log_filters['log_date'])
                                 . '&contact=' . urlencode($log_contact)
-                                . '&agent=' . urlencode($log_agent));
+                                . $log_agent_param);
                         ?>
                         <span class="label label-light-warning label-inline font-weight-bold mr-2">
                             Hour: <?php echo html_escape($log_hour_label); ?>
@@ -131,9 +141,10 @@ $contact_url = function ($number) use ($log_filters) {
                     <?php if ($log_sort_dir !== 'desc') { ?>
                         <input type="hidden" name="dir" value="<?php echo html_escape($log_sort_dir); ?>">
                     <?php } ?>
+                    <!-- Filters laid out 3 per row: Date/Time/Direction, then Contact/Agent/Actions. -->
                     <div class="row align-items-end">
-                        <div class="col-md-3">
-                            <div class="form-group mb-0">
+                        <div class="col-md-4">
+                            <div class="form-group mb-4">
                                 <label>Date Range</label>
                                 <div id="ghl_message_log_daterangepicker" class="input-icon">
                                     <input readonly type="text" name="log_date" value="<?php echo html_escape($log_filters['log_date']); ?>" autocomplete="off" class="form-control">
@@ -141,8 +152,8 @@ $contact_url = function ($number) use ($log_filters) {
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-3">
-                            <div class="form-group mb-0">
+                        <div class="col-md-4">
+                            <div class="form-group mb-4">
                                 <label>Time of Day <span class="text-muted font-size-sm">(each day)</span></label>
                                 <div class="d-flex align-items-center" style="gap:6px;">
                                     <input type="time" name="time_from" value="<?php echo html_escape($log_time_from); ?>" class="form-control" aria-label="From time">
@@ -151,8 +162,8 @@ $contact_url = function ($number) use ($log_filters) {
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-2">
-                            <div class="form-group mb-2">
+                        <div class="col-md-4">
+                            <div class="form-group mb-4">
                                 <label>Direction</label>
                                 <select name="direction" class="form-control">
                                     <option value="" <?php if ($log_direction === '') { echo 'selected'; } ?>>All</option>
@@ -161,29 +172,36 @@ $contact_url = function ($number) use ($log_filters) {
                                 </select>
                             </div>
                         </div>
-                        <div class="col-md-2">
+                    </div>
+                    <div class="row align-items-end">
+                        <div class="col-md-4">
                             <div class="form-group mb-2">
-                                <label>Contact Number</label>
-                                <input type="text" name="contact" value="<?php echo html_escape($log_contact); ?>" autocomplete="off" placeholder="e.g. 0123456789" class="form-control">
+                                <label>Contact Number
+                                    <i class="la la-info-circle" style="cursor:help;" data-toggle="tooltip" title="Filter by one or more contacts. Separate multiple numbers with a comma, e.g. 0123456789, 0198765432"></i>
+                                </label>
+                                <input type="text" name="contact" value="<?php echo html_escape($log_contact); ?>" autocomplete="off" placeholder="e.g. 0123456789, 0198765432" class="form-control">
                             </div>
                         </div>
-                        <div class="col-md-2">
-                            <div class="form-group mb-0">
+                        <div class="col-md-4">
+                            <div class="form-group mb-2">
                                 <label>Agent</label>
-                                <select name="agent" data-live-search="true" class="form-control selectpicker" title="All Agents">
-                                    <option value="" <?php if ($log_agent === '') { echo 'selected'; } ?>>All Agents</option>
+                                <select name="agent[]" multiple data-live-search="true" data-actions-box="true" data-selected-text-format="count > 1" class="form-control selectpicker" title="All Agents">
                                     <?php foreach ($log_agents as $agent_name) { ?>
-                                        <option data-icon="la la-user-alt font-size-lg bs-icon" value="<?php echo html_escape($agent_name); ?>" <?php if ($log_agent !== '' && $log_agent === $agent_name) { echo 'selected'; } ?>><?php echo html_escape($agent_name); ?></option>
+                                        <option data-icon="la la-user-alt font-size-lg bs-icon" value="<?php echo html_escape($agent_name); ?>" <?php if (in_array($agent_name, $log_selected_agents, true)) { echo 'selected'; } ?>><?php echo html_escape($agent_name); ?></option>
                                     <?php } ?>
                                 </select>
                             </div>
                         </div>
-                        <div class="col-md-2">
-                            <input type="submit" value="Filter" class="btn btn-light-success font-weight-bold btn-block mb-2">
-                            <input type="button" id="ghl-message-log-reset" value="Reset" class="btn btn-light-primary font-weight-bold btn-block mb-2">
-                            <a href="<?php echo base_url('Report/Ghl_Message_Log_Export?log_date=') . urlencode($log_filters['log_date']) . '&contact=' . urlencode($log_contact) . '&agent=' . urlencode($log_agent) . $log_hour_param . $log_time_param . $log_direction_param; ?>" class="btn btn-light-info font-weight-bold btn-block">
-                                <i class="la la-download"></i> Export CSV
-                            </a>
+                        <div class="col-md-4">
+                            <div class="form-group mb-2">
+                                <div class="d-flex" style="gap:8px;">
+                                    <input type="submit" value="Filter" class="btn btn-light-success font-weight-bold flex-fill">
+                                    <input type="button" id="ghl-message-log-reset" value="Reset" class="btn btn-light-primary font-weight-bold flex-fill">
+                                    <a href="<?php echo base_url('Report/Ghl_Message_Log_Export?log_date=') . urlencode($log_filters['log_date']) . '&contact=' . urlencode($log_contact) . $log_agent_param . $log_hour_param . $log_time_param . $log_direction_param; ?>" class="btn btn-light-info font-weight-bold flex-fill text-nowrap">
+                                        <i class="la la-download"></i> Export CSV
+                                    </a>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </form>

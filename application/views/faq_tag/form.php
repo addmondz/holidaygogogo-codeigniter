@@ -40,6 +40,17 @@
 								</div>
 							</div>
 						</div>
+						<div class="col-md-6">
+							<div class="form-group">
+								<label>Default Tag</label>
+								<div class="checkbox-inline" style="margin-top:8px;">
+									<label class="checkbox checkbox-lg">
+										<input type="checkbox" name="IsDefault" value="Y" <?php echo (isset($tag->IsDefault) && $tag->IsDefault === 'Y') ? 'checked' : ''; ?>><span></span> Show up-front on the internal FAQ Library (<strong>/Faq/Internal</strong>)
+									</label>
+								</div>
+								<span class="form-text" style="color:#5f6b78; font-size:12.5px;">Only default tags appear as chips on /Faq/Internal. Other tags stay reachable through the tag search bar.</span>
+							</div>
+						</div>
 					</div>
 				</div>
 			</div>

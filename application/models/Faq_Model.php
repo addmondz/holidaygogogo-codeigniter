@@ -628,6 +628,57 @@ class Faq_Model extends CI_Model
 		return $map;
 	}
 
+	// Ids of the active tags flagged IsDefault = 'Y'. These are the curated
+	// shortlist shown as filter chips up-front on the internal FAQ Library
+	// (/Faq/Internal); every other present tag is reachable only through the
+	// tag search bar.
+	function Default_Tag_Ids()
+	{
+		$this->db->select('FAQTagID');
+		$this->db->where('Status', 'Y');
+		$this->db->where('IsDefault', 'Y');
+		$rows = $this->db->get('faq_tag')->result();
+
+		$ids = array();
+		foreach($rows as $row) {
+			$ids[] = (int)$row->FAQTagID;
+		}
+		return $ids;
+	}
+
+	// Pure: turn the id => name map of tags present on a page plus the set of
+	// default tag ids into an ordered list of chip descriptors for the tag
+	// filter bar. Every present tag is returned (the tag search bar reveals the
+	// non-default ones); is_default marks which render as curated chips up-front.
+	// Sorted by name (natural, case-insensitive). Default ids not present on the
+	// page are ignored, and ids compare as ints so '3' matches 3.
+	public static function Tag_Chips($present_tags, $default_ids)
+	{
+		$default = array();
+		if(is_array($default_ids)) {
+			foreach($default_ids as $id) {
+				$default[(int)$id] = true;
+			}
+		}
+
+		$chips = array();
+		if(is_array($present_tags)) {
+			foreach($present_tags as $id => $name) {
+				$id = (int)$id;
+				$chips[] = array(
+					'id'         => $id,
+					'name'       => (string)$name,
+					'is_default' => isset($default[$id]),
+				);
+			}
+		}
+
+		usort($chips, function($a, $b) {
+			return strnatcasecmp($a['name'], $b['name']);
+		});
+		return $chips;
+	}
+
 	// Active destination categories for the FAQ form's multi-select. Same source
 	// the booking form uses: category rows flagged IsDestination = 'YES'.
 	function Read_Destinations()

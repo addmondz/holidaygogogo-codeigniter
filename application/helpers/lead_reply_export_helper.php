@@ -111,30 +111,33 @@ if ( ! function_exists('lead_reply_export_build_matrix'))
      * @param array $perDayRows map of 'Y-m-d' => list of formatted daily rows,
      *                          each row having owner_user_id, owner_name,
      *                          new_leads_picked_up, lead_responded,
-     *                          transfer_out_leads, today_handling_leads,
+     *                          transfer_out_leads, helped_reply_leads,
+     *                          today_handling_leads,
      *                          avg_response_time_seconds, avg_response_time_label
      * @return array {
      *     owners: list of [owner_user_id, owner_name, total_picked_up,
-     *                      total_responded, total_transfer_out, total_handling,
-     *                      avg_response_time_label] sorted by total_responded
-     *                      desc then owner_name asc,
+     *                      total_responded, total_transfer_out, total_helped,
+     *                      total_handling, avg_response_time_label] sorted by
+     *                      total_responded desc then owner_name asc,
      *     lookup: owner_user_id => ('Y-m-d' => [picked_up, responded,
-     *                      transfer_out, handling, avg_response_time_label])
+     *                      transfer_out, helped, handling, avg_response_time_label])
      * }
      *
      * Cell metric order mirrors the on-screen dashboard columns exactly:
-     * New Lead Picked Up, Lead Responded, Transfer Out, Today Handling,
-     * Avg Response Time. The per-owner Avg Response Time is weighted by each
+     * New Lead Picked Up, Lead Responded, Transfer Out, Helped Reply,
+     * Today Handling, Avg Response Time. The per-owner Avg Response Time is
+     * weighted by each
      * day's Lead Responded count (days with no measured time are ignored),
      * matching the dashboard's total-row formula.
      */
     function lead_reply_export_build_matrix($dates, $perDayRows)
     {
         $names  = array();   // owner_user_id => owner_name
-        $lookup = array();   // owner_user_id => date => [picked, resp, out, hand, avgLabel]
+        $lookup = array();   // owner_user_id => date => [picked, resp, out, helped, hand, avgLabel]
         $totalPickedUp    = array();
         $totalResponded   = array();
         $totalTransferOut = array();
+        $totalHelped      = array();
         $totalHandling    = array();
         $weightedSeconds  = array();   // owner_user_id => sum(avgSeconds * responded)
         $weightedLeads    = array();   // owner_user_id => sum(responded) over measured days
@@ -150,6 +153,7 @@ if ( ! function_exists('lead_reply_export_build_matrix'))
                 $pickedUp    = (int) $row['new_leads_picked_up'];
                 $responded   = (int) $row['lead_responded'];
                 $transferOut = (int) $row['transfer_out_leads'];
+                $helped      = isset($row['helped_reply_leads']) ? (int) $row['helped_reply_leads'] : 0;
                 $handling    = (int) $row['today_handling_leads'];
                 $avgSeconds  = isset($row['avg_response_time_seconds']) && $row['avg_response_time_seconds'] !== null
                     ? (int) $row['avg_response_time_seconds'] : null;
@@ -162,15 +166,17 @@ if ( ! function_exists('lead_reply_export_build_matrix'))
                     $totalPickedUp[$ownerId]    = 0;
                     $totalResponded[$ownerId]   = 0;
                     $totalTransferOut[$ownerId] = 0;
+                    $totalHelped[$ownerId]      = 0;
                     $totalHandling[$ownerId]    = 0;
                     $weightedSeconds[$ownerId]  = 0;
                     $weightedLeads[$ownerId]    = 0;
                 }
 
-                $lookup[$ownerId][$date] = array($pickedUp, $responded, $transferOut, $handling, $avgLabel);
+                $lookup[$ownerId][$date] = array($pickedUp, $responded, $transferOut, $helped, $handling, $avgLabel);
                 $totalPickedUp[$ownerId]    += $pickedUp;
                 $totalResponded[$ownerId]   += $responded;
                 $totalTransferOut[$ownerId] += $transferOut;
+                $totalHelped[$ownerId]      += $helped;
                 $totalHandling[$ownerId]    += $handling;
                 if ($avgSeconds !== null && $responded > 0) {
                     $weightedSeconds[$ownerId] += $avgSeconds * $responded;
@@ -189,6 +195,7 @@ if ( ! function_exists('lead_reply_export_build_matrix'))
                 'total_picked_up'         => $totalPickedUp[$ownerId],
                 'total_responded'         => $totalResponded[$ownerId],
                 'total_transfer_out'      => $totalTransferOut[$ownerId],
+                'total_helped'            => $totalHelped[$ownerId],
                 'total_handling'          => $totalHandling[$ownerId],
                 'avg_response_time_label' => lead_reply_export_duration_label($avgSeconds),
             );

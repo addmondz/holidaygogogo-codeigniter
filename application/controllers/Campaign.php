@@ -192,15 +192,30 @@ class Campaign extends MY_Controller
 		$limit  = $fetch_all ? 2000 : 15;
 		$offset = ($page - 1) * $limit;
 
+		// The picker's Type dropdown chooses the source: GHL leads only, booking
+		// guests only, or (default) both. Without this the model stayed in its
+		// default 'guest' mode, so picking "GHL" still returned booking guests
+		// and the synthesized Team Leader fallback rows.
+		$type = strtolower(trim((string)$this->input->get('type')));
+		$mode = ($type === 'ghl') ? 'ghl' : (($type === 'guest') ? 'guest' : 'all');
+		$this->Guests_Model->Set_Mode($mode);
+
 		$rows  = $this->Guests_Model->Read_Guests($limit, $offset);
 		$total = $this->Guests_Model->Count_Guests();
 
+		// Show the contact WITH its international calling code — the same
+		// "+60 169546738" form the Guest List dashboard renders. Without this the
+		// picker dumped the raw local Mobile (no code, trunk "0" inconsistent), so
+		// the number shown/stored/blasted was wrong. Mirrors guests/index.php.
+		$this->load->helper('guest_contact');
+
 		$out = array();
 		foreach($rows as $r) {
+			$calling_code = isset($r->CallingCode) ? (string)$r->CallingCode : '';
 			$out[] = array(
 				'DedupKey'   => $r->dedup_key,
 				'GuestName'  => $r->Name,
-				'ContactNum' => $r->ContactNum,
+				'ContactNum' => guest_contact_format_display($calling_code, (string)$r->ContactNum),
 				'Email'      => $r->Email,
 				'GuestType'  => $r->Type,
 			);
@@ -223,6 +238,8 @@ class Campaign extends MY_Controller
 			'customer_types' => $this->Customer_Type_Model->Read_Customer_Types(),
 			'nationalities'  => $this->Guests_Model->Read_Distinct('Nationality'),
 			'languages'      => $this->Guests_Model->Read_Distinct('ChatLanguage'),
+			'races'          => $this->Guests_Model->Read_Distinct_Ghl_Races(),
+			'lead_tags'      => $this->Guests_Model->Read_Ghl_Tags(),
 			'destinations'   => $this->Booking_Model->Read_Categories(),
 			'campaigns'      => $this->Campaign_Model->Read_Campaigns(),
 		);

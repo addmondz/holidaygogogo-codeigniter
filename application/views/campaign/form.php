@@ -157,7 +157,7 @@
 								<span><i class="la la-search"></i></span>
 							</div>
 						</div>
-						<div class="col-md-2">
+						<div class="col-md-3">
 							<label>Type</label>
 							<select id="guest_search_type" class="form-control selectpicker">
 								<option value="">--ALL TYPES--</option>
@@ -165,7 +165,7 @@
 								<option value="ghl">GHL</option>
 							</select>
 						</div>
-						<div class="col-md-2">
+						<div class="col-md-3">
 							<label>Role</label>
 							<select id="guest_search_role" class="form-control selectpicker">
 								<option value="">--ALL ROLES--</option>
@@ -183,6 +183,91 @@
 							</select>
 						</div>
 					</div>
+					<!-- Row 2 — booking attributes (customer + team member) -->
+					<div class="row mb-4">
+						<div class="col-md-3">
+							<label>Destination</label>
+							<select id="guest_search_destination" class="form-control selectpicker" data-live-search="true" multiple data-actions-box="true" title="--ALL DESTINATIONS--">
+								<?php if(!empty($destinations)) { foreach($destinations as $d) { ?>
+									<option value="<?php echo (int)$d->CategoryID; ?>"><?php echo htmlspecialchars($d->Name); ?></option>
+								<?php } } ?>
+							</select>
+						</div>
+						<div class="col-md-3">
+							<label>Source</label>
+							<select id="guest_search_source" class="form-control selectpicker" data-live-search="true" multiple data-actions-box="true" title="--ALL SOURCES--">
+								<?php if(!empty($sources)) { foreach($sources as $s) { ?>
+									<option value="<?php echo (int)$s->SourceID; ?>"><?php echo htmlspecialchars($s->Name); ?></option>
+								<?php } } ?>
+							</select>
+						</div>
+						<div class="col-md-3">
+							<label>Customer Type</label>
+							<select id="guest_search_customer_type" class="form-control selectpicker" data-live-search="true" multiple data-actions-box="true" title="--ALL CUSTOMER TYPES--">
+								<?php if(!empty($customer_types)) { foreach($customer_types as $ct) { ?>
+									<option value="<?php echo htmlspecialchars($ct->Name, ENT_QUOTES); ?>"><?php echo htmlspecialchars($ct->Name); ?></option>
+								<?php } } ?>
+							</select>
+						</div>
+						<div class="col-md-3">
+							<label>Language</label>
+							<select id="guest_search_language" class="form-control selectpicker" data-live-search="true" multiple data-actions-box="true" title="--ALL LANGUAGES--">
+								<?php if(!empty($languages)) { foreach($languages as $l) { ?>
+									<option value="<?php echo htmlspecialchars($l->value, ENT_QUOTES); ?>"><?php echo htmlspecialchars($l->value); ?></option>
+								<?php } } ?>
+							</select>
+						</div>
+					</div>
+
+					<!-- Row 3 — demographics (Race / Tag are GHL-lead only) -->
+					<div class="row mb-4">
+						<div class="col-md-3">
+							<label>Gender</label>
+							<select id="guest_search_gender" class="form-control selectpicker" multiple data-actions-box="true" title="--ALL GENDERS--">
+								<option value="Male">Male</option>
+								<option value="Female">Female</option>
+								<option value="Other">Other</option>
+							</select>
+						</div>
+						<div class="col-md-3">
+							<label>Race <span class="text-muted font-size-xs">(leads only)</span></label>
+							<select id="guest_search_race" class="form-control selectpicker" data-live-search="true" multiple data-actions-box="true" title="--ALL RACES--">
+								<?php if(!empty($races)) { foreach($races as $r) { ?>
+									<option value="<?php echo htmlspecialchars($r->value, ENT_QUOTES); ?>"><?php echo htmlspecialchars($r->value); ?></option>
+								<?php } } ?>
+							</select>
+						</div>
+						<div class="col-md-3">
+							<label>Tag <span class="text-muted font-size-xs">(leads only)</span></label>
+							<select id="guest_search_tags" class="form-control selectpicker" data-live-search="true" multiple data-actions-box="true" title="--ALL TAGS--">
+								<?php if(!empty($lead_tags)) { foreach($lead_tags as $t) { ?>
+									<option value="<?php echo htmlspecialchars($t, ENT_QUOTES); ?>"><?php echo htmlspecialchars($t); ?></option>
+								<?php } } ?>
+							</select>
+						</div>
+						<div class="col-md-3">
+							<label>Birthday</label>
+							<select id="guest_search_birthday" class="form-control selectpicker">
+								<option value="">--ANY--</option>
+								<option value="today">Today</option>
+								<option value="this_month">This Month</option>
+								<option value="1">January</option>
+								<option value="2">February</option>
+								<option value="3">March</option>
+								<option value="4">April</option>
+								<option value="5">May</option>
+								<option value="6">June</option>
+								<option value="7">July</option>
+								<option value="8">August</option>
+								<option value="9">September</option>
+								<option value="10">October</option>
+								<option value="11">November</option>
+								<option value="12">December</option>
+							</select>
+						</div>
+					</div>
+
+					<!-- Row 4 — dates -->
 					<div class="row mb-4">
 						<div class="col-md-3">
 							<label>Date of Bookings
@@ -196,12 +281,26 @@
 							</div>
 						</div>
 						<div class="col-md-3">
-							<label>Destination</label>
-							<select id="guest_search_destination" class="form-control selectpicker" data-live-search="true" multiple data-actions-box="true" title="--ALL DESTINATIONS--">
-								<?php if(!empty($destinations)) { foreach($destinations as $d) { ?>
-									<option value="<?php echo (int)$d->CategoryID; ?>"><?php echo htmlspecialchars($d->Name); ?></option>
-								<?php } } ?>
-							</select>
+							<label>Travel Date
+								<a onclick="Reset_Guest_Travel_Date()" class="btn btn-icon btn-light-warning btn-xs" data-toggle="tooltip" title="Clear travel date">
+									<i class="la la-undo"></i>
+								</a>
+							</label>
+							<div id="guest_search_travel_date" class="input-icon">
+								<input readonly type="text" autocomplete="off" class="form-control" placeholder="DD/MM/YYYY - DD/MM/YYYY">
+								<span><i class="la la-calendar"></i></span>
+							</div>
+						</div>
+						<div class="col-md-3">
+							<label>Date of Birth
+								<a onclick="Reset_Guest_Dob()" class="btn btn-icon btn-light-warning btn-xs" data-toggle="tooltip" title="Clear date of birth">
+									<i class="la la-undo"></i>
+								</a>
+							</label>
+							<div id="guest_search_dob" class="input-icon">
+								<input readonly type="text" autocomplete="off" class="form-control" placeholder="DD/MM/YYYY - DD/MM/YYYY">
+								<span><i class="la la-calendar"></i></span>
+							</div>
 						</div>
 						<div class="col-md-3">
 							<div class="d-flex justify-content-between align-items-center">
@@ -217,8 +316,70 @@
 								<?php } } ?>
 							</select>
 						</div>
-						<div class="col-md-3 d-flex align-items-end">
-							<button type="button" id="guest_search_btn" class="btn btn-light-success font-weight-bold w-100">Search</button>
+					</div>
+
+					<!-- Row 5 — customer-value segments (booking guests only) -->
+					<div class="separator separator-dashed my-3"></div>
+					<div class="text-muted font-weight-bold mb-2">Customer-value segments <span class="font-size-xs">(booking guests only)</span></div>
+					<div class="row mb-4">
+						<div class="col-md-3">
+							<label>Purchase Count</label>
+							<select id="guest_search_min_purchases" class="form-control selectpicker">
+								<option value="">--ANY--</option>
+								<option value="2">2&times; and above</option>
+								<option value="3">3&times; and above</option>
+								<option value="5">5&times; and above</option>
+							</select>
+						</div>
+						<div class="col-md-3">
+							<label>Lifetime Booking Value</label>
+							<select id="guest_search_ltv" class="form-control selectpicker">
+								<option value="">--ANY--</option>
+								<option value="0-10000">Below RM10k</option>
+								<option value="10000-20000">RM10k &ndash; 20k</option>
+								<option value="20000-30000">RM20k &ndash; 30k</option>
+								<option value="30000-50000">RM30k &ndash; 50k</option>
+								<option value="50000-100000">RM50k &ndash; 100k</option>
+								<option value="100000+">RM100k and above</option>
+							</select>
+						</div>
+						<div class="col-md-3">
+							<label>Booking-to-Travel Lead
+								<a href="javascript:;" class="text-muted" data-toggle="tooltip" title="How far ahead the booking was created before the travel start date"><i class="la la-info-circle"></i></a>
+							</label>
+							<select id="guest_search_booking_lead" class="form-control selectpicker">
+								<option value="">--ANY--</option>
+								<option value="0-1">Within 1 month</option>
+								<option value="1-2">1 &ndash; 2 months</option>
+								<option value="2-3">2 &ndash; 3 months</option>
+								<option value="3-6">3 &ndash; 6 months</option>
+								<option value="6+">6 months and above</option>
+							</select>
+						</div>
+						<div class="col-md-3">
+							<label class="d-block">More segments</label>
+							<div class="checkbox-inline">
+								<label class="checkbox checkbox-lg">
+									<input type="checkbox" id="guest_search_family_kids"><span></span> Family with kids
+								</label>
+							</div>
+							<div class="checkbox-inline">
+								<label class="checkbox checkbox-lg">
+									<input type="checkbox" id="guest_search_consecutive_years"><span></span> Purchased 2 consecutive years+
+								</label>
+							</div>
+							<div class="checkbox-inline">
+								<label class="checkbox checkbox-lg">
+									<input type="checkbox" id="guest_search_cancelled"><span></span> Has cancelled BC
+								</label>
+							</div>
+						</div>
+					</div>
+
+					<div class="row mb-4">
+						<div class="col-md-12 text-right">
+							<button type="button" id="guest_search_reset" class="btn btn-light font-weight-bold mr-2"><i class="la la-undo"></i>Reset Filters</button>
+							<button type="button" id="guest_search_btn" class="btn btn-light-success font-weight-bold" style="min-width:160px;"><i class="la la-search"></i>Search</button>
 						</div>
 					</div>
 
@@ -329,6 +490,27 @@
 		$(this).find('input').val('');
 	});
 	function Reset_Guest_Booking_Date() { $('#guest_search_booking_date input').val(''); }
+
+	// Travel Date + Date of Birth ranges — same behaviour as Date of Bookings.
+	function setupGuestRange(sel) {
+		$(sel).daterangepicker({
+			autoUpdateInput: false,
+			locale: { format: 'DD/MM/YYYY', cancelLabel: 'Clear' },
+			buttonClasses: ' btn',
+			applyClass: 'btn-primary',
+			cancelClass: 'btn-secondary'
+		});
+		$(sel).on('apply.daterangepicker', function(ev, picker) {
+			$(this).find('input').val(picker.startDate.format('DD/MM/YYYY') + ' - ' + picker.endDate.format('DD/MM/YYYY'));
+		});
+		$(sel).on('cancel.daterangepicker', function(ev, picker) {
+			$(this).find('input').val('');
+		});
+	}
+	setupGuestRange('#guest_search_travel_date');
+	setupGuestRange('#guest_search_dob');
+	function Reset_Guest_Travel_Date() { $('#guest_search_travel_date input').val(''); }
+	function Reset_Guest_Dob() { $('#guest_search_dob input').val(''); }
 
 	$('[data-toggle="tooltip"]').tooltip();
 
@@ -445,7 +627,22 @@
 				role: $('#guest_search_role').val(),
 				nationality: $('#guest_search_nationality').val(),
 				booking_date: $('#guest_search_booking_date input').val(),
+				travel_date: $('#guest_search_travel_date input').val(),
+				dob: $('#guest_search_dob input').val(),
 				destination: $('#guest_search_destination').val() || [],
+				source: $('#guest_search_source').val() || [],
+				customer_type: $('#guest_search_customer_type').val() || [],
+				language: $('#guest_search_language').val() || [],
+				gender: $('#guest_search_gender').val() || [],
+				race: $('#guest_search_race').val() || [],
+				tags: $('#guest_search_tags').val() || [],
+				birthday: $('#guest_search_birthday').val(),
+				min_purchases: $('#guest_search_min_purchases').val(),
+				ltv: $('#guest_search_ltv').val(),
+				booking_lead: $('#guest_search_booking_lead').val(),
+				family_kids: $('#guest_search_family_kids').is(':checked') ? '1' : '',
+				consecutive_years: $('#guest_search_consecutive_years').is(':checked') ? '1' : '',
+				cancelled: $('#guest_search_cancelled').is(':checked') ? '1' : '',
 				joined_campaign: $('#guest_search_joined_campaign').val() || [],
 				campaign_mode: $('#guest_search_campaign_mode').val()
 			};
@@ -535,6 +732,21 @@
 		$('#guest_search_btn').on('click', function() { loadResults(1); });
 		$('#picker_pick_all').on('click', pickAllMatching);
 		$('#guest_search_q').on('keydown', function(e) { if(e.which === 13) { e.preventDefault(); loadResults(1); } });
+
+		// Reset every picker filter back to its empty state (does NOT touch the
+		// already-selected guests). Clears text, ranges, checkboxes and repaints
+		// the bootstrap-select dropdowns.
+		$('#guest_search_reset').on('click', function() {
+			$('#guest_search_q').val('');
+			$('#guest_search_booking_date input, #guest_search_travel_date input, #guest_search_dob input').val('');
+			$('#guest_search_family_kids, #guest_search_consecutive_years, #guest_search_cancelled').prop('checked', false);
+			$('#guest_search_type, #guest_search_role, #guest_search_nationality, #guest_search_birthday, ' +
+				'#guest_search_min_purchases, #guest_search_ltv, #guest_search_booking_lead, ' +
+				'#guest_search_destination, #guest_search_source, #guest_search_customer_type, #guest_search_language, ' +
+				'#guest_search_gender, #guest_search_race, #guest_search_tags, #guest_search_joined_campaign').val('');
+			$('#guest_search_campaign_mode').val('include');
+			$('.selectpicker').selectpicker('refresh');
+		});
 		$('#picker_prev').on('click', function() { if(currentPage > 1) { loadResults(currentPage - 1); } });
 		$('#picker_next').on('click', function() { if(currentPage < totalPages) { loadResults(currentPage + 1); } });
 

@@ -28,6 +28,7 @@ if (!function_exists('lead_reply_activity_leads_activity_field')) {
             case 'today_handling':
                 return 'first_reply_at';
             case 'transfer_out':
+            case 'helped_reply':
                 return 'reply_created_at';
             case 'picked_up':
             default:
@@ -95,7 +96,7 @@ if (!function_exists('lead_reply_activity_leads_format')) {
      * @param array  $rows   each row keyed (missing keys tolerated):
      *   contact_name, phone, conversation_id, owner_name, and the metric's
      *   activity field (lead_started_at / first_reply_at / reply_created_at).
-     * @param string $metric picked_up | responded | transfer_out | today_handling
+     * @param string $metric picked_up | responded | transfer_out | helped_reply | today_handling
      * @return array list of display rows:
      *   contact_name, phone, conversation_id, owner_name, activity_label
      */
