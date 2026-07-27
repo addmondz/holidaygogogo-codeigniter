@@ -497,29 +497,6 @@ class Guests extends MY_Controller
 	}
 
 	/**
-	 * Return one chat file parsed into messages for the in-app bubble viewer.
-	 */
-	function View_Chat_History()
-	{
-		$id  = (int) $this->input->get('id');
-		$row = $this->Guests_Model->Get_Chat_History_File($id);
-		if (!$row) {
-			$this->output->set_content_type('application/json')
-				->set_output(json_encode(array('ok' => false, 'message' => 'File not found.')));
-			return;
-		}
-
-		$path = FCPATH . 'assets/upload/chat_history/' . basename($row->StoredName);
-		$text = is_file($path) ? file_get_contents($path) : '';
-
-		$this->output->set_content_type('application/json')->set_output(json_encode(array(
-			'ok'       => true,
-			'title'    => ($row->Title !== null && $row->Title !== '') ? $row->Title : $row->OriginalName,
-			'messages' => chat_history_parse($text),
-		)));
-	}
-
-	/**
 	 * Stream the raw .txt back to the browser under its original filename.
 	 */
 	function Download_Chat_History()

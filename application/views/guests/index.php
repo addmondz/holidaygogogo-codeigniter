@@ -907,28 +907,8 @@ div.kt-datatable__pager-container {
 	</div>
 </div>
 
-<!-- Chat history modal: upload exported WhatsApp .txt chats per person, then
-     view them as chat bubbles or download the raw file. Multiple files kept. -->
-<style>
-	.ch-bubble-row { display:flex; margin-bottom:8px; }
-	.ch-bubble-row.ch-out { justify-content:flex-end; }
-	.ch-bubble {
-		max-width:78%; padding:8px 12px; border-radius:12px; font-size:13px;
-		line-height:1.45; white-space:pre-wrap; word-break:break-word; text-align:left;
-		box-shadow:0 1px 1px rgba(0,0,0,.08);
-	}
-	.ch-in  .ch-bubble { background:#ffffff; border:1px solid #e4e6ef; border-top-left-radius:2px; }
-	.ch-out .ch-bubble { background:#d9fdd3; border:1px solid #bff0b4; border-top-right-radius:2px; }
-	.ch-sender { font-size:11px; font-weight:700; color:#3699ff; margin-bottom:2px; }
-	.ch-out .ch-sender { color:#128c7e; }
-	.ch-time  { font-size:10px; color:#8f97a5; margin-top:3px; text-align:right; }
-	.ch-system {
-		text-align:center; margin:8px auto; font-size:11px; color:#7e8299;
-		background:#fff8e1; border:1px solid #ffe7a0; border-radius:8px;
-		padding:4px 10px; max-width:90%;
-	}
-	#ch_thread { background:#eae6df; padding:14px; border-radius:8px; max-height:52vh; overflow-y:auto; }
-</style>
+<!-- Chat history modal: upload exported WhatsApp .txt chats per person and
+     download the raw file back. Multiple files kept per person. -->
 <div class="modal fade" id="chat_history_modal" tabindex="-1" role="dialog" aria-hidden="true">
 	<div class="modal-dialog modal-dialog-centered modal-lg" role="document">
 		<div class="modal-content">
@@ -965,15 +945,6 @@ div.kt-datatable__pager-container {
 					<div id="ch_list">
 						<div class="text-muted text-center py-3"><i class="la la-spinner la-spin"></i>&nbsp; Loading chats…</div>
 					</div>
-				</div>
-				<!-- Viewer pane: parsed chat bubbles -->
-				<div id="ch_viewer_pane" style="display:none;">
-					<div class="d-flex justify-content-between align-items-center mb-2">
-						<button type="button" id="ch_back" class="btn btn-light btn-sm font-weight-bold"><i class="la la-arrow-left"></i> Back</button>
-						<span id="ch_viewer_title" class="font-weight-bold text-dark-75" style="font-size:13px;"></span>
-						<a href="javascript:;" id="ch_viewer_download" class="btn btn-light-primary btn-sm font-weight-bold"><i class="la la-download"></i> Download</a>
-					</div>
-					<div id="ch_thread"></div>
 				</div>
 			</div>
 		</div>
@@ -1470,7 +1441,6 @@ div.kt-datatable__pager-container {
 	// they work from every page that renders this view (Guest List / Customer / GHL).
 	var CH_LIST_URL     = '<?php echo base_url('Guests/Chat_History'); ?>';
 	var CH_UPLOAD_URL   = '<?php echo base_url('Guests/Upload_Chat_History'); ?>';
-	var CH_VIEW_URL     = '<?php echo base_url('Guests/View_Chat_History'); ?>';
 	var CH_DOWNLOAD_URL = '<?php echo base_url('Guests/Download_Chat_History'); ?>';
 	var CH_DELETE_URL   = '<?php echo base_url('Guests/Delete_Chat_History'); ?>';
 	var chDedupKey = '';
@@ -1483,8 +1453,6 @@ div.kt-datatable__pager-container {
 		if (!m) { return raw || ''; }
 		return m[3] + ' ' + GR_MONTHS[parseInt(m[2], 10) - 1] + ' ' + m[1] + ' ' + m[4] + ':' + m[5];
 	}
-
-	function chShowList() { $('#ch_viewer_pane').hide(); $('#ch_list_pane').show(); }
 
 	function chRenderList(files) {
 		var $list = $('#ch_list');
@@ -1503,7 +1471,6 @@ div.kt-datatable__pager-container {
 					'<div class="font-weight-bold text-dark-75" style="font-size:13px;">' + meta + '</div>' +
 					'<div class="text-muted" style="font-size:11px;">' + sub + '</div>' +
 				'</div>' +
-				'<button type="button" class="btn btn-icon btn-light-primary btn-xs ch-view ml-1" data-id="' + f.id + '" data-title="' + chEscape(f.title) + '" data-toggle="tooltip" title="View chat"><i class="la la-eye"></i></button>' +
 				'<a href="' + CH_DOWNLOAD_URL + '?id=' + f.id + '" class="btn btn-icon btn-light-success btn-xs ml-1" data-toggle="tooltip" title="Download .txt"><i class="la la-download"></i></a>' +
 				(f.can_delete ?
 					'<button type="button" class="btn btn-icon btn-light-danger btn-xs ch-delete ml-1" data-id="' + f.id + '" data-toggle="tooltip" title="Delete"><i class="la la-trash"></i></button>' : '') +
@@ -1541,7 +1508,6 @@ div.kt-datatable__pager-container {
 		$('#ch_file').val('');
 		$('#ch_file_label').text('Choose .txt file');
 		$('#ch_title').val('');
-		chShowList();
 		$('#chat_history_modal').modal('show');
 		chLoad();
 	});
@@ -1579,51 +1545,6 @@ div.kt-datatable__pager-container {
 				$error.text('Network error. Please try again.').show();
 			});
 	});
-
-	function chRenderThread(messages) {
-		var $t = $('#ch_thread');
-		if (!messages || !messages.length) {
-			$t.html('<div class="text-muted text-center py-3">This chat file has no readable messages.</div>');
-			return;
-		}
-		var html = '';
-		for (var i = 0; i < messages.length; i++) {
-			var m = messages[i];
-			if (m.system) { html += '<div class="ch-system">' + chEscape(m.body) + '</div>'; continue; }
-			var side = m.outbound ? 'ch-out' : 'ch-in';
-			html += '<div class="ch-bubble-row ' + side + '">' +
-				'<div class="ch-bubble">' +
-					(m.sender ? '<div class="ch-sender">' + chEscape(m.sender) + '</div>' : '') +
-					chEscape(m.body) +
-					(m.ts ? '<div class="ch-time">' + chEscape(m.ts) + '</div>' : '') +
-				'</div>' +
-			'</div>';
-		}
-		$t.html(html);
-		$t.scrollTop(0);
-	}
-
-	$('#ch_list').on('click', '.ch-view', function() {
-		var $btn = $(this), id = $btn.attr('data-id');
-		$('#ch_viewer_title').text($btn.attr('data-title') || '');
-		$('#ch_viewer_download').attr('data-id', id);
-		$('#ch_thread').html('<div class="text-muted text-center py-3"><i class="la la-spinner la-spin"></i>&nbsp; Loading…</div>');
-		$('#ch_list_pane').hide();
-		$('#ch_viewer_pane').show();
-		$.ajax({ url: CH_VIEW_URL, method: 'GET', dataType: 'json', data: { id: id }, timeout: 30000 })
-			.done(function(res) {
-				if (res && res.ok) { chRenderThread(res.messages); }
-				else { $('#ch_thread').html('<div class="text-danger text-center py-3">' + chEscape((res && res.message) || 'Could not open chat.') + '</div>'); }
-			})
-			.fail(function() { $('#ch_thread').html('<div class="text-danger text-center py-3">Network error. Please try again.</div>'); });
-	});
-
-	$('#ch_viewer_download').on('click', function() {
-		var id = $(this).attr('data-id');
-		if (id) { window.open(CH_DOWNLOAD_URL + '?id=' + id, '_blank'); }
-	});
-
-	$('#ch_back').on('click', chShowList);
 
 	$('#ch_list').on('click', '.ch-delete', function() {
 		var id = $(this).attr('data-id');
