@@ -1032,6 +1032,60 @@ class Report extends MY_Controller
         $this->load->view('layout/footer');
 	}
 
+    function PowerBI()
+    {
+        $titles = array('tab_title' => 'HolidayGoGoGo | Report', 'breadcrumb_title' => 'Report >> PowerBI');
+        $array = array(
+            'workspace_id' => '',
+            'dataset_id' => '',
+            'embed_url' => '',
+            'embed_token' => '',
+            'error' => '',
+        );
+
+        $this->load->library('powerbi');
+        $this->config->load('powerbi', TRUE);
+        $array['dataset_id'] = $this->config->item('dataset_id', 'powerbi');
+        $array['workspace_id'] = $this->config->item('workspace_id', 'powerbi');
+
+        if (!$this->powerbi->isConfigured()) {
+            $array['error'] = 'Power BI is not configured. Please add your credentials and dataset ID to the .env file.';
+        } else {
+            try {
+                $array['embed_url'] = $this->powerbi->getCreateEmbedUrl();
+                $array['embed_token'] = $this->powerbi->getCreateEmbedToken();
+            } catch (Exception $e) {
+                $array['error'] = $e->getMessage();
+            }
+        }
+
+        $this->load->view('layout/header', $titles);
+        $this->load->view('report/powerbi', $array);
+        $this->load->view('layout/footer');
+    }
+
+    function Embed_Token()
+    {
+        header('Content-Type: application/json');
+        $this->load->library('powerbi');
+
+        try {
+            if (!$this->powerbi->isConfigured()) {
+                throw new Exception('Power BI is not configured.');
+            }
+
+            echo json_encode(array(
+                'embedToken' => $this->powerbi->getCreateEmbedToken(),
+                'embedUrl' => $this->powerbi->getCreateEmbedUrl(),
+                'datasetId' => $this->config->item('dataset_id', 'powerbi'),
+                'tokenExpiry' => $this->powerbi->getTokenExpiry(),
+            ));
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(array('error' => $e->getMessage()));
+        }
+    }
+
     function Download_Product_Sales() {
 		$spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
 		$spreadsheet->getActiveSheet()->setTitle('Report');
