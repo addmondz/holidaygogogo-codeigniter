@@ -36,15 +36,40 @@ function Delete_Record(background, title, url, key, value, status, href)
 	});
 }
 
-function Display_Message(background, title, url)
+function Revert_Booking_Status(background, bookingNumber, revertUrl, fromStatusText, toStatusText)
+{
+	const swalWithBootstrapButtons = Swal.mixin({
+		customClass: {
+			confirmButton: 'btn btn-light-success m-2',
+			cancelButton: 'btn btn-danger m-2'
+		},
+		buttonsStyling: true
+	});
+	swalWithBootstrapButtons.fire({
+		width: 550,
+		background: `url(${background})`,
+		icon: 'warning',
+		title: 'Revert Booking Status ?',
+		html: `<b>${bookingNumber}</b><br>${fromStatusText} → ${toStatusText}`,
+		confirmButtonText: 'Confirm',
+		cancelButtonText: 'Cancel',
+		showCancelButton: true
+	}).then((action) => {
+		if(action.isConfirmed) {
+			window.location.href = revertUrl;
+		}
+	});
+}
+
+function Display_Message(background, title, url, showConfirmButton = false)
 {
 	Swal.fire({
 		width: 550,
 		background: `url(${background})`,
 		icon: title.includes('Successfully') || title.includes('No Changes') ? 'success' : 'error',
 		title: title,
-		showConfirmButton: false,
-		timer: 2200
+		showConfirmButton: showConfirmButton,
+		...(confirm ? {} : { timer: 2200 })
 	}).then(() => {
 		if(title.includes('Successfully') || title.includes('No Changes') || title.includes('Page Will Refresh')) {
 			window.location.href = url;

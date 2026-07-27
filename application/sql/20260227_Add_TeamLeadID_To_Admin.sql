@@ -1,0 +1,3 @@
+ALTER TABLE `admin` ADD COLUMN `TeamLeadID` INT NULL DEFAULT NULL AFTER `AccessControl`;
+
+ALTER TABLE `admin` MODIFY COLUMN `Level` ENUM('10','20','25','30','40','50') NOT NULL;

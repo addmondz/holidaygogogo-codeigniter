@@ -3,14 +3,14 @@ class Supplier_Model extends CI_Model
 {
 	function Read_Supplier()
 	{
-		$this->db->select('SupplierID, Name, Phone, PrimaryEmail, SecondaryEmail, Address, CurrencyCode, Bank, BankAccount, BankHolder, SwiftCode');
+		$this->db->select('SupplierID, Name, Phone, PrimaryEmail, SecondaryEmail, Address, CurrencyCode, Bank, BankAccount, BankHolder, SwiftCode, SupplierCode,AutocountSyncAction, AutocountSyncStatus, AutocountSyncMessage');
 		$this->db->where('SupplierID', $this->input->get('supplier_id'));
 		return $this->db->get('supplier')->row_array();
 	}
 
 	function Read_Suppliers1()
 	{
-		$this->db->select('SupplierID, Name, Phone, Status');
+		$this->db->select('SupplierID, Name, Phone, Status, SupplierCode,AutocountSyncAction, AutocountSyncStatus, AutocountSyncMessage');;
 		if(!empty($this->input->get('name'))) {
 			$this->db->where('Name', $this->input->get('name'));
 		}
@@ -48,7 +48,7 @@ class Supplier_Model extends CI_Model
 
 	function Read_Suppliers2()
 	{
-		$this->db->select('Name, Phone, PrimaryEmail, SecondaryEmail, Address, CurrencyCode, Bank, BankAccount, BankHolder, SwiftCode');
+		$this->db->select('Name, Phone, PrimaryEmail, SecondaryEmail, Address, CurrencyCode, Bank, BankAccount, BankHolder, SwiftCode, SupplierCode, AutocountSyncAction, AutocountSyncStatus, AutocountSyncMessage');
 		if(!empty($this->input->get('name'))) {
 			$this->db->where('Name', $this->input->get('name'));
 		}
@@ -143,4 +143,68 @@ class Supplier_Model extends CI_Model
 			return false;
 		}
 	}
+
+	public function find($supplier_id)
+    {
+        return $this->db->get_where('supplier', ['SupplierID' => $supplier_id])->row();
+    }
+	
+    public function update_by_id($supplier_id, $data = [])
+    {
+        if (empty($data)) return false;
+
+        return $this->db
+            ->where('SupplierID', $supplier_id)
+            ->update('supplier', $data);
+    }
+	public function get_pending_sycn_suppliers()
+	{
+		$this->load->helper('autocount');
+		$config = get_autocount_config();
+
+		$supplier_qty_cront = !empty($config['supplier_qty_cront'])
+			? (int)$config['supplier_qty_cront']
+			: 10;
+		
+		$statuses = !empty($config['supplier_sync_autocount_status']) 
+			? (array)$config['supplier_sync_autocount_status'] 
+			: ['P'];
+
+		$this->db->from('supplier');
+		$this->db->where_in('AutocountSyncStatus', $statuses);
+		$this->db->where('AutocountSyncAction IS NOT NULL', null, false);
+
+		if (!empty($config['supplier_cutoff_date'])) {
+			$date = date('Y-m-d', strtotime($config['supplier_cutoff_date']));
+			$this->db->where('supplier.InsertDate >', $date);
+		}
+
+		$this->db->limit($supplier_qty_cront);
+
+		return $this->db->get()->result_array();
+	}
+
+	public function get_supplier_by_name($name)
+	{
+		$this->db->select('SupplierID, Name, SupplierCode');
+		$this->db->where('Name', $name);
+		$this->db->where('Status', 'Y');
+		return $this->db->get('supplier')->row();
+	}
+
+	public function get_all_suppliers_for_mapping()
+	{
+		$this->db->select('Name, SupplierCode');
+		$this->db->where('Status', 'Y');
+		$this->db->order_by('Name', 'ASC');
+		$result = $this->db->get('supplier')->result();
+		
+		$mapping = array();
+		foreach ($result as $supplier) {
+			$mapping[trim(strtolower($supplier->Name))] = $supplier->SupplierCode;
+		}
+		
+		return $mapping;
+	}
+
 }

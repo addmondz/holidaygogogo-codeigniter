@@ -1,0 +1,232 @@
+<?php
+defined('BASEPATH') or exit('No direct script access allowed');
+
+/**
+ * Draft -> Payment Response Helper
+ *
+ * Pure SQL builders behind the "Draft -> Payment Time" summary card
+ * (Booking::ajax_summary_cards). The card measures how long, after a booking is
+ * saved as draft, it takes to reach the payment stage:
+ *
+ *   START : the booking is saved as draft -> earliest TRANSITION into SAD
+ *           ("SAVE AS DRAFT") in booking_status_log
+ *   END   : the booking first reaches P ("PENDING PAYMENT") -> earliest
+ *           TRANSITION into P
+ *
+ * Only bookings that have BOTH a SAD anchor and a P transition are counted
+ * (inner joins), so a draft still working its way through SAD/PB/PBC simply
+ * isn't in the average yet. The window is on the START anchor (the SAD
+ * timestamp), so the metric is "drafts saved in this period and the time they
+ * took to reach payment".
+ *
+ * Kept free of CodeIgniter/DB so it can be unit tested under SQLite :memory:
+ * (see tests/helpers/SubmittedPaymentResponseSqlTest.php). Uses UNIX_TIMESTAMP
+ * so a SQLite UDF can stand in for MySQL's native function under test.
+ *
+ * Depends on lead_conversion_credit_helper for the TC1/TC2 credited-slot
+ * attribution (load it before these in the controller), so the TC variant and
+ * the "Best agent" footer agree with the other credited-slot summary cards.
+ */
+
+if (!function_exists('submitted_payment_draft_window_sql_fragment')) {
+    /**
+     * Subquery: earliest `booking_status_log` row per booking that TRANSITIONS
+     * into SAD ("SAVE AS DRAFT") — the moment the booking was saved as draft,
+     * which anchors the start of the response-time window.
+     *
+     * @return string
+     */
+    function submitted_payment_draft_window_sql_fragment()
+    {
+        return "(
+            SELECT booking_id, MIN(created_at) AS first_sad_at
+            FROM booking_status_log
+            WHERE to_status = 'SAD'
+            GROUP BY booking_id
+        )";
+    }
+}
+
+if (!function_exists('submitted_payment_pending_window_sql_fragment')) {
+    /**
+     * Subquery: earliest `booking_status_log` row per booking that TRANSITIONS
+     * into P ("PENDING PAYMENT"). The from_status guard skips any CREATION row
+     * (to_status='P', from_status NULL) so only a genuine advance into payment
+     * counts as the end anchor.
+     *
+     * @return string
+     */
+    function submitted_payment_pending_window_sql_fragment()
+    {
+        return "(
+            SELECT booking_id, MIN(created_at) AS first_p_at
+            FROM booking_status_log
+            WHERE to_status = 'P' AND from_status IS NOT NULL
+            GROUP BY booking_id
+        )";
+    }
+}
+
+if (!function_exists('submitted_payment_avg_response_sql')) {
+    /**
+     * SQL for the "Draft -> Payment Time" summary card.
+     *
+     * Returns one row with `avg_seconds` and `n`. Bind two placeholders for the
+     * window on the draft anchor (`first_sad_at >= ? AND first_sad_at < ?`).
+     * When `$with_credit_clause` is true, two extra placeholders are appended
+     * for the admin_id (bound twice, matching
+     * `lead_conversion_credit_booking_clause`).
+     *
+     * @param bool $with_credit_clause Apply the TC1/TC2 credit filter so the
+     *                                 result is scoped to a single admin.
+     * @return string
+     */
+    function submitted_payment_avg_response_sql($with_credit_clause = false)
+    {
+        $draft_join = submitted_payment_draft_window_sql_fragment();
+        $pay_join   = submitted_payment_pending_window_sql_fragment();
+        $sql = "SELECT
+                    AVG(UNIX_TIMESTAMP(p.first_p_at) - UNIX_TIMESTAMP(d.first_sad_at)) AS avg_seconds,
+                    COUNT(*) AS n
+                FROM {$draft_join} d
+                JOIN booking b ON b.BookingID = d.booking_id
+                JOIN {$pay_join} p ON p.booking_id = d.booking_id
+                WHERE d.first_sad_at >= ? AND d.first_sad_at < ?
+                  AND b.Status != 'N'";
+        if ($with_credit_clause) {
+            // lead_conversion_credit_booking_clause() returns its own pair of
+            // placeholders and references `booking.SalesAgent`/`SalesAgent2`;
+            // swap the qualifier so the clause matches our `b` alias.
+            $credit = lead_conversion_credit_booking_clause();
+            $credit = str_replace('booking.', 'b.', $credit);
+            $sql .= " AND " . $credit;
+        }
+        return $sql;
+    }
+}
+
+if (!function_exists('submitted_payment_conversion_summary_sql')) {
+    /**
+     * SQL for the OP / OP Team Lead "Avg Conversion Time" and
+     * "Slow Conversions (> 24h)" cards. Same SAD -> first-P gap as the TC
+     * "Draft -> Payment Time" card, but company-wide (every agent — OP oversees
+     * operations, not a sales slot) and returning the slow count in one pass:
+     *
+     *   avg_seconds : AVG(first_p_at - first_sad_at) over qualifying bookings
+     *   n           : how many drafts saved in the window reached payment
+     *   slow_n      : how many of those took longer than $slow_threshold_seconds
+     *
+     * Live bookings only (Status != 'N', CancelStatus = 'N'), matching the
+     * status=A scope of the drill-down (apply_slow_conversion_filter) so the
+     * card count and the linked listing return the same bookings. Windowed on
+     * the SAD anchor — bind two placeholders (first_sad_at >= ? AND <= ?); the
+     * caller passes today as the end so the window is cut off at today.
+     *
+     * The threshold is a server-side constant inlined as an integer (numeric
+     * UNIX_TIMESTAMP arithmetic, so no user input is interpolated).
+     *
+     * @param int       $slow_threshold_seconds default 86400 (24h)
+     * @param int[]|null $sales_agent_ids        when a non-empty list, scope to
+     *                                           those TC1 slots (b.SalesAgent IN
+     *                                           (...)). The OP cards pass the
+     *                                           logged-in user's whole OP team so
+     *                                           teammates share the metric. IDs
+     *                                           are cast to int and inlined (no
+     *                                           user input — admin ids from the
+     *                                           admin table), matching the inlined
+     *                                           threshold above.
+     * @return string
+     */
+    function submitted_payment_conversion_summary_sql($slow_threshold_seconds = 86400, $sales_agent_ids = null)
+    {
+        $slow       = (int) $slow_threshold_seconds;
+        $draft_join = submitted_payment_draft_window_sql_fragment();
+        $pay_join   = submitted_payment_pending_window_sql_fragment();
+        $gap = 'UNIX_TIMESTAMP(p.first_p_at) - UNIX_TIMESTAMP(d.first_sad_at)';
+        $sql = "SELECT
+                    AVG({$gap}) AS avg_seconds,
+                    COUNT(*) AS n,
+                    SUM(CASE WHEN ({$gap}) > {$slow} THEN 1 ELSE 0 END) AS slow_n
+                FROM {$draft_join} d
+                JOIN booking b ON b.BookingID = d.booking_id
+                JOIN {$pay_join} p ON p.booking_id = d.booking_id
+                WHERE d.first_sad_at >= ? AND d.first_sad_at <= ?
+                  AND b.Status != 'N'
+                  AND b.CancelStatus = 'N'";
+        if (!empty($sales_agent_ids)) {
+            $ids = array_values(array_filter(array_map('intval', (array) $sales_agent_ids)));
+            if (!empty($ids)) {
+                $sql .= " AND b.SalesAgent IN (" . implode(',', $ids) . ")";
+            }
+        }
+        return $sql;
+    }
+}
+
+if (!function_exists('submitted_payment_slow_ids_sql_fragment')) {
+    /**
+     * Subquery fragment for the "Slow Conversions (> 24h)" drill-down
+     * (Booking_Model::apply_slow_conversion_filter, ?slow_conversion=1):
+     * the booking_ids whose SAD -> first-P gap exceeds the threshold, with the
+     * SAD anchor inside ['$win_start', '$win_end']. Mirrors
+     * submitted_payment_conversion_summary_sql so the slow count and the listing
+     * agree. The live-booking scope (Status != 'N', CancelStatus = 'N') is
+     * supplied by the listing's status=A filter, so it isn't repeated here.
+     *
+     * $win_start / $win_end must be caller-validated timestamps and $threshold a
+     * constant int — they are interpolated, never bound (CodeIgniter active
+     * record one-liner), so the caller carries the no-user-input guarantee.
+     *
+     * @param string $win_start 'Y-m-d H:i:s'
+     * @param string $win_end   'Y-m-d H:i:s'
+     * @param int    $threshold seconds
+     * @return string
+     */
+    function submitted_payment_slow_ids_sql_fragment($win_start, $win_end, $threshold)
+    {
+        $threshold  = (int) $threshold;
+        $draft_join = submitted_payment_draft_window_sql_fragment();
+        $pay_join   = submitted_payment_pending_window_sql_fragment();
+        $gap = 'UNIX_TIMESTAMP(p.first_p_at) - UNIX_TIMESTAMP(d.first_sad_at)';
+        return "SELECT d.booking_id
+                FROM {$draft_join} d
+                JOIN {$pay_join} p ON p.booking_id = d.booking_id
+                WHERE d.first_sad_at >= '{$win_start}'
+                  AND d.first_sad_at <= '{$win_end}'
+                  AND ({$gap}) > {$threshold}";
+    }
+}
+
+if (!function_exists('submitted_payment_best_agent_sql')) {
+    /**
+     * SQL for the "Best:" footer on the Draft -> Payment Time card. Groups by
+     * the credited admin (TC1 pre-cutoff, TC2 on/after), keeps only agents with
+     * at least 2 qualifying bookings (min-sample guard shared with the other
+     * cards), and returns the agent with the lowest (fastest) average.
+     *
+     * Bind two placeholders for the window. Returns one row with `AdminID`,
+     * `avg_seconds`, `n` — or zero rows when nobody qualifies.
+     *
+     * @return string
+     */
+    function submitted_payment_best_agent_sql()
+    {
+        $draft_join = submitted_payment_draft_window_sql_fragment();
+        $pay_join   = submitted_payment_pending_window_sql_fragment();
+        $agent_expr = lead_conversion_credit_agent_expr('b');
+        return "SELECT
+                    {$agent_expr} AS AdminID,
+                    AVG(UNIX_TIMESTAMP(p.first_p_at) - UNIX_TIMESTAMP(d.first_sad_at)) AS avg_seconds,
+                    COUNT(*) AS n
+                FROM {$draft_join} d
+                JOIN booking b ON b.BookingID = d.booking_id
+                JOIN {$pay_join} p ON p.booking_id = d.booking_id
+                WHERE d.first_sad_at >= ? AND d.first_sad_at < ?
+                  AND b.Status != 'N'
+                  AND {$agent_expr} IS NOT NULL
+                GROUP BY {$agent_expr}
+                HAVING n >= 2
+                ORDER BY avg_seconds ASC
+                LIMIT 1";
+    }
+}

@@ -121,7 +121,7 @@ $config['charset'] = 'UTF-8';
 | setting this variable to TRUE (boolean).  See the user guide for details.
 |
 */
-$config['enable_hooks'] = FALSE;
+$config['enable_hooks'] = TRUE;
 
 /*
 |--------------------------------------------------------------------------
@@ -406,7 +406,8 @@ $config['sess_driver'] = 'files';
 $config['sess_cookie_name'] = 'ci_session';
 $config['sess_samesite'] = 'Lax';
 $config['sess_expiration'] = 7200;
-$config['sess_save_path'] = NULL;
+// $config['sess_save_path'] = NULL;
+$config['sess_save_path'] = APPPATH . 'cache/sessions'; // <- must exist & be writable
 $config['sess_match_ip'] = FALSE;
 $config['sess_time_to_update'] = 300;
 $config['sess_regenerate_destroy'] = FALSE;
@@ -549,3 +550,17 @@ $config['rewrite_short_tags'] = FALSE;
 | Array:		array('10.0.1.200', '192.168.5.0/24')
 */
 $config['proxy_ips'] = '';
+
+/*
+|--------------------------------------------------------------------------
+| Customer Portal HMAC Secret
+|--------------------------------------------------------------------------
+|
+| Secret key used for generating and verifying HMAC hashes for customer
+| portal URLs. This should be a long, random string stored securely.
+| You can also set this via .env file as CUSTOMER_PORTAL_HMAC_SECRET
+|
+*/
+$config['customer_portal_hmac_secret'] = isset($env['CUSTOMER_PORTAL_HMAC_SECRET']) && !empty($env['CUSTOMER_PORTAL_HMAC_SECRET']) 
+    ? $env['CUSTOMER_PORTAL_HMAC_SECRET'] 
+    : 'change-this-to-a-secure-random-string-in-production';

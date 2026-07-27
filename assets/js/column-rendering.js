@@ -11,7 +11,7 @@ var KTDatatablesAdvancedColumnRendering = function() {
 			paging: true,
 			columnDefs: [
 				{
-					targets: ['test', 'gl_status', 'status', 'action'],
+					targets: ['booking_checkbox', 'test', 'gl_status', 'status', 'autocount_sync_status','action'],
 					orderable: false
 				},
 				{ 'type': 'date', 'targets': ['bc_date', 'start_date', 'end_date', 'transaction_date', 'deadline', 'month'] },

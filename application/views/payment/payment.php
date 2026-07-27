@@ -10,6 +10,11 @@
                 <?php $current_url = base_url($_SERVER['REQUEST_URI']); ?>
             </div>
             <div class="card-body">
+                <script>
+                    function isSupplierPaymentType(type) {
+                        return type == 'SUPPLIER PAYMENT (DEPOSIT)' || type == 'SUPPLIER PAYMENT (FULL)' || type == 'SUPPLIER PAYMENT (ADDITIONAL)';
+                    }
+                </script>
                 <form id="form" action="<?php if(current_url() == base_url('Payment/Create')) { echo base_url('Payment/Create'); } else { echo base_url('Payment/Update?payment_id=') . $this->input->get('payment_id'); } ?>" method="post" enctype="multipart/form-data">
                     <?php if(current_url() == base_url('Payment/Create')) { ?>
                         <div id="booking"></div>
@@ -84,6 +89,11 @@
                             var payment_ids = [];
                             var booking_auto_selected = false;
                             var outstanding_balance = 0;
+                            var booking_products = [];
+                            var booking_net_total = 0;
+                            var existing_total_credit = 0;
+                            var existing_total_debit = 0;
+                            window.productOptionsHtml = '';
 
                             <?php if(!empty($this->input->get('booking_number'))) { ?>
                                 Select_Booking();
@@ -113,6 +123,12 @@
                                     },
                                     dataType: 'json',
                                     success: function(array) {
+                                        booking_products = array.booking_products || [];
+                                        var productOptions = '<option selected disabled value="">--SELECT PRODUCT--</option>';
+                                        $.each(booking_products, function(key, bp) {
+                                            productOptions += '<option data-icon="la la-box font-size-lg bs-icon" value="' + bp.BookingProductID + '" data-product-id="' + bp.ProductID + '">' + bp.ProductCode + ' - ' + bp.Name + '</option>';
+                                        });
+                                        window.productOptionsHtml = productOptions;
                                         reservation_number = array.ReservationNumber;
                                         var count = 0;
                                         var credit_payments = [];
@@ -120,12 +136,13 @@
                                         outstanding_balance = parseFloat((array.NetTotal).replace(/[RM,]/g, ''));
                                         var debit_payments = [];
                                         var total_debit = 0;
+                                        var customerInTypes = ['DEPOSIT', 'FULL', 'ADDITIONAL PAYMENT'];
                                         if(array.credit_payments.length > 0) {
                                             $.each(array.credit_payments, function(key, value) {
                                                 count++;
                                                 credit_payments.push('<tr><td>' + count + '</td><td>' + value.Date + '</td><td>' + value.Type + '</td><td style="color:#F64E60;">' + value.Status + '</td><td>Reference Number : ' + value.ReferenceNumber + '<br>Remark : ' + value.PaymentRemark + '</td><td style="color:#2AAA8A; text-align:right;">' + value.Credit + '</td><td>' + value.Debit + '</td></tr>');
                                                 total_credit = total_credit + parseFloat((value.Credit).replace(/[RM,]/g, ''));
-                                                if(value.Status == '<i class="la la-check-circle text-success"></i>') {
+                                                if(value.Status == '<i class="la la-check-circle text-success"></i>' && customerInTypes.indexOf(value.Type) !== -1) {
                                                     outstanding_balance = outstanding_balance - parseFloat((value.Credit).replace(/[RM,]/g, ''));
                                                 }
                                             });
@@ -133,7 +150,7 @@
                                         if(array.debit_payments.length > 0) {
                                             $.each(array.debit_payments, function(key, value) {
                                                 count++;
-                                                if(value.Type == 'SUPPLIER PAYMENT') {
+                                                if(isSupplierPaymentType(value.Type)) {
                                                     debit_payments.push('<tr><td>' + count + '</td><td>' + value.Date + '</td><td>' + value.Type + '</td><td style="color:#F64E60;">' + value.Status + '</td><td>Payment Deadline : ' + value.Deadline + '<br>Supplier : ' + value.Supplier + '<br>Quotation Number : ' + value.QuotationNumber + '<br>Invoice Number : ' + value.InvoiceNumber + '<br>Reference Number : ' + value.ReferenceNumber + '<br>Remark : ' + value.PaymentRemark + '</td><td>' + value.Credit + '</td><td style="color:#F88379; text-align:right;">' + value.Debit + '</td></tr>');
                                                 } else {
                                                     debit_payments.push('<tr><td>' + count + '</td><td>' + value.Date + '</td><td>' + value.Type + '</td><td style="color:#F64E60;">' + value.Status + '</td><td>Payment Deadline : ' + value.Deadline + '<br>Bank : ' + value.Bank + '<br>Bank Account : ' + value.BankAccount + '<br>Bank Holder : ' + value.BankHolder + '<br>Reference Number : ' + value.ReferenceNumber + '<br>Remark : ' + value.DebitRemark + '</td><td>' + value.Credit + '</td><td style="color:#F88379; text-align:right;">' + value.Debit + '</td></tr>');
@@ -240,6 +257,11 @@
                                                 '<br><br>' +
                                             '</div>' +
                                         '</div>').insertAfter('#summary');
+                                        $('#total_credit').val(total_credit.toLocaleString('en-US', {minimumFractionDigits: 2}));
+                                        $('#total_debit').val(total_debit.toLocaleString('en-US', {minimumFractionDigits: 2}));
+                                        booking_net_total = parseFloat((array.NetTotal).replace(/[RM,]/g, '')) || 0;
+                                        existing_total_credit = total_credit;
+                                        existing_total_debit = total_debit;
                                     }
                                 });
                                 for(var i = 0; i < payment_ids.length; i++) {
@@ -315,7 +337,7 @@
                                                 '<select name="credit_type-'+ payment_id +'" class="form-control selectpicker">' +
                                                     '<option selected disabled data-icon="la la-dollar font-size-lg bs-icon" value="">--SELECT PAYMENT TYPE--</option>' +
                                                     '<?php foreach(unserialize(PAYMENT_TYPE) as $key => $value) { ?>' +
-                                                        '<?php if($key == 'SUPPLIER PAYMENT' || $key == 'CUSTOMER REFUND' || $key == 'ONE-TIME PAYMENT' || $key == 'AGENT COMMISSION' || $key == 'BANK CHARGES' || $key == 'CREDIT CARD CHARGES') { continue; } ?>' +
+                                                        '<?php if($key == 'SUPPLIER PAYMENT (DEPOSIT)' || $key == 'SUPPLIER PAYMENT (FULL)' || $key == 'SUPPLIER PAYMENT (ADDITIONAL)' || $key == 'CUSTOMER REFUND' || $key == 'ONE-TIME PAYMENT' || $key == 'AGENT COMMISSION' || $key == 'BANK CHARGES' || $key == 'CREDIT CARD CHARGES') { continue; } ?>' +
                                                         '<option data-icon="la la-dollar font-size-lg bs-icon" value="<?php echo $key; ?>"><?php echo $value; ?></option>' +
                                                     '<?php } ?>' +
                                                 '</select>' +
@@ -326,7 +348,8 @@
                                             '<div class="col-md-6 mb-7 mb-md-0">' +
                                                 '<label>Amount (RM) <span style="color:red;">*</span></label>' +
                                                 '<div class="input-icon">' +
-                                                    '<input type="text" name="credit-'+ payment_id +'" autocomplete="off" onchange="Validate_Amount('+ '/Credit/' + ',' + payment_id +')" class="form-control" style="text-align:right;">' +
+                                                    // '<input type="text" name="credit-'+ payment_id +'" autocomplete="off" onchange="Validate_Amount('+ '/Credit/' + ',' + payment_id +')" class="form-control" style="text-align:right;">' +
+                                                    '<input type="text" name="credit-'+ payment_id +'" autocomplete="off" onchange="Validate_Amount(`credit`, ' + payment_id + ')" class="form-control" style="text-align:right;">' +
                                                     '<span>' +
                                                         '<i class="la la-dollar"></i>' +
                                                     '</span>' +
@@ -356,7 +379,8 @@
                                             '<div class="col-md-6">' +
                                                 '<label>Bank Slip</label>' +
                                                 '<div class="custom-file">' +
-                                                    '<input type="file" name="bank_slip-'+ payment_id +'" onchange="Update_File_Label('+ '/BankSlip/' + ',' + payment_id +')" class="custom-file-input">' +
+                                                    // '<input type="file" name="bank_slip-'+ payment_id +'" onchange="Update_File_Label('+ '/BankSlip/' + ',' + payment_id +')" class="custom-file-input">' +
+                                                    '<input type="file" name="bank_slip-'+ payment_id +'" onchange="Update_File_Label(`bank_slip`, ' + payment_id + ')" class="custom-file-input">' +
                                                     '<label id="bank_slip-'+ payment_id +'" class="custom-file-label" style="font-size:13px;"></label>' +
                                                 '</div>' +
                                             '</div>' +
@@ -369,7 +393,9 @@
                                         format: 'dd/mm/yyyy',
                                         autoclose: true
                                     });
-                                    $(`select[name="credit_type-${payment_id}"]`).selectpicker();
+                                    $(`select[name="credit_type-${payment_id}"]`).selectpicker().on('changed.bs.select', function() {
+                                        Calculate_Subtotal();
+                                    });
                                 } else {
                                     $('<div id="payment_out-'+ payment_id +'" class="p-3" style="background-color:#FAA0A030;">' +
                                         '<div class="row">' +
@@ -378,7 +404,7 @@
                                                 '<select name="debit_type-'+ payment_id +'" onchange="Debit('+ payment_id +')" class="form-control selectpicker">' +
                                                     '<option selected disabled data-icon="la la-dollar font-size-lg bs-icon" value="">--SELECT PAYMENT TYPE--</option>' +
                                                     '<?php foreach(unserialize(PAYMENT_TYPE) as $key => $value) { ?>' +
-                                                        '<?php if($key == 'DEPOSIT' || $key == 'FULL' || $key == 'SUPPLIER REFUND' || $key == 'ADDITIONAL PAYMENT') { continue; } ?>' +
+                                                        '<?php if($key == 'SUPPLIER REFUND' || $key == 'DEPOSIT' || $key == 'FULL' || $key == 'ADDITIONAL PAYMENT') { continue; } ?>' +
                                                         '<option data-icon="la la-dollar font-size-lg bs-icon" value="<?php echo $key; ?>"><?php echo $value; ?></option>' +
                                                     '<?php } ?>' +
                                                 '</select>' +
@@ -386,7 +412,8 @@
                                             '<div class="col-md-6">' +
                                                 '<label>Amount (RM)</label>' +
                                                 '<div class="input-icon">' +
-                                                    '<input type="text" name="debit-'+ payment_id +'" autocomplete="off" onchange="Validate_Amount('+ '/Debit/' + ',' + payment_id +')" class="form-control" style="text-align:right;">' +
+                                                    // '<input type="text" name="debit-'+ payment_id +'" autocomplete="off" onchange="Validate_Amount('+ '/Debit/' + ',' + payment_id +')" class="form-control" style="text-align:right;">' +
+                                                    '<input type="text" name="debit-'+ payment_id +'" autocomplete="off" onchange="Validate_Amount(`debit`, ' + payment_id + ')" class="form-control" style="text-align:right;">' +
                                                     '<span>' +
                                                         '<i class="la la-dollar"></i>' +
                                                     '</span>' +
@@ -462,7 +489,7 @@
                             function Debit(payment_id) {
                                 $(`#debit-${payment_id}`).remove();
                                 var payment_type = $(`select[name="debit_type-${payment_id}"]`).val();
-                                if(payment_type == 'SUPPLIER PAYMENT') {
+                                if(isSupplierPaymentType(payment_type)) {
                                     $('<div id="debit-'+ payment_id +'" class="p-3" style="background-color:#DE316310;">' +
                                         '<div class="row">' +
                                             '<div class="col-md-12">' +
@@ -486,7 +513,8 @@
                                             '<div class="col-md-6">' +
                                                 '<label>Quotation</label>' +
                                                 '<div class="custom-file">' +
-                                                    '<input type="file" name="quotation-'+ payment_id +'" onchange="Update_File_Label('+ '/Quotation/' + ',' + payment_id +')" class="custom-file-input">' +
+                                                    // '<input type="file" name="quotation-'+ payment_id +'" onchange="Update_File_Label('+ '/Quotation/' + ',' + payment_id +')" class="custom-file-input">' +
+                                                    '<input type="file" name="quotation-'+ payment_id +'" onchange="Update_File_Label(`Quotation`, ' + payment_id + ')" class="custom-file-input">' +
                                                     '<label id="quotation-'+ payment_id +'" class="custom-file-label" style="font-size:13px;"></label>' +
                                                 '</div>' +
                                             '</div>' +
@@ -505,13 +533,25 @@
                                             '<div class="col-md-6">' +
                                                 '<label>Invoice</label>' +
                                                 '<div class="custom-file">' +
-                                                    '<input type="file" name="invoice-'+ payment_id +'" onchange="Update_File_Label('+ '/Invoice/' + ',' + payment_id +')" class="custom-file-input">' +
+                                                    // '<input type="file" name="invoice-'+ payment_id +'" onchange="Update_File_Label('+ '/Invoice/' + ',' + payment_id +')" class="custom-file-input">' +
+                                                    '<input type="file" name="invoice-'+ payment_id +'" onchange="Update_File_Label(`Invoice`, ' + payment_id + ')" class="custom-file-input">' +
                                                     '<label id="invoice-'+ payment_id +'" class="custom-file-label" style="font-size:13px;"></label>' +
                                                 '</div>' +
                                             '</div>' +
                                         '</div>' +
+                                        '<br>' +
+                                        '<div class="row">' +
+                                            '<div class="col-md-12">' +
+                                                '<label>Product</label>' +
+                                                '<select name="booking_product-'+ payment_id +'" data-live-search="true" onchange="Select_Product('+ payment_id +')" class="form-control selectpicker">' +
+                                                    window.productOptionsHtml +
+                                                '</select>' +
+                                            '</div>' +
+                                        '</div>' +
+                                        '<div id="checklist-container-'+ payment_id +'" class="mt-3"></div>' +
                                     '</div>').insertBefore('#benchmark-' + payment_id);
                                     $(`select[name="supplier-${payment_id}"]`).selectpicker();
+                                    $(`select[name="booking_product-${payment_id}"]`).selectpicker();
                                 } else {
                                     $('<div id="debit-'+ payment_id +'" class="p-3" style="background-color:#D7004010;">' +
                                         '<div class="row">' +
@@ -557,6 +597,63 @@
                                         '</div>' +
                                     '</div>').insertBefore('#benchmark-' + payment_id);
                                 }
+                            }
+
+                            function Select_Product(payment_id) {
+                                var booking_id = $('select[name="booking"]').val();
+                                var $select = $(`select[name="booking_product-${payment_id}"]`);
+                                var product_id = $select.find(':selected').data('product-id');
+                                var container = $(`#checklist-container-${payment_id}`);
+                                if(!product_id) {
+                                    container.html('');
+                                    return;
+                                }
+                                $.ajax({
+                                    url: '<?php echo base_url("Payment/Get_Product_Checklist") ?>',
+                                    type: 'get',
+                                    data: { booking_id: booking_id, product_id: product_id },
+                                    dataType: 'json',
+                                    success: function(res) {
+                                        if(!res.success) return;
+                                        var html = '<div class="p-3" style="background-color:#f0f0f0; border-radius:5px;">';
+                                        html += '<h6 class="font-weight-bold mb-3">Package Checklist</h6>';
+                                        $.each(res.checklists, function(i, cl) {
+                                            var checked = res.completions[cl.ID] ? 'checked' : '';
+                                            var info = '';
+                                            if(res.completions[cl.ID]) {
+                                                info = '<small class="text-muted ml-2">' + res.completions[cl.ID].created_by_name + ' - ' + res.completions[cl.ID].created_at + '</small>';
+                                            }
+                                            html += '<div class="checkbox-inline mb-2"><label class="checkbox"><input type="checkbox" name="checklist_item" value="' + cl.ID + '" ' + checked + '><span></span> ' + cl.name + '</label>' + info + '</div>';
+                                        });
+                                        html += '<button type="button" onclick="Save_Payment_Checklist(' + payment_id + ')" class="btn btn-sm btn-primary mt-3">Save Checklist</button>';
+                                        html += '</div>';
+                                        container.html(html);
+                                    }
+                                });
+                            }
+
+                            function Save_Payment_Checklist(payment_id) {
+                                var booking_id = $('select[name="booking"]').val();
+                                var $select = $(`select[name="booking_product-${payment_id}"]`);
+                                var product_id = $select.find(':selected').data('product-id');
+                                var completions = [];
+                                $(`#checklist-container-${payment_id} input[name="checklist_item"]:checked`).each(function() {
+                                    completions.push($(this).val());
+                                });
+                                $.ajax({
+                                    url: '<?php echo base_url("Payment/Save_Checklist") ?>',
+                                    type: 'post',
+                                    data: { booking_id: booking_id, product_id: product_id, completions: completions },
+                                    dataType: 'json',
+                                    success: function(res) {
+                                        if(res.success) {
+                                            toastr.success('Checklist saved successfully');
+                                            Select_Product(payment_id);
+                                        } else {
+                                            toastr.error(res.message || 'Failed to save checklist');
+                                        }
+                                    }
+                                });
                             }
 
                             function Delete_Payment(payment_id)
@@ -626,7 +723,33 @@
                                     }
                                 }
                             }
-                            
+
+                            function Has_New_Payment_Out() {
+                                for(var i = 0; i < payment_ids.length; i++) {
+                                    if($(`#transaction_type-${payment_ids[i]}`).val() == 'PAYMENT OUT') {
+                                        return true;
+                                    }
+                                }
+                                return false;
+                            }
+
+                            function Projected_Margin_Pct() {
+                                if(!booking_net_total || booking_net_total <= 0) return null;
+                                var new_credit = 0, new_debit = 0;
+                                for(var i = 0; i < payment_ids.length; i++) {
+                                    var type = $(`#transaction_type-${payment_ids[i]}`).val();
+                                    if(type == 'PAYMENT IN') {
+                                        var v = $(`input[name="credit-${payment_ids[i]}"]`).val();
+                                        if(v) new_credit += parseFloat(v.replace(/,/g, '')) || 0;
+                                    } else if(type == 'PAYMENT OUT') {
+                                        var v = $(`input[name="debit-${payment_ids[i]}"]`).val();
+                                        if(v) new_debit += parseFloat(v.replace(/,/g, '')) || 0;
+                                    }
+                                }
+                                var projected_profit = (existing_total_credit + new_credit) - (existing_total_debit + new_debit);
+                                return (projected_profit / booking_net_total) * 100;
+                            }
+
                             $('input[type="submit"]').click(function(event) {
                                 event.preventDefault();
                                 const swalWithBootstrapButtons = Swal.mixin({
@@ -664,7 +787,7 @@
                                                         }
                                                     } else {
                                                         if($(`#transaction_type-${payment_ids[i]}`).val() == 'PAYMENT OUT') {
-                                                            if(($(`select[name="debit_type-${payment_ids[i]}"]`).val() == 'SUPPLIER PAYMENT' && $(`select[name="supplier-${payment_ids[i]}"]`).val() == null) || $(`select[name="debit_type-${payment_ids[i]}"]`).val() == null || $(`input[name="payment_deadline-${payment_ids[i]}"]`).val() == '' || ($(`select[name="debit_type-${payment_ids[i]}"]`).val() != 'SUPPLIER PAYMENT' && ($(`select[name="bank-${payment_ids[i]}"]`).val() == '' || $(`input[name="bank_account-${payment_ids[i]}"]`).val() == '' || $(`input[name="bank_holder-${payment_ids[i]}"]`).val() == ''))) {
+                                                            if((isSupplierPaymentType($(`select[name="debit_type-${payment_ids[i]}"]`).val()) && $(`select[name="supplier-${payment_ids[i]}"]`).val() == null) || $(`select[name="debit_type-${payment_ids[i]}"]`).val() == null || $(`input[name="payment_deadline-${payment_ids[i]}"]`).val() == '' || (!isSupplierPaymentType($(`select[name="debit_type-${payment_ids[i]}"]`).val()) && ($(`select[name="bank-${payment_ids[i]}"]`).val() == '' || $(`input[name="bank_account-${payment_ids[i]}"]`).val() == '' || $(`input[name="bank_holder-${payment_ids[i]}"]`).val() == ''))) {
                                                                 Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', 'Please Insert All Required Payment Out Details', null);
                                                                 return;
                                                             } else {
@@ -721,7 +844,28 @@
                                                             var base_url = '<?php echo base_url('Payment') ?>';
                                                             $('input[name="url"]').val(base_url + '?booking_number=' + $('input[name="booking_number"]').val());
                                                         <?php } ?>
-                                                        $('#form').submit();
+                                                        var doSubmit = function() { $('#form').submit(); };
+                                                        if(Has_New_Payment_Out()) {
+                                                            var margin = Projected_Margin_Pct();
+                                                            if(margin !== null && margin < 5) {
+                                                                swalWithBootstrapButtons.fire({
+                                                                    width: 550,
+                                                                    background: 'url(<?php echo base_url('assets/image/sweetalert.jpg') ?>)',
+                                                                    icon: 'warning',
+                                                                    title: 'The net profit is less than 5%, continue?',
+                                                                    html: 'Projected margin: <strong>' + margin.toFixed(2) + '%</strong>',
+                                                                    confirmButtonText: 'Continue',
+                                                                    cancelButtonText: 'Cancel',
+                                                                    showCancelButton: true
+                                                                }).then(function(action) {
+                                                                    if(action.isConfirmed) doSubmit();
+                                                                });
+                                                            } else {
+                                                                doSubmit();
+                                                            }
+                                                        } else {
+                                                            doSubmit();
+                                                        }
                                                     }
                                                 }
                                             }
@@ -772,8 +916,8 @@
                                     <label>Payment Type</label>
                                     <select <?php if(current_url() == base_url('Payment/View')) { echo 'disabled'; } ?> name="payment_type" class="form-control selectpicker">
                                         <?php foreach(unserialize(PAYMENT_TYPE) as $key => $value) {
-                                            if($Credit != 0.00 && ($key == 'SUPPLIER PAYMENT' || $key == 'CUSTOMER REFUND' || $key == 'ONE-TIME PAYMENT' || $key == 'AGENT COMMISSION' || $key == 'BANK CHARGES')) { continue; }
-                                            if($Credit == 0.00 && ($key == 'DEPOSIT' || $key == 'FULL' || $key == 'SUPPLIER REFUND' || $key == 'ADDITIONAL PAYMENT')) { continue; } ?>
+                                            if($Credit != 0.00 && ($key == 'SUPPLIER PAYMENT (DEPOSIT)' || $key == 'SUPPLIER PAYMENT (FULL)' || $key == 'SUPPLIER PAYMENT (ADDITIONAL)' || $key == 'CUSTOMER REFUND' || $key == 'ONE-TIME PAYMENT' || $key == 'AGENT COMMISSION' || $key == 'BANK CHARGES' || $key == 'CREDIT CARD CHARGES')) { continue; }
+                                            if($Credit == 0.00 && ($key == 'SUPPLIER REFUND' || $key == 'DEPOSIT' || $key == 'FULL' || $key == 'ADDITIONAL PAYMENT')) { continue; } ?>
                                             <option <?php if($key == $Type) { echo 'selected'; } ?> data-icon="la la-dollar font-size-lg bs-icon" value="<?php echo $key; ?>"><?php echo $value; ?></option>
                                         <?php } ?>
                                     </select>
@@ -866,7 +1010,7 @@
                                         </div>
                                     </div>
                                 </div>
-                                <div class="supplier_payment col-md-6" <?php if($Type != 'SUPPLIER PAYMENT') { echo 'style="display:none;"'; } ?>>
+                                <div class="supplier_payment col-md-6" <?php if($Type != 'SUPPLIER PAYMENT (DEPOSIT)' && $Type != 'SUPPLIER PAYMENT (FULL)' && $Type != 'SUPPLIER PAYMENT (ADDITIONAL)') { echo 'style="display:none;"'; } ?>>
                                     <div class="form-group">
                                         <label>Supplier
                                             <span style="color:red;">*</span>
@@ -879,7 +1023,7 @@
                                         </select>
                                     </div>
                                 </div>
-                                <div class="supplier_payment col-md-6" <?php if($Type != 'SUPPLIER PAYMENT') { echo 'style="display:none;"'; } ?>>
+                                <div class="supplier_payment col-md-6" <?php if($Type != 'SUPPLIER PAYMENT (DEPOSIT)' && $Type != 'SUPPLIER PAYMENT (FULL)' && $Type != 'SUPPLIER PAYMENT (ADDITIONAL)') { echo 'style="display:none;"'; } ?>>
                                     <div class="form-group">
                                         <label>Quotation Number</label>
                                         <div class="input-icon">
@@ -890,7 +1034,7 @@
                                         </div>
                                     </div>
                                 </div>
-                                <div class="supplier_payment col-md-6" <?php if($Type != 'SUPPLIER PAYMENT') { echo 'style="display:none;"'; } ?>>
+                                <div class="supplier_payment col-md-6" <?php if($Type != 'SUPPLIER PAYMENT (DEPOSIT)' && $Type != 'SUPPLIER PAYMENT (FULL)' && $Type != 'SUPPLIER PAYMENT (ADDITIONAL)') { echo 'style="display:none;"'; } ?>>
                                     <div class="form-group">
                                         <label>Quotation</label>
                                         <div class="custom-file mb-2">
@@ -904,7 +1048,7 @@
                                         <?php } ?>
                                     </div>
                                 </div>
-                                <div class="supplier_payment col-md-6" <?php if($Type != 'SUPPLIER PAYMENT') { echo 'style="display:none;"'; } ?>>
+                                <div class="supplier_payment col-md-6" <?php if($Type != 'SUPPLIER PAYMENT (DEPOSIT)' && $Type != 'SUPPLIER PAYMENT (FULL)' && $Type != 'SUPPLIER PAYMENT (ADDITIONAL)') { echo 'style="display:none;"'; } ?>>
                                     <div class="form-group">
                                         <label>Invoice Number</label>
                                         <div class="input-icon">
@@ -915,7 +1059,7 @@
                                         </div>
                                     </div>
                                 </div>
-                                <div class="supplier_payment col-md-6" <?php if($Type != 'SUPPLIER PAYMENT') { echo 'style="display:none;"'; } ?>>
+                                <div class="supplier_payment col-md-6" <?php if($Type != 'SUPPLIER PAYMENT (DEPOSIT)' && $Type != 'SUPPLIER PAYMENT (FULL)' && $Type != 'SUPPLIER PAYMENT (ADDITIONAL)') { echo 'style="display:none;"'; } ?>>
                                     <div class="form-group">
                                         <label>Invoice</label>
                                         <div class="custom-file mb-2">
@@ -928,6 +1072,20 @@
                                             </a>
                                         <?php } ?>
                                     </div>
+                                </div>
+                                <div class="supplier_payment col-md-6" <?php if($Type != 'SUPPLIER PAYMENT (DEPOSIT)' && $Type != 'SUPPLIER PAYMENT (FULL)' && $Type != 'SUPPLIER PAYMENT (ADDITIONAL)') { echo 'style="display:none;"'; } ?>>
+                                    <div class="form-group">
+                                        <label>Product</label>
+                                        <select <?php if(current_url() == base_url('Payment/View')) { echo 'disabled'; } ?> name="booking_product" data-live-search="true" onchange="Select_Product_Update()" class="form-control selectpicker">
+                                            <option selected data-icon="la la-box font-size-lg bs-icon" value="">--SELECT PRODUCT--</option>
+                                            <?php if(isset($booking_products)) { foreach($booking_products as $bp) { ?>
+                                                <option <?php if(isset($BookingProductID) && $bp->BookingProductID == $BookingProductID) { echo 'selected'; } ?> data-icon="la la-box font-size-lg bs-icon" value="<?php echo $bp->BookingProductID; ?>" data-product-id="<?php echo $bp->ProductID; ?>"><?php echo $bp->ProductCode . ' - ' . $bp->Name; ?></option>
+                                            <?php } } ?>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="supplier_payment col-md-12" <?php if($Type != 'SUPPLIER PAYMENT (DEPOSIT)' && $Type != 'SUPPLIER PAYMENT (FULL)' && $Type != 'SUPPLIER PAYMENT (ADDITIONAL)') { echo 'style="display:none;"'; } ?>>
+                                    <div id="checklist-container-update"></div>
                                 </div>
                                 <div class="customer_refund_one_time_payment col-md-6" <?php if($Type != 'CUSTOMER REFUND' && $Type != 'ONE-TIME PAYMENT' && $Type != 'AGENT COMMISSION' && $Type != 'BANK CHARGES') { echo 'style="display:none;"'; } ?>>
                                     <div class="form-group">
@@ -1073,7 +1231,7 @@
                                     $('input[name="bank_account"]').val('');
                                     $('input[name="bank_holder"]').val('');
                                     $('input[name="remark"]').val('');
-                                    if(payment_type == 'SUPPLIER PAYMENT') {
+                                    if(isSupplierPaymentType(payment_type)) {
                                         $('.supplier_payment').show();
                                         $('.customer_refund_one_time_payment').hide();
                                     } else {
@@ -1122,7 +1280,7 @@
                                 }).then((action) => {
                                     if(action.isConfirmed) {
                                         var credit = <?php echo str_replace(',', '', $Credit) ?>;
-                                        if((credit != 0.00 && $('input[name="transaction_date"]').val() == '') || $('input[name="credit-'+ <?php echo $this->input->get('payment_id'); ?> +'"]').val() == '' || $('input[name="payment_deadline"]').val() == '' || ($('select[name="payment_type"]').val() == 'SUPPLIER PAYMENT' && $('select[name="supplier"]').val() == '') || (($('select[name="payment_type"]').val() == 'CUSTOMER REFUND' || $('select[name="payment_type"]').val() == 'ONE-TIME PAYMENT' || $('select[name="payment_type"]').val() == 'AGENT COMMISSION' || $('select[name="payment_type"]').val() == 'BANK CHARGES') && $('input[name="bank"]').val() == '') || (($('select[name="payment_type"]').val() == 'CUSTOMER REFUND' || $('select[name="payment_type"]').val() == 'ONE-TIME PAYMENT' || $('select[name="payment_type"]').val() == 'AGENT COMMISSION' || $('select[name="payment_type"]').val() == 'BANK CHARGES') && $('input[name="bank_account"]').val() == '') || (($('select[name="payment_type"]').val() == 'CUSTOMER REFUND' || $('select[name="payment_type"]').val() == 'ONE-TIME PAYMENT' || $('select[name="payment_type"]').val() == 'AGENT COMMISSION' || $('select[name="payment_type"]').val() == 'BANK CHARGES') && $('input[name="bank_holder"]').val() == '')) {
+                                        if((credit != 0.00 && $('input[name="transaction_date"]').val() == '') || $('input[name="credit-'+ <?php echo $this->input->get('payment_id'); ?> +'"]').val() == '' || $('input[name="payment_deadline"]').val() == '' || (isSupplierPaymentType($('select[name="payment_type"]').val()) && $('select[name="supplier"]').val() == '') || (($('select[name="payment_type"]').val() == 'CUSTOMER REFUND' || $('select[name="payment_type"]').val() == 'ONE-TIME PAYMENT' || $('select[name="payment_type"]').val() == 'AGENT COMMISSION' || $('select[name="payment_type"]').val() == 'BANK CHARGES') && $('input[name="bank"]').val() == '') || (($('select[name="payment_type"]').val() == 'CUSTOMER REFUND' || $('select[name="payment_type"]').val() == 'ONE-TIME PAYMENT' || $('select[name="payment_type"]').val() == 'AGENT COMMISSION' || $('select[name="payment_type"]').val() == 'BANK CHARGES') && $('input[name="bank_account"]').val() == '') || (($('select[name="payment_type"]').val() == 'CUSTOMER REFUND' || $('select[name="payment_type"]').val() == 'ONE-TIME PAYMENT' || $('select[name="payment_type"]').val() == 'AGENT COMMISSION' || $('select[name="payment_type"]').val() == 'BANK CHARGES') && $('input[name="bank_holder"]').val() == '')) {
                                             Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', 'Please Insert All Required Payment Information', null);
                                         } else {
                                             if(($('input[name="debit-'+ <?php echo $this->input->get('payment_id'); ?> +'"]').val() == '' && ($('select[name="currency_code"]').val() == '' && $('input[name="foreign_currency-'+ <?php echo $this->input->get('payment_id'); ?> +'"]').val() == ''))) {
@@ -1148,6 +1306,76 @@
                                 });
                             });
                         </script>
+                        <script>
+                            function Select_Product_Update() {
+                                var booking_id = <?php echo $BookingID ?>;
+                                var $select = $('select[name="booking_product"]');
+                                var product_id = $select.find(':selected').data('product-id');
+                                var container = $('#checklist-container-update');
+                                if(!product_id) {
+                                    container.html('');
+                                    return;
+                                }
+                                $.ajax({
+                                    url: '<?php echo base_url("Payment/Get_Product_Checklist") ?>',
+                                    type: 'get',
+                                    data: { booking_id: booking_id, product_id: product_id },
+                                    dataType: 'json',
+                                    success: function(res) {
+                                        if(!res.success) return;
+                                        var isView = <?php echo current_url() == base_url('Payment/View') ? 'true' : 'false'; ?>;
+                                        var html = '<div class="p-3" style="background-color:#f0f0f0; border-radius:5px;">';
+                                        html += '<h6 class="font-weight-bold mb-3">Package Checklist</h6>';
+                                        $.each(res.checklists, function(i, cl) {
+                                            var checked = res.completions[cl.ID] ? 'checked' : '';
+                                            var disabled = isView ? 'disabled' : '';
+                                            var info = '';
+                                            if(res.completions[cl.ID]) {
+                                                info = '<small class="text-muted ml-2">' + res.completions[cl.ID].created_by_name + ' - ' + res.completions[cl.ID].created_at + '</small>';
+                                            }
+                                            html += '<div class="checkbox-inline mb-2"><label class="checkbox"><input type="checkbox" name="checklist_item_update" value="' + cl.ID + '" ' + checked + ' ' + disabled + '><span></span> ' + cl.name + '</label>' + info + '</div>';
+                                        });
+                                        if(!isView) {
+                                            html += '<button type="button" onclick="Save_Payment_Checklist_Update()" class="btn btn-sm btn-primary mt-3">Save Checklist</button>';
+                                        }
+                                        html += '</div>';
+                                        container.html(html);
+                                    }
+                                });
+                            }
+
+                            function Save_Payment_Checklist_Update() {
+                                var booking_id = <?php echo $BookingID ?>;
+                                var $select = $('select[name="booking_product"]');
+                                var product_id = $select.find(':selected').data('product-id');
+                                var completions = [];
+                                $('#checklist-container-update input[name="checklist_item_update"]:checked').each(function() {
+                                    completions.push($(this).val());
+                                });
+                                $.ajax({
+                                    url: '<?php echo base_url("Payment/Save_Checklist") ?>',
+                                    type: 'post',
+                                    data: { booking_id: booking_id, product_id: product_id, completions: completions },
+                                    dataType: 'json',
+                                    success: function(res) {
+                                        if(res.success) {
+                                            toastr.success('Checklist saved successfully');
+                                            Select_Product_Update();
+                                        } else {
+                                            toastr.error(res.message || 'Failed to save checklist');
+                                        }
+                                    }
+                                });
+                            }
+
+                            // Auto-load checklist if product is already selected
+                            $(document).ready(function() {
+                                var selectedProduct = $('select[name="booking_product"]').val();
+                                if(selectedProduct) {
+                                    Select_Product_Update();
+                                }
+                            });
+                        </script>
                     <?php } ?>
                 </form>
             </div>
@@ -1156,22 +1384,19 @@
 </div>
 
 <script>
-    function Validate_Amount(value, payment_id)
-    {
-        var amount = value == '/Credit/' ? ($(`input[name="credit-${payment_id}"]`).val()).replace(/,/g, '') : ($(`input[name="debit-${payment_id}"]`).val()).replace(/,/g, '');
-        if(amount.match(/^[1-9][\d]{0,9}([\.][\d]{0,2})?$/)) {
-            if(value == '/Credit/') {
-                $(`input[name="credit-${payment_id}"]`).val(parseFloat(amount).toLocaleString('en-US', {minimumFractionDigits: 2}));
-            } else {
-                $(`input[name="debit-${payment_id}"]`).val(parseFloat(amount).toLocaleString('en-US', {minimumFractionDigits: 2}));
-            }
+    function Validate_Amount(kind, payment_id, el) {
+        const isCredit = kind === 'credit';
+        const $input = el ? $(el) : $(`input[name="${isCredit ? `credit-${payment_id}` : `debit-${payment_id}` }"]`);
+        const raw = String($input.val() || '').replace(/,/g, '').trim();
+        const re = /^(?:0|[1-9]\d{0,9})(?:\.\d{1,2})?$/;
+
+        if (re.test(raw)) {
+            const num = parseFloat(raw);
+            $input.val(num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
         } else {
-            if(value == '/Credit/') {
-                $(`input[name="credit-${payment_id}"]`).val('');
-            } else {
-                $(`input[name="debit-${payment_id}"]`).val('');
-            }
+            $input.val('');
         }
+
         <?php if(current_url() == base_url('Payment/Create')) { ?>
             Calculate_Subtotal();
         <?php } ?>

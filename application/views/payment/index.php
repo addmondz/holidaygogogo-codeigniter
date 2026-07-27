@@ -1,3 +1,15 @@
+<?php
+    ini_set("memory_limit","512M");
+    // Autocount status is only relevant to Owner (10) and Finance (30)
+    $show_autocount_status = in_array((int)$this->session->userdata('level'), [10, 30]);
+?>
+<style>
+.booking-quick-range .btn {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+}
+</style>
+
 <div class="d-flex flex-column-fluid">
     <div class="container-fluid">
         <?php if($this->session->flashdata('message_success')) { ?>
@@ -40,9 +52,14 @@
                             <i class="la la-user-friends"></i>GL
                         </a>
                         <?php if(in_array('AB', $this->session->access_control)) { ?>
-                            <a href="<?php if(!empty($payments)) { echo base_url('Booking/Update?booking_id=') . $payments[0]->BookingID; } else { echo base_url('Booking/Update?booking_id=') . $booking_id; } ?>" class="btn btn-light-success font-weight-bold mb-2" style="width:180px;">
+                            <a href="<?php if(!empty($payments)) { echo base_url('Booking/Update?booking_id=') . $payments[0]->BookingID; } else { echo base_url('Booking/Update?booking_id=') . $booking_id; } ?>" class="btn btn-light-success font-weight-bold mr-1 mb-2" style="width:180px;">
                                 <i class="la la-suitcase"></i>Booking
                             </a>
+                        <?php } ?>
+                        <?php if((in_array('AB', $this->session->access_control) || $this->session->userdata('level') == 20) && !empty($booking_id) && $booking_id != 'NA') { ?>
+                            <button type="button" onclick="openRemarksModal(<?php echo $booking_id; ?>, '<?php echo addslashes(strtoupper($this->input->get('booking_number'))); ?>', '<?php echo $sales_agent_id; ?>', '<?php echo $booking_op_id; ?>')" class="btn btn-light-dark font-weight-bold mb-2" style="width:180px;">
+                                <i class="la la-comment"></i>View Remark
+                            </button>
                         <?php } ?>
                     <?php } ?>
                 </div>
@@ -94,18 +111,31 @@
                                                         <i class="la la-calendar"></i>
                                                     </span>
                                                 </div>
+                                                <div class="booking-quick-range mt-2" data-target="travel_date">
+                                                    <button type="button" class="btn btn-light-primary btn-sm font-weight-bold mr-1 mb-1" data-range="next7">Next 7 Days</button>
+                                                    <button type="button" class="btn btn-light-primary btn-sm font-weight-bold mr-1 mb-1" data-range="next14">Next 14 Days</button>
+                                                    <button type="button" class="btn btn-light-primary btn-sm font-weight-bold mr-1 mb-1" data-range="next30">Next 30 Days</button>
+                                                </div>
                                             </div>
                                         </div>
                                         <?php if($this->session->userdata('level') != 20) { ?>
                                             <div class="col-md-3">
                                                 <div class="form-group">
                                                     <label>Sales Agent</label>
-                                                    <select name="sales_agent" data-live-search="true" class="form-control selectpicker">
-                                                        <option selected data-icon="la la-user-alt font-size-lg bs-icon" value="">--SELECT SALES AGENT--</option>
-                                                        <?php foreach($admins as $admin) { ?>
-                                                            <option data-icon="la la-user-alt font-size-lg bs-icon" value="<?php echo $admin->AdminID; ?>" <?php if(!empty($this->input->get('sales_agent')) && $this->input->get('sales_agent') == $admin->AdminID) { echo 'selected'; } ?>><?php echo $admin->Name; ?></option>
-                                                        <?php } ?>
+                                                    <?php $selected_sales_agents = !empty($this->input->get('sales_agent')) ? explode(',', $this->input->get('sales_agent')) : []; ?>
+                                                    <select id="sales_agent_select" data-live-search="true" class="form-control selectpicker" multiple data-actions-box="true" title="--SELECT SALES AGENT--">
+                                                        <optgroup label="Active">
+                                                        <?php foreach($admins as $admin) { if($admin->Status == 'Y') { ?>
+                                                            <option data-icon="la la-user-alt font-size-lg bs-icon" value="<?php echo $admin->AdminID; ?>" <?php if(in_array($admin->AdminID, $selected_sales_agents)) { echo 'selected'; } ?>><?php echo $admin->Name; ?></option>
+                                                        <?php } } ?>
+                                                        </optgroup>
+                                                        <optgroup label="Deactivated">
+                                                        <?php foreach($admins as $admin) { if($admin->Status == 'D') { ?>
+                                                            <option data-icon="la la-user-alt font-size-lg bs-icon" value="<?php echo $admin->AdminID; ?>" <?php if(in_array($admin->AdminID, $selected_sales_agents)) { echo 'selected'; } ?>><?php echo $admin->Name; ?></option>
+                                                        <?php } } ?>
+                                                        </optgroup>
                                                     </select>
+                                                    <input type="hidden" name="sales_agent" id="sales_agent_hidden" value="<?php echo $this->input->get('sales_agent'); ?>">
                                                 </div>
                                             </div>
                                         <?php } ?>
@@ -126,6 +156,11 @@
                                                         <i class="la la-calendar"></i>
                                                     </span>
                                                 </div>
+                                                <div class="booking-quick-range mt-2" data-target="transaction_date">
+                                                    <button type="button" class="btn btn-light-primary btn-sm font-weight-bold mr-1 mb-1" data-range="last7">Last 7 Days</button>
+                                                    <button type="button" class="btn btn-light-primary btn-sm font-weight-bold mr-1 mb-1" data-range="last14">Last 14 Days</button>
+                                                    <button type="button" class="btn btn-light-primary btn-sm font-weight-bold mr-1 mb-1" data-range="last30">Last 30 Days</button>
+                                                </div>
                                             </div>
                                         </div>
                                         <div class="col-md-3">
@@ -141,28 +176,35 @@
                                                         <i class="la la-calendar"></i>
                                                     </span>
                                                 </div>
+                                                <div class="booking-quick-range mt-2" data-target="payment_deadline">
+                                                    <button type="button" class="btn btn-light-primary btn-sm font-weight-bold mr-1 mb-1" data-range="next7">Next 7 Days</button>
+                                                    <button type="button" class="btn btn-light-primary btn-sm font-weight-bold mr-1 mb-1" data-range="next14">Next 14 Days</button>
+                                                    <button type="button" class="btn btn-light-primary btn-sm font-weight-bold mr-1 mb-1" data-range="next30">Next 30 Days</button>
+                                                </div>
                                             </div>
                                         </div>
                                         <div class="col-md-3">
                                             <div class="form-group">
                                                 <label>Status</label>
-                                                <select name="status" class="form-control selectpicker">
-                                                    <option selected data-icon="la la-dollar font-size-lg bs-icon" value="">--SELECT STATUS--</option>
+                                                <?php $selected_statuses = !empty($this->input->get('status')) ? explode(',', $this->input->get('status')) : []; ?>
+                                                <select id="status_select" class="form-control selectpicker" multiple data-actions-box="true" title="--SELECT STATUS--">
                                                     <?php foreach(unserialize(PAYMENT_STATUS) as $key => $value) { ?>
-                                                        <option data-icon="<?php if($key == 'Y') { echo 'la la-check-circle'; } else if($key == 'P') { echo 'la la-exclamation-circle'; } else { echo 'la la-times-circle'; } ?> font-size-lg bs-icon" value="<?php echo $key; ?>" <?php if(!empty($this->input->get('status')) && $this->input->get('status') == $key) { echo 'selected'; } ?>><?php echo $value; ?></option>
+                                                        <option data-icon="<?php if($key == 'Y') { echo 'la la-check-circle'; } else if($key == 'P') { echo 'la la-exclamation-circle'; } else { echo 'la la-times-circle'; } ?> font-size-lg bs-icon" value="<?php echo $key; ?>" <?php if(in_array($key, $selected_statuses)) { echo 'selected'; } ?>><?php echo $value; ?></option>
                                                     <?php } ?>
                                                 </select>
+                                                <input type="hidden" name="status" id="status_hidden" value="<?php echo $this->input->get('status'); ?>">
                                             </div>
                                         </div>
                                         <div class="col-md-3">
                                             <div class="form-group">
                                                 <label>Payment Type</label>
-                                                <select name="payment_type" class="form-control selectpicker">
-                                                    <option selected data-icon="la la-dollar font-size-lg bs-icon" value="">--SELECT PAYMENT TYPE--</option>
+                                                <?php $selected_payment_types = !empty($this->input->get('payment_type')) ? explode(',', $this->input->get('payment_type')) : []; ?>
+                                                <select id="payment_type_select" class="form-control selectpicker" multiple data-actions-box="true" title="--SELECT PAYMENT TYPE--">
                                                     <?php foreach(unserialize(PAYMENT_TYPE) as $key => $value) { ?>
-                                                        <option data-icon="la la-dollar font-size-lg bs-icon" value="<?php echo $key; ?>" <?php if(!empty($this->input->get('payment_type')) && $this->input->get('payment_type') == $key) { echo 'selected'; } ?>><?php echo $value; ?></option>
+                                                        <option data-icon="la la-dollar font-size-lg bs-icon" value="<?php echo $key; ?>" <?php if(in_array($key, $selected_payment_types)) { echo 'selected'; } ?>><?php echo $value; ?></option>
                                                     <?php } ?>
                                                 </select>
+                                                <input type="hidden" name="payment_type" id="payment_type_hidden" value="<?php echo $this->input->get('payment_type'); ?>">
                                             </div>
                                         </div>
                                     </div>
@@ -170,12 +212,13 @@
                                         <div class="col-md-3">
                                             <div class="form-group">
                                                 <label>Transaction Type</label>
-                                                <select name="transaction_type" class="form-control selectpicker">
-                                                    <option selected data-icon="la la-dollar font-size-lg bs-icon" value="">--SELECT TRANSACTION TYPE--</option>
+                                                <?php $selected_transaction_types = !empty($this->input->get('transaction_type')) ? explode(',', $this->input->get('transaction_type')) : []; ?>
+                                                <select id="transaction_type_select" class="form-control selectpicker" multiple data-actions-box="true" title="--SELECT TRANSACTION TYPE--">
                                                     <?php foreach(unserialize(TRANSACTION_TYPE) as $key => $value) { ?>
-                                                        <option data-icon="<?php if($key == 'PAYMENT IN') { echo 'la la-receipt'; } else { echo 'la la-file-invoice-dollar'; } ?> font-size-lg bs-icon" value="<?php echo $key; ?>" <?php if(!empty($this->input->get('transaction_type')) && $this->input->get('transaction_type') == $key) { echo 'selected'; } ?>><?php echo $value; ?></option>
+                                                        <option data-icon="<?php if($key == 'PAYMENT IN') { echo 'la la-receipt'; } else { echo 'la la-file-invoice-dollar'; } ?> font-size-lg bs-icon" value="<?php echo $key; ?>" <?php if(in_array($key, $selected_transaction_types)) { echo 'selected'; } ?>><?php echo $value; ?></option>
                                                     <?php } ?>
                                                 </select>
+                                                <input type="hidden" name="transaction_type" id="transaction_type_hidden" value="<?php echo $this->input->get('transaction_type'); ?>">
                                             </div>
                                         </div>
                                         <div class="col-md-3">
@@ -192,12 +235,13 @@
                                         <div class="col-md-3">
                                             <div class="form-group">
                                                 <label>Supplier</label>
-                                                <select name="supplier" data-live-search="true" class="form-control selectpicker">
-                                                    <option selected data-icon="la la-user-alt font-size-lg bs-icon" value="">--SELECT SUPPLIER--</option>
+                                                <?php $selected_suppliers = !empty($this->input->get('supplier')) ? explode(',', $this->input->get('supplier')) : []; ?>
+                                                <select id="supplier_select" data-live-search="true" class="form-control selectpicker" multiple data-actions-box="true" title="--SELECT SUPPLIER--">
                                                     <?php foreach($suppliers as $supplier) { ?>
-                                                        <option data-icon="la la-user-alt font-size-lg bs-icon" value="<?php echo $supplier->SupplierID; ?>" <?php if(!empty($this->input->get('supplier')) && $this->input->get('supplier') == $supplier->SupplierID) { echo 'selected'; } ?>><?php echo $supplier->Name; ?></option>
+                                                        <option data-icon="la la-user-alt font-size-lg bs-icon" value="<?php echo $supplier->SupplierID; ?>" <?php if(in_array($supplier->SupplierID, $selected_suppliers)) { echo 'selected'; } ?>><?php echo $supplier->Name; ?></option>
                                                     <?php } ?>
                                                 </select>
+                                                <input type="hidden" name="supplier" id="supplier_hidden" value="<?php echo $this->input->get('supplier'); ?>">
                                             </div>
                                         </div>
                                         <div class="col-md-3">
@@ -257,6 +301,31 @@
                                                 </div>
                                             </div>
                                         </div>
+                                        <div class="col-md-3">
+                                            <div class="form-group">
+                                                <label>Autocount Reference</label>
+                                                <div class="input-icon">
+                                                    <input type="text" name="autocount_reference" value="<?php if(!empty($this->input->get('autocount_reference'))) { echo strtoupper($this->input->get('autocount_reference')); } ?>" autocomplete="off" class="form-control">
+                                                    <span>
+                                                        <i class="la la-hashtag"></i>
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <?php if($show_autocount_status) { ?>
+                                        <div class="col-md-3">
+                                            <div class="form-group">
+                                                <label>Autocount Status</label>
+                                                <?php $selected_autocount_statuses = !empty($this->input->get('autocount_status')) ? explode(',', $this->input->get('autocount_status')) : []; ?>
+                                                <select id="autocount_status_select" class="form-control selectpicker" multiple data-actions-box="true" title="--SELECT AUTOCOUNT STATUS--">
+                                                    <option data-icon="la la-clock font-size-lg bs-icon" value="P" <?php if(in_array('P', $selected_autocount_statuses)) echo 'selected'; ?>>Pending</option>
+                                                    <option data-icon="la la-check-circle font-size-lg bs-icon" value="S" <?php if(in_array('S', $selected_autocount_statuses)) echo 'selected'; ?>>Synced</option>
+                                                    <option data-icon="la la-times-circle font-size-lg bs-icon" value="F" <?php if(in_array('F', $selected_autocount_statuses)) echo 'selected'; ?>>Failed</option>
+                                                </select>
+                                                <input type="hidden" name="autocount_status" id="autocount_status_hidden" value="<?php echo $this->input->get('autocount_status'); ?>">
+                                            </div>
+                                        </div>
+                                        <?php } ?>
                                     </div>
                                     <input type="button" id="filter" value="Filter" class="btn btn-light-success font-weight-bold" style="width:80px;">
                                     <input type="button" id="reset" value="Reset" class="btn btn-light-primary font-weight-bold" style="width:80px;">
@@ -341,6 +410,20 @@
                     </div>
                 <?php } ?>
                 <br><br>
+                <?php if ($bulkPaymentSyncToAutocount) { ?>
+                    <button type="button"
+                            class="btn btn-primary font-weight-bold mb-2"
+                            id="sync-autocount-payment"
+                            style="width:180px; display:none;">
+                        Sync Autocount
+                    </button>
+                <?php } ?>
+                <button type="button"
+                        class="btn btn-warning font-weight-bold mb-2"
+                        id="change-payment-autocount-to-pending"
+                        style="width:180px; display:none;">
+                    Change to P Status
+                </button>
                 <div class="dataTables_wrapper dt-bootstrap4 no-footer" <?php if(empty($payments)) { echo 'style="overflow-x:auto;"'; } ?>>
                     <table id="kt_datatable" class="table table-bordered table-head-custom table-checkable dataTable no-footer dtr-inline">
                         <thead>
@@ -372,71 +455,16 @@
                                 <th style="text-align:center;">Supplier</th>
                                 <th class="deadline" style="text-align:center;">Deadline</th>
                                 <th style="text-align:center;">Reference</th>
+                                <th style="text-align:center;">Autocount Reference</th>
                                 <th class="status" style="text-align:center;">Status</th>
+                                <?php if($show_autocount_status) { ?>
+                                <th class="autocount_sync_status" style="text-align:center;">Autocount Status</th>
+                                <?php } ?>
                                 <th class="action" style="text-align:center;">Action</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <?php if(empty($payments)) { ?>
-                                <td colspan="<?php if($this->session->userdata('level') != 20 && in_array('AP', $this->session->access_control)) { echo 18; } else if($this->session->userdata('level') != 20 && !in_array('AP', $this->session->access_control)) { echo 17; } else { echo 16; } ?>" style="text-align:center; padding-top:10px; padding-bottom:10px;">Payment Records Not Found</td>
-                            <?php } else { ?>
-                                <?php $count = 1; ?>
-                                <?php foreach($payments as $payment) { ?>
-                                    <tr>
-                                        <td id="<?php echo 'count-' . $payment->PaymentID; ?>" style="text-align:center; padding-top:15px; padding-bottom:15px;"><?php echo $count; ?></td>
-                                        <?php if($this->session->userdata('level') != 20 && in_array('AP', $this->session->access_control)) { ?>
-                                            <td style="text-align:center;">
-                                                <label class="checkbox checkbox-outline checkbox-success">
-                                                    <input type="checkbox" id="<?php echo $payment->PaymentID; ?>" onclick="Select_Payment(<?php echo $payment->PaymentID; ?>)">
-                                                    <span></span>
-                                                </label>
-                                            </td>
-                                        <?php } ?>
-                                        <td id="<?php echo 'date-' . $payment->PaymentID; ?>" style="text-align:center;"><?php echo $payment->Date; ?></td>
-                                        <?php if($this->session->userdata('level') != 20) { ?>
-                                            <td style="text-align:center;"><?php echo $payment->SalesAgent; ?></td>
-                                        <?php } ?>
-                                        <td style="text-align:center;">
-                                            <?php if(!empty($this->input->get('booking_number'))) { ?>
-                                                <?php echo $payment->BookingNumber; ?>
-                                            <?php } else { ?>
-                                                <a href="<?php echo base_url('Payment?booking_number=') . $payment->BookingNumber . '&customer=' . str_replace('&', '%26', $payment->Customer); ?>" target="_blank"><?php echo $payment->BookingNumber; ?></a>
-                                            <?php } ?>
-                                        </td>
-                                        <td style="text-align:center;"><?php echo $payment->Customer; ?></td>
-                                        <td style="text-align:center;"><?php echo $payment->ReservationNumber; ?></td>
-                                        <td style="text-align:center;"><?php echo $payment->StartDate; ?></td>
-                                        <td style="text-align:center;"><?php echo $payment->EndDate; ?></td>
-                                        <td style="color:#2AAA8A; text-align:center;"><?php echo $payment->TotalCredit; ?></td>
-                                        <td style="text-align:center;"><?php echo $payment->Type; ?></td>
-                                        <?php if(empty($this->input->get('payment_deadline'))) { ?>
-                                            <td id="<?php echo 'credit-' . $payment->PaymentID; ?>" style="color:#2AAA8A; text-align:center;"><?php echo $payment->Credit; ?></td>
-                                        <?php } ?>
-                                        <td style="color:#F88379; text-align:center;"><?php echo $payment->Debit; ?></td>
-                                        <td style="text-align:center;">
-                                            <a href="<?php echo base_url('Supplier/Update?supplier_id=') . $payment->SupplierID; ?>" target="_blank"><?php echo $payment->Supplier; ?></a>
-                                        </td>
-                                        <td id="<?php echo 'deadline-' . $payment->PaymentID; ?>" style="text-align:center;"><?php echo $payment->Deadline; ?></td>
-                                        <td id="<?php echo 'reference_number-' . $payment->PaymentID; ?>" style="text-align:center;"><?php echo $payment->ReferenceNumber; ?></td>
-                                        <td style="text-align:center;"><?php if($payment->Status == 'Y') { echo '<i class="la la-check-circle text-success"></i>'; } else if($payment->Status == 'P') { echo '<i class="la la-exclamation-circle text-warning"></i>'; } else { echo '<i class="la la-times-circle text-danger"></i>'; } ?></td>
-                                        <td style="text-align:center;">
-                                            <div class="btn-group">
-                                                <button type="button" data-toggle="dropdown" class="btn btn-light-primary btn-sm dropdown-toggle" style="padding-left:3px;"></button>
-                                                <div class="dropdown-menu">
-                                                    <?php if(in_array('RP', $this->session->access_control)) { ?>
-                                                        <button onclick="Delete_Record('<?php echo base_url('assets/image/sweetalert.jpg'); ?>', '<?php if(!empty($payment->Credit)) { echo 'Payment Record : Credit ' . $payment->Credit; } else { echo 'Payment Record : Debit ' . $payment->Debit; } ?>', '<?php echo base_url('Payment/Delete'); ?>', 'payment_id', <?php echo $payment->PaymentID; ?>, '<?php echo $payment->Status; ?>', '<?php if(strpos($current_url, '?') == true) { echo base_url('Payment?') . (explode('?', $current_url))[1]; } else { echo base_url('Payment'); } ?>')" class="dropdown-item" style="color:#E37383; font-size:11px;">Delete Payment</button>
-                                                    <?php } ?>
-                                                    <a href="<?php echo base_url('Payment/View?payment_id=') . $payment->PaymentID; ?>" class="dropdown-item" style="font-size:11px;">Read Payment</a>
-                                                    <?php if(in_array('AP', $this->session->access_control)) { ?>
-                                                        <a href="<?php if(strpos($current_url, '?') == true) { echo base_url('Payment/Update?payment_id=') . $payment->PaymentID . '&' . (explode('?', $current_url))[1]; } else { echo base_url('Payment/Update?payment_id=') . $payment->PaymentID; } ?>" class="dropdown-item" style="font-size:11px;">Update Payment</a>
-                                                    <?php } ?>
-                                                </div>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                    <?php $count++; ?>
-                                <?php } ?>
-                            <?php } ?>
+                            <!-- Data loaded via AJAX server-side processing -->
                         </tbody>
                     </table>
                     <?php if(!empty($this->input->get('payment_deadline'))) { ?>
@@ -520,15 +548,15 @@
                             </div>
                         </div>
                     <?php } ?>
-                    <?php if(!empty($this->input->get('supplier')) || !empty($this->input->get('transaction_date')) || !empty($this->input->get('payment_type')) || !empty($this->input->get('transaction_type')) || !empty($this->input->get('reference_number')) || !empty($this->input->get('payment_deadline')) || !empty($this->input->get('quotation_number')) || !empty($this->input->get('invoice_number')) || !empty($this->input->get('bank')) || !empty($this->input->get('bank_account')) || !empty($this->input->get('bank_holder')) || !empty($this->input->get('status')) || !empty($this->input->get('booking_number')) || !empty($this->input->get('customer')) || !empty($this->input->get('travel_date')) || !empty($this->input->get('sales_agent'))) { ?>
-                        <br>
+                    <?php if($this->session->userdata('level') != 20) { ?>
                         <div class="row">
+                            <br>
                             <div class="col-md-12 pt-3 pb-3" style="background-color:white; border:3px solid #D7E2F2; border-radius:8px;">
                                 <div class="row">
                                     <div class="col-md-4 mb-7 mb-md-0">
                                         <label style="color:#2AAA8A;">Total Payment In (RM)</label>
                                         <div class="input-icon">
-                                            <input disabled type="text" value="<?php echo $total_credit; ?>" class="form-control" style="text-align:right;">
+                                            <input disabled type="text" id="total_credit_display" value="Loading..." class="form-control" style="text-align:right;">
                                             <span>
                                                 <i class="la la-dollar"></i>
                                             </span>
@@ -537,7 +565,7 @@
                                     <div class="col-md-4 mb-7 mb-md-0">
                                         <label style="color:#F88379;">- Total Payment Out (RM)</label>
                                         <div class="input-icon">
-                                            <input disabled type="text" value="<?php echo $total_debit; ?>" class="form-control" style="text-align:right;">
+                                            <input disabled type="text" id="total_debit_display" value="Loading..." class="form-control" style="text-align:right;">
                                             <span>
                                                 <i class="la la-dollar"></i>
                                             </span>
@@ -546,7 +574,7 @@
                                     <div class="col-md-4">
                                         <label style="color:#FFC000;">= Total Net Profit (RM)</label>
                                         <div class="input-icon">
-                                            <input disabled type="text" value="<?php echo $total_net_profit; ?>" class="form-control" style="text-align:right;">
+                                            <input disabled type="text" id="total_net_profit_display" value="Loading..." class="form-control" style="text-align:right;">
                                             <span>
                                                 <i class="la la-dollar"></i>
                                             </span>
@@ -596,6 +624,49 @@
         }
     });
 
+    $(window).on('load', function() {
+        $('#kt_daterangepicker_4').daterangepicker({
+            buttonClasses: ' btn',
+            applyClass: 'btn-primary',
+            cancelClass: 'btn-secondary',
+            autoApply: true
+        }, function(start, end, label) {
+            $('#kt_daterangepicker_4 .form-control').val(start.format('DD/MM/YYYY') + ' - ' + end.format('DD/MM/YYYY'));
+        });
+    });
+
+    $(document).on('click', '.booking-quick-range button', function() {
+        var $row     = $(this).closest('.booking-quick-range');
+        var target   = $row.data('target');
+        var range    = $(this).data('range');
+        var pickerMap = {
+            'travel_date':      '#kt_daterangepicker_4',
+            'transaction_date': '#kt_daterangepicker_5',
+            'payment_deadline': '#kt_daterangepicker_3'
+        };
+        var pickerId = pickerMap[target];
+
+        var start, end;
+        switch(range) {
+            case 'next7':  start = moment();                       end = moment().add(6, 'days');  break;
+            case 'next14': start = moment();                       end = moment().add(13, 'days'); break;
+            case 'next30': start = moment();                       end = moment().add(29, 'days'); break;
+            case 'last7':  start = moment().subtract(6, 'days');   end = moment();                 break;
+            case 'last14': start = moment().subtract(13, 'days');  end = moment();                 break;
+            case 'last30': start = moment().subtract(29, 'days');  end = moment();                 break;
+            default: return;
+        }
+
+        if(pickerId) {
+            var picker = $(pickerId).data('daterangepicker');
+            if(picker) {
+                picker.setStartDate(start);
+                picker.setEndDate(end);
+            }
+        }
+        $('input[name="' + target + '"]').val(start.format('DD/MM/YYYY') + ' - ' + end.format('DD/MM/YYYY'));
+    });
+
     function Reset_Travel_Date() {
         $('input[name="travel_date"]').val('');
     }
@@ -616,9 +687,54 @@
         $('input[name="deadline"]').val('');
     }
     
-    <?php if(!empty($this->input->get('supplier')) || !empty($this->input->get('transaction_date')) || !empty($this->input->get('payment_type')) || !empty($this->input->get('transaction_type')) || !empty($this->input->get('reference_number')) || !empty($this->input->get('payment_deadline')) || !empty($this->input->get('quotation_number')) || !empty($this->input->get('invoice_number')) || !empty($this->input->get('bank')) || !empty($this->input->get('bank_account')) || !empty($this->input->get('bank_holder')) || !empty($this->input->get('status')) || !empty($this->input->get('booking_number')) || !empty($this->input->get('customer')) || !empty($this->input->get('travel_date')) || !empty($this->input->get('sales_agent'))) { ?>
+    <?php if(!empty($this->input->get('supplier')) || !empty($this->input->get('transaction_date')) || !empty($this->input->get('payment_type')) || !empty($this->input->get('transaction_type')) || !empty($this->input->get('reference_number')) || !empty($this->input->get('payment_deadline')) || !empty($this->input->get('quotation_number')) || !empty($this->input->get('invoice_number')) || !empty($this->input->get('bank')) || !empty($this->input->get('bank_account')) || !empty($this->input->get('bank_holder')) || !empty($this->input->get('status')) || !empty($this->input->get('booking_number')) || !empty($this->input->get('customer')) || !empty($this->input->get('travel_date')) || !empty($this->input->get('sales_agent')) || !empty($this->input->get('autocount_reference'))) { ?>
         $('#payment_header').click();
     <?php } ?>
+
+    var multi_filters = ['status','sales_agent','payment_type','transaction_type','supplier','autocount_status'];
+
+    function syncMultiSelect(name) {
+        var $sel = $('#' + name + '_select');
+        var $hid = $('#' + name + '_hidden');
+        if(!$sel.length || !$hid.length) return;
+        var v = $sel.val();
+        $hid.val(v ? v.join(',') : '');
+    }
+    function moveSelectedToTop(name) {
+        var $sel = $('#' + name + '_select');
+        if(!$sel.length) return;
+        var $groups = $sel.children('optgroup');
+        var changed = false;
+        if($groups.length) {
+            $groups.each(function() {
+                var $grp = $(this);
+                var $opts = $grp.children('option');
+                var $selected = $opts.filter(':selected');
+                if(!$selected.length || $selected.length === $opts.length) return;
+                var $unselected = $opts.not(':selected');
+                $grp.empty().append($selected).append($unselected);
+                changed = true;
+            });
+        } else {
+            var $opts = $sel.children('option');
+            var $selected = $opts.filter(':selected');
+            if($selected.length && $selected.length < $opts.length) {
+                var $unselected = $opts.not(':selected');
+                $sel.empty().append($selected).append($unselected);
+                changed = true;
+            }
+        }
+        if(changed) $sel.selectpicker('refresh');
+    }
+    multi_filters.forEach(function(name) {
+        var $s = $('#' + name + '_select');
+        $s.on('changed.bs.select', function() { syncMultiSelect(name); });
+        $s.on('hidden.bs.select', function() { moveSelectedToTop(name); });
+        moveSelectedToTop(name);
+    });
+    $('#form1').on('submit', function() {
+        multi_filters.forEach(syncMultiSelect);
+    });
 
     $('#filter').click(function() {
         $('#form1').submit();
@@ -630,31 +746,72 @@
     
     $('#all').click(function() {
         payment_ids = [];
-        var payments = <?php echo json_encode($payments) ?>;
-        for(var i = 0; i < payments.length; i++) {
-            if($('#all').is(':checked')) {
-                $(`#${payments[i].PaymentID}`).prop('checked', true);
-                payment_ids.push(payments[i].PaymentID);
+        var isChecked = $('#all').is(':checked');
+
+        // Get all visible checkboxes from the DataTable
+        $('.check_item').each(function() {
+            var paymentId = $(this).attr('id');
+            if(isChecked) {
+                $(this).prop('checked', true);
+                payment_ids.push(parseInt(paymentId));
             } else {
-                $(`#${payments[i].PaymentID}`).prop('checked', false);
+                $(this).prop('checked', false);
             }
+        });
+
+        var bulkPaymentSyncToAutocount = "<?php echo $bulkPaymentSyncToAutocount; ?>";
+        if (bulkPaymentSyncToAutocount) {
+            if (isChecked) {
+                $('#sync-autocount-payment').show();
+            } else {
+                $('#sync-autocount-payment').hide();
+            }
+        }
+
+        if (isChecked) {
+            $('#change-payment-autocount-to-pending').show();
+        } else {
+            $('#change-payment-autocount-to-pending').hide();
         }
     });
 
     function Select_Payment(payment_id) {
-        if($(`#${payment_id}`).is(':checked')) {
-            var total_payments = <?php echo count($payments) ?>;
-            if(payment_ids.length + 1 == total_payments) {
-                $('#all').prop('checked', true);
-            }
+        if ($(`#${payment_id}`).is(':checked')) {
+            // Add payment_id to the selected list
             payment_ids.push(payment_id);
         } else {
-            $('#all').prop('checked', false);
+            // Remove payment_id from the selected list
             payment_ids = payment_ids.filter(function(value) {
                 return value != payment_id;
             });
         }
+
+        // If at least one payment is selected, show the "Sync Autocount" button
+        var bulkPaymentSyncToAutocount = "<?php echo $bulkPaymentSyncToAutocount; ?>";
+        if (bulkPaymentSyncToAutocount) {
+            if (payment_ids.length > 0) {
+                $('#sync-autocount-payment').show();
+            } else {
+                $('#sync-autocount-payment').hide();
+            }
+        }
+
+        if (payment_ids.length > 0) {
+            $('#change-payment-autocount-to-pending').show();
+        } else {
+            $('#change-payment-autocount-to-pending').hide();
+        }
+
+        // Update the "Select All" checkbox based on visible checkboxes
+        var totalVisible = $('.check_item').length;
+        var totalChecked = $('.check_item:checked').length;
+        if (totalChecked == totalVisible && totalVisible > 0) {
+            $('#all').prop('checked', true);
+        } else {
+            $('#all').prop('checked', false);
+        }
     }
+
     
     $('input[type="submit"]').click(function(event) {
         event.preventDefault();
@@ -804,4 +961,643 @@
             }
         }
     });
+</script>
+<script>
+var syncAutocountBtn = document.getElementById('sync-autocount-payment');
+if (syncAutocountBtn) {
+    syncAutocountBtn.addEventListener('click', function() {
+        let selected = Array.from(document.querySelectorAll('.check_item:checked'))
+                            .map(cb => cb.value);
+
+        if (selected.length === 0) {
+            alert("Please select at least one payment.");
+            return;
+        }
+
+       fetch("<?php echo base_url('Payment/bulkSyncToAutocount'); ?>", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ payment_ids: selected })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                alert(data.message);
+            } else {
+                alert("❌ " + data.message);
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            alert("Error occurred during sync.");
+        });
+    });
+}
+
+document.getElementById('change-payment-autocount-to-pending').addEventListener('click', function() {
+    let selected = Array.from(document.querySelectorAll('.check_item:checked'))
+                        .map(cb => cb.id);
+
+    if (selected.length === 0) {
+        alert("Please select at least one payment.");
+        return;
+    }
+
+    if (!confirm("Are you sure you want to change " + selected.length + " payment(s) to Pending (P) status?")) {
+        return;
+    }
+
+    fetch("<?php echo base_url('Payment/bulkChangePaymentAutocountStatusToPending'); ?>", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ payment_ids: selected })
+    })
+    .then(res => res.json())
+    .then(data => {
+        alert(data.message);
+        if (data.success) {
+            paymentTable.ajax.reload();
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        alert("Error occurred during status change.");
+    });
+});
+</script>
+
+<!-- Server-Side DataTables Initialization -->
+<script>
+var paymentTable;
+var is_sales_agent = <?php echo $this->session->userdata('level') == 20 ? 'true' : 'false'; ?>;
+var has_ap_permission = <?php echo in_array('AP', $this->session->access_control) ? 'true' : 'false'; ?>;
+var has_payment_deadline_filter = <?php echo !empty($this->input->get('payment_deadline')) ? 'true' : 'false'; ?>;
+
+$(document).ready(function() {
+    setTimeout(function() {
+        // Destroy existing DataTable if it exists
+        if ($.fn.DataTable.isDataTable('#kt_datatable')) {
+            $('#kt_datatable').DataTable().destroy();
+        }
+
+        // Build columns array based on user role and filters
+        var columns = [
+            { data: 'row_number', orderable: false, searchable: false, className: 'text-center' },
+        ];
+
+        // Checkbox column (only for non-SA users with AP permission)
+        if (!is_sales_agent && has_ap_permission) {
+            columns.push({ data: 'checkbox', orderable: false, searchable: false, className: 'text-center' });
+        }
+
+        columns.push({ data: 'transaction_date', className: 'text-center' });
+
+        // Sales agent column (hidden for SA users)
+        if (!is_sales_agent) {
+            columns.push({ data: 'sales_agent', className: 'text-center' });
+        }
+
+        columns = columns.concat([
+            { data: 'booking_number', className: 'text-center' },
+            { data: 'customer', className: 'text-center' },
+            { data: 'reservation', className: 'text-center' },
+            { data: 'start_date', className: 'text-center' },
+            { data: 'end_date', className: 'text-center' },
+            { data: 'total_credit', className: 'text-center' },
+            { data: 'type', className: 'text-center' },
+        ]);
+
+        // Credit/In column (hidden when payment_deadline filter is set)
+        if (!has_payment_deadline_filter) {
+            columns.push({ data: 'credit', className: 'text-center' });
+        }
+
+        columns = columns.concat([
+            { data: 'debit', className: 'text-center' },
+            { data: 'supplier', className: 'text-center' },
+            { data: 'deadline', className: 'text-center' },
+            { data: 'reference', className: 'text-center' },
+            { data: 'autocount_ref', className: 'text-center' },
+            { data: 'status', orderable: false, className: 'text-center' },
+            <?php if($show_autocount_status) { ?>
+            { data: 'autocount_status', orderable: false, className: 'text-center' },
+            <?php } ?>
+            { data: 'action', orderable: false, searchable: false, className: 'text-center' }
+        ]);
+
+        // Get current filter params from URL
+        var urlParams = new URLSearchParams(window.location.search);
+        var filterParams = {};
+        var filterKeys = ['booking_number', 'customer', 'travel_date', 'transaction_date', 'payment_deadline',
+            'status', 'payment_type', 'transaction_type', 'reference_number', 'supplier',
+            'quotation_number', 'invoice_number', 'bank', 'bank_account', 'bank_holder', 'sales_agent', 'autocount_reference', 'autocount_status', 'view_mode'];
+
+        filterKeys.forEach(function(param) {
+            if (urlParams.has(param)) {
+                filterParams[param] = urlParams.get(param);
+            }
+        });
+
+        // Initialize DataTable with server-side processing
+        paymentTable = $('#kt_datatable').DataTable({
+            processing: true,
+            serverSide: true,
+            responsive: true,
+            ajax: {
+                url: '<?php echo base_url("Payment/ajax_list"); ?>',
+                type: 'GET',
+                data: function(d) {
+                    for (var key in filterParams) {
+                        d[key] = filterParams[key];
+                    }
+                    return d;
+                }
+            },
+            columns: columns,
+            order: [[is_sales_agent && has_ap_permission ? 1 : (is_sales_agent ? 1 : 2), 'desc']],
+            pageLength: 100,
+            lengthMenu: [[50, 100, 200, 500], [50, 100, 200, 500]],
+            searchDelay: 300,
+            language: {
+                processing: '<div class="spinner spinner-primary spinner-lg mr-15"></div> Loading...',
+                emptyTable: 'Payment Records Not Found',
+                zeroRecords: 'No matching records found'
+            },
+            drawCallback: function(settings) {
+                // Re-init tooltips and checkbox listeners after each draw
+                $('[data-toggle="tooltip"]').tooltip();
+                // Reset selection state
+                payment_ids = [];
+                $('#all').prop('checked', false);
+                $('#sync-autocount-payment').hide();
+                $('#change-payment-autocount-to-pending').hide();
+            }
+        });
+
+        // Load summary totals
+        loadPaymentSummary();
+    }, 100);
+});
+
+function loadPaymentSummary() {
+    var urlParams = new URLSearchParams(window.location.search);
+    var params = [];
+    var filterKeys = ['booking_number', 'customer', 'travel_date', 'transaction_date', 'payment_deadline',
+        'status', 'payment_type', 'transaction_type', 'reference_number', 'supplier',
+        'quotation_number', 'invoice_number', 'bank', 'bank_account', 'bank_holder', 'sales_agent', 'autocount_reference', 'view_mode'];
+
+    filterKeys.forEach(function(param) {
+        if (urlParams.has(param)) {
+            params.push(param + '=' + encodeURIComponent(urlParams.get(param)));
+        }
+    });
+
+    var queryString = params.length > 0 ? '?' + params.join('&') : '';
+
+    $.ajax({
+        url: '<?php echo base_url("Payment/ajax_summary"); ?>' + queryString,
+        type: 'GET',
+        dataType: 'json',
+        success: function(data) {
+            $('#total_credit_display').val(data.total_credit);
+            $('#total_debit_display').val(data.total_debit);
+            $('#total_net_profit_display').val(data.total_net_profit);
+        },
+        error: function() {
+            console.error('Failed to load payment summary');
+            $('#total_credit_display').val('Error');
+            $('#total_debit_display').val('Error');
+            $('#total_net_profit_display').val('Error');
+        }
+    });
+}
+
+function escapeHtml(text) {
+    if(!text) return '';
+    var div = document.createElement('div');
+    div.appendChild(document.createTextNode(text));
+    return div.innerHTML;
+}
+</script>
+
+<!-- Remarks Modal -->
+<div class="modal fade" id="remarksModal" tabindex="-1" role="dialog" aria-labelledby="remarksModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header" style="background-color:#D7E2F2;">
+                <h5 class="modal-title" id="remarksModalLabel" style="color:#6082B6;">
+                    <strong>Remarks</strong>
+                </h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body" id="remarksModalBody">
+                <!-- Internal Comments Section -->
+                <h6 class="font-weight-bold mb-2" style="color:#6082B6;">Internal Comments</h6>
+                <div id="remarks-internal-list" style="max-height:250px; overflow-y:auto;">
+                    <div class="text-center py-3"><div class="spinner spinner-primary spinner-lg"></div></div>
+                </div>
+                <div class="border-top pt-2 mt-2">
+                    <div class="form-group mb-2 mention-wrapper" style="position: relative;">
+                        <textarea id="modal-new-comment-content" class="form-control" rows="2" placeholder="Enter your comment here... Type @ to mention a user" style="font-size: 0.8125rem;"></textarea>
+                    </div>
+                    <button type="button" id="modal-add-comment-btn" class="btn btn-primary btn-sm font-weight-bold mt-2 mb-2">
+                        <i class="la la-comment"></i> Add Comment
+                    </button>
+                </div>
+
+                <hr>
+
+                <!-- Customer Remarks Section -->
+                <h6 class="font-weight-bold mb-2" style="color:#388E3C;">Customer Remarks</h6>
+                <div id="remarks-customer-list" style="max-height:250px; overflow-y:auto;">
+                    <div class="text-center py-3"><div class="spinner spinner-primary spinner-lg"></div></div>
+                </div>
+                <div class="border-top pt-2 mt-2">
+                    <div class="form-group mb-2">
+                        <textarea id="modal-new-customer-remark-content" class="form-control" rows="2" placeholder="Add your response or remark here..." style="font-size: 0.8125rem;"></textarea>
+                    </div>
+                    <button type="button" id="modal-add-customer-remark-btn" class="btn btn-primary btn-sm font-weight-bold mt-2 mb-2">
+                        <i class="la la-comment"></i> Add Remark
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+var remarksModalBookingId = null;
+var remarksModalSalesAgentId = null;
+var remarksModalBookingOpId = null;
+
+window.ADMIN_HANDLE_MAP = <?php
+    $__map = array();
+    if (!empty($notify_admins)) {
+        foreach ($notify_admins as $__a) {
+            if ($__a->Status === 'Y' && !empty($__a->handle)) {
+                $__map[] = array(
+                    'AdminID' => (int)$__a->AdminID,
+                    'Name' => $__a->Name,
+                    'handle' => $__a->handle,
+                );
+            }
+        }
+    }
+    echo json_encode($__map);
+?>;
+
+function renderMentionedContent(text) {
+    if (text == null) return '';
+    var safe = escapeHtml(String(text));
+    var nameByHandle = {};
+    (window.ADMIN_HANDLE_MAP || []).forEach(function(a) { nameByHandle[a.handle] = a.Name; });
+    return safe.replace(/@([a-z0-9]+)/g, function(full, handle) {
+        if (nameByHandle[handle]) {
+            return '<span class="mention" style="color:#1877f2;font-weight:600;background:#e7f3ff;padding:1px 4px;border-radius:3px;">@' + escapeHtml(nameByHandle[handle]) + '</span>';
+        }
+        return full;
+    });
+}
+
+function initMentionAutocomplete(textareaSelector) {
+    var $ta = $(textareaSelector);
+    if (!$ta.length || $ta.data('mention-init')) return;
+    $ta.data('mention-init', true);
+
+    var admins = (window.ADMIN_HANDLE_MAP || []).slice();
+    var $dd = $('<ul class="mention-dropdown"></ul>').css({
+        position: 'absolute', zIndex: 1070, background: '#fff',
+        border: '1px solid #d0d7de', borderRadius: '4px', padding: '4px 0',
+        margin: 0, listStyle: 'none', maxHeight: '180px', overflowY: 'auto',
+        minWidth: '180px', boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
+        display: 'none', fontSize: '0.8125rem'
+    });
+    $ta.closest('.mention-wrapper').append($dd);
+
+    var activeIdx = 0;
+
+    function hide() { $dd.hide().empty(); }
+
+    function filter(q) {
+        q = q.toLowerCase();
+        return admins.filter(function(a) {
+            return a.handle.indexOf(q) === 0 || a.Name.toLowerCase().indexOf(q) !== -1;
+        }).slice(0, 8);
+    }
+
+    function render(list) {
+        $dd.empty();
+        if (!list.length) { hide(); return; }
+        list.forEach(function(a, i) {
+            var $li = $('<li></li>').css({
+                padding: '6px 10px', cursor: 'pointer',
+                background: i === activeIdx ? '#e7f3ff' : 'transparent'
+            }).attr('data-handle', a.handle);
+            $li.html('<strong>' + escapeHtml(a.Name) + '</strong> <span style="color:#65676b;font-size:0.75rem;">@' + escapeHtml(a.handle) + '</span>');
+            $li.on('mousedown', function(e) { e.preventDefault(); pick(a.handle); });
+            $li.on('mouseenter', function() { activeIdx = i; render(list); });
+            $dd.append($li);
+        });
+        $dd.show();
+    }
+
+    function currentMatch() {
+        var val = $ta.val();
+        var pos = $ta[0].selectionStart;
+        var before = val.slice(0, pos);
+        var m = before.match(/(?:^|\s)@([a-z0-9]*)$/i);
+        if (!m) return null;
+        return { query: m[1].toLowerCase(), start: pos - m[1].length - 1, end: pos };
+    }
+
+    function pick(handle) {
+        var match = currentMatch();
+        if (!match) { hide(); return; }
+        var val = $ta.val();
+        var newVal = val.slice(0, match.start) + '@' + handle + ' ' + val.slice(match.end);
+        var newPos = match.start + handle.length + 2;
+        $ta.val(newVal);
+        $ta[0].setSelectionRange(newPos, newPos);
+        $ta.trigger('focus');
+        hide();
+    }
+
+    $ta.on('input click keyup', function(e) {
+        if (e.type === 'keyup' && (e.keyCode === 38 || e.keyCode === 40 || e.keyCode === 13 || e.keyCode === 27 || e.keyCode === 9)) return;
+        var match = currentMatch();
+        if (!match) { hide(); return; }
+        activeIdx = 0;
+        var list = filter(match.query);
+        if (!list.length) { hide(); return; }
+        $dd.css({ top: ($ta.outerHeight() + 2) + 'px', left: '0px', right: 'auto' });
+        render(list);
+        $dd.data('current-list', list);
+    });
+
+    $ta.on('keydown', function(e) {
+        if (!$dd.is(':visible')) return;
+        var list = $dd.data('current-list') || [];
+        if (e.keyCode === 38) {
+            e.preventDefault();
+            activeIdx = (activeIdx - 1 + list.length) % list.length;
+            render(list);
+        } else if (e.keyCode === 40) {
+            e.preventDefault();
+            activeIdx = (activeIdx + 1) % list.length;
+            render(list);
+        } else if (e.keyCode === 13 || e.keyCode === 9) {
+            if (list[activeIdx]) {
+                e.preventDefault();
+                e.stopPropagation();
+                pick(list[activeIdx].handle);
+            }
+        } else if (e.keyCode === 27) {
+            e.preventDefault();
+            hide();
+        }
+    });
+
+    $ta.on('blur', function() { setTimeout(hide, 150); });
+}
+
+function renderRemarkItem(remark) {
+    var avatarColor = ['primary', 'success', 'info', 'warning', 'danger'][remark.commenter_name.charCodeAt(0) % 5];
+    return '<div class="comment-item d-flex mb-2 mx-2 pb-2 pl-1" style="border-bottom: 1px solid #e4e6eb;">' +
+        '<div class="flex-shrink-0 mr-2">' +
+        '<div class="symbol symbol-32 symbol-circle symbol-light-' + avatarColor + '">' +
+        '<span class="symbol-label font-weight-bold" style="font-size: 0.75rem;">' + (remark.commenter_initials || remark.commenter_name.substring(0, 2).toUpperCase()) + '</span>' +
+        '</div>' +
+        '</div>' +
+        '<div class="flex-grow-1" style="min-width: 0;">' +
+        '<div class="d-flex align-items-baseline mb-1">' +
+        '<strong class="mr-2" style="font-size: 0.8125rem; color: #050505;">' + escapeHtml(remark.commenter_name) + '</strong>' +
+        '<span class="text-muted" style="font-size: 0.75rem; color: #65676b;">' + remark.created_at + '</span>' +
+        '</div>' +
+        '<div class="comment-text" style="font-size: 0.8125rem; color: #050505; line-height: 1.3; white-space: pre-wrap; word-wrap: break-word;">' + renderMentionedContent(remark.content) + '</div>' +
+        '</div>' +
+        '</div>';
+}
+
+function loadModalInternalComments() {
+    $.ajax({
+        url: '<?php echo base_url("Booking/Get_Remarks"); ?>',
+        type: 'get',
+        data: { booking_id: remarksModalBookingId },
+        dataType: 'json',
+        success: function(response) {
+            var list = $('#remarks-internal-list');
+            list.empty();
+            if (response.success && response.remarks && response.remarks.length > 0) {
+                response.remarks.forEach(function(remark) {
+                    list.append(renderRemarkItem(remark));
+                });
+                // Scroll to bottom
+                list.scrollTop(list[0].scrollHeight);
+            } else {
+                list.html('<div class="text-center text-muted py-3" style="font-size: 0.8125rem;">No internal comments yet.</div>');
+            }
+        },
+        error: function() {
+            $('#remarks-internal-list').html('<div class="text-center text-danger py-3" style="font-size: 0.8125rem;">Error loading comments.</div>');
+        }
+    });
+}
+
+function loadModalCustomerRemarks() {
+    $.ajax({
+        url: '<?php echo base_url("Booking/Get_Customer_Remarks"); ?>',
+        type: 'get',
+        data: { booking_id: remarksModalBookingId },
+        dataType: 'json',
+        success: function(response) {
+            var list = $('#remarks-customer-list');
+            list.empty();
+            if (response.success && response.remarks && response.remarks.length > 0) {
+                response.remarks.forEach(function(remark) {
+                    list.append(renderRemarkItem(remark));
+                });
+                list.scrollTop(list[0].scrollHeight);
+            } else {
+                list.html('<div class="text-center text-muted py-3" style="font-size: 0.8125rem;">No customer remarks yet.</div>');
+            }
+        },
+        error: function() {
+            $('#remarks-customer-list').html('<div class="text-center text-danger py-3" style="font-size: 0.8125rem;">Error loading remarks.</div>');
+        }
+    });
+}
+
+function openRemarksModal(bookingId, bookingNumber, salesAgentId, bookingOpId) {
+    remarksModalBookingId = bookingId;
+    remarksModalSalesAgentId = salesAgentId;
+    remarksModalBookingOpId = bookingOpId;
+
+    $('#remarksModalLabel').html('<strong>Remarks &mdash; ' + escapeHtml(bookingNumber) + '</strong>');
+    var spinnerHtml = '<div class="text-center py-3"><div class="spinner spinner-primary spinner-lg"></div></div>';
+    $('#remarks-internal-list').html(spinnerHtml);
+    $('#remarks-customer-list').html(spinnerHtml);
+
+    // Clear form fields
+    $('#modal-new-comment-content').val('');
+    $('#modal-new-customer-remark-content').val('');
+
+    $('#remarksModal').modal('show');
+
+    loadModalInternalComments();
+    loadModalCustomerRemarks();
+}
+
+// Add internal comment from modal
+$('#modal-add-comment-btn').on('click', function() {
+    var content = $('#modal-new-comment-content').val().trim();
+    if (!content) {
+        Swal.fire({
+            width: 550,
+            background: 'url(<?php echo base_url("assets/image/sweetalert.jpg"); ?>)',
+            icon: 'warning',
+            title: 'Please enter a comment',
+            showConfirmButton: false,
+            timer: 2000
+        });
+        return;
+    }
+
+    var $btn = $(this);
+    var originalText = $btn.html();
+    $btn.prop('disabled', true).html('<i class="la la-spinner la-spin"></i> Adding...');
+
+    $.ajax({
+        url: '<?php echo base_url("Booking/Add_Remark"); ?>',
+        type: 'post',
+        data: {
+            booking_id: remarksModalBookingId,
+            content: content
+        },
+        dataType: 'json',
+        success: function(response) {
+            $btn.prop('disabled', false).html(originalText);
+            if (response.success) {
+                $('#modal-new-comment-content').val('');
+                loadModalInternalComments();
+                Swal.fire({
+                    width: 550,
+                    background: 'url(<?php echo base_url("assets/image/sweetalert.jpg"); ?>)',
+                    icon: 'success',
+                    title: 'Comment added Successfully',
+                    showConfirmButton: false,
+                    timer: 2200
+                });
+            } else {
+                Swal.fire({
+                    width: 550,
+                    background: 'url(<?php echo base_url("assets/image/sweetalert.jpg"); ?>)',
+                    icon: 'error',
+                    title: response.message || 'Failed to add comment',
+                    showConfirmButton: false,
+                    timer: 3000
+                });
+            }
+        },
+        error: function() {
+            $btn.prop('disabled', false).html(originalText);
+            Swal.fire({
+                width: 550,
+                background: 'url(<?php echo base_url("assets/image/sweetalert.jpg"); ?>)',
+                icon: 'error',
+                title: 'Error adding comment. Please try again.',
+                showConfirmButton: false,
+                timer: 3000
+            });
+        }
+    });
+});
+
+// Add customer remark from modal
+$('#modal-add-customer-remark-btn').on('click', function() {
+    var content = $('#modal-new-customer-remark-content').val().trim();
+    if (!content) {
+        Swal.fire({
+            width: 550,
+            background: 'url(<?php echo base_url("assets/image/sweetalert.jpg"); ?>)',
+            icon: 'warning',
+            title: 'Please enter a remark',
+            showConfirmButton: false,
+            timer: 2000
+        });
+        return;
+    }
+
+    var $btn = $(this);
+    var originalText = $btn.html();
+    $btn.prop('disabled', true).html('<i class="la la-spinner la-spin"></i> Adding...');
+
+    $.ajax({
+        url: '<?php echo base_url("Booking/Add_Remark"); ?>',
+        type: 'post',
+        data: {
+            booking_id: remarksModalBookingId,
+            content: content,
+            remark_type: '2'
+        },
+        dataType: 'json',
+        success: function(response) {
+            $btn.prop('disabled', false).html(originalText);
+            if (response.success) {
+                $('#modal-new-customer-remark-content').val('');
+                loadModalCustomerRemarks();
+                Swal.fire({
+                    width: 550,
+                    background: 'url(<?php echo base_url("assets/image/sweetalert.jpg"); ?>)',
+                    icon: 'success',
+                    title: 'Remark added Successfully',
+                    showConfirmButton: false,
+                    timer: 2200
+                });
+            } else {
+                Swal.fire({
+                    width: 550,
+                    background: 'url(<?php echo base_url("assets/image/sweetalert.jpg"); ?>)',
+                    icon: 'error',
+                    title: response.message || 'Failed to add remark',
+                    showConfirmButton: false,
+                    timer: 3000
+                });
+            }
+        },
+        error: function() {
+            $btn.prop('disabled', false).html(originalText);
+            Swal.fire({
+                width: 550,
+                background: 'url(<?php echo base_url("assets/image/sweetalert.jpg"); ?>)',
+                icon: 'error',
+                title: 'Error adding remark. Please try again.',
+                showConfirmButton: false,
+                timer: 3000
+            });
+        }
+    });
+});
+
+// Allow Ctrl+Enter / Shift+Enter to submit in modal textareas
+$('#modal-new-comment-content').on('keydown', function(e) {
+    if ((e.ctrlKey || e.shiftKey) && e.keyCode === 13) {
+        e.preventDefault();
+        $('#modal-add-comment-btn').click();
+    }
+});
+$('#modal-new-customer-remark-content').on('keydown', function(e) {
+    if ((e.ctrlKey || e.shiftKey) && e.keyCode === 13) {
+        e.preventDefault();
+        $('#modal-add-customer-remark-btn').click();
+    }
+});
+
+// Initialize @mention autocomplete on the modal textarea when modal opens
+$('#remarksModal').on('shown.bs.modal', function() {
+    if (typeof initMentionAutocomplete === 'function') {
+        initMentionAutocomplete('#modal-new-comment-content');
+    }
+});
 </script>

@@ -50,14 +50,96 @@ class Category_Model extends CI_Model
 		return $this->db->get('country_code')->result();
 	}
 
+	function Read_Products()
+	{
+		$this->db->select('ProductID, ProductCode, Name');
+		$this->db->where('Status', 'Y');
+		$this->db->order_by('ProductCode', 'ASC');
+		$this->db->order_by('Name', 'ASC');
+		return $this->db->get('product')->result();
+	}
+
+	function Read_Category_Product_Ids($category_id)
+	{
+		$this->db->select('ProductID');
+		$this->db->where('CategoryID', $category_id);
+		$this->db->where('Status', 'Y');
+		$rows = $this->db->get('category_product')->result();
+		$ids = array();
+		foreach($rows as $row) {
+			$ids[] = $row->ProductID;
+		}
+		return $ids;
+	}
+
 	function Create()
 	{
 		$this->db->insert_batch('category', json_decode(json_encode($this->input->post('category'))));
+		// insert_id() returns the first auto-increment id from the batch (MySQL).
+		$category_id = $this->db->insert_id();
+		$this->Sync_Products($category_id);
+		return $category_id;
 	}
-	
+
 	function Update()
 	{
-		$this->db->update_batch('category', json_decode(json_encode($this->input->post('category'))), 'CategoryID');
+		$category = json_decode(json_encode($this->input->post('category')));
+		// Drop any non-column keys (e.g. numeric keys from a malformed post)
+		// so they can never become invalid SQL columns.
+		foreach($category as $row) {
+			foreach((array) $row as $key => $value) {
+				if(!is_string($key) || $key === '' || ctype_digit($key)) {
+					unset($row->$key);
+				}
+			}
+		}
+		// Only run the category column update when there are real field changes
+		// (more than the always-present CategoryID/UpdateBy/UpdateDate trio);
+		// product-link changes alone are handled by Sync_Products() below.
+		if(count((array) $category[0]) > 3) {
+			$this->db->update_batch('category', $category, 'CategoryID');
+		}
+		$this->Sync_Products($category[0]->CategoryID);
+	}
+
+	// Replace the category's product links with the posted set. Posted as a flat
+	// array of ProductIDs under 'products'; absent key means "no change" (skip),
+	// empty array means "clear all links".
+	function Sync_Products($category_id)
+	{
+		if(empty($category_id)) {
+			return;
+		}
+		$products = $this->input->post('products');
+		if($products === null) {
+			return;
+		}
+		// The form posts products as a JSON-encoded array of ProductIDs.
+		if(is_string($products)) {
+			$products = json_decode($products, true);
+		}
+		if(!is_array($products)) {
+			return;
+		}
+		$this->db->where('CategoryID', $category_id);
+		$this->db->delete('category_product');
+		$products = array_values(array_unique(array_filter($products, 'strlen')));
+		if(empty($products)) {
+			return;
+		}
+		$admin_id = $this->session->userdata('admin_id');
+		$now = date('Y-m-d H:i:s');
+		$rows = array();
+		foreach($products as $product_id) {
+			$rows[] = array(
+				'CategoryID' => $category_id,
+				'ProductID'  => $product_id,
+				'Status'     => 'Y',
+				'InsertBy'   => $admin_id,
+				'InsertDate' => $now
+			);
+		}
+		$this->db->insert_batch('category_product', $rows);
 	}
 	
 	function Detect()
@@ -69,4 +151,8 @@ class Category_Model extends CI_Model
 			return false;
 		}
 	}
+	function find($category_id)
+    {
+        return $this->db->get_where('category', ['CategoryID' => $category_id])->row();
+    }
 }

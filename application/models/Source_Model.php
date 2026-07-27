@@ -14,9 +14,23 @@ class Source_Model extends CI_Model
 		if(!empty($this->input->get('name'))) {
 			$this->db->where('Name', $this->input->get('name'));
 		}
-		$this->db->where('Status', 'Y');
 		$this->db->order_by('Name', 'ASC');
 		return $this->db->get('source')->result();
+	}
+
+	function Toggle_Status($source_id)
+	{
+		$this->db->select('Status');
+		$this->db->where('SourceID', $source_id);
+		$source = $this->db->get('source')->row();
+
+		$new_status = ($source->Status == 'Y') ? 'N' : 'Y';
+		$this->db->where('SourceID', $source_id);
+		$this->db->update('source', array(
+			'Status' => $new_status,
+			'UpdateBy' => $this->session->userdata('admin_id'),
+			'UpdateDate' => date('Y-m-d H:i:s')
+		));
 	}
 
 	function Create()

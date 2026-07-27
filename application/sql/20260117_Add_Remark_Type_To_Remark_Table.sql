@@ -1,0 +1,2 @@
+ALTER TABLE remark
+ADD COLUMN type INT DEFAULT 1;

@@ -20,12 +20,27 @@ class Admin extends MY_Controller
 					case 20:
 						$admin->Level = 'SALES AGENT';
 						break;
+					case 25:
+						$admin->Level = 'TEAM LEAD';
+						break;
 					case 30:
 						$admin->Level = 'FINANCE';
 						break;
+					case 40:
+						$admin->Level = 'OP';
+						break;
+					case 45:
+						$admin->Level = 'OP TEAM LEAD';
+						break;
+					case 50:
+						$admin->Level = 'TC';
+						break;
+					case 60:
+						$admin->Level = 'MARKETING';
+						break;
 					default:
 				}
-				
+
 				switch($admin->Status) {
 					case 'Y':
 						$admin->StatusIcon = '<i class="la la-check-circle text-success"></i>';
@@ -49,8 +64,13 @@ class Admin extends MY_Controller
 			echo json_encode($status);
 		} else {
 			$titles = array('tab_title' => 'HolidayGoGoGo | Admin', 'breadcrumb_title' => 'Admin >> Create');
-			$array = array('Action' => 'C', 'AdminID' => 0, 'Name' => 'NA', 'AccessControl' => array());
+			$array = array('Action' => 'C', 'AdminID' => 0, 'Name' => 'NA', 'AccessControl' => array(), 'TeamID' => '');
 			$array['country_codes'] = $this->Admin_Model->Read_Country_Codes();
+			$array['teams'] = $this->Admin_Model->Read_Teams();
+			$array['ghl_users'] = $this->Admin_Model->Read_GHL_Users();
+			$array['lead_dashboard_agents'] = array();
+			$array['sales_targets'] = array();
+			$array['year_sales_targets'] = array();
 			$this->load->view('layout/header', $titles);
 			$this->load->view('admin/admin', $array);
 			$this->load->view('layout/footer');
@@ -69,6 +89,11 @@ class Admin extends MY_Controller
 				$array['AccessControl'] = explode(',', $array['AccessControl']);
 				$array['Action'] = 'U';
 				$array['country_codes'] = $this->Admin_Model->Read_Country_Codes();
+				$array['teams'] = $this->Admin_Model->Read_Teams();
+				$array['ghl_users'] = $this->Admin_Model->Read_GHL_Users();
+				$array['lead_dashboard_agents'] = $this->Admin_Model->Read_Lead_Dashboard_Agents_For_Admin($this->input->get('admin_id'));
+				$array['sales_targets'] = $this->Admin_Model->Read_Sales_Targets_For_Admin($this->input->get('admin_id'));
+				$array['year_sales_targets'] = $this->Admin_Model->Read_Year_Sales_Targets_For_Admin($this->input->get('admin_id'));
 				$this->load->view('layout/header', $titles);
 				$this->load->view('admin/admin', $array);
 				$this->load->view('layout/footer');
@@ -87,7 +112,7 @@ class Admin extends MY_Controller
 			$this->load->view('errors/access_denied');
 		}
 	}
-	
+
 	function Update_Status_To_N()
 	{
 		if($this->input->is_ajax_request()) {

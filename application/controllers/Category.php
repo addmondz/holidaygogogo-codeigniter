@@ -28,6 +28,8 @@ class Category extends MY_Controller
 			$array = array('CategoryID' => 'NA', 'Name' => 'NA');
 			$array['category_codes'] = $this->Category_Model->Read_Category_Codes();
 			$array['countries'] = $this->Category_Model->Read_Country_Codes();
+			$array['products'] = $this->Category_Model->Read_Products();
+			$array['category_product_ids'] = array();
 			$this->load->view('layout/header', $titles);
 			$this->load->view('category/category', $array);
 			$this->load->view('layout/footer');
@@ -37,7 +39,9 @@ class Category extends MY_Controller
 	function Update()
 	{
 		if($this->input->is_ajax_request()) {
-			if(count($this->input->post('category')[0]) > 3) {
+			// Save when there are category field changes (more than the baseline
+			// CategoryID/UpdateBy/UpdateDate) OR when the product links changed.
+			if(count($this->input->post('category')[0]) > 3 || $this->input->post('products') !== null) {
 				$this->Category_Model->Update();
 			}
 		} else {
@@ -47,6 +51,8 @@ class Category extends MY_Controller
 				$array = $this->Category_Model->Read_Category();
 				$array['category_codes'] = $this->Category_Model->Read_Category_Codes();
 				$array['countries'] = $this->Category_Model->Read_Country_Codes();
+				$array['products'] = $this->Category_Model->Read_Products();
+				$array['category_product_ids'] = $this->Category_Model->Read_Category_Product_Ids($this->input->get('category_id'));
 				$this->load->view('layout/header', $titles);
 				$this->load->view('category/category', $array);
 				$this->load->view('layout/footer');
