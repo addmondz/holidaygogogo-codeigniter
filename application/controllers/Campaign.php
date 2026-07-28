@@ -113,6 +113,14 @@ class Campaign extends MY_Controller
 		$data['campaign']        = $this->Campaign_Model->Read_Campaign($id);
 		$data['campaign_guests'] = $this->Campaign_Model->Read_Campaign_Guests($id);
 
+		// Human-readable summary of the guest-picker filters this campaign was
+		// built from. ID-based filters resolve against the same lookups the form
+		// dropdowns use, so the View page shows names not raw ids.
+		$data['filter_rows'] = $this->Campaign_Model->Describe_Filters(
+			isset($data['campaign']->FiltersJson) ? $data['campaign']->FiltersJson : null,
+			$this->Filter_Lookups()
+		);
+
 		$this->load->view('layout/header', $titles);
 		$this->load->view('campaign/view', $data);
 		$this->load->view('layout/footer');
@@ -196,12 +204,23 @@ class Campaign extends MY_Controller
 		// guests only, or (default) both. Without this the model stayed in its
 		// default 'guest' mode, so picking "GHL" still returned booking guests
 		// and the synthesized Team Leader fallback rows.
+		//
+		// "Customer" is a separate source: the customer master (one row per
+		// customer, incl. those with no booking yet). It reuses the shared
+		// Customer List query so the same filters (Customer Type, Source, …)
+		// apply, and it emits the same dedup_key/Name/CallingCode/ContactNum/
+		// Email/Type columns the row mapping below expects.
 		$type = strtolower(trim((string)$this->input->get('type')));
-		$mode = ($type === 'ghl') ? 'ghl' : (($type === 'guest') ? 'guest' : 'all');
-		$this->Guests_Model->Set_Mode($mode);
+		if($type === 'customer') {
+			$rows  = $this->Guests_Model->Read_Customers_Rich($limit, $offset);
+			$total = $this->Guests_Model->Count_Customers_Rich();
+		} else {
+			$mode = ($type === 'ghl') ? 'ghl' : (($type === 'guest') ? 'guest' : 'all');
+			$this->Guests_Model->Set_Mode($mode);
 
-		$rows  = $this->Guests_Model->Read_Guests($limit, $offset);
-		$total = $this->Guests_Model->Count_Guests();
+			$rows  = $this->Guests_Model->Read_Guests($limit, $offset);
+			$total = $this->Guests_Model->Count_Guests();
+		}
 
 		// Show the contact WITH its international calling code — the same
 		// "+60 169546738" form the Guest List dashboard renders. Without this the
@@ -245,6 +264,19 @@ class Campaign extends MY_Controller
 		);
 	}
 
+	// id => name maps for the filters whose stored value is an id (destination,
+	// source, joined_campaign). Used to render readable filter chips on View.
+	private function Filter_Lookups()
+	{
+		$dest = array();
+		foreach($this->Booking_Model->Read_Categories() as $d) { $dest[(string)$d->CategoryID] = $d->Name; }
+		$src = array();
+		foreach($this->Booking_Model->Read_Sources() as $s) { $src[(string)$s->SourceID] = $s->Name; }
+		$camp = array();
+		foreach($this->Campaign_Model->Read_Campaigns() as $c) { $camp[(string)$c->CampaignID] = $c->Name; }
+		return array('destination' => $dest, 'source' => $src, 'joined_campaign' => $camp);
+	}
+
 	private function Save_From_Post($id)
 	{
 		$name = trim((string)$this->input->post('Name'));
@@ -261,11 +293,16 @@ class Campaign extends MY_Controller
 			}
 		}
 
+		// Snapshot of the guest-picker filters used to build the roster. Stored
+		// so the edit screen can show the audience this campaign was drawn from.
+		$filters = $this->Campaign_Model->Normalize_Filters($this->input->post('FiltersJson'));
+
 		$data = array(
 			'Name'          => $name,
 			'CampaignDate'  => $campaign_date,
 			'Description'   => $this->input->post('Description'),
 			'GhlWorkflowID' => trim((string)$this->input->post('GhlWorkflowID')),
+			'FiltersJson'   => $filters === null ? null : json_encode($filters, JSON_UNESCAPED_UNICODE),
 		);
 
 		$posted_guests = $this->input->post('guests');

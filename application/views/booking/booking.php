@@ -525,6 +525,22 @@
                             </div>
 
                             <div class="form-group">
+                                <label>Email</label>
+                                <div class="input-icon">
+                                    <input type="email"
+                                        id="Email"
+                                        name="Email"
+                                        <?php if (current_url() == base_url('Booking/Update') || current_url() == base_url('Booking/Duplicate')) { ?>
+                                            value="<?php echo htmlspecialchars(isset($CustomerPrimaryEmail) ? $CustomerPrimaryEmail : '', ENT_QUOTES); ?>"
+                                        <?php } ?>
+                                        autocomplete="off"
+                                        class="form-control"
+                                        placeholder="Enter email address">
+                                    <span><i class="la la-envelope"></i></span>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
                                 <label>IC / Passport / SSM No. <span style="color:red;">*</span></label>
                                 <div class="input-icon">
                                     <input type="text"
@@ -4706,6 +4722,8 @@
                 tin_no: ($('#tin_no').val() || '').toUpperCase(),
 
                 AltName: ($('#AltName').val() || '').toUpperCase(),
+
+                PrimaryEmail: ($('#Email').val() || '').trim(),
 
                 customer_type: $('#customer_type').val() || [],
 

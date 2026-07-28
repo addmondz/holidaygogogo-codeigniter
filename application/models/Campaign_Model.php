@@ -51,7 +51,7 @@ class Campaign_Model extends CI_Model
 
 	function Read_Campaign($id)
 	{
-		$this->db->select('CampaignID, Name, CampaignDate, Description, GhlWorkflowID, Status, InsertBy, InsertDate');
+		$this->db->select('CampaignID, Name, CampaignDate, Description, GhlWorkflowID, FiltersJson, Status, InsertBy, InsertDate');
 		$this->db->where('CampaignID', (int)$id);
 		return $this->db->get('campaign')->row();
 	}
@@ -94,6 +94,7 @@ class Campaign_Model extends CI_Model
 			'CampaignDate'  => !empty($data['CampaignDate']) ? $data['CampaignDate'] : null,
 			'Description'   => isset($data['Description']) ? $data['Description'] : null,
 			'GhlWorkflowID' => isset($data['GhlWorkflowID']) && $data['GhlWorkflowID'] !== '' ? $data['GhlWorkflowID'] : null,
+			'FiltersJson'   => isset($data['FiltersJson']) && $data['FiltersJson'] !== '' ? $data['FiltersJson'] : null,
 			'Status'        => 'Y',
 			'InsertBy'      => $admin_id,
 			'InsertDate'    => $now,
@@ -125,6 +126,7 @@ class Campaign_Model extends CI_Model
 			'CampaignDate'  => !empty($data['CampaignDate']) ? $data['CampaignDate'] : null,
 			'Description'   => isset($data['Description']) ? $data['Description'] : null,
 			'GhlWorkflowID' => isset($data['GhlWorkflowID']) && $data['GhlWorkflowID'] !== '' ? $data['GhlWorkflowID'] : null,
+			'FiltersJson'   => isset($data['FiltersJson']) && $data['FiltersJson'] !== '' ? $data['FiltersJson'] : null,
 			'UpdateBy'      => $admin_id,
 			'UpdateDate'    => $now,
 		);
@@ -184,5 +186,169 @@ class Campaign_Model extends CI_Model
 			);
 		}
 		return $out;
+	}
+
+	// Sanitise the guest-picker filter snapshot posted from the form before it
+	// is stored on the campaign. Keeps only whitelisted keys, coerces scalars
+	// to strings and multi-selects to string arrays, and drops empties. Returns
+	// null when nothing meaningful was applied (campaign_mode alone doesn't
+	// count — it only rides along when a real filter is present).
+	public static function Normalize_Filters($raw)
+	{
+		if(!is_string($raw) || trim($raw) === '') { return null; }
+		$decoded = json_decode($raw, true);
+		if(!is_array($decoded) || $decoded === array() || array_keys($decoded) === range(0, count($decoded) - 1)) {
+			// not an associative object
+			return null;
+		}
+
+		$multi = array('destination', 'source', 'customer_type', 'language',
+			'gender', 'race', 'tags', 'joined_campaign');
+		$scalar = array('q', 'type', 'bc_type', 'role', 'nationality', 'booking_date',
+			'travel_date', 'dob', 'birthday', 'min_purchases', 'ltv',
+			'booking_lead', 'family_kids', 'consecutive_years', 'cancelled',
+			'has_email', 'campaign_mode');
+
+		$out = array();
+		foreach($multi as $k) {
+			if(!isset($decoded[$k]) || !is_array($decoded[$k])) { continue; }
+			$vals = array();
+			foreach($decoded[$k] as $v) {
+				if(is_array($v)) { continue; }
+				$v = trim((string)$v);
+				if($v !== '') { $vals[] = $v; }
+			}
+			if(!empty($vals)) { $out[$k] = $vals; }
+		}
+		foreach($scalar as $k) {
+			if(!isset($decoded[$k])) { continue; }
+			$v = $decoded[$k];
+			if(is_array($v)) { $v = reset($v); }
+			$v = trim((string)$v);
+			if($v !== '') { $out[$k] = $v; }
+		}
+
+		// "Meaningful" = at least one filter other than the include/exclude toggle.
+		$real = $out;
+		unset($real['campaign_mode']);
+		if(empty($real)) { return null; }
+
+		return $out;
+	}
+
+	// Turn a stored filter snapshot into an ordered list of human-readable
+	// {label, values[]} rows for the View page. $lookups resolves the id-based
+	// filters: ['destination'=>[id=>name], 'source'=>[id=>name],
+	// 'joined_campaign'=>[id=>name]]. Accepts a JSON string or a decoded array.
+	public static function Describe_Filters($filters, $lookups = array())
+	{
+		if(is_string($filters)) {
+			$filters = ($filters === '') ? array() : json_decode($filters, true);
+		}
+		if(!is_array($filters) || empty($filters)) { return array(); }
+		if(!is_array($lookups)) { $lookups = array(); }
+
+		$labels = array(
+			'q'                 => 'Name contains',
+			'type'              => 'Guest Type',
+			'bc_type'           => 'Booking Type',
+			'role'              => 'Role',
+			'nationality'       => 'Nationality',
+			'destination'       => 'Destination',
+			'source'            => 'Source',
+			'customer_type'     => 'Customer Type',
+			'language'          => 'Language',
+			'gender'            => 'Gender',
+			'race'              => 'Race',
+			'tags'              => 'Tag',
+			'birthday'          => 'Birthday',
+			'booking_date'      => 'Date of Bookings',
+			'travel_date'       => 'Travel Date',
+			'dob'               => 'Date of Birth',
+			'min_purchases'     => 'Purchase Count',
+			'ltv'               => 'Lifetime Booking Value',
+			'booking_lead'      => 'Booking-to-Travel Lead',
+			'family_kids'       => 'Family with kids',
+			'consecutive_years' => 'Purchased 2 consecutive years+',
+			'cancelled'         => 'Has cancelled BC',
+			'has_email'         => 'Has email address',
+			'joined_campaign'   => 'Campaign',
+		);
+		$id_lookups = array('destination', 'source', 'joined_campaign');
+		$flags      = array('family_kids', 'consecutive_years', 'cancelled', 'has_email');
+		$months     = array(1 => 'January', 'February', 'March', 'April', 'May',
+			'June', 'July', 'August', 'September', 'October', 'November', 'December');
+		$type_map     = array('guest' => 'Booking Guest', 'ghl' => 'GHL', 'customer' => 'Customer');
+		$bc_map       = array(
+			'BOOKING CONFIRMATION' => 'Booking Confirmation (BC)',
+			'PROFORMA INVOICE'     => 'Proforma Invoice (PI)',
+			'QUOTATION'            => 'Quotation (QU)',
+		);
+		$ltv_map      = array(
+			'0-10000'       => 'Below RM10k',
+			'10000-20000'   => "RM10k \xe2\x80\x93 20k",
+			'20000-30000'   => "RM20k \xe2\x80\x93 30k",
+			'30000-50000'   => "RM30k \xe2\x80\x93 50k",
+			'50000-100000'  => "RM50k \xe2\x80\x93 100k",
+			'100000+'       => 'RM100k and above',
+		);
+		$lead_map     = array(
+			'0-1' => 'Within 1 month',
+			'1-2' => "1 \xe2\x80\x93 2 months",
+			'2-3' => "2 \xe2\x80\x93 3 months",
+			'3-6' => "3 \xe2\x80\x93 6 months",
+			'6+'  => '6 months and above',
+		);
+
+		$rows = array();
+		foreach($labels as $key => $label) {
+			if(!isset($filters[$key])) { continue; }
+			$raw = $filters[$key];
+
+			// Segment checkboxes only appear when actually ticked.
+			if(in_array($key, $flags, true)) {
+				if((string)$raw === '1') { $rows[] = array('label' => $label, 'values' => array('Yes')); }
+				continue;
+			}
+
+			$vals = is_array($raw) ? $raw : array($raw);
+			$out  = array();
+			foreach($vals as $v) {
+				if(is_array($v)) { continue; }
+				$v = trim((string)$v);
+				if($v === '') { continue; }
+
+				if(in_array($key, $id_lookups, true)) {
+					$map = isset($lookups[$key]) && is_array($lookups[$key]) ? $lookups[$key] : array();
+					$out[] = isset($map[$v]) ? (string)$map[$v] : $v;
+				} elseif($key === 'type') {
+					$out[] = isset($type_map[$v]) ? $type_map[$v] : $v;
+				} elseif($key === 'bc_type') {
+					$out[] = isset($bc_map[$v]) ? $bc_map[$v] : $v;
+				} elseif($key === 'min_purchases') {
+					$out[] = $v . "\xc3\x97 and above";
+				} elseif($key === 'ltv') {
+					$out[] = isset($ltv_map[$v]) ? $ltv_map[$v] : $v;
+				} elseif($key === 'booking_lead') {
+					$out[] = isset($lead_map[$v]) ? $lead_map[$v] : $v;
+				} elseif($key === 'birthday') {
+					if($v === 'today')          { $out[] = 'Today'; }
+					elseif($v === 'this_month') { $out[] = 'This Month'; }
+					elseif(isset($months[(int)$v])) { $out[] = $months[(int)$v]; }
+					else { $out[] = $v; }
+				} else {
+					$out[] = $v;
+				}
+			}
+			if(empty($out)) { continue; }
+
+			// The include/exclude toggle rides on the Campaign row's label.
+			if($key === 'joined_campaign') {
+				$mode  = isset($filters['campaign_mode']) ? strtolower((string)$filters['campaign_mode']) : 'include';
+				$label = $label . ($mode === 'exclude' ? ' (Exclude)' : ' (Include)');
+			}
+			$rows[] = array('label' => $label, 'values' => $out);
+		}
+		return $rows;
 	}
 }

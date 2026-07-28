@@ -69,6 +69,25 @@
 						<?php } ?>
 					</div>
 				</div>
+				<?php if(!empty($filter_rows)) { ?>
+					<div class="separator separator-dashed my-4"></div>
+					<div class="text-muted font-weight-bold mb-3" style="font-size:12px;">
+						<i class="la la-filter"></i> Filters Applied
+						<span class="text-muted font-weight-normal">(audience this campaign was drawn from)</span>
+					</div>
+					<div class="row">
+						<?php foreach($filter_rows as $fr) { ?>
+							<div class="col-md-4 mb-3">
+								<div class="text-muted" style="font-size:12px;"><?php echo htmlspecialchars($fr['label']); ?></div>
+								<div>
+									<?php foreach($fr['values'] as $val) { ?>
+										<span class="label label-inline label-pill label-light-info font-weight-bold mr-1 mb-1"><?php echo htmlspecialchars($val); ?></span>
+									<?php } ?>
+								</div>
+							</div>
+						<?php } ?>
+					</div>
+				<?php } ?>
 			</div>
 		</div>
 

@@ -675,9 +675,10 @@ if (!function_exists('guest_list_ghl_suppressed_by_filters')) {
                 return true;
             }
         }
-        // Campaign-segment filters that only a booking guest can satisfy (a lead
-        // has no bookings / sales / travel gap / cancel status) also drop leads.
-        if (guest_list_any_filter_set($get, guest_list_booking_only_segment_keys())) {
+        // The "Customer type" value segments target the customer master (see
+        // guest_list_customer_segment_sql); a GHL lead has no bookings / sales /
+        // travel gap / cancel status, so any of them drops the GHL branch.
+        if (guest_list_any_filter_set($get, guest_list_customer_only_segment_keys())) {
             return true;
         }
         // Guest Role is multi-select: a lead only ever holds the "Lead" role, so
@@ -704,6 +705,11 @@ if (!function_exists('guest_list_bookings_suppressed_by_filters')) {
     {
         // Tag / Race live only on GHL leads, so either drops the booking branch.
         if (guest_list_any_filter_set($get, guest_list_leads_only_segment_keys())) {
+            return true;
+        }
+        // The "Customer type" value segments target the customer master only, so a
+        // booking-guest row can never satisfy one — drop the booking branch too.
+        if (guest_list_any_filter_set($get, guest_list_customer_only_segment_keys())) {
             return true;
         }
         // Multi-select role: a booking guest is never a "Lead", so the booking
@@ -750,6 +756,16 @@ if (!function_exists('guest_list_leader_fallback_suppressed_by_filters')) {
         // Tag / Race live only on GHL leads, so either drops the leader-fallback
         // (a synthesized booking-leader row carries neither).
         if (guest_list_any_filter_set($get, guest_list_leads_only_segment_keys())) {
+            return true;
+        }
+        // The "Customer type" value segments target the customer master only, so a
+        // synthesized leader row can never satisfy one — drop the fallback too.
+        if (guest_list_any_filter_set($get, guest_list_customer_only_segment_keys())) {
+            return true;
+        }
+        // "Has email address" keeps only rows carrying an email; a synthesized
+        // leader row has none (its Email column is always NULL), so drop it.
+        if (guest_list_flag_on($get, 'has_email')) {
             return true;
         }
         $roles = isset($get['role']) ? guest_list_multi_values($get['role']) : array();
@@ -937,17 +953,107 @@ if (!function_exists('guest_list_cancel_predicate')) {
     }
 }
 
-if (!function_exists('guest_list_booking_only_segment_keys')) {
+if (!function_exists('guest_list_customer_only_segment_keys')) {
     /**
-     * The new campaign-segment filters that only a BOOKING guest can satisfy — a
-     * GHL lead has no bookings, sales, travel window or cancel status, so any of
-     * these drops the GHL branch (added to guest_list_ghl_suppressed_by_filters).
+     * The campaign "Customer type" value segments. These target the CUSTOMER
+     * master (one row per customer — see guest_list_customer_segment_sql), not the
+     * booking-guest listing. A booking-guest row, a synthesized leader-fallback
+     * row and a GHL lead can none of them satisfy a per-customer purchase-count /
+     * lifetime-value / booking-lead / kids / consecutive-years / cancelled-BC
+     * measurement, so any of these drops EVERY branch on the booking+GHL UNION
+     * path; the filters apply on the separate customer query instead.
      *
      * @return string[]
      */
-    function guest_list_booking_only_segment_keys()
+    function guest_list_customer_only_segment_keys()
     {
         return array('min_purchases', 'ltv', 'booking_lead', 'consecutive_years', 'family_kids', 'cancelled');
+    }
+}
+
+if (!function_exists('guest_list_customer_segment_sql')) {
+    /**
+     * Build the customer-path WHERE fragment for the campaign "Customer type"
+     * value segments (Purchase Count, Lifetime Booking Value, Booking-to-Travel
+     * Lead, Family with kids, Purchased 2 consecutive years, Has cancelled BC).
+     *
+     * Each segment is a correlated subquery over that one customer's own bookings
+     * (b.CustomerID = c.CustomerID), so it filters the customer master row `c` in
+     * Build_Customer_Branch. The "Has cancelled BC" toggle flips the booking set
+     * every OTHER segment measures over — active (CancelStatus = 'N') to cancelled
+     * (CancelStatus <> 'N'), mirroring the old guest-path flip — and on its own
+     * requires the customer to own at least one cancelled booking.
+     *
+     * Returns a SQL string (each clause already prefixed with AND, safe to append
+     * straight onto the WHERE) plus the ordered bound params. Both are empty when
+     * no segment is active.
+     *
+     * @param array $get The request GET params.
+     * @return array{sql:string,params:array}
+     */
+    function guest_list_customer_segment_sql($get)
+    {
+        $sql    = '';
+        $params = array();
+
+        $cancelled = guest_list_flag_on($get, 'cancelled');
+        // The booking set every value segment below is measured over.
+        $set = "FROM booking b WHERE b.CustomerID = c.CustomerID AND b.Status <> 'N' AND "
+             . ($cancelled ? "b.CancelStatus <> 'N'" : "b.CancelStatus = 'N'");
+
+        // Has cancelled BC: the customer must own at least one cancelled booking.
+        if ($cancelled) {
+            $sql .= " AND EXISTS (SELECT 1 FROM booking b
+                WHERE b.CustomerID = c.CustomerID AND b.Status <> 'N' AND b.CancelStatus <> 'N') ";
+        }
+
+        // Purchased N× and above: distinct bookings in the set.
+        $min = guest_list_purchase_count_min(isset($get['min_purchases']) ? $get['min_purchases'] : '');
+        if ($min !== null) {
+            $sql     .= " AND (SELECT COUNT(DISTINCT b.BookingID) {$set}) >= ? ";
+            $params[] = $min;
+        }
+
+        // Lifetime Booking Value bucket: total NetTotal across the set
+        // (min inclusive, max exclusive).
+        $ltv = guest_list_parse_bucket_bounds(isset($get['ltv']) ? $get['ltv'] : '');
+        if ($ltv !== null) {
+            $sql     .= " AND (SELECT COALESCE(SUM(COALESCE(b.NetTotal, 0)), 0) {$set}) >= ? ";
+            $params[] = $ltv[0];
+            if ($ltv[1] !== null) {
+                $sql     .= " AND (SELECT COALESCE(SUM(COALESCE(b.NetTotal, 0)), 0) {$set}) < ? ";
+                $params[] = $ltv[1];
+            }
+        }
+
+        // Booking-to-Travel Lead bucket (months): ANY one booking in the set was
+        // created that far ahead of its travel start.
+        $lead = guest_list_parse_bucket_bounds(isset($get['booking_lead']) ? $get['booking_lead'] : '');
+        if ($lead !== null) {
+            $sql     .= " AND EXISTS (SELECT 1 {$set} AND TIMESTAMPDIFF(MONTH, b.InsertDate, b.StartDate) >= ? ";
+            $params[] = $lead[0];
+            if ($lead[1] !== null) {
+                $sql     .= " AND TIMESTAMPDIFF(MONTH, b.InsertDate, b.StartDate) < ? ";
+                $params[] = $lead[1];
+            }
+            $sql .= ") ";
+        }
+
+        // Family with kids: ANY booking in the set carries a child or infant.
+        if (guest_list_flag_on($get, 'family_kids')) {
+            $sql .= " AND EXISTS (SELECT 1 {$set} AND (COALESCE(b.Children, 0) > 0 OR COALESCE(b.Infant, 0) > 0)) ";
+        }
+
+        // Purchased 2 consecutive years+: OR each booking year into a bitmask
+        // (base 2000); two set bits one position apart mean two adjacent calendar
+        // years exist. The aggregate lives in HAVING over the single implicit group.
+        if (guest_list_flag_on($get, 'consecutive_years')) {
+            $mask = "BIT_OR(1 << (YEAR(b.InsertDate) - 2000))";
+            $sql .= " AND EXISTS (SELECT 1 {$set} AND YEAR(b.InsertDate) >= 2000
+                HAVING ({$mask} & ({$mask} << 1)) <> 0) ";
+        }
+
+        return array('sql' => $sql, 'params' => $params);
     }
 }
 

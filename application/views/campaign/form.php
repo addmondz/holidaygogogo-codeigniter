@@ -55,6 +55,15 @@
 	font-weight:600;
 	font-size:13px;
 }
+.picker-source-legend {
+	background:#F3F6F9;
+	border:1px solid #E4E6EF;
+	border-radius:6px;
+	padding:8px 12px;
+	color:#3F4254;
+	font-size:12px;
+}
+.picker-source-legend .label { margin:0 2px; }
 .btn-icon-circle {
 	width: 28px; height: 28px; padding: 0;
 	display:inline-flex; align-items:center; justify-content:center;
@@ -145,13 +154,21 @@
 						</h3>
 					</div>
 					<div class="card-toolbar">
-						<span class="picker-summary">Selected: <span id="picker_count">0</span></span>
+						<!-- selected count moved next to Selected Guests title -->
 					</div>
 				</div>
 				<div class="card-body">
+					<!-- Each filter's tag shows which source(s) it actually narrows:
+					     gl = booking guests · lead = GHL leads · cust = customers. -->
+					<div class="picker-source-legend mb-4">
+						Each filter tag shows which source it narrows &mdash;
+						<span class="label label-inline label-light-success font-weight-bold">gl</span> booking guests &middot;
+						<span class="label label-inline label-light-warning font-weight-bold">lead</span> GHL leads &middot;
+						<span class="label label-inline label-light-info font-weight-bold">cust</span> customers.
+					</div>
 					<div class="row mb-4">
 						<div class="col-md-3">
-							<label>Search guests (name)</label>
+							<label>Search guests (name) <span class="text-muted font-size-xs">(cust/lead/gl)</span></label>
 							<div class="input-icon">
 								<input type="text" id="guest_search_q" autocomplete="off" class="form-control" placeholder="Type a name">
 								<span><i class="la la-search"></i></span>
@@ -162,11 +179,12 @@
 							<select id="guest_search_type" class="form-control selectpicker">
 								<option value="">--ALL TYPES--</option>
 								<option value="guest">Booking Guest</option>
+								<option value="customer">Customer</option>
 								<option value="ghl">GHL</option>
 							</select>
 						</div>
 						<div class="col-md-3">
-							<label>Role</label>
+							<label>Role <span class="text-muted font-size-xs">(cust/lead/gl)</span></label>
 							<select id="guest_search_role" class="form-control selectpicker">
 								<option value="">--ALL ROLES--</option>
 								<option value="Team Leader">Team Leader</option>
@@ -174,7 +192,7 @@
 							</select>
 						</div>
 						<div class="col-md-3">
-							<label>Nationality</label>
+							<label>Nationality <span class="text-muted font-size-xs">(cust/gl)</span></label>
 							<select id="guest_search_nationality" class="form-control selectpicker" data-live-search="true">
 								<option value="">--ALL NATIONALITIES--</option>
 								<?php if(!empty($nationalities)) { foreach($nationalities as $n) { ?>
@@ -186,7 +204,7 @@
 					<!-- Row 2 — booking attributes (customer + team member) -->
 					<div class="row mb-4">
 						<div class="col-md-3">
-							<label>Destination</label>
+							<label>Destination <span class="text-muted font-size-xs">(cust/gl)</span></label>
 							<select id="guest_search_destination" class="form-control selectpicker" data-live-search="true" multiple data-actions-box="true" title="--ALL DESTINATIONS--">
 								<?php if(!empty($destinations)) { foreach($destinations as $d) { ?>
 									<option value="<?php echo (int)$d->CategoryID; ?>"><?php echo htmlspecialchars($d->Name); ?></option>
@@ -194,7 +212,7 @@
 							</select>
 						</div>
 						<div class="col-md-3">
-							<label>Source</label>
+							<label>Source <span class="text-muted font-size-xs">(cust/gl)</span></label>
 							<select id="guest_search_source" class="form-control selectpicker" data-live-search="true" multiple data-actions-box="true" title="--ALL SOURCES--">
 								<?php if(!empty($sources)) { foreach($sources as $s) { ?>
 									<option value="<?php echo (int)$s->SourceID; ?>"><?php echo htmlspecialchars($s->Name); ?></option>
@@ -202,7 +220,7 @@
 							</select>
 						</div>
 						<div class="col-md-3">
-							<label>Customer Type</label>
+							<label>Customer Type <span class="text-muted font-size-xs">(cust/gl)</span></label>
 							<select id="guest_search_customer_type" class="form-control selectpicker" data-live-search="true" multiple data-actions-box="true" title="--ALL CUSTOMER TYPES--">
 								<?php if(!empty($customer_types)) { foreach($customer_types as $ct) { ?>
 									<option value="<?php echo htmlspecialchars($ct->Name, ENT_QUOTES); ?>"><?php echo htmlspecialchars($ct->Name); ?></option>
@@ -210,7 +228,7 @@
 							</select>
 						</div>
 						<div class="col-md-3">
-							<label>Language</label>
+							<label>Language <span class="text-muted font-size-xs">(cust/gl)</span></label>
 							<select id="guest_search_language" class="form-control selectpicker" data-live-search="true" multiple data-actions-box="true" title="--ALL LANGUAGES--">
 								<?php if(!empty($languages)) { foreach($languages as $l) { ?>
 									<option value="<?php echo htmlspecialchars($l->value, ENT_QUOTES); ?>"><?php echo htmlspecialchars($l->value); ?></option>
@@ -222,7 +240,7 @@
 					<!-- Row 3 — demographics (Race / Tag are GHL-lead only) -->
 					<div class="row mb-4">
 						<div class="col-md-3">
-							<label>Gender</label>
+							<label>Gender <span class="text-muted font-size-xs">(cust/gl)</span></label>
 							<select id="guest_search_gender" class="form-control selectpicker" multiple data-actions-box="true" title="--ALL GENDERS--">
 								<option value="Male">Male</option>
 								<option value="Female">Female</option>
@@ -230,7 +248,7 @@
 							</select>
 						</div>
 						<div class="col-md-3">
-							<label>Race <span class="text-muted font-size-xs">(leads only)</span></label>
+							<label>Race <span class="text-muted font-size-xs">(lead only)</span></label>
 							<select id="guest_search_race" class="form-control selectpicker" data-live-search="true" multiple data-actions-box="true" title="--ALL RACES--">
 								<?php if(!empty($races)) { foreach($races as $r) { ?>
 									<option value="<?php echo htmlspecialchars($r->value, ENT_QUOTES); ?>"><?php echo htmlspecialchars($r->value); ?></option>
@@ -238,7 +256,7 @@
 							</select>
 						</div>
 						<div class="col-md-3">
-							<label>Tag <span class="text-muted font-size-xs">(leads only)</span></label>
+							<label>Tag <span class="text-muted font-size-xs">(lead only)</span></label>
 							<select id="guest_search_tags" class="form-control selectpicker" data-live-search="true" multiple data-actions-box="true" title="--ALL TAGS--">
 								<?php if(!empty($lead_tags)) { foreach($lead_tags as $t) { ?>
 									<option value="<?php echo htmlspecialchars($t, ENT_QUOTES); ?>"><?php echo htmlspecialchars($t); ?></option>
@@ -246,7 +264,7 @@
 							</select>
 						</div>
 						<div class="col-md-3">
-							<label>Birthday</label>
+							<label>Birthday <span class="text-muted font-size-xs">(cust/gl)</span></label>
 							<select id="guest_search_birthday" class="form-control selectpicker">
 								<option value="">--ANY--</option>
 								<option value="today">Today</option>
@@ -270,7 +288,7 @@
 					<!-- Row 4 — dates -->
 					<div class="row mb-4">
 						<div class="col-md-3">
-							<label>Date of Bookings
+							<label>Date of Bookings <span class="text-muted font-size-xs">(cust/lead/gl)</span>
 								<a onclick="Reset_Guest_Booking_Date()" class="btn btn-icon btn-light-warning btn-xs" data-toggle="tooltip" title="Clear booking date">
 									<i class="la la-undo"></i>
 								</a>
@@ -281,7 +299,7 @@
 							</div>
 						</div>
 						<div class="col-md-3">
-							<label>Travel Date
+							<label>Travel Date <span class="text-muted font-size-xs">(cust/gl)</span>
 								<a onclick="Reset_Guest_Travel_Date()" class="btn btn-icon btn-light-warning btn-xs" data-toggle="tooltip" title="Clear travel date">
 									<i class="la la-undo"></i>
 								</a>
@@ -292,7 +310,7 @@
 							</div>
 						</div>
 						<div class="col-md-3">
-							<label>Date of Birth
+							<label>Date of Birth <span class="text-muted font-size-xs">(cust/gl)</span>
 								<a onclick="Reset_Guest_Dob()" class="btn btn-icon btn-light-warning btn-xs" data-toggle="tooltip" title="Clear date of birth">
 									<i class="la la-undo"></i>
 								</a>
@@ -304,7 +322,7 @@
 						</div>
 						<div class="col-md-3">
 							<div class="d-flex justify-content-between align-items-center">
-								<label class="mb-0">Campaign</label>
+								<label class="mb-0">Campaign <span class="text-muted font-size-xs">(lead/gl)</span></label>
 								<select id="guest_search_campaign_mode" class="form-control form-control-sm w-auto" style="height:auto;padding:2px 22px 2px 8px;">
 									<option value="include">Include</option>
 									<option value="exclude">Exclude</option>
@@ -318,9 +336,35 @@
 						</div>
 					</div>
 
-					<!-- Row 5 — customer-value segments (booking guests only) -->
+					<!-- Booking Type — BC / PI / QU (booking guests only). Defaults to
+					     Booking Confirmation so a roster is drawn from confirmed bookings;
+					     switch to Proforma Invoice / Quotation to target those instead. -->
+					<div class="row mb-4">
+						<div class="col-md-3">
+							<label>Booking Type <span class="text-muted font-size-xs">(gl only)</span></label>
+							<select id="guest_search_bc_type" class="form-control selectpicker">
+								<option value="BOOKING CONFIRMATION" selected>Booking Confirmation (BC)</option>
+								<option value="PROFORMA INVOICE">Proforma Invoice (PI)</option>
+								<option value="QUOTATION">Quotation (QU)</option>
+							</select>
+						</div>
+					</div>
+
+					<!-- Contact availability — applies to every source (guest / lead / customer) -->
+					<div class="row mb-4">
+						<div class="col-md-3">
+							<label class="d-block">Contact <span class="text-muted font-size-xs">(cust/lead/gl)</span></label>
+							<div class="checkbox-inline">
+								<label class="checkbox checkbox-lg">
+									<input type="checkbox" id="guest_search_has_email"><span></span> Has email address
+								</label>
+							</div>
+						</div>
+					</div>
+
+					<!-- Customer-value segments (customers only) -->
 					<div class="separator separator-dashed my-3"></div>
-					<div class="text-muted font-weight-bold mb-2">Customer-value segments <span class="font-size-xs">(booking guests only)</span></div>
+					<div class="text-muted font-weight-bold mb-2">Customer-value segments <span class="font-size-xs">(cust only)</span></div>
 					<div class="row mb-4">
 						<div class="col-md-3">
 							<label>Purchase Count</label>
@@ -417,7 +461,7 @@
 						</div>
 						<div class="col-md-5">
 							<div class="d-flex justify-content-between align-items-center mb-2">
-								<div class="picker-section-title" style="margin-bottom:0;">Selected Guests</div>
+								<div class="picker-section-title" style="margin-bottom:0;">Selected Guests <span class="badge badge-primary" id="picker_count">0</span></div>
 								<button type="button" id="picker_clear_all" class="btn btn-light-danger btn-sm font-weight-bold" data-toggle="tooltip" title="Remove all selected guests">
 									<i class="la la-times-circle"></i>Clear All
 								</button>
@@ -441,6 +485,7 @@
 					</div>
 
 					<div id="picker_hidden_inputs"></div>
+					<input type="hidden" name="FiltersJson" id="campaign_filters_json" value="">
 				</div>
 			</div>
 
@@ -457,6 +502,14 @@
 <script>
 	var CAMPAIGN_INITIAL_SELECTED = <?php echo json_encode($initial_selected, JSON_UNESCAPED_UNICODE); ?>;
 	var SEARCH_URL = '<?php echo base_url('Campaign/Search_Guests'); ?>';
+	<?php
+		$saved_filters = array();
+		if(!empty($campaign->FiltersJson)) {
+			$decoded = json_decode($campaign->FiltersJson, true);
+			if(is_array($decoded)) { $saved_filters = $decoded; }
+		}
+	?>
+	var CAMPAIGN_SAVED_FILTERS = <?php echo json_encode($saved_filters, JSON_UNESCAPED_UNICODE); ?>;
 
 	$('#kt_datepicker_campaign').daterangepicker({
 		singleDatePicker: true,
@@ -624,6 +677,7 @@
 			return {
 				q: $('#guest_search_q').val(),
 				type: $('#guest_search_type').val(),
+				bc_type: $('#guest_search_bc_type').val(),
 				role: $('#guest_search_role').val(),
 				nationality: $('#guest_search_nationality').val(),
 				booking_date: $('#guest_search_booking_date input').val(),
@@ -643,9 +697,47 @@
 				family_kids: $('#guest_search_family_kids').is(':checked') ? '1' : '',
 				consecutive_years: $('#guest_search_consecutive_years').is(':checked') ? '1' : '',
 				cancelled: $('#guest_search_cancelled').is(':checked') ? '1' : '',
+				has_email: $('#guest_search_has_email').is(':checked') ? '1' : '',
 				joined_campaign: $('#guest_search_joined_campaign').val() || [],
 				campaign_mode: $('#guest_search_campaign_mode').val()
 			};
+		}
+
+		// Re-populate every picker filter input from a saved snapshot (edit mode)
+		// so the user can see the audience this campaign was drawn from. Mirrors
+		// the keys produced by currentFilterData().
+		function applyFilters(f) {
+			if(!f || typeof f !== 'object') { return false; }
+			function setSel(id, v) { $(id).val(v === undefined || v === null ? '' : v); }
+			setSel('#guest_search_q', f.q);
+			setSel('#guest_search_type', f.type);
+			// Old campaigns saved before Booking Type existed have no bc_type — fall
+			// back to the BC default so the preview matches the new picker default.
+			setSel('#guest_search_bc_type', f.bc_type || 'BOOKING CONFIRMATION');
+			setSel('#guest_search_role', f.role);
+			setSel('#guest_search_nationality', f.nationality);
+			setSel('#guest_search_birthday', f.birthday);
+			setSel('#guest_search_min_purchases', f.min_purchases);
+			setSel('#guest_search_ltv', f.ltv);
+			setSel('#guest_search_booking_lead', f.booking_lead);
+			setSel('#guest_search_destination', f.destination || []);
+			setSel('#guest_search_source', f.source || []);
+			setSel('#guest_search_customer_type', f.customer_type || []);
+			setSel('#guest_search_language', f.language || []);
+			setSel('#guest_search_gender', f.gender || []);
+			setSel('#guest_search_race', f.race || []);
+			setSel('#guest_search_tags', f.tags || []);
+			setSel('#guest_search_joined_campaign', f.joined_campaign || []);
+			setSel('#guest_search_campaign_mode', f.campaign_mode || 'include');
+			$('#guest_search_booking_date input').val(f.booking_date || '');
+			$('#guest_search_travel_date input').val(f.travel_date || '');
+			$('#guest_search_dob input').val(f.dob || '');
+			$('#guest_search_family_kids').prop('checked', f.family_kids === '1');
+			$('#guest_search_consecutive_years').prop('checked', f.consecutive_years === '1');
+			$('#guest_search_cancelled').prop('checked', f.cancelled === '1');
+			$('#guest_search_has_email').prop('checked', f.has_email === '1');
+			$('.selectpicker').selectpicker('refresh');
+			return true;
 		}
 
 		function loadResults(page) {
@@ -739,12 +831,14 @@
 		$('#guest_search_reset').on('click', function() {
 			$('#guest_search_q').val('');
 			$('#guest_search_booking_date input, #guest_search_travel_date input, #guest_search_dob input').val('');
-			$('#guest_search_family_kids, #guest_search_consecutive_years, #guest_search_cancelled').prop('checked', false);
+			$('#guest_search_family_kids, #guest_search_consecutive_years, #guest_search_cancelled, #guest_search_has_email').prop('checked', false);
 			$('#guest_search_type, #guest_search_role, #guest_search_nationality, #guest_search_birthday, ' +
 				'#guest_search_min_purchases, #guest_search_ltv, #guest_search_booking_lead, ' +
 				'#guest_search_destination, #guest_search_source, #guest_search_customer_type, #guest_search_language, ' +
 				'#guest_search_gender, #guest_search_race, #guest_search_tags, #guest_search_joined_campaign').val('');
 			$('#guest_search_campaign_mode').val('include');
+			// Booking Type resets to its BC default, not blank.
+			$('#guest_search_bc_type').val('BOOKING CONFIRMATION');
 			$('.selectpicker').selectpicker('refresh');
 		});
 		$('#picker_prev').on('click', function() { if(currentPage > 1) { loadResults(currentPage - 1); } });
@@ -796,8 +890,16 @@
 				Swal.fire({ icon: 'error', title: 'Name is required', timer: 1800, showConfirmButton: false });
 				return false;
 			}
+			// Snapshot the current filter inputs so they persist with the campaign.
+			$('#campaign_filters_json').val(JSON.stringify(currentFilterData()));
 		});
 
 		renderSelected();
+
+		// Edit mode: restore the saved filter snapshot and auto-run the search so
+		// the Available Guests list shows the audience the roster was drawn from.
+		if(applyFilters(CAMPAIGN_SAVED_FILTERS) && Object.keys(CAMPAIGN_SAVED_FILTERS).length) {
+			loadResults(1);
+		}
 	})();
 </script>

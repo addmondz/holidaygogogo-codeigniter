@@ -29,6 +29,16 @@ function assert_eq($label, $expected, $actual) {
     }
 }
 
+function assert_contains($label, $needle, $haystack) {
+    if (strpos($haystack, $needle) !== false) {
+        echo "  PASS  {$label} contains " . var_export($needle, true) . "\n";
+    } else {
+        echo "  FAIL  {$label}: " . var_export($needle, true)
+           . " not found in " . var_export($haystack, true) . "\n";
+        exit(1);
+    }
+}
+
 // ---- purchase count (2x+) --------------------------------------------------
 echo "purchase count min:\n";
 assert_eq('empty → null',   null, guest_list_purchase_count_min(''));
@@ -73,22 +83,78 @@ assert_eq('race drops fallback',  true,  guest_list_leader_fallback_suppressed_b
 assert_eq('tags keeps GHL',       false, guest_list_ghl_suppressed_by_filters(array('tags' => array('VIP'))));
 assert_eq('empty tags no drop',   false, guest_list_bookings_suppressed_by_filters(array('tags' => array())));
 
-// ---- suppression: booking-only segments drop the GHL branch ----------------
-echo "booking-only segment suppression:\n";
+// ---- suppression: customer-only segments drop EVERY UNION branch -----------
+// The value segments now target the customer master, so a booking guest, a
+// synthesized leader-fallback row and a GHL lead can none of them satisfy one:
+// each drops its branch on the booking+GHL UNION path (leaving zero rows unless
+// the picker's Type = Customer, which runs the separate customer query).
+echo "customer-only segment suppression:\n";
 foreach (array('min_purchases' => '2', 'ltv' => '10000-20000', 'booking_lead' => '1-2',
     'consecutive_years' => '1', 'family_kids' => '1', 'cancelled' => '1') as $k => $v) {
-    assert_eq("{$k} drops GHL", true, guest_list_ghl_suppressed_by_filters(array($k => $v)));
-    assert_eq("{$k} keeps booking", false, guest_list_bookings_suppressed_by_filters(array($k => $v)));
-    assert_eq("{$k} keeps fallback", false, guest_list_leader_fallback_suppressed_by_filters(array($k => $v)));
+    assert_eq("{$k} drops GHL",      true, guest_list_ghl_suppressed_by_filters(array($k => $v)));
+    assert_eq("{$k} drops booking",  true, guest_list_bookings_suppressed_by_filters(array($k => $v)));
+    assert_eq("{$k} drops fallback", true, guest_list_leader_fallback_suppressed_by_filters(array($k => $v)));
 }
 // An off toggle ('0') must NOT suppress anything.
-assert_eq('cancelled=0 keeps GHL', false, guest_list_ghl_suppressed_by_filters(array('cancelled' => '0')));
+assert_eq('cancelled=0 keeps GHL',     false, guest_list_ghl_suppressed_by_filters(array('cancelled' => '0')));
+assert_eq('cancelled=0 keeps booking', false, guest_list_bookings_suppressed_by_filters(array('cancelled' => '0')));
+
+// ---- "Has email address" filter --------------------------------------------
+// The rows-with-email toggle keeps booking guests + GHL leads (both carry an
+// email column) but drops the leader-fallback branch — a synthesized leader row
+// has no email (its Email column is always NULL), so it can never match.
+echo "has_email suppression:\n";
+assert_eq('has_email drops fallback',   true,  guest_list_leader_fallback_suppressed_by_filters(array('has_email' => '1')));
+assert_eq('has_email keeps booking',    false, guest_list_bookings_suppressed_by_filters(array('has_email' => '1')));
+assert_eq('has_email keeps GHL',        false, guest_list_ghl_suppressed_by_filters(array('has_email' => '1')));
+assert_eq('has_email=0 keeps fallback', false, guest_list_leader_fallback_suppressed_by_filters(array('has_email' => '0')));
 
 // ---- branch routing end-to-end ---------------------------------------------
 echo "branches_to_run integration:\n";
 $b = guest_list_branches_to_run('all', array('race' => array('Chinese')));
 assert_eq('race: only GHL runs', array('bookings' => false, 'ghl' => true), $b);
 $b = guest_list_branches_to_run('all', array('min_purchases' => '2'));
-assert_eq('2x+: only bookings run', array('bookings' => true, 'ghl' => false), $b);
+assert_eq('2x+: nothing runs on UNION (customer-only now)', array('bookings' => false, 'ghl' => false), $b);
+
+// ---- customer-path segment SQL builder -------------------------------------
+// The pure builder that turns the value segments into a correlated WHERE
+// fragment over the customer's own bookings (b.CustomerID = c.CustomerID).
+echo "customer segment sql:\n";
+$none = guest_list_customer_segment_sql(array());
+assert_eq('no segment → empty sql',    '',          $none['sql']);
+assert_eq('no segment → empty params', array(),     $none['params']);
+
+$mp = guest_list_customer_segment_sql(array('min_purchases' => '2'));
+assert_eq('min_purchases params', array(2), $mp['params']);
+assert_contains('min_purchases sql', 'COUNT(DISTINCT b.BookingID)', $mp['sql']);
+assert_contains('min_purchases active set', "b.CancelStatus = 'N'", $mp['sql']);
+
+$lv = guest_list_customer_segment_sql(array('ltv' => '10000-20000'));
+assert_eq('ltv params', array(10000.0, 20000.0), $lv['params']);
+assert_contains('ltv sql', 'SUM(COALESCE(b.NetTotal', $lv['sql']);
+
+$ll = guest_list_customer_segment_sql(array('ltv' => '50000+'));
+assert_eq('ltv open-ended params', array(50000.0), $ll['params']);
+
+$bl = guest_list_customer_segment_sql(array('booking_lead' => '1-2'));
+assert_eq('booking_lead params', array(1.0, 2.0), $bl['params']);
+assert_contains('booking_lead sql', 'TIMESTAMPDIFF(MONTH', $bl['sql']);
+
+$fk = guest_list_customer_segment_sql(array('family_kids' => '1'));
+assert_eq('family_kids params', array(), $fk['params']);
+assert_contains('family_kids sql', 'b.Children', $fk['sql']);
+
+$cy = guest_list_customer_segment_sql(array('consecutive_years' => '1'));
+assert_eq('consecutive_years params', array(), $cy['params']);
+assert_contains('consecutive_years sql', 'BIT_OR', $cy['sql']);
+
+$cn = guest_list_customer_segment_sql(array('cancelled' => '1'));
+assert_eq('cancelled params', array(), $cn['params']);
+assert_contains('cancelled requires cancelled BC', "b.CancelStatus <> 'N'", $cn['sql']);
+
+// Cancelled flips the booking set the OTHER segments measure over.
+$mix = guest_list_customer_segment_sql(array('cancelled' => '1', 'min_purchases' => '2'));
+assert_eq('cancelled+min params', array(2), $mix['params']);
+assert_contains('cancelled flips the set', "b.CancelStatus <> 'N'", $mix['sql']);
 
 echo "\nAll assertions passed.\n";

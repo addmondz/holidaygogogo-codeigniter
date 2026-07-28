@@ -66,9 +66,9 @@ class Guests_Model extends CI_Model
 
 		$booking = null;
 		if($run_bookings) {
-			// Cancelled-BC segment flips the default "hide cancelled" predicate to
-			// "only cancelled" so a campaign can target guests whose booking fell
-			// through (guest_list_cancel_predicate).
+			// This branch always hides cancelled bookings: the "Has cancelled BC"
+			// segment is customer-only now (it suppresses this branch entirely), so
+			// the predicate only ever resolves to the default hide.
 			$where = " WHERE b.Status != 'N' AND " . guest_list_cancel_predicate($get, 'b.CancelStatus') . "
 				AND gl.dedup_key IS NOT NULL
 				AND (
@@ -141,26 +141,10 @@ class Guests_Model extends CI_Model
 				}
 			}
 
-			// Family-with-kids segment: keep guests on a booking that carries at
-			// least one child or infant (a row-level match — a guest counts when
-			// ANY of their bookings has kids).
-			if(guest_list_flag_on($get, 'family_kids')) {
-				$where .= " AND (COALESCE(b.Children, 0) > 0 OR COALESCE(b.Infant, 0) > 0) ";
-			}
-
-			// Booking-lead timeline: how far ahead the BC was created before the
-			// travel start (bucketed in months, min inclusive / max exclusive).
-			// NULL / zero dates give a NULL diff that fails the comparison, so
-			// placeholder bookings never match.
-			$lead = guest_list_parse_bucket_bounds($this->input->get('booking_lead'));
-			if($lead !== null) {
-				$where     .= " AND TIMESTAMPDIFF(MONTH, b.InsertDate, b.StartDate) >= ? ";
-				$b_params[] = $lead[0];
-				if($lead[1] !== null) {
-					$where     .= " AND TIMESTAMPDIFF(MONTH, b.InsertDate, b.StartDate) < ? ";
-					$b_params[] = $lead[1];
-				}
-			}
+			// (The "Customer type" value segments — family-with-kids, booking-lead,
+			// purchase count, lifetime value, consecutive years, cancelled BC — now
+			// target the customer master and are applied in Build_Customer_Branch;
+			// they suppress this whole branch, so they are not built here.)
 
 			$booking_number = trim((string)$this->input->get('booking_number'));
 			if($booking_number !== '') {
@@ -192,6 +176,11 @@ class Guests_Model extends CI_Model
 				$where     .= " AND gl.Email LIKE ? ";
 				$b_params[] = '%' . $email . '%';
 			}
+			// "Has email address" campaign filter: keep only guests carrying an
+			// email so an email blast has someone to reach.
+			if(guest_list_flag_on($get, 'has_email')) {
+				$where .= " AND NULLIF(TRIM(gl.Email), '') IS NOT NULL ";
+			}
 			// Customer Code / Date Creation live on the linked customer master
 			// (c.CustomerCode / c.created_at), so they filter the customer row.
 			$customer_code = trim((string)$this->input->get('customer_code'));
@@ -215,6 +204,12 @@ class Guests_Model extends CI_Model
 			$this->Append_In_Clause($where, $b_params, 'gl.Gender',                        $this->input->get('gender'));
 			$this->Append_In_Clause($where, $b_params, 'gl.Type',                          $this->input->get('guest_type'));
 			$this->Append_In_Clause($where, $b_params, 'COALESCE(gl.ChatLanguage, c.ChatLanguage, b.ChatLanguage)', $this->input->get('language'));
+			// Booking Type — BC / PI / QU (booking.BookingConfirmationTitle:
+			// 'BOOKING CONFIRMATION' / 'PROFORMA INVOICE' / 'QUOTATION'). The
+			// campaign picker defaults this to BOOKING CONFIRMATION so a roster is
+			// drawn from confirmed bookings only; PI / QU are opt-in. The Guest List
+			// page never sends bc_type, so this stays a no-op there.
+			$this->Append_In_Clause($where, $b_params, 'b.BookingConfirmationTitle',   $this->input->get('bc_type'));
 			// "Campaign" filter keys off the campaign_guests roster snapshot.
 			// Multi-select over ANY of the picked campaigns; mode = include keeps
 			// guests who joined them, exclude drops them. Keyed on dedup_key so it
@@ -278,35 +273,9 @@ class Guests_Model extends CI_Model
 				$having_params[] = (int)$pax_max;
 			}
 
-			// --- Campaign customer-value segments (per-person aggregates) ---
-			// "Purchased N× and above": distinct bookings under this person.
-			$min_purchases = guest_list_purchase_count_min($this->input->get('min_purchases'));
-			if($min_purchases !== null) {
-				$having[]        = "COUNT(DISTINCT BookingID) >= ?";
-				$having_params[] = $min_purchases;
-			}
-
-			// Lifetime Booking Value bucket: the total NetTotal across the
-			// person's bookings (min inclusive, max exclusive).
-			$sales_expr = "COALESCE(SUM(CASE WHEN booking_rn = 1 THEN BookingNetTotal END), 0)";
-			$ltv = guest_list_parse_bucket_bounds($this->input->get('ltv'));
-			if($ltv !== null) {
-				$having[]        = "{$sales_expr} >= ?";
-				$having_params[] = $ltv[0];
-				if($ltv[1] !== null) {
-					$having[]        = "{$sales_expr} < ?";
-					$having_params[] = $ltv[1];
-				}
-			}
-
-			// "Purchased on a yearly basis (2 consecutive years+)": OR each
-			// booking year into a bitmask (base 2000), then two set bits one
-			// position apart mean two adjacent calendar years exist.
-			if(guest_list_flag_on($get, 'consecutive_years')) {
-				$year_mask = "BIT_OR(CASE WHEN booking_rn = 1 AND YEAR(BookingDate) >= 2000
-					THEN (1 << (YEAR(BookingDate) - 2000)) ELSE 0 END)";
-				$having[] = "({$year_mask} & ({$year_mask} << 1)) <> 0";
-			}
+			// (The "Customer type" value segments — purchase count, lifetime value,
+			// consecutive years — are per-CUSTOMER aggregates now, applied in
+			// Build_Customer_Branch; they suppress this branch, so no HAVING here.)
 
 			$booking = array(
 				'dedup'         => $dedup,
@@ -349,6 +318,10 @@ class Guests_Model extends CI_Model
 			if($email !== '') {
 				$ghl_where .= " AND gc.email LIKE ? ";
 				$g_params[] = '%' . $email . '%';
+			}
+			// "Has email address" campaign filter — keep only leads with an email.
+			if(guest_list_flag_on($get, 'has_email')) {
+				$ghl_where .= " AND NULLIF(TRIM(gc.email), '') IS NOT NULL ";
 			}
 
 			// These GHL lead attributes may be stored either on ghl_contacts
@@ -538,21 +511,8 @@ WHERE 1 = 1
 			$params[] = $travel_range[0];
 		}
 
-		// Family-with-kids / booking-lead timeline: row-level booking segments,
-		// same as the main booking branch (a leader counts when ANY of their
-		// unfilled bookings matches).
-		if(guest_list_flag_on($get, 'family_kids')) {
-			$where .= " AND (COALESCE(b.Children, 0) > 0 OR COALESCE(b.Infant, 0) > 0) ";
-		}
-		$lead = guest_list_parse_bucket_bounds($this->input->get('booking_lead'));
-		if($lead !== null) {
-			$where   .= " AND TIMESTAMPDIFF(MONTH, b.InsertDate, b.StartDate) >= ? ";
-			$params[] = $lead[0];
-			if($lead[1] !== null) {
-				$where   .= " AND TIMESTAMPDIFF(MONTH, b.InsertDate, b.StartDate) < ? ";
-				$params[] = $lead[1];
-			}
-		}
+		// (The "Customer type" value segments are per-customer now and suppress
+		// this fallback branch, so none of them are built here.)
 
 		$booking_number = trim((string)$this->input->get('booking_number'));
 		if($booking_number !== '') {
@@ -593,6 +553,9 @@ WHERE 1 = 1
 		$this->Append_In_Clause($where, $params, 'b.Source',      $this->input->get('source'));
 		$this->Append_In_Clause($where, $params, 'c.customer_type', $this->input->get('customer_type'));
 		$this->Append_In_Clause($where, $params, "COALESCE(c.ChatLanguage, b.ChatLanguage)", $this->input->get('language'));
+		// Booking Type (BC / PI / QU) — filter the leader's own booking too so the
+		// synthesized leader row honours the campaign picker's default of BC-only.
+		$this->Append_In_Clause($where, $params, 'b.BookingConfirmationTitle', $this->input->get('bc_type'));
 
 		// "Campaign" filter over leaders in a campaign roster; multi-select over
 		// any of the picked campaigns, include/exclude via campaign_mode. The
@@ -612,35 +575,10 @@ WHERE 1 = 1
 			$params[] = '%' . $q_raw . '%';
 		}
 
-		// Per-leader value segments filter the GROUP BY {$key} result via HAVING,
-		// mirroring the booking branch. Each unfilled booking is one row here, so
-		// COUNT(DISTINCT b.BookingID) / SUM(b.NetTotal) / YEAR(b.InsertDate) need
-		// no booking_rn de-dup.
+		// (The per-customer value segments are applied in Build_Customer_Branch and
+		// suppress this fallback branch, so it needs no HAVING of its own now.)
 		$having        = array();
 		$having_params = array();
-
-		$min_purchases = guest_list_purchase_count_min($this->input->get('min_purchases'));
-		if($min_purchases !== null) {
-			$having[]        = "COUNT(DISTINCT b.BookingID) >= ?";
-			$having_params[] = $min_purchases;
-		}
-
-		$sales_expr = "COALESCE(SUM(COALESCE(b.NetTotal, 0)), 0)";
-		$ltv = guest_list_parse_bucket_bounds($this->input->get('ltv'));
-		if($ltv !== null) {
-			$having[]        = "{$sales_expr} >= ?";
-			$having_params[] = $ltv[0];
-			if($ltv[1] !== null) {
-				$having[]        = "{$sales_expr} < ?";
-				$having_params[] = $ltv[1];
-			}
-		}
-
-		if(guest_list_flag_on($get, 'consecutive_years')) {
-			$year_mask = "BIT_OR(CASE WHEN YEAR(b.InsertDate) >= 2000
-				THEN (1 << (YEAR(b.InsertDate) - 2000)) ELSE 0 END)";
-			$having[] = "({$year_mask} & ({$year_mask} << 1)) <> 0";
-		}
 
 		$from = "
 	FROM booking b
@@ -997,6 +935,11 @@ GROUP BY mm.merge_key";
 			$params[] = '%' . $email . '%';
 		}
 
+		// "Has email address" campaign filter — keep only customers with an email.
+		if (guest_list_flag_on($get, 'has_email')) {
+			$where .= " AND NULLIF(TRIM(c.PrimaryEmail), '') IS NOT NULL ";
+		}
+
 		$customer_code = trim((string) $this->input->get('customer_code'));
 		if ($customer_code !== '') {
 			$where   .= " AND c.CustomerCode LIKE ? ";
@@ -1144,6 +1087,18 @@ GROUP BY mm.merge_key";
 				AND gr.FollowDate >= ? AND gr.FollowDate <= ?) ";
 			$params[] = $follow_range[0];
 			$params[] = $follow_range[1];
+		}
+
+		// ---- "Customer type" value segments (purchase count / lifetime value /
+		// booking-lead / family-with-kids / consecutive years / cancelled-BC) ----
+		// Measured over each customer's own bookings. These target the customer
+		// master, so the campaign picker applies them ONLY on this path (the
+		// booking+GHL UNION path suppresses them — see
+		// guest_list_customer_only_segment_keys).
+		$seg = guest_list_customer_segment_sql($get);
+		if ($seg['sql'] !== '') {
+			$where  .= $seg['sql'];
+			$params  = array_merge($params, $seg['params']);
 		}
 
 		return array('where' => $where, 'params' => $params, 'needs_pax_join' => $needs_pax_join);
