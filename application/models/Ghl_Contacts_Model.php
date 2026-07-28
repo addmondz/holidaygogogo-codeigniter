@@ -149,7 +149,7 @@ class Ghl_Contacts_Model extends CI_Model
 
         $allowed = array(
             'contact_id', 'first_name', 'last_name', 'email', 'phone',
-            'assigned_to', 'lead_source', 'gender', 'race', 'nationality',
+            'assigned_to', 'lead_source', 'created_by', 'gender', 'race', 'nationality',
             'chat_language', 'date_of_birth', 'tags_json', 'date_added',
         );
 

@@ -2,8 +2,8 @@
 class Guests_Model extends CI_Model
 {
 	// Which source(s) this request reads: 'guest' (Guest List, booking guests),
-	// 'ghl' (GHL Leads) or 'all' (campaign picker, both). Set once per request by
-	// the controller.
+	// 'ghl' (GHL Leads, synced only), 'manual' (Manual Leads, hand-entered only)
+	// or 'all' (campaign picker, both). Set once per request by the controller.
 	private $mode = 'guest';
 
 	/**
@@ -13,7 +13,7 @@ class Guests_Model extends CI_Model
 	 */
 	function Set_Mode($mode)
 	{
-		$this->mode = in_array($mode, array('ghl', 'all'), true) ? $mode : 'guest';
+		$this->mode = in_array($mode, array('ghl', 'manual', 'all'), true) ? $mode : 'guest';
 		return $this;
 	}
 
@@ -355,6 +355,21 @@ class Guests_Model extends CI_Model
 				$ghl_where .= " AND {$neg}EXISTS (SELECT 1 FROM campaign_guests cg
 					WHERE cg.CampaignID IN ({$ph}) AND cg.DedupKey = {$gc_dedup}) ";
 				foreach($joined_campaigns as $cid) { $g_params[] = (int)$cid; }
+			}
+
+			// Split the shared GHL branch between its two pages, and enforce the
+			// Manual Leads page's per-creator privacy: mode 'ghl' hides manual rows,
+			// mode 'manual' keeps only manual rows and (for non view-all roles)
+			// restricts to the viewer's own created leads. See the pure helper for
+			// the exact predicate + bound params.
+			list($ls_sql, $ls_params) = guest_list_ghl_lead_source_scope(
+				$this->mode,
+				$this->session->userdata('level'),
+				$this->session->userdata('admin_id')
+			);
+			if($ls_sql !== '') {
+				$ghl_where .= $ls_sql;
+				foreach($ls_params as $p) { $g_params[] = $p; }
 			}
 
 			// GHL Leads is its own page now, so the query reads ghl_contacts only —

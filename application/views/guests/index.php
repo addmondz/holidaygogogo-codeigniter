@@ -78,9 +78,14 @@ div.kt-datatable__pager-container {
 </style>
 
 <?php
-	// Shared by the Guest List (Guests) and GHL Leads (Ghl_Leads) pages — each
-	// passes the controller base and heading, defaulting to the Guest List page.
+	// Shared by the Guest List (Guests), GHL Leads (Ghl_Leads), Manual Leads
+	// (Manual_Leads) and Customer pages — each passes the controller base and
+	// heading, defaulting to the Guest List page.
 	$list_base  = isset($list_base)  ? $list_base  : 'Guests';
+	// GHL Leads and Manual Leads are both lead-only pages that share this layout
+	// (same columns/filters); only the Type column + Create modal differ. Guest
+	// List and Customer keep their own booking-guest columns.
+	$is_lead_list = ($list_base === 'Ghl_Leads' || $list_base === 'Manual_Leads');
 	$page_title = isset($page_title) ? $page_title : 'Guest List Records';
 	// wa-digits => true for contacts that have a stored WhatsApp conversation.
 	$msg_log_phones = isset($msg_log_phones) && is_array($msg_log_phones) ? $msg_log_phones : array();
@@ -113,7 +118,7 @@ div.kt-datatable__pager-container {
 						</a>
 					</div>
 				<?php } ?>
-				<?php if($list_base === 'Ghl_Leads') { ?>
+				<?php if($list_base === 'Manual_Leads') { ?>
 					<div class="card-toolbar">
 						<button type="button" class="btn btn-primary font-weight-bold mb-2" style="width:180px;" data-toggle="modal" data-target="#ghl_lead_create_modal" title="Add a lead by hand (stored as a Manual lead)">
 							<i class="la la-user-plus"></i>Create Lead
@@ -122,12 +127,12 @@ div.kt-datatable__pager-container {
 				<?php } ?>
 			</div>
 			<div class="card-body">
-				<?php if($list_base === 'Ghl_Leads' && $this->session->flashdata('ghl_lead_success')) { ?>
+				<?php if($list_base === 'Manual_Leads' && $this->session->flashdata('ghl_lead_success')) { ?>
 					<div class="alert alert-light-success font-weight-bold" role="alert" style="border-left:4px solid #1bc5bd;">
 						<?php echo htmlspecialchars($this->session->flashdata('ghl_lead_success')); ?>
 					</div>
 				<?php } ?>
-				<?php if($list_base === 'Ghl_Leads' && $this->session->flashdata('ghl_lead_error')) { ?>
+				<?php if($list_base === 'Manual_Leads' && $this->session->flashdata('ghl_lead_error')) { ?>
 					<div class="alert alert-light-danger font-weight-bold" role="alert" style="border-left:4px solid #f64e60;">
 						<?php echo htmlspecialchars($this->session->flashdata('ghl_lead_error')); ?>
 					</div>
@@ -150,7 +155,7 @@ div.kt-datatable__pager-container {
 						<div id="guests_info" class="collapse">
 							<div class="card-body">
 								<form action="<?php echo base_url($list_base) ?>" method="get" class="form">
-										<?php if($list_base !== 'Ghl_Leads') { ?>
+										<?php if(!$is_lead_list) { ?>
 									<div class="row">
 										<div class="col-md-3">
 											<div class="form-group">
@@ -229,7 +234,7 @@ div.kt-datatable__pager-container {
 												</select>
 											</div>
 										</div>
-										<?php if($list_base !== 'Ghl_Leads') { ?>
+										<?php if(!$is_lead_list) { ?>
 										<div class="col-md-3">
 											<div class="form-group">
 												<label>Guest Type</label>
@@ -297,8 +302,8 @@ div.kt-datatable__pager-container {
 										</div>
 										<div class="col-md-3">
 											<div class="form-group">
-												<label><?php echo ($list_base === 'Ghl_Leads') ? 'Lead Capture Date' : 'Booking Date'; ?>
-													<a onclick="Reset_Booking_Date()" class="btn btn-icon btn-light-warning btn-xs" data-toggle="tooltip" title="<?php echo ($list_base === 'Ghl_Leads') ? 'Clear lead capture date' : 'Clear booking date'; ?>">
+												<label><?php echo $is_lead_list ? 'Lead Capture Date' : 'Booking Date'; ?>
+													<a onclick="Reset_Booking_Date()" class="btn btn-icon btn-light-warning btn-xs" data-toggle="tooltip" title="<?php echo $is_lead_list ? 'Clear lead capture date' : 'Clear booking date'; ?>">
 														<i class="la la-undo"></i>
 													</a>
 												</label>
@@ -360,7 +365,7 @@ div.kt-datatable__pager-container {
 												</select>
 											</div>
 										</div>
-										<?php if($list_base !== 'Ghl_Leads') { ?>
+										<?php if(!$is_lead_list) { ?>
 										<div class="col-md-3">
 											<div class="form-group">
 												<label>Campaign Date
@@ -521,29 +526,31 @@ div.kt-datatable__pager-container {
 				</div>
 
 				<br><br>
-				<div class="dataTables_wrapper dt-bootstrap4 no-footer" <?php if(empty($guests)) { echo 'style="overflow-x:auto;"'; } ?>>
+				<div class="dataTables_wrapper dt-bootstrap4 no-footer" style="overflow-x:auto;">
 					<table id="kt_datatable" class="table table-bordered table-head-custom table-checkable dataTable no-footer dtr-inline"<?php if($list_base === 'Customer') { echo ' data-no-datatable="1"'; } ?>>
 						<thead>
 							<tr>
 								<th style="text-align:center;">No.</th>
-								<?php if($list_base !== 'Ghl_Leads') { ?>
+								<?php if(!$is_lead_list) { ?>
 									<th style="text-align:center;">Alt Name</th>
 								<?php } ?>
 								<th style="text-align:center;"><?php echo ($list_base === 'Customer') ? 'Customer Name' : 'Guest First Name'; ?></th>
 								<th style="text-align:center;">Contact Num</th>
-								<?php if($list_base !== 'Ghl_Leads') { ?>
+								<?php if(!$is_lead_list) { ?>
 									<th style="text-align:center;">Email</th>
 								<?php } ?>
-								<?php if($list_base === 'Ghl_Leads') { ?>
+								<?php if($is_lead_list) { ?>
 									<th style="text-align:center;">Tags</th>
-									<th style="text-align:center;">Type</th>
+									<?php if($list_base === 'Ghl_Leads') { ?>
+										<th style="text-align:center;">Type</th>
+									<?php } ?>
 									<th style="text-align:center;">Gender</th>
 									<th style="text-align:center;">Language</th>
 									<th style="text-align:center;">Race</th>
 									<th style="text-align:center;">Nationality</th>
 									<th style="text-align:center;">Date of Birth</th>
 								<?php } ?>
-								<?php if($list_base !== 'Ghl_Leads') { ?>
+								<?php if(!$is_lead_list) { ?>
 									<th style="text-align:center;">Language</th>
 									<th style="text-align:center;">Guest Type</th>
 									<th style="text-align:center;">Destination</th>
@@ -580,13 +587,13 @@ div.kt-datatable__pager-container {
 						</thead>
 						<tbody>
 							<?php if(empty($guests)) { ?>
-								<tr><td colspan="<?php echo ($list_base === 'Customer') ? 12 : 11; ?>" style="text-align:center; padding-top:10px; padding-bottom:10px;">Guest Records Not Found</td></tr>
+								<tr><td colspan="<?php echo ($list_base === 'Customer') ? 12 : ($list_base === 'Manual_Leads' ? 10 : 11); ?>" style="text-align:center; padding-top:10px; padding-bottom:10px;">Guest Records Not Found</td></tr>
 							<?php } else { ?>
 								<?php $count = 1; foreach($guests as $g) { ?>
 									<?php $is_ghl_row = isset($g->Type) && ($g->Type === 'GHL' || $g->Type === 'Manual'); ?>
 									<tr>
 										<td style="text-align:center; padding-top:15px; padding-bottom:15px;"><?php echo $count; ?></td>
-										<?php if($list_base !== 'Ghl_Leads') {
+										<?php if(!$is_lead_list) {
 											$altname_val = isset($g->AltName) ? (string) $g->AltName : '';
 											$alt_customer_id = isset($g->CustomerID) ? (int) $g->CustomerID : 0;
 											// Editable only when the row maps to a real customer (GHL/leader-
@@ -657,7 +664,7 @@ div.kt-datatable__pager-container {
 												<?php } ?>
 											</span>
 										</td>
-										<?php if($list_base !== 'Ghl_Leads') { ?>
+										<?php if(!$is_lead_list) { ?>
 										<?php $email_val = (string) $g->Email; ?>
 										<td class="gl-cell<?php if(!$is_ghl_row) echo ' gl-editable'; ?>" style="text-align:center;"<?php if(!$is_ghl_row) { ?> data-field="email" data-dedup-key="<?php echo htmlspecialchars($g->dedup_key, ENT_QUOTES); ?>" data-value="<?php echo htmlspecialchars($email_val, ENT_QUOTES); ?>"<?php } ?>>
 											<span class="gl-display">
@@ -668,7 +675,7 @@ div.kt-datatable__pager-container {
 											</span>
 										</td>
 										<?php } ?>
-										<?php if($list_base === 'Ghl_Leads') { ?>
+										<?php if($is_lead_list) { ?>
 											<td style="text-align:center; max-width:220px;">
 												<?php
 													$lead_tags = $is_ghl_row ? ghl_lead_tags_parse(isset($g->Tags) ? $g->Tags : null) : array();
@@ -682,13 +689,15 @@ div.kt-datatable__pager-container {
 													}
 												?>
 											</td>
-											<?php
-												$lead_type = (isset($g->Type) && $g->Type === 'Manual') ? 'Manual' : 'GHL';
-												$type_cls  = $lead_type === 'Manual' ? 'label-light-warning' : 'label-light-info';
-											?>
-											<td style="text-align:center;">
-												<span class="label label-inline font-weight-bold <?php echo $type_cls; ?>"><?php echo $lead_type; ?></span>
-											</td>
+											<?php if($list_base === 'Ghl_Leads') { ?>
+												<?php
+													$lead_type = (isset($g->Type) && $g->Type === 'Manual') ? 'Manual' : 'GHL';
+													$type_cls  = $lead_type === 'Manual' ? 'label-light-warning' : 'label-light-info';
+												?>
+												<td style="text-align:center;">
+													<span class="label label-inline font-weight-bold <?php echo $type_cls; ?>"><?php echo $lead_type; ?></span>
+												</td>
+											<?php } ?>
 											<?php
 												// Gender / Language / Race / Nationality / DOB are stored only for
 												// manual leads; synced GHL contacts leave them blank (shown "—").
@@ -707,7 +716,7 @@ div.kt-datatable__pager-container {
 											<td style="text-align:center;"><?php echo $nat_val    !== '' ? htmlspecialchars($nat_val)    : $gl_dash; ?></td>
 											<td style="text-align:center;"><?php echo $dob_show   !== '' ? htmlspecialchars($dob_show)   : $gl_dash; ?></td>
 										<?php } ?>
-										<?php if($list_base !== 'Ghl_Leads') { ?>
+										<?php if(!$is_lead_list) { ?>
 										<?php $lang_val = (string) $g->Language; ?>
 										<td class="gl-cell<?php if(!$is_ghl_row) echo ' gl-editable'; ?>" style="text-align:center;"<?php if(!$is_ghl_row) { ?> data-field="language" data-dedup-key="<?php echo htmlspecialchars($g->dedup_key, ENT_QUOTES); ?>" data-value="<?php echo htmlspecialchars($lang_val, ENT_QUOTES); ?>"<?php } ?>>
 											<span class="gl-display">
@@ -732,7 +741,7 @@ div.kt-datatable__pager-container {
 											<?php endif; ?>
 										</td>
 										<?php } ?>
-										<?php if($list_base !== 'Ghl_Leads') { ?>
+										<?php if(!$is_lead_list) { ?>
 											<td style="text-align:center;">
 												<?php
 													$dests = array();
@@ -1649,10 +1658,11 @@ div.kt-datatable__pager-container {
 </script>
 <?php } ?>
 
-<?php if($list_base === 'Ghl_Leads') { ?>
-<!-- Create Lead modal: add one lead by hand. It is stored in the same table as
-     the API-synced leads but flagged "Manual" (Type column) with a synthetic id
-     the GHL sync never touches. Fields mirror the GHL Leads columns. -->
+<?php if($list_base === 'Manual_Leads') { ?>
+<!-- Create Lead modal (Manual Leads page): add one lead by hand. It is stored in
+     the same ghl_contacts table as the API-synced leads but flagged "Manual" with
+     a synthetic id the GHL sync never touches, and stamped with created_by so it
+     stays private to its creator. Fields mirror the lead columns. -->
 <style>
 	/* This theme's .modal-lg/.modal-xl widths sit behind @media(min-width:1200px),
 	   so below 1200px they collapse to the default 500px. Widen this one modal
@@ -1667,7 +1677,7 @@ div.kt-datatable__pager-container {
 </style>
 <div class="modal fade" id="ghl_lead_create_modal" tabindex="-1" role="dialog" aria-labelledby="ghl_lead_create_label" aria-hidden="true">
 	<div class="modal-dialog" role="document">
-		<form action="<?php echo base_url('Ghl_Leads/Create'); ?>" method="post" id="ghl_lead_create_form">
+		<form action="<?php echo base_url('Manual_Leads/Create'); ?>" method="post" id="ghl_lead_create_form">
 			<div class="modal-content">
 				<div class="modal-header" style="background-color:#D7E2F2;">
 					<h5 class="modal-title" id="ghl_lead_create_label" style="color:#6082B6;"><strong>Create Manual Lead</strong></h5>

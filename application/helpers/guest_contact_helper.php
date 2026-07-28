@@ -786,26 +786,73 @@ if (!function_exists('guest_list_branches_to_run')) {
     /**
      * Decide which branch(es) a caller reads. The two standalone pages each lock
      * to ONE source; the campaign guest picker can read both at once:
-     *   - mode 'guest' → the Guest List page (booking guests only)
-     *   - mode 'ghl'   → the GHL Leads page (GHL leads only)
-     *   - mode 'all'   → campaign picker (booking guests + leader fallback + leads)
+     *   - mode 'guest'  → the Guest List page (booking guests only)
+     *   - mode 'ghl'    → the GHL Leads page (GHL-synced leads only)
+     *   - mode 'manual' → the Manual Leads page (hand-entered leads only) — same
+     *                     GHL branch as 'ghl', narrowed to lead_source='manual'
+     *                     by guest_list_ghl_lead_source_scope().
+     *   - mode 'all'    → campaign picker (booking guests + leader fallback + leads)
      *
      * The active filters can still drop a branch to empty when they can never
      * match it (e.g. a booking-only Destination filter on the GHL branch, or
      * Guest Role = Lead on the booking branch) — reusing the same suppression
      * predicates the merged listing used, so every caller stays consistent.
      *
-     * @param string $mode 'guest', 'ghl' or 'all' (anything else → 'guest').
+     * @param string $mode 'guest', 'ghl', 'manual' or 'all' (anything else → 'guest').
      * @param array  $get  The request GET params.
      * @return array{bookings:bool,ghl:bool}
      */
     function guest_list_branches_to_run($mode, $get)
     {
-        $mode = in_array($mode, array('ghl', 'all'), true) ? $mode : 'guest';
+        $mode = in_array($mode, array('ghl', 'manual', 'all'), true) ? $mode : 'guest';
+        // 'ghl' and 'manual' are both lead-only pages built on the GHL branch;
+        // only the Guest List page ('guest'/fallback) reads the booking branch.
+        $ghl_only = in_array($mode, array('ghl', 'manual'), true);
         return array(
-            'bookings' => ($mode !== 'ghl')   && !guest_list_bookings_suppressed_by_filters($get),
+            'bookings' => (!$ghl_only)        && !guest_list_bookings_suppressed_by_filters($get),
             'ghl'      => ($mode !== 'guest') && !guest_list_ghl_suppressed_by_filters($get),
         );
+    }
+}
+
+if (!function_exists('guest_list_ghl_lead_source_scope')) {
+    /**
+     * The extra WHERE fragment that splits the shared GHL branch into its two
+     * lead pages, plus per-creator privacy on the Manual Leads page:
+     *   - mode 'ghl'    → synced leads only; hide hand-entered rows
+     *                     ("moved out" to the Manual Leads page).
+     *   - mode 'manual' → hand-entered rows only; and unless the viewer is a
+     *                     view-all role (Owner 10 / Team Lead 25 / Marketing 60),
+     *                     restrict to the leads THEY created (gc.created_by = ?).
+     *   - anything else ('all' campaign picker) → no filter (keeps both sources).
+     *
+     * Pure (no DB/session): the caller passes the viewer's level + admin id, so
+     * this unit-tests in isolation and runs identically on MySQL and SQLite.
+     *
+     * @param string   $mode     'ghl', 'manual' or other.
+     * @param int|null $level    the viewer's role level.
+     * @param int|null $admin_id the viewer's admin id.
+     * @return array{0:string,1:array} [sql_fragment, bound_params]
+     */
+    function guest_list_ghl_lead_source_scope($mode, $level, $admin_id)
+    {
+        if ($mode === 'ghl') {
+            // Manual leads live on their own page now — exclude them here.
+            return array(" AND (gc.lead_source IS NULL OR gc.lead_source <> 'manual') ", array());
+        }
+
+        if ($mode === 'manual') {
+            $sql = " AND gc.lead_source = 'manual' ";
+            // Owner / Team Lead / Marketing see every manual lead; everyone else
+            // sees only the ones they created.
+            if (!in_array((int) $level, array(10, 25, 60), true)) {
+                $sql .= " AND gc.created_by = ? ";
+                return array($sql, array((int) $admin_id));
+            }
+            return array($sql, array());
+        }
+
+        return array('', array());
     }
 }
 

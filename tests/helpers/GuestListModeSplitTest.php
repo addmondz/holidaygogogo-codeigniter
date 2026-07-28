@@ -34,6 +34,14 @@ $h = guest_list_branches_to_run('ghl', array());
 assert_eq('ghl page skips bookings',  false, $h['bookings']);
 assert_eq('ghl page runs ghl',        true,  $h['ghl']);
 
+// ---- Manual Leads page (mode 'manual') reads ONLY the GHL branch too -------
+$m = guest_list_branches_to_run('manual', array());
+assert_eq('manual page skips bookings', false, $m['bookings']);
+assert_eq('manual page runs ghl',       true,  $m['ghl']);
+// booking-only filter still empties the Manual Leads page (a lead can't match)
+$md = guest_list_branches_to_run('manual', array('destination' => '7'));
+assert_eq('destination empties manual page', false, $md['ghl']);
+
 // ---- unknown mode falls back to the booking (Guest List) page --------------
 $f = guest_list_branches_to_run('', array());
 assert_eq('empty mode runs bookings', true,  $f['bookings']);

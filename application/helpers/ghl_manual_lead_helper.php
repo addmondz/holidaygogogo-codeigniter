@@ -24,9 +24,11 @@ defined('BASEPATH') OR exit('No direct script access allowed');
  *                     gender,chat_language,race,nationality,date_of_birth)
  * @param string $uid  a unique suffix for the synthetic contact_id (caller supplies)
  * @param string $now  'Y-m-d H:i:s' capture time (caller supplies)
+ * @param int|null $created_by admin id of the creator (caller supplies from the
+ *                     session — NEVER from $post; drives per-creator visibility)
  * @return array{ok:bool,errors:string[],row:array}
  */
-function ghl_manual_lead_prepare($post, $uid, $now)
+function ghl_manual_lead_prepare($post, $uid, $now, $created_by = null)
 {
     $post = is_array($post) ? $post : array();
 
@@ -84,6 +86,8 @@ function ghl_manual_lead_prepare($post, $uid, $now)
         'date_of_birth' => $dob,
         'tags_json'     => $tags_json,
         'date_added'    => $now,
+        // Server-supplied creator (session admin id), not a $post field.
+        'created_by'    => $created_by !== null ? (int) $created_by : null,
     );
 
     return array('ok' => true, 'errors' => array(), 'row' => $row);

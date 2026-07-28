@@ -40,9 +40,13 @@ $res = ghl_manual_lead_prepare(array(
     'nationality'   => 'Malaysia',
     'date_of_birth' => '1990-05-20',
     'tags'          => 'Redang, VIP, redang',
-), 'abc123', $now);
+    // created_by is server-supplied; a POST value must NOT leak into the row.
+    'created_by'    => '999',
+), 'abc123', $now, 42);
 
 assert_eq('happy ok', true, $res['ok']);
+// creator comes from the $created_by arg, never from POST
+assert_eq('created_by from arg', 42, $res['row']['created_by']);
 assert_eq('happy no errors', array(), $res['errors']);
 assert_eq('synthetic contact_id', 'manual:abc123', $res['row']['contact_id']);
 assert_eq('lead_source', 'manual', $res['row']['lead_source']);
@@ -65,6 +69,8 @@ assert_eq('minimal email null', null, $min['row']['email']);
 assert_eq('minimal tags null', null, $min['row']['tags_json']);
 assert_eq('minimal dob null', null, $min['row']['date_of_birth']);
 assert_eq('minimal gender null', null, $min['row']['gender']);
+// created_by defaults to null when the caller omits it
+assert_eq('minimal created_by null', null, $min['row']['created_by']);
 
 // ---- blank lead rejected ---------------------------------------------------
 $blank = ghl_manual_lead_prepare(array('tags' => 'x'), 'u3', $now);

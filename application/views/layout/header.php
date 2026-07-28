@@ -450,7 +450,7 @@ $is_dev_env = ($app_env !== 'prod');
 								$op_footer_only = ((int)$this->session->level === 40);
 							?>
 							<?php if(!in_array((int)$this->session->level, [20, 60]) || $can_product || $can_customer || $can_guests) { ?>
-								<li class="menu-item menu-item-submenu <?php if($this->router->class == 'Category_Code' || $this->router->class == 'Category' || $this->router->class == 'Supplier' || $this->router->class == 'Product' || $this->router->class == 'Costing' || $this->router->class == 'Footer' || $this->router->class == 'Country_Code' || $this->router->class == 'Tag' || $this->router->class == 'Source' || $this->router->class == 'Package_Checklist' || $this->router->class == 'Product_Package_Checklist' || $this->router->class == 'Cancellation_Reason' || $this->router->class == 'Slow_Conversion_Reason' || $this->router->class == 'Customer_Type' || $this->router->class == 'Guests' || $this->router->class == 'Ghl_Leads' || $this->router->class == 'Campaign' || $this->router->class == 'Quick_Filter' || $this->router->class == 'Agent_Score_Setting' || $this->router->class == 'Card_Visibility_Setting' || $this->router->class == 'Team') { echo 'menu-item-active menu-item-open'; } ?>">
+								<li class="menu-item menu-item-submenu <?php if($this->router->class == 'Category_Code' || $this->router->class == 'Category' || $this->router->class == 'Supplier' || $this->router->class == 'Product' || $this->router->class == 'Costing' || $this->router->class == 'Footer' || $this->router->class == 'Country_Code' || $this->router->class == 'Tag' || $this->router->class == 'Source' || $this->router->class == 'Package_Checklist' || $this->router->class == 'Product_Package_Checklist' || $this->router->class == 'Cancellation_Reason' || $this->router->class == 'Slow_Conversion_Reason' || $this->router->class == 'Customer_Type' || $this->router->class == 'Guests' || $this->router->class == 'Ghl_Leads' || $this->router->class == 'Manual_Leads' || $this->router->class == 'Campaign' || $this->router->class == 'Quick_Filter' || $this->router->class == 'Agent_Score_Setting' || $this->router->class == 'Card_Visibility_Setting' || $this->router->class == 'Team') { echo 'menu-item-active menu-item-open'; } ?>">
 									<a href="javascript:;" class="menu-link menu-toggle">
 										<span class="svg-icon menu-icon">
 											<svg>
@@ -548,6 +548,14 @@ $is_dev_env = ($app_env !== 'prod');
 														<span></span>
 													</i>
 													<span class="menu-text">GHL Leads</span>
+												</a>
+											</li>
+											<li class="menu-item <?php if($this->router->class == 'Manual_Leads') { echo 'menu-item-active'; } ?>">
+												<a href="<?php echo base_url('Manual_Leads'); ?>" class="menu-link">
+													<i class="menu-bullet menu-bullet-dot">
+														<span></span>
+													</i>
+													<span class="menu-text">Manual Leads</span>
 												</a>
 											</li>
 											<?php if($this->session->level == 10) { ?>
