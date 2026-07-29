@@ -653,7 +653,8 @@ WHERE 1 = 1
 		CONVERT(MAX(c.CustomerCode) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS CustomerCode,
 		CONVERT(MAX(c.AltName) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS AltName,
 		MAX(c.CustomerID) AS CustomerID,
-		MAX(c.created_at) AS CustomerCreatedAt
+		MAX(c.created_at) AS CustomerCreatedAt,
+		MAX(b.InsertDate) AS RecencyAt
 	{$from}
 	GROUP BY {$key}
 	{$having}
@@ -701,7 +702,8 @@ SELECT
 	CONVERT(MAX(CASE WHEN rn = 1 THEN CustomerCode END) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS CustomerCode,
 	CONVERT(MAX(CASE WHEN rn = 1 THEN AltName END) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS AltName,
 	MAX(CASE WHEN rn = 1 THEN CustomerID END) AS CustomerID,
-	MAX(CASE WHEN rn = 1 THEN CustomerCreatedAt END) AS CustomerCreatedAt
+	MAX(CASE WHEN rn = 1 THEN CustomerCreatedAt END) AS CustomerCreatedAt,
+	MAX(BookingDate) AS RecencyAt
 FROM (
 	{$this->Booking_Windowed_Select($dedup, $booking['from'])}
 ) t
@@ -748,7 +750,8 @@ SELECT
 	CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS CustomerCode,
 	CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS AltName,
 	CAST(NULL AS UNSIGNED) AS CustomerID,
-	CAST(NULL AS DATETIME) AS CustomerCreatedAt
+	CAST(NULL AS DATETIME) AS CustomerCreatedAt,
+	COALESCE(gc.date_added, gc.created_at) AS RecencyAt
 {$ghl['from']}
 			";
 			$params = array_merge($params, $ghl['params']);
@@ -831,7 +834,8 @@ SELECT
 	MAX(CASE WHEN mm.rep_rn = 1 THEN mm.CustomerCode      END) AS CustomerCode,
 	MAX(CASE WHEN mm.rep_rn = 1 THEN mm.AltName           END) AS AltName,
 	MAX(CASE WHEN mm.rep_rn = 1 THEN mm.CustomerID        END) AS CustomerID,
-	MAX(CASE WHEN mm.rep_rn = 1 THEN mm.CustomerCreatedAt END) AS CustomerCreatedAt
+	MAX(CASE WHEN mm.rep_rn = 1 THEN mm.CustomerCreatedAt END) AS CustomerCreatedAt,
+	MAX(mm.RecencyAt) AS RecencyAt
 FROM (
 	SELECT m.*,
 		{$mk} AS merge_key,
@@ -848,17 +852,17 @@ GROUP BY mm.merge_key";
 			return array();
 		}
 
-		// Named rows first, then alphabetical. Contacts with no name anywhere
-		// (NULL/blank Name — e.g. a bare GHL phone lead) would otherwise sort to
-		// the very top and fill page 1 with blank "—" rows, hiding the thousands
-		// of real names below them.
+		// Latest first: newest booking/lead (RecencyAt = MAX booking InsertDate or
+		// lead date_added across the merged person) at the top. Undated rows sort
+		// last (NULL is lowest in DESC); a blank-name tiebreak keeps nameless rows
+		// below same-dated named ones, and Name is the final alphabetical tiebreak.
 		//
 		// Wrap the grouped merge in an outer SELECT so ORDER BY resolves to the
-		// aggregated output columns (Type/Name) — referencing them directly on the
-		// grouped query makes MySQL bind to the non-aggregated mm.Type/mm.Name and
-		// trip only_full_group_by.
+		// aggregated output columns (RecencyAt/Name) — referencing them directly on
+		// the grouped query makes MySQL bind to the non-aggregated columns and trip
+		// only_full_group_by.
 		$sql = "SELECT * FROM (" . $this->Merged_Wrapped_Sql($inner) . ") final"
-			. " ORDER BY CASE WHEN Type = 'Booking Guest' THEN 0 ELSE 1 END, (Name IS NULL OR Name = '') ASC, Name ASC LIMIT " . (int)$limit . " OFFSET " . (int)$offset;
+			. " ORDER BY RecencyAt IS NULL ASC, RecencyAt DESC, (Name IS NULL OR Name = '') ASC, Name ASC LIMIT " . (int)$limit . " OFFSET " . (int)$offset;
 		return $this->db->query($sql, $params)->result();
 	}
 
