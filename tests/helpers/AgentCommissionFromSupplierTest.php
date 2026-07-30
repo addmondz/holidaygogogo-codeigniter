@@ -77,5 +77,25 @@ check('deal-with is the supplier name', $param['master']['dealWith'] === 'ABC To
 check('detail account is the supplier creditor code', $param['details'][0]['accNo'] === '400-A123');
 check('detail amount is the debit', (float)$param['details'][0]['amount'] === 500.00);
 
+// --- 3. Same type as Payment IN posts a receipt (OR) to the supplier -------
+// When it arrives as money IN (Credit > 0) the commission is received FROM the
+// supplier, so it must still book against the supplier's creditor account — an
+// OR whose deal-with and detail account are the supplier's, NOT the customer's.
+$GLOBALS['__ac_param'] = null;
+$sync->autocount_create(array(
+    'Type'         => 'AGENT COMMISSION FROM SUPPLIER',
+    'Credit'       => 500.00,
+    'Debit'        => 0.00,
+    'dealWith'     => 'ABC Tours Sdn Bhd',   // supplier name (set in enrichPayment)
+    'CustomerCode' => '300-C999',            // must NOT be used for this type
+    'SupplierCode' => '400-A123',            // supplier's creditor code
+    'Date'         => '2026-07-30',
+));
+$param = $GLOBALS['__ac_param'];
+check('IN: document is an OR (payment in)', $param['master']['docType'] === 'OR');
+check('IN: deal-with is the supplier name', $param['master']['dealWith'] === 'ABC Tours Sdn Bhd');
+check('IN: detail account is the supplier creditor code (not the customer)', $param['details'][0]['accNo'] === '400-A123');
+check('IN: detail amount is the credit', (float)$param['details'][0]['amount'] === 500.00);
+
 echo "\n" . ($failures === 0 ? "ALL TESTS PASSED\n" : "{$failures} TEST(S) FAILED\n");
 exit($failures === 0 ? 0 : 1);

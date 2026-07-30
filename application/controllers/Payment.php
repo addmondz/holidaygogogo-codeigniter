@@ -626,12 +626,16 @@ class Payment extends MY_Controller
 		$array['credit_payments'] = [];
 		$array['debit_payments'] = [];
 		foreach($payments as $payment) {
+			// Direction must be read before Credit is reformatted to a string below.
+			$is_credit = $payment->Credit != 0.00;
 			$payment->Date = empty($payment->Date) ? '-' : strtoupper(date('j M Y', strtotime($payment->Date)));
 			$payment->Credit = $payment->Credit != 0.00 ? number_format($payment->Credit, 2, '.', ',') : '';
 			$payment->ReferenceNumber = empty($payment->ReferenceNumber) ? '-' : $payment->ReferenceNumber;
 			$payment->Debit = $payment->Credit != 0.00 ? '' : number_format($payment->Debit, 2, '.', ',');
 			$payment->PaymentRemark = empty($payment->PaymentRemark) ? '-' : $payment->PaymentRemark;
-			if($payment->Type == 'DEPOSIT' || $payment->Type == 'FULL' || $payment->Type == 'SUPPLIER REFUND' || $payment->Type == 'ADDITIONAL PAYMENT') {
+			// "AGENT COMMISSION FROM SUPPLIER" can be either direction; a money-in one
+			// (received from the supplier) belongs in the Payment In table.
+			if($payment->Type == 'DEPOSIT' || $payment->Type == 'FULL' || $payment->Type == 'SUPPLIER REFUND' || $payment->Type == 'ADDITIONAL PAYMENT' || ($payment->Type == 'AGENT COMMISSION FROM SUPPLIER' && $is_credit)) {
 				array_push($array['credit_payments'], $payment);
 			} else {
 				$payment->Deadline = strtoupper(date('j M Y', strtotime($payment->Deadline)));
@@ -681,7 +685,9 @@ class Payment extends MY_Controller
 				$this->load->library('upload');
 				$config['upload_path'] = 'assets/upload/payment';
 				$config['allowed_types'] = 'jpg|jpeg|png|pdf';
-				if($payment['Credit'] == 0.00 && $supplier_id != $payment['SupplierID']) {
+				// Supplier is editable for payment-out supplier types (Credit == 0) and
+				// for "AGENT COMMISSION FROM SUPPLIER" received as money in (Credit > 0).
+				if(($payment['Credit'] == 0.00 || $payment['Type'] == 'AGENT COMMISSION FROM SUPPLIER') && $supplier_id != $payment['SupplierID']) {
 					$array['payment'][0]['SupplierID'] = $supplier_id;
 					$this->Payment_Model->Create_Payment_Log('SupplierID', $payment['SupplierID'], $supplier_id, $payment['PaymentID']);
 				}

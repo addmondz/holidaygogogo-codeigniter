@@ -82,7 +82,7 @@ class PaymentSync {
 					$acc_no = '';
 					$amount = 0.00;
 					if ($data['Credit'] != 0.00){
-						$acc_no = arr_get($data, 'CustomerCode', '');//$config['payment_acc_no_1'];
+						$acc_no = (arr_get($data, 'Type', '') === 'AGENT COMMISSION FROM SUPPLIER') ? arr_get($data, 'SupplierCode', '') : arr_get($data, 'CustomerCode', '');//$config['payment_acc_no_1'];
 						$amount = $data['Credit'];
 					} else if ($data['Debit'] != 0.00){
 						$acc_no = arr_get($data, 'SupplierCode', '');//$config['payment_acc_no_2'];
@@ -121,7 +121,7 @@ class PaymentSync {
 				$acc_no = '';
 				$amount = 0.00;
 				if ($data['Credit'] != 0.00) { // OR
-					$acc_no = arr_get($data, 'CustomerCode', '');//$config['payment_acc_no_1'];
+					$acc_no = (arr_get($data, 'Type', '') === 'AGENT COMMISSION FROM SUPPLIER') ? arr_get($data, 'SupplierCode', '') : arr_get($data, 'CustomerCode', '');//$config['payment_acc_no_1'];
 					$amount = $data['Credit'];
 				} else if ($data['Debit'] != 0.00) { // PV
 					$acc_no = arr_get($data, 'SupplierCode', '');//$config['payment_acc_no_2'];
@@ -164,7 +164,7 @@ class PaymentSync {
 			} else {
 				// Fallback: minimal paymentDetails
 				if ($data['Credit'] != 0.00) {
-					$acc_no = arr_get($data, 'CustomerCode', '');//$config['payment_acc_no_1'];
+					$acc_no = (arr_get($data, 'Type', '') === 'AGENT COMMISSION FROM SUPPLIER') ? arr_get($data, 'SupplierCode', '') : arr_get($data, 'CustomerCode', '');//$config['payment_acc_no_1'];
 					$amount = $data['Credit'];
 				} else if ($data['Debit'] != 0.00) {
 					$acc_no = arr_get($data, 'SupplierCode', '');//$config['payment_acc_no_2'];
@@ -234,7 +234,7 @@ class PaymentSync {
 					$acc_no = '';
 					$amount = 0.00;
 					if ($data['Credit'] != 0.00){
-						$acc_no = arr_get($data, 'CustomerCode', '');//$config['payment_acc_no_1'];
+						$acc_no = (arr_get($data, 'Type', '') === 'AGENT COMMISSION FROM SUPPLIER') ? arr_get($data, 'SupplierCode', '') : arr_get($data, 'CustomerCode', '');//$config['payment_acc_no_1'];
 						$amount = $data['Credit'];
 					} else if ($data['Debit'] != 0.00){
 						$acc_no = arr_get($data, 'SupplierCode', '');//$config['payment_acc_no_2'];
@@ -272,7 +272,7 @@ class PaymentSync {
 				$acc_no = '';
 				$amount = 0.00;
 				if ($data['Credit'] != 0.00) {
-					$acc_no = arr_get($data, 'CustomerCode', '');//$config['payment_acc_no_1'];
+					$acc_no = (arr_get($data, 'Type', '') === 'AGENT COMMISSION FROM SUPPLIER') ? arr_get($data, 'SupplierCode', '') : arr_get($data, 'CustomerCode', '');//$config['payment_acc_no_1'];
 					$amount = $data['Credit'];
 				} else if ($data['Debit'] != 0.00) {
 					$acc_no = arr_get($data, 'SupplierCode', '');//$config['payment_acc_no_2'];
@@ -316,7 +316,7 @@ class PaymentSync {
 				$acc_no = '';
 				$amount = 0.00;
 				if ($data['Credit'] != 0.00) {
-					$acc_no = arr_get($data, 'CustomerCode', '');//$config['payment_acc_no_1'];
+					$acc_no = (arr_get($data, 'Type', '') === 'AGENT COMMISSION FROM SUPPLIER') ? arr_get($data, 'SupplierCode', '') : arr_get($data, 'CustomerCode', '');//$config['payment_acc_no_1'];
 					$amount = $data['Credit'];
 				} else if ($data['Debit'] != 0.00) {
 					$acc_no = arr_get($data, 'SupplierCode', '');//$config['payment_acc_no_2'];

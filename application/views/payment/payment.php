@@ -145,7 +145,11 @@
                                         if(array.credit_payments.length > 0) {
                                             $.each(array.credit_payments, function(key, value) {
                                                 count++;
-                                                credit_payments.push('<tr><td>' + count + '</td><td>' + value.Date + '</td><td>' + value.Type + '</td><td style="color:#F64E60;">' + value.Status + '</td><td>Reference Number : ' + value.ReferenceNumber + '<br>Remark : ' + value.PaymentRemark + '</td><td style="color:#2AAA8A; text-align:right;">' + value.Credit + '</td><td>' + value.Debit + '</td></tr>');
+                                                if(value.Type == 'AGENT COMMISSION FROM SUPPLIER') {
+                                                    credit_payments.push('<tr><td>' + count + '</td><td>' + value.Date + '</td><td>' + value.Type + '</td><td style="color:#F64E60;">' + value.Status + '</td><td>Supplier : ' + value.Supplier + '<br>Reference Number : ' + value.ReferenceNumber + '<br>Remark : ' + value.PaymentRemark + '</td><td style="color:#2AAA8A; text-align:right;">' + value.Credit + '</td><td>' + value.Debit + '</td></tr>');
+                                                } else {
+                                                    credit_payments.push('<tr><td>' + count + '</td><td>' + value.Date + '</td><td>' + value.Type + '</td><td style="color:#F64E60;">' + value.Status + '</td><td>Reference Number : ' + value.ReferenceNumber + '<br>Remark : ' + value.PaymentRemark + '</td><td style="color:#2AAA8A; text-align:right;">' + value.Credit + '</td><td>' + value.Debit + '</td></tr>');
+                                                }
                                                 total_credit = total_credit + parseFloat((value.Credit).replace(/[RM,]/g, ''));
                                                 if(value.Status == '<i class="la la-check-circle text-success"></i>' && customerInTypes.indexOf(value.Type) !== -1) {
                                                     outstanding_balance = outstanding_balance - parseFloat((value.Credit).replace(/[RM,]/g, ''));
@@ -344,7 +348,7 @@
                                                 '<select name="credit_type-'+ payment_id +'" class="form-control selectpicker">' +
                                                     '<option selected disabled data-icon="la la-dollar font-size-lg bs-icon" value="">--SELECT PAYMENT TYPE--</option>' +
                                                     '<?php foreach(unserialize(PAYMENT_TYPE) as $key => $value) { ?>' +
-                                                        '<?php if($key == 'SUPPLIER PAYMENT (DEPOSIT)' || $key == 'SUPPLIER PAYMENT (FULL)' || $key == 'SUPPLIER PAYMENT (ADDITIONAL)' || $key == 'CUSTOMER REFUND' || $key == 'ONE-TIME PAYMENT' || $key == 'AGENT COMMISSION' || $key == 'AGENT COMMISSION FROM SUPPLIER' || $key == 'BANK CHARGES' || $key == 'CREDIT CARD CHARGES') { continue; } ?>' +
+                                                        '<?php if($key == 'SUPPLIER PAYMENT (DEPOSIT)' || $key == 'SUPPLIER PAYMENT (FULL)' || $key == 'SUPPLIER PAYMENT (ADDITIONAL)' || $key == 'CUSTOMER REFUND' || $key == 'ONE-TIME PAYMENT' || $key == 'AGENT COMMISSION' || $key == 'BANK CHARGES' || $key == 'CREDIT CARD CHARGES') { continue; } ?>' +
                                                         '<option data-icon="la la-dollar font-size-lg bs-icon" value="<?php echo $key; ?>"><?php echo $value; ?></option>' +
                                                     '<?php } ?>' +
                                                 '</select>' +
@@ -392,7 +396,17 @@
                                                 '</div>' +
                                             '</div>' +
                                         '</div>' +
+                                        '<br>' +
+                                        '<div class="row acfs-supplier-row-'+ payment_id +'" style="display:none;">' +
+                                            '<div class="col-md-12">' +
+                                                '<label>Supplier <span style="color:red;">*</span></label>' +
+                                                '<select name="supplier-'+ payment_id +'" data-live-search="true" class="form-control selectpicker">' +
+                                                    '<option selected disabled data-icon="la la-user-alt font-size-lg bs-icon" value="">--SELECT SUPPLIER--</option>' + array1 +
+                                                '</select>' +
+                                            '</div>' +
+                                        '</div>' +
                                     '</div>').insertBefore('#benchmark-' + payment_id);
+                                    $(`select[name="supplier-${payment_id}"]`).selectpicker();
                                     $(`input[name="transaction_date-${payment_id}"]`).datepicker({
                                         orientation: 'bottom left',
                                         todayHighlight: true,
@@ -401,6 +415,13 @@
                                         autoclose: true
                                     });
                                     $(`select[name="credit_type-${payment_id}"]`).selectpicker().on('changed.bs.select', function() {
+                                        // "AGENT COMMISSION FROM SUPPLIER" as money in is received from a
+                                        // supplier, so it needs a Supplier selector (shown only for it).
+                                        if($(this).val() == 'AGENT COMMISSION FROM SUPPLIER') {
+                                            $('.acfs-supplier-row-' + payment_id).show();
+                                        } else {
+                                            $('.acfs-supplier-row-' + payment_id).hide();
+                                        }
                                         Calculate_Subtotal();
                                     });
                                 } else {
@@ -800,7 +821,8 @@
                                                         full_payment++;
                                                     }
                                                     if($(`#transaction_type-${payment_ids[i]}`).val() == 'PAYMENT IN') {
-                                                        if($(`input[name="transaction_date-${payment_ids[i]}"]`).val() == '' || $(`select[name="credit_type-${payment_ids[i]}"]`).val() == null || $(`input[name="credit-${payment_ids[i]}"]`).val() == '') {
+                                                        var credit_type_val = $(`select[name="credit_type-${payment_ids[i]}"]`).val();
+                                                        if($(`input[name="transaction_date-${payment_ids[i]}"]`).val() == '' || credit_type_val == null || $(`input[name="credit-${payment_ids[i]}"]`).val() == '' || (usesSupplier(credit_type_val) && ($(`select[name="supplier-${payment_ids[i]}"]`).val() == null || $(`select[name="supplier-${payment_ids[i]}"]`).val() == ''))) {
                                                             Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', 'Please Insert All Required Payment In Details', null);
                                                             return;
                                                         }
@@ -935,7 +957,7 @@
                                     <label>Payment Type</label>
                                     <select <?php if(current_url() == base_url('Payment/View')) { echo 'disabled'; } ?> name="payment_type" class="form-control selectpicker">
                                         <?php foreach(unserialize(PAYMENT_TYPE) as $key => $value) {
-                                            if($Credit != 0.00 && ($key == 'SUPPLIER PAYMENT (DEPOSIT)' || $key == 'SUPPLIER PAYMENT (FULL)' || $key == 'SUPPLIER PAYMENT (ADDITIONAL)' || $key == 'CUSTOMER REFUND' || $key == 'ONE-TIME PAYMENT' || $key == 'AGENT COMMISSION' || $key == 'AGENT COMMISSION FROM SUPPLIER' || $key == 'BANK CHARGES' || $key == 'CREDIT CARD CHARGES')) { continue; }
+                                            if($Credit != 0.00 && ($key == 'SUPPLIER PAYMENT (DEPOSIT)' || $key == 'SUPPLIER PAYMENT (FULL)' || $key == 'SUPPLIER PAYMENT (ADDITIONAL)' || $key == 'CUSTOMER REFUND' || $key == 'ONE-TIME PAYMENT' || $key == 'AGENT COMMISSION' || $key == 'BANK CHARGES' || $key == 'CREDIT CARD CHARGES')) { continue; }
                                             if($Credit == 0.00 && ($key == 'SUPPLIER REFUND' || $key == 'DEPOSIT' || $key == 'FULL' || $key == 'ADDITIONAL PAYMENT')) { continue; } ?>
                                             <option <?php if($key == $Type) { echo 'selected'; } ?> data-icon="la la-dollar font-size-lg bs-icon" value="<?php echo $key; ?>"><?php echo $value; ?></option>
                                         <?php } ?>
@@ -980,6 +1002,23 @@
                                             <i class="la la-file-alt"></i>Bank Slip
                                         </a>
                                     <?php } ?>
+                                </div>
+                            </div>
+                            <?php // Supplier applies to payment-out supplier types AND to
+                            // "AGENT COMMISSION FROM SUPPLIER" received as money in, so it lives
+                            // outside the payment-out ($Credit == 0) block. Its own $Type check
+                            // controls when it shows. ?>
+                            <div class="supplier_field col-md-6" <?php if($Type != 'SUPPLIER PAYMENT (DEPOSIT)' && $Type != 'SUPPLIER PAYMENT (FULL)' && $Type != 'SUPPLIER PAYMENT (ADDITIONAL)' && $Type != 'AGENT COMMISSION FROM SUPPLIER') { echo 'style="display:none;"'; } ?>>
+                                <div class="form-group">
+                                    <label>Supplier
+                                        <span style="color:red;">*</span>
+                                    </label>
+                                    <select <?php if(current_url() == base_url('Payment/View')) { echo 'disabled'; } ?> name="supplier" data-live-search="true" class="form-control selectpicker">
+                                        <option selected data-icon="la la-user-alt font-size-lg bs-icon" value="">--SELECT SUPPLIER--</option>
+                                        <?php foreach($suppliers as $supplier) { ?>
+                                            <option <?php if($supplier->SupplierID == $SupplierID) { echo 'selected'; } ?> data-icon="la la-user-alt font-size-lg bs-icon" value="<?php echo $supplier->SupplierID; ?>"><?php echo $supplier->Name; ?></option>
+                                        <?php } ?>
+                                    </select>
                                 </div>
                             </div>
                             <?php if($Credit == 0.00) { ?>
@@ -1027,19 +1066,6 @@
                                                 <i class="la la-dollar"></i>
                                             </span>
                                         </div>
-                                    </div>
-                                </div>
-                                <div class="supplier_field col-md-6" <?php if($Type != 'SUPPLIER PAYMENT (DEPOSIT)' && $Type != 'SUPPLIER PAYMENT (FULL)' && $Type != 'SUPPLIER PAYMENT (ADDITIONAL)' && $Type != 'AGENT COMMISSION FROM SUPPLIER') { echo 'style="display:none;"'; } ?>>
-                                    <div class="form-group">
-                                        <label>Supplier
-                                            <span style="color:red;">*</span>
-                                        </label>
-                                        <select <?php if(current_url() == base_url('Payment/View')) { echo 'disabled'; } ?> name="supplier" data-live-search="true" class="form-control selectpicker">
-                                            <option selected data-icon="la la-user-alt font-size-lg bs-icon" value="">--SELECT SUPPLIER--</option>
-                                            <?php foreach($suppliers as $supplier) { ?>
-                                                <option <?php if($supplier->SupplierID == $SupplierID) { echo 'selected'; } ?> data-icon="la la-user-alt font-size-lg bs-icon" value="<?php echo $supplier->SupplierID; ?>"><?php echo $supplier->Name; ?></option>
-                                            <?php } ?>
-                                        </select>
                                     </div>
                                 </div>
                                 <div class="supplier_payment col-md-6" <?php if($Type != 'SUPPLIER PAYMENT (DEPOSIT)' && $Type != 'SUPPLIER PAYMENT (FULL)' && $Type != 'SUPPLIER PAYMENT (ADDITIONAL)') { echo 'style="display:none;"'; } ?>>

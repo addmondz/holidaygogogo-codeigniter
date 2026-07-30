@@ -2016,9 +2016,15 @@ class Cron extends CI_Controller
 
 		$payment['description'] = trim($desc);
 
-		// deal with 
+		// deal with
 		if ($payment['Credit'] != 0.00) { // OR
-			$payment['dealWith'] = !empty($payment['Customer']) ? $payment['Customer'] : '';
+			// Commission received FROM a supplier is a receipt addressed to that
+			// supplier, not the customer — even though it's money in (an OR).
+			if (!empty($payment['Type']) && $payment['Type'] === 'AGENT COMMISSION FROM SUPPLIER') {
+				$payment['dealWith'] = !empty($payment['supplier_name']) ? $payment['supplier_name'] : '';
+			} else {
+				$payment['dealWith'] = !empty($payment['Customer']) ? $payment['Customer'] : '';
+			}
 		} else { // PV
 			$payment['dealWith'] = !empty($payment['supplier_name']) ? $payment['supplier_name'] : '';
 		}
