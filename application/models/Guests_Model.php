@@ -873,6 +873,28 @@ GROUP BY mm.merge_key";
 		return $this->db->query($sql, $params)->result();
 	}
 
+	/**
+	 * The un-paginated result set for the Excel export: same UNION/merge/ordering
+	 * as Read_Guests but without LIMIT/OFFSET, so the download mirrors the whole
+	 * filtered listing at once.
+	 *
+	 * Returns the raw CI result OBJECT (not ->result()) on purpose: the caller
+	 * walks it with unbuffered_row() so we never build one big PHP array of every
+	 * guest — the export can span the entire history and that array alone could
+	 * exhaust memory. Returns null when the mode/filters can match nothing.
+	 */
+	function Read_Guests_For_Export()
+	{
+		list($inner, $params) = $this->Build_Merged_Sql_And_Params();
+		if($inner === null) {
+			return null;
+		}
+
+		$sql = "SELECT * FROM (" . $this->Merged_Wrapped_Sql($inner) . ") final"
+			. " ORDER BY RecencyAt IS NULL ASC, RecencyAt DESC, (Name IS NULL OR Name = '') ASC, Name ASC";
+		return $this->db->query($sql, $params);
+	}
+
 	function Count_Guests()
 	{
 		// Count the SAME rows the listing renders — one per merge_key — so

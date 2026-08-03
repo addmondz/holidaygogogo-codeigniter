@@ -46,6 +46,19 @@ class Guests extends MY_Controller
 		$this->load->view('layout/footer');
 	}
 
+	/**
+	 * Export the filtered Guest List to Excel (all pages at once). Same filters
+	 * and merge as the listing, streamed as an .xlsx.
+	 */
+	function Download()
+	{
+		if(lc_block_view('guests')) { return; }
+		$this->load->helper('guest_list_export');
+		$this->Guests_Model->Set_Mode('guest');
+		$rows = $this->Guests_Model->Read_Guests_For_Export();
+		guest_list_export_stream($rows, 'guest', 'GUEST_LIST_' . date('Ymd') . '.xlsx');
+	}
+
 	function Count()
 	{
 		if(lc_block_view('guests')) { return; }

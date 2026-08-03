@@ -216,7 +216,7 @@ div.kt-datatable__pager-container {
                                                 <button type="button" data-toggle="dropdown" class="btn btn-light-primary btn-sm dropdown-toggle" style="padding-left:3px;"></button>
                                                 <div class="dropdown-menu">
                                                     <a href="<?php echo base_url('Customer/Update?customer_id=') . $customer->CustomerID; ?>" class="dropdown-item" style="font-size:11px;">Update Customer</a>
-                                                    <?php if ($this->session->userdata('level') == 10): ?>
+                                                    <?php if (can_delete_customer($this->session->userdata('level'), $this->session->userdata('admin_id'))): ?>
                                                     <div class="dropdown-divider"></div>
                                                     <a href="#" class="dropdown-item delete-customer text-danger"
                                                        data-customer-id="<?php echo $customer->CustomerID; ?>"

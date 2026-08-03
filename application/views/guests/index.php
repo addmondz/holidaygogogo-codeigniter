@@ -135,17 +135,30 @@ div.kt-datatable__pager-container {
 						</a>
 					</div>
 				<?php } ?>
-				<?php if($list_base === 'Manual_Leads' && $lc_can_edit) { ?>
+				<?php if($list_base === 'Guests' || $list_base === 'Ghl_Leads' || $list_base === 'Manual_Leads') {
+					// Preserve the current filters on the export link (same trick as the
+					// Customer download): re-attach whatever query string is in the URL.
+					$current_url = base_url($_SERVER['REQUEST_URI']);
+					$export_qs   = (strpos($current_url, '?') !== false) ? '?' . explode('?', $current_url, 2)[1] : '';
+					// Label mirrors the Customer page's "Customer Records" download button.
+					$export_labels = array('Guests' => 'Guest List Records', 'Ghl_Leads' => 'GHL Leads Records', 'Manual_Leads' => 'Manual Leads Records');
+					$export_label  = $export_labels[$list_base];
+				?>
 					<div class="card-toolbar">
-						<a href="<?php echo base_url('Manual_Leads/Import_Template'); ?>" class="btn btn-light-primary font-weight-bold mr-1 mb-2" style="width:180px;" title="Download the Excel template for bulk upload">
-							<i class="la la-file-download"></i>Import Template
+						<?php if($list_base === 'Manual_Leads' && $lc_can_edit) { ?>
+							<a href="<?php echo base_url('Manual_Leads/Import_Template'); ?>" class="btn btn-light-primary font-weight-bold mr-1 mb-2" style="width:180px;" title="Download the Excel template for bulk upload">
+								<i class="la la-file-download"></i>Import Template
+							</a>
+							<button type="button" class="btn btn-light-success font-weight-bold mr-1 mb-2" style="width:180px;" data-toggle="modal" data-target="#manual_lead_import_modal" title="Upload a filled template to bulk-create manual leads">
+								<i class="la la-file-import"></i>Bulk Upload
+							</button>
+							<button type="button" class="btn btn-primary font-weight-bold mr-1 mb-2" style="width:180px;" data-toggle="modal" data-target="#ghl_lead_create_modal" title="Add a lead by hand (stored as a Manual lead)">
+								<i class="la la-user-plus"></i>Create Lead
+							</button>
+						<?php } ?>
+						<a href="<?php echo base_url($list_base . '/Download') . $export_qs; ?>" class="btn btn-light-warning font-weight-bold mb-2" style="width:180px;" data-toggle="tooltip" title="Download the filtered list as an Excel file">
+							<i class="las la-arrow-circle-down"></i><?php echo $export_label; ?>
 						</a>
-						<button type="button" class="btn btn-light-success font-weight-bold mr-1 mb-2" style="width:180px;" data-toggle="modal" data-target="#manual_lead_import_modal" title="Upload a filled template to bulk-create manual leads">
-							<i class="la la-file-import"></i>Bulk Upload
-						</button>
-						<button type="button" class="btn btn-primary font-weight-bold mb-2" style="width:180px;" data-toggle="modal" data-target="#ghl_lead_create_modal" title="Add a lead by hand (stored as a Manual lead)">
-							<i class="la la-user-plus"></i>Create Lead
-						</button>
 					</div>
 				<?php } ?>
 			</div>
@@ -848,7 +861,7 @@ div.kt-datatable__pager-container {
 														<a href="javascript:;" class="dropdown-item js-lead-status-log" style="font-size:11px;" data-dedup-key="<?php echo htmlspecialchars($g->dedup_key, ENT_QUOTES); ?>" data-name="<?php echo htmlspecialchars($g->Name, ENT_QUOTES); ?>">Lead Status<?php if($slc > 0) { echo ' (' . $slc . ')'; } ?></a>
 													<?php } ?>
 													<?php if(!$is_ghl_row) { ?>
-														<?php if($list_base === 'Customer' && !empty($g->CustomerID) && (int)$this->session->userdata('level') === 10) { ?>
+														<?php if($list_base === 'Customer' && !empty($g->CustomerID) && can_delete_customer($this->session->userdata('level'), $this->session->userdata('admin_id'))) { ?>
 															<a href="#" class="dropdown-item delete-customer text-danger" data-customer-id="<?php echo $g->CustomerID; ?>" data-customer-name="<?php echo htmlspecialchars($g->Name, ENT_QUOTES); ?>" style="font-size:11px;">Delete Customer</a>
 														<?php } ?>
 														<?php if($list_base !== 'Customer' && !empty($g->Token)) { ?>

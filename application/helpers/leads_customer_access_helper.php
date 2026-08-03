@@ -18,6 +18,13 @@ defined('BASEPATH') OR exit('No direct script access allowed');
  * gates opening the page. Edit implies view.
  */
 
+if ( ! defined('CUSTOMER_DELETE_ADMIN_ID')) {
+    // ERNIDA (Finance, AdminID 7) is allowed to delete customers alongside the
+    // OWNER. Kept here (autoloaded helper) so the Delete() controller guard and
+    // both listing views agree on one source of truth. See can_delete_customer().
+    define('CUSTOMER_DELETE_ADMIN_ID', 7);
+}
+
 if ( ! function_exists('lc_modules'))
 {
     function lc_modules()
@@ -189,5 +196,29 @@ if ( ! function_exists('lc_any_view'))
             }
         }
         return false;
+    }
+}
+
+/**
+ * Whether this admin may delete (soft-delete) a customer master. The OWNER
+ * (level 10) always may; ERNIDA (Finance, AdminID 7) was additionally granted
+ * delete rights (2026-08-03). Everyone else may not, whatever their level.
+ *
+ * Pure — pass the session 'level' and 'admin_id'. Used by Customer::Delete()
+ * and by the delete-button gate in the customer + guests listing views.
+ *
+ * @param mixed $level    session 'level'    (int or string)
+ * @param mixed $admin_id session 'admin_id' (int or string)
+ * @return bool
+ */
+if ( ! function_exists('can_delete_customer'))
+{
+    function can_delete_customer($level, $admin_id)
+    {
+        if ((int) $level === 10) {
+            return true;
+        }
+        return $admin_id !== null && $admin_id !== ''
+            && (int) $admin_id === CUSTOMER_DELETE_ADMIN_ID;
     }
 }

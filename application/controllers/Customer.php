@@ -179,9 +179,10 @@ class Customer extends MY_Controller
 	
 	function Delete()
 	{
-		if(lc_block_edit('customer')) { return; }
-		if ($this->session->userdata('level') != 10) {
-			show_error('Only owner level can delete customer.', 403);
+		// Owner (level 10) or ERNIDA (Finance, AdminID 7) may delete — one source
+		// of truth in can_delete_customer(); mirrors the listing delete-button gate.
+		if (!can_delete_customer($this->session->userdata('level'), $this->session->userdata('admin_id'))) {
+			show_error('You are not allowed to delete customer.', 403);
 			return;
 		}
 		//$this->Universal_Model->Delete('CustomerID', $this->input->get('customer_id'), 'customer');

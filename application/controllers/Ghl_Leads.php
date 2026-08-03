@@ -53,6 +53,17 @@ class Ghl_Leads extends MY_Controller
 	}
 
 	/**
+	 * Export the filtered GHL Leads to Excel (all pages at once).
+	 */
+	function Download()
+	{
+		$this->load->helper('guest_list_export');
+		$this->Guests_Model->Set_Mode('ghl');
+		$rows = $this->Guests_Model->Read_Guests_For_Export();
+		guest_list_export_stream($rows, 'ghl', 'GHL_LEADS_' . date('Ymd') . '.xlsx');
+	}
+
+	/**
 	 * dedup_key => active chat-file count for the leads on this page (badges the
 	 * Action menu with "Chat History (n)"). GHL rows carry a dedup_key too, so the
 	 * count works for both synced and manual leads.

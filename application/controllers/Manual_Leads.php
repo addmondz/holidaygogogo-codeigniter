@@ -60,6 +60,18 @@ class Manual_Leads extends MY_Controller
 	}
 
 	/**
+	 * Export the filtered Manual Leads to Excel (all pages at once). Respects the
+	 * same per-creator visibility as the listing (mode 'manual').
+	 */
+	function Download()
+	{
+		$this->load->helper('guest_list_export');
+		$this->Guests_Model->Set_Mode('manual');
+		$rows = $this->Guests_Model->Read_Guests_For_Export();
+		guest_list_export_stream($rows, 'manual', 'MANUAL_LEADS_' . date('Ymd') . '.xlsx');
+	}
+
+	/**
 	 * Create a hand-entered ("Manual") lead from the Create Lead modal. Stored in
 	 * ghl_contacts with a synthetic "manual:<uid>" id, lead_source = 'manual' and
 	 * created_by = the current admin (drives per-creator visibility). The GHL API
