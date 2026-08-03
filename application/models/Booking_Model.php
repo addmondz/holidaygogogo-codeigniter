@@ -357,6 +357,18 @@ class Booking_Model extends CI_Model
 			return;
 		}
 
+		// Global search box: a search should look across EVERY booking, not just
+		// the default landing scope (AfterSalesService='PENDING'), which otherwise
+		// hides confirmed/completed bookings and makes a search for e.g. a
+		// destination look broken. When the user types a search term and hasn't
+		// picked an explicit status, drop the PENDING gate but still exclude
+		// cancelled bookings (same rule as the guest_list_status case above).
+		$search_value = $this->input->get('search[value]');
+		if(($status === null || $status === '') && !empty($search_value)) {
+			$this->db->where('booking.CancelStatus', 'N');
+			return;
+		}
+
 		// PO uses the 3pm-aware overdue cutoff so the list agrees with the
 		// dashboard Payment Overdue card (today's deadlines count from 3pm).
 		$where = booking_status_filter_full_where(
@@ -2213,17 +2225,38 @@ class Booking_Model extends CI_Model
 			$this->db->where("NOT (booking.Status = 'Y' AND booking.AfterSalesService = 'COMPLETE')");
 		}
 
-		// DataTables search parameter
+		// DataTables global search box: match against EVERY column shown in the
+		// listing (and a few useful hidden identifiers). All referenced tables are
+		// joined by the two search callers — Read_Bookings_Paginated and
+		// Count_Bookings_Filtered (sa2_admin added to the count for this). Dates and
+		// NetTotal are matched via LIKE so a partial like "2026-08" or "1500" works.
 		$search_value = $this->input->get('search[value]');
 		if(!empty($search_value)) {
 			$this->db->group_start();
+			// Booking / customer identifiers
 			$this->db->like('BookingNumber', $search_value);
+			$this->db->or_like('ReservationNumber', $search_value);
 			$this->db->or_like('Customer', $search_value);
+			$this->db->or_like('customer.name', $search_value);
 			$this->db->or_like('customer.CustomerCode', $search_value);
-			$this->db->or_like('category.Name', $search_value);
-			$this->db->or_like('admin.Name', $search_value);
-			$this->db->or_like('op_admin.Name', $search_value);
 			$this->db->or_like('booking.Mobile', $search_value);
+			$this->db->or_like('booking.Mobile2', $search_value);
+			// People
+			$this->db->or_like('admin.Name', $search_value);        // Sales Agent
+			$this->db->or_like('sa2_admin.Name', $search_value);    // Sales Agent 2
+			$this->db->or_like('op_admin.Name', $search_value);     // OP
+			// Booking attributes
+			$this->db->or_like('source.Name', $search_value);       // Source
+			$this->db->or_like('category.Name', $search_value);     // Destination
+			$this->db->or_like('booking.ChatLanguage', $search_value);
+			$this->db->or_like('booking.BookingConfirmationTitle', $search_value);
+			$this->db->or_like('cancellation_reason.Name', $search_value);
+			$this->db->or_like('booking.AutocountSyncStatus', $search_value);
+			// Dates (partial text match) and amount
+			$this->db->or_like('booking.InsertDate', $search_value);
+			$this->db->or_like('booking.StartDate', $search_value);
+			$this->db->or_like('booking.EndDate', $search_value);
+			$this->db->or_like('booking.NetTotal', $search_value);
 			$this->db->group_end();
 		}
 
@@ -2541,6 +2574,7 @@ class Booking_Model extends CI_Model
 	{
 		$this->db->from('booking');
 		$this->db->join('admin', 'admin.AdminID = booking.SalesAgent', 'left');
+		$this->db->join('admin AS sa2_admin', 'sa2_admin.AdminID = booking.SalesAgent2', 'left');
 		$this->db->join('admin AS op_admin', 'op_admin.AdminID = booking.BookingOP', 'left');
 		$this->db->join('category', 'category.CategoryID = booking.Destination', 'left');
 		$this->db->join('country_code', 'country_code.CountryCodeID = booking.CountryCodeID', 'left');
@@ -2563,6 +2597,7 @@ class Booking_Model extends CI_Model
 		$this->db->select('booking.BookingID, booking.NetTotal');
 		$this->db->from('booking');
 		$this->db->join('admin', 'admin.AdminID = booking.SalesAgent', 'left');
+		$this->db->join('admin AS sa2_admin', 'sa2_admin.AdminID = booking.SalesAgent2', 'left');
 		$this->db->join('admin AS op_admin', 'op_admin.AdminID = booking.BookingOP', 'left');
 		$this->db->join('category', 'category.CategoryID = booking.Destination', 'left');
 		$this->db->join('country_code', 'country_code.CountryCodeID = booking.CountryCodeID', 'left');

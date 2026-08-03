@@ -20,8 +20,10 @@ defined('BASEPATH') OR exit('No direct script access allowed');
  * rule the booking branch applies — otherwise it would be an invisible, useless
  * "—" row.
  *
- * @param array  $post request fields (first_name,last_name,phone,email,tags,
- *                     gender,chat_language,race,nationality,date_of_birth)
+ * @param array  $post request fields (first_name,last_name,company_name,phone,
+ *                     email,address,gender,chat_language,race,nationality,country,
+ *                     source,tags,notes,customer_type,lead_intro,lead_status,
+ *                     date_of_birth)
  * @param string $uid  a unique suffix for the synthetic contact_id (caller supplies)
  * @param string $now  'Y-m-d H:i:s' capture time (caller supplies)
  * @param int|null $created_by admin id of the creator (caller supplies from the
@@ -38,12 +40,20 @@ function ghl_manual_lead_prepare($post, $uid, $now, $created_by = null)
 
     $first_name = $get('first_name');
     $last_name  = $get('last_name');
+    $company    = $get('company_name');
     $phone      = $get('phone');
     $email      = $get('email');
+    $address    = $get('address');
     $gender     = $get('gender');
     $language   = $get('chat_language');
     $race       = $get('race');
     $nationality = $get('nationality');
+    $country    = $get('country');
+    $source     = $get('source');
+    $notes      = $get('notes');
+    $customer_type = $get('customer_type');
+    $lead_intro = $get('lead_intro');
+    $lead_status = $get('lead_status');
     $dob_raw    = $get('date_of_birth');
     $tags_raw   = isset($post['tags']) ? (string) $post['tags'] : '';
 
@@ -77,12 +87,20 @@ function ghl_manual_lead_prepare($post, $uid, $now, $created_by = null)
         'lead_source'   => 'manual',
         'first_name'    => $first_name !== '' ? $first_name : null,
         'last_name'     => $last_name !== '' ? $last_name : null,
+        'company_name'  => $company !== '' ? $company : null,
         'phone'         => $phone !== '' ? $phone : null,
         'email'         => $email !== '' ? $email : null,
+        'address'       => $address !== '' ? $address : null,
         'gender'        => $gender !== '' ? $gender : null,
         'chat_language' => $language !== '' ? $language : null,
         'race'          => $race !== '' ? $race : null,
         'nationality'   => $nationality !== '' ? $nationality : null,
+        'country'       => $country !== '' ? $country : null,
+        'source'        => $source !== '' ? $source : null,
+        'notes'         => $notes !== '' ? $notes : null,
+        'customer_type' => $customer_type !== '' ? $customer_type : null,
+        'lead_intro'    => $lead_intro !== '' ? $lead_intro : null,
+        'lead_status'   => $lead_status !== '' ? $lead_status : null,
         'date_of_birth' => $dob,
         'tags_json'     => $tags_json,
         'date_added'    => $now,
@@ -173,4 +191,70 @@ function ghl_manual_lead_normalize_gender($raw)
         }
     }
     return '';
+}
+
+/**
+ * The Bulk Upload template columns, in order: sheet column label => the POST key
+ * ghl_manual_lead_prepare() reads. One place so the template (Import_Template)
+ * and the parser (row_to_post) can never drift apart.
+ *
+ * @return array ordered label => post-key
+ */
+function ghl_manual_lead_import_columns()
+{
+    return array(
+        'NAME'            => 'first_name',
+        'COMPANY NAME'    => 'company_name',
+        'CONTACT NUMBER'  => 'phone',
+        'EMAIL'           => 'email',
+        'ADDRESS'         => 'address',
+        'GENDER'          => 'gender',
+        'LANGUAGE'        => 'chat_language',
+        'RACE'            => 'race',
+        'NATIONALITY'     => 'nationality',
+        'COUNTRY'         => 'country',
+        'SOURCE'          => 'source',
+        'TAGS'            => 'tags',
+        'NOTES'           => 'notes',
+        'CUSTOMER TYPE'   => 'customer_type',
+        'LEAD INTRO'      => 'lead_intro',
+        'LEAD STATUS'     => 'lead_status',
+    );
+}
+
+/**
+ * Map ONE raw uploaded sheet row (0-indexed cell array, as PhpSpreadsheet
+ * toArray() emits) to the same associative shape ghl_manual_lead_prepare() reads,
+ * so bulk import reuses the exact create-form validation. Returns null for the
+ * header row and for a fully-blank row (trailing empties Excel leaves behind).
+ * Pure + DB-free so it unit-tests in isolation.
+ *
+ * @param array $row 0-indexed cells
+ * @return array|null POST-shaped assoc, or null to skip this row
+ */
+function ghl_manual_lead_row_to_post($row)
+{
+    if (!is_array($row)) {
+        return null;
+    }
+    $keys  = array_values(ghl_manual_lead_import_columns()); // post keys, in column order
+    $post  = array();
+    $blank = true;
+    foreach ($keys as $i => $key) {
+        $val = isset($row[$i]) ? trim((string) $row[$i]) : '';
+        if ($val !== '') {
+            $blank = false;
+        }
+        $post[$key] = $val;
+    }
+
+    // Drop the header row wherever it sits (matches the template's first labels).
+    if (strcasecmp($post['first_name'], 'NAME') === 0
+        && strcasecmp($post['company_name'], 'COMPANY NAME') === 0) {
+        return null;
+    }
+    if ($blank) {
+        return null;
+    }
+    return $post;
 }

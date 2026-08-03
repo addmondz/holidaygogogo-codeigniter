@@ -9,6 +9,10 @@ class Customer extends MY_Controller
 	function __construct()
 	{
 		parent::__construct();
+		// Leads/Customer tab access: view gates the whole page (owner always allowed).
+		if ( ! lc_can_view('customer')) {
+			redirect(base_url('Booking'));
+		}
 		$this->load->model('Customer_Model');
 		$this->load->model('Universal_Model');
 		$this->load->model('Customer_Type_Model');
@@ -49,6 +53,7 @@ class Customer extends MY_Controller
 		$data['nationalities']  = $this->Guests_Model->Read_Distinct('Nationality');
 		$data['languages']      = $this->Guests_Model->Read_Distinct('ChatLanguage');
 		$data['edit_languages'] = array('CN', 'EN', 'ML');
+		$data['lc_can_edit']    = lc_can_edit('customer');
 
 		$titles = [
 			'tab_title' => 'HolidayGoGoGo | Customer',
@@ -117,7 +122,8 @@ class Customer extends MY_Controller
 	}
 
 	function Create()
-	{							
+	{
+		if(lc_block_edit('customer')) { return; }
 		if($this->input->is_ajax_request()) {
 			$this->Customer_Model->Create();
 		} else {
@@ -131,6 +137,7 @@ class Customer extends MY_Controller
 
 	function Update()
 	{
+		if(lc_block_edit('customer')) { return; }
 		if($this->input->is_ajax_request()) {
 			if(count($this->input->post('customer')[0]) > 1) {
 				$this->Customer_Model->Update();
@@ -172,6 +179,7 @@ class Customer extends MY_Controller
 	
 	function Delete()
 	{
+		if(lc_block_edit('customer')) { return; }
 		if ($this->session->userdata('level') != 10) {
 			show_error('Only owner level can delete customer.', 403);
 			return;
@@ -319,6 +327,7 @@ class Customer extends MY_Controller
 	 */
 	function Import()
 	{
+		if(lc_block_edit('customer')) { return; }
 		if ($this->input->server('REQUEST_METHOD') !== 'POST' || empty($_FILES['import_file']['name'])) {
 			redirect(base_url('Customer'));
 			return;
@@ -484,8 +493,9 @@ class Customer extends MY_Controller
 	 */
 	public function GeneratePortalUrl()
 	{
+		if(lc_block_edit('customer')) { return; }
 		$this->load->helper('utils');
-		
+
 		$customer_id = $this->input->get('customer_id');
 		
 		if (empty($customer_id)) {

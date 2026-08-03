@@ -1657,6 +1657,74 @@ GROUP BY mm.merge_key";
 	}
 
 	/**
+	 * ----- Lead Status log (Manual Leads) --------------------------------------
+	 * A dated (StatusDate + LeadStatus + optional Note) history per lead, keyed by
+	 * dedup_key exactly like guest_remarks so it follows the person. Author in
+	 * CreatedBy, soft-deleted via Status, author-only delete. Distinct from the
+	 * single "current status" (ghl_contacts.lead_status) and from the lead_status
+	 * settings picklist (which only supplies the status NAMES).
+	 */
+	function Add_Lead_Status_Log($dedup_key, $status_date, $lead_status, $note, $admin_id)
+	{
+		$this->db->insert('lead_status_log', array(
+			'dedup_key'  => (string) $dedup_key,
+			'StatusDate' => $status_date,
+			'LeadStatus' => (string) $lead_status,
+			'Note'       => ($note !== '' && $note !== null) ? (string) $note : null,
+			'Status'     => 'Y',
+			'CreatedBy'  => $admin_id,
+			'CreatedAt'  => date('Y-m-d H:i:s'),
+		));
+		return (int) $this->db->insert_id();
+	}
+
+	function Read_Lead_Status_Log($dedup_key, $viewer_admin_id = null)
+	{
+		$sql = "SELECT lsl.LogID, lsl.StatusDate, lsl.LeadStatus, lsl.Note,
+				lsl.CreatedBy, lsl.CreatedAt, a.Name AS CreatedByName
+			FROM lead_status_log lsl
+			LEFT JOIN admin a ON a.AdminID = lsl.CreatedBy
+			WHERE lsl.Status = 'Y' AND lsl.dedup_key = ?
+			ORDER BY lsl.StatusDate DESC, lsl.LogID DESC";
+		$rows = $this->db->query($sql, array((string) $dedup_key))->result();
+		foreach ($rows as $r) {
+			$r->CanDelete = ($viewer_admin_id !== null && (int) $r->CreatedBy === (int) $viewer_admin_id);
+		}
+		return $rows;
+	}
+
+	function Read_Lead_Status_Log_Counts($dedup_keys)
+	{
+		$keys = array();
+		foreach ((array) $dedup_keys as $k) {
+			$k = (string) $k;
+			if ($k !== '' && !in_array($k, $keys, true)) {
+				$keys[] = $k;
+			}
+		}
+		if (empty($keys)) {
+			return array();
+		}
+		$placeholders = implode(',', array_fill(0, count($keys), '?'));
+		$sql = "SELECT dedup_key, COUNT(*) AS cnt FROM lead_status_log
+			WHERE Status = 'Y' AND dedup_key IN ({$placeholders}) GROUP BY dedup_key";
+		$out = array();
+		foreach ($this->db->query($sql, $keys)->result() as $row) {
+			$out[$row->dedup_key] = (int) $row->cnt;
+		}
+		return $out;
+	}
+
+	function Delete_Lead_Status_Log($log_id, $admin_id)
+	{
+		$this->db->query(
+			"UPDATE lead_status_log SET Status = 'N' WHERE LogID = ? AND CreatedBy = ? AND Status = 'Y'",
+			array((int) $log_id, $admin_id)
+		);
+		return $this->db->affected_rows();
+	}
+
+	/**
 	 * ----- Chat history files (uploaded WhatsApp .txt exports) -----------------
 	 * Keyed by dedup_key like the remarks above, so an uploaded chat follows the
 	 * person across all their bookings/leads. StoredName is the random on-disk

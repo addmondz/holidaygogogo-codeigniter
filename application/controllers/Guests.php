@@ -16,6 +16,7 @@ class Guests extends MY_Controller
 
 	function index()
 	{
+		if(lc_block_view('guests')) { return; }
 		$titles = array('tab_title' => 'HolidayGoGoGo | Guest List', 'breadcrumb_title' => 'Guest List');
 		$page   = max(1, (int) $this->input->get('page'));
 		$limit  = 30;
@@ -39,6 +40,7 @@ class Guests extends MY_Controller
 		$data['nationalities']  = $this->Guests_Model->Read_Distinct('Nationality');
 		$data['languages']      = $this->Guests_Model->Read_Distinct('ChatLanguage');
 		$data['edit_languages'] = $this->Guest_Languages();
+		$data['lc_can_edit']    = lc_can_edit('guests');
 		$this->load->view('layout/header', $titles);
 		$this->load->view('guests/index', $data);
 		$this->load->view('layout/footer');
@@ -46,6 +48,7 @@ class Guests extends MY_Controller
 
 	function Count()
 	{
+		if(lc_block_view('guests')) { return; }
 		$page  = max(1, (int) $this->input->get('page'));
 		$limit = 30;
 		$this->Guests_Model->Set_Mode('guest');
@@ -68,6 +71,7 @@ class Guests extends MY_Controller
 
 	function Update_Contact()
 	{
+		if(lc_block_edit(lc_request_module('guests'))) { return; }
 		$out = function ($data) {
 			$this->output
 				->set_content_type('application/json')
@@ -200,6 +204,7 @@ class Guests extends MY_Controller
 	 */
 	function Update_Field()
 	{
+		if(lc_block_edit(lc_request_module('guests'))) { return; }
 		$out = function ($data) {
 			$this->output
 				->set_content_type('application/json')
@@ -308,6 +313,7 @@ class Guests extends MY_Controller
 	 */
 	function Remarks()
 	{
+		if(lc_block_view(lc_request_module('guests'))) { return; }
 		$dedup_key = (string) $this->input->get('dedup_key');
 		if ($dedup_key === '') {
 			$this->output->set_content_type('application/json')
@@ -344,6 +350,7 @@ class Guests extends MY_Controller
 	 */
 	function Add_Remark()
 	{
+		if(lc_block_edit(lc_request_module('guests'))) { return; }
 		$out = function ($data) {
 			$this->output->set_content_type('application/json')->set_output(json_encode($data));
 		};
@@ -389,6 +396,7 @@ class Guests extends MY_Controller
 	 */
 	function Delete_Remark()
 	{
+		if(lc_block_edit(lc_request_module('guests'))) { return; }
 		$out = function ($data) {
 			$this->output->set_content_type('application/json')->set_output(json_encode($data));
 		};
@@ -429,6 +437,7 @@ class Guests extends MY_Controller
 	 */
 	function Chat_History()
 	{
+		if(lc_block_view(lc_request_module('guests'))) { return; }
 		$dedup_key = (string) $this->input->get('dedup_key');
 		if ($dedup_key === '') {
 			$this->output->set_content_type('application/json')
@@ -461,6 +470,7 @@ class Guests extends MY_Controller
 	 */
 	function Upload_Chat_History()
 	{
+		if(lc_block_edit(lc_request_module('guests'))) { return; }
 		$out = function ($data) {
 			$this->output->set_content_type('application/json')->set_output(json_encode($data));
 		};
@@ -501,6 +511,7 @@ class Guests extends MY_Controller
 	 */
 	function Download_Chat_History()
 	{
+		if(lc_block_view(lc_request_module('guests'))) { return; }
 		$id  = (int) $this->input->get('id');
 		$row = $this->Guests_Model->Get_Chat_History_File($id);
 		if (!$row) {
@@ -526,6 +537,7 @@ class Guests extends MY_Controller
 	 */
 	function Delete_Chat_History()
 	{
+		if(lc_block_edit(lc_request_module('guests'))) { return; }
 		$out = function ($data) {
 			$this->output->set_content_type('application/json')->set_output(json_encode($data));
 		};
@@ -554,6 +566,9 @@ class Guests extends MY_Controller
 
 	function View()
 	{
+		// Customer Profile is reachable from any of the four lists, so allow anyone
+		// who can view at least one of them (owner always).
+		if( ! lc_any_view()) { redirect(base_url('Booking')); return; }
 		$key = $this->input->get('key');
 		if(empty($key)) { redirect('Guests'); return; }
 

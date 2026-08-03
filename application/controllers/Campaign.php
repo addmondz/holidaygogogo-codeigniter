@@ -215,7 +215,7 @@ class Campaign extends MY_Controller
 			$rows  = $this->Guests_Model->Read_Customers_Rich($limit, $offset);
 			$total = $this->Guests_Model->Count_Customers_Rich();
 		} else {
-			$mode = ($type === 'ghl') ? 'ghl' : (($type === 'guest') ? 'guest' : 'all');
+			$mode = ($type === 'ghl') ? 'ghl' : (($type === 'manual') ? 'manual' : (($type === 'guest') ? 'guest' : 'all'));
 			$this->Guests_Model->Set_Mode($mode);
 
 			$rows  = $this->Guests_Model->Read_Guests($limit, $offset);

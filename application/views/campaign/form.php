@@ -159,16 +159,19 @@
 				</div>
 				<div class="card-body">
 					<!-- Each filter's tag shows which source(s) it actually narrows:
-					     gl = booking guests · lead = GHL leads · cust = customers. -->
+					     gl = booking guests · lead = GHL leads · manual = manual leads
+					     · cust = customers. Manual leads share the GHL-lead query branch,
+					     so they narrow by the same demographic filters as GHL leads. -->
 					<div class="picker-source-legend mb-4">
 						Each filter tag shows which source it narrows &mdash;
 						<span class="label label-inline label-light-success font-weight-bold">gl</span> booking guests &middot;
 						<span class="label label-inline label-light-warning font-weight-bold">lead</span> GHL leads &middot;
+						<span class="label label-inline label-light-primary font-weight-bold">manual</span> manual leads &middot;
 						<span class="label label-inline label-light-info font-weight-bold">cust</span> customers.
 					</div>
 					<div class="row mb-4">
 						<div class="col-md-3">
-							<label>Search guests (name) <span class="text-muted font-size-xs">(cust/lead/gl)</span></label>
+							<label>Search guests (name) <span class="text-muted font-size-xs">(cust/lead/manual/gl)</span></label>
 							<div class="input-icon">
 								<input type="text" id="guest_search_q" autocomplete="off" class="form-control" placeholder="Type a name">
 								<span><i class="la la-search"></i></span>
@@ -181,6 +184,7 @@
 								<option value="guest">Booking Guest</option>
 								<option value="customer">Customer</option>
 								<option value="ghl">GHL</option>
+								<option value="manual">Manual Lead</option>
 							</select>
 						</div>
 						<div class="col-md-3">
@@ -192,7 +196,7 @@
 							</select>
 						</div>
 						<div class="col-md-3">
-							<label>Nationality <span class="text-muted font-size-xs">(cust/gl)</span></label>
+							<label>Nationality <span class="text-muted font-size-xs">(cust/gl/manual)</span></label>
 							<select id="guest_search_nationality" class="form-control selectpicker" data-live-search="true">
 								<option value="">--ALL NATIONALITIES--</option>
 								<?php if(!empty($nationalities)) { foreach($nationalities as $n) { ?>
@@ -228,7 +232,7 @@
 							</select>
 						</div>
 						<div class="col-md-3">
-							<label>Language <span class="text-muted font-size-xs">(cust/gl)</span></label>
+							<label>Language <span class="text-muted font-size-xs">(cust/gl/manual)</span></label>
 							<select id="guest_search_language" class="form-control selectpicker" data-live-search="true" multiple data-actions-box="true" title="--ALL LANGUAGES--">
 								<?php if(!empty($languages)) { foreach($languages as $l) { ?>
 									<option value="<?php echo htmlspecialchars($l->value, ENT_QUOTES); ?>"><?php echo htmlspecialchars($l->value); ?></option>
@@ -240,7 +244,7 @@
 					<!-- Row 3 — demographics (Race / Tag are GHL-lead only) -->
 					<div class="row mb-4">
 						<div class="col-md-3">
-							<label>Gender <span class="text-muted font-size-xs">(cust/gl)</span></label>
+							<label>Gender <span class="text-muted font-size-xs">(cust/gl/manual)</span></label>
 							<select id="guest_search_gender" class="form-control selectpicker" multiple data-actions-box="true" title="--ALL GENDERS--">
 								<option value="Male">Male</option>
 								<option value="Female">Female</option>
@@ -248,7 +252,7 @@
 							</select>
 						</div>
 						<div class="col-md-3">
-							<label>Race <span class="text-muted font-size-xs">(lead only)</span></label>
+							<label>Race <span class="text-muted font-size-xs">(lead/manual)</span></label>
 							<select id="guest_search_race" class="form-control selectpicker" data-live-search="true" multiple data-actions-box="true" title="--ALL RACES--">
 								<?php if(!empty($races)) { foreach($races as $r) { ?>
 									<option value="<?php echo htmlspecialchars($r->value, ENT_QUOTES); ?>"><?php echo htmlspecialchars($r->value); ?></option>
@@ -256,7 +260,7 @@
 							</select>
 						</div>
 						<div class="col-md-3">
-							<label>Tag <span class="text-muted font-size-xs">(lead only)</span></label>
+							<label>Tag <span class="text-muted font-size-xs">(lead/manual)</span></label>
 							<select id="guest_search_tags" class="form-control selectpicker" data-live-search="true" multiple data-actions-box="true" title="--ALL TAGS--">
 								<?php if(!empty($lead_tags)) { foreach($lead_tags as $t) { ?>
 									<option value="<?php echo htmlspecialchars($t, ENT_QUOTES); ?>"><?php echo htmlspecialchars($t); ?></option>
@@ -288,7 +292,7 @@
 					<!-- Row 4 — dates -->
 					<div class="row mb-4">
 						<div class="col-md-3">
-							<label>Date of Bookings <span class="text-muted font-size-xs">(cust/lead/gl)</span>
+							<label>Date of Bookings <span class="text-muted font-size-xs">(cust/lead/manual/gl)</span>
 								<a onclick="Reset_Guest_Booking_Date()" class="btn btn-icon btn-light-warning btn-xs" data-toggle="tooltip" title="Clear booking date">
 									<i class="la la-undo"></i>
 								</a>
@@ -322,7 +326,7 @@
 						</div>
 						<div class="col-md-3">
 							<div class="d-flex justify-content-between align-items-center">
-								<label class="mb-0">Campaign <span class="text-muted font-size-xs">(lead/gl)</span></label>
+								<label class="mb-0">Campaign <span class="text-muted font-size-xs">(lead/manual/gl)</span></label>
 								<select id="guest_search_campaign_mode" class="form-control form-control-sm w-auto" style="height:auto;padding:2px 22px 2px 8px;">
 									<option value="include">Include</option>
 									<option value="exclude">Exclude</option>
@@ -350,10 +354,10 @@
 						</div>
 					</div>
 
-					<!-- Contact availability — applies to every source (guest / lead / customer) -->
+					<!-- Contact availability — applies to every source (guest / lead / manual / customer) -->
 					<div class="row mb-4">
 						<div class="col-md-3">
-							<label class="d-block">Contact <span class="text-muted font-size-xs">(cust/lead/gl)</span></label>
+							<label class="d-block">Contact <span class="text-muted font-size-xs">(cust/lead/manual/gl)</span></label>
 							<div class="checkbox-inline">
 								<label class="checkbox checkbox-lg">
 									<input type="checkbox" id="guest_search_has_email"><span></span> Has email address
@@ -589,6 +593,9 @@
 		function typeLabel(type) {
 			if(type === 'GHL') {
 				return '<span class="label label-inline label-pill label-light-warning font-weight-bold">GHL</span>';
+			}
+			if(type === 'Manual') {
+				return '<span class="label label-inline label-pill label-light-primary font-weight-bold">Manual Lead</span>';
 			}
 			return '<span class="label label-inline label-pill label-light-success font-weight-bold">Booking Guest</span>';
 		}

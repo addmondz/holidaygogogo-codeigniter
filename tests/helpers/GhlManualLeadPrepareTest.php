@@ -32,12 +32,20 @@ $now = '2026-07-24 10:00:00';
 $res = ghl_manual_lead_prepare(array(
     'first_name'    => '  Ali  ',
     'last_name'     => 'Bakar',
+    'company_name'  => 'Acme Sdn Bhd',
     'phone'         => '+60 12-345 6789',
     'email'         => 'ali@example.com',
+    'address'       => 'No 1, Jalan Besar',
     'gender'        => 'male',
     'chat_language' => 'Malay',
     'race'          => 'Malay',
     'nationality'   => 'Malaysia',
+    'country'       => 'Malaysia',
+    'source'        => 'Facebook',
+    'notes'         => 'Called twice, keen on Redang',
+    'customer_type' => 'Company',
+    'lead_intro'    => 'Referred by existing client',
+    'lead_status'   => 'New',
     'date_of_birth' => '1990-05-20',
     'tags'          => 'Redang, VIP, redang',
     // created_by is server-supplied; a POST value must NOT leak into the row.
@@ -60,6 +68,15 @@ assert_eq('dob', '1990-05-20', $res['row']['date_of_birth']);
 assert_eq('date_added passthrough', $now, $res['row']['date_added']);
 // tags: de-duped case-insensitively, first-seen order, JSON array
 assert_eq('tags json', '["Redang","VIP"]', $res['row']['tags_json']);
+// new extra fields passthrough (trimmed, empty => null)
+assert_eq('company_name', 'Acme Sdn Bhd', $res['row']['company_name']);
+assert_eq('address', 'No 1, Jalan Besar', $res['row']['address']);
+assert_eq('country', 'Malaysia', $res['row']['country']);
+assert_eq('source', 'Facebook', $res['row']['source']);
+assert_eq('notes', 'Called twice, keen on Redang', $res['row']['notes']);
+assert_eq('customer_type', 'Company', $res['row']['customer_type']);
+assert_eq('lead_intro', 'Referred by existing client', $res['row']['lead_intro']);
+assert_eq('lead_status', 'New', $res['row']['lead_status']);
 
 // ---- minimal: name only, everything else null ------------------------------
 $min = ghl_manual_lead_prepare(array('first_name' => 'Solo'), 'u2', $now);
@@ -69,6 +86,15 @@ assert_eq('minimal email null', null, $min['row']['email']);
 assert_eq('minimal tags null', null, $min['row']['tags_json']);
 assert_eq('minimal dob null', null, $min['row']['date_of_birth']);
 assert_eq('minimal gender null', null, $min['row']['gender']);
+// new extra fields default null when omitted
+assert_eq('minimal company null', null, $min['row']['company_name']);
+assert_eq('minimal address null', null, $min['row']['address']);
+assert_eq('minimal country null', null, $min['row']['country']);
+assert_eq('minimal source null', null, $min['row']['source']);
+assert_eq('minimal notes null', null, $min['row']['notes']);
+assert_eq('minimal customer_type null', null, $min['row']['customer_type']);
+assert_eq('minimal lead_intro null', null, $min['row']['lead_intro']);
+assert_eq('minimal lead_status null', null, $min['row']['lead_status']);
 // created_by defaults to null when the caller omits it
 assert_eq('minimal created_by null', null, $min['row']['created_by']);
 
@@ -95,5 +121,34 @@ assert_eq('unknown gender null', null, $g['row']['gender']);
 // ---- tags-only encode helper ------------------------------------------------
 assert_eq('encode empty', null, ghl_manual_lead_encode_tags('   '));
 assert_eq('encode split newlines', '["a","b"]', ghl_manual_lead_encode_tags("a\nb\n"));
+
+// ---- bulk import: column map <-> row mapper stay in lockstep ----------------
+$cols = ghl_manual_lead_import_columns();
+assert_eq('import col count', 16, count($cols));
+assert_eq('first import key', 'first_name', array_values($cols)[0]);
+assert_eq('last import key', 'lead_status', array_values($cols)[15]);
+
+// a filled data row maps 0-indexed cells onto the prepare() POST keys
+$rowPost = ghl_manual_lead_row_to_post(array(
+    'Ali', 'Acme', '0123456789', 'ali@example.com', 'No 1',
+    'Male', 'Malay', 'Malay', 'Malaysia', 'Malaysia', 'Facebook',
+    'Redang, VIP', 'keen', 'Company', 'referral', 'New',
+));
+assert_eq('row first_name', 'Ali', $rowPost['first_name']);
+assert_eq('row company', 'Acme', $rowPost['company_name']);
+assert_eq('row lead_status', 'New', $rowPost['lead_status']);
+// feeding that mapped row straight into prepare() yields a valid insert row
+$rowPrepared = ghl_manual_lead_prepare($rowPost, 'bulk1', $now, 7);
+assert_eq('row prepares ok', true, $rowPrepared['ok']);
+assert_eq('row prepared status', 'New', $rowPrepared['row']['lead_status']);
+
+// header row is dropped (NAME + COMPANY NAME are the first two labels)
+assert_eq('header dropped', null, ghl_manual_lead_row_to_post(array(
+    'NAME', 'COMPANY NAME', 'CONTACT NUMBER', 'EMAIL',
+)));
+// fully-blank row is dropped
+assert_eq('blank row dropped', null, ghl_manual_lead_row_to_post(array('', '', '', '')));
+// non-array is dropped
+assert_eq('non-array dropped', null, ghl_manual_lead_row_to_post('nope'));
 
 echo "\nAll GhlManualLeadPrepare assertions passed.\n";

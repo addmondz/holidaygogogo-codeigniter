@@ -240,6 +240,54 @@ if (!function_exists('guest_remark_validate_remark')) {
     }
 }
 
+if (!function_exists('lead_status_log_validate_status')) {
+    /**
+     * Validate the Lead Status value on a Manual Lead status-log entry before it
+     * is stored in lead_status_log.LeadStatus. Required, length-capped to the
+     * lead_status.Name column width (50). The value is a preset status NAME chosen
+     * from the settings picklist; free values are accepted (the picklist can
+     * change over time) but must be non-empty.
+     *
+     * @param string $raw Raw input.
+     * @return array{ok:bool,error:string,value:string} value is the trimmed status.
+     */
+    function lead_status_log_validate_status($raw)
+    {
+        $raw = trim((string) $raw);
+        if ($raw === '') {
+            return array('ok' => false, 'error' => 'Status is required.', 'value' => '');
+        }
+        $len = function_exists('mb_strlen') ? mb_strlen($raw) : strlen($raw);
+        if ($len > 50) {
+            return array('ok' => false, 'error' => 'Status is too long.', 'value' => '');
+        }
+        return array('ok' => true, 'error' => '', 'value' => $raw);
+    }
+}
+
+if (!function_exists('lead_status_log_validate_note')) {
+    /**
+     * Validate the optional Note on a Manual Lead status-log entry before it is
+     * stored in lead_status_log.Note. Empty is allowed and returns value '' (the
+     * caller stores NULL); otherwise it is trimmed and length-capped.
+     *
+     * @param string $raw Raw input.
+     * @return array{ok:bool,error:string,value:string} value is the trimmed note or ''.
+     */
+    function lead_status_log_validate_note($raw)
+    {
+        $raw = trim((string) $raw);
+        if ($raw === '') {
+            return array('ok' => true, 'error' => '', 'value' => '');
+        }
+        $len = function_exists('mb_strlen') ? mb_strlen($raw) : strlen($raw);
+        if ($len > 1000) {
+            return array('ok' => false, 'error' => 'Note is too long.', 'value' => '');
+        }
+        return array('ok' => true, 'error' => '', 'value' => $raw);
+    }
+}
+
 if (!function_exists('guest_contact_parse_multi')) {
     /**
      * Split a merged row's packed phone list into display-ready entries.

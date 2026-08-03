@@ -1,3 +1,9 @@
+<?php if(!$lc_can_edit) { ?>
+<style>
+/* Read-only (no edit permission on this page): hide inline-edit pencils. */
+.contact-edit-btn, .gl-edit-btn { display: none !important; }
+</style>
+<?php } ?>
 <style>
 .kt-datatable__pager,
 .kt-datatable__pager-info,
@@ -82,6 +88,13 @@ div.kt-datatable__pager-container {
 	// (Manual_Leads) and Customer pages — each passes the controller base and
 	// heading, defaulting to the Guest List page.
 	$list_base  = isset($list_base)  ? $list_base  : 'Guests';
+	// Leads/Customer per-page edit permission. When false the page is read-only:
+	// inline edit, remarks/chat writes, and Create/Import are hidden (server also
+	// blocks the writes). Owner always has edit. $lc_module maps the page to its
+	// permission key so the shared Guests/* write endpoints authorize correctly.
+	$lc_can_edit = isset($lc_can_edit) ? (bool) $lc_can_edit : true;
+	$lc_module_map = array('Guests' => 'guests', 'Customer' => 'customer', 'Ghl_Leads' => 'ghl_leads', 'Manual_Leads' => 'manual_leads');
+	$lc_module = isset($lc_module_map[$list_base]) ? $lc_module_map[$list_base] : 'guests';
 	// GHL Leads and Manual Leads are both lead-only pages that share this layout
 	// (same columns/filters); only the Type column + Create modal differ. Guest
 	// List and Customer keep their own booking-guest columns.
@@ -91,6 +104,8 @@ div.kt-datatable__pager-container {
 	$msg_log_phones = isset($msg_log_phones) && is_array($msg_log_phones) ? $msg_log_phones : array();
 	// dedup_key => active-remark count, to badge each row's Remarks action.
 	$remark_counts  = isset($remark_counts) && is_array($remark_counts) ? $remark_counts : array();
+	// dedup_key => active Lead Status log count, to badge each Manual row's action.
+	$status_log_counts = isset($status_log_counts) && is_array($status_log_counts) ? $status_log_counts : array();
 ?>
 <div class="d-flex flex-column-fluid">
 	<div class="container-fluid">
@@ -103,6 +118,7 @@ div.kt-datatable__pager-container {
 				</div>
 				<?php if($list_base === 'Customer') { ?>
 					<div class="card-toolbar">
+						<?php if($lc_can_edit) { ?>
 						<a href="<?php echo base_url('Customer/Create'); ?>" class="btn btn-primary font-weight-bold mr-1 mb-2" style="width:180px;">
 							<i class="la la-user-alt"></i>Create Customer
 						</a>
@@ -112,14 +128,21 @@ div.kt-datatable__pager-container {
 						<button type="button" class="btn btn-light-success font-weight-bold mr-1 mb-2" style="width:180px;" data-toggle="modal" data-target="#customer_import_modal" title="Upload a filled template to bulk-create customers">
 							<i class="la la-file-import"></i>Bulk Import
 						</button>
+						<?php } ?>
 						<?php $current_url = base_url($_SERVER['REQUEST_URI']); ?>
 						<a href="<?php if(strpos($current_url, '?') == true) { echo base_url('Customer/Download?') . (explode('?', $current_url))[1]; } else { echo base_url('Customer/Download'); } ?>" class="btn btn-light-warning font-weight-bold mb-2" style="width:180px;">
 							<i class="las la-arrow-circle-down"></i>Customer Records
 						</a>
 					</div>
 				<?php } ?>
-				<?php if($list_base === 'Manual_Leads') { ?>
+				<?php if($list_base === 'Manual_Leads' && $lc_can_edit) { ?>
 					<div class="card-toolbar">
+						<a href="<?php echo base_url('Manual_Leads/Import_Template'); ?>" class="btn btn-light-primary font-weight-bold mr-1 mb-2" style="width:180px;" title="Download the Excel template for bulk upload">
+							<i class="la la-file-download"></i>Import Template
+						</a>
+						<button type="button" class="btn btn-light-success font-weight-bold mr-1 mb-2" style="width:180px;" data-toggle="modal" data-target="#manual_lead_import_modal" title="Upload a filled template to bulk-create manual leads">
+							<i class="la la-file-import"></i>Bulk Upload
+						</button>
 						<button type="button" class="btn btn-primary font-weight-bold mb-2" style="width:180px;" data-toggle="modal" data-target="#ghl_lead_create_modal" title="Add a lead by hand (stored as a Manual lead)">
 							<i class="la la-user-plus"></i>Create Lead
 						</button>
@@ -820,6 +843,10 @@ div.kt-datatable__pager-container {
 														<a href="javascript:;" class="dropdown-item js-remarks" style="font-size:11px;" data-dedup-key="<?php echo htmlspecialchars($g->dedup_key, ENT_QUOTES); ?>" data-name="<?php echo htmlspecialchars($g->Name, ENT_QUOTES); ?>">Remarks<?php if($rc > 0) { echo ' (' . $rc . ')'; } ?></a>
 													<?php } ?>
 													<a href="javascript:;" class="dropdown-item js-chat-history" style="font-size:11px;" data-dedup-key="<?php echo htmlspecialchars($g->dedup_key, ENT_QUOTES); ?>" data-name="<?php echo htmlspecialchars($g->Name, ENT_QUOTES); ?>">Chat History<?php if($chat_c > 0) { echo ' (' . $chat_c . ')'; } ?></a>
+													<?php if($list_base === 'Manual_Leads' && isset($g->Type) && $g->Type === 'Manual') { ?>
+														<?php $slc = isset($status_log_counts[$g->dedup_key]) ? (int) $status_log_counts[$g->dedup_key] : 0; ?>
+														<a href="javascript:;" class="dropdown-item js-lead-status-log" style="font-size:11px;" data-dedup-key="<?php echo htmlspecialchars($g->dedup_key, ENT_QUOTES); ?>" data-name="<?php echo htmlspecialchars($g->Name, ENT_QUOTES); ?>">Lead Status<?php if($slc > 0) { echo ' (' . $slc . ')'; } ?></a>
+													<?php } ?>
 													<?php if(!$is_ghl_row) { ?>
 														<?php if($list_base === 'Customer' && !empty($g->CustomerID) && (int)$this->session->userdata('level') === 10) { ?>
 															<a href="#" class="dropdown-item delete-customer text-danger" data-customer-id="<?php echo $g->CustomerID; ?>" data-customer-name="<?php echo htmlspecialchars($g->Name, ENT_QUOTES); ?>" style="font-size:11px;">Delete Customer</a>
@@ -874,6 +901,7 @@ div.kt-datatable__pager-container {
 				<button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
 			</div>
 			<div class="modal-body">
+				<?php if($lc_can_edit) { ?>
 				<!-- Add form -->
 				<div class="form-group row mb-2">
 					<div class="col-md-4">
@@ -907,6 +935,7 @@ div.kt-datatable__pager-container {
 				</div>
 				<div id="gr_error" class="text-danger font-weight-bold mb-2" style="font-size:12px; display:none;"></div>
 				<hr>
+				<?php } ?>
 				<!-- Existing remarks -->
 				<div id="gr_list">
 					<div class="text-muted text-center py-3"><i class="la la-spinner la-spin"></i>&nbsp; Loading remarks…</div>
@@ -930,6 +959,7 @@ div.kt-datatable__pager-container {
 			<div class="modal-body">
 				<!-- List pane: upload + saved files -->
 				<div id="ch_list_pane">
+					<?php if($lc_can_edit) { ?>
 					<div class="form-group row mb-2">
 						<div class="col-md-6">
 							<label class="font-weight-bold" style="font-size:12px;">Chat Export File (.txt) <span class="text-danger">*</span></label>
@@ -949,6 +979,7 @@ div.kt-datatable__pager-container {
 						</div>
 					</div>
 					<div class="form-text text-muted mb-2" style="font-size:11px;">Export a WhatsApp chat (without media) and upload the .txt here. Max 5MB.</div>
+					<?php } ?>
 					<div id="ch_error" class="text-danger font-weight-bold mb-2" style="font-size:12px; display:none;"></div>
 					<hr>
 					<div id="ch_list">
@@ -1104,6 +1135,11 @@ div.kt-datatable__pager-container {
 		}
 	}
 
+	// Leads/Customer per-page access, shared by all write/read calls below. Server
+	// re-checks these — the JS gate is only to keep the UI honest for view-only users.
+	var LC_MODULE   = '<?php echo $lc_module; ?>';
+	var LC_CAN_EDIT = <?php echo $lc_can_edit ? 'true' : 'false'; ?>;
+
 	// ----- Inline contact-number edit -----
 	var GUEST_CONTACT_UPDATE_URL = '<?php echo base_url('Guests/Update_Contact'); ?>';
 
@@ -1148,6 +1184,7 @@ div.kt-datatable__pager-container {
 	}
 
 	$('#kt_datatable').on('click', '.contact-edit-btn', function() {
+		if (!LC_CAN_EDIT) { return; }
 		var $cell = $(this).closest('.contact-cell');
 		if ($cell.find('.contact-editor').length) { return; }
 		var current = $cell.attr('data-mobile') || '';
@@ -1188,7 +1225,7 @@ div.kt-datatable__pager-container {
 			url: GUEST_CONTACT_UPDATE_URL,
 			method: 'POST',
 			dataType: 'json',
-			data: { dedup_key: $cell.attr('data-dedup-key'), customer_id: $cell.attr('data-customer-id'), mobile: mobile },
+			data: { dedup_key: $cell.attr('data-dedup-key'), customer_id: $cell.attr('data-customer-id'), mobile: mobile, module: LC_MODULE },
 			timeout: 30000
 		}).done(function(res) {
 			if (res && res.ok) {
@@ -1228,6 +1265,7 @@ div.kt-datatable__pager-container {
 	}
 
 	$('#kt_datatable').on('click', '.gl-edit-btn', function() {
+		if (!LC_CAN_EDIT) { return; }
 		var $cell = $(this).closest('.gl-cell');
 		if ($cell.find('.gl-editor').length) { return; }
 		var field   = $cell.attr('data-field');
@@ -1283,7 +1321,7 @@ div.kt-datatable__pager-container {
 			url: GL_FIELD_UPDATE_URL,
 			method: 'POST',
 			dataType: 'json',
-			data: { dedup_key: $cell.attr('data-dedup-key'), customer_id: $cell.attr('data-customer-id'), field: field, value: value },
+			data: { dedup_key: $cell.attr('data-dedup-key'), customer_id: $cell.attr('data-customer-id'), field: field, value: value, module: LC_MODULE },
 			timeout: 30000
 		}).done(function(res) {
 			if (res && res.ok) {
@@ -1361,7 +1399,7 @@ div.kt-datatable__pager-container {
 
 	function grLoad() {
 		$('#gr_list').html('<div class="text-muted text-center py-3"><i class="la la-spinner la-spin"></i>&nbsp; Loading remarks…</div>');
-		$.ajax({ url: GR_LIST_URL, method: 'GET', dataType: 'json', data: { dedup_key: grDedupKey }, timeout: 30000 })
+		$.ajax({ url: GR_LIST_URL, method: 'GET', dataType: 'json', data: { dedup_key: grDedupKey, module: LC_MODULE }, timeout: 30000 })
 			.done(function(res) {
 				if (res && res.ok) { grRenderList(res.remarks); }
 				else { $('#gr_list').html('<div class="text-danger text-center py-3">' + grEscape((res && res.message) || 'Could not load remarks.') + '</div>'); }
@@ -1406,7 +1444,7 @@ div.kt-datatable__pager-container {
 
 		$.ajax({
 			url: GR_ADD_URL, method: 'POST', dataType: 'json', timeout: 30000,
-			data: { dedup_key: grDedupKey, campaign_date: campaign, destination_id: dest, follow_date: follow, remark: remark }
+			data: { dedup_key: grDedupKey, campaign_date: campaign, destination_id: dest, follow_date: follow, remark: remark, module: LC_MODULE }
 		}).done(function(res) {
 			$btn.prop('disabled', false);
 			if (res && res.ok) {
@@ -1431,7 +1469,7 @@ div.kt-datatable__pager-container {
 		var $btn = $(this);
 		var id   = $btn.attr('data-id');
 		$btn.tooltip('hide').prop('disabled', true).find('i').attr('class', 'la la-spinner la-spin');
-		$.ajax({ url: GR_DELETE_URL, method: 'POST', dataType: 'json', data: { id: id }, timeout: 30000 })
+		$.ajax({ url: GR_DELETE_URL, method: 'POST', dataType: 'json', data: { id: id, module: LC_MODULE }, timeout: 30000 })
 			.done(function(res) {
 				if (res && res.ok) { grBumpBadge(-1); grLoad(); }
 				else {
@@ -1480,7 +1518,7 @@ div.kt-datatable__pager-container {
 					'<div class="font-weight-bold text-dark-75" style="font-size:13px;">' + meta + '</div>' +
 					'<div class="text-muted" style="font-size:11px;">' + sub + '</div>' +
 				'</div>' +
-				'<a href="' + CH_DOWNLOAD_URL + '?id=' + f.id + '" class="btn btn-icon btn-light-success btn-xs ml-1" data-toggle="tooltip" title="Download .txt"><i class="la la-download"></i></a>' +
+				'<a href="' + CH_DOWNLOAD_URL + '?id=' + f.id + '&module=' + LC_MODULE + '" class="btn btn-icon btn-light-success btn-xs ml-1" data-toggle="tooltip" title="Download .txt"><i class="la la-download"></i></a>' +
 				(f.can_delete ?
 					'<button type="button" class="btn btn-icon btn-light-danger btn-xs ch-delete ml-1" data-id="' + f.id + '" data-toggle="tooltip" title="Delete"><i class="la la-trash"></i></button>' : '') +
 			'</div>';
@@ -1492,7 +1530,7 @@ div.kt-datatable__pager-container {
 
 	function chLoad() {
 		$('#ch_list').html('<div class="text-muted text-center py-3"><i class="la la-spinner la-spin"></i>&nbsp; Loading chats…</div>');
-		$.ajax({ url: CH_LIST_URL, method: 'GET', dataType: 'json', data: { dedup_key: chDedupKey }, timeout: 30000 })
+		$.ajax({ url: CH_LIST_URL, method: 'GET', dataType: 'json', data: { dedup_key: chDedupKey, module: LC_MODULE }, timeout: 30000 })
 			.done(function(res) {
 				if (res && res.ok) { chRenderList(res.files); }
 				else { $('#ch_list').html('<div class="text-danger text-center py-3">' + chEscape((res && res.message) || 'Could not load chats.') + '</div>'); }
@@ -1536,6 +1574,7 @@ div.kt-datatable__pager-container {
 		fd.append('dedup_key', chDedupKey);
 		fd.append('title', $('#ch_title').val());
 		fd.append('chat_file', file);
+		fd.append('module', LC_MODULE);
 
 		$btn.prop('disabled', true).html('<i class="la la-spinner la-spin"></i>');
 		$.ajax({ url: CH_UPLOAD_URL, method: 'POST', data: fd, processData: false, contentType: false, dataType: 'json', timeout: 60000 })
@@ -1564,7 +1603,7 @@ div.kt-datatable__pager-container {
 			confirmButtonColor: '#d33', cancelButtonColor: '#3085d6'
 		}).then(function(result) {
 			if (!result.isConfirmed) return;
-			$.ajax({ url: CH_DELETE_URL, method: 'POST', dataType: 'json', data: { id: id }, timeout: 30000 })
+			$.ajax({ url: CH_DELETE_URL, method: 'POST', dataType: 'json', data: { id: id, module: LC_MODULE }, timeout: 30000 })
 				.done(function(res) {
 					if (res && res.ok) { chBumpBadge(-1); chLoad(); }
 					else { $('#ch_error').text((res && res.message) || 'Could not delete.').show(); }
@@ -1688,12 +1727,12 @@ div.kt-datatable__pager-container {
 					</div>
 					<div class="form-group row">
 						<div class="col-md-6">
-							<label>First Name <span class="text-danger">*</span></label>
+							<label>Name <span class="text-danger">*</span></label>
 							<input type="text" name="first_name" class="form-control" autocomplete="off">
 						</div>
 						<div class="col-md-6">
-							<label>Last Name</label>
-							<input type="text" name="last_name" class="form-control" autocomplete="off">
+							<label>Company Name</label>
+							<input type="text" name="company_name" class="form-control" autocomplete="off">
 						</div>
 					</div>
 					<div class="form-group row">
@@ -1702,8 +1741,18 @@ div.kt-datatable__pager-container {
 							<input type="text" name="phone" class="form-control" autocomplete="off" placeholder="e.g. +60 12-345 6789">
 						</div>
 						<div class="col-md-6">
-							<label>Email <span class="text-danger">*</span></label>
+							<label>Email</label>
 							<input type="email" name="email" class="form-control" autocomplete="off">
+						</div>
+					</div>
+					<div class="form-group row">
+						<div class="col-md-6">
+							<label>Address</label>
+							<input type="text" name="address" class="form-control" autocomplete="off">
+						</div>
+						<div class="col-md-6">
+							<label>Country</label>
+							<input type="text" name="country" class="form-control" autocomplete="off">
 						</div>
 					</div>
 					<div class="form-group row">
@@ -1733,14 +1782,64 @@ div.kt-datatable__pager-container {
 					</div>
 					<div class="form-group row">
 						<div class="col-md-6">
-							<label>Date of Birth</label>
-							<input type="date" name="date_of_birth" class="form-control" autocomplete="off">
+							<label>Source</label>
+							<input type="text" name="source" class="form-control" autocomplete="off" placeholder="e.g. Facebook, Walk-in, Referral">
+						</div>
+						<div class="col-md-6">
+							<label>Customer Type</label>
+							<select name="customer_type" class="form-control">
+								<option value="">-- Select --</option>
+								<?php if(!empty($customer_types)) { foreach($customer_types as $ct) { ?>
+								<option value="<?php echo htmlspecialchars($ct->Name, ENT_QUOTES); ?>"><?php echo htmlspecialchars($ct->Name); ?></option>
+								<?php } } ?>
+							</select>
+						</div>
+					</div>
+					<div class="form-group row">
+						<div class="col-md-6">
+							<label>Lead Status</label>
+							<select name="lead_status" class="form-control">
+								<option value="">-- Select --</option>
+								<?php if(!empty($lead_statuses)) { foreach($lead_statuses as $ls) { ?>
+								<option value="<?php echo htmlspecialchars($ls->Name, ENT_QUOTES); ?>"><?php echo htmlspecialchars($ls->Name); ?></option>
+								<?php } } ?>
+							</select>
 						</div>
 						<div class="col-md-6">
 							<label>Tags</label>
 							<input type="text" name="tags" class="form-control" autocomplete="off" placeholder="Comma-separated, e.g. Redang, VIP">
 						</div>
 					</div>
+					<div class="form-group">
+						<label>Notes</label>
+						<textarea name="notes" class="form-control" rows="2" autocomplete="off"></textarea>
+					</div>
+					<div class="form-group">
+						<label>Lead Intro</label>
+						<textarea name="lead_intro" class="form-control" rows="2" autocomplete="off"></textarea>
+					</div>
+					<div class="separator separator-dashed my-3"></div>
+					<label class="font-weight-bold">Lead Status Updates <span class="text-muted font-size-xs">(optional — dated status history)</span></label>
+					<div id="lead_log_rows">
+						<div class="form-group row lead-log-row mb-2">
+							<div class="col-md-4">
+								<input type="date" name="log_date[]" class="form-control" autocomplete="off" placeholder="Date">
+							</div>
+							<div class="col-md-4">
+								<select name="log_status[]" class="form-control">
+									<option value="">-- Status --</option>
+									<?php if(!empty($lead_statuses)) { foreach($lead_statuses as $ls) { ?>
+									<option value="<?php echo htmlspecialchars($ls->Name, ENT_QUOTES); ?>"><?php echo htmlspecialchars($ls->Name); ?></option>
+									<?php } } ?>
+								</select>
+							</div>
+							<div class="col-md-4 d-flex">
+								<input type="text" name="log_note[]" class="form-control" maxlength="1000" autocomplete="off" placeholder="Note (optional)">
+								<button type="button" class="btn btn-icon btn-light-danger ml-1 lead-log-remove" title="Remove"><i class="la la-trash"></i></button>
+							</div>
+						</div>
+					</div>
+					<button type="button" id="lead_log_add" class="btn btn-light-primary btn-sm font-weight-bold"><i class="la la-plus"></i> Add update</button>
 				</div>
 				<div class="modal-footer">
 					<button type="button" class="btn btn-light font-weight-bold" data-dismiss="modal">Cancel</button>
@@ -1757,14 +1856,13 @@ div.kt-datatable__pager-container {
 	$('#ghl_lead_create_form').on('submit', function(e) {
 		var $form = $(this);
 		var val = function(name) { return $.trim($form.find('[name="' + name + '"]').val() || ''); };
-		var first = val('first_name'), last = val('last_name'), phone = val('phone'), email = val('email');
+		var first = val('first_name'), phone = val('phone'), email = val('email');
 		var $err = $('#ghl_lead_create_error');
 		var problems = [];
 
-		// Mirror the server rule: a lead needs at least one identifying value.
-		if (first === '' && last === '' && phone === '' && email === '') {
-			problems.push('Enter at least a name, contact number or email.');
-		}
+		// Name and Contact Number are the required fields on the form.
+		if (first === '') { problems.push('Name is required.'); }
+		if (phone === '') { problems.push('Contact Number is required.'); }
 		// Validate email shape when provided (server double-checks too).
 		if (email !== '' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
 			problems.push('Email address is not valid.');
@@ -1779,6 +1877,254 @@ div.kt-datatable__pager-container {
 		$err.addClass('d-none');
 		$('#ghl_lead_create_submit').prop('disabled', true).html('<i class="la la-spinner la-spin"></i>Creating...');
 	});
+
+	// Repeatable "Lead Status Updates" rows on the create form. Add clones the
+	// first row (cleared); remove drops a row but always keeps at least one.
+	$('#lead_log_add').on('click', function() {
+		var $rows = $('#lead_log_rows');
+		var $clone = $rows.find('.lead-log-row').first().clone();
+		$clone.find('input').val('');
+		$clone.find('select').val('');
+		$rows.append($clone);
+	});
+	$('#lead_log_rows').on('click', '.lead-log-remove', function() {
+		var $rows = $('#lead_log_rows .lead-log-row');
+		if ($rows.length > 1) {
+			$(this).closest('.lead-log-row').remove();
+		} else {
+			// last row: just clear it rather than leaving none
+			var $r = $(this).closest('.lead-log-row');
+			$r.find('input').val('');
+			$r.find('select').val('');
+		}
+	});
 </script>
 
+<!-- Bulk Upload modal (Manual Leads): upload a filled Import Template to create
+     many manual leads at once. Purely additive (never edits/removes). Each row is
+     validated exactly like the single Create Lead form. -->
+<div class="modal fade" id="manual_lead_import_modal" tabindex="-1" role="dialog" aria-labelledby="manual_lead_import_label" aria-hidden="true">
+	<div class="modal-dialog modal-dialog-centered" role="document">
+		<form action="<?php echo base_url('Manual_Leads/Import'); ?>" method="post" enctype="multipart/form-data" id="manual_lead_import_form">
+			<div class="modal-content">
+				<div class="modal-header" style="background-color:#D7E2F2;">
+					<h5 class="modal-title" id="manual_lead_import_label" style="color:#6082B6;"><strong>Bulk Upload Manual Leads</strong></h5>
+					<button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+				</div>
+				<div class="modal-body">
+					<div class="alert alert-light-primary" role="alert" style="border-left:4px solid #6082B6;">
+						Download <strong>Import Template</strong> first, fill one lead per row, then upload it here. Each row becomes a new manual lead.
+					</div>
+					<div class="form-group">
+						<label>Excel File <span class="text-danger">*</span></label>
+						<div class="custom-file">
+							<input type="file" name="import_file" class="custom-file-input" id="manual_lead_import_file" accept=".xlsx,.xls" required>
+							<label class="custom-file-label" for="manual_lead_import_file" id="manual_lead_import_file_label">Choose .xlsx / .xls file</label>
+						</div>
+						<span class="form-text text-muted"><strong>Name</strong> and <strong>Contact Number</strong> are required per row. The last 3 uploads are kept as backups.</span>
+					</div>
+				</div>
+				<div class="modal-footer">
+					<button type="button" class="btn btn-light font-weight-bold" data-dismiss="modal">Cancel</button>
+					<button type="submit" class="btn btn-success font-weight-bold" id="manual_lead_import_submit">
+						<i class="la la-file-import"></i>Create Leads
+					</button>
+				</div>
+			</div>
+		</form>
+	</div>
+</div>
+<script>
+	$('#manual_lead_import_file').on('change', function() {
+		var name = (this.files && this.files.length) ? this.files[0].name : 'Choose .xlsx / .xls file';
+		$('#manual_lead_import_file_label').text(name);
+	});
+	$('#manual_lead_import_form').on('submit', function() {
+		$('#manual_lead_import_submit').prop('disabled', true).html('<i class="la la-spinner la-spin"></i>Creating...');
+	});
+</script>
+
+<?php } ?>
+
+<?php if($list_base === 'Manual_Leads') { ?>
+<!-- Lead Status log modal (Manual Leads): a dated status history per lead —
+     multiple (Date + Status + optional Note) entries, alongside the single
+     current status on the lead. Author-only delete. Mirrors the Remarks log. -->
+<div class="modal fade" id="lead_status_log_modal" tabindex="-1" role="dialog" aria-hidden="true">
+	<div class="modal-dialog modal-dialog-centered modal-lg" role="document">
+		<div class="modal-content">
+			<div class="modal-header" style="background-color:#D7E2F2;">
+				<h5 class="modal-title" style="color:#6082B6;">
+					<i class="la la-tasks"></i> Lead Status &mdash; <span id="lsl_lead_name" class="font-weight-bold"></span>
+				</h5>
+				<button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+			</div>
+			<div class="modal-body">
+				<!-- Add form -->
+				<div class="form-group row mb-2">
+					<div class="col-md-4">
+						<label class="font-weight-bold" style="font-size:12px;">Date</label>
+						<input type="date" id="lsl_status_date" class="form-control">
+					</div>
+					<div class="col-md-4">
+						<label class="font-weight-bold" style="font-size:12px;">Status</label>
+						<select id="lsl_status" class="form-control">
+							<option value="">-- Select --</option>
+							<?php if(!empty($lead_statuses)) { foreach($lead_statuses as $ls) { ?>
+								<option value="<?php echo htmlspecialchars($ls->Name, ENT_QUOTES); ?>"><?php echo htmlspecialchars($ls->Name); ?></option>
+							<?php } } ?>
+						</select>
+					</div>
+					<div class="col-md-4 d-flex align-items-end">
+						<button type="button" id="lsl_add" class="btn btn-light-success font-weight-bold btn-block">
+							<i class="la la-plus"></i> Add
+						</button>
+					</div>
+				</div>
+				<div class="form-group row mb-2">
+					<div class="col-md-12">
+						<label class="font-weight-bold" style="font-size:12px;">Note <span class="text-muted">(optional)</span></label>
+						<input type="text" id="lsl_note" class="form-control" maxlength="1000" placeholder="e.g. Sent Redang package, waiting on reply">
+					</div>
+				</div>
+				<div id="lsl_error" class="text-danger font-weight-bold mb-2" style="font-size:12px; display:none;"></div>
+				<hr>
+				<!-- Existing entries -->
+				<div id="lsl_list">
+					<div class="text-muted text-center py-3"><i class="la la-spinner la-spin"></i>&nbsp; Loading&hellip;</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+<script>
+	// ----- Lead Status log (dated status history, multiple per Manual lead) -----
+	var LSL_LIST_URL   = '<?php echo base_url('Manual_Leads/Lead_Status_Log'); ?>';
+	var LSL_ADD_URL    = '<?php echo base_url('Manual_Leads/Add_Lead_Status_Log'); ?>';
+	var LSL_DELETE_URL = '<?php echo base_url('Manual_Leads/Delete_Lead_Status_Log'); ?>';
+	var LSL_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+	var lslDedupKey = '';
+
+	function lslEscape(v) { return $('<span>').text(v == null ? '' : v).html(); }
+	function lslPad(n) { return (n < 10 ? '0' : '') + n; }
+	function lslFormatDate(raw) {
+		var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(raw || '');
+		if (!m) { return ''; }
+		return lslPad(parseInt(m[3], 10)) + ' ' + LSL_MONTHS[parseInt(m[2], 10) - 1] + ' ' + m[1];
+	}
+	function lslTodayLocal() {
+		var d = new Date();
+		return d.getFullYear() + '-' + lslPad(d.getMonth() + 1) + '-' + lslPad(d.getDate());
+	}
+
+	function lslRenderList(entries) {
+		var $list = $('#lsl_list');
+		if (!entries || !entries.length) {
+			$list.html('<div class="text-muted text-center py-3">No status updates yet.</div>');
+			return;
+		}
+		var html = '<div>';
+		for (var i = 0; i < entries.length; i++) {
+			var e = entries[i];
+			var meta = '<i class="la la-calendar text-primary"></i> ' + lslEscape(lslFormatDate(e.status_date)) +
+				' <span class="label label-inline label-light-primary font-weight-bold">' + lslEscape(e.lead_status) + '</span>';
+			if (e.created_by) {
+				meta += ' <span class="text-muted font-weight-normal">— ' + lslEscape(e.created_by) + '</span>';
+			}
+			html += '<div class="d-flex align-items-start border-bottom py-2" data-log-id="' + e.id + '">' +
+				'<div class="flex-grow-1">' +
+					'<div class="font-weight-bold text-dark-75" style="font-size:12px;">' + meta + '</div>' +
+					(e.note ? '<div class="text-dark-75" style="font-size:13px; white-space:pre-wrap;">' + lslEscape(e.note) + '</div>' : '') +
+				'</div>' +
+				(e.can_delete ?
+					'<button type="button" class="btn btn-icon btn-light-danger btn-xs lsl-delete ml-2" data-id="' + e.id + '" data-toggle="tooltip" title="Delete entry"><i class="la la-trash"></i></button>' : '') +
+			'</div>';
+		}
+		html += '</div>';
+		$list.html(html);
+		$list.find('[data-toggle="tooltip"]').tooltip();
+	}
+
+	function lslLoad() {
+		$('#lsl_list').html('<div class="text-muted text-center py-3"><i class="la la-spinner la-spin"></i>&nbsp; Loading&hellip;</div>');
+		$.ajax({ url: LSL_LIST_URL, method: 'GET', dataType: 'json', data: { dedup_key: lslDedupKey }, timeout: 30000 })
+			.done(function(res) {
+				if (res && res.ok) { lslRenderList(res.entries); }
+				else { $('#lsl_list').html('<div class="text-danger text-center py-3">' + lslEscape((res && res.message) || 'Could not load.') + '</div>'); }
+			})
+			.fail(function() { $('#lsl_list').html('<div class="text-danger text-center py-3">Network error. Please try again.</div>'); });
+	}
+
+	// Bump the "(n)" badge on the row's Lead Status action by delta.
+	function lslBumpBadge(delta) {
+		var $link = $('.js-lead-status-log[data-dedup-key="' + lslDedupKey.replace(/"/g, '\\"') + '"]');
+		$link.each(function() {
+			var $a = $(this);
+			var n = parseInt(($a.text().match(/\((\d+)\)/) || [0, 0])[1], 10) + delta;
+			$a.text('Lead Status' + (n > 0 ? ' (' + n + ')' : ''));
+		});
+	}
+
+	$(document).on('click', '.js-lead-status-log', function() {
+		lslDedupKey = $(this).attr('data-dedup-key') || '';
+		$('#lsl_lead_name').text($(this).attr('data-name') || '');
+		$('#lsl_error').hide().text('');
+		$('#lsl_status_date').val(lslTodayLocal());
+		$('#lsl_status').val('');
+		$('#lsl_note').val('');
+		$('#lead_status_log_modal').modal('show');
+		lslLoad();
+	});
+
+	$('#lsl_add').on('click', function() {
+		var $btn   = $(this);
+		var $error = $('#lsl_error');
+		var date   = $('#lsl_status_date').val();
+		var status = $('#lsl_status').val();
+		var note   = $.trim($('#lsl_note').val());
+
+		$error.hide().text('');
+		if (!status) { $error.text('Please choose a status.').show(); return; }
+		$btn.prop('disabled', true);
+
+		$.ajax({
+			url: LSL_ADD_URL, method: 'POST', dataType: 'json', timeout: 30000,
+			data: { dedup_key: lslDedupKey, status_date: date, lead_status: status, note: note }
+		}).done(function(res) {
+			$btn.prop('disabled', false);
+			if (res && res.ok) {
+				$('#lsl_note').val('');
+				lslBumpBadge(1);
+				lslLoad();
+			} else {
+				$error.text((res && res.message) || 'Could not add entry.').show();
+			}
+		}).fail(function() {
+			$btn.prop('disabled', false);
+			$error.text('Network error. Please try again.').show();
+		});
+	});
+
+	$('#lsl_note').on('keydown', function(e) {
+		if (e.which === 13) { e.preventDefault(); $('#lsl_add').click(); }
+	});
+
+	$('#lsl_list').on('click', '.lsl-delete', function() {
+		var $btn = $(this);
+		var id   = $btn.attr('data-id');
+		$btn.tooltip('hide').prop('disabled', true).find('i').attr('class', 'la la-spinner la-spin');
+		$.ajax({ url: LSL_DELETE_URL, method: 'POST', dataType: 'json', data: { id: id }, timeout: 30000 })
+			.done(function(res) {
+				if (res && res.ok) { lslBumpBadge(-1); lslLoad(); }
+				else {
+					$('#lsl_error').text((res && res.message) || 'Could not delete entry.').show();
+					$btn.prop('disabled', false).find('i').attr('class', 'la la-trash');
+				}
+			})
+			.fail(function() {
+				$('#lsl_error').text('Network error. Please try again.').show();
+				$btn.prop('disabled', false).find('i').attr('class', 'la la-trash');
+			});
+	});
+</script>
 <?php } ?>

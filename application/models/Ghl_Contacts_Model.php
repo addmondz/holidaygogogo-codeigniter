@@ -148,9 +148,10 @@ class Ghl_Contacts_Model extends CI_Model
         $now = $this->get_code_datetime();
 
         $allowed = array(
-            'contact_id', 'first_name', 'last_name', 'email', 'phone',
+            'contact_id', 'first_name', 'last_name', 'company_name', 'email', 'phone',
             'assigned_to', 'lead_source', 'created_by', 'gender', 'race', 'nationality',
-            'chat_language', 'date_of_birth', 'tags_json', 'date_added',
+            'address', 'country', 'source', 'notes', 'customer_type', 'lead_intro',
+            'lead_status', 'chat_language', 'date_of_birth', 'tags_json', 'date_added',
         );
 
         $insert = array();
@@ -168,6 +169,21 @@ class Ghl_Contacts_Model extends CI_Model
         }
 
         return (int) $this->db->insert_id();
+    }
+
+    /**
+     * The dedup_key the Guest/Manual listing shows for a contact row — exactly the
+     * COALESCE(gc.dedup_key, CONCAT('ghl:', gc.id)) the SELECT uses — so a Lead
+     * Status log entry seeded at create time keys to the SAME value the listing's
+     * Action menu later passes back. Returns null if the id is unknown.
+     */
+    public function effective_dedup_key($id)
+    {
+        $row = $this->db->select('dedup_key, id')->from('ghl_contacts')->where('id', (int) $id)->get()->row();
+        if (!$row) {
+            return null;
+        }
+        return ($row->dedup_key !== null) ? (string) $row->dedup_key : ('ghl:' . (int) $row->id);
     }
 
     public function get_last_contact_cursor()

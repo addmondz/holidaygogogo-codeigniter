@@ -6,11 +6,11 @@ class MY_Controller extends CI_Controller
 		parent::__construct();
 		if($this->session->has_userdata('admin_id') && $this->session->has_userdata('level')) {
 			if(in_array($this->session->level, [20, 25, 45, 60])) {
-				// Product / Customer / Guest List are gated per-admin: an Owner-granted
-				// AccessControl flag (VPR/VC/VGL) overrides the level block. See
-				// setting_module_access_helper. MARKETING (60) is restricted like a
-				// Sales Agent: no Settings pages except Customer / Guest List when the
-				// Owner grants the VC / VGL flag.
+				// Product is gated per-admin: an Owner-granted AccessControl flag
+				// (VPR) overrides the level block. See setting_module_access_helper.
+				// Customer / Guest List / GHL Leads / Manual Leads have moved to the
+				// "Leads/Customer" tab and are gated per-page by lc_can_view() inside
+				// each controller (leads_customer_access_helper), not here.
 				$level = $this->session->level;
 				$access_control = (array) $this->session->access_control;
 				switch($this->router->class) {
@@ -25,13 +25,11 @@ class MY_Controller extends CI_Controller
 							redirect('Dashboard');
 						}
 						break;
-					case 'Customer':
-						if( ! admin_can_access_setting_module('customer', $level, $access_control)) {
-							redirect('Dashboard');
-						}
-						break;
-					case 'Guests':
-						if( ! admin_can_access_setting_module('guests', $level, $access_control, $this->config->item('show_guest_list'))) {
+					case 'Lead_Status':
+						// Lead Status presets: OWNER (10, never enters this block) and
+						// TEAM LEAD (25) manage them. SALES AGENT (20), OP TEAM LEAD (45)
+						// and MARKETING (60) are blocked.
+						if(in_array((int)$this->session->level, [20, 45, 60])) {
 							redirect('Dashboard');
 						}
 						break;

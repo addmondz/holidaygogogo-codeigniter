@@ -12,6 +12,10 @@ class Ghl_Leads extends MY_Controller
 		if (!$this->config->item('show_guest_list')) {
 			redirect(base_url('Booking'));
 		}
+		// Leads/Customer tab access: view gates the whole page (owner always allowed).
+		if ( ! lc_can_view('ghl_leads')) {
+			redirect(base_url('Booking'));
+		}
 		$this->load->model('Guests_Model');
 		$this->load->model('Booking_Model');
 		$this->load->model('Customer_Type_Model');
@@ -42,6 +46,7 @@ class Ghl_Leads extends MY_Controller
 		$data['customer_types'] = $this->Customer_Type_Model->Read_Customer_Types();
 		$data['nationalities']  = $this->Guests_Model->Read_Distinct('Nationality');
 		$data['languages']      = $this->Guests_Model->Read_Distinct('ChatLanguage');
+		$data['lc_can_edit']    = lc_can_edit('ghl_leads');
 		$this->load->view('layout/header', $titles);
 		$this->load->view('guests/index', $data);
 		$this->load->view('layout/footer');
