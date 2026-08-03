@@ -58,12 +58,12 @@ class GhlContactsSyncService
         $insertedTotal = 0;
         $updatedTotal = 0;
         $apiTotal = null;
-        $nextPageUrl = null;
+        $hasMorePages = true;
 
         try {
-            do {
+            while ($hasMorePages) {
                 $page++;
-                $response = $this->requestContacts($config, $nextPageUrl);
+                $response = $this->requestContacts($config, $page);
 
                 if ($response['status'] >= 400) {
                     $this->logEvent($runId, $moduleName, array(
@@ -108,10 +108,6 @@ class GhlContactsSyncService
                 }
 
                 $lastContact = end($contacts);
-                $lastContactId = isset($lastContact['id']) ? $lastContact['id'] : (isset($lastContact['_id']) ? $lastContact['_id'] : null);
-                $lastContactDateAdded = $this->normalizeUtcDateTime(
-                    isset($lastContact['dateAdded']) ? $lastContact['dateAdded'] : null
-                );
 
                 $this->logEvent($runId, $moduleName, array(
                     'full_sync' => $mode === 'full' ? 1 : 0,
@@ -135,8 +131,8 @@ class GhlContactsSyncService
                     break;
                 }
 
-                $nextPageUrl = $response['body']['meta']['nextPageUrl'] ?? null;
-            } while (!empty($nextPageUrl));
+                $hasMorePages = $this->hasMorePages($response['body'], $page, $pulled, $config['page_limit'], $pulledTotal);
+            }
 
             $this->logEvent($runId, $moduleName, array(
                 'full_sync' => $mode === 'full' ? 1 : 0,
@@ -188,7 +184,7 @@ class GhlContactsSyncService
     {
         return array(
             'base_url' => 'https://services.leadconnectorhq.com',
-            'contacts_path' => '/contacts/',
+            'contacts_path' => '/contacts/search',
             'token' => (string) get_env('GHL_API_TOKEN'),
             'api_version' => (string) (get_env('GHL_API_VERSION') ?: '2021-07-28'),
             'location_id' => (string) get_env('GHL_LOCATION_ID'),
@@ -216,26 +212,32 @@ class GhlContactsSyncService
         }
     }
 
-    protected function requestContacts($config, $nextPageUrl = null)
+    protected function requestContacts($config, $page = 1)
     {
-        $query = array(
+        $payload = array(
             'locationId' => $config['location_id'],
-            'limit' => $config['page_limit'],
+            'sort' => array(
+                array(
+                    'field' => 'dateUpdated',
+                    'direction' => 'desc',
+                ),
+            ),
+            'pageLimit' => $config['page_limit'],
         );
 
-        if ($nextPageUrl) {
-            $url = $nextPageUrl;
-        } else {
-            $url = rtrim($config['base_url'], '/') . $config['contacts_path'] . '?' . http_build_query($query);
+        if ((int) $page > 1) {
+            $payload['page'] = (int) $page;
         }
 
+        $url = rtrim($config['base_url'], '/') . $config['contacts_path'];
         $headers = array(
             'Accept: application/json',
             'Authorization: Bearer ' . $config['token'],
-            'Version: ' . $config['api_version']
+            'Version: ' . $config['api_version'],
+            'Content-Type: application/json',
         );
 
-        return $this->curlRequest('GET', $url, array(), $headers);
+        return $this->curlRequest('POST', $url, $payload, $headers);
     }
 
     protected function extractContacts($body)
@@ -261,6 +263,36 @@ class GhlContactsSyncService
         }
 
         return $fallback !== null ? (int) $fallback : null;
+    }
+
+    protected function hasMorePages($body, $page, $pulled, $pageLimit, $pulledTotal)
+    {
+        if ($pulled < (int) $pageLimit) {
+            return false;
+        }
+
+        $total = $this->extractApiTotal($body);
+        if ($total !== null && $pulledTotal >= $total) {
+            return false;
+        }
+
+        $totalPages = null;
+        foreach (array(
+            isset($body['totalPages']) ? $body['totalPages'] : null,
+            isset($body['meta']['totalPages']) ? $body['meta']['totalPages'] : null,
+            isset($body['meta']['pages']) ? $body['meta']['pages'] : null,
+        ) as $candidate) {
+            if ($candidate !== null && $candidate !== '' && is_numeric($candidate)) {
+                $totalPages = (int) $candidate;
+                break;
+            }
+        }
+
+        if ($totalPages !== null && (int) $page >= $totalPages) {
+            return false;
+        }
+
+        return true;
     }
 
     protected function normalizeContact($contact)
@@ -444,6 +476,17 @@ class GhlContactsSyncService
         }
 
         try {
+            if (is_numeric($value)) {
+                $timestamp = (int) $value;
+                if ($timestamp > 9999999999) {
+                    $timestamp = (int) floor($timestamp / 1000);
+                }
+
+                return (new DateTimeImmutable('@' . $timestamp))
+                    ->setTimezone(new DateTimeZone('UTC'))
+                    ->format('Y-m-d');
+            }
+
             return (new DateTimeImmutable((string) $value))->format('Y-m-d');
         } catch (Exception $e) {
             return null;
@@ -504,13 +547,13 @@ class GhlContactsSyncService
             return false;
         }
 
-        $rawDateAdded = isset($lastContact['dateAdded']) ? $lastContact['dateAdded'] : null;
-        if (empty($rawDateAdded)) {
+        $rawDateUpdated = isset($lastContact['dateUpdated']) ? $lastContact['dateUpdated'] : null;
+        if (empty($rawDateUpdated)) {
             return false;
         }
 
         try {
-            $contactDate = new DateTimeImmutable((string) $rawDateAdded);
+            $contactDate = new DateTimeImmutable((string) $rawDateUpdated);
             $contactDate = $contactDate
                 ->setTimezone($cutoff->getTimezone())
                 ->setTime(0, 0, 0);

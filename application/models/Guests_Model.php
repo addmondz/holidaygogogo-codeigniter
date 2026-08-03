@@ -307,6 +307,13 @@ class Guests_Model extends CI_Model
 				$g_params[] = $ghl_range[1];
 			}
 
+			$dob_range = guest_list_parse_date_range($this->input->get('dob'));
+			if($dob_range !== null) {
+				$ghl_where .= " AND gc.date_of_birth >= ? AND gc.date_of_birth <= ? ";
+				$g_params[] = $dob_range[0];
+				$g_params[] = $dob_range[1];
+			}
+
 			// Contact Number / Email are not booking-only — a lead carries both,
 			// so they filter the GHL branch too (gc.phone / gc.email).
 			$contact_number = trim((string)$this->input->get('contact_number'));

@@ -708,9 +708,9 @@ if (!function_exists('guest_list_ghl_suppressed_by_filters')) {
     {
         $booking_only = array(
             'travel_date', 'sales_agent', 'source',
-            'customer_type', 'nationality', 'gender', 'language',
+            'customer_type',
             'booking_number', 'destination', 'pax_min', 'pax_max',
-            'team_leader', 'booking_id', 'dob', 'birthday', 'guest_type',
+            'team_leader', 'booking_id', 'birthday', 'guest_type',
             // Remark-based filters: a GHL lead has no guest remarks, so a
             // Campaign/Follow date range can never match one.
             'campaign_date', 'follow_date',
