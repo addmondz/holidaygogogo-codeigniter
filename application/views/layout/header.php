@@ -439,11 +439,16 @@ $is_dev_env = ($app_env !== 'prod');
 								<?php } ?>
 							<?php
 								// "Leads/Customer" tab — groups Customer, Guest List, GHL Leads and
-								// Manual Leads. Visibility is per-page via lc_can_view() (owner always).
-								// Access Settings (owner only) manages who can view/edit each page.
-								$lc_active = in_array($this->router->class, array('Customer', 'Guests', 'Ghl_Leads', 'Manual_Leads', 'Leads_Customer_Access'), true);
+								// Manual Leads, Campaign and Lead Status. Customer/Guest/GHL/Manual
+								// visibility is per-page via lc_can_view() (owner always). Campaign
+								// (owner only) and Lead Status (owner + team lead) keep their own
+								// level gating. Access Settings (owner only) manages who can
+								// view/edit each page.
+								$lc_active = in_array($this->router->class, array('Customer', 'Guests', 'Ghl_Leads', 'Manual_Leads', 'Campaign', 'Lead_Status', 'Leads_Customer_Access'), true);
+								$lc_show_campaign    = ((int)$this->session->level === 10);
+								$lc_show_lead_status = in_array((int)$this->session->level, [10, 25], true);
 							?>
-							<?php if(lc_any_view()) { ?>
+							<?php if(lc_any_view() || $lc_show_campaign || $lc_show_lead_status) { ?>
 								<li class="menu-item menu-item-submenu <?php if($lc_active) { echo 'menu-item-active menu-item-open'; } ?>">
 									<a href="javascript:;" class="menu-link menu-toggle">
 										<span class="svg-icon menu-icon">
@@ -489,6 +494,22 @@ $is_dev_env = ($app_env !== 'prod');
 												<a href="<?php echo base_url('Manual_Leads'); ?>" class="menu-link">
 													<i class="menu-bullet menu-bullet-dot"><span></span></i>
 													<span class="menu-text">Manual Leads</span>
+												</a>
+											</li>
+											<?php } ?>
+											<?php if($lc_show_campaign) { ?>
+											<li class="menu-item <?php if($this->router->class == 'Campaign') { echo 'menu-item-active'; } ?>">
+												<a href="<?php echo base_url('Campaign'); ?>" class="menu-link">
+													<i class="menu-bullet menu-bullet-dot"><span></span></i>
+													<span class="menu-text">Campaign</span>
+												</a>
+											</li>
+											<?php } ?>
+											<?php if($lc_show_lead_status) { ?>
+											<li class="menu-item <?php if($this->router->class == 'Lead_Status') { echo 'menu-item-active'; } ?>">
+												<a href="<?php echo base_url('Lead_Status'); ?>" class="menu-link">
+													<i class="menu-bullet menu-bullet-dot"><span></span></i>
+													<span class="menu-text">Lead Status</span>
 												</a>
 											</li>
 											<?php } ?>
@@ -589,17 +610,7 @@ $is_dev_env = ($app_env !== 'prod');
 													</a>
 												</li>
 											<?php } ?>
-											<?php // Customer / Guest List / GHL Leads / Manual Leads moved to the "Leads/Customer" tab. ?>
-											<?php if($this->session->level == 10) { ?>
-											<li class="menu-item <?php if($this->router->class == 'Campaign') { echo 'menu-item-active'; } ?>">
-												<a href="<?php echo base_url('Campaign'); ?>" class="menu-link">
-													<i class="menu-bullet menu-bullet-dot">
-														<span></span>
-													</i>
-													<span class="menu-text">Campaign</span>
-												</a>
-											</li>
-											<?php } ?>
+											<?php // Customer / Guest List / GHL Leads / Manual Leads / Campaign / Lead Status moved to the "Leads/Customer" tab. ?>
 											<?php if($can_product && !$op_footer_only) { ?>
 												<li class="menu-item <?php if($this->router->class == 'Product') { echo 'menu-item-active'; } ?>">
 													<a href="<?php echo base_url('Product'); ?>" class="menu-link">
@@ -694,16 +705,6 @@ $is_dev_env = ($app_env !== 'prod');
 													<span class="menu-text">Customer Type</span>
 												</a>
 											</li>
-											<?php if(in_array((int)$this->session->level, [10, 25])) { ?>
-											<li class="menu-item <?php if($this->router->class == 'Lead_Status') { echo 'menu-item-active'; } ?>">
-												<a href="<?php echo base_url('Lead_Status'); ?>" class="menu-link">
-													<i class="menu-bullet menu-bullet-dot">
-														<span></span>
-													</i>
-													<span class="menu-text">Lead Status</span>
-												</a>
-											</li>
-											<?php } ?>
 											<li class="menu-item <?php if($this->router->class == 'Quick_Filter') { echo 'menu-item-active'; } ?>">
 												<a href="<?php echo base_url('Quick_Filter'); ?>" class="menu-link">
 													<i class="menu-bullet menu-bullet-dot">
