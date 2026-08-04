@@ -840,6 +840,9 @@ div.kt-datatable__pager-container {
 											<div class="btn-group">
 												<button type="button" data-toggle="dropdown" class="btn btn-light-primary btn-sm dropdown-toggle" style="padding-left:3px;"></button>
 												<div class="dropdown-menu">
+													<?php if($list_base === 'Manual_Leads' && isset($g->Type) && $g->Type === 'Manual') { ?>
+														<a href="javascript:;" class="dropdown-item js-view-lead" style="font-size:11px;" data-dedup-key="<?php echo htmlspecialchars($g->dedup_key, ENT_QUOTES); ?>">View Details</a>
+													<?php } ?>
 													<?php if(!$is_ghl_row) { ?>
 														<?php if($list_base === 'Customer' && !empty($g->CustomerID)) { ?>
 															<a href="<?php echo base_url('Customer/Update?customer_id=') . $g->CustomerID; ?>" class="dropdown-item" style="font-size:11px;">Update Customer</a>
@@ -1780,23 +1783,44 @@ div.kt-datatable__pager-container {
 						</div>
 						<div class="col-md-6">
 							<label>Language</label>
-							<input type="text" name="chat_language" class="form-control" autocomplete="off">
+							<select name="chat_language" class="form-control">
+								<option value="">-- Select --</option>
+								<option value="Chinese">Chinese</option>
+								<option value="Malay">Malay</option>
+								<option value="English">English</option>
+							</select>
 						</div>
 					</div>
 					<div class="form-group row">
 						<div class="col-md-6">
 							<label>Race</label>
-							<input type="text" name="race" class="form-control" autocomplete="off">
+							<select name="race" class="form-control">
+								<option value="">-- Select --</option>
+								<option value="Chinese">Chinese</option>
+								<option value="Malay">Malay</option>
+								<option value="Indian">Indian</option>
+								<option value="Non Malaysian">Non Malaysian</option>
+							</select>
 						</div>
 						<div class="col-md-6">
 							<label>Nationality</label>
-							<input type="text" name="nationality" class="form-control" autocomplete="off">
+							<select name="nationality" class="form-control">
+								<option value="">-- Select --</option>
+								<?php if(!empty($nationalities)) { foreach($nationalities as $n) { ?>
+								<option value="<?php echo htmlspecialchars($n->value, ENT_QUOTES); ?>"><?php echo htmlspecialchars($n->value); ?></option>
+								<?php } } ?>
+							</select>
 						</div>
 					</div>
 					<div class="form-group row">
 						<div class="col-md-6">
 							<label>Source</label>
-							<input type="text" name="source" class="form-control" autocomplete="off" placeholder="e.g. Facebook, Walk-in, Referral">
+							<select name="source" class="form-control">
+								<option value="">-- Select --</option>
+								<?php if(!empty($sources)) { foreach($sources as $src) { ?>
+								<option value="<?php echo htmlspecialchars($src->Name, ENT_QUOTES); ?>"><?php echo htmlspecialchars($src->Name); ?></option>
+								<?php } } ?>
+							</select>
 						</div>
 						<div class="col-md-6">
 							<label>Customer Type</label>
@@ -2137,6 +2161,99 @@ div.kt-datatable__pager-container {
 			.fail(function() {
 				$('#lsl_error').text('Network error. Please try again.').show();
 				$btn.prop('disabled', false).find('i').attr('class', 'la la-trash');
+			});
+	});
+</script>
+
+<!-- Lead View modal (Manual Leads): read-only detail of one hand-entered lead,
+     loaded on demand from Manual_Leads/View_Lead by dedup_key. -->
+<div class="modal fade" id="lead_view_modal" tabindex="-1" role="dialog" aria-hidden="true">
+	<div class="modal-dialog modal-dialog-centered modal-lg" role="document">
+		<div class="modal-content">
+			<div class="modal-header" style="background-color:#D7E2F2;">
+				<h5 class="modal-title" style="color:#6082B6;">
+					<i class="la la-id-card"></i> Lead Details &mdash; <span id="lv_name" class="font-weight-bold"></span>
+				</h5>
+				<button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+			</div>
+			<div class="modal-body">
+				<div id="lv_loading" class="text-muted text-center py-4"><i class="la la-spinner la-spin"></i>&nbsp; Loading&hellip;</div>
+				<div id="lv_error" class="text-danger font-weight-bold text-center py-4" style="display:none;"></div>
+				<div id="lv_body" style="display:none;"></div>
+			</div>
+		</div>
+	</div>
+</div>
+<script>
+	// ----- Lead View (read-only detail of one Manual lead) -----
+	var LV_URL = '<?php echo base_url('Manual_Leads/View_Lead'); ?>';
+
+	function lvEscape(v) { return $('<span>').text(v == null ? '' : v).html(); }
+
+	// One label/value row; a blank value renders a muted dash.
+	function lvRow(label, value) {
+		var val = (value == null || String(value).trim() === '')
+			? '<span class="text-muted">&mdash;</span>' : lvEscape(value);
+		return '<div class="form-group row mb-1">' +
+			'<div class="col-md-4 font-weight-bold" style="font-size:12px;">' + lvEscape(label) + '</div>' +
+			'<div class="col-md-8" style="font-size:12px; white-space:pre-wrap;">' + val + '</div>' +
+			'</div>';
+	}
+
+	function lvTags(tags) {
+		if (!tags || !tags.length) { return '<span class="text-muted">&mdash;</span>'; }
+		return tags.map(function(t) {
+			return '<span class="label label-inline label-light-primary font-weight-bold mr-1 mb-1">' + lvEscape(t) + '</span>';
+		}).join('');
+	}
+
+	function lvRender(d) {
+		var html = '';
+		html += lvRow('Contact Number', d.phone);
+		html += lvRow('Email', d.email);
+		html += lvRow('Company', d.company_name);
+		html += lvRow('Address', d.address);
+		html += lvRow('Country', d.country);
+		html += lvRow('Gender', d.gender);
+		html += lvRow('Race', d.race);
+		html += lvRow('Nationality', d.nationality);
+		html += lvRow('Language', d.chat_language);
+		html += lvRow('Date of Birth', d.date_of_birth);
+		html += '<hr class="my-2">';
+		html += lvRow('Source', d.source);
+		html += lvRow('Customer Type', d.customer_type);
+		html += lvRow('Lead Status', d.lead_status);
+		html += lvRow('Lead Intro', d.lead_intro);
+		html += lvRow('Notes', d.notes);
+		html += '<div class="form-group row mb-1"><div class="col-md-4 font-weight-bold" style="font-size:12px;">Tags</div>' +
+			'<div class="col-md-8" style="font-size:12px;">' + lvTags(d.tags) + '</div></div>';
+		html += '<hr class="my-2">';
+		html += lvRow('Created By', d.created_by);
+		html += lvRow('Created At', d.created_at);
+		return html;
+	}
+
+	$(document).on('click', '.js-view-lead', function() {
+		var dedupKey = $(this).attr('data-dedup-key') || '';
+		$('#lv_name').text('');
+		$('#lv_body').hide().empty();
+		$('#lv_error').hide().text('');
+		$('#lv_loading').show();
+		$('#lead_view_modal').modal('show');
+
+		$.ajax({ url: LV_URL, method: 'GET', dataType: 'json', data: { dedup_key: dedupKey }, timeout: 30000 })
+			.done(function(res) {
+				$('#lv_loading').hide();
+				if (res && res.ok && res.lead) {
+					$('#lv_name').text(res.lead.name || '');
+					$('#lv_body').html(lvRender(res.lead)).show();
+				} else {
+					$('#lv_error').text((res && res.message) || 'Could not load lead.').show();
+				}
+			})
+			.fail(function() {
+				$('#lv_loading').hide();
+				$('#lv_error').text('Network error. Please try again.').show();
 			});
 	});
 </script>

@@ -1748,6 +1748,42 @@ GROUP BY mm.merge_key";
 	}
 
 	/**
+	 * Read the full detail of one hand-entered ("Manual") lead for the Action ▸ View
+	 * modal, resolving the listing's dedup_key back to its ghl_contacts row. A manual
+	 * lead is inserted without a stored dedup_key, so the listing shows the fallback
+	 * COALESCE(gc.dedup_key, CONCAT('ghl:', gc.id)) — match on either form. Applies the
+	 * SAME per-creator privacy the listing uses (mode 'manual'), so a viewer can't open
+	 * a lead they aren't allowed to see by guessing the key. Returns the row or null.
+	 */
+	function Read_Manual_Lead_Detail($dedup_key)
+	{
+		$dedup_key = (string) $dedup_key;
+		if ($dedup_key === '') {
+			return null;
+		}
+		list($scope_sql, $scope_params) = guest_list_ghl_lead_source_scope(
+			'manual',
+			$this->session->userdata('level'),
+			$this->session->userdata('admin_id')
+		);
+		// A manual lead has no stored dedup_key, so the listing shows the fallback
+		// 'ghl:<id>'. Resolve that to the numeric id in PHP (portable across MySQL +
+		// SQLite — no CONCAT) and also allow a real dedup_key for completeness.
+		$fallback_id = (strpos($dedup_key, 'ghl:') === 0) ? (int) substr($dedup_key, 4) : -1;
+		$sql = "SELECT gc.id, gc.first_name, gc.last_name, gc.company_name, gc.phone,
+				gc.email, gc.address, gc.gender, gc.chat_language, gc.race, gc.nationality,
+				gc.country, gc.source, gc.notes, gc.customer_type, gc.lead_intro,
+				gc.lead_status, gc.date_of_birth, gc.tags_json,
+				COALESCE(gc.date_added, gc.created_at) AS created_at, a.Name AS CreatedByName
+			FROM ghl_contacts gc
+			LEFT JOIN admin a ON a.AdminID = gc.created_by
+			WHERE (gc.dedup_key = ? OR gc.id = ?) {$scope_sql}
+			LIMIT 1";
+		$params = array_merge(array($dedup_key, $fallback_id), $scope_params);
+		return $this->db->query($sql, $params)->row();
+	}
+
+	/**
 	 * ----- Chat history files (uploaded WhatsApp .txt exports) -----------------
 	 * Keyed by dedup_key like the remarks above, so an uploaded chat follows the
 	 * person across all their bookings/leads. StoredName is the random on-disk

@@ -147,6 +147,56 @@ class Manual_Leads extends MY_Controller
 	}
 
 	/**
+	 * Read one manual lead's full detail for the Action ▸ View modal. GET ?dedup_key=…
+	 * Returns { ok, lead:{...formatted fields...} }. Respects per-creator visibility
+	 * (Read_Manual_Lead_Detail applies the same 'manual' scope as the listing), so a
+	 * viewer can only open a lead they are allowed to see.
+	 */
+	function View_Lead()
+	{
+		$out = function ($data) {
+			$this->output->set_content_type('application/json')->set_output(json_encode($data));
+		};
+		$dedup_key = (string) $this->input->get('dedup_key');
+		if ($dedup_key === '') {
+			return $out(array('ok' => false, 'message' => 'Missing lead reference.'));
+		}
+		$row = $this->Guests_Model->Read_Manual_Lead_Detail($dedup_key);
+		if (!$row) {
+			return $out(array('ok' => false, 'message' => 'Lead not found.'));
+		}
+
+		$tags = ghl_lead_tags_parse($row->tags_json);
+		$name = trim((string) ($row->first_name ?? '') . ' ' . (string) ($row->last_name ?? ''));
+		$dob  = ($row->date_of_birth && $row->date_of_birth !== '0000-00-00')
+			? date('d M Y', strtotime($row->date_of_birth)) : '';
+		$created = ($row->created_at && $row->created_at !== '0000-00-00 00:00:00')
+			? date('d M Y, g:i A', strtotime($row->created_at)) : '';
+
+		return $out(array('ok' => true, 'lead' => array(
+			'name'          => $name,
+			'company_name'  => $row->company_name,
+			'phone'         => $row->phone,
+			'email'         => $row->email,
+			'address'       => $row->address,
+			'gender'        => $row->gender,
+			'chat_language' => $row->chat_language,
+			'race'          => $row->race,
+			'nationality'   => $row->nationality,
+			'country'       => $row->country,
+			'source'        => $row->source,
+			'customer_type' => $row->customer_type,
+			'lead_intro'    => $row->lead_intro,
+			'lead_status'   => $row->lead_status,
+			'notes'         => $row->notes,
+			'date_of_birth' => $dob,
+			'tags'          => array_values($tags),
+			'created_by'    => $row->CreatedByName,
+			'created_at'    => $created,
+		)));
+	}
+
+	/**
 	 * Read the Lead Status log for one lead (Action menu modal). GET ?dedup_key=…
 	 * Returns { ok, entries:[{id,status_date,lead_status,note,created_by,can_delete}] }.
 	 */
