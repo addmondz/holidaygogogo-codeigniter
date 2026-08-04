@@ -221,6 +221,11 @@ class Guest_List_Room extends MY_Controller
 		$this->db->where('GuestListID', $guest_list_id);
 		$this->db->update('guest_list', array('Type' => $type));
 
+		// Guest Type is part of the customer "self guest" snapshot — keep the
+		// Customer List column in sync after a room-driven type change.
+		$this->load->model('Customer_Model');
+		$this->Customer_Model->Refresh_Snapshot_By_Booking($guest->BookingID);
+
 		$this->load->model('Guest_List_Model');
 		$this->Guest_List_Model->Auto_Assign_Rooms($guest->BookingID);
 

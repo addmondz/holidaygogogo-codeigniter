@@ -1088,34 +1088,34 @@ GROUP BY mm.merge_key";
 			$params[] = (int) $pax_max;
 		}
 
-		// ---- Tier 3: guest-level (EXISTS on the customer's own guest_list rows) ----
-		$gstr = '';
-		$gpar = array();
-
+		// ---- Tier 3: guest attributes, now DENORMALISED onto the customer row as
+		// c.Gender / c.DateOfBirth / c.Nationality / c.GuestType (kept in sync from
+		// guest_list by Customer_Model::Refresh_Snapshot_*). Filtering these columns
+		// directly replaces the old per-customer EXISTS scan of the multi-million-row
+		// guest_list table — the source of the Customer List timeouts.
 		$dob_range = guest_list_parse_date_range($this->input->get('dob'));
 		if ($dob_range !== null) {
-			$gstr  .= " AND gl.DateOfBirth >= ? AND gl.DateOfBirth <= ? ";
-			$gpar[] = $dob_range[0];
-			$gpar[] = $dob_range[1];
+			$where   .= " AND c.DateOfBirth >= ? AND c.DateOfBirth <= ? ";
+			$params[] = $dob_range[0];
+			$params[] = $dob_range[1];
 		}
 
-		$birthday = guest_list_birthday_clause($this->input->get('birthday'));
+		$birthday = guest_list_birthday_clause($this->input->get('birthday'), 'c.DateOfBirth');
 		if ($birthday !== null) {
-			$gstr .= $birthday['sql'];
-			foreach ($birthday['params'] as $bp) { $gpar[] = $bp; }
+			$where .= $birthday['sql'];
+			foreach ($birthday['params'] as $bp) { $params[] = $bp; }
 		}
 
-		$this->Append_In_Clause($gstr, $gpar, 'gl.Gender', $this->input->get('gender'));
-		$this->Append_In_Clause($gstr, $gpar, 'gl.Type',   $this->input->get('guest_type'));
-		$this->Append_In_Clause($gstr, $gpar, 'cn.Country', $this->input->get('nationality'));
+		$this->Append_In_Clause($where, $params, 'c.Gender',    $this->input->get('gender'));
+		$this->Append_In_Clause($where, $params, 'c.GuestType', $this->input->get('guest_type'));
 
-		if ($gstr !== '') {
-			$where .= " AND EXISTS (
-				SELECT 1 FROM guest_list gl
-				LEFT JOIN country_code cn ON cn.CountryCodeID = gl.Nationality
-				WHERE gl.Status = 'Y' AND gl.dedup_key = {$key}
-				{$gstr} ) ";
-			$params = array_merge($params, $gpar);
+		// Nationality arrives as country NAMES; the snapshot stores the CountryCodeID,
+		// so map names -> ids via country_code (matches the old cn.Country filter).
+		$nat_values = guest_list_multi_values($this->input->get('nationality'));
+		if (!empty($nat_values)) {
+			$nat_ph  = implode(',', array_fill(0, count($nat_values), '?'));
+			$where  .= " AND c.Nationality IN (SELECT CountryCodeID FROM country_code WHERE Country IN ({$nat_ph})) ";
+			$params  = array_merge($params, $nat_values);
 		}
 
 		// ---- Remark tier: EXISTS on the customer's remark log (by dedup_key) ----
@@ -1214,23 +1214,6 @@ GROUP BY mm.merge_key";
 	}
 
 	/**
-	 * The `glself` derived table: one guest_list row per phone key (the customer's
-	 * own guest record where they appear as a guest), for the Gender / Nationality
-	 * / DOB / Guest Type columns. Guest Type defaults to ADULT when absent.
-	 */
-	private function Customer_Self_Guest_Subquery()
-	{
-		return "(
-			SELECT dedup_key, Gender, Nationality, DateOfBirth, Type FROM (
-				SELECT gl.dedup_key, gl.Gender, gl.Nationality, gl.DateOfBirth, gl.Type,
-					ROW_NUMBER() OVER (PARTITION BY gl.dedup_key ORDER BY gl.GuestListID) AS rn
-				FROM guest_list gl
-				WHERE gl.Status = 'Y' AND gl.dedup_key IS NOT NULL
-			) z WHERE z.rn = 1
-		)";
-	}
-
-	/**
 	 * The Customer List page: one row per active customer, enriched with the same
 	 * columns the Guest List shows, ordered by customer Date Creation. $sort_dir
 	 * ('DESC' newest-first default, or 'ASC' oldest-first) drives the header sort
@@ -1246,7 +1229,8 @@ GROUP BY mm.merge_key";
 		$bagg   = $this->Customer_Booking_Aggregate_Subquery();
 		$blat   = $this->Customer_Latest_Booking_Subquery();
 		$bcc    = $this->Customer_Calling_Code_Subquery();
-		$glf    = $this->Customer_Self_Guest_Subquery();
+		// Gender/DOB/Nationality/GuestType now come from the customer snapshot
+		// columns (c.*), so the old multi-million-row guest_list self-join is gone.
 
 		$sql = "
 	SELECT
@@ -1264,9 +1248,9 @@ GROUP BY mm.merge_key";
 		CONVERT(c.customer_type USING utf8mb4) COLLATE utf8mb4_unicode_ci AS CustomerType,
 		CONVERT(cat.Name USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Destination,
 		CONVERT(cn.Country USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Nationality,
-		CONVERT(glself.Gender USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Gender,
-		CONVERT(COALESCE(glself.Type, 'ADULT') USING utf8mb4) COLLATE utf8mb4_unicode_ci AS GuestType,
-		glself.DateOfBirth AS DOB,
+		CONVERT(c.Gender USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Gender,
+		CONVERT(COALESCE(c.GuestType, 'ADULT') USING utf8mb4) COLLATE utf8mb4_unicode_ci AS GuestType,
+		c.DateOfBirth AS DOB,
 		COALESCE(bagg.TotalPax, 0) AS TotalPax,
 		CAST('Booking Guest' AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS Type,
 		CONVERT(blatest.Token USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Token,
@@ -1284,8 +1268,7 @@ GROUP BY mm.merge_key";
 	LEFT JOIN source   s   ON s.SourceID  = blatest.Source
 	LEFT JOIN category cat ON cat.CategoryID = blatest.Destination
 	LEFT JOIN {$bagg} bagg ON bagg.CustomerID = c.CustomerID
-	LEFT JOIN {$glf} glself ON glself.dedup_key = {$key}
-	LEFT JOIN country_code cn ON cn.CountryCodeID = glself.Nationality
+	LEFT JOIN country_code cn ON cn.CountryCodeID = c.Nationality
 	{$branch['where']}
 	ORDER BY (c.created_at IS NULL) ASC, c.created_at {$dir}, c.name ASC
 	LIMIT " . (int) $limit . " OFFSET " . (int) $offset;
@@ -1395,6 +1378,14 @@ GROUP BY mm.merge_key";
 		}
 		$this->db->query($sql, $params);
 
+		// The new Mobile changes the guest's generated dedup_key, so refresh the
+		// customer snapshot for BOTH the old key (member left) and the new key.
+		$this->load->helper('guest_contact');
+		$this->load->model('Customer_Model');
+		$this->Customer_Model->Refresh_Snapshot_By_Keys(
+			array($current_dedup_key, guest_contact_normalize_key($new_mobile))
+		);
+
 		return $affected + $this->db->affected_rows();
 	}
 
@@ -1502,6 +1493,9 @@ GROUP BY mm.merge_key";
 			'phone_number' => $new_mobile,
 			'updated_at'   => date('Y-m-d H:i:s'),
 		));
+		// New phone -> different self guest record; recompute this customer's snapshot.
+		$this->load->model('Customer_Model');
+		$this->Customer_Model->Refresh_Snapshot_For_Customer($customer_id);
 		return 1;
 	}
 

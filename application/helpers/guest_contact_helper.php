@@ -474,7 +474,7 @@ if (!function_exists('guest_list_birthday_clause')) {
      * @param string $raw Raw dropdown value from the request.
      * @return array{sql:string,params:array}|null
      */
-    function guest_list_birthday_clause($raw)
+    function guest_list_birthday_clause($raw, $column = 'gl.DateOfBirth')
     {
         $raw = trim((string) $raw);
         if ($raw === '') {
@@ -482,13 +482,13 @@ if (!function_exists('guest_list_birthday_clause')) {
         }
         if ($raw === 'today') {
             return array(
-                'sql'    => " AND MONTH(gl.DateOfBirth) = MONTH(CURDATE()) AND DAY(gl.DateOfBirth) = DAY(CURDATE()) ",
+                'sql'    => " AND MONTH({$column}) = MONTH(CURDATE()) AND DAY({$column}) = DAY(CURDATE()) ",
                 'params' => array(),
             );
         }
         if ($raw === 'this_month') {
             return array(
-                'sql'    => " AND MONTH(gl.DateOfBirth) = MONTH(CURDATE()) ",
+                'sql'    => " AND MONTH({$column}) = MONTH(CURDATE()) ",
                 'params' => array(),
             );
         }
@@ -496,7 +496,7 @@ if (!function_exists('guest_list_birthday_clause')) {
             $month = (int) $raw;
             if ($month >= 1 && $month <= 12) {
                 return array(
-                    'sql'    => " AND MONTH(gl.DateOfBirth) = ? ",
+                    'sql'    => " AND MONTH({$column}) = ? ",
                     'params' => array($month),
                 );
             }

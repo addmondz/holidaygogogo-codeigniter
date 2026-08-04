@@ -286,6 +286,9 @@ class Customer_Model extends CI_Model
 		$insert = $this->db->insert('customer', $data);
 
 		if ($insert && $this->db->affected_rows() > 0) {
+			// A new customer may already match existing guest rows by phone —
+			// populate its snapshot from them (NULL if none).
+			$this->Refresh_Snapshot_For_Customer($this->db->insert_id());
 			return $this->output
 				->set_content_type('application/json')
 				->set_output(json_encode([
@@ -370,6 +373,21 @@ class Customer_Model extends CI_Model
 		$this->db->where('CustomerID', $this->input->post('customer_id'));
 		$this->db->where('AutocountSyncMessage', '');
 		$this->db->update('customer');
+
+		// phone_number may have changed -> recompute the guest snapshot for every
+		// customer touched by this save (usually one).
+		$touched = array();
+		if (!empty($this->input->post('customer_id'))) {
+			$touched[(int) $this->input->post('customer_id')] = true;
+		}
+		foreach ((array) $rows as $row) {
+			if (is_array($row) && !empty($row['CustomerID'])) {
+				$touched[(int) $row['CustomerID']] = true;
+			}
+		}
+		foreach (array_keys($touched) as $cid) {
+			$this->Refresh_Snapshot_For_Customer($cid);
+		}
 	}
 
 
@@ -385,6 +403,139 @@ class Customer_Model extends CI_Model
         return $this->db
             ->where('CustomerID', $customer_id)
             ->update('customer', $data);
+    }
+
+    // ------------------------------------------------------------------
+    // "Self guest" snapshot sync (customer.Gender/DateOfBirth/Nationality/
+    // GuestType). These columns are a denormalised copy of the customer's own
+    // guest_list record so the Customer List can filter/sort/enrich without
+    // touching the multi-million-row guest_list table. Kept fresh in real time
+    // by calling the methods below from every guest_list / customer.phone write
+    // path; a full rebuild is available via the backfill migration or the
+    // customer_snapshot_resync CLI command. See Guests_Model::Read_Customers_Rich.
+    // ------------------------------------------------------------------
+
+    // The customer's phone key = last 9 digits of phone_number, matching the
+    // guest_list dedup_key generated column. Interpolated (no user input).
+    const SNAPSHOT_KEY_EXPR = "NULLIF(RIGHT(REGEXP_REPLACE(IFNULL(c.phone_number, ''), '[^0-9]', ''), 9), '')";
+
+    /**
+     * Recompute the snapshot for EVERY customer whose phone key is one of $keys,
+     * reading each key's self record (active guest_list row, lowest GuestListID)
+     * in a single statement. A key with no active guest row clears that
+     * customer's snapshot to NULL (LEFT JOIN), so this self-heals deletes too.
+     *
+     * @param string[] $keys dedup_keys (last-9-digit phone keys) to refresh.
+     */
+    public function Refresh_Snapshot_By_Keys(array $keys)
+    {
+        // Normalise: strings, no blanks, deduped.
+        $keys = array_values(array_unique(array_filter(
+            array_map('strval', $keys),
+            function ($k) { return $k !== ''; }
+        )));
+        if (empty($keys)) {
+            return;
+        }
+
+        $ph  = implode(',', array_fill(0, count($keys), '?'));
+        $key = self::SNAPSHOT_KEY_EXPR;
+        $sql = "UPDATE customer c
+            LEFT JOIN (
+                SELECT dedup_key, Gender, DateOfBirth, Nationality, Type FROM (
+                    SELECT gl.dedup_key, gl.Gender, gl.DateOfBirth, gl.Nationality, gl.Type,
+                        ROW_NUMBER() OVER (PARTITION BY gl.dedup_key ORDER BY gl.GuestListID ASC) AS rn
+                    FROM guest_list gl
+                    WHERE gl.Status = 'Y' AND gl.dedup_key IN ({$ph})
+                ) z WHERE z.rn = 1
+            ) g ON g.dedup_key = {$key}
+            SET c.Gender = g.Gender, c.DateOfBirth = g.DateOfBirth,
+                c.Nationality = g.Nationality, c.GuestType = g.Type
+            WHERE {$key} IN ({$ph})";
+        // Keys appear twice: the derived-table filter and the customer WHERE.
+        $this->db->query($sql, array_merge($keys, $keys));
+    }
+
+    /**
+     * Refresh the snapshot for all customers tied to a booking's guests — used
+     * after a guest_list write (create/update/delete) on that booking. Reads the
+     * distinct dedup_keys of the booking's guest rows (incl. just-deleted ones,
+     * so their key is re-evaluated and cleared if it lost its self record).
+     */
+    public function Refresh_Snapshot_By_Booking($booking_id)
+    {
+        $booking_id = (int) $booking_id;
+        if ($booking_id < 1) {
+            return;
+        }
+        $rows = $this->db->distinct()->select('dedup_key')
+            ->from('guest_list')
+            ->where('BookingID', $booking_id)
+            ->where('dedup_key IS NOT NULL', null, false)
+            ->get()->result();
+        $keys = array();
+        foreach ($rows as $r) {
+            if ($r->dedup_key !== null && $r->dedup_key !== '') {
+                $keys[] = $r->dedup_key;
+            }
+        }
+        $this->Refresh_Snapshot_By_Keys($keys);
+    }
+
+    /**
+     * Refresh one customer's snapshot from its OWN phone — used after the
+     * customer's phone_number is created/changed (which changes which guest_list
+     * row is its self record). A blank/no-digit phone clears the snapshot.
+     */
+    /**
+     * Rebuild the snapshot for ALL customers from guest_list in one statement —
+     * the same logic as the backfill migration. Safety net for the real-time
+     * hooks: run via the customer_snapshot_resync CLI command (optionally
+     * cron'd) to self-heal any drift. Returns rows affected.
+     */
+    public function Rebuild_All_Snapshots()
+    {
+        $key = self::SNAPSHOT_KEY_EXPR;
+        $sql = "UPDATE customer c
+            LEFT JOIN (
+                SELECT dedup_key, Gender, DateOfBirth, Nationality, Type FROM (
+                    SELECT gl.dedup_key, gl.Gender, gl.DateOfBirth, gl.Nationality, gl.Type,
+                        ROW_NUMBER() OVER (PARTITION BY gl.dedup_key ORDER BY gl.GuestListID ASC) AS rn
+                    FROM guest_list gl
+                    WHERE gl.Status = 'Y' AND gl.dedup_key IS NOT NULL
+                ) z WHERE z.rn = 1
+            ) g ON g.dedup_key = {$key}
+            SET c.Gender = g.Gender, c.DateOfBirth = g.DateOfBirth,
+                c.Nationality = g.Nationality, c.GuestType = g.Type
+            WHERE {$key} IS NOT NULL";
+        $this->db->query($sql);
+        return $this->db->affected_rows();
+    }
+
+    public function Refresh_Snapshot_For_Customer($customer_id)
+    {
+        $customer_id = (int) $customer_id;
+        if ($customer_id < 1) {
+            return;
+        }
+        // Reuse SNAPSHOT_KEY_EXPR (aliased customer as c) to read this row's key.
+        $row = $this->db
+            ->select(self::SNAPSHOT_KEY_EXPR . ' AS k', false)
+            ->from('customer c')
+            ->where('c.CustomerID', $customer_id)
+            ->get()->row();
+
+        if ($row && $row->k !== null && $row->k !== '') {
+            // Refresh by key — also (idempotently) refreshes any other customer
+            // sharing the new key, which is correct.
+            $this->Refresh_Snapshot_By_Keys(array($row->k));
+        } else {
+            // No usable phone -> nothing to snapshot; clear any stale values.
+            $this->db->where('CustomerID', $customer_id)->update('customer', array(
+                'Gender' => null, 'DateOfBirth' => null,
+                'Nationality' => null, 'GuestType' => null,
+            ));
+        }
     }
 
     public function generate_customer_code($customer_name)
@@ -807,6 +958,7 @@ class Customer_Model extends CI_Model
 				$data['CustomerCode'] = $supplied_code;
 				$ok = $this->db->insert('customer', $data) && $this->db->affected_rows() > 0;
 				if ($ok) {
+					$this->Refresh_Snapshot_For_Customer($this->db->insert_id());
 					$summary['created'][] = array('line' => $line, 'name' => $name, 'code' => $supplied_code);
 				} else {
 					$summary['failed'][] = array('line' => $line, 'name' => $name, 'reason' => 'Insert failed');
@@ -814,6 +966,7 @@ class Customer_Model extends CI_Model
 			} else {
 				$new_id = $this->create_with_generated_code($data);
 				if ($new_id) {
+					$this->Refresh_Snapshot_For_Customer($new_id);
 					$row = $this->find($new_id);
 					$summary['created'][] = array('line' => $line, 'name' => $name,
 						'code' => $row ? $row->CustomerCode : null);

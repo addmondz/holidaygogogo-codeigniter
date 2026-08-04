@@ -78,6 +78,7 @@ class Guest_List_Model extends CI_Model
 			}
 		}
 		$this->db->insert('guest_list', $array);
+		$this->Sync_Customer_Snapshot($booking_id);
 	}
 
 	// Destination country = first product's category country (mirrors the
@@ -160,6 +161,24 @@ class Guest_List_Model extends CI_Model
 			}
 			$this->db->insert('guest_list', $array);
 		}
+		// New guests may be the customer's own record (Gender/DOB/Nationality/Type)
+		// — refresh the denormalised customer.* snapshot for this booking's guests.
+		$this->Sync_Customer_Snapshot($booking_id);
+	}
+
+	/**
+	 * Keep the denormalised customer "self guest" snapshot (Gender / DateOfBirth
+	 * / Nationality / GuestType) in step after a guest_list write on $booking_id.
+	 * Central hook so every guest form save/update/delete refreshes the Customer
+	 * List columns in real time. Best-effort: never blocks the guest_list write.
+	 */
+	private function Sync_Customer_Snapshot($booking_id)
+	{
+		if (empty($booking_id)) {
+			return;
+		}
+		$this->load->model('Customer_Model');
+		$this->Customer_Model->Refresh_Snapshot_By_Booking($booking_id);
 	}
 
 	function Create_Guest_List_Log($booking_id)
@@ -221,7 +240,26 @@ class Guest_List_Model extends CI_Model
 				}
 			}
 		}
+		// Refresh the customer snapshot for these guests. $booking_id can be null
+		// from some callers, so fall back to resolving it from the first guest row.
+		if (empty($booking_id)) {
+			$booking_id = $this->Booking_Id_For_Guest($this->input->post('guests')[0] ?? null);
+		}
+		$this->Sync_Customer_Snapshot($booking_id);
 		return $value;
+	}
+
+	/** BookingID for a guest_list row, so an update with no booking_id can still
+	 *  target the right snapshot. Returns null when the guest id is unknown. */
+	private function Booking_Id_For_Guest($guest_list_id)
+	{
+		$guest_list_id = (int) $guest_list_id;
+		if ($guest_list_id < 1) {
+			return null;
+		}
+		$row = $this->db->select('BookingID')
+			->get_where('guest_list', array('GuestListID' => $guest_list_id))->row();
+		return $row ? $row->BookingID : null;
 	}
 
 	function Update_GL_Session($column, $value, $gl_session_lock, $gl_session_expiration)
@@ -236,6 +274,9 @@ class Guest_List_Model extends CI_Model
 	
 	function Delete($guest_list_id)
 	{
+		// Capture the booking BEFORE the soft-delete so we can refresh the
+		// customer snapshot (the deleted row may have been the self record).
+		$booking_id = $this->Booking_Id_For_Guest($guest_list_id);
 		$array = array(
 			'Status' => 'N',
 			'UpdateBy' => $this->session->userdata('admin_id'),
@@ -243,6 +284,7 @@ class Guest_List_Model extends CI_Model
 		);
 		$this->db->where('GuestListID', $guest_list_id);
 		$this->db->update('guest_list', $array);
+		$this->Sync_Customer_Snapshot($booking_id);
 	}
 
 	function Update_Passport_Copy($guest_list_id, $filename)
