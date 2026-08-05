@@ -40,7 +40,6 @@ class Manual_Leads extends MY_Controller
 		$this->load->model('Ghl_Messages_Model');
 		$data['msg_log_phones'] = $this->Ghl_Messages_Model->Phones_With_Messages_For_Guests($data['guests']);
 		$data['chat_counts']    = $this->Chat_Counts_For_Guests($data['guests']);
-		$data['status_log_counts'] = $this->Status_Log_Counts_For_Guests($data['guests']);
 		$data['total']          = null;
 		$data['page']           = $page;
 		$data['limit']          = $limit;
@@ -147,6 +146,102 @@ class Manual_Leads extends MY_Controller
 	}
 
 	/**
+	 * Update an existing hand-entered ("Manual") lead from the Edit Lead modal
+	 * (the same form as Create, in edit mode). POST dedup_key + the lead fields.
+	 * The lead must be visible to the current viewer (Read_Manual_Lead_Detail
+	 * applies the same per-creator 'manual' scope as the listing), so a viewer can
+	 * only edit a lead they are allowed to see. The identity/ownership columns
+	 * (contact_id, lead_source, created_by, date_added) are never changed — see
+	 * Ghl_Contacts_Model::update_manual_lead. Redirects back with a flash message.
+	 */
+	function Update()
+	{
+		if(lc_block_edit('manual_leads')) { return; }
+		$this->load->helper('ghl_manual_lead');
+		$this->load->model('Ghl_Contacts_Model');
+
+		$dedup_key = (string) $this->input->post('dedup_key');
+		if ($dedup_key === '') {
+			$this->session->set_flashdata('ghl_lead_error', 'Missing lead reference.');
+			redirect(base_url('Manual_Leads'));
+			return;
+		}
+
+		// Existence + visibility check: the scope inside Read_Manual_Lead_Detail
+		// means a viewer who cannot see this manual lead gets null here.
+		$existing = $this->Guests_Model->Read_Manual_Lead_Detail($dedup_key);
+		if (!$existing) {
+			$this->session->set_flashdata('ghl_lead_error', 'Lead not found.');
+			redirect(base_url('Manual_Leads'));
+			return;
+		}
+
+		// Reuse the create mapper/validator; the model's update whitelist ignores
+		// the create-only keys (contact_id, lead_source, created_by, date_added),
+		// so passing the empty uid / null creator here is harmless.
+		$now = date('Y-m-d H:i:s');
+		$prepared = ghl_manual_lead_prepare($this->input->post(), '', $now, null);
+		if (!$prepared['ok']) {
+			$this->session->set_flashdata('ghl_lead_error', implode(' ', $prepared['errors']));
+			redirect(base_url('Manual_Leads'));
+			return;
+		}
+
+		if ($this->Ghl_Contacts_Model->update_manual_lead((int) $existing->id, $prepared['row'])) {
+			$this->session->set_flashdata('ghl_lead_success', 'Manual lead updated.');
+		} else {
+			$this->session->set_flashdata('ghl_lead_error', 'Could not update the lead. Please try again.');
+		}
+		redirect(base_url('Manual_Leads'));
+	}
+
+	/**
+	 * Read one manual lead's RAW editable values to pre-fill the Edit Lead modal.
+	 * GET ?dedup_key=… Returns { ok, lead:{...raw fields...} }. Unlike View_Lead
+	 * (which formats for display), this returns date_of_birth as Y-m-d for the date
+	 * input and tags as a comma-joined string for the tags text field. Same
+	 * per-creator visibility as the listing (via Read_Manual_Lead_Detail).
+	 */
+	function Edit_Data()
+	{
+		$out = function ($data) {
+			$this->output->set_content_type('application/json')->set_output(json_encode($data));
+		};
+		$dedup_key = (string) $this->input->get('dedup_key');
+		if ($dedup_key === '') {
+			return $out(array('ok' => false, 'message' => 'Missing lead reference.'));
+		}
+		$row = $this->Guests_Model->Read_Manual_Lead_Detail($dedup_key);
+		if (!$row) {
+			return $out(array('ok' => false, 'message' => 'Lead not found.'));
+		}
+
+		$tags = ghl_lead_tags_parse($row->tags_json);
+		$dob  = ($row->date_of_birth && $row->date_of_birth !== '0000-00-00') ? $row->date_of_birth : '';
+
+		return $out(array('ok' => true, 'lead' => array(
+			'first_name'    => $row->first_name,
+			'last_name'     => $row->last_name,
+			'company_name'  => $row->company_name,
+			'phone'         => $row->phone,
+			'email'         => $row->email,
+			'address'       => $row->address,
+			'country'       => $row->country,
+			'gender'        => $row->gender,
+			'chat_language' => $row->chat_language,
+			'race'          => $row->race,
+			'nationality'   => $row->nationality,
+			'source'        => $row->source,
+			'customer_type' => $row->customer_type,
+			'lead_status'   => $row->lead_status,
+			'lead_intro'    => $row->lead_intro,
+			'notes'         => $row->notes,
+			'date_of_birth' => $dob,
+			'tags'          => implode(', ', array_values($tags)),
+		)));
+	}
+
+	/**
 	 * Read one manual lead's full detail for the Action ▸ View modal. GET ?dedup_key=…
 	 * Returns { ok, lead:{...formatted fields...} }. Respects per-creator visibility
 	 * (Read_Manual_Lead_Detail applies the same 'manual' scope as the listing), so a
@@ -173,6 +268,17 @@ class Manual_Leads extends MY_Controller
 		$created = ($row->created_at && $row->created_at !== '0000-00-00 00:00:00')
 			? date('d M Y, g:i A', strtotime($row->created_at)) : '';
 
+		// Dated status history (newest first) — shown as a list in the View modal.
+		$status_log = array();
+		foreach ($this->Guests_Model->Read_Lead_Status_Log($dedup_key) as $r) {
+			$status_log[] = array(
+				'status_date' => $r->StatusDate,
+				'lead_status' => $r->LeadStatus,
+				'note'        => $r->Note !== null ? $r->Note : '',
+				'created_by'  => $r->CreatedByName !== null ? $r->CreatedByName : '',
+			);
+		}
+
 		return $out(array('ok' => true, 'lead' => array(
 			'name'          => $name,
 			'company_name'  => $row->company_name,
@@ -191,6 +297,7 @@ class Manual_Leads extends MY_Controller
 			'notes'         => $row->notes,
 			'date_of_birth' => $dob,
 			'tags'          => array_values($tags),
+			'status_log'    => $status_log,
 			'created_by'    => $row->CreatedByName,
 			'created_at'    => $created,
 		)));
@@ -439,21 +546,6 @@ class Manual_Leads extends MY_Controller
 			}
 		}
 		return $this->Guests_Model->Read_Chat_History_Counts($keys);
-	}
-
-	/**
-	 * dedup_key => active Lead Status log count for the leads on this page (badges
-	 * the Action menu with "Lead Status (n)").
-	 */
-	private function Status_Log_Counts_For_Guests($guests)
-	{
-		$keys = array();
-		foreach ((array) $guests as $g) {
-			if (!empty($g->dedup_key)) {
-				$keys[] = $g->dedup_key;
-			}
-		}
-		return $this->Guests_Model->Read_Lead_Status_Log_Counts($keys);
 	}
 
 	function Count()

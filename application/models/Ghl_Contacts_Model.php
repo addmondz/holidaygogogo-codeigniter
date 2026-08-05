@@ -172,6 +172,49 @@ class Ghl_Contacts_Model extends CI_Model
     }
 
     /**
+     * Update an existing hand-entered ("Manual") lead's editable columns. $row is
+     * the whitelisted array from ghl_manual_lead_prepare(); only the visible-column
+     * fields are applied — the identity/ownership columns (contact_id, lead_source,
+     * created_by, date_added) are deliberately NOT in the whitelist, so an edit can
+     * never re-key the lead or steal its creator. The WHERE is pinned to
+     * lead_source = 'manual', so a GHL-synced row can never be touched by this path.
+     * Returns true on success (0 changed rows still counts), false otherwise.
+     */
+    public function update_manual_lead($id, $row)
+    {
+        $id = (int) $id;
+        if ($id < 1) {
+            return false;
+        }
+
+        // Only the columns the Edit form actually exposes. last_name and
+        // date_of_birth are intentionally excluded: the shared Create/Edit form has
+        // no input for them, so an absent POST value must NOT wipe a stored value
+        // (e.g. a last_name/DOB brought in by bulk import).
+        $allowed = array(
+            'first_name', 'company_name', 'email', 'phone', 'gender',
+            'race', 'nationality', 'address', 'country', 'source', 'notes',
+            'customer_type', 'lead_intro', 'lead_status', 'chat_language',
+            'tags_json',
+        );
+
+        $update = array();
+        foreach ($allowed as $column) {
+            if (array_key_exists($column, $row)) {
+                $update[$column] = $row[$column];
+            }
+        }
+        if (empty($update)) {
+            return false;
+        }
+
+        $update['updated_at'] = $this->get_code_datetime();
+
+        $this->db->where('id', $id)->where('lead_source', 'manual');
+        return $this->db->update('ghl_contacts', $update);
+    }
+
+    /**
      * The dedup_key the Guest/Manual listing shows for a contact row — exactly the
      * COALESCE(gc.dedup_key, CONCAT('ghl:', gc.id)) the SELECT uses — so a Lead
      * Status log entry seeded at create time keys to the SAME value the listing's

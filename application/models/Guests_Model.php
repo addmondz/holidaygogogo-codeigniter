@@ -1716,28 +1716,6 @@ GROUP BY mm.merge_key";
 		return $rows;
 	}
 
-	function Read_Lead_Status_Log_Counts($dedup_keys)
-	{
-		$keys = array();
-		foreach ((array) $dedup_keys as $k) {
-			$k = (string) $k;
-			if ($k !== '' && !in_array($k, $keys, true)) {
-				$keys[] = $k;
-			}
-		}
-		if (empty($keys)) {
-			return array();
-		}
-		$placeholders = implode(',', array_fill(0, count($keys), '?'));
-		$sql = "SELECT dedup_key, COUNT(*) AS cnt FROM lead_status_log
-			WHERE Status = 'Y' AND dedup_key IN ({$placeholders}) GROUP BY dedup_key";
-		$out = array();
-		foreach ($this->db->query($sql, $keys)->result() as $row) {
-			$out[$row->dedup_key] = (int) $row->cnt;
-		}
-		return $out;
-	}
-
 	function Delete_Lead_Status_Log($log_id, $admin_id)
 	{
 		$this->db->query(
