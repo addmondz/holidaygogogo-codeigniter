@@ -283,6 +283,22 @@ class Customer_Model extends CI_Model
 			'updated_at'    => date('Y-m-d H:i:s'),
 		];
 
+		// HARD BLOCK on duplicate phone: if an active customer already has this
+		// phone (normalised, any format), refuse to create a second record and
+		// return the existing match so the form can point the user to it. There
+		// is no override — a phone identifies one customer.
+		$matches = $this->find_active_by_phone($data['phone_number']);
+		if (!empty($matches)) {
+			return $this->output
+				->set_content_type('application/json')
+				->set_output(json_encode([
+					'success'   => false,
+					'duplicate' => true,
+					'matches'   => $matches,
+					'message'   => 'A customer with this phone number already exists.',
+				]));
+		}
+
 		$insert = $this->db->insert('customer', $data);
 
 		if ($insert && $this->db->affected_rows() > 0) {
@@ -394,6 +410,434 @@ class Customer_Model extends CI_Model
 	public function find($customer_id)
     {
         return $this->db->get_where('customer', ['CustomerID' => $customer_id])->row();
+    }
+
+    /**
+     * Normalised last-9-digit phone key (customer-only duplicate detection).
+     * Returns '' for a blank/digitless phone so those never match.
+     */
+    private function _phone_norm($phone)
+    {
+        $this->load->helper('customer_dedup');
+        return customer_phone_dedup_key($phone);
+    }
+
+    /**
+     * Active customers whose phone matches $phone by normalised last-9-digit key,
+     * computed on the fly in SQL (no stored column). Used by the "possible
+     * duplicate" check on the customer + booking create paths. Name is
+     * deliberately NOT part of the match (real namesakes with different phones
+     * are allowed). Looks at the customer table only.
+     *
+     * @param string   $phone
+     * @param int|null $exclude_customer_id Skip this id (e.g. the row being edited).
+     * @return array Rows: CustomerID, name, phone_number, CustomerCode.
+     */
+    public function find_active_by_phone($phone, $exclude_customer_id = null)
+    {
+        $key = $this->_phone_norm($phone);
+        if ($key === '') {
+            return array();
+        }
+        // Same last-9-digit normalisation as customer_phone_dedup_key(), applied
+        // to the stored phone_number so any format ("0122983045" / "122983045" /
+        // "+60 122983045") collapses to the same key.
+        $this->db->select('CustomerID, name, phone_number, CustomerCode');
+        $this->db->where('Status', 'Y');
+        $this->db->where(
+            "RIGHT(REGEXP_REPLACE(IFNULL(phone_number, ''), '[^0-9]', ''), 9) = " . $this->db->escape($key),
+            null,
+            false
+        );
+        if (!empty($exclude_customer_id)) {
+            $this->db->where('CustomerID !=', (int) $exclude_customer_id);
+        }
+        $this->db->limit(5);
+        return $this->db->get('customer')->result();
+    }
+
+    /**
+     * On-the-fly customer creation for the booking flow with a HARD duplicate-
+     * phone block: if an active customer already has this phone (normalised),
+     * reuse that customer (refreshing its details from $data) instead of
+     * inserting a duplicate; otherwise create a new customer with a generated
+     * code. Returns the CustomerID (existing or new), or null on failure.
+     *
+     * @param array $data Customer fields (expects at least phone_number / name).
+     * @return int|null
+     */
+    public function create_or_reuse_by_phone(array $data)
+    {
+        $existing = $this->find_active_by_phone(isset($data['phone_number']) ? $data['phone_number'] : null);
+        if (!empty($existing)) {
+            $id = (int) $existing[0]->CustomerID;
+            // Refresh the reused customer with the latest booking-form details,
+            // but never stamp create-time fields onto an existing row. Re-queue
+            // it for AutoCount so the refreshed details sync.
+            $update = $data;
+            unset($update['created_at'], $update['AutocountSyncAction']);
+            $update['AutocountSyncStatus'] = 'P';
+            $this->update_by_id($id, $update);
+            $this->Refresh_Snapshot_For_Customer($id);
+            return $id;
+        }
+        return $this->create_with_generated_code($data);
+    }
+
+    /**
+     * Last-9-digit phone key SQL expression on the customer table, shared by the
+     * duplicate-group queries below (same normalisation as customer_phone_dedup_key).
+     */
+    private function _phone_key_sql($col = 'phone_number')
+    {
+        return "RIGHT(REGEXP_REPLACE(IFNULL($col, ''), '[^0-9]', ''), 9)";
+    }
+
+    /**
+     * How many active phone-duplicate groups exist (COUNT>1 sharing a phone key).
+     *
+     * @param bool $only_same_name Restrict to groups whose rows all share one name.
+     * @return int
+     */
+    public function Count_Duplicate_Phone_Groups($only_same_name = false)
+    {
+        $k = $this->_phone_key_sql();
+        $having = $only_same_name ? 'HAVING c > 1 AND names = 1' : 'HAVING c > 1';
+        $sql = "SELECT COUNT(*) AS grp_count FROM (
+                    SELECT $k AS pk, COUNT(*) AS c, COUNT(DISTINCT UPPER(TRIM(name))) AS names
+                    FROM customer
+                    WHERE Status = 'Y' AND $k <> ''
+                    GROUP BY pk $having
+                ) g";
+        $row = $this->db->query($sql)->row();
+        return $row ? (int) $row->grp_count : 0;
+    }
+
+    /**
+     * One page of phone-duplicate groups, each with its member records (name,
+     * code, phone, created_at, AutoCount status, booking_count), a names_differ
+     * flag and a suggested keeper. Owner-only merge tool consumes this.
+     *
+     * @param int  $limit
+     * @param int  $offset
+     * @param bool $only_same_name
+     * @return array List of groups: ['pk','records','names_differ','suggested_keeper'].
+     */
+    public function Find_Duplicate_Phone_Groups($limit, $offset, $only_same_name = false)
+    {
+        $this->load->helper('customer_dedup');
+        $k = $this->_phone_key_sql();
+
+        // 1. The phone keys on this page (most-duplicated first).
+        $having = $only_same_name ? 'HAVING c > 1 AND names = 1' : 'HAVING c > 1';
+        $keys = $this->db->query(
+            "SELECT $k AS pk, COUNT(*) AS c, COUNT(DISTINCT UPPER(TRIM(name))) AS names
+             FROM customer
+             WHERE Status = 'Y' AND $k <> ''
+             GROUP BY pk $having
+             ORDER BY c DESC, pk ASC
+             LIMIT ? OFFSET ?",
+            array((int) $limit, (int) $offset)
+        )->result();
+
+        if (empty($keys)) {
+            return array();
+        }
+
+        // 2. All active records for those keys, with a booking count.
+        $pks  = array_map(function ($r) { return $r->pk; }, $keys);
+        $ph   = implode(',', array_fill(0, count($pks), '?'));
+        $kc   = $this->_phone_key_sql('c.phone_number');
+        $rows = $this->db->query(
+            "SELECT c.CustomerID, c.name, c.CustomerCode, c.phone_number, c.created_at,
+                    c.AutocountSyncStatus, $kc AS pk,
+                    (SELECT COUNT(*) FROM booking b
+                       WHERE b.CustomerID = c.CustomerID OR b.CustomerID2 = c.CustomerID) AS booking_count
+             FROM customer c
+             WHERE c.Status = 'Y' AND $kc IN ($ph)
+             ORDER BY booking_count DESC, c.CustomerID ASC",
+            $pks
+        )->result();
+
+        // 3. Bucket records by key, preserving the key page order.
+        $by_key = array();
+        foreach ($rows as $r) {
+            $by_key[$r->pk][] = $r;
+        }
+
+        $groups = array();
+        foreach ($keys as $key) {
+            $recs = isset($by_key[$key->pk]) ? $by_key[$key->pk] : array();
+            if (count($recs) < 2) {
+                continue; // guard against races
+            }
+            $groups[] = array(
+                'pk'               => $key->pk,
+                'records'          => $recs,
+                'names_differ'     => customer_group_names_differ($recs),
+                'suggested_keeper' => customer_default_keeper_id($recs),
+            );
+        }
+        return $groups;
+    }
+
+    /**
+     * Merge duplicate customers into one keeper: re-point every booking from the
+     * losers to the keeper (CustomerID, CustomerID2, denormalised CustomerCode),
+     * then deactivate the losers (Status='N'). Transactional. SAFETY: every loser
+     * must be active AND share the keeper's normalised phone key, so a bad POST
+     * can never fuse unrelated customers. Local only — AutoCount is not touched.
+     *
+     * @param int   $keeper_id
+     * @param array $loser_ids
+     * @return array ['success'=>bool, 'message'?, 'bookings_moved'?, 'deactivated'?]
+     */
+    public function Merge_Customers($keeper_id, array $loser_ids, $allow_cross_phone = false)
+    {
+        $keeper_id = (int) $keeper_id;
+        $loser_ids = array_values(array_diff(
+            array_unique(array_map('intval', $loser_ids)),
+            array($keeper_id, 0)
+        ));
+        if (!$keeper_id || empty($loser_ids)) {
+            return array('success' => false, 'message' => 'Nothing to merge.');
+        }
+
+        $keeper = $this->db->get_where('customer', array('CustomerID' => $keeper_id, 'Status' => 'Y'))->row();
+        if (!$keeper) {
+            return array('success' => false, 'message' => 'Keeper not found or inactive.');
+        }
+        $key = $this->_phone_norm($keeper->phone_number);
+        if ($key === '') {
+            return array('success' => false, 'message' => 'Keeper has no valid phone number.');
+        }
+
+        $loser_codes = array();
+        foreach ($loser_ids as $lid) {
+            $l = $this->db->get_where('customer', array('CustomerID' => $lid, 'Status' => 'Y'))->row();
+            if (!$l) {
+                return array('success' => false, 'message' => "Customer #{$lid} not found or already inactive.");
+            }
+            // Same-phone safety, unless the owner explicitly opted into a manual
+            // cross-phone merge (a record pulled in via "Add another record").
+            if (!$allow_cross_phone && $this->_phone_norm($l->phone_number) !== $key) {
+                return array('success' => false, 'message' => "Customer #{$lid} has a different phone — refusing to merge.");
+            }
+            if (!empty($l->CustomerCode)) {
+                $loser_codes[] = $l->CustomerCode;
+            }
+        }
+
+        // Capture the BEFORE-state for the undo log (inside the txn, pre-update).
+        $undo = array(
+            'losers'   => array_values($loser_ids),
+            'cust_id'  => array(),
+            'cust_id2' => array(),
+            'codes'    => array(),
+        );
+        foreach ($this->db->select('BookingID, CustomerID')->where_in('CustomerID', $loser_ids)
+                     ->get('booking')->result() as $b) {
+            $undo['cust_id'][] = array('BookingID' => (int) $b->BookingID, 'old' => (int) $b->CustomerID);
+        }
+        foreach ($this->db->select('BookingID, CustomerID2')->where_in('CustomerID2', $loser_ids)
+                     ->get('booking')->result() as $b) {
+            $undo['cust_id2'][] = array('BookingID' => (int) $b->BookingID, 'old' => (int) $b->CustomerID2);
+        }
+        if (!empty($loser_codes) && !empty($keeper->CustomerCode)) {
+            foreach ($this->db->select('BookingID, CustomerCode')->where_in('CustomerCode', $loser_codes)
+                         ->get('booking')->result() as $b) {
+                $undo['codes'][] = array('BookingID' => (int) $b->BookingID, 'old' => $b->CustomerCode);
+            }
+        }
+
+        $this->db->trans_start();
+
+        $this->db->where_in('CustomerID', $loser_ids)->update('booking', array('CustomerID' => $keeper_id));
+        $moved = (int) $this->db->affected_rows();
+
+        $this->db->where_in('CustomerID2', $loser_ids)->update('booking', array('CustomerID2' => $keeper_id));
+        $moved += (int) $this->db->affected_rows();
+
+        // Denormalised booking.CustomerCode: repoint any that held a loser's code.
+        if (!empty($loser_codes) && !empty($keeper->CustomerCode)) {
+            $this->db->where_in('CustomerCode', $loser_codes)
+                ->update('booking', array('CustomerCode' => $keeper->CustomerCode));
+        }
+
+        $this->db->where_in('CustomerID', $loser_ids)
+            ->update('customer', array('Status' => 'N', 'updated_at' => date('Y-m-d H:i:s')));
+
+        // Undo log — lets the owner revert this merge (guarded). Written in-txn.
+        $this->db->insert('customer_merge_log', array(
+            'keeper_id'    => $keeper_id,
+            'admin_id'     => (int) $this->session->userdata('admin_id') ?: null,
+            'undo_payload' => json_encode($undo),
+            'status'       => 'MERGED',
+            'created_at'   => date('Y-m-d H:i:s'),
+        ));
+
+        $this->db->trans_complete();
+        if ($this->db->trans_status() === false) {
+            return array('success' => false, 'message' => 'Database error — merge rolled back.');
+        }
+
+        $this->Refresh_Snapshot_For_Customer($keeper_id);
+
+        return array(
+            'success'        => true,
+            'keeper'         => $keeper_id,
+            'deactivated'    => count($loser_ids),
+            'bookings_moved' => $moved,
+        );
+    }
+
+    /**
+     * Guarded revert of a past merge (customer_merge_log row). Re-points each
+     * moved booking back to its original customer ONLY IF it still points to the
+     * keeper (edits made after the merge are left alone and reported as skipped),
+     * reactivates the deactivated losers, and restores overwritten booking codes.
+     * Transactional. Local only — AutoCount is not touched.
+     *
+     * @param int $merge_id
+     * @return array ['success'=>bool, 'message'?, 'reverted'?, 'skipped'?, 'reactivated'?]
+     */
+    public function Revert_Merge($merge_id)
+    {
+        $merge_id = (int) $merge_id;
+        $log = $this->db->get_where('customer_merge_log', array('MergeID' => $merge_id))->row();
+        if (!$log) {
+            return array('success' => false, 'message' => 'Merge record not found.');
+        }
+        if ($log->status === 'REVERTED') {
+            return array('success' => false, 'message' => 'This merge has already been reverted.');
+        }
+
+        $undo   = json_decode($log->undo_payload, true);
+        $keeper = (int) $log->keeper_id;
+        if (!is_array($undo)) {
+            return array('success' => false, 'message' => 'Undo data is unreadable.');
+        }
+
+        $reverted = 0;
+        $skipped  = 0;
+
+        $this->db->trans_start();
+
+        // booking.CustomerID — only if it still points to the keeper.
+        foreach ((isset($undo['cust_id']) ? $undo['cust_id'] : array()) as $it) {
+            $this->db->where('BookingID', (int) $it['BookingID'])->where('CustomerID', $keeper)
+                ->update('booking', array('CustomerID' => (int) $it['old']));
+            if ($this->db->affected_rows() > 0) { $reverted++; } else { $skipped++; }
+        }
+        // booking.CustomerID2 — only if it still points to the keeper.
+        foreach ((isset($undo['cust_id2']) ? $undo['cust_id2'] : array()) as $it) {
+            $this->db->where('BookingID', (int) $it['BookingID'])->where('CustomerID2', $keeper)
+                ->update('booking', array('CustomerID2' => (int) $it['old']));
+            if ($this->db->affected_rows() > 0) { $reverted++; } else { $skipped++; }
+        }
+        // booking.CustomerCode — restore only rows still holding the keeper's code.
+        $keeper_row = $this->db->get_where('customer', array('CustomerID' => $keeper))->row();
+        $keeper_code = $keeper_row ? $keeper_row->CustomerCode : null;
+        foreach ((isset($undo['codes']) ? $undo['codes'] : array()) as $it) {
+            if ($keeper_code === null) { break; }
+            $this->db->where('BookingID', (int) $it['BookingID'])->where('CustomerCode', $keeper_code)
+                ->update('booking', array('CustomerCode' => $it['old']));
+        }
+
+        // Reactivate the losers that are still deactivated.
+        $reactivated = 0;
+        $losers = isset($undo['losers']) ? array_map('intval', $undo['losers']) : array();
+        if (!empty($losers)) {
+            $this->db->where_in('CustomerID', $losers)->where('Status', 'N')
+                ->update('customer', array('Status' => 'Y', 'updated_at' => date('Y-m-d H:i:s')));
+            $reactivated = (int) $this->db->affected_rows();
+        }
+
+        $this->db->where('MergeID', $merge_id)->update('customer_merge_log', array(
+            'status'      => 'REVERTED',
+            'reverted_at' => date('Y-m-d H:i:s'),
+        ));
+
+        $this->db->trans_complete();
+        if ($this->db->trans_status() === false) {
+            return array('success' => false, 'message' => 'Database error — revert rolled back.');
+        }
+
+        // Refresh snapshots for the keeper and every reactivated loser.
+        $this->Refresh_Snapshot_For_Customer($keeper);
+        foreach ($losers as $lid) {
+            $this->Refresh_Snapshot_For_Customer($lid);
+        }
+
+        return array(
+            'success'     => true,
+            'reverted'    => $reverted,
+            'skipped'     => $skipped,
+            'reactivated' => $reactivated,
+        );
+    }
+
+    /**
+     * Recent merges for the owner's Merge History panel, newest first, each with
+     * the keeper's name/code and how many records it folded in.
+     *
+     * @param int $limit
+     * @return array
+     */
+    public function Recent_Merges($limit = 30)
+    {
+        $rows = $this->db->select('l.MergeID, l.keeper_id, l.admin_id, l.undo_payload, l.status,
+                                   l.created_at, l.reverted_at,
+                                   c.name AS keeper_name, c.CustomerCode AS keeper_code,
+                                   a.Name AS admin_name')
+            ->from('customer_merge_log l')
+            ->join('customer c', 'c.CustomerID = l.keeper_id', 'left')
+            ->join('admin a', 'a.AdminID = l.admin_id', 'left')
+            ->order_by('l.MergeID', 'DESC')
+            ->limit((int) $limit)
+            ->get()->result();
+
+        foreach ($rows as $r) {
+            $p = json_decode($r->undo_payload, true);
+            $r->loser_count = (is_array($p) && isset($p['losers'])) ? count($p['losers']) : 0;
+            unset($r->undo_payload);
+        }
+        return $rows;
+    }
+
+    /**
+     * Search active customers by name / CustomerCode / phone for the merge tool's
+     * "Add another record" box (lets the owner pull an extra record — even one
+     * with a different phone — into a merge group). Excludes given ids.
+     *
+     * @param string $q
+     * @param array  $exclude_ids
+     * @param int    $limit
+     * @return array Rows: CustomerID, name, CustomerCode, phone_number, booking_count.
+     */
+    public function Search_Active_Customers($q, array $exclude_ids = array(), $limit = 15)
+    {
+        $q = trim((string) $q);
+        if ($q === '') {
+            return array();
+        }
+
+        $this->db->select('c.CustomerID, c.name, c.CustomerCode, c.phone_number,
+            (SELECT COUNT(*) FROM booking b WHERE b.CustomerID = c.CustomerID OR b.CustomerID2 = c.CustomerID) AS booking_count', false);
+        $this->db->from('customer c');
+        $this->db->where('c.Status', 'Y');
+        $this->db->group_start()
+            ->like('c.name', $q)
+            ->or_like('c.CustomerCode', $q)
+            ->or_like('c.phone_number', $q)
+            ->group_end();
+        $exclude_ids = array_filter(array_map('intval', $exclude_ids));
+        if (!empty($exclude_ids)) {
+            $this->db->where_not_in('c.CustomerID', $exclude_ids);
+        }
+        $this->db->order_by('c.name', 'ASC');
+        $this->db->limit((int) $limit);
+        return $this->db->get()->result();
     }
 	
     public function update_by_id($customer_id, $data = [])
@@ -885,20 +1329,16 @@ class Customer_Model extends CI_Model
 	}
 
 	/**
-	 * Whether an active customer with this exact name + phone already exists, so
-	 * a re-import doesn't create a duplicate master record. Name is compared as
-	 * stored (the importer uppercases it, matching the single-create form).
+	 * Whether an active customer with this phone already exists, so a re-import
+	 * doesn't create a duplicate master record. Detection is by PHONE only
+	 * (normalised last-9-digit key), matching the single-create + booking paths:
+	 * the same person typed "0122983045" / "122983045" is one customer, while a
+	 * real namesake with a different phone is allowed. A blank/digitless phone
+	 * never counts as a duplicate.
 	 */
-	public function exists_by_name_phone($name, $phone)
+	public function exists_active_by_phone($phone)
 	{
-		$this->db->where('name', $name);
-		if ($phone === null || $phone === '') {
-			$this->db->where('(phone_number IS NULL OR phone_number = "")', null, false);
-		} else {
-			$this->db->where('phone_number', $phone);
-		}
-		$this->db->where('Status', 'Y');
-		return $this->db->count_all_results('customer') > 0;
+		return !empty($this->find_active_by_phone($phone));
 	}
 
 	/**
@@ -927,7 +1367,7 @@ class Customer_Model extends CI_Model
 				$summary['failed'][] = array('line' => $line, 'name' => $name, 'reason' => $entry['error']);
 				continue;
 			}
-			if ($this->exists_by_name_phone($name, isset($entry['phone_number']) ? $entry['phone_number'] : null)) {
+			if ($this->exists_active_by_phone(isset($entry['phone_number']) ? $entry['phone_number'] : null)) {
 				$summary['skipped_duplicate'][] = array('line' => $line, 'name' => $name);
 				continue;
 			}

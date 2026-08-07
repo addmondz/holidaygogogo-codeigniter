@@ -200,6 +200,12 @@
         });
     });
 
+    var SWAL_IMG = '<?php echo base_url('assets/image/sweetalert.jpg') ?>';
+    var BACK_URL = '<?php echo base_url('Customer') ?>';
+    var OK_MSG   = '<?php if(current_url() == base_url('Customer/Create')) { echo 'New'; } ?> Customer Record <?php if(current_url() == base_url('Customer/Update')) { echo ': ' . str_replace('\'', '', $name); } ?> Successfully <?php if(current_url() == base_url('Customer/Create')) { echo 'Created'; } else { echo 'Updated'; } ?>';
+    var FAIL_MSG = '<?php if(current_url() == base_url('Customer/Create')) { echo 'New'; } ?> Customer Record <?php if(current_url() == base_url('Customer/Update')) { echo ': ' . str_replace('\'', '', $name); } ?> Could Not Be <?php if(current_url() == base_url('Customer/Create')) { echo 'Created'; } else { echo 'Updated'; } ?>';
+    var CUSTOMER_EDIT_URL = '<?php echo base_url('Customer/Update') ?>';
+
     function Submit_Customer(url, customer_id, customer) {
         $.ajax({
             url: url,
@@ -208,11 +214,48 @@
                 customer_id: customer_id,
                 customer: customer
             },
-            success: function() {
-                Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', '<?php if(current_url() == base_url('Customer/Create')) { echo 'New'; } ?> Customer Record <?php if(current_url() == base_url('Customer/Update')) { echo ': ' . str_replace('\'', '', $name); } ?> Successfully <?php if(current_url() == base_url('Customer/Create')) { echo 'Created'; } else { echo 'Updated'; } ?>', '<?php echo base_url('Customer') ?>');
+            dataType: 'text',
+            success: function(resp) {
+                var data = null;
+                try { data = JSON.parse(resp); } catch (e) {}
+
+                // HARD duplicate block: a customer with this phone already exists,
+                // so creation is refused. Point the user to the existing record.
+                if (data && data.duplicate && data.matches && data.matches.length) {
+                    var m = data.matches[0];
+                    var esc = function(s) { return $('<div>').text(s == null ? '' : String(s)).html(); };
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Duplicate Customer Blocked',
+                        html: 'A customer with this phone number already exists, so a new record was not created:<br><br>'
+                            + '<strong>' + esc(m.name) + '</strong><br>'
+                            + 'Code: <strong>' + esc(m.CustomerCode || '&mdash;') + '</strong><br>'
+                            + 'Phone: ' + esc(m.phone_number),
+                        showCancelButton: true,
+                        confirmButtonText: 'View existing customer',
+                        cancelButtonText: 'Back to edit',
+                        customClass: {
+                            confirmButton: 'btn btn-light-success m-2',
+                            cancelButton: 'btn btn-secondary m-2'
+                        },
+                        buttonsStyling: true
+                    }).then(function(res) {
+                        if (res.isConfirmed) {
+                            window.location.href = CUSTOMER_EDIT_URL + '?customer_id=' + encodeURIComponent(m.CustomerID);
+                        }
+                    });
+                    return;
+                }
+
+                if (data && data.success === false) {
+                    Display_Message(SWAL_IMG, data.message || FAIL_MSG, null);
+                    return;
+                }
+
+                Display_Message(SWAL_IMG, OK_MSG, BACK_URL);
             },
             error: function() {
-                Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', '<?php if(current_url() == base_url('Customer/Create')) { echo 'New'; } ?> Customer Record <?php if(current_url() == base_url('Customer/Update')) { echo ': ' . str_replace('\'', '', $name); } ?> Could Not Be <?php if(current_url() == base_url('Customer/Create')) { echo 'Created'; } else { echo 'Updated'; } ?>', null);
+                Display_Message(SWAL_IMG, FAIL_MSG, null);
             }
         });
     }

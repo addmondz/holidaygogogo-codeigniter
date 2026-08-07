@@ -4638,36 +4638,38 @@
         };
 
         // Pre-submit duplicate-customer check: only when no CustomerID is bound
-        // (i.e. the agent typed a name manually) and both name + mobile are present.
+        // (i.e. the agent typed a name manually) and a mobile is present. Matching
+        // is by PHONE only (normalised) — a namesake with a different phone is a
+        // different person, so name is not part of the check.
         const _custName = ($('#Customer').val() || '').trim();
         const _mobile   = ($('#Mobile').val() || '').trim();
         const _custId   = $('#CustomerID').val();
 
-        if (!_custId && _custName && _mobile) {
+        if (!_custId && _mobile) {
             $.ajax({
                 url: '<?= base_url('customer/check_duplicate'); ?>',
                 type: 'GET',
-                data: { name: _custName, phone: _mobile },
+                data: { phone: _mobile },
                 dataType: 'json'
             }).done(function(matches) {
                 if (matches && matches.length > 0) {
                     const m = matches[0];
                     const esc = function(s) { return $('<div>').text(s == null ? '' : String(s)).html(); };
+                    // Hard block: a customer with this phone already exists, so no
+                    // duplicate will be created. The booking is bound to the
+                    // existing customer (the server reuses it either way).
                     Swal.fire({
                         icon: 'warning',
-                        title: 'Possible Duplicate Customer',
-                        html: 'A customer with this name and phone already exists:<br><br>'
+                        title: 'Existing Customer Found',
+                        html: 'A customer with this phone number already exists, so this booking will use it:<br><br>'
                             + '<strong>' + esc(m.name) + '</strong><br>'
                             + 'Code: <strong>' + esc(m.CustomerCode || '—') + '</strong><br>'
                             + 'Phone: ' + esc(m.phone_number),
                         showCancelButton: true,
-                        showDenyButton: true,
                         confirmButtonText: 'Use existing customer',
-                        denyButtonText: 'Create new anyway',
                         cancelButtonText: 'Back to edit',
                         customClass: {
                             confirmButton: 'btn btn-light-success m-2',
-                            denyButton: 'btn btn-warning m-2',
                             cancelButton: 'btn btn-secondary m-2'
                         },
                         buttonsStyling: true
@@ -4680,8 +4682,6 @@
                                 .removeClass('text-muted text-primary')
                                 .addClass('text-success')
                                 .html('<i class="la la-check-circle"></i> Existing Customer — <strong>' + esc(m.CustomerCode || 'Empty Customer Code ') + '</strong> (' + esc(m.phone_number || 'No phone number') + ')');
-                            proceedToConfirm();
-                        } else if (res.isDenied) {
                             proceedToConfirm();
                         }
                     });

@@ -379,6 +379,28 @@ class Guests_Model extends CI_Model
 				foreach($ls_params as $p) { $g_params[] = $p; }
 			}
 
+			// The campaign picker (mode 'all') runs this branch ALONGSIDE the booking
+			// branch, so a person who is BOTH a booking guest and a GHL lead on the
+			// same phone would appear twice — and the name+IC display-merge can't
+			// collapse them (the booking row carries an IC → merge_key "ic:name|IC",
+			// the lead has none → merge_key = bare dedup_key). Suppress the lead when
+			// its phone already belongs to a visible (non-cancelled, in-scope) booking
+			// guest; the richer booking row represents them. This restores the anti-join
+			// the old merged listing had (dropped when GHL Leads became its own page);
+			// the standalone 'ghl'/'manual' pages run this branch alone and skip it.
+			if($this->mode === 'all') {
+				$ghl_where .= " AND NOT EXISTS (SELECT 1 FROM guest_list glx
+					JOIN booking bx ON bx.BookingID = glx.BookingID
+					WHERE glx.Status = 'Y' AND bx.Status != 'N'
+					AND " . guest_list_cancel_predicate($get, 'bx.CancelStatus') . "
+					AND glx.dedup_key = {$gc_dedup} ";
+				if(in_array($this->session->userdata('level'), array(20, 50))) {
+					$ghl_where .= " AND bx.SalesAgent = ? ";
+					$g_params[] = $this->session->userdata('admin_id');
+				}
+				$ghl_where .= ") ";
+			}
+
 			// GHL Leads is its own page now, so the query reads ghl_contacts only —
 			// no booking/guest_list scan. (The old merged listing anti-joined the
 			// two to avoid showing one person twice; separate pages don't need it.)
@@ -436,6 +458,13 @@ WHERE 1 = 1
 	 */
 	private function Booking_Windowed_Select($dedup, $from)
 	{
+		// rn=1 is the row that represents this person — its Name/Contact/Email/…
+		// win the MAX(CASE WHEN rn=1 …) picks in the outer aggregate. Newest
+		// booking first, but when two guests in the SAME booking share a phone (a
+		// child put under the parent's number → same dedup_key) InsertDate+BookingID
+		// tie, so break it: prefer the ADULT (the phone's real owner/leader), then
+		// the earliest-entered row. Without these tiebreakers MySQL broke the tie
+		// arbitrarily and could surface the child/team-member instead of the leader.
 		return "
 	SELECT
 		{$dedup} AS dedup_key,
@@ -471,7 +500,9 @@ WHERE 1 = 1
 		COALESCE(b.NetTotal, 0) AS BookingNetTotal,
 		ROW_NUMBER() OVER (
 			PARTITION BY {$dedup}
-			ORDER BY b.InsertDate DESC, b.BookingID DESC
+			ORDER BY b.InsertDate DESC, b.BookingID DESC,
+				CASE WHEN gl.Type = 'ADULT' THEN 0 ELSE 1 END ASC,
+				gl.GuestListID ASC
 		) AS rn,
 		ROW_NUMBER() OVER (
 			PARTITION BY {$dedup}, b.BookingID

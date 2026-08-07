@@ -444,7 +444,7 @@ $is_dev_env = ($app_env !== 'prod');
 								// (owner only) and Lead Status (owner + team lead) keep their own
 								// level gating. Access Settings (owner only) manages who can
 								// view/edit each page.
-								$lc_active = in_array($this->router->class, array('Customer', 'Guests', 'Ghl_Leads', 'Manual_Leads', 'Campaign', 'Lead_Status', 'Leads_Customer_Access'), true);
+								$lc_active = in_array($this->router->class, array('Customer', 'Guests', 'Ghl_Leads', 'Manual_Leads', 'Campaign', 'Lead_Status', 'Leads_Customer_Access', 'Merge_Duplicate_Customers'), true);
 								$lc_show_campaign    = ((int)$this->session->level === 10);
 								$lc_show_lead_status = in_array((int)$this->session->level, [10, 25], true);
 							?>

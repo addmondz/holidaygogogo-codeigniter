@@ -1052,9 +1052,10 @@ class Booking_Model extends CI_Model
 				$data['AutocountSyncAction'] = 'C';
 				$data['AutocountSyncStatus'] = 'P';
 
-				// Generates a unique CustomerCode; the model serialises and
-				// re-checks in code so a concurrent insert can't collide.
-				$customer_id = $this->Customer_Model->create_with_generated_code($data);
+				// Hard duplicate-phone block: reuse an existing customer with the
+				// same phone (any format) instead of creating a duplicate; only a
+				// genuinely new phone creates a new customer + generated code.
+				$customer_id = $this->Customer_Model->create_or_reuse_by_phone($data);
 
 				// remove this no need sync directly, cron will sync customer at first
 				// // Immediately sync to Autocount
@@ -1493,9 +1494,10 @@ class Booking_Model extends CI_Model
 				$data['AutocountSyncAction'] = 'C';
 				$data['AutocountSyncStatus'] = 'P';
 
-				// Generates a unique CustomerCode; the model serialises and
-				// re-checks in code so a concurrent insert can't collide.
-				$customer_id = $this->Customer_Model->create_with_generated_code($data);
+				// Hard duplicate-phone block: reuse an existing customer with the
+				// same phone (any format) instead of creating a duplicate; only a
+				// genuinely new phone creates a new customer + generated code.
+				$customer_id = $this->Customer_Model->create_or_reuse_by_phone($data);
 
 				// no need sync directly, cron will sync customer at first
 				// // Immediately sync to Autocount
