@@ -16,11 +16,19 @@ class Merge_Duplicate_Customers extends MY_Controller
     function __construct()
     {
         parent::__construct();
-        // Owner-only. MY_Controller doesn't gate this class, so guard here.
-        if ((int) $this->session->userdata('level') !== 10) {
+        // Owner (level 10) or ERNIDA (Finance, AdminID 7) may use this tool.
+        // MY_Controller doesn't gate this class, so guard here.
+        if ( ! $this->can_merge()) {
             redirect('Dashboard');
         }
         $this->load->model('Customer_Model');
+    }
+
+    /** Who may use the merge tool: Owner (level 10) or ERNIDA (AdminID 7). */
+    private function can_merge()
+    {
+        return (int) $this->session->userdata('level') === 10
+            || (int) $this->session->userdata('admin_id') === 7;
     }
 
     function index()

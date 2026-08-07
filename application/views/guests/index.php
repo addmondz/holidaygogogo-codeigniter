@@ -127,7 +127,7 @@ div.kt-datatable__pager-container {
 							<i class="la la-file-import"></i>Bulk Import
 						</button>
 						<?php } ?>
-						<?php if((int)$this->session->level === 10) { ?>
+						<?php if((int)$this->session->level === 10 || (int)$this->session->admin_id === 7 /* ERNIDA */) { ?>
 						<a href="<?php echo base_url('Merge_Duplicate_Customers'); ?>" class="btn btn-light-danger font-weight-bold mr-1 mb-2" style="width:180px;" data-toggle="tooltip" title="Review and merge customers that share a phone number">
 							<i class="la la-code-branch"></i>Merge Duplicates
 						</a>
