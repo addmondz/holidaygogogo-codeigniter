@@ -326,7 +326,7 @@
 						</div>
 						<div class="col-md-3">
 							<div class="d-flex justify-content-between align-items-center">
-								<label class="mb-0">Campaign <span class="text-muted font-size-xs">(lead/manual/gl)</span></label>
+								<label class="mb-0">Campaign <span class="text-muted font-size-xs">(cust/lead/manual/gl)</span></label>
 								<select id="guest_search_campaign_mode" class="form-control form-control-sm w-auto" style="height:auto;padding:2px 22px 2px 8px;">
 									<option value="include">Include</option>
 									<option value="exclude">Exclude</option>

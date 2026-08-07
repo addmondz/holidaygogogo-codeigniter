@@ -6,8 +6,11 @@
  * range on gl.DateOfBirth, entered via the same daterangepicker the Booking /
  * Travel Date filters use and parsed by guest_list_parse_date_range().
  *
- * DOB is booking-only: a GHL lead carries no date of birth, so any dob filter
- * drops the GHL branch entirely (like sales_agent / gender / destination do).
+ * DOB now filters the GHL/manual branch too: manual leads carry a
+ * gc.date_of_birth, so the model applies the same born-between range there
+ * (AND gc.date_of_birth >= ? AND <= ?) instead of suppressing the branch. A
+ * lead with no DOB simply fails the comparison and drops out, so DOB is NOT in
+ * guest_list_ghl_suppressed_by_filters().
  */
 
 if (!defined('BASEPATH')) {
@@ -25,10 +28,12 @@ function assert_eq($label, $expected, $actual) {
     }
 }
 
-// ---- DOB is booking-only: it suppresses the GHL branch ---------------------
+// ---- DOB filters (does NOT suppress) the GHL/manual branch -----------------
+// Manual leads carry gc.date_of_birth, so the GHL branch applies the range
+// rather than being dropped; a DOB filter therefore keeps the GHL branch.
 assert_eq('empty dob keeps GHL',     false, guest_list_ghl_suppressed_by_filters(array('dob' => '   ')));
 assert_eq('no dob keeps GHL',        false, guest_list_ghl_suppressed_by_filters(array()));
-assert_eq('dob range drops GHL',     true,  guest_list_ghl_suppressed_by_filters(array('dob' => '01/01/1990 - 31/12/1999')));
+assert_eq('dob range keeps GHL',     false, guest_list_ghl_suppressed_by_filters(array('dob' => '01/01/1990 - 31/12/1999')));
 // DOB never suppresses the booking branch (that is only Guest Role = Lead).
 assert_eq('dob keeps bookings',      false, guest_list_bookings_suppressed_by_filters(array('dob' => '01/01/1990 - 31/12/1999')));
 

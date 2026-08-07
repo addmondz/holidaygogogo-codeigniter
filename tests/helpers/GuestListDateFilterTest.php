@@ -8,9 +8,12 @@
  *   - booking_date filters GHL leads by their lead-captured date
  *     (DATE(COALESCE(date_added, created_at)) — the value shown in the
  *     "Booking Date(s)" column);
- *   - any booking-only filter (travel_date, sales_agent, source,
- *     customer_type, nationality, gender, language) drops the GHL branch
- *     entirely, since a lead can never carry those attributes.
+ *   - booking/customer-only filters (travel_date, sales_agent, source,
+ *     customer_type) drop the GHL branch entirely, since a lead can never
+ *     carry those attributes;
+ *   - lead-carried attributes (nationality, gender, language, race) instead
+ *     FILTER the GHL branch (gcv.* / gc.*), so they keep it — a lead that does
+ *     not match the value is dropped by the WHERE, not the whole branch.
  */
 
 if (!defined('BASEPATH')) {
@@ -48,9 +51,10 @@ assert_eq('travel_date drops GHL',         true,  guest_list_ghl_suppressed_by_f
 assert_eq('sales_agent drops GHL',         true,  guest_list_ghl_suppressed_by_filters(array('sales_agent' => '7')));
 assert_eq('source drops GHL',              true,  guest_list_ghl_suppressed_by_filters(array('source' => '3')));
 assert_eq('customer_type drops GHL',       true,  guest_list_ghl_suppressed_by_filters(array('customer_type' => 'VIP')));
-assert_eq('nationality drops GHL',         true,  guest_list_ghl_suppressed_by_filters(array('nationality' => 'Malaysia')));
-assert_eq('gender drops GHL',              true,  guest_list_ghl_suppressed_by_filters(array('gender' => 'Male')));
-assert_eq('language drops GHL',            true,  guest_list_ghl_suppressed_by_filters(array('language' => 'English')));
+// Lead-carried attributes filter the GHL branch instead of suppressing it.
+assert_eq('nationality keeps GHL',         false, guest_list_ghl_suppressed_by_filters(array('nationality' => 'Malaysia')));
+assert_eq('gender keeps GHL',              false, guest_list_ghl_suppressed_by_filters(array('gender' => 'Male')));
+assert_eq('language keeps GHL',            false, guest_list_ghl_suppressed_by_filters(array('language' => 'English')));
 
 // ---- integration: GHL leads filter by their captured date -----------------
 $pdo = new PDO('sqlite::memory:');
