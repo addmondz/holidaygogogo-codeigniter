@@ -363,6 +363,14 @@ $is_dev_env = ($app_env !== 'prod');
 													</a>
 												</li>
 												<?php } ?>
+												<li class="menu-item <?php if($this->router->method == 'PowerBI_Reports' || $this->router->method == 'PowerBI_View') { echo 'menu-item-active'; } ?>">
+													<a href="<?php echo base_url('Report/PowerBI_Reports'); ?>" class="menu-link">
+														<i class="menu-bullet menu-bullet-dot">
+															<span></span>
+														</i>
+														<span class="menu-text">Power BI Reports</span>
+													</a>
+												</li>
 												<li class="menu-item <?php if($this->router->method == 'PowerBI') { echo 'menu-item-active'; } ?>">
 													<a href="<?php echo base_url('Report/PowerBI'); ?>" class="menu-link">
 														<i class="menu-bullet menu-bullet-dot">
