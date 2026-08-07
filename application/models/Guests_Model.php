@@ -1149,6 +1149,20 @@ GROUP BY mm.merge_key";
 			$params  = array_merge($params, $nat_values);
 		}
 
+		// "Campaign" filter — same campaign_guests roster snapshot the booking/GHL
+		// branches use, keyed on the customer's own phone dedup key so it matches
+		// the person across every one of their bookings. Include keeps customers on
+		// the picked campaign(s); exclude drops them. Name-only customers (NULL key)
+		// never match a roster, so include correctly hides them.
+		$joined_campaigns = guest_list_multi_values($this->input->get('joined_campaign'));
+		if (!empty($joined_campaigns)) {
+			$ph   = implode(',', array_fill(0, count($joined_campaigns), '?'));
+			$neg  = $this->input->get('campaign_mode') === 'exclude' ? 'NOT ' : '';
+			$where .= " AND {$neg}EXISTS (SELECT 1 FROM campaign_guests cg
+				WHERE cg.CampaignID IN ({$ph}) AND cg.DedupKey = {$key}) ";
+			foreach ($joined_campaigns as $cid) { $params[] = (int)$cid; }
+		}
+
 		// ---- Remark tier: EXISTS on the customer's remark log (by dedup_key) ----
 		$campaign_range = guest_list_parse_date_range($this->input->get('campaign_date'));
 		if ($campaign_range !== null) {
