@@ -30,11 +30,14 @@ class Powerbi
 
     public function isConfigured()
     {
-        return !empty($this->tenant_id)
-            && !empty($this->client_id)
-            && !empty($this->client_secret)
+        return $this->hasCredentials()
             && !empty($this->workspace_id)
             && !empty($this->dataset_id);
+    }
+
+    public function isWorkspaceConfigured()
+    {
+        return $this->hasCredentials() && !empty($this->workspace_id);
     }
 
     public function getDatasetId()
@@ -45,6 +48,11 @@ class Powerbi
     public function getWorkspaceId()
     {
         return $this->workspace_id;
+    }
+
+    public function getReportId()
+    {
+        return $this->report_id;
     }
 
     public function getTokenExpiry()
@@ -80,16 +88,34 @@ class Powerbi
         return $response['token'];
     }
 
-    public function getReport()
+    public function listReports()
     {
-        if (!empty($this->embed_url)) {
+        $url = 'https://api.powerbi.com/v1.0/myorg/groups/' . $this->workspace_id . '/reports';
+        $response = $this->request('GET', $url);
+
+        return !empty($response['value']) && is_array($response['value'])
+            ? $response['value']
+            : array();
+    }
+
+    public function getReport($report_id = null)
+    {
+        $report_id = !empty($report_id) ? $report_id : $this->report_id;
+
+        if (empty($report_id)) {
+            throw new Exception('Power BI report ID is required.');
+        }
+
+        if (!empty($this->embed_url) && $report_id === $this->report_id) {
             return array(
                 'id' => $this->report_id,
                 'embedUrl' => $this->embed_url,
+                'datasetId' => $this->dataset_id,
+                'name' => '',
             );
         }
 
-        $url = 'https://api.powerbi.com/v1.0/myorg/groups/' . $this->workspace_id . '/reports/' . $this->report_id;
+        $url = 'https://api.powerbi.com/v1.0/myorg/groups/' . $this->workspace_id . '/reports/' . $report_id;
         $response = $this->request('GET', $url);
 
         if (empty($response['embedUrl'])) {
@@ -99,9 +125,62 @@ class Powerbi
         return $response;
     }
 
+    public function getReportEmbedToken($report_id, $dataset_id = null, $access_level = 'View')
+    {
+        $report_id = !empty($report_id) ? $report_id : $this->report_id;
+        if (empty($report_id)) {
+            throw new Exception('Power BI report ID is required.');
+        }
+
+        $access_level = strcasecmp($access_level, 'Edit') === 0 ? 'Edit' : 'View';
+        $dataset_id = !empty($dataset_id) ? $dataset_id : $this->dataset_id;
+
+        if ($access_level === 'Edit' && !empty($dataset_id)) {
+            $url = 'https://api.powerbi.com/v1.0/myorg/GenerateToken';
+            $body = array(
+                'reports' => array(
+                    array(
+                        'id' => $report_id,
+                        'allowEdit' => true,
+                    ),
+                ),
+                'datasets' => array(
+                    array('id' => $dataset_id),
+                ),
+                'targetWorkspaces' => array(
+                    array('id' => $this->workspace_id),
+                ),
+            );
+        } else {
+            $url = 'https://api.powerbi.com/v1.0/myorg/groups/' . $this->workspace_id . '/reports/' . $report_id . '/GenerateToken';
+            $body = array(
+                'accessLevel' => $access_level,
+            );
+        }
+
+        $response = $this->request('POST', $url, $body);
+
+        if (empty($response['token'])) {
+            throw new Exception('Unable to generate Power BI report embed token.');
+        }
+
+        if (!empty($response['expiration'])) {
+            $this->token_expiry = $response['expiration'];
+        }
+
+        return $response['token'];
+    }
+
     public function getEmbedToken()
     {
         return $this->getCreateEmbedToken();
+    }
+
+    protected function hasCredentials()
+    {
+        return !empty($this->tenant_id)
+            && !empty($this->client_id)
+            && !empty($this->client_secret);
     }
 
     protected function getAccessToken()
@@ -190,7 +269,7 @@ class Powerbi
         }
 
         if ($code === 'PowerBIEntityNotFound' || $http_code === 404) {
-            return 'Power BI workspace or dataset was not found. Check POWERBI_WORKSPACE_ID and POWERBI_DATASET_ID, and make sure the dataset is published to that shared workspace.';
+            return 'Power BI workspace, report, or dataset was not found. Check POWERBI_WORKSPACE_ID, POWERBI_REPORT_ID, and POWERBI_DATASET_ID, and make sure the content is published to that shared workspace.';
         }
 
         if (!empty($message)) {

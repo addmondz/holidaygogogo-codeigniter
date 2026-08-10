@@ -1034,7 +1034,7 @@ class Report extends MY_Controller
 
     function PowerBI()
     {
-        $titles = array('tab_title' => 'HolidayGoGoGo | Report', 'breadcrumb_title' => 'Report >> PowerBI');
+        $titles = array('tab_title' => 'HolidayGoGoGo | Report', 'breadcrumb_title' => 'Report >> PowerBI Builder');
         $array = array(
             'workspace_id' => '',
             'dataset_id' => '',
@@ -1064,12 +1064,111 @@ class Report extends MY_Controller
         $this->load->view('layout/footer');
     }
 
+    function PowerBI_Reports()
+    {
+        $titles = array('tab_title' => 'HolidayGoGoGo | Report', 'breadcrumb_title' => 'Report >> Power BI Reports');
+        $array = array(
+            'reports' => array(),
+            'error' => '',
+        );
+
+        $this->load->library('powerbi');
+
+        if (!$this->powerbi->isWorkspaceConfigured()) {
+            $array['error'] = 'Power BI is not configured. Please add your Azure credentials and workspace ID to the .env file.';
+        } else {
+            try {
+                $array['reports'] = $this->powerbi->listReports();
+            } catch (Exception $e) {
+                $array['error'] = $e->getMessage();
+            }
+        }
+
+        $this->load->view('layout/header', $titles);
+        $this->load->view('report/powerbi_reports', $array);
+        $this->load->view('layout/footer');
+    }
+
+    function PowerBI_View($report_id = '')
+    {
+        $report_id = trim((string) $report_id);
+        $mode = strtolower((string) $this->input->get('mode'));
+        $access_level = ($mode === 'edit') ? 'Edit' : 'View';
+
+        $titles = array('tab_title' => 'HolidayGoGoGo | Report', 'breadcrumb_title' => 'Report >> Power BI Report');
+        $array = array(
+            'report_id' => $report_id,
+            'report_name' => '',
+            'workspace_id' => '',
+            'dataset_id' => '',
+            'embed_url' => '',
+            'embed_token' => '',
+            'access_level' => $access_level,
+            'error' => '',
+        );
+
+        $this->load->library('powerbi');
+        $this->config->load('powerbi', TRUE);
+        $array['workspace_id'] = $this->powerbi->getWorkspaceId();
+
+        if ($report_id === '') {
+            $array['error'] = 'No Power BI report was selected.';
+        } elseif (!$this->powerbi->isWorkspaceConfigured()) {
+            $array['error'] = 'Power BI is not configured. Please add your Azure credentials and workspace ID to the .env file.';
+        } else {
+            try {
+                $report = $this->powerbi->getReport($report_id);
+                $dataset_id = !empty($report['datasetId']) ? $report['datasetId'] : $this->powerbi->getDatasetId();
+
+                $array['report_id'] = !empty($report['id']) ? $report['id'] : $report_id;
+                $array['report_name'] = !empty($report['name']) ? $report['name'] : 'Power BI Report';
+                $array['dataset_id'] = $dataset_id;
+                $array['embed_url'] = $report['embedUrl'];
+                $array['embed_token'] = $this->powerbi->getReportEmbedToken(
+                    $array['report_id'],
+                    $dataset_id,
+                    $access_level
+                );
+                $titles['breadcrumb_title'] = 'Report >> ' . $array['report_name'];
+            } catch (Exception $e) {
+                $array['error'] = $e->getMessage();
+            }
+        }
+
+        $this->load->view('layout/header', $titles);
+        $this->load->view('report/powerbi_view', $array);
+        $this->load->view('layout/footer');
+    }
+
     function Embed_Token()
     {
         header('Content-Type: application/json');
         $this->load->library('powerbi');
+        $this->config->load('powerbi', TRUE);
+
+        $report_id = trim((string) $this->input->get_post('report_id'));
+        $mode = strtolower((string) $this->input->get_post('mode'));
+        $access_level = ($mode === 'edit') ? 'Edit' : 'View';
 
         try {
+            if ($report_id !== '') {
+                if (!$this->powerbi->isWorkspaceConfigured()) {
+                    throw new Exception('Power BI is not configured.');
+                }
+
+                $report = $this->powerbi->getReport($report_id);
+                $dataset_id = !empty($report['datasetId']) ? $report['datasetId'] : $this->powerbi->getDatasetId();
+
+                echo json_encode(array(
+                    'embedToken' => $this->powerbi->getReportEmbedToken($report_id, $dataset_id, $access_level),
+                    'embedUrl' => !empty($report['embedUrl']) ? $report['embedUrl'] : '',
+                    'reportId' => $report_id,
+                    'datasetId' => $dataset_id,
+                    'tokenExpiry' => $this->powerbi->getTokenExpiry(),
+                ));
+                return;
+            }
+
             if (!$this->powerbi->isConfigured()) {
                 throw new Exception('Power BI is not configured.');
             }
