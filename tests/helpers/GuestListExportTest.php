@@ -31,8 +31,16 @@ $assertions['guest has DESTINATION']       = in_array('DESTINATION', $guest_head
 $assertions['guest has no TAGS']           = !in_array('TAGS', $guest_headers, true);
 $assertions['ghl has TYPE column']         = in_array('TYPE', $ghl_headers, true);
 $assertions['manual has no TYPE column']   = !in_array('TYPE', $manual_headers, true);
-$assertions['ghl+manual have TAGS/DOB']    = in_array('TAGS', $ghl_headers, true) && in_array('DATE OF BIRTH', $manual_headers, true);
-$assertions['leads have no EMAIL column']  = !in_array('EMAIL', $ghl_headers, true) && !in_array('EMAIL', $manual_headers, true);
+$assertions['ghl has TAGS, manual none']   = in_array('TAGS', $ghl_headers, true) && !in_array('TAGS', $manual_headers, true);
+$assertions['manual has business cols']    = in_array('CLIENT TYPE', $manual_headers, true) && in_array('NATURE OF BUSINESS', $manual_headers, true)
+	&& in_array('NUMBER OF PAX', $manual_headers, true) && in_array('STATE', $manual_headers, true);
+$assertions['manual + ghl have DOB']       = in_array('DATE OF BIRTH', $manual_headers, true) && in_array('DATE OF BIRTH', $ghl_headers, true);
+// Manual export is a FULL field dump: it carries all the extra columns the slim
+// GHL Leads export omits (email, company, notes, current status + status updates…).
+$assertions['manual full-dump cols']       = in_array('EMAIL', $manual_headers, true) && in_array('COMPANY NAME', $manual_headers, true)
+	&& in_array('CURRENT STATUS', $manual_headers, true) && in_array('LEAD STATUS UPDATES', $manual_headers, true)
+	&& in_array('NOTES', $manual_headers, true) && in_array('CREATED BY', $manual_headers, true) && in_array('CREATED AT', $manual_headers, true);
+$assertions['ghl has no EMAIL column']     = !in_array('EMAIL', $ghl_headers, true);
 $assertions['unknown mode -> guest cols']  = array_column(guest_list_export_columns('whatever'), 0) === $guest_headers;
 
 // ---- phone cell: merged multi-number row -------------------------------
@@ -56,6 +64,16 @@ $assertions['tags empty -> ""']            = guest_list_export_cell((object) arr
 $assertions['type Manual']                 = guest_list_export_cell((object) array('Type' => 'Manual'), 'Type') === 'Manual';
 $assertions['type default -> GHL']         = guest_list_export_cell((object) array('Type' => ''), 'Type') === 'GHL';
 
+// ---- manual business cells ---------------------------------------------
+$assertions['client type passthrough']     = guest_list_export_cell((object) array('ClientType' => 'HRDC'), 'ClientType') === 'HRDC';
+$assertions['nature passthrough']          = guest_list_export_cell((object) array('NatureOfBusiness' => 'Travel Agency'), 'NatureOfBusiness') === 'Travel Agency';
+$assertions['pax gets " pax" suffix']      = guest_list_export_cell((object) array('NumberOfPax' => '11-20'), 'NumberOfPax') === '11-20 pax';
+$assertions['pax empty -> ""']             = guest_list_export_cell((object) array('NumberOfPax' => ''), 'NumberOfPax') === '';
+$assertions['state passthrough']           = guest_list_export_cell((object) array('State' => 'Selangor'), 'State') === 'Selangor';
+$assertions['status updates passthrough']  = guest_list_export_cell((object) array('StatusUpdates' => '2026-08-10 New; 2026-08-12 Follow Up (called)'), 'StatusUpdates') === '2026-08-10 New; 2026-08-12 Follow Up (called)';
+$assertions['created-at formatted']        = guest_list_export_cell((object) array('CreatedAt' => '2026-08-10 14:30:00'), 'CreatedAt') === date('d M Y, g:i A', strtotime('2026-08-10 14:30:00'));
+$assertions['created-at blank -> ""']      = guest_list_export_cell((object) array('CreatedAt' => '0000-00-00 00:00:00'), 'CreatedAt') === '';
+
 // ---- DOB: formatted / invalid dropped ----------------------------------
 $assertions['dob formatted d M Y']         = guest_list_export_cell((object) array('DOB' => '1990-05-14'), 'DOB') === date('d M Y', strtotime('1990-05-14'));
 $assertions['dob 0000 -> ""']              = guest_list_export_cell((object) array('DOB' => '0000-00-00'), 'DOB') === '';
@@ -78,6 +96,34 @@ $assertions['matrix headers == ghl cols']  = $mx['headers'] === $ghl_headers;
 $assertions['matrix row width == headers']  = count($mx['rows'][0]) === count($mx['headers']);
 $assertions['matrix name cell correct']     = $mx['rows'][0][0] === 'Ali';
 $assertions['matrix empty rows -> []']      = guest_list_export_matrix(array(), 'manual')['rows'] === array();
+
+// ---- customer mode column set (Customer List export = dashboard fields) --
+$customer_headers = array_column(guest_list_export_columns('customer'), 0);
+$assertions['customer has ALT + CUSTOMER NAME'] = in_array('ALT NAME', $customer_headers, true) && in_array('CUSTOMER NAME', $customer_headers, true);
+$assertions['customer has CODE + DATE CREATION'] = in_array('CUSTOMER CODE', $customer_headers, true) && in_array('DATE CREATION', $customer_headers, true);
+$assertions['customer has filter fields']  = in_array('SALES AGENT', $customer_headers, true) && in_array('SOURCE', $customer_headers, true)
+	&& in_array('DESTINATION', $customer_headers, true) && in_array('NATIONALITY', $customer_headers, true)
+	&& in_array('NUM OF PAX', $customer_headers, true) && in_array('DATE OF BIRTH', $customer_headers, true);
+$assertions['customer keeps AutoCount col'] = in_array('AUTOCOUNT SYNC STATUS', $customer_headers, true);
+$assertions['customer has no TYPE/TAGS']    = !in_array('TYPE', $customer_headers, true) && !in_array('TAGS', $customer_headers, true);
+
+// ---- customer Date Creation cell format --------------------------------
+$assertions['customer date-creation fmt']  = guest_list_export_cell((object) array('CustomerCreatedAt' => '2026-08-10 09:15:00'), 'CustomerCreatedAt') === date('d M Y, g:i A', strtotime('2026-08-10 09:15:00'));
+$assertions['customer date-creation blank'] = guest_list_export_cell((object) array('CustomerCreatedAt' => '0000-00-00 00:00:00'), 'CustomerCreatedAt') === '';
+
+// ---- customer matrix from a rich-listing-like row ----------------------
+$crow = (object) array(
+	'AltName' => 'Ah Beng', 'Name' => 'Tan Ah Beng', 'ContactNum' => '0123456789', 'CallingCode' => '+60',
+	'Email' => 'a@b.com', 'Language' => 'EN', 'AgentName' => 'Sara', 'Source' => 'FB',
+	'CustomerType' => 'VIP', 'GuestType' => 'ADULT', 'Destination' => 'Redang', 'Nationality' => 'MY',
+	'Gender' => 'Male', 'TotalPax' => 4, 'DOB' => '1988-03-02', 'CustomerCode' => 'C0001',
+	'CustomerCreatedAt' => '2026-01-05 10:00:00', 'AutocountSyncStatus' => 'S', 'AutocountSyncMessage' => '',
+);
+$cmx = guest_list_export_matrix(array($crow), 'customer');
+$assertions['customer matrix headers']      = $cmx['headers'] === $customer_headers;
+$assertions['customer matrix row width']    = count($cmx['rows'][0]) === count($cmx['headers']);
+$assertions['customer matrix phone fmt']     = in_array('+60 123456789', $cmx['rows'][0], true);
+$assertions['customer matrix guesttype']     = in_array('Adult', $cmx['rows'][0], true);
 
 // ---- report -------------------------------------------------------------
 $failed = 0;

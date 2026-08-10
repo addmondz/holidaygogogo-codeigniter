@@ -54,6 +54,10 @@ function ghl_manual_lead_prepare($post, $uid, $now, $created_by = null)
     $customer_type = $get('customer_type');
     $lead_intro = $get('lead_intro');
     $lead_status = $get('lead_status');
+    $nature     = $get('nature_of_business');
+    $number_of_pax = $get('number_of_pax');
+    $client_type = $get('client_type');
+    $state      = $get('state');
     $dob_raw    = $get('date_of_birth');
     $tags_raw   = isset($post['tags']) ? (string) $post['tags'] : '';
 
@@ -101,6 +105,10 @@ function ghl_manual_lead_prepare($post, $uid, $now, $created_by = null)
         'customer_type' => $customer_type !== '' ? $customer_type : null,
         'lead_intro'    => $lead_intro !== '' ? $lead_intro : null,
         'lead_status'   => $lead_status !== '' ? $lead_status : null,
+        'nature_of_business' => $nature !== '' ? $nature : null,
+        'number_of_pax' => $number_of_pax !== '' ? $number_of_pax : null,
+        'client_type'   => $client_type !== '' ? $client_type : null,
+        'state'         => $state !== '' ? $state : null,
         'date_of_birth' => $dob,
         'tags_json'     => $tags_json,
         'date_added'    => $now,
@@ -214,11 +222,52 @@ function ghl_manual_lead_import_columns()
         'NATIONALITY'     => 'nationality',
         'COUNTRY'         => 'country',
         'SOURCE'          => 'source',
-        'TAGS'            => 'tags',
+        'CLIENT TYPE'     => 'client_type',
         'NOTES'           => 'notes',
         'CUSTOMER TYPE'   => 'customer_type',
         'LEAD INTRO'      => 'lead_intro',
         'LEAD STATUS'     => 'lead_status',
+        'NATURE OF BUSINESS' => 'nature_of_business',
+        'NUMBER OF PAX'   => 'number_of_pax',
+        'STATE'           => 'state',
+    );
+}
+
+/**
+ * The fixed "Client Type" dropdown options for a Manual Lead (stored in
+ * ghl_contacts.client_type; replaces the old free-typed Tags field). One place so
+ * the create/edit form, the filter and the import share the exact same list.
+ *
+ * @return string[]
+ */
+function ghl_manual_lead_client_types()
+{
+    return array('HRDC', 'Meeting', 'Incentive', 'Conference', 'Expo', 'Leisure');
+}
+
+/**
+ * The fixed "Number of Pax" bucket options (stored verbatim in
+ * ghl_contacts.number_of_pax as the label so the multi-select IN filter matches).
+ *
+ * @return string[]
+ */
+function ghl_manual_lead_pax_options()
+{
+    return array('1-10', '11-20', '21-30', '31-40', '41-50', '51-60', '61-70', '71-80', '81-90', '91-100', '100+');
+}
+
+/**
+ * The Malaysian states + federal territories for the "State" dropdown (stored in
+ * ghl_contacts.state).
+ *
+ * @return string[]
+ */
+function ghl_manual_lead_states()
+{
+    return array(
+        'Johor', 'Kedah', 'Kelantan', 'Melaka', 'Negeri Sembilan', 'Pahang',
+        'Perak', 'Perlis', 'Pulau Pinang', 'Sabah', 'Sarawak', 'Selangor',
+        'Terengganu', 'Kuala Lumpur', 'Labuan', 'Putrajaya',
     );
 }
 

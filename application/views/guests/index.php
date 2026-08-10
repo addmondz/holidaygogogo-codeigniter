@@ -539,7 +539,90 @@ div.kt-datatable__pager-container {
 														</select>
 													</div>
 												</div>
+												<?php if($list_base === 'Ghl_Leads') { ?>
+													<div class="col-md-3">
+														<div class="form-group">
+															<label>Tags</label>
+															<?php $sel_tags = guest_list_multi_values($this->input->get('tags')); ?>
+															<select name="tags[]" class="form-control selectpicker" data-live-search="true" multiple data-actions-box="true" title="--SELECT TAGS--">
+																<?php if(!empty($ghl_tags)) { foreach($ghl_tags as $tag) { ?>
+																	<option data-icon="la la-tag font-size-lg bs-icon" value="<?php echo htmlspecialchars($tag, ENT_QUOTES); ?>" <?php if(in_array((string)$tag, $sel_tags, true)) echo 'selected'; ?>><?php echo htmlspecialchars($tag); ?></option>
+																<?php } } ?>
+															</select>
+														</div>
+													</div>
+													<div class="col-md-3">
+														<div class="form-group">
+															<label>Date of Birth
+																<a onclick="Reset_Dob()" class="btn btn-icon btn-light-warning btn-xs" data-toggle="tooltip" title="Clear date of birth">
+																	<i class="la la-undo"></i>
+																</a>
+															</label>
+															<div id="kt_daterangepicker_guests_dob" class="input-icon">
+																<input readonly type="text" name="dob" value="<?php if(!empty($this->input->get('dob'))) { echo $this->input->get('dob'); } ?>" autocomplete="off" class="form-control">
+																<span><i class="la la-calendar"></i></span>
+															</div>
+														</div>
+													</div>
+												<?php } ?>
 											</div>
+										<?php if($list_base === 'Manual_Leads') { ?>
+											<div class="row">
+												<div class="col-md-3">
+													<div class="form-group">
+														<label>Lead Status</label>
+														<?php $sel_lead_status = guest_list_multi_values($this->input->get('lead_status')); ?>
+														<select name="lead_status[]" class="form-control selectpicker" data-live-search="true" multiple data-actions-box="true" title="--SELECT LEAD STATUS--">
+															<?php if(!empty($lead_statuses)) { foreach($lead_statuses as $ls) { ?>
+																<option data-icon="la la-flag font-size-lg bs-icon" value="<?php echo htmlspecialchars($ls->Name, ENT_QUOTES); ?>" <?php if(in_array((string)$ls->Name, $sel_lead_status, true)) echo 'selected'; ?>><?php echo htmlspecialchars($ls->Name); ?></option>
+															<?php } } ?>
+														</select>
+													</div>
+												</div>
+												<div class="col-md-3">
+													<div class="form-group">
+														<label>Client Type</label>
+														<?php $sel_client_type = guest_list_multi_values($this->input->get('client_type')); ?>
+														<select name="client_type[]" class="form-control selectpicker" multiple data-actions-box="true" title="--SELECT CLIENT TYPE--">
+															<?php foreach($client_types as $ctp) { ?>
+																<option data-icon="la la-briefcase font-size-lg bs-icon" value="<?php echo htmlspecialchars($ctp, ENT_QUOTES); ?>" <?php if(in_array($ctp, $sel_client_type, true)) echo 'selected'; ?>><?php echo htmlspecialchars($ctp); ?></option>
+															<?php } ?>
+														</select>
+													</div>
+												</div>
+												<div class="col-md-3">
+													<div class="form-group">
+														<label>Number of Pax</label>
+														<?php $sel_pax = guest_list_multi_values($this->input->get('number_of_pax')); ?>
+														<select name="number_of_pax[]" class="form-control selectpicker" multiple data-actions-box="true" title="--SELECT NUMBER OF PAX--">
+															<?php foreach($pax_options as $po) { ?>
+																<option data-icon="la la-users font-size-lg bs-icon" value="<?php echo htmlspecialchars($po, ENT_QUOTES); ?>" <?php if(in_array($po, $sel_pax, true)) echo 'selected'; ?>><?php echo htmlspecialchars($po); ?> pax</option>
+															<?php } ?>
+														</select>
+													</div>
+												</div>
+												<div class="col-md-3">
+													<div class="form-group">
+														<label>State</label>
+														<?php $sel_state = guest_list_multi_values($this->input->get('state')); ?>
+														<select name="state[]" class="form-control selectpicker" data-live-search="true" multiple data-actions-box="true" title="--SELECT STATE--">
+															<?php foreach($states as $st_opt) { ?>
+																<option data-icon="la la-map-marker font-size-lg bs-icon" value="<?php echo htmlspecialchars($st_opt, ENT_QUOTES); ?>" <?php if(in_array($st_opt, $sel_state, true)) echo 'selected'; ?>><?php echo htmlspecialchars($st_opt); ?></option>
+															<?php } ?>
+														</select>
+													</div>
+												</div>
+												<div class="col-md-3">
+													<div class="form-group">
+														<label>Nature of Business</label>
+														<div class="input-icon">
+															<input type="text" name="nature_of_business" value="<?php if(!empty($this->input->get('nature_of_business'))) { echo htmlspecialchars($this->input->get('nature_of_business'), ENT_QUOTES); } ?>" autocomplete="off" class="form-control" placeholder="e.g. Manufacturing">
+															<span><i class="la la-briefcase"></i></span>
+														</div>
+													</div>
+												</div>
+											</div>
+										<?php } ?>
 										<?php } ?>
 										<input type="submit" value="Filter" class="btn btn-light-success font-weight-bold" style="width:80px;">
 									<input type="button" id="reset" value="Reset" class="btn btn-light-primary font-weight-bold" style="width:80px;">
@@ -564,7 +647,7 @@ div.kt-datatable__pager-container {
 									<th style="text-align:center;">Email</th>
 								<?php } ?>
 								<?php if($is_lead_list) { ?>
-									<th style="text-align:center;">Tags</th>
+									<th style="text-align:center;"><?php echo ($list_base === 'Manual_Leads') ? 'Client Type' : 'Tags'; ?></th>
 									<?php if($list_base === 'Ghl_Leads') { ?>
 										<th style="text-align:center;">Type</th>
 									<?php } ?>
@@ -701,14 +784,26 @@ div.kt-datatable__pager-container {
 										<?php if($is_lead_list) { ?>
 											<td style="text-align:center; max-width:220px;">
 												<?php
-													$lead_tags = $is_ghl_row ? ghl_lead_tags_parse(isset($g->Tags) ? $g->Tags : null) : array();
-													if(!empty($lead_tags)) {
-														foreach($lead_tags as $tag) {
-															echo '<span class="label label-inline label-light-primary font-weight-bold mr-1 mb-1" style="white-space:normal;">'
-																. htmlspecialchars($tag) . '</span>';
+													if($list_base === 'Manual_Leads') {
+														// Manual Leads: this column is "Client Type" (a single preset value).
+														$client_val = isset($g->ClientType) ? trim((string) $g->ClientType) : '';
+														if($client_val !== '') {
+															echo '<span class="label label-inline label-light-primary font-weight-bold" style="white-space:normal;">'
+																. htmlspecialchars($client_val) . '</span>';
+														} else {
+															echo '<span class="text-muted">&mdash;</span>';
 														}
 													} else {
-														echo '<span class="text-muted">&mdash;</span>';
+														// GHL Leads: the "Tags" column (conversation tags, may be several).
+														$lead_tags = $is_ghl_row ? ghl_lead_tags_parse(isset($g->Tags) ? $g->Tags : null) : array();
+														if(!empty($lead_tags)) {
+															foreach($lead_tags as $tag) {
+																echo '<span class="label label-inline label-light-primary font-weight-bold mr-1 mb-1" style="white-space:normal;">'
+																	. htmlspecialchars($tag) . '</span>';
+															}
+														} else {
+															echo '<span class="text-muted">&mdash;</span>';
+														}
 													}
 												?>
 											</td>
@@ -991,7 +1086,7 @@ div.kt-datatable__pager-container {
 
 <script>
 	<?php
-		$expanded_keys = array('q', 'booking_number', 'contact_number', 'email', 'destination', 'role', 'pax_min', 'pax_max', 'sales_agent', 'source', 'customer_type', 'nationality', 'gender', 'guest_type', 'language', 'booking_date', 'travel_date', 'dob', 'birthday', 'campaign_date', 'follow_date', 'customer_code', 'create_date');
+		$expanded_keys = array('q', 'booking_number', 'contact_number', 'email', 'destination', 'role', 'pax_min', 'pax_max', 'sales_agent', 'source', 'customer_type', 'nationality', 'gender', 'guest_type', 'language', 'booking_date', 'travel_date', 'dob', 'birthday', 'campaign_date', 'follow_date', 'customer_code', 'create_date', 'race', 'client_type', 'number_of_pax', 'state', 'nature_of_business', 'lead_status');
 		$expand = false;
 		foreach($expanded_keys as $k) {
 			if($this->input->get($k) !== null && $this->input->get($k) !== '') { $expand = true; break; }
@@ -1827,8 +1922,39 @@ div.kt-datatable__pager-container {
 							</select>
 						</div>
 						<div class="col-md-6">
-							<label>Tags</label>
-							<input type="text" name="tags" class="form-control" autocomplete="off" placeholder="Comma-separated, e.g. Redang, VIP">
+							<label>Client Type</label>
+							<select name="client_type" class="form-control">
+								<option value="">-- Select --</option>
+								<?php foreach($client_types as $ctp) { ?>
+								<option value="<?php echo htmlspecialchars($ctp, ENT_QUOTES); ?>"><?php echo htmlspecialchars($ctp); ?></option>
+								<?php } ?>
+							</select>
+						</div>
+					</div>
+					<div class="form-group row">
+						<div class="col-md-6">
+							<label>Nature of Business</label>
+							<input type="text" name="nature_of_business" class="form-control" autocomplete="off" placeholder="e.g. Manufacturing, Education">
+						</div>
+						<div class="col-md-6">
+							<label>Number of Pax</label>
+							<select name="number_of_pax" class="form-control">
+								<option value="">-- Select --</option>
+								<?php foreach($pax_options as $po) { ?>
+								<option value="<?php echo htmlspecialchars($po, ENT_QUOTES); ?>"><?php echo htmlspecialchars($po); ?> pax</option>
+								<?php } ?>
+							</select>
+						</div>
+					</div>
+					<div class="form-group row">
+						<div class="col-md-6">
+							<label>State</label>
+							<select name="state" class="form-control">
+								<option value="">-- Select --</option>
+								<?php foreach($states as $st_opt) { ?>
+								<option value="<?php echo htmlspecialchars($st_opt, ENT_QUOTES); ?>"><?php echo htmlspecialchars($st_opt); ?></option>
+								<?php } ?>
+							</select>
 						</div>
 					</div>
 					<div class="form-group">
@@ -2020,7 +2146,8 @@ div.kt-datatable__pager-container {
 					set('gender', d.gender);             set('chat_language', d.chat_language);
 					set('race', d.race);                 set('nationality', d.nationality);
 					set('source', d.source);             set('customer_type', d.customer_type);
-					set('lead_status', d.lead_status);   set('tags', d.tags);
+					set('lead_status', d.lead_status);   set('client_type', d.client_type);
+					set('nature_of_business', d.nature_of_business); set('number_of_pax', d.number_of_pax); set('state', d.state);
 					set('notes', d.notes);               set('lead_intro', d.lead_intro);
 					$submit.prop('disabled', false).html('<i class="la la-save"></i>Save Changes');
 				} else {
@@ -2271,13 +2398,15 @@ div.kt-datatable__pager-container {
 		html += '<hr class="my-2">';
 		html += lvRow('Source', d.source);
 		html += lvRow('Customer Type', d.customer_type);
+		html += lvRow('Client Type', d.client_type);
+		html += lvRow('Nature of Business', d.nature_of_business);
+		html += lvRow('Number of Pax', d.number_of_pax ? d.number_of_pax + ' pax' : '');
+		html += lvRow('State', d.state);
 		html += lvRow('Current Status', d.lead_status);
 		html += '<div class="form-group row mb-1"><div class="col-md-4 font-weight-bold" style="font-size:12px;">Status History</div>' +
 			'<div class="col-md-8" style="font-size:12px;">' + lvStatusHistory(d.status_log) + '</div></div>';
 		html += lvRow('Lead Intro', d.lead_intro);
 		html += lvRow('Notes', d.notes);
-		html += '<div class="form-group row mb-1"><div class="col-md-4 font-weight-bold" style="font-size:12px;">Tags</div>' +
-			'<div class="col-md-8" style="font-size:12px;">' + lvTags(d.tags) + '</div></div>';
 		html += '<hr class="my-2">';
 		html += lvRow('Created By', d.created_by);
 		html += lvRow('Created At', d.created_at);

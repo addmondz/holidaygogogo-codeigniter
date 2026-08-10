@@ -214,62 +214,19 @@ class Customer extends MY_Controller
 		}
 	}
 	
+	/**
+	 * Export the filtered Customer List to Excel (all pages at once). Uses the
+	 * SAME customer-anchored filter engine as the dashboard (Guests_Model's
+	 * Build_Customer_Branch, via Read_Customers_Rich_For_Export) so the download
+	 * mirrors whatever filters are active on screen — the old
+	 * Customer_Model::Read_Customers_For_Export() read a different, legacy set of
+	 * query params and therefore ignored the dashboard filters entirely. Columns
+	 * are the shared 'customer' export set (dashboard fields + filter fields).
+	 */
 	function Download() {
-		$spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
-		$spreadsheet->getActiveSheet()->setTitle('Customer Records');
-		$spreadsheet->getProperties()->setCreator('HolidayGoGoGo');
-		// Columns A–F mirror the Customer dashboard order (Alt Name, Name, Contact,
-		// Email, Language, Customer Code); G is Date Creation (created_at). The
-		// AutoCount sync columns + Updated At are kept after for operational use.
-		// Dashboard's Guest Type / Destination are booking-derived, not on the
-		// customer master, so they aren't part of this record export.
-		$spreadsheet->getActiveSheet()->setCellValue('A1', 'ALT NAME');
-		$spreadsheet->getActiveSheet()->setCellValue('B1', 'NAME');
-		$spreadsheet->getActiveSheet()->setCellValue('C1', 'PHONE NUMBER');
-		$spreadsheet->getActiveSheet()->setCellValue('D1', 'EMAIL');
-		$spreadsheet->getActiveSheet()->setCellValue('E1', 'CHAT LANGUAGE');
-		$spreadsheet->getActiveSheet()->setCellValue('F1', 'CUSTOMER CODE');
-		$spreadsheet->getActiveSheet()->setCellValue('G1', 'DATE CREATION');
-		$spreadsheet->getActiveSheet()->setCellValue('H1', 'AUTOCOUNT SYNC ACTION');
-		$spreadsheet->getActiveSheet()->setCellValue('I1', 'AUTOCOUNT SYNC STATUS');
-		$spreadsheet->getActiveSheet()->setCellValue('J1', 'AUTOCOUNT SYNC MESSAGE');
-		$spreadsheet->getActiveSheet()->setCellValue('K1', 'UPDATED AT');
-		$row = 2;
-		$customers = $this->Customer_Model->Read_Customers_For_Export();
-		$spreadsheet->getActiveSheet()->getStyle('A1:K1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_BLACK);
-		$spreadsheet->getActiveSheet()->getStyle('A1:K1')->getFont()->getColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_WHITE);
-		$spreadsheet->getActiveSheet()->getStyle('A1:K1')->getFont()->setBold(true);
-		if(!empty($customers)) {
-			foreach($customers as $customer) {
-				$spreadsheet->getActiveSheet()->setCellValueExplicit('A' . $row, isset($customer->AltName) ? $customer->AltName : '', \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-				$spreadsheet->getActiveSheet()->setCellValueExplicit('B' . $row, $customer->name, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-				$spreadsheet->getActiveSheet()->setCellValueExplicit('C' . $row, $customer->phone_number, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-				$spreadsheet->getActiveSheet()->setCellValueExplicit('D' . $row, isset($customer->PrimaryEmail) ? $customer->PrimaryEmail : '', \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-				$spreadsheet->getActiveSheet()->setCellValueExplicit('E' . $row, $customer->ChatLanguage, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-				$spreadsheet->getActiveSheet()->setCellValueExplicit('F' . $row, $customer->CustomerCode, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-				$spreadsheet->getActiveSheet()->setCellValueExplicit('G' . $row, $customer->created_at, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-				$spreadsheet->getActiveSheet()->setCellValueExplicit('H' . $row, $customer->AutocountSyncAction, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-				$spreadsheet->getActiveSheet()->setCellValueExplicit('I' . $row, $customer->AutocountSyncStatus, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-				$spreadsheet->getActiveSheet()->setCellValueExplicit('J' . $row, $customer->AutocountSyncMessage, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-				$spreadsheet->getActiveSheet()->setCellValueExplicit('K' . $row, $customer->updated_at, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-				$row++;
-			}
-			$spreadsheet->getActiveSheet()->getStyle('A:K')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_RIGHT);
-		} else {
-			$spreadsheet->getActiveSheet()->mergeCells('A2:K2');
-			$spreadsheet->getActiveSheet()->getCell('A2')->setValue('Customer Records Not Found');
-			$spreadsheet->getActiveSheet()->getStyle('A:K')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
-		}
-		foreach (array('A','B','C','D','E','F','G','H','I','J','K') as $c) {
-			$spreadsheet->getActiveSheet()->getColumnDimension($c)->setWidth(35);
-		}
-		$customer_records = 'CUSTOMER_RECORDS_' . date('Ymd') . '.xlsx';
-		header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-		header('Content-Disposition: attachment;filename="' . $customer_records . '"');
-		header('Cache-Control: max-age=0');
-		header('Cache-Control: max-age=1');
-		$writer = \PhpOffice\PhpSpreadsheet\IOFactory::createWriter($spreadsheet, 'Xlsx');
-		$writer->save('php://output');
+		$this->load->helper('guest_list_export');
+		$rows = $this->Guests_Model->Read_Customers_Rich_For_Export();
+		guest_list_export_stream($rows, 'customer', 'CUSTOMER_RECORDS_' . date('Ymd') . '.xlsx');
 	}
 
 	/**

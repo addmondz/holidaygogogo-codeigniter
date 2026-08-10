@@ -353,6 +353,33 @@ class Guests_Model extends CI_Model
 				$ghl_where .= " AND (" . implode(' OR ', $ors) . ") ";
 			}
 
+			// Manual-lead business fields (Manual Leads page). These live only on
+			// hand-entered rows: Nature of Business is a free-text LIKE; Number of
+			// Pax / Client Type / State are multi-select IN over the stored label.
+			$nature = trim((string)$this->input->get('nature_of_business'));
+			if($nature !== '') {
+				$ghl_where .= " AND gc.nature_of_business LIKE ? ";
+				$g_params[] = '%' . $nature . '%';
+			}
+			$this->Append_In_Clause($ghl_where, $g_params, 'gc.number_of_pax', $this->input->get('number_of_pax'));
+			$this->Append_In_Clause($ghl_where, $g_params, 'gc.client_type',   $this->input->get('client_type'));
+			$this->Append_In_Clause($ghl_where, $g_params, 'gc.state',         $this->input->get('state'));
+
+			// Lead Status (Manual Leads): a lead matches when the picked status is its
+			// CURRENT status (gc.lead_status) OR appears in ANY of its dated Lead
+			// Status Update log entries (lead_status_log, keyed by the same dedup_key
+			// the listing shows). Multi-select over the picked statuses.
+			$lead_statuses = guest_list_multi_values($this->input->get('lead_status'));
+			if(!empty($lead_statuses)) {
+				$ph = implode(',', array_fill(0, count($lead_statuses), '?'));
+				$ghl_where .= " AND ( gc.lead_status IN ({$ph})
+					OR EXISTS (SELECT 1 FROM lead_status_log lsl
+						WHERE lsl.Status = 'Y' AND lsl.dedup_key = {$gc_dedup}
+						AND lsl.LeadStatus IN ({$ph})) ) ";
+				foreach($lead_statuses as $st) { $g_params[] = $st; } // current-status IN
+				foreach($lead_statuses as $st) { $g_params[] = $st; } // log-entry IN
+			}
+
 			// "Campaign" filter over leads in a campaign roster; multi-select over
 			// any of the picked campaigns, include/exclude via campaign_mode.
 			$joined_campaigns = guest_list_multi_values($this->input->get('joined_campaign'));
@@ -688,6 +715,7 @@ WHERE 1 = 1
 		CONVERT(GROUP_CONCAT(DISTINCT CONCAT(DATE(b.StartDate), '|', IFNULL(DATE(b.EndDate), '')) ORDER BY CONCAT(DATE(b.StartDate), '|', IFNULL(DATE(b.EndDate), '')) SEPARATOR ',') USING utf8mb4) COLLATE utf8mb4_unicode_ci AS TravelDates,
 		CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS IC,
 		CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS Tags,
+		CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS ClientType,
 		CONVERT(MAX(c.CustomerCode) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS CustomerCode,
 		CONVERT(MAX(c.AltName) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS AltName,
 		MAX(c.CustomerID) AS CustomerID,
@@ -737,6 +765,7 @@ SELECT
 	CONVERT(GROUP_CONCAT(DISTINCT CONCAT(DATE(TravelStart), '|', IFNULL(DATE(TravelEnd), '')) ORDER BY CONCAT(DATE(TravelStart), '|', IFNULL(DATE(TravelEnd), '')) SEPARATOR ',') USING utf8mb4) COLLATE utf8mb4_unicode_ci AS TravelDates,
 	CONVERT(MAX(CASE WHEN rn = 1 THEN IdentificationNumber END) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS IC,
 	CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS Tags,
+	CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS ClientType,
 	CONVERT(MAX(CASE WHEN rn = 1 THEN CustomerCode END) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS CustomerCode,
 	CONVERT(MAX(CASE WHEN rn = 1 THEN AltName END) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS AltName,
 	MAX(CASE WHEN rn = 1 THEN CustomerID END) AS CustomerID,
@@ -785,6 +814,7 @@ SELECT
 	CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS TravelDates,
 	CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS IC,
 	CONVERT(COALESCE(gt.tags_concat, gc.tags_json) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Tags,
+	CONVERT(gc.client_type USING utf8mb4) COLLATE utf8mb4_unicode_ci AS ClientType,
 	CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS CustomerCode,
 	CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS AltName,
 	CAST(NULL AS UNSIGNED) AS CustomerID,
@@ -869,6 +899,7 @@ SELECT
 	CONVERT(GROUP_CONCAT(mm.TravelDates  SEPARATOR ',') USING utf8mb4) COLLATE utf8mb4_unicode_ci AS TravelDates,
 	MAX(CASE WHEN mm.rep_rn = 1 THEN mm.IC   END) AS IC,
 	MAX(CASE WHEN mm.rep_rn = 1 THEN mm.Tags END) AS Tags,
+	MAX(CASE WHEN mm.rep_rn = 1 THEN mm.ClientType       END) AS ClientType,
 	MAX(CASE WHEN mm.rep_rn = 1 THEN mm.CustomerCode      END) AS CustomerCode,
 	MAX(CASE WHEN mm.rep_rn = 1 THEN mm.AltName           END) AS AltName,
 	MAX(CASE WHEN mm.rep_rn = 1 THEN mm.CustomerID        END) AS CustomerID,
@@ -924,6 +955,68 @@ GROUP BY mm.merge_key";
 		$sql = "SELECT * FROM (" . $this->Merged_Wrapped_Sql($inner) . ") final"
 			. " ORDER BY RecencyAt IS NULL ASC, RecencyAt DESC, (Name IS NULL OR Name = '') ASC, Name ASC";
 		return $this->db->query($sql, $params);
+	}
+
+	/**
+	 * FULL Manual Leads export: every stored lead field PLUS the dated Lead Status
+	 * Updates (lead_status_log entries joined into one cell). The shared listing
+	 * only carries a slim column set, so instead of bloating that UNION this reads
+	 * ghl_contacts directly — but reuses the EXACT same filter WHERE + params the
+	 * listing built (the GHL branch from Build_Branches, mode 'manual'), so an
+	 * export always mirrors the on-screen filtered rows. Returns the CI result
+	 * OBJECT for unbuffered streaming, or null when nothing can match.
+	 */
+	function Read_Manual_Leads_For_Export()
+	{
+		$this->mode = 'manual';
+		list($booking, $ghl) = $this->Build_Branches();
+		if($ghl === null) {
+			return null;
+		}
+		$gc_dedup = $ghl['dedup'];
+
+		// The dated Lead Status Updates, oldest→newest, as "YYYY-MM-DD Status (note)"
+		// one entry PER LINE inside one cell — the SEPARATOR is a real newline (the
+		// PHP double-quoted "\n" below becomes a literal LF in the SQL string, as
+		// GROUP_CONCAT's SEPARATOR only accepts a string literal, not CHAR(10)). The
+		// export column enables wrap-text so each update sits on its own row in Excel.
+		// Keyed by the SAME dedup_key the listing shows (COALESCE(gc.dedup_key,
+		// 'ghl:'||id)), matching Add/Read_Lead_Status_Log.
+		$status_updates = "(SELECT GROUP_CONCAT(
+				CONCAT(DATE(lsl.StatusDate), ' ', lsl.LeadStatus,
+					CASE WHEN NULLIF(TRIM(lsl.Note), '') IS NOT NULL THEN CONCAT(' (', lsl.Note, ')') ELSE '' END)
+				ORDER BY lsl.StatusDate ASC, lsl.LogID ASC SEPARATOR '\n')
+			FROM lead_status_log lsl
+			WHERE lsl.Status = 'Y' AND lsl.dedup_key = {$gc_dedup})";
+
+		$sql = "SELECT
+			gc.first_name        AS Name,
+			gc.company_name      AS Company,
+			gc.phone             AS ContactNum,
+			gc.email             AS Email,
+			gc.address           AS Address,
+			gc.country           AS Country,
+			gc.gender            AS Gender,
+			gc.race              AS Race,
+			gc.nationality       AS Nationality,
+			gc.chat_language     AS Language,
+			gc.date_of_birth     AS DOB,
+			gc.source            AS Source,
+			gc.customer_type     AS CustomerType,
+			gc.client_type       AS ClientType,
+			gc.nature_of_business AS NatureOfBusiness,
+			gc.number_of_pax     AS NumberOfPax,
+			gc.state             AS State,
+			gc.lead_status       AS CurrentStatus,
+			{$status_updates}    AS StatusUpdates,
+			gc.lead_intro        AS LeadIntro,
+			gc.notes             AS Notes,
+			(SELECT a2.Name FROM admin a2 WHERE a2.AdminID = gc.created_by) AS CreatedBy,
+			COALESCE(gc.date_added, gc.created_at) AS CreatedAt
+		{$ghl['from']}
+		ORDER BY COALESCE(gc.date_added, gc.created_at) DESC, gc.id DESC";
+
+		return $this->db->query($sql, $ghl['params']);
 	}
 
 	function Count_Guests()
@@ -1319,6 +1412,60 @@ GROUP BY mm.merge_key";
 	LIMIT " . (int) $limit . " OFFSET " . (int) $offset;
 
 		return $this->db->query($sql, $branch['params'])->result();
+	}
+
+	/**
+	 * FULL Customer List export: the SAME customer-anchored rows the dashboard
+	 * shows, filtered by the SAME Build_Customer_Branch() WHERE + params — but
+	 * without LIMIT/OFFSET, so an export mirrors the on-screen filtered set across
+	 * every page. Returns the CI result OBJECT (not ->result()) so the export
+	 * helper can stream it one unbuffered row at a time. Column aliases match the
+	 * 'customer' mode in guest_list_export_helper.
+	 */
+	function Read_Customers_Rich_For_Export()
+	{
+		$branch = $this->Build_Customer_Branch();
+		$key    = $this->Customer_Dedup_Key_Expr();
+		$bagg   = $this->Customer_Booking_Aggregate_Subquery();
+		$blat   = $this->Customer_Latest_Booking_Subquery();
+		$bcc    = $this->Customer_Calling_Code_Subquery();
+
+		$sql = "
+	SELECT
+		{$key} AS dedup_key,
+		c.CustomerID AS CustomerID,
+		CONVERT(c.name USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Name,
+		CONVERT(c.phone_number USING utf8mb4) COLLATE utf8mb4_unicode_ci AS ContactNum,
+		CONVERT(ccp.CountryCode USING utf8mb4) COLLATE utf8mb4_unicode_ci AS CallingCode,
+		CONVERT(c.PrimaryEmail USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Email,
+		CONVERT(c.ChatLanguage USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Language,
+		CONVERT(a.Name USING utf8mb4) COLLATE utf8mb4_unicode_ci AS AgentName,
+		CONVERT(s.Name USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Source,
+		CONVERT(c.customer_type USING utf8mb4) COLLATE utf8mb4_unicode_ci AS CustomerType,
+		CONVERT(cat.Name USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Destination,
+		CONVERT(cn.Country USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Nationality,
+		CONVERT(c.Gender USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Gender,
+		CONVERT(COALESCE(c.GuestType, 'ADULT') USING utf8mb4) COLLATE utf8mb4_unicode_ci AS GuestType,
+		c.DateOfBirth AS DOB,
+		COALESCE(bagg.TotalPax, 0) AS TotalPax,
+		CONVERT(c.CustomerCode USING utf8mb4) COLLATE utf8mb4_unicode_ci AS CustomerCode,
+		CONVERT(c.AltName USING utf8mb4) COLLATE utf8mb4_unicode_ci AS AltName,
+		c.AutocountSyncStatus  AS AutocountSyncStatus,
+		CONVERT(c.AutocountSyncMessage USING utf8mb4) COLLATE utf8mb4_unicode_ci AS AutocountSyncMessage,
+		c.created_at AS CustomerCreatedAt
+	FROM customer c
+	LEFT JOIN {$blat} blatest ON blatest.CustomerID = c.CustomerID
+	LEFT JOIN {$bcc} bcc ON bcc.CustomerID = c.CustomerID
+	LEFT JOIN country_code ccp ON ccp.CountryCodeID = bcc.CountryCodeID
+	LEFT JOIN admin    a   ON a.AdminID   = blatest.SalesAgent
+	LEFT JOIN source   s   ON s.SourceID  = blatest.Source
+	LEFT JOIN category cat ON cat.CategoryID = blatest.Destination
+	LEFT JOIN {$bagg} bagg ON bagg.CustomerID = c.CustomerID
+	LEFT JOIN country_code cn ON cn.CountryCodeID = c.Nationality
+	{$branch['where']}
+	ORDER BY (c.created_at IS NULL) ASC, c.created_at DESC, c.name ASC";
+
+		return $this->db->query($sql, $branch['params']);
 	}
 
 	/**
@@ -1796,7 +1943,8 @@ GROUP BY mm.merge_key";
 		$sql = "SELECT gc.id, gc.first_name, gc.last_name, gc.company_name, gc.phone,
 				gc.email, gc.address, gc.gender, gc.chat_language, gc.race, gc.nationality,
 				gc.country, gc.source, gc.notes, gc.customer_type, gc.lead_intro,
-				gc.lead_status, gc.date_of_birth, gc.tags_json,
+				gc.lead_status, gc.nature_of_business, gc.number_of_pax, gc.client_type, gc.state,
+				gc.date_of_birth, gc.tags_json,
 				COALESCE(gc.date_added, gc.created_at) AS created_at, a.Name AS CreatedByName
 			FROM ghl_contacts gc
 			LEFT JOIN admin a ON a.AdminID = gc.created_by

@@ -26,22 +26,80 @@ if (!function_exists('guest_list_export_columns')) {
 	 */
 	function guest_list_export_columns($mode)
 	{
-		if ($mode === 'ghl' || $mode === 'manual') {
-			$cols = array(
+		if ($mode === 'customer') {
+			// Customer List export: mirrors the on-screen columns (Alt Name, Customer
+			// Name, Contact, Email, Language, Guest Type, Destination, Customer Code,
+			// Date Creation) PLUS the fields the dashboard filters on but doesn't show
+			// as columns (Sales Agent, Source, Customer Type, Nationality, Gender,
+			// Num of Pax, DOB), so a filtered download is self-explanatory. AutoCount
+			// sync columns are kept for operational use. Field names map to the
+			// Read_Customers_Rich_For_Export() SELECT aliases.
+			return array(
+				array('ALT NAME', 'AltName'),
+				array('CUSTOMER NAME', 'Name'),
+				array('CONTACT NUM', '__phone'),
+				array('EMAIL', 'Email'),
+				array('LANGUAGE', 'Language'),
+				array('SALES AGENT', 'AgentName'),
+				array('SOURCE', 'Source'),
+				array('CUSTOMER TYPE', 'CustomerType'),
+				array('GUEST TYPE', 'GuestType'),
+				array('DESTINATION', 'Destination'),
+				array('NATIONALITY', 'Nationality'),
+				array('GENDER', 'Gender'),
+				array('NUM OF PAX', 'TotalPax'),
+				array('DATE OF BIRTH', 'DOB'),
+				array('CUSTOMER CODE', 'CustomerCode'),
+				array('DATE CREATION', 'CustomerCreatedAt'),
+				array('AUTOCOUNT SYNC STATUS', 'AutocountSyncStatus'),
+				array('AUTOCOUNT SYNC MESSAGE', 'AutocountSyncMessage'),
+			);
+		}
+
+		if ($mode === 'manual') {
+			// Manual Leads: EVERY stored lead field plus the dated Lead Status
+			// Updates (the lead_status_log history joined into one cell). Client Type
+			// replaces the old Tags field; Nature of Business / Number of Pax / State
+			// are manual-only.
+			return array(
+				array('GUEST FIRST NAME', 'Name'),
+				array('COMPANY NAME', 'Company'),
+				array('CONTACT NUM', '__phone'),
+				array('EMAIL', 'Email'),
+				array('ADDRESS', 'Address'),
+				array('COUNTRY', 'Country'),
+				array('GENDER', 'Gender'),
+				array('RACE', 'Race'),
+				array('NATIONALITY', 'Nationality'),
+				array('LANGUAGE', 'Language'),
+				array('DATE OF BIRTH', 'DOB'),
+				array('SOURCE', 'Source'),
+				array('CUSTOMER TYPE', 'CustomerType'),
+				array('CLIENT TYPE', 'ClientType'),
+				array('NATURE OF BUSINESS', 'NatureOfBusiness'),
+				array('NUMBER OF PAX', 'NumberOfPax'),
+				array('STATE', 'State'),
+				array('CURRENT STATUS', 'CurrentStatus'),
+				array('LEAD STATUS UPDATES', 'StatusUpdates'),
+				array('LEAD INTRO', 'LeadIntro'),
+				array('NOTES', 'Notes'),
+				array('CREATED BY', 'CreatedBy'),
+				array('CREATED AT', 'CreatedAt'),
+			);
+		}
+
+		if ($mode === 'ghl') {
+			return array(
 				array('GUEST FIRST NAME', 'Name'),
 				array('CONTACT NUM', '__phone'),
 				array('TAGS', 'Tags'),
-			);
-			if ($mode === 'ghl') {
-				$cols[] = array('TYPE', 'Type');
-			}
-			return array_merge($cols, array(
+				array('TYPE', 'Type'),
 				array('GENDER', 'Gender'),
 				array('LANGUAGE', 'Language'),
 				array('RACE', 'Race'),
 				array('NATIONALITY', 'Nationality'),
 				array('DATE OF BIRTH', 'DOB'),
-			));
+			);
 		}
 
 		// Guest List (booking guests): mirrors the on-screen column order.
@@ -107,6 +165,19 @@ if (!function_exists('guest_list_export_cell')) {
 
 		if ($field === 'Type') {
 			return ($raw === 'Manual') ? 'Manual' : 'GHL';
+		}
+
+		if ($field === 'NumberOfPax') {
+			$raw = trim($raw);
+			return $raw === '' ? '' : $raw . ' pax';
+		}
+
+		if ($field === 'CreatedAt' || $field === 'CustomerCreatedAt') {
+			$raw = trim($raw);
+			if ($raw === '' || $raw === '0000-00-00 00:00:00' || strtotime($raw) === false) {
+				return '';
+			}
+			return date('d M Y, g:i A', strtotime($raw));
 		}
 
 		if ($field === 'DOB') {
@@ -196,10 +267,21 @@ if (!function_exists('guest_list_export_stream')) {
 		$sheet->setTitle('Records');
 		$spreadsheet->getProperties()->setCreator('HolidayGoGoGo');
 
+		// Fields whose cell holds several lines (e.g. the Manual Leads "Lead Status
+		// Updates" — one dated entry per line). Their columns get wrap-text so the
+		// newlines actually render as separate rows inside the cell, plus a wider
+		// width to fit the dates + notes.
+		$multiline_fields = array('StatusUpdates');
+		$wrap_cols = array();
 		foreach ($cols as $i => $c) {
 			$col = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($i + 1);
 			$sheet->setCellValue($col . '1', $c[0]);
-			$sheet->getColumnDimension($col)->setWidth(28);
+			if (in_array($c[1], $multiline_fields, true)) {
+				$sheet->getColumnDimension($col)->setWidth(42);
+				$wrap_cols[] = $col;
+			} else {
+				$sheet->getColumnDimension($col)->setWidth(28);
+			}
 		}
 		$sheet->getStyle('A1:' . $last . '1')->getFill()
 			->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
@@ -223,6 +305,16 @@ if (!function_exists('guest_list_export_stream')) {
 					);
 				}
 				$row++;
+			}
+		}
+
+		// Wrap-text (top-aligned) on the multi-line columns so each newline-separated
+		// entry shows on its own row inside the cell.
+		if ($row > 2 && !empty($wrap_cols)) {
+			foreach ($wrap_cols as $col) {
+				$style = $sheet->getStyle($col . '2:' . $col . ($row - 1))->getAlignment();
+				$style->setWrapText(true);
+				$style->setVertical(\PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_TOP);
 			}
 		}
 

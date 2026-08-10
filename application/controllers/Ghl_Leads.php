@@ -46,6 +46,7 @@ class Ghl_Leads extends MY_Controller
 		$data['customer_types'] = $this->Customer_Type_Model->Read_Customer_Types();
 		$data['nationalities']  = $this->Guests_Model->Read_Distinct('Nationality');
 		$data['languages']      = $this->Guests_Model->Read_Distinct('ChatLanguage');
+		$data['ghl_tags']       = $this->Guests_Model->Read_Ghl_Tags(); // Tags filter options
 		$data['lc_can_edit']    = lc_can_edit('ghl_leads');
 		$this->load->view('layout/header', $titles);
 		$this->load->view('guests/index', $data);

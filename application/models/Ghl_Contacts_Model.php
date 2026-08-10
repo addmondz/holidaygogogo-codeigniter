@@ -151,7 +151,8 @@ class Ghl_Contacts_Model extends CI_Model
             'contact_id', 'first_name', 'last_name', 'company_name', 'email', 'phone',
             'assigned_to', 'lead_source', 'created_by', 'gender', 'race', 'nationality',
             'address', 'country', 'source', 'notes', 'customer_type', 'lead_intro',
-            'lead_status', 'chat_language', 'date_of_birth', 'tags_json', 'date_added',
+            'lead_status', 'nature_of_business', 'number_of_pax', 'client_type', 'state',
+            'chat_language', 'date_of_birth', 'tags_json', 'date_added',
         );
 
         $insert = array();
@@ -195,6 +196,7 @@ class Ghl_Contacts_Model extends CI_Model
             'first_name', 'company_name', 'email', 'phone', 'gender',
             'race', 'nationality', 'address', 'country', 'source', 'notes',
             'customer_type', 'lead_intro', 'lead_status', 'chat_language',
+            'nature_of_business', 'number_of_pax', 'client_type', 'state',
             'tags_json',
         );
 

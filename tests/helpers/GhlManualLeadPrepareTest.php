@@ -48,6 +48,10 @@ $res = ghl_manual_lead_prepare(array(
     'lead_status'   => 'New',
     'date_of_birth' => '1990-05-20',
     'tags'          => 'Redang, VIP, redang',
+    'nature_of_business' => '  Travel Agency  ',
+    'number_of_pax' => '11-20',
+    'client_type'   => 'HRDC',
+    'state'         => 'Selangor',
     // created_by is server-supplied; a POST value must NOT leak into the row.
     'created_by'    => '999',
 ), 'abc123', $now, 42);
@@ -77,6 +81,11 @@ assert_eq('notes', 'Called twice, keen on Redang', $res['row']['notes']);
 assert_eq('customer_type', 'Company', $res['row']['customer_type']);
 assert_eq('lead_intro', 'Referred by existing client', $res['row']['lead_intro']);
 assert_eq('lead_status', 'New', $res['row']['lead_status']);
+// business fields: trimmed, empty => null
+assert_eq('nature_of_business trimmed', 'Travel Agency', $res['row']['nature_of_business']);
+assert_eq('number_of_pax', '11-20', $res['row']['number_of_pax']);
+assert_eq('client_type', 'HRDC', $res['row']['client_type']);
+assert_eq('state', 'Selangor', $res['row']['state']);
 
 // ---- minimal: name only, everything else null ------------------------------
 $min = ghl_manual_lead_prepare(array('first_name' => 'Solo'), 'u2', $now);
@@ -95,6 +104,10 @@ assert_eq('minimal notes null', null, $min['row']['notes']);
 assert_eq('minimal customer_type null', null, $min['row']['customer_type']);
 assert_eq('minimal lead_intro null', null, $min['row']['lead_intro']);
 assert_eq('minimal lead_status null', null, $min['row']['lead_status']);
+assert_eq('minimal nature null', null, $min['row']['nature_of_business']);
+assert_eq('minimal number_of_pax null', null, $min['row']['number_of_pax']);
+assert_eq('minimal client_type null', null, $min['row']['client_type']);
+assert_eq('minimal state null', null, $min['row']['state']);
 // created_by defaults to null when the caller omits it
 assert_eq('minimal created_by null', null, $min['row']['created_by']);
 
@@ -124,23 +137,30 @@ assert_eq('encode split newlines', '["a","b"]', ghl_manual_lead_encode_tags("a\n
 
 // ---- bulk import: column map <-> row mapper stay in lockstep ----------------
 $cols = ghl_manual_lead_import_columns();
-assert_eq('import col count', 16, count($cols));
+assert_eq('import col count', 19, count($cols));
 assert_eq('first import key', 'first_name', array_values($cols)[0]);
-assert_eq('last import key', 'lead_status', array_values($cols)[15]);
+assert_eq('last import key', 'state', array_values($cols)[18]);
+// Tags is gone; CLIENT TYPE now sits in the old TAGS slot (index 11).
+assert_eq('client_type col', 'client_type', array_values($cols)[11]);
 
 // a filled data row maps 0-indexed cells onto the prepare() POST keys
 $rowPost = ghl_manual_lead_row_to_post(array(
     'Ali', 'Acme', '0123456789', 'ali@example.com', 'No 1',
     'Male', 'Malay', 'Malay', 'Malaysia', 'Malaysia', 'Facebook',
-    'Redang, VIP', 'keen', 'Company', 'referral', 'New',
+    'HRDC', 'keen', 'Company', 'referral', 'New', 'Travel Agency', '11-20', 'Selangor',
 ));
 assert_eq('row first_name', 'Ali', $rowPost['first_name']);
 assert_eq('row company', 'Acme', $rowPost['company_name']);
 assert_eq('row lead_status', 'New', $rowPost['lead_status']);
+assert_eq('row client_type', 'HRDC', $rowPost['client_type']);
+assert_eq('row nature', 'Travel Agency', $rowPost['nature_of_business']);
+assert_eq('row number_of_pax', '11-20', $rowPost['number_of_pax']);
+assert_eq('row state', 'Selangor', $rowPost['state']);
 // feeding that mapped row straight into prepare() yields a valid insert row
 $rowPrepared = ghl_manual_lead_prepare($rowPost, 'bulk1', $now, 7);
 assert_eq('row prepares ok', true, $rowPrepared['ok']);
 assert_eq('row prepared status', 'New', $rowPrepared['row']['lead_status']);
+assert_eq('row prepared client_type', 'HRDC', $rowPrepared['row']['client_type']);
 
 // header row is dropped (NAME + COMPANY NAME are the first two labels)
 assert_eq('header dropped', null, ghl_manual_lead_row_to_post(array(

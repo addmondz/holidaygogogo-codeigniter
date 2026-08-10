@@ -35,6 +35,7 @@ class Manual_Leads extends MY_Controller
 		$limit  = 30;
 		$offset = ($page - 1) * $limit;
 
+		$this->load->helper('ghl_manual_lead');
 		$this->Guests_Model->Set_Mode('manual');
 		$data['guests']         = $this->Guests_Model->Read_Guests($limit, $offset);
 		$this->load->model('Ghl_Messages_Model');
@@ -52,6 +53,9 @@ class Manual_Leads extends MY_Controller
 		$data['lead_statuses']  = $this->Lead_Status_Model->Read_Lead_Statuses();
 		$data['nationalities']  = $this->Guests_Model->Read_Distinct('Nationality');
 		$data['languages']      = $this->Guests_Model->Read_Distinct('ChatLanguage');
+		$data['client_types']   = ghl_manual_lead_client_types();
+		$data['pax_options']    = ghl_manual_lead_pax_options();
+		$data['states']         = ghl_manual_lead_states();
 		$data['lc_can_edit']    = lc_can_edit('manual_leads');
 		$this->load->view('layout/header', $titles);
 		$this->load->view('guests/index', $data);
@@ -66,7 +70,9 @@ class Manual_Leads extends MY_Controller
 	{
 		$this->load->helper('guest_list_export');
 		$this->Guests_Model->Set_Mode('manual');
-		$rows = $this->Guests_Model->Read_Guests_For_Export();
+		// Full field dump (all lead columns + dated Lead Status Updates), not the
+		// slim shared-listing column set.
+		$rows = $this->Guests_Model->Read_Manual_Leads_For_Export();
 		guest_list_export_stream($rows, 'manual', 'MANUAL_LEADS_' . date('Ymd') . '.xlsx');
 	}
 
@@ -236,6 +242,10 @@ class Manual_Leads extends MY_Controller
 			'lead_status'   => $row->lead_status,
 			'lead_intro'    => $row->lead_intro,
 			'notes'         => $row->notes,
+			'nature_of_business' => $row->nature_of_business,
+			'number_of_pax' => $row->number_of_pax,
+			'client_type'   => $row->client_type,
+			'state'         => $row->state,
 			'date_of_birth' => $dob,
 			'tags'          => implode(', ', array_values($tags)),
 		)));
@@ -295,6 +305,10 @@ class Manual_Leads extends MY_Controller
 			'lead_intro'    => $row->lead_intro,
 			'lead_status'   => $row->lead_status,
 			'notes'         => $row->notes,
+			'nature_of_business' => $row->nature_of_business,
+			'number_of_pax' => $row->number_of_pax,
+			'client_type'   => $row->client_type,
+			'state'         => $row->state,
 			'date_of_birth' => $dob,
 			'tags'          => array_values($tags),
 			'status_log'    => $status_log,
@@ -404,7 +418,7 @@ class Manual_Leads extends MY_Controller
 			$sheet->getColumnDimension($col)->setWidth(20);
 			$col++;
 		}
-		$last_col = chr(ord('A') + count($headers) - 1); // 17 cols => 'Q'
+		$last_col = chr(ord('A') + count($headers) - 1); // 19 cols => 'S'
 		$sheet->getStyle('A1:' . $last_col . '1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_BLACK);
 		$sheet->getStyle('A1:' . $last_col . '1')->getFont()->getColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_WHITE);
 		$sheet->getStyle('A1:' . $last_col . '1')->getFont()->setBold(true);
@@ -413,8 +427,8 @@ class Manual_Leads extends MY_Controller
 		// (or EMAIL) must be filled — a fully-blank row is skipped.
 		$sample = array('ALI BIN ABU', 'Acme Sdn Bhd', '0123456789', 'ali@example.com',
 			'No 1, Jalan Besar, 50000 KL', 'Male', 'Malay', 'Malay', 'Malaysia', 'Malaysia',
-			'Facebook', 'Redang, VIP', 'Called twice, keen on Redang', 'Company',
-			'Referred by existing client', 'New');
+			'Facebook', 'HRDC', 'Called twice, keen on Redang', 'Company',
+			'Referred by existing client', 'New', 'Travel Agency', '11-20', 'Selangor');
 		$col = 'A';
 		foreach ($sample as $val) {
 			$sheet->setCellValueExplicit($col . '2', $val, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);

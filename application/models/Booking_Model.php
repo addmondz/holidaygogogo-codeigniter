@@ -2199,15 +2199,19 @@ class Booking_Model extends CI_Model
 		//     whose TC, TC2 or OP belongs to their team. Cross-team: a booking whose
 		//     people span teams is visible to each involved team's lead/OP.
 		//   Everyone else (Owner 10, Finance 30, Marketing 60): unscoped.
-		// TC Lead (25) "Payment From Customer Due Soon" card is scoped to the
-		// lead's OWN bookings (same as a TC), so its ?customer_payment drill-down
-		// must scope to own bookings too — otherwise the team-scoped listing
-		// below shows the whole team and disagrees with the card count. Treat
-		// level 25 like a TC (own scope) ONLY for this drill-down; the normal
-		// TC Lead listing keeps the team scope. See CustomerPaymentTcLeadScopeParityTest.
-		$tclead_own_payment = ($level === 25 && !empty($this->input->get('customer_payment')));
+		// The "Payment From Customer Due Soon" card is scoped to the viewer's OWN
+		// bookings (SalesAgent/SalesAgent2 = me, same as a TC) for BOTH the Owner
+		// (10) and the TC Lead (25) — on the booking listing they render the
+		// sales-agent card set (summary_cards_show_agent_set). So their
+		// ?customer_payment drill-down must scope to own bookings too, otherwise
+		// the default listing (Owner = unscoped/company-wide, TC Lead =
+		// team-scoped) shows far more rows than the card counted. Treat levels
+		// 10/25 like a TC (own scope) ONLY for this drill-down; their normal
+		// listing keeps its wider scope. See CustomerPaymentTcLeadScopeParityTest
+		// and CustomerPaymentOwnerScopeParityTest.
+		$own_payment_drilldown = (in_array($level, [10, 25]) && !empty($this->input->get('customer_payment')));
 
-		if(in_array($level, [20, 50]) || $tclead_own_payment) {
+		if(in_array($level, [20, 50]) || $own_payment_drilldown) {
 			$this->db->group_start();
 			$this->db->where('booking.SalesAgent', $admin_id);
 			$this->db->or_where('booking.SalesAgent2', $admin_id);
