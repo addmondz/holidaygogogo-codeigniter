@@ -8,7 +8,9 @@ class Campaign extends MY_Controller
 			redirect(base_url('Booking'));
 			return;
 		}
-		if($this->session->userdata('level') != 10) {
+		// Leads/Customer tab access: view gates the whole page (owner always
+		// allowed; everyone else only when granted on the Access Settings grid).
+		if( ! lc_can_view('campaign')) {
 			redirect(base_url('Booking'));
 			return;
 		}
@@ -43,6 +45,7 @@ class Campaign extends MY_Controller
 
 	function Create()
 	{
+		if(lc_block_edit('campaign')) { return; }
 		if($this->input->post()) {
 			$saved = $this->Save_From_Post(null);
 			if($saved === false) {
@@ -68,6 +71,7 @@ class Campaign extends MY_Controller
 
 	function Update()
 	{
+		if(lc_block_edit('campaign')) { return; }
 		$id = (int)$this->input->get('campaign_id');
 		if($this->input->post()) {
 			$post_id = (int)$this->input->post('campaign_id');
@@ -128,6 +132,7 @@ class Campaign extends MY_Controller
 
 	function Delete()
 	{
+		if(lc_block_edit('campaign')) { return; }
 		$this->Universal_Model->Delete('CampaignID', $this->input->get('campaign_id'), 'campaign');
 	}
 
@@ -137,6 +142,7 @@ class Campaign extends MY_Controller
 	// Sync_Status to render progress.
 	function Sync_Enqueue()
 	{
+		if(lc_block_edit('campaign')) { return; }
 		header('Content-Type: application/json');
 		$id = (int) $this->input->post('campaign_id');
 		if ($id <= 0) {
@@ -210,8 +216,26 @@ class Campaign extends MY_Controller
 		// Customer List query so the same filters (Customer Type, Source, …)
 		// apply, and it emits the same dedup_key/Name/CallingCode/ContactNum/
 		// Email/Type columns the row mapping below expects.
+		// People opted out of THIS campaign's picker (Action ▸ Campaigns toggle on
+		// the listing) are dropped from every branch. Only applies when editing an
+		// existing campaign (campaign_id > 0); Create mode sends 0 = no exclusion.
+		$this->Guests_Model->Exclude_Campaign_Hidden((int) $this->input->get('campaign_id'));
+
+		// Show the contact WITH its international calling code, and detect the
+		// customer-value segments below — both need the guest_contact helper.
+		$this->load->helper('guest_contact');
+
+		// The Customer-value segments (Purchase Count, Lifetime Value, Booking-
+		// lead, family-with-kids, consecutive-years, cancelled-BC) are measured
+		// per CUSTOMER master, so they only yield rows on the Customer branch.
+		// On the booking/GHL UNION path these same keys SUPPRESS every branch
+		// (see guest_list_customer_only_segment_keys), so a picker left at
+		// "--ALL TYPES--" with only a Purchase Count set returned nothing. When
+		// one of these is active, force the customer branch regardless of Type.
+		$force_customer = guest_list_any_filter_set($this->input->get(), guest_list_customer_only_segment_keys());
+
 		$type = strtolower(trim((string)$this->input->get('type')));
-		if($type === 'customer') {
+		if($type === 'customer' || $force_customer) {
 			$rows  = $this->Guests_Model->Read_Customers_Rich($limit, $offset);
 			$total = $this->Guests_Model->Count_Customers_Rich();
 		} else {
@@ -222,12 +246,9 @@ class Campaign extends MY_Controller
 			$total = $this->Guests_Model->Count_Guests();
 		}
 
-		// Show the contact WITH its international calling code — the same
-		// "+60 169546738" form the Guest List dashboard renders. Without this the
-		// picker dumped the raw local Mobile (no code, trunk "0" inconsistent), so
-		// the number shown/stored/blasted was wrong. Mirrors guests/index.php.
-		$this->load->helper('guest_contact');
-
+		// (The contact is rendered WITH its international calling code below — the
+		// same "+60 169546738" form the Guest List dashboard shows; the
+		// guest_contact helper was already loaded above.)
 		$out = array();
 		foreach($rows as $r) {
 			$calling_code = isset($r->CallingCode) ? (string)$r->CallingCode : '';

@@ -15,6 +15,12 @@
                     <a href="<?php if(strpos($current_url, '?') == true) { echo base_url('Product/Download?') . (explode('?', $current_url))[1]; } else { echo base_url('Product/Download'); } ?>" class="btn btn-light-warning font-weight-bold mr-1 mb-2" style="width:180px;">
                         <i class="las la-arrow-circle-down"></i>Product Records
                     </a>
+                    <a href="<?php echo base_url('Product/Import_Template'); ?>" class="btn btn-light-info font-weight-bold mr-1 mb-2" style="width:180px;" data-toggle="tooltip" title="Download the blank Excel template to bulk create/update products">
+                        <i class="la la-file-download"></i>Import Template
+                    </a>
+                    <button type="button" class="btn btn-light-success font-weight-bold mr-1 mb-2" style="width:180px;" data-toggle="modal" data-target="#product_import_modal" title="Upload a filled template to bulk create/update products">
+                        <i class="la la-file-import"></i>Bulk Import
+                    </button>
                     <?php if(!empty($products)) { ?>
                     <button type="button" id="btn_bulk_add_checklist" class="btn btn-light-success font-weight-bold mb-2" style="width:200px;">
                         <i class="las la-check-square"></i>Add Checklist to All
@@ -23,6 +29,16 @@
                 </div>
             </div>
             <div class="card-body">
+                <?php if($this->session->flashdata('product_import_success')) { ?>
+                    <div class="alert alert-light-success font-weight-bold" role="alert" style="border-left:4px solid #1bc5bd;">
+                        <?php echo htmlspecialchars($this->session->flashdata('product_import_success')); ?>
+                    </div>
+                <?php } ?>
+                <?php if($this->session->flashdata('product_import_error')) { ?>
+                    <div class="alert alert-light-danger font-weight-bold" role="alert" style="border-left:4px solid #f64e60;">
+                        <?php echo htmlspecialchars($this->session->flashdata('product_import_error')); ?>
+                    </div>
+                <?php } ?>
                 <div class="accordion accordion-solid accordion-toggle-plus">
                     <div class="card">
                         <div class="card-header">
@@ -129,6 +145,48 @@
         </div>
     </div>
 </div>
+
+<div class="modal fade" id="product_import_modal" tabindex="-1" role="dialog" aria-labelledby="product_import_label" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <form action="<?php echo base_url('Product/Import'); ?>" method="post" enctype="multipart/form-data" id="product_import_form">
+            <div class="modal-content">
+                <div class="modal-header" style="background-color:#D7E2F2;">
+                    <h5 class="modal-title" id="product_import_label" style="color:#6082B6;"><strong>Bulk Import Products from Excel</strong></h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-light-primary" role="alert" style="border-left:4px solid #6082B6;">
+                        Download <strong>Import Template</strong> first, fill one product per row, then upload it here. A row whose <strong>Product Code</strong> matches an existing product <strong>updates</strong> it; a blank Product Code <strong>creates</strong> a new product.
+                    </div>
+                    <div class="form-group">
+                        <label>Excel File <span class="text-danger">*</span></label>
+                        <div class="custom-file">
+                            <input type="file" name="import_file" class="custom-file-input" id="product_import_file" accept=".xlsx,.xls" required>
+                            <label class="custom-file-label" for="product_import_file" id="product_import_file_label">Choose .xlsx / .xls file</label>
+                        </div>
+                        <span class="form-text text-muted"><strong>Category</strong>, <strong>Supplier</strong> and <strong>Name</strong> are required per row. Category/Supplier must match existing names. The last 3 uploads are kept as backups.</span>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light font-weight-bold" data-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success font-weight-bold" id="product_import_submit">
+                        <i class="la la-file-import"></i>Import Products
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    $('#product_import_file').on('change', function() {
+        var name = (this.files && this.files.length) ? this.files[0].name : 'Choose .xlsx / .xls file';
+        $('#product_import_file_label').text(name);
+    });
+    $('#product_import_form').on('submit', function() {
+        $('#product_import_submit').prop('disabled', true).html('<i class="la la-spinner la-spin"></i>Importing...');
+    });
+</script>
 
 <script>
     <?php if(!empty($this->input->get('category')) || !empty($this->input->get('supplier')) || !empty($this->input->get('product_code')) || !empty($this->input->get('name'))) { ?>

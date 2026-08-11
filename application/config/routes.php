@@ -81,6 +81,14 @@ $route['ghl-custom-field-viewer'] = 'Ghl_Custom_Field_Viewer';
 $route['message-log'] = 'Message_Log';
 $route['message-log-csv'] = 'Message_Log/csv';
 
+// Public, token-gated customer Quotation PDF under the /Costing namespace. Maps to
+// the standalone Costing_Quotation controller (no staff login) — the real Costing
+// controller is auth-gated, so a customer link must resolve here instead.
+$route['Costing/Quotation/(:num)'] = 'Costing_Quotation/index/$1';
+$route['costing/quotation/(:num)'] = 'Costing_Quotation/index/$1';
+$route['Costing/Quotation'] = 'Costing_Quotation';
+$route['costing/quotation'] = 'Costing_Quotation';
+
 // Map lowercase CLI URIs to the mixed-case controller class so they resolve on
 // case-sensitive (Linux) prod filesystems, not just case-insensitive local ones.
 $route['backfill_team_snapshot_cutoff'] = 'Backfill_Team_Snapshot_Cutoff';

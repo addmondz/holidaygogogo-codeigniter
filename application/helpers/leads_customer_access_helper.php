@@ -3,13 +3,15 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 
 /**
  * Per-admin, per-page view/edit access for the "Leads/Customer" tab, which groups
- * four pages that used to live under Setting:
+ * these pages that used to live under Setting:
  *
  *   Module         Class          Page
  *   customer       Customer       Customer List
  *   guests         Guests         Guest List
  *   ghl_leads      Ghl_Leads      GHL Leads
  *   manual_leads   Manual_Leads   Manual Leads
+ *   campaign       Campaign       Campaign
+ *   lead_status    Lead_Status    Lead Status
  *
  * The OWNER (level 10) always has full view+edit and is never stored. Every other
  * admin sees/edits nothing by default — the owner grants rights per page on the
@@ -34,6 +36,8 @@ if ( ! function_exists('lc_modules'))
             'guests'       => array('class' => 'Guests',       'label' => 'Guest List'),
             'ghl_leads'    => array('class' => 'Ghl_Leads',    'label' => 'GHL Leads'),
             'manual_leads' => array('class' => 'Manual_Leads', 'label' => 'Manual Leads'),
+            'campaign'     => array('class' => 'Campaign',     'label' => 'Campaign'),
+            'lead_status'  => array('class' => 'Lead_Status',  'label' => 'Lead Status'),
         );
     }
 }

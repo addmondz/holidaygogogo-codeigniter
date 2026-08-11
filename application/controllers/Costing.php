@@ -38,6 +38,24 @@ class Costing extends MY_Controller
         $force_new_snapshot = $snapshot_mode === 'create'
             || ($active_tab === 'bookings' && $selected_booking_id <= 0)
             || $this->input->get('new_snapshot', true) === '1';
+
+        // One costing package holds at most ONE snapshot. On the snapshots tab
+        // always edit the existing one; only allow create when none exists yet.
+        if ($active_tab === 'bookings') {
+            $existing_booking_id = $this->Costing_Model->Existing_Booking_Id($package_id);
+            if ($existing_booking_id > 0) {
+                $booking_id = $existing_booking_id;
+                $selected_booking_id = $existing_booking_id;
+                $snapshot_mode = 'view';
+                $force_new_snapshot = false;
+            } else {
+                $booking_id = 0;
+                $selected_booking_id = 0;
+                $snapshot_mode = 'create';
+                $force_new_snapshot = true;
+            }
+        }
+
         $array = $this->Costing_Model->Read_Package_Workspace_Data($package_id, $booking_id, 'MYR', $force_new_snapshot);
 
         if (empty($array['package']['id'])) {
@@ -147,7 +165,7 @@ class Costing extends MY_Controller
             'margin_percentage' => $this->input->post('margin_percentage'),
             'commissionable_per_pax' => $this->input->post('commissionable_per_pax'),
             'ad_hoc_per_pax' => $this->input->post('ad_hoc_per_pax'),
-            'selling_price_per_pax' => $this->input->post('selling_price_per_pax'),
+            'snapshot' => $this->input->post('snapshot'),
         ));
 
         if ($booking_id > 0) {
@@ -172,8 +190,8 @@ class Costing extends MY_Controller
             'margin_percentage' => $this->input->post('margin_percentage'),
             'commissionable_per_pax' => $this->input->post('commissionable_per_pax'),
             'ad_hoc_per_pax' => $this->input->post('ad_hoc_per_pax'),
-            'selling_price_per_pax' => $this->input->post('selling_price_per_pax'),
             'rows' => $this->input->post('rows'),
+            'snapshot' => $this->input->post('snapshot'),
         ));
 
         $booking_id = (int) $this->input->post('booking_id');
@@ -197,6 +215,19 @@ class Costing extends MY_Controller
         }
 
         redirect('Costing/Package/' . $package_id . '?tab=bookings');
+    }
+
+    public function Save_Itinerary()
+    {
+        $package_id = (int) $this->input->post('package_id');
+        if ($package_id > 0 && $this->Costing_Model->Save_Itinerary_Days($package_id, (array) $this->input->post('itinerary'))) {
+            $this->session->set_flashdata('message_success', 'Itinerary saved successfully.');
+        } else {
+            $this->session->set_flashdata('message_error', 'Unable to save itinerary.');
+        }
+
+        $booking_id = (int) $this->input->post('booking_id');
+        redirect('Costing/Package/' . $package_id . '?tab=itinerary' . ($booking_id > 0 ? '&booking_id=' . $booking_id : ''));
     }
 
     public function Currency()
@@ -337,7 +368,7 @@ class Costing extends MY_Controller
     private function Normalize_Package_Tab($tab)
     {
         $tab = strtolower(trim((string) $tab));
-        return in_array($tab, array('details', 'costing', 'bookings'), true) ? $tab : 'details';
+        return in_array($tab, array('details', 'costing', 'bookings', 'itinerary'), true) ? $tab : 'details';
     }
 
     private function Normalize_Snapshot_Mode($mode, $booking_id)

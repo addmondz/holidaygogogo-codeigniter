@@ -291,6 +291,11 @@ $achieved_margin_percentage = (float) $financials['selling_price_per_pax'] > 0
                             <span class="nav-text">Booking Snapshots</span>
                         </a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link <?php echo $active_tab === 'itinerary' ? 'active' : ''; ?>" href="<?php echo base_url('Costing/Package/' . $package_id . '?tab=itinerary'); ?>" role="tab">
+                            <span class="nav-text">Itinerary</span>
+                        </a>
+                    </li>
                 </ul>
 
                 <div class="tab-content">
@@ -420,11 +425,10 @@ $achieved_margin_percentage = (float) $financials['selling_price_per_pax'] > 0
                                 <?php } ?>
                             </div>
                             <div class="costing-toolbar-actions">
-                                <?php if (!$is_snapshot_list_mode) { ?>
-                                    <a href="<?php echo base_url('Costing/Package/' . $package_id . '?tab=bookings'); ?>" class="btn btn-light-primary font-weight-bold">Back To Snapshot List</a>
-                                <?php } ?>
-                                <?php if ($is_snapshot_list_mode) { ?>
-                                    <a href="<?php echo base_url('Costing/Package/' . $package_id . '?tab=bookings&mode=create_snapshot'); ?>" class="btn btn-primary font-weight-bold">Create Snapshot</a>
+                                <?php if ($is_snapshot_view_mode && !empty($quotation_token)) { ?>
+                                    <a href="<?php echo base_url('Costing/Quotation/' . (int) $package_id); ?>" target="_blank" class="btn btn-light-success font-weight-bold">
+                                        <i class="la la-file-pdf"></i>View Quotation PDF
+                                    </a>
                                 <?php } ?>
                                 <?php if ($is_snapshot_view_mode) { ?>
                                     <form method="post" action="<?php echo base_url('Costing/Delete_Booking_Snapshot'); ?>" class="costing-inline-form delete-booking-form">
@@ -464,6 +468,11 @@ $achieved_margin_percentage = (float) $financials['selling_price_per_pax'] > 0
                                                         <a href="<?php echo base_url('Costing/Package/' . $package_id . '?tab=bookings&booking_id=' . (int) $saved_booking['id']); ?>" class="btn btn-icon btn-light-primary btn-sm mr-2" title="View / Edit Snapshot">
                                                             <i class="la la-edit"></i>
                                                         </a>
+                                                        <?php if (!empty($saved_booking['quotation_token'])) { ?>
+                                                            <a href="<?php echo base_url('Costing/Quotation?token=' . html_escape($saved_booking['quotation_token'])); ?>" target="_blank" class="btn btn-icon btn-light-success btn-sm mr-2" title="Open Quotation PDF">
+                                                                <i class="la la-file-pdf"></i>
+                                                            </a>
+                                                        <?php } ?>
                                                         <form method="post" action="<?php echo base_url('Costing/Delete_Booking_Snapshot'); ?>" class="costing-inline-form delete-booking-form">
                                                             <input type="hidden" name="package_id" value="<?php echo $package_id; ?>">
                                                             <input type="hidden" name="booking_id" value="<?php echo (int) $saved_booking['id']; ?>">
@@ -534,15 +543,9 @@ $achieved_margin_percentage = (float) $financials['selling_price_per_pax'] > 0
                                         <div class="row">
                                             <div class="col-md-4">
                                                 <div class="form-group">
-                                                    <label>Margin percentage</label>
-                                                    <input type="number" step="0.01" min="0" max="99.99" class="form-control" name="margin_percentage" value="<?php echo html_escape($financials['margin_percentage']); ?>">
-                                                    <span class="form-text text-muted">Selling Price (Price per Pax) = Cost / (1 - Margin)</span>
-                                                </div>
-                                            </div>
-                                            <div class="col-md-4">
-                                                <div class="form-group">
-                                                    <label>Manual Selling Price / Pax</label>
-                                                    <input type="number" step="0.01" min="0" class="form-control" name="selling_price_per_pax" value="<?php echo html_escape($financials['selling_price_per_pax']); ?>">
+                                                    <label>Margin percentage (markup)</label>
+                                                    <input type="number" step="0.01" min="0" class="form-control" name="margin_percentage" value="<?php echo html_escape($financials['margin_percentage']); ?>">
+                                                    <span class="form-text text-muted">Selling = Cost &times; (1 + Margin%). Profit = Cost &times; Margin%.</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -683,18 +686,57 @@ $achieved_margin_percentage = (float) $financials['selling_price_per_pax'] > 0
                                             <div class="row mb-5">
                                                 <div class="col-md-4">
                                                     <div class="form-group">
-                                                        <label>Margin percentage</label>
-                                                        <input type="number" step="0.01" min="0" max="99.99" class="form-control financial-input" name="margin_percentage" id="margin_percentage" value="<?php echo html_escape($financials['margin_percentage']); ?>">
-                                                        <span class="form-text text-muted">Selling Price (Price per Pax) = Cost / (1 - Margin)</span>
+                                                        <label>Margin percentage (markup)</label>
+                                                        <input type="number" step="0.01" min="0" class="form-control financial-input" name="margin_percentage" id="margin_percentage" value="<?php echo html_escape($financials['margin_percentage']); ?>">
+                                                        <span class="form-text text-muted">Selling = Cost &times; (1 + Margin%). Profit shown at the side.</span>
                                                     </div>
                                                 </div>
-                                                <div class="col-md-4">
-                                                    <div class="form-group">
-                                                        <label>Manual Selling Price / Pax (MYR)</label>
-                                                        <input type="number" step="0.01" min="0" class="form-control financial-input" name="selling_price_per_pax" id="selling_price_per_pax" value="<?php echo html_escape($financials['selling_price_per_pax']); ?>">
+                                                <div class="col-md-4 d-flex align-items-center">
+                                                    <div class="costing-output-chip" style="min-width:220px;">
+                                                        <div class="costing-output-chip-label">Profit (<?php echo html_escape($base_currency); ?>)</div>
+                                                        <div class="costing-output-chip-value financial-total-profit-output"><?php echo $format_base_amount($financials['total_profit']); ?></div>
                                                     </div>
                                                 </div>
                                             </div>
+
+                                            <div class="mb-2 font-weight-bold text-dark">Currency Snapshot</div>
+                                            <div class="text-muted mb-3" style="font-size:12px;">Each currency's MYR rate is frozen onto this snapshot. Auto-filled from the latest <a href="<?php echo base_url('Costing/Currency'); ?>" target="_blank">Costing Currency</a> rate &mdash; edit and add a remark, then Save Snapshot to lock it. Saved quotations never move.</div>
+                                            <div class="table-responsive costing-snapshot-table-wrapper mb-5">
+                                                <table class="table table-bordered table-head-custom costing-snapshot-table">
+                                                    <thead>
+                                                        <tr>
+                                                            <th style="text-align:center; width:120px;">Currency</th>
+                                                            <th style="text-align:center; width:220px;">1 unit = ? MYR</th>
+                                                            <th style="text-align:center;">Remark</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        <?php if (empty($snapshot_panel)) { ?>
+                                                            <tr><td colspan="3" class="costing-empty-cell">Add cost rows with a currency to build the snapshot.</td></tr>
+                                                        <?php } else { ?>
+                                                            <?php foreach ($snapshot_panel as $snap) { $is_myr = $snap['currency_code'] === 'MYR'; ?>
+                                                                <tr>
+                                                                    <td style="text-align:center;">
+                                                                        <span class="label label-lg label-light-primary label-inline" style="min-width:74px; justify-content:center;"><?php echo html_escape($snap['currency_code']); ?></span>
+                                                                    </td>
+                                                                    <td>
+                                                                        <input type="number" step="0.00000001" min="0" class="form-control" name="snapshot[<?php echo (int) $snap['currency_id']; ?>][rate_to_myr]" value="<?php echo html_escape(rtrim(rtrim(number_format((float) $snap['rate_to_myr'], 8, '.', ''), '0'), '.')); ?>" <?php echo $is_myr ? 'readonly' : ''; ?>>
+                                                                    </td>
+                                                                    <td>
+                                                                        <input type="text" class="form-control" name="snapshot[<?php echo (int) $snap['currency_id']; ?>][remark]" value="<?php echo html_escape($snap['remark']); ?>" placeholder="<?php echo $is_myr ? 'Base currency' : 'e.g. peak season, bank rate'; ?>" <?php echo $is_myr ? 'readonly' : ''; ?>>
+                                                                    </td>
+                                                                </tr>
+                                                            <?php } ?>
+                                                        <?php } ?>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+
+                                            <?php if (!empty($quotation_token)) { ?>
+                                                <a href="<?php echo base_url('Costing/Quotation/' . (int) $package_id); ?>" target="_blank" class="btn btn-light-success font-weight-bold mb-4">
+                                                    <i class="la la-file-pdf"></i>View Quotation PDF
+                                                </a>
+                                            <?php } ?>
 
                                             <div class="table-responsive costing-snapshot-table-wrapper">
                                                 <table class="table table-bordered table-head-custom costing-snapshot-table" id="costing-items-table">
@@ -827,7 +869,7 @@ $achieved_margin_percentage = (float) $financials['selling_price_per_pax'] > 0
                                                         <tr>
                                                             <td>
                                                                 <span class="metric-name">Calculated Selling Price</span>
-                                                                <span class="metric-formula">Per pax: Cost per pax / (1 - margin percentage)</span>
+                                                                <span class="metric-formula">Per pax: Cost per pax &times; (1 + margin percentage)</span>
                                                                 <span class="metric-formula">Total: Calculated selling price per pax x total pax</span>
                                                             </td>
                                                             <td style="text-align:right;"><span class="metric-value financial-price-per-pax-output" id="financial-price-per-pax"><?php echo $format_base_amount($financials['price_per_pax']); ?></span></td>
@@ -861,6 +903,55 @@ $achieved_margin_percentage = (float) $financials['selling_price_per_pax'] > 0
                         </form>
                         <?php } ?>
                     </div>
+
+                    <div class="tab-pane fade <?php echo $active_tab === 'itinerary' ? 'show active' : ''; ?>" id="package_itinerary_tab" role="tabpanel">
+                        <div class="costing-toolbar mb-5 d-flex justify-content-between align-items-start flex-wrap">
+                            <div>
+                                <h3 class="mb-1">Itinerary</h3>
+                                <div class="text-muted">Per-day plan shown on the customer Quotation PDF. Shared across this package's snapshots.</div>
+                            </div>
+                            <?php if (!empty($quotation_token)) { ?>
+                                <a href="<?php echo base_url('Costing/Quotation/' . (int) $package_id); ?>" target="_blank" class="btn btn-light-success font-weight-bold">
+                                    <i class="la la-file-pdf"></i>View Quotation PDF
+                                </a>
+                            <?php } ?>
+                        </div>
+
+                        <form method="post" action="<?php echo base_url('Costing/Save_Itinerary'); ?>">
+                            <input type="hidden" name="package_id" value="<?php echo $package_id; ?>">
+                            <input type="hidden" name="booking_id" value="<?php echo (int) $booking_id; ?>">
+                            <div class="card card-custom mb-5">
+                                <div class="card-body">
+                                    <div class="table-responsive costing-snapshot-table-wrapper">
+                                        <table class="table table-bordered table-head-custom costing-snapshot-table" id="itinerary-table">
+                                            <thead>
+                                                <tr>
+                                                    <th style="text-align:center; width:90px;">Day</th>
+                                                    <th style="text-align:center; width:260px;">Title</th>
+                                                    <th style="text-align:center;">Description</th>
+                                                    <th style="text-align:center; width:100px;">Action</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="itinerary-body">
+                                                <?php
+                                                $itinerary_rows = !empty($itinerary_days) ? $itinerary_days : array(array('day_number' => 1, 'title' => '', 'description' => ''));
+                                                foreach ($itinerary_rows as $i => $day) { ?>
+                                                    <tr class="itinerary-row">
+                                                        <td><input type="number" min="1" class="form-control itinerary-day" name="itinerary[<?php echo $i; ?>][day_number]" value="<?php echo (int) (isset($day['day_number']) ? $day['day_number'] : $i + 1); ?>"></td>
+                                                        <td><input type="text" class="form-control" name="itinerary[<?php echo $i; ?>][title]" value="<?php echo html_escape(isset($day['title']) ? $day['title'] : ''); ?>" placeholder="e.g. Arrival &amp; City Tour"></td>
+                                                        <td><textarea rows="2" class="form-control" name="itinerary[<?php echo $i; ?>][description]" placeholder="What happens on this day"><?php echo html_escape(isset($day['description']) ? $day['description'] : ''); ?></textarea></td>
+                                                        <td style="text-align:center;"><button type="button" class="btn btn-light-danger btn-sm remove-itinerary-row">Remove</button></td>
+                                                    </tr>
+                                                <?php } ?>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <button type="button" class="btn btn-light-primary font-weight-bold mr-2" id="add-itinerary-row">Add Day</button>
+                                    <button type="submit" class="btn btn-primary font-weight-bold">Save Itinerary</button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
                 </div>
             </div>
         </div>
@@ -880,6 +971,29 @@ $achieved_margin_percentage = (float) $financials['selling_price_per_pax'] > 0
                     </button>
                 </div>
                 <div class="modal-body">
+                    <?php $item_master = isset($item_master) ? $item_master : array(); ?>
+                    <?php if (!empty($item_master)) { ?>
+                        <div class="row">
+                            <div class="col-md-12">
+                                <div class="form-group">
+                                    <label>Insert from Item Master (optional)</label>
+                                    <select class="form-control" id="template_item_master_picker">
+                                        <option value="">&mdash; Type manually, or pick a saved item &mdash;</option>
+                                        <?php foreach ($item_master as $master_item) { ?>
+                                            <option value="<?php echo (int) $master_item['id']; ?>"
+                                                data-name="<?php echo html_escape($master_item['name']); ?>"
+                                                data-category="<?php echo html_escape($master_item['category_label']); ?>"
+                                                data-currency-id="<?php echo (int) $master_item['default_currency_id']; ?>"
+                                                data-unit-cost="<?php echo html_escape(number_format((float) $master_item['default_unit_cost'], 2, '.', '')); ?>">
+                                                [<?php echo html_escape($master_item['category_label']); ?>] <?php echo html_escape($master_item['name']); ?> (<?php echo html_escape($master_item['currency_code']); ?> <?php echo number_format((float) $master_item['default_unit_cost'], 2); ?>)
+                                            </option>
+                                        <?php } ?>
+                                    </select>
+                                    <span class="form-text text-muted">Picking an item fills the fields below &mdash; still editable. Manage items under <b>Costing Item</b>.</span>
+                                </div>
+                            </div>
+                        </div>
+                    <?php } ?>
                     <div class="row">
                         <div class="col-md-5">
                             <div class="form-group">
@@ -1188,24 +1302,22 @@ $achieved_margin_percentage = (float) $financials['selling_price_per_pax'] > 0
                 totalCost += asNumber(row.dataset.baseTotal);
             });
 
-            var marginPercentage = marginField ? Math.min(99.99, Math.max(0, asNumber(marginField.value))) : 0;
+            // Markup on cost (percentage only, no manual selling price):
+            //   selling = cost x (1 + margin%);  profit = cost x margin%.
+            var marginPercentage = marginField ? Math.max(0, asNumber(marginField.value)) : 0;
 
             var costPerPax = totalPax > 0 ? totalCost / totalPax : 0;
             var marginRate = marginPercentage / 100;
-            var pricePerPax = totalPax > 0 && marginRate < 1 ? costPerPax / (1 - marginRate) : 0;
+            var pricePerPax = costPerPax * (1 + marginRate);
             var calculatedSellingTotal = pricePerPax * totalPax;
             var markupAmountTotal = calculatedSellingTotal - totalCost;
             var markupAmountPerPax = pricePerPax - costPerPax;
-            var enteredSellingPrice = sellingPriceField ? asNumber(sellingPriceField.value) : 0;
-            var sellingPricePerPax = sellingPriceManuallyEdited && enteredSellingPrice > 0 ? enteredSellingPrice : pricePerPax;
+            var sellingPricePerPax = pricePerPax;
             var totalRevenue = sellingPricePerPax * totalPax;
             var grossProfit = totalRevenue - totalCost;
-            var profitPerPax = sellingPricePerPax - costPerPax;
-            var achievedMarginPercentage = sellingPricePerPax > 0 ? (profitPerPax / sellingPricePerPax) * 100 : 0;
-
-            if (sellingPriceField && (!sellingPriceManuallyEdited || enteredSellingPrice <= 0)) {
-                sellingPriceField.value = sellingPricePerPax.toFixed(2);
-            }
+            var profitPerPax = markupAmountPerPax;
+            // Achieved margin, expressed as markup over cost.
+            var achievedMarginPercentage = costPerPax > 0 ? (profitPerPax / costPerPax) * 100 : 0;
 
             updatePercentOutput('.financial-margin-percentage-label', marginPercentage);
             updatePercentOutput('.financial-achieved-margin-percentage-label', achievedMarginPercentage);
@@ -1253,6 +1365,23 @@ $achieved_margin_percentage = (float) $financials['selling_price_per_pax'] > 0
             document.getElementById('template_item_currency_id').value = baseCurrencyId || '';
             document.getElementById('template-item-form-title').textContent = 'Add Cost Template';
             document.getElementById('template-item-submit-button').textContent = 'Save Cost Template';
+            var picker = document.getElementById('template_item_master_picker');
+            if (picker) { picker.value = ''; }
+        }
+
+        // Insert-from-Item-Master: pre-fill the Cost Template fields from a saved item.
+        var itemMasterPicker = document.getElementById('template_item_master_picker');
+        if (itemMasterPicker) {
+            itemMasterPicker.addEventListener('change', function () {
+                var opt = this.options[this.selectedIndex];
+                if (!opt || !this.value) { return; }
+                document.getElementById('template_item_name').value = opt.getAttribute('data-name') || '';
+                document.getElementById('template_item_category').value = opt.getAttribute('data-category') || '';
+                document.getElementById('template_item_default_unit_price').value = opt.getAttribute('data-unit-cost') || '0';
+                var currencyId = opt.getAttribute('data-currency-id') || '';
+                var currencySelect = document.getElementById('template_item_currency_id');
+                if (currencyId && currencySelect) { currencySelect.value = currencyId; }
+            });
         }
 
         if (addTemplateItemButton) {
@@ -1384,5 +1513,42 @@ $achieved_margin_percentage = (float) $financials['selling_price_per_pax'] > 0
         updatePaxTotals();
         syncGenerateFinancials();
         recalculateFinancials();
+    })();
+</script>
+
+<script>
+    (function () {
+        var body = document.getElementById('itinerary-body');
+        var addButton = document.getElementById('add-itinerary-row');
+        if (!body || !addButton) { return; }
+
+        function nextIndex() {
+            return body.querySelectorAll('.itinerary-row').length;
+        }
+
+        addButton.addEventListener('click', function () {
+            var index = nextIndex();
+            var day = index + 1;
+            var tr = document.createElement('tr');
+            tr.className = 'itinerary-row';
+            tr.innerHTML =
+                '<td><input type="number" min="1" class="form-control itinerary-day" name="itinerary[' + index + '][day_number]" value="' + day + '"></td>' +
+                '<td><input type="text" class="form-control" name="itinerary[' + index + '][title]" placeholder="Day title"></td>' +
+                '<td><textarea rows="2" class="form-control" name="itinerary[' + index + '][description]" placeholder="What happens on this day"></textarea></td>' +
+                '<td style="text-align:center;"><button type="button" class="btn btn-light-danger btn-sm remove-itinerary-row">Remove</button></td>';
+            body.appendChild(tr);
+        });
+
+        body.addEventListener('click', function (event) {
+            if (!event.target.classList.contains('remove-itinerary-row')) { return; }
+            var rows = body.querySelectorAll('.itinerary-row');
+            if (rows.length <= 1) {
+                event.target.closest('.itinerary-row').querySelectorAll('input, textarea').forEach(function (f) {
+                    if (f.type === 'number') { f.value = 1; } else { f.value = ''; }
+                });
+                return;
+            }
+            event.target.closest('.itinerary-row').remove();
+        });
     })();
 </script>

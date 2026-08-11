@@ -940,6 +940,12 @@ div.kt-datatable__pager-container {
 														<a href="javascript:;" class="dropdown-item js-remarks" style="font-size:11px;" data-dedup-key="<?php echo htmlspecialchars($g->dedup_key, ENT_QUOTES); ?>" data-name="<?php echo htmlspecialchars($g->Name, ENT_QUOTES); ?>">Remarks<?php if($rc > 0) { echo ' (' . $rc . ')'; } ?></a>
 													<?php } ?>
 													<a href="javascript:;" class="dropdown-item js-chat-history" style="font-size:11px;" data-dedup-key="<?php echo htmlspecialchars($g->dedup_key, ENT_QUOTES); ?>" data-name="<?php echo htmlspecialchars($g->Name, ENT_QUOTES); ?>">Chat History<?php if($chat_c > 0) { echo ' (' . $chat_c . ')'; } ?></a>
+													<?php if($list_base === 'Customer' && !empty($g->dedup_key)) {
+														$camp_c   = isset($campaign_counts[$g->dedup_key]) ? (int) $campaign_counts[$g->dedup_key] : 0;
+														$camp_hid = isset($campaign_hidden[$g->dedup_key]);
+													?>
+														<a href="javascript:;" class="dropdown-item js-campaigns" style="font-size:11px;" data-dedup-key="<?php echo htmlspecialchars($g->dedup_key, ENT_QUOTES); ?>" data-name="<?php echo htmlspecialchars($g->Name, ENT_QUOTES); ?>">Campaigns<?php if($camp_c > 0) { echo ' (' . $camp_c . ')'; } ?><?php if($camp_hid) { echo ' <i class="fa fa-eye-slash text-danger" data-toggle="tooltip" title="Hidden from &ge;1 campaign picker"></i>'; } ?></a>
+													<?php } ?>
 													<?php if(!$is_ghl_row) { ?>
 														<?php if($list_base === 'Customer' && !empty($g->CustomerID) && can_delete_customer($this->session->userdata('level'), $this->session->userdata('admin_id'))) { ?>
 															<a href="#" class="dropdown-item delete-customer text-danger" data-customer-id="<?php echo $g->CustomerID; ?>" data-customer-name="<?php echo htmlspecialchars($g->Name, ENT_QUOTES); ?>" style="font-size:11px;">Delete Customer</a>
@@ -1038,8 +1044,28 @@ div.kt-datatable__pager-container {
 	</div>
 </div>
 
-<!-- Chat history modal: upload exported WhatsApp .txt chats per person and
-     download the raw file back. Multiple files kept per person. -->
+<!-- Chat history modal: upload exported WhatsApp .txt chats per person, then
+     view them as WhatsApp-style chat bubbles or download the raw file. Multiple
+     files kept per person. Bubble look mirrors the Booking listing message log. -->
+<style>
+	#ch_thread { background:#ece5dd; padding:14px; border-radius:8px; max-height:56vh; overflow-y:auto; }
+	.ch-bubble-row { display:flex; margin-bottom:10px; }
+	.ch-bubble-row.ch-out { justify-content:flex-end; }
+	.ch-bubble {
+		max-width:78%; padding:8px 11px; border-radius:9px; font-size:14px; line-height:1.4;
+		color:#111; box-shadow:0 1px 1px rgba(0,0,0,.12); white-space:pre-wrap; word-wrap:break-word; text-align:left;
+	}
+	.ch-in  .ch-bubble { background:#ffffff; border-top-left-radius:2px; }
+	.ch-out .ch-bubble { background:#dcf8c6; border-top-right-radius:2px; }
+	.ch-sender { font-size:12px; font-weight:600; color:#0b7d66; margin-bottom:2px; }
+	.ch-out .ch-sender { color:#557a2e; }
+	.ch-time  { font-size:11px; color:#667; text-align:right; margin-top:3px; }
+	.ch-system {
+		text-align:center; margin:8px auto; font-size:11px; color:#7e8299;
+		background:#fff8e1; border:1px solid #ffe7a0; border-radius:8px;
+		padding:4px 10px; max-width:90%;
+	}
+</style>
 <div class="modal fade" id="chat_history_modal" tabindex="-1" role="dialog" aria-hidden="true">
 	<div class="modal-dialog modal-dialog-centered modal-lg" role="document">
 		<div class="modal-content">
@@ -1079,10 +1105,46 @@ div.kt-datatable__pager-container {
 						<div class="text-muted text-center py-3"><i class="la la-spinner la-spin"></i>&nbsp; Loading chats…</div>
 					</div>
 				</div>
+				<!-- Viewer pane: parsed WhatsApp chat bubbles for one file -->
+				<div id="ch_viewer_pane" style="display:none;">
+					<div class="d-flex justify-content-between align-items-center mb-2">
+						<button type="button" id="ch_back" class="btn btn-light btn-sm font-weight-bold"><i class="la la-arrow-left"></i> Back</button>
+						<span id="ch_viewer_title" class="font-weight-bold text-dark-75 text-truncate px-2" style="font-size:13px;"></span>
+						<a href="javascript:;" id="ch_viewer_download" class="btn btn-light-primary btn-sm font-weight-bold"><i class="la la-download"></i> Download</a>
+					</div>
+					<div id="ch_thread"></div>
+				</div>
 			</div>
 		</div>
 	</div>
 </div>
+
+<?php if($list_base === 'Customer') { ?>
+<!-- Campaigns modal: which campaigns this customer is on + a toggle to opt them
+     in/out of the campaign form audience picker. Keyed by dedup_key. -->
+<div class="modal fade" id="campaigns_modal" tabindex="-1" role="dialog" aria-hidden="true">
+	<div class="modal-dialog modal-dialog-centered modal-lg" role="document">
+		<div class="modal-content">
+			<div class="modal-header" style="background-color:#D7E2F2;">
+				<h5 class="modal-title" style="color:#6082B6;">
+					<i class="la la-bullhorn"></i> Campaigns &mdash; <span id="cp_guest_name" class="font-weight-bold"></span>
+				</h5>
+				<button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+			</div>
+			<div class="modal-body">
+				<div class="text-muted mb-3" style="font-size:11px;">
+					<i class="fa fa-info-circle"></i> <strong>Member</strong> = already on the campaign's list.
+					Turn a campaign OFF to keep this customer out of <em>that</em> campaign's guest picker (when editing it).
+				</div>
+				<div id="cp_error" class="text-danger font-weight-bold mb-2" style="font-size:12px; display:none;"></div>
+				<div id="cp_list">
+					<div class="text-muted text-center py-3"><i class="la la-spinner la-spin"></i>&nbsp; Loading campaigns…</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+<?php } ?>
 
 <script>
 	<?php
@@ -1581,6 +1643,7 @@ div.kt-datatable__pager-container {
 	// they work from every page that renders this view (Guest List / Customer / GHL).
 	var CH_LIST_URL     = '<?php echo base_url('Guests/Chat_History'); ?>';
 	var CH_UPLOAD_URL   = '<?php echo base_url('Guests/Upload_Chat_History'); ?>';
+	var CH_VIEW_URL     = '<?php echo base_url('Guests/View_Chat_History'); ?>';
 	var CH_DOWNLOAD_URL = '<?php echo base_url('Guests/Download_Chat_History'); ?>';
 	var CH_DELETE_URL   = '<?php echo base_url('Guests/Delete_Chat_History'); ?>';
 	var chDedupKey = '';
@@ -1593,6 +1656,8 @@ div.kt-datatable__pager-container {
 		if (!m) { return raw || ''; }
 		return m[3] + ' ' + GR_MONTHS[parseInt(m[2], 10) - 1] + ' ' + m[1] + ' ' + m[4] + ':' + m[5];
 	}
+
+	function chShowList() { $('#ch_viewer_pane').hide(); $('#ch_list_pane').show(); }
 
 	function chRenderList(files) {
 		var $list = $('#ch_list');
@@ -1611,6 +1676,7 @@ div.kt-datatable__pager-container {
 					'<div class="font-weight-bold text-dark-75" style="font-size:13px;">' + meta + '</div>' +
 					'<div class="text-muted" style="font-size:11px;">' + sub + '</div>' +
 				'</div>' +
+				'<button type="button" class="btn btn-icon btn-light-primary btn-xs ch-view ml-1" data-id="' + f.id + '" data-title="' + chEscape(f.title) + '" data-toggle="tooltip" title="View chat"><i class="la la-eye"></i></button>' +
 				'<a href="' + CH_DOWNLOAD_URL + '?id=' + f.id + '&module=' + LC_MODULE + '" class="btn btn-icon btn-light-success btn-xs ml-1" data-toggle="tooltip" title="Download .txt"><i class="la la-download"></i></a>' +
 				(f.can_delete ?
 					'<button type="button" class="btn btn-icon btn-light-danger btn-xs ch-delete ml-1" data-id="' + f.id + '" data-toggle="tooltip" title="Delete"><i class="la la-trash"></i></button>' : '') +
@@ -1648,6 +1714,7 @@ div.kt-datatable__pager-container {
 		$('#ch_file').val('');
 		$('#ch_file_label').text('Choose .txt file');
 		$('#ch_title').val('');
+		chShowList();
 		$('#chat_history_modal').modal('show');
 		chLoad();
 	});
@@ -1687,6 +1754,53 @@ div.kt-datatable__pager-container {
 			});
 	});
 
+	// Render one parsed file as WhatsApp-style bubbles (out=us right, in=customer
+	// left, system notices centered). Messages come pre-ordered from the server.
+	function chRenderThread(messages) {
+		var $t = $('#ch_thread');
+		if (!messages || !messages.length) {
+			$t.html('<div class="text-muted text-center py-3">This chat file has no readable messages.</div>');
+			return;
+		}
+		var html = '';
+		for (var i = 0; i < messages.length; i++) {
+			var m = messages[i];
+			if (m.system) { html += '<div class="ch-system">' + chEscape(m.body) + '</div>'; continue; }
+			var side = m.outbound ? 'ch-out' : 'ch-in';
+			html += '<div class="ch-bubble-row ' + side + '">' +
+				'<div class="ch-bubble">' +
+					(m.sender ? '<div class="ch-sender">' + chEscape(m.sender) + '</div>' : '') +
+					'<div class="ch-text">' + chEscape(m.body) + '</div>' +
+					(m.ts ? '<div class="ch-time">' + chEscape(m.ts) + '</div>' : '') +
+				'</div>' +
+			'</div>';
+		}
+		$t.html(html);
+		$t.scrollTop($t[0].scrollHeight); // jump to latest, like WhatsApp
+	}
+
+	$('#ch_list').on('click', '.ch-view', function() {
+		var $btn = $(this), id = $btn.attr('data-id');
+		$('#ch_viewer_title').text($btn.attr('data-title') || '');
+		$('#ch_viewer_download').attr('data-id', id);
+		$('#ch_thread').html('<div class="text-muted text-center py-3"><i class="la la-spinner la-spin"></i>&nbsp; Loading…</div>');
+		$('#ch_list_pane').hide();
+		$('#ch_viewer_pane').show();
+		$.ajax({ url: CH_VIEW_URL, method: 'GET', dataType: 'json', data: { id: id, module: LC_MODULE }, timeout: 30000 })
+			.done(function(res) {
+				if (res && res.ok) { chRenderThread(res.messages); }
+				else { $('#ch_thread').html('<div class="text-danger text-center py-3">' + chEscape((res && res.message) || 'Could not open chat.') + '</div>'); }
+			})
+			.fail(function() { $('#ch_thread').html('<div class="text-danger text-center py-3">Network error. Please try again.</div>'); });
+	});
+
+	$('#ch_viewer_download').on('click', function() {
+		var id = $(this).attr('data-id');
+		if (id) { window.open(CH_DOWNLOAD_URL + '?id=' + id + '&module=' + LC_MODULE, '_blank'); }
+	});
+
+	$('#ch_back').on('click', chShowList);
+
 	$('#ch_list').on('click', '.ch-delete', function() {
 		var id = $(this).attr('data-id');
 		Swal.fire({
@@ -1706,6 +1820,97 @@ div.kt-datatable__pager-container {
 	});
 
 	<?php if($list_base === 'Customer') { ?>
+	// ----- Campaigns modal (all campaigns + per-campaign show-in-picker toggle) -
+	var CP_LIST_URL = '<?php echo base_url('Guests/Campaigns'); ?>';
+	var CP_SET_URL  = '<?php echo base_url('Guests/Set_Campaign_Visibility'); ?>';
+	var CP_CAN_EDIT = <?php echo $lc_can_edit ? 'true' : 'false'; ?>;
+	var cpDedupKey  = '';
+
+	function cpEscape(s) { return $('<div>').text(s == null ? '' : String(s)).html(); }
+
+	function cpRenderList(campaigns) {
+		var $list = $('#cp_list');
+		if (!campaigns || !campaigns.length) {
+			$list.html('<div class="text-muted text-center py-3">No active campaigns.</div>');
+			return;
+		}
+		var html = '<table class="table table-sm mb-0" style="font-size:12px;"><thead><tr>' +
+			'<th>Campaign</th><th>Date</th><th class="text-center">Member</th>' +
+			'<th class="text-center">Show in picker</th></tr></thead><tbody>';
+		for (var i = 0; i < campaigns.length; i++) {
+			var c = campaigns[i];
+			var checked = c.is_hidden ? '' : 'checked';
+			var disabled = CP_CAN_EDIT ? '' : 'disabled';
+			var member = c.is_member
+				? '<span class="label label-inline label-light-success font-weight-bold">Member</span>'
+				: '<span class="text-muted">—</span>';
+			html += '<tr>' +
+				'<td class="font-weight-bold">' + cpEscape(c.name) + '</td>' +
+				'<td>' + cpEscape(c.campaign_date || '—') + '</td>' +
+				'<td class="text-center">' + member + '</td>' +
+				'<td class="text-center">' +
+					'<span class="switch switch-sm switch-icon">' +
+						'<label class="mb-0">' +
+							'<input type="checkbox" class="cp-toggle" data-campaign-id="' + c.id + '" ' + checked + ' ' + disabled + '>' +
+							'<span></span>' +
+						'</label>' +
+					'</span>' +
+				'</td>' +
+			'</tr>';
+		}
+		html += '</tbody></table>';
+		$list.html(html);
+	}
+
+	// Show a red eye-slash on the row's Action item when hidden from ≥1 campaign.
+	function cpMarkRow() {
+		var anyHidden = $('#cp_list .cp-toggle').filter(function() { return !$(this).is(':checked'); }).length > 0;
+		var $link = $('.js-campaigns[data-dedup-key="' + cpDedupKey.replace(/"/g, '\\"') + '"]');
+		$link.find('.fa-eye-slash').remove();
+		if (anyHidden) {
+			$link.append(' <i class="fa fa-eye-slash text-danger" data-toggle="tooltip" title="Hidden from ≥1 campaign picker"></i>');
+			$link.find('[data-toggle="tooltip"]').tooltip();
+		}
+	}
+
+	function cpLoad() {
+		$('#cp_list').html('<div class="text-muted text-center py-3"><i class="la la-spinner la-spin"></i>&nbsp; Loading campaigns…</div>');
+		$.ajax({ url: CP_LIST_URL, method: 'GET', dataType: 'json', data: { dedup_key: cpDedupKey, module: LC_MODULE }, timeout: 30000 })
+			.done(function(res) {
+				if (res && res.ok) { cpRenderList(res.campaigns); }
+				else { $('#cp_list').html('<div class="text-danger text-center py-3">' + cpEscape((res && res.message) || 'Could not load campaigns.') + '</div>'); }
+			})
+			.fail(function() { $('#cp_list').html('<div class="text-danger text-center py-3">Network error. Please try again.</div>'); });
+	}
+
+	$(document).on('click', '.js-campaigns', function() {
+		cpDedupKey = $(this).attr('data-dedup-key') || '';
+		$('#cp_guest_name').text($(this).attr('data-name') || '');
+		$('#cp_error').hide().text('');
+		$('#campaigns_modal').modal('show');
+		cpLoad();
+	});
+
+	// Per-campaign toggle: unchecked = hidden from that campaign's picker.
+	$('#cp_list').on('change', '.cp-toggle', function() {
+		var $toggle = $(this);
+		var campaignId = $toggle.attr('data-campaign-id');
+		var hidden = $toggle.is(':checked') ? 0 : 1;
+		$toggle.prop('disabled', true);
+		$('#cp_error').hide().text('');
+		$.ajax({ url: CP_SET_URL, method: 'POST', dataType: 'json', timeout: 30000,
+			data: { campaign_id: campaignId, dedup_key: cpDedupKey, hidden: hidden, module: LC_MODULE } })
+			.done(function(res) {
+				$toggle.prop('disabled', false);
+				if (res && res.ok) { $toggle.prop('checked', !res.hidden); cpMarkRow(); }
+				else { $toggle.prop('checked', !hidden); $('#cp_error').text((res && res.message) || 'Could not save.').show(); }
+			})
+			.fail(function() {
+				$toggle.prop('disabled', false).prop('checked', !hidden);
+				$('#cp_error').text('Network error. Please try again.').show();
+			});
+	});
+
 	// ----- Customer master actions (Customer List page only) -----
 	// Soft-delete customer (Status='N') via the existing Customer/Delete endpoint.
 	$(document).on('click', '.delete-customer', function(e) {

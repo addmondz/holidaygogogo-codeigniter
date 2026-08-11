@@ -54,6 +54,7 @@ if (!function_exists('card_visibility_registry')) {
 			// The old team-lead-only card set (group "TC Lead") was retired when
 			// $show_tclead was hard-set to false.
 			'tc_bc_created'            => array('group' => 'TC', 'title' => 'BC Created',                         'levels' => array(10, 20, 50, 25), 'anchor' => 'sc-bc-month-count',                 'keys' => array('bc_month', 'bc_year')),
+			'tc_commission_month'      => array('group' => 'TC', 'title' => 'Sales Commission (Month)',          'levels' => array(50),             'anchor' => 'sc-commission-month-value',         'keys' => array('commission_month')),
 			'tc_sales_month'           => array('group' => 'TC', 'title' => 'Month Sales vs Target',              'levels' => array(10, 20, 50, 25), 'anchor' => 'sc-sales-month-value',              'keys' => array('sales_month')),
 			'tc_sales_year'            => array('group' => 'TC', 'title' => 'Year Sales vs Target',               'levels' => array(10, 20, 50, 25), 'anchor' => 'sc-sales-year-value',               'keys' => array('sales_year')),
 			'tc_cancellation_rate'     => array('group' => 'TC', 'title' => 'Cancellation Rate (Month)',          'levels' => array(10, 20, 50, 25), 'anchor' => 'sc-cancel-rate-value',              'keys' => array('cancellation_rate')),

@@ -221,6 +221,24 @@
                                 Create the admin first, then re-open this record to set targets.
                             </div>
                         <?php } else { ?>
+                            <div class="row mb-2">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label>Commission Rate (%)</label>
+                                        <div class="input-icon">
+                                            <input type="number" min="0" max="100" step="0.01" id="CommissionPercent" name="CommissionPercent" class="form-control" value="<?php echo isset($CommissionPercent) ? number_format((float)$CommissionPercent, 2, '.', '') : '0.00'; ?>" autocomplete="off">
+                                            <span><i class="la la-percent"></i></span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 d-flex align-items-center">
+                                    <small class="text-muted">
+                                        Sales commission rate for this TC. Applied to the completed-booking
+                                        sales (as second sales agent) on the TC's Booking dashboard
+                                        &ldquo;Sales Commission (Month)&rdquo; card. Saves with <strong>Update Admin</strong>.
+                                    </small>
+                                </div>
+                            </div>
                             <div class="row">
                                 <div class="col-md-3">
                                     <div class="form-group">

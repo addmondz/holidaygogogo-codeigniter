@@ -506,6 +506,9 @@
 <script>
 	var CAMPAIGN_INITIAL_SELECTED = <?php echo json_encode($initial_selected, JSON_UNESCAPED_UNICODE); ?>;
 	var SEARCH_URL = '<?php echo base_url('Campaign/Search_Guests'); ?>';
+	// Id of the campaign being edited (0 in create mode). Sent with every picker
+	// search so people opted out of THIS campaign's picker are dropped server-side.
+	var CAMPAIGN_ID = <?php echo (int)$campaign->CampaignID; ?>;
 	<?php
 		$saved_filters = array();
 		if(!empty($campaign->FiltersJson)) {
@@ -753,7 +756,7 @@
 			$.ajax({
 				url: SEARCH_URL,
 				type: 'get',
-				data: $.extend({ page: currentPage }, currentFilterData()),
+				data: $.extend({ page: currentPage, campaign_id: CAMPAIGN_ID }, currentFilterData()),
 				dataType: 'json',
 				success: function(resp) {
 					totalPages = resp.total_pages;
@@ -804,7 +807,7 @@
 				$.ajax({
 					url: SEARCH_URL,
 					type: 'get',
-					data: $.extend({ all: 1 }, currentFilterData()),
+					data: $.extend({ all: 1, campaign_id: CAMPAIGN_ID }, currentFilterData()),
 					dataType: 'json',
 					success: function(resp) {
 						var added   = addRowsToSelected(resp.rows);

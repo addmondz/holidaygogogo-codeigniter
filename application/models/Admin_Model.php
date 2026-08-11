@@ -72,7 +72,7 @@ class Admin_Model extends CI_Model
 							return false;
 						}
 					case 'Update':
-						$this->db->select('AdminID, CountryCodeID, Name, Gender, IdentificationNumber, PassportNumber, Mobile, Email, Username, Level, AccessControl, TeamID');
+						$this->db->select('AdminID, CountryCodeID, Name, Gender, IdentificationNumber, PassportNumber, Mobile, Email, Username, Level, AccessControl, TeamID, CommissionPercent');
 						$this->db->where('AdminID', $this->input->get('admin_id'));
 						$this->db->limit(1);
 						$admin = $this->db->get('admin');

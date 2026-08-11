@@ -39,8 +39,10 @@ class Customer extends MY_Controller
 		$data['sort_dir']       = $sort_dir;
 		$data['guests']         = $this->Guests_Model->Read_Customers_Rich($limit, $offset, $sort_dir);
 		$data['msg_log_phones'] = $this->Ghl_Messages_Model->Phones_With_Messages_For_Guests($data['guests']);
-		$data['remark_counts']  = $this->Remark_Counts_For_Guests($data['guests']);
-		$data['chat_counts']    = $this->Chat_Counts_For_Guests($data['guests']);
+		$data['remark_counts']   = $this->Remark_Counts_For_Guests($data['guests']);
+		$data['chat_counts']     = $this->Chat_Counts_For_Guests($data['guests']);
+		$data['campaign_counts'] = $this->Campaign_Info_For_Guests($data['guests'], 'count');
+		$data['campaign_hidden'] = $this->Campaign_Info_For_Guests($data['guests'], 'hidden');
 		$data['total']          = null; // AJAX-loaded via Count(), like Guests/Ghl_Leads
 		$data['page']           = $page;
 		$data['limit']          = $limit;
@@ -119,6 +121,24 @@ class Customer extends MY_Controller
 			}
 		}
 		return $this->Guests_Model->Read_Chat_History_Counts($keys);
+	}
+
+	/**
+	 * dedup_key => campaign count ('count') or opted-out flag ('hidden') map for
+	 * the rows on this page, badging the Action ▸ Campaigns item and pre-checking
+	 * its visibility toggle without a per-row query.
+	 */
+	private function Campaign_Info_For_Guests($guests, $which)
+	{
+		$keys = array();
+		foreach ((array) $guests as $g) {
+			if (!empty($g->dedup_key)) {
+				$keys[] = $g->dedup_key;
+			}
+		}
+		return ($which === 'hidden')
+			? $this->Guests_Model->Read_Campaign_Hidden_Flags($keys)
+			: $this->Guests_Model->Read_Campaign_Counts($keys);
 	}
 
 	function Create()

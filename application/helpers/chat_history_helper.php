@@ -6,8 +6,9 @@ defined('BASEPATH') OR exit('No direct script access allowed');
  * on the Guest / Customer / GHL Leads listing (views/guests/index.php).
  *
  * Agents export a WhatsApp chat as a .txt file and attach it to a person. These
- * helpers validate the upload and pick a safe on-disk name; the raw file is kept
- * for download only (no in-app viewer). Kept side-effect free so they unit-test
+ * helpers validate the upload, pick a safe on-disk name, parse the export into
+ * messages the viewer renders as chat bubbles, and decide which side (ours vs
+ * the customer) a message sits on. Kept side-effect free so they unit-test
  * without a DB (see tests/helpers/ChatHistoryHelperTest.php).
  */
 
@@ -48,5 +49,84 @@ if (!function_exists('chat_history_stored_name')) {
 	function chat_history_stored_name($original_name = '')
 	{
 		return md5(uniqid(rand(), true) . microtime(true)) . '.txt';
+	}
+}
+
+if (!function_exists('chat_history_is_outbound')) {
+	/**
+	 * True when a message sender is us (the company), so the viewer floats it to
+	 * the right. WhatsApp names our line like "Holidaygogogo Tours Simon"; match
+	 * the brand loosely (spaces/case ignored) so any staff suffix still counts.
+	 */
+	function chat_history_is_outbound($sender)
+	{
+		$s = strtolower((string) $sender);
+		$s = str_replace(array(' ', '-', '_'), '', $s);
+		return strpos($s, 'holidaygogogo') !== false;
+	}
+}
+
+if (!function_exists('chat_history_parse')) {
+	/**
+	 * Parse a WhatsApp .txt export into an ordered list of messages:
+	 *   array('ts'=>string, 'sender'=>string, 'body'=>string,
+	 *         'system'=>bool, 'outbound'=>bool)
+	 *
+	 * A new message begins on a line shaped "<date>, <time> - <rest>". The <rest>
+	 * is "Sender: body" for a chat line, or a bare notice (E2E-encryption banner,
+	 * "Missed voice call", …) for a system line — flagged system=true with an
+	 * empty sender. Lines that don't start a new message are continuation lines
+	 * and fold onto the previous message's body (multi-line messages). Fully
+	 * blank system lines are dropped.
+	 */
+	function chat_history_parse($text)
+	{
+		$text  = str_replace(array("\r\n", "\r"), "\n", (string) $text);
+		$lines = explode("\n", $text);
+
+		// "7/23/26, 1:35 PM - rest"  /  "13/07/2026, 13:35 - rest" (24h too).
+		$head = '/^(\d{1,2}\/\d{1,2}\/\d{2,4}),\s+(\d{1,2}:\d{2}(?::\d{2})?(?:\s?[APap][Mm])?)\s+-\s+(.*)$/u';
+
+		$messages = array();
+		$last     = -1; // index of the message continuation lines append to.
+
+		foreach ($lines as $line) {
+			if (preg_match($head, $line, $m)) {
+				$ts   = trim($m[1] . ', ' . $m[2]);
+				$rest = $m[3];
+
+				// "Sender: body" → chat line; no "Name: " prefix → system notice.
+				$sender = '';
+				$body   = $rest;
+				$system = true;
+				if (preg_match('/^([^:\n]{1,80}?):\s(.*)$/us', $rest, $mm)) {
+					$sender = trim($mm[1]);
+					$body   = $mm[2];
+					$system = false;
+				}
+
+				if ($system && trim($body) === '') {
+					// A bare "…- " placeholder line carries nothing; skip it, but
+					// keep continuation folding pointed at the real prior message.
+					continue;
+				}
+
+				$messages[] = array(
+					'ts'       => $ts,
+					'sender'   => $sender,
+					'body'     => $body,
+					'system'   => $system,
+					'outbound' => $system ? false : chat_history_is_outbound($sender),
+				);
+				$last = count($messages) - 1;
+			} else {
+				// Continuation of the current message (a wrapped/multi-line body).
+				if ($last >= 0) {
+					$messages[$last]['body'] .= "\n" . $line;
+				}
+			}
+		}
+
+		return $messages;
 	}
 }

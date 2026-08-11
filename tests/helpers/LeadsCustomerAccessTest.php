@@ -49,6 +49,21 @@ $assertions['edit implies view'] = lc_resolve_access('guests', 20, $editOnly)['v
 $assertions['no row: view false'] = lc_resolve_access('ghl_leads', 20, $viewEdit)['view'] === false;
 $assertions['no row: edit false'] = lc_resolve_access('ghl_leads', 20, $viewEdit)['edit'] === false;
 
+// 5b) Campaign + Lead Status are grid-controlled like the other modules -------
+$assertions['campaign is a module']    = in_array('campaign', $modules, true);
+$assertions['lead_status is a module'] = in_array('lead_status', $modules, true);
+// Non-owner has no default access (pure grid, owner-only default) — a Team Lead
+// (25) sees Lead Status only when explicitly granted, matching Campaign.
+$assertions['campaign no grant: view false']    = lc_resolve_access('campaign', 25, array())['view'] === false;
+$assertions['lead_status no grant: view false'] = lc_resolve_access('lead_status', 25, array())['view'] === false;
+$grantNew = array(
+    'campaign'    => array('CanView' => 1, 'CanEdit' => 0),
+    'lead_status' => array('CanView' => 1, 'CanEdit' => 1),
+);
+$assertions['campaign granted view']       = lc_resolve_access('campaign', 25, $grantNew)['view'] === true;
+$assertions['campaign granted no edit']    = lc_resolve_access('campaign', 25, $grantNew)['edit'] === false;
+$assertions['lead_status granted view+edit'] = lc_resolve_access('lead_status', 25, $grantNew)['edit'] === true;
+
 // 6) Unknown module => both false (even for a granted non-owner) --------------
 $assertions['unknown: view false'] = lc_resolve_access('nope', 20, $viewEdit)['view'] === false;
 $assertions['unknown: edit false'] = lc_resolve_access('nope', 20, $viewEdit)['edit'] === false;

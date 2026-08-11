@@ -6,6 +6,12 @@ class Guests_Model extends CI_Model
 	// or 'all' (campaign picker, both). Set once per request by the controller.
 	private $mode = 'guest';
 
+	// > 0 when the campaign audience picker is reading for a specific campaign
+	// being edited: every listing branch then drops people opted out of THAT
+	// campaign's picker (campaign_hidden_guests row for this id). 0 = off (normal
+	// listings, and Create mode where no campaign exists yet). Keyed by dedup_key.
+	private $campaign_hidden_id = 0;
+
 	/**
 	 * Lock the listing to one source. Controllers call this before Read/Count so
 	 * the Guest List and GHL Leads pages each read only their own branch; the
@@ -15,6 +21,34 @@ class Guests_Model extends CI_Model
 	{
 		$this->mode = in_array($mode, array('ghl', 'manual', 'all'), true) ? $mode : 'guest';
 		return $this;
+	}
+
+	/**
+	 * Scope the next Read/Count to a campaign's audience picker: people opted out
+	 * of THIS campaign's picker disappear from every branch (booking guest / GHL /
+	 * leader / customer). Pass 0 (Create mode / normal listings) to leave it off.
+	 */
+	function Exclude_Campaign_Hidden($campaign_id)
+	{
+		$this->campaign_hidden_id = (int) $campaign_id;
+		return $this;
+	}
+
+	/**
+	 * The per-campaign " AND NOT EXISTS (...) " exclusion for a branch, as
+	 * [sql, params]. Empty when off (id <= 0). $key_expr is the branch's trusted
+	 * dedup-key SQL expression (gl.dedup_key, the GHL/customer key, …); the bound
+	 * campaign id must be pushed onto the branch's param list at the call site so
+	 * it stays aligned with the '?' in the appended SQL.
+	 */
+	private function Campaign_Hidden_Exclusion($key_expr)
+	{
+		if ($this->campaign_hidden_id <= 0) {
+			return array('', array());
+		}
+		$sql = " AND NOT EXISTS (SELECT 1 FROM campaign_hidden_guests chg
+			WHERE chg.CampaignID = ? AND chg.DedupKey = {$key_expr}) ";
+		return array($sql, array($this->campaign_hidden_id));
 	}
 
 	private function Dedup_Key_Expr()
@@ -222,6 +256,9 @@ class Guests_Model extends CI_Model
 					WHERE cg.CampaignID IN ({$ph}) AND cg.DedupKey = gl.dedup_key) ";
 				foreach($joined_campaigns as $cid) { $b_params[] = (int)$cid; }
 			}
+			list($chg_sql, $chg_par) = $this->Campaign_Hidden_Exclusion('gl.dedup_key');
+			$where .= $chg_sql;
+			foreach($chg_par as $p) { $b_params[] = $p; }
 			if($has_q) {
 				// Search Name matches the guest's own name OR their booking's team
 				// leader (b.Customer, the name on the BC form), so searching a
@@ -390,6 +427,9 @@ class Guests_Model extends CI_Model
 					WHERE cg.CampaignID IN ({$ph}) AND cg.DedupKey = {$gc_dedup}) ";
 				foreach($joined_campaigns as $cid) { $g_params[] = (int)$cid; }
 			}
+			list($chg_sql, $chg_par) = $this->Campaign_Hidden_Exclusion($gc_dedup);
+			$ghl_where .= $chg_sql;
+			foreach($chg_par as $p) { $g_params[] = $p; }
 
 			// Split the shared GHL branch between its two pages, and enforce the
 			// Manual Leads page's per-creator privacy: mode 'ghl' hides manual rows,
@@ -648,6 +688,9 @@ WHERE 1 = 1
 				WHERE cg.CampaignID IN ({$ph}) AND cg.DedupKey = {$key}) ";
 			foreach($joined_campaigns as $cid) { $params[] = (int)$cid; }
 		}
+		list($chg_sql, $chg_par) = $this->Campaign_Hidden_Exclusion($key);
+		$where .= $chg_sql;
+		foreach($chg_par as $p) { $params[] = $p; }
 
 		$q_raw = trim((string)$this->input->get('q'));
 		if($q_raw !== '') {
@@ -1255,6 +1298,9 @@ GROUP BY mm.merge_key";
 				WHERE cg.CampaignID IN ({$ph}) AND cg.DedupKey = {$key}) ";
 			foreach ($joined_campaigns as $cid) { $params[] = (int)$cid; }
 		}
+		list($chg_sql, $chg_par) = $this->Campaign_Hidden_Exclusion($key);
+		$where .= $chg_sql;
+		foreach ($chg_par as $p) { $params[] = $p; }
 
 		// ---- Remark tier: EXISTS on the customer's remark log (by dedup_key) ----
 		$campaign_range = guest_list_parse_date_range($this->input->get('campaign_date'));
@@ -1869,6 +1915,106 @@ GROUP BY mm.merge_key";
 			array((int) $remark_id, $admin_id)
 		);
 		return $this->db->affected_rows();
+	}
+
+	/**
+	 * ----- Campaign membership + per-campaign visibility (Action ▸ Campaigns) ---
+	 * Every active campaign, with two per-campaign flags for this person
+	 * (dedup_key): IsMember (already on the campaign_guests roster) and IsHidden
+	 * (opted out of THIS campaign's audience picker). Same dedup keying as
+	 * remarks/chat history so it spans all of their bookings/leads. Newest first.
+	 */
+	function Read_Campaigns_With_Visibility($dedup_key)
+	{
+		$dedup_key = (string) $dedup_key;
+		$sql = "SELECT c.CampaignID, c.Name, c.CampaignDate,
+				CASE WHEN cg.DedupKey IS NULL THEN 0 ELSE 1 END AS IsMember,
+				CASE WHEN chg.DedupKey IS NULL THEN 0 ELSE 1 END AS IsHidden
+			FROM campaign c
+			LEFT JOIN campaign_guests cg
+				ON cg.CampaignID = c.CampaignID AND cg.DedupKey = ?
+			LEFT JOIN campaign_hidden_guests chg
+				ON chg.CampaignID = c.CampaignID AND chg.DedupKey = ?
+			WHERE c.Status = 'Y'
+			ORDER BY c.CampaignDate DESC, c.CampaignID DESC";
+		return $this->db->query($sql, array($dedup_key, $dedup_key))->result();
+	}
+
+	/**
+	 * dedup_key => count of active campaigns the person is on, over a set of keys
+	 * — badges the listing's Action menu ("Campaigns (n)") without a per-row query.
+	 */
+	function Read_Campaign_Counts($dedup_keys)
+	{
+		$keys = array();
+		foreach ((array) $dedup_keys as $k) {
+			$k = (string) $k;
+			if ($k !== '' && !in_array($k, $keys, true)) { $keys[] = $k; }
+		}
+		if (empty($keys)) {
+			return array();
+		}
+		$placeholders = implode(',', array_fill(0, count($keys), '?'));
+		$sql = "SELECT cg.DedupKey, COUNT(*) AS cnt
+			FROM campaign_guests cg
+			JOIN campaign c ON c.CampaignID = cg.CampaignID AND c.Status = 'Y'
+			WHERE cg.DedupKey IN ({$placeholders})
+			GROUP BY cg.DedupKey";
+		$out = array();
+		foreach ($this->db->query($sql, $keys)->result() as $row) {
+			$out[$row->DedupKey] = (int) $row->cnt;
+		}
+		return $out;
+	}
+
+	/**
+	 * dedup_key => true map for people hidden from AT LEAST ONE campaign's picker,
+	 * over a set of keys — badges the listing's Action menu (eye-slash) without a
+	 * per-row query.
+	 */
+	function Read_Campaign_Hidden_Flags($dedup_keys)
+	{
+		$keys = array();
+		foreach ((array) $dedup_keys as $k) {
+			$k = (string) $k;
+			if ($k !== '' && !in_array($k, $keys, true)) { $keys[] = $k; }
+		}
+		if (empty($keys)) {
+			return array();
+		}
+		$placeholders = implode(',', array_fill(0, count($keys), '?'));
+		$sql = "SELECT DISTINCT DedupKey FROM campaign_hidden_guests WHERE DedupKey IN ({$placeholders})";
+		$out = array();
+		foreach ($this->db->query($sql, $keys)->result() as $row) {
+			$out[$row->DedupKey] = true;
+		}
+		return $out;
+	}
+
+	/**
+	 * Opt a person in/out of a SINGLE campaign's audience picker. Hidden = insert
+	 * the (CampaignID, dedup_key) row (idempotent via REPLACE), shown = delete it.
+	 * Returns the new hidden state so the caller can echo it back to the toggle.
+	 */
+	function Set_Campaign_Hidden($campaign_id, $dedup_key, $hidden, $admin_id)
+	{
+		$campaign_id = (int) $campaign_id;
+		$dedup_key   = (string) $dedup_key;
+		if ($campaign_id <= 0 || $dedup_key === '') {
+			return false;
+		}
+		if ($hidden) {
+			$this->db->query(
+				"REPLACE INTO campaign_hidden_guests (CampaignID, DedupKey, HiddenBy, HiddenAt) VALUES (?, ?, ?, ?)",
+				array($campaign_id, $dedup_key, $admin_id, date('Y-m-d H:i:s'))
+			);
+			return true;
+		}
+		$this->db->query(
+			"DELETE FROM campaign_hidden_guests WHERE CampaignID = ? AND DedupKey = ?",
+			array($campaign_id, $dedup_key)
+		);
+		return false;
 	}
 
 	/**

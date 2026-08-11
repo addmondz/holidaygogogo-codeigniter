@@ -25,14 +25,9 @@ class MY_Controller extends CI_Controller
 							redirect('Dashboard');
 						}
 						break;
-					case 'Lead_Status':
-						// Lead Status presets: OWNER (10, never enters this block) and
-						// TEAM LEAD (25) manage them. SALES AGENT (20), OP TEAM LEAD (45)
-						// and MARKETING (60) are blocked.
-						if(in_array((int)$this->session->level, [20, 45, 60])) {
-							redirect('Dashboard');
-						}
-						break;
+					// Lead_Status moved to the "Leads/Customer" tab; it is now gated
+					// per-page by lc_can_view('lead_status') inside the controller
+					// (leads_customer_access_helper), not by level here.
 					case 'Company':
 					case 'Admin':
 					case 'Category_Code':

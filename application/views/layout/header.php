@@ -24,6 +24,18 @@ $is_dev_env = ($app_env !== 'prod');
 </head>
 
 <style type="text/css">
+	/*
+	 * Fix: table "Action" dropdowns opening only once.
+	 * Metronic's KTApp.initAbsoluteDropdown('.dataTables_wrapper') (datatables-bundle.js)
+	 * detaches an open dropdown-menu to <body>, and on close calls $menu.hide() which
+	 * leaves an inline style="display:none". It never restores display on the next open,
+	 * so after the first open every later open adds .show but stays display:none (invisible).
+	 * Let the .show state win over that stray inline display:none.
+	 */
+	.dropdown-menu.show {
+		display: block !important;
+	}
+
 	input::-webkit-outer-spin-button,
 	input::-webkit-inner-spin-button {
 		-webkit-appearance: none;
@@ -446,15 +458,14 @@ $is_dev_env = ($app_env !== 'prod');
 									</li>
 								<?php } ?>
 							<?php
-								// "Leads/Customer" tab — groups Customer, Guest List, GHL Leads and
-								// Manual Leads, Campaign and Lead Status. Customer/Guest/GHL/Manual
-								// visibility is per-page via lc_can_view() (owner always). Campaign
-								// (owner only) and Lead Status (owner + team lead) keep their own
-								// level gating. Access Settings (owner only) manages who can
-								// view/edit each page.
+								// "Leads/Customer" tab — groups Customer, Guest List, GHL Leads,
+								// Manual Leads, Campaign and Lead Status. Every page's visibility
+								// is now per-page via lc_can_view() (owner always allowed;
+								// everyone else only when granted). Access Settings (owner only)
+								// manages who can view/edit each page.
 								$lc_active = in_array($this->router->class, array('Customer', 'Guests', 'Ghl_Leads', 'Manual_Leads', 'Campaign', 'Lead_Status', 'Leads_Customer_Access', 'Merge_Duplicate_Customers'), true);
-								$lc_show_campaign    = ((int)$this->session->level === 10);
-								$lc_show_lead_status = in_array((int)$this->session->level, [10, 25], true);
+								$lc_show_campaign    = lc_can_view('campaign');
+								$lc_show_lead_status = lc_can_view('lead_status');
 							?>
 							<?php if(lc_any_view() || $lc_show_campaign || $lc_show_lead_status) { ?>
 								<li class="menu-item menu-item-submenu <?php if($lc_active) { echo 'menu-item-active menu-item-open'; } ?>">
@@ -545,7 +556,7 @@ $is_dev_env = ($app_env !== 'prod');
 								$op_footer_only = ((int)$this->session->level === 40);
 							?>
 							<?php if(!in_array((int)$this->session->level, [20, 60]) || $can_product) { ?>
-								<li class="menu-item menu-item-submenu <?php if($this->router->class == 'Category_Code' || $this->router->class == 'Category' || $this->router->class == 'Supplier' || $this->router->class == 'Product' || $this->router->class == 'Costing' || $this->router->class == 'Footer' || $this->router->class == 'Country_Code' || $this->router->class == 'Tag' || $this->router->class == 'Source' || $this->router->class == 'Package_Checklist' || $this->router->class == 'Product_Package_Checklist' || $this->router->class == 'Cancellation_Reason' || $this->router->class == 'Slow_Conversion_Reason' || $this->router->class == 'Customer_Type' || $this->router->class == 'Lead_Status' || $this->router->class == 'Campaign' || $this->router->class == 'Quick_Filter' || $this->router->class == 'Agent_Score_Setting' || $this->router->class == 'Card_Visibility_Setting' || $this->router->class == 'Team') { echo 'menu-item-active menu-item-open'; } ?>">
+								<li class="menu-item menu-item-submenu <?php if($this->router->class == 'Category_Code' || $this->router->class == 'Category' || $this->router->class == 'Supplier' || $this->router->class == 'Product' || $this->router->class == 'Costing' || $this->router->class == 'Costing_Item' || $this->router->class == 'Footer' || $this->router->class == 'Country_Code' || $this->router->class == 'Tag' || $this->router->class == 'Source' || $this->router->class == 'Package_Checklist' || $this->router->class == 'Product_Package_Checklist' || $this->router->class == 'Cancellation_Reason' || $this->router->class == 'Slow_Conversion_Reason' || $this->router->class == 'Customer_Type' || $this->router->class == 'Lead_Status' || $this->router->class == 'Campaign' || $this->router->class == 'Quick_Filter' || $this->router->class == 'Agent_Score_Setting' || $this->router->class == 'Card_Visibility_Setting' || $this->router->class == 'Team') { echo 'menu-item-active menu-item-open'; } ?>">
 									<a href="javascript:;" class="menu-link menu-toggle">
 										<span class="svg-icon menu-icon">
 											<svg>
@@ -636,6 +647,14 @@ $is_dev_env = ($app_env !== 'prod');
 																<span></span>
 															</i>
 															<span class="menu-text">Costing Packages</span>
+														</a>
+													</li>
+													<li class="menu-item <?php if($this->router->class == 'Costing_Item') { echo 'menu-item-active'; } ?>">
+														<a href="<?php echo base_url('Costing_Item'); ?>" class="menu-link">
+															<i class="menu-bullet menu-bullet-dot">
+																<span></span>
+															</i>
+															<span class="menu-text">Costing Item</span>
 														</a>
 													</li>
 													<li class="menu-item <?php if($this->router->class == 'Costing' && $this->router->method == 'Currency') { echo 'menu-item-active'; } ?>">

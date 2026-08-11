@@ -1289,6 +1289,40 @@ class Booking extends MY_Controller
 				'yoy'        => $year_ago_cmp($sales_year_actual, $sales_year_ly),
 			);
 
+			// ---------- Sales Commission (Month) — TC (level 50) only ----------
+			// The TC's own commission rate (admin.CommissionPercent) applied to the
+			// NetTotal of every COMPLETED booking (Status='Y') where they hold the
+			// SECOND sales-agent slot (SalesAgent2), created in the selected month.
+			// Unlike the other TC cards this ALWAYS credits the TC2 slot — it ignores
+			// the TC1/TC2 InsertDate cutoff, per the commission rule. Cancelled /
+			// non-BC / zero-value rows are excluded like the sales card.
+			if($level === 50) {
+				$this->load->helper('tc_commission');
+				$commission_sales_sql =
+					"SELECT COALESCE(SUM(NetTotal),0) AS total FROM booking
+					 WHERE SalesAgent2 = ?
+					   AND Status='Y'
+					   AND CancelStatus='N'
+					   AND BookingConfirmationTitle='BOOKING CONFIRMATION'
+					   AND NetTotal > 0
+					   AND CAST(InsertDate AS DATE) BETWEEN ? AND ?";
+				$commission_base = (float) $this->db->query(
+					$commission_sales_sql,
+					array($admin_id, $month_start, $month_end)
+				)->row()->total;
+				$commission_pct = (float) $this->db->query(
+					"SELECT COALESCE(CommissionPercent,0) AS pct FROM admin WHERE AdminID = ?",
+					array($admin_id)
+				)->row()->pct;
+				$commission_amt = tc_commission_amount($commission_base, $commission_pct);
+				$cards['commission_month'] = array(
+					'value'   => $money($commission_amt),
+					'base'    => $money($commission_base),
+					'percent' => tc_commission_percent_label($commission_pct),
+					'raw'     => $commission_amt,
+				);
+			}
+
 			$row = $this->db->query(
 				"SELECT COUNT(*) AS total,
 				        SUM(CASE WHEN CancelStatus='Y' THEN 1 ELSE 0 END) AS cancelled

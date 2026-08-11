@@ -278,6 +278,29 @@
                     </div>
                 </div>
             </div>
+            <?php /* Sales Commission (Month) — TC role (level 50) only. Shares
+                     sc-pos-2 with the Month Sales card and precedes it in source,
+                     so it renders as the first card in the sales row. */ ?>
+            <?php if((int) $this->session->userdata('level') === 50) { ?>
+            <div class="col-md-3 sc-pos-2">
+                <div class="card card-custom">
+                    <div class="card-header border-0 summary-card-header" style="background-color:#F5E6CD;">
+                        <h3>Sales Commission (Month)</h3>
+                        <i id="pop-commission-month" class="la la-info-circle summary-info-icon" data-toggle="popover" data-trigger="hover focus" data-placement="bottom" data-html="true" title="How this is calculated" data-content="<strong>What it shows:</strong> Your sales commission earned on completed bookings this month.<br><br><strong>Sales counted:</strong> the total value (NetTotal) of every <strong>completed</strong> booking where you are the <strong>second sales agent (TC2)</strong>, created in the selected month. Quotations, proforma invoices and cancelled bookings are not included, and only completed bookings count.<br><br><strong>Commission:</strong> your sales total &times; your commission rate. Your rate is set for each TC under Admin &rarr; Sales Target section (Commission Rate).<br><br>Note: this always uses the second sales agent slot, regardless of the 1&nbsp;Jun&nbsp;2026 credit cutoff used by the other cards."></i>
+                    </div>
+                    <div class="card-body summary-card-body">
+                        <div class="summary-value-sm" id="sc-commission-month-value">...</div>
+                        <div class="summary-sub">
+                            Rate: <span id="sc-commission-month-percent" style="color:#6082B6;font-weight:600;">—</span>
+                            · Completed sales: <span id="sc-commission-month-base">—</span>
+                        </div>
+                        <div class="summary-sub" style="color:#7E8299;">
+                            Commission on completed bookings where you are the second sales agent (TC2), this month.
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <?php } ?>
             <div class="col-md-3 sc-pos-2">
                 <div class="card card-custom">
                     <div class="card-header border-0 summary-card-header" style="background-color:#F5E6CD;">
@@ -1752,6 +1775,11 @@ $(function() {
             setText('sc-bc-year-count', c.bc_year.count);
             setLink('sc-bc-year-link', c.bc_year.link);
             setBestFigure('sc-bc-year-best', c.bc_year.best, 'Best (year)');
+        }
+        if(c.commission_month) {
+            setText('sc-commission-month-value', c.commission_month.value);
+            setText('sc-commission-month-percent', c.commission_month.percent);
+            setText('sc-commission-month-base', c.commission_month.base);
         }
         if(c.sales_month) {
             setText('sc-sales-month-value', c.sales_month.value);

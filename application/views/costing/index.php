@@ -68,6 +68,11 @@ $packages = isset($packages) ? $packages : array();
                                             <a href="<?php echo base_url('Costing/Package/' . (int) $package['id']); ?>" class="btn btn-icon btn-light-primary btn-sm mr-2" title="View Package">
                                                 <i class="la la-eye"></i>
                                             </a>
+                                            <?php if (!empty($package['booking_count'])) { ?>
+                                                <a href="<?php echo base_url('Costing/Quotation/' . (int) $package['id']); ?>" target="_blank" class="btn btn-icon btn-light-success btn-sm mr-2" title="Open Quotation PDF">
+                                                    <i class="la la-file-pdf"></i>
+                                                </a>
+                                            <?php } ?>
                                             <form method="post" action="<?php echo base_url('Costing/Delete_Package'); ?>" class="d-inline delete-package-form">
                                                 <input type="hidden" name="package_id" value="<?php echo (int) $package['id']; ?>">
                                                 <button type="button" class="btn btn-icon btn-light-danger btn-sm delete-package-button" data-name="<?php echo html_escape($package['name']); ?>" title="Delete Package">

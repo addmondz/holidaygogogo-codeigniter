@@ -26,7 +26,8 @@ class Costing_Model extends CI_Model
                 cb.id AS latest_booking_id,
                 cb.travel_date AS latest_travel_date,
                 cb.total_pax AS latest_total_pax,
-                cb.status AS latest_booking_status
+                cb.status AS latest_booking_status,
+                cb.quotation_token AS latest_quotation_token
             FROM costing_packages cp
             LEFT JOIN costing_bookings cb ON cb.id = (
                 SELECT cb_latest.id
@@ -150,6 +151,10 @@ class Costing_Model extends CI_Model
             'statuses' => array('draft', 'active', 'inactive'),
             'cost_types' => $this->Read_Cost_Types(),
             'latest_exchange_rates' => $this->Read_Latest_Exchange_Rates(),
+            'snapshot_panel' => $booking ? $this->Read_Snapshot_Panel((int) $booking['id']) : array(),
+            'itinerary_days' => $this->Read_Itinerary_Days((int) $package['id']),
+            'quotation_token' => $booking && !empty($booking['quotation_token']) ? $booking['quotation_token'] : '',
+            'item_master' => $this->Read_Item_Master(),
         );
     }
 
@@ -288,6 +293,12 @@ class Costing_Model extends CI_Model
             return 0;
         }
 
+        // One snapshot per package: if this package already has one, reuse (update)
+        // it instead of creating a second.
+        if ($booking_id <= 0) {
+            $booking_id = $this->Existing_Booking_Id($package_id);
+        }
+
         $snapshot_rows = array();
         if (!empty($posted_rows)) {
             $selected_rows = array();
@@ -353,6 +364,23 @@ class Costing_Model extends CI_Model
             return 0;
         }
 
+        $this->Ensure_Quotation_Token($booking_id);
+
+        // Seed the frozen snapshot from the daily feed (or the posted rates) so a
+        // brand-new scenario already has one rate row per currency to confirm.
+        if (!empty($payload['snapshot'])) {
+            $this->Save_Snapshot_Rates($booking_id, (array) $payload['snapshot']);
+        } else {
+            $seed = array();
+            foreach ($this->Read_Snapshot_Panel($booking_id) as $panel_row) {
+                $seed[$panel_row['currency_id']] = array(
+                    'rate_to_myr' => $panel_row['rate_to_myr'],
+                    'remark'      => $panel_row['remark'],
+                );
+            }
+            $this->Save_Snapshot_Rates($booking_id, $seed);
+        }
+
         $this->Recalculate_Booking_Financials($booking_id);
 
         return $booking_id;
@@ -399,8 +427,11 @@ class Costing_Model extends CI_Model
             'margin_percentage' => $payload['margin_percentage'],
             'commissionable_per_pax' => $payload['commissionable_per_pax'],
             'ad_hoc_per_pax' => $payload['ad_hoc_per_pax'],
-            'selling_price_per_pax' => isset($payload['selling_price_per_pax']) ? $payload['selling_price_per_pax'] : 0,
+            'selling_price_per_pax' => 0,
         ));
+
+        // Freeze the confirmed currency snapshot (rates + remarks) for this scenario.
+        $this->Save_Snapshot_Rates($booking_id, isset($payload['snapshot']) ? (array) $payload['snapshot'] : array());
 
         $this->db->trans_complete();
 
@@ -408,6 +439,7 @@ class Costing_Model extends CI_Model
             return false;
         }
 
+        $this->Ensure_Quotation_Token($booking_id);
         $this->Recalculate_Booking_Financials($booking_id);
 
         return true;
@@ -500,6 +532,47 @@ class Costing_Model extends CI_Model
         return $this->db->insert('costing_exchange_rates', $data);
     }
 
+    /**
+     * Auto-update the foreign -> MYR rates on /Costing/Currency from a MYR-based
+     * API rates map (the nightly Cron::fetchExchangeRates feed). One row per
+     * currency per day; a currency that already has a rate dated $rate_date is
+     * left untouched (manual same-day override wins), and bank charges are
+     * carried forward. Planning is pure (currency_rate_costing_updates); this
+     * only reads current state and writes the resulting rows.
+     *
+     * @param array  $rates_map  [ 'USD' => 0.2234, ... ] MYR->foreign, positive
+     * @param string $rate_date  Y-m-d the rates are dated
+     * @return array { updated: string[], skipped: string[] }
+     */
+    public function Auto_Update_Rates_From_Feed($rates_map, $rate_date, $base_currency_code = 'MYR')
+    {
+        $this->load->helper('currency_rate');
+
+        $currencies = $this->Read_Currencies();
+
+        // Latest FOREIGN -> MYR row per pair, so we can honour a same-day manual
+        // rate and carry its bank charges forward.
+        $base = $this->Read_Base_Currency($base_currency_code);
+        $existing_by_code = array();
+        if ($base && !empty($base['id'])) {
+            $latest = $this->Read_Latest_Exchange_Rates(array('to_currency_id' => (int) $base['id']));
+            foreach ($latest as $row) {
+                $existing_by_code[strtoupper($row['from_currency_code'])] = array(
+                    'valid_from'       => $row['valid_from'],
+                    'bank_charges_myr' => $row['bank_charges_myr'],
+                );
+            }
+        }
+
+        $plan = currency_rate_costing_updates($rates_map, $currencies, $base_currency_code, $existing_by_code, $rate_date);
+
+        foreach ($plan['updates'] as $payload) {
+            $this->Save_Exchange_Rate($payload);
+        }
+
+        return array('updated' => $plan['updated'], 'skipped' => $plan['skipped']);
+    }
+
     public function Delete_Exchange_Rate($exchange_rate_id)
     {
         $exchange_rate_id = (int) $exchange_rate_id;
@@ -535,6 +608,241 @@ class Costing_Model extends CI_Model
                 'gross_profit' => $financials['gross_profit'],
                 'total_profit' => $financials['total_profit'],
             ));
+    }
+
+    /**
+     * currency_id => rate_to_myr for a scenario's frozen snapshot.
+     */
+    public function Read_Snapshot_Rate_Map($booking_id)
+    {
+        $rows = $this->db
+            ->select('currency_id, rate_to_myr')
+            ->where('costing_booking_id', (int) $booking_id)
+            ->get('costing_snapshot_rates')
+            ->result_array();
+
+        $map = array();
+        foreach ($rows as $row) {
+            $map[(int) $row['currency_id']] = (float) $row['rate_to_myr'];
+        }
+        return $map;
+    }
+
+    /**
+     * The currency snapshot panel for a scenario: one row per distinct currency
+     * used by its cost rows, prefilled from any saved snapshot, else the latest
+     * foreign->MYR rate maintained on the Costing Currency page
+     * (costing_exchange_rates), else blank for manual entry. MYR is always 1.
+     *
+     * @return array list of currency_id, currency_code, rate_to_myr, remark, has_saved
+     */
+    public function Read_Snapshot_Panel($booking_id)
+    {
+        $this->load->helper('costing_calc');
+
+        $booking = $this->db->select('travel_date')->where('id', (int) $booking_id)->get('costing_bookings')->row_array();
+        $travel_date = $booking ? $booking['travel_date'] : null;
+        $base_currency = $this->Read_Base_Currency('MYR');
+        $base_currency_id = $base_currency ? (int) $base_currency['id'] : 0;
+
+        $currencies = $this->db
+            ->select('DISTINCT costing_booking_items.currency_id AS currency_id, costing_currencies.code AS code', false)
+            ->join('costing_currencies', 'costing_currencies.id = costing_booking_items.currency_id')
+            ->where('costing_booking_items.booking_id', (int) $booking_id)
+            ->order_by('costing_currencies.code', 'ASC')
+            ->get('costing_booking_items')
+            ->result_array();
+
+        $saved = $this->db
+            ->where('costing_booking_id', (int) $booking_id)
+            ->get('costing_snapshot_rates')
+            ->result_array();
+        $saved_by_id = array();
+        foreach ($saved as $row) {
+            $saved_by_id[(int) $row['currency_id']] = $row;
+        }
+
+        $panel = array();
+        foreach ($currencies as $currency) {
+            $currency_id = (int) $currency['currency_id'];
+            $code = strtoupper((string) $currency['code']);
+            if (isset($saved_by_id[$currency_id])) {
+                $rate = (float) $saved_by_id[$currency_id]['rate_to_myr'];
+                $remark = (string) $saved_by_id[$currency_id]['remark'];
+                $has_saved = true;
+            } else {
+                // Prefill from the Costing Currency page's latest foreign->MYR rate.
+                $rate = $code === 'MYR' ? 1.0 : $this->Resolve_Exchange_Rate($currency_id, $base_currency_id, $travel_date);
+                $remark = '';
+                $has_saved = false;
+            }
+            $panel[] = array(
+                'currency_id'   => $currency_id,
+                'currency_code' => $code,
+                'rate_to_myr'   => costing_normalize_rate($code, $rate),
+                'remark'        => $remark,
+                'has_saved'     => $has_saved,
+            );
+        }
+
+        return $panel;
+    }
+
+    /**
+     * Freeze the posted snapshot rates (+ remarks) for a scenario. Replace-all.
+     * MYR is forced to 1.0 and non-positive rates are stored as 0 (manual entry).
+     *
+     * @param int   $booking_id
+     * @param array $posted list of currency_id => [rate_to_myr, remark]
+     */
+    public function Save_Snapshot_Rates($booking_id, $posted)
+    {
+        $this->load->helper('costing_calc');
+        $booking_id = (int) $booking_id;
+
+        $this->db->where('costing_booking_id', $booking_id)->delete('costing_snapshot_rates');
+
+        if (empty($posted) || !is_array($posted)) {
+            return;
+        }
+
+        foreach ($posted as $currency_id => $data) {
+            $currency_id = (int) $currency_id;
+            if ($currency_id <= 0) {
+                continue;
+            }
+            $currency = $this->db->select('code')->where('id', $currency_id)->get('costing_currencies')->row_array();
+            if (!$currency) {
+                continue;
+            }
+            $code = strtoupper((string) $currency['code']);
+            $this->db->insert('costing_snapshot_rates', array(
+                'costing_booking_id' => $booking_id,
+                'currency_id'        => $currency_id,
+                'currency_code'      => $code,
+                'rate_to_myr'        => costing_normalize_rate($code, isset($data['rate_to_myr']) ? $data['rate_to_myr'] : 0),
+                'remark'             => isset($data['remark']) ? trim((string) $data['remark']) : null,
+            ));
+        }
+    }
+
+    /**
+     * Per-day itinerary for a package (drives the Quotation PDF).
+     */
+    public function Read_Itinerary_Days($package_id)
+    {
+        return $this->db
+            ->where('package_id', (int) $package_id)
+            ->order_by('day_number', 'ASC')
+            ->order_by('id', 'ASC')
+            ->get('costing_itinerary_days')
+            ->result_array();
+    }
+
+    /**
+     * Replace-all save of a package's itinerary days.
+     *
+     * @param array $rows list of [day_number, title, description]
+     */
+    public function Save_Itinerary_Days($package_id, $rows)
+    {
+        $package_id = (int) $package_id;
+        if ($package_id <= 0) {
+            return false;
+        }
+
+        $this->db->trans_start();
+        $this->db->where('package_id', $package_id)->delete('costing_itinerary_days');
+
+        $day = 1;
+        foreach ((array) $rows as $row) {
+            $title = trim((string) (isset($row['title']) ? $row['title'] : ''));
+            $description = trim((string) (isset($row['description']) ? $row['description'] : ''));
+            if ($title === '' && $description === '') {
+                continue;
+            }
+            $day_number = isset($row['day_number']) && (int) $row['day_number'] > 0 ? (int) $row['day_number'] : $day;
+            $this->db->insert('costing_itinerary_days', array(
+                'package_id'  => $package_id,
+                'day_number'  => $day_number,
+                'title'       => $title !== '' ? $title : null,
+                'description' => $description !== '' ? $description : null,
+            ));
+            $day++;
+        }
+
+        $this->db->trans_complete();
+        return (bool) $this->db->trans_status();
+    }
+
+    /**
+     * Ensure a scenario has a shareable quotation token; return it.
+     */
+    public function Ensure_Quotation_Token($booking_id)
+    {
+        $booking_id = (int) $booking_id;
+        $row = $this->db->select('quotation_token')->where('id', $booking_id)->get('costing_bookings')->row_array();
+        if ($row && !empty($row['quotation_token'])) {
+            return $row['quotation_token'];
+        }
+        $token = md5(uniqid((string) $booking_id, true));
+        $this->db->where('id', $booking_id)->update('costing_bookings', array('quotation_token' => $token));
+        return $token;
+    }
+
+    /**
+     * Quotation data for a package (its single snapshot). One package = one
+     * snapshot, so the quotation is addressed per package. Ensures the token
+     * exists so old token-based links keep working too.
+     */
+    public function Read_Quotation_By_Package($package_id)
+    {
+        $booking_id = $this->Existing_Booking_Id($package_id);
+        if ($booking_id <= 0) {
+            return null;
+        }
+        $token = $this->Ensure_Quotation_Token($booking_id);
+        return $this->Read_Quotation_By_Token($token);
+    }
+
+    /**
+     * Read the full data needed to render a Quotation PDF, by scenario token.
+     * Customer-facing: package + itinerary + selling total only.
+     */
+    public function Read_Quotation_By_Token($token)
+    {
+        $token = trim((string) $token);
+        if ($token === '') {
+            return null;
+        }
+
+        $booking = $this->db
+            ->select('cb.*, cp.name AS package_name, cp.duration_days, cp.duration_nights')
+            ->from('costing_bookings cb')
+            ->join('costing_packages cp', 'cp.id = cb.package_id')
+            ->where('cb.quotation_token', $token)
+            ->get()
+            ->row_array();
+
+        if (!$booking) {
+            return null;
+        }
+
+        $base_currency = $this->Read_Base_Currency('MYR');
+        $base_currency_id = $base_currency ? (int) $base_currency['id'] : 0;
+        $booking_items = $this->Read_Booking_Items((int) $booking['id'], $base_currency_id, $booking['travel_date']);
+        $financials = $this->Calculate_Financials_From_Booking($booking, $booking_items, $base_currency_id);
+
+        return array(
+            'booking'    => $booking,
+            'package'    => array(
+                'name'            => $booking['package_name'],
+                'duration_days'   => (int) $booking['duration_days'],
+                'duration_nights' => (int) $booking['duration_nights'],
+            ),
+            'itinerary'  => $this->Read_Itinerary_Days((int) $booking['package_id']),
+            'financials' => $financials,
+        );
     }
 
     private function Read_Base_Currency($base_currency_code)
@@ -665,7 +973,7 @@ class Costing_Model extends CI_Model
     private function Read_Bookings_For_Package($package_id)
     {
         $rows = $this->db
-            ->select('id, travel_date, total_pax, status')
+            ->select('id, travel_date, total_pax, status, quotation_token')
             ->where('package_id', (int) $package_id)
             ->order_by('id', 'DESC')
             ->get('costing_bookings')
@@ -678,6 +986,51 @@ class Costing_Model extends CI_Model
         unset($row);
 
         return $rows;
+    }
+
+    /**
+     * Active global item master, with currency code + human category label,
+     * for the "insert from Item Master" picker in the Cost Template modal.
+     */
+    public function Read_Item_Master()
+    {
+        $this->load->helper('costing_calc');
+        $labels = costing_categories();
+
+        $rows = $this->db
+            ->select('ci.id, ci.name, ci.category, ci.default_currency_id, ci.default_unit_cost, cc.code AS currency_code')
+            ->from('costing_items ci')
+            ->join('costing_currencies cc', 'cc.id = ci.default_currency_id', 'left')
+            ->where('ci.Status', 'Y')
+            ->order_by('ci.category', 'ASC')
+            ->order_by('ci.name', 'ASC')
+            ->get()
+            ->result_array();
+
+        foreach ($rows as &$row) {
+            $key = (string) $row['category'];
+            $row['category_label'] = isset($labels[$key]) ? $labels[$key] : ucwords(str_replace('_', ' ', $key));
+        }
+        unset($row);
+
+        return $rows;
+    }
+
+    /**
+     * The single snapshot id for a package (newest wins), or 0. A package holds
+     * at most one snapshot, so this is the one to edit.
+     */
+    public function Existing_Booking_Id($package_id)
+    {
+        $row = $this->db
+            ->select('id')
+            ->where('package_id', (int) $package_id)
+            ->order_by('id', 'DESC')
+            ->limit(1)
+            ->get('costing_bookings')
+            ->row_array();
+
+        return $row ? (int) $row['id'] : 0;
     }
 
     private function Read_Latest_Booking_For_Package($package_id)
@@ -758,9 +1111,19 @@ class Costing_Model extends CI_Model
             ->get('costing_booking_items')
             ->result_array();
 
+        // Frozen per-scenario snapshot wins over the live feed: a saved quotation's
+        // numbers must never move. Fall back to the live rate only for currencies
+        // that have no snapshot row yet (e.g. pre-snapshot legacy scenarios).
+        $snapshot_map = $this->Read_Snapshot_Rate_Map((int) $booking_id);
+
         foreach ($items as &$item) {
-            $exchange_rate = $this->Resolve_Exchange_Rate_Details((int) $item['currency_id'], $base_currency_id, $travel_date);
-            $item['exchange_rate'] = (float) $exchange_rate['rate'];
+            $currency_id = (int) $item['currency_id'];
+            if (isset($snapshot_map[$currency_id])) {
+                $item['exchange_rate'] = (float) $snapshot_map[$currency_id];
+            } else {
+                $exchange_rate = $this->Resolve_Exchange_Rate_Details($currency_id, $base_currency_id, $travel_date);
+                $item['exchange_rate'] = (float) $exchange_rate['rate'];
+            }
             $item['bank_charges_myr'] = (float) $item['bank_charges_myr'];
             $item['base_total'] = round(((float) $item['total_amount'] * (float) $item['exchange_rate']) + (float) $item['bank_charges_myr'], 2);
         }
@@ -1067,7 +1430,10 @@ class Costing_Model extends CI_Model
             ->get('costing_booking_financials')
             ->row_array();
 
-        $margin_percentage = $existing ? min(99.99, (float) $existing['margin_percentage']) : 0;
+        // Margin is a MARKUP ON COST (percentage only). selling = cost x (1 + margin%);
+        // profit = cost x margin%. There is NO manual selling price — it is always
+        // derived from the margin, so the profit shown at the side is authoritative.
+        $margin_percentage = $existing ? max(0, (float) $existing['margin_percentage']) : 0;
         $commissionable_per_pax = $existing ? (float) $existing['commissionable_per_pax'] : 0;
         $ad_hoc_per_pax = $existing ? (float) $existing['ad_hoc_per_pax'] : 0;
         $total_pax = max(1, (int) $booking['total_pax']);
@@ -1080,14 +1446,11 @@ class Costing_Model extends CI_Model
         $total_cost = round($total_cost, 2);
         $cost_per_pax = round($total_cost / $total_pax, 2);
         $margin_rate = $margin_percentage / 100;
-        $price_per_pax = $margin_rate >= 1
-            ? 0
-            : round($cost_per_pax / (1 - $margin_rate), 2);
+        $price_per_pax = round($cost_per_pax * (1 + $margin_rate), 2);
         $markup_amount_total = round(($price_per_pax * $total_pax) - $total_cost, 2);
         $total_per_pax = $price_per_pax;
-        $selling_price_per_pax = $existing && (float) $existing['selling_price_per_pax'] > 0
-            ? round((float) $existing['selling_price_per_pax'], 2)
-            : $price_per_pax;
+        // Selling price is derived from the markup, never entered by hand.
+        $selling_price_per_pax = $price_per_pax;
         $total_revenue = round($selling_price_per_pax * $total_pax, 2);
         $gross_profit = round($total_revenue - $total_cost, 2);
 
@@ -1195,6 +1558,10 @@ class Costing_Model extends CI_Model
             'statuses' => array('draft', 'active', 'inactive'),
             'cost_types' => $this->Read_Cost_Types(),
             'latest_exchange_rates' => $this->Read_Latest_Exchange_Rates(),
+            'snapshot_panel' => array(),
+            'itinerary_days' => array(),
+            'quotation_token' => '',
+            'item_master' => array(),
         );
     }
 

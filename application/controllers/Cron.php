@@ -406,7 +406,109 @@ class Cron extends CI_Controller
 		}
 		$this->runSync();
     }
-	
+
+	/**
+	 * Daily exchange rates.
+	 *
+	 * Pulls the once-a-day MYR-based rates from open.er-api.com (free, no key)
+	 * and refreshes every foreign currency on /Costing/Currency (inverted to
+	 * FOREIGN->MYR). Every run is traced in exchange_rate_run_log. On a failed
+	 * fetch nothing is written, so the last good rates stay in effect.
+	 *
+	 *   CLI (cron):  php index.php Cron fetchExchangeRates
+	 *   Web (manual, gated by the AutoCount manual-sync key):
+	 *                /Cron/fetchExchangeRates?key=XXXX
+	 */
+	public function fetchExchangeRates()
+	{
+		// Web access is gated by the same manual-sync key as syncAll(); CLI is open.
+		if (!is_cli()) {
+			$this->load->helper('autocount');
+			$config = get_autocount_config();
+			if ($this->input->get('key') !== $config['manual_sync_autocount_key']) {
+				show_error('Unauthorized access', 401);
+				return;
+			}
+		}
+
+		$this->load->helper('currency_rate');
+		$this->load->model('Exchange_Rate_Model');
+
+		// Open the audit trail row (status=running) up front so even a crash
+		// mid-run leaves a trace of the attempt.
+		$runId = $this->Exchange_Rate_Model->Start_Run_Log(array(
+			'source' => is_cli() ? 'cli' : 'web',
+		));
+
+		$base  = 'MYR';
+		$quote = 'USD';
+		$url   = 'https://open.er-api.com/v6/latest/MYR';
+
+		$ch = curl_init();
+		curl_setopt($ch, CURLOPT_URL, $url);
+		curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+		curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+		$raw   = curl_exec($ch);
+		$errNo = curl_errno($ch);
+		$err   = curl_error($ch);
+		curl_close($ch);
+
+		if ($errNo) {
+			$this->fetchExchangeRates_fallback("curl_error:{$err}");
+			$this->Exchange_Rate_Model->Finish_Run_Log($runId, 'failed', array('error' => "curl_error:{$err}"));
+			return;
+		}
+
+		$all = currency_rate_parse_erapi_all($raw);
+		if (!$all['ok']) {
+			$this->fetchExchangeRates_fallback($all['error']);
+			$this->Exchange_Rate_Model->Finish_Run_Log($runId, 'failed', array('error' => $all['error']));
+			return;
+		}
+
+		// Headline MYR->USD rate, kept in the run log for a quick daily trace.
+		$usd_rate = isset($all['rates'][$quote]) ? $all['rates'][$quote] : null;
+
+		$msg = "[CRON] fetchExchangeRates {$base}->{$quote} = " . ($usd_rate !== null ? $usd_rate : 'n/a') . " ({$all['rate_date']})";
+		$this->customCronLogging($msg);
+		if (is_cli()) {
+			echo $msg . PHP_EOL;
+		}
+
+		// Auto-feed every foreign currency on /Costing/Currency from the same
+		// call (inverted to FOREIGN->MYR). Skips any currency already set today.
+		$this->load->model('Costing_Model');
+		$res = $this->Costing_Model->Auto_Update_Rates_From_Feed($all['rates'], $all['rate_date']);
+		$costMsg = '[CRON] fetchExchangeRates costing rates updated=[' . implode(',', $res['updated']) . '] skipped=[' . implode(',', $res['skipped']) . ']';
+		$this->customCronLogging($costMsg);
+		if (is_cli()) {
+			echo $costMsg . PHP_EOL;
+		}
+
+		// Close the audit trail row with the outcome.
+		$this->Exchange_Rate_Model->Finish_Run_Log($runId, 'completed', array_merge(array(
+			'base_code'  => $base,
+			'quote_code' => $quote,
+			'rate'       => $usd_rate,
+			'rate_date'  => $all['rate_date'],
+		), currency_rate_run_log_summary($res)));
+	}
+
+	/**
+	 * Fetch failed: nothing is written (last good rates stay in effect); just
+	 * log why today was skipped, noting the last successful run for context.
+	 */
+	private function fetchExchangeRates_fallback($reason)
+	{
+		$last = $this->Exchange_Rate_Model->Read_Last_Completed_Run();
+		$have = $last ? "last good {$last['rate']} ({$last['rate_date']}) still in effect" : 'NO prior successful run';
+		$msg  = "[CRON] fetchExchangeRates failed ({$reason}); {$have}";
+		$this->customCronLogging($msg);
+		if (is_cli()) {
+			echo $msg . PHP_EOL;
+		}
+	}
+
 	private function runSync()
 	{
 		$this->syncCustomer();

@@ -478,6 +478,64 @@ class Guests extends MY_Controller
 	}
 
 	/**
+	 * ----- Campaigns (Action ▸ Campaigns) -------------------------------------
+	 * Every active campaign with two per-campaign flags for this person: whether
+	 * they're on its roster (member) and whether they're opted out of its
+	 * audience picker (hidden). Same JSON contract + dedup_key keying as
+	 * remarks/chat history; called by absolute path from the shared listing view.
+	 */
+	function Campaigns()
+	{
+		if(lc_block_view(lc_request_module('guests'))) { return; }
+		$dedup_key = (string) $this->input->get('dedup_key');
+		if ($dedup_key === '') {
+			$this->output->set_content_type('application/json')
+				->set_output(json_encode(array('ok' => false, 'message' => 'Missing guest reference.')));
+			return;
+		}
+
+		$rows = $this->Guests_Model->Read_Campaigns_With_Visibility($dedup_key);
+
+		$out = array();
+		foreach ($rows as $r) {
+			$out[] = array(
+				'id'            => (int) $r->CampaignID,
+				'name'          => $r->Name,
+				'campaign_date' => $r->CampaignDate !== null ? $r->CampaignDate : '',
+				'is_member'     => (int) $r->IsMember === 1,
+				'is_hidden'     => (int) $r->IsHidden === 1,
+			);
+		}
+
+		$this->output->set_content_type('application/json')
+			->set_output(json_encode(array('ok' => true, 'campaigns' => $out)));
+	}
+
+	/**
+	 * Opt a person in/out of a SINGLE campaign's audience picker (Action ▸
+	 * Campaigns per-campaign toggle). Editing permission required; keyed by
+	 * (campaign, dedup_key) so it follows the person across every source they
+	 * surface in for that campaign. Echoes back the new state.
+	 */
+	function Set_Campaign_Visibility()
+	{
+		if(lc_block_edit(lc_request_module('guests'))) { return; }
+		$out = function ($data) {
+			$this->output->set_content_type('application/json')->set_output(json_encode($data));
+		};
+
+		$campaign_id = (int) $this->input->post('campaign_id');
+		$dedup_key   = (string) $this->input->post('dedup_key');
+		if ($campaign_id <= 0 || $dedup_key === '') {
+			return $out(array('ok' => false, 'message' => 'Missing campaign or guest reference.'));
+		}
+
+		$hidden = (int) $this->input->post('hidden') === 1;
+		$state  = $this->Guests_Model->Set_Campaign_Hidden($campaign_id, $dedup_key, $hidden, $this->session->userdata('admin_id'));
+		return $out(array('ok' => true, 'hidden' => (bool) $state));
+	}
+
+	/**
 	 * Store an uploaded chat .txt (validated by the pure helper) under
 	 * assets/upload/chat_history/ and record it against the guest's dedup_key.
 	 */
@@ -517,6 +575,31 @@ class Guests extends MY_Controller
 		$id = $this->Guests_Model->Add_Chat_History($dedup_key, $original, $stored, $title, $admin_id);
 
 		return $out(array('ok' => true, 'file' => array('id' => (int) $id)));
+	}
+
+	/**
+	 * Return one chat file parsed into messages for the in-app bubble viewer.
+	 * View permission gated (same as the list/download endpoints).
+	 */
+	function View_Chat_History()
+	{
+		if(lc_block_view(lc_request_module('guests'))) { return; }
+		$id  = (int) $this->input->get('id');
+		$row = $this->Guests_Model->Get_Chat_History_File($id);
+		if (!$row) {
+			$this->output->set_content_type('application/json')
+				->set_output(json_encode(array('ok' => false, 'message' => 'File not found.')));
+			return;
+		}
+
+		$path = FCPATH . 'assets/upload/chat_history/' . basename($row->StoredName);
+		$text = is_file($path) ? file_get_contents($path) : '';
+
+		$this->output->set_content_type('application/json')->set_output(json_encode(array(
+			'ok'       => true,
+			'title'    => ($row->Title !== null && $row->Title !== '') ? $row->Title : $row->OriginalName,
+			'messages' => chat_history_parse($text),
+		)));
 	}
 
 	/**

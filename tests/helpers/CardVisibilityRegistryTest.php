@@ -69,11 +69,18 @@ $has_tl = false;
 foreach ($reg as $slug => $c) { if (strpos($slug, 'tl_') === 0) { $has_tl = true; } }
 check('no retired tl_* cards remain', $has_tl === false);
 
-// TC Lead (25) sees the whole TC agent card set, so every TC-group card must
-// offer a switch for level 25 (otherwise the owner cannot hide it from a Lead).
+// Some TC-group cards are intentionally scoped to the TC role (level 50) only —
+// e.g. Sales Commission (Month), which Owner / TC Lead never render. Those are
+// exempt from the "shared TC card" invariants below (they only apply to cards
+// the whole agent-set — 10/20/25/50 — actually sees).
+$tc_only = function ($c) { return array_map('intval', $c['levels']) === array(50); };
+
+// TC Lead (25) sees the whole SHARED TC agent card set, so every shared TC-group
+// card must offer a switch for level 25 (otherwise the owner cannot hide it from
+// a Lead). TC-only cards are exempt (a Lead never sees them).
 $tc_missing_25 = array();
 foreach ($reg as $slug => $c) {
-	if ($c['group'] !== 'TC') { continue; }
+	if ($c['group'] !== 'TC' || $tc_only($c)) { continue; }
 	if (!in_array(25, array_map('intval', $c['levels']), true)) { $tc_missing_25[] = $slug; }
 }
 check('every TC card is toggleable for TC Lead (level 25)', empty($tc_missing_25));
@@ -92,11 +99,17 @@ eq('TC Lead eligible for a TC card', array('tc_bc_created|9'), $lead_pairs);
 // listing card can never be hidden by the managing owner.
 $tc_missing_10 = array();
 foreach ($reg as $slug => $c) {
-	if ($c['group'] !== 'TC') { continue; }
+	if ($c['group'] !== 'TC' || $tc_only($c)) { continue; }
 	if (!in_array(10, array_map('intval', $c['levels']), true)) { $tc_missing_10[] = $slug; }
 }
-check('every TC card is toggleable for Owner (level 10)', empty($tc_missing_10));
+check('every shared TC card is toggleable for Owner (level 10)', empty($tc_missing_10));
 if (!empty($tc_missing_10)) { echo '    missing 10: ' . implode(', ', $tc_missing_10) . "\n"; }
+
+// The TC-only commission card is scoped to level 50 alone — Owner (10) / TC Lead
+// (25) / Sales Agent (20) must NOT be offered a switch (they never render it).
+check('tc_commission_month exists', isset($reg['tc_commission_month']));
+check('tc_commission_month is TC-only (level 50)',
+	isset($reg['tc_commission_month']) && array_map('intval', $reg['tc_commission_month']['levels']) === array(50));
 
 // A level-10 (Owner) user is offered a pair for a TC card (end-to-end).
 $owner = array((object) array('AdminID' => 3, 'Name' => 'Owner', 'Level' => '10'));

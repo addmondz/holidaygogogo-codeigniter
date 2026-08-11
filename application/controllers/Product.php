@@ -275,6 +275,125 @@ class Product extends MY_Controller
 		$writer->save('php://output');
 	}
 
+	// Download a blank .xlsx template (same columns as the "Product Records"
+	// export) so users can fill one product per row and re-upload via Import().
+	function Import_Template() {
+		$spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+		$sheet = $spreadsheet->getActiveSheet();
+		$sheet->setTitle('Product Import');
+		$spreadsheet->getProperties()->setCreator('HolidayGoGoGo');
+
+		$col = 'A';
+		foreach (Product_Model::IMPORT_COLUMNS as $label) {
+			$sheet->setCellValue($col . '1', $label);
+			$sheet->getColumnDimension($col)->setWidth(28);
+			$col++;
+		}
+		$last = chr(ord('A') + count(Product_Model::IMPORT_COLUMNS) - 1);
+		$sheet->getStyle('A1:' . $last . '1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_BLACK);
+		$sheet->getStyle('A1:' . $last . '1')->getFont()->getColor()->setARGB(\PhpOffice\PhpSpreadsheet\Style\Color::COLOR_WHITE);
+		$sheet->getStyle('A1:' . $last . '1')->getFont()->setBold(true);
+
+		// One greyed sample row so the expected shape is obvious.
+		$sample = array('Hotel', 'Sunrise Travel', '', 'Deluxe Sea View Room', '1200.00', '900.00');
+		$col = 'A';
+		foreach ($sample as $val) {
+			$sheet->setCellValueExplicit($col . '2', $val, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+			$col++;
+		}
+		$sheet->getStyle('A2:' . $last . '2')->getFont()->getColor()->setARGB('FF9E9E9E');
+
+		$filename = 'PRODUCT_IMPORT_TEMPLATE_' . date('Ymd') . '.xlsx';
+		header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+		header('Content-Disposition: attachment;filename="' . $filename . '"');
+		header('Cache-Control: max-age=0');
+		$writer = \PhpOffice\PhpSpreadsheet\IOFactory::createWriter($spreadsheet, 'Xlsx');
+		$writer->save('php://output');
+	}
+
+	// Bulk upsert products from a filled template: PRODUCT CODE matching an
+	// existing product updates it, blank/unknown code creates a new product.
+	function Import() {
+		if ($this->input->server('REQUEST_METHOD') !== 'POST' || empty($_FILES['import_file']['name'])) {
+			redirect(base_url('Product'));
+			return;
+		}
+
+		$file = $_FILES['import_file'];
+		if ($file['error'] !== UPLOAD_ERR_OK) {
+			$this->session->set_flashdata('product_import_error', 'Upload failed. Please try again.');
+			redirect(base_url('Product'));
+			return;
+		}
+		$ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+		if (!in_array($ext, array('xlsx', 'xls'), true)) {
+			$this->session->set_flashdata('product_import_error', 'Please upload an Excel file (.xlsx or .xls).');
+			redirect(base_url('Product'));
+			return;
+		}
+		if ($file['size'] > 10 * 1024 * 1024) {
+			$this->session->set_flashdata('product_import_error', 'File too large. Maximum size is 10MB.');
+			redirect(base_url('Product'));
+			return;
+		}
+
+		// Save the upload as a backup, then keep only the newest 3.
+		$dir = FCPATH . 'assets/upload/product_import/';
+		if (!is_dir($dir)) {
+			mkdir($dir, 0755, true);
+		}
+		$dest = $dir . 'product_import_' . time() . '.' . $ext;
+		if (!move_uploaded_file($file['tmp_name'], $dest)) {
+			$this->session->set_flashdata('product_import_error', 'Could not save the uploaded file.');
+			redirect(base_url('Product'));
+			return;
+		}
+		$existing = array();
+		foreach (glob($dir . 'product_import_*') as $path) {
+			$existing[] = basename($path);
+		}
+		foreach (Product_Model::Prune_Import_Backups($existing, 3) as $old) {
+			@unlink($dir . $old);
+		}
+
+		try {
+			$spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($dest);
+			$rows = $spreadsheet->getActiveSheet()->toArray(null, true, true, false);
+		} catch (\Exception $e) {
+			$this->session->set_flashdata('product_import_error', 'Could not read the Excel file. Please use the downloaded template.');
+			redirect(base_url('Product'));
+			return;
+		}
+
+		$parsed = Product_Model::Parse_Import_Rows(
+			$rows,
+			$this->Product_Model->Category_Name_Map(),
+			$this->Product_Model->Supplier_Name_Map()
+		);
+		if (empty($parsed)) {
+			$this->session->set_flashdata('product_import_error', 'No product rows found in the file. Nothing was imported.');
+			redirect(base_url('Product'));
+			return;
+		}
+
+		$admin_id = (int) $this->session->userdata('admin_id');
+		$summary = $this->Product_Model->Bulk_Import($parsed, $admin_id);
+
+		$msg = count($summary['created']) . ' product(s) created, ' . count($summary['updated']) . ' updated.';
+		if (!empty($summary['failed'])) {
+			$lines = array();
+			foreach ($summary['failed'] as $f) {
+				$lines[] = 'row ' . $f['line'] . ' — ' . $f['reason'];
+			}
+			$msg .= ' Failed ' . count($lines) . ' row(s): ' . implode('; ', $lines) . '.';
+		}
+
+		// Anything created/updated -> success banner (with any fail notes); nothing -> error.
+		$key = (!empty($summary['created']) || !empty($summary['updated'])) ? 'product_import_success' : 'product_import_error';
+		$this->session->set_flashdata($key, $msg);
+		redirect(base_url('Product'));
+	}
+
 	function Detect() {
 		$redundant_name = $this->Product_Model->Detect();
 		if($redundant_name) {

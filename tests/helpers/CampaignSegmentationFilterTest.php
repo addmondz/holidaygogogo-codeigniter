@@ -157,4 +157,29 @@ $mix = guest_list_customer_segment_sql(array('cancelled' => '1', 'min_purchases'
 assert_eq('cancelled+min params', array(2), $mix['params']);
 assert_contains('cancelled flips the set', "b.CancelStatus <> 'N'", $mix['sql']);
 
+// ---- Campaign picker "force customer branch" routing contract --------------
+// Bug: with Type left at "--ALL TYPES--", any customer-value segment suppressed
+// EVERY UNION branch (asserted above) so the picker returned "No matching
+// guests". Campaign::Search_Guests now forces the customer query whenever
+//   guest_list_any_filter_set($get, guest_list_customer_only_segment_keys())
+// is true. This locks that exact predicate so all six segments route to the
+// customer branch, and nothing else trips it.
+echo "force-customer routing:\n";
+$seg_keys = guest_list_customer_only_segment_keys();
+assert_eq('all six segment keys present', array('min_purchases', 'ltv', 'booking_lead', 'consecutive_years', 'family_kids', 'cancelled'), $seg_keys);
+
+foreach (array('min_purchases' => '2', 'ltv' => '10000-20000', 'booking_lead' => '1-2',
+    'consecutive_years' => '1', 'family_kids' => '1', 'cancelled' => '1') as $k => $v) {
+    assert_eq("{$k} forces customer branch", true, guest_list_any_filter_set(array($k => $v), $seg_keys));
+}
+
+// Nothing set → do NOT force (normal booking/GHL routing). Off toggles ('0'),
+// blank dropdowns and empty multi-selects must not trip the customer branch.
+assert_eq('no segment → no force',        false, guest_list_any_filter_set(array(), $seg_keys));
+assert_eq('off cancelled toggle no force', false, guest_list_any_filter_set(array('cancelled' => '0'), $seg_keys));
+assert_eq('blank dropdown no force',       false, guest_list_any_filter_set(array('min_purchases' => '', 'ltv' => ''), $seg_keys));
+assert_eq('empty multiselect no force',    false, guest_list_any_filter_set(array('family_kids' => array()), $seg_keys));
+// A non-segment filter (e.g. Destination) must NOT force the customer branch.
+assert_eq('destination no force',          false, guest_list_any_filter_set(array('destination' => array('5')), $seg_keys));
+
 echo "\nAll assertions passed.\n";
