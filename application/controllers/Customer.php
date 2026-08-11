@@ -43,6 +43,7 @@ class Customer extends MY_Controller
 		$data['chat_counts']     = $this->Chat_Counts_For_Guests($data['guests']);
 		$data['campaign_counts'] = $this->Campaign_Info_For_Guests($data['guests'], 'count');
 		$data['campaign_hidden'] = $this->Campaign_Info_For_Guests($data['guests'], 'hidden');
+		$data['attached_destinations'] = $this->Attached_Destinations_For_Guests($data['guests']);
 		$data['total']          = null; // AJAX-loaded via Count(), like Guests/Ghl_Leads
 		$data['page']           = $page;
 		$data['limit']          = $limit;
@@ -97,6 +98,22 @@ class Customer extends MY_Controller
 	 * view can badge each Action menu with "Remarks (n)". Mirrors the private
 	 * helper of the same name on the Guests controller.
 	 */
+	/**
+	 * CustomerID => attached-destination names map for the rows on this page, so
+	 * the shared view can render the "Attached Destinations" column without a
+	 * per-row query. Mirrors the Remark/Chat count helpers.
+	 */
+	private function Attached_Destinations_For_Guests($guests)
+	{
+		$ids = array();
+		foreach ((array) $guests as $g) {
+			if (!empty($g->CustomerID)) {
+				$ids[] = (int) $g->CustomerID;
+			}
+		}
+		return $this->Guests_Model->Read_Customer_Attached_Destinations($ids);
+	}
+
 	private function Remark_Counts_For_Guests($guests)
 	{
 		$keys = array();
@@ -148,7 +165,12 @@ class Customer extends MY_Controller
 			$this->Customer_Model->Create();
 		} else {
 			$titles = array('tab_title' => 'HolidayGoGoGo | Customer', 'breadcrumb_title' => 'Customer >> Create');
-			$array = array('CustomerID' => 'NA', 'name' => 'NA');
+			$array = array(
+				'CustomerID' => 'NA',
+				'name' => 'NA',
+				'destinations' => $this->Booking_Model->Read_Categories(),
+				'selected_destinations' => array(),
+			);
 			$this->load->view('layout/header', $titles);
 			$this->load->view('customer/customer', $array);
 			$this->load->view('layout/footer');
@@ -159,6 +181,15 @@ class Customer extends MY_Controller
 	{
 		if(lc_block_edit('customer')) { return; }
 		if($this->input->is_ajax_request()) {
+			// Attached destinations sync independently of the customer fields, so
+			// a destination-only change still saves. Only touched when the form
+			// actually posts a `destinations` key (other callers unaffected).
+			if($this->input->post('destinations') !== null) {
+				$this->Customer_Model->Sync_Customer_Destinations(
+					$this->input->post('customer_id'),
+					$this->input->post('destinations')
+				);
+			}
 			if(count($this->input->post('customer')[0]) > 1) {
 				$this->Customer_Model->Update();
 
@@ -187,6 +218,9 @@ class Customer extends MY_Controller
 			$valid_customer_id = $this->Universal_Model->Validate_Id('CustomerID', $this->input->get('customer_id'), 'customer');
 			$array = $valid_customer_id ? $this->Customer_Model->Read_Customer() : null;
 			if($valid_customer_id && !empty($array) && (isset($array['Status']) ? $array['Status'] : 'Y') === 'Y') {
+				// Destination master list + this customer's currently attached ids.
+				$array['destinations'] = $this->Booking_Model->Read_Categories();
+				$array['selected_destinations'] = $this->Customer_Model->Read_Customer_Destination_Ids($array['CustomerID']);
 				$titles = array('tab_title' => 'HolidayGoGoGo | Customer', 'breadcrumb_title' => 'Customer >> Update');
 				$this->load->view('layout/header', $titles);
 				$this->load->view('customer/customer', $array);

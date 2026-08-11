@@ -302,14 +302,17 @@ class Customer_Model extends CI_Model
 		$insert = $this->db->insert('customer', $data);
 
 		if ($insert && $this->db->affected_rows() > 0) {
+			$new_id = $this->db->insert_id();
+			// Attach the manually-selected destinations (validated + replace-set).
+			$this->Sync_Customer_Destinations($new_id, $this->input->post('destinations'));
 			// A new customer may already match existing guest rows by phone —
 			// populate its snapshot from them (NULL if none).
-			$this->Refresh_Snapshot_For_Customer($this->db->insert_id());
+			$this->Refresh_Snapshot_For_Customer($new_id);
 			return $this->output
 				->set_content_type('application/json')
 				->set_output(json_encode([
 					'success' => true,
-					'CustomerID' => $this->db->insert_id(),
+					'CustomerID' => $new_id,
 					'message' => 'Customer inserted successfully.'
 				]));
 		} else {
@@ -406,6 +409,90 @@ class Customer_Model extends CI_Model
 		}
 	}
 
+
+	/**
+	 * CategoryIDs of the destinations manually attached to a customer (active
+	 * links only), for pre-selecting the multi-select on the edit form. Returns
+	 * a plain int array; empty when none.
+	 */
+	public function Read_Customer_Destination_Ids($customer_id)
+	{
+		if (empty($customer_id)) {
+			return array();
+		}
+		$this->db->select('CategoryID');
+		$this->db->where('CustomerID', $customer_id);
+		$this->db->where('Status', 'Y');
+		$rows = $this->db->get('customer_destination')->result();
+		$ids = array();
+		foreach ($rows as $r) {
+			$ids[] = (int) $r->CategoryID;
+		}
+		return $ids;
+	}
+
+	/**
+	 * Replace a customer's attached destinations with the given set. Only real
+	 * destination categories (category.IsDestination = 'YES', active) are kept —
+	 * anything else in the payload is silently dropped so the form can't inject
+	 * arbitrary CategoryIDs. Deletes rows no longer selected and inserts the new
+	 * ones (the UNIQUE key keeps it idempotent). Passing an empty/omitted set
+	 * clears all links.
+	 */
+	public function Sync_Customer_Destinations($customer_id, $category_ids)
+	{
+		if (empty($customer_id)) {
+			return;
+		}
+
+		// The form posts the selection as a JSON string so an empty set still
+		// arrives (jQuery drops empty arrays). Accept a string or a plain array.
+		if (is_string($category_ids)) {
+			$decoded = json_decode($category_ids, true);
+			$category_ids = is_array($decoded) ? $decoded : array();
+		}
+
+		// Normalise the incoming ids to a unique list of positive ints.
+		$wanted = array();
+		foreach ((array) $category_ids as $cid) {
+			$cid = (int) $cid;
+			if ($cid > 0) {
+				$wanted[$cid] = $cid;
+			}
+		}
+
+		// Keep only ids that are genuine active destination categories.
+		$valid = array();
+		if (!empty($wanted)) {
+			$this->db->select('CategoryID');
+			$this->db->where_in('CategoryID', array_values($wanted));
+			$this->db->where('IsDestination', 'YES');
+			$this->db->where('Status', 'Y');
+			foreach ($this->db->get('category')->result() as $row) {
+				$valid[(int) $row->CategoryID] = (int) $row->CategoryID;
+			}
+		}
+
+		// Replace the set: drop everything for this customer, then insert the
+		// validated selection. Simplest correct behaviour for a small pivot.
+		$this->db->where('CustomerID', $customer_id)->delete('customer_destination');
+
+		if (!empty($valid)) {
+			$now      = date('Y-m-d H:i:s');
+			$admin_id = $this->session->userdata('admin_id');
+			$batch    = array();
+			foreach ($valid as $cid) {
+				$batch[] = array(
+					'CustomerID' => (int) $customer_id,
+					'CategoryID' => $cid,
+					'Status'     => 'Y',
+					'InsertBy'   => $admin_id,
+					'InsertDate' => $now,
+				);
+			}
+			$this->db->insert_batch('customer_destination', $batch);
+		}
+	}
 
 	public function find($customer_id)
     {

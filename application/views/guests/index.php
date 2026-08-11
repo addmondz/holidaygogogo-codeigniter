@@ -858,8 +858,14 @@ div.kt-datatable__pager-container {
 										<?php if(!$is_lead_list) { ?>
 											<td style="text-align:center;">
 												<?php
+													// Merge booking-derived destinations (pipe-separated) with the
+													// manually-attached ones (newline-separated), deduped, one per line.
 													$dests = array();
-													foreach(explode('||', isset($g->Destination) ? (string)$g->Destination : '') as $d) {
+													$dest_parts = explode('||', isset($g->Destination) ? (string)$g->Destination : '');
+													$att_raw = ($list_base === 'Customer' && isset($g->CustomerID) && isset($attached_destinations[$g->CustomerID]))
+														? (string)$attached_destinations[$g->CustomerID] : '';
+													if($att_raw !== '') { $dest_parts = array_merge($dest_parts, explode("\n", $att_raw)); }
+													foreach($dest_parts as $d) {
 														$d = trim($d);
 														if($d === '' || $d === '-') { continue; }
 														if(!in_array($d, $dests, true)) { $dests[] = $d; }

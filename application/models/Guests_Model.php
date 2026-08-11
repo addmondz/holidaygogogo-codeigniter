@@ -1208,7 +1208,6 @@ GROUP BY mm.merge_key";
 			$bpar[] = $tl_clause['param'];
 		}
 
-		$this->Append_In_Clause($bstr, $bpar, 'b.Destination', $this->input->get('destination'));
 		$this->Append_In_Clause($bstr, $bpar, 'b.SalesAgent',  $this->input->get('sales_agent'));
 		$this->Append_In_Clause($bstr, $bpar, 'b.Source',      $this->input->get('source'));
 		$this->Append_In_Clause($bstr, $bpar, 'b.BookingID',   $this->input->get('booking_id'));
@@ -1219,6 +1218,25 @@ GROUP BY mm.merge_key";
 				WHERE b.CustomerID = c.CustomerID AND b.Status != 'N' AND b.CancelStatus = 'N'
 				{$bstr} ) ";
 			$params = array_merge($params, $bpar);
+		}
+
+		// Destination filter matches EITHER a booking destination OR a manually
+		// attached destination (customer_destination), so it agrees with the
+		// merged Destination column shown on the Customer list.
+		$dest_values = guest_list_multi_values($this->input->get('destination'));
+		if (!empty($dest_values)) {
+			$ph = implode(',', array_fill(0, count($dest_values), '?'));
+			$where .= " AND ( EXISTS (
+					SELECT 1 FROM booking b
+					WHERE b.CustomerID = c.CustomerID AND b.Status != 'N' AND b.CancelStatus = 'N'
+						AND b.Destination IN ({$ph})
+				) OR EXISTS (
+					SELECT 1 FROM customer_destination cd
+					WHERE cd.CustomerID = c.CustomerID AND cd.Status = 'Y'
+						AND cd.CategoryID IN ({$ph})
+				) ) ";
+			foreach ($dest_values as $v) { $params[] = $v; } // booking EXISTS
+			foreach ($dest_values as $v) { $params[] = $v; } // attached EXISTS
 		}
 
 		// Guest Role: a customer "leads" a booking when that booking's own contact
@@ -1529,6 +1547,39 @@ GROUP BY mm.merge_key";
 		$sql = "SELECT COUNT(*) AS cnt FROM customer c {$pax_join} {$branch['where']}";
 		$row = $this->db->query($sql, $branch['params'])->row();
 		return $row ? (int) $row->cnt : 0;
+	}
+
+	/**
+	 * CustomerID => newline-joined attached-destination names, for the Customer
+	 * listing's "Attached Destinations" column. One batched query for the whole
+	 * page (mirrors the remark_counts / chat_counts per-page map pattern). Only
+	 * active links to active destination categories are shown.
+	 */
+	function Read_Customer_Attached_Destinations($customer_ids)
+	{
+		$ids = array();
+		foreach ((array) $customer_ids as $cid) {
+			$cid = (int) $cid;
+			if ($cid > 0) { $ids[$cid] = $cid; }
+		}
+		if (empty($ids)) {
+			return array();
+		}
+
+		$this->db->select('cd.CustomerID AS CustomerID, GROUP_CONCAT(cat.Name ORDER BY cat.Name SEPARATOR "\n") AS Names', false);
+		$this->db->from('customer_destination cd');
+		$this->db->join('category cat', 'cat.CategoryID = cd.CategoryID', 'inner');
+		$this->db->where_in('cd.CustomerID', array_values($ids));
+		$this->db->where('cd.Status', 'Y');
+		$this->db->where('cat.IsDestination', 'YES');
+		$this->db->where('cat.Status', 'Y');
+		$this->db->group_by('cd.CustomerID');
+
+		$map = array();
+		foreach ($this->db->get()->result() as $row) {
+			$map[(int) $row->CustomerID] = (string) $row->Names;
+		}
+		return $map;
 	}
 
 	/**
