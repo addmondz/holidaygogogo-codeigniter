@@ -81,17 +81,17 @@ class Guest_List_Model extends CI_Model
 		$this->Sync_Customer_Snapshot($booking_id);
 	}
 
-	// Destination country = first product's category country (mirrors the
-	// Guest List form's nationality/destination logic).
+	// Destination country = the booking's destination category country.
+	// Uses booking.Destination (the trip's category), NOT the first product,
+	// which may be a Malaysia-tagged add-on (flight ticket, insurance) and would
+	// mislabel an overseas trip. Mirrors the Guest List display in Guest_List.php.
 	private function Destination_Country_Name($booking_id)
 	{
 		$this->db->select('country_code.Country As CategoryCountryName');
-		$this->db->from('booking_product');
-		$this->db->join('product', 'product.ProductID = booking_product.ProductID', 'left');
-		$this->db->join('category', 'category.CategoryID = product.CategoryID', 'left');
+		$this->db->from('booking');
+		$this->db->join('category', 'category.CategoryID = booking.Destination', 'left');
 		$this->db->join('country_code', 'country_code.CountryCodeID = category.Country', 'left');
-		$this->db->where('booking_product.BookingID', $booking_id);
-		$this->db->where('booking_product.Status', 'Y');
+		$this->db->where('booking.BookingID', $booking_id);
 		$row = $this->db->get()->row();
 		return ($row && !empty($row->CategoryCountryName)) ? strtoupper($row->CategoryCountryName) : '';
 	}

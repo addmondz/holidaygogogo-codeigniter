@@ -2,10 +2,12 @@
 /**
  * Run with: php tests/helpers/BookingExportRemarkTest.php
  *
- * Locks the REMARK column contract for the "Booking Records" download
- * (Booking::Download). Cancelled bookings must carry their cancellation reason
- * (and any free-text cancellation remark) into the REMARK cell, appended after
- * the booking's own remark, without clobbering it.
+ * Locks the REMARK / CANCELLATION column contract for the "Booking Records"
+ * download (Booking::Download). The booking's own remark, the cancellation
+ * reason and the cancellation remark each live in their OWN column:
+ *   - REMARK              -> BookingRemark only.
+ *   - CANCELLATION REASON -> reason name, cancelled bookings only.
+ *   - CANCELLATION REMARK -> free-text remark, cancelled bookings only.
  */
 
 if (!defined('BASEPATH')) {
@@ -38,24 +40,23 @@ function dummy_booking($fields)
     return (object) array_merge($defaults, $fields);
 }
 
-// 1. Active booking: remark passes through untouched.
+// --- REMARK column: always just the booking's own remark ---
+
 check(
     'active booking keeps its own remark',
     'Customer prefers window seat',
     booking_export_remark(dummy_booking(array('BookingRemark' => 'Customer prefers window seat')))
 );
 
-// 2. Active booking with no remark: empty string.
 check(
     'active booking with no remark stays empty',
     '',
     booking_export_remark(dummy_booking(array()))
 );
 
-// 3. Cancelled with reason + remark, and an existing booking remark: appended on a new line.
 check(
-    'cancelled: reason + remark appended below booking remark',
-    "Paid deposit only\nCancellation Reason: Customer Request - Changed travel dates",
+    'cancelled booking REMARK column is NOT polluted with cancellation info',
+    'Paid deposit only',
     booking_export_remark(dummy_booking(array(
         'BookingRemark'          => 'Paid deposit only',
         'CancelStatus'           => 'Y',
@@ -64,45 +65,67 @@ check(
     )))
 );
 
-// 4. Cancelled with reason only (no cancellation remark): no trailing dash.
+// --- CANCELLATION REASON column ---
+
 check(
-    'cancelled: reason only, no dash suffix',
-    'Cancellation Reason: Out of Budget',
-    booking_export_remark(dummy_booking(array(
+    'non-cancelled booking has blank cancellation reason',
+    '',
+    booking_export_cancellation_reason(dummy_booking(array(
+        'CancellationReasonName' => 'Should Not Show',
+    )))
+);
+
+check(
+    'cancelled booking exposes reason name',
+    'Out of Budget',
+    booking_export_cancellation_reason(dummy_booking(array(
         'CancelStatus'           => 'Y',
         'CancellationReasonName' => 'Out of Budget',
     )))
 );
 
-// 5. Cancelled but no reason recorded: nothing appended.
 check(
-    'cancelled without a reason appends nothing',
-    'Some note',
-    booking_export_remark(dummy_booking(array(
-        'BookingRemark' => 'Some note',
-        'CancelStatus'  => 'Y',
+    'cancelled without a reason gives blank reason',
+    '',
+    booking_export_cancellation_reason(dummy_booking(array(
+        'CancelStatus' => 'Y',
     )))
 );
 
-// 6. Cancelled, no booking remark: cancellation line stands alone (no leading newline).
+// --- CANCELLATION REMARK column ---
+
 check(
-    'cancelled with empty booking remark has no leading blank line',
-    'Cancellation Reason: Duplicate - Double booked',
-    booking_export_remark(dummy_booking(array(
+    'non-cancelled booking has blank cancellation remark',
+    '',
+    booking_export_cancellation_remark(dummy_booking(array(
+        'CancellationRemark' => 'Should Not Show',
+    )))
+);
+
+check(
+    'cancelled booking exposes free-text remark',
+    'Changed travel dates',
+    booking_export_cancellation_remark(dummy_booking(array(
+        'CancelStatus'       => 'Y',
+        'CancellationRemark' => 'Changed travel dates',
+    )))
+);
+
+check(
+    'cancelled with reason but no remark gives blank remark',
+    '',
+    booking_export_cancellation_remark(dummy_booking(array(
         'CancelStatus'           => 'Y',
         'CancellationReasonName' => 'Duplicate',
-        'CancellationRemark'     => 'Double booked',
     )))
 );
 
-// 7. Whitespace-only cancellation remark is treated as absent.
 check(
-    'whitespace-only cancellation remark is ignored',
-    'Cancellation Reason: Customer Request',
-    booking_export_remark(dummy_booking(array(
-        'CancelStatus'           => 'Y',
-        'CancellationReasonName' => 'Customer Request',
-        'CancellationRemark'     => '   ',
+    'whitespace-only cancellation remark is trimmed to blank',
+    '',
+    booking_export_cancellation_remark(dummy_booking(array(
+        'CancelStatus'       => 'Y',
+        'CancellationRemark' => '   ',
     )))
 );
 

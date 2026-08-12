@@ -257,12 +257,20 @@ class Guest_List extends CI_Controller
 							$pax_parts = array_filter(array($adult_str, $child_str, $infant_str));
 							$array['guest_lists'][0]->PaxNumber = !empty($pax_parts) ? implode('& ', $pax_parts) : '0 Pax';
 
-							// Determine destination country from products (use first product's category country)
+							// Destination country = the booking's destination category country
+							// (NOT the first product, which may be a Malaysia-tagged add-on such as
+							// a flight ticket or insurance and would mislabel an overseas trip).
 							$destination_country = null;
 							$destination_country_name = null;
-							if(!empty($array['booking_products']) && !empty($array['booking_products'][0]->CategoryCountry)) {
-								$destination_country = $array['booking_products'][0]->CategoryCountry;
-								$destination_country_name = strtoupper($array['booking_products'][0]->CategoryCountryName);
+							$this->db->select('category.Country As CategoryCountry, country_code.Country As CategoryCountryName');
+							$this->db->from('booking');
+							$this->db->join('category', 'category.CategoryID = booking.Destination', 'left');
+							$this->db->join('country_code', 'country_code.CountryCodeID = category.Country', 'left');
+							$this->db->where('booking.BookingID', $array['guest_lists'][0]->BookingID);
+							$dest_row = $this->db->get()->row();
+							if($dest_row && !empty($dest_row->CategoryCountry)) {
+								$destination_country = $dest_row->CategoryCountry;
+								$destination_country_name = strtoupper($dest_row->CategoryCountryName);
 							}
 							$array['destination_country'] = $destination_country;
 							$array['destination_country_name'] = $destination_country_name;
