@@ -24,6 +24,7 @@ class Manual_Leads extends MY_Controller
 		$this->load->model('Booking_Model');
 		$this->load->model('Customer_Type_Model');
 		$this->load->model('Lead_Status_Model');
+		$this->load->model('Nature_Of_Business_Model');
 		$this->load->helper('guest_contact');
 		$this->load->helper('ghl_lead_tags');
 	}
@@ -51,6 +52,7 @@ class Manual_Leads extends MY_Controller
 		$data['destinations']   = $this->Booking_Model->Read_Categories();
 		$data['customer_types'] = $this->Customer_Type_Model->Read_Customer_Types();
 		$data['lead_statuses']  = $this->Lead_Status_Model->Read_Lead_Statuses();
+		$data['nature_of_businesses'] = $this->Nature_Of_Business_Model->Read_Nature_Of_Businesses();
 		$data['nationalities']  = $this->Guests_Model->Read_Distinct('Nationality');
 		$data['languages']      = $this->Guests_Model->Read_Distinct('ChatLanguage');
 		$data['client_types']   = ghl_manual_lead_client_types();

@@ -615,10 +615,13 @@ div.kt-datatable__pager-container {
 												<div class="col-md-3">
 													<div class="form-group">
 														<label>Nature of Business</label>
-														<div class="input-icon">
-															<input type="text" name="nature_of_business" value="<?php if(!empty($this->input->get('nature_of_business'))) { echo htmlspecialchars($this->input->get('nature_of_business'), ENT_QUOTES); } ?>" autocomplete="off" class="form-control" placeholder="e.g. Manufacturing">
-															<span><i class="la la-briefcase"></i></span>
-														</div>
+														<?php $sel_nob = trim((string)$this->input->get('nature_of_business')); ?>
+														<select name="nature_of_business" class="form-control selectpicker" data-live-search="true" title="--SELECT NATURE OF BUSINESS--">
+															<option value="">--SELECT NATURE OF BUSINESS--</option>
+															<?php if(!empty($nature_of_businesses)) { foreach($nature_of_businesses as $nob) { ?>
+																<option data-icon="la la-briefcase font-size-lg bs-icon" value="<?php echo htmlspecialchars($nob->Name, ENT_QUOTES); ?>" <?php if($sel_nob === $nob->Name) echo 'selected'; ?>><?php echo htmlspecialchars($nob->Name); ?></option>
+															<?php } } ?>
+														</select>
 													</div>
 												</div>
 											</div>
@@ -641,20 +644,30 @@ div.kt-datatable__pager-container {
 								<?php if(!$is_lead_list) { ?>
 									<th style="text-align:center;">Alt Name</th>
 								<?php } ?>
-								<th style="text-align:center;"><?php echo ($list_base === 'Customer') ? 'Customer Name' : 'Guest First Name'; ?></th>
+								<th style="text-align:center;"><?php echo ($list_base === 'Customer') ? 'Customer Name' : (($list_base === 'Manual_Leads') ? 'Guest Name' : 'Guest First Name'); ?></th>
 								<th style="text-align:center;">Contact Num</th>
 								<?php if(!$is_lead_list) { ?>
 									<th style="text-align:center;">Email</th>
 								<?php } ?>
 								<?php if($is_lead_list) { ?>
-									<th style="text-align:center;"><?php echo ($list_base === 'Manual_Leads') ? 'Client Type' : 'Tags'; ?></th>
-									<?php if($list_base === 'Ghl_Leads') { ?>
-										<th style="text-align:center;">Type</th>
+									<?php if($list_base === 'Manual_Leads') { ?>
+										<th style="text-align:center;">Nature of Business</th>
+										<th style="text-align:center;">Client Type</th>
+										<th style="text-align:center;">Language</th>
+										<th style="text-align:center;">Race</th>
+										<th style="text-align:center;">Lead Status</th>
+										<th style="text-align:center;">Created Date</th>
+										<th style="text-align:center;">State</th>
+									<?php } else { ?>
+										<th style="text-align:center;">Tags</th>
+										<?php if($list_base === 'Ghl_Leads') { ?>
+											<th style="text-align:center;">Type</th>
+										<?php } ?>
+										<th style="text-align:center;">Gender</th>
+										<th style="text-align:center;">Language</th>
+										<th style="text-align:center;">Race</th>
+										<th style="text-align:center;">Nationality</th>
 									<?php } ?>
-									<th style="text-align:center;">Gender</th>
-									<th style="text-align:center;">Language</th>
-									<th style="text-align:center;">Race</th>
-									<th style="text-align:center;">Nationality</th>
 								<?php } ?>
 								<?php if(!$is_lead_list) { ?>
 									<th style="text-align:center;">Language</th>
@@ -693,7 +706,7 @@ div.kt-datatable__pager-container {
 						</thead>
 						<tbody>
 							<?php if(empty($guests)) { ?>
-								<tr><td colspan="<?php echo ($list_base === 'Customer') ? 12 : ($list_base === 'Manual_Leads' ? 10 : 11); ?>" style="text-align:center; padding-top:10px; padding-bottom:10px;">Guest Records Not Found</td></tr>
+								<tr><td colspan="<?php echo ($list_base === 'Customer') ? 12 : ($list_base === 'Manual_Leads' ? 11 : 11); ?>" style="text-align:center; padding-top:10px; padding-bottom:10px;">Guest Records Not Found</td></tr>
 							<?php } else { ?>
 								<?php $count = 1; foreach($guests as $g) { ?>
 									<?php $is_ghl_row = isset($g->Type) && ($g->Type === 'GHL' || $g->Type === 'Manual'); ?>
@@ -782,28 +795,45 @@ div.kt-datatable__pager-container {
 										</td>
 										<?php } ?>
 										<?php if($is_lead_list) { ?>
+											<?php $gl_dash = '<span class="text-muted">&mdash;</span>'; ?>
+											<?php if($list_base === 'Manual_Leads') { ?>
+												<?php
+													$nob_val    = isset($g->NatureOfBusiness) ? trim((string) $g->NatureOfBusiness) : '';
+													$client_val = isset($g->ClientType)       ? trim((string) $g->ClientType)       : '';
+													$lang_val   = isset($g->Language)         ? trim((string) $g->Language)         : '';
+													$race_val   = isset($g->Race)             ? trim((string) $g->Race)             : '';
+													$status_val = isset($g->LeadStatus)       ? trim((string) $g->LeadStatus)       : '';
+													$state_val  = isset($g->State)            ? trim((string) $g->State)            : '';
+													$created_raw = isset($g->RecencyAt) ? (string) $g->RecencyAt : '';
+													$created_ts  = ($created_raw !== '' && strpos($created_raw, '0000-00-00') !== 0) ? strtotime($created_raw) : false;
+												?>
+												<td style="text-align:center; max-width:200px;"><?php echo $nob_val !== '' ? htmlspecialchars($nob_val) : $gl_dash; ?></td>
+												<td style="text-align:center;">
+													<?php if($client_val !== '') { ?>
+														<span class="label label-inline label-light-primary font-weight-bold" style="white-space:normal;"><?php echo htmlspecialchars($client_val); ?></span>
+													<?php } else { echo $gl_dash; } ?>
+												</td>
+												<td style="text-align:center;"><?php echo $lang_val !== '' ? htmlspecialchars($lang_val) : $gl_dash; ?></td>
+												<td style="text-align:center;"><?php echo $race_val !== '' ? htmlspecialchars($race_val) : $gl_dash; ?></td>
+												<td style="text-align:center;">
+													<?php if($status_val !== '') { ?>
+														<span class="label label-inline label-light-info font-weight-bold" style="white-space:normal;"><?php echo htmlspecialchars($status_val); ?></span>
+													<?php } else { echo $gl_dash; } ?>
+												</td>
+												<td style="text-align:center; white-space:nowrap;"><?php echo $created_ts ? date('d M Y', $created_ts) : $gl_dash; ?></td>
+												<td style="text-align:center;"><?php echo $state_val !== '' ? htmlspecialchars($state_val) : $gl_dash; ?></td>
+											<?php } else { ?>
 											<td style="text-align:center; max-width:220px;">
 												<?php
-													if($list_base === 'Manual_Leads') {
-														// Manual Leads: this column is "Client Type" (a single preset value).
-														$client_val = isset($g->ClientType) ? trim((string) $g->ClientType) : '';
-														if($client_val !== '') {
-															echo '<span class="label label-inline label-light-primary font-weight-bold" style="white-space:normal;">'
-																. htmlspecialchars($client_val) . '</span>';
-														} else {
-															echo '<span class="text-muted">&mdash;</span>';
+													// GHL Leads: the "Tags" column (conversation tags, may be several).
+													$lead_tags = $is_ghl_row ? ghl_lead_tags_parse(isset($g->Tags) ? $g->Tags : null) : array();
+													if(!empty($lead_tags)) {
+														foreach($lead_tags as $tag) {
+															echo '<span class="label label-inline label-light-primary font-weight-bold mr-1 mb-1" style="white-space:normal;">'
+																. htmlspecialchars($tag) . '</span>';
 														}
 													} else {
-														// GHL Leads: the "Tags" column (conversation tags, may be several).
-														$lead_tags = $is_ghl_row ? ghl_lead_tags_parse(isset($g->Tags) ? $g->Tags : null) : array();
-														if(!empty($lead_tags)) {
-															foreach($lead_tags as $tag) {
-																echo '<span class="label label-inline label-light-primary font-weight-bold mr-1 mb-1" style="white-space:normal;">'
-																	. htmlspecialchars($tag) . '</span>';
-															}
-														} else {
-															echo '<span class="text-muted">&mdash;</span>';
-														}
+														echo $gl_dash;
 													}
 												?>
 											</td>
@@ -829,6 +859,7 @@ div.kt-datatable__pager-container {
 											<td style="text-align:center;"><?php echo $lang_val   !== '' ? htmlspecialchars($lang_val)   : $gl_dash; ?></td>
 											<td style="text-align:center;"><?php echo $race_val   !== '' ? htmlspecialchars($race_val)   : $gl_dash; ?></td>
 											<td style="text-align:center;"><?php echo $nat_val    !== '' ? htmlspecialchars($nat_val)    : $gl_dash; ?></td>
+										<?php } // end non-manual lead branch ?>
 										<?php } ?>
 										<?php if(!$is_lead_list) { ?>
 										<?php $lang_val = (string) $g->Language; ?>
@@ -2145,7 +2176,12 @@ div.kt-datatable__pager-container {
 					<div class="form-group row">
 						<div class="col-md-6">
 							<label>Nature of Business</label>
-							<input type="text" name="nature_of_business" class="form-control" autocomplete="off" placeholder="e.g. Manufacturing, Education">
+							<select name="nature_of_business" class="form-control">
+								<option value="">-- Select --</option>
+								<?php if(!empty($nature_of_businesses)) { foreach($nature_of_businesses as $nob) { ?>
+								<option value="<?php echo htmlspecialchars($nob->Name, ENT_QUOTES); ?>"><?php echo htmlspecialchars($nob->Name); ?></option>
+								<?php } } ?>
+							</select>
 						</div>
 						<div class="col-md-6">
 							<label>Number of Pax</label>

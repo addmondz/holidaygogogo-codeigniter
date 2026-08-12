@@ -402,19 +402,27 @@ class Guests_Model extends CI_Model
 			$this->Append_In_Clause($ghl_where, $g_params, 'gc.client_type',   $this->input->get('client_type'));
 			$this->Append_In_Clause($ghl_where, $g_params, 'gc.state',         $this->input->get('state'));
 
-			// Lead Status (Manual Leads): a lead matches when the picked status is its
-			// CURRENT status (gc.lead_status) OR appears in ANY of its dated Lead
-			// Status Update log entries (lead_status_log, keyed by the same dedup_key
-			// the listing shows). Multi-select over the picked statuses.
+			// Lead Status (Manual Leads): a lead matches only on its LATEST status, not
+			// any status it ever held. The latest status is the newest dated Lead Status
+			// Update log entry (lead_status_log, by StatusDate then LogID, keyed by the
+			// same dedup_key the listing shows); when a lead has no log entries at all we
+			// fall back to its current status field (gc.lead_status). Multi-select.
 			$lead_statuses = guest_list_multi_values($this->input->get('lead_status'));
 			if(!empty($lead_statuses)) {
 				$ph = implode(',', array_fill(0, count($lead_statuses), '?'));
-				$ghl_where .= " AND ( gc.lead_status IN ({$ph})
-					OR EXISTS (SELECT 1 FROM lead_status_log lsl
+				$ghl_where .= " AND (
+					EXISTS (SELECT 1 FROM lead_status_log lsl
 						WHERE lsl.Status = 'Y' AND lsl.dedup_key = {$gc_dedup}
-						AND lsl.LeadStatus IN ({$ph})) ) ";
-				foreach($lead_statuses as $st) { $g_params[] = $st; } // current-status IN
-				foreach($lead_statuses as $st) { $g_params[] = $st; } // log-entry IN
+						AND lsl.LeadStatus IN ({$ph})
+						AND NOT EXISTS (SELECT 1 FROM lead_status_log lsl2
+							WHERE lsl2.Status = 'Y' AND lsl2.dedup_key = {$gc_dedup}
+							AND (lsl2.StatusDate > lsl.StatusDate
+								OR (lsl2.StatusDate = lsl.StatusDate AND lsl2.LogID > lsl.LogID))))
+					OR ( gc.lead_status IN ({$ph})
+						AND NOT EXISTS (SELECT 1 FROM lead_status_log lsl3
+							WHERE lsl3.Status = 'Y' AND lsl3.dedup_key = {$gc_dedup})) ) ";
+				foreach($lead_statuses as $st) { $g_params[] = $st; } // latest-log IN
+				foreach($lead_statuses as $st) { $g_params[] = $st; } // no-log fallback IN
 			}
 
 			// "Campaign" filter over leads in a campaign roster; multi-select over
@@ -763,6 +771,9 @@ WHERE 1 = 1
 		CONVERT(MAX(c.AltName) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS AltName,
 		MAX(c.CustomerID) AS CustomerID,
 		MAX(c.created_at) AS CustomerCreatedAt,
+		CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS NatureOfBusiness,
+		CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS LeadStatus,
+		CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS State,
 		MAX(b.InsertDate) AS RecencyAt
 	{$from}
 	GROUP BY {$key}
@@ -813,6 +824,9 @@ SELECT
 	CONVERT(MAX(CASE WHEN rn = 1 THEN AltName END) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS AltName,
 	MAX(CASE WHEN rn = 1 THEN CustomerID END) AS CustomerID,
 	MAX(CASE WHEN rn = 1 THEN CustomerCreatedAt END) AS CustomerCreatedAt,
+	CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS NatureOfBusiness,
+	CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS LeadStatus,
+	CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS State,
 	MAX(BookingDate) AS RecencyAt
 FROM (
 	{$this->Booking_Windowed_Select($dedup, $booking['from'])}
@@ -862,6 +876,14 @@ SELECT
 	CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS AltName,
 	CAST(NULL AS UNSIGNED) AS CustomerID,
 	CAST(NULL AS DATETIME) AS CustomerCreatedAt,
+	CONVERT(gc.nature_of_business USING utf8mb4) COLLATE utf8mb4_unicode_ci AS NatureOfBusiness,
+	CONVERT(COALESCE(
+		(SELECT lsl.LeadStatus FROM lead_status_log lsl
+			WHERE lsl.Status = 'Y' AND lsl.dedup_key = {$gc_dedup}
+			ORDER BY lsl.StatusDate DESC, lsl.LogID DESC LIMIT 1),
+		gc.lead_status
+	) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS LeadStatus,
+	CONVERT(gc.state USING utf8mb4) COLLATE utf8mb4_unicode_ci AS State,
 	COALESCE(gc.date_added, gc.created_at) AS RecencyAt
 {$ghl['from']}
 			";
@@ -947,6 +969,9 @@ SELECT
 	MAX(CASE WHEN mm.rep_rn = 1 THEN mm.AltName           END) AS AltName,
 	MAX(CASE WHEN mm.rep_rn = 1 THEN mm.CustomerID        END) AS CustomerID,
 	MAX(CASE WHEN mm.rep_rn = 1 THEN mm.CustomerCreatedAt END) AS CustomerCreatedAt,
+	MAX(CASE WHEN mm.rep_rn = 1 THEN mm.NatureOfBusiness END) AS NatureOfBusiness,
+	MAX(CASE WHEN mm.rep_rn = 1 THEN mm.LeadStatus       END) AS LeadStatus,
+	MAX(CASE WHEN mm.rep_rn = 1 THEN mm.State            END) AS State,
 	MAX(mm.RecencyAt) AS RecencyAt
 FROM (
 	SELECT m.*,

@@ -12,6 +12,7 @@ defined('BASEPATH') OR exit('No direct script access allowed');
  *   manual_leads   Manual_Leads   Manual Leads
  *   campaign       Campaign       Campaign
  *   lead_status    Lead_Status    Lead Status
+ *   nature_of_business Nature_Of_Business  Nature of Business
  *
  * The OWNER (level 10) always has full view+edit and is never stored. Every other
  * admin sees/edits nothing by default — the owner grants rights per page on the
@@ -38,6 +39,7 @@ if ( ! function_exists('lc_modules'))
             'manual_leads' => array('class' => 'Manual_Leads', 'label' => 'Manual Leads'),
             'campaign'     => array('class' => 'Campaign',     'label' => 'Campaign'),
             'lead_status'  => array('class' => 'Lead_Status',  'label' => 'Lead Status'),
+            'nature_of_business' => array('class' => 'Nature_Of_Business', 'label' => 'Nature of Business'),
         );
     }
 }

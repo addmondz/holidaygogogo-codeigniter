@@ -336,9 +336,21 @@ class Customer_Model extends CI_Model
 		$admin_id = $this->session->userdata('admin_id');
 		if (is_array($rows)) {
 			foreach ($rows as $i => $row) {
-				if (!is_array($row) || !array_key_exists('CustomerCode', $row) || empty($row['CustomerID'])) {
+				if (!is_array($row)) {
 					continue;
 				}
+				// Drop numeric column keys (e.g. a "0" key from an empty-string field
+				// name serialized as customer[0][]) — they produce "SET 0 = ..." and
+				// break the UPDATE. Only real named columns may pass.
+				foreach (array_keys($row) as $col) {
+					if (!is_string($col) || $col === '' || ctype_digit((string) $col)) {
+						unset($rows[$i][$col]);
+					}
+				}
+				if (!array_key_exists('CustomerCode', $rows[$i]) || empty($rows[$i]['CustomerID'])) {
+					continue;
+				}
+				$row = $rows[$i];
 				$current = $this->find($row['CustomerID']);
 				$stored  = $current ? $current->CustomerCode : null;
 				if (!customer_code_change_allowed($admin_id, $stored, $row['CustomerCode'])) {

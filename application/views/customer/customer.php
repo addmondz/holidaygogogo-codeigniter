@@ -191,6 +191,10 @@
                         if(dirty_fields.length > 0){
                             for(var i = 0; i < dirty_fields.length; i++){
                                 var key = dirty_fields[i].id;
+                                // Skip phantom dirty fields with no id (e.g. bootstrap-select's
+                                // live-search box) — an empty key serializes as customer[0][]
+                                // and PHP reads it as numeric column "0", corrupting the UPDATE.
+                                if(!key) { continue; }
                                 // Destinations is a separate top-level param, not a customer column.
                                 if(key === 'Destinations') { continue; }
                                 // Email and billing address are case-sensitive; keep as typed.

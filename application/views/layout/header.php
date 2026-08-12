@@ -463,11 +463,12 @@ $is_dev_env = ($app_env !== 'prod');
 								// is now per-page via lc_can_view() (owner always allowed;
 								// everyone else only when granted). Access Settings (owner only)
 								// manages who can view/edit each page.
-								$lc_active = in_array($this->router->class, array('Customer', 'Guests', 'Ghl_Leads', 'Manual_Leads', 'Campaign', 'Lead_Status', 'Leads_Customer_Access', 'Merge_Duplicate_Customers'), true);
+								$lc_active = in_array($this->router->class, array('Customer', 'Guests', 'Ghl_Leads', 'Manual_Leads', 'Campaign', 'Lead_Status', 'Nature_Of_Business', 'Leads_Customer_Access', 'Merge_Duplicate_Customers'), true);
 								$lc_show_campaign    = lc_can_view('campaign');
 								$lc_show_lead_status = lc_can_view('lead_status');
+								$lc_show_nature_of_business = lc_can_view('nature_of_business');
 							?>
-							<?php if(lc_any_view() || $lc_show_campaign || $lc_show_lead_status) { ?>
+							<?php if(lc_any_view() || $lc_show_campaign || $lc_show_lead_status || $lc_show_nature_of_business) { ?>
 								<li class="menu-item menu-item-submenu <?php if($lc_active) { echo 'menu-item-active menu-item-open'; } ?>">
 									<a href="javascript:;" class="menu-link menu-toggle">
 										<span class="svg-icon menu-icon">
@@ -529,6 +530,14 @@ $is_dev_env = ($app_env !== 'prod');
 												<a href="<?php echo base_url('Lead_Status'); ?>" class="menu-link">
 													<i class="menu-bullet menu-bullet-dot"><span></span></i>
 													<span class="menu-text">Lead Status</span>
+												</a>
+											</li>
+											<?php } ?>
+											<?php if($lc_show_nature_of_business) { ?>
+											<li class="menu-item <?php if($this->router->class == 'Nature_Of_Business') { echo 'menu-item-active'; } ?>">
+												<a href="<?php echo base_url('Nature_Of_Business'); ?>" class="menu-link">
+													<i class="menu-bullet menu-bullet-dot"><span></span></i>
+													<span class="menu-text">Nature of Business</span>
 												</a>
 											</li>
 											<?php } ?>

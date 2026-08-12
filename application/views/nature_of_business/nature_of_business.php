@@ -1,0 +1,126 @@
+<div class="d-flex flex-column-fluid">
+    <div class="container-fluid">
+        <div class="card card-custom mb-5">
+            <div class="card-header flex-wrap py-3" style="background-color:#D7E2F2;">
+                <div class="card-title">
+                    <h3 class="card-label" style="color:#6082B6;">
+                        <strong><?php if(current_url() == base_url('Nature_Of_Business/Create')) { echo 'New Nature of Business Record'; } else { echo 'Nature of Business Record : ' . $Name; } ?></strong>
+                    </h3>
+                </div>
+            </div>
+            <div class="card-body">
+                <form id="form">
+                    <strong>Nature of Business Information :</strong>
+                    <br><br>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Name
+                                    <span style="color:red;">*</span>
+                                </label>
+                                <div class="input-icon">
+                                    <input type="text" id="Name" <?php if(current_url() == base_url('Nature_Of_Business/Update')) { ?> value="<?php echo $Name; ?>" <?php } ?> autocomplete="off" class="form-control">
+                                    <span>
+                                        <i class="la la-briefcase"></i>
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-between border-top pt-5">
+                        <input type="button" value="<?php if(current_url() == base_url('Nature_Of_Business/Create')) { echo 'Create Nature of Business'; } else { echo 'Update Nature of Business'; } ?>" class="btn btn-success font-weight-bold px-9 py-4" style="width:260px; margin-left:auto;">
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    $('#Name').change(function() {
+        var name = ($('#Name').val()).toUpperCase();
+        $.ajax({
+            url: '<?php echo base_url('Nature_Of_Business/Detect') ?>',
+            type: 'post',
+            data: {
+                name: name,
+                nature_of_business_id: '<?php echo (current_url() == base_url('Nature_Of_Business/Update')) ? $NatureOfBusinessID : ''; ?>'
+            },
+            dataType: 'json',
+            success: function(redundant_name) {
+                if(redundant_name) {
+                    Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', 'Redundant Name Detected', null);
+                    $('#Name').val('');
+                }
+            }
+        });
+    });
+
+    $('input[type="button"]').click(function() {
+        const swalWithBootstrapButtons = Swal.mixin({
+            customClass: {
+                confirmButton: 'btn btn-light-success m-2',
+                cancelButton: 'btn btn-danger m-2'
+            },
+            buttonsStyling: true
+        });
+        swalWithBootstrapButtons.fire({
+            width: 550,
+            background: 'url(<?php echo base_url('assets/image/sweetalert.jpg') ?>)',
+            icon: 'warning',
+            title: <?php if(current_url() == base_url('Nature_Of_Business/Create')) { ?> 'Create New Nature of Business Record ?' <?php } else { ?> '<?php echo 'Update Nature of Business Record : ' . str_replace('\'', '', $Name) . ' ?'; ?>' <?php } ?>,
+            confirmButtonText: 'Confirm',
+            cancelButtonText: 'Cancel',
+            showCancelButton: true
+        }).then((action) => {
+            if(action.isConfirmed) {
+                var name = ($('#Name').val()).toUpperCase();
+                if(name == '') {
+                    Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', 'Please Insert All Required Nature of Business Information', null);
+                } else {
+                    if(window.location.href == '<?php echo base_url('Nature_Of_Business/Create'); ?>') {
+                        var nature_of_business = [];
+                        nature_of_business.push({Name:name, InsertBy:<?php echo $this->session->userdata('admin_id') ?>, InsertDate:'<?php echo date('Y-m-d H:i:s') ?>'});
+                        Submit_Nature_Of_Business('<?php echo base_url('Nature_Of_Business/Create') ?>', nature_of_business);
+                    } else {
+                        var nature_of_business = [{NatureOfBusinessID:<?php echo $NatureOfBusinessID ?>, UpdateBy:<?php echo $this->session->userdata('admin_id') ?>, UpdateDate:'<?php echo date('Y-m-d H:i:s') ?>'}];
+                        var dirty_field = $('#form').dirty('showDirtyFields');
+                        if(dirty_field.length == 1) {
+                            var key = dirty_field[0].id;
+                            var value = (dirty_field[0].value).toUpperCase();
+                            nature_of_business[0][key] = value;
+                        }
+                        count = 0;
+                        $.each(nature_of_business[0], function() {
+                            count++;
+                        });
+                        if(count == 3) {
+                            Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', '<?php echo 'No Changes Detected In Nature of Business Record : ' . str_replace('\'', '', $Name); ?>', '<?php echo base_url('Nature_Of_Business') ?>');
+                        } else {
+                            Submit_Nature_Of_Business('<?php echo base_url('Nature_Of_Business/Update') ?>', nature_of_business);
+                        }
+                    }
+                }
+            }
+        });
+    });
+
+    function Submit_Nature_Of_Business(url, nature_of_business)
+    {
+        $.ajax({
+            url: url,
+            type: 'post',
+            data: {
+                nature_of_business: nature_of_business
+            },
+            success: function() {
+                Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', '<?php if(current_url() == base_url('Nature_Of_Business/Create')) { echo 'New'; } ?> Nature of Business Record <?php if(current_url() == base_url('Nature_Of_Business/Update')) { echo ': ' . str_replace('\'', '', $Name); } ?> Successfully <?php if(current_url() == base_url('Nature_Of_Business/Create')) { echo 'Created'; } else { echo 'Updated'; } ?>', '<?php echo base_url('Nature_Of_Business') ?>');
+            },
+            error: function() {
+                Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', '<?php if(current_url() == base_url('Nature_Of_Business/Create')) { echo 'New'; } ?> Nature of Business Record <?php if(current_url() == base_url('Nature_Of_Business/Update')) { echo ': ' . str_replace('\'', '', $Name); } ?> Could Not Be <?php if(current_url() == base_url('Nature_Of_Business/Create')) { echo 'Created'; } else { echo 'Updated'; } ?>', null);
+            }
+        });
+    }
+
+    $('#form').dirty('isClean');
+</script>

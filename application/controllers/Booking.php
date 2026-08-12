@@ -5907,6 +5907,7 @@ class Booking extends MY_Controller
 		// Sales Agents (20) and Marketing (60) never see profit, so it is left out
 		// of their export too (see admin_hides_profit / profit_visibility_helper).
 		$hide_profit = admin_hides_profit($this->session->userdata('level'));
+		$this->load->helper('booking_export_remark');
 		$spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
 		$spreadsheet->getActiveSheet()->setTitle('Booking Records');
 		$spreadsheet->getProperties()->setCreator('HolidayGoGoGo');
@@ -6086,7 +6087,7 @@ class Booking extends MY_Controller
 					$spreadsheet->getActiveSheet()->setCellValue('P' . $row, $booking->Profit);
 				}
 				$spreadsheet->getActiveSheet()->setCellValueExplicit('Q' . $row, $booking->Status, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-				$spreadsheet->getActiveSheet()->setCellValueExplicit('R' . $row, $booking->BookingRemark, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+				$spreadsheet->getActiveSheet()->setCellValueExplicit('R' . $row, booking_export_remark($booking), \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 				$spreadsheet->getActiveSheet()->setCellValueExplicit('S' . $row, $booking->ChatLanguage, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 				$spreadsheet->getActiveSheet()->setCellValueExplicit('T' . $row, $booking->SourceName, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
 				$row++;
