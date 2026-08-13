@@ -15,7 +15,13 @@ class Costing extends MY_Controller
             'breadcrumb_title' => 'Setting >> Costing >> Packages',
         );
 
-        $array = $this->Costing_Model->Read_Packages_Dashboard();
+        $filters = array(
+            'search' => trim((string) $this->input->get('search')),
+            'status' => trim((string) $this->input->get('status')),
+        );
+
+        $array = $this->Costing_Model->Read_Packages_Dashboard($filters);
+        $array['filters'] = $filters;
 
         $this->load->view('layout/header', $titles);
         $this->load->view('costing/index', $array);

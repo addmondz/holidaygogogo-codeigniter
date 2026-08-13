@@ -1,5 +1,9 @@
 <?php
 $packages = isset($packages) ? $packages : array();
+$filters = isset($filters) ? $filters : array('search' => '', 'status' => '');
+$filter_search = isset($filters['search']) ? $filters['search'] : '';
+$filter_status = isset($filters['status']) ? $filters['status'] : '';
+$has_filter = ($filter_search !== '' || $filter_status !== '');
 ?>
 
 <div class="d-flex flex-column-fluid">
@@ -31,6 +35,44 @@ $packages = isset($packages) ? $packages : array();
                 <div class="mb-6">
                     <div class="font-size-h5 font-weight-bold text-dark mb-2">Packages</div>
                     <div class="text-muted">Show package records only. Open a package to manage costing breakdown, booking snapshots, and calculations.</div>
+                </div>
+
+                <div class="accordion accordion-solid accordion-toggle-plus mb-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <div id="costing_filter_header" data-toggle="collapse" data-target="#costing_filter_body" class="card-title <?php echo $has_filter ? '' : 'collapsed'; ?>" style="font-size:13px;">Filter Packages</div>
+                        </div>
+                        <div id="costing_filter_body" class="collapse <?php echo $has_filter ? 'show' : ''; ?>">
+                            <div class="card-body">
+                                <form method="get" action="<?php echo base_url('Costing'); ?>">
+                                    <div class="form-group row align-items-end mb-0">
+                                        <div class="col-md-5">
+                                            <label class="font-weight-bold">Search</label>
+                                            <input type="text" name="search" value="<?php echo html_escape($filter_search); ?>" class="form-control" placeholder="Package name, tour code or description">
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="font-weight-bold">Status</label>
+                                            <select name="status" class="form-control">
+                                                <option value="">All</option>
+                                                <option value="active" <?php echo ($filter_status === 'active') ? 'selected' : ''; ?>>Active</option>
+                                                <option value="inactive" <?php echo ($filter_status === 'inactive') ? 'selected' : ''; ?>>Inactive</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <button type="submit" class="btn btn-primary font-weight-bold mr-2">
+                                                <i class="la la-search"></i>Filter
+                                            </button>
+                                            <?php if ($has_filter) { ?>
+                                                <a href="<?php echo base_url('Costing'); ?>" class="btn btn-light font-weight-bold">
+                                                    <i class="la la-times"></i>Clear
+                                                </a>
+                                            <?php } ?>
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="dataTables_wrapper dt-bootstrap4 no-footer" <?php if (empty($packages)) { echo 'style="overflow-x:auto;"'; } ?>>

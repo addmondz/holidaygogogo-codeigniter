@@ -2,8 +2,23 @@
 
 class Costing_Model extends CI_Model
 {
-    public function Read_Packages_Dashboard()
+    public function Read_Packages_Dashboard($filters = array())
     {
+        $where = array();
+
+        $search = isset($filters['search']) ? trim((string) $filters['search']) : '';
+        if ($search !== '') {
+            $like = $this->db->escape_like_str($search);
+            $where[] = "(cp.name LIKE '%" . $like . "%' OR cp.tour_code LIKE '%" . $like . "%' OR cp.description LIKE '%" . $like . "%')";
+        }
+
+        $status = isset($filters['status']) ? trim((string) $filters['status']) : '';
+        if ($status !== '') {
+            $where[] = "cp.status = " . $this->db->escape($status);
+        }
+
+        $where_sql = !empty($where) ? ('WHERE ' . implode(' AND ', $where)) : '';
+
         $packages = $this->db->query("
             SELECT
                 cp.id,
@@ -37,6 +52,7 @@ class Costing_Model extends CI_Model
                 ORDER BY cb_latest.id DESC
                 LIMIT 1
             )
+            " . $where_sql . "
             ORDER BY cp.updated_at DESC, cp.id DESC
         ")->result_array();
 

@@ -28,8 +28,9 @@ if ($active_index === false) {
     $active_index = 0;
 }
 
-// Cost rows: reuse the saved snapshot when it exists, else seed one row per
-// active item-master entry (its multiplier + default currency/count; cost typed here).
+// Cost rows: reuse the saved snapshot when it exists. A fresh template shows
+// only category headers (each with its own item picker) — items are added
+// per-category on demand, not pre-seeded from the master.
 $cost_rows = array();
 if (!empty($booking_items)) {
     foreach ($booking_items as $item) {
@@ -40,20 +41,6 @@ if (!empty($booking_items)) {
             'currency_id'     => (int) (isset($item['currency_id']) ? $item['currency_id'] : 0),
             'unit_price'      => (float) (isset($item['unit_price']) ? $item['unit_price'] : 0),
             'count'           => (float) (isset($item['quantity']) ? $item['quantity'] : 1),
-            'include'         => true,
-        );
-    }
-} else {
-    foreach ($item_master as $item) {
-        $mt = isset($item['multiplier_type']) ? $item['multiplier_type'] : 'fixed';
-        $count = $mt === 'per_day' ? $duration_days : ($mt === 'per_pax' ? $total_pax : 1);
-        $cost_rows[] = array(
-            'name'            => isset($item['name']) ? $item['name'] : '',
-            'category'        => isset($item['category']) ? $item['category'] : 'miscellaneous',
-            'multiplier_type' => $mt,
-            'currency_id'     => (int) (isset($item['default_currency_id']) ? $item['default_currency_id'] : 0),
-            'unit_price'      => 0,
-            'count'           => (float) $count,
             'include'         => true,
         );
     }
