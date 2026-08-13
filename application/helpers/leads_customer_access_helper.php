@@ -105,6 +105,24 @@ if ( ! function_exists('lc_current_rows'))
     }
 }
 
+if ( ! function_exists('lc_customer_lookup_method'))
+{
+    /**
+     * Lightweight Customer endpoints that Booking create/edit needs for EVERY
+     * sales agent: the type-ahead customer search + the duplicate-phone check.
+     * These are exempt from the page-level lc_can_view('customer') gate in the
+     * Customer controller constructor, so an agent WITHOUT Customer-module view
+     * access can still search and attach a customer while making a booking.
+     * They only return name/phone/code — data already shown on the booking form.
+     * Match is case-insensitive because CI method names can be called in any case.
+     */
+    function lc_customer_lookup_method($method)
+    {
+        $allowed = array('search', 'search1', 'check_duplicate');
+        return in_array(strtolower((string) $method), $allowed, true);
+    }
+}
+
 if ( ! function_exists('lc_can_view'))
 {
     function lc_can_view($module)

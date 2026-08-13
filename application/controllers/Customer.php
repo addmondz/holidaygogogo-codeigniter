@@ -10,7 +10,11 @@ class Customer extends MY_Controller
 	{
 		parent::__construct();
 		// Leads/Customer tab access: view gates the whole page (owner always allowed).
-		if ( ! lc_can_view('customer')) {
+		// EXCEPT the lightweight booking-time lookups (customer type-ahead search +
+		// duplicate-phone check): every sales agent needs those to attach a customer
+		// while creating a booking, even without Customer-module view access.
+		if ( ! lc_customer_lookup_method($this->router->fetch_method())
+			&& ! lc_can_view('customer')) {
 			redirect(base_url('Booking'));
 		}
 		$this->load->model('Customer_Model');
