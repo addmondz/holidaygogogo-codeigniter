@@ -90,11 +90,21 @@ assert_eq('empty tags no drop',   false, guest_list_bookings_suppressed_by_filte
 // the picker's Type = Customer, which runs the separate customer query).
 echo "customer-only segment suppression:\n";
 foreach (array('min_purchases' => '2', 'ltv' => '10000-20000', 'booking_lead' => '1-2',
-    'consecutive_years' => '1', 'family_kids' => '1', 'cancelled' => '1') as $k => $v) {
+    'consecutive_years' => '1', 'cancelled' => '1') as $k => $v) {
     assert_eq("{$k} drops GHL",      true, guest_list_ghl_suppressed_by_filters(array($k => $v)));
     assert_eq("{$k} drops booking",  true, guest_list_bookings_suppressed_by_filters(array($k => $v)));
     assert_eq("{$k} drops fallback", true, guest_list_leader_fallback_suppressed_by_filters(array($k => $v)));
 }
+
+// "Family with kids" is NOT customer-only: a child/infant lives on the booking,
+// so it now KEEPS the booking + leader-fallback branches (an "All types" picker
+// returns booking guests whose trip carried a kid) and only drops the GHL branch
+// (a lead has no booking). The customer branch still applies it when Type=Customer.
+echo "family_kids routing (booking + fallback keep, GHL drops):\n";
+assert_eq('family_kids drops GHL',       true,  guest_list_ghl_suppressed_by_filters(array('family_kids' => '1')));
+assert_eq('family_kids keeps booking',   false, guest_list_bookings_suppressed_by_filters(array('family_kids' => '1')));
+assert_eq('family_kids keeps fallback',  false, guest_list_leader_fallback_suppressed_by_filters(array('family_kids' => '1')));
+assert_eq('family_kids=0 keeps GHL',     false, guest_list_ghl_suppressed_by_filters(array('family_kids' => '0')));
 // An off toggle ('0') must NOT suppress anything.
 assert_eq('cancelled=0 keeps GHL',     false, guest_list_ghl_suppressed_by_filters(array('cancelled' => '0')));
 assert_eq('cancelled=0 keeps booking', false, guest_list_bookings_suppressed_by_filters(array('cancelled' => '0')));
@@ -162,14 +172,17 @@ assert_contains('cancelled flips the set', "b.CancelStatus <> 'N'", $mix['sql'])
 // EVERY UNION branch (asserted above) so the picker returned "No matching
 // guests". Campaign::Search_Guests now forces the customer query whenever
 //   guest_list_any_filter_set($get, guest_list_customer_only_segment_keys())
-// is true. This locks that exact predicate so all six segments route to the
-// customer branch, and nothing else trips it.
+// is true. This locks that exact predicate so the per-customer segments route to
+// the customer branch, and nothing else trips it. NOTE: family_kids is NOT in
+// this set anymore — it applies on the booking branch too, so it must NOT force
+// the customer-only path.
 echo "force-customer routing:\n";
 $seg_keys = guest_list_customer_only_segment_keys();
-assert_eq('all six segment keys present', array('min_purchases', 'ltv', 'booking_lead', 'consecutive_years', 'family_kids', 'cancelled'), $seg_keys);
+assert_eq('five segment keys present', array('min_purchases', 'ltv', 'booking_lead', 'consecutive_years', 'cancelled'), $seg_keys);
+assert_eq('family_kids not a force key', false, guest_list_any_filter_set(array('family_kids' => '1'), $seg_keys));
 
 foreach (array('min_purchases' => '2', 'ltv' => '10000-20000', 'booking_lead' => '1-2',
-    'consecutive_years' => '1', 'family_kids' => '1', 'cancelled' => '1') as $k => $v) {
+    'consecutive_years' => '1', 'cancelled' => '1') as $k => $v) {
     assert_eq("{$k} forces customer branch", true, guest_list_any_filter_set(array($k => $v), $seg_keys));
 }
 
@@ -178,7 +191,6 @@ foreach (array('min_purchases' => '2', 'ltv' => '10000-20000', 'booking_lead' =>
 assert_eq('no segment → no force',        false, guest_list_any_filter_set(array(), $seg_keys));
 assert_eq('off cancelled toggle no force', false, guest_list_any_filter_set(array('cancelled' => '0'), $seg_keys));
 assert_eq('blank dropdown no force',       false, guest_list_any_filter_set(array('min_purchases' => '', 'ltv' => ''), $seg_keys));
-assert_eq('empty multiselect no force',    false, guest_list_any_filter_set(array('family_kids' => array()), $seg_keys));
 // A non-segment filter (e.g. Destination) must NOT force the customer branch.
 assert_eq('destination no force',          false, guest_list_any_filter_set(array('destination' => array('5')), $seg_keys));
 

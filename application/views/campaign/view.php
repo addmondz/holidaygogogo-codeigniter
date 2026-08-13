@@ -47,14 +47,16 @@
 						</div>
 					</div>
 				</div>
-				<?php if(!empty($campaign->Description)) { ?>
-					<div class="row mb-3">
-						<div class="col-md-10">
-							<div class="text-muted" style="font-size:12px;">Description</div>
+				<div class="row mb-3">
+					<div class="col-md-10">
+						<div class="text-muted" style="font-size:12px;">Description</div>
+						<?php if(!empty($campaign->Description)) { ?>
 							<div style="white-space:pre-wrap; color:#3F4254;"><?php echo htmlspecialchars((string)$campaign->Description); ?></div>
-						</div>
+						<?php } else { ?>
+							<div style="color:#B5B5C3;">&mdash;</div>
+						<?php } ?>
 					</div>
-				<?php } ?>
+				</div>
 				<div class="row">
 					<div class="col-md-6">
 						<div class="text-muted" style="font-size:12px;">GHL Workflow ID</div>

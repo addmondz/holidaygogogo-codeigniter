@@ -66,6 +66,7 @@ class Costing_Item_Model extends CI_Model
 
         $name = trim((string) $item['name']);
         $category = strtolower(trim((string) $item['category']));
+        $multiplier_type = costing_normalize_multiplier_type(isset($item['multiplier_type']) ? $item['multiplier_type'] : 'fixed');
         $currency_id = (int) $item['default_currency_id'];
         $unit_cost = (float) $item['default_unit_cost'];
 
@@ -76,6 +77,7 @@ class Costing_Item_Model extends CI_Model
         $data = array(
             'name'                => $name,
             'category'            => $category,
+            'multiplier_type'     => $multiplier_type,
             'default_currency_id' => $currency_id,
             'default_unit_cost'   => $unit_cost,
         );

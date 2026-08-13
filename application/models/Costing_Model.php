@@ -155,7 +155,40 @@ class Costing_Model extends CI_Model
             'itinerary_days' => $this->Read_Itinerary_Days((int) $package['id']),
             'quotation_token' => $booking && !empty($booking['quotation_token']) ? $booking['quotation_token'] : '',
             'item_master' => $this->Read_Item_Master(),
+            'currency_rate_map' => $this->Read_Currency_Rate_Map($booking ? $booking['travel_date'] : null, (int) $base_currency['id']),
         );
+    }
+
+    /**
+     * currency_id => { code, rate_to_myr, bank_charges_myr } for the cost step's
+     * live "MYR (convert)" preview. Pulls the latest foreign->MYR rate + bank
+     * charge maintained on the Costing Currency page (costing_exchange_rates).
+     * The base currency (MYR) is rate 1 with no charge. Server-side saving still
+     * freezes the confirmed snapshot rates, so this map is only a UI convenience.
+     */
+    public function Read_Currency_Rate_Map($travel_date = null, $base_currency_id = 0)
+    {
+        if ($base_currency_id <= 0) {
+            $base = $this->Read_Base_Currency('MYR');
+            $base_currency_id = $base ? (int) $base['id'] : 0;
+        }
+
+        $map = array();
+        foreach ($this->Read_Currencies() as $currency) {
+            $currency_id = (int) $currency['id'];
+            if ($currency_id === $base_currency_id) {
+                $map[$currency_id] = array('code' => strtoupper((string) $currency['code']), 'rate_to_myr' => 1.0, 'bank_charges_myr' => 0.0);
+                continue;
+            }
+            $details = $this->Resolve_Exchange_Rate_Details($currency_id, $base_currency_id, $travel_date);
+            $map[$currency_id] = array(
+                'code' => strtoupper((string) $currency['code']),
+                'rate_to_myr' => (float) $details['rate'],
+                'bank_charges_myr' => (float) $details['bank_charges_myr'],
+            );
+        }
+
+        return $map;
     }
 
     public function Read_Currency_Dashboard_Data()
@@ -833,6 +866,17 @@ class Costing_Model extends CI_Model
         $booking_items = $this->Read_Booking_Items((int) $booking['id'], $base_currency_id, $booking['travel_date']);
         $financials = $this->Calculate_Financials_From_Booking($booking, $booking_items, $base_currency_id);
 
+        // Customer-facing line items: name + selling price (MYR cost incl. bank
+        // charges, marked up by the same margin). Raw cost/margin/profit stay hidden.
+        $margin = max(0, (float) $financials['margin_percentage']);
+        $items = array();
+        foreach ($booking_items as $item) {
+            $items[] = array(
+                'name'    => $item['name'],
+                'selling' => round((float) $item['base_total'] * (1 + $margin / 100), 2),
+            );
+        }
+
         return array(
             'booking'    => $booking,
             'package'    => array(
@@ -841,6 +885,7 @@ class Costing_Model extends CI_Model
                 'duration_nights' => (int) $booking['duration_nights'],
             ),
             'itinerary'  => $this->Read_Itinerary_Days((int) $booking['package_id']),
+            'items'      => $items,
             'financials' => $financials,
         );
     }
@@ -997,8 +1042,10 @@ class Costing_Model extends CI_Model
         $this->load->helper('costing_calc');
         $labels = costing_categories();
 
+        $multiplier_labels = costing_multiplier_types();
+
         $rows = $this->db
-            ->select('ci.id, ci.name, ci.category, ci.default_currency_id, ci.default_unit_cost, cc.code AS currency_code')
+            ->select('ci.id, ci.name, ci.category, ci.multiplier_type, ci.default_currency_id, ci.default_unit_cost, cc.code AS currency_code')
             ->from('costing_items ci')
             ->join('costing_currencies cc', 'cc.id = ci.default_currency_id', 'left')
             ->where('ci.Status', 'Y')
@@ -1010,6 +1057,8 @@ class Costing_Model extends CI_Model
         foreach ($rows as &$row) {
             $key = (string) $row['category'];
             $row['category_label'] = isset($labels[$key]) ? $labels[$key] : ucwords(str_replace('_', ' ', $key));
+            $row['multiplier_type'] = costing_normalize_multiplier_type(isset($row['multiplier_type']) ? $row['multiplier_type'] : 'fixed');
+            $row['multiplier_label'] = isset($multiplier_labels[$row['multiplier_type']]) ? $multiplier_labels[$row['multiplier_type']] : 'Fixed';
         }
         unset($row);
 
@@ -1096,6 +1145,7 @@ class Costing_Model extends CI_Model
                 costing_booking_items.name,
                 costing_booking_items.category,
                 COALESCE(costing_booking_items.pax_type, "") AS pax_type,
+                COALESCE(costing_booking_items.multiplier_type, "fixed") AS multiplier_type,
                 costing_booking_items.quantity,
                 costing_booking_items.unit_count,
                 costing_booking_items.unit_price,
@@ -1114,6 +1164,7 @@ class Costing_Model extends CI_Model
         // Frozen per-scenario snapshot wins over the live feed: a saved quotation's
         // numbers must never move. Fall back to the live rate only for currencies
         // that have no snapshot row yet (e.g. pre-snapshot legacy scenarios).
+        $this->load->helper('costing_calc');
         $snapshot_map = $this->Read_Snapshot_Rate_Map((int) $booking_id);
 
         foreach ($items as &$item) {
@@ -1125,7 +1176,13 @@ class Costing_Model extends CI_Model
                 $item['exchange_rate'] = (float) $exchange_rate['rate'];
             }
             $item['bank_charges_myr'] = (float) $item['bank_charges_myr'];
-            $item['base_total'] = round(((float) $item['total_amount'] * (float) $item['exchange_rate']) + (float) $item['bank_charges_myr'], 2);
+
+            // Cost template math: convert the foreign unit cost to MYR (bank charge
+            // baked in), then multiply by the count (No of Day / No of pax / 1).
+            $cost_foreign = (float) $item['unit_price'] * (float) $item['unit_count'];
+            $myr = costing_row_myr($cost_foreign, $item['exchange_rate'], $item['bank_charges_myr'], (float) $item['quantity']);
+            $item['myr_per_unit'] = $myr['myr_per_unit'];
+            $item['base_total'] = $myr['total_myr'];
         }
         unset($item);
 
@@ -1368,17 +1425,23 @@ class Costing_Model extends CI_Model
                 continue;
             }
 
+            $this->load->helper('costing_calc');
             $normalized_row = array(
                 'package_item_id' => !empty($row['package_item_id']) ? (int) $row['package_item_id'] : null,
                 'name' => $name,
                 'category' => $category,
-                'pax_type' => in_array((string) $row['pax_type'], array('', 'adult', 'child'), true) ? (string) $row['pax_type'] : '',
+                'pax_type' => in_array((string) (isset($row['pax_type']) ? $row['pax_type'] : ''), array('', 'adult', 'child'), true) ? (string) (isset($row['pax_type']) ? $row['pax_type'] : '') : '',
+                'multiplier_type' => costing_normalize_multiplier_type(isset($row['multiplier_type']) ? $row['multiplier_type'] : 'fixed'),
                 'quantity' => round(max(0, (float) $row['quantity']), 2),
-                'unit_count' => round(max(0, (float) $row['unit_count']), 2),
+                'unit_count' => round(max(0, (float) (isset($row['unit_count']) ? $row['unit_count'] : 1)), 2),
                 'unit_price' => round(max(0, (float) $row['unit_price']), 2),
                 'currency_id' => $currency_id,
                 'remark' => trim((string) (isset($row['remark']) ? $row['remark'] : '')),
             );
+
+            if ((float) $normalized_row['unit_count'] <= 0) {
+                $normalized_row['unit_count'] = 1.0;
+            }
 
             if (array_key_exists('bank_charges_myr', $row)) {
                 $normalized_row['bank_charges_myr'] = round(max(0, (float) $row['bank_charges_myr']), 2);
@@ -1562,6 +1625,7 @@ class Costing_Model extends CI_Model
             'itinerary_days' => array(),
             'quotation_token' => '',
             'item_master' => array(),
+            'currency_rate_map' => array(),
         );
     }
 

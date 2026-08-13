@@ -3,10 +3,10 @@
  * Run with: php tests/helpers/ManualLeadLatestStatusFilterTest.php
  *
  * Locks the Manual Leads "Lead Status" filter (Guests_Model::Build_Branches).
- * A lead must match ONLY on its LATEST status, never a status it merely held
- * once. "Latest" = the newest active lead_status_log entry, ordered by
- * StatusDate then LogID (tie-break); a lead with NO log entries falls back to
- * its current status field gc.lead_status.
+ * A lead's status now lives ONLY in the dated lead_status_log (the single
+ * "current status" field gc.lead_status was dropped). A lead matches ONLY on
+ * its LATEST status — the newest active log entry, ordered by StatusDate then
+ * LogID (tie-break). A lead with NO log entries has no status and never matches.
  *
  * This mirrors the exact WHERE the model emits (portable ANSI SQL — the
  * correlated EXISTS / NOT EXISTS run unchanged on SQLite) against real rows.
@@ -16,23 +16,23 @@ $pdo = new PDO('sqlite::memory:');
 $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
 $pdo->exec("CREATE TABLE ghl_contacts (
-    id INTEGER PRIMARY KEY, dedup_key TEXT, lead_status TEXT)");
+    id INTEGER PRIMARY KEY, dedup_key TEXT)");
 $pdo->exec("CREATE TABLE lead_status_log (
     LogID INTEGER PRIMARY KEY, dedup_key TEXT, StatusDate TEXT,
     LeadStatus TEXT, Status TEXT)");
 
 // --- leads --------------------------------------------------------------------
 // A: log Interested (old) -> Closed (new)  => latest = Closed
-// B: no log, current field = Interested    => latest = Interested (fallback)
+// B: no log at all                          => never matches
 // C: two entries SAME date, LogID tie-break => latest = higher LogID (Won)
 // D: newest entry soft-deleted (Status=N)   => latest active = Interested
-// E: no log, no current field               => never matches
-$pdo->exec("INSERT INTO ghl_contacts (id, dedup_key, lead_status) VALUES
-    (1, 'k-a', 'Interested'),
-    (2, 'k-b', 'Interested'),
-    (3, 'k-c', NULL),
-    (4, 'k-d', 'New'),
-    (5, 'k-e', NULL)");
+// E: no log at all                          => never matches
+$pdo->exec("INSERT INTO ghl_contacts (id, dedup_key) VALUES
+    (1, 'k-a'),
+    (2, 'k-b'),
+    (3, 'k-c'),
+    (4, 'k-d'),
+    (5, 'k-e')");
 $pdo->exec("INSERT INTO lead_status_log (LogID, dedup_key, StatusDate, LeadStatus, Status) VALUES
     (10, 'k-a', '2026-08-01', 'Interested', 'Y'),
     (11, 'k-a', '2026-08-05', 'Closed',     'Y'),
@@ -53,13 +53,10 @@ function matched_ids(PDO $pdo, $gc_dedup, array $picked) {
             AND NOT EXISTS (SELECT 1 FROM lead_status_log lsl2
                 WHERE lsl2.Status = 'Y' AND lsl2.dedup_key = {$gc_dedup}
                 AND (lsl2.StatusDate > lsl.StatusDate
-                    OR (lsl2.StatusDate = lsl.StatusDate AND lsl2.LogID > lsl.LogID))))
-        OR ( gc.lead_status IN ({$ph})
-            AND NOT EXISTS (SELECT 1 FROM lead_status_log lsl3
-                WHERE lsl3.Status = 'Y' AND lsl3.dedup_key = {$gc_dedup})) )
+                    OR (lsl2.StatusDate = lsl.StatusDate AND lsl2.LogID > lsl.LogID)))) )
         ORDER BY gc.id";
     $stmt = $pdo->prepare($sql);
-    $stmt->execute(array_merge($picked, $picked)); // latest-log IN, then fallback IN
+    $stmt->execute($picked); // latest-log IN only (no current-status fallback)
     return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
 }
 
@@ -73,9 +70,10 @@ function assert_eq($label, $expected, $actual) {
     }
 }
 
-// A's latest is Closed, not Interested — the whole point of the fix.
-assert_eq('Interested: only no-log fallback (B) + soft-delete survivor (D)',
-    array(2, 4), matched_ids($pdo, $gc_dedup, array('Interested')));
+// A's latest is Closed, not Interested; only D's latest active entry is Interested.
+// B (no log) never matches now that the current-status fallback is gone.
+assert_eq('Interested: soft-delete survivor (D) only',
+    array(4), matched_ids($pdo, $gc_dedup, array('Interested')));
 
 // A surfaces only under its LATEST status.
 assert_eq('Closed: latest of A only', array(1), matched_ids($pdo, $gc_dedup, array('Closed')));
@@ -87,9 +85,7 @@ assert_eq('Won: C tie-break by LogID', array(3), matched_ids($pdo, $gc_dedup, ar
 assert_eq('Closed+Won multi-select', array(1, 3),
     matched_ids($pdo, $gc_dedup, array('Closed', 'Won')));
 
-// Fallback status only counts when the lead has no log at all (A had 'New'? no,
-// A's field is Interested but it HAS a log, so 'New' matches only D's field...
-// D has a log, so its field must NOT count — 'New' matches nobody).
-assert_eq('New: field ignored when a log exists', array(), matched_ids($pdo, $gc_dedup, array('New')));
+// A status never held in any log matches nobody.
+assert_eq('New: matches nobody', array(), matched_ids($pdo, $gc_dedup, array('New')));
 
 echo "\nAll assertions passed.\n";

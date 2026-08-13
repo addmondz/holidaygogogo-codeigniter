@@ -58,6 +58,7 @@ class Manual_Leads extends MY_Controller
 		$data['client_types']   = ghl_manual_lead_client_types();
 		$data['pax_options']    = ghl_manual_lead_pax_options();
 		$data['states']         = ghl_manual_lead_states();
+		$data['country_codes']  = $this->Booking_Model->Read_Country_Codes(); // dial-code picker
 		$data['lc_can_edit']    = lc_can_edit('manual_leads');
 		$this->load->view('layout/header', $titles);
 		$this->load->view('guests/index', $data);
@@ -98,7 +99,7 @@ class Manual_Leads extends MY_Controller
 		// Creator is taken from the session, NEVER from the POST body.
 		$created_by = (int) $this->session->userdata('admin_id');
 
-		$prepared = ghl_manual_lead_prepare($this->input->post(), $uid, $now, $created_by);
+		$prepared = ghl_manual_lead_prepare($this->input->post(), $uid, $now, $created_by, true);
 
 		if (!$prepared['ok']) {
 			$this->session->set_flashdata('ghl_lead_error', implode(' ', $prepared['errors']));
@@ -154,6 +155,26 @@ class Manual_Leads extends MY_Controller
 	}
 
 	/**
+	 * Seed the single "LEAD STATUS" cell from a bulk-import row as the lead's first
+	 * dated Lead Status log entry (status lives only in lead_status_log now — there
+	 * is no current-status column). Dated the import time. A blank or invalid status
+	 * is skipped silently: the lead is already saved, so a bad status must not fail
+	 * the import.
+	 */
+	private function Seed_Import_Status($new_id, $raw_status, $created_by, $now)
+	{
+		$st = lead_status_log_validate_status((string) $raw_status);
+		if (!$st['ok']) {
+			return; // blank / invalid -> lead simply starts with no status
+		}
+		$dedup_key = $this->Ghl_Contacts_Model->effective_dedup_key($new_id);
+		if ($dedup_key === null) {
+			return;
+		}
+		$this->Guests_Model->Add_Lead_Status_Log($dedup_key, substr((string) $now, 0, 10), $st['value'], '', $created_by);
+	}
+
+	/**
 	 * Update an existing hand-entered ("Manual") lead from the Edit Lead modal
 	 * (the same form as Create, in edit mode). POST dedup_key + the lead fields.
 	 * The lead must be visible to the current viewer (Read_Manual_Lead_Detail
@@ -188,7 +209,7 @@ class Manual_Leads extends MY_Controller
 		// the create-only keys (contact_id, lead_source, created_by, date_added),
 		// so passing the empty uid / null creator here is harmless.
 		$now = date('Y-m-d H:i:s');
-		$prepared = ghl_manual_lead_prepare($this->input->post(), '', $now, null);
+		$prepared = ghl_manual_lead_prepare($this->input->post(), '', $now, null, true);
 		if (!$prepared['ok']) {
 			$this->session->set_flashdata('ghl_lead_error', implode(' ', $prepared['errors']));
 			redirect(base_url('Manual_Leads'));
@@ -241,7 +262,6 @@ class Manual_Leads extends MY_Controller
 			'nationality'   => $row->nationality,
 			'source'        => $row->source,
 			'customer_type' => $row->customer_type,
-			'lead_status'   => $row->lead_status,
 			'lead_intro'    => $row->lead_intro,
 			'notes'         => $row->notes,
 			'nature_of_business' => $row->nature_of_business,
@@ -305,7 +325,6 @@ class Manual_Leads extends MY_Controller
 			'source'        => $row->source,
 			'customer_type' => $row->customer_type,
 			'lead_intro'    => $row->lead_intro,
-			'lead_status'   => $row->lead_status,
 			'notes'         => $row->notes,
 			'nature_of_business' => $row->nature_of_business,
 			'number_of_pax' => $row->number_of_pax,
@@ -530,8 +549,13 @@ class Manual_Leads extends MY_Controller
 				$failed[] = 'row ' . $line . ($name !== '' ? ' (' . $name . ')' : '') . ' — ' . implode(' ', $prepared['errors']);
 				continue;
 			}
-			if ($this->Ghl_Contacts_Model->create_manual_lead($prepared['row'])) {
+			$new_id = $this->Ghl_Contacts_Model->create_manual_lead($prepared['row']);
+			if ($new_id) {
 				$created++;
+				// The single "LEAD STATUS" cell becomes the lead's first dated status
+				// log entry (status lives only in lead_status_log now). Dated today;
+				// skipped when blank/invalid so a bad status never fails the import.
+				$this->Seed_Import_Status((int) $new_id, (string) ($post['lead_status'] ?? ''), $created_by, $now);
 			} else {
 				$failed[] = 'row ' . $line . ' — could not save';
 			}

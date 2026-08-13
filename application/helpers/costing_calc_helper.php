@@ -165,6 +165,98 @@ if (!function_exists('costing_build_snapshot_rows')) {
     }
 }
 
+if (!function_exists('costing_multiplier_types')) {
+    /**
+     * How a cost line scales, code => human label. Stored on the item master and
+     * copied onto each snapshot cost row. "Per Day" multiplies by the package
+     * duration_days, "Per Pax" by the booking total_pax, "Fixed" by 1.
+     *
+     * @return array<string,string>
+     */
+    function costing_multiplier_types()
+    {
+        return [
+            'per_day' => 'Per Day',
+            'per_pax' => 'Per Pax',
+            'fixed'   => 'Fixed',
+        ];
+    }
+}
+
+if (!function_exists('costing_normalize_multiplier_type')) {
+    /**
+     * Clamp a multiplier type to a known code, defaulting to 'fixed'.
+     *
+     * @param mixed $type
+     * @return string one of per_day|per_pax|fixed
+     */
+    function costing_normalize_multiplier_type($type)
+    {
+        $type = strtolower(trim((string) $type));
+        return array_key_exists($type, costing_multiplier_types()) ? $type : 'fixed';
+    }
+}
+
+if (!function_exists('costing_multiplier_count')) {
+    /**
+     * The count a line is multiplied by, from its multiplier type. Per-day uses
+     * the package duration, per-pax uses the booking pax, fixed is always 1.
+     * Never below 0.
+     *
+     * @param string $multiplier_type
+     * @param int    $duration_days
+     * @param int    $total_pax
+     * @return int
+     */
+    function costing_multiplier_count($multiplier_type, $duration_days, $total_pax)
+    {
+        switch (costing_normalize_multiplier_type($multiplier_type)) {
+            case 'per_day':
+                return max(0, (int) $duration_days);
+            case 'per_pax':
+                return max(0, (int) $total_pax);
+            case 'fixed':
+            default:
+                return 1;
+        }
+    }
+}
+
+if (!function_exists('costing_row_myr')) {
+    /**
+     * Convert one cost line the way the cost template shows it: the foreign Cost
+     * is converted to MYR and the per-unit bank charge is baked in ("MYR (convert)
+     * — already include bank charges"), then multiplied by the count (No of Day /
+     * No of pax) to give the line Total in MYR.
+     *
+     *   myr_per_unit = round(cost_foreign * rate, 2) + bank_charges_myr
+     *   total_myr    = round(myr_per_unit * count, 2)
+     *
+     * @param float $cost_foreign     unit cost in the row's currency
+     * @param float $rate             rate_to_myr for that currency (>=0)
+     * @param float $bank_charges_myr per-unit bank charge already in MYR (>=0)
+     * @param float $count            No of Day / No of pax / 1
+     * @return array ['myr_per_unit','total_myr'] (floats, 2dp)
+     */
+    function costing_row_myr($cost_foreign, $rate, $bank_charges_myr, $count)
+    {
+        $rate = (float) $rate;
+        if ($rate < 0) {
+            $rate = 0.0;
+        }
+        $bank = max(0.0, (float) $bank_charges_myr);
+        $count = max(0.0, (float) $count);
+
+        $myr_per_unit = round((float) $cost_foreign * $rate, 2) + $bank;
+        $total_myr    = round($myr_per_unit * $count, 2);
+
+        return [
+            'myr_per_unit' => round($myr_per_unit, 2),
+            'total_myr'    => $total_myr,
+        ];
+    }
+}
+
 if (!function_exists('costing_normalize_rate')) {
     /**
      * Normalise a user-entered / prefilled rate: MYR is always 1.0, non-positive

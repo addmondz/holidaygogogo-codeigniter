@@ -729,6 +729,12 @@ if (!function_exists('guest_list_ghl_suppressed_by_filters')) {
         if (guest_list_any_filter_set($get, guest_list_customer_only_segment_keys())) {
             return true;
         }
+        // "Family with kids" reads a booking's child/infant count; a GHL lead has
+        // no booking, so it can never satisfy it — drop the GHL branch. (It still
+        // applies on the booking / leader-fallback / customer branches.)
+        if (guest_list_flag_on($get, 'family_kids')) {
+            return true;
+        }
         // Guest Role is multi-select: a lead only ever holds the "Lead" role, so
         // any role filter that does NOT include "Lead" can never match a lead.
         $roles = isset($get['role']) ? guest_list_multi_values($get['role']) : array();
@@ -1048,6 +1054,52 @@ if (!function_exists('guest_list_cancel_predicate')) {
     }
 }
 
+if (!function_exists('guest_list_lock_predicate')) {
+    /**
+     * The Guest List dashboard shows guests only from bookings whose guest list
+     * is CURRENTLY locked (booking.LockStatus = 'Y'). A list that was never
+     * locked, or was locked and later unlocked (LockStatus back to 'N'), is
+     * excluded — LockStatus only ever holds the current state, so "= 'Y'"
+     * covers both cases.
+     *
+     * This is scoped to the Guest List page (mode 'guest') on purpose: the
+     * campaign picker ('all') and the GHL / Manual lead pages must not be
+     * narrowed to locked bookings, so the predicate is empty there.
+     *
+     * @param string $mode The listing mode ('guest', 'all', 'ghl', 'manual').
+     * @param string $col  The lock-status column (e.g. 'b.LockStatus'). Trusted,
+     *                     code-supplied.
+     * @return string SQL fragment prefixed with AND (safe to append), or '' when
+     *                the mode is not the Guest List dashboard.
+     */
+    function guest_list_lock_predicate($mode, $col)
+    {
+        return $mode === 'guest' ? " AND {$col} = 'Y' " : '';
+    }
+}
+
+if (!function_exists('guest_list_member_only_predicate')) {
+    /**
+     * The Guest List dashboard lists Team MEMBERS only. A booking's Team Leader
+     * (the guest whose phone is the booking's own contact number) belongs to the
+     * Customer page, not the guest list, so their row is dropped here.
+     *
+     * Scoped to the Guest List page (mode 'guest'): the campaign picker ('all')
+     * still needs leaders as an audience, and the GHL / Manual lead pages have no
+     * leaders, so the predicate is empty for every mode but 'guest'.
+     *
+     * @param string $mode        The listing mode ('guest', 'all', 'ghl', 'manual').
+     * @param string $leader_expr The boolean "this row is the leader" SQL. Trusted,
+     *                            code-supplied (see Guests_Model::Leader_Match_Expr).
+     * @return string SQL fragment prefixed with AND (safe to append), or '' when
+     *                the mode is not the Guest List dashboard.
+     */
+    function guest_list_member_only_predicate($mode, $leader_expr)
+    {
+        return $mode === 'guest' ? " AND NOT ({$leader_expr}) " : '';
+    }
+}
+
 if (!function_exists('guest_list_customer_only_segment_keys')) {
     /**
      * The campaign "Customer type" value segments. These target the CUSTOMER
@@ -1062,7 +1114,13 @@ if (!function_exists('guest_list_customer_only_segment_keys')) {
      */
     function guest_list_customer_only_segment_keys()
     {
-        return array('min_purchases', 'ltv', 'booking_lead', 'consecutive_years', 'family_kids', 'cancelled');
+        // NOTE: "family_kids" is deliberately NOT here. Unlike the true
+        // per-customer aggregates below (purchase count, lifetime value, …), a
+        // child/infant lives on the booking itself, so a booking-guest row and a
+        // leader-fallback row CAN satisfy it. It therefore applies on every branch
+        // that has a booking (see Build_Branches / Build_Leader_Fallback_Branch),
+        // and only the GHL branch — a lead has no booking — suppresses it.
+        return array('min_purchases', 'ltv', 'booking_lead', 'consecutive_years', 'cancelled');
     }
 }
 

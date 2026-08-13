@@ -32,6 +32,7 @@ class Costing_Item extends MY_Controller
             'items'             => $this->Costing_Item_Model->Read_Items($filters),
             'currency_options'  => $this->Costing_Item_Model->Read_Currency_Options(),
             'categories'        => costing_categories(),
+            'multiplier_types'  => costing_multiplier_types(),
             'item_filters'      => $filters,
         );
 
@@ -52,6 +53,7 @@ class Costing_Item extends MY_Controller
             'id'                  => $item_id,
             'name'                => $this->input->post('name'),
             'category'            => $this->input->post('category'),
+            'multiplier_type'     => $this->input->post('multiplier_type'),
             'default_currency_id' => $this->input->post('default_currency_id'),
             'default_unit_cost'   => $this->input->post('default_unit_cost'),
         ));

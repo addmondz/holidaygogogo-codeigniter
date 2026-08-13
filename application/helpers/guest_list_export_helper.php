@@ -79,7 +79,6 @@ if (!function_exists('guest_list_export_columns')) {
 				array('NATURE OF BUSINESS', 'NatureOfBusiness'),
 				array('NUMBER OF PAX', 'NumberOfPax'),
 				array('STATE', 'State'),
-				array('CURRENT STATUS', 'CurrentStatus'),
 				array('LEAD STATUS UPDATES', 'StatusUpdates'),
 				array('LEAD INTRO', 'LeadIntro'),
 				array('NOTES', 'Notes'),

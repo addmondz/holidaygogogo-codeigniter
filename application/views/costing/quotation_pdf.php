@@ -5,13 +5,15 @@ defined('BASEPATH') OR exit('No direct script access allowed');
  * Customer-facing Quotation PDF (Dompdf). Layout mirrors the Booking Confirmation
  * PDF (application/views/booking/booking_confirmation.php): embedded logo header,
  * company block, title + No. row, a details table, itemised rows (here: the per-day
- * itinerary), and a totals footer. Shows the total selling price in MYR only —
- * cost, margin, currency snapshot, and profit are internal and NOT rendered.
+ * itinerary), a per-item "Package Includes" list with each line's selling price,
+ * and a totals footer. All prices are the customer-facing selling price in MYR —
+ * raw cost, margin %, currency snapshot, and profit stay internal and are NOT rendered.
  */
 $company    = isset($company) && is_array($company) ? $company : array();
 $booking    = isset($booking) ? $booking : array();
 $package    = isset($package) ? $package : array();
 $itinerary  = isset($itinerary) ? $itinerary : array();
+$items      = isset($items) ? $items : array();
 $financials = isset($financials) ? $financials : array();
 $public_ref = isset($public_ref) ? $public_ref : '';
 
@@ -107,7 +109,31 @@ if (is_file($logoPath)) {
         </tr>
     </table>
 
-    <hr style="margin-bottom:0px;">
+    <?php if (!empty($items)) { ?>
+        <hr style="margin-bottom:0px;">
+        <table style="width:100%; font-size:13px;">
+            <tr style="font-weight:700;">
+                <td style="width:8%;">No.</td>
+                <td style="width:62%;">Package Includes</td>
+                <td style="width:30%; text-align:right;">Price (RM)</td>
+            </tr>
+        </table>
+        <hr style="margin-top:0px; margin-bottom:5px;">
+        <table style="width:100%; font-size:12px; border-spacing:0;">
+            <?php $item_no = 0; ?>
+            <?php foreach ($items as $line) { ?>
+                <?php if (trim((string) $line['name']) === '') { continue; } ?>
+                <?php $item_no++; ?>
+                <tr style="vertical-align:baseline;">
+                    <td style="width:8%; padding:3px 0;"><?php echo $item_no; ?></td>
+                    <td style="width:62%; padding:3px 0;"><?php echo html_escape($line['name']); ?></td>
+                    <td style="width:30%; text-align:right; padding:3px 0;"><?php echo number_format((float) $line['selling'], 2, '.', ','); ?></td>
+                </tr>
+            <?php } ?>
+        </table>
+    <?php } ?>
+
+    <hr style="margin-bottom:0px; margin-top:10px;">
     <table style="width:100%; font-size:13px;">
         <tr style="font-weight:700;">
             <td style="width:8%;">Day</td>

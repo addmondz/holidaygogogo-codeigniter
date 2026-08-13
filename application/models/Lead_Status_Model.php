@@ -1,8 +1,9 @@
 <?php
 /**
  * Lead Status presets store (table: lead_status). Mirrors Customer_Type_Model.
- * Manual leads store the chosen status by NAME in ghl_contacts.lead_status, so a
- * rename cascades onto those rows to keep the stored string valid.
+ * Manual leads record the chosen status by NAME in the dated lead_status_log
+ * (lead_status_log.LeadStatus), so a rename cascades onto those log rows to keep
+ * the stored string valid.
  */
 class Lead_Status_Model extends CI_Model
 {
@@ -43,10 +44,11 @@ class Lead_Status_Model extends CI_Model
 				continue;
 			}
 			$old = $this->db->select('Name')->where('LeadStatusID', $row['LeadStatusID'])->get('lead_status')->row_array();
-			// Manual leads reference the status by name; carry a rename onto them.
+			// Manual leads reference the status by name in the dated status log;
+			// carry a rename onto those log entries so the stored string stays valid.
 			if($old && $old['Name'] !== $row['Name']) {
-				$this->db->where('lead_status', $old['Name']);
-				$this->db->update('ghl_contacts', ['lead_status' => $row['Name']]);
+				$this->db->where('LeadStatus', $old['Name']);
+				$this->db->update('lead_status_log', ['LeadStatus' => $row['Name']]);
 			}
 		}
 

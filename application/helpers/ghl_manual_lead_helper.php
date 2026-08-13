@@ -1,6 +1,10 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 
+// Country-code phone helpers (combine picker code + local number into the stored
+// "+60 123456789" shape). Pulled in here so create + bulk-import share it.
+require_once __DIR__ . '/phone_country_helper.php';
+
 /**
  * Prepare a hand-entered ("Manual") GHL lead for insertion into ghl_contacts.
  *
@@ -22,15 +26,18 @@ defined('BASEPATH') OR exit('No direct script access allowed');
  *
  * @param array  $post request fields (first_name,last_name,company_name,phone,
  *                     email,address,gender,chat_language,race,nationality,country,
- *                     source,tags,notes,customer_type,lead_intro,lead_status,
- *                     date_of_birth)
+ *                     source,tags,notes,customer_type,lead_intro,date_of_birth).
+ *                     NOTE: a lead's status is NOT a ghl_contacts column — it lives
+ *                     in the dated lead_status_log. Any 'lead_status' POST key is
+ *                     ignored here; the caller seeds it into the log (see
+ *                     Manual_Leads::Seed_Status_Log / the bulk Import loop).
  * @param string $uid  a unique suffix for the synthetic contact_id (caller supplies)
  * @param string $now  'Y-m-d H:i:s' capture time (caller supplies)
  * @param int|null $created_by admin id of the creator (caller supplies from the
  *                     session — NEVER from $post; drives per-creator visibility)
  * @return array{ok:bool,errors:string[],row:array}
  */
-function ghl_manual_lead_prepare($post, $uid, $now, $created_by = null)
+function ghl_manual_lead_prepare($post, $uid, $now, $created_by = null, $require_country_code = false)
 {
     $post = is_array($post) ? $post : array();
 
@@ -41,8 +48,13 @@ function ghl_manual_lead_prepare($post, $uid, $now, $created_by = null)
     $first_name = $get('first_name');
     $last_name  = $get('last_name');
     $company    = $get('company_name');
-    $phone      = $get('phone');
-    $email      = $get('email');
+    // The create/edit form posts the dial code and the local number separately;
+    // combine them into the stored "+60 123456789" shape. Bulk import posts a
+    // single 'phone' with no code, which passes through unchanged.
+    $phone_local = $get('phone');
+    $phone_code  = $get('phone_country_code');
+    $phone       = phone_country_combine($phone_code, $phone_local);
+    $email       = $get('email');
     $address    = $get('address');
     $gender     = $get('gender');
     $language   = $get('chat_language');
@@ -53,7 +65,6 @@ function ghl_manual_lead_prepare($post, $uid, $now, $created_by = null)
     $notes      = $get('notes');
     $customer_type = $get('customer_type');
     $lead_intro = $get('lead_intro');
-    $lead_status = $get('lead_status');
     $nature     = $get('nature_of_business');
     $number_of_pax = $get('number_of_pax');
     $client_type = $get('client_type');
@@ -66,6 +77,12 @@ function ghl_manual_lead_prepare($post, $uid, $now, $created_by = null)
     // A lead must carry at least one identifying value, else it is a blank row.
     if ($first_name === '' && $last_name === '' && $phone === '' && $email === '') {
         $errors[] = 'Enter at least a name, contact number or email.';
+    }
+
+    // Create/edit form: a contact number must carry a country code. Bulk import
+    // (require flag off) keeps accepting a bare number, unchanged.
+    if ($require_country_code && $phone_local !== '' && ! phone_country_has_code($phone)) {
+        $errors[] = 'Please select the phone country code.';
     }
 
     if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
@@ -104,7 +121,6 @@ function ghl_manual_lead_prepare($post, $uid, $now, $created_by = null)
         'notes'         => $notes !== '' ? $notes : null,
         'customer_type' => $customer_type !== '' ? $customer_type : null,
         'lead_intro'    => $lead_intro !== '' ? $lead_intro : null,
-        'lead_status'   => $lead_status !== '' ? $lead_status : null,
         'nature_of_business' => $nature !== '' ? $nature : null,
         'number_of_pax' => $number_of_pax !== '' ? $number_of_pax : null,
         'client_type'   => $client_type !== '' ? $client_type : null,

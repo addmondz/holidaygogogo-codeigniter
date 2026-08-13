@@ -1,3 +1,4 @@
+<?php $this->load->view('partials/phone_country_picker_assets'); ?>
 <div class="d-flex flex-column-fluid">
     <div class="container-fluid">
         <div class="card card-custom mb-5">
@@ -36,10 +37,36 @@
                         <div class="col-md-6">
                             <div class="form-group">
                                 <label>Phone</label>
-                                <div class="input-icon">
-                                    <input type="text" id="phone_number" <?php if(current_url() == base_url('Customer/Update')) { ?> value="<?php echo $phone_number; ?>" <?php } ?> autocomplete="off" class="form-control">
-                                    <span><i class="la la-phone"></i></span>
+                                <?php
+                                    // Stored phone is "+60 123456789"; split it so the dial-code
+                                    // picker and the local number field pre-fill on edit.
+                                    $__stored_phone = (current_url() == base_url('Customer/Update')) ? (isset($phone_number) ? $phone_number : '') : '';
+                                    $__phone = phone_country_split($__stored_phone);
+                                ?>
+                                <div class="phone-input-wrapper" data-picker id="cust_phone_wrapper">
+                                    <div class="phone-country-selector">
+                                        <span class="phone-country-flag">🌐</span>
+                                        <span class="phone-country-code">--</span>
+                                        <span class="phone-country-arrow">▼</span>
+                                    </div>
+                                    <input type="text" id="phone_local" value="<?php echo htmlspecialchars($__phone['local'], ENT_QUOTES); ?>" autocomplete="off" class="phone-input-field" placeholder="Enter phone number">
+                                    <input type="hidden" id="phone_country_code" class="phone-code-value" value="<?php echo htmlspecialchars($__phone['code'] !== '' ? $__phone['code'] : '+60', ENT_QUOTES); ?>">
+                                    <div class="phone-dropdown">
+                                        <div class="phone-dropdown-search">
+                                            <input type="text" class="phone-search" placeholder="Search country...">
+                                        </div>
+                                        <div class="phone-dropdown-list">
+                                            <?php foreach((isset($country_codes) ? $country_codes : array()) as $cc) { ?>
+                                            <div class="phone-dropdown-item" data-code="<?php echo htmlspecialchars($cc->CountryCode, ENT_QUOTES); ?>" data-country="<?php echo htmlspecialchars(strtolower($cc->Country), ENT_QUOTES); ?>" data-country-name="<?php echo htmlspecialchars($cc->Country, ENT_QUOTES); ?>">
+                                                <span class="phone-dropdown-item-flag">🌐</span>
+                                                <span class="phone-dropdown-item-name"><?php echo htmlspecialchars($cc->Country); ?></span>
+                                                <span class="phone-dropdown-item-code"><?php echo htmlspecialchars($cc->CountryCode); ?></span>
+                                            </div>
+                                            <?php } ?>
+                                        </div>
+                                    </div>
                                 </div>
+                                <span class="form-text text-muted">Pick the country code, then enter the number.</span>
                             </div>
                         </div>
                         <div class="col-md-6">
@@ -157,7 +184,11 @@
             if(action.isConfirmed) {
                 var name = ($('#name').val()).toUpperCase();
                 var AltName = ($('#AltName').val()).toUpperCase();
-                var phone_number = $('#phone_number').val();
+                // Phone is entered as a dial-code picker + local number; combine into
+                // the stored "+60 123456789" shape.
+                var phone_code = $('#phone_country_code').val();
+                var phone_local = $('#phone_local').val();
+                var phone_number = combinePhone(phone_code, phone_local);
                 var ChatLanguage = $('#ChatLanguage').val();
                 var CustomerCode = $('#CustomerCode').val();
                 var ic_passport_no = ($('#ic_passport_no').val()).toUpperCase();
@@ -169,6 +200,8 @@
 
                 if(name == '') {
                     Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', 'Please Insert All Required Customer Information', null);
+                } else if($.trim(phone_local) !== '' && $.trim(phone_code) === '') {
+                    Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', 'Please select the phone country code.', null);
                 } else {
                     if(window.location.href == '<?php echo base_url('Customer/Create'); ?>') {
                         var customer = [{
@@ -197,12 +230,18 @@
                                 if(!key) { continue; }
                                 // Destinations is a separate top-level param, not a customer column.
                                 if(key === 'Destinations') { continue; }
+                                // Phone picker fields are not customer columns; the combined
+                                // phone_number is handled separately below.
+                                if(key === 'phone_country_code' || key === 'phone_local') { continue; }
                                 // Email and billing address are case-sensitive; keep as typed.
                                 var preserveCase = (key === 'PrimaryEmail' || key === 'Address');
                                 var value = preserveCase ? dirty_fields[i].value : (dirty_fields[i].value).toUpperCase();
                                 customer[0][key] = value;
                             }
                         }
+                        // Phone is rebuilt from the picker; send it only when it changed.
+                        var phoneChanged = (phone_number !== INITIAL_PHONE);
+                        if(phoneChanged) { customer[0].phone_number = phone_number; }
                         count = 0;
                         $.each(customer[0], function() {
                             count++;
@@ -210,7 +249,7 @@
                         // Did the destination selection change vs what was loaded?
                         var destChanged = JSON.stringify(destinations.slice().sort())
                             !== JSON.stringify(INITIAL_DESTINATIONS.slice().sort());
-                        if(count == 1 && !destChanged) {
+                        if(count == 1 && !destChanged && !phoneChanged) {
                             Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', '<?php echo 'No Changes Detected In Customer Record : ' . str_replace('\'', '', $name); ?>', '<?php echo base_url('Customer') ?>');
                         } else {
                             Submit_Customer('<?php echo base_url('Customer/Update') ?>', customer[0].CustomerID, customer, destinations);
@@ -230,6 +269,23 @@
     // Destination CategoryIDs loaded for this record (Update pre-select), so we can
     // tell whether the selection changed even when no customer field is dirty.
     var INITIAL_DESTINATIONS = <?php echo json_encode(array_map('strval', isset($selected_destinations) ? (array) $selected_destinations : array())); ?>;
+
+    // The phone as originally stored ("+60 123456789" or ''), so we can tell
+    // whether the picker changed even when no other field is dirty.
+    var INITIAL_PHONE = <?php echo json_encode(isset($__stored_phone) ? $__stored_phone : ''); ?>;
+
+    // Combine the dial-code picker + local number into the stored shape. Mirrors
+    // the server phone_country_combine(): drops a single leading trunk "0"; with
+    // no code the local number passes through unchanged.
+    function combinePhone(code, local) {
+        local = $.trim(local == null ? '' : ('' + local));
+        code  = $.trim(code == null ? '' : ('' + code));
+        if(local === '') { return ''; }
+        if(code === '') { return local; }
+        if(local.charAt(0) === '0') { local = local.substring(1); }
+        if(local === '') { return code; }
+        return code + ' ' + local;
+    }
 
     function Submit_Customer(url, customer_id, customer, destinations) {
         $.ajax({

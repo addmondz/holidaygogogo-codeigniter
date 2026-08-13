@@ -6,7 +6,8 @@ defined('BASEPATH') OR exit('No direct script access allowed');
  * Booking_Confirmation / Travel_Voucher this extends CI_Controller (no staff
  * login) so the shareable link works for customers; access is guarded solely by
  * the unguessable costing_bookings.quotation_token. Shows the tour, per-day
- * itinerary, and total selling price (MYR) only — no cost/margin/profit/snapshot.
+ * itinerary, a per-item "Package Includes" list at customer selling prices, and the
+ * total selling price (MYR) — raw cost/margin/profit/snapshot stay hidden.
  *
  *   /Costing_Quotation?token=XXXX
  */

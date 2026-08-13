@@ -149,11 +149,44 @@ $assertions['e2e: selling 1430'] = $approx($e_fin['selling'], 1430.00);
 $assertions['e2e: profit 130']   = $approx($e_fin['profit'], 130.00);
 
 /* ------------------------------------------------------------------ *
+ * 6b) MULTIPLIER TYPES + ROW MYR (cost template)                      *
+ * ------------------------------------------------------------------ */
+
+$mult = costing_multiplier_types();
+$assertions['mult: 3 types']              = (count($mult) === 3);
+$assertions['mult: keys per_day/pax/fix'] = (isset($mult['per_day'], $mult['per_pax'], $mult['fixed']));
+$assertions['mult: label per day']        = ($mult['per_day'] === 'Per Day');
+
+$assertions['mult: normalize unknown -> fixed'] = (costing_normalize_multiplier_type('bogus') === 'fixed');
+$assertions['mult: normalize trims/cases']      = (costing_normalize_multiplier_type(' Per_Pax ') === 'per_pax');
+
+$assertions['mult: per_day uses duration'] = (costing_multiplier_count('per_day', 5, 20) === 5);
+$assertions['mult: per_pax uses pax']      = (costing_multiplier_count('per_pax', 5, 20) === 20);
+$assertions['mult: fixed is 1']            = (costing_multiplier_count('fixed', 5, 20) === 1);
+$assertions['mult: negative clamped to 0'] = (costing_multiplier_count('per_day', -3, 20) === 0);
+
+// Image case: USD 30 @ rate 4 (no bank charge) -> 120/unit, No of Day 5 -> 600.
+$img = costing_row_myr(30, 4.0, 0, 5);
+$assertions['row: USD30@4 -> 120/unit'] = $approx($img['myr_per_unit'], 120.00);
+$assertions['row: 120 x 5 days -> 600'] = $approx($img['total_myr'], 600.00);
+
+// Bank charge is baked into per-unit MYR and multiplied by the count.
+$bc = costing_row_myr(100, 4.5, 10, 3);
+$assertions['row: 100@4.5 + 10 bank -> 460/unit'] = $approx($bc['myr_per_unit'], 460.00);
+$assertions['row: 460 x 3 -> 1380']               = $approx($bc['total_myr'], 1380.00);
+
+$assertions['row: fixed count 1']        = $approx(costing_row_myr(100, 4.5, 0, 1)['total_myr'], 450.00);
+$assertions['row: zero count -> 0 total'] = $approx(costing_row_myr(100, 4.5, 10, 0)['total_myr'], 0.00);
+$assertions['row: negative rate -> 0 rate'] = $approx(costing_row_myr(100, -4.5, 0, 1)['total_myr'], 0.00);
+$assertions['row: negative bank clamped'] = $approx(costing_row_myr(100, 4.5, -10, 1)['myr_per_unit'], 450.00);
+$assertions['row: rounds per-unit 2dp']   = $approx(costing_row_myr(10.005, 1.0, 0, 1)['myr_per_unit'], 10.01);
+
+/* ------------------------------------------------------------------ *
  * 7) SOURCE CONTRACT                                                  *
  * ------------------------------------------------------------------ */
 
 $helper = @file_get_contents(__DIR__ . '/../../application/helpers/costing_calc_helper.php');
-foreach (['costing_categories', 'costing_line_to_myr', 'costing_sum_by_category', 'costing_apply_markup', 'costing_build_snapshot_rows', 'costing_normalize_rate'] as $fn) {
+foreach (['costing_categories', 'costing_line_to_myr', 'costing_sum_by_category', 'costing_apply_markup', 'costing_build_snapshot_rows', 'costing_normalize_rate', 'costing_multiplier_types', 'costing_multiplier_count', 'costing_row_myr'] as $fn) {
     $assertions["helper: defines {$fn}()"] = (bool) preg_match('/function\s+' . preg_quote($fn, '/') . '\s*\(/', (string) $helper);
 }
 

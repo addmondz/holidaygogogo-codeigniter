@@ -21,6 +21,7 @@ class Customer extends MY_Controller
 		$this->load->model('Ghl_Messages_Model');  // WhatsApp message-log badges
 		$this->load->helper('customer_code');      // can_edit_customer_code() for the form + guard
 		$this->load->helper('guest_contact');      // filter/format helpers used by the shared view
+		$this->load->helper('phone_country');      // dial-code picker combine/split for the create/edit form
 	}
 
 	/**
@@ -41,8 +42,7 @@ class Customer extends MY_Controller
 		$data['msg_log_phones'] = $this->Ghl_Messages_Model->Phones_With_Messages_For_Guests($data['guests']);
 		$data['remark_counts']   = $this->Remark_Counts_For_Guests($data['guests']);
 		$data['chat_counts']     = $this->Chat_Counts_For_Guests($data['guests']);
-		$data['campaign_counts'] = $this->Campaign_Info_For_Guests($data['guests'], 'count');
-		$data['campaign_hidden'] = $this->Campaign_Info_For_Guests($data['guests'], 'hidden');
+		$data['campaign_counts'] = $this->Campaign_Info_For_Guests($data['guests']);
 		$data['attached_destinations'] = $this->Attached_Destinations_For_Guests($data['guests']);
 		$data['total']          = null; // AJAX-loaded via Count(), like Guests/Ghl_Leads
 		$data['page']           = $page;
@@ -141,11 +141,10 @@ class Customer extends MY_Controller
 	}
 
 	/**
-	 * dedup_key => campaign count ('count') or opted-out flag ('hidden') map for
-	 * the rows on this page, badging the Action ▸ Campaigns item and pre-checking
-	 * its visibility toggle without a per-row query.
+	 * dedup_key => count of campaigns the person joined, for the rows on this
+	 * page — badges the Action ▸ Campaigns item without a per-row query.
 	 */
-	private function Campaign_Info_For_Guests($guests, $which)
+	private function Campaign_Info_For_Guests($guests)
 	{
 		$keys = array();
 		foreach ((array) $guests as $g) {
@@ -153,9 +152,7 @@ class Customer extends MY_Controller
 				$keys[] = $g->dedup_key;
 			}
 		}
-		return ($which === 'hidden')
-			? $this->Guests_Model->Read_Campaign_Hidden_Flags($keys)
-			: $this->Guests_Model->Read_Campaign_Counts($keys);
+		return $this->Guests_Model->Read_Campaign_Counts($keys);
 	}
 
 	function Create()
@@ -170,6 +167,7 @@ class Customer extends MY_Controller
 				'name' => 'NA',
 				'destinations' => $this->Booking_Model->Read_Categories(),
 				'selected_destinations' => array(),
+				'country_codes' => $this->Booking_Model->Read_Country_Codes(),
 			);
 			$this->load->view('layout/header', $titles);
 			$this->load->view('customer/customer', $array);
@@ -221,6 +219,7 @@ class Customer extends MY_Controller
 				// Destination master list + this customer's currently attached ids.
 				$array['destinations'] = $this->Booking_Model->Read_Categories();
 				$array['selected_destinations'] = $this->Customer_Model->Read_Customer_Destination_Ids($array['CustomerID']);
+				$array['country_codes'] = $this->Booking_Model->Read_Country_Codes();
 				$titles = array('tab_title' => 'HolidayGoGoGo | Customer', 'breadcrumb_title' => 'Customer >> Update');
 				$this->load->view('layout/header', $titles);
 				$this->load->view('customer/customer', $array);

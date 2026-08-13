@@ -80,7 +80,9 @@ assert_eq('source', 'Facebook', $res['row']['source']);
 assert_eq('notes', 'Called twice, keen on Redang', $res['row']['notes']);
 assert_eq('customer_type', 'Company', $res['row']['customer_type']);
 assert_eq('lead_intro', 'Referred by existing client', $res['row']['lead_intro']);
-assert_eq('lead_status', 'New', $res['row']['lead_status']);
+// lead_status is no longer a stored column (status lives in lead_status_log);
+// a POST value must NOT leak into the insert row.
+assert_eq('lead_status not stored', false, array_key_exists('lead_status', $res['row']));
 // business fields: trimmed, empty => null
 assert_eq('nature_of_business trimmed', 'Travel Agency', $res['row']['nature_of_business']);
 assert_eq('number_of_pax', '11-20', $res['row']['number_of_pax']);
@@ -103,7 +105,7 @@ assert_eq('minimal source null', null, $min['row']['source']);
 assert_eq('minimal notes null', null, $min['row']['notes']);
 assert_eq('minimal customer_type null', null, $min['row']['customer_type']);
 assert_eq('minimal lead_intro null', null, $min['row']['lead_intro']);
-assert_eq('minimal lead_status null', null, $min['row']['lead_status']);
+assert_eq('minimal lead_status absent', false, array_key_exists('lead_status', $min['row']));
 assert_eq('minimal nature null', null, $min['row']['nature_of_business']);
 assert_eq('minimal number_of_pax null', null, $min['row']['number_of_pax']);
 assert_eq('minimal client_type null', null, $min['row']['client_type']);
@@ -151,6 +153,8 @@ $rowPost = ghl_manual_lead_row_to_post(array(
 ));
 assert_eq('row first_name', 'Ali', $rowPost['first_name']);
 assert_eq('row company', 'Acme', $rowPost['company_name']);
+// LEAD STATUS still maps into the POST (import seeds it as a log entry), even
+// though it is no longer stored on the ghl_contacts row.
 assert_eq('row lead_status', 'New', $rowPost['lead_status']);
 assert_eq('row client_type', 'HRDC', $rowPost['client_type']);
 assert_eq('row nature', 'Travel Agency', $rowPost['nature_of_business']);
@@ -159,7 +163,7 @@ assert_eq('row state', 'Selangor', $rowPost['state']);
 // feeding that mapped row straight into prepare() yields a valid insert row
 $rowPrepared = ghl_manual_lead_prepare($rowPost, 'bulk1', $now, 7);
 assert_eq('row prepares ok', true, $rowPrepared['ok']);
-assert_eq('row prepared status', 'New', $rowPrepared['row']['lead_status']);
+assert_eq('row prepared status absent', false, array_key_exists('lead_status', $rowPrepared['row']));
 assert_eq('row prepared client_type', 'HRDC', $rowPrepared['row']['client_type']);
 
 // header row is dropped (NAME + COMPANY NAME are the first two labels)
@@ -170,5 +174,28 @@ assert_eq('header dropped', null, ghl_manual_lead_row_to_post(array(
 assert_eq('blank row dropped', null, ghl_manual_lead_row_to_post(array('', '', '', '')));
 // non-array is dropped
 assert_eq('non-array dropped', null, ghl_manual_lead_row_to_post('nope'));
+
+// ---- country code: form posts dial code + local, combined into stored phone --
+$cc = ghl_manual_lead_prepare(array(
+    'first_name' => 'Siti', 'phone_country_code' => '+60', 'phone' => '0123456789',
+), 'ccp', $now, 7, true);
+assert_eq('cc combined stored', '+60 123456789', $cc['row']['phone']);
+assert_eq('cc ok with code', true, $cc['ok']);
+
+// require flag on + local number but NO code selected -> error
+$ccNo = ghl_manual_lead_prepare(array(
+    'first_name' => 'Siti', 'phone_country_code' => '', 'phone' => '0123456789',
+), 'ccn', $now, 7, true);
+assert_eq('cc missing code fails', false, $ccNo['ok']);
+assert_eq('cc missing code error', true, in_array('Please select the phone country code.', $ccNo['errors'], true));
+
+// no phone at all + require flag -> no country-code error (name identifies it)
+$ccBlank = ghl_manual_lead_prepare(array('first_name' => 'Siti'), 'ccb', $now, 7, true);
+assert_eq('cc blank phone ok', true, $ccBlank['ok']);
+
+// bulk import path (require flag OFF): bare number passes through unchanged
+$imp = ghl_manual_lead_prepare(array('first_name' => 'Siti', 'phone' => '0123456789'), 'imp', $now, 7);
+assert_eq('import bare phone ok', true, $imp['ok']);
+assert_eq('import bare phone stored', '0123456789', $imp['row']['phone']);
 
 echo "\nAll GhlManualLeadPrepare assertions passed.\n";

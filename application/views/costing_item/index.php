@@ -2,6 +2,7 @@
 $items = isset($items) ? $items : array();
 $currency_options = isset($currency_options) ? $currency_options : array();
 $categories = isset($categories) ? $categories : array();
+$multiplier_types = isset($multiplier_types) ? $multiplier_types : array('per_day' => 'Per Day', 'per_pax' => 'Per Pax', 'fixed' => 'Fixed');
 $item_filters = isset($item_filters) ? $item_filters : array('name' => '', 'category' => '');
 $filter_open = !empty($item_filters['name']) || !empty($item_filters['category']);
 
@@ -91,6 +92,7 @@ if (!function_exists('costing_item_category_label')) {
                                 <th style="text-align:center; width:70px;">No.</th>
                                 <th style="text-align:center; width:160px;">Category</th>
                                 <th style="text-align:center;">Item Name</th>
+                                <th style="text-align:center; width:130px;">Multiplier</th>
                                 <th style="text-align:center; width:120px;">Currency</th>
                                 <th style="text-align:center; width:180px;">Default Unit Cost</th>
                                 <th class="action" style="text-align:center; width:200px;">Action</th>
@@ -98,7 +100,7 @@ if (!function_exists('costing_item_category_label')) {
                         </thead>
                         <tbody>
                             <?php if (empty($items)) { ?>
-                                <tr><td colspan="6" style="text-align:center; padding:16px;">Items Not Found</td></tr>
+                                <tr><td colspan="7" style="text-align:center; padding:16px;">Items Not Found</td></tr>
                             <?php } else { $count = 1; ?>
                                 <?php foreach ($items as $item) { ?>
                                     <tr>
@@ -107,6 +109,10 @@ if (!function_exists('costing_item_category_label')) {
                                             <span class="label label-lg label-light-primary label-inline costing-item-cat-mark"><?php echo html_escape(costing_item_category_label($categories, $item['category'])); ?></span>
                                         </td>
                                         <td><div class="font-weight-bold text-dark"><?php echo html_escape($item['name']); ?></div></td>
+                                        <td style="text-align:center;">
+                                            <?php $mt = isset($item['multiplier_type']) ? (string) $item['multiplier_type'] : 'fixed'; ?>
+                                            <span class="label label-lg label-light-info label-inline"><?php echo html_escape(isset($multiplier_types[$mt]) ? $multiplier_types[$mt] : ucfirst($mt)); ?></span>
+                                        </td>
                                         <td style="text-align:center;"><?php echo html_escape($item['currency_code'] !== null ? $item['currency_code'] : '-'); ?></td>
                                         <td style="text-align:center;"><span class="font-weight-bold text-dark"><?php echo html_escape($item['currency_code']); ?> <?php echo number_format((float) $item['default_unit_cost'], 2); ?></span></td>
                                         <td>
@@ -152,6 +158,15 @@ if (!function_exists('costing_item_category_label')) {
                         </select>
                     </div>
                     <div class="form-group">
+                        <label>Multiplier</label>
+                        <select name="multiplier_type" id="modal_item_multiplier" class="form-control" required>
+                            <?php foreach ($multiplier_types as $key => $label) { ?>
+                                <option value="<?php echo html_escape($key); ?>"><?php echo html_escape($label); ?></option>
+                            <?php } ?>
+                        </select>
+                        <span class="form-text text-muted">Per Day multiplies by the package days, Per Pax by the number of pax, Fixed stays as one.</span>
+                    </div>
+                    <div class="form-group">
                         <label>Default Currency</label>
                         <select name="default_currency_id" id="modal_item_currency" class="form-control" required>
                             <?php foreach ($currency_options as $currency) { ?>
@@ -179,6 +194,7 @@ if (!function_exists('costing_item_category_label')) {
         var idInput = document.getElementById('modal_item_id');
         var nameInput = document.getElementById('modal_item_name');
         var categoryInput = document.getElementById('modal_item_category');
+        var multiplierInput = document.getElementById('modal_item_multiplier');
         var currencyInput = document.getElementById('modal_item_currency');
         var costInput = document.getElementById('modal_item_cost');
 
@@ -187,6 +203,7 @@ if (!function_exists('costing_item_category_label')) {
             idInput.value = '';
             nameInput.value = '';
             categoryInput.selectedIndex = 0;
+            multiplierInput.value = 'fixed';
             currencyInput.selectedIndex = 0;
             costInput.value = '0';
         }
@@ -201,6 +218,7 @@ if (!function_exists('costing_item_category_label')) {
                 idInput.value = item.id || '';
                 nameInput.value = item.name || '';
                 categoryInput.value = item.category || '';
+                multiplierInput.value = item.multiplier_type || 'fixed';
                 currencyInput.value = item.default_currency_id || '';
                 costInput.value = item.default_unit_cost || '0';
                 $('#item_modal').modal('show');

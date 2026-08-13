@@ -12,9 +12,9 @@ $packages = isset($packages) ? $packages : array();
                     </h3>
                 </div>
                 <div class="card-toolbar">
-                    <button type="button" class="btn btn-primary font-weight-bold mr-2" data-toggle="modal" data-target="#package_modal">
+                    <a href="<?php echo base_url('Costing/Create'); ?>" class="btn btn-primary font-weight-bold mr-2">
                         <i class="la la-plus"></i>Create Package
-                    </button>
+                    </a>
                     <a href="<?php echo base_url('Costing/Currency'); ?>" class="btn btn-light-primary font-weight-bold">
                         <i class="la la-coins"></i>Currency Setup
                     </a>
@@ -88,67 +88,6 @@ $packages = isset($packages) ? $packages : array();
                     </table>
                 </div>
             </div>
-        </div>
-    </div>
-</div>
-
-<div class="modal fade" id="package_modal" tabindex="-1" role="dialog" aria-hidden="true">
-    <div class="modal-dialog modal-lg" role="document">
-        <div class="modal-content">
-            <form method="post" action="<?php echo base_url('Costing/Save_Package'); ?>">
-                <div class="modal-header">
-                    <h5 class="modal-title">Create Package</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                        <i aria-hidden="true" class="ki ki-close"></i>
-                    </button>
-                </div>
-                <div class="modal-body">
-                    <input type="hidden" name="package_id" value="">
-                    <input type="hidden" name="return_to" value="workspace">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="form-group">
-                                <label>Package Name</label>
-                                <input type="text" name="name" class="form-control" required>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="form-group">
-                                <label>Days</label>
-                                <input type="number" min="1" name="duration_days" class="form-control" value="1" required>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="form-group">
-                                <label>Nights</label>
-                                <input type="number" min="0" name="duration_nights" class="form-control" value="0" required>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="row">
-                        <div class="col-md-4">
-                            <div class="form-group">
-                                <label>Status</label>
-                                <select name="status" class="form-control">
-                                    <option value="draft">Draft</option>
-                                    <option value="active">Active</option>
-                                    <option value="inactive">Inactive</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="col-md-8">
-                            <div class="form-group">
-                                <label>Description</label>
-                                <textarea name="description" rows="3" class="form-control"></textarea>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-light-primary font-weight-bold" data-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary font-weight-bold">Create Package</button>
-                </div>
-            </form>
         </div>
     </div>
 </div>

@@ -479,9 +479,8 @@ class Guests extends MY_Controller
 
 	/**
 	 * ----- Campaigns (Action ▸ Campaigns) -------------------------------------
-	 * Every active campaign with two per-campaign flags for this person: whether
-	 * they're on its roster (member) and whether they're opted out of its
-	 * audience picker (hidden). Same JSON contract + dedup_key keying as
+	 * The active campaigns this person has joined (on the roster) — campaigns
+	 * they never joined are excluded. Same JSON contract + dedup_key keying as
 	 * remarks/chat history; called by absolute path from the shared listing view.
 	 */
 	function Campaigns()
@@ -494,7 +493,7 @@ class Guests extends MY_Controller
 			return;
 		}
 
-		$rows = $this->Guests_Model->Read_Campaigns_With_Visibility($dedup_key);
+		$rows = $this->Guests_Model->Read_Member_Campaigns($dedup_key);
 
 		$out = array();
 		foreach ($rows as $r) {
@@ -502,8 +501,6 @@ class Guests extends MY_Controller
 				'id'            => (int) $r->CampaignID,
 				'name'          => $r->Name,
 				'campaign_date' => $r->CampaignDate !== null ? $r->CampaignDate : '',
-				'is_member'     => (int) $r->IsMember === 1,
-				'is_hidden'     => (int) $r->IsHidden === 1,
 			);
 		}
 

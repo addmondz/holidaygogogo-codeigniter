@@ -283,6 +283,18 @@ class Customer_Model extends CI_Model
 			'updated_at'    => date('Y-m-d H:i:s'),
 		];
 
+		// A phone number, when given, must carry a country code (the create/edit
+		// form enforces this too; this is the server-side backstop).
+		$this->load->helper('phone_country');
+		if (!empty($data['phone_number']) && !phone_country_has_code($data['phone_number'])) {
+			return $this->output
+				->set_content_type('application/json')
+				->set_output(json_encode([
+					'success' => false,
+					'message' => 'Phone number must include a country code.',
+				]));
+		}
+
 		// HARD BLOCK on duplicate phone: if an active customer already has this
 		// phone (normalised, any format), refuse to create a second record and
 		// return the existing match so the form can point the user to it. There
@@ -366,6 +378,23 @@ class Customer_Model extends CI_Model
 
 		if (empty($rows)) {
 			return; // nothing left to write after the guard
+		}
+
+		// A changed phone number must carry a country code (server-side backstop
+		// for the create/edit form's picker).
+		$this->load->helper('phone_country');
+		foreach ($rows as $row) {
+			$r = (array) $row;
+			if (array_key_exists('phone_number', $r)
+				&& trim((string) $r['phone_number']) !== ''
+				&& !phone_country_has_code($r['phone_number'])) {
+				return $this->output
+					->set_content_type('application/json')
+					->set_output(json_encode([
+						'success' => false,
+						'message' => 'Phone number must include a country code.',
+					]));
+			}
 		}
 
 		$this->db->update_batch('customer', json_decode(json_encode($rows)), 'CustomerID');

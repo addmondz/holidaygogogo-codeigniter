@@ -163,6 +163,10 @@ $assertions['cron: CLI-gated']                     = (bool) preg_match('/fetchEx
 $assertions['cron: hits open.er-api MYR']          = (strpos((string) $cron, 'open.er-api.com/v6/latest/MYR') !== false);
 $assertions['cron: parses full rates map']         = (strpos((string) $cron, 'currency_rate_parse_erapi_all(') !== false);
 $assertions['cron: feeds Costing rates']           = (strpos((string) $cron, 'Auto_Update_Rates_From_Feed(') !== false);
+// Rates are stored under the REAL run date, not the API's (lagging) date.
+$assertions['cron: stamps run date']               = (bool) preg_match("/\\\$storeDate\s*=\s*date\('Y-m-d'\)/", (string) $cron);
+$assertions['cron: feeds costing with run date']   = (strpos((string) $cron, 'Auto_Update_Rates_From_Feed($all[\'rates\'], $storeDate)') !== false);
+$assertions['cron: does NOT feed costing api date'] = (strpos((string) $cron, "Auto_Update_Rates_From_Feed(\$all['rates'], \$all['rate_date'])") === false);
 $assertions['cron: opens run log']                 = (strpos((string) $cron, 'Start_Run_Log(') !== false);
 $assertions['cron: closes run log (completed)']    = (bool) preg_match("/Finish_Run_Log\([^;]*'completed'/s", (string) $cron);
 $assertions['cron: closes run log (failed)']       = (bool) preg_match("/Finish_Run_Log\([^;]*'failed'/s", (string) $cron);

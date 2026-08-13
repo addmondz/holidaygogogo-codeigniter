@@ -469,7 +469,15 @@ class Cron extends CI_Controller
 		// Headline MYR->USD rate, kept in the run log for a quick daily trace.
 		$usd_rate = isset($all['rates'][$quote]) ? $all['rates'][$quote] : null;
 
-		$msg = "[CRON] fetchExchangeRates {$base}->{$quote} = " . ($usd_rate !== null ? $usd_rate : 'n/a') . " ({$all['rate_date']})";
+		// Stamp rates under the REAL run date, not the API's own "last update"
+		// date. open.er-api refreshes at 00:00 UTC (08:00 MYT) and its date field
+		// can lag a day or more from a cached edge; keying on it would freeze the
+		// stored rate (see live log: a newer rate skipped because the API date
+		// hadn't advanced). Run date guarantees one fresh row per day the cron
+		// runs, and still protects same-day manual edits.
+		$storeDate = date('Y-m-d');
+
+		$msg = "[CRON] fetchExchangeRates {$base}->{$quote} = " . ($usd_rate !== null ? $usd_rate : 'n/a') . " (api {$all['rate_date']}, stored {$storeDate})";
 		$this->customCronLogging($msg);
 		if (is_cli()) {
 			echo $msg . PHP_EOL;
@@ -478,19 +486,20 @@ class Cron extends CI_Controller
 		// Auto-feed every foreign currency on /Costing/Currency from the same
 		// call (inverted to FOREIGN->MYR). Skips any currency already set today.
 		$this->load->model('Costing_Model');
-		$res = $this->Costing_Model->Auto_Update_Rates_From_Feed($all['rates'], $all['rate_date']);
+		$res = $this->Costing_Model->Auto_Update_Rates_From_Feed($all['rates'], $storeDate);
 		$costMsg = '[CRON] fetchExchangeRates costing rates updated=[' . implode(',', $res['updated']) . '] skipped=[' . implode(',', $res['skipped']) . ']';
 		$this->customCronLogging($costMsg);
 		if (is_cli()) {
 			echo $costMsg . PHP_EOL;
 		}
 
-		// Close the audit trail row with the outcome.
+		// Close the audit trail row with the outcome. rate_date = the date we
+		// stored under (real day); the API's own date is in the log line above.
 		$this->Exchange_Rate_Model->Finish_Run_Log($runId, 'completed', array_merge(array(
 			'base_code'  => $base,
 			'quote_code' => $quote,
 			'rate'       => $usd_rate,
-			'rate_date'  => $all['rate_date'],
+			'rate_date'  => $storeDate,
 		), currency_rate_run_log_summary($res)));
 	}
 

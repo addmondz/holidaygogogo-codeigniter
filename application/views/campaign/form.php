@@ -600,6 +600,12 @@
 			if(type === 'Manual') {
 				return '<span class="label label-inline label-pill label-light-primary font-weight-bold">Manual Lead</span>';
 			}
+			// A booking's Team Leader lives in the Customer listing (not the Guest
+			// listing), so the picker types them as Customer — the same person shown
+			// under Type = Customer.
+			if(type === 'Customer') {
+				return '<span class="label label-inline label-pill label-light-info font-weight-bold">Customer</span>';
+			}
 			return '<span class="label label-inline label-pill label-light-success font-weight-bold">Booking Guest</span>';
 		}
 
@@ -850,6 +856,18 @@
 			// Booking Type resets to its BC default, not blank.
 			$('#guest_search_bc_type').val('BOOKING CONFIRMATION');
 			$('.selectpicker').selectpicker('refresh');
+			// Also wipe the available-results table back to its untouched state so a
+			// reset clears the previous search's matches (and its pagination), not
+			// just the filter inputs. Does NOT touch already-selected guests.
+			currentRows = [];
+			searched    = false;
+			lastTotal   = 0;
+			currentPage = 1;
+			totalPages  = 0;
+			$('#picker_results_body').html('<tr><td colspan="5" class="picker-empty">Use the search above to find guests.</td></tr>');
+			$('#picker_results_info').text('');
+			$('#picker_prev, #picker_next').prop('disabled', true);
+			$('#picker_pick_all').prop('disabled', true);
 		});
 		$('#picker_prev').on('click', function() { if(currentPage > 1) { loadResults(currentPage - 1); } });
 		$('#picker_next').on('click', function() { if(currentPage < totalPages) { loadResults(currentPage + 1); } });

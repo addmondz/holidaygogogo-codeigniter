@@ -322,7 +322,10 @@ div.kt-datatable__pager-container {
 												<label>Guest Role</label>
 												<?php $sel_role = guest_list_multi_values($this->input->get('role')); ?>
 												<select name="role[]" class="form-control selectpicker" multiple data-actions-box="true" title="--SELECT ROLE--">
+													<?php // The Guest List lists Team Members only — leaders belong to the Customer page — so the Team Leader option is hidden here. ?>
+													<?php if($list_base !== 'Guests') { ?>
 													<option data-icon="la la-user-friends font-size-lg bs-icon" value="Team Leader" <?php if(in_array('Team Leader', $sel_role, true)) echo 'selected'; ?>>Team Leader</option>
+													<?php } ?>
 													<option data-icon="la la-user-friends font-size-lg bs-icon" value="Team Member" <?php if(in_array('Team Member', $sel_role, true)) echo 'selected'; ?>>Team Member</option>
 													<option data-icon="la la-user-friends font-size-lg bs-icon" value="Lead"        <?php if(in_array('Lead', $sel_role, true))        echo 'selected'; ?>>Lead (GHL)</option>
 												</select>
@@ -657,6 +660,7 @@ div.kt-datatable__pager-container {
 										<th style="text-align:center;">Race</th>
 										<th style="text-align:center;">Lead Status</th>
 										<th style="text-align:center;">Created Date</th>
+										<th style="text-align:center;">Customer Type</th>
 										<th style="text-align:center;">State</th>
 									<?php } else { ?>
 										<th style="text-align:center;">Tags</th>
@@ -706,7 +710,7 @@ div.kt-datatable__pager-container {
 						</thead>
 						<tbody>
 							<?php if(empty($guests)) { ?>
-								<tr><td colspan="<?php echo ($list_base === 'Customer') ? 12 : ($list_base === 'Manual_Leads' ? 11 : 11); ?>" style="text-align:center; padding-top:10px; padding-bottom:10px;">Guest Records Not Found</td></tr>
+								<tr><td colspan="<?php echo ($list_base === 'Customer') ? 12 : ($list_base === 'Manual_Leads' ? 12 : 11); ?>" style="text-align:center; padding-top:10px; padding-bottom:10px;">Guest Records Not Found</td></tr>
 							<?php } else { ?>
 								<?php $count = 1; foreach($guests as $g) { ?>
 									<?php $is_ghl_row = isset($g->Type) && ($g->Type === 'GHL' || $g->Type === 'Manual'); ?>
@@ -804,6 +808,7 @@ div.kt-datatable__pager-container {
 													$race_val   = isset($g->Race)             ? trim((string) $g->Race)             : '';
 													$status_val = isset($g->LeadStatus)       ? trim((string) $g->LeadStatus)       : '';
 													$state_val  = isset($g->State)            ? trim((string) $g->State)            : '';
+													$cust_val   = isset($g->CustomerType)     ? trim((string) $g->CustomerType)     : '';
 													$created_raw = isset($g->RecencyAt) ? (string) $g->RecencyAt : '';
 													$created_ts  = ($created_raw !== '' && strpos($created_raw, '0000-00-00') !== 0) ? strtotime($created_raw) : false;
 												?>
@@ -821,6 +826,11 @@ div.kt-datatable__pager-container {
 													<?php } else { echo $gl_dash; } ?>
 												</td>
 												<td style="text-align:center; white-space:nowrap;"><?php echo $created_ts ? date('d M Y', $created_ts) : $gl_dash; ?></td>
+												<td style="text-align:center;">
+													<?php if($cust_val !== '') { ?>
+														<span class="label label-inline label-light-success font-weight-bold" style="white-space:normal;"><?php echo htmlspecialchars($cust_val); ?></span>
+													<?php } else { echo $gl_dash; } ?>
+												</td>
 												<td style="text-align:center;"><?php echo $state_val !== '' ? htmlspecialchars($state_val) : $gl_dash; ?></td>
 											<?php } else { ?>
 											<td style="text-align:center; max-width:220px;">
@@ -979,9 +989,8 @@ div.kt-datatable__pager-container {
 													<a href="javascript:;" class="dropdown-item js-chat-history" style="font-size:11px;" data-dedup-key="<?php echo htmlspecialchars($g->dedup_key, ENT_QUOTES); ?>" data-name="<?php echo htmlspecialchars($g->Name, ENT_QUOTES); ?>">Chat History<?php if($chat_c > 0) { echo ' (' . $chat_c . ')'; } ?></a>
 													<?php if($list_base === 'Customer' && !empty($g->dedup_key)) {
 														$camp_c   = isset($campaign_counts[$g->dedup_key]) ? (int) $campaign_counts[$g->dedup_key] : 0;
-														$camp_hid = isset($campaign_hidden[$g->dedup_key]);
 													?>
-														<a href="javascript:;" class="dropdown-item js-campaigns" style="font-size:11px;" data-dedup-key="<?php echo htmlspecialchars($g->dedup_key, ENT_QUOTES); ?>" data-name="<?php echo htmlspecialchars($g->Name, ENT_QUOTES); ?>">Campaigns<?php if($camp_c > 0) { echo ' (' . $camp_c . ')'; } ?><?php if($camp_hid) { echo ' <i class="fa fa-eye-slash text-danger" data-toggle="tooltip" title="Hidden from &ge;1 campaign picker"></i>'; } ?></a>
+														<a href="javascript:;" class="dropdown-item js-campaigns" style="font-size:11px;" data-dedup-key="<?php echo htmlspecialchars($g->dedup_key, ENT_QUOTES); ?>" data-name="<?php echo htmlspecialchars($g->Name, ENT_QUOTES); ?>">Campaigns<?php if($camp_c > 0) { echo ' (' . $camp_c . ')'; } ?></a>
 													<?php } ?>
 													<?php if(!$is_ghl_row) { ?>
 														<?php if($list_base === 'Customer' && !empty($g->CustomerID) && can_delete_customer($this->session->userdata('level'), $this->session->userdata('admin_id'))) { ?>
@@ -1170,8 +1179,7 @@ div.kt-datatable__pager-container {
 			</div>
 			<div class="modal-body">
 				<div class="text-muted mb-3" style="font-size:11px;">
-					<i class="fa fa-info-circle"></i> <strong>Member</strong> = already on the campaign's list.
-					Turn a campaign OFF to keep this customer out of <em>that</em> campaign's guest picker (when editing it).
+					<i class="fa fa-info-circle"></i> Campaigns this customer has joined.
 				</div>
 				<div id="cp_error" class="text-danger font-weight-bold mb-2" style="font-size:12px; display:none;"></div>
 				<div id="cp_list">
@@ -1857,10 +1865,8 @@ div.kt-datatable__pager-container {
 	});
 
 	<?php if($list_base === 'Customer') { ?>
-	// ----- Campaigns modal (all campaigns + per-campaign show-in-picker toggle) -
+	// ----- Campaigns modal (read-only list of campaigns the customer joined) ----
 	var CP_LIST_URL = '<?php echo base_url('Guests/Campaigns'); ?>';
-	var CP_SET_URL  = '<?php echo base_url('Guests/Set_Campaign_Visibility'); ?>';
-	var CP_CAN_EDIT = <?php echo $lc_can_edit ? 'true' : 'false'; ?>;
 	var cpDedupKey  = '';
 
 	function cpEscape(s) { return $('<div>').text(s == null ? '' : String(s)).html(); }
@@ -1868,46 +1874,20 @@ div.kt-datatable__pager-container {
 	function cpRenderList(campaigns) {
 		var $list = $('#cp_list');
 		if (!campaigns || !campaigns.length) {
-			$list.html('<div class="text-muted text-center py-3">No active campaigns.</div>');
+			$list.html('<div class="text-muted text-center py-3">Not in any campaign yet.</div>');
 			return;
 		}
 		var html = '<table class="table table-sm mb-0" style="font-size:12px;"><thead><tr>' +
-			'<th>Campaign</th><th>Date</th><th class="text-center">Member</th>' +
-			'<th class="text-center">Show in picker</th></tr></thead><tbody>';
+			'<th>Campaign</th><th>Date</th></tr></thead><tbody>';
 		for (var i = 0; i < campaigns.length; i++) {
 			var c = campaigns[i];
-			var checked = c.is_hidden ? '' : 'checked';
-			var disabled = CP_CAN_EDIT ? '' : 'disabled';
-			var member = c.is_member
-				? '<span class="label label-inline label-light-success font-weight-bold">Member</span>'
-				: '<span class="text-muted">—</span>';
 			html += '<tr>' +
 				'<td class="font-weight-bold">' + cpEscape(c.name) + '</td>' +
 				'<td>' + cpEscape(c.campaign_date || '—') + '</td>' +
-				'<td class="text-center">' + member + '</td>' +
-				'<td class="text-center">' +
-					'<span class="switch switch-sm switch-icon">' +
-						'<label class="mb-0">' +
-							'<input type="checkbox" class="cp-toggle" data-campaign-id="' + c.id + '" ' + checked + ' ' + disabled + '>' +
-							'<span></span>' +
-						'</label>' +
-					'</span>' +
-				'</td>' +
 			'</tr>';
 		}
 		html += '</tbody></table>';
 		$list.html(html);
-	}
-
-	// Show a red eye-slash on the row's Action item when hidden from ≥1 campaign.
-	function cpMarkRow() {
-		var anyHidden = $('#cp_list .cp-toggle').filter(function() { return !$(this).is(':checked'); }).length > 0;
-		var $link = $('.js-campaigns[data-dedup-key="' + cpDedupKey.replace(/"/g, '\\"') + '"]');
-		$link.find('.fa-eye-slash').remove();
-		if (anyHidden) {
-			$link.append(' <i class="fa fa-eye-slash text-danger" data-toggle="tooltip" title="Hidden from ≥1 campaign picker"></i>');
-			$link.find('[data-toggle="tooltip"]').tooltip();
-		}
 	}
 
 	function cpLoad() {
@@ -1926,26 +1906,6 @@ div.kt-datatable__pager-container {
 		$('#cp_error').hide().text('');
 		$('#campaigns_modal').modal('show');
 		cpLoad();
-	});
-
-	// Per-campaign toggle: unchecked = hidden from that campaign's picker.
-	$('#cp_list').on('change', '.cp-toggle', function() {
-		var $toggle = $(this);
-		var campaignId = $toggle.attr('data-campaign-id');
-		var hidden = $toggle.is(':checked') ? 0 : 1;
-		$toggle.prop('disabled', true);
-		$('#cp_error').hide().text('');
-		$.ajax({ url: CP_SET_URL, method: 'POST', dataType: 'json', timeout: 30000,
-			data: { campaign_id: campaignId, dedup_key: cpDedupKey, hidden: hidden, module: LC_MODULE } })
-			.done(function(res) {
-				$toggle.prop('disabled', false);
-				if (res && res.ok) { $toggle.prop('checked', !res.hidden); cpMarkRow(); }
-				else { $toggle.prop('checked', !hidden); $('#cp_error').text((res && res.message) || 'Could not save.').show(); }
-			})
-			.fail(function() {
-				$toggle.prop('disabled', false).prop('checked', !hidden);
-				$('#cp_error').text('Network error. Please try again.').show();
-			});
 	});
 
 	// ----- Customer master actions (Customer List page only) -----
@@ -2049,6 +2009,7 @@ div.kt-datatable__pager-container {
 		margin: 1.75rem auto !important;
 	}
 </style>
+<?php $this->load->view('partials/phone_country_picker_assets'); ?>
 <div class="modal fade" id="ghl_lead_create_modal" tabindex="-1" role="dialog" aria-labelledby="ghl_lead_create_label" aria-hidden="true">
 	<div class="modal-dialog" role="document">
 		<form action="<?php echo base_url('Manual_Leads/Create'); ?>" method="post" id="ghl_lead_create_form">
@@ -2075,7 +2036,30 @@ div.kt-datatable__pager-container {
 					<div class="form-group row">
 						<div class="col-md-6">
 							<label>Contact Number <span class="text-danger">*</span></label>
-							<input type="text" name="phone" class="form-control" autocomplete="off" placeholder="e.g. +60 12-345 6789">
+							<div class="phone-input-wrapper" data-picker id="ml_phone_wrapper">
+									<div class="phone-country-selector">
+										<span class="phone-country-flag">🌐</span>
+										<span class="phone-country-code">--</span>
+										<span class="phone-country-arrow">▼</span>
+									</div>
+									<input type="text" name="phone" id="ml_phone_local" class="phone-input-field" autocomplete="off" placeholder="Enter phone number">
+									<input type="hidden" name="phone_country_code" id="ml_phone_country_code" class="phone-code-value" value="+60">
+									<div class="phone-dropdown">
+										<div class="phone-dropdown-search">
+											<input type="text" class="phone-search" placeholder="Search country...">
+										</div>
+										<div class="phone-dropdown-list">
+											<?php foreach((isset($country_codes) ? $country_codes : array()) as $cc) { ?>
+											<div class="phone-dropdown-item" data-code="<?php echo htmlspecialchars($cc->CountryCode, ENT_QUOTES); ?>" data-country="<?php echo htmlspecialchars(strtolower($cc->Country), ENT_QUOTES); ?>" data-country-name="<?php echo htmlspecialchars($cc->Country, ENT_QUOTES); ?>">
+												<span class="phone-dropdown-item-flag">🌐</span>
+												<span class="phone-dropdown-item-name"><?php echo htmlspecialchars($cc->Country); ?></span>
+												<span class="phone-dropdown-item-code"><?php echo htmlspecialchars($cc->CountryCode); ?></span>
+											</div>
+											<?php } ?>
+										</div>
+									</div>
+								</div>
+								<span class="form-text text-muted">Pick the country code, then enter the number.</span>
 						</div>
 						<div class="col-md-6">
 							<label>Email</label>
@@ -2155,26 +2139,6 @@ div.kt-datatable__pager-container {
 					</div>
 					<div class="form-group row">
 						<div class="col-md-6">
-							<label>Current Status</label>
-							<select name="lead_status" class="form-control">
-								<option value="">-- Select --</option>
-								<?php if(!empty($lead_statuses)) { foreach($lead_statuses as $ls) { ?>
-								<option value="<?php echo htmlspecialchars($ls->Name, ENT_QUOTES); ?>"><?php echo htmlspecialchars($ls->Name); ?></option>
-								<?php } } ?>
-							</select>
-						</div>
-						<div class="col-md-6">
-							<label>Client Type</label>
-							<select name="client_type" class="form-control">
-								<option value="">-- Select --</option>
-								<?php foreach($client_types as $ctp) { ?>
-								<option value="<?php echo htmlspecialchars($ctp, ENT_QUOTES); ?>"><?php echo htmlspecialchars($ctp); ?></option>
-								<?php } ?>
-							</select>
-						</div>
-					</div>
-					<div class="form-group row">
-						<div class="col-md-6">
 							<label>Nature of Business</label>
 							<select name="nature_of_business" class="form-control">
 								<option value="">-- Select --</option>
@@ -2194,6 +2158,15 @@ div.kt-datatable__pager-container {
 						</div>
 					</div>
 					<div class="form-group row">
+						<div class="col-md-6">
+							<label>Client Type</label>
+							<select name="client_type" class="form-control">
+								<option value="">-- Select --</option>
+								<?php foreach($client_types as $ctp) { ?>
+								<option value="<?php echo htmlspecialchars($ctp, ENT_QUOTES); ?>"><?php echo htmlspecialchars($ctp); ?></option>
+								<?php } ?>
+							</select>
+						</div>
 						<div class="col-md-6">
 							<label>State</label>
 							<select name="state" class="form-control">
@@ -2291,12 +2264,15 @@ div.kt-datatable__pager-container {
 		var $form = $(this);
 		var val = function(name) { return $.trim($form.find('[name="' + name + '"]').val() || ''); };
 		var first = val('first_name'), phone = val('phone'), email = val('email');
+		var phoneCode = val('phone_country_code');
 		var $err = $('#ghl_lead_create_error');
 		var problems = [];
 
-		// Name and Contact Number are the required fields on the form.
+		// Name and Contact Number are the required fields on the form; the number
+		// must carry a country code.
 		if (first === '') { problems.push('Name is required.'); }
 		if (phone === '') { problems.push('Contact Number is required.'); }
+		else if (phoneCode === '') { problems.push('Please select the phone country code.'); }
 		// Validate email shape when provided (server double-checks too).
 		if (email !== '' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
 			problems.push('Email address is not valid.');
@@ -2340,10 +2316,22 @@ div.kt-datatable__pager-container {
 	var ML_UPDATE_ACTION = '<?php echo base_url('Manual_Leads/Update'); ?>';
 	var ML_EDIT_URL      = '<?php echo base_url('Manual_Leads/Edit_Data'); ?>';
 
+	// Read a stored phone "+60 123456789" into { code:'+60', local:'123456789' }
+	// so the Edit action can pre-fill the dial-code picker. Mirrors the server
+	// phone_country_split(); a legacy number with no code goes wholly to local.
+	function mlSplitPhone(v) {
+		v = $.trim(v == null ? '' : ('' + v));
+		var m = /^(\+\d{1,4})\s+(\S.*)$/.exec(v);
+		if (m) { return { code: m[1], local: $.trim(m[2]) }; }
+		return { code: '', local: v };
+	}
+
 	// Reset the shared modal back to a blank Create form.
 	function mlResetCreate() {
 		var $form = $('#ghl_lead_create_form');
 		$form[0].reset();
+		// reset() restores the hidden dial code to +60 but not the picker display.
+		if (window.phonePickerSetCode) { phonePickerSetCode(document.getElementById('ml_phone_wrapper'), '+60'); }
 		$('#ghl_lead_dedup_key').val('');
 		$form.attr('action', ML_CREATE_ACTION);
 		$('#ghl_lead_create_label').html('<strong>Create Manual Lead</strong>');
@@ -2388,12 +2376,15 @@ div.kt-datatable__pager-container {
 					$('#ghl_lead_dedup_key').val(dedupKey);
 					$form.attr('action', ML_UPDATE_ACTION);
 					set('first_name', d.first_name);     set('company_name', d.company_name);
-					set('phone', d.phone);               set('email', d.email);
+					// Stored phone is "+60 123456789"; split it back into the picker.
+						var mlPhone = mlSplitPhone(d.phone);
+						phonePickerSetCode(document.getElementById('ml_phone_wrapper'), mlPhone.code);
+						set('phone', mlPhone.local);         set('email', d.email);
 					set('address', d.address);           set('country', d.country);
 					set('gender', d.gender);             set('chat_language', d.chat_language);
 					set('race', d.race);                 set('nationality', d.nationality);
 					set('source', d.source);             set('customer_type', d.customer_type);
-					set('lead_status', d.lead_status);   set('client_type', d.client_type);
+						set('client_type', d.client_type);
 					set('nature_of_business', d.nature_of_business); set('number_of_pax', d.number_of_pax); set('state', d.state);
 					set('notes', d.notes);               set('lead_intro', d.lead_intro);
 					$submit.prop('disabled', false).html('<i class="la la-save"></i>Save Changes');
@@ -2649,7 +2640,6 @@ div.kt-datatable__pager-container {
 		html += lvRow('Nature of Business', d.nature_of_business);
 		html += lvRow('Number of Pax', d.number_of_pax ? d.number_of_pax + ' pax' : '');
 		html += lvRow('State', d.state);
-		html += lvRow('Current Status', d.lead_status);
 		html += '<div class="form-group row mb-1"><div class="col-md-4 font-weight-bold" style="font-size:12px;">Status History</div>' +
 			'<div class="col-md-8" style="font-size:12px;">' + lvStatusHistory(d.status_log) + '</div></div>';
 		html += lvRow('Lead Intro', d.lead_intro);

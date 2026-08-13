@@ -103,7 +103,9 @@ class Guests_Model extends CI_Model
 			// This branch always hides cancelled bookings: the "Has cancelled BC"
 			// segment is customer-only now (it suppresses this branch entirely), so
 			// the predicate only ever resolves to the default hide.
-			$where = " WHERE b.Status != 'N' AND " . guest_list_cancel_predicate($get, 'b.CancelStatus') . "
+			$where = " WHERE b.Status != 'N' AND " . guest_list_cancel_predicate($get, 'b.CancelStatus')
+				. guest_list_lock_predicate($this->mode, 'b.LockStatus')
+				. guest_list_member_only_predicate($this->mode, $this->Leader_Match_Expr()) . "
 				AND gl.dedup_key IS NOT NULL
 				AND (
 					NULLIF(TRIM(gl.Name), '')     IS NOT NULL
@@ -175,10 +177,19 @@ class Guests_Model extends CI_Model
 				}
 			}
 
-			// (The "Customer type" value segments — family-with-kids, booking-lead,
-			// purchase count, lifetime value, consecutive years, cancelled BC — now
-			// target the customer master and are applied in Build_Customer_Branch;
-			// they suppress this whole branch, so they are not built here.)
+			// (The "Customer type" value segments — booking-lead, purchase count,
+			// lifetime value, consecutive years, cancelled BC — now target the
+			// customer master and are applied in Build_Customer_Branch; they suppress
+			// this whole branch, so they are not built here.)
+
+			// EXCEPTION — "Family with kids": a child/infant lives on the booking, so
+			// a booking-guest row CAN satisfy it. So when the picker's Type is left at
+			// "--ALL TYPES--" (or Booking Guest) this branch returns guests whose own
+			// trip carried a kid, instead of forcing the customer master. GHL leads
+			// (no booking) stay suppressed.
+			if(guest_list_flag_on($get, 'family_kids')) {
+				$where .= " AND (COALESCE(b.Children, 0) > 0 OR COALESCE(b.Infant, 0) > 0) ";
+			}
 
 			$booking_number = trim((string)$this->input->get('booking_number'));
 			if($booking_number !== '') {
@@ -260,11 +271,10 @@ class Guests_Model extends CI_Model
 			$where .= $chg_sql;
 			foreach($chg_par as $p) { $b_params[] = $p; }
 			if($has_q) {
-				// Search Name matches the guest's own name OR their booking's team
-				// leader (b.Customer, the name on the BC form), so searching a
-				// leader surfaces everyone on their team.
-				$where     .= " AND ( gl.Name LIKE ? OR gl.LastName LIKE ? OR CONCAT_WS(' ', gl.Name, gl.LastName) LIKE ? OR b.Customer LIKE ? ) ";
-				$b_params[] = $like;
+				// Search Name matches the guest's OWN name only (first, last, or the
+				// two joined). To search by the booking's team leader (b.Customer, the
+				// name on the BC form) use the dedicated "Team Leader" column filter.
+				$where     .= " AND ( gl.Name LIKE ? OR gl.LastName LIKE ? OR CONCAT_WS(' ', gl.Name, gl.LastName) LIKE ? ) ";
 				$b_params[] = $like;
 				$b_params[] = $like;
 				$b_params[] = $like;
@@ -402,27 +412,22 @@ class Guests_Model extends CI_Model
 			$this->Append_In_Clause($ghl_where, $g_params, 'gc.client_type',   $this->input->get('client_type'));
 			$this->Append_In_Clause($ghl_where, $g_params, 'gc.state',         $this->input->get('state'));
 
-			// Lead Status (Manual Leads): a lead matches only on its LATEST status, not
-			// any status it ever held. The latest status is the newest dated Lead Status
-			// Update log entry (lead_status_log, by StatusDate then LogID, keyed by the
-			// same dedup_key the listing shows); when a lead has no log entries at all we
-			// fall back to its current status field (gc.lead_status). Multi-select.
+			// Lead Status (Manual Leads): a lead's status lives ONLY in the dated Lead
+			// Status Updates log (lead_status_log). A lead matches only on its LATEST
+			// status — the newest log entry by StatusDate then LogID (tie-break), keyed
+			// by the same dedup_key the listing shows — never a status it merely held
+			// once. A lead with no log entries has no status and cannot match. Multi-select.
 			$lead_statuses = guest_list_multi_values($this->input->get('lead_status'));
 			if(!empty($lead_statuses)) {
 				$ph = implode(',', array_fill(0, count($lead_statuses), '?'));
-				$ghl_where .= " AND (
-					EXISTS (SELECT 1 FROM lead_status_log lsl
+				$ghl_where .= " AND EXISTS (SELECT 1 FROM lead_status_log lsl
 						WHERE lsl.Status = 'Y' AND lsl.dedup_key = {$gc_dedup}
 						AND lsl.LeadStatus IN ({$ph})
 						AND NOT EXISTS (SELECT 1 FROM lead_status_log lsl2
 							WHERE lsl2.Status = 'Y' AND lsl2.dedup_key = {$gc_dedup}
 							AND (lsl2.StatusDate > lsl.StatusDate
-								OR (lsl2.StatusDate = lsl.StatusDate AND lsl2.LogID > lsl.LogID))))
-					OR ( gc.lead_status IN ({$ph})
-						AND NOT EXISTS (SELECT 1 FROM lead_status_log lsl3
-							WHERE lsl3.Status = 'Y' AND lsl3.dedup_key = {$gc_dedup})) ) ";
+								OR (lsl2.StatusDate = lsl.StatusDate AND lsl2.LogID > lsl.LogID)))) ";
 				foreach($lead_statuses as $st) { $g_params[] = $st; } // latest-log IN
-				foreach($lead_statuses as $st) { $g_params[] = $st; } // no-log fallback IN
 			}
 
 			// "Campaign" filter over leads in a campaign roster; multi-select over
@@ -531,6 +536,20 @@ WHERE 1 = 1
 	 * into Role and Num of Pax — and the HAVING built in Build_Branches filters
 	 * on exactly those, identically in both paths.
 	 */
+	/**
+	 * The boolean SQL that flags a guest_list row as its booking's Team Leader:
+	 * the guest's phone (dedup_key = last 9 digits) is the booking's own contact
+	 * number (b.Mobile, else the customer's phone_number). One source of truth so
+	 * the IsLeader column and the "members only" WHERE filter can never drift.
+	 */
+	private function Leader_Match_Expr()
+	{
+		return "gl.dedup_key = COALESCE(
+			NULLIF(RIGHT(REGEXP_REPLACE(IFNULL(b.Mobile, ''),       '[^0-9]', ''), 9), ''),
+			NULLIF(RIGHT(REGEXP_REPLACE(IFNULL(c.phone_number, ''), '[^0-9]', ''), 9), '')
+		)";
+	}
+
 	private function Booking_Windowed_Select($dedup, $from)
 	{
 		// rn=1 is the row that represents this person — its Name/Contact/Email/…
@@ -567,10 +586,7 @@ WHERE 1 = 1
 		c.created_at     AS CustomerCreatedAt,
 		b.StartDate      AS TravelStart,
 		b.EndDate        AS TravelEnd,
-		CASE WHEN gl.dedup_key = COALESCE(
-			NULLIF(RIGHT(REGEXP_REPLACE(IFNULL(b.Mobile, ''),       '[^0-9]', ''), 9), ''),
-			NULLIF(RIGHT(REGEXP_REPLACE(IFNULL(c.phone_number, ''), '[^0-9]', ''), 9), '')
-		) THEN 1 ELSE 0 END AS IsLeader,
+		CASE WHEN " . $this->Leader_Match_Expr() . " THEN 1 ELSE 0 END AS IsLeader,
 		(COALESCE(b.Adult, 0) + COALESCE(b.Children, 0) + COALESCE(b.Infant, 0)) AS BookingPax,
 		COALESCE(b.NetTotal, 0) AS BookingNetTotal,
 		ROW_NUMBER() OVER (
@@ -609,6 +625,13 @@ WHERE 1 = 1
 		if(guest_list_leader_fallback_suppressed_by_filters($get)) {
 			return null;
 		}
+		// This branch exists only to surface booking Team Leaders. The Guest List
+		// dashboard (mode 'guest') lists members only — leaders live on the Customer
+		// page — so drop the whole fallback there. The campaign picker ('all') still
+		// needs leaders as an audience, so it keeps it.
+		if($this->mode === 'guest') {
+			return null;
+		}
 
 		$key = $this->Booking_Leader_Key_Expr();
 
@@ -639,8 +662,13 @@ WHERE 1 = 1
 			$params[] = $travel_range[0];
 		}
 
-		// (The "Customer type" value segments are per-customer now and suppress
-		// this fallback branch, so none of them are built here.)
+		// (The per-customer value segments suppress this fallback branch, so none of
+		// them are built here — except "Family with kids", which reads the leader's
+		// own booking child/infant count, so a leader whose trip carried a kid stays
+		// pickable under an "All types" campaign audience.)
+		if(guest_list_flag_on($get, 'family_kids')) {
+			$where .= " AND (COALESCE(b.Children, 0) > 0 OR COALESCE(b.Infant, 0) > 0) ";
+		}
 
 		$booking_number = trim((string)$this->input->get('booking_number'));
 		if($booking_number !== '') {
@@ -759,7 +787,7 @@ WHERE 1 = 1
 		CAST(NULL AS DATE) AS DOB,
 		COALESCE(SUM(COALESCE(b.Adult, 0) + COALESCE(b.Children, 0) + COALESCE(b.Infant, 0)), 0) AS TotalPax,
 		COALESCE(SUM(COALESCE(b.NetTotal, 0)), 0) AS TotalSales,
-		CAST('Booking Guest' AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS Type,
+		CAST('Customer' AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS Type,
 		CONVERT(MAX(b.Token) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Token,
 		CONVERT('Team Leader' USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Role,
 		CONVERT(GROUP_CONCAT(DISTINCT DATE(b.InsertDate) ORDER BY DATE(b.InsertDate) SEPARATOR ',') USING utf8mb4) COLLATE utf8mb4_unicode_ci AS BookingDates,
@@ -812,7 +840,7 @@ SELECT
 	MAX(CASE WHEN rn = 1 THEN DateOfBirth END) AS DOB,
 	COALESCE(SUM(CASE WHEN booking_rn = 1 THEN BookingPax      END), 0) AS TotalPax,
 	COALESCE(SUM(CASE WHEN booking_rn = 1 THEN BookingNetTotal END), 0) AS TotalSales,
-	CAST('Booking Guest' AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS Type,
+	CONVERT(CASE WHEN MAX(IsLeader) = 1 THEN 'Customer' ELSE 'Booking Guest' END USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Type,
 	CONVERT(MAX(CASE WHEN rn = 1 THEN Token END) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Token,
 	CONVERT(CASE WHEN MAX(IsLeader) = 1 THEN 'Team Leader' ELSE 'Team Member' END USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Role,
 	CONVERT(GROUP_CONCAT(DISTINCT DATE(BookingDate) ORDER BY DATE(BookingDate) SEPARATOR ',') USING utf8mb4) COLLATE utf8mb4_unicode_ci AS BookingDates,
@@ -855,7 +883,7 @@ SELECT
 	CONVERT(COALESCE(NULLIF(TRIM(gcv.language), ''), gc.chat_language) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Language,
 	NULL AS AgentName,
 	NULL AS Source,
-	NULL AS CustomerType,
+	CONVERT(gc.customer_type USING utf8mb4) COLLATE utf8mb4_unicode_ci AS CustomerType,
 	NULL AS Destination,
 	CONVERT(COALESCE(NULLIF(TRIM(gcv.nationality), ''), gc.nationality) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Nationality,
 	CONVERT(COALESCE(NULLIF(TRIM(gcv.gender), ''), gc.gender) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Gender,
@@ -877,11 +905,9 @@ SELECT
 	CAST(NULL AS UNSIGNED) AS CustomerID,
 	CAST(NULL AS DATETIME) AS CustomerCreatedAt,
 	CONVERT(gc.nature_of_business USING utf8mb4) COLLATE utf8mb4_unicode_ci AS NatureOfBusiness,
-	CONVERT(COALESCE(
-		(SELECT lsl.LeadStatus FROM lead_status_log lsl
-			WHERE lsl.Status = 'Y' AND lsl.dedup_key = {$gc_dedup}
-			ORDER BY lsl.StatusDate DESC, lsl.LogID DESC LIMIT 1),
-		gc.lead_status
+	CONVERT((SELECT lsl.LeadStatus FROM lead_status_log lsl
+		WHERE lsl.Status = 'Y' AND lsl.dedup_key = {$gc_dedup}
+		ORDER BY lsl.StatusDate DESC, lsl.LogID DESC LIMIT 1
 	) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS LeadStatus,
 	CONVERT(gc.state USING utf8mb4) COLLATE utf8mb4_unicode_ci AS State,
 	COALESCE(gc.date_added, gc.created_at) AS RecencyAt
@@ -1075,7 +1101,6 @@ GROUP BY mm.merge_key";
 			gc.nature_of_business AS NatureOfBusiness,
 			gc.number_of_pax     AS NumberOfPax,
 			gc.state             AS State,
-			gc.lead_status       AS CurrentStatus,
 			{$status_updates}    AS StatusUpdates,
 			gc.lead_intro        AS LeadIntro,
 			gc.notes             AS Notes,
@@ -1479,7 +1504,7 @@ GROUP BY mm.merge_key";
 		CONVERT(COALESCE(c.GuestType, 'ADULT') USING utf8mb4) COLLATE utf8mb4_unicode_ci AS GuestType,
 		c.DateOfBirth AS DOB,
 		COALESCE(bagg.TotalPax, 0) AS TotalPax,
-		CAST('Booking Guest' AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS Type,
+		CAST('Customer' AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS Type,
 		CONVERT(blatest.Token USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Token,
 		CONVERT(CASE WHEN bagg.AnyLeader = 1 THEN 'Team Leader' ELSE 'Team Member' END USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Role,
 		CONVERT(c.CustomerCode USING utf8mb4) COLLATE utf8mb4_unicode_ci AS CustomerCode,
@@ -1994,26 +2019,22 @@ GROUP BY mm.merge_key";
 	}
 
 	/**
-	 * ----- Campaign membership + per-campaign visibility (Action ▸ Campaigns) ---
-	 * Every active campaign, with two per-campaign flags for this person
-	 * (dedup_key): IsMember (already on the campaign_guests roster) and IsHidden
-	 * (opted out of THIS campaign's audience picker). Same dedup keying as
-	 * remarks/chat history so it spans all of their bookings/leads. Newest first.
+	 * ----- Campaigns this person joined (Action ▸ Campaigns) ------------------
+	 * Only the active campaigns whose roster (campaign_guests) already includes
+	 * this person (dedup_key) — campaigns they never joined are excluded. Same
+	 * dedup keying as remarks/chat history so it spans all of their
+	 * bookings/leads. Newest first.
 	 */
-	function Read_Campaigns_With_Visibility($dedup_key)
+	function Read_Member_Campaigns($dedup_key)
 	{
 		$dedup_key = (string) $dedup_key;
-		$sql = "SELECT c.CampaignID, c.Name, c.CampaignDate,
-				CASE WHEN cg.DedupKey IS NULL THEN 0 ELSE 1 END AS IsMember,
-				CASE WHEN chg.DedupKey IS NULL THEN 0 ELSE 1 END AS IsHidden
+		$sql = "SELECT c.CampaignID, c.Name, c.CampaignDate
 			FROM campaign c
-			LEFT JOIN campaign_guests cg
+			JOIN campaign_guests cg
 				ON cg.CampaignID = c.CampaignID AND cg.DedupKey = ?
-			LEFT JOIN campaign_hidden_guests chg
-				ON chg.CampaignID = c.CampaignID AND chg.DedupKey = ?
 			WHERE c.Status = 'Y'
 			ORDER BY c.CampaignDate DESC, c.CampaignID DESC";
-		return $this->db->query($sql, array($dedup_key, $dedup_key))->result();
+		return $this->db->query($sql, array($dedup_key))->result();
 	}
 
 	/**
@@ -2039,30 +2060,6 @@ GROUP BY mm.merge_key";
 		$out = array();
 		foreach ($this->db->query($sql, $keys)->result() as $row) {
 			$out[$row->DedupKey] = (int) $row->cnt;
-		}
-		return $out;
-	}
-
-	/**
-	 * dedup_key => true map for people hidden from AT LEAST ONE campaign's picker,
-	 * over a set of keys — badges the listing's Action menu (eye-slash) without a
-	 * per-row query.
-	 */
-	function Read_Campaign_Hidden_Flags($dedup_keys)
-	{
-		$keys = array();
-		foreach ((array) $dedup_keys as $k) {
-			$k = (string) $k;
-			if ($k !== '' && !in_array($k, $keys, true)) { $keys[] = $k; }
-		}
-		if (empty($keys)) {
-			return array();
-		}
-		$placeholders = implode(',', array_fill(0, count($keys), '?'));
-		$sql = "SELECT DISTINCT DedupKey FROM campaign_hidden_guests WHERE DedupKey IN ({$placeholders})";
-		$out = array();
-		foreach ($this->db->query($sql, $keys)->result() as $row) {
-			$out[$row->DedupKey] = true;
 		}
 		return $out;
 	}
@@ -2097,9 +2094,10 @@ GROUP BY mm.merge_key";
 	 * ----- Lead Status log (Manual Leads) --------------------------------------
 	 * A dated (StatusDate + LeadStatus + optional Note) history per lead, keyed by
 	 * dedup_key exactly like guest_remarks so it follows the person. Author in
-	 * CreatedBy, soft-deleted via Status, author-only delete. Distinct from the
-	 * single "current status" (ghl_contacts.lead_status) and from the lead_status
-	 * settings picklist (which only supplies the status NAMES).
+	 * CreatedBy, soft-deleted via Status, author-only delete. This log is now the
+	 * ONLY place a manual lead's status lives (the single ghl_contacts.lead_status
+	 * field was dropped); the latest active entry is the lead's current status. The
+	 * lead_status settings picklist only supplies the status NAMES.
 	 */
 	function Add_Lead_Status_Log($dedup_key, $status_date, $lead_status, $note, $admin_id)
 	{
@@ -2165,7 +2163,7 @@ GROUP BY mm.merge_key";
 		$sql = "SELECT gc.id, gc.first_name, gc.last_name, gc.company_name, gc.phone,
 				gc.email, gc.address, gc.gender, gc.chat_language, gc.race, gc.nationality,
 				gc.country, gc.source, gc.notes, gc.customer_type, gc.lead_intro,
-				gc.lead_status, gc.nature_of_business, gc.number_of_pax, gc.client_type, gc.state,
+				gc.nature_of_business, gc.number_of_pax, gc.client_type, gc.state,
 				gc.date_of_birth, gc.tags_json,
 				COALESCE(gc.date_added, gc.created_at) AS created_at, a.Name AS CreatedByName
 			FROM ghl_contacts gc
