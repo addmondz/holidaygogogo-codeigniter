@@ -55,7 +55,6 @@ class Costing_Item extends MY_Controller
             'category'            => $this->input->post('category'),
             'multiplier_type'     => $this->input->post('multiplier_type'),
             'default_currency_id' => $this->input->post('default_currency_id'),
-            'default_unit_cost'   => $this->input->post('default_unit_cost'),
         ));
 
         if ($success) {

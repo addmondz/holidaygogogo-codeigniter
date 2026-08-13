@@ -35,6 +35,7 @@ class Ghl_Leads extends MY_Controller
 		$this->load->model('Ghl_Messages_Model');
 		$data['msg_log_phones'] = $this->Ghl_Messages_Model->Phones_With_Messages_For_Guests($data['guests']);
 		$data['chat_counts']    = $this->Chat_Counts_For_Guests($data['guests']);
+		$data['campaign_counts'] = $this->Campaign_Counts_For_Guests($data['guests']);
 		$data['total']          = null;
 		$data['page']           = $page;
 		$data['limit']          = $limit;
@@ -78,6 +79,21 @@ class Ghl_Leads extends MY_Controller
 			}
 		}
 		return $this->Guests_Model->Read_Chat_History_Counts($keys);
+	}
+
+	/**
+	 * dedup_key => count of campaigns the person joined, for the rows on this
+	 * page — badges the Action ▸ Campaigns item without a per-row query.
+	 */
+	private function Campaign_Counts_For_Guests($guests)
+	{
+		$keys = array();
+		foreach ((array) $guests as $g) {
+			if (!empty($g->dedup_key)) {
+				$keys[] = $g->dedup_key;
+			}
+		}
+		return $this->Guests_Model->Read_Campaign_Counts($keys);
 	}
 
 	function Count()

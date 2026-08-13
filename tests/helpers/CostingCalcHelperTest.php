@@ -181,12 +181,30 @@ $assertions['row: negative rate -> 0 rate'] = $approx(costing_row_myr(100, -4.5,
 $assertions['row: negative bank clamped'] = $approx(costing_row_myr(100, 4.5, -10, 1)['myr_per_unit'], 450.00);
 $assertions['row: rounds per-unit 2dp']   = $approx(costing_row_myr(10.005, 1.0, 0, 1)['myr_per_unit'], 10.01);
 
+// costing_row_totals: a frozen per-unit MYR (saved on the row, bank charge already
+// baked in at save time) WINS and is never recomputed from the rate/bank charge —
+// only the line total is derived from it. This is what freezing into a stored
+// column buys: the "MYR (convert)" value can't drift when the master rate moves.
+$frozen = costing_row_totals(460.00, 100, 4.5, 10, 3);
+$assertions['totals: frozen per-unit wins']    = $approx($frozen['myr_per_unit'], 460.00);
+$assertions['totals: frozen x count -> total'] = $approx($frozen['total_myr'], 1380.00);
+$moved = costing_row_totals(460.00, 100, 9.9, 999, 2); // master rate changed after save
+$assertions['totals: frozen ignores moved rate']       = $approx($moved['myr_per_unit'], 460.00);
+$assertions['totals: frozen ignores moved rate total'] = $approx($moved['total_myr'], 920.00);
+// Legacy rows (no frozen value) fall back to converting from rate + bank charge.
+$legacy = costing_row_totals(null, 100, 4.5, 10, 3);
+$assertions['totals: null -> computes like row_myr'] = $approx($legacy['myr_per_unit'], 460.00);
+$assertions['totals: null legacy total']             = $approx($legacy['total_myr'], 1380.00);
+$assertions['totals: empty string -> legacy']        = $approx(costing_row_totals('', 30, 4.0, 0, 5)['total_myr'], 600.00);
+$assertions['totals: frozen 0 stays 0']              = $approx(costing_row_totals(0.0, 100, 4.5, 10, 3)['myr_per_unit'], 0.00);
+$assertions['totals: negative frozen clamped']       = $approx(costing_row_totals(-5, 100, 4.5, 10, 3)['myr_per_unit'], 0.00);
+
 /* ------------------------------------------------------------------ *
  * 7) SOURCE CONTRACT                                                  *
  * ------------------------------------------------------------------ */
 
 $helper = @file_get_contents(__DIR__ . '/../../application/helpers/costing_calc_helper.php');
-foreach (['costing_categories', 'costing_line_to_myr', 'costing_sum_by_category', 'costing_apply_markup', 'costing_build_snapshot_rows', 'costing_normalize_rate', 'costing_multiplier_types', 'costing_multiplier_count', 'costing_row_myr'] as $fn) {
+foreach (['costing_categories', 'costing_line_to_myr', 'costing_sum_by_category', 'costing_apply_markup', 'costing_build_snapshot_rows', 'costing_normalize_rate', 'costing_multiplier_types', 'costing_multiplier_count', 'costing_row_myr', 'costing_row_totals'] as $fn) {
     $assertions["helper: defines {$fn}()"] = (bool) preg_match('/function\s+' . preg_quote($fn, '/') . '\s*\(/', (string) $helper);
 }
 

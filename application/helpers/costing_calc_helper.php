@@ -257,6 +257,39 @@ if (!function_exists('costing_row_myr')) {
     }
 }
 
+if (!function_exists('costing_row_totals')) {
+    /**
+     * Resolve a cost row's MYR figures, preferring a FROZEN per-unit value saved
+     * with the row over recomputing from the (master/live) rate.
+     *
+     * The "MYR (convert)" column already bakes in the bank charge; once a row is
+     * saved we persist that per-unit figure in its own column so it never drifts
+     * when the exchange-rate master or bank charge changes later. When a frozen
+     * value is present ($stored_myr_per_unit not null/''), it wins and only the
+     * line total is derived from it. When absent (legacy pre-freeze rows), fall
+     * back to converting from the rate + bank charge like costing_row_myr().
+     *
+     * @param float|null $stored_myr_per_unit frozen per-unit MYR, or null/'' to compute
+     * @param float $cost_foreign
+     * @param float $rate
+     * @param float $bank_charges_myr
+     * @param float $count
+     * @return array ['myr_per_unit','total_myr'] (floats, 2dp)
+     */
+    function costing_row_totals($stored_myr_per_unit, $cost_foreign, $rate, $bank_charges_myr, $count)
+    {
+        if ($stored_myr_per_unit !== null && $stored_myr_per_unit !== '') {
+            $per_unit = round(max(0.0, (float) $stored_myr_per_unit), 2);
+            return [
+                'myr_per_unit' => $per_unit,
+                'total_myr'    => round($per_unit * max(0.0, (float) $count), 2),
+            ];
+        }
+
+        return costing_row_myr($cost_foreign, $rate, $bank_charges_myr, $count);
+    }
+}
+
 if (!function_exists('costing_normalize_rate')) {
     /**
      * Normalise a user-entered / prefilled rate: MYR is always 1.0, non-positive

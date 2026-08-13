@@ -50,7 +50,7 @@ WHERE NOT EXISTS (
 );
 
 INSERT INTO `costing_packages` (`name`, `duration_days`, `duration_nights`, `description`, `status`)
-SELECT 'Demo Bali 5D4N Private Tour', 5, 4, 'Sample costing package for private tour costing with mixed currencies.', 'draft'
+SELECT 'Demo Bali 5D4N Private Tour', 5, 4, 'Sample costing package for private tour costing with mixed currencies.', 'active'
 WHERE NOT EXISTS (
   SELECT 1 FROM `costing_packages` WHERE `name` = 'Demo Bali 5D4N Private Tour'
 );
@@ -108,7 +108,7 @@ WHERE NOT EXISTS (
 );
 
 INSERT INTO `costing_bookings` (`package_id`, `travel_date`, `adult_count`, `child_count`, `total_pax`, `status`)
-SELECT @bali_package_id, '2026-09-10', 4, 0, 4, 'draft'
+SELECT @bali_package_id, '2026-09-10', 4, 0, 4, 'active'
 WHERE NOT EXISTS (
   SELECT 1 FROM `costing_bookings`
   WHERE `package_id` = @bali_package_id AND `travel_date` = '2026-09-10' AND `adult_count` = 4 AND `child_count` = 0

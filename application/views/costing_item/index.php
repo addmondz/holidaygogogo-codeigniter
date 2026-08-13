@@ -46,7 +46,7 @@ if (!function_exists('costing_item_category_label')) {
                 <div class="d-flex justify-content-between align-items-start flex-wrap mb-6">
                     <div class="mb-3">
                         <div class="font-size-h5 font-weight-bold text-dark mb-2">Item Setup</div>
-                        <div class="text-muted">Reusable cost items, each in one of the five categories, with a default currency and unit cost.</div>
+                        <div class="text-muted">Reusable cost items, each in one of the five categories, with a default currency. Unit cost is entered per costing.</div>
                     </div>
                 </div>
 
@@ -94,13 +94,12 @@ if (!function_exists('costing_item_category_label')) {
                                 <th style="text-align:center;">Item Name</th>
                                 <th style="text-align:center; width:130px;">Multiplier</th>
                                 <th style="text-align:center; width:120px;">Currency</th>
-                                <th style="text-align:center; width:180px;">Default Unit Cost</th>
                                 <th class="action" style="text-align:center; width:200px;">Action</th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php if (empty($items)) { ?>
-                                <tr><td colspan="7" style="text-align:center; padding:16px;">Items Not Found</td></tr>
+                                <tr><td colspan="6" style="text-align:center; padding:16px;">Items Not Found</td></tr>
                             <?php } else { $count = 1; ?>
                                 <?php foreach ($items as $item) { ?>
                                     <tr>
@@ -114,7 +113,6 @@ if (!function_exists('costing_item_category_label')) {
                                             <span class="label label-lg label-light-info label-inline"><?php echo html_escape(isset($multiplier_types[$mt]) ? $multiplier_types[$mt] : ucfirst($mt)); ?></span>
                                         </td>
                                         <td style="text-align:center;"><?php echo html_escape($item['currency_code'] !== null ? $item['currency_code'] : '-'); ?></td>
-                                        <td style="text-align:center;"><span class="font-weight-bold text-dark"><?php echo html_escape($item['currency_code']); ?> <?php echo number_format((float) $item['default_unit_cost'], 2); ?></span></td>
                                         <td>
                                             <div class="d-flex justify-content-center flex-wrap" style="gap:6px;">
                                                 <button type="button" class="btn btn-sm btn-light-primary font-weight-bold edit-item" data-item="<?php echo html_escape(json_encode($item)); ?>">Edit</button>
@@ -166,17 +164,13 @@ if (!function_exists('costing_item_category_label')) {
                         </select>
                         <span class="form-text text-muted">Per Day multiplies by the package days, Per Pax by the number of pax, Fixed stays as one.</span>
                     </div>
-                    <div class="form-group">
+                    <div class="form-group mb-0">
                         <label>Default Currency</label>
                         <select name="default_currency_id" id="modal_item_currency" class="form-control" required>
                             <?php foreach ($currency_options as $currency) { ?>
                                 <option value="<?php echo (int) $currency['id']; ?>"><?php echo html_escape($currency['code']); ?> — <?php echo html_escape($currency['name']); ?></option>
                             <?php } ?>
                         </select>
-                    </div>
-                    <div class="form-group mb-0">
-                        <label>Default Unit Cost</label>
-                        <input type="number" step="0.01" min="0" name="default_unit_cost" id="modal_item_cost" class="form-control" value="0">
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -196,7 +190,6 @@ if (!function_exists('costing_item_category_label')) {
         var categoryInput = document.getElementById('modal_item_category');
         var multiplierInput = document.getElementById('modal_item_multiplier');
         var currencyInput = document.getElementById('modal_item_currency');
-        var costInput = document.getElementById('modal_item_cost');
 
         function resetModal() {
             title.textContent = 'Add Item';
@@ -205,7 +198,6 @@ if (!function_exists('costing_item_category_label')) {
             categoryInput.selectedIndex = 0;
             multiplierInput.value = 'fixed';
             currencyInput.selectedIndex = 0;
-            costInput.value = '0';
         }
 
         document.getElementById('add_item_button').addEventListener('click', resetModal);
@@ -220,7 +212,6 @@ if (!function_exists('costing_item_category_label')) {
                 categoryInput.value = item.category || '';
                 multiplierInput.value = item.multiplier_type || 'fixed';
                 currencyInput.value = item.default_currency_id || '';
-                costInput.value = item.default_unit_cost || '0';
                 $('#item_modal').modal('show');
             } catch (e) { console.error('Unable to read item data.', e); }
         });

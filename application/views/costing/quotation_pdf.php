@@ -58,22 +58,34 @@ if (is_file($logoPath)) {
     .text-center { text-align: center; }
     .text-right { text-align: right; }
     .small-font { font-size: 13px; }
-    @page { margin: 40px; }
+    /* Reserve top/bottom margin on every page for the repeating header/footer. */
+    @page { margin: 165px 40px 95px 40px; }
+    #pdf-header { position: fixed; top: -145px; left: 0px; right: 0px; height: 135px; }
+    #pdf-footer { position: fixed; bottom: -78px; left: 0px; right: 0px; height: 68px; }
 </style><body>
-    <table>
-        <tr>
-            <?php if ($logoSrc !== '') { ?>
-                <td style="width:15%"><img src="<?php echo $logoSrc; ?>" style="width:160px;"></td>
-            <?php } ?>
-            <td style="width:85%; text-align: center;">
-                <h1><?php echo html_escape($CompanyName); ?></h1>
-                <small>(Co. Reg. No. - <?php echo html_escape($CompanyReg); ?> | Travel Agent License No. - <?php echo html_escape($CompanyLicense); ?>)</small>
-                <p class="text-center small-font"><small>Address : <?php echo html_escape($CompanyAddress); ?></small></p>
-                <p class="text-center small-font"><small>Website : <?php echo html_escape($CompanyWebsite); ?></small></p>
-            </td>
-        </tr>
-    </table>
-    <hr class="margin-top-10">
+    <!-- Repeats on every page (fixed) -->
+    <div id="pdf-header">
+        <table>
+            <tr>
+                <?php if ($logoSrc !== '') { ?>
+                    <td style="width:15%"><img src="<?php echo $logoSrc; ?>" style="width:160px;"></td>
+                <?php } ?>
+                <td style="width:85%; text-align: center;">
+                    <h1><?php echo html_escape($CompanyName); ?></h1>
+                    <small>(Co. Reg. No. - <?php echo html_escape($CompanyReg); ?> | Travel Agent License No. - <?php echo html_escape($CompanyLicense); ?>)</small>
+                    <p class="text-center small-font"><small>Address : <?php echo html_escape($CompanyAddress); ?></small></p>
+                    <p class="text-center small-font"><small>Website : <?php echo html_escape($CompanyWebsite); ?></small></p>
+                </td>
+            </tr>
+        </table>
+        <hr class="margin-top-10">
+    </div>
+
+    <!-- Repeats on every page (fixed) -->
+    <div id="pdf-footer">
+        <hr style="margin-bottom:5px;">
+        <p style="font-size:12px; text-align:center;"><i>This Is A Computer Generated Quotation. No Signature Required.</i></p>
+    </div>
 
     <table style="width:100%;">
         <tr>
@@ -133,32 +145,6 @@ if (is_file($logoPath)) {
         </table>
     <?php } ?>
 
-    <hr style="margin-bottom:0px; margin-top:10px;">
-    <table style="width:100%; font-size:13px;">
-        <tr style="font-weight:700;">
-            <td style="width:8%;">Day</td>
-            <td style="width:32%;">Itinerary</td>
-            <td style="width:60%;">Details</td>
-        </tr>
-    </table>
-    <hr style="margin-top:0px;">
-
-    <?php if (empty($itinerary)) { ?>
-        <table style="width:100%; font-size:11px; border-spacing:5px;">
-            <tr><td style="text-align:center; padding:10px;">Itinerary details to be confirmed.</td></tr>
-        </table>
-    <?php } else { ?>
-        <?php foreach ($itinerary as $day) { ?>
-            <table style="width:100%; font-size:11px; border-spacing:5px;">
-                <tr style="vertical-align:baseline;">
-                    <td style="width:8%;">Day <?php echo (int) $day['day_number']; ?></td>
-                    <td style="width:32%;"><strong><?php echo html_escape(isset($day['title']) ? $day['title'] : ''); ?></strong></td>
-                    <td style="width:60%;"><?php echo nl2br(html_escape(isset($day['description']) ? $day['description'] : '')); ?></td>
-                </tr>
-            </table>
-        <?php } ?>
-    <?php } ?>
-
     <hr style="margin-bottom:5px; margin-top:10px;">
     <table style="width:100%; margin-bottom:10px;">
         <tr style="font-weight:bold;">
@@ -175,11 +161,34 @@ if (is_file($logoPath)) {
         <?php } ?>
     </table>
 
-    <p style="font-size:12px;">This quotation is indicative and subject to availability and final confirmation. All prices are quoted in Malaysian Ringgit (RM).</p>
-    <hr>
-    <table class="text-center" style="width:100%;">
-        <tr>
-            <td style="font-size:12px; text-align:center;"><i>This Is A Computer Generated Quotation. No Signature Required.</i></td>
-        </tr>
-    </table>
+    <!-- PAGE 2: Itinerary -->
+    <div style="page-break-before: always;">
+        <h3 class="text-center" style="margin-bottom:5px;"><?php echo html_escape($PackageName); ?> — Itinerary</h3>
+        <p class="text-center small-font" style="margin-bottom:8px;"><?php echo $DurationDays; ?> Days / <?php echo $DurationNights; ?> Nights</p>
+        <hr style="margin-bottom:0px;">
+        <table style="width:100%; font-size:13px;">
+            <tr style="font-weight:700;">
+                <td style="width:8%;">Day</td>
+                <td style="width:32%;">Itinerary</td>
+                <td style="width:60%;">Details</td>
+            </tr>
+        </table>
+        <hr style="margin-top:0px;">
+
+        <?php if (empty($itinerary)) { ?>
+            <table style="width:100%; font-size:11px; border-spacing:5px;">
+                <tr><td style="text-align:center; padding:10px;">Itinerary details to be confirmed.</td></tr>
+            </table>
+        <?php } else { ?>
+            <?php foreach ($itinerary as $day) { ?>
+                <table style="width:100%; font-size:11px; border-spacing:5px;">
+                    <tr style="vertical-align:baseline;">
+                        <td style="width:8%;">Day <?php echo (int) $day['day_number']; ?></td>
+                        <td style="width:32%;"><strong><?php echo html_escape(isset($day['title']) ? $day['title'] : ''); ?></strong></td>
+                        <td style="width:60%;"><?php echo nl2br(html_escape(isset($day['description']) ? $day['description'] : '')); ?></td>
+                    </tr>
+                </table>
+            <?php } ?>
+        <?php } ?>
+    </div>
 </body></html>

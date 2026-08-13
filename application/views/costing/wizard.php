@@ -7,7 +7,7 @@ $currencies = isset($currencies) ? $currencies : array();
 $currency_rate_map = isset($currency_rate_map) ? $currency_rate_map : array();
 $financials = isset($financials) ? $financials : array();
 $itinerary_days = isset($itinerary_days) ? $itinerary_days : array();
-$statuses = isset($statuses) ? $statuses : array('draft', 'active', 'inactive');
+$statuses = isset($statuses) ? $statuses : array('active', 'inactive');
 $wizard_steps = isset($wizard_steps) ? $wizard_steps : array('details' => 'Package Details', 'cost' => 'Cost Template & Margin', 'itinerary' => 'Itinerary', 'done' => 'Save & Quotation');
 $active_step = isset($active_step) ? $active_step : 'details';
 $has_snapshot = !empty($has_snapshot);
@@ -19,7 +19,7 @@ $adult_count = isset($booking['adult_count']) ? (int) $booking['adult_count'] : 
 $child_count = isset($booking['child_count']) ? (int) $booking['child_count'] : 0;
 $total_pax = isset($booking['total_pax']) ? (int) $booking['total_pax'] : ($adult_count + $child_count);
 $travel_date = isset($booking['travel_date']) ? $booking['travel_date'] : date('Y-m-d');
-$booking_status_value = isset($booking['status_value']) ? $booking['status_value'] : 'draft';
+$booking_status_value = isset($booking['status_value']) ? $booking['status_value'] : 'active';
 $margin_percentage = isset($financials['margin_percentage']) ? (float) $financials['margin_percentage'] : 0;
 
 $step_keys = array_keys($wizard_steps);
@@ -29,7 +29,7 @@ if ($active_index === false) {
 }
 
 // Cost rows: reuse the saved snapshot when it exists, else seed one row per
-// active item-master entry (its multiplier + default currency/cost/count).
+// active item-master entry (its multiplier + default currency/count; cost typed here).
 $cost_rows = array();
 if (!empty($booking_items)) {
     foreach ($booking_items as $item) {
@@ -52,7 +52,7 @@ if (!empty($booking_items)) {
             'category'        => isset($item['category']) ? $item['category'] : 'miscellaneous',
             'multiplier_type' => $mt,
             'currency_id'     => (int) (isset($item['default_currency_id']) ? $item['default_currency_id'] : 0),
-            'unit_price'      => (float) (isset($item['default_unit_cost']) ? $item['default_unit_cost'] : 0),
+            'unit_price'      => 0,
             'count'           => (float) $count,
             'include'         => true,
         );
@@ -86,8 +86,13 @@ if (!empty($booking_items)) {
     .cw-panel-sub { color: #6d7288; margin-bottom: 22px; }
     .cw-cost-table th { background: #f3f6fb; color: #3f4254; font-size: 12.5px; text-align: center; white-space: nowrap; }
     .cw-cost-table td { vertical-align: middle; }
+    .cw-cost-table tr.cw-cat-row td {
+        background: #eef4ff; color: #45608a; font-weight: 700; font-size: 12.5px;
+        text-transform: uppercase; letter-spacing: .5px; padding: 9px 12px;
+    }
     .cw-cost-table input, .cw-cost-table select { min-width: 90px; }
     .cw-myr { font-weight: 700; color: #3f4254; white-space: nowrap; }
+    .cw-bank-note { display: block; font-size: 11.5px; font-weight: 600; color: #8a6d3b; margin-top: 2px; }
     .cw-total { font-weight: 700; color: #187DE4; white-space: nowrap; }
     .cw-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 20px; }
     .cw-summary-box { border: 1px solid #e4e6ef; border-radius: 8px; padding: 14px 16px; background: #f9fbff; }
@@ -235,18 +240,37 @@ if (!empty($booking_items)) {
                             </tr>
                         </thead>
                         <tbody id="cw-cost-body">
-                            <?php foreach ($cost_rows as $idx => $row) { ?>
-                                <tr class="cw-row">
+                            <?php
+                            // Group the cost rows by category (canonical order first, then any
+                            // stragglers) so the template reads as sections, not one long list.
+                            $this->load->helper('costing_calc');
+                            $cat_labels = costing_categories();
+                            $grouped = array();
+                            foreach ($cost_rows as $idx => $row) {
+                                $cat = isset($row['category']) ? $row['category'] : 'miscellaneous';
+                                if (!isset($cat_labels[$cat])) { $cat = 'miscellaneous'; }
+                                $grouped[$cat][] = array('idx' => $idx, 'row' => $row);
+                            }
+                            foreach (array_keys($cat_labels) as $cat) {
+                                if (empty($grouped[$cat])) { continue; }
+                            ?>
+                                <tr class="cw-cat-row" data-cat="<?php echo html_escape($cat); ?>">
+                                    <td colspan="8"><?php echo html_escape($cat_labels[$cat]); ?></td>
+                                </tr>
+                                <?php foreach ($grouped[$cat] as $entry) { $idx = $entry['idx']; $row = $entry['row']; ?>
+                                <tr class="cw-row" data-cat="<?php echo html_escape($cat); ?>">
                                     <td class="text-center">
                                         <input type="hidden" name="rows[<?php echo $idx; ?>][include]" value="0" class="cw-include-hidden">
                                         <input type="checkbox" class="cw-include" <?php echo !empty($row['include']) ? 'checked' : ''; ?>>
                                     </td>
                                     <td>
                                         <input type="text" class="form-control" name="rows[<?php echo $idx; ?>][name]" value="<?php echo html_escape($row['name']); ?>" placeholder="Cost item" readonly>
-                                        <input type="hidden" name="rows[<?php echo $idx; ?>][category]" value="<?php echo html_escape($row['category']); ?>">
+                                        <input type="hidden" name="rows[<?php echo $idx; ?>][category]" value="<?php echo html_escape($cat); ?>">
                                         <input type="hidden" name="rows[<?php echo $idx; ?>][unit_count]" value="1">
                                         <input type="hidden" name="rows[<?php echo $idx; ?>][pax_type]" value="">
                                         <input type="hidden" class="cw-mult-type" name="rows[<?php echo $idx; ?>][multiplier_type]" value="<?php echo html_escape($row['multiplier_type']); ?>">
+                                        <input type="hidden" class="cw-myr-hidden" name="rows[<?php echo $idx; ?>][myr_per_unit]" value="">
+                                        <input type="hidden" class="cw-bank-hidden" name="rows[<?php echo $idx; ?>][bank_charges_myr]" value="">
                                     </td>
                                     <td>
                                         <select class="form-control cw-currency" name="rows[<?php echo $idx; ?>][currency_id]">
@@ -256,13 +280,14 @@ if (!empty($booking_items)) {
                                         </select>
                                     </td>
                                     <td><input type="number" step="0.01" min="0" class="form-control cw-cost" name="rows[<?php echo $idx; ?>][unit_price]" value="<?php echo html_escape($row['unit_price']); ?>"></td>
-                                    <td class="text-right cw-myr">0.00</td>
+                                    <td class="text-right cw-myr"><span class="cw-myr-val">0.00</span><span class="cw-bank-note"></span></td>
                                     <td><input type="number" step="1" min="0" class="form-control cw-count" name="rows[<?php echo $idx; ?>][quantity]" value="<?php echo html_escape($row['count']); ?>"></td>
                                     <td class="text-right cw-total">0.00</td>
                                     <td class="text-center">
                                         <button type="button" class="btn btn-icon btn-light-danger btn-sm cw-remove" title="Remove row"><i class="la la-trash"></i></button>
                                     </td>
                                 </tr>
+                                <?php } ?>
                             <?php } ?>
                         </tbody>
                     </table>
@@ -271,7 +296,7 @@ if (!empty($booking_items)) {
                     <select id="cw-add-item" class="form-control" style="max-width:340px;">
                         <option value="">— Select item from master —</option>
                         <?php foreach ($item_master as $mi_idx => $mi) { ?>
-                            <option value="<?php echo (int) $mi_idx; ?>"><?php echo html_escape($mi['name']); ?> (<?php echo html_escape(isset($mi['currency_code']) ? $mi['currency_code'] : ''); ?> <?php echo html_escape(rtrim(rtrim(number_format((float) $mi['default_unit_cost'], 2), '0'), '.')); ?> · <?php echo html_escape(isset($mi['multiplier_label']) ? $mi['multiplier_label'] : ''); ?>)</option>
+                            <option value="<?php echo (int) $mi_idx; ?>"><?php echo html_escape($mi['name']); ?> (<?php echo html_escape(isset($mi['currency_code']) ? $mi['currency_code'] : ''); ?> · <?php echo html_escape(isset($mi['multiplier_label']) ? $mi['multiplier_label'] : ''); ?>)</option>
                         <?php } ?>
                     </select>
                     <button type="button" class="btn btn-light-primary font-weight-bold" id="cw-add-row"><i class="la la-plus"></i>Add Cost Item</button>
@@ -381,6 +406,7 @@ if (!empty($booking_items)) {
 <script>
 (function () {
     var RATE_MAP = <?php echo json_encode($currency_rate_map); ?> || {};
+    var CAT_LABELS = <?php echo json_encode($cat_labels); ?> || {};
     var DURATION_DAYS = <?php echo (int) $duration_days; ?>;
 
     var body = document.getElementById('cw-cost-body');
@@ -425,7 +451,19 @@ if (!empty($booking_items)) {
             var count = parseFloat(countInput.value) || 0;
             var total = Math.round(perUnit * count * 100) / 100;
 
-            row.querySelector('.cw-myr').textContent = money(perUnit);
+            // Freeze the "MYR (convert)" figure (bank charge baked in) + the bank
+            // charge itself onto hidden inputs so the saved value is exactly what
+            // the user sees here, not re-pulled from the master on save.
+            var info = RATE_MAP[row.querySelector('.cw-currency').value] || { bank_charges_myr: 0 };
+            var myrHidden = row.querySelector('.cw-myr-hidden');
+            var bankHidden = row.querySelector('.cw-bank-hidden');
+            var bankVal = Number(info.bank_charges_myr) || 0;
+            if (myrHidden) { myrHidden.value = perUnit; }
+            if (bankHidden) { bankHidden.value = bankVal; }
+
+            var myrCell = row.querySelector('.cw-myr');
+            myrCell.querySelector('.cw-myr-val').textContent = money(perUnit);
+            myrCell.querySelector('.cw-bank-note').textContent = bankVal > 0 ? ('incl. ' + money(bankVal) + ' bank') : '';
             row.querySelector('.cw-total').textContent = money(total);
             row.style.opacity = included ? '1' : '0.45';
             if (included) { grandCost += total; }
@@ -461,7 +499,7 @@ if (!empty($booking_items)) {
             'category'        => isset($mi['category']) ? $mi['category'] : 'miscellaneous',
             'multiplier_type' => isset($mi['multiplier_type']) ? $mi['multiplier_type'] : 'fixed',
             'currency_id'     => (int) (isset($mi['default_currency_id']) ? $mi['default_currency_id'] : 0),
-            'unit_price'      => (float) (isset($mi['default_unit_cost']) ? $mi['default_unit_cost'] : 0),
+            'unit_price'      => 0,
         );
     }, $item_master)); ?> || [];
     var addItemSelect = document.getElementById('cw-add-item');
@@ -470,6 +508,32 @@ if (!empty($booking_items)) {
         if (type === 'per_day') { return DURATION_DAYS; }
         if (type === 'per_pax') { return totalPax(); }
         return 1;
+    }
+
+    // Drop a new row under its category header (creating the header if this is the
+    // first row of that category) so the added row lands in the right group.
+    function insertIntoCategory(tr, category) {
+        if (!CAT_LABELS[category]) { category = 'miscellaneous'; }
+        tr.setAttribute('data-cat', category);
+        var header = body.querySelector('.cw-cat-row[data-cat="' + category + '"]');
+        if (!header) {
+            header = document.createElement('tr');
+            header.className = 'cw-cat-row';
+            header.setAttribute('data-cat', category);
+            header.innerHTML = '<td colspan="8">' + CAT_LABELS[category] + '</td>';
+            body.appendChild(header);
+            body.appendChild(tr);
+            return;
+        }
+        var node = header.nextSibling;
+        var lastInGroup = header;
+        while (node) {
+            if (node.nodeType === 1 && node.classList.contains('cw-cat-row')) { break; }
+            if (node.nodeType === 1 && node.classList.contains('cw-row') && node.getAttribute('data-cat') === category) { lastInGroup = node; }
+            node = node.nextSibling;
+        }
+        if (lastInGroup.nextSibling) { body.insertBefore(tr, lastInGroup.nextSibling); }
+        else { body.appendChild(tr); }
     }
 
     function addRow() {
@@ -490,14 +554,15 @@ if (!empty($booking_items)) {
             '<input type="hidden" name="rows[' + i + '][category]" value="miscellaneous">' +
             '<input type="hidden" name="rows[' + i + '][unit_count]" value="1">' +
             '<input type="hidden" name="rows[' + i + '][pax_type]" value="">' +
-            '<input type="hidden" class="cw-mult-type" name="rows[' + i + '][multiplier_type]" value="fixed"></td>' +
+            '<input type="hidden" class="cw-mult-type" name="rows[' + i + '][multiplier_type]" value="fixed">' +
+            '<input type="hidden" class="cw-myr-hidden" name="rows[' + i + '][myr_per_unit]" value="">' +
+            '<input type="hidden" class="cw-bank-hidden" name="rows[' + i + '][bank_charges_myr]" value=""></td>' +
             '<td><select class="form-control cw-currency" name="rows[' + i + '][currency_id]">' + currencyOptions(item.currency_id) + '</select></td>' +
             '<td><input type="number" step="0.01" min="0" class="form-control cw-cost" name="rows[' + i + '][unit_price]" value="0"></td>' +
-            '<td class="text-right cw-myr">0.00</td>' +
+            '<td class="text-right cw-myr"><span class="cw-myr-val">0.00</span><span class="cw-bank-note"></span></td>' +
             '<td><input type="number" step="1" min="0" class="form-control cw-count" name="rows[' + i + '][quantity]" value="1"></td>' +
             '<td class="text-right cw-total">0.00</td>' +
             '<td class="text-center"><button type="button" class="btn btn-icon btn-light-danger btn-sm cw-remove" title="Remove row"><i class="la la-trash"></i></button></td>';
-        body.appendChild(tr);
 
         tr.querySelector('input[name="rows[' + i + '][name]"]').value = item.name;
         tr.querySelector('input[name="rows[' + i + '][category]"]').value = item.category;
@@ -505,15 +570,30 @@ if (!empty($booking_items)) {
         tr.querySelector('.cw-cost').value = item.unit_price;
         tr.querySelector('.cw-count').value = masterCount(item.multiplier_type);
 
+        insertIntoCategory(tr, item.category);
+
         addItemSelect.value = '';
         recalc();
     }
 
     body.addEventListener('input', recalc);
     body.addEventListener('change', recalc);
+    // Drop a category header once its last row is removed.
+    function pruneEmptyCategories() {
+        body.querySelectorAll('.cw-cat-row').forEach(function (header) {
+            var node = header.nextSibling, has = false;
+            while (node) {
+                if (node.nodeType === 1 && node.classList.contains('cw-cat-row')) { break; }
+                if (node.nodeType === 1 && node.classList.contains('cw-row')) { has = true; break; }
+                node = node.nextSibling;
+            }
+            if (!has) { header.remove(); }
+        });
+    }
+
     body.addEventListener('click', function (e) {
         var btn = e.target.closest('.cw-remove');
-        if (btn) { var row = btn.closest('.cw-row'); if (row) { row.remove(); recalc(); } }
+        if (btn) { var row = btn.closest('.cw-row'); if (row) { row.remove(); pruneEmptyCategories(); recalc(); } }
     });
     adultInput.addEventListener('input', recalc);
     childInput.addEventListener('input', recalc);

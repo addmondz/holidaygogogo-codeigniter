@@ -434,6 +434,7 @@ div.kt-datatable__pager-container {
 												</div>
 											</div>
 										</div>
+										<?php if($list_base === 'Customer') { ?>
 										<div class="col-md-3">
 											<div class="form-group">
 												<label>Customer Code</label>
@@ -443,6 +444,7 @@ div.kt-datatable__pager-container {
 												</div>
 											</div>
 										</div>
+										<?php } ?>
 										<div class="col-md-3">
 											<div class="form-group">
 												<label>Date Creation
@@ -677,7 +679,9 @@ div.kt-datatable__pager-container {
 									<th style="text-align:center;">Language</th>
 									<th style="text-align:center;">Guest Type</th>
 									<th style="text-align:center;">Destination</th>
-									<th style="text-align:center;">Customer Code</th>
+									<?php if($list_base === 'Customer') { ?>
+										<th style="text-align:center;">Customer Code</th>
+									<?php } ?>
 									<?php if($list_base === 'Customer') {
 										// Server-side sort toggle on customer Date Creation. Preserve all
 										// current filters, drop page (jump back to page 1 on re-sort).
@@ -710,7 +714,7 @@ div.kt-datatable__pager-container {
 						</thead>
 						<tbody>
 							<?php if(empty($guests)) { ?>
-								<tr><td colspan="<?php echo ($list_base === 'Customer') ? 12 : ($list_base === 'Manual_Leads' ? 12 : 11); ?>" style="text-align:center; padding-top:10px; padding-bottom:10px;">Guest Records Not Found</td></tr>
+								<tr><td colspan="<?php echo ($list_base === 'Customer') ? 12 : ($list_base === 'Manual_Leads' ? 12 : 10); ?>" style="text-align:center; padding-top:10px; padding-bottom:10px;">Guest Records Not Found</td></tr>
 							<?php } else { ?>
 								<?php $count = 1; foreach($guests as $g) { ?>
 									<?php $is_ghl_row = isset($g->Type) && ($g->Type === 'GHL' || $g->Type === 'Manual'); ?>
@@ -920,10 +924,12 @@ div.kt-datatable__pager-container {
 													}
 												?>
 											</td>
+											<?php if($list_base === 'Customer') { ?>
 											<td style="text-align:center; white-space:nowrap;">
 												<?php $cust_code = isset($g->CustomerCode) ? trim((string)$g->CustomerCode) : ''; ?>
 												<?php if($cust_code !== '') { echo htmlspecialchars($cust_code); } else { echo '<span class="text-muted">&mdash;</span>'; } ?>
 											</td>
+											<?php } ?>
 											<td style="text-align:center; white-space:nowrap;">
 												<?php
 													$created_raw = isset($g->CustomerCreatedAt) ? (string)$g->CustomerCreatedAt : '';
@@ -987,7 +993,7 @@ div.kt-datatable__pager-container {
 														<a href="javascript:;" class="dropdown-item js-remarks" style="font-size:11px;" data-dedup-key="<?php echo htmlspecialchars($g->dedup_key, ENT_QUOTES); ?>" data-name="<?php echo htmlspecialchars($g->Name, ENT_QUOTES); ?>">Remarks<?php if($rc > 0) { echo ' (' . $rc . ')'; } ?></a>
 													<?php } ?>
 													<a href="javascript:;" class="dropdown-item js-chat-history" style="font-size:11px;" data-dedup-key="<?php echo htmlspecialchars($g->dedup_key, ENT_QUOTES); ?>" data-name="<?php echo htmlspecialchars($g->Name, ENT_QUOTES); ?>">Chat History<?php if($chat_c > 0) { echo ' (' . $chat_c . ')'; } ?></a>
-													<?php if($list_base === 'Customer' && !empty($g->dedup_key)) {
+													<?php if(!empty($g->dedup_key)) {
 														$camp_c   = isset($campaign_counts[$g->dedup_key]) ? (int) $campaign_counts[$g->dedup_key] : 0;
 													?>
 														<a href="javascript:;" class="dropdown-item js-campaigns" style="font-size:11px;" data-dedup-key="<?php echo htmlspecialchars($g->dedup_key, ENT_QUOTES); ?>" data-name="<?php echo htmlspecialchars($g->Name, ENT_QUOTES); ?>">Campaigns<?php if($camp_c > 0) { echo ' (' . $camp_c . ')'; } ?></a>
@@ -1165,9 +1171,8 @@ div.kt-datatable__pager-container {
 	</div>
 </div>
 
-<?php if($list_base === 'Customer') { ?>
-<!-- Campaigns modal: which campaigns this customer is on + a toggle to opt them
-     in/out of the campaign form audience picker. Keyed by dedup_key. -->
+<!-- Campaigns modal: read-only list of campaigns this person joined. Shared by
+     Customer / Guest List / GHL Leads / Manual Leads. Keyed by dedup_key. -->
 <div class="modal fade" id="campaigns_modal" tabindex="-1" role="dialog" aria-hidden="true">
 	<div class="modal-dialog modal-dialog-centered modal-lg" role="document">
 		<div class="modal-content">
@@ -1179,7 +1184,7 @@ div.kt-datatable__pager-container {
 			</div>
 			<div class="modal-body">
 				<div class="text-muted mb-3" style="font-size:11px;">
-					<i class="fa fa-info-circle"></i> Campaigns this customer has joined.
+					<i class="fa fa-info-circle"></i> Campaigns this person has joined.
 				</div>
 				<div id="cp_error" class="text-danger font-weight-bold mb-2" style="font-size:12px; display:none;"></div>
 				<div id="cp_list">
@@ -1189,7 +1194,6 @@ div.kt-datatable__pager-container {
 		</div>
 	</div>
 </div>
-<?php } ?>
 
 <script>
 	<?php
@@ -1864,8 +1868,7 @@ div.kt-datatable__pager-container {
 		});
 	});
 
-	<?php if($list_base === 'Customer') { ?>
-	// ----- Campaigns modal (read-only list of campaigns the customer joined) ----
+	// ----- Campaigns modal (read-only list of campaigns the person joined) ----
 	var CP_LIST_URL = '<?php echo base_url('Guests/Campaigns'); ?>';
 	var cpDedupKey  = '';
 
@@ -1908,6 +1911,7 @@ div.kt-datatable__pager-container {
 		cpLoad();
 	});
 
+	<?php if($list_base === 'Customer') { ?>
 	// ----- Customer master actions (Customer List page only) -----
 	// Soft-delete customer (Status='N') via the existing Customer/Delete endpoint.
 	$(document).on('click', '.delete-customer', function(e) {

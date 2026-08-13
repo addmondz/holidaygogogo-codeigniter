@@ -57,7 +57,7 @@ class Costing_Item_Model extends CI_Model
     /**
      * Create or update an item. Returns true on success.
      *
-     * @param array $item id, name, category, default_currency_id, default_unit_cost
+     * @param array $item id, name, category, default_currency_id
      */
     public function Save_Item($item)
     {
@@ -68,7 +68,6 @@ class Costing_Item_Model extends CI_Model
         $category = strtolower(trim((string) $item['category']));
         $multiplier_type = costing_normalize_multiplier_type(isset($item['multiplier_type']) ? $item['multiplier_type'] : 'fixed');
         $currency_id = (int) $item['default_currency_id'];
-        $unit_cost = (float) $item['default_unit_cost'];
 
         if ($name === '' || !in_array($category, $valid_categories, true) || $currency_id <= 0) {
             return false;
@@ -79,7 +78,6 @@ class Costing_Item_Model extends CI_Model
             'category'            => $category,
             'multiplier_type'     => $multiplier_type,
             'default_currency_id' => $currency_id,
-            'default_unit_cost'   => $unit_cost,
         );
 
         if ((int) $item['id'] > 0) {

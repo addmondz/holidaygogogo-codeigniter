@@ -53,20 +53,20 @@ class Costing_Seed extends CI_Controller
         $sgd = $this->currency_id('SGD', 'Singapore Dollar');
 
         $items = array(
-            array('Return Flight (Economy)', 'flight',        $usd, 320.00),
-            array('Domestic Transfer Flight', 'flight',        $myr, 250.00),
-            array('4-Star Hotel (per night)', 'accommodation', $sgd, 180.00),
-            array('Beach Resort (per night)',  'accommodation', $usd, 150.00),
-            array('Airport Transfer (van)',    'other',         $myr, 120.00),
-            array('Travel Insurance',          'other',         $myr,  45.00),
-            array('Tour Leader (per day)',     'tour_leader',   $myr, 400.00),
-            array('Local Guide (per day)',     'tour_leader',   $usd,  80.00),
-            array('SIM Card',                  'miscellaneous', $myr,  25.00),
-            array('Tips & Gratuities',         'miscellaneous', $myr,  60.00),
+            array('Return Flight (Economy)', 'flight',        $usd),
+            array('Domestic Transfer Flight', 'flight',        $myr),
+            array('4-Star Hotel (per night)', 'accommodation', $sgd),
+            array('Beach Resort (per night)',  'accommodation', $usd),
+            array('Airport Transfer (van)',    'other',         $myr),
+            array('Travel Insurance',          'other',         $myr),
+            array('Tour Leader (per day)',     'tour_leader',   $myr),
+            array('Local Guide (per day)',     'tour_leader',   $usd),
+            array('SIM Card',                  'miscellaneous', $myr),
+            array('Tips & Gratuities',         'miscellaneous', $myr),
         );
         $created = 0;
         foreach ($items as $it) {
-            if ($this->Costing_Item_Model->Save_Item(array('id' => 0, 'name' => $it[0], 'category' => $it[1], 'default_currency_id' => $it[2], 'default_unit_cost' => $it[3]))) {
+            if ($this->Costing_Item_Model->Save_Item(array('id' => 0, 'name' => $it[0], 'category' => $it[1], 'default_currency_id' => $it[2]))) {
                 $created++;
             }
         }

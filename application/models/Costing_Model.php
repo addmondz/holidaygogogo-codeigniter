@@ -148,7 +148,7 @@ class Costing_Model extends CI_Model
             'has_booking' => !empty($booking),
             'has_bookings' => !empty($bookings),
             'currencies' => $this->Read_Currencies(),
-            'statuses' => array('draft', 'active', 'inactive'),
+            'statuses' => array('active', 'inactive'),
             'cost_types' => $this->Read_Cost_Types(),
             'latest_exchange_rates' => $this->Read_Latest_Exchange_Rates(),
             'snapshot_panel' => $booking ? $this->Read_Snapshot_Panel((int) $booking['id']) : array(),
@@ -1045,7 +1045,7 @@ class Costing_Model extends CI_Model
         $multiplier_labels = costing_multiplier_types();
 
         $rows = $this->db
-            ->select('ci.id, ci.name, ci.category, ci.multiplier_type, ci.default_currency_id, ci.default_unit_cost, cc.code AS currency_code')
+            ->select('ci.id, ci.name, ci.category, ci.multiplier_type, ci.default_currency_id, cc.code AS currency_code')
             ->from('costing_items ci')
             ->join('costing_currencies cc', 'cc.id = ci.default_currency_id', 'left')
             ->where('ci.Status', 'Y')
@@ -1152,6 +1152,7 @@ class Costing_Model extends CI_Model
                 costing_booking_items.currency_id,
                 costing_booking_items.total_amount,
                 costing_booking_items.bank_charges_myr,
+                costing_booking_items.myr_per_unit AS frozen_myr_per_unit,
                 COALESCE(costing_booking_items.remark, "") AS remark,
                 costing_currencies.code AS currency
             ')
@@ -1177,10 +1178,13 @@ class Costing_Model extends CI_Model
             }
             $item['bank_charges_myr'] = (float) $item['bank_charges_myr'];
 
-            // Cost template math: convert the foreign unit cost to MYR (bank charge
-            // baked in), then multiply by the count (No of Day / No of pax / 1).
+            // Cost template math: the frozen per-unit MYR saved with the row wins
+            // (bank charge already baked in at save time, never re-pulled from the
+            // master); legacy rows with no frozen value convert from the rate.
+            $stored_myr = ($item['frozen_myr_per_unit'] === null) ? null : (float) $item['frozen_myr_per_unit'];
+            unset($item['frozen_myr_per_unit']);
             $cost_foreign = (float) $item['unit_price'] * (float) $item['unit_count'];
-            $myr = costing_row_myr($cost_foreign, $item['exchange_rate'], $item['bank_charges_myr'], (float) $item['quantity']);
+            $myr = costing_row_totals($stored_myr, $cost_foreign, $item['exchange_rate'], $item['bank_charges_myr'], (float) $item['quantity']);
             $item['myr_per_unit'] = $myr['myr_per_unit'];
             $item['base_total'] = $myr['total_myr'];
         }
@@ -1447,6 +1451,13 @@ class Costing_Model extends CI_Model
                 $normalized_row['bank_charges_myr'] = round(max(0, (float) $row['bank_charges_myr']), 2);
             }
 
+            // Freeze the "MYR (convert)" figure the user saw (foreign cost -> MYR
+            // with bank charge baked in) into its own column, so it never drifts
+            // when the exchange-rate master moves after saving.
+            if (array_key_exists('myr_per_unit', $row) && $row['myr_per_unit'] !== '') {
+                $normalized_row['myr_per_unit'] = round(max(0, (float) $row['myr_per_unit']), 2);
+            }
+
             $normalized[] = $normalized_row;
         }
 
@@ -1548,7 +1559,7 @@ class Costing_Model extends CI_Model
     private function Normalize_Status($status)
     {
         $status = strtolower(trim((string) $status));
-        return in_array($status, array('draft', 'active', 'inactive'), true) ? $status : 'draft';
+        return in_array($status, array('active', 'inactive'), true) ? $status : 'active';
     }
 
     private function Normalize_Cost_Type($cost_type)
@@ -1604,8 +1615,8 @@ class Costing_Model extends CI_Model
                 'duration_days' => 1,
                 'duration_nights' => 0,
                 'description' => '',
-                'status' => 'Draft',
-                'status_value' => 'draft',
+                'status' => 'Active',
+                'status_value' => 'active',
             ),
             'booking' => $this->Empty_Booking_Data(),
             'bookings' => array(),
@@ -1618,7 +1629,7 @@ class Costing_Model extends CI_Model
             'has_booking' => false,
             'has_bookings' => false,
             'currencies' => $this->Read_Currencies(),
-            'statuses' => array('draft', 'active', 'inactive'),
+            'statuses' => array('active', 'inactive'),
             'cost_types' => $this->Read_Cost_Types(),
             'latest_exchange_rates' => $this->Read_Latest_Exchange_Rates(),
             'snapshot_panel' => array(),
@@ -1638,8 +1649,8 @@ class Costing_Model extends CI_Model
             'adult_count' => 2,
             'child_count' => 0,
             'total_pax' => 2,
-            'status' => 'Draft',
-            'status_value' => 'draft',
+            'status' => 'Active',
+            'status_value' => 'active',
         );
     }
 
