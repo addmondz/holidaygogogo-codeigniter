@@ -24,6 +24,7 @@ $CompanyAddress = isset($company['Address']) ? $company['Address'] : '';
 $CompanyWebsite = isset($company['Website']) ? $company['Website'] : '';
 
 $PackageName   = isset($package['name']) ? $package['name'] : '-';
+$TourCode      = isset($package['tour_code']) && $package['tour_code'] !== '' ? $package['tour_code'] : '-';
 $DurationDays  = (int) (isset($package['duration_days']) ? $package['duration_days'] : 0);
 $DurationNights = (int) (isset($package['duration_nights']) ? $package['duration_nights'] : 0);
 $TotalPax      = (int) (isset($booking['total_pax']) ? $booking['total_pax'] : 0);
@@ -115,9 +116,9 @@ if (is_file($logoPath)) {
             <td>Date</td>
             <td> : </td>
             <td><?php echo html_escape($InsertDate); ?></td>
-            <td></td>
-            <td></td>
-            <td></td>
+            <td><b>Tour Code</b></td>
+            <td> : </td>
+            <td><?php echo html_escape($TourCode); ?></td>
         </tr>
     </table>
 
@@ -145,21 +146,24 @@ if (is_file($logoPath)) {
         </table>
     <?php } ?>
 
-    <hr style="margin-bottom:5px; margin-top:10px;">
-    <table style="width:100%; margin-bottom:10px;">
-        <tr style="font-weight:bold;">
-            <td style="width:60%;">&nbsp;</td>
-            <td style="width:28%;">Total Package Price (RM):</td>
-            <td style="width:12%; text-align:right; float:left;"><label><?php echo number_format($TotalSelling, 2, '.', ','); ?></label></td>
-        </tr>
-        <?php if ($TotalPax > 0) { ?>
-        <tr>
-            <td>&nbsp;</td>
-            <td style="border-bottom: 1px solid black;">Price / Pax (RM):</td>
-            <td style="text-align:right; float:left; border-bottom: 1px solid black;"><label><?php echo number_format($TotalSelling / max(1, $TotalPax), 2, '.', ','); ?></label></td>
-        </tr>
-        <?php } ?>
-    </table>
+    <!-- Totals pinned to the bottom of page 1 (mirrors the Booking Confirmation footer). -->
+    <div style="position: absolute; bottom: 0; left: 0; right: 0;">
+        <hr style="margin-bottom:5px; margin-top:10px;">
+        <table style="width:100%; margin-bottom:10px;">
+            <tr style="font-weight:bold;">
+                <td style="width:60%;">&nbsp;</td>
+                <td style="width:28%;">Total Package Price (RM):</td>
+                <td style="width:12%; text-align:right; float:left;"><label><?php echo number_format($TotalSelling, 2, '.', ','); ?></label></td>
+            </tr>
+            <?php if ($TotalPax > 0) { ?>
+            <tr>
+                <td>&nbsp;</td>
+                <td style="border-bottom: 1px solid black;">Price / Pax (RM):</td>
+                <td style="text-align:right; float:left; border-bottom: 1px solid black;"><label><?php echo number_format($TotalSelling / max(1, $TotalPax), 2, '.', ','); ?></label></td>
+            </tr>
+            <?php } ?>
+        </table>
+    </div>
 
     <!-- PAGE 2: Itinerary -->
     <div style="page-break-before: always;">

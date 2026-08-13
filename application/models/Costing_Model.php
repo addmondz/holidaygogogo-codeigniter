@@ -8,6 +8,7 @@ class Costing_Model extends CI_Model
             SELECT
                 cp.id,
                 cp.name,
+                cp.tour_code,
                 cp.duration_days,
                 cp.duration_nights,
                 cp.description,
@@ -122,6 +123,7 @@ class Costing_Model extends CI_Model
             'package' => array(
                 'id' => (int) $package['id'],
                 'name' => $package['name'],
+                'tour_code' => isset($package['tour_code']) ? $package['tour_code'] : '',
                 'duration_days' => (int) $package['duration_days'],
                 'duration_nights' => (int) $package['duration_nights'],
                 'description' => $package['description'],
@@ -223,6 +225,7 @@ class Costing_Model extends CI_Model
     {
         $data = array(
             'name' => trim((string) $package['name']),
+            'tour_code' => trim((string) (isset($package['tour_code']) ? $package['tour_code'] : '')),
             'duration_days' => max(1, (int) $package['duration_days']),
             'duration_nights' => max(0, (int) $package['duration_nights']),
             'description' => trim((string) $package['description']),
@@ -850,7 +853,7 @@ class Costing_Model extends CI_Model
         }
 
         $booking = $this->db
-            ->select('cb.*, cp.name AS package_name, cp.duration_days, cp.duration_nights')
+            ->select('cb.*, cp.name AS package_name, cp.tour_code, cp.duration_days, cp.duration_nights')
             ->from('costing_bookings cb')
             ->join('costing_packages cp', 'cp.id = cb.package_id')
             ->where('cb.quotation_token', $token)
@@ -881,6 +884,7 @@ class Costing_Model extends CI_Model
             'booking'    => $booking,
             'package'    => array(
                 'name'            => $booking['package_name'],
+                'tour_code'       => isset($booking['tour_code']) ? $booking['tour_code'] : '',
                 'duration_days'   => (int) $booking['duration_days'],
                 'duration_nights' => (int) $booking['duration_nights'],
             ),

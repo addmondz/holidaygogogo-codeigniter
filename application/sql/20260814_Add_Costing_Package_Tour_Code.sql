@@ -1,0 +1,1 @@
+ALTER TABLE costing_packages ADD COLUMN tour_code VARCHAR(50) NULL DEFAULT NULL AFTER name;

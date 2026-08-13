@@ -39,6 +39,7 @@ $packages = isset($packages) ? $packages : array();
                             <tr>
                                 <th style="text-align:center;">No.</th>
                                 <th style="text-align:center;">Package Name</th>
+                                <th style="text-align:center;">Tour Code</th>
                                 <th style="text-align:center;">Duration</th>
                                 <th style="text-align:center;">Status</th>
                                 <th style="text-align:center;">Updated At</th>
@@ -48,7 +49,7 @@ $packages = isset($packages) ? $packages : array();
                         <tbody>
                             <?php if (empty($packages)) { ?>
                                 <tr>
-                                    <td colspan="6" style="text-align:center; padding-top:10px; padding-bottom:10px;">Costing Package Records Not Found</td>
+                                    <td colspan="7" style="text-align:center; padding-top:10px; padding-bottom:10px;">Costing Package Records Not Found</td>
                                 </tr>
                             <?php } else { ?>
                                 <?php $count = 1; ?>
@@ -59,6 +60,7 @@ $packages = isset($packages) ? $packages : array();
                                             <div class="font-weight-bold"><?php echo html_escape($package['name']); ?></div>
                                             <div class="text-muted"><?php echo html_escape($package['description']); ?></div>
                                         </td>
+                                        <td style="text-align:center;"><?php echo !empty($package['tour_code']) ? html_escape($package['tour_code']) : '-'; ?></td>
                                         <td style="text-align:center;"><?php echo (int) $package['duration_days']; ?>D / <?php echo (int) $package['duration_nights']; ?>N</td>
                                         <td style="text-align:center;">
                                             <span class="label label-lg label-light-primary label-inline"><?php echo html_escape($package['status_label']); ?></span>

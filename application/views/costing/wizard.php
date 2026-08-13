@@ -150,6 +150,14 @@ if (!empty($booking_items)) {
                             <input type="text" name="name" class="form-control" required value="<?php echo html_escape($package['name']); ?>">
                         </div>
                     </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Tour Code</label>
+                            <input type="text" name="tour_code" class="form-control" value="<?php echo html_escape(isset($package['tour_code']) ? $package['tour_code'] : ''); ?>">
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
                     <div class="col-md-3">
                         <div class="form-group">
                             <label>Days</label>
@@ -251,13 +259,39 @@ if (!empty($booking_items)) {
                                 if (!isset($cat_labels[$cat])) { $cat = 'miscellaneous'; }
                                 $grouped[$cat][] = array('idx' => $idx, 'row' => $row);
                             }
+                            // Categories that have at least one master item to offer.
+                            $master_cats = array();
+                            foreach ($item_master as $mi) {
+                                $mc = isset($mi['category']) ? $mi['category'] : 'miscellaneous';
+                                if (!isset($cat_labels[$mc])) { $mc = 'miscellaneous'; }
+                                $master_cats[$mc] = true;
+                            }
+                            // Only render a category when it has master items to add or
+                            // existing rows to show — hide otherwise-empty sections.
                             foreach (array_keys($cat_labels) as $cat) {
-                                if (empty($grouped[$cat])) { continue; }
+                                if (empty($master_cats[$cat]) && empty($grouped[$cat])) { continue; }
                             ?>
                                 <tr class="cw-cat-row" data-cat="<?php echo html_escape($cat); ?>">
-                                    <td colspan="8"><?php echo html_escape($cat_labels[$cat]); ?></td>
+                                    <td colspan="8">
+                                        <div class="d-flex flex-wrap align-items-center justify-content-between" style="gap:8px;">
+                                            <span><?php echo html_escape($cat_labels[$cat]); ?></span>
+                                            <div class="d-flex align-items-center" style="gap:8px;">
+                                                <select class="form-control form-control-sm cw-cat-add" data-cat="<?php echo html_escape($cat); ?>" style="min-width:240px;max-width:280px;">
+                                                    <option value="">— Add <?php echo html_escape($cat_labels[$cat]); ?> item —</option>
+                                                    <?php foreach ($item_master as $mi_idx => $mi) {
+                                                        $mcat = isset($mi['category']) ? $mi['category'] : 'miscellaneous';
+                                                        if (!isset($cat_labels[$mcat])) { $mcat = 'miscellaneous'; }
+                                                        if ($mcat !== $cat) { continue; }
+                                                    ?>
+                                                        <option value="<?php echo (int) $mi_idx; ?>"><?php echo html_escape($mi['name']); ?> (<?php echo html_escape(isset($mi['currency_code']) ? $mi['currency_code'] : ''); ?> · <?php echo html_escape(isset($mi['multiplier_label']) ? $mi['multiplier_label'] : ''); ?>)</option>
+                                                    <?php } ?>
+                                                </select>
+                                                <button type="button" class="btn btn-sm btn-success font-weight-bold cw-cat-add-btn" data-cat="<?php echo html_escape($cat); ?>"><i class="la la-plus"></i>Add</button>
+                                            </div>
+                                        </div>
+                                    </td>
                                 </tr>
-                                <?php foreach ($grouped[$cat] as $entry) { $idx = $entry['idx']; $row = $entry['row']; ?>
+                                <?php foreach ((isset($grouped[$cat]) ? $grouped[$cat] : array()) as $entry) { $idx = $entry['idx']; $row = $entry['row']; ?>
                                 <tr class="cw-row" data-cat="<?php echo html_escape($cat); ?>">
                                     <td class="text-center">
                                         <input type="hidden" name="rows[<?php echo $idx; ?>][include]" value="0" class="cw-include-hidden">
@@ -293,13 +327,6 @@ if (!empty($booking_items)) {
                     </table>
                 </div>
                 <div class="d-flex flex-wrap align-items-center" style="gap:8px;">
-                    <select id="cw-add-item" class="form-control" style="max-width:340px;">
-                        <option value="">— Select item from master —</option>
-                        <?php foreach ($item_master as $mi_idx => $mi) { ?>
-                            <option value="<?php echo (int) $mi_idx; ?>"><?php echo html_escape($mi['name']); ?> (<?php echo html_escape(isset($mi['currency_code']) ? $mi['currency_code'] : ''); ?> · <?php echo html_escape(isset($mi['multiplier_label']) ? $mi['multiplier_label'] : ''); ?>)</option>
-                        <?php } ?>
-                    </select>
-                    <button type="button" class="btn btn-light-primary font-weight-bold" id="cw-add-row"><i class="la la-plus"></i>Add Cost Item</button>
                     <a href="<?php echo base_url('Costing_Item'); ?>" target="_blank" class="btn btn-light font-weight-bold" title="Manage item master">Manage Items</a>
                 </div>
                 <?php if (empty($item_master)) { ?>
@@ -414,7 +441,6 @@ if (!empty($booking_items)) {
     var childInput = document.getElementById('cw-child');
     var totalPaxInput = document.getElementById('cw-total-pax');
     var marginInput = document.getElementById('cw-margin');
-    var addRowBtn = document.getElementById('cw-add-row');
     var rowSeq = <?php echo count($cost_rows); ?>;
 
     function money(n) { return 'RM ' + (Math.round((Number(n) || 0) * 100) / 100).toFixed(2); }
@@ -502,7 +528,6 @@ if (!empty($booking_items)) {
             'unit_price'      => 0,
         );
     }, $item_master)); ?> || [];
-    var addItemSelect = document.getElementById('cw-add-item');
 
     function masterCount(type) {
         if (type === 'per_day') { return DURATION_DAYS; }
@@ -536,13 +561,15 @@ if (!empty($booking_items)) {
         else { body.appendChild(tr); }
     }
 
-    function addRow() {
-        if (!addItemSelect || addItemSelect.value === '') {
-            if (typeof Swal !== 'undefined') { Swal.fire({ icon: 'info', title: 'Pick an item', text: 'Select a cost item from the master first.' }); }
-            else { alert('Select a cost item from the master first.'); }
+    // Each category header carries its own item picker; add lands the row in that
+    // category and only offers items belonging to it.
+    function addRow(sel) {
+        if (!sel || sel.value === '') {
+            if (typeof Swal !== 'undefined') { Swal.fire({ icon: 'info', title: 'Pick an item', text: 'Select a cost item for this category first.' }); }
+            else { alert('Select a cost item for this category first.'); }
             return;
         }
-        var item = MASTER[parseInt(addItemSelect.value, 10)];
+        var item = MASTER[parseInt(sel.value, 10)];
         if (!item) { return; }
 
         var i = rowSeq++;
@@ -572,35 +599,41 @@ if (!empty($booking_items)) {
 
         insertIntoCategory(tr, item.category);
 
-        addItemSelect.value = '';
+        sel.value = '';
+        // Keep Select2 (if active) in sync with the native reset.
+        if (window.jQuery && jQuery.fn.select2) { jQuery(sel).trigger('change.select2'); }
         recalc();
     }
 
     body.addEventListener('input', recalc);
     body.addEventListener('change', recalc);
-    // Drop a category header once its last row is removed.
-    function pruneEmptyCategories() {
-        body.querySelectorAll('.cw-cat-row').forEach(function (header) {
-            var node = header.nextSibling, has = false;
-            while (node) {
-                if (node.nodeType === 1 && node.classList.contains('cw-cat-row')) { break; }
-                if (node.nodeType === 1 && node.classList.contains('cw-row')) { has = true; break; }
-                node = node.nextSibling;
-            }
-            if (!has) { header.remove(); }
-        });
-    }
-
     body.addEventListener('click', function (e) {
+        var addBtn = e.target.closest('.cw-cat-add-btn');
+        if (addBtn) {
+            var cat = addBtn.getAttribute('data-cat');
+            addRow(body.querySelector('.cw-cat-add[data-cat="' + cat + '"]'));
+            return;
+        }
         var btn = e.target.closest('.cw-remove');
-        if (btn) { var row = btn.closest('.cw-row'); if (row) { row.remove(); pruneEmptyCategories(); recalc(); } }
+        // Keep the (now empty) category header so all sections stay visible.
+        if (btn) { var row = btn.closest('.cw-row'); if (row) { row.remove(); recalc(); } }
     });
     adultInput.addEventListener('input', recalc);
     childInput.addEventListener('input', recalc);
     marginInput.addEventListener('input', recalc);
-    addRowBtn.addEventListener('click', addRow);
 
     recalc();
+
+    // Each category picker is type-to-search (Select2 ships with the theme).
+    if (window.jQuery && jQuery.fn.select2) {
+        jQuery('.cw-cat-add').each(function () {
+            jQuery(this).select2({
+                placeholder: jQuery(this).find('option').first().text(),
+                allowClear: true,
+                width: '260px'
+            });
+        });
+    }
 })();
 </script>
 <?php } elseif ($active_step === 'itinerary') { ?>
