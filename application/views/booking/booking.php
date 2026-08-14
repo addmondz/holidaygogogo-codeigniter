@@ -438,6 +438,10 @@
                                     $customer_id_value = ($is_edit_page && !empty($CustomerID)) ? $CustomerID : '';
                                     ?>
                                     <input type="hidden" id="CustomerID" name="CustomerID" value="<?= htmlspecialchars($customer_id_value, ENT_QUOTES) ?>">
+                                    <!-- Set to 1 by the "Existing Customer Found" dialog when the agent
+                                         chooses "Create new customer anyway", forcing the server to make a
+                                         brand-new customer instead of reusing the same-phone match. -->
+                                    <input type="hidden" id="force_new_customer" name="force_new_customer" value="">
 
 
                                     <span><i class="la la-user"></i></span>
@@ -4661,20 +4665,25 @@
                     Swal.fire({
                         icon: 'warning',
                         title: 'Existing Customer Found',
-                        html: 'A customer with this phone number already exists, so this booking will use it:<br><br>'
+                        html: 'A customer with this phone number already exists:<br><br>'
                             + '<strong>' + esc(m.name) + '</strong><br>'
                             + 'Code: <strong>' + esc(m.CustomerCode || '—') + '</strong><br>'
-                            + 'Phone: ' + esc(m.phone_number),
+                            + 'Phone: ' + esc(m.phone_number)
+                            + '<br><br>Use it for this booking, or create a new customer anyway?',
                         showCancelButton: true,
+                        showDenyButton: true,
                         confirmButtonText: 'Use existing customer',
+                        denyButtonText: 'Create new customer anyway',
                         cancelButtonText: 'Back to edit',
                         customClass: {
                             confirmButton: 'btn btn-light-success m-2',
+                            denyButton: 'btn btn-light-primary m-2',
                             cancelButton: 'btn btn-secondary m-2'
                         },
                         buttonsStyling: true
                     }).then(function(res) {
                         if (res.isConfirmed) {
+                            $('#force_new_customer').val('');
                             $('#CustomerID').val(m.CustomerID);
                             $('#Customer').val(m.name);
                             $('#Customer').data('selectedCode', m.CustomerCode || '');
@@ -4682,6 +4691,12 @@
                                 .removeClass('text-muted text-primary')
                                 .addClass('text-success')
                                 .html('<i class="la la-check-circle"></i> Existing Customer — <strong>' + esc(m.CustomerCode || 'Empty Customer Code ') + '</strong> (' + esc(m.phone_number || 'No phone number') + ')');
+                            proceedToConfirm();
+                        } else if (res.isDenied) {
+                            // Keep CustomerID blank and flag the server to force-create a
+                            // brand-new customer despite the same-phone match.
+                            $('#CustomerID').val('');
+                            $('#force_new_customer').val('1');
                             proceedToConfirm();
                         }
                     });
@@ -4726,6 +4741,8 @@
                 PrimaryEmail: ($('#Email').val() || '').trim(),
 
                 customer_type: $('#customer_type').val() || [],
+
+                force_new_customer: $('#force_new_customer').val() || '',
 
             };
 

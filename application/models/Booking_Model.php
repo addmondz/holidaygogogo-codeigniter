@@ -1056,7 +1056,14 @@ class Booking_Model extends CI_Model
 				// Hard duplicate-phone block: reuse an existing customer with the
 				// same phone (any format) instead of creating a duplicate; only a
 				// genuinely new phone creates a new customer + generated code.
-				$customer_id = $this->Customer_Model->create_or_reuse_by_phone($data);
+				// The agent can override this from the "Existing Customer Found"
+				// dialog ("Create new customer anyway") — force_new_customer forces
+				// a brand-new customer even when the phone already exists.
+				if ($this->input->post('force_new_customer')) {
+					$customer_id = $this->Customer_Model->create_with_generated_code($data);
+				} else {
+					$customer_id = $this->Customer_Model->create_or_reuse_by_phone($data);
+				}
 
 				// remove this no need sync directly, cron will sync customer at first
 				// // Immediately sync to Autocount
@@ -1498,7 +1505,14 @@ class Booking_Model extends CI_Model
 				// Hard duplicate-phone block: reuse an existing customer with the
 				// same phone (any format) instead of creating a duplicate; only a
 				// genuinely new phone creates a new customer + generated code.
-				$customer_id = $this->Customer_Model->create_or_reuse_by_phone($data);
+				// The agent can override this from the "Existing Customer Found"
+				// dialog ("Create new customer anyway") — force_new_customer forces
+				// a brand-new customer even when the phone already exists.
+				if ($this->input->post('force_new_customer')) {
+					$customer_id = $this->Customer_Model->create_with_generated_code($data);
+				} else {
+					$customer_id = $this->Customer_Model->create_or_reuse_by_phone($data);
+				}
 
 				// no need sync directly, cron will sync customer at first
 				// // Immediately sync to Autocount
