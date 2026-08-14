@@ -153,17 +153,22 @@ $assertions['e2e: profit 130']   = $approx($e_fin['profit'], 130.00);
  * ------------------------------------------------------------------ */
 
 $mult = costing_multiplier_types();
-$assertions['mult: 3 types']              = (count($mult) === 3);
+$assertions['mult: 4 types']              = (count($mult) === 4);
 $assertions['mult: keys per_day/pax/fix'] = (isset($mult['per_day'], $mult['per_pax'], $mult['fixed']));
+$assertions['mult: key per_day_pax']      = (isset($mult['per_day_pax']));
 $assertions['mult: label per day']        = ($mult['per_day'] === 'Per Day');
+$assertions['mult: label per day & pax']  = ($mult['per_day_pax'] === 'Per Day & Pax');
 
 $assertions['mult: normalize unknown -> fixed'] = (costing_normalize_multiplier_type('bogus') === 'fixed');
 $assertions['mult: normalize trims/cases']      = (costing_normalize_multiplier_type(' Per_Pax ') === 'per_pax');
+$assertions['mult: normalize per_day_pax']      = (costing_normalize_multiplier_type(' Per_Day_Pax ') === 'per_day_pax');
 
 $assertions['mult: per_day uses duration'] = (costing_multiplier_count('per_day', 5, 20) === 5);
 $assertions['mult: per_pax uses pax']      = (costing_multiplier_count('per_pax', 5, 20) === 20);
+$assertions['mult: per_day_pax = day*pax'] = (costing_multiplier_count('per_day_pax', 5, 20) === 100);
 $assertions['mult: fixed is 1']            = (costing_multiplier_count('fixed', 5, 20) === 1);
 $assertions['mult: negative clamped to 0'] = (costing_multiplier_count('per_day', -3, 20) === 0);
+$assertions['mult: day*pax neg day -> 0']  = (costing_multiplier_count('per_day_pax', -3, 20) === 0);
 
 // Image case: USD 30 @ rate 4 (no bank charge) -> 120/unit, No of Day 5 -> 600.
 $img = costing_row_myr(30, 4.0, 0, 5);
@@ -200,11 +205,49 @@ $assertions['totals: frozen 0 stays 0']              = $approx(costing_row_total
 $assertions['totals: negative frozen clamped']       = $approx(costing_row_totals(-5, 100, 4.5, 10, 3)['myr_per_unit'], 0.00);
 
 /* ------------------------------------------------------------------ *
+ * 6b) CURRENCY BREAKDOWN (rate + total per currency)                  *
+ * ------------------------------------------------------------------ */
+
+// Rate map is keyed by currency_id like the cost step's $currency_rate_map.
+$bd_map = [
+    1 => ['code' => 'MYR', 'rate_to_myr' => 1.0, 'bank_charges_myr' => 0.0],
+    2 => ['code' => 'USD', 'rate_to_myr' => 4.5, 'bank_charges_myr' => 10.0],
+    3 => ['code' => 'THB', 'rate_to_myr' => 0.13, 'bank_charges_myr' => 0.0],
+];
+$bd_rows = [
+    ['currency_id' => 2, 'unit_price' => 100, 'count' => 2, 'include' => 1], // USD 200 -> (450+10)*2 = 920
+    ['currency_id' => 2, 'unit_price' => 50,  'count' => 1, 'include' => 1], // USD 50  -> (225+10)*1 = 235
+    ['currency_id' => 3, 'unit_price' => 1000, 'count' => 1, 'include' => 1], // THB 1000 -> 130
+    ['currency_id' => 1, 'unit_price' => 300, 'count' => 1, 'include' => 1], // MYR 300 -> 300
+    ['currency_id' => 2, 'unit_price' => 999, 'count' => 9, 'include' => 0], // excluded
+];
+$bd = costing_currency_breakdown($bd_rows, $bd_map);
+$by = [];
+foreach ($bd as $e) { $by[$e['code']] = $e; }
+
+$assertions['breakdown: one entry per used currency'] = (count($bd) === 3);
+$assertions['breakdown: ordered by code (MYR,THB,USD)'] =
+    ($bd[0]['code'] === 'MYR' && $bd[1]['code'] === 'THB' && $bd[2]['code'] === 'USD');
+$assertions['breakdown: USD total_foreign summed'] = $approx($by['USD']['total_foreign'], 250.00);
+$assertions['breakdown: USD total_myr summed (incl bank)'] = $approx($by['USD']['total_myr'], 1155.00);
+$assertions['breakdown: USD rate carried'] = $approx($by['USD']['rate_to_myr'], 4.5);
+$assertions['breakdown: USD bank charge carried'] = $approx($by['USD']['bank_charges_myr'], 10.0);
+$assertions['breakdown: THB total_foreign'] = $approx($by['THB']['total_foreign'], 1000.00);
+$assertions['breakdown: THB total_myr'] = $approx($by['THB']['total_myr'], 130.00);
+$assertions['breakdown: MYR rate 1, foreign == myr'] =
+    ($approx($by['MYR']['rate_to_myr'], 1.0) && $approx($by['MYR']['total_foreign'], 300.00) && $approx($by['MYR']['total_myr'], 300.00));
+$assertions['breakdown: excluded rows skipped'] = ($approx($by['USD']['total_foreign'], 250.00));
+$assertions['breakdown: empty rows -> empty list'] = (costing_currency_breakdown([], $bd_map) === []);
+// A row missing its rate (unknown currency) still lists, rate 0, myr 0.
+$bd_missing = costing_currency_breakdown([['currency_id' => 99, 'unit_price' => 100, 'count' => 1]], $bd_map);
+$assertions['breakdown: unknown currency -> rate 0'] = ($approx($bd_missing[0]['rate_to_myr'], 0.0) && $approx($bd_missing[0]['total_myr'], 0.0) && $approx($bd_missing[0]['total_foreign'], 100.00));
+
+/* ------------------------------------------------------------------ *
  * 7) SOURCE CONTRACT                                                  *
  * ------------------------------------------------------------------ */
 
 $helper = @file_get_contents(__DIR__ . '/../../application/helpers/costing_calc_helper.php');
-foreach (['costing_categories', 'costing_line_to_myr', 'costing_sum_by_category', 'costing_apply_markup', 'costing_build_snapshot_rows', 'costing_normalize_rate', 'costing_multiplier_types', 'costing_multiplier_count', 'costing_row_myr', 'costing_row_totals'] as $fn) {
+foreach (['costing_categories', 'costing_line_to_myr', 'costing_sum_by_category', 'costing_apply_markup', 'costing_build_snapshot_rows', 'costing_normalize_rate', 'costing_multiplier_types', 'costing_multiplier_count', 'costing_row_myr', 'costing_row_totals', 'costing_currency_breakdown'] as $fn) {
     $assertions["helper: defines {$fn}()"] = (bool) preg_match('/function\s+' . preg_quote($fn, '/') . '\s*\(/', (string) $helper);
 }
 

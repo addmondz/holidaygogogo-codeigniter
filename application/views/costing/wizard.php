@@ -22,6 +22,13 @@ $travel_date = isset($booking['travel_date']) ? $booking['travel_date'] : date('
 $booking_status_value = isset($booking['status_value']) ? $booking['status_value'] : 'active';
 $margin_percentage = isset($financials['margin_percentage']) ? (float) $financials['margin_percentage'] : 0;
 
+// Multiplier options for the per-row picker in the cost template. Each row copies
+// its item's default multiplier, but the user may override it here (e.g. a normally
+// per-day guide charged once for this package).
+$multiplier_type_options = function_exists('costing_multiplier_types')
+    ? costing_multiplier_types()
+    : array('per_day' => 'Per Day', 'per_pax' => 'Per Pax', 'per_day_pax' => 'Per Day & Pax', 'fixed' => 'Fixed');
+
 $step_keys = array_keys($wizard_steps);
 $active_index = array_search($active_step, $step_keys, true);
 if ($active_index === false) {
@@ -286,10 +293,14 @@ if (!empty($booking_items)) {
                                     </td>
                                     <td>
                                         <input type="text" class="form-control" name="rows[<?php echo $idx; ?>][name]" value="<?php echo html_escape($row['name']); ?>" placeholder="Cost item" readonly>
+                                        <select class="form-control form-control-sm cw-mult-type mt-2" name="rows[<?php echo $idx; ?>][multiplier_type]" title="How this cost scales">
+                                            <?php $rmt = strtolower(trim((string) $row['multiplier_type'])); if (!isset($multiplier_type_options[$rmt])) { $rmt = 'fixed'; } foreach ($multiplier_type_options as $mkey => $mlabel) { ?>
+                                                <option value="<?php echo html_escape($mkey); ?>" <?php echo ($mkey === $rmt) ? 'selected' : ''; ?>><?php echo html_escape($mlabel); ?></option>
+                                            <?php } ?>
+                                        </select>
                                         <input type="hidden" name="rows[<?php echo $idx; ?>][category]" value="<?php echo html_escape($cat); ?>">
                                         <input type="hidden" name="rows[<?php echo $idx; ?>][unit_count]" value="1">
                                         <input type="hidden" name="rows[<?php echo $idx; ?>][pax_type]" value="">
-                                        <input type="hidden" class="cw-mult-type" name="rows[<?php echo $idx; ?>][multiplier_type]" value="<?php echo html_escape($row['multiplier_type']); ?>">
                                         <input type="hidden" class="cw-myr-hidden" name="rows[<?php echo $idx; ?>][myr_per_unit]" value="">
                                         <input type="hidden" class="cw-bank-hidden" name="rows[<?php echo $idx; ?>][bank_charges_myr]" value="">
                                     </td>
@@ -313,20 +324,54 @@ if (!empty($booking_items)) {
                         </tbody>
                     </table>
                 </div>
-                <div class="d-flex flex-wrap align-items-center" style="gap:8px;">
-                    <a href="<?php echo base_url('Costing_Item'); ?>" target="_blank" class="btn btn-light font-weight-bold" title="Manage item master">Manage Items</a>
-                </div>
-                <?php if (empty($item_master)) { ?>
-                    <div class="text-muted mt-2">No items in the master yet — add them under <a href="<?php echo base_url('Costing_Item'); ?>" target="_blank">Costing Item</a>.</div>
-                <?php } ?>
-
-                <div class="row mt-5">
+                <div class="row mt-3">
                     <div class="col-md-4">
                         <div class="form-group mb-0">
                             <label>Margin (Markup on Cost %)</label>
                             <input type="number" step="0.01" min="0" id="cw-margin" name="margin_percentage" class="form-control" value="<?php echo html_escape($margin_percentage); ?>">
                             <span class="form-text text-muted">Selling = Cost × (1 + margin%). No manual selling price.</span>
                         </div>
+                    </div>
+                </div>
+
+                <div class="d-flex flex-wrap align-items-center mt-3" style="gap:8px;">
+                    <a href="<?php echo base_url('Costing_Item'); ?>" target="_blank" class="btn btn-light font-weight-bold" title="Manage item master">Manage Items</a>
+                </div>
+                <?php if (empty($item_master)) { ?>
+                    <div class="text-muted mt-2">No items in the master yet — add them under <a href="<?php echo base_url('Costing_Item'); ?>" target="_blank">Costing Item</a>.</div>
+                <?php } ?>
+
+                <?php
+                // Per-currency roll-up: rate to MYR + total owed in each currency
+                // used, so the user sees how much of each foreign currency this
+                // package needs and at what frozen rate.
+                $cur_breakdown = costing_currency_breakdown($cost_rows, $currency_rate_map);
+                ?>
+                <div class="cw-cur-panel" id="cw-cur-panel" style="margin-top:24px;<?php echo empty($cur_breakdown) ? 'display:none;' : ''; ?>">
+                    <div class="cw-panel-title" style="font-size:14px;">Currency Breakdown</div>
+                    <div class="table-responsive">
+                        <table class="table table-bordered mb-0 w-100" id="cw-cur-table">
+                            <thead>
+                                <tr>
+                                    <th style="text-align:left;">Currency</th>
+                                    <th class="text-right">Rate to MYR</th>
+                                    <th class="text-right">Bank Charge / unit</th>
+                                    <th class="text-right">Total (currency)</th>
+                                    <th class="text-right">Total in MYR</th>
+                                </tr>
+                            </thead>
+                            <tbody id="cw-cur-body">
+                                <?php foreach ($cur_breakdown as $cb) { ?>
+                                <tr>
+                                    <td style="text-align:left;"><?php echo html_escape($cb['code']); ?></td>
+                                    <td class="text-right"><?php echo number_format($cb['rate_to_myr'], 4); ?></td>
+                                    <td class="text-right"><?php echo $cb['bank_charges_myr'] > 0 ? 'RM ' . number_format($cb['bank_charges_myr'], 2) : '—'; ?></td>
+                                    <td class="text-right"><?php echo html_escape($cb['code']) . ' ' . number_format($cb['total_foreign'], 2); ?></td>
+                                    <td class="text-right">RM <?php echo number_format($cb['total_myr'], 2); ?></td>
+                                </tr>
+                                <?php } ?>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
 
@@ -445,6 +490,7 @@ if (!empty($booking_items)) {
         var type = row.querySelector('.cw-mult-type').value;
         if (type === 'per_day') { return DURATION_DAYS; }
         if (type === 'per_pax') { return totalPax(); }
+        if (type === 'per_day_pax') { return DURATION_DAYS * totalPax(); }
         return null; // fixed / custom -> leave user value
     }
 
@@ -495,6 +541,54 @@ if (!empty($booking_items)) {
         document.getElementById('cw-sum-sellpax').textContent = money(sellPax);
         document.getElementById('cw-sum-revenue').textContent = money(revenue);
         document.getElementById('cw-sum-profit').textContent = money(profit);
+
+        renderCurrencyBreakdown();
+    }
+
+    // Roll included rows up per currency: rate to MYR + total owed in each
+    // currency (mirrors the costing_currency_breakdown() PHP helper).
+    function renderCurrencyBreakdown() {
+        var panel = document.getElementById('cw-cur-panel');
+        var tbody = document.getElementById('cw-cur-body');
+        if (!panel || !tbody) { return; }
+
+        var acc = {};
+        body.querySelectorAll('.cw-row').forEach(function (row) {
+            if (!row.querySelector('.cw-include').checked) { return; }
+            var cid = row.querySelector('.cw-currency').value;
+            var info = RATE_MAP[cid] || { code: '', rate_to_myr: 0, bank_charges_myr: 0 };
+            var unit = parseFloat(row.querySelector('.cw-cost').value) || 0;
+            var count = parseFloat(row.querySelector('.cw-count').value) || 0;
+            var perUnit = rowMyrPerUnit(row);
+            if (!acc[cid]) {
+                acc[cid] = {
+                    code: info.code || '',
+                    rate: Number(info.rate_to_myr) || 0,
+                    bank: Number(info.bank_charges_myr) || 0,
+                    foreign: 0,
+                    myr: 0
+                };
+            }
+            acc[cid].foreign += unit * count;
+            acc[cid].myr += Math.round(perUnit * count * 100) / 100;
+        });
+
+        var list = Object.keys(acc).map(function (k) { return acc[k]; });
+        list.sort(function (a, b) { return a.code < b.code ? -1 : (a.code > b.code ? 1 : 0); });
+
+        if (!list.length) { panel.style.display = 'none'; tbody.innerHTML = ''; return; }
+        panel.style.display = '';
+
+        function num(n, d) { return (Math.round((Number(n) || 0) * Math.pow(10, d)) / Math.pow(10, d)).toFixed(d); }
+        tbody.innerHTML = list.map(function (e) {
+            return '<tr>' +
+                '<td style="text-align:left;">' + (e.code || '?') + '</td>' +
+                '<td class="text-right">' + num(e.rate, 4) + '</td>' +
+                '<td class="text-right">' + (e.bank > 0 ? 'RM ' + num(e.bank, 2) : '&mdash;') + '</td>' +
+                '<td class="text-right">' + (e.code || '?') + ' ' + num(e.foreign, 2) + '</td>' +
+                '<td class="text-right">RM ' + num(e.myr, 2) + '</td>' +
+                '</tr>';
+        }).join('');
     }
 
     function currencyOptions(selectedId) {
@@ -519,7 +613,19 @@ if (!empty($booking_items)) {
     function masterCount(type) {
         if (type === 'per_day') { return DURATION_DAYS; }
         if (type === 'per_pax') { return totalPax(); }
+        if (type === 'per_day_pax') { return DURATION_DAYS * totalPax(); }
         return 1;
+    }
+
+    // Build the multiplier <select> options for a freshly added row, mirroring the
+    // costing_multiplier_types() helper so it stays in one source of truth server-side.
+    var MULT_TYPES = <?php echo json_encode($multiplier_type_options); ?> || {};
+    function multiplierOptions(selectedType) {
+        var opts = '';
+        Object.keys(MULT_TYPES).forEach(function (key) {
+            opts += '<option value="' + key + '"' + (key === selectedType ? ' selected' : '') + '>' + MULT_TYPES[key] + '</option>';
+        });
+        return opts;
     }
 
     // Drop a new row under its category header (creating the header if this is the
@@ -565,10 +671,10 @@ if (!empty($booking_items)) {
         tr.innerHTML =
             '<td class="text-center"><input type="hidden" name="rows[' + i + '][include]" value="0" class="cw-include-hidden"><input type="checkbox" class="cw-include" checked></td>' +
             '<td><input type="text" class="form-control" name="rows[' + i + '][name]" value="" readonly>' +
+            '<select class="form-control form-control-sm cw-mult-type mt-2" name="rows[' + i + '][multiplier_type]" title="How this cost scales">' + multiplierOptions(item.multiplier_type) + '</select>' +
             '<input type="hidden" name="rows[' + i + '][category]" value="miscellaneous">' +
             '<input type="hidden" name="rows[' + i + '][unit_count]" value="1">' +
             '<input type="hidden" name="rows[' + i + '][pax_type]" value="">' +
-            '<input type="hidden" class="cw-mult-type" name="rows[' + i + '][multiplier_type]" value="fixed">' +
             '<input type="hidden" class="cw-myr-hidden" name="rows[' + i + '][myr_per_unit]" value="">' +
             '<input type="hidden" class="cw-bank-hidden" name="rows[' + i + '][bank_charges_myr]" value=""></td>' +
             '<td><select class="form-control cw-currency" name="rows[' + i + '][currency_id]">' + currencyOptions(item.currency_id) + '</select></td>' +

@@ -2,7 +2,7 @@
 $items = isset($items) ? $items : array();
 $currency_options = isset($currency_options) ? $currency_options : array();
 $categories = isset($categories) ? $categories : array();
-$multiplier_types = isset($multiplier_types) ? $multiplier_types : array('per_day' => 'Per Day', 'per_pax' => 'Per Pax', 'fixed' => 'Fixed');
+$multiplier_types = isset($multiplier_types) ? $multiplier_types : array('per_day' => 'Per Day', 'per_pax' => 'Per Pax', 'per_day_pax' => 'Per Day & Pax', 'fixed' => 'Fixed');
 $item_filters = isset($item_filters) ? $item_filters : array('name' => '', 'category' => '');
 $filter_open = !empty($item_filters['name']) || !empty($item_filters['category']);
 

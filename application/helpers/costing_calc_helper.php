@@ -169,16 +169,18 @@ if (!function_exists('costing_multiplier_types')) {
     /**
      * How a cost line scales, code => human label. Stored on the item master and
      * copied onto each snapshot cost row. "Per Day" multiplies by the package
-     * duration_days, "Per Pax" by the booking total_pax, "Fixed" by 1.
+     * duration_days, "Per Pax" by the booking total_pax, "Per Day & Pax" by both
+     * (duration_days × total_pax), "Fixed" by 1.
      *
      * @return array<string,string>
      */
     function costing_multiplier_types()
     {
         return [
-            'per_day' => 'Per Day',
-            'per_pax' => 'Per Pax',
-            'fixed'   => 'Fixed',
+            'per_day'     => 'Per Day',
+            'per_pax'     => 'Per Pax',
+            'per_day_pax' => 'Per Day & Pax',
+            'fixed'       => 'Fixed',
         ];
     }
 }
@@ -200,8 +202,8 @@ if (!function_exists('costing_normalize_multiplier_type')) {
 if (!function_exists('costing_multiplier_count')) {
     /**
      * The count a line is multiplied by, from its multiplier type. Per-day uses
-     * the package duration, per-pax uses the booking pax, fixed is always 1.
-     * Never below 0.
+     * the package duration, per-pax uses the booking pax, per-day-pax uses both
+     * (duration × pax), fixed is always 1. Never below 0.
      *
      * @param string $multiplier_type
      * @param int    $duration_days
@@ -215,6 +217,8 @@ if (!function_exists('costing_multiplier_count')) {
                 return max(0, (int) $duration_days);
             case 'per_pax':
                 return max(0, (int) $total_pax);
+            case 'per_day_pax':
+                return max(0, (int) $duration_days) * max(0, (int) $total_pax);
             case 'fixed':
             default:
                 return 1;
@@ -287,6 +291,69 @@ if (!function_exists('costing_row_totals')) {
         }
 
         return costing_row_myr($cost_foreign, $rate, $bank_charges_myr, $count);
+    }
+}
+
+if (!function_exists('costing_currency_breakdown')) {
+    /**
+     * Roll the cost rows up per currency so the cost template can show, for each
+     * currency actually used, its rate to MYR, the per-unit bank charge, and the
+     * TOTAL owed in that currency (plus the MYR equivalent). Only rows flagged
+     * as included count. Currencies are returned ordered by code.
+     *
+     * Row shape  : ['currency_id','unit_price','count','include'].
+     * Rate map   : currency_id => ['code','rate_to_myr','bank_charges_myr'].
+     * Each entry : ['currency_id','code','rate_to_myr','bank_charges_myr',
+     *               'total_foreign','total_myr'] (2dp totals).
+     *
+     * @param array $rows
+     * @param array $rate_map
+     * @return array list of per-currency entries
+     */
+    function costing_currency_breakdown($rows, $rate_map)
+    {
+        $acc = array();
+        foreach ((array) $rows as $row) {
+            if (array_key_exists('include', $row) && !$row['include']) {
+                continue;
+            }
+            $cid  = isset($row['currency_id']) ? (int) $row['currency_id'] : 0;
+            $info = isset($rate_map[$cid]) ? $rate_map[$cid] : array();
+            $rate = isset($info['rate_to_myr']) ? (float) $info['rate_to_myr'] : 0.0;
+            if ($rate < 0) {
+                $rate = 0.0;
+            }
+            $bank  = isset($info['bank_charges_myr']) ? max(0.0, (float) $info['bank_charges_myr']) : 0.0;
+            $unit  = (float) (isset($row['unit_price']) ? $row['unit_price'] : 0);
+            $count = max(0.0, (float) (isset($row['count']) ? $row['count'] : 0));
+
+            $line = costing_row_myr($unit, $rate, $bank, $count);
+
+            if (!isset($acc[$cid])) {
+                $acc[$cid] = array(
+                    'currency_id'      => $cid,
+                    'code'             => isset($info['code']) ? $info['code'] : '',
+                    'rate_to_myr'      => $rate,
+                    'bank_charges_myr' => $bank,
+                    'total_foreign'    => 0.0,
+                    'total_myr'        => 0.0,
+                );
+            }
+            $acc[$cid]['total_foreign'] += $unit * $count;
+            $acc[$cid]['total_myr']     += $line['total_myr'];
+        }
+
+        foreach ($acc as &$entry) {
+            $entry['total_foreign'] = round($entry['total_foreign'], 2);
+            $entry['total_myr']     = round($entry['total_myr'], 2);
+        }
+        unset($entry);
+
+        usort($acc, function ($a, $b) {
+            return strcmp($a['code'], $b['code']);
+        });
+
+        return array_values($acc);
     }
 }
 

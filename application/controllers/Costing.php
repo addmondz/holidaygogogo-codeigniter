@@ -185,6 +185,16 @@ class Costing extends MY_Controller
         $this->load->view('layout/footer');
     }
 
+    /**
+     * Stream every currency's full MYR rate history to an .xlsx download.
+     */
+    public function Export_Currency_History()
+    {
+        $this->load->helper('costing_currency_export');
+        $histories = $this->Costing_Model->Read_Exchange_Rate_History_For_Export();
+        costing_currency_export_stream($histories, 'COSTING_CURRENCY_HISTORY_' . date('Ymd') . '.xlsx');
+    }
+
     public function Save_Currency()
     {
         $active_tab = $this->Normalize_Currency_Tab($this->input->post('active_tab'));

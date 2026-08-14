@@ -177,6 +177,9 @@ if (!function_exists('costing_currency_display_date')) {
                     <a href="<?php echo base_url('Costing'); ?>" class="btn btn-light-primary font-weight-bold">
                         <i class="la la-arrow-left"></i>Back To Packages
                     </a>
+                    <a href="<?php echo base_url('Costing/Export_Currency_History'); ?>" class="btn btn-light-success font-weight-bold">
+                        <i class="la la-file-excel-o"></i>Export History
+                    </a>
                     <button type="button" class="btn btn-primary font-weight-bold" id="add_currency_button" data-toggle="modal" data-target="#currency_modal">
                         <i class="la la-plus"></i>Add Currency
                     </button>

@@ -1291,6 +1291,15 @@ class Costing_Model extends CI_Model
         ", $params)->result_array();
     }
 
+    /**
+     * Public wrapper: every currency pair with its full rate history, newest
+     * first, for the Costing Currency Excel export.
+     */
+    public function Read_Exchange_Rate_History_For_Export()
+    {
+        return $this->Read_Exchange_Rate_History();
+    }
+
     private function Read_Exchange_Rate_History()
     {
         return $this->db->query("
