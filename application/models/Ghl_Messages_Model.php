@@ -150,6 +150,107 @@ class Ghl_Messages_Model extends CI_Model
     }
 
     /**
+     * Companion to Phones_With_Messages_For_Guests for GHL contacts that have
+     * NO stored phone (ghl_contacts.phone empty → the listing shows "—", so the
+     * phone-based icon can never appear). Their WhatsApp history is still owned
+     * by the GHL contact id, so we look messages up by contact id instead.
+     *
+     * Only phone-less GHL rows are checked (phone rows already get the phone
+     * icon), keyed by the row's dedup_key so the view can flag them.
+     *
+     * @param array $guests Guest rows (objects with Type, ContactNum, dedup_key).
+     * @return array<string,bool> dedup_key => true for rows with messages.
+     */
+    public function Contacts_With_Messages_For_Guests($guests)
+    {
+        if (empty($guests)) {
+            return array();
+        }
+        $this->load->helper('guest_contact');
+        $keys = array();
+        foreach ($guests as $g) {
+            // Phone-less GHL rows only: phone rows already get the phone icon,
+            // Manual leads / booking guests have no history by contact id.
+            $dk = guest_contact_phoneless_ghl_key($g);
+            if ($dk !== '') {
+                $keys[$dk] = true;
+            }
+        }
+        return $this->Dedup_Keys_With_Messages(array_keys($keys));
+    }
+
+    /**
+     * Given GHL listing dedup_keys, return the subset that has at least one
+     * stored WhatsApp message, looked up by contact id. A row's dedup_key maps
+     * to its GHL contact via COALESCE(ghl_contacts.dedup_key, 'ghl:'||id).
+     *
+     * @param array $dedup_keys
+     * @return array<string,bool> dedup_key => true.
+     */
+    public function Dedup_Keys_With_Messages($dedup_keys)
+    {
+        $dedup_keys = array_values(array_unique(array_filter(
+            (array) $dedup_keys,
+            function ($k) { return trim((string) $k) !== ''; }
+        )));
+        if (empty($dedup_keys)) {
+            return array();
+        }
+        $placeholders = implode(',', array_fill(0, count($dedup_keys), '?'));
+        $rows = $this->db->query("
+            SELECT COALESCE(gc.dedup_key, CONCAT('ghl:', gc.id)) AS dk
+            FROM ghl_contacts gc
+            JOIN ghl_messages gm ON gm.contact_id = gc.contact_id
+            WHERE COALESCE(gc.dedup_key, CONCAT('ghl:', gc.id)) IN ($placeholders)
+            GROUP BY dk
+        ", $dedup_keys)->result_array();
+
+        $out = array();
+        foreach ($rows as $row) {
+            $out[$row['dk']] = true;
+        }
+        return $out;
+    }
+
+    /**
+     * The full WhatsApp conversation for a GHL contact identified by its listing
+     * dedup_key (used when the contact has no stored phone). Shaped like
+     * Conversation_By_Phone for the same chat modal.
+     *
+     * @param string $dedup_key The listing row's dedup_key (e.g. "ghl:21").
+     * @param int    $limit     Max messages returned.
+     * @return array<int,array{side:string,author:string,body:string,time:string,type:string}>
+     */
+    public function Conversation_By_Dedup_Key($dedup_key, $limit = 500)
+    {
+        $this->load->helper('ghl_message_log');
+
+        $dedup_key = trim((string) $dedup_key);
+        if ($dedup_key === '') {
+            return array();
+        }
+        $limit = max(1, (int) $limit);
+
+        $rows = $this->db->query("
+            SELECT gm.direction, gm.body, gm.message_type, gm.date_added,
+                   gu.Name AS agent_name, cv.contact_name
+            FROM ghl_contacts gc
+            JOIN ghl_messages gm ON gm.contact_id = gc.contact_id
+            LEFT JOIN ghl_users gu ON gu.UserID = gm.user_id
+            LEFT JOIN ghl_conversations cv ON cv.conversation_id = gm.conversation_id
+            WHERE COALESCE(gc.dedup_key, CONCAT('ghl:', gc.id)) = ?
+            ORDER BY gm.date_added ASC, gm.id ASC
+            LIMIT {$limit}
+        ", array($dedup_key))->result_array();
+
+        $out = array();
+        foreach ($rows as $row) {
+            $out[] = ghl_message_log_shape_message($row);
+        }
+        return $out;
+    }
+
+    /**
      * The full WhatsApp conversation for a single phone, oldest first, shaped
      * for the chat modal. Outbound messages carry the agent's GHL user name.
      *

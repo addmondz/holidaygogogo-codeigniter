@@ -428,6 +428,37 @@ if (!function_exists('guest_contact_wa_digits')) {
     }
 }
 
+if (!function_exists('guest_contact_phoneless_ghl_key')) {
+    /**
+     * A GHL listing row's dedup_key when it has NO stored phone — the case where
+     * the phone-based "View message log" icon can never appear, so the icon must
+     * fall back to a lookup by GHL contact id. Returns '' for anything else
+     * (phone present, or a non-GHL row such as a booking guest / Manual lead).
+     *
+     * Accepts a row object or array with Type, ContactNum, dedup_key.
+     *
+     * @param object|array $g
+     * @return string dedup_key, or '' when the row does not qualify.
+     */
+    function guest_contact_phoneless_ghl_key($g)
+    {
+        $get = function ($key) use ($g) {
+            if (is_object($g)) {
+                return isset($g->$key) ? $g->$key : null;
+            }
+            return (is_array($g) && isset($g[$key])) ? $g[$key] : null;
+        };
+
+        if ((string) $get('Type') !== 'GHL') {
+            return '';
+        }
+        if (trim((string) $get('ContactNum')) !== '') {
+            return '';
+        }
+        return trim((string) $get('dedup_key'));
+    }
+}
+
 if (!function_exists('guest_list_parse_date_range')) {
     /**
      * Parse a daterangepicker value ("DD/MM/YYYY - DD/MM/YYYY") into a

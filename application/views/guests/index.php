@@ -102,6 +102,9 @@ div.kt-datatable__pager-container {
 	$page_title = isset($page_title) ? $page_title : 'Guest List Records';
 	// wa-digits => true for contacts that have a stored WhatsApp conversation.
 	$msg_log_phones = isset($msg_log_phones) && is_array($msg_log_phones) ? $msg_log_phones : array();
+	// dedup_key => true for phone-less GHL contacts that still have a stored
+	// conversation (looked up by contact id, not phone).
+	$msg_log_contacts = isset($msg_log_contacts) && is_array($msg_log_contacts) ? $msg_log_contacts : array();
 	// dedup_key => active-remark count, to badge each row's Remarks action.
 	$remark_counts  = isset($remark_counts) && is_array($remark_counts) ? $remark_counts : array();
 ?>
@@ -765,6 +768,13 @@ div.kt-datatable__pager-container {
 											<span class="contact-display">
 												<?php if(empty($phones)) { ?>
 													<span class="contact-num"><span class="text-muted">&mdash;</span></span>
+													<?php // Phone-less GHL contact that still has a stored WhatsApp
+													      // conversation: show the msg-log icon keyed by contact id.
+													if(!empty($g->dedup_key) && !empty($msg_log_contacts[$g->dedup_key])) { ?>
+														<button type="button" class="btn btn-icon btn-light-success btn-xs js-msg-log ml-1" data-toggle="tooltip" title="View message log" data-dedup-key="<?php echo htmlspecialchars($g->dedup_key, ENT_QUOTES); ?>" data-name="<?php echo htmlspecialchars($g->Name, ENT_QUOTES); ?>">
+															<i class="la la-comments"></i>
+														</button>
+													<?php } ?>
 												<?php } else { foreach($phones as $pi => $ph) {
 													$contact_display = guest_contact_format_display($ph['calling_code'], $ph['mobile']);
 													$wa_number       = guest_contact_wa_digits($ph['calling_code'], $ph['mobile']);

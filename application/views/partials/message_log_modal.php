@@ -85,20 +85,26 @@
 
 	$(document).on('click', '.js-msg-log', function (e) {
 		e.preventDefault();
+		// Phone rows pass data-phone; phone-less GHL contacts pass data-dedup-key.
 		var phone = $(this).data('phone');
+		var dedup = $(this).data('dedup-key');
 		var name  = $(this).data('name') || 'Contact';
+		var params = phone ? { phone: phone, name: name } : { dedup_key: dedup, name: name };
+		var query  = phone
+			? 'phone=' + encodeURIComponent(phone)
+			: 'dedup_key=' + encodeURIComponent(dedup);
 
 		$('#messageLogName').text(name);
 		$('#messageLogPhone').text(phone ? '+' + String(phone).replace(/^\+/, '') : '');
 		$('#messageLogList').empty();
 		$('#messageLogEmpty').hide();
 		$('#messageLogCsv').hide().attr('href',
-			'<?php echo base_url('message-log-csv'); ?>?phone=' + encodeURIComponent(phone) + '&name=' + encodeURIComponent(name));
+			'<?php echo base_url('message-log-csv'); ?>?' + query + '&name=' + encodeURIComponent(name));
 		$('#messageLogLoading').show();
 		$('#messageLogModal').modal('show');
 
 		if (loadReq && loadReq.abort) { loadReq.abort(); }
-		loadReq = $.getJSON('<?php echo base_url('message-log'); ?>', { phone: phone, name: name })
+		loadReq = $.getJSON('<?php echo base_url('message-log'); ?>', params)
 			.done(function (res) {
 				$('#messageLogLoading').hide();
 				var msgs = (res && res.messages) || [];

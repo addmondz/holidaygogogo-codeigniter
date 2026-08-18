@@ -34,6 +34,7 @@ class Ghl_Leads extends MY_Controller
 		$data['guests']         = $this->Guests_Model->Read_Guests($limit, $offset);
 		$this->load->model('Ghl_Messages_Model');
 		$data['msg_log_phones'] = $this->Ghl_Messages_Model->Phones_With_Messages_For_Guests($data['guests']);
+		$data['msg_log_contacts'] = $this->Ghl_Messages_Model->Contacts_With_Messages_For_Guests($data['guests']);
 		$data['chat_counts']    = $this->Chat_Counts_For_Guests($data['guests']);
 		$data['campaign_counts'] = $this->Campaign_Counts_For_Guests($data['guests']);
 		$data['total']          = null;

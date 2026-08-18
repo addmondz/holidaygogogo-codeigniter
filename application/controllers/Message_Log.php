@@ -14,10 +14,15 @@ class Message_Log extends MY_Controller
     {
         $this->load->model('Ghl_Messages_Model');
 
-        $phone = trim((string) $this->input->get('phone'));
-        $name  = trim((string) $this->input->get('name'));
+        $phone     = trim((string) $this->input->get('phone'));
+        $name      = trim((string) $this->input->get('name'));
+        $dedup_key = trim((string) $this->input->get('dedup_key'));
 
-        $messages = $this->Ghl_Messages_Model->Conversation_By_Phone($phone);
+        // Phone-less GHL contacts ("—" in the listing) carry their WhatsApp
+        // history by contact id; look them up by dedup_key instead of phone.
+        $messages = ($phone !== '')
+            ? $this->Ghl_Messages_Model->Conversation_By_Phone($phone)
+            : $this->Ghl_Messages_Model->Conversation_By_Dedup_Key($dedup_key);
 
         $this->output
             ->set_content_type('application/json')
@@ -38,10 +43,13 @@ class Message_Log extends MY_Controller
     {
         $this->load->model('Ghl_Messages_Model');
 
-        $phone = trim((string) $this->input->get('phone'));
-        $name  = trim((string) $this->input->get('name'));
+        $phone     = trim((string) $this->input->get('phone'));
+        $name      = trim((string) $this->input->get('name'));
+        $dedup_key = trim((string) $this->input->get('dedup_key'));
 
-        $messages = $this->Ghl_Messages_Model->Conversation_By_Phone($phone);
+        $messages = ($phone !== '')
+            ? $this->Ghl_Messages_Model->Conversation_By_Phone($phone)
+            : $this->Ghl_Messages_Model->Conversation_By_Dedup_Key($dedup_key);
 
         $slug = preg_replace('/[^0-9]/', '', $phone);
         if ($slug === '') { $slug = 'contact'; }
