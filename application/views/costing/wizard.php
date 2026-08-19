@@ -7,6 +7,7 @@ $currencies = isset($currencies) ? $currencies : array();
 $currency_rate_map = isset($currency_rate_map) ? $currency_rate_map : array();
 $financials = isset($financials) ? $financials : array();
 $itinerary_days = isset($itinerary_days) ? $itinerary_days : array();
+$combinations = isset($combinations) ? $combinations : array();
 $statuses = isset($statuses) ? $statuses : array('active', 'inactive');
 $wizard_steps = isset($wizard_steps) ? $wizard_steps : array('details' => 'Package Details', 'cost' => 'Cost Template & Margin', 'itinerary' => 'Itinerary', 'done' => 'Save & Quotation');
 $active_step = isset($active_step) ? $active_step : 'details';
@@ -97,6 +98,12 @@ if (!empty($booking_items)) {
     .cw-itin-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 20px; }
     .cw-itin-field { min-width: 0; }
     @media (max-width: 767px) { .cw-itin-fields { grid-template-columns: 1fr; } }
+    .cw-combo-card { border: 1px solid #e4e6ef; border-radius: 8px; padding: 16px; margin-bottom: 16px; background: #fbfdff; }
+    .cw-combo-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+    .cw-combo-head .cw-combo-name { font-weight: 700; }
+    .cw-combo-foot { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 22px; margin-top: 8px; font-weight: 700; color: #3f4254; }
+    .cw-combo-foot .sell { color: #187DE4; }
+    .cw-combo-empty { color: #9aa0b3; font-style: italic; }
 </style>
 
 <div class="d-flex flex-column-fluid">
@@ -383,6 +390,26 @@ if (!empty($booking_items)) {
                     <div class="cw-summary-box"><div class="lbl">Profit</div><div class="val" id="cw-sum-profit" style="color:#1BC5BD;">RM 0.00</div></div>
                 </div>
             </div>
+
+            <!-- COMBINATIONS: customer-facing bundles shown on the Quotation PDF -->
+            <div class="cw-panel">
+                <div class="cw-panel-title">Combinations</div>
+                <div class="cw-panel-sub">Bundles shown on the customer Quotation PDF (the internal cost items above are hidden from it). Each combination has its own items — selling price = its cost &times; margin. All combinations add up to the total package price.</div>
+
+                <div id="cw-combos"></div>
+
+                <div class="d-flex flex-wrap align-items-center justify-content-between mt-2" style="gap:10px;">
+                    <button type="button" class="btn btn-light-primary font-weight-bold" id="cw-combo-add"><i class="la la-plus"></i>Add Combination</button>
+                    <div class="cw-summary-box" style="margin:0;min-width:240px;">
+                        <div class="lbl">Combinations Total (Selling)</div>
+                        <div class="val" id="cw-combo-grand" style="color:#187DE4;">RM 0.00</div>
+                    </div>
+                </div>
+                <?php if (empty($item_master)) { ?>
+                    <div class="text-muted mt-2">Add items to the master first under <a href="<?php echo base_url('Costing_Item'); ?>" target="_blank">Costing Item</a> to build combinations.</div>
+                <?php } ?>
+            </div>
+
             <div class="cw-actions">
                 <a href="<?php echo base_url('Costing/Package/' . $package_id . '?step=details'); ?>" class="btn btn-light font-weight-bold"><i class="la la-arrow-left mr-2"></i>Back</a>
                 <button type="submit" class="btn btn-primary font-weight-bold">Save &amp; Continue<i class="la la-arrow-right ml-2"></i></button>
@@ -495,6 +522,26 @@ if (!empty($booking_items)) {
     var totalPaxInput = document.getElementById('cw-total-pax');
     var marginInput = document.getElementById('cw-margin');
     var rowSeq = <?php echo count($cost_rows); ?>;
+    var combosWrap = document.getElementById('cw-combos');
+    var comboSeq = 0; // monotonic combination index for unique field names
+
+    // Saved combinations to re-render on load (edit mode). Each: name + its items.
+    var EXISTING_COMBOS = <?php echo json_encode(array_map(function ($combo) {
+        return array(
+            'name' => isset($combo['name']) ? $combo['name'] : '',
+            'items' => array_map(function ($it) {
+                return array(
+                    'name'            => isset($it['name']) ? $it['name'] : '',
+                    'category'        => isset($it['category']) ? $it['category'] : 'miscellaneous',
+                    'multiplier_type' => isset($it['multiplier_type']) ? $it['multiplier_type'] : 'fixed',
+                    'currency_id'     => (int) (isset($it['currency_id']) ? $it['currency_id'] : 0),
+                    'unit_price'      => (float) (isset($it['unit_price']) ? $it['unit_price'] : 0),
+                    'count'           => (float) (isset($it['quantity']) ? $it['quantity'] : 1),
+                    'remark'          => isset($it['remark']) ? $it['remark'] : '',
+                );
+            }, isset($combo['items']) ? $combo['items'] : array()),
+        );
+    }, $combinations)); ?> || [];
 
     function money(n) { return 'RM ' + (Math.round((Number(n) || 0) * 100) / 100).toFixed(2); }
     function totalPax() { return (parseInt(adultInput.value, 10) || 0) + (parseInt(childInput.value, 10) || 0); }
@@ -515,43 +562,58 @@ if (!empty($booking_items)) {
         return null; // fixed / custom -> leave user value
     }
 
+    // Price a single cost row (internal template OR a combination): refresh its
+    // day/pax count, freeze the MYR-convert + bank charge onto its hidden inputs,
+    // paint the MYR/Total cells. Returns { included, total }. Combination rows have
+    // no Use checkbox, so they are always included.
+    function processRow(row) {
+        var includeEl = row.querySelector('.cw-include');
+        var included = includeEl ? includeEl.checked : true;
+        var incHidden = row.querySelector('.cw-include-hidden');
+        if (incHidden) { incHidden.value = included ? '1' : '0'; }
+
+        // Refresh day/pax-driven counts as pax changes.
+        var auto = autoCount(row);
+        var countInput = row.querySelector('.cw-count');
+        if (auto !== null && document.activeElement !== countInput) { countInput.value = auto; }
+
+        var perUnit = rowMyrPerUnit(row);
+        var count = parseFloat(countInput.value) || 0;
+        var total = Math.round(perUnit * count * 100) / 100;
+
+        // Freeze the "MYR (convert)" figure (bank charge baked in) + the bank
+        // charge itself onto hidden inputs so the saved value is exactly what
+        // the user sees here, not re-pulled from the master on save.
+        var info = RATE_MAP[row.querySelector('.cw-currency').value] || { bank_charges_myr: 0 };
+        var myrHidden = row.querySelector('.cw-myr-hidden');
+        var bankHidden = row.querySelector('.cw-bank-hidden');
+        var bankVal = Number(info.bank_charges_myr) || 0;
+        if (myrHidden) { myrHidden.value = perUnit; }
+        if (bankHidden) { bankHidden.value = bankVal; }
+
+        var myrCell = row.querySelector('.cw-myr');
+        myrCell.querySelector('.cw-myr-val').textContent = money(perUnit);
+        myrCell.querySelector('.cw-bank-note').textContent = bankVal > 0 ? ('incl. ' + money(bankVal) + ' bank') : '';
+        row.querySelector('.cw-total').textContent = money(total);
+        row.style.opacity = included ? '1' : '0.45';
+        return { included: included, total: total };
+    }
+
+    function currentMargin() {
+        var margin = parseFloat(marginInput.value) || 0;
+        return margin < 0 ? 0 : margin;
+    }
+
     function recalc() {
         totalPaxInput.value = totalPax();
         var grandCost = 0;
         body.querySelectorAll('.cw-row').forEach(function (row) {
-            var included = row.querySelector('.cw-include').checked;
-            row.querySelector('.cw-include-hidden').value = included ? '1' : '0';
-
-            // Refresh day/pax-driven counts as pax changes.
-            var auto = autoCount(row);
-            var countInput = row.querySelector('.cw-count');
-            if (auto !== null && document.activeElement !== countInput) { countInput.value = auto; }
-
-            var perUnit = rowMyrPerUnit(row);
-            var count = parseFloat(countInput.value) || 0;
-            var total = Math.round(perUnit * count * 100) / 100;
-
-            // Freeze the "MYR (convert)" figure (bank charge baked in) + the bank
-            // charge itself onto hidden inputs so the saved value is exactly what
-            // the user sees here, not re-pulled from the master on save.
-            var info = RATE_MAP[row.querySelector('.cw-currency').value] || { bank_charges_myr: 0 };
-            var myrHidden = row.querySelector('.cw-myr-hidden');
-            var bankHidden = row.querySelector('.cw-bank-hidden');
-            var bankVal = Number(info.bank_charges_myr) || 0;
-            if (myrHidden) { myrHidden.value = perUnit; }
-            if (bankHidden) { bankHidden.value = bankVal; }
-
-            var myrCell = row.querySelector('.cw-myr');
-            myrCell.querySelector('.cw-myr-val').textContent = money(perUnit);
-            myrCell.querySelector('.cw-bank-note').textContent = bankVal > 0 ? ('incl. ' + money(bankVal) + ' bank') : '';
-            row.querySelector('.cw-total').textContent = money(total);
-            row.style.opacity = included ? '1' : '0.45';
-            if (included) { grandCost += total; }
+            var res = processRow(row);
+            if (res.included) { grandCost += res.total; }
         });
 
         var pax = totalPax() || 1;
-        var margin = parseFloat(marginInput.value) || 0;
-        if (margin < 0) { margin = 0; }
+        var margin = currentMargin();
         var costPax = grandCost / pax;
         var sellPax = Math.round(costPax * (1 + margin / 100) * 100) / 100;
         var revenue = Math.round(sellPax * pax * 100) / 100;
@@ -564,6 +626,26 @@ if (!empty($booking_items)) {
         document.getElementById('cw-sum-profit').textContent = money(profit);
 
         renderCurrencyBreakdown();
+        recalcCombos(margin);
+    }
+
+    // Each combination's cost = sum of its rows' MYR totals; selling = cost x
+    // (1 + margin%). Combinations are additive: their sellings sum into the grand
+    // total shown to the customer.
+    function recalcCombos(margin) {
+        var grand = 0;
+        combosWrap.querySelectorAll('.cw-combo-card').forEach(function (card) {
+            var cost = 0;
+            card.querySelectorAll('.cw-crow').forEach(function (row) { cost += processRow(row).total; });
+            var selling = Math.round(cost * (1 + margin / 100) * 100) / 100;
+            var costEl = card.querySelector('.cw-combo-cost');
+            var sellEl = card.querySelector('.cw-combo-sell');
+            if (costEl) { costEl.textContent = money(cost); }
+            if (sellEl) { sellEl.textContent = money(selling); }
+            grand += selling;
+        });
+        var g = document.getElementById('cw-combo-grand');
+        if (g) { g.textContent = money(grand); }
     }
 
     // Roll included rows up per currency: rate to MYR + total owed in each
@@ -736,6 +818,144 @@ if (!empty($booking_items)) {
     adultInput.addEventListener('input', recalc);
     childInput.addEventListener('input', recalc);
     marginInput.addEventListener('input', recalc);
+
+    /* -------------------------------------------------------------------- *
+     *  COMBINATIONS — customer bundles shown on the Quotation PDF.          *
+     *  Same per-row cost math as the template above, grouped per bundle.    *
+     * -------------------------------------------------------------------- */
+
+    // One item picker per combination: every master item, grouped by category.
+    function comboItemPicker() {
+        var sel = document.createElement('select');
+        sel.className = 'form-control form-control-sm cw-combo-pick';
+        var ph = document.createElement('option');
+        ph.value = ''; ph.textContent = '— Add item —';
+        sel.appendChild(ph);
+        var byCat = {};
+        MASTER.forEach(function (mi, idx) {
+            var cat = CAT_LABELS[mi.category] ? mi.category : 'miscellaneous';
+            (byCat[cat] = byCat[cat] || []).push(idx);
+        });
+        Object.keys(CAT_LABELS).forEach(function (cat) {
+            if (!byCat[cat]) { return; }
+            var og = document.createElement('optgroup');
+            og.label = CAT_LABELS[cat];
+            byCat[cat].forEach(function (idx) {
+                var o = document.createElement('option');
+                o.value = idx; o.textContent = MASTER[idx].name;
+                og.appendChild(o);
+            });
+            sel.appendChild(og);
+        });
+        return sel;
+    }
+
+    // Append a cost row to a combination card. `item` supplies the master values.
+    function addComboRow(card, item) {
+        var c = card.getAttribute('data-c');
+        var r = parseInt(card.dataset.rseq, 10) || 0;
+        card.dataset.rseq = (r + 1);
+        var base = 'combinations[' + c + '][rows][' + r + ']';
+        var tr = document.createElement('tr');
+        tr.className = 'cw-row cw-crow';
+        tr.innerHTML =
+            '<td><input type="text" class="form-control" name="' + base + '[name]" value="" readonly>' +
+            '<select class="form-control form-control-sm cw-mult-type mt-2" name="' + base + '[multiplier_type]" title="How this cost scales">' + multiplierOptions(item.multiplier_type) + '</select>' +
+            '<textarea class="form-control form-control-sm cw-remark mt-2" name="' + base + '[remark]" rows="2" placeholder="Remark (optional)"></textarea>' +
+            '<input type="hidden" name="' + base + '[include]" value="1">' +
+            '<input type="hidden" name="' + base + '[category]" value="miscellaneous">' +
+            '<input type="hidden" name="' + base + '[unit_count]" value="1">' +
+            '<input type="hidden" name="' + base + '[pax_type]" value="">' +
+            '<input type="hidden" class="cw-myr-hidden" name="' + base + '[myr_per_unit]" value="">' +
+            '<input type="hidden" class="cw-bank-hidden" name="' + base + '[bank_charges_myr]" value=""></td>' +
+            '<td><select class="form-control cw-currency" name="' + base + '[currency_id]">' + currencyOptions(item.currency_id) + '</select></td>' +
+            '<td><input type="number" step="0.01" min="0" class="form-control cw-cost" name="' + base + '[unit_price]" value="0"></td>' +
+            '<td class="text-right cw-myr"><span class="cw-myr-val">0.00</span><span class="cw-bank-note"></span></td>' +
+            '<td><input type="number" step="1" min="0" class="form-control cw-count" name="' + base + '[quantity]" value="1"></td>' +
+            '<td class="text-right cw-total">0.00</td>' +
+            '<td class="text-center"><button type="button" class="btn btn-icon btn-light-danger btn-sm cw-remove" title="Remove row"><i class="la la-trash"></i></button></td>';
+
+        tr.querySelector('input[name="' + base + '[name]"]').value = item.name || '';
+        tr.querySelector('input[name="' + base + '[category]"]').value = item.category || 'miscellaneous';
+        tr.querySelector('.cw-mult-type').value = item.multiplier_type || 'fixed';
+        tr.querySelector('.cw-cost').value = (item.unit_price !== undefined ? item.unit_price : 0);
+        tr.querySelector('.cw-count').value = (item.count !== undefined && item.count !== null && item.count !== '') ? item.count : masterCount(item.multiplier_type);
+        tr.querySelector('.cw-remark').value = item.remark || '';
+
+        card.querySelector('.cw-combo-body').appendChild(tr);
+        return tr;
+    }
+
+    // Build a combination card (name + its own cost table + item picker + totals).
+    function addComboCard(name, items) {
+        var c = comboSeq++;
+        var card = document.createElement('div');
+        card.className = 'cw-combo-card';
+        card.setAttribute('data-c', c);
+        card.dataset.rseq = '0';
+        card.innerHTML =
+            '<div class="cw-combo-head">' +
+                '<input type="text" class="form-control cw-combo-name" name="combinations[' + c + '][name]" placeholder="Combination name (e.g. Premium)" value="">' +
+                '<button type="button" class="btn btn-icon btn-light-danger cw-combo-remove" title="Remove combination"><i class="la la-trash"></i></button>' +
+            '</div>' +
+            '<div class="table-responsive"><table class="table table-bordered cw-cost-table mb-2">' +
+                '<thead><tr>' +
+                    '<th style="text-align:left;">Details</th>' +
+                    '<th style="width:120px;">Currency</th>' +
+                    '<th style="width:120px;">Cost</th>' +
+                    '<th style="width:140px;">MYR (convert)</th>' +
+                    '<th style="width:120px;">No of Day / Pax</th>' +
+                    '<th style="width:140px;">Total in MYR</th>' +
+                    '<th style="width:44px;"></th>' +
+                '</tr></thead>' +
+                '<tbody class="cw-combo-body"></tbody>' +
+            '</table></div>' +
+            '<div class="d-flex align-items-center" style="gap:8px;"><span class="cw-combo-pick-slot"></span>' +
+                '<button type="button" class="btn btn-sm btn-success font-weight-bold cw-combo-add-item"><i class="la la-plus"></i>Add Item</button></div>' +
+            '<div class="cw-combo-foot">Cost:&nbsp;<span class="cw-combo-cost">RM 0.00</span> &middot; Selling:&nbsp;<span class="sell cw-combo-sell">RM 0.00</span></div>';
+
+        card.querySelector('.cw-combo-pick-slot').appendChild(comboItemPicker());
+        combosWrap.appendChild(card);
+        card.querySelector('.cw-combo-name').value = name || '';
+        (items || []).forEach(function (it) { addComboRow(card, it); });
+
+        if (window.jQuery && jQuery.fn.select2) {
+            jQuery(card).find('.cw-combo-pick').select2({ placeholder: '— Add item —', allowClear: true, width: '260px' });
+        }
+        return card;
+    }
+
+    combosWrap.addEventListener('input', recalc);
+    combosWrap.addEventListener('change', recalc);
+    combosWrap.addEventListener('click', function (e) {
+        var addItem = e.target.closest('.cw-combo-add-item');
+        if (addItem) {
+            var card = addItem.closest('.cw-combo-card');
+            var pick = card.querySelector('.cw-combo-pick');
+            if (!pick || pick.value === '') {
+                if (typeof Swal !== 'undefined') { Swal.fire({ icon: 'info', title: 'Pick an item', text: 'Select a cost item to add.' }); }
+                else { alert('Select a cost item to add.'); }
+                return;
+            }
+            var mi = MASTER[parseInt(pick.value, 10)];
+            if (mi) {
+                addComboRow(card, { name: mi.name, category: mi.category, multiplier_type: mi.multiplier_type, currency_id: mi.currency_id, unit_price: 0, count: masterCount(mi.multiplier_type), remark: '' });
+                pick.value = '';
+                if (window.jQuery && jQuery.fn.select2) { jQuery(pick).trigger('change.select2'); }
+                recalc();
+            }
+            return;
+        }
+        var rmBtn = e.target.closest('.cw-remove');
+        if (rmBtn && rmBtn.closest('.cw-crow')) { rmBtn.closest('.cw-crow').remove(); recalc(); return; }
+        var rmCard = e.target.closest('.cw-combo-remove');
+        if (rmCard) { var cc = rmCard.closest('.cw-combo-card'); if (cc) { cc.remove(); recalc(); } }
+    });
+
+    document.getElementById('cw-combo-add').addEventListener('click', function () { addComboCard('', []); recalc(); });
+
+    // Render saved combinations (edit mode) before the first price pass.
+    EXISTING_COMBOS.forEach(function (combo) { addComboCard(combo.name, combo.items); });
 
     recalc();
 

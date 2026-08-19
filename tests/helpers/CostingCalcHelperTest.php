@@ -243,11 +243,45 @@ $bd_missing = costing_currency_breakdown([['currency_id' => 99, 'unit_price' => 
 $assertions['breakdown: unknown currency -> rate 0'] = ($approx($bd_missing[0]['rate_to_myr'], 0.0) && $approx($bd_missing[0]['total_myr'], 0.0) && $approx($bd_missing[0]['total_foreign'], 100.00));
 
 /* ------------------------------------------------------------------ *
+ * 6b) COMBINATION SUMMARY (customer bundles, additive)                *
+ * ------------------------------------------------------------------ */
+
+$combos_in = [
+    ['name' => 'Premium',  'item_names' => ['Business Flight', '5-Star Hotel'], 'cost_myr' => 4000.00],
+    ['name' => 'Standard', 'item_names' => ['Economy Flight', '4-Star Hotel'],  'cost_myr' => 2500.00],
+];
+$cs = costing_combination_summary($combos_in, 20); // 20% markup
+
+$assertions['combo: one entry per combination'] = (count($cs['combinations']) === 2);
+$assertions['combo: name carried'] = ($cs['combinations'][0]['name'] === 'Premium');
+$assertions['combo: item names carried'] = ($cs['combinations'][0]['item_names'] === ['Business Flight', '5-Star Hotel']);
+$assertions['combo: selling = cost x (1+margin)'] = $approx($cs['combinations'][0]['selling'], 4800.00);
+$assertions['combo: second selling'] = $approx($cs['combinations'][1]['selling'], 3000.00);
+$assertions['combo: total_cost = sum of costs'] = $approx($cs['total_cost'], 6500.00);
+$assertions['combo: total_selling additive'] = $approx($cs['total_selling'], 7800.00);
+
+// Zero margin -> selling == cost.
+$cs0 = costing_combination_summary([['name' => 'A', 'item_names' => ['x'], 'cost_myr' => 1000]], 0);
+$assertions['combo: zero margin keeps cost'] = $approx($cs0['combinations'][0]['selling'], 1000.00);
+// Negative margin clamped to 0.
+$csn = costing_combination_summary([['name' => 'A', 'item_names' => [], 'cost_myr' => 1000]], -5);
+$assertions['combo: negative margin clamped'] = $approx($csn['total_selling'], 1000.00);
+// Blank item names filtered; missing keys tolerated.
+$csb = costing_combination_summary([['name' => 'A', 'item_names' => ['x', '  ', ''], 'cost_myr' => 100]], 10);
+$assertions['combo: blank item names dropped'] = ($csb['combinations'][0]['item_names'] === ['x']);
+$assertions['combo: empty input -> zero totals'] = (
+    costing_combination_summary([], 20) === ['combinations' => [], 'total_cost' => 0.0, 'total_selling' => 0.0]
+);
+// Rounds to 2dp.
+$csr = costing_combination_summary([['name' => 'A', 'item_names' => [], 'cost_myr' => 33.335]], 0);
+$assertions['combo: cost rounds to 2dp'] = $approx($csr['combinations'][0]['cost_myr'], 33.34);
+
+/* ------------------------------------------------------------------ *
  * 7) SOURCE CONTRACT                                                  *
  * ------------------------------------------------------------------ */
 
 $helper = @file_get_contents(__DIR__ . '/../../application/helpers/costing_calc_helper.php');
-foreach (['costing_categories', 'costing_line_to_myr', 'costing_sum_by_category', 'costing_apply_markup', 'costing_build_snapshot_rows', 'costing_normalize_rate', 'costing_multiplier_types', 'costing_multiplier_count', 'costing_row_myr', 'costing_row_totals', 'costing_currency_breakdown'] as $fn) {
+foreach (['costing_categories', 'costing_line_to_myr', 'costing_sum_by_category', 'costing_apply_markup', 'costing_build_snapshot_rows', 'costing_normalize_rate', 'costing_multiplier_types', 'costing_multiplier_count', 'costing_row_myr', 'costing_row_totals', 'costing_currency_breakdown', 'costing_combination_summary'] as $fn) {
     $assertions["helper: defines {$fn}()"] = (bool) preg_match('/function\s+' . preg_quote($fn, '/') . '\s*\(/', (string) $helper);
 }
 

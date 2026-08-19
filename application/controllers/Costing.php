@@ -139,6 +139,7 @@ class Costing extends MY_Controller
             'child_count' => $this->input->post('child_count'),
             'status' => $this->input->post('status'),
             'rows' => $this->input->post('rows'),
+            'combinations' => $this->input->post('combinations'),
             'margin_percentage' => $this->input->post('margin_percentage'),
             'commissionable_per_pax' => $this->input->post('commissionable_per_pax'),
             'ad_hoc_per_pax' => $this->input->post('ad_hoc_per_pax'),

@@ -174,6 +174,7 @@ class Costing_Model extends CI_Model
             'quotation_token' => $booking && !empty($booking['quotation_token']) ? $booking['quotation_token'] : '',
             'item_master' => $this->Read_Item_Master(),
             'currency_rate_map' => $this->Read_Currency_Rate_Map($booking ? $booking['travel_date'] : null, (int) $base_currency['id']),
+            'combinations' => $booking ? $this->Read_Combinations((int) $booking['id'], (int) $base_currency['id'], $booking['travel_date']) : array(),
         );
     }
 
@@ -311,6 +312,7 @@ class Costing_Model extends CI_Model
         if (!empty($booking_ids)) {
             $this->db->where_in('booking_id', $booking_ids)->delete('costing_booking_financials');
             $this->db->where_in('booking_id', $booking_ids)->delete('costing_booking_items');
+            $this->db->where_in('costing_booking_id', $booking_ids)->delete('costing_combinations');
         }
 
         $this->db->where('package_id', $package_id)->delete('costing_bookings');
@@ -397,7 +399,12 @@ class Costing_Model extends CI_Model
             }
         }
 
-        if (empty($snapshot_rows)) {
+        // Customer combinations (each = a named bundle of its own cost rows).
+        // Normalised here so an all-empty scenario (no template rows AND no
+        // combination rows) can still be rejected below.
+        $combinations = $this->Prepare_Combinations(isset($payload['combinations']) ? (array) $payload['combinations'] : array());
+
+        if (empty($snapshot_rows) && empty($combinations)) {
             return 0;
         }
 
@@ -426,8 +433,33 @@ class Costing_Model extends CI_Model
                 $row['bank_charges_myr'] = $this->Resolve_Bank_Charges_Myr((int) $row['currency_id'], $travel_date);
             }
             $row['booking_id'] = $booking_id;
+            $row['combination_id'] = null;
             $row['total_amount'] = round((float) $row['quantity'] * (float) $row['unit_count'] * (float) $row['unit_price'], 2);
             $this->db->insert('costing_booking_items', $row);
+        }
+
+        // Replace-all the combinations for this scenario. Its cost rows were already
+        // cleared above (delete by booking_id covers combination rows too); now
+        // re-create each combination and insert its rows tagged with the new id.
+        $this->db->where('costing_booking_id', $booking_id)->delete('costing_combinations');
+        $sort = 0;
+        foreach ($combinations as $combo) {
+            $this->db->insert('costing_combinations', array(
+                'costing_booking_id' => $booking_id,
+                'name' => $combo['name'],
+                'sort_order' => $sort,
+            ));
+            $combination_id = (int) $this->db->insert_id();
+            foreach ($combo['rows'] as $row) {
+                if (!isset($row['bank_charges_myr'])) {
+                    $row['bank_charges_myr'] = $this->Resolve_Bank_Charges_Myr((int) $row['currency_id'], $travel_date);
+                }
+                $row['booking_id'] = $booking_id;
+                $row['combination_id'] = $combination_id;
+                $row['total_amount'] = round((float) $row['quantity'] * (float) $row['unit_count'] * (float) $row['unit_price'], 2);
+                $this->db->insert('costing_booking_items', $row);
+            }
+            $sort++;
         }
 
         $this->Upsert_Booking_Financials($booking_id, array(
@@ -913,6 +945,7 @@ class Costing_Model extends CI_Model
 
         // Customer-facing line items: name + selling price (MYR cost incl. bank
         // charges, marked up by the same margin). Raw cost/margin/profit stay hidden.
+        // Kept as a fallback for legacy scenarios that have no combinations yet.
         $margin = max(0, (float) $financials['margin_percentage']);
         $items = array();
         foreach ($booking_items as $item) {
@@ -922,6 +955,25 @@ class Costing_Model extends CI_Model
             );
         }
 
+        // Customer combinations: each bundle's name + item names + its selling
+        // price. Additive — their sum is the total package price. When present,
+        // the PDF shows combinations instead of the internal item list.
+        $this->load->helper('costing_calc');
+        $combo_input = array();
+        foreach ($this->Read_Combinations((int) $booking['id'], $base_currency_id, $booking['travel_date']) as $combo) {
+            $names = array();
+            foreach ($combo['items'] as $combo_item) {
+                $names[] = $combo_item['name'];
+            }
+            $combo_input[] = array(
+                'name'       => $combo['name'],
+                'item_names' => $names,
+                'cost_myr'   => $combo['cost_myr'],
+            );
+        }
+        $combo_summary = costing_combination_summary($combo_input, $margin);
+        $has_combinations = !empty($combo_summary['combinations']);
+
         return array(
             'booking'    => $booking,
             'package'    => array(
@@ -930,9 +982,13 @@ class Costing_Model extends CI_Model
                 'duration_days'   => (int) $booking['duration_days'],
                 'duration_nights' => (int) $booking['duration_nights'],
             ),
-            'itinerary'  => $this->Read_Itinerary_Days((int) $booking['package_id']),
-            'items'      => $items,
-            'financials' => $financials,
+            'itinerary'     => $this->Read_Itinerary_Days((int) $booking['package_id']),
+            'items'         => $items,
+            'combinations'  => $combo_summary['combinations'],
+            // Additive combination total when there are combinations, else the
+            // legacy internal revenue so old quotations keep their total.
+            'total_selling' => $has_combinations ? $combo_summary['total_selling'] : (float) $financials['total_revenue'],
+            'financials'    => $financials,
         );
     }
 
@@ -1184,31 +1240,55 @@ class Costing_Model extends CI_Model
 
     private function Read_Booking_Items($booking_id, $base_currency_id, $travel_date = null)
     {
+        // Internal cost template only: rows NOT tied to a customer combination
+        // (combination_id IS NULL). Combination rows are read separately so they
+        // never inflate the internal cost/margin/profit summary.
         $items = $this->db
-            ->select('
-                costing_booking_items.id,
-                costing_booking_items.booking_id,
-                costing_booking_items.package_item_id,
-                costing_booking_items.name,
-                costing_booking_items.category,
-                COALESCE(costing_booking_items.pax_type, "") AS pax_type,
-                COALESCE(costing_booking_items.multiplier_type, "fixed") AS multiplier_type,
-                costing_booking_items.quantity,
-                costing_booking_items.unit_count,
-                costing_booking_items.unit_price,
-                costing_booking_items.currency_id,
-                costing_booking_items.total_amount,
-                costing_booking_items.bank_charges_myr,
-                costing_booking_items.myr_per_unit AS frozen_myr_per_unit,
-                COALESCE(costing_booking_items.remark, "") AS remark,
-                costing_currencies.code AS currency
-            ')
+            ->select($this->Booking_Item_Select())
             ->join('costing_currencies', 'costing_currencies.id = costing_booking_items.currency_id')
             ->where('costing_booking_items.booking_id', (int) $booking_id)
+            ->where('costing_booking_items.combination_id IS NULL', null, false)
             ->order_by('costing_booking_items.id', 'ASC')
             ->get('costing_booking_items')
             ->result_array();
 
+        return $this->Hydrate_Booking_Item_Rows($items, (int) $booking_id, $base_currency_id, $travel_date);
+    }
+
+    /**
+     * Shared SELECT list for a costing cost row (internal template or a
+     * combination). Includes combination_id so callers can group.
+     */
+    private function Booking_Item_Select()
+    {
+        return '
+            costing_booking_items.id,
+            costing_booking_items.booking_id,
+            costing_booking_items.combination_id,
+            costing_booking_items.package_item_id,
+            costing_booking_items.name,
+            costing_booking_items.category,
+            COALESCE(costing_booking_items.pax_type, "") AS pax_type,
+            COALESCE(costing_booking_items.multiplier_type, "fixed") AS multiplier_type,
+            costing_booking_items.quantity,
+            costing_booking_items.unit_count,
+            costing_booking_items.unit_price,
+            costing_booking_items.currency_id,
+            costing_booking_items.total_amount,
+            costing_booking_items.bank_charges_myr,
+            costing_booking_items.myr_per_unit AS frozen_myr_per_unit,
+            COALESCE(costing_booking_items.remark, "") AS remark,
+            costing_currencies.code AS currency
+        ';
+    }
+
+    /**
+     * Apply the frozen per-unit MYR (or live-rate fallback) to a set of raw cost
+     * rows. Shared by the internal template read and the combination read so both
+     * price identically. Sets exchange_rate, myr_per_unit and base_total per row.
+     */
+    private function Hydrate_Booking_Item_Rows($items, $booking_id, $base_currency_id, $travel_date = null)
+    {
         // Frozen per-scenario snapshot wins over the live feed: a saved quotation's
         // numbers must never move. Fall back to the live rate only for currencies
         // that have no snapshot row yet (e.g. pre-snapshot legacy scenarios).
@@ -1238,6 +1318,65 @@ class Costing_Model extends CI_Model
         unset($item);
 
         return $items;
+    }
+
+    /**
+     * A scenario's customer combinations (the bundles shown on the Quotation PDF).
+     * Each combination groups its own cost items (costing_booking_items rows tagged
+     * with its combination_id), priced with the same frozen/live MYR math as the
+     * internal template. cost_myr = sum of the combination's item MYR totals.
+     *
+     * @return array list of ['id','name','cost_myr','items'=>[cost rows]]
+     */
+    public function Read_Combinations($booking_id, $base_currency_id, $travel_date = null)
+    {
+        $booking_id = (int) $booking_id;
+
+        $combos = $this->db
+            ->select('id, name')
+            ->where('costing_booking_id', $booking_id)
+            ->order_by('sort_order', 'ASC')
+            ->order_by('id', 'ASC')
+            ->get('costing_combinations')
+            ->result_array();
+
+        if (empty($combos)) {
+            return array();
+        }
+
+        $rows = $this->db
+            ->select($this->Booking_Item_Select())
+            ->join('costing_currencies', 'costing_currencies.id = costing_booking_items.currency_id')
+            ->where('costing_booking_items.booking_id', $booking_id)
+            ->where('costing_booking_items.combination_id IS NOT NULL', null, false)
+            ->order_by('costing_booking_items.id', 'ASC')
+            ->get('costing_booking_items')
+            ->result_array();
+
+        $rows = $this->Hydrate_Booking_Item_Rows($rows, $booking_id, $base_currency_id, $travel_date);
+
+        $rows_by_combo = array();
+        foreach ($rows as $row) {
+            $rows_by_combo[(int) $row['combination_id']][] = $row;
+        }
+
+        $out = array();
+        foreach ($combos as $combo) {
+            $combo_id = (int) $combo['id'];
+            $items = isset($rows_by_combo[$combo_id]) ? $rows_by_combo[$combo_id] : array();
+            $cost_myr = 0.0;
+            foreach ($items as $item) {
+                $cost_myr += (float) $item['base_total'];
+            }
+            $out[] = array(
+                'id'       => $combo_id,
+                'name'     => (string) $combo['name'],
+                'cost_myr' => round($cost_myr, 2),
+                'items'    => $items,
+            );
+        }
+
+        return $out;
     }
 
     private function Read_Currencies($filters = array())
@@ -1470,6 +1609,46 @@ class Costing_Model extends CI_Model
             'bank_charges_myr' => null,
             'remark' => $remark,
         );
+    }
+
+    /**
+     * Normalise posted customer combinations. Each combination keeps a name and
+     * its own normalised cost rows (same rules as the internal template). A row is
+     * included unless its include flag is explicitly 0. A combination with no
+     * usable rows is dropped; a nameless-but-non-empty one gets an auto name.
+     *
+     * @return array list of ['name'=>string, 'rows'=>array]
+     */
+    private function Prepare_Combinations($posted)
+    {
+        $out = array();
+        $seq = 0;
+
+        foreach ((array) $posted as $combo) {
+            $seq++;
+            $name = trim((string) (isset($combo['name']) ? $combo['name'] : ''));
+            $posted_rows = isset($combo['rows']) ? (array) $combo['rows'] : array();
+
+            $selected = array();
+            foreach ($posted_rows as $row) {
+                if (!array_key_exists('include', $row) || !empty($row['include'])) {
+                    $selected[] = $row;
+                }
+            }
+
+            $rows = $this->Normalize_Booking_Rows($selected);
+            if (empty($rows)) {
+                continue;
+            }
+
+            if ($name === '') {
+                $name = 'Combination ' . $seq;
+            }
+
+            $out[] = array('name' => $name, 'rows' => $rows);
+        }
+
+        return $out;
     }
 
     private function Normalize_Booking_Rows($rows)

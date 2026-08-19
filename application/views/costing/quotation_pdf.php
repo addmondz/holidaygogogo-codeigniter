@@ -12,10 +12,11 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 $company    = isset($company) && is_array($company) ? $company : array();
 $booking    = isset($booking) ? $booking : array();
 $package    = isset($package) ? $package : array();
-$itinerary  = isset($itinerary) ? $itinerary : array();
-$items      = isset($items) ? $items : array();
-$financials = isset($financials) ? $financials : array();
-$public_ref = isset($public_ref) ? $public_ref : '';
+$itinerary    = isset($itinerary) ? $itinerary : array();
+$items        = isset($items) ? $items : array();
+$combinations = isset($combinations) ? $combinations : array();
+$financials   = isset($financials) ? $financials : array();
+$public_ref   = isset($public_ref) ? $public_ref : '';
 
 $CompanyName    = isset($company['Name']) ? $company['Name'] : 'HolidayGoGoGo';
 $CompanyReg     = isset($company['RegistrationNumber']) ? $company['RegistrationNumber'] : '';
@@ -28,7 +29,12 @@ $TourCode      = isset($package['tour_code']) && $package['tour_code'] !== '' ? 
 $DurationDays  = (int) (isset($package['duration_days']) ? $package['duration_days'] : 0);
 $DurationNights = (int) (isset($package['duration_nights']) ? $package['duration_nights'] : 0);
 $TotalPax      = (int) (isset($booking['total_pax']) ? $booking['total_pax'] : 0);
-$TotalSelling  = (float) (isset($financials['total_revenue']) ? $financials['total_revenue'] : 0);
+// Total shown to the customer: additive combination total when combinations
+// exist, else the legacy internal revenue (passed as total_selling by the model).
+$TotalSelling  = isset($total_selling)
+    ? (float) $total_selling
+    : (float) (isset($financials['total_revenue']) ? $financials['total_revenue'] : 0);
+$HasCombinations = !empty($combinations);
 
 $TravelDate = !empty($booking['travel_date']) && strtotime($booking['travel_date'])
     ? strtoupper(date('d M Y', strtotime($booking['travel_date'])))
@@ -122,7 +128,32 @@ if (is_file($logoPath)) {
         </tr>
     </table>
 
-    <?php if (!empty($items)) { ?>
+    <?php if ($HasCombinations) { ?>
+        <!-- Customer combinations: each bundle = its name + items + price. Additive. -->
+        <hr style="margin-bottom:0px;">
+        <table style="width:100%; font-size:13px;">
+            <tr style="font-weight:700;">
+                <td style="width:70%;">Package Combinations</td>
+                <td style="width:30%; text-align:right;">Price (RM)</td>
+            </tr>
+        </table>
+        <hr style="margin-top:0px; margin-bottom:5px;">
+        <?php foreach ($combinations as $combo) { ?>
+            <table style="width:100%; font-size:12px; border-spacing:0; margin-bottom:8px;">
+                <tr style="vertical-align:baseline; font-weight:700;">
+                    <td style="width:70%; padding:3px 0;"><?php echo strtoupper(html_escape($combo['name'])); ?></td>
+                    <td style="width:30%; text-align:right; padding:3px 0;"><?php echo number_format((float) $combo['selling'], 2, '.', ','); ?></td>
+                </tr>
+                <?php foreach ($combo['item_names'] as $combo_item_name) { ?>
+                    <?php if (trim((string) $combo_item_name) === '') { continue; } ?>
+                    <tr style="vertical-align:baseline;">
+                        <td style="width:70%; padding:1px 0 1px 14px;">&bull; <?php echo html_escape($combo_item_name); ?></td>
+                        <td style="width:30%;">&nbsp;</td>
+                    </tr>
+                <?php } ?>
+            </table>
+        <?php } ?>
+    <?php } elseif (!empty($items)) { ?>
         <hr style="margin-bottom:0px;">
         <table style="width:100%; font-size:13px;">
             <tr style="font-weight:700;">

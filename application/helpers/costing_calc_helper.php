@@ -159,6 +159,64 @@ if (!function_exists('costing_apply_markup')) {
     }
 }
 
+if (!function_exists('costing_combination_summary')) {
+    /**
+     * Roll a scenario's combinations up for the customer quotation. Each
+     * combination carries a name, its item names, and its MYR cost (the sum of its
+     * item MYR totals). Selling = cost x (1 + margin%) using the same markup-on-cost
+     * margin as the internal template. Combinations are ADDITIVE: the grand total
+     * is the sum of every combination's selling price.
+     *
+     * @param array $combinations each: ['name'=>string, 'item_names'=>array, 'cost_myr'=>float]
+     * @param float $margin_percent markup-on-cost percentage (never negative)
+     * @return array [
+     *   'combinations' => [ ['name','item_names','cost_myr','selling'], ... ],
+     *   'total_cost'    => float, // sum of combination costs (MYR)
+     *   'total_selling' => float, // sum of combination selling prices (MYR)
+     * ]
+     */
+    function costing_combination_summary($combinations, $margin_percent)
+    {
+        $margin = (float) $margin_percent;
+        if ($margin < 0) {
+            $margin = 0.0;
+        }
+
+        $out = [];
+        $total_cost = 0.0;
+        $total_selling = 0.0;
+
+        foreach ((array) $combinations as $combo) {
+            $cost = round((float) (isset($combo['cost_myr']) ? $combo['cost_myr'] : 0), 2);
+            $selling = round($cost * (1 + $margin / 100), 2);
+
+            $names = [];
+            foreach ((array) (isset($combo['item_names']) ? $combo['item_names'] : []) as $name) {
+                $name = trim((string) $name);
+                if ($name !== '') {
+                    $names[] = $name;
+                }
+            }
+
+            $out[] = [
+                'name'       => trim((string) (isset($combo['name']) ? $combo['name'] : '')),
+                'item_names' => $names,
+                'cost_myr'   => $cost,
+                'selling'    => $selling,
+            ];
+
+            $total_cost += $cost;
+            $total_selling += $selling;
+        }
+
+        return [
+            'combinations'  => $out,
+            'total_cost'    => round($total_cost, 2),
+            'total_selling' => round($total_selling, 2),
+        ];
+    }
+}
+
 if (!function_exists('costing_build_snapshot_rows')) {
     /**
      * Build the distinct-currency snapshot skeleton from the cost rows, pre-filling
