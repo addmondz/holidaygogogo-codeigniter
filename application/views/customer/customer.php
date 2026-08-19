@@ -151,6 +151,16 @@
                                 </div>
                             </div>
                         </div>
+                        <div class="col-md-12">
+                            <div class="form-group">
+                                <label class="checkbox checkbox-lg font-weight-bold">
+                                    <input type="checkbox" id="CreatedFromEInvoice" <?php if(current_url() == base_url('Customer/Update') && !empty($CreatedFromEInvoice)) { echo 'checked'; } ?>>
+                                    <span></span>
+                                    &nbsp;Non-Booker (created from an e-invoice request)
+                                </label>
+                                <span class="form-text text-muted">Tick to mark this customer as someone who is not the booking customer.</span>
+                            </div>
+                        </div>
                     </div>
                     <div class="d-flex justify-content-between border-top pt-5">
                         <input type="button" value="<?php if(current_url() == base_url('Customer/Create')) { echo 'Create Customer'; } else { echo 'Update Customer'; } ?>" class="btn btn-success font-weight-bold px-9 py-4" style="width:180px; margin-left:auto;">
@@ -213,7 +223,8 @@
                             ic_passport_no: ic_passport_no,
                             tin_no: tin_no,
                             Address: Address,
-                            PrimaryEmail: PrimaryEmail
+                            PrimaryEmail: PrimaryEmail,
+                            CreatedFromEInvoice: ($('#CreatedFromEInvoice').is(':checked') ? 1 : 0)
                             // InsertBy: <?php echo $this->session->userdata('admin_id') ?>,
                             // InsertDate: '<?php echo date('Y-m-d H:i:s') ?>'
                         }];
@@ -242,6 +253,11 @@
                         // Phone is rebuilt from the picker; send it only when it changed.
                         var phoneChanged = (phone_number !== INITIAL_PHONE);
                         if(phoneChanged) { customer[0].phone_number = phone_number; }
+                        // Non-booker checkbox isn't caught by jquery.dirty reliably;
+                        // send it explicitly only when toggled from its loaded value.
+                        var einvoiceFlag = $('#CreatedFromEInvoice').is(':checked') ? 1 : 0;
+                        var flagChanged = (einvoiceFlag !== INITIAL_EINVOICE);
+                        if(flagChanged) { customer[0].CreatedFromEInvoice = einvoiceFlag; }
                         count = 0;
                         $.each(customer[0], function() {
                             count++;
@@ -249,7 +265,7 @@
                         // Did the destination selection change vs what was loaded?
                         var destChanged = JSON.stringify(destinations.slice().sort())
                             !== JSON.stringify(INITIAL_DESTINATIONS.slice().sort());
-                        if(count == 1 && !destChanged && !phoneChanged) {
+                        if(count == 1 && !destChanged && !phoneChanged && !flagChanged) {
                             Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', '<?php echo 'No Changes Detected In Customer Record : ' . str_replace('\'', '', $name); ?>', '<?php echo base_url('Customer') ?>');
                         } else {
                             Submit_Customer('<?php echo base_url('Customer/Update') ?>', customer[0].CustomerID, customer, destinations);
@@ -273,6 +289,10 @@
     // The phone as originally stored ("+60 123456789" or ''), so we can tell
     // whether the picker changed even when no other field is dirty.
     var INITIAL_PHONE = <?php echo json_encode(isset($__stored_phone) ? $__stored_phone : ''); ?>;
+
+    // Non-booker flag as loaded, so a toggle is detected even when nothing else
+    // is dirty (the checkbox isn't tracked by jquery.dirty).
+    var INITIAL_EINVOICE = <?php echo (current_url() == base_url('Customer/Update') && !empty($CreatedFromEInvoice)) ? 1 : 0; ?>;
 
     // Combine the dial-code picker + local number into the stored shape. Mirrors
     // the server phone_country_combine(): drops a single leading trunk "0"; with

@@ -15,8 +15,10 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 
 if (!function_exists('costing_categories')) {
     /**
-     * The five fixed cost categories, code => human label. Shared by the item
-     * master, the package cost template, and the snapshot so there is one list.
+     * Default seed / fallback cost categories, code => human label. Categories are
+     * now a dynamic master (table costing_categories, see Costing_Category_Model);
+     * this list only seeds a fresh install and is the fallback when the master is
+     * empty. Shared with the pure math below so tests stay DB-free.
      *
      * @return array<string,string>
      */
@@ -29,6 +31,42 @@ if (!function_exists('costing_categories')) {
             'tour_leader'   => 'Tour Leader',
             'miscellaneous' => 'Miscellaneous',
         ];
+    }
+}
+
+if (!function_exists('costing_category_slug')) {
+    /**
+     * Turn a category name into a stable, unique code slug (lowercase a-z0-9_).
+     * Used when creating a new category in the master. Pure so it stays testable.
+     *
+     * @param string   $name     human label, e.g. "Land Transport"
+     * @param string[] $existing codes already taken (any case) to avoid clashes
+     * @return string slug, e.g. "land_transport" (suffixed _2, _3... on clash);
+     *                empty name falls back to "category".
+     */
+    function costing_category_slug($name, $existing = [])
+    {
+        $slug = strtolower(trim((string) $name));
+        $slug = preg_replace('/[^a-z0-9]+/', '_', $slug);
+        $slug = trim((string) $slug, '_');
+        if ($slug === '') {
+            $slug = 'category';
+        }
+
+        $taken = [];
+        foreach ((array) $existing as $code) {
+            $taken[strtolower(trim((string) $code))] = true;
+        }
+
+        if (!isset($taken[$slug])) {
+            return $slug;
+        }
+
+        $n = 2;
+        while (isset($taken[$slug . '_' . $n])) {
+            $n++;
+        }
+        return $slug . '_' . $n;
     }
 }
 

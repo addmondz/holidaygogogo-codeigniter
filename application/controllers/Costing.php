@@ -90,7 +90,6 @@ class Costing extends MY_Controller
         $package_id = $this->Costing_Model->Save_Package(array(
             'id' => (int) $this->input->post('package_id'),
             'name' => $this->input->post('name'),
-            'tour_code' => $this->input->post('tour_code'),
             'duration_days' => $this->input->post('duration_days'),
             'duration_nights' => $this->input->post('duration_nights'),
             'description' => $this->input->post('description'),

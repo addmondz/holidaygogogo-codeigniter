@@ -57,6 +57,27 @@ class Guests_Model extends CI_Model
 	}
 
 	/**
+	 * The key the booking branch GROUPS on (NOT the one it displays). A stored
+	 * dedup_key only means "same person" when it is a real phone (a run of 7+
+	 * digits) or an email (has '@'). Junk typed into Mobile/Email — "-", "na",
+	 * "tba", "xxx", "0", … — normalises to that same junk string and would
+	 * collapse hundreds of unrelated guests into ONE row, whose Destinations then
+	 * concat into a giant list (the reported bug). For those, fall back to a
+	 * per-guest-row unique key so each junk-keyed guest stays its own row.
+	 *
+	 * The DISPLAYED dedup_key column stays the raw {$dedup} (see the outer
+	 * SELECT), so inline-edit / remarks / campaign keying is unchanged.
+	 */
+	private function Dedup_Group_Key_Expr($dedup)
+	{
+		return "CASE
+			WHEN {$dedup} REGEXP '[0-9]{7,}' OR {$dedup} LIKE '%@%'
+				THEN {$dedup}
+			ELSE CONVERT(CONCAT('gl:', gl.GuestListID) USING utf8mb4) COLLATE utf8mb4_unicode_ci
+		END";
+	}
+
+	/**
 	 * Append a multi-select filter as an " AND {$column} IN (?, ?, …) " fragment
 	 * to $where and push its values onto $params. No-op when nothing is selected.
 	 * $column is a trusted, code-supplied SQL expression (never user input);
@@ -552,6 +573,7 @@ WHERE 1 = 1
 
 	private function Booking_Windowed_Select($dedup, $from)
 	{
+		$group = $this->Dedup_Group_Key_Expr($dedup);
 		// rn=1 is the row that represents this person — its Name/Contact/Email/…
 		// win the MAX(CASE WHEN rn=1 …) picks in the outer aggregate. Newest
 		// booking first, but when two guests in the SAME booking share a phone (a
@@ -562,6 +584,7 @@ WHERE 1 = 1
 		return "
 	SELECT
 		{$dedup} AS dedup_key,
+		{$group} AS group_key,
 		TRIM(gl.Name) AS display_name,
 		gl.Mobile        AS ContactNum,
 		ccp.CountryCode  AS CallingCode,
@@ -590,13 +613,13 @@ WHERE 1 = 1
 		(COALESCE(b.Adult, 0) + COALESCE(b.Children, 0) + COALESCE(b.Infant, 0)) AS BookingPax,
 		COALESCE(b.NetTotal, 0) AS BookingNetTotal,
 		ROW_NUMBER() OVER (
-			PARTITION BY {$dedup}
+			PARTITION BY {$group}
 			ORDER BY b.InsertDate DESC, b.BookingID DESC,
 				CASE WHEN gl.Type = 'ADULT' THEN 0 ELSE 1 END ASC,
 				gl.GuestListID ASC
 		) AS rn,
 		ROW_NUMBER() OVER (
-			PARTITION BY {$dedup}, b.BookingID
+			PARTITION BY {$group}, b.BookingID
 			ORDER BY gl.GuestListID
 		) AS booking_rn
 	{$from}
@@ -821,7 +844,7 @@ WHERE 1 = 1
 			$dedup = $booking['dedup'];
 			$parts[] = "
 SELECT
-	dedup_key,
+	MAX(dedup_key) AS dedup_key,
 	CONVERT(MAX(CASE WHEN rn = 1 THEN display_name   END) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS Name,
 	CONVERT(GROUP_CONCAT(DISTINCT CASE WHEN booking_rn = 1 THEN NULLIF(TRIM(BookingCustomer), '') END SEPARATOR '||') USING utf8mb4) COLLATE utf8mb4_unicode_ci AS TeamLeader,
 	CONVERT(GROUP_CONCAT(DISTINCT CASE WHEN booking_rn = 1 AND NULLIF(TRIM(BookingCustomer), '') IS NOT NULL THEN CONCAT(BookingID, ':', TRIM(BookingCustomer)) END SEPARATOR '||') USING utf8mb4) COLLATE utf8mb4_unicode_ci AS TeamLeaderBookings,
@@ -859,7 +882,7 @@ SELECT
 FROM (
 	{$this->Booking_Windowed_Select($dedup, $booking['from'])}
 ) t
-GROUP BY dedup_key
+GROUP BY group_key
 {$booking['having']}
 			";
 			$params = array_merge($params, $booking['params'], $booking['having_params']);
@@ -1221,6 +1244,15 @@ GROUP BY mm.merge_key";
 		$this->Append_In_Clause($where, $params, 'c.ChatLanguage',  $this->input->get('language'));
 		$this->Append_In_Clause($where, $params, 'c.customer_type', $this->input->get('customer_type'));
 
+		// Non-booker (created from an e-invoice request) filter: '1' = only flagged
+		// non-bookers, '0' = only bookers; blank = no filter.
+		$non_booker = trim((string) $this->input->get('non_booker'));
+		if ($non_booker === '1') {
+			$where .= " AND c.CreatedFromEInvoice = 1 ";
+		} elseif ($non_booker === '0') {
+			$where .= " AND (c.CreatedFromEInvoice = 0 OR c.CreatedFromEInvoice IS NULL) ";
+		}
+
 		// ---- Tier 2: booking-level (EXISTS on the customer's bookings) ----
 		$bstr  = '';
 		$bpar  = array();
@@ -1401,6 +1433,15 @@ GROUP BY mm.merge_key";
 			$params  = array_merge($params, $seg['params']);
 		}
 
+		// ---- Default "Booking Status" gate: hide customers whose bookings are all
+		// cancelled or all quotation/proforma (like the booking listing), unless the
+		// customer_booking_status[] filter (or the legacy cancelled=1 toggle) reveals
+		// them. No-booking customers stay visible. Always applied, so the count,
+		// listing and export share the same default set. ----
+		$status = guest_list_customer_status_predicate($get);
+		$where  .= $status['sql'];
+		$params  = array_merge($params, $status['params']);
+
 		return array('where' => $where, 'params' => $params, 'needs_pax_join' => $needs_pax_join);
 	}
 
@@ -1511,6 +1552,7 @@ GROUP BY mm.merge_key";
 		CONVERT(c.AltName USING utf8mb4) COLLATE utf8mb4_unicode_ci AS AltName,
 		c.AutocountSyncStatus  AS AutocountSyncStatus,
 		CONVERT(c.AutocountSyncMessage USING utf8mb4) COLLATE utf8mb4_unicode_ci AS AutocountSyncMessage,
+		c.CreatedFromEInvoice AS CreatedFromEInvoice,
 		c.created_at AS CustomerCreatedAt
 	FROM customer c
 	LEFT JOIN {$blat} blatest ON blatest.CustomerID = c.CustomerID
@@ -1566,6 +1608,7 @@ GROUP BY mm.merge_key";
 		CONVERT(c.AltName USING utf8mb4) COLLATE utf8mb4_unicode_ci AS AltName,
 		c.AutocountSyncStatus  AS AutocountSyncStatus,
 		CONVERT(c.AutocountSyncMessage USING utf8mb4) COLLATE utf8mb4_unicode_ci AS AutocountSyncMessage,
+		c.CreatedFromEInvoice AS CreatedFromEInvoice,
 		c.created_at AS CustomerCreatedAt
 	FROM customer c
 	LEFT JOIN {$blat} blatest ON blatest.CustomerID = c.CustomerID

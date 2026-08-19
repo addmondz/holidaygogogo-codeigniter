@@ -275,6 +275,9 @@ class Customer_Model extends CI_Model
 			'Address'        => !empty($customer['Address']) ? trim($customer['Address']) : null,
 			// Primary email, synced to AutoCount debtor emailAddress.
 			'PrimaryEmail'   => !empty($customer['PrimaryEmail']) ? trim($customer['PrimaryEmail']) : null,
+			// Non-booker flag: 1 when this customer is not the booking customer
+			// (e-invoice request origin, or ticked on the form). Badge on listing.
+			'CreatedFromEInvoice' => !empty($customer['CreatedFromEInvoice']) ? 1 : 0,
 			// Flag for AutoCount sync so master-data customers (no booking) get
 			// pushed by the cron. AutoCount auto-generates the code if blank.
 			'AutocountSyncAction' => 'C',
@@ -610,6 +613,27 @@ class Customer_Model extends CI_Model
             return $id;
         }
         return $this->create_with_generated_code($data);
+    }
+
+    /**
+     * Clear the "non-booker" flag (CreatedFromEInvoice) on the given customers.
+     * Called when a customer becomes a booking's CustomerID / CustomerID2 — being
+     * attached to a booking makes them a booker, so the e-invoice-origin flag no
+     * longer applies. Only flips rows currently flagged (=1); nulls/dupes ignored.
+     *
+     * @param int|int[] $customer_ids One id or a list (mixed null/0 tolerated).
+     * @return int Rows cleared.
+     */
+    public function Clear_Einvoice_Flag($customer_ids)
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', (array) $customer_ids))));
+        if (empty($ids)) {
+            return 0;
+        }
+        $this->db->where_in('CustomerID', $ids);
+        $this->db->where('CreatedFromEInvoice', 1);
+        $this->db->update('customer', ['CreatedFromEInvoice' => 0]);
+        return (int) $this->db->affected_rows();
     }
 
     /**

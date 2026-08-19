@@ -1119,6 +1119,14 @@ class Booking_Model extends CI_Model
 		$this->db->where('CustomerID', null);
 		$this->db->update('booking');
 
+		// A customer attached to a booking (primary or secondary) is a booker, so
+		// clear any "non-booker / e-invoice origin" flag they may carry.
+		$this->load->model('Customer_Model');
+		$this->Customer_Model->Clear_Einvoice_Flag([
+			$customer_id,
+			isset($this->input->post('booking')[0]['CustomerID2']) ? $this->input->post('booking')[0]['CustomerID2'] : null,
+		]);
+
 		$this->db->select('BookingNumber, ReservationNumber, DepositDeadline, FullPaymentDeadline, Customer, booking.Mobile As CustomerMobile, StartDate, EndDate, Adult, Children, Infant, BookingRemark, NetTotal, ChatLanguage, Source, admin.CountryCodeID, admin.Name As SalesAgent, admin.Mobile As SalesAgentMobile, category.Name As Destination, CountryCode, source.Name As SourceName');
 		$this->db->join('admin', 'admin.AdminID = booking.SalesAgent', 'left');
 		$this->db->join('category', 'category.CategoryID = booking.Destination', 'left');
@@ -1548,6 +1556,14 @@ class Booking_Model extends CI_Model
 		$this->db->where('BookingID', $this->input->post('booking_id'));
 		$this->db->where("(CustomerID IS NULL OR CustomerID <> " . $this->db->escape($customer_id) . ")", null, false);
 		$this->db->update('booking');
+
+		// A customer attached to a booking (primary or secondary) is a booker, so
+		// clear any "non-booker / e-invoice origin" flag they may carry.
+		$this->load->model('Customer_Model');
+		$this->Customer_Model->Clear_Einvoice_Flag([
+			$customer_id,
+			isset($this->input->post('booking')[0]['CustomerID2']) ? $this->input->post('booking')[0]['CustomerID2'] : null,
+		]);
 
 		$this->db->set('TravelVoucherFooterID', null);
 		$this->db->where('BookingID', $this->input->post('booking_id'));

@@ -62,7 +62,8 @@ class Costing_Item_Model extends CI_Model
     public function Save_Item($item)
     {
         $this->load->helper('costing_calc');
-        $valid_categories = array_keys(costing_categories());
+        $this->load->model('Costing_Category_Model');
+        $valid_categories = array_keys($this->Costing_Category_Model->Read_Category_Map());
 
         $name = trim((string) $item['name']);
         $category = strtolower(trim((string) $item['category']));

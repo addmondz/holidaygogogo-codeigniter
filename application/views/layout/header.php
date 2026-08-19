@@ -666,6 +666,14 @@ $is_dev_env = ($app_env !== 'prod');
 															<span class="menu-text">Costing Item</span>
 														</a>
 													</li>
+													<li class="menu-item <?php if($this->router->class == 'Costing_Category') { echo 'menu-item-active'; } ?>">
+														<a href="<?php echo base_url('Costing_Category'); ?>" class="menu-link">
+															<i class="menu-bullet menu-bullet-dot">
+																<span></span>
+															</i>
+															<span class="menu-text">Costing Category</span>
+														</a>
+													</li>
 													<li class="menu-item <?php if($this->router->class == 'Costing' && $this->router->method == 'Currency') { echo 'menu-item-active'; } ?>">
 														<a href="<?php echo base_url('Costing/Currency'); ?>" class="menu-link">
 															<i class="menu-bullet menu-bullet-dot">

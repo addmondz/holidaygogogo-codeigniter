@@ -18,6 +18,7 @@ class Costing_Item extends MY_Controller
             return;
         }
         $this->load->model('Costing_Item_Model');
+        $this->load->model('Costing_Category_Model');
         $this->load->helper('costing_calc');
     }
 
@@ -31,7 +32,7 @@ class Costing_Item extends MY_Controller
         $array = array(
             'items'             => $this->Costing_Item_Model->Read_Items($filters),
             'currency_options'  => $this->Costing_Item_Model->Read_Currency_Options(),
-            'categories'        => costing_categories(),
+            'categories'        => $this->Costing_Category_Model->Read_Category_Map(),
             'multiplier_types'  => costing_multiplier_types(),
             'item_filters'      => $filters,
         );

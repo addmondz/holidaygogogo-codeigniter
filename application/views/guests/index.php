@@ -242,6 +242,41 @@ div.kt-datatable__pager-container {
 											</div>
 										</div>
 									</div>
+									<?php if($list_base === 'Customer') {
+										// Booking Status gate: the list defaults to customers with an active Booking
+										// Confirmation; pick extra statuses to reveal cancelled / quotation / proforma
+										// customers (mirrors how the booking listing hides those rows until filtered).
+										$sel_booking_status = guest_list_multi_values($this->input->get('customer_booking_status'));
+										$booking_status_opts = array(
+											'bc'        => array('Booking Confirmation', 'la-file-invoice'),
+											'cancelled' => array('Cancelled',            'la-times-circle'),
+											'quotation' => array('Quotation',            'la-file-alt'),
+											'proforma'  => array('Proforma Invoice',     'la-file-invoice-dollar'),
+										); ?>
+									<div class="row">
+										<div class="col-md-3">
+											<div class="form-group">
+												<label>Booking Status</label>
+												<select name="customer_booking_status[]" class="form-control selectpicker" multiple data-actions-box="true" title="Active Booking Confirmation (default)">
+													<?php foreach($booking_status_opts as $val => $opt) { ?>
+														<option data-icon="la <?php echo $opt[1]; ?> font-size-lg bs-icon" value="<?php echo $val; ?>" <?php if(in_array($val, $sel_booking_status, true)) echo 'selected'; ?>><?php echo $opt[0]; ?></option>
+													<?php } ?>
+												</select>
+											</div>
+										</div>
+										<div class="col-md-3">
+											<div class="form-group">
+												<label>Non-Booker</label>
+												<?php $sel_non_booker = (string) $this->input->get('non_booker'); ?>
+												<select name="non_booker" class="form-control selectpicker" title="--ALL--">
+													<option value="" <?php if($sel_non_booker === '') echo 'selected'; ?>>All</option>
+													<option data-icon="la la-user-tag font-size-lg bs-icon" value="1" <?php if($sel_non_booker === '1') echo 'selected'; ?>>Non-Booker only (e-invoice)</option>
+													<option data-icon="la la-user font-size-lg bs-icon" value="0" <?php if($sel_non_booker === '0') echo 'selected'; ?>>Booker only</option>
+												</select>
+											</div>
+										</div>
+									</div>
+									<?php } ?>
 									<div class="row">
 										<div class="col-md-3">
 											<div class="form-group">
@@ -743,6 +778,9 @@ div.kt-datatable__pager-container {
 										<td class="gl-cell<?php if(!$is_ghl_row) echo ' gl-editable'; ?>" style="text-align:center;"<?php if(!$is_ghl_row) { ?> data-field="name" data-dedup-key="<?php echo htmlspecialchars($g->dedup_key, ENT_QUOTES); ?>" data-value="<?php echo htmlspecialchars($name_val, ENT_QUOTES); ?>"<?php } ?>>
 											<span class="gl-display">
 												<span class="gl-text"><?php if($name_val !== '') { echo htmlspecialchars($name_val); } else { echo '<span class="text-muted">&mdash;</span>'; } ?></span>
+												<?php if(!empty($g->CreatedFromEInvoice)) { ?>
+													<span class="label label-inline label-pill label-light-warning font-weight-bold ml-1" data-toggle="tooltip" title="Not the booker — created from an e-invoice request">Non-Booker</span>
+												<?php } ?>
 												<?php if(!$is_ghl_row) { ?>
 													<button type="button" class="btn btn-icon btn-light-primary btn-xs gl-edit-btn ml-1" data-toggle="tooltip" title="Edit first name"><i class="la la-pencil"></i></button>
 												<?php } ?>
@@ -1207,7 +1245,7 @@ div.kt-datatable__pager-container {
 
 <script>
 	<?php
-		$expanded_keys = array('q', 'booking_number', 'contact_number', 'email', 'destination', 'role', 'pax_min', 'pax_max', 'sales_agent', 'source', 'customer_type', 'nationality', 'gender', 'guest_type', 'language', 'booking_date', 'travel_date', 'dob', 'birthday', 'campaign_date', 'follow_date', 'customer_code', 'create_date', 'race', 'client_type', 'number_of_pax', 'state', 'nature_of_business', 'lead_status');
+		$expanded_keys = array('q', 'booking_number', 'contact_number', 'email', 'destination', 'role', 'pax_min', 'pax_max', 'sales_agent', 'source', 'customer_type', 'nationality', 'gender', 'guest_type', 'language', 'booking_date', 'travel_date', 'dob', 'birthday', 'campaign_date', 'follow_date', 'customer_code', 'create_date', 'race', 'client_type', 'number_of_pax', 'state', 'nature_of_business', 'lead_status', 'customer_booking_status', 'non_booker');
 		$expand = false;
 		foreach($expanded_keys as $k) {
 			if($this->input->get($k) !== null && $this->input->get($k) !== '') { $expand = true; break; }

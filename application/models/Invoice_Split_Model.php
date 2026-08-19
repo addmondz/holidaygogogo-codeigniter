@@ -414,6 +414,96 @@ class Invoice_Split_Model extends CI_Model
     }
 
     /**
+     * Create a customer record for every e-invoice pax whose requested name AND
+     * phone both differ from the booking customer (booking.Customer / .Mobile).
+     * Called from the customer-portal SUBMIT flow only.
+     *
+     * Rules (see einvoice_customer_helper):
+     *   - New customer ONLY when both name and phone differ (pure helper decides).
+     *   - Skip (do nothing) when the differing phone already belongs to an active
+     *     customer — never insert a duplicate phone.
+     *   - New rows are flagged AutocountSyncAction='C' / Status='P' so the cron
+     *     pushes them to AutoCount (same path as a manually-created customer).
+     *
+     * Best-effort: any failure is logged, never surfaced, so it cannot break the
+     * e-invoice submission. Returns the list of created CustomerIDs.
+     *
+     * @param int   $booking_id
+     * @param array $pax_data  Validated pax rows (PaxName, TIN, Email, Address, PhoneNumber).
+     * @return int[] CustomerIDs created (empty when none).
+     */
+    function Create_Customers_For_New_Pax($booking_id, $pax_data)
+    {
+        $created = [];
+        try {
+            if (empty($pax_data) || !is_array($pax_data)) {
+                return $created;
+            }
+
+            $this->db->select('Customer, Mobile');
+            $this->db->where('BookingID', $booking_id);
+            $booking = $this->db->get('booking')->row_array();
+            if (empty($booking)) {
+                return $created;
+            }
+            $booking_name  = isset($booking['Customer']) ? $booking['Customer'] : '';
+            $booking_phone = isset($booking['Mobile']) ? $booking['Mobile'] : '';
+
+            $this->load->helper('einvoice_customer');
+            $this->load->model('Customer_Model');
+            $now = date('Y-m-d H:i:s');
+
+            foreach ($pax_data as $pax) {
+                $pax_name  = isset($pax['PaxName']) ? $pax['PaxName'] : '';
+                $pax_phone = isset($pax['PhoneNumber']) ? $pax['PhoneNumber'] : '';
+
+                if (!einvoice_pax_needs_new_customer($pax_name, $pax_phone, $booking_name, $booking_phone)) {
+                    continue;
+                }
+
+                // Skip-if-exists: a phone identifies one customer. If the pax phone
+                // already belongs to an active customer, do nothing (no create, no
+                // link) per the confirmed rule.
+                if (!empty($this->Customer_Model->find_active_by_phone($pax_phone))) {
+                    log_message('info', 'E-invoice: pax "' . $pax_name . '" phone already has a customer; skipped (booking ' . $booking_id . ')');
+                    continue;
+                }
+
+                $data = [
+                    'name'         => trim($pax_name),
+                    'phone_number' => trim($pax_phone),
+                    'PrimaryEmail' => !empty($pax['Email']) ? trim($pax['Email']) : null,
+                    'Address'      => !empty($pax['Address']) ? trim($pax['Address']) : null,
+                    'tin_no'       => !empty($pax['TIN']) ? strtoupper(trim($pax['TIN'])) : null,
+                    // Mark as a non-booker created from an e-invoice request (badge
+                    // in the customer listing; toggleable on the customer form).
+                    'CreatedFromEInvoice' => 1,
+                    // Queue for AutoCount push by the cron (code auto-generated).
+                    'AutocountSyncAction' => 'C',
+                    'AutocountSyncStatus' => 'P',
+                    'created_at'   => $now,
+                    'updated_at'   => $now,
+                ];
+
+                $new_id = $this->Customer_Model->create_with_generated_code($data);
+                if ($new_id) {
+                    // Populate the snapshot from any matching guest rows (mirrors
+                    // Customer_Model::Create).
+                    $this->Customer_Model->Refresh_Snapshot_For_Customer($new_id);
+                    $created[] = (int) $new_id;
+                    log_message('info', 'E-invoice: created customer #' . $new_id . ' from pax "' . $pax_name . '" (booking ' . $booking_id . ')');
+                } else {
+                    log_message('error', 'E-invoice: failed to create customer from pax "' . $pax_name . '" (booking ' . $booking_id . ')');
+                }
+            }
+        } catch (\Exception $e) {
+            log_message('error', 'E-invoice Create_Customers_For_New_Pax failed for booking ' . $booking_id . ': ' . $e->getMessage());
+        }
+
+        return $created;
+    }
+
+    /**
      * Soft-delete all split data for a booking
      */
     function Delete_Split($booking_id)

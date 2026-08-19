@@ -48,6 +48,7 @@ if (!empty($booking_items)) {
             'currency_id'     => (int) (isset($item['currency_id']) ? $item['currency_id'] : 0),
             'unit_price'      => (float) (isset($item['unit_price']) ? $item['unit_price'] : 0),
             'count'           => (float) (isset($item['quantity']) ? $item['quantity'] : 1),
+            'remark'          => isset($item['remark']) ? $item['remark'] : '',
             'include'         => true,
         );
     }
@@ -93,6 +94,9 @@ if (!empty($booking_items)) {
     .cw-summary-box .lbl { font-size: 11px; text-transform: uppercase; font-weight: 700; color: #6d7288; letter-spacing: .4px; }
     .cw-summary-box .val { font-size: 20px; font-weight: 700; color: #3f4254; margin-top: 4px; }
     .cw-actions { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
+    .cw-itin-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 20px; }
+    .cw-itin-field { min-width: 0; }
+    @media (max-width: 767px) { .cw-itin-fields { grid-template-columns: 1fr; } }
 </style>
 
 <div class="d-flex flex-column-fluid">
@@ -138,16 +142,10 @@ if (!empty($booking_items)) {
                 <div class="cw-panel-title">Package Details</div>
                 <div class="cw-panel-sub">Name the package and set its duration and status.</div>
                 <div class="row">
-                    <div class="col-md-6">
+                    <div class="col-md-12">
                         <div class="form-group">
                             <label>Package Name</label>
                             <input type="text" name="name" class="form-control" required value="<?php echo html_escape($package['name']); ?>">
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label>Tour Code</label>
-                            <input type="text" name="tour_code" class="form-control" value="<?php echo html_escape(isset($package['tour_code']) ? $package['tour_code'] : ''); ?>">
                         </div>
                     </div>
                 </div>
@@ -246,7 +244,8 @@ if (!empty($booking_items)) {
                             // Group the cost rows by category (canonical order first, then any
                             // stragglers) so the template reads as sections, not one long list.
                             $this->load->helper('costing_calc');
-                            $cat_labels = costing_categories();
+                            $this->load->model('Costing_Category_Model');
+                            $cat_labels = $this->Costing_Category_Model->Read_Category_Map();
                             $grouped = array();
                             foreach ($cost_rows as $idx => $row) {
                                 $cat = isset($row['category']) ? $row['category'] : 'miscellaneous';
@@ -298,6 +297,7 @@ if (!empty($booking_items)) {
                                                 <option value="<?php echo html_escape($mkey); ?>" <?php echo ($mkey === $rmt) ? 'selected' : ''; ?>><?php echo html_escape($mlabel); ?></option>
                                             <?php } ?>
                                         </select>
+                                        <textarea class="form-control form-control-sm cw-remark mt-2" name="rows[<?php echo $idx; ?>][remark]" rows="2" placeholder="Remark (optional)"><?php echo html_escape($row['remark']); ?></textarea>
                                         <input type="hidden" name="rows[<?php echo $idx; ?>][category]" value="<?php echo html_escape($cat); ?>">
                                         <input type="hidden" name="rows[<?php echo $idx; ?>][unit_count]" value="1">
                                         <input type="hidden" name="rows[<?php echo $idx; ?>][pax_type]" value="">
@@ -395,37 +395,58 @@ if (!empty($booking_items)) {
         $itin_rows = !empty($itinerary_days) ? $itinerary_days : array();
         if (empty($itin_rows)) {
             for ($d = 1; $d <= max(1, $duration_days); $d++) {
-                $itin_rows[] = array('day_number' => $d, 'title' => '', 'description' => '');
+                $itin_rows[] = array('day_number' => $d);
             }
         }
+        // Each day = a plain-text title + five rich-text (TinyMCE) HTML blocks.
+        $itin_fields = array(
+            'description'          => 'Description',
+            'meal_plan'            => 'Meal Plan',
+            'notes'                => 'Notes',
+            'special_remark'       => 'Special Remark',
+            'terms_and_conditions' => 'Terms & Conditions',
+        );
+        // Renders one day card. $tpl=true emits the blank JS template with an
+        // "__I__" index placeholder (values blank); otherwise a saved/seed row.
+        $render_itin_card = function ($i, $day, $tpl = false) use ($itin_fields) {
+            $idx  = $tpl ? '__I__' : (int) $i;
+            $dayn = $tpl ? '' : (int) (isset($day['day_number']) ? $day['day_number'] : ((int) $i + 1));
+            ob_start(); ?>
+            <div class="cw-panel cw-itin-day">
+                <div class="d-flex align-items-end mb-4" style="gap:10px;">
+                    <div style="width:80px;">
+                        <label class="font-weight-bold mb-1">Day</label>
+                        <input type="number" min="1" class="form-control" name="itinerary[<?php echo $idx; ?>][day_number]" value="<?php echo $dayn; ?>">
+                    </div>
+                    <div style="flex:1;">
+                        <label class="font-weight-bold mb-1">Title</label>
+                        <input type="text" class="form-control" name="itinerary[<?php echo $idx; ?>][title]" value="<?php echo $tpl ? '' : html_escape(isset($day['title']) ? $day['title'] : ''); ?>" placeholder="Day title e.g. Arrival &amp; City Tour">
+                    </div>
+                    <button type="button" class="btn btn-icon btn-light-danger cw-itin-remove" data-toggle="tooltip" title="Remove day"><i class="la la-trash"></i></button>
+                </div>
+                <div class="cw-itin-fields">
+                    <?php foreach ($itin_fields as $key => $label) { ?>
+                        <div class="cw-itin-field">
+                            <label class="font-weight-bold mb-1"><?php echo $label; ?></label>
+                            <textarea id="cw-ed-<?php echo $idx; ?>-<?php echo $key; ?>" class="form-control cw-itin-editor" name="itinerary[<?php echo $idx; ?>][<?php echo $key; ?>]"><?php echo $tpl ? '' : html_escape(isset($day[$key]) ? $day[$key] : ''); ?></textarea>
+                        </div>
+                    <?php } ?>
+                </div>
+            </div>
+            <?php return ob_get_clean();
+        };
         ?>
-        <form method="post" action="<?php echo base_url('Costing/Save_Itinerary'); ?>">
+        <form method="post" action="<?php echo base_url('Costing/Save_Itinerary'); ?>" id="cw-itin-form">
             <input type="hidden" name="package_id" value="<?php echo $package_id; ?>">
             <div class="cw-panel">
                 <div class="cw-panel-title">Itinerary</div>
-                <div class="cw-panel-sub">Per-day plan shown on the customer Quotation PDF.</div>
-                <div class="table-responsive">
-                    <table class="table table-bordered" id="cw-itin-table">
-                        <thead>
-                            <tr>
-                                <th style="width:90px; text-align:center;">Day</th>
-                                <th style="width:26%;">Title</th>
-                                <th>Description</th>
-                                <th style="width:44px;"></th>
-                            </tr>
-                        </thead>
-                        <tbody id="cw-itin-body">
-                            <?php foreach ($itin_rows as $i => $day) { ?>
-                                <tr>
-                                    <td><input type="number" min="1" class="form-control" name="itinerary[<?php echo $i; ?>][day_number]" value="<?php echo (int) (isset($day['day_number']) ? $day['day_number'] : $i + 1); ?>"></td>
-                                    <td><input type="text" class="form-control" name="itinerary[<?php echo $i; ?>][title]" value="<?php echo html_escape(isset($day['title']) ? $day['title'] : ''); ?>" placeholder="e.g. Arrival &amp; City Tour"></td>
-                                    <td><textarea rows="2" class="form-control" name="itinerary[<?php echo $i; ?>][description]" placeholder="What happens on this day"><?php echo html_escape(isset($day['description']) ? $day['description'] : ''); ?></textarea></td>
-                                    <td class="text-center"><button type="button" class="btn btn-icon btn-light-danger btn-sm cw-itin-remove" title="Remove day"><i class="la la-trash"></i></button></td>
-                                </tr>
-                            <?php } ?>
-                        </tbody>
-                    </table>
-                </div>
+                <div class="cw-panel-sub">Per-day plan shown on the customer Quotation PDF. Each block is a rich-text editor.</div>
+            </div>
+            <div id="cw-itin-body">
+                <?php foreach ($itin_rows as $i => $day) { echo $render_itin_card($i, $day); } ?>
+            </div>
+            <template id="cw-itin-tpl"><?php echo $render_itin_card(0, array(), true); ?></template>
+            <div class="cw-panel">
                 <button type="button" class="btn btn-light-primary font-weight-bold" id="cw-itin-add"><i class="la la-plus"></i>Add Day</button>
             </div>
             <div class="cw-actions">
@@ -672,6 +693,7 @@ if (!empty($booking_items)) {
             '<td class="text-center"><input type="hidden" name="rows[' + i + '][include]" value="0" class="cw-include-hidden"><input type="checkbox" class="cw-include" checked></td>' +
             '<td><input type="text" class="form-control" name="rows[' + i + '][name]" value="" readonly>' +
             '<select class="form-control form-control-sm cw-mult-type mt-2" name="rows[' + i + '][multiplier_type]" title="How this cost scales">' + multiplierOptions(item.multiplier_type) + '</select>' +
+            '<textarea class="form-control form-control-sm cw-remark mt-2" name="rows[' + i + '][remark]" rows="2" placeholder="Remark (optional)"></textarea>' +
             '<input type="hidden" name="rows[' + i + '][category]" value="miscellaneous">' +
             '<input type="hidden" name="rows[' + i + '][unit_count]" value="1">' +
             '<input type="hidden" name="rows[' + i + '][pax_type]" value="">' +
@@ -731,34 +753,94 @@ if (!empty($booking_items)) {
 </script>
 <?php } elseif ($active_step === 'itinerary') { ?>
 <script>
-(function () {
+// Runs on jQuery ready so the TinyMCE bundle (loaded later in the footer) is
+// available. Each itinerary day has five rich-text editors; new days are cloned
+// from a blank <template> and their editors initialised on the fly.
+jQuery(function () {
     var body = document.getElementById('cw-itin-body');
     var addBtn = document.getElementById('cw-itin-add');
-    var seq = body.querySelectorAll('tr').length;
+    var tpl = document.getElementById('cw-itin-tpl');
+    var form = document.getElementById('cw-itin-form');
+    if (!body || !addBtn || !tpl || !form) { return; }
+
+    var hasTiny = (typeof window.tinymce !== 'undefined');
+    var seq = body.querySelectorAll('.cw-itin-day').length;
+
+    // Shared editor config — text formatting + lists; pasted images embed as
+    // base64 (rendered inline by DomPDF). Positioning styles are dropped so
+    // Word/PDF pastes don't overlap on the printed quotation.
+    var editorConfig = {
+        menubar: false,
+        height: 70,
+        branding: false,
+        statusbar: false,
+        toolbar: 'undo redo | bold italic underline | forecolor backcolor | bullist numlist | alignleft aligncenter alignright | removeformat',
+        plugins: 'lists paste',
+        paste_data_images: true,
+        paste_webkit_styles: 'none',
+        paste_remove_styles_if_webkit: true,
+        invalid_styles: { '*': 'position top left right bottom z-index' },
+        content_style: 'body{font-size:13px} img{max-width:100%;height:auto}'
+    };
+
+    function initEditors(scope) {
+        if (!hasTiny) { return; }
+        scope.querySelectorAll('.cw-itin-editor').forEach(function (el) {
+            tinymce.init(Object.assign({}, editorConfig, { target: el }));
+        });
+    }
+
+    function removeEditors(scope) {
+        if (!hasTiny) { return; }
+        scope.querySelectorAll('.cw-itin-editor').forEach(function (el) {
+            var ed = tinymce.get(el.id);
+            if (ed) { ed.remove(); }
+        });
+    }
+
+    initEditors(body);
 
     addBtn.addEventListener('click', function () {
-        var i = seq++;
-        var day = body.querySelectorAll('tr').length + 1;
-        var tr = document.createElement('tr');
-        tr.innerHTML =
-            '<td><input type="number" min="1" class="form-control" name="itinerary[' + i + '][day_number]" value="' + day + '"></td>' +
-            '<td><input type="text" class="form-control" name="itinerary[' + i + '][title]" placeholder="Day title"></td>' +
-            '<td><textarea rows="2" class="form-control" name="itinerary[' + i + '][description]" placeholder="What happens on this day"></textarea></td>' +
-            '<td class="text-center"><button type="button" class="btn btn-icon btn-light-danger btn-sm cw-itin-remove" title="Remove day"><i class="la la-trash"></i></button></td>';
-        body.appendChild(tr);
+        var html = tpl.innerHTML.replace(/__I__/g, seq++);
+        var wrap = document.createElement('div');
+        wrap.innerHTML = html.trim();
+        var card = wrap.firstElementChild;
+        card.querySelector('input[name$="[day_number]"]').value = body.querySelectorAll('.cw-itin-day').length + 1;
+        body.appendChild(card);
+        initEditors(card);
+        if (window.jQuery && jQuery.fn.tooltip) {
+            jQuery(card).find('[data-toggle="tooltip"]').tooltip();
+        }
     });
 
     body.addEventListener('click', function (e) {
         var btn = e.target.closest('.cw-itin-remove');
         if (!btn) { return; }
-        var rows = body.querySelectorAll('tr');
-        if (rows.length <= 1) {
-            var only = btn.closest('tr');
-            only.querySelectorAll('input[type=text], textarea').forEach(function (el) { el.value = ''; });
+        var card = btn.closest('.cw-itin-day');
+        var cards = body.querySelectorAll('.cw-itin-day');
+        if (cards.length <= 1) {
+            // Keep at least one day — clear it instead of removing.
+            card.querySelector('input[name$="[title]"]').value = '';
+            if (hasTiny) {
+                card.querySelectorAll('.cw-itin-editor').forEach(function (el) {
+                    var ed = tinymce.get(el.id);
+                    if (ed) { ed.setContent(''); } else { el.value = ''; }
+                });
+            }
             return;
         }
-        btn.closest('tr').remove();
+        removeEditors(card);
+        card.remove();
     });
-})();
+
+    // Sync every editor back to its textarea before the form posts.
+    form.addEventListener('submit', function () {
+        if (hasTiny) { tinymce.triggerSave(); }
+    });
+
+    if (window.jQuery && jQuery.fn.tooltip) {
+        jQuery('[data-toggle="tooltip"]').tooltip();
+    }
+});
 </script>
 <?php } ?>

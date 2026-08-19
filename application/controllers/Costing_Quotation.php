@@ -39,6 +39,23 @@ class Costing_Quotation extends CI_Controller
         $data['company'] = $this->Company_Model->Read();
         $data['public_ref'] = $this->public_ref($data['booking']);
 
+        // Itinerary blocks are rich text (TinyMCE). Strip layout-breaking styles
+        // and inline any local images so DomPDF renders them — same pipeline the
+        // booking voucher footers use.
+        $this->load->helper('voucher_image');
+        $this->load->helper('costing_itinerary');
+        if (!empty($data['itinerary']) && is_array($data['itinerary'])) {
+            $html_fields = costing_itinerary_html_fields();
+            foreach ($data['itinerary'] as &$day) {
+                foreach ($html_fields as $field) {
+                    $day[$field] = inline_voucher_images_html(
+                        sanitize_voucher_content_html(isset($day[$field]) ? $day[$field] : '')
+                    );
+                }
+            }
+            unset($day);
+        }
+
         require_once APPPATH . 'libraries/dompdf/autoload.inc.php';
         $dompdf = new \Dompdf\Dompdf();
         $dompdf->loadHtml($this->load->view('costing/quotation_pdf', $data, true), 'UTF-8');
@@ -48,6 +65,11 @@ class Costing_Quotation extends CI_Controller
 
         header('Content-Type: application/pdf');
         header('Content-Disposition: inline; filename="Quotation-' . $data['public_ref'] . '.pdf"');
+        // Always serve the freshest render — the quotation is edited in place, so
+        // stop the browser/proxy from showing a stale cached PDF after an update.
+        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+        header('Pragma: no-cache');
+        header('Expires: 0');
         echo $dompdf->output();
         exit;
     }

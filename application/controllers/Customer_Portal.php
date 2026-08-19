@@ -1308,6 +1308,10 @@ class Customer_Portal extends CI_Controller
             // failures are logged but never surfaced to the customer, so a
             // mail-provider outage cannot break the submission flow.
             if ($submit_status === 'S') {
+                // Auto-create a customer for any pax whose name AND phone both
+                // differ from the booking customer (queued to AutoCount by cron).
+                // Best-effort: never blocks the submission.
+                $this->Invoice_Split_Model->Create_Customers_For_New_Pax($booking['BookingID'], $pax_data);
                 $this->Invoice_Split_Model->Send_Finance_Notification($booking['BookingID']);
             }
 

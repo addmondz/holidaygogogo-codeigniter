@@ -1241,6 +1241,83 @@ if (!function_exists('guest_list_customer_segment_sql')) {
     }
 }
 
+if (!function_exists('guest_list_customer_status_tokens')) {
+    /**
+     * The booking-status tokens the Customer List "Booking Status" filter accepts,
+     * mapped to the correlated booking predicate that qualifies a customer for that
+     * status. Each predicate is measured over that one customer's own bookings
+     * (b.CustomerID = c.CustomerID). 'bc' is the default set (active BOOKING
+     * CONFIRMATION); the other three reveal customers otherwise hidden — cancelled,
+     * quotation-only and proforma-only — mirroring the booking listing where those
+     * rows are hidden until the user filters for them.
+     *
+     * @return array<string,string> token => SQL boolean fragment (alias b).
+     */
+    function guest_list_customer_status_tokens()
+    {
+        $active = "b.Status <> 'N'";
+        return array(
+            'bc'        => "{$active} AND b.CancelStatus = 'N' AND b.BookingConfirmationTitle = 'BOOKING CONFIRMATION'",
+            'cancelled' => "{$active} AND b.CancelStatus <> 'N'",
+            'quotation' => "{$active} AND b.CancelStatus = 'N' AND b.BookingConfirmationTitle = 'QUOTATION'",
+            'proforma'  => "{$active} AND b.CancelStatus = 'N' AND b.BookingConfirmationTitle = 'PROFORMA INVOICE'",
+        );
+    }
+}
+
+if (!function_exists('guest_list_customer_status_predicate')) {
+    /**
+     * Build the Customer List default "Booking Status" gate for Build_Customer_Branch.
+     *
+     * By default the list shows only customers with at least one active BOOKING
+     * CONFIRMATION — a customer whose bookings are ALL cancelled or ALL quotation /
+     * proforma is hidden, exactly like the booking listing hides those rows until
+     * filtered. The `customer_booking_status[]` multi-select reveals extra sets:
+     * each selected token OR-s its qualifying-booking EXISTS in. The legacy
+     * campaign "Has cancelled BC" toggle (cancelled=1) also reveals cancelled ones
+     * so that audience segment keeps working.
+     *
+     * Customers with NO booking at all are ALWAYS kept — they are contacts (e.g.
+     * bulk-imported / leads-turned-customer), not "from" a cancelled/QU/PI booking.
+     *
+     * No bound params (all values are code-supplied), but the {sql,params} shape
+     * matches the sibling segment builder for a uniform caller.
+     *
+     * @param array $get The request GET params.
+     * @return array{sql:string,params:array}
+     */
+    function guest_list_customer_status_predicate($get)
+    {
+        $tokens = guest_list_customer_status_tokens();
+
+        $selected = array();
+        foreach (guest_list_multi_values(isset($get['customer_booking_status']) ? $get['customer_booking_status'] : null) as $v) {
+            $v = strtolower($v);
+            if (isset($tokens[$v])) {
+                $selected[$v] = true;
+            }
+        }
+        // Legacy campaign toggle: "Has cancelled BC" reveals cancelled customers.
+        if (guest_list_flag_on($get, 'cancelled')) {
+            $selected['cancelled'] = true;
+        }
+        // Nothing chosen → the default confirmed set.
+        if (empty($selected)) {
+            $selected['bc'] = true;
+        }
+
+        // No-booking customers are always visible (never "from" a hidden booking).
+        $ors = array("NOT EXISTS (SELECT 1 FROM booking b WHERE b.CustomerID = c.CustomerID AND b.Status <> 'N')");
+        foreach ($tokens as $token => $pred) {
+            if (isset($selected[$token])) {
+                $ors[] = "EXISTS (SELECT 1 FROM booking b WHERE b.CustomerID = c.CustomerID AND {$pred})";
+            }
+        }
+
+        return array('sql' => ' AND ( ' . implode(' OR ', $ors) . ' ) ', 'params' => array());
+    }
+}
+
 if (!function_exists('guest_list_leads_only_segment_keys')) {
     /**
      * The new campaign-segment filters that only a GHL/manual LEAD can satisfy —

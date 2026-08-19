@@ -241,7 +241,6 @@ class Costing_Model extends CI_Model
     {
         $data = array(
             'name' => trim((string) $package['name']),
-            'tour_code' => trim((string) (isset($package['tour_code']) ? $package['tour_code'] : '')),
             'duration_days' => max(1, (int) $package['duration_days']),
             'duration_nights' => max(0, (int) $package['duration_nights']),
             'description' => trim((string) $package['description']),
@@ -252,13 +251,41 @@ class Costing_Model extends CI_Model
             return 0;
         }
 
+        // Tour code is fully auto: assigned once on create (qu-YYMM-XXXX), never
+        // touched on edit (there is no tour_code field on the form anymore).
         if (!empty($package['id'])) {
             $this->db->where('id', (int) $package['id'])->update('costing_packages', $data);
             return (int) $package['id'];
         }
 
+        $data['tour_code'] = $this->Next_Tour_Code();
         $this->db->insert('costing_packages', $data);
         return (int) $this->db->insert_id();
+    }
+
+    /**
+     * Next auto tour code (qu-YYMM-XXXX) for the current month. Sequence = highest
+     * existing code in this YYMM period + 1; hand-typed / other-period codes are
+     * ignored. Format/parse live in the pure costing_tour_code helper.
+     */
+    public function Next_Tour_Code()
+    {
+        $this->load->helper('costing_tour_code');
+        $period = date('ym');
+
+        $like = costing_tour_code_prefix() . '-' . $period . '-';
+        $rows = $this->db
+            ->select('tour_code')
+            ->like('tour_code', $like, 'after')
+            ->get('costing_packages')
+            ->result_array();
+
+        $existing = array();
+        foreach ($rows as $row) {
+            $existing[] = (string) $row['tour_code'];
+        }
+
+        return costing_tour_code_next($existing, $period);
     }
 
     public function Delete_Package($package_id)
@@ -792,12 +819,15 @@ class Costing_Model extends CI_Model
     }
 
     /**
-     * Replace-all save of a package's itinerary days.
+     * Replace-all save of a package's itinerary days. Each row carries a
+     * plain-text title plus five rich-text (TinyMCE) HTML blocks — description,
+     * meal plan, notes, special remark and terms & conditions.
      *
-     * @param array $rows list of [day_number, title, description]
+     * @param array $rows list of [day_number, title, description, meal_plan, notes, special_remark, terms_and_conditions]
      */
     public function Save_Itinerary_Days($package_id, $rows)
     {
+        $this->load->helper('costing_itinerary');
         $package_id = (int) $package_id;
         if ($package_id <= 0) {
             return false;
@@ -808,18 +838,14 @@ class Costing_Model extends CI_Model
 
         $day = 1;
         foreach ((array) $rows as $row) {
-            $title = trim((string) (isset($row['title']) ? $row['title'] : ''));
-            $description = trim((string) (isset($row['description']) ? $row['description'] : ''));
-            if ($title === '' && $description === '') {
+            $prepared = costing_itinerary_prepare_row($row);
+            if ($prepared['is_empty']) {
                 continue;
             }
-            $day_number = isset($row['day_number']) && (int) $row['day_number'] > 0 ? (int) $row['day_number'] : $day;
-            $this->db->insert('costing_itinerary_days', array(
-                'package_id'  => $package_id,
-                'day_number'  => $day_number,
-                'title'       => $title !== '' ? $title : null,
-                'description' => $description !== '' ? $description : null,
-            ));
+            unset($prepared['is_empty']);
+            $prepared['package_id'] = $package_id;
+            $prepared['day_number'] = $prepared['day_number'] > 0 ? $prepared['day_number'] : $day;
+            $this->db->insert('costing_itinerary_days', $prepared);
             $day++;
         }
 
@@ -1060,7 +1086,8 @@ class Costing_Model extends CI_Model
     public function Read_Item_Master()
     {
         $this->load->helper('costing_calc');
-        $labels = costing_categories();
+        $this->load->model('Costing_Category_Model');
+        $labels = $this->Costing_Category_Model->Read_Category_Map();
 
         $multiplier_labels = costing_multiplier_types();
 
