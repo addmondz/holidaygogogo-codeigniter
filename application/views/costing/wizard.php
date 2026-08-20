@@ -394,7 +394,7 @@ if (!empty($booking_items)) {
             <!-- COMBINATIONS: customer-facing bundles shown on the Quotation PDF -->
             <div class="cw-panel">
                 <div class="cw-panel-title">Combinations</div>
-                <div class="cw-panel-sub">Bundles shown on the customer Quotation PDF (the internal cost items above are hidden from it). Each combination has its own items — selling price = its cost &times; margin. All combinations add up to the total package price.</div>
+                <div class="cw-panel-sub">Bundles shown on the customer Quotation PDF (the internal cost items above are hidden from it). Add items to each combination by picking from the internal cost table above — its live cost is copied in. Selling price = its cost &times; margin. All combinations add up to the total package price.</div>
 
                 <div id="cw-combos"></div>
 
@@ -799,6 +799,7 @@ if (!empty($booking_items)) {
         sel.value = '';
         // Keep Select2 (if active) in sync with the native reset.
         if (window.jQuery && jQuery.fn.select2) { jQuery(sel).trigger('change.select2'); }
+        refreshComboPickers();
         recalc();
     }
 
@@ -813,7 +814,7 @@ if (!empty($booking_items)) {
         }
         var btn = e.target.closest('.cw-remove');
         // Keep the (now empty) category header so all sections stay visible.
-        if (btn) { var row = btn.closest('.cw-row'); if (row) { row.remove(); recalc(); } }
+        if (btn) { var row = btn.closest('.cw-row'); if (row) { row.remove(); refreshComboPickers(); recalc(); } }
     });
     adultInput.addEventListener('input', recalc);
     childInput.addEventListener('input', recalc);
@@ -824,30 +825,82 @@ if (!empty($booking_items)) {
      *  Same per-row cost math as the template above, grouped per bundle.    *
      * -------------------------------------------------------------------- */
 
-    // One item picker per combination: every master item, grouped by category.
-    function comboItemPicker() {
-        var sel = document.createElement('select');
-        sel.className = 'form-control form-control-sm cw-combo-pick';
+    // Combination items are picked ONLY from the internal cost table above — not
+    // the whole master. A combo bundle just re-uses rows already costed at the top.
+    function topRows() { return Array.prototype.slice.call(body.querySelectorAll('.cw-row')); }
+
+    var topUidSeq = 0;
+    function topRowUid(row) {
+        if (!row.dataset.uid) { row.dataset.uid = 'tr' + (topUidSeq++); }
+        return row.dataset.uid;
+    }
+    function topRowCat(row) {
+        var c = row.getAttribute('data-cat') || 'miscellaneous';
+        return CAT_LABELS[c] ? c : 'miscellaneous';
+    }
+    function topRowName(row) {
+        var el = row.querySelector('input[type="text"]');
+        return el ? el.value : '';
+    }
+
+    // Copy a top cost row's LIVE values so the combo row mirrors what's costed above.
+    function readTopRow(row) {
+        var mult = row.querySelector('.cw-mult-type');
+        var cur = row.querySelector('.cw-currency');
+        var cost = row.querySelector('.cw-cost');
+        var cnt = row.querySelector('.cw-count');
+        var rmk = row.querySelector('.cw-remark');
+        var catEl = row.querySelector('input[name*="[category]"]');
+        return {
+            name: topRowName(row),
+            category: catEl ? catEl.value : topRowCat(row),
+            multiplier_type: mult ? mult.value : 'fixed',
+            currency_id: cur ? cur.value : 0,
+            unit_price: cost ? cost.value : 0,
+            count: cnt ? cnt.value : '',
+            remark: rmk ? rmk.value : ''
+        };
+    }
+
+    // Fill a combo picker <select> with the current top rows, grouped by category.
+    function populateComboPicker(sel) {
+        var keep = sel.value;
+        sel.innerHTML = '';
         var ph = document.createElement('option');
         ph.value = ''; ph.textContent = '— Add item —';
         sel.appendChild(ph);
         var byCat = {};
-        MASTER.forEach(function (mi, idx) {
-            var cat = CAT_LABELS[mi.category] ? mi.category : 'miscellaneous';
-            (byCat[cat] = byCat[cat] || []).push(idx);
+        topRows().forEach(function (row) {
+            (byCat[topRowCat(row)] = byCat[topRowCat(row)] || []).push(row);
         });
         Object.keys(CAT_LABELS).forEach(function (cat) {
             if (!byCat[cat]) { return; }
             var og = document.createElement('optgroup');
             og.label = CAT_LABELS[cat];
-            byCat[cat].forEach(function (idx) {
+            byCat[cat].forEach(function (row) {
                 var o = document.createElement('option');
-                o.value = idx; o.textContent = MASTER[idx].name;
+                o.value = topRowUid(row); o.textContent = topRowName(row) || '(unnamed)';
                 og.appendChild(o);
             });
             sel.appendChild(og);
         });
+        if (keep && sel.querySelector('option[value="' + keep + '"]')) { sel.value = keep; }
+    }
+
+    // One item picker per combination, sourced from the internal cost table.
+    function comboItemPicker() {
+        var sel = document.createElement('select');
+        sel.className = 'form-control form-control-sm cw-combo-pick';
+        populateComboPicker(sel);
         return sel;
+    }
+
+    // Re-sync every combination's picker after top rows are added/removed.
+    function refreshComboPickers() {
+        combosWrap.querySelectorAll('.cw-combo-pick').forEach(function (sel) {
+            populateComboPicker(sel);
+            if (window.jQuery && jQuery.fn.select2 && jQuery(sel).data('select2')) { jQuery(sel).trigger('change.select2'); }
+        });
     }
 
     // Append a cost row to a combination card. `item` supplies the master values.
@@ -933,13 +986,13 @@ if (!empty($booking_items)) {
             var card = addItem.closest('.cw-combo-card');
             var pick = card.querySelector('.cw-combo-pick');
             if (!pick || pick.value === '') {
-                if (typeof Swal !== 'undefined') { Swal.fire({ icon: 'info', title: 'Pick an item', text: 'Select a cost item to add.' }); }
-                else { alert('Select a cost item to add.'); }
+                if (typeof Swal !== 'undefined') { Swal.fire({ icon: 'info', title: 'Pick an item', text: 'Select a cost item from the table above.' }); }
+                else { alert('Select a cost item from the table above.'); }
                 return;
             }
-            var mi = MASTER[parseInt(pick.value, 10)];
-            if (mi) {
-                addComboRow(card, { name: mi.name, category: mi.category, multiplier_type: mi.multiplier_type, currency_id: mi.currency_id, unit_price: 0, count: masterCount(mi.multiplier_type), remark: '' });
+            var srcRow = body.querySelector('.cw-row[data-uid="' + pick.value + '"]');
+            if (srcRow) {
+                addComboRow(card, readTopRow(srcRow));
                 pick.value = '';
                 if (window.jQuery && jQuery.fn.select2) { jQuery(pick).trigger('change.select2'); }
                 recalc();
