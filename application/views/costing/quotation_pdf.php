@@ -21,7 +21,10 @@ $public_ref   = isset($public_ref) ? $public_ref : '';
 $CompanyName    = isset($company['Name']) ? $company['Name'] : 'HolidayGoGoGo';
 $CompanyReg     = isset($company['RegistrationNumber']) ? $company['RegistrationNumber'] : '';
 $CompanyLicense = isset($company['LicenseNumber']) ? $company['LicenseNumber'] : '';
-$CompanyAddress = isset($company['Address']) ? $company['Address'] : '';
+// Prefer the dated address (matches Booking Confirmation PDF); fall back to DB.
+$CompanyAddress = isset($CompanyAddress) && $CompanyAddress !== ''
+    ? $CompanyAddress
+    : (isset($company['Address']) ? $company['Address'] : '');
 $CompanyWebsite = isset($company['Website']) ? $company['Website'] : '';
 
 $PackageName   = isset($package['name']) ? $package['name'] : '-';

@@ -39,6 +39,12 @@ class Costing_Quotation extends CI_Controller
         $data['company'] = $this->Company_Model->Read();
         $data['public_ref'] = $this->public_ref($data['booking']);
 
+        // Use the same dated address source as the Booking Confirmation PDF so
+        // both documents always show the current office address. A quotation is a
+        // present-dated document, so this resolves to the new (post-cutoff) address.
+        $this->load->helper('company_address');
+        $data['CompanyAddress'] = pdf_company_address_for_date(date('Y-m-d'));
+
         // Itinerary blocks are rich text (TinyMCE). Strip layout-breaking styles
         // and inline any local images so DomPDF renders them — same pipeline the
         // booking voucher footers use.
