@@ -579,16 +579,57 @@ class Guests extends MY_Controller
 		if (!is_dir($dir)) {
 			mkdir($dir, 0755, true);
 		}
+
+		$title    = trim((string) $this->input->post('title'));
+		$admin_id = $this->session->userdata('admin_id');
+		$ext      = strtolower(pathinfo($original, PATHINFO_EXTENSION));
+
+		// A .zip may bundle many WhatsApp exports — extract every .txt inside and
+		// record each as its own chat file (keyed to the same guest).
+		if ($ext === 'zip') {
+			if (!class_exists('ZipArchive')) {
+				return $out(array('ok' => false, 'message' => 'ZIP uploads are not supported on this server.'));
+			}
+			$zip = new ZipArchive();
+			if ($zip->open($_FILES['chat_file']['tmp_name']) !== true) {
+				return $out(array('ok' => false, 'message' => 'Could not open the ZIP file.'));
+			}
+
+			$per_file_max = 5 * 1024 * 1024; // same cap as a single .txt upload
+			$added = 0;
+			for ($i = 0; $i < $zip->numFiles; $i++) {
+				$entry = $zip->getNameIndex($i);
+				if (!chat_history_zip_entry_is_txt($entry)) { continue; }
+
+				$stat = $zip->statIndex($i);
+				if ($stat && (int) $stat['size'] > $per_file_max) { continue; } // guard against zip bombs
+
+				$content = $zip->getFromIndex($i);
+				if ($content === false || trim($content) === '') { continue; }
+
+				$stored = chat_history_stored_name($entry);
+				if (file_put_contents($dir . $stored, $content) === false) { continue; }
+
+				$entry_name = basename(str_replace('\\', '/', $entry));
+				$this->Guests_Model->Add_Chat_History($dedup_key, $entry_name, $stored, $title, $admin_id);
+				$added++;
+			}
+			$zip->close();
+
+			if ($added < 1) {
+				return $out(array('ok' => false, 'message' => 'No .txt chat files were found in the ZIP.'));
+			}
+			return $out(array('ok' => true, 'added' => $added));
+		}
+
 		$stored = chat_history_stored_name($original);
 		if (!move_uploaded_file($_FILES['chat_file']['tmp_name'], $dir . $stored)) {
 			return $out(array('ok' => false, 'message' => 'Could not save the file. Please try again.'));
 		}
 
-		$title    = trim((string) $this->input->post('title'));
-		$admin_id = $this->session->userdata('admin_id');
 		$id = $this->Guests_Model->Add_Chat_History($dedup_key, $original, $stored, $title, $admin_id);
 
-		return $out(array('ok' => true, 'file' => array('id' => (int) $id)));
+		return $out(array('ok' => true, 'added' => 1, 'file' => array('id' => (int) $id)));
 	}
 
 	/**

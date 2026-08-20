@@ -1181,10 +1181,10 @@ div.kt-datatable__pager-container {
 					<?php if($lc_can_edit) { ?>
 					<div class="form-group row mb-2">
 						<div class="col-md-6">
-							<label class="font-weight-bold" style="font-size:12px;">Chat Export File (.txt) <span class="text-danger">*</span></label>
+							<label class="font-weight-bold" style="font-size:12px;">Chat Export File (.txt or .zip) <span class="text-danger">*</span></label>
 							<div class="custom-file">
-								<input type="file" id="ch_file" class="custom-file-input" accept=".txt,text/plain">
-								<label class="custom-file-label" for="ch_file" id="ch_file_label">Choose .txt file</label>
+								<input type="file" id="ch_file" class="custom-file-input" accept=".txt,.zip,text/plain,application/zip">
+								<label class="custom-file-label" for="ch_file" id="ch_file_label">Choose .txt or .zip file</label>
 							</div>
 						</div>
 						<div class="col-md-4">
@@ -1197,7 +1197,7 @@ div.kt-datatable__pager-container {
 							</button>
 						</div>
 					</div>
-					<div class="form-text text-muted mb-2" style="font-size:11px;">Export a WhatsApp chat (without media) and upload the .txt here. Max 5MB.</div>
+					<div class="form-text text-muted mb-2" style="font-size:11px;">Export a WhatsApp chat (without media) and upload the .txt here, or upload a .zip of several .txt exports at once. Max 5MB per file, 30MB per zip.</div>
 					<?php } ?>
 					<div id="ch_error" class="text-danger font-weight-bold mb-2" style="font-size:12px; display:none;"></div>
 					<hr>
@@ -1809,7 +1809,7 @@ div.kt-datatable__pager-container {
 		$('#ch_guest_name').text($(this).attr('data-name') || '');
 		$('#ch_error').hide().text('');
 		$('#ch_file').val('');
-		$('#ch_file_label').text('Choose .txt file');
+		$('#ch_file_label').text('Choose .txt or .zip file');
 		$('#ch_title').val('');
 		chShowList();
 		$('#chat_history_modal').modal('show');
@@ -1817,7 +1817,7 @@ div.kt-datatable__pager-container {
 	});
 
 	$('#ch_file').on('change', function() {
-		var name = (this.files && this.files.length) ? this.files[0].name : 'Choose .txt file';
+		var name = (this.files && this.files.length) ? this.files[0].name : 'Choose .txt or .zip file';
 		$('#ch_file_label').text(name);
 	});
 
@@ -1825,7 +1825,7 @@ div.kt-datatable__pager-container {
 		var $btn = $(this), $error = $('#ch_error');
 		var file = $('#ch_file')[0].files[0];
 		$error.hide().text('');
-		if (!file) { $error.text('Please choose a .txt file.').show(); return; }
+		if (!file) { $error.text('Please choose a .txt or .zip file.').show(); return; }
 
 		var fd = new FormData();
 		fd.append('dedup_key', chDedupKey);
@@ -1838,8 +1838,8 @@ div.kt-datatable__pager-container {
 			.done(function(res) {
 				$btn.prop('disabled', false).html('<i class="la la-upload"></i> Upload');
 				if (res && res.ok) {
-					$('#ch_file').val(''); $('#ch_file_label').text('Choose .txt file'); $('#ch_title').val('');
-					chBumpBadge(1);
+					$('#ch_file').val(''); $('#ch_file_label').text('Choose .txt or .zip file'); $('#ch_title').val('');
+					chBumpBadge(res.added || 1);
 					chLoad();
 				} else {
 					$error.text((res && res.message) || 'Could not upload.').show();

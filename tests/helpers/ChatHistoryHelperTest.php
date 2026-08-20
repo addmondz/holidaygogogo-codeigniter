@@ -36,6 +36,19 @@ assert_false('empty file rejected',       chat_history_validate_upload('chat.txt
 assert_false('blank name rejected',       chat_history_validate_upload('   ', 10)['ok']);
 assert_false('oversize rejected',         chat_history_validate_upload('chat.txt', 6 * 1024 * 1024)['ok']);
 assert_true('uppercase ext accepted',     chat_history_validate_upload('CHAT.TXT', 10)['ok']);
+assert_true('zip accepted',               chat_history_validate_upload('chats.zip', 1234)['ok']);
+assert_true('zip up to 30MB accepted',    chat_history_validate_upload('chats.zip', 20 * 1024 * 1024)['ok']);
+assert_false('oversize zip rejected',     chat_history_validate_upload('chats.zip', 31 * 1024 * 1024)['ok']);
+assert_false('txt over 5MB rejected',     chat_history_validate_upload('chat.txt', 6 * 1024 * 1024)['ok']);
+
+// ---- zip_entry_is_txt ------------------------------------------------------
+assert_true('plain txt entry',            chat_history_zip_entry_is_txt('WhatsApp Chat with Ali.txt'));
+assert_true('nested txt entry',           chat_history_zip_entry_is_txt('exports/chat.TXT'));
+assert_false('directory entry',           chat_history_zip_entry_is_txt('exports/'));
+assert_false('macosx junk',               chat_history_zip_entry_is_txt('__MACOSX/chat.txt'));
+assert_false('appledouble fork',          chat_history_zip_entry_is_txt('._chat.txt'));
+assert_false('non-txt in zip',            chat_history_zip_entry_is_txt('chat.pdf'));
+assert_false('empty entry',               chat_history_zip_entry_is_txt(''));
 
 // ---- stored_name -----------------------------------------------------------
 $stored = chat_history_stored_name('../../etc/passwd');

@@ -25,18 +25,44 @@ if (!function_exists('chat_history_validate_upload')) {
 			return array('ok' => false, 'error' => 'No file was selected.');
 		}
 		$ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
-		if ($ext !== 'txt') {
-			return array('ok' => false, 'error' => 'Only .txt chat exports are allowed.');
+		if ($ext !== 'txt' && $ext !== 'zip') {
+			return array('ok' => false, 'error' => 'Only .txt or .zip chat exports are allowed.');
 		}
 		$size = (int) $size;
 		if ($size <= 0) {
 			return array('ok' => false, 'error' => 'The file is empty.');
 		}
-		$max = 5 * 1024 * 1024; // 5 MB — WhatsApp text exports are tiny.
+		// WhatsApp text exports are tiny; a .zip may bundle many of them.
+		$max = ($ext === 'zip') ? 30 * 1024 * 1024 : 5 * 1024 * 1024;
 		if ($size > $max) {
-			return array('ok' => false, 'error' => 'File too large (max 5MB).');
+			$cap = ($ext === 'zip') ? '30MB' : '5MB';
+			return array('ok' => false, 'error' => 'File too large (max ' . $cap . ').');
 		}
 		return array('ok' => true, 'error' => '');
+	}
+}
+
+if (!function_exists('chat_history_zip_entry_is_txt')) {
+	/**
+	 * Decide whether a ZIP entry should be extracted as a chat export: a real
+	 * .txt file only. Skips directory entries, macOS archive junk (__MACOSX/
+	 * folder + ._ AppleDouble resource forks) and any other hidden dotfiles, so
+	 * a zip made on a Mac doesn't produce phantom/garbage chat records.
+	 */
+	function chat_history_zip_entry_is_txt($entry_name)
+	{
+		$name = str_replace('\\', '/', (string) $entry_name);
+		if ($name === '' || substr($name, -1) === '/') {
+			return false; // directory entry
+		}
+		if (strpos($name, '__MACOSX/') !== false) {
+			return false;
+		}
+		$base = basename($name);
+		if ($base === '' || $base[0] === '.') {
+			return false; // ._foo AppleDouble forks and other dotfiles
+		}
+		return strtolower(pathinfo($base, PATHINFO_EXTENSION)) === 'txt';
 	}
 }
 
