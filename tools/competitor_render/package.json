@@ -1,0 +1,10 @@
+{
+  "name": "competitor-render",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Playwright render service for the Competitor Analysis crawler (JS SPA sites)",
+  "bin": { "competitor-render": "render.js" },
+  "dependencies": {
+    "playwright": "^1.40.0"
+  }
+}

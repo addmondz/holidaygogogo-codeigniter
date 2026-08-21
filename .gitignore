@@ -5,3 +5,8 @@ backups/*.sql.gz
 backups/cron.log
 whats-new.txt
 commit.txt
+# Competitor Analysis Playwright render service deps
+tools/competitor_render/node_modules/
+
+# Competitor Analysis runtime crawl job/status files (recreated at runtime)
+application/logs/competitor_crawl/

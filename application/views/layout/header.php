@@ -553,6 +553,16 @@ $is_dev_env = ($app_env !== 'prod');
 									</div>
 								</li>
 							<?php } ?>
+							<?php if((int)$this->session->level === 10) { ?>
+								<li class="menu-item <?php if($this->router->class == 'Competitor_Analysis') { echo 'menu-item-active'; } ?>">
+									<a href="<?php echo base_url('Competitor_Analysis'); ?>" class="menu-link">
+										<span class="svg-icon menu-icon">
+											<i class="la la-robot" style="font-size:20px;"></i>
+										</span>
+										<span class="menu-text">Competitor Analysis</span>
+									</a>
+								</li>
+							<?php } ?>
 							<?php
 								// Per-admin access to Product (an Owner-granted VPR flag overrides the
 								// role block). Keep menu in sync with the MY_Controller gate so links

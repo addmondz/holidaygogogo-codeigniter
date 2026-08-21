@@ -1,0 +1,35 @@
+-- Competitor Analysis — full schema (consolidated). One row per analysis: a
+-- crawl summarises a whole site (products_json + product_count), an upload is a
+-- single product; the rich per-product profile lives in details_json. CREATE TABLE
+-- IF NOT EXISTS is fine (unlike ALTER ... IF NOT EXISTS, which MySQL 9 rejects).
+CREATE TABLE IF NOT EXISTS `competitor_analyses` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `url` VARCHAR(1000) NOT NULL,
+  `page_title` VARCHAR(500) NULL DEFAULT NULL,
+  `product_name` VARCHAR(500) NULL DEFAULT NULL,
+  `tour_code` VARCHAR(100) NULL DEFAULT NULL,
+  `price` VARCHAR(255) NULL DEFAULT NULL,
+  `currency` VARCHAR(20) NULL DEFAULT NULL,
+  `destination` VARCHAR(255) NULL DEFAULT NULL,
+  `duration` VARCHAR(100) NULL DEFAULT NULL,
+  `inclusions` TEXT NULL DEFAULT NULL,
+  `pros` TEXT NULL DEFAULT NULL,
+  `cons` TEXT NULL DEFAULT NULL,
+  `summary` TEXT NULL DEFAULT NULL,
+  `comparison` TEXT NULL DEFAULT NULL,
+  `details_json` LONGTEXT NULL DEFAULT NULL,
+  `products_json` LONGTEXT NULL DEFAULT NULL,
+  `product_count` INT NOT NULL DEFAULT 0,
+  `raw_json` LONGTEXT NULL DEFAULT NULL,
+  `model` VARCHAR(100) NULL DEFAULT NULL,
+  `input_tokens` INT NOT NULL DEFAULT 0,
+  `output_tokens` INT NOT NULL DEFAULT 0,
+  `cost_usd` DECIMAL(12,6) NOT NULL DEFAULT 0,
+  `status` VARCHAR(20) NOT NULL DEFAULT 'done',
+  `error_message` TEXT NULL DEFAULT NULL,
+  `created_by` INT NULL DEFAULT NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_competitor_analyses_created_at` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
