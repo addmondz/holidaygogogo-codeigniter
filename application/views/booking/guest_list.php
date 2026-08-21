@@ -1506,7 +1506,11 @@
 				// files are uploaded on change via uploadSinglePassport() and their
 				// filenames live in the existing_passport_copies / new_passport_copies
 				// hidden inputs, so they travel with the serialized payload.
-				var payload = $('#form').serialize();
+				// Append the lock identity so the server can reject an auto-save
+				// from a stale/expired session (prevents wiping saved guest data).
+				var payload = $('#form').serialize()
+					+ '&lock_token=' + encodeURIComponent(lockToken || '')
+					+ '&guest_list_hash=' + encodeURIComponent(guestListHash || '');
 
 				$.ajax({
 					url: '<?php echo base_url('Guest_List/auto_save'); ?>',

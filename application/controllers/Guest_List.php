@@ -837,6 +837,27 @@ class Guest_List extends CI_Controller
 		try {
 			$booking_id = $this->Guest_List_Model->Read_Booking_ID();
 
+			// Stale-form guard: the clobber fires the instant the GL lock timer
+			// hits zero (lock expired) and a leftover tab may no longer own the
+			// lock. Refuse to write when the lock is missing/expired or held by
+			// another session, so a dead form can't touch saved guest data.
+			// Resolve the lock by the booking Token (auto-save posts no ?gl=, so
+			// derive the booking from the first posted guest row).
+			$this->load->helper('guest_list_autosave');
+			$this->load->model('Guest_list_lock_model');
+			if (empty($booking_id)) {
+				$booking_id = $this->Guest_List_Model->Booking_Id_For_Posted_Guest();
+			}
+			$token = $this->Booking_Token_By_Id($booking_id);
+			$lock  = !empty($token) ? $this->Guest_list_lock_model->getByHash($token) : null;
+			$user_id = $this->session->userdata('admin_id') ?: null;
+			$expired = $this->Guest_list_lock_model->isExpired($lock);
+			$same_owner = $this->Guest_list_lock_model->isSameOwner($lock, $this->input->post('lock_token'), $user_id);
+			if (!gl_autosave_should_write($expired, $same_owner)) {
+				echo json_encode(array('status' => 'skipped', 'message' => 'Lock expired or not owned — auto-save discarded'));
+				return;
+			}
+
 			// Resolve passport copies the same way index() does, so that auto-save
 			// respects freshly uploaded files and preserves existing ones.
 			$this->resolve_passport_copies($booking_id);
@@ -844,7 +865,8 @@ class Guest_List extends CI_Controller
 			// preserve_case=true: auto-save must store exactly what the user
 			// typed so the reload shows their text verbatim. Normal submit
 			// (index()) still uppercases as it always has.
-			$this->Guest_List_Model->Update(true, $booking_id);
+			// skip_empty=true: a blank field must never overwrite saved data.
+			$this->Guest_List_Model->Update(true, $booking_id, true);
 
 			if (!empty($this->input->post('new_guests'))) {
 				$this->Guest_List_Model->Create_Guest($booking_id, true);
@@ -864,6 +886,16 @@ class Guest_List extends CI_Controller
 			log_message('error', 'Guest_List auto_save failed: ' . $e->getMessage());
 			echo json_encode(array('status' => 'error', 'message' => $e->getMessage()));
 		}
+	}
+
+	/** Booking Token (= GL lock hash) for a BookingID; null when unknown. */
+	private function Booking_Token_By_Id($booking_id)
+	{
+		if (empty($booking_id)) {
+			return null;
+		}
+		$row = $this->db->select('Token')->where('BookingID', $booking_id)->get('booking')->row();
+		return $row ? $row->Token : null;
 	}
 
 	/**

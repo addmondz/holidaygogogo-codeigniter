@@ -192,8 +192,15 @@ class Guest_List_Model extends CI_Model
 		$this->db->insert('guest_list_log', $array);
 	}
 
-	function Update($preserve_case = false, $booking_id = null)
+	function Update($preserve_case = false, $booking_id = null, $skip_empty = false)
 	{
+		// $skip_empty (auto-save): a blank incoming field must NOT overwrite an
+		// existing saved value — a stale/leftover form otherwise wipes real
+		// guest data. Drop blank fields before the write. The normal submit
+		// leaves $skip_empty false so intentional clears still persist.
+		if ($skip_empty) {
+			$this->load->helper('guest_list_autosave');
+		}
 		$upper = function($value) use ($preserve_case) {
 			return $preserve_case ? $value : strtoupper($value);
 		};
@@ -230,6 +237,14 @@ class Guest_List_Model extends CI_Model
 				if(!$this->Passport_Applicable($destination_country_name, $this->input->post('nationalities')[$i] ?? null)) {
 					$this->Clear_Inapplicable_Passport($array);
 				}
+				// Auto-save: strip blank fields so nothing already saved gets
+				// nulled out. An all-blank row prunes to empty -> skip its write.
+				if ($skip_empty) {
+					$array = gl_autosave_prune_blanks($array);
+					if (empty($array)) {
+						continue;
+					}
+				}
 				$this->db->where('GuestListID', $this->input->post('guests')[$i]);
 				$this->db->update('guest_list', $array);
 				if($this->db->affected_rows() > 0) {
@@ -247,6 +262,13 @@ class Guest_List_Model extends CI_Model
 		}
 		$this->Sync_Customer_Snapshot($booking_id);
 		return $value;
+	}
+
+	/** BookingID from the first posted guest row. Auto-save posts no ?gl=, so
+	 *  this recovers the booking (and thus the lock) from guests[0]. */
+	public function Booking_Id_For_Posted_Guest()
+	{
+		return $this->Booking_Id_For_Guest($this->input->post('guests')[0] ?? null);
 	}
 
 	/** BookingID for a guest_list row, so an update with no booking_id can still
