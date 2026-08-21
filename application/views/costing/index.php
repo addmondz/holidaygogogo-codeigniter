@@ -3,7 +3,10 @@ $packages = isset($packages) ? $packages : array();
 $filters = isset($filters) ? $filters : array('search' => '', 'status' => '');
 $filter_search = isset($filters['search']) ? $filters['search'] : '';
 $filter_status = isset($filters['status']) ? $filters['status'] : '';
-$has_filter = ($filter_search !== '' || $filter_status !== '');
+$filter_customer_name = isset($filters['customer_name']) ? $filters['customer_name'] : '';
+$filter_customer_contact = isset($filters['customer_contact']) ? $filters['customer_contact'] : '';
+$filter_customer_email = isset($filters['customer_email']) ? $filters['customer_email'] : '';
+$has_filter = ($filter_search !== '' || $filter_status !== '' || $filter_customer_name !== '' || $filter_customer_contact !== '' || $filter_customer_email !== '');
 ?>
 
 <div class="d-flex flex-column-fluid">
@@ -45,7 +48,7 @@ $has_filter = ($filter_search !== '' || $filter_status !== '');
                         <div id="costing_filter_body" class="collapse <?php echo $has_filter ? 'show' : ''; ?>">
                             <div class="card-body">
                                 <form method="get" action="<?php echo base_url('Costing'); ?>">
-                                    <div class="form-group row align-items-end mb-0">
+                                    <div class="form-group row mb-4">
                                         <div class="col-md-5">
                                             <label class="font-weight-bold">Search</label>
                                             <input type="text" name="search" value="<?php echo html_escape($filter_search); ?>" class="form-control" placeholder="Package name, tour code or description">
@@ -58,7 +61,21 @@ $has_filter = ($filter_search !== '' || $filter_status !== '');
                                                 <option value="inactive" <?php echo ($filter_status === 'inactive') ? 'selected' : ''; ?>>Inactive</option>
                                             </select>
                                         </div>
-                                        <div class="col-md-4">
+                                    </div>
+                                    <div class="form-group row align-items-end mb-0">
+                                        <div class="col-md-3">
+                                            <label class="font-weight-bold">Customer Name</label>
+                                            <input type="text" name="customer_name" value="<?php echo html_escape($filter_customer_name); ?>" class="form-control" placeholder="Customer name">
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="font-weight-bold">Contact Number</label>
+                                            <input type="text" name="customer_contact" value="<?php echo html_escape($filter_customer_contact); ?>" class="form-control" placeholder="Contact number">
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="font-weight-bold">Email Address</label>
+                                            <input type="text" name="customer_email" value="<?php echo html_escape($filter_customer_email); ?>" class="form-control" placeholder="Email address">
+                                        </div>
+                                        <div class="col-md-3">
                                             <button type="submit" class="btn btn-primary font-weight-bold mr-2">
                                                 <i class="la la-search"></i>Filter
                                             </button>
@@ -81,6 +98,9 @@ $has_filter = ($filter_search !== '' || $filter_status !== '');
                             <tr>
                                 <th style="text-align:center;">No.</th>
                                 <th style="text-align:center;">Package Name</th>
+                                <th style="text-align:center;">Customer Name</th>
+                                <th style="text-align:center;">Contact Number</th>
+                                <th style="text-align:center;">Email Address</th>
                                 <th style="text-align:center;">Tour Code</th>
                                 <th style="text-align:center;">Duration</th>
                                 <th style="text-align:center;">Status</th>
@@ -91,7 +111,7 @@ $has_filter = ($filter_search !== '' || $filter_status !== '');
                         <tbody>
                             <?php if (empty($packages)) { ?>
                                 <tr>
-                                    <td colspan="7" style="text-align:center; padding-top:10px; padding-bottom:10px;">Costing Package Records Not Found</td>
+                                    <td colspan="10" style="text-align:center; padding-top:10px; padding-bottom:10px;">Costing Package Records Not Found</td>
                                 </tr>
                             <?php } else { ?>
                                 <?php $count = 1; ?>
@@ -102,6 +122,9 @@ $has_filter = ($filter_search !== '' || $filter_status !== '');
                                             <div class="font-weight-bold"><?php echo html_escape($package['name']); ?></div>
                                             <div class="text-muted"><?php echo html_escape($package['description']); ?></div>
                                         </td>
+                                        <td><?php echo !empty($package['customer_name']) ? html_escape($package['customer_name']) : '-'; ?></td>
+                                        <td style="text-align:center;"><?php echo !empty($package['customer_contact']) ? html_escape($package['customer_contact']) : '-'; ?></td>
+                                        <td><?php echo !empty($package['customer_email']) ? html_escape($package['customer_email']) : '-'; ?></td>
                                         <td style="text-align:center;"><?php echo !empty($package['tour_code']) ? html_escape($package['tour_code']) : '-'; ?></td>
                                         <td style="text-align:center;"><?php echo (int) $package['duration_days']; ?>D / <?php echo (int) $package['duration_nights']; ?>N</td>
                                         <td style="text-align:center;">

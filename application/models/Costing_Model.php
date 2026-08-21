@@ -17,12 +17,30 @@ class Costing_Model extends CI_Model
             $where[] = "cp.status = " . $this->db->escape($status);
         }
 
+        $customer_name = isset($filters['customer_name']) ? trim((string) $filters['customer_name']) : '';
+        if ($customer_name !== '') {
+            $where[] = "cp.customer_name LIKE '%" . $this->db->escape_like_str($customer_name) . "%'";
+        }
+
+        $customer_contact = isset($filters['customer_contact']) ? trim((string) $filters['customer_contact']) : '';
+        if ($customer_contact !== '') {
+            $where[] = "cp.customer_contact LIKE '%" . $this->db->escape_like_str($customer_contact) . "%'";
+        }
+
+        $customer_email = isset($filters['customer_email']) ? trim((string) $filters['customer_email']) : '';
+        if ($customer_email !== '') {
+            $where[] = "cp.customer_email LIKE '%" . $this->db->escape_like_str($customer_email) . "%'";
+        }
+
         $where_sql = !empty($where) ? ('WHERE ' . implode(' AND ', $where)) : '';
 
         $packages = $this->db->query("
             SELECT
                 cp.id,
                 cp.name,
+                cp.customer_name,
+                cp.customer_contact,
+                cp.customer_email,
                 cp.tour_code,
                 cp.duration_days,
                 cp.duration_nights,
@@ -139,6 +157,9 @@ class Costing_Model extends CI_Model
             'package' => array(
                 'id' => (int) $package['id'],
                 'name' => $package['name'],
+                'customer_name' => isset($package['customer_name']) ? $package['customer_name'] : '',
+                'customer_contact' => isset($package['customer_contact']) ? $package['customer_contact'] : '',
+                'customer_email' => isset($package['customer_email']) ? $package['customer_email'] : '',
                 'tour_code' => isset($package['tour_code']) ? $package['tour_code'] : '',
                 'duration_days' => (int) $package['duration_days'],
                 'duration_nights' => (int) $package['duration_nights'],
@@ -242,6 +263,9 @@ class Costing_Model extends CI_Model
     {
         $data = array(
             'name' => trim((string) $package['name']),
+            'customer_name' => trim((string) $package['customer_name']),
+            'customer_contact' => trim((string) $package['customer_contact']),
+            'customer_email' => trim((string) $package['customer_email']),
             'duration_days' => max(1, (int) $package['duration_days']),
             'duration_nights' => max(0, (int) $package['duration_nights']),
             'description' => trim((string) $package['description']),

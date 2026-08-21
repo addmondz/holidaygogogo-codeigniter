@@ -18,6 +18,9 @@ class Costing extends MY_Controller
         $filters = array(
             'search' => trim((string) $this->input->get('search')),
             'status' => trim((string) $this->input->get('status')),
+            'customer_name' => trim((string) $this->input->get('customer_name')),
+            'customer_contact' => trim((string) $this->input->get('customer_contact')),
+            'customer_email' => trim((string) $this->input->get('customer_email')),
         );
 
         $array = $this->Costing_Model->Read_Packages_Dashboard($filters);
@@ -90,6 +93,9 @@ class Costing extends MY_Controller
         $package_id = $this->Costing_Model->Save_Package(array(
             'id' => (int) $this->input->post('package_id'),
             'name' => $this->input->post('name'),
+            'customer_name' => $this->input->post('customer_name'),
+            'customer_contact' => $this->input->post('customer_contact'),
+            'customer_email' => $this->input->post('customer_email'),
             'duration_days' => $this->input->post('duration_days'),
             'duration_nights' => $this->input->post('duration_nights'),
             'description' => $this->input->post('description'),

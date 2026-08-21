@@ -157,6 +157,26 @@ if (!empty($booking_items)) {
                     </div>
                 </div>
                 <div class="row">
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label>Customer Name</label>
+                            <input type="text" name="customer_name" class="form-control" value="<?php echo html_escape(isset($package['customer_name']) ? $package['customer_name'] : ''); ?>">
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label>Contact Number</label>
+                            <input type="text" name="customer_contact" class="form-control" value="<?php echo html_escape(isset($package['customer_contact']) ? $package['customer_contact'] : ''); ?>">
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label>Email Address</label>
+                            <input type="email" name="customer_email" class="form-control" value="<?php echo html_escape(isset($package['customer_email']) ? $package['customer_email'] : ''); ?>">
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
                     <div class="col-md-3">
                         <div class="form-group">
                             <label>Days</label>
@@ -259,17 +279,10 @@ if (!empty($booking_items)) {
                                 if (!isset($cat_labels[$cat])) { $cat = 'miscellaneous'; }
                                 $grouped[$cat][] = array('idx' => $idx, 'row' => $row);
                             }
-                            // Categories that have at least one master item to offer.
-                            $master_cats = array();
-                            foreach ($item_master as $mi) {
-                                $mc = isset($mi['category']) ? $mi['category'] : 'miscellaneous';
-                                if (!isset($cat_labels[$mc])) { $mc = 'miscellaneous'; }
-                                $master_cats[$mc] = true;
-                            }
-                            // Only render a category when it has master items to add or
-                            // existing rows to show — hide otherwise-empty sections.
+                            // Render every dynamic category from the master so the user can add
+                            // items under any of them — even categories with no master items or
+                            // saved rows yet (empty pickers still let the section show).
                             foreach (array_keys($cat_labels) as $cat) {
-                                if (empty($master_cats[$cat]) && empty($grouped[$cat])) { continue; }
                             ?>
                                 <tr class="cw-cat-row" data-cat="<?php echo html_escape($cat); ?>">
                                     <td colspan="8">
