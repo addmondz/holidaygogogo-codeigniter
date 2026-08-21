@@ -1,7 +1,3 @@
--- Competitor Analysis — full schema (consolidated). One row per analysis: a
--- crawl summarises a whole site (products_json + product_count), an upload is a
--- single product; the rich per-product profile lives in details_json. CREATE TABLE
--- IF NOT EXISTS is fine (unlike ALTER ... IF NOT EXISTS, which MySQL 9 rejects).
 CREATE TABLE IF NOT EXISTS `competitor_analyses` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   `url` VARCHAR(1000) NOT NULL,
