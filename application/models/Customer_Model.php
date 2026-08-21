@@ -298,11 +298,12 @@ class Customer_Model extends CI_Model
 				]));
 		}
 
-		// HARD BLOCK on duplicate phone: if an active customer already has this
-		// phone (normalised, any format), refuse to create a second record and
-		// return the existing match so the form can point the user to it. There
-		// is no override — a phone identifies one customer.
-		$matches = $this->find_active_by_phone($data['phone_number']);
+		// HARD BLOCK on duplicate: if an active customer already has BOTH this
+		// name AND this phone (normalised, any format), refuse to create a second
+		// record and return the existing match so the form can point the user to
+		// it. There is no override. A same-phone-but-different-name (or vice
+		// versa) is allowed to pass here.
+		$matches = $this->find_active_by_phone($data['phone_number'], null, $data['name']);
 		if (!empty($matches)) {
 			return $this->output
 				->set_content_type('application/json')
@@ -310,7 +311,7 @@ class Customer_Model extends CI_Model
 					'success'   => false,
 					'duplicate' => true,
 					'matches'   => $matches,
-					'message'   => 'A customer with this phone number already exists.',
+					'message'   => 'A customer with this name and phone number already exists.',
 				]));
 		}
 
@@ -556,15 +557,20 @@ class Customer_Model extends CI_Model
     /**
      * Active customers whose phone matches $phone by normalised last-9-digit key,
      * computed on the fly in SQL (no stored column). Used by the "possible
-     * duplicate" check on the customer + booking create paths. Name is
-     * deliberately NOT part of the match (real namesakes with different phones
-     * are allowed). Looks at the customer table only.
+     * duplicate" check on the customer + booking create paths. Looks at the
+     * customer table only.
      *
-     * @param string   $phone
-     * @param int|null $exclude_customer_id Skip this id (e.g. the row being edited).
+     * By default name is NOT part of the match (real namesakes with different
+     * phones are allowed on the booking path). Pass $match_name to additionally
+     * require a case-insensitive, trimmed name match — the customer form uses
+     * this so a record is only blocked when BOTH name AND phone already exist.
+     *
+     * @param string      $phone
+     * @param int|null    $exclude_customer_id Skip this id (e.g. the row being edited).
+     * @param string|null $match_name          When non-empty, also require this name.
      * @return array Rows: CustomerID, name, phone_number, CustomerCode.
      */
-    public function find_active_by_phone($phone, $exclude_customer_id = null)
+    public function find_active_by_phone($phone, $exclude_customer_id = null, $match_name = null)
     {
         $key = $this->_phone_norm($phone);
         if ($key === '') {
@@ -580,6 +586,15 @@ class Customer_Model extends CI_Model
             null,
             false
         );
+        // Optional name gate: same phone AND same name (case/space-insensitive).
+        $name = ($match_name === null) ? '' : trim((string) $match_name);
+        if ($name !== '') {
+            $this->db->where(
+                "LOWER(TRIM(IFNULL(name, ''))) = " . $this->db->escape(strtolower($name)),
+                null,
+                false
+            );
+        }
         if (!empty($exclude_customer_id)) {
             $this->db->where('CustomerID !=', (int) $exclude_customer_id);
         }

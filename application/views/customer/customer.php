@@ -323,15 +323,15 @@
                 var data = null;
                 try { data = JSON.parse(resp); } catch (e) {}
 
-                // HARD duplicate block: a customer with this phone already exists,
-                // so creation is refused. Point the user to the existing record.
+                // HARD duplicate block: a customer with this name AND phone
+                // already exists, so creation is refused. Point the user to it.
                 if (data && data.duplicate && data.matches && data.matches.length) {
                     var m = data.matches[0];
                     var esc = function(s) { return $('<div>').text(s == null ? '' : String(s)).html(); };
                     Swal.fire({
                         icon: 'error',
                         title: 'Duplicate Customer Blocked',
-                        html: 'A customer with this phone number already exists, so a new record was not created:<br><br>'
+                        html: 'A customer with this name and phone number already exists, so a new record was not created:<br><br>'
                             + '<strong>' + esc(m.name) + '</strong><br>'
                             + 'Code: <strong>' + esc(m.CustomerCode || '&mdash;') + '</strong><br>'
                             + 'Phone: ' + esc(m.phone_number),
