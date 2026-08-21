@@ -3,7 +3,8 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 
 /**
  * Competitor_Job — the background worker for Competitor Analysis. Spawned as a
- * detached CLI process:  php index.php competitor_job run <job_id>
+ * detached CLI process:  php index.php Competitor_Job run <job_id>
+ * (exact case — Linux filesystems are case-sensitive; lowercase 404s there.)
  *
  * Two modes (from the queued status file's `mode`):
  *   - 'crawl' (default): discover + read every product into per-product {url,text}

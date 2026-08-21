@@ -381,8 +381,10 @@ class Competitor_Analysis extends MY_Controller
 		$out   = $dir . $job_id . '.out';
 		// pcre.jit=0: the spawned (sandboxed) process can't allocate JIT executable
 		// memory, which otherwise spams a PCRE-JIT warning; the interpreter is fine.
+		// Controller name MUST match the file case exactly (Competitor_Job) — Linux
+		// filesystems are case-sensitive, so lowercase 'competitor_job' 404s there.
 		// `& echo $!` prints the detached worker's PID so we can Terminate it later.
-		$cmd = escapeshellarg($php) . ' -d pcre.jit=0 ' . escapeshellarg($index) . ' competitor_job run ' . escapeshellarg($job_id)
+		$cmd = escapeshellarg($php) . ' -d pcre.jit=0 ' . escapeshellarg($index) . ' Competitor_Job run ' . escapeshellarg($job_id)
 			. ' > ' . escapeshellarg($out) . ' 2>&1 & echo $!';
 		$pid = (int) @exec($cmd);
 		if ($pid > 0) {
