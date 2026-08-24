@@ -62,6 +62,15 @@ class Costing_Quotation extends CI_Controller
             unset($day);
         }
 
+        // Same sanitise/inline pipeline for the itinerary-wide blocks.
+        if (!empty($data['itinerary_meta']) && is_array($data['itinerary_meta'])) {
+            foreach ($data['itinerary_meta'] as $key => $val) {
+                $data['itinerary_meta'][$key] = inline_voucher_images_html(
+                    sanitize_voucher_content_html((string) $val)
+                );
+            }
+        }
+
         require_once APPPATH . 'libraries/dompdf/autoload.inc.php';
         $dompdf = new \Dompdf\Dompdf();
         $dompdf->loadHtml($this->load->view('costing/quotation_pdf', $data, true), 'UTF-8');

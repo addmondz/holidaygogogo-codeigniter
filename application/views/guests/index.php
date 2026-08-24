@@ -624,6 +624,19 @@ div.kt-datatable__pager-container {
 												</div>
 												<div class="col-md-3">
 													<div class="form-group">
+														<label>Lead Status Date
+															<a onclick="Reset_Lead_Status_Date()" class="btn btn-icon btn-light-warning btn-xs" data-toggle="tooltip" title="Clear lead status date">
+																<i class="la la-undo"></i>
+															</a>
+														</label>
+														<div id="kt_daterangepicker_guests_lead_status" class="input-icon">
+															<input readonly type="text" name="lead_status_date" value="<?php if(!empty($this->input->get('lead_status_date'))) { echo htmlspecialchars($this->input->get('lead_status_date'), ENT_QUOTES); } ?>" autocomplete="off" class="form-control" placeholder="Any status set in range">
+															<span><i class="la la-calendar"></i></span>
+														</div>
+													</div>
+												</div>
+												<div class="col-md-3">
+													<div class="form-group">
 														<label>Client Type</label>
 														<?php $sel_client_type = guest_list_multi_values($this->input->get('client_type')); ?>
 														<select name="client_type[]" class="form-control selectpicker" multiple data-actions-box="true" title="--SELECT CLIENT TYPE--">
@@ -1299,6 +1312,9 @@ div.kt-datatable__pager-container {
 	function Reset_Create_Date() {
 		$('#kt_daterangepicker_guests_create input').val('');
 	}
+	function Reset_Lead_Status_Date() {
+		$('#kt_daterangepicker_guests_lead_status input').val('');
+	}
 
 	$('#kt_daterangepicker_guests_booking').daterangepicker({
 		buttonClasses: ' btn',
@@ -1350,6 +1366,19 @@ div.kt-datatable__pager-container {
 		autoUpdateInput: false
 	}, function(start, end, label) {
 		$('#kt_daterangepicker_guests_create .form-control').val(start.format('DD/MM/YYYY') + ' - ' + end.format('DD/MM/YYYY'));
+	});
+
+	// Lead Status Date = when any lead_status_log entry was recorded (Manual Leads).
+	// autoUpdateInput:false keeps the input blank until a range is picked, so an
+	// untouched picker sends nothing.
+	$('#kt_daterangepicker_guests_lead_status').daterangepicker({
+		buttonClasses: ' btn',
+		applyClass: 'btn-primary',
+		cancelClass: 'btn-secondary',
+		autoApply: true,
+		autoUpdateInput: false
+	}, function(start, end, label) {
+		$('#kt_daterangepicker_guests_lead_status .form-control').val(start.format('DD/MM/YYYY') + ' - ' + end.format('DD/MM/YYYY'));
 	});
 
 	// DOB spans decades, so show month/year dropdowns and cap the range at today

@@ -2,22 +2,125 @@
 defined('BASEPATH') OR exit('No direct script access allowed');
 
 /**
- * Pure helpers for the Costing package per-day itinerary. Each day carries a
- * plain-text title plus five rich-text (TinyMCE) HTML blocks — description,
- * meal plan, notes, special remark and terms & conditions — that render on the
- * customer Quotation PDF. Kept free of the CI super-object so the model can
- * reuse them and PHPUnit can drive them directly.
+ * Pure helpers for the Costing package itinerary.
+ *
+ * Each DAY carries a plain-text title, one rich-text (TinyMCE) HTML block
+ * (description) and a multi-select Meal Plan (stored as comma-separated slugs).
+ * Notes, Special Remark and Terms & Conditions apply to the WHOLE itinerary (one
+ * set per package), not per day, so they live on costing_packages and are
+ * handled by the itinerary-level helpers below.
+ *
+ * Kept free of the CI super-object so the model can reuse them and PHPUnit can
+ * drive them directly.
  */
 
 if (!function_exists('costing_itinerary_html_fields')) {
     /**
-     * The five rich-text columns on costing_itinerary_days, in display order.
+     * The per-day rich-text columns on costing_itinerary_days, in display order.
+     * (Meal plan is a multi-select, handled separately.)
      *
      * @return string[]
      */
     function costing_itinerary_html_fields()
     {
-        return array('description', 'meal_plan', 'notes', 'special_remark', 'terms_and_conditions');
+        return array('description');
+    }
+}
+
+if (!function_exists('costing_meal_plan_options')) {
+    /**
+     * The selectable Meal Plan options, slug => label, in display order. A day
+     * can have several (breakfast + lunch + dinner), so these render as
+     * checkboxes and store as a comma-separated slug list.
+     *
+     * @return array<string,string>
+     */
+    function costing_meal_plan_options()
+    {
+        return array(
+            'breakfast'           => 'Breakfast',
+            'lunch'               => 'Lunch',
+            'dinner'              => 'Dinner',
+            'tea_break'           => 'Tea Break',
+            'supper'              => 'Supper',
+            'special_arrangement' => 'Special Arrangement',
+        );
+    }
+}
+
+if (!function_exists('costing_meal_plan_normalize')) {
+    /**
+     * Normalise a posted Meal Plan selection into a stored slug string. Accepts
+     * the checkbox array (['breakfast','dinner']) or an existing comma-separated
+     * string. Keeps only valid slugs, de-duplicated, in canonical option order.
+     * Returns null when nothing valid is selected.
+     *
+     * @param array|string|null $selected
+     * @return string|null
+     */
+    function costing_meal_plan_normalize($selected)
+    {
+        if (is_string($selected)) {
+            $selected = explode(',', $selected);
+        }
+        $picked = array();
+        foreach ((array) $selected as $slug) {
+            $picked[trim((string) $slug)] = true;
+        }
+
+        $out = array();
+        foreach (array_keys(costing_meal_plan_options()) as $slug) {
+            if (isset($picked[$slug])) {
+                $out[] = $slug;
+            }
+        }
+
+        return empty($out) ? null : implode(',', $out);
+    }
+}
+
+if (!function_exists('costing_meal_plan_labels')) {
+    /**
+     * Human-readable Meal Plan labels for display, from a stored slug string.
+     * Falls back to the stripped raw text for legacy (pre-select) HTML values so
+     * nothing already saved disappears.
+     *
+     * @param string|null $stored
+     * @return string[]
+     */
+    function costing_meal_plan_labels($stored)
+    {
+        $options = costing_meal_plan_options();
+        $slugs = array_map('trim', explode(',', (string) $stored));
+
+        $labels = array();
+        foreach (array_keys($options) as $slug) {
+            if (in_array($slug, $slugs, true)) {
+                $labels[] = $options[$slug];
+            }
+        }
+
+        if (empty($labels)) {
+            $legacy = trim(strip_tags((string) $stored));
+            if ($legacy !== '') {
+                $labels[] = $legacy;
+            }
+        }
+
+        return $labels;
+    }
+}
+
+if (!function_exists('costing_itinerary_level_fields')) {
+    /**
+     * The itinerary-level rich-text columns on costing_packages, in display
+     * order. Shared once beneath the whole itinerary rather than per day.
+     *
+     * @return string[]
+     */
+    function costing_itinerary_level_fields()
+    {
+        return array('itinerary_notes', 'itinerary_special_remark', 'itinerary_terms_and_conditions');
     }
 }
 
@@ -47,14 +150,15 @@ if (!function_exists('costing_itinerary_html_is_blank')) {
 
 if (!function_exists('costing_itinerary_prepare_row')) {
     /**
-     * Normalise one posted itinerary row into an insert-ready shape. Title is
+     * Normalise one posted itinerary day row into an insert-ready shape. Title is
      * trimmed plain text; each HTML field is trimmed and nulled when visually
-     * blank. 'is_empty' is true only when the title AND all five HTML fields are
-     * blank, so the caller can skip the row entirely. 'day_number' is 0 when not
-     * supplied — the caller assigns a sequential fallback.
+     * blank; meal_plan is a multi-select normalised to a slug list. 'is_empty' is
+     * true only when the title AND description AND meal plan are all blank, so the
+     * caller can skip the row entirely. 'day_number' is 0 when not supplied — the
+     * caller assigns a sequential fallback.
      *
      * @param array $row
-     * @return array {day_number:int, title:?string, <html fields>:?string, is_empty:bool}
+     * @return array {day_number:int, title:?string, description:?string, meal_plan:?string, is_empty:bool}
      */
     function costing_itinerary_prepare_row($row)
     {
@@ -78,7 +182,46 @@ if (!function_exists('costing_itinerary_prepare_row')) {
             }
         }
 
+        $out['meal_plan'] = costing_meal_plan_normalize(isset($row['meal_plan']) ? $row['meal_plan'] : null);
+        if ($out['meal_plan'] !== null) {
+            $all_blank = false;
+        }
+
         $out['is_empty'] = $all_blank;
+        return $out;
+    }
+}
+
+if (!function_exists('costing_itinerary_prepare_level')) {
+    /**
+     * Normalise the posted itinerary-level fields (notes, special remark, terms &
+     * conditions) into a package-update shape. Each rich-text field is trimmed
+     * and nulled when visually blank. The post keys are the bare names (notes,
+     * special_remark, terms_and_conditions); the returned keys are the
+     * costing_packages columns (itinerary_notes, ...).
+     *
+     * @param array $post
+     * @return array {itinerary_notes:?string, itinerary_special_remark:?string, itinerary_terms_and_conditions:?string}
+     */
+    function costing_itinerary_prepare_level($post)
+    {
+        $post = (array) $post;
+        // column => posted field name
+        $map = array(
+            'itinerary_notes'                => 'notes',
+            'itinerary_special_remark'       => 'special_remark',
+            'itinerary_terms_and_conditions' => 'terms_and_conditions',
+        );
+
+        $out = array();
+        foreach ($map as $column => $key) {
+            $val = trim((string) (isset($post[$key]) ? $post[$key] : ''));
+            if ($val !== '' && costing_itinerary_html_is_blank($val)) {
+                $val = '';
+            }
+            $out[$column] = $val !== '' ? $val : null;
+        }
+
         return $out;
     }
 }

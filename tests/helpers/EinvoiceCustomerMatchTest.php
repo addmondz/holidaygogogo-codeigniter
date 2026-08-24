@@ -3,8 +3,9 @@
  * Run with: php tests/helpers/EinvoiceCustomerMatchTest.php
  *
  * Locks the pure e-invoice pax->new-customer decision (no DB / no HTTP).
- * Rule: new customer ONLY when BOTH name AND phone differ from the booking
- * customer; name is case/whitespace-insensitive; phone is last-9-digit keyed.
+ * Rule: new customer when name OR phone differs from the booking customer
+ * (same customer only when BOTH match); name is case/whitespace-insensitive;
+ * phone is last-9-digit keyed.
  */
 
 if (!defined('BASEPATH')) {
@@ -27,11 +28,11 @@ $assertions['same name+phone -> false'] =
 $assertions['same name (case/space) + same phone (format) -> false'] =
     (einvoice_pax_needs_new_customer('  ALI bin  Abu ', '122983045', 'Ali Bin Abu', '+60 12-2983045') === false);
 
-/* 3) ONLY ONE DIFFERS -> NOT new --------------------------------- */
-$assertions['diff name, SAME phone -> false'] =
-    (einvoice_pax_needs_new_customer('Siti', '0122983045', 'Ali', '+60 122983045') === false);
-$assertions['SAME name, diff phone -> false'] =
-    (einvoice_pax_needs_new_customer('Ali', '0139998877', 'Ali', '0122983045') === false);
+/* 3) ONLY ONE DIFFERS -> new ------------------------------------- */
+$assertions['diff name, SAME phone -> true'] =
+    (einvoice_pax_needs_new_customer('Siti', '0122983045', 'Ali', '+60 122983045') === true);
+$assertions['SAME name, diff phone -> true'] =
+    (einvoice_pax_needs_new_customer('Ali', '0139998877', 'Ali', '0122983045') === true);
 
 /* 4) BOTH DIFFER -> new ------------------------------------------ */
 $assertions['diff name AND diff phone -> true'] =

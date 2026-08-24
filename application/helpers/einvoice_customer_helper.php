@@ -9,10 +9,10 @@ defined('BASEPATH') or exit('No direct script access allowed');
  * customer recorded on the booking. If the pax looks like a DIFFERENT person, a
  * new customer record is created (and queued to AutoCount) by the caller.
  *
- * Business rule (confirmed 2026-08-19):
- *   - A pax is treated as a new customer ONLY when BOTH the name AND the phone
- *     differ from the booking customer. A single-field mismatch (same phone /
- *     different name, or same name / different phone) is the same customer.
+ * Business rule (updated 2026-08-24):
+ *   - A pax is treated as a new customer when the name OR the phone differs
+ *     from the booking customer. The pax is the same customer ONLY when BOTH
+ *     the name AND the phone match.
  *   - Name match  : case- and whitespace-insensitive.
  *   - Phone match : last-9-digit key (shares customer_phone_dedup_key so any
  *                   format collapses to the same key).
@@ -41,8 +41,9 @@ if (!function_exists('einvoice_pax_needs_new_customer')) {
     /**
      * Whether a single e-invoice pax should become a new customer record.
      *
-     * True ONLY when the pax name AND phone both differ from the booking
-     * customer. Requires the pax to carry a non-blank name and phone.
+     * True when the pax name OR phone differs from the booking customer (i.e.
+     * NOT a new customer only when BOTH match). Requires the pax to carry a
+     * non-blank name and phone.
      *
      * @param string $pax_name      Requested pax name.
      * @param string $pax_phone     Requested pax phone.
@@ -69,6 +70,6 @@ if (!function_exists('einvoice_pax_needs_new_customer')) {
         $name_differs  = $pax_name_key !== einvoice_name_key($booking_name);
         $phone_differs = $pax_phone_key !== customer_phone_dedup_key($booking_phone);
 
-        return $name_differs && $phone_differs;
+        return $name_differs || $phone_differs;
     }
 }

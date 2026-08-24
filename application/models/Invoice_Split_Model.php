@@ -461,11 +461,12 @@ class Invoice_Split_Model extends CI_Model
                     continue;
                 }
 
-                // Skip-if-exists: a phone identifies one customer. If the pax phone
-                // already belongs to an active customer, do nothing (no create, no
-                // link) per the confirmed rule.
-                if (!empty($this->Customer_Model->find_active_by_phone($pax_phone))) {
-                    log_message('info', 'E-invoice: pax "' . $pax_name . '" phone already has a customer; skipped (booking ' . $booking_id . ')');
+                // Skip-if-exists: only when an active customer already matches
+                // BOTH this pax's phone AND name. A same-phone/different-name pax
+                // (e.g. a company billing name on a personal booker's phone) is a
+                // distinct customer and still gets created, per the OR rule above.
+                if (!empty($this->Customer_Model->find_active_by_phone($pax_phone, null, $pax_name))) {
+                    log_message('info', 'E-invoice: pax "' . $pax_name . '" name+phone already has a customer; skipped (booking ' . $booking_id . ')');
                     continue;
                 }
 

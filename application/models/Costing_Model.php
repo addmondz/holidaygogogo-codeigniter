@@ -150,7 +150,8 @@ class Costing_Model extends CI_Model
 
         if ($booking) {
             $booking_items = $this->Read_Booking_Items($booking['id'], (int) $base_currency['id'], $booking['travel_date']);
-            $financials = $this->Calculate_Financials_From_Booking($booking, $booking_items, (int) $base_currency['id']);
+            $financial_rows = $this->Read_Cost_Rows_For_Financials($booking['id'], (int) $base_currency['id'], $booking['travel_date']);
+            $financials = $this->Calculate_Financials_From_Booking($booking, $financial_rows, (int) $base_currency['id']);
         }
 
         return array(
@@ -192,6 +193,12 @@ class Costing_Model extends CI_Model
             'latest_exchange_rates' => $this->Read_Latest_Exchange_Rates(),
             'snapshot_panel' => $booking ? $this->Read_Snapshot_Panel((int) $booking['id']) : array(),
             'itinerary_days' => $this->Read_Itinerary_Days((int) $package['id']),
+            // Itinerary-wide rich-text blocks (one set per package).
+            'itinerary_meta' => array(
+                'notes'                => isset($package['itinerary_notes']) ? $package['itinerary_notes'] : '',
+                'special_remark'       => isset($package['itinerary_special_remark']) ? $package['itinerary_special_remark'] : '',
+                'terms_and_conditions' => isset($package['itinerary_terms_and_conditions']) ? $package['itinerary_terms_and_conditions'] : '',
+            ),
             'quotation_token' => $booking && !empty($booking['quotation_token']) ? $booking['quotation_token'] : '',
             'item_master' => $this->Read_Item_Master(),
             'currency_rate_map' => $this->Read_Currency_Rate_Map($booking ? $booking['travel_date'] : null, (int) $base_currency['id']),
@@ -385,7 +392,6 @@ class Costing_Model extends CI_Model
     public function Generate_Booking_Snapshot($package_id, $payload)
     {
         $package_id = (int) $package_id;
-        $selected_package_item_ids = array_values(array_unique(array_filter(array_map('intval', isset($payload['selected_package_item_ids']) ? (array) $payload['selected_package_item_ids'] : array()))));
         $posted_rows = isset($payload['rows']) ? (array) $payload['rows'] : array();
         $adult_count = max(0, (int) $payload['adult_count']);
         $child_count = max(0, (int) $payload['child_count']);
@@ -404,6 +410,10 @@ class Costing_Model extends CI_Model
             $booking_id = $this->Existing_Booking_Id($package_id);
         }
 
+        // The cost step is combinations-only: internal (combination_id IS NULL)
+        // rows exist solely for legacy scenarios that still post `rows`. New
+        // scenarios keep every cost line inside a combination, so nothing is
+        // auto-seeded from the package template here.
         $snapshot_rows = array();
         if (!empty($posted_rows)) {
             $selected_rows = array();
@@ -413,14 +423,6 @@ class Costing_Model extends CI_Model
                 }
             }
             $snapshot_rows = $this->Normalize_Booking_Rows($selected_rows);
-        } else {
-            $package_items = empty($selected_package_item_ids)
-                ? $this->Read_Package_Items($package_id)
-                : $this->Read_Package_Items_By_Ids($package_id, $selected_package_item_ids);
-
-            foreach ($package_items as $item) {
-                $snapshot_rows[] = $this->Build_Snapshot_Row_From_Template($item, $adult_count, $child_count, $total_pax);
-            }
         }
 
         // Customer combinations (each = a named bundle of its own cost rows).
@@ -727,7 +729,7 @@ class Costing_Model extends CI_Model
 
         $base_currency = $this->Read_Base_Currency($base_currency_code);
         $base_currency_id = $base_currency ? (int) $base_currency['id'] : 0;
-        $booking_items = $this->Read_Booking_Items((int) $booking_id, $base_currency_id, $booking['travel_date']);
+        $booking_items = $this->Read_Cost_Rows_For_Financials((int) $booking_id, $base_currency_id, $booking['travel_date']);
         $financials = $this->Calculate_Financials_From_Booking($booking, $booking_items, $base_currency_id);
 
         return $this->db
@@ -875,13 +877,15 @@ class Costing_Model extends CI_Model
     }
 
     /**
-     * Replace-all save of a package's itinerary days. Each row carries a
-     * plain-text title plus five rich-text (TinyMCE) HTML blocks — description,
-     * meal plan, notes, special remark and terms & conditions.
+     * Replace-all save of a package's itinerary. Each DAY row carries a
+     * plain-text title plus two rich-text (TinyMCE) HTML blocks — description and
+     * meal plan. Notes, Special Remark and Terms & Conditions apply to the whole
+     * itinerary and are stored once on costing_packages via $level_fields.
      *
-     * @param array $rows list of [day_number, title, description, meal_plan, notes, special_remark, terms_and_conditions]
+     * @param array $rows         list of [day_number, title, description, meal_plan]
+     * @param array $level_fields posted [notes, special_remark, terms_and_conditions]
      */
-    public function Save_Itinerary_Days($package_id, $rows)
+    public function Save_Itinerary_Days($package_id, $rows, $level_fields = array())
     {
         $this->load->helper('costing_itinerary');
         $package_id = (int) $package_id;
@@ -904,6 +908,10 @@ class Costing_Model extends CI_Model
             $this->db->insert('costing_itinerary_days', $prepared);
             $day++;
         }
+
+        // Itinerary-wide notes/special remark/terms live on the package itself.
+        $this->db->where('id', $package_id)
+            ->update('costing_packages', costing_itinerary_prepare_level($level_fields));
 
         $this->db->trans_complete();
         return (bool) $this->db->trans_status();
@@ -951,7 +959,7 @@ class Costing_Model extends CI_Model
         }
 
         $booking = $this->db
-            ->select('cb.*, cp.name AS package_name, cp.tour_code, cp.duration_days, cp.duration_nights')
+            ->select('cb.*, cp.name AS package_name, cp.tour_code, cp.duration_days, cp.duration_nights, cp.itinerary_notes, cp.itinerary_special_remark, cp.itinerary_terms_and_conditions')
             ->from('costing_bookings cb')
             ->join('costing_packages cp', 'cp.id = cb.package_id')
             ->where('cb.quotation_token', $token)
@@ -965,7 +973,8 @@ class Costing_Model extends CI_Model
         $base_currency = $this->Read_Base_Currency('MYR');
         $base_currency_id = $base_currency ? (int) $base_currency['id'] : 0;
         $booking_items = $this->Read_Booking_Items((int) $booking['id'], $base_currency_id, $booking['travel_date']);
-        $financials = $this->Calculate_Financials_From_Booking($booking, $booking_items, $base_currency_id);
+        $financial_rows = $this->Read_Cost_Rows_For_Financials((int) $booking['id'], $base_currency_id, $booking['travel_date']);
+        $financials = $this->Calculate_Financials_From_Booking($booking, $financial_rows, $base_currency_id);
 
         // Customer-facing line items: name + selling price (MYR cost incl. bank
         // charges, marked up by the same margin). Raw cost/margin/profit stay hidden.
@@ -1007,6 +1016,11 @@ class Costing_Model extends CI_Model
                 'duration_nights' => (int) $booking['duration_nights'],
             ),
             'itinerary'     => $this->Read_Itinerary_Days((int) $booking['package_id']),
+            'itinerary_meta' => array(
+                'notes'                => isset($booking['itinerary_notes']) ? $booking['itinerary_notes'] : '',
+                'special_remark'       => isset($booking['itinerary_special_remark']) ? $booking['itinerary_special_remark'] : '',
+                'terms_and_conditions' => isset($booking['itinerary_terms_and_conditions']) ? $booking['itinerary_terms_and_conditions'] : '',
+            ),
             'items'         => $items,
             'combinations'  => $combo_summary['combinations'],
             // Additive combination total when there are combinations, else the
@@ -1247,21 +1261,6 @@ class Costing_Model extends CI_Model
             ->result_array();
     }
 
-    private function Read_Package_Items_By_Ids($package_id, $item_ids)
-    {
-        if (empty($item_ids)) {
-            return array();
-        }
-
-        return $this->db
-            ->select('id, package_id, name, description, category, cost_type, default_unit_price, currency_id')
-            ->where('package_id', (int) $package_id)
-            ->where_in('id', $item_ids)
-            ->order_by('id', 'ASC')
-            ->get('costing_package_items')
-            ->result_array();
-    }
-
     private function Read_Booking_Items($booking_id, $base_currency_id, $travel_date = null)
     {
         // Internal cost template only: rows NOT tied to a customer combination
@@ -1272,6 +1271,25 @@ class Costing_Model extends CI_Model
             ->join('costing_currencies', 'costing_currencies.id = costing_booking_items.currency_id')
             ->where('costing_booking_items.booking_id', (int) $booking_id)
             ->where('costing_booking_items.combination_id IS NULL', null, false)
+            ->order_by('costing_booking_items.id', 'ASC')
+            ->get('costing_booking_items')
+            ->result_array();
+
+        return $this->Hydrate_Booking_Item_Rows($items, (int) $booking_id, $base_currency_id, $travel_date);
+    }
+
+    /**
+     * Every cost row for the booking regardless of combination. Combinations are
+     * now the sole cost source, so the internal Total Cost / Profit summary is the
+     * aggregate of all combination rows (plus any legacy internal rows). Legacy
+     * combination-less scenarios fall back to their internal rows unchanged.
+     */
+    private function Read_Cost_Rows_For_Financials($booking_id, $base_currency_id, $travel_date = null)
+    {
+        $items = $this->db
+            ->select($this->Booking_Item_Select())
+            ->join('costing_currencies', 'costing_currencies.id = costing_booking_items.currency_id')
+            ->where('costing_booking_items.booking_id', (int) $booking_id)
             ->order_by('costing_booking_items.id', 'ASC')
             ->get('costing_booking_items')
             ->result_array();
@@ -1588,53 +1606,6 @@ class Costing_Model extends CI_Model
             : array('rate' => 0, 'bank_charges_myr' => 0);
     }
 
-    private function Build_Snapshot_Row_From_Template($item, $adult_count, $child_count, $total_pax)
-    {
-        $quantity = 1;
-        $unit_count = 1;
-        $pax_type = null;
-        $remark = 'Generated from package template';
-
-        switch ($item['cost_type']) {
-            case 'per_adult':
-                $quantity = $adult_count;
-                $pax_type = 'adult';
-                break;
-            case 'per_child':
-                $quantity = $child_count;
-                $pax_type = 'child';
-                break;
-            case 'per_pax':
-                $quantity = $total_pax;
-                break;
-            case 'per_unit':
-                $quantity = 1;
-                $unit_count = 1;
-                $remark = 'Generated from package template. Update units if needed.';
-                break;
-            case 'fixed':
-            default:
-                $quantity = 1;
-                break;
-        }
-
-        $total_amount = round($quantity * $unit_count * (float) $item['default_unit_price'], 2);
-
-        return array(
-            'package_item_id' => (int) $item['id'],
-            'name' => $item['name'],
-            'category' => $item['category'],
-            'pax_type' => $pax_type,
-            'quantity' => $quantity,
-            'unit_count' => $unit_count,
-            'unit_price' => round((float) $item['default_unit_price'], 2),
-            'currency_id' => (int) $item['currency_id'],
-            'total_amount' => $total_amount,
-            'bank_charges_myr' => null,
-            'remark' => $remark,
-        );
-    }
-
     /**
      * Normalise posted customer combinations. Each combination keeps a name and
      * its own normalised cost rows (same rules as the internal template). A row is
@@ -1893,6 +1864,7 @@ class Costing_Model extends CI_Model
             'latest_exchange_rates' => $this->Read_Latest_Exchange_Rates(),
             'snapshot_panel' => array(),
             'itinerary_days' => array(),
+            'itinerary_meta' => array('notes' => '', 'special_remark' => '', 'terms_and_conditions' => ''),
             'quotation_token' => '',
             'item_master' => array(),
             'currency_rate_map' => array(),

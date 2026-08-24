@@ -36,24 +36,10 @@ if ($active_index === false) {
     $active_index = 0;
 }
 
-// Cost rows: reuse the saved snapshot when it exists. A fresh template shows
-// only category headers (each with its own item picker) — items are added
-// per-category on demand, not pre-seeded from the master.
-$cost_rows = array();
-if (!empty($booking_items)) {
-    foreach ($booking_items as $item) {
-        $cost_rows[] = array(
-            'name'            => isset($item['name']) ? $item['name'] : '',
-            'category'        => isset($item['category']) ? $item['category'] : 'miscellaneous',
-            'multiplier_type' => isset($item['multiplier_type']) ? $item['multiplier_type'] : 'fixed',
-            'currency_id'     => (int) (isset($item['currency_id']) ? $item['currency_id'] : 0),
-            'unit_price'      => (float) (isset($item['unit_price']) ? $item['unit_price'] : 0),
-            'count'           => (float) (isset($item['quantity']) ? $item['quantity'] : 1),
-            'remark'          => isset($item['remark']) ? $item['remark'] : '',
-            'include'         => true,
-        );
-    }
-}
+// Category slug => label map. Combinations are grouped by category in their item
+// picker, so the map is needed outside any single cost table now.
+$this->load->model('Costing_Category_Model');
+$cat_labels = $this->Costing_Category_Model->Read_Category_Map();
 ?>
 
 <style>
@@ -82,11 +68,15 @@ if (!empty($booking_items)) {
     .cw-panel-sub { color: #6d7288; margin-bottom: 22px; }
     .cw-cost-table th { background: #f3f6fb; color: #3f4254; font-size: 12.5px; text-align: center; white-space: nowrap; }
     .cw-cost-table td { vertical-align: middle; }
-    .cw-cost-table tr.cw-cat-row td {
+    .cw-cost-table tr.cw-cat-row td,
+    .cw-cost-table tr.cw-combo-cat-row td {
         background: #eef4ff; color: #45608a; font-weight: 700; font-size: 12.5px;
         text-transform: uppercase; letter-spacing: .5px; padding: 9px 12px;
     }
     .cw-cost-table input, .cw-cost-table select { min-width: 90px; }
+    /* Remark sits on its own full-width row directly beneath its cost row. */
+    .cw-cost-table tr.cw-crmk td { border-top: 0; padding-top: 0; }
+    .cw-cost-table tr.cw-crmk .cw-remark { min-width: 0; width: 100%; }
     .cw-myr { font-weight: 700; color: #3f4254; white-space: nowrap; }
     .cw-bank-note { display: block; font-size: 11.5px; font-weight: 600; color: #8a6d3b; margin-top: 2px; }
     .cw-total { font-weight: 700; color: #187DE4; white-space: nowrap; }
@@ -223,9 +213,9 @@ if (!empty($booking_items)) {
             <input type="hidden" name="status" value="<?php echo html_escape($booking_status_value); ?>">
             <div class="cw-panel">
                 <div class="cw-panel-title">Cost Template &amp; Margin</div>
-                <div class="cw-panel-sub">Enter each cost in its currency — MYR converts automatically (bank charges included) using the Costing Currency rates, then multiplies by the day/pax count.</div>
+                <div class="cw-panel-sub">Set the pax and margin, then build the customer's price as one or more combinations below. Each combination holds its own cost items — enter each cost in its currency and MYR converts automatically (bank charges included) using the Costing Currency rates.</div>
 
-                <div class="row mb-4">
+                <div class="row mb-2">
                     <div class="col-md-3">
                         <div class="form-group mb-2">
                             <label>Travel Date</label>
@@ -251,100 +241,7 @@ if (!empty($booking_items)) {
                         </div>
                     </div>
                 </div>
-
-                <div class="table-responsive">
-                    <table class="table table-bordered cw-cost-table mb-2" id="cw-cost-table">
-                        <thead>
-                            <tr>
-                                <th style="width:34px;">Use</th>
-                                <th style="text-align:left;">Details</th>
-                                <th style="width:120px;">Currency</th>
-                                <th style="width:120px;">Cost</th>
-                                <th style="width:140px;">MYR (convert)</th>
-                                <th style="width:120px;">No of Day / Pax</th>
-                                <th style="width:140px;">Total in MYR</th>
-                                <th style="width:44px;"></th>
-                            </tr>
-                        </thead>
-                        <tbody id="cw-cost-body">
-                            <?php
-                            // Group the cost rows by category (canonical order first, then any
-                            // stragglers) so the template reads as sections, not one long list.
-                            $this->load->helper('costing_calc');
-                            $this->load->model('Costing_Category_Model');
-                            $cat_labels = $this->Costing_Category_Model->Read_Category_Map();
-                            $grouped = array();
-                            foreach ($cost_rows as $idx => $row) {
-                                $cat = isset($row['category']) ? $row['category'] : 'miscellaneous';
-                                if (!isset($cat_labels[$cat])) { $cat = 'miscellaneous'; }
-                                $grouped[$cat][] = array('idx' => $idx, 'row' => $row);
-                            }
-                            // Render every dynamic category from the master so the user can add
-                            // items under any of them — even categories with no master items or
-                            // saved rows yet (empty pickers still let the section show).
-                            foreach (array_keys($cat_labels) as $cat) {
-                            ?>
-                                <tr class="cw-cat-row" data-cat="<?php echo html_escape($cat); ?>">
-                                    <td colspan="8">
-                                        <div class="d-flex flex-wrap align-items-center justify-content-between" style="gap:8px;">
-                                            <span><?php echo html_escape($cat_labels[$cat]); ?></span>
-                                            <div class="d-flex align-items-center" style="gap:8px;">
-                                                <select class="form-control form-control-sm cw-cat-add" data-cat="<?php echo html_escape($cat); ?>" style="min-width:240px;max-width:280px;">
-                                                    <option value="">— Add <?php echo html_escape($cat_labels[$cat]); ?> item —</option>
-                                                    <?php foreach ($item_master as $mi_idx => $mi) {
-                                                        $mcat = isset($mi['category']) ? $mi['category'] : 'miscellaneous';
-                                                        if (!isset($cat_labels[$mcat])) { $mcat = 'miscellaneous'; }
-                                                        if ($mcat !== $cat) { continue; }
-                                                    ?>
-                                                        <option value="<?php echo (int) $mi_idx; ?>"><?php echo html_escape($mi['name']); ?> (<?php echo html_escape(isset($mi['currency_code']) ? $mi['currency_code'] : ''); ?> · <?php echo html_escape(isset($mi['multiplier_label']) ? $mi['multiplier_label'] : ''); ?>)</option>
-                                                    <?php } ?>
-                                                </select>
-                                                <button type="button" class="btn btn-sm btn-success font-weight-bold cw-cat-add-btn" data-cat="<?php echo html_escape($cat); ?>"><i class="la la-plus"></i>Add</button>
-                                            </div>
-                                        </div>
-                                    </td>
-                                </tr>
-                                <?php foreach ((isset($grouped[$cat]) ? $grouped[$cat] : array()) as $entry) { $idx = $entry['idx']; $row = $entry['row']; ?>
-                                <tr class="cw-row" data-cat="<?php echo html_escape($cat); ?>">
-                                    <td class="text-center">
-                                        <input type="hidden" name="rows[<?php echo $idx; ?>][include]" value="0" class="cw-include-hidden">
-                                        <input type="checkbox" class="cw-include" <?php echo !empty($row['include']) ? 'checked' : ''; ?>>
-                                    </td>
-                                    <td>
-                                        <input type="text" class="form-control" name="rows[<?php echo $idx; ?>][name]" value="<?php echo html_escape($row['name']); ?>" placeholder="Cost item" readonly>
-                                        <select class="form-control form-control-sm cw-mult-type mt-2" name="rows[<?php echo $idx; ?>][multiplier_type]" title="How this cost scales">
-                                            <?php $rmt = strtolower(trim((string) $row['multiplier_type'])); if (!isset($multiplier_type_options[$rmt])) { $rmt = 'fixed'; } foreach ($multiplier_type_options as $mkey => $mlabel) { ?>
-                                                <option value="<?php echo html_escape($mkey); ?>" <?php echo ($mkey === $rmt) ? 'selected' : ''; ?>><?php echo html_escape($mlabel); ?></option>
-                                            <?php } ?>
-                                        </select>
-                                        <textarea class="form-control form-control-sm cw-remark mt-2" name="rows[<?php echo $idx; ?>][remark]" rows="2" placeholder="Remark (optional)"><?php echo html_escape($row['remark']); ?></textarea>
-                                        <input type="hidden" name="rows[<?php echo $idx; ?>][category]" value="<?php echo html_escape($cat); ?>">
-                                        <input type="hidden" name="rows[<?php echo $idx; ?>][unit_count]" value="1">
-                                        <input type="hidden" name="rows[<?php echo $idx; ?>][pax_type]" value="">
-                                        <input type="hidden" class="cw-myr-hidden" name="rows[<?php echo $idx; ?>][myr_per_unit]" value="">
-                                        <input type="hidden" class="cw-bank-hidden" name="rows[<?php echo $idx; ?>][bank_charges_myr]" value="">
-                                    </td>
-                                    <td>
-                                        <select class="form-control cw-currency" name="rows[<?php echo $idx; ?>][currency_id]">
-                                            <?php foreach ($currencies as $currency) { ?>
-                                                <option value="<?php echo (int) $currency['id']; ?>" <?php echo ((int) $currency['id'] === (int) $row['currency_id']) ? 'selected' : ''; ?>><?php echo html_escape($currency['code']); ?></option>
-                                            <?php } ?>
-                                        </select>
-                                    </td>
-                                    <td><input type="number" step="0.01" min="0" class="form-control cw-cost" name="rows[<?php echo $idx; ?>][unit_price]" value="<?php echo html_escape($row['unit_price']); ?>"></td>
-                                    <td class="text-right cw-myr"><span class="cw-myr-val">0.00</span><span class="cw-bank-note"></span></td>
-                                    <td><input type="number" step="1" min="0" class="form-control cw-count" name="rows[<?php echo $idx; ?>][quantity]" value="<?php echo html_escape($row['count']); ?>"></td>
-                                    <td class="text-right cw-total">0.00</td>
-                                    <td class="text-center">
-                                        <button type="button" class="btn btn-icon btn-light-danger btn-sm cw-remove" title="Remove row"><i class="la la-trash"></i></button>
-                                    </td>
-                                </tr>
-                                <?php } ?>
-                            <?php } ?>
-                        </tbody>
-                    </table>
-                </div>
-                <div class="row mt-3">
+                <div class="row">
                     <div class="col-md-4">
                         <div class="form-group mb-0">
                             <label>Margin (Markup on Cost %)</label>
@@ -353,21 +250,30 @@ if (!empty($booking_items)) {
                         </div>
                     </div>
                 </div>
+            </div>
 
-                <div class="d-flex flex-wrap align-items-center mt-3" style="gap:8px;">
-                    <a href="<?php echo base_url('Costing_Item'); ?>" target="_blank" class="btn btn-light font-weight-bold" title="Manage item master">Manage Items</a>
+            <!-- COMBINATIONS: customer-facing bundles shown on the Quotation PDF -->
+            <div class="cw-panel">
+                <div class="cw-panel-title">Combinations</div>
+                <div class="cw-panel-sub">Bundles shown on the customer Quotation PDF. Add cost items to each combination straight from the item master. Selling price = its cost &times; margin. All combinations add up to the total package price.</div>
+
+                <div id="cw-combos"></div>
+
+                <div class="d-flex flex-wrap align-items-center justify-content-between mt-2" style="gap:10px;">
+                    <div class="d-flex flex-wrap align-items-center" style="gap:8px;">
+                        <button type="button" class="btn btn-light-primary font-weight-bold" id="cw-combo-add"><i class="la la-plus"></i>Add Combination</button>
+                        <a href="<?php echo base_url('Costing_Item'); ?>" target="_blank" class="btn btn-light font-weight-bold" title="Manage item master">Manage Items</a>
+                    </div>
+                    <div class="cw-summary-box" style="margin:0;min-width:240px;">
+                        <div class="lbl">Combinations Total (Selling)</div>
+                        <div class="val" id="cw-combo-grand" style="color:#187DE4;">RM 0.00</div>
+                    </div>
                 </div>
                 <?php if (empty($item_master)) { ?>
-                    <div class="text-muted mt-2">No items in the master yet — add them under <a href="<?php echo base_url('Costing_Item'); ?>" target="_blank">Costing Item</a>.</div>
+                    <div class="text-muted mt-2">Add items to the master first under <a href="<?php echo base_url('Costing_Item'); ?>" target="_blank">Costing Item</a> to build combinations.</div>
                 <?php } ?>
 
-                <?php
-                // Per-currency roll-up: rate to MYR + total owed in each currency
-                // used, so the user sees how much of each foreign currency this
-                // package needs and at what frozen rate.
-                $cur_breakdown = costing_currency_breakdown($cost_rows, $currency_rate_map);
-                ?>
-                <div class="cw-cur-panel" id="cw-cur-panel" style="margin-top:24px;<?php echo empty($cur_breakdown) ? 'display:none;' : ''; ?>">
+                <div class="cw-cur-panel" id="cw-cur-panel" style="margin-top:24px;display:none;">
                     <div class="cw-panel-title" style="font-size:14px;">Currency Breakdown</div>
                     <div class="table-responsive">
                         <table class="table table-bordered mb-0 w-100" id="cw-cur-table">
@@ -380,17 +286,7 @@ if (!empty($booking_items)) {
                                     <th class="text-right">Total in MYR</th>
                                 </tr>
                             </thead>
-                            <tbody id="cw-cur-body">
-                                <?php foreach ($cur_breakdown as $cb) { ?>
-                                <tr>
-                                    <td style="text-align:left;"><?php echo html_escape($cb['code']); ?></td>
-                                    <td class="text-right"><?php echo number_format($cb['rate_to_myr'], 4); ?></td>
-                                    <td class="text-right"><?php echo $cb['bank_charges_myr'] > 0 ? 'RM ' . number_format($cb['bank_charges_myr'], 2) : '—'; ?></td>
-                                    <td class="text-right"><?php echo html_escape($cb['code']) . ' ' . number_format($cb['total_foreign'], 2); ?></td>
-                                    <td class="text-right">RM <?php echo number_format($cb['total_myr'], 2); ?></td>
-                                </tr>
-                                <?php } ?>
-                            </tbody>
+                            <tbody id="cw-cur-body"></tbody>
                         </table>
                     </div>
                 </div>
@@ -402,25 +298,6 @@ if (!empty($booking_items)) {
                     <div class="cw-summary-box"><div class="lbl">Total Revenue</div><div class="val" id="cw-sum-revenue">RM 0.00</div></div>
                     <div class="cw-summary-box"><div class="lbl">Profit</div><div class="val" id="cw-sum-profit" style="color:#1BC5BD;">RM 0.00</div></div>
                 </div>
-            </div>
-
-            <!-- COMBINATIONS: customer-facing bundles shown on the Quotation PDF -->
-            <div class="cw-panel">
-                <div class="cw-panel-title">Combinations</div>
-                <div class="cw-panel-sub">Bundles shown on the customer Quotation PDF (the internal cost items above are hidden from it). Add items to each combination by picking from the internal cost table above — its live cost is copied in. Selling price = its cost &times; margin. All combinations add up to the total package price.</div>
-
-                <div id="cw-combos"></div>
-
-                <div class="d-flex flex-wrap align-items-center justify-content-between mt-2" style="gap:10px;">
-                    <button type="button" class="btn btn-light-primary font-weight-bold" id="cw-combo-add"><i class="la la-plus"></i>Add Combination</button>
-                    <div class="cw-summary-box" style="margin:0;min-width:240px;">
-                        <div class="lbl">Combinations Total (Selling)</div>
-                        <div class="val" id="cw-combo-grand" style="color:#187DE4;">RM 0.00</div>
-                    </div>
-                </div>
-                <?php if (empty($item_master)) { ?>
-                    <div class="text-muted mt-2">Add items to the master first under <a href="<?php echo base_url('Costing_Item'); ?>" target="_blank">Costing Item</a> to build combinations.</div>
-                <?php } ?>
             </div>
 
             <div class="cw-actions">
@@ -438,17 +315,23 @@ if (!empty($booking_items)) {
                 $itin_rows[] = array('day_number' => $d);
             }
         }
-        // Each day = a plain-text title + five rich-text (TinyMCE) HTML blocks.
+        // Each day = a plain-text title + a rich-text Description + a multi-select
+        // Meal Plan. Notes / Special Remark / Terms apply to the whole itinerary.
+        $this->load->helper('costing_itinerary');
         $itin_fields = array(
-            'description'          => 'Description',
-            'meal_plan'            => 'Meal Plan',
-            'notes'                => 'Notes',
-            'special_remark'       => 'Special Remark',
-            'terms_and_conditions' => 'Terms & Conditions',
+            'description' => 'Description',
+        );
+        $meal_options = costing_meal_plan_options();
+        // Itinerary-wide rich-text blocks (one set for the whole itinerary).
+        $itin_meta = isset($itinerary_meta) ? $itinerary_meta : array();
+        $itin_level_fields = array(
+            'itinerary_notes'                => array('Notes', 'notes'),
+            'itinerary_special_remark'       => array('Special Remark', 'special_remark'),
+            'itinerary_terms_and_conditions' => array('Terms & Conditions', 'terms_and_conditions'),
         );
         // Renders one day card. $tpl=true emits the blank JS template with an
         // "__I__" index placeholder (values blank); otherwise a saved/seed row.
-        $render_itin_card = function ($i, $day, $tpl = false) use ($itin_fields) {
+        $render_itin_card = function ($i, $day, $tpl = false) use ($itin_fields, $meal_options) {
             $idx  = $tpl ? '__I__' : (int) $i;
             $dayn = $tpl ? '' : (int) (isset($day['day_number']) ? $day['day_number'] : ((int) $i + 1));
             ob_start(); ?>
@@ -470,7 +353,20 @@ if (!empty($booking_items)) {
                             <label class="font-weight-bold mb-1"><?php echo $label; ?></label>
                             <textarea id="cw-ed-<?php echo $idx; ?>-<?php echo $key; ?>" class="form-control cw-itin-editor" name="itinerary[<?php echo $idx; ?>][<?php echo $key; ?>]"><?php echo $tpl ? '' : html_escape(isset($day[$key]) ? $day[$key] : ''); ?></textarea>
                         </div>
-                    <?php } ?>
+                    <?php }
+                    // Meal Plan is a multi-select (a day can have several meals).
+                    $meal_sel = $tpl ? array() : array_map('trim', explode(',', (string) (isset($day['meal_plan']) ? $day['meal_plan'] : ''))); ?>
+                    <div class="cw-itin-field">
+                        <label class="font-weight-bold mb-1">Meal Plan</label>
+                        <div class="d-flex flex-wrap" style="gap:10px 22px;">
+                            <?php foreach ($meal_options as $slug => $mlabel) { ?>
+                                <label style="display:inline-flex; align-items:center; gap:8px; margin:0; font-weight:400; cursor:pointer;">
+                                    <input type="checkbox" style="width:16px; height:16px; margin:0;" name="itinerary[<?php echo $idx; ?>][meal_plan][]" value="<?php echo $slug; ?>"<?php echo in_array($slug, $meal_sel, true) ? ' checked' : ''; ?>>
+                                    <span><?php echo $mlabel; ?></span>
+                                </label>
+                            <?php } ?>
+                        </div>
+                    </div>
                 </div>
             </div>
             <?php return ob_get_clean();
@@ -488,6 +384,17 @@ if (!empty($booking_items)) {
             <template id="cw-itin-tpl"><?php echo $render_itin_card(0, array(), true); ?></template>
             <div class="cw-panel">
                 <button type="button" class="btn btn-light-primary font-weight-bold" id="cw-itin-add"><i class="la la-plus"></i>Add Day</button>
+            </div>
+            <div class="cw-panel" id="cw-itin-meta">
+                <div class="cw-panel-title">Notes &amp; Terms</div>
+                <div class="cw-panel-sub">Shown once at the bottom of the Quotation PDF — applies to the whole itinerary, not a single day.</div>
+                <?php foreach ($itin_level_fields as $key => $meta) {
+                    list($label, $post_key) = $meta; ?>
+                    <div class="cw-itin-field mb-4">
+                        <label class="font-weight-bold mb-1"><?php echo $label; ?></label>
+                        <textarea id="cw-ed-meta-<?php echo $key; ?>" class="form-control cw-itin-editor" name="<?php echo $key; ?>"><?php echo html_escape(isset($itin_meta[$post_key]) ? $itin_meta[$post_key] : ''); ?></textarea>
+                    </div>
+                <?php } ?>
             </div>
             <div class="cw-actions">
                 <a href="<?php echo base_url('Costing/Package/' . $package_id . '?step=cost'); ?>" class="btn btn-light font-weight-bold"><i class="la la-arrow-left mr-2"></i>Back</a>
@@ -529,12 +436,10 @@ if (!empty($booking_items)) {
     var CAT_LABELS = <?php echo json_encode($cat_labels); ?> || {};
     var DURATION_DAYS = <?php echo (int) $duration_days; ?>;
 
-    var body = document.getElementById('cw-cost-body');
     var adultInput = document.getElementById('cw-adult');
     var childInput = document.getElementById('cw-child');
     var totalPaxInput = document.getElementById('cw-total-pax');
     var marginInput = document.getElementById('cw-margin');
-    var rowSeq = <?php echo count($cost_rows); ?>;
     var combosWrap = document.getElementById('cw-combos');
     var comboSeq = 0; // monotonic combination index for unique field names
 
@@ -575,17 +480,10 @@ if (!empty($booking_items)) {
         return null; // fixed / custom -> leave user value
     }
 
-    // Price a single cost row (internal template OR a combination): refresh its
-    // day/pax count, freeze the MYR-convert + bank charge onto its hidden inputs,
-    // paint the MYR/Total cells. Returns { included, total }. Combination rows have
-    // no Use checkbox, so they are always included.
+    // Price a single combination cost row: refresh its day/pax count, freeze the
+    // MYR-convert + bank charge onto its hidden inputs, paint the MYR/Total cells.
+    // Returns { total }. Combination rows have no Use checkbox — always included.
     function processRow(row) {
-        var includeEl = row.querySelector('.cw-include');
-        var included = includeEl ? includeEl.checked : true;
-        var incHidden = row.querySelector('.cw-include-hidden');
-        if (incHidden) { incHidden.value = included ? '1' : '0'; }
-
-        // Refresh day/pax-driven counts as pax changes.
         var auto = autoCount(row);
         var countInput = row.querySelector('.cw-count');
         if (auto !== null && document.activeElement !== countInput) { countInput.value = auto; }
@@ -594,9 +492,8 @@ if (!empty($booking_items)) {
         var count = parseFloat(countInput.value) || 0;
         var total = Math.round(perUnit * count * 100) / 100;
 
-        // Freeze the "MYR (convert)" figure (bank charge baked in) + the bank
-        // charge itself onto hidden inputs so the saved value is exactly what
-        // the user sees here, not re-pulled from the master on save.
+        // Freeze the "MYR (convert)" figure (bank charge baked in) + the bank charge
+        // itself onto hidden inputs so the saved value is exactly what the user sees.
         var info = RATE_MAP[row.querySelector('.cw-currency').value] || { bank_charges_myr: 0 };
         var myrHidden = row.querySelector('.cw-myr-hidden');
         var bankHidden = row.querySelector('.cw-bank-hidden');
@@ -608,8 +505,7 @@ if (!empty($booking_items)) {
         myrCell.querySelector('.cw-myr-val').textContent = money(perUnit);
         myrCell.querySelector('.cw-bank-note').textContent = bankVal > 0 ? ('incl. ' + money(bankVal) + ' bank') : '';
         row.querySelector('.cw-total').textContent = money(total);
-        row.style.opacity = included ? '1' : '0.45';
-        return { included: included, total: total };
+        return { total: total };
     }
 
     function currentMargin() {
@@ -617,16 +513,36 @@ if (!empty($booking_items)) {
         return margin < 0 ? 0 : margin;
     }
 
+    // Each combination's cost = sum of its rows' MYR totals; selling = cost x
+    // (1 + margin%). Combinations are additive: their sellings sum into the grand
+    // customer total, and their costs into the internal Total Cost. Returns totals.
+    function recalcCombos(margin) {
+        var grandCost = 0, grandSelling = 0;
+        combosWrap.querySelectorAll('.cw-combo-card').forEach(function (card) {
+            var cost = 0;
+            card.querySelectorAll('.cw-crow').forEach(function (row) { cost += processRow(row).total; });
+            var selling = Math.round(cost * (1 + margin / 100) * 100) / 100;
+            var costEl = card.querySelector('.cw-combo-cost');
+            var sellEl = card.querySelector('.cw-combo-sell');
+            if (costEl) { costEl.textContent = money(cost); }
+            if (sellEl) { sellEl.textContent = money(selling); }
+            grandCost += cost;
+            grandSelling += selling;
+        });
+        var g = document.getElementById('cw-combo-grand');
+        if (g) { g.textContent = money(grandSelling); }
+        return { cost: Math.round(grandCost * 100) / 100, selling: Math.round(grandSelling * 100) / 100 };
+    }
+
+    // Internal P&L is the aggregate of every combination row (there is no separate
+    // internal cost table any more). Total Cost = sum of all combination costs.
     function recalc() {
         totalPaxInput.value = totalPax();
-        var grandCost = 0;
-        body.querySelectorAll('.cw-row').forEach(function (row) {
-            var res = processRow(row);
-            if (res.included) { grandCost += res.total; }
-        });
+        var margin = currentMargin();
+        var totals = recalcCombos(margin);
 
         var pax = totalPax() || 1;
-        var margin = currentMargin();
+        var grandCost = totals.cost;
         var costPax = grandCost / pax;
         var sellPax = Math.round(costPax * (1 + margin / 100) * 100) / 100;
         var revenue = Math.round(sellPax * pax * 100) / 100;
@@ -639,29 +555,9 @@ if (!empty($booking_items)) {
         document.getElementById('cw-sum-profit').textContent = money(profit);
 
         renderCurrencyBreakdown();
-        recalcCombos(margin);
     }
 
-    // Each combination's cost = sum of its rows' MYR totals; selling = cost x
-    // (1 + margin%). Combinations are additive: their sellings sum into the grand
-    // total shown to the customer.
-    function recalcCombos(margin) {
-        var grand = 0;
-        combosWrap.querySelectorAll('.cw-combo-card').forEach(function (card) {
-            var cost = 0;
-            card.querySelectorAll('.cw-crow').forEach(function (row) { cost += processRow(row).total; });
-            var selling = Math.round(cost * (1 + margin / 100) * 100) / 100;
-            var costEl = card.querySelector('.cw-combo-cost');
-            var sellEl = card.querySelector('.cw-combo-sell');
-            if (costEl) { costEl.textContent = money(cost); }
-            if (sellEl) { sellEl.textContent = money(selling); }
-            grand += selling;
-        });
-        var g = document.getElementById('cw-combo-grand');
-        if (g) { g.textContent = money(grand); }
-    }
-
-    // Roll included rows up per currency: rate to MYR + total owed in each
+    // Roll every combination row up per currency: rate to MYR + total owed in each
     // currency (mirrors the costing_currency_breakdown() PHP helper).
     function renderCurrencyBreakdown() {
         var panel = document.getElementById('cw-cur-panel');
@@ -669,8 +565,7 @@ if (!empty($booking_items)) {
         if (!panel || !tbody) { return; }
 
         var acc = {};
-        body.querySelectorAll('.cw-row').forEach(function (row) {
-            if (!row.querySelector('.cw-include').checked) { return; }
+        combosWrap.querySelectorAll('.cw-crow').forEach(function (row) {
             var cid = row.querySelector('.cw-currency').value;
             var info = RATE_MAP[cid] || { code: '', rate_to_myr: 0, bank_charges_myr: 0 };
             var unit = parseFloat(row.querySelector('.cw-cost').value) || 0;
@@ -715,14 +610,19 @@ if (!empty($booking_items)) {
         return opts;
     }
 
-    // Cost items are added from the master, never free text.
+    // Combination cost items are added from the master, never free text. Each entry
+    // carries its category + display labels so the per-combination picker can group
+    // and label its options like the old internal table did.
     var MASTER = <?php echo json_encode(array_map(function ($mi) {
         return array(
-            'name'            => isset($mi['name']) ? $mi['name'] : '',
-            'category'        => isset($mi['category']) ? $mi['category'] : 'miscellaneous',
-            'multiplier_type' => isset($mi['multiplier_type']) ? $mi['multiplier_type'] : 'fixed',
-            'currency_id'     => (int) (isset($mi['default_currency_id']) ? $mi['default_currency_id'] : 0),
-            'unit_price'      => 0,
+            'name'             => isset($mi['name']) ? $mi['name'] : '',
+            'category'         => isset($mi['category']) ? $mi['category'] : 'miscellaneous',
+            'category_label'   => isset($mi['category_label']) ? $mi['category_label'] : 'Miscellaneous',
+            'multiplier_type'  => isset($mi['multiplier_type']) ? $mi['multiplier_type'] : 'fixed',
+            'multiplier_label' => isset($mi['multiplier_label']) ? $mi['multiplier_label'] : 'Fixed',
+            'currency_id'      => (int) (isset($mi['default_currency_id']) ? $mi['default_currency_id'] : 0),
+            'currency_code'    => isset($mi['currency_code']) ? $mi['currency_code'] : '',
+            'unit_price'       => 0,
         );
     }, $item_master)); ?> || [];
 
@@ -744,190 +644,87 @@ if (!empty($booking_items)) {
         return opts;
     }
 
-    // Drop a new row under its category header (creating the header if this is the
-    // first row of that category) so the added row lands in the right group.
-    function insertIntoCategory(tr, category) {
-        if (!CAT_LABELS[category]) { category = 'miscellaneous'; }
-        tr.setAttribute('data-cat', category);
-        var header = body.querySelector('.cw-cat-row[data-cat="' + category + '"]');
-        if (!header) {
-            header = document.createElement('tr');
-            header.className = 'cw-cat-row';
-            header.setAttribute('data-cat', category);
-            header.innerHTML = '<td colspan="8">' + CAT_LABELS[category] + '</td>';
-            body.appendChild(header);
-            body.appendChild(tr);
-            return;
-        }
-        var node = header.nextSibling;
-        var lastInGroup = header;
-        while (node) {
-            if (node.nodeType === 1 && node.classList.contains('cw-cat-row')) { break; }
-            if (node.nodeType === 1 && node.classList.contains('cw-row') && node.getAttribute('data-cat') === category) { lastInGroup = node; }
-            node = node.nextSibling;
-        }
-        if (lastInGroup.nextSibling) { body.insertBefore(tr, lastInGroup.nextSibling); }
-        else { body.appendChild(tr); }
-    }
-
-    // Each category header carries its own item picker; add lands the row in that
-    // category and only offers items belonging to it.
-    function addRow(sel) {
-        if (!sel || sel.value === '') {
-            if (typeof Swal !== 'undefined') { Swal.fire({ icon: 'info', title: 'Pick an item', text: 'Select a cost item for this category first.' }); }
-            else { alert('Select a cost item for this category first.'); }
-            return;
-        }
-        var item = MASTER[parseInt(sel.value, 10)];
-        if (!item) { return; }
-
-        var i = rowSeq++;
-        var tr = document.createElement('tr');
-        tr.className = 'cw-row';
-        tr.innerHTML =
-            '<td class="text-center"><input type="hidden" name="rows[' + i + '][include]" value="0" class="cw-include-hidden"><input type="checkbox" class="cw-include" checked></td>' +
-            '<td><input type="text" class="form-control" name="rows[' + i + '][name]" value="" readonly>' +
-            '<select class="form-control form-control-sm cw-mult-type mt-2" name="rows[' + i + '][multiplier_type]" title="How this cost scales">' + multiplierOptions(item.multiplier_type) + '</select>' +
-            '<textarea class="form-control form-control-sm cw-remark mt-2" name="rows[' + i + '][remark]" rows="2" placeholder="Remark (optional)"></textarea>' +
-            '<input type="hidden" name="rows[' + i + '][category]" value="miscellaneous">' +
-            '<input type="hidden" name="rows[' + i + '][unit_count]" value="1">' +
-            '<input type="hidden" name="rows[' + i + '][pax_type]" value="">' +
-            '<input type="hidden" class="cw-myr-hidden" name="rows[' + i + '][myr_per_unit]" value="">' +
-            '<input type="hidden" class="cw-bank-hidden" name="rows[' + i + '][bank_charges_myr]" value=""></td>' +
-            '<td><select class="form-control cw-currency" name="rows[' + i + '][currency_id]">' + currencyOptions(item.currency_id) + '</select></td>' +
-            '<td><input type="number" step="0.01" min="0" class="form-control cw-cost" name="rows[' + i + '][unit_price]" value="0"></td>' +
-            '<td class="text-right cw-myr"><span class="cw-myr-val">0.00</span><span class="cw-bank-note"></span></td>' +
-            '<td><input type="number" step="1" min="0" class="form-control cw-count" name="rows[' + i + '][quantity]" value="1"></td>' +
-            '<td class="text-right cw-total">0.00</td>' +
-            '<td class="text-center"><button type="button" class="btn btn-icon btn-light-danger btn-sm cw-remove" title="Remove row"><i class="la la-trash"></i></button></td>';
-
-        tr.querySelector('input[name="rows[' + i + '][name]"]').value = item.name;
-        tr.querySelector('input[name="rows[' + i + '][category]"]').value = item.category;
-        tr.querySelector('.cw-mult-type').value = item.multiplier_type;
-        tr.querySelector('.cw-cost').value = item.unit_price;
-        tr.querySelector('.cw-count').value = masterCount(item.multiplier_type);
-
-        insertIntoCategory(tr, item.category);
-
-        sel.value = '';
-        // Keep Select2 (if active) in sync with the native reset.
-        if (window.jQuery && jQuery.fn.select2) { jQuery(sel).trigger('change.select2'); }
-        refreshComboPickers();
-        recalc();
-    }
-
-    body.addEventListener('input', recalc);
-    body.addEventListener('change', recalc);
-    body.addEventListener('click', function (e) {
-        var addBtn = e.target.closest('.cw-cat-add-btn');
-        if (addBtn) {
-            var cat = addBtn.getAttribute('data-cat');
-            addRow(body.querySelector('.cw-cat-add[data-cat="' + cat + '"]'));
-            return;
-        }
-        var btn = e.target.closest('.cw-remove');
-        // Keep the (now empty) category header so all sections stay visible.
-        if (btn) { var row = btn.closest('.cw-row'); if (row) { row.remove(); refreshComboPickers(); recalc(); } }
-    });
-    adultInput.addEventListener('input', recalc);
-    childInput.addEventListener('input', recalc);
-    marginInput.addEventListener('input', recalc);
-
     /* -------------------------------------------------------------------- *
      *  COMBINATIONS — customer bundles shown on the Quotation PDF.          *
-     *  Same per-row cost math as the template above, grouped per bundle.    *
+     *  Each bundle owns its cost rows, added straight from the item master. *
      * -------------------------------------------------------------------- */
 
-    // Combination items are picked ONLY from the internal cost table above — not
-    // the whole master. A combo bundle just re-uses rows already costed at the top.
-    function topRows() { return Array.prototype.slice.call(body.querySelectorAll('.cw-row')); }
+    function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
 
-    var topUidSeq = 0;
-    function topRowUid(row) {
-        if (!row.dataset.uid) { row.dataset.uid = 'tr' + (topUidSeq++); }
-        return row.dataset.uid;
-    }
-    function topRowCat(row) {
-        var c = row.getAttribute('data-cat') || 'miscellaneous';
-        return CAT_LABELS[c] ? c : 'miscellaneous';
-    }
-    function topRowName(row) {
-        var el = row.querySelector('input[type="text"]');
-        return el ? el.value : '';
-    }
-
-    // Copy a top cost row's LIVE values so the combo row mirrors what's costed above.
-    function readTopRow(row) {
-        var mult = row.querySelector('.cw-mult-type');
-        var cur = row.querySelector('.cw-currency');
-        var cost = row.querySelector('.cw-cost');
-        var cnt = row.querySelector('.cw-count');
-        var rmk = row.querySelector('.cw-remark');
-        var catEl = row.querySelector('input[name*="[category]"]');
-        return {
-            name: topRowName(row),
-            category: catEl ? catEl.value : topRowCat(row),
-            multiplier_type: mult ? mult.value : 'fixed',
-            currency_id: cur ? cur.value : 0,
-            unit_price: cost ? cost.value : 0,
-            count: cnt ? cnt.value : '',
-            remark: rmk ? rmk.value : ''
-        };
-    }
-
-    // Fill a combo picker <select> with the current top rows, grouped by category.
-    function populateComboPicker(sel) {
-        var keep = sel.value;
-        sel.innerHTML = '';
-        var ph = document.createElement('option');
-        ph.value = ''; ph.textContent = '— Add item —';
-        sel.appendChild(ph);
+    // One item picker per combination, sourced from the whole master and grouped by
+    // category. Option value = index into MASTER.
+    function masterItemPicker() {
+        var sel = document.createElement('select');
+        sel.className = 'form-control form-control-sm cw-combo-pick';
+        var html = '<option value="">— Add item —</option>';
         var byCat = {};
-        topRows().forEach(function (row) {
-            (byCat[topRowCat(row)] = byCat[topRowCat(row)] || []).push(row);
+        MASTER.forEach(function (mi, idx) {
+            var cat = CAT_LABELS[mi.category] ? mi.category : 'miscellaneous';
+            (byCat[cat] = byCat[cat] || []).push(idx);
         });
         Object.keys(CAT_LABELS).forEach(function (cat) {
             if (!byCat[cat]) { return; }
-            var og = document.createElement('optgroup');
-            og.label = CAT_LABELS[cat];
-            byCat[cat].forEach(function (row) {
-                var o = document.createElement('option');
-                o.value = topRowUid(row); o.textContent = topRowName(row) || '(unnamed)';
-                og.appendChild(o);
+            html += '<optgroup label="' + esc(CAT_LABELS[cat]) + '">';
+            byCat[cat].forEach(function (idx) {
+                var mi = MASTER[idx];
+                html += '<option value="' + idx + '">' + esc(mi.name) + ' (' + esc(mi.currency_code) + ' · ' + esc(mi.multiplier_label) + ')</option>';
             });
-            sel.appendChild(og);
+            html += '</optgroup>';
         });
-        if (keep && sel.querySelector('option[value="' + keep + '"]')) { sel.value = keep; }
-    }
-
-    // One item picker per combination, sourced from the internal cost table.
-    function comboItemPicker() {
-        var sel = document.createElement('select');
-        sel.className = 'form-control form-control-sm cw-combo-pick';
-        populateComboPicker(sel);
+        sel.innerHTML = html;
         return sel;
     }
 
-    // Re-sync every combination's picker after top rows are added/removed.
-    function refreshComboPickers() {
-        combosWrap.querySelectorAll('.cw-combo-pick').forEach(function (sel) {
-            populateComboPicker(sel);
-            if (window.jQuery && jQuery.fn.select2 && jQuery(sel).data('select2')) { jQuery(sel).trigger('change.select2'); }
-        });
+    // A category header row inside a combination's cost table.
+    function comboCatHeader(cat) {
+        var tr = document.createElement('tr');
+        tr.className = 'cw-combo-cat-row';
+        tr.setAttribute('data-cat', cat);
+        tr.innerHTML = '<td colspan="7">' + esc(CAT_LABELS[cat] || 'Miscellaneous') + '</td>';
+        return tr;
     }
 
-    // Append a cost row to a combination card. `item` supplies the master values.
+    // Drop an item row (+ its remark row) under its category header inside a combo
+    // table, creating the header in canonical category order when it's the first of
+    // its kind — so the combination reads as grouped sections, not one flat list.
+    function insertComboRow(tbody, cat, itemRow, remarkRow) {
+        var order = Object.keys(CAT_LABELS);
+        var header = tbody.querySelector('.cw-combo-cat-row[data-cat="' + cat + '"]');
+        if (!header) {
+            header = comboCatHeader(cat);
+            var myIdx = order.indexOf(cat);
+            var ref = null, existing = tbody.querySelectorAll('.cw-combo-cat-row');
+            for (var i = 0; i < existing.length; i++) {
+                if (order.indexOf(existing[i].getAttribute('data-cat')) > myIdx) { ref = existing[i]; break; }
+            }
+            tbody.insertBefore(header, ref);
+        }
+        var node = header.nextSibling, last = header;
+        while (node) {
+            if (node.nodeType === 1 && node.classList.contains('cw-combo-cat-row')) { break; }
+            if (node.nodeType === 1 && node.getAttribute('data-cat') === cat) { last = node; }
+            node = node.nextSibling;
+        }
+        tbody.insertBefore(itemRow, last.nextSibling);
+        tbody.insertBefore(remarkRow, itemRow.nextSibling);
+    }
+
+    // Append a cost row to a combination card. `item` supplies the master values
+    // (or the saved values in edit mode). Each item is two <tr>s: the cost row and
+    // a full-width remark row directly beneath it; both grouped under the category.
     function addComboRow(card, item) {
         var c = card.getAttribute('data-c');
         var r = parseInt(card.dataset.rseq, 10) || 0;
         card.dataset.rseq = (r + 1);
         var base = 'combinations[' + c + '][rows][' + r + ']';
+        var cat = (item.category && CAT_LABELS[item.category]) ? item.category : 'miscellaneous';
+
         var tr = document.createElement('tr');
         tr.className = 'cw-row cw-crow';
+        tr.setAttribute('data-cat', cat);
         tr.innerHTML =
             '<td><input type="text" class="form-control" name="' + base + '[name]" value="" readonly>' +
             '<select class="form-control form-control-sm cw-mult-type mt-2" name="' + base + '[multiplier_type]" title="How this cost scales">' + multiplierOptions(item.multiplier_type) + '</select>' +
-            '<textarea class="form-control form-control-sm cw-remark mt-2" name="' + base + '[remark]" rows="2" placeholder="Remark (optional)"></textarea>' +
             '<input type="hidden" name="' + base + '[include]" value="1">' +
             '<input type="hidden" name="' + base + '[category]" value="miscellaneous">' +
             '<input type="hidden" name="' + base + '[unit_count]" value="1">' +
@@ -941,14 +738,19 @@ if (!empty($booking_items)) {
             '<td class="text-right cw-total">0.00</td>' +
             '<td class="text-center"><button type="button" class="btn btn-icon btn-light-danger btn-sm cw-remove" title="Remove row"><i class="la la-trash"></i></button></td>';
 
+        var remarkTr = document.createElement('tr');
+        remarkTr.className = 'cw-crmk';
+        remarkTr.setAttribute('data-cat', cat);
+        remarkTr.innerHTML = '<td colspan="7"><textarea class="form-control form-control-sm cw-remark" name="' + base + '[remark]" rows="2" placeholder="Remark (optional)"></textarea></td>';
+
         tr.querySelector('input[name="' + base + '[name]"]').value = item.name || '';
-        tr.querySelector('input[name="' + base + '[category]"]').value = item.category || 'miscellaneous';
+        tr.querySelector('input[name="' + base + '[category]"]').value = cat;
         tr.querySelector('.cw-mult-type').value = item.multiplier_type || 'fixed';
         tr.querySelector('.cw-cost').value = (item.unit_price !== undefined ? item.unit_price : 0);
         tr.querySelector('.cw-count').value = (item.count !== undefined && item.count !== null && item.count !== '') ? item.count : masterCount(item.multiplier_type);
-        tr.querySelector('.cw-remark').value = item.remark || '';
+        remarkTr.querySelector('.cw-remark').value = item.remark || '';
 
-        card.querySelector('.cw-combo-body').appendChild(tr);
+        insertComboRow(card.querySelector('.cw-combo-body'), cat, tr, remarkTr);
         return tr;
     }
 
@@ -980,7 +782,7 @@ if (!empty($booking_items)) {
                 '<button type="button" class="btn btn-sm btn-success font-weight-bold cw-combo-add-item"><i class="la la-plus"></i>Add Item</button></div>' +
             '<div class="cw-combo-foot">Cost:&nbsp;<span class="cw-combo-cost">RM 0.00</span> &middot; Selling:&nbsp;<span class="sell cw-combo-sell">RM 0.00</span></div>';
 
-        card.querySelector('.cw-combo-pick-slot').appendChild(comboItemPicker());
+        card.querySelector('.cw-combo-pick-slot').appendChild(masterItemPicker());
         combosWrap.appendChild(card);
         card.querySelector('.cw-combo-name').value = name || '';
         (items || []).forEach(function (it) { addComboRow(card, it); });
@@ -999,13 +801,13 @@ if (!empty($booking_items)) {
             var card = addItem.closest('.cw-combo-card');
             var pick = card.querySelector('.cw-combo-pick');
             if (!pick || pick.value === '') {
-                if (typeof Swal !== 'undefined') { Swal.fire({ icon: 'info', title: 'Pick an item', text: 'Select a cost item from the table above.' }); }
-                else { alert('Select a cost item from the table above.'); }
+                if (typeof Swal !== 'undefined') { Swal.fire({ icon: 'info', title: 'Pick an item', text: 'Select a cost item from the master first.' }); }
+                else { alert('Select a cost item from the master first.'); }
                 return;
             }
-            var srcRow = body.querySelector('.cw-row[data-uid="' + pick.value + '"]');
-            if (srcRow) {
-                addComboRow(card, readTopRow(srcRow));
+            var item = MASTER[parseInt(pick.value, 10)];
+            if (item) {
+                addComboRow(card, item);
                 pick.value = '';
                 if (window.jQuery && jQuery.fn.select2) { jQuery(pick).trigger('change.select2'); }
                 recalc();
@@ -1013,28 +815,38 @@ if (!empty($booking_items)) {
             return;
         }
         var rmBtn = e.target.closest('.cw-remove');
-        if (rmBtn && rmBtn.closest('.cw-crow')) { rmBtn.closest('.cw-crow').remove(); recalc(); return; }
+        if (rmBtn && rmBtn.closest('.cw-crow')) {
+            var row = rmBtn.closest('.cw-crow');
+            var tbody = row.parentNode;
+            var cat = row.getAttribute('data-cat');
+            var rmk = row.nextElementSibling;
+            if (rmk && rmk.classList.contains('cw-crmk')) { rmk.remove(); }
+            row.remove();
+            // Drop the category header once its last item is gone, so empty sections
+            // don't linger.
+            if (tbody && cat) {
+                var stillHas = Array.prototype.some.call(tbody.querySelectorAll('.cw-crow'), function (x) { return x.getAttribute('data-cat') === cat; });
+                if (!stillHas) {
+                    var hdr = tbody.querySelector('.cw-combo-cat-row[data-cat="' + cat + '"]');
+                    if (hdr) { hdr.remove(); }
+                }
+            }
+            recalc();
+            return;
+        }
         var rmCard = e.target.closest('.cw-combo-remove');
         if (rmCard) { var cc = rmCard.closest('.cw-combo-card'); if (cc) { cc.remove(); recalc(); } }
     });
 
     document.getElementById('cw-combo-add').addEventListener('click', function () { addComboCard('', []); recalc(); });
+    adultInput.addEventListener('input', recalc);
+    childInput.addEventListener('input', recalc);
+    marginInput.addEventListener('input', recalc);
 
     // Render saved combinations (edit mode) before the first price pass.
     EXISTING_COMBOS.forEach(function (combo) { addComboCard(combo.name, combo.items); });
 
     recalc();
-
-    // Each category picker is type-to-search (Select2 ships with the theme).
-    if (window.jQuery && jQuery.fn.select2) {
-        jQuery('.cw-cat-add').each(function () {
-            jQuery(this).select2({
-                placeholder: jQuery(this).find('option').first().text(),
-                allowClear: true,
-                width: '260px'
-            });
-        });
-    }
 })();
 </script>
 <?php } elseif ($active_step === 'itinerary') { ?>
@@ -1086,6 +898,10 @@ jQuery(function () {
 
     initEditors(body);
 
+    // Itinerary-wide Notes/Special Remark/Terms editors live outside #cw-itin-body.
+    var meta = document.getElementById('cw-itin-meta');
+    if (meta) { initEditors(meta); }
+
     addBtn.addEventListener('click', function () {
         var html = tpl.innerHTML.replace(/__I__/g, seq++);
         var wrap = document.createElement('div');
@@ -1107,6 +923,7 @@ jQuery(function () {
         if (cards.length <= 1) {
             // Keep at least one day — clear it instead of removing.
             card.querySelector('input[name$="[title]"]').value = '';
+            card.querySelectorAll('input[type="checkbox"]').forEach(function (cb) { cb.checked = false; });
             if (hasTiny) {
                 card.querySelectorAll('.cw-itin-editor').forEach(function (el) {
                     var ed = tinymce.get(el.id);

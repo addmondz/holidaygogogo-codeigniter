@@ -168,7 +168,12 @@ class Costing extends MY_Controller
     public function Save_Itinerary()
     {
         $package_id = (int) $this->input->post('package_id');
-        if ($package_id > 0 && $this->Costing_Model->Save_Itinerary_Days($package_id, (array) $this->input->post('itinerary'))) {
+        $level_fields = array(
+            'notes'                => $this->input->post('itinerary_notes'),
+            'special_remark'       => $this->input->post('itinerary_special_remark'),
+            'terms_and_conditions' => $this->input->post('itinerary_terms_and_conditions'),
+        );
+        if ($package_id > 0 && $this->Costing_Model->Save_Itinerary_Days($package_id, (array) $this->input->post('itinerary'), $level_fields)) {
             $this->session->set_flashdata('message_success', 'Itinerary saved.');
         } else {
             $this->session->set_flashdata('message_error', 'Unable to save itinerary.');

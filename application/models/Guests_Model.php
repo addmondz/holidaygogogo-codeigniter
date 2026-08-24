@@ -434,12 +434,34 @@ class Guests_Model extends CI_Model
 			$this->Append_In_Clause($ghl_where, $g_params, 'gc.state',         $this->input->get('state'));
 
 			// Lead Status (Manual Leads): a lead's status lives ONLY in the dated Lead
-			// Status Updates log (lead_status_log). A lead matches only on its LATEST
-			// status — the newest log entry by StatusDate then LogID (tie-break), keyed
-			// by the same dedup_key the listing shows — never a status it merely held
-			// once. A lead with no log entries has no status and cannot match. Multi-select.
-			$lead_statuses = guest_list_multi_values($this->input->get('lead_status'));
-			if(!empty($lead_statuses)) {
+			// Status Updates log (lead_status_log). Two related filters read it:
+			//
+			//  - Lead Status (no date): matches only on a lead's LATEST status — the
+			//    newest active log entry by StatusDate then LogID (tie-break), keyed by
+			//    the same dedup_key the listing shows — never a status it merely held
+			//    once. A lead with no log entries has no status and cannot match.
+			//  - Lead Status Date: matches a lead that had ANY active log entry whose
+			//    StatusDate falls in the range (inclusive) — even if the status later
+			//    changed. When a Lead Status is ALSO picked alongside a date, the two
+			//    combine into a SINGLE any-entry test (that dated entry must carry one
+			//    of the picked statuses) — deliberately NOT the latest-status rule, so
+			//    "moved to X during this window" still matches if X is no longer current.
+			// Both are multi-select on the status.
+			$lead_statuses  = guest_list_multi_values($this->input->get('lead_status'));
+			$lead_status_dt = guest_list_parse_date_range($this->input->get('lead_status_date'));
+			if($lead_status_dt !== null) {
+				$ghl_where .= " AND EXISTS (SELECT 1 FROM lead_status_log lsl
+						WHERE lsl.Status = 'Y' AND lsl.dedup_key = {$gc_dedup}
+						AND lsl.StatusDate >= ? AND lsl.StatusDate <= ? ";
+				$g_params[] = $lead_status_dt[0];
+				$g_params[] = $lead_status_dt[1];
+				if(!empty($lead_statuses)) {
+					$ph = implode(',', array_fill(0, count($lead_statuses), '?'));
+					$ghl_where .= " AND lsl.LeadStatus IN ({$ph}) ";
+					foreach($lead_statuses as $st) { $g_params[] = $st; } // any dated entry IN
+				}
+				$ghl_where .= ") ";
+			} elseif(!empty($lead_statuses)) {
 				$ph = implode(',', array_fill(0, count($lead_statuses), '?'));
 				$ghl_where .= " AND EXISTS (SELECT 1 FROM lead_status_log lsl
 						WHERE lsl.Status = 'Y' AND lsl.dedup_key = {$gc_dedup}

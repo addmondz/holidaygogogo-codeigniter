@@ -218,31 +218,40 @@ if (is_file($logoPath)) {
                 <tr><td style="text-align:center; padding:10px;">Itinerary details to be confirmed.</td></tr>
             </table>
         <?php } else {
-            // Extra rich-text blocks shown under each day's description, in order.
-            $itin_extra = array(
-                'meal_plan'            => 'Meal Plan',
-                'notes'                => 'Notes',
-                'special_remark'       => 'Special Remark',
-                'terms_and_conditions' => 'Terms &amp; Conditions',
-            );
-            foreach ($itinerary as $day) { ?>
+            $this->load->helper('costing_itinerary');
+            foreach ($itinerary as $day) {
+                $meals = costing_meal_plan_labels(isset($day['meal_plan']) ? $day['meal_plan'] : ''); ?>
                 <table style="width:100%; font-size:11px; border-spacing:5px;">
                     <tr style="vertical-align:baseline;">
                         <td style="width:8%;">Day <?php echo (int) $day['day_number']; ?></td>
                         <td style="width:32%;"><strong><?php echo html_escape(isset($day['title']) ? $day['title'] : ''); ?></strong></td>
                         <td style="width:60%;">
                             <div><?php echo isset($day['description']) ? $day['description'] : ''; ?></div>
-                            <?php foreach ($itin_extra as $key => $label) {
-                                $val = isset($day[$key]) ? $day[$key] : '';
-                                if (trim(strip_tags($val, '<img>')) === '' && stripos($val, '<img') === false) {
-                                    continue;
-                                } ?>
-                                <div style="margin-top:4px;"><strong style="color:#2b3a55;"><?php echo $label; ?>:</strong> <?php echo $val; ?></div>
+                            <?php if (!empty($meals)) { ?>
+                                <div style="margin-top:4px;"><strong style="color:#2b3a55;">Meal Plan:</strong> <?php echo html_escape(implode(', ', $meals)); ?></div>
                             <?php } ?>
                         </td>
                     </tr>
                 </table>
             <?php } ?>
+        <?php }
+
+        // Itinerary-wide Notes / Special Remark / Terms & Conditions — one set for
+        // the whole itinerary, shown once beneath the day-by-day plan.
+        $itin_meta = isset($itinerary_meta) ? $itinerary_meta : array();
+        $itin_level = array(
+            'notes'                => 'Notes',
+            'special_remark'       => 'Special Remark',
+            'terms_and_conditions' => 'Terms &amp; Conditions',
+        );
+        foreach ($itin_level as $key => $label) {
+            $val = isset($itin_meta[$key]) ? $itin_meta[$key] : '';
+            if (trim(strip_tags($val, '<img>')) === '' && stripos($val, '<img') === false) {
+                continue;
+            } ?>
+            <table style="width:100%; font-size:11px; border-spacing:5px; margin-top:8px;">
+                <tr><td><strong style="color:#2b3a55;"><?php echo $label; ?>:</strong> <?php echo $val; ?></td></tr>
+            </table>
         <?php } ?>
     </div>
 </body></html>

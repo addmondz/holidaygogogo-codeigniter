@@ -15,10 +15,26 @@ require_once __DIR__ . '/../../application/helpers/costing_itinerary_helper.php'
 
 $assertions = array();
 
-// --- costing_itinerary_html_fields -----------------------------------------
+// --- costing_itinerary_html_fields (per-day) -------------------------------
 $fields = costing_itinerary_html_fields();
-$assertions['five html fields'] = count($fields) === 5;
-$assertions['fields in order']  = $fields === array('description', 'meal_plan', 'notes', 'special_remark', 'terms_and_conditions');
+$assertions['one per-day html field']  = $fields === array('description');
+
+// --- costing_itinerary_level_fields (whole itinerary) ----------------------
+$level = costing_itinerary_level_fields();
+$assertions['three level fields'] = $level === array('itinerary_notes', 'itinerary_special_remark', 'itinerary_terms_and_conditions');
+
+// --- meal plan options + normalise + labels --------------------------------
+$opts = costing_meal_plan_options();
+$assertions['six meal options']     = count($opts) === 6;
+$assertions['meal option slugs']    = array_keys($opts) === array('breakfast', 'lunch', 'dinner', 'tea_break', 'supper', 'special_arrangement');
+// Canonical order regardless of posted order; invalids dropped; deduped.
+$assertions['meal normalise order'] = costing_meal_plan_normalize(array('dinner', 'breakfast', 'lunch')) === 'breakfast,lunch,dinner';
+$assertions['meal normalise drop']  = costing_meal_plan_normalize(array('breakfast', 'bogus', 'breakfast')) === 'breakfast';
+$assertions['meal normalise empty'] = costing_meal_plan_normalize(array()) === null;
+$assertions['meal normalise str']   = costing_meal_plan_normalize('supper,tea_break') === 'tea_break,supper';
+$assertions['meal labels']          = costing_meal_plan_labels('breakfast,dinner') === array('Breakfast', 'Dinner');
+$assertions['meal labels legacy']   = costing_meal_plan_labels('<p>B / L / D</p>') === array('B / L / D');
+$assertions['meal labels empty']    = costing_meal_plan_labels('') === array();
 
 // --- costing_itinerary_html_is_blank ---------------------------------------
 $assertions['empty string blank']    = costing_itinerary_html_is_blank('') === true;
@@ -33,21 +49,20 @@ $assertions['bold text not blank']   = costing_itinerary_html_is_blank('<strong>
 $assertions['image only not blank']  = costing_itinerary_html_is_blank('<p><img src="/x.jpg"></p>') === false;
 
 // --- costing_itinerary_prepare_row: a fully empty row is skippable ----------
+// Only the per-day fields (title, description, meal_plan) decide emptiness now;
+// notes/special_remark/terms moved to the itinerary level and are ignored here.
 $empty = costing_itinerary_prepare_row(array(
     'day_number'           => 3,
     'title'                => '  ',
     'description'          => '<p></p>',
-    'meal_plan'            => '<p>&nbsp;</p>',
-    'notes'                => '',
-    'special_remark'       => '<p><br></p>',
-    'terms_and_conditions' => '   ',
+    'meal_plan'            => array(),
 ));
 $assertions['empty row is_empty']     = $empty['is_empty'] === true;
 $assertions['empty row keeps day']    = $empty['day_number'] === 3;
 $assertions['empty row null title']   = $empty['title'] === null;
 $assertions['empty row null desc']    = $empty['description'] === null;
 $assertions['empty row null meal']    = $empty['meal_plan'] === null;
-$assertions['empty row null terms']   = $empty['terms_and_conditions'] === null;
+$assertions['empty row no level keys'] = !array_key_exists('notes', $empty) && !array_key_exists('special_remark', $empty);
 
 // --- title-only row is kept -------------------------------------------------
 $titleOnly = costing_itinerary_prepare_row(array('title' => 'Arrival Day', 'description' => '<p></p>'));
@@ -55,29 +70,44 @@ $assertions['title-only not empty']   = $titleOnly['is_empty'] === false;
 $assertions['title-only trims']       = $titleOnly['title'] === 'Arrival Day';
 $assertions['title-only day 0']       = $titleOnly['day_number'] === 0;
 
-// --- a row with real rich content in each field ----------------------------
+// --- a row with real content in each per-day field -------------------------
 $full = costing_itinerary_prepare_row(array(
     'day_number'           => '2',
     'title'                => '  City Tour  ',
     'description'          => '<p>Visit the <strong>old town</strong>.</p>',
-    'meal_plan'            => '<p>B / L / D</p>',
-    'notes'                => '<ul><li>Bring walking shoes</li></ul>',
-    'special_remark'       => '<p>Vegetarian available</p>',
-    'terms_and_conditions' => '<p>Non-refundable after departure.</p>',
+    'meal_plan'            => array('breakfast', 'lunch', 'dinner'),
 ));
 $assertions['full not empty']         = $full['is_empty'] === false;
 $assertions['full day cast int']      = $full['day_number'] === 2;
 $assertions['full title trimmed']     = $full['title'] === 'City Tour';
 $assertions['full desc kept']         = $full['description'] === '<p>Visit the <strong>old town</strong>.</p>';
-$assertions['full meal kept']         = $full['meal_plan'] === '<p>B / L / D</p>';
-$assertions['full notes kept']        = strpos($full['notes'], '<li>Bring walking shoes</li>') !== false;
-$assertions['full remark kept']       = $full['special_remark'] === '<p>Vegetarian available</p>';
-$assertions['full terms kept']        = $full['terms_and_conditions'] === '<p>Non-refundable after departure.</p>';
+$assertions['full meal kept']         = $full['meal_plan'] === 'breakfast,lunch,dinner';
 
 // --- a meal-plan-only row is kept even with no title/description -----------
-$mealOnly = costing_itinerary_prepare_row(array('meal_plan' => '<p>Breakfast only</p>'));
+$mealOnly = costing_itinerary_prepare_row(array('meal_plan' => array('breakfast')));
 $assertions['meal-only not empty']    = $mealOnly['is_empty'] === false;
 $assertions['meal-only null title']   = $mealOnly['title'] === null;
+$assertions['meal-only slug kept']    = $mealOnly['meal_plan'] === 'breakfast';
+
+// --- costing_itinerary_prepare_level: itinerary-wide fields ----------------
+$lvl = costing_itinerary_prepare_level(array(
+    'notes'                => '<ul><li>Bring walking shoes</li></ul>',
+    'special_remark'       => '   ',
+    'terms_and_conditions' => '<p>Non-refundable after departure.</p>',
+));
+$assertions['level notes kept']       = strpos($lvl['itinerary_notes'], '<li>Bring walking shoes</li>') !== false;
+$assertions['level blank remark null'] = $lvl['itinerary_special_remark'] === null;
+$assertions['level terms kept']       = $lvl['itinerary_terms_and_conditions'] === '<p>Non-refundable after departure.</p>';
+
+// Blank TinyMCE markup collapses to null.
+$lvlBlank = costing_itinerary_prepare_level(array(
+    'notes'                => '<p><br></p>',
+    'special_remark'       => '<p>&nbsp;</p>',
+    'terms_and_conditions' => '',
+));
+$assertions['level all blank null'] = $lvlBlank['itinerary_notes'] === null
+    && $lvlBlank['itinerary_special_remark'] === null
+    && $lvlBlank['itinerary_terms_and_conditions'] === null;
 
 $failed = 0;
 foreach ($assertions as $label => $ok) {
