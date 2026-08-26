@@ -265,7 +265,7 @@ class Payment_Model extends CI_Model
 	function Read_Received_Payments($booking_id) {
 		$this->db->select('Type, Credit, Debit');
 		$this->db->where('BookingID', $booking_id);
-		$this->db->where_in('Type', array('ADDITIONAL PAYMENT', 'DEPOSIT', 'FULL', 'CUSTOMER REFUND'));
+		$this->db->where_in('Type', payment_received_credit_types());
 		$this->db->where('Status', 'Y');
 		return $this->db->get('payment')->result();
 	}

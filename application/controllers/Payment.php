@@ -133,15 +133,7 @@ class Payment extends MY_Controller
 
 	function Calculate_Total_Credit($booking_id) {
 		$payments = $this->Payment_Model->Read_Received_Payments($booking_id);
-		$total_credit = 0;
-		foreach($payments as $payment) {
-			if ($payment->Type === 'CUSTOMER REFUND') {
-				$total_credit -= $payment->Debit;
-			} else {
-				$total_credit += $payment->Credit;
-			}
-		}
-		return $total_credit;
+		return payment_received_credit_total($payments);
 	}
 
 	// ============================================
