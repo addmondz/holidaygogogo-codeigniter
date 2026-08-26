@@ -410,11 +410,10 @@ class Booking extends MY_Controller
 							$total_debit += $payment->Debit;
 						}
 					}
-					if($payment->Status == 'Y' && !empty($payment->Credit) && $payment->Credit > 0
-						&& (!isset($payment->Type) || $payment->Type != 'AGENT COMMISSION FROM SUPPLIER')) {
-						$total_credit_approved += floatval($payment->Credit);
-					}
 				}
+				// Settled credit (excludes supplier commission except on a
+				// commission-fee booking with no customer payment of its own).
+				$total_credit_approved = payment_approved_customer_credit($payments);
 				$net_profit = $total_credit - $total_debit;
 				if($net_profit != 0 && $booking->NetTotal != 0) {
 					$profit_margin = round(($net_profit / $booking->NetTotal) * 100);
@@ -972,10 +971,7 @@ class Booking extends MY_Controller
 		$cust_overdue_op = $cust_after3pm ? '<=' : '<';
 		$cust_today_val  = $cust_after3pm ? '1000-01-01' : $today;
 		$cust_nd  = "(CASE WHEN booking.Status = 'P' THEN COALESCE(booking.DepositDeadline, booking.FullPaymentDeadline) ELSE booking.FullPaymentDeadline END)";
-		$cust_out = "(booking.NetTotal - COALESCE((SELECT SUM(p.Credit) FROM payment p"
-			. " WHERE p.BookingID = booking.BookingID"
-			. " AND p.Status = 'Y' AND p.Credit > 0"
-			. " AND (p.Type IS NULL OR p.Type != 'AGENT COMMISSION FROM SUPPLIER')), 0))";
+		$cust_out = "(booking.NetTotal - " . booking_settled_credit_sql() . ")";
 		$tc_own = "(booking.SalesAgent = ? OR booking.SalesAgent2 = ?)";
 		$row = $this->db->query(
 			"SELECT
@@ -2622,10 +2618,7 @@ class Booking extends MY_Controller
 			$cust_overdue_op = $cust_after3pm ? '<=' : '<';
 			$cust_today_val  = $cust_after3pm ? '1000-01-01' : $today;
 			$cust_nd  = "(CASE WHEN booking.Status = 'P' THEN COALESCE(booking.DepositDeadline, booking.FullPaymentDeadline) ELSE booking.FullPaymentDeadline END)";
-			$cust_out = "(booking.NetTotal - COALESCE((SELECT SUM(p.Credit) FROM payment p"
-				. " WHERE p.BookingID = booking.BookingID"
-				. " AND p.Status = 'Y' AND p.Credit > 0"
-				. " AND (p.Type IS NULL OR p.Type != 'AGENT COMMISSION FROM SUPPLIER')), 0))";
+			$cust_out = "(booking.NetTotal - " . booking_settled_credit_sql() . ")";
 			$row = $this->db->query(
 				"SELECT
 				    SUM(CASE WHEN t.nd {$cust_overdue_op} ? THEN 1 ELSE 0 END) AS overdue_cnt,
@@ -5044,11 +5037,9 @@ class Booking extends MY_Controller
 								if (($payment->Status == 'Y' || $payment->Status == 'P') && $payment->Credit > 0) {
 									$deposit_paid += $payment->Credit;
 								}
-								if ($payment->Status == 'Y' && !empty($payment->Credit) && $payment->Credit > 0
-									&& (!isset($payment->Type) || $payment->Type != 'AGENT COMMISSION FROM SUPPLIER')) {
-									$total_credit_approved += floatval($payment->Credit);
-								}
 							}
+							// Settled credit (guards supplier commission — see listing above).
+							$total_credit_approved = payment_approved_customer_credit($payments);
 						}
 					}
 					$array['DepositPaid'] = $deposit_paid;

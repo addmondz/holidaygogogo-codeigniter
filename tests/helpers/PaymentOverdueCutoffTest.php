@@ -17,6 +17,9 @@
 if (!defined('BASEPATH')) {
     define('BASEPATH', __DIR__);
 }
+// payment_type_helper supplies booking_settled_credit_sql(), used by the PO
+// clause. In the app both are autoloaded together (see config/autoload.php).
+require __DIR__ . '/../../application/helpers/payment_type_helper.php';
 require __DIR__ . '/../../application/helpers/booking_status_filter_helper.php';
 
 function assert_eq($label, $expected, $actual) {

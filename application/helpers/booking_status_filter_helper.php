@@ -99,10 +99,7 @@ if (!function_exists('booking_status_filter_per_status_clauses')) {
                 // credits) -- without this, fully-paid PP rows past their
                 // deadline display as "PARTIAL PAYMENT" but still appear under
                 // the PO filter.
-                $approved_credit_sql = "COALESCE((SELECT SUM(p.Credit) FROM payment p"
-                    . " WHERE p.BookingID = booking.BookingID"
-                    . " AND p.Status = 'Y' AND p.Credit > 0"
-                    . " AND (p.Type IS NULL OR p.Type != 'AGENT COMMISSION FROM SUPPLIER')), 0)";
+                $approved_credit_sql = booking_settled_credit_sql();
                 return [
                     "CancelStatus = 'N'",
                     "(((booking.FullPaymentDeadline < '" . $po_cut . "' AND booking.Status IN ('P','PP'))"

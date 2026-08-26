@@ -142,10 +142,7 @@ class Booking_Model extends CI_Model
 		$p_dl  = $range("COALESCE(booking.DepositDeadline, booking.FullPaymentDeadline)");
 		$pp_dl = $range("booking.FullPaymentDeadline");
 
-		$outstanding = "(booking.NetTotal - COALESCE((SELECT SUM(p.Credit) FROM payment p"
-			. " WHERE p.BookingID = booking.BookingID"
-			. " AND p.Status = 'Y' AND p.Credit > 0"
-			. " AND (p.Type IS NULL OR p.Type != 'AGENT COMMISSION FROM SUPPLIER')), 0)) > 0";
+		$outstanding = "(booking.NetTotal - " . booking_settled_credit_sql() . ") > 0";
 
 		$this->db->where(
 			"((booking.Status = 'P' AND {$p_dl})"
@@ -608,10 +605,7 @@ class Booking_Model extends CI_Model
 					$today = date('Y-m-d');
 					// Match display_booking_status(): a P/PP row only renders as PO when
 					// there is still an outstanding balance (NetTotal > approved credits).
-					$approved_credit_sql = "COALESCE((SELECT SUM(p.Credit) FROM payment p"
-						. " WHERE p.BookingID = booking.BookingID"
-						. " AND p.Status = 'Y' AND p.Credit > 0"
-						. " AND (p.Type IS NULL OR p.Type != 'AGENT COMMISSION FROM SUPPLIER')), 0)";
+					$approved_credit_sql = booking_settled_credit_sql();
 					$this->db->where('CancelStatus', 'N');
 					$this->db->where(
 						"(((`booking`.`FullPaymentDeadline` < '".$today."' AND `booking`.`Status` IN ('P','PP'))"

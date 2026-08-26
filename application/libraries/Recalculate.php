@@ -48,14 +48,28 @@ class Recalculate {
             $payments = $this->CI->Booking_Model->Read_Payments($booking->BookingID);
             $total_approved_credit = 0;
             if(!empty($payments)) {
+                $customer_credit = 0;
+                $commission_credit = 0;
                 foreach($payments as $payment) {
-                    if($payment->Type != 'SUPPLIER REFUND' && $payment->Type != 'AGENT COMMISSION FROM SUPPLIER' && $payment->Credit != 0.00 && $payment->Status == 'Y') {
-                        $total_approved_credit += $payment->Credit;
+                    if($payment->Credit == 0.00 || $payment->Status != 'Y') {
+                        continue;
+                    }
+                    if($payment->Type == 'AGENT COMMISSION FROM SUPPLIER') {
+                        $commission_credit += $payment->Credit;
+                    } elseif($payment->Type != 'SUPPLIER REFUND') {
+                        $customer_credit += $payment->Credit;
                     }
                 }
+                // On a normal booking the supplier commission is extra income on
+                // top of the customer's payment; only a commission-fee booking
+                // with no customer payment of its own is settled by it.
+                $total_approved_credit = $customer_credit + ($customer_credit == 0 ? $commission_credit : 0);
                 if($total_approved_credit != 0) {
                     $full_payment_existed = $this->CI->Payment_Model->Read_Type($booking->BookingID);
-                    if($full_payment_existed && round($total_approved_credit, 2) >= round(floatval($booking->NetTotal), 2)) {
+                    $net = round(floatval($booking->NetTotal), 2);
+                    $is_full = ($full_payment_existed && round($customer_credit, 2) >= $net)
+                        || ($customer_credit == 0 && round($commission_credit, 2) >= $net);
+                    if($is_full) {
                         // Full payment received (with FULL type payment) - move to PBO (Pending Booking Operation)
                         if($booking->Status == 'P' || $booking->Status == 'PP') {
                             $this->CI->Booking_Model->Update_Status('PBO', $booking->BookingID);

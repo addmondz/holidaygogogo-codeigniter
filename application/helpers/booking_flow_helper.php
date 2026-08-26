@@ -662,21 +662,40 @@ if (!function_exists('has_full_payment')) {
         $CI->load->model('Booking_Model');
         $payments = $CI->Booking_Model->Read_Payments($booking_id);
 
-        $total_approved_credit = 0;
+        $customer_credit = 0;    // deposit / full / additional (normal booking)
+        $commission_credit = 0;  // money-in AGENT COMMISSION FROM SUPPLIER
         $has_full_type = false;
         if (!empty($payments)) {
             foreach ($payments as $payment) {
                 $credit_amount = !empty($payment->Credit) ? floatval($payment->Credit) : 0;
-                if ($payment->Type != 'SUPPLIER REFUND' && $payment->Type != 'AGENT COMMISSION FROM SUPPLIER' && $credit_amount > 0 && $payment->Status == 'Y') {
-                    $total_approved_credit += $credit_amount;
+                if ($credit_amount <= 0 || $payment->Status != 'Y') {
+                    continue;
                 }
-                if ($payment->Type == 'FULL' && $payment->Status == 'Y') {
-                    $has_full_type = true;
+                if ($payment->Type == 'AGENT COMMISSION FROM SUPPLIER') {
+                    $commission_credit += $credit_amount;
+                } elseif ($payment->Type != 'SUPPLIER REFUND') {
+                    $customer_credit += $credit_amount;
+                    if ($payment->Type == 'FULL') {
+                        $has_full_type = true;
+                    }
                 }
             }
         }
 
-        return $has_full_type && round($total_approved_credit, 2) >= round(floatval($booking->NetTotal), 2);
+        $net = round(floatval($booking->NetTotal), 2);
+
+        // Normal booking: a FULL-type payment plus customer credit covering NetTotal.
+        if ($has_full_type && round($customer_credit, 2) >= $net) {
+            return true;
+        }
+
+        // Commission-fee booking (no customer payment of its own): the money-in
+        // supplier commission settles the sale on its own.
+        if ($customer_credit == 0 && $commission_credit > 0 && round($commission_credit, 2) >= $net) {
+            return true;
+        }
+
+        return false;
     }
 }
 
