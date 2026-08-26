@@ -988,9 +988,10 @@ class Costing_Model extends CI_Model
             );
         }
 
-        // Customer combinations: each bundle's name + item names + its selling
-        // price. Additive — their sum is the total package price. When present,
-        // the PDF shows combinations instead of the internal item list.
+        // Customer combinations: each is an alternative package option — its name +
+        // item names + its own selling price. The customer picks ONE, so prices are
+        // NOT summed. When present, the PDF shows these options instead of the
+        // internal item list.
         $this->load->helper('costing_calc');
         $combo_input = array();
         foreach ($this->Read_Combinations((int) $booking['id'], $base_currency_id, $booking['travel_date']) as $combo) {
@@ -1023,8 +1024,9 @@ class Costing_Model extends CI_Model
             ),
             'items'         => $items,
             'combinations'  => $combo_summary['combinations'],
-            // Additive combination total when there are combinations, else the
-            // legacy internal revenue so old quotations keep their total.
+            // Only used by the legacy flat item-list footer (no combinations). With
+            // combination options each is priced on its own and never summed, so the
+            // PDF ignores this value when combinations exist.
             'total_selling' => $has_combinations ? $combo_summary['total_selling'] : (float) $financials['total_revenue'],
             'financials'    => $financials,
         );

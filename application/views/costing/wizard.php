@@ -91,8 +91,8 @@ $cat_labels = $this->Costing_Category_Model->Read_Category_Map();
     .cw-combo-card { border: 1px solid #e4e6ef; border-radius: 8px; padding: 16px; margin-bottom: 16px; background: #fbfdff; }
     .cw-combo-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
     .cw-combo-head .cw-combo-name { font-weight: 700; }
-    .cw-combo-foot { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 22px; margin-top: 8px; font-weight: 700; color: #3f4254; }
-    .cw-combo-foot .sell { color: #187DE4; }
+    .cw-combo-summary { margin-top: 14px; }
+    .cw-combo-summary .cw-summary-box { background: #fff; }
     .cw-combo-empty { color: #9aa0b3; font-style: italic; }
 </style>
 
@@ -255,19 +255,13 @@ $cat_labels = $this->Costing_Category_Model->Read_Category_Map();
             <!-- COMBINATIONS: customer-facing bundles shown on the Quotation PDF -->
             <div class="cw-panel">
                 <div class="cw-panel-title">Combinations</div>
-                <div class="cw-panel-sub">Bundles shown on the customer Quotation PDF. Add cost items to each combination straight from the item master. Selling price = its cost &times; margin. All combinations add up to the total package price.</div>
+                <div class="cw-panel-sub">Alternative packages shown on the customer Quotation PDF &mdash; the customer picks ONE. Add cost items to each combination straight from the item master. Each combination is priced on its own (selling = its cost &times; margin); there is no combined total.</div>
 
                 <div id="cw-combos"></div>
 
-                <div class="d-flex flex-wrap align-items-center justify-content-between mt-2" style="gap:10px;">
-                    <div class="d-flex flex-wrap align-items-center" style="gap:8px;">
-                        <button type="button" class="btn btn-light-primary font-weight-bold" id="cw-combo-add"><i class="la la-plus"></i>Add Combination</button>
-                        <a href="<?php echo base_url('Costing_Item'); ?>" target="_blank" class="btn btn-light font-weight-bold" title="Manage item master">Manage Items</a>
-                    </div>
-                    <div class="cw-summary-box" style="margin:0;min-width:240px;">
-                        <div class="lbl">Combinations Total (Selling)</div>
-                        <div class="val" id="cw-combo-grand" style="color:#187DE4;">RM 0.00</div>
-                    </div>
+                <div class="d-flex flex-wrap align-items-center mt-2" style="gap:8px;">
+                    <button type="button" class="btn btn-light-primary font-weight-bold" id="cw-combo-add"><i class="la la-plus"></i>Add Combination</button>
+                    <a href="<?php echo base_url('Costing_Item'); ?>" target="_blank" class="btn btn-light font-weight-bold" title="Manage item master">Manage Items</a>
                 </div>
                 <?php if (empty($item_master)) { ?>
                     <div class="text-muted mt-2">Add items to the master first under <a href="<?php echo base_url('Costing_Item'); ?>" target="_blank">Costing Item</a> to build combinations.</div>
@@ -291,13 +285,6 @@ $cat_labels = $this->Costing_Category_Model->Read_Category_Map();
                     </div>
                 </div>
 
-                <div class="cw-summary">
-                    <div class="cw-summary-box"><div class="lbl">Total Cost</div><div class="val" id="cw-sum-cost">RM 0.00</div></div>
-                    <div class="cw-summary-box"><div class="lbl">Cost / Pax</div><div class="val" id="cw-sum-costpax">RM 0.00</div></div>
-                    <div class="cw-summary-box"><div class="lbl">Selling / Pax</div><div class="val" id="cw-sum-sellpax">RM 0.00</div></div>
-                    <div class="cw-summary-box"><div class="lbl">Total Revenue</div><div class="val" id="cw-sum-revenue">RM 0.00</div></div>
-                    <div class="cw-summary-box"><div class="lbl">Profit</div><div class="val" id="cw-sum-profit" style="color:#1BC5BD;">RM 0.00</div></div>
-                </div>
             </div>
 
             <div class="cw-actions">
@@ -513,47 +500,33 @@ $cat_labels = $this->Costing_Category_Model->Read_Category_Map();
         return margin < 0 ? 0 : margin;
     }
 
-    // Each combination's cost = sum of its rows' MYR totals; selling = cost x
-    // (1 + margin%). Combinations are additive: their sellings sum into the grand
-    // customer total, and their costs into the internal Total Cost. Returns totals.
-    function recalcCombos(margin) {
-        var grandCost = 0, grandSelling = 0;
+    // Combinations are ALTERNATIVES — the customer picks ONE, so each is priced on
+    // its own with no grand total. Each card gets its own full P&L: cost = sum of its
+    // rows' MYR totals; cost/pax, selling/pax (cost/pax x (1 + margin%)), total
+    // revenue (selling/pax x pax) and profit (revenue - cost).
+    function recalcCombos(margin, pax) {
+        function set(card, sel, val) { var el = card.querySelector(sel); if (el) { el.textContent = money(val); } }
         combosWrap.querySelectorAll('.cw-combo-card').forEach(function (card) {
             var cost = 0;
             card.querySelectorAll('.cw-crow').forEach(function (row) { cost += processRow(row).total; });
-            var selling = Math.round(cost * (1 + margin / 100) * 100) / 100;
-            var costEl = card.querySelector('.cw-combo-cost');
-            var sellEl = card.querySelector('.cw-combo-sell');
-            if (costEl) { costEl.textContent = money(cost); }
-            if (sellEl) { sellEl.textContent = money(selling); }
-            grandCost += cost;
-            grandSelling += selling;
+            cost = Math.round(cost * 100) / 100;
+            var costPax = cost / pax;
+            var sellPax = Math.round(costPax * (1 + margin / 100) * 100) / 100;
+            var revenue = Math.round(sellPax * pax * 100) / 100;
+            var profit = Math.round((revenue - cost) * 100) / 100;
+            set(card, '.cw-combo-cost', cost);
+            set(card, '.cw-combo-costpax', costPax);
+            set(card, '.cw-combo-sellpax', sellPax);
+            set(card, '.cw-combo-revenue', revenue);
+            set(card, '.cw-combo-profit', profit);
         });
-        var g = document.getElementById('cw-combo-grand');
-        if (g) { g.textContent = money(grandSelling); }
-        return { cost: Math.round(grandCost * 100) / 100, selling: Math.round(grandSelling * 100) / 100 };
     }
 
-    // Internal P&L is the aggregate of every combination row (there is no separate
-    // internal cost table any more). Total Cost = sum of all combination costs.
     function recalc() {
         totalPaxInput.value = totalPax();
         var margin = currentMargin();
-        var totals = recalcCombos(margin);
-
         var pax = totalPax() || 1;
-        var grandCost = totals.cost;
-        var costPax = grandCost / pax;
-        var sellPax = Math.round(costPax * (1 + margin / 100) * 100) / 100;
-        var revenue = Math.round(sellPax * pax * 100) / 100;
-        var profit = Math.round((revenue - grandCost) * 100) / 100;
-
-        document.getElementById('cw-sum-cost').textContent = money(grandCost);
-        document.getElementById('cw-sum-costpax').textContent = money(costPax);
-        document.getElementById('cw-sum-sellpax').textContent = money(sellPax);
-        document.getElementById('cw-sum-revenue').textContent = money(revenue);
-        document.getElementById('cw-sum-profit').textContent = money(profit);
-
+        recalcCombos(margin, pax);
         renderCurrencyBreakdown();
     }
 
@@ -780,7 +753,13 @@ $cat_labels = $this->Costing_Category_Model->Read_Category_Map();
             '</table></div>' +
             '<div class="d-flex align-items-center" style="gap:8px;"><span class="cw-combo-pick-slot"></span>' +
                 '<button type="button" class="btn btn-sm btn-success font-weight-bold cw-combo-add-item"><i class="la la-plus"></i>Add Item</button></div>' +
-            '<div class="cw-combo-foot">Cost:&nbsp;<span class="cw-combo-cost">RM 0.00</span> &middot; Selling:&nbsp;<span class="sell cw-combo-sell">RM 0.00</span></div>';
+            '<div class="cw-summary cw-combo-summary">' +
+                '<div class="cw-summary-box"><div class="lbl">Total Cost</div><div class="val cw-combo-cost">RM 0.00</div></div>' +
+                '<div class="cw-summary-box"><div class="lbl">Cost / Pax</div><div class="val cw-combo-costpax">RM 0.00</div></div>' +
+                '<div class="cw-summary-box"><div class="lbl">Selling / Pax</div><div class="val cw-combo-sellpax" style="color:#187DE4;">RM 0.00</div></div>' +
+                '<div class="cw-summary-box"><div class="lbl">Total Revenue</div><div class="val cw-combo-revenue">RM 0.00</div></div>' +
+                '<div class="cw-summary-box"><div class="lbl">Profit</div><div class="val cw-combo-profit" style="color:#1BC5BD;">RM 0.00</div></div>' +
+            '</div>';
 
         card.querySelector('.cw-combo-pick-slot').appendChild(masterItemPicker());
         combosWrap.appendChild(card);

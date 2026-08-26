@@ -38,6 +38,10 @@ $TotalSelling  = isset($total_selling)
     ? (float) $total_selling
     : (float) (isset($financials['total_revenue']) ? $financials['total_revenue'] : 0);
 $HasCombinations = !empty($combinations);
+// Markup-on-cost margin, used to price each combination option per-pax so the
+// customer PDF matches the internal cost step exactly (price/pax rounded first,
+// then × pax) instead of drifting by a cent from cost × margin.
+$Margin = max(0, (float) (isset($financials['margin_percentage']) ? $financials['margin_percentage'] : 0));
 
 $TravelDate = !empty($booking['travel_date']) && strtotime($booking['travel_date'])
     ? strtoupper(date('d M Y', strtotime($booking['travel_date'])))
@@ -132,21 +136,41 @@ if (is_file($logoPath)) {
     </table>
 
     <?php if ($HasCombinations) { ?>
-        <!-- Customer combinations: each bundle = its name + items + price. Additive. -->
+        <!-- Customer combinations: each is an ALTERNATIVE package option, priced on
+             its own. The customer picks ONE, so prices are NOT summed. -->
         <hr style="margin-bottom:0px;">
         <table style="width:100%; font-size:13px;">
             <tr style="font-weight:700;">
-                <td style="width:70%;">Package Combinations</td>
+                <td style="width:70%;">Package Options <span style="font-weight:400; font-size:11px;">(choose one)</span></td>
                 <td style="width:30%; text-align:right;">Price (RM)</td>
             </tr>
         </table>
         <hr style="margin-top:0px; margin-bottom:5px;">
         <?php foreach ($combinations as $combo) { ?>
+            <?php
+            // Price per-pax first, then × pax — mirrors the cost step's per-combo
+            // Total Revenue so this option's price is self-consistent (price/pax × pax)
+            // and identical to what staff saw internally.
+            $combo_cost = (float) (isset($combo['cost_myr']) ? $combo['cost_myr'] : 0);
+            if ($TotalPax > 0) {
+                $combo_price_pax = round(round($combo_cost / $TotalPax, 2) * (1 + $Margin / 100), 2);
+                $combo_selling   = round($combo_price_pax * $TotalPax, 2);
+            } else {
+                $combo_price_pax = 0.0;
+                $combo_selling   = round($combo_cost * (1 + $Margin / 100), 2);
+            }
+            ?>
             <table style="width:100%; font-size:12px; border-spacing:0; margin-bottom:8px;">
                 <tr style="vertical-align:baseline; font-weight:700;">
                     <td style="width:70%; padding:3px 0;"><?php echo strtoupper(html_escape($combo['name'])); ?></td>
-                    <td style="width:30%; text-align:right; padding:3px 0;"><?php echo number_format((float) $combo['selling'], 2, '.', ','); ?></td>
+                    <td style="width:30%; text-align:right; padding:3px 0;"><?php echo number_format($combo_selling, 2, '.', ','); ?></td>
                 </tr>
+                <?php if ($TotalPax > 0) { ?>
+                    <tr style="vertical-align:baseline;">
+                        <td style="width:70%; padding:0 0 1px 0; font-size:11px; color:#555;">Price / Pax</td>
+                        <td style="width:30%; text-align:right; padding:0 0 1px 0; font-size:11px; color:#555;"><?php echo number_format($combo_price_pax, 2, '.', ','); ?></td>
+                    </tr>
+                <?php } ?>
                 <?php foreach ($combo['item_names'] as $combo_item_name) { ?>
                     <?php if (trim((string) $combo_item_name) === '') { continue; } ?>
                     <tr style="vertical-align:baseline;">
@@ -180,7 +204,10 @@ if (is_file($logoPath)) {
         </table>
     <?php } ?>
 
-    <!-- Totals pinned to the bottom of page 1 (mirrors the Booking Confirmation footer). -->
+    <!-- Totals pinned to the bottom of page 1 (mirrors the Booking Confirmation footer).
+         Only for the legacy flat item list — combination options are each priced on
+         their own above (the customer picks one), so there is no single total. -->
+    <?php if (!$HasCombinations) { ?>
     <div style="position: absolute; bottom: 0; left: 0; right: 0;">
         <hr style="margin-bottom:5px; margin-top:10px;">
         <table style="width:100%; margin-bottom:10px;">
@@ -198,6 +225,7 @@ if (is_file($logoPath)) {
             <?php } ?>
         </table>
     </div>
+    <?php } ?>
 
     <!-- PAGE 2: Itinerary -->
     <div style="page-break-before: always;">
