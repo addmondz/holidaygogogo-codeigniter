@@ -113,7 +113,7 @@ if ( ! function_exists('competitor_output_contract'))
 			. '"pros": string[], '
 			. '"cons": string[], '
 			. '"summary": string (2-4 sentence overview), '
-			. '"comparison": string (how this competitor product compares to OUR products below — pricing, value, gaps, and a recommendation)'
+			. '"comparison": string (FIRST find a product in OUR PRODUCTS below that MATCHES or is SIMILAR to this competitor product — same/overlapping destination or tour type. If one matches, compare against THAT product only: pricing, value, gaps, and a recommendation. If NONE of our products match or are similar, do NOT force a comparison — state plainly that we have no comparable product on our side for this destination/type.)'
 			. '}';
 		return "Reply with ONLY a single JSON object, no markdown, no code fences, matching exactly this shape: "
 			. $schema_hint . ". "
@@ -1700,6 +1700,41 @@ if ( ! function_exists('competitor_ice_api_kind'))
 	}
 }
 
+if ( ! function_exists('competitor_ice_series_web_url'))
+{
+	/**
+	 * Build the customer-facing web itinerary URL for an ICE series from its detail
+	 * JSON — "<origin>/web/itinerary/<code>?type=series[&depart_date=<first tour date>]",
+	 * the page a visitor actually browses. The crawler reads the machine /api/v1/series/<id>
+	 * JSON, but we store/show THIS friendly URL instead. depart_date is passed through
+	 * in the API's own DD/MM/YYYY form. Returns '' when the JSON carries no code. Pure.
+	 */
+	function competitor_ice_series_web_url($json, $origin)
+	{
+		$d = is_string($json) ? json_decode($json, true) : $json;
+		if ( ! is_array($d)) {
+			return '';
+		}
+		if ( ! isset($d['code']) && ! isset($d['caption']) && isset($d['data']) && is_array($d['data'])) {
+			$d = $d['data'];
+		}
+		$code = isset($d['code']) ? trim((string) $d['code']) : '';
+		if ($code === '') {
+			return '';
+		}
+		$url = rtrim((string) $origin, '/') . '/web/itinerary/' . rawurlencode($code) . '?type=series';
+		if ( ! empty($d['tours']) && is_array($d['tours'])) {
+			foreach ($d['tours'] as $t) {
+				if (is_array($t) && ! empty($t['departure_date'])) {
+					$url .= '&depart_date=' . rawurlencode(trim((string) $t['departure_date']));
+					break;
+				}
+			}
+		}
+		return $url;
+	}
+}
+
 if ( ! function_exists('competitor_ice_series_items'))
 {
 	/**
@@ -1830,6 +1865,15 @@ if ( ! function_exists('competitor_ice_series_to_text'))
 			}
 		}
 
+		// Day-by-day itinerary — the structured `itinerary_plans` the /web/itinerary
+		// page renders (when the product ships one; many gd.my tours carry it only in
+		// the brochure PDF instead, which the caller reads separately).
+		$itin = competitor_ice_itinerary_text(
+			isset($d['itinerary_plans']) ? $d['itinerary_plans'] : array(),
+			isset($d['general_content']) ? $d['general_content'] : ''
+		);
+		if ($itin !== '') { $lines[] = "Itinerary:\n" . $itin; }
+
 		$files = array();
 		foreach (array('file_copy_url', 'file_url') as $fk) {
 			if ( ! empty($d[$fk]) && is_string($d[$fk])) { $files[] = $d[$fk]; }
@@ -1838,6 +1882,104 @@ if ( ! function_exists('competitor_ice_series_to_text'))
 
 		$text = trim(implode("\n\n", array_filter(array_map('trim', $lines), 'strlen')));
 		return preg_replace('/\n{3,}/', "\n\n", $text);
+	}
+}
+
+if ( ! function_exists('competitor_ice_meals_text'))
+{
+	/**
+	 * Render an ICE day-plan's `display_meals` into a short string, tolerating the
+	 * shapes it can take: a plain string ("Breakfast / Lunch"), a list of meal names,
+	 * or a map meal=>bool / meal=>label. Returns '' when there's nothing to show. Pure.
+	 */
+	function competitor_ice_meals_text($m)
+	{
+		if (is_string($m)) { return trim(preg_replace('/\s+/', ' ', $m)); }
+		if ( ! is_array($m) || empty($m)) { return ''; }
+		$assoc = array_keys($m) !== range(0, count($m) - 1);
+		$out = array();
+		foreach ($m as $k => $v) {
+			if ($assoc) {
+				if (is_bool($v)) {
+					if ($v) { $out[] = ucwords(str_replace('_', ' ', (string) $k)); }
+				} elseif (is_scalar($v) && trim((string) $v) !== '') {
+					$out[] = trim((string) $v);
+				}
+			} elseif (is_scalar($v) && trim((string) $v) !== '') {
+				$out[] = trim((string) $v);
+			}
+		}
+		return implode(', ', $out);
+	}
+}
+
+if ( ! function_exists('competitor_ice_itinerary_text'))
+{
+	/**
+	 * Flatten an ICE series' structured day-by-day itinerary — the `itinerary_plans`
+	 * array the /web/itinerary page renders — into readable "Day N: …" text for the
+	 * AI. Each plan = {day, title, title_two, display_meals, activities[]}; each
+	 * activity = {title, tagline, subtitle (+ *_two second-language variants),
+	 * category}. English (the primary field) leads, the second language is appended
+	 * in parentheses when it differs. `$general` is the optional general_content HTML
+	 * intro. Returns '' when there is no structured itinerary. Pure.
+	 */
+	function competitor_ice_itinerary_text($plans, $general = '')
+	{
+		// Prefer the primary (English) string; append the alt-language one when it adds info.
+		$bi = function ($a, $b) {
+			$a = trim(preg_replace('/\s+/', ' ', (string) $a));
+			$b = trim(preg_replace('/\s+/', ' ', (string) $b));
+			if ($a === '') { return $b; }
+			if ($b === '' || strcasecmp($a, $b) === 0) { return $a; }
+			return $a . ' (' . $b . ')';
+		};
+
+		$out = array();
+		$g = trim((string) $general);
+		if ($g !== '') {
+			$gt = competitor_html_to_text($g, 4000);
+			if ($gt !== '') { $out[] = $gt; }
+		}
+
+		if (is_array($plans)) {
+			$days = array();
+			foreach (array_values($plans) as $i => $plan) {
+				if ( ! is_array($plan)) {
+					$s = trim((string) $plan);
+					if ($s !== '') { $days[] = 'Day ' . ($i + 1) . ': ' . $s; }
+					continue;
+				}
+				$dayno = (isset($plan['day']) && trim((string) $plan['day']) !== '') ? trim((string) $plan['day']) : (string) ($i + 1);
+				$title = $bi(isset($plan['title']) ? $plan['title'] : '', isset($plan['title_two']) ? $plan['title_two'] : '');
+				$head  = 'Day ' . $dayno . ($title !== '' ? ': ' . $title : '');
+				$meals = competitor_ice_meals_text(isset($plan['display_meals']) ? $plan['display_meals'] : null);
+				if ($meals !== '') { $head .= '  [Meals: ' . $meals . ']'; }
+
+				$acts = array();
+				if ( ! empty($plan['activities']) && is_array($plan['activities'])) {
+					foreach ($plan['activities'] as $a) {
+						if ( ! is_array($a)) {
+							$s = trim(preg_replace('/\s+/', ' ', (string) $a));
+							if ($s !== '') { $acts[] = $s; }
+							continue;
+						}
+						$at  = $bi(isset($a['title']) ? $a['title'] : '', isset($a['title_two']) ? $a['title_two'] : '');
+						$tag = $bi(isset($a['tagline']) ? $a['tagline'] : '', isset($a['tagline_two']) ? $a['tagline_two'] : '');
+						$sub = $bi(isset($a['subtitle']) ? $a['subtitle'] : '', isset($a['subtitle_two']) ? $a['subtitle_two'] : '');
+						$seg = $at;
+						if ($tag !== '') { $seg = trim($seg . ($seg !== '' ? ' — ' : '') . $tag); }
+						if ($sub !== '') { $seg = ($seg !== '' ? $seg . ': ' . $sub : $sub); }
+						$seg = trim(preg_replace('/\s+/', ' ', $seg));
+						if ($seg !== '') { $acts[] = $seg; }
+					}
+				}
+				$days[] = $head . ($acts ? "\n- " . implode("\n- ", $acts) : '');
+			}
+			if ($days) { $out[] = implode("\n", $days); }
+		}
+
+		return $out ? implode("\n\n", $out) : '';
 	}
 }
 

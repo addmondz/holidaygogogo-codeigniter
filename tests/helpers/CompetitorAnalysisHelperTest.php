@@ -324,6 +324,18 @@ check('ice_series_items label falls back to code', 'FS-XYZ · CHINA · MYR 999.5
 check('ice_series_items respects limit', 1, count(competitor_ice_series_items($seriesList, 'https://www.gd.my', 1)));
 check('ice_series_items empty on junk', array(), competitor_ice_series_items('nope', 'https://x.com'));
 
+// ---- competitor_ice_series_web_url ------------------------------------------
+$webSeries = json_encode(array('code' => 'FS-4VSIT', 'caption' => '4D3N NHA TRANG',
+    'tours' => array(array('departure_date' => '26/09/2026'), array('departure_date' => '24/10/2026'))));
+check('ice_series_web_url with depart_date', 'https://www.gd.my/web/itinerary/FS-4VSIT?type=series&depart_date=26%2F09%2F2026',
+    competitor_ice_series_web_url($webSeries, 'https://www.gd.my/'));
+check('ice_series_web_url no tours = no depart_date', 'https://www.gd.my/web/itinerary/FS-4VSIT?type=series',
+    competitor_ice_series_web_url(json_encode(array('code' => 'FS-4VSIT')), 'https://www.gd.my'));
+check('ice_series_web_url unwraps data', 'https://x.com/web/itinerary/AB-1?type=series',
+    competitor_ice_series_web_url(json_encode(array('data' => array('code' => 'AB-1'))), 'https://x.com'));
+check('ice_series_web_url empty when no code', '', competitor_ice_series_web_url(json_encode(array('caption' => 'x')), 'https://www.gd.my'));
+check('ice_series_web_url empty on junk', '', competitor_ice_series_web_url('nope', 'https://www.gd.my'));
+
 // ---- competitor_ice_series_to_text ------------------------------------------
 $seriesDetail = json_encode(array(
     'id' => 6618, 'code' => 'FS-P4HAK-1', 'country' => 'CHINA', 'price_currency' => 'MYR',
@@ -348,6 +360,36 @@ check_true('ice_series_to_text has guide langs', strpos($stext, 'guide: EN/CN') 
 check_true('ice_series_to_text has highlights', strpos($stext, 'Great Wall of Hainan') !== false);
 check_true('ice_series_to_text has file url', strpos($stext, 'https://www.gd.my/i/FS-P4HAK-1') !== false);
 check('ice_series_to_text empty on junk', '', competitor_ice_series_to_text('nope'));
+
+// ---- competitor_ice_meals_text ----------------------------------------------
+check('ice_meals_text string', 'Breakfast / Lunch', competitor_ice_meals_text('Breakfast / Lunch'));
+check('ice_meals_text list', 'Breakfast, Dinner', competitor_ice_meals_text(array('Breakfast', 'Dinner')));
+check('ice_meals_text bool map keeps true', 'Breakfast, Dinner', competitor_ice_meals_text(array('breakfast' => true, 'lunch' => false, 'dinner' => true)));
+check('ice_meals_text empty', '', competitor_ice_meals_text(null));
+
+// ---- competitor_ice_itinerary_text ------------------------------------------
+$plans = array(
+    array('day' => 1, 'title' => 'Arrive Nha Trang', 'title_two' => '抵达芽庄', 'display_meals' => array('dinner' => true),
+        'activities' => array(
+            array('title' => 'Hon Chong', 'title_two' => '钟屿石岬角', 'tagline' => 'Coastal rocks', 'category' => 'sightseeing'),
+            array('title' => 'Night Market', 'subtitle' => 'Free time', 'category' => 'sightseeing'),
+        )),
+    array('day' => 3, 'title' => 'Free & Easy', 'display_meals' => 'Breakfast',
+        'activities' => array(array('title' => 'Optional VinWonders', 'tagline' => 'USD 55', 'category' => 'recommended_optional'))),
+);
+$itin = competitor_ice_itinerary_text($plans, '<p>Overview: relaxed beach tour</p>');
+check_true('itinerary_text has general_content', strpos($itin, 'Overview: relaxed beach tour') !== false);
+check_true('itinerary_text day1 bilingual title', strpos($itin, 'Day 1: Arrive Nha Trang (抵达芽庄)') !== false);
+check_true('itinerary_text day1 meals', strpos($itin, '[Meals: Dinner]') !== false);
+check_true('itinerary_text activity bilingual + tagline', strpos($itin, 'Hon Chong (钟屿石岬角) — Coastal rocks') !== false);
+check_true('itinerary_text activity subtitle', strpos($itin, 'Night Market: Free time') !== false);
+check_true('itinerary_text keeps explicit day number', strpos($itin, 'Day 3: Free & Easy') !== false);
+check('itinerary_text empty when no plans', '', competitor_ice_itinerary_text(array(), ''));
+
+// integration: series_to_text folds in the structured itinerary
+$seriesWithItin = json_encode(array('code' => 'AB-1', 'caption' => 'Beach Trip',
+    'itinerary_plans' => $plans));
+check_true('ice_series_to_text includes itinerary', strpos(competitor_ice_series_to_text($seriesWithItin), 'Day 1: Arrive Nha Trang') !== false);
 
 // ---- competitor_scrape_is_thin ----------------------------------------------
 check_true('scrape_is_thin true for empty', competitor_scrape_is_thin(''));

@@ -59,6 +59,13 @@ class CompetitorAnalysisService
 	/** Site-wide nav/menu links (from the homepage) — excluded when drilling listings. */
 	protected $nav_links = array();
 
+	/**
+	 * Set by extract_source_text() when the page was an ICE series API URL: the
+	 * customer-facing /web/itinerary/<code> URL to store/show instead of the raw
+	 * /api/v1/series/<id> URL the crawler actually read. '' for non-ICE pages.
+	 */
+	protected $last_ice_web_url = '';
+
 	/** JSON API bodies captured by the Playwright render service on the last render. */
 	protected $last_render_apis = array();
 
@@ -854,7 +861,10 @@ class CompetitorAnalysisService
 			$this->log_crawl('dropped_article', array('url' => $url, 'text_len' => strlen($text)));
 			return array();
 		}
-		$item = array('url' => $url, 'text' => $text);
+		// Store the customer-facing web URL for an ICE series (set while extracting),
+		// not the raw /api/v1/series/<id> URL the crawler read.
+		$display_url = ($this->last_ice_web_url !== '') ? $this->last_ice_web_url : $url;
+		$item = array('url' => $display_url, 'text' => $text);
 		if ($this->last_page_title !== '') {
 			$item['title'] = $this->last_page_title;   // real <h1> name — see crawl_to_text
 		}
@@ -989,6 +999,7 @@ class CompetitorAnalysisService
 		$this->last_page_title  = '';
 		$this->last_page_links  = array();
 		$this->last_render_apis = array();   // don't carry a prior page's captured APIs
+		$this->last_ice_web_url = '';
 		$html_thin = false;   // was the raw HTML a blank-shell SPA?
 
 		// $prefetched (when given) IS the body of $url fetched in parallel upstream —
@@ -999,7 +1010,15 @@ class CompetitorAnalysisService
 
 		$kind = competitor_ice_api_kind($url);
 		if ($kind === 'series') {
-			$text = competitor_ice_series_to_text($fetch_self());
+			$body = $fetch_self();
+			$text = competitor_ice_series_to_text($body);
+			// Remember the customer-facing /web/itinerary/<code> URL so the stored
+			// product shows the real website page, not the /api/v1 URL we crawled.
+			$parts = parse_url($url);
+			if ( ! empty($parts['scheme']) && ! empty($parts['host'])) {
+				$origin = $parts['scheme'] . '://' . $parts['host'] . (isset($parts['port']) ? ':' . $parts['port'] : '');
+				$this->last_ice_web_url = competitor_ice_series_web_url($body, $origin);
+			}
 		} elseif ($kind === 'posts') {
 			$text = competitor_json_api_to_text($fetch_self());
 		} else {
