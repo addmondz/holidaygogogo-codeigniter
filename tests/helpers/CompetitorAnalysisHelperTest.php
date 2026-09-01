@@ -259,6 +259,41 @@ check('job_view message', 'Done — 3', $pv['message']);
 check('job_view no analysis_id when unset', 0, $pv['analysis_id']);
 check('job_view exposes analysis_id', 42,
     competitor_job_public_view(array('state' => 'done', 'analysis_id' => 42))['analysis_id']);
+check('job_view ai_crawl false by default', false, $pv['ai_crawl']);
+check('job_view ai_crawl exposes flag', true,
+    competitor_job_public_view(array('state' => 'done', 'ai_crawl' => 1))['ai_crawl']);
+
+// ---- competitor_model_supports_temperature ----------------------------------
+check('temp: gpt-4o-mini yes', true, competitor_model_supports_temperature('gpt-4o-mini'));
+check('temp: gpt-4.1 yes', true, competitor_model_supports_temperature('gpt-4.1'));
+check('temp: gpt-5.5 no (reasoning)', false, competitor_model_supports_temperature('gpt-5.5'));
+check('temp: gpt-5 no', false, competitor_model_supports_temperature('gpt-5'));
+check('temp: gpt-5.5-pro no', false, competitor_model_supports_temperature('gpt-5.5-pro'));
+check('temp: gpt-5-chat-latest yes', true, competitor_model_supports_temperature('gpt-5-chat-latest'));
+check('temp: o4-mini no', false, competitor_model_supports_temperature('o4-mini'));
+check('temp: o3 no', false, competitor_model_supports_temperature('o3'));
+check('temp: blank defaults yes', true, competitor_model_supports_temperature(''));
+
+// ---- competitor_web_search_tool_for_model -----------------------------------
+check('websearch tool: gpt-4o uses preview', 'web_search_preview', competitor_web_search_tool_for_model('gpt-4o'));
+check('websearch tool: gpt-5.5 uses GA', 'web_search', competitor_web_search_tool_for_model('gpt-5.5'));
+check('websearch tool: o4-mini uses GA', 'web_search', competitor_web_search_tool_for_model('o4-mini'));
+check('websearch tool: env override wins', 'web_search', competitor_web_search_tool_for_model('gpt-4o', 'web_search'));
+check('websearch tool: blank override ignored', 'web_search_preview', competitor_web_search_tool_for_model('gpt-4o', ''));
+
+// ---- competitor_estimate_cost knows gpt-5 family ----------------------------
+check_true('cost: gpt-5.5 priced above mini fallback',
+    competitor_estimate_cost('gpt-5.5', 1000000, 0) > competitor_estimate_cost('gpt-4o-mini', 1000000, 0));
+
+// ---- competitor_build_discovery_agent ---------------------------------------
+$disc = competitor_build_discovery_agent('https://comp.com', 8);
+check_true('discovery agent uses web_search', strpos($disc['instructions'], 'web_search') !== false);
+check_true('discovery agent caps at limit', strpos($disc['instructions'], '8') !== false);
+check_true('discovery agent input carries base url', strpos($disc['input'], 'https://comp.com') !== false);
+check_true('discovery agent no keyword line when blank', strpos($disc['input'], 'FOCUS') === false);
+$discKw = competitor_build_discovery_agent('https://comp.com', 8, 'yunnan');
+check_true('discovery agent instructions mention keyword focus', strpos($discKw['instructions'], 'yunnan') !== false);
+check_true('discovery agent input mentions keyword', strpos($discKw['input'], 'yunnan') !== false);
 
 // ---- competitor_ice_listing_api_url -----------------------------------------
 check('ice_listing_api maps /web/listing + query',

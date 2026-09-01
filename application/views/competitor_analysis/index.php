@@ -41,6 +41,13 @@
                             </label>
                             <span class="form-text text-muted" style="font-size:12px;">Uses a real browser on every page — slower. Turn on only for JS sites the quick crawl reads wrong.</span>
                         </div>
+                        <div class="form-group mb-2">
+                            <label class="d-inline-flex align-items-center mb-1" style="cursor:pointer; font-size:13px;">
+                                <input type="checkbox" id="competitor_ai_crawl" class="mr-2" style="width:16px; height:16px;">
+                                <span class="font-weight-bold">Crawl with AI</span>
+                            </label>
+                            <span class="form-text text-muted" style="font-size:12px;">Lets AI browse the site to find the tour pages — best for JS sites the quick crawl can’t read. Uses a small OpenAI call for discovery.</span>
+                        </div>
                     </div>
 
                     <!-- OR divider -->
@@ -245,7 +252,8 @@
                         + (j.title ? '<div class="text-muted" style="font-size:11px;">' + esc(j.title) + '</div>' : '')
                     : '<a href="' + esc(j.url) + '" target="_blank" rel="noopener" style="font-size:12px;">' + esc(j.url) + '</a>'
                         + (j.keyword ? '<br><span class="label label-light-primary label-inline font-weight-bold mt-1" style="font-size:11px;"><i class="la la-filter mr-1"></i>Keyword: ' + esc(j.keyword) + '</span>' : '')
-                        + (j.force_render ? ' <span class="label label-light-warning label-inline font-weight-bold mt-1" style="font-size:11px;"><i class="la la-desktop mr-1"></i>Full render</span>' : '');
+                        + (j.force_render ? ' <span class="label label-light-warning label-inline font-weight-bold mt-1" style="font-size:11px;"><i class="la la-desktop mr-1"></i>Full render</span>' : '')
+                        + (j.ai_crawl ? ' <span class="label label-light-info label-inline font-weight-bold mt-1" style="font-size:11px;"><i class="la la-robot mr-1"></i>AI crawl</span>' : '');
                 return '<tr>'
                     + '<td style="text-align:center; padding:12px 8px;">' + no + '</td>'
                     + '<td style="max-width:260px; word-break:break-all;">' + source + '</td>'
@@ -339,11 +347,13 @@
             var kw = $.trim($('#competitor_keyword').val());
             if(kw !== '') { form.append('keyword', kw); }
             if($('#competitor_force_render').is(':checked')) { form.append('force_render', '1'); }
+            if($('#competitor_ai_crawl').is(':checked')) { form.append('ai_crawl', '1'); }
             title = kw !== '' ? ('Crawling for “' + kw + '”…') : 'Crawling the site…';
             // Reset the crawl inputs so the next crawl starts clean (the keyword +
-            // full-render are remembered on the queued crawl row, not the form).
+            // full-render + AI crawl are remembered on the queued crawl row, not the form).
             $('#competitor_keyword').val('');
             $('#competitor_force_render').prop('checked', false);
+            $('#competitor_ai_crawl').prop('checked', false);
         }
         runAnalyze(form, $(this), title);
     });

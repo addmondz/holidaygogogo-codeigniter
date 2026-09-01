@@ -27,12 +27,13 @@
                                 <th style="text-align:center;">No.</th>
                                 <th>Product</th>
                                 <th style="text-align:center;">AI Cost (USD)</th>
+                                <th style="text-align:center;">Analysed On</th>
                                 <th style="text-align:center;">Status</th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php if (empty($products)) { ?>
-                                <tr><td colspan="5" style="text-align:center; padding:12px;">No products crawled</td></tr>
+                                <tr><td colspan="6" style="text-align:center; padding:12px;">No products crawled</td></tr>
                             <?php } else { $n = 1; foreach ($products as $p) {
                                 $analysed = ((int) $p['analysis_id'] > 0);
                             ?>
@@ -47,6 +48,13 @@
                                         <?php if ( ! empty($p['url'])) { ?><div style="margin-top:2px;"><a href="<?php echo htmlspecialchars($p['url']); ?>" target="_blank" rel="noopener" class="text-muted" style="font-size:11px; word-break:break-all;"><i class="la la-external-link-alt mr-1"></i><?php echo htmlspecialchars($p['url']); ?></a></div><?php } ?>
                                     </td>
                                     <td style="text-align:center; font-size:12px;"><?php echo $analysed && $p['cost'] > 0 ? number_format((float) $p['cost'], 4) : '—'; ?></td>
+                                    <td style="text-align:center; font-size:12px;">
+                                        <?php if ($analysed && ! empty($p['analysed_at'])) { ?>
+                                            <span class="label label-light-success label-inline font-weight-bold" style="font-size:11px;"><i class="la la-check mr-1"></i><?php echo htmlspecialchars(date('d M Y, g:i A', strtotime($p['analysed_at']))); ?></span>
+                                        <?php } else { ?>
+                                            <span class="text-muted" style="font-size:11px;">—</span>
+                                        <?php } ?>
+                                    </td>
                                     <td style="text-align:center;">
                                         <?php if ($analysed) { ?>
                                             <a href="<?php echo base_url('Competitor_Analysis/View?id=') . (int) $p['analysis_id']; ?>" class="btn btn-light-success btn-sm font-weight-bold" style="font-size:11px;"><i class="la la-search mr-1"></i>View</a>

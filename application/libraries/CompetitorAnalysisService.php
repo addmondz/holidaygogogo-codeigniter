@@ -20,7 +20,8 @@ defined('BASEPATH') OR exit('No direct script access allowed');
  *   OPENAI_API_KEY         (required)
  *   OPENAI_MODEL           (optional, default gpt-4o-mini — must support web_search)
  *   OPENAI_BASE_URL        (optional, default https://api.openai.com/v1)
- *   OPENAI_WEB_SEARCH_TOOL (optional, default web_search)
+ *   OPENAI_WEB_SEARCH_TOOL (optional; auto-picks web_search for gpt-5/o-series,
+ *                           web_search_preview for gpt-4o — override to force one)
  *
  * analyze() returns a flat record (see competitor_parse_ai_response) plus
  * 'raw_json' and 'model'. On any failure it throws Exception with a
@@ -32,6 +33,13 @@ class CompetitorAnalysisService
 
 	/** Token usage from the most recent request(), for costing to_record(). */
 	protected $last_usage = array('input_tokens' => 0, 'output_tokens' => 0);
+
+	/**
+	 * Running USD cost of every OpenAI call since the last reset — used to bill the
+	 * AI-crawl DISCOVERY step (its web_search call), whose cost isn't attached to any
+	 * saved product row. Reset at the start of each crawl_to_text().
+	 */
+	protected $run_cost = 0.0;
 
 	/**
 	 * Set by extract_source_text(): true when the page was a blank-shell JS SPA and
@@ -561,7 +569,7 @@ class CompetitorAnalysisService
 	 * page URLs; we validate/dedupe them against the site host. Costs one small
 	 * OpenAI call (discovery only — no per-product analysis yet).
 	 */
-	public function discover_product_urls_ai($base_url, $limit = 10)
+	public function discover_product_urls_ai($base_url, $limit = 10, $keyword = '')
 	{
 		$base_url = trim((string) $base_url);
 		if ( ! preg_match('#^https?://#i', $base_url)) {
@@ -569,11 +577,11 @@ class CompetitorAnalysisService
 		}
 		$limit = (int) $limit > 0 ? (int) $limit : 10;
 
-		$spec = competitor_build_discovery_agent($base_url, $limit);
+		$spec = competitor_build_discovery_agent($base_url, $limit, $keyword);
 		$raw  = $this->request($spec['instructions'], $spec['input'], array(array('type' => $this->web_search_tool())), 'discovery ' . $base_url);
 		$host = parse_url($base_url, PHP_URL_HOST);
 		$found = competitor_parse_url_list($raw, $host ?: '', $limit);
-		$this->log_crawl('discovery_result', array('base_url' => $base_url, 'count' => count($found)));
+		$this->log_crawl('discovery_result', array('base_url' => $base_url, 'keyword' => (string) $keyword, 'count' => count($found)));
 		return $found;
 	}
 
@@ -1257,13 +1265,20 @@ class CompetitorAnalysisService
 		return $cache[$name] = $found;
 	}
 
-	/** Reset the per-crawl web_search + headless budgets. */
+	/** Reset the per-crawl web_search + headless budgets and the running AI cost. */
 	protected function reset_render_budget()
 	{
 		$this->websearch_cap   = competitor_websearch_cap(get_env('COMPETITOR_MAX_WEBSEARCH'));
 		$this->websearch_count = 0;
 		$this->headless_cap    = competitor_headless_cap(get_env('COMPETITOR_MAX_HEADLESS'));
 		$this->headless_count  = 0;
+		$this->run_cost        = 0.0;
+	}
+
+	/** USD cost of all OpenAI calls since the last reset (e.g. the AI-crawl discovery). */
+	public function last_run_cost()
+	{
+		return round((float) $this->run_cost, 6);
 	}
 
 	/**
@@ -1513,7 +1528,7 @@ class CompetitorAnalysisService
 	 * $progress, when given, is called as $progress($phase, $done, $total, $label)
 	 * so a background job can report live progress ('discovering' then 'reading').
 	 */
-	public function crawl_to_text($base_url, $limit = 0, $progress = null, $keyword = '', $force_render = false)
+	public function crawl_to_text($base_url, $limit = 0, $progress = null, $keyword = '', $force_render = false, $ai_discover = false)
 	{
 		$base_url = trim((string) $base_url);
 		if ( ! preg_match('#^https?://#i', $base_url)) {
@@ -1538,10 +1553,23 @@ class CompetitorAnalysisService
 
 		// ICE site + keyword → use ICE's native search API (server-side match), not a
 		// full-catalogue enumeration + text filter. Returns null when it isn't ICE.
-		$ice_kw = ($keyword !== '') ? $this->discover_ice_keyword($base_url, $keyword) : null;
+		$ice_kw  = ($keyword !== '') ? $this->discover_ice_keyword($base_url, $keyword) : null;
+		$ai_used = false;   // AI discovery already applied any keyword — skip the slug filter below
 		if ($ice_kw !== null) {
 			$found = $ice_kw;
 			$this->last_discovery_source = 'ice';
+		} elseif ($ai_discover && get_env('OPENAI_API_KEY')) {
+			// "Crawl with AI": let the web_search agent browse the site and hand back the
+			// individual tour URLs (best for JS sites the cheap cascade can't read). Fall
+			// back to the free HTML/sitemap/headless discovery when it returns nothing.
+			$found = $this->discover_product_urls_ai($base_url, ($limit > 0 ? $limit : 10), $keyword);
+			if ( ! empty($found)) {
+				$ai_used = true;
+				$this->last_discovery_source = 'ai';
+			} else {
+				$this->log_crawl('ai_discovery_empty', array('base_url' => $base_url));
+				$found = $this->discover_product_urls($base_url, $limit);
+			}
 		} else {
 			$found = $this->discover_product_urls($base_url, $limit);
 		}
@@ -1559,8 +1587,8 @@ class CompetitorAnalysisService
 			// Keyword crawl reads ONLY the matching products. ICE search already matched
 			// server-side; otherwise match the URL slug OR the discovery label, PLUS a
 			// JS-category drill-down for SPAs whose sitemap lists only category pages.
-			if ($ice_kw !== null) {
-				$slug = $urls;   // ICE API already applied the keyword
+			if ($ice_kw !== null || $ai_used) {
+				$slug = $urls;   // ICE API / AI discovery already applied the keyword
 			} else {
 				$slug = array();
 				foreach ($urls as $u) {
@@ -1570,9 +1598,10 @@ class CompetitorAnalysisService
 				}
 			}
 			// JS-category drill-down only when the slug match came up short (and not an
-			// ICE site — ICE has no HTML category pages). Renders category pages with
-			// headless (slow), so it's skipped when discovery already answered.
-			$hub  = ($ice_kw === null && count($slug) < 3) ? $this->discover_keyword_hub_products($base_url, $keyword) : array();
+			// ICE / AI-discovery run — those already returned the matching products).
+			// Renders category pages with headless (slow), so it's skipped when discovery
+			// already answered.
+			$hub  = ($ice_kw === null && ! $ai_used && count($slug) < 3) ? $this->discover_keyword_hub_products($base_url, $keyword) : array();
 			$urls = array_values(array_unique(array_merge($slug, $hub)));
 			if ( ! empty($hub)) {
 				$this->last_discovery_source = 'headless';   // JS site → allow headless reads
@@ -1847,8 +1876,7 @@ class CompetitorAnalysisService
 
 	protected function web_search_tool()
 	{
-		$t = get_env('OPENAI_WEB_SEARCH_TOOL');
-		return $t ? $t : 'web_search_preview';
+		return competitor_web_search_tool_for_model($this->model(), (string) get_env('OPENAI_WEB_SEARCH_TOOL'));
 	}
 
 	/**
@@ -1873,8 +1901,12 @@ class CompetitorAnalysisService
 			'model'        => $this->model(),
 			'instructions' => $instructions,
 			'input'        => $input,
-			'temperature'  => 0.2,
 		);
+		// Reasoning models (gpt-5+, o-series) reject a custom temperature — only send
+		// it to models that accept one (gpt-4o etc.).
+		if (competitor_model_supports_temperature($this->model())) {
+			$payload['temperature'] = 0.2;
+		}
 		if ( ! empty($tools)) {
 			$payload['tools'] = $tools;
 		}
@@ -1895,8 +1927,9 @@ class CompetitorAnalysisService
 			CURLOPT_POST           => true,
 			CURLOPT_POSTFIELDS     => json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
 			CURLOPT_CONNECTTIMEOUT => 15,
-			// Browsing / document reading + reasoning can take a while.
-			CURLOPT_TIMEOUT        => 180,
+			// Browsing / document reading + reasoning can take a while — GPT-5 reasoning
+			// models especially, so allow a longer ceiling.
+			CURLOPT_TIMEOUT        => 300,
 			CURLOPT_HTTPHEADER     => array(
 				'Content-Type: application/json',
 				'Authorization: Bearer ' . $key,
@@ -1916,6 +1949,10 @@ class CompetitorAnalysisService
 		$json = json_decode($resp, true);
 		// Capture token usage for costing before we unwrap the text.
 		$this->last_usage = competitor_extract_usage($json);
+		// Accumulate this call's cost so a crawl's non-product AI spend (the AI-crawl
+		// discovery web_search) can be billed onto the crawl row.
+		$this->run_cost += competitor_estimate_cost(
+			$this->model(), $this->last_usage['input_tokens'], $this->last_usage['output_tokens'], $this->price_rates());
 		if ($code >= 400) {
 			$msg = isset($json['error']['message']) ? $json['error']['message'] : ('HTTP ' . $code);
 			$this->log_ai('http_error', array('label' => $label, 'code' => $code, 'message' => $msg, 'ms' => $ms, 'body' => mb_substr((string) $resp, 0, 3000)));

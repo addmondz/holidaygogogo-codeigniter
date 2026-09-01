@@ -45,6 +45,7 @@ class Competitor_Job extends CI_Controller
 				'mode'         => isset($job['mode']) ? $job['mode'] : 'crawl',
 				'keyword'      => isset($job['keyword']) ? $job['keyword'] : '',          // persist chips
 				'force_render' => ! empty($job['force_render']) ? 1 : 0,                  // across updates
+				'ai_crawl'     => ! empty($job['ai_crawl']) ? 1 : 0,
 				'created'      => isset($job['created']) ? $job['created'] : date('Y-m-d H:i:s'),   // fixed submit time
 				'ts'           => date('Y-m-d H:i:s'),
 			);
@@ -81,15 +82,20 @@ class Competitor_Job extends CI_Controller
 				}
 				$write($data);
 			};
-			$keyword = isset($job['keyword']) ? (string) $job['keyword'] : '';
-			$force   = ! empty($job['force_render']);
-			$items = $this->competitoranalysisservice->crawl_to_text($url, 0, $progress, $keyword, $force);
+			$keyword  = isset($job['keyword']) ? (string) $job['keyword'] : '';
+			$force    = ! empty($job['force_render']);
+			$ai_crawl = ! empty($job['ai_crawl']);
+			$items = $this->competitoranalysisservice->crawl_to_text($url, 0, $progress, $keyword, $force, $ai_crawl);
 			$items_file = APPPATH . 'logs/competitor_crawl/jobs/' . $job['job'] . '.items.json';
 			@file_put_contents($items_file, json_encode($items, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
 
+			// AI-crawl discovery (web_search) spends tokens that aren't tied to any saved
+			// product — seed the crawl's running cost with it so the AI Cost column reflects
+			// it (later analyses add on top via merge_crawl_analysed).
+			$crawl_cost = (float) $this->competitoranalysisservice->last_run_cost();
 			$n = count($items);
 			$write(array('state' => 'done', 'phase' => 'reading', 'done' => $n, 'total' => $n,
-				'count' => $n, 'items_file' => $items_file));
+				'count' => $n, 'items_file' => $items_file, 'cost_total' => round($crawl_cost, 6)));
 		} catch (Exception $e) {
 			$write(array('state' => 'error', 'message' => $e->getMessage()));
 		}
@@ -135,7 +141,7 @@ class Competitor_Job extends CI_Controller
 						$rec['status']     = 'done';
 						$rec['created_by'] = isset($job['created_by']) ? $job['created_by'] : null;
 						$id = (int) $this->Competitor_Analysis_Model->Create($rec);
-						$results[(string) $i] = array('id' => $id, 'cost' => (float) $site['cost_usd']);
+						$results[(string) $i] = array('id' => $id, 'cost' => (float) $site['cost_usd'], 'at' => date('Y-m-d H:i:s'));
 						$total_cost += (float) $site['cost_usd'];
 					}
 				} catch (Exception $e) {

@@ -70,6 +70,7 @@ class Competitor_Analysis extends MY_Controller
 				'chars'       => mb_strlen($text, 'UTF-8'),
 				'analysis_id' => isset($a['id']) ? (int) $a['id'] : 0,
 				'cost'        => isset($a['cost']) ? (float) $a['cost'] : 0.0,
+				'analysed_at' => isset($a['at']) ? (string) $a['at'] : '',
 			);
 		}
 		$titles = array(
@@ -184,9 +185,10 @@ class Competitor_Analysis extends MY_Controller
 		// URL → background crawl + auto-analyse job (non-blocking; polled in the
 		// history table). AI runs only when OPENAI_API_KEY is set.
 		if ( ! $has_file) {
-			$keyword = trim((string) $this->input->post('keyword'));
-			$force   = (string) $this->input->post('force_render') === '1';
-			$job_id = $this->start_crawl_job($url, $keyword, $force);
+			$keyword  = trim((string) $this->input->post('keyword'));
+			$force    = (string) $this->input->post('force_render') === '1';
+			$ai_crawl = (string) $this->input->post('ai_crawl') === '1';
+			$job_id = $this->start_crawl_job($url, $keyword, $force, $ai_crawl);
 			if ($job_id !== '') {
 				echo json_encode(array('success' => true, 'job' => $job_id));
 			} else {
@@ -342,12 +344,13 @@ class Competitor_Analysis extends MY_Controller
 	 * Queue a crawl and spawn the detached CLI worker. Returns the job id or ''
 	 * when it can't be spawned.
 	 */
-	private function start_crawl_job($url, $keyword = '', $force_render = false)
+	private function start_crawl_job($url, $keyword = '', $force_render = false, $ai_crawl = false)
 	{
 		return $this->queue_job(array(
 			'url'          => $url,
 			'keyword'      => trim((string) $keyword),
 			'force_render' => $force_render ? 1 : 0,
+			'ai_crawl'     => $ai_crawl ? 1 : 0,
 			'created_by'   => $this->session->admin_id,
 		));
 	}

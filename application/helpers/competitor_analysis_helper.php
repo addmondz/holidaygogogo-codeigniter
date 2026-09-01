@@ -1499,6 +1499,7 @@ if ( ! function_exists('competitor_job_public_view'))
 			'count'       => isset($s['count']) ? (int) $s['count'] : 0,
 			'keyword'     => isset($s['keyword']) ? (string) $s['keyword'] : '',
 			'force_render' => ! empty($s['force_render']),
+			'ai_crawl'    => ! empty($s['ai_crawl']),
 			// Fixed submission time (when pasted + Analyse clicked), not last update.
 			'ts'          => isset($s['created']) ? (string) $s['created'] : (isset($s['ts']) ? (string) $s['ts'] : ''),
 			// Live-ETA inputs (reading phase): progress + when reading began.
@@ -2096,16 +2097,22 @@ if ( ! function_exists('competitor_build_discovery_agent'))
 	 * tour/product page URLs (not analysis, just the links). Returns
 	 * ['instructions', 'input']; the caller adds the web_search tool.
 	 */
-	function competitor_build_discovery_agent($base_url, $limit = 10)
+	function competitor_build_discovery_agent($base_url, $limit = 10, $keyword = '')
 	{
-		$limit = (int) $limit > 0 ? (int) $limit : 10;
+		$limit   = (int) $limit > 0 ? (int) $limit : 10;
+		$keyword = trim((string) $keyword);
+		$focus   = ($keyword !== '')
+			? "Collect ONLY tours whose destination/title matches the keyword \"" . $keyword . "\"; skip unrelated tours. "
+			: "";
 		$instructions = "You are a web researcher for a Malaysian tour operator. "
 			. "Use the web_search tool to OPEN and BROWSE the competitor travel website at the URL given — "
 			. "including its tour/package listing pages — and collect the URLs of individual TOUR/PRODUCT DETAIL "
 			. "pages (a specific tour, not the homepage and not a category/listing page). "
+			. $focus
 			. "Only include pages on the same website. "
 			. "Reply with ONLY a JSON array of up to " . $limit . " absolute URL strings — no prose, no markdown.";
 		$input = "SITE URL (browse this and its tour listings): " . $base_url . "\n"
+			. ($keyword !== '' ? "FOCUS keyword (match tours to this): " . $keyword . "\n" : "")
 			. "Return up to " . $limit . " individual tour/product page URLs as a JSON array.";
 		return array('instructions' => $instructions, 'input' => $input);
 	}
@@ -2318,7 +2325,54 @@ if ( ! function_exists('competitor_model_prices'))
 			'gpt-4.1-mini' => array(0.40, 1.60),
 			'gpt-4.1-nano' => array(0.10, 0.40),
 			'o4-mini'      => array(1.10, 4.40),
+			// GPT-5 family — approximate launch-era list prices (USD/1M tokens). Set
+			// OPENAI_PRICE_INPUT / OPENAI_PRICE_OUTPUT in .env for exact costing.
+			'gpt-5'        => array(1.25, 10.00),
+			'gpt-5-mini'   => array(0.25, 2.00),
+			'gpt-5-nano'   => array(0.05, 0.40),
+			'gpt-5.4-mini' => array(0.25, 2.00),
+			'gpt-5.5'      => array(1.25, 10.00),
+			'gpt-5.5-pro'  => array(15.00, 120.00),
 		);
+	}
+}
+
+if ( ! function_exists('competitor_model_supports_temperature'))
+{
+	/**
+	 * Whether a model accepts a custom `temperature` on the Responses API.
+	 * Reasoning models (o-series, gpt-5+) only allow the default and 400 when a
+	 * temperature is sent — EXCEPT their `-chat` variants. Pure.
+	 */
+	function competitor_model_supports_temperature($model)
+	{
+		$m = strtolower(trim((string) $model));
+		if ($m === '') {
+			return true;
+		}
+		$is_reasoning = (bool) preg_match('/^o\d/', $m) || (bool) preg_match('/^gpt-5/', $m);
+		return ! ($is_reasoning && strpos($m, 'chat') === false);
+	}
+}
+
+if ( ! function_exists('competitor_web_search_tool_for_model'))
+{
+	/**
+	 * The web_search tool `type` a given model expects. GPT-5 / o-series use the
+	 * GA `web_search`; older gpt-4o uses `web_search_preview`. A non-empty
+	 * OPENAI_WEB_SEARCH_TOOL override always wins. Pure.
+	 */
+	function competitor_web_search_tool_for_model($model, $override = '')
+	{
+		$override = trim((string) $override);
+		if ($override !== '') {
+			return $override;
+		}
+		$m = strtolower(trim((string) $model));
+		if (preg_match('/^o\d/', $m) || preg_match('/^gpt-5/', $m)) {
+			return 'web_search';
+		}
+		return 'web_search_preview';
 	}
 }
 
