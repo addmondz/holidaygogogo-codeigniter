@@ -251,8 +251,6 @@ $meals = $av('meals');
 <?php if($has($sv('comparison'))) { ?>
     <div class="mt-3">
         <h5 class="font-weight-bolder text-dark">Comparison vs Our Products</h5>
-        <div class="p-4 rounded" style="background:#FFF4DE; font-size:14px; white-space:pre-line;">
-            <?php echo htmlspecialchars($sv('comparison')); ?>
-        </div>
+        <div class="p-4 rounded" style="background:#FFF4DE; font-size:14px; white-space:pre-line;"><?php echo htmlspecialchars($sv('comparison')); ?></div>
     </div>
 <?php } ?>

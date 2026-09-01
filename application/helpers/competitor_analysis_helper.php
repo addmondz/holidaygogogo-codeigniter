@@ -89,8 +89,8 @@ if ( ! function_exists('competitor_output_contract'))
 			. '"duration": string (days/nights e.g. "5D4N"), '
 			. '"travel_months": string[] (departure months/dates offered), '
 			. '"departure_city": string (where the tour departs from), '
-			. '"flight_departure": string (outbound flight detail: airline/flight no/time, "" if none), '
-			. '"flight_return": string (return flight detail, "" if none), '
+			. '"flight_departure": string (FULL outbound flight detail EXACTLY as given: airline + flight no + from/to airports + date + time for every outbound leg, joining connecting legs with " -> "; "" if none), '
+			. '"flight_return": string (FULL return flight detail the same way, all legs; "" if none), '
 			. '"themes": string[] (INFER trip themes e.g. "Nature","Culture","Shopping"), '
 			. '"tour_styles": string[] (INFER e.g. "Group tour","Free & easy","Luxury"), '
 			. '"difficulty": string (INFER physical difficulty e.g. "Easy","Moderate","Challenging"), '
@@ -98,10 +98,10 @@ if ( ! function_exists('competitor_output_contract'))
 			. '"inclusions": string[] (what the price includes), '
 			. '"exclusions": string[] (what is NOT included), '
 			. '"hotels": string[] (hotels/accommodation named), '
-			. '"meals": {"breakfast": string, "lunch": string, "dinner": string} (counts as shown, "" if unknown), '
+			. '"meals": {"breakfast": string, "lunch": string, "dinner": string} (for each meal, work through the day-by-day meal plan and give the COUNT plus the exact days it is provided e.g. "3 (Day 2,3,4)"; add special cuisine in parentheses when named; "" if the plan never provides that meal — do not guess a count), '
 			. '"shopping_stops": string[] (shopping/factory stops), '
-			. '"optional_tours": string[] (optional/add-on tours), '
-			. '"special_remarks": string[] (important notes/terms/conditions), '
+			. '"optional_tours": string[] (EVERY optional/add-on tour listed, each one verbatim WITH its price and conditions e.g. min pax / what is included — never drop, merge or summarise any), '
+			. '"special_remarks": string[] (EVERY important note/term/condition, each listed separately — e.g. guide/commentary language, nationality restriction, room & single-supplement rules, insurance, disclaimers; do not omit any), '
 			. '"scenic_highlights": string[] (INFER key scenic/sightseeing highlights), '
 			. '"signature_meals": string[] (INFER notable/signature meals featured), '
 			. '"target_traveller": string (INFER ideal traveller e.g. "Families","Seniors","Couples"), '
@@ -109,7 +109,7 @@ if ( ! function_exists('competitor_output_contract'))
 			. '"child_friendly": string (INFER "Yes"/"No" + short reason), '
 			. '"senior_friendly": string (INFER "Yes"/"No" + short reason), '
 			. '"usp": string[] (INFER unique selling points for the target traveller), '
-			. '"itinerary": [{"day": string, "title": string, "description": string}] (one entry per day), '
+			. '"itinerary": [{"day": string, "title": string, "description": string}] (one entry per day; the description must list ALL places/activities visited that day, not just a few), '
 			. '"pros": string[], '
 			. '"cons": string[], '
 			. '"summary": string (2-4 sentence overview), '
@@ -1821,24 +1821,9 @@ if ( ! function_exists('competitor_ice_series_to_text'))
 		}
 
 		if ( ! empty($d['includings']) && is_array($d['includings'])) {
-			$inc = array();
-			foreach ($d['includings'] as $k => $v) {
-				$k = str_replace('_', ' ', (string) $k);
-				if (is_scalar($v)) {
-					$vv = is_bool($v) ? ($v ? 'yes' : 'no') : trim((string) $v);
-					if ($vv !== '') { $inc[] = $k . ': ' . $vv; }
-				} elseif (is_array($v)) {
-					$flat = array();
-					foreach ($v as $vk => $vv2) {
-						if (is_scalar($vv2)) {
-							$s = is_bool($vv2) ? ($vv2 ? 'yes' : 'no') : trim((string) $vv2);
-							if ($s !== '') { $flat[] = str_replace('_', ' ', (string) $vk) . ' ' . $s; }
-						}
-					}
-					if ($flat) { $inc[] = $k . ': ' . implode(', ', array_slice($flat, 0, 10)); }
-				}
-			}
-			if ($inc) { $lines[] = "Inclusions:\n- " . implode("\n- ", $inc); }
+			$split = competitor_ice_includings_split($d['includings']);
+			if ($split['inclusions']) { $lines[] = "Inclusions:\n- " . implode("\n- ", $split['inclusions']); }
+			if ($split['exclusions']) { $lines[] = "Not included:\n- " . implode("\n- ", $split['exclusions']); }
 		}
 
 		if ( ! empty($d['tours']) && is_array($d['tours'])) {
@@ -1864,6 +1849,11 @@ if ( ! function_exists('competitor_ice_series_to_text'))
 				}
 			}
 		}
+
+		// Flight legs — carried per-departure in tours[].flights[], never in the
+		// description text, so surface them explicitly or the AI has no flight data.
+		$flt = competitor_ice_flights_text(isset($d['tours']) ? $d['tours'] : array());
+		if ($flt !== '') { $lines[] = "Flights:\n- " . $flt; }
 
 		// Day-by-day itinerary — the structured `itinerary_plans` the /web/itinerary
 		// page renders (when the product ships one; many gd.my tours carry it only in
@@ -1980,6 +1970,95 @@ if ( ! function_exists('competitor_ice_itinerary_text'))
 		}
 
 		return $out ? implode("\n\n", $out) : '';
+	}
+}
+
+if ( ! function_exists('competitor_ice_flights_text'))
+{
+	/**
+	 * Render an ICE series' flight legs into readable text for the AI. The flight
+	 * detail lives in `tours[].flights[]` (airline, flight_no, from/to airports,
+	 * departure/arrival date+time) and only the SELECTED/first bookable departure
+	 * carries it, so we render the first tour that actually has flights. Each leg =
+	 * "AirAsia AK 204: Kuala Lumpur (KUL) -> Nha Trang (CXR), depart 26/09/2026
+	 * 10:10, arrive 26/09/2026 11:30". Returns '' when no flights are present. Pure.
+	 */
+	function competitor_ice_flights_text($tours)
+	{
+		if ( ! is_array($tours)) {
+			return '';
+		}
+		$flights = array();
+		foreach ($tours as $t) {
+			if (is_array($t) && ! empty($t['flights']) && is_array($t['flights'])) {
+				$flights = $t['flights'];
+				break;
+			}
+		}
+		if (empty($flights)) {
+			return '';
+		}
+		$g = function ($a, $k) {
+			return isset($a[$k]) && is_scalar($a[$k]) ? trim((string) $a[$k]) : '';
+		};
+		$legs = array();
+		foreach ($flights as $f) {
+			if ( ! is_array($f)) { continue; }
+			$carrier = trim($g($f, 'airline') . ' ' . $g($f, 'flight_no'));
+			$route   = trim($g($f, 'from_airport') . ($g($f, 'to_airport') !== '' ? ' -> ' . $g($f, 'to_airport') : ''));
+			$dep     = trim($g($f, 'departure_date') . ' ' . $g($f, 'departure_time'));
+			$arr     = trim($g($f, 'arrival_date') . ' ' . $g($f, 'arrival_time'));
+			$seg = $carrier !== '' ? $carrier : 'Flight';
+			if ($route !== '') { $seg .= ': ' . $route; }
+			if ($dep !== '')   { $seg .= ', depart ' . $dep; }
+			if ($arr !== '')   { $seg .= ', arrive ' . $arr; }
+			$seg = trim(preg_replace('/\s+/', ' ', $seg));
+			if ($seg !== '') { $legs[] = $seg; }
+		}
+		return $legs ? implode("\n- ", $legs) : '';
+	}
+}
+
+if ( ! function_exists('competitor_ice_includings_split'))
+{
+	/**
+	 * Split an ICE series' `includings` flag-map into what the price DOES and does
+	 * NOT include, so the AI reports real exclusions instead of inventing them from
+	 * opaque internal flags. Truthy bool / non-empty scalar / non-empty nested array
+	 * => included; a bool false => "not included". Internal flags that carry no
+	 * customer meaning as a bare yes/no are dropped entirely: `acf`, and a BARE
+	 * boolean `accommodation` flag (it contradicts a separately-named hotel — a
+	 * nested accommodation object with details is still kept). Returns
+	 * ['inclusions' => string[], 'exclusions' => string[]]. Pure.
+	 */
+	function competitor_ice_includings_split($includings)
+	{
+		$out = array('inclusions' => array(), 'exclusions' => array());
+		if ( ! is_array($includings)) {
+			return $out;
+		}
+		$opaque = array('acf', 'accommodation'); // meaningless/misleading as a bare boolean
+		foreach ($includings as $k => $v) {
+			$key = str_replace('_', ' ', (string) $k);
+			if (is_bool($v)) {
+				if (in_array((string) $k, $opaque, true)) { continue; }
+				if ($v) { $out['inclusions'][] = $key; }
+				else    { $out['exclusions'][] = $key; }
+			} elseif (is_scalar($v)) {
+				$vv = trim((string) $v);
+				if ($vv !== '') { $out['inclusions'][] = $key . ': ' . $vv; }
+			} elseif (is_array($v)) {
+				$flat = array();
+				foreach ($v as $vk => $vv2) {
+					if (is_scalar($vv2)) {
+						$s = is_bool($vv2) ? ($vv2 ? 'yes' : 'no') : trim((string) $vv2);
+						if ($s !== '') { $flat[] = str_replace('_', ' ', (string) $vk) . ' ' . $s; }
+					}
+				}
+				if ($flat) { $out['inclusions'][] = $key . ': ' . implode(', ', array_slice($flat, 0, 10)); }
+			}
+		}
+		return $out;
 	}
 }
 

@@ -353,7 +353,8 @@ $stext = competitor_ice_series_to_text($seriesDetail);
 check_true('ice_series_to_text has product name', strpos($stext, "4D3N LET'S GO TO HAINAN") !== false);
 check_true('ice_series_to_text has code+country', strpos($stext, 'Code: FS-P4HAK-1') !== false && strpos($stext, 'Country: CHINA') !== false);
 check_true('ice_series_to_text renders description', strpos($stext, 'Direct flight to Hainan') !== false);
-check_true('ice_series_to_text has inclusions', strpos($stext, 'hotel: 4 star') !== false && strpos($stext, 'wifi: yes') !== false);
+check_true('ice_series_to_text has inclusions', strpos($stext, 'hotel: 4 star') !== false && preg_match('/Inclusions:.*wifi/s', $stext) === 1);
+check_true('ice_series_to_text lists not-included', strpos($stext, 'Not included:') !== false && strpos($stext, 'meal onboard') !== false);
 check_true('ice_series_to_text nested including', strpos($stext, 'accommodation:') !== false);
 check_true('ice_series_to_text has departures', strpos($stext, '2026-06-01 from Penang: 1388') !== false);
 check_true('ice_series_to_text has guide langs', strpos($stext, 'guide: EN/CN') !== false);
@@ -390,6 +391,48 @@ check('itinerary_text empty when no plans', '', competitor_ice_itinerary_text(ar
 $seriesWithItin = json_encode(array('code' => 'AB-1', 'caption' => 'Beach Trip',
     'itinerary_plans' => $plans));
 check_true('ice_series_to_text includes itinerary', strpos(competitor_ice_series_to_text($seriesWithItin), 'Day 1: Arrive Nha Trang') !== false);
+
+// ---- competitor_ice_includings_split ----------------------------------------
+$sp = competitor_ice_includings_split(array(
+    'airport_taxes' => true, 'group_departure' => true, 'luggage' => true, 'wifi' => false,
+    'meal_onboard' => true, 'hotel' => true, 'gratuities' => false, 'acf' => false, 'accommodation' => false));
+check_true('includings_split keeps real inclusions',
+    in_array('hotel', $sp['inclusions']) && in_array('airport taxes', $sp['inclusions']) && in_array('meal onboard', $sp['inclusions']));
+check_true('includings_split real exclusions',
+    in_array('wifi', $sp['exclusions']) && in_array('gratuities', $sp['exclusions']));
+check_true('includings_split drops opaque acf',
+    ! in_array('acf', $sp['exclusions']) && ! in_array('acf', $sp['inclusions']));
+check_true('includings_split drops bare bool accommodation',
+    ! in_array('accommodation', $sp['exclusions']) && ! in_array('accommodation', $sp['inclusions']));
+check_true('includings_split keeps scalar value',
+    in_array('hotel: 4 star', competitor_ice_includings_split(array('hotel' => '4 star'))['inclusions']));
+check_true('includings_split keeps nested accommodation object',
+    count(competitor_ice_includings_split(array('accommodation' => array('nights' => '3')))['inclusions']) === 1);
+check('includings_split empty on junk', array('inclusions' => array(), 'exclusions' => array()),
+    competitor_ice_includings_split('nope'));
+
+// ---- competitor_ice_flights_text --------------------------------------------
+$flightTours = array(
+    array('departure_date' => '24/10/2026', 'flights' => array()),           // empty leg -> skipped
+    array('departure_date' => '26/09/2026', 'flights' => array(
+        array('airline' => 'AirAsia', 'flight_no' => 'AK 204', 'from_airport' => 'Kuala Lumpur (KUL)',
+            'to_airport' => 'Nha Trang (CXR)', 'departure_date' => '26/09/2026', 'departure_time' => '10:10',
+            'arrival_date' => '26/09/2026', 'arrival_time' => '11:30'),
+        array('airline' => 'AirAsia', 'flight_no' => 'AK 205', 'from_airport' => 'Nha Trang (CXR)',
+            'to_airport' => 'Kuala Lumpur (KUL)', 'departure_date' => '29/09/2026', 'departure_time' => '12:00',
+            'arrival_date' => '29/09/2026', 'arrival_time' => '15:25'),
+    )),
+);
+$ftext = competitor_ice_flights_text($flightTours);
+check_true('ice_flights_text renders outbound leg', strpos($ftext, 'AirAsia AK 204: Kuala Lumpur (KUL) -> Nha Trang (CXR), depart 26/09/2026 10:10, arrive 26/09/2026 11:30') !== false);
+check_true('ice_flights_text renders return leg', strpos($ftext, 'AirAsia AK 205: Nha Trang (CXR) -> Kuala Lumpur (KUL)') !== false);
+check('ice_flights_text empty when no flights', '', competitor_ice_flights_text(array(array('flights' => array()))));
+check('ice_flights_text empty on junk', '', competitor_ice_flights_text('nope'));
+
+// integration: series_to_text surfaces the flight legs
+$seriesWithFlights = json_encode(array('code' => 'FS-4VSIT', 'caption' => 'Nha Trang', 'tours' => $flightTours));
+check_true('ice_series_to_text includes flights', strpos(competitor_ice_series_to_text($seriesWithFlights), 'Flights:') !== false
+    && strpos(competitor_ice_series_to_text($seriesWithFlights), 'AK 204') !== false);
 
 // ---- competitor_scrape_is_thin ----------------------------------------------
 check_true('scrape_is_thin true for empty', competitor_scrape_is_thin(''));
@@ -911,6 +954,8 @@ check_true('contract lists itinerary', stripos($contract, 'itinerary') !== false
 check_true('contract lists exclusions', stripos($contract, 'exclusions') !== false);
 check_true('contract lists meals', stripos($contract, 'meals') !== false);
 check_true('contract marks INFER fields', strpos($contract, 'INFER') !== false);
+check_true('contract asks for full flight detail', stripos($contract, 'FULL outbound flight detail') !== false);
+check_true('contract asks optionals verbatim with price', stripos($contract, 'each one verbatim WITH its price') !== false);
 
 echo "\n" . ($failures === 0 ? "ALL PASS\n" : "{$failures} FAILURE(S)\n");
 exit($failures === 0 ? 0 : 1);
