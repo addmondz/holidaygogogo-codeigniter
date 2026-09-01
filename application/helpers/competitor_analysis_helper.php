@@ -113,7 +113,8 @@ if ( ! function_exists('competitor_output_contract'))
 			. '"pros": string[], '
 			. '"cons": string[], '
 			. '"summary": string (2-4 sentence overview), '
-			. '"comparison": string (FIRST find a product in OUR PRODUCTS below that MATCHES or is SIMILAR to this competitor product — same/overlapping destination or tour type. If one matches, compare against THAT product only: pricing, value, gaps, and a recommendation. If NONE of our products match or are similar, do NOT force a comparison — state plainly that we have no comparable product on our side for this destination/type.)'
+			. '"comparison": string (FIRST find a product in OUR PRODUCTS below that MATCHES or is SIMILAR to this competitor product — same/overlapping destination or tour type. If one matches, compare against THAT product only: pricing, value, gaps, and a recommendation. If NONE of our products match or are similar, do NOT force a comparison — state plainly that we have no comparable product on our side for this destination/type.), '
+			. '"matched_product": string (the EXACT "name" from OUR PRODUCTS you compared against in "comparison"; "" if none matched)'
 			. '}';
 		return "Reply with ONLY a single JSON object, no markdown, no code fences, matching exactly this shape: "
 			. $schema_hint . ". "
@@ -2458,6 +2459,7 @@ if ( ! function_exists('competitor_parse_ai_response'))
 			'senior_friendly'  => $str($get('senior_friendly')),
 			'summary'          => $str($get('summary')),
 			'comparison'       => $str($get('comparison')),
+			'matched_product'  => $str($get('matched_product')),
 			// Multi-entry lists.
 			'countries'        => $list($get('countries')),
 			'cities'           => $list($get('cities')),

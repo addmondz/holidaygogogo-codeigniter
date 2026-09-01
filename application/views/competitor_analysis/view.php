@@ -86,7 +86,7 @@ $title = $a->product_name ?: ($a->page_title ?: 'Competitor Analysis');
                         'departure_city' => $a->departure_city ?? '', 'flight_departure' => $a->flight_departure ?? '', 'flight_return' => $a->flight_return ?? '',
                         'difficulty' => $a->difficulty ?? '', 'target_traveller' => $a->target_traveller ?? '', 'suitable_age' => $a->suitable_age ?? '',
                         'child_friendly' => $a->child_friendly ?? '', 'senior_friendly' => $a->senior_friendly ?? '',
-                        'summary' => $a->summary, 'comparison' => $a->comparison,
+                        'summary' => $a->summary, 'comparison' => $a->comparison, 'matched_product' => $a->matched_product ?? '',
                         'countries' => $a->countries ?? array(), 'cities' => $a->cities ?? array(), 'travel_months' => $a->travel_months ?? array(),
                         'themes' => $a->themes ?? array(), 'tour_styles' => $a->tour_styles ?? array(), 'local_transport' => $a->local_transport ?? array(),
                         'inclusions' => $a->inclusions, 'exclusions' => $a->exclusions ?? array(), 'hotels' => $a->hotels ?? array(),

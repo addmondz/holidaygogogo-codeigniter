@@ -17,6 +17,7 @@ class Competitor_Analysis_Model extends CI_Model
 	private $detail_keys = array(
 		'price_from', 'price_to', 'departure_city', 'flight_departure', 'flight_return',
 		'difficulty', 'target_traveller', 'suitable_age', 'child_friendly', 'senior_friendly',
+		'matched_product',
 		'countries', 'cities', 'travel_months', 'themes', 'tour_styles', 'local_transport',
 		'exclusions', 'hotels', 'shopping_stops', 'optional_tours', 'special_remarks',
 		'scenic_highlights', 'signature_meals', 'usp', 'meals', 'itinerary',
@@ -127,7 +128,7 @@ class Competitor_Analysis_Model extends CI_Model
 		}
 		$scalar_keys = array('price_from', 'price_to', 'departure_city', 'flight_departure',
 			'flight_return', 'difficulty', 'target_traveller', 'suitable_age',
-			'child_friendly', 'senior_friendly');
+			'child_friendly', 'senior_friendly', 'matched_product');
 		foreach ($this->detail_keys as $k) {
 			if ($k === 'meals') {
 				$m = isset($details['meals']) && is_array($details['meals']) ? $details['meals'] : array();

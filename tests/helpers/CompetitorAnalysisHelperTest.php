@@ -851,11 +851,14 @@ $clean = json_encode(array(
     'inclusions' => array('Hotel', 'Breakfast'),
     'pros' => array('Cheap'), 'cons' => array('No flight'),
     'summary' => 'Budget Bali tour.', 'comparison' => 'Cheaper than ours.',
+    'matched_product' => 'Bali Deluxe 5D4N',
 ));
 $rec = competitor_parse_ai_response($clean);
 check('parse product_name', 'Bali 5D4N', $rec['product_name']);
 check('parse inclusions as list', array('Hotel', 'Breakfast'), $rec['inclusions']);
 check('parse comparison', 'Cheaper than ours.', $rec['comparison']);
+check('parse matched_product', 'Bali Deluxe 5D4N', $rec['matched_product']);
+check('parse matched_product default ""', '', competitor_parse_ai_response('{"foo":"bar"}')['matched_product']);
 
 // code-fenced + surrounding prose
 $fenced = "Here you go:\n```json\n" . $clean . "\n```\nthanks";
