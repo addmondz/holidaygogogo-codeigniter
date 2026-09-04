@@ -61,6 +61,9 @@ assert_true('two calls differ',          chat_history_stored_name('a.txt') !== c
 assert_true('company sender is outbound',   chat_history_is_outbound('Holidaygogogo Tours Simon'));
 assert_true('spaced/cased brand matches',   chat_history_is_outbound('holiday gogogo'));
 assert_false('customer number not outbound', chat_history_is_outbound('+60 12-291 1210'));
+// iOS/Web exports label our own line "You" instead of the brand name.
+assert_true('You is outbound',              chat_history_is_outbound('You'));
+assert_false('random name not outbound',    chat_history_is_outbound('Youssef'));
 
 // ---- parse -----------------------------------------------------------------
 $sample = implode("\n", array(
@@ -95,6 +98,41 @@ assert_eq('msg2 ts',              '7/23/26, 1:36 PM', $msgs[2]['ts']);
 
 // [3] final inbound message
 assert_eq('msg3 body',            '好的谢谢', $msgs[3]['body']);
+
+// iOS / WhatsApp-Web export uses "[<date>, <time>] Sender: body" (bracketed,
+// seconds in the time, "You" as our own line, "] - " system notices).
+$ios = implode("\n", array(
+    'Messages and calls are end-to-end encrypted. No one outside of this chat can read them.',
+    '[9/4/26, 2:43:02 PM] +65 9460 1972: 你好，想问一下包车价格',
+    'Breakfast (ayer hitam) -',
+    '[9/4/26, 2:43:03 PM] - Messages and calls are end-to-end encrypted. Tap to learn more.',
+    '[9/4/26, 2:45:11 PM] You: 您好，可以麻烦您whatsapp到 +60102956786吗？',
+    '[9/4/26, 2:45:37 PM] +65 9460 1972: 好的👌',
+));
+$imsgs = chat_history_parse($ios);
+
+// Leading no-timestamp banner dropped; inbound + system notice + outbound + inbound = 4.
+assert_eq('ios message count',    4, count($imsgs));
+
+// [0] inbound bracketed line with a folded continuation
+assert_false('ios0 not system',   $imsgs[0]['system']);
+assert_eq('ios0 sender',          '+65 9460 1972', $imsgs[0]['sender']);
+assert_false('ios0 not outbound', $imsgs[0]['outbound']);
+assert_true('ios0 folds wrap',    strpos($imsgs[0]['body'], 'Breakfast') !== false);
+assert_eq('ios0 ts',              '9/4/26, 2:43:02 PM', $imsgs[0]['ts']);
+
+// [1] "] - " system notice (dash stripped, flagged system)
+assert_true('ios1 is system',     $imsgs[1]['system']);
+assert_eq('ios1 sender empty',    '', $imsgs[1]['sender']);
+assert_true('ios1 body kept',     strpos($imsgs[1]['body'], 'end-to-end encrypted') !== false);
+
+// [2] our own "You:" line floats outbound
+assert_true('ios2 outbound',      $imsgs[2]['outbound']);
+assert_eq('ios2 sender',          'You', $imsgs[2]['sender']);
+
+// [3] final inbound
+assert_false('ios3 not outbound', $imsgs[3]['outbound']);
+assert_eq('ios3 sender',          '+65 9460 1972', $imsgs[3]['sender']);
 
 // Empty input is safe.
 assert_eq('empty text -> []',     array(), chat_history_parse(''));

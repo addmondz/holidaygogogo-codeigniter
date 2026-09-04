@@ -83,11 +83,16 @@ if (!function_exists('chat_history_is_outbound')) {
 	 * True when a message sender is us (the company), so the viewer floats it to
 	 * the right. WhatsApp names our line like "Holidaygogogo Tours Simon"; match
 	 * the brand loosely (spaces/case ignored) so any staff suffix still counts.
+	 * iOS / WhatsApp-Web exports label our own line simply "You" — treat that as
+	 * outbound too (the exporter is always us).
 	 */
 	function chat_history_is_outbound($sender)
 	{
 		$s = strtolower((string) $sender);
 		$s = str_replace(array(' ', '-', '_'), '', $s);
+		if ($s === 'you') {
+			return true;
+		}
 		return strpos($s, 'holidaygogogo') !== false;
 	}
 }
@@ -98,9 +103,12 @@ if (!function_exists('chat_history_parse')) {
 	 *   array('ts'=>string, 'sender'=>string, 'body'=>string,
 	 *         'system'=>bool, 'outbound'=>bool)
 	 *
-	 * A new message begins on a line shaped "<date>, <time> - <rest>". The <rest>
-	 * is "Sender: body" for a chat line, or a bare notice (E2E-encryption banner,
-	 * "Missed voice call", …) for a system line — flagged system=true with an
+	 * A new message begins on a timestamped header line, in either export dialect:
+	 *   - Android : "<date>, <time> - <rest>"
+	 *   - iOS/Web : "[<date>, <time>] <rest>"  (bracketed, seconds in the time,
+	 *               an optional leading LTR mark, "] - " system notices)
+	 * The <rest> is "Sender: body" for a chat line, or a bare notice (E2E-encryption
+	 * banner, "Missed voice call", …) for a system line — flagged system=true with an
 	 * empty sender. Lines that don't start a new message are continuation lines
 	 * and fold onto the previous message's body (multi-line messages). Fully
 	 * blank system lines are dropped.
@@ -110,16 +118,31 @@ if (!function_exists('chat_history_parse')) {
 		$text  = str_replace(array("\r\n", "\r"), "\n", (string) $text);
 		$lines = explode("\n", $text);
 
-		// "7/23/26, 1:35 PM - rest"  /  "13/07/2026, 13:35 - rest" (24h too).
-		$head = '/^(\d{1,2}\/\d{1,2}\/\d{2,4}),\s+(\d{1,2}:\d{2}(?::\d{2})?(?:\s?[APap][Mm])?)\s+-\s+(.*)$/u';
+		// Android: "7/23/26, 1:35 PM - rest" / "13/07/2026, 13:35 - rest" (24h too).
+		$head_android = '/^(\d{1,2}\/\d{1,2}\/\d{2,4}),\s+(\d{1,2}:\d{2}(?::\d{2})?(?:\s?[APap][Mm])?)\s+-\s+(.*)$/u';
+		// iOS/Web: "[9/4/26, 2:43:02 PM] rest" (optional leading LTR mark \x{200e}).
+		$head_ios     = '/^\x{200e}?\[(\d{1,2}\/\d{1,2}\/\d{2,4}),\s+(\d{1,2}:\d{2}(?::\d{2})?(?:\s?[APap][Mm])?)\]\s*(.*)$/u';
 
 		$messages = array();
 		$last     = -1; // index of the message continuation lines append to.
 
 		foreach ($lines as $line) {
-			if (preg_match($head, $line, $m)) {
+			$m      = null;
+			$is_ios = false;
+			if (preg_match($head_android, $line, $m)) {
+				// matched Android dialect
+			} elseif (preg_match($head_ios, $line, $m)) {
+				$is_ios = true;
+			}
+			if ($m) {
 				$ts   = trim($m[1] . ', ' . $m[2]);
 				$rest = $m[3];
+
+				// iOS system notices come as "] - <notice>"; drop the leading dash
+				// so they read the same as the Android bare-notice form.
+				if ($is_ios) {
+					$rest = preg_replace('/^-\s+/u', '', $rest);
+				}
 
 				// "Sender: body" → chat line; no "Name: " prefix → system notice.
 				$sender = '';
