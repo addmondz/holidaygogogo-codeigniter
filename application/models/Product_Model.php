@@ -3,7 +3,12 @@ class Product_Model extends CI_Model
 {
 	function Read_Product()
 	{
-		$this->db->select('ProductID, product.SupplierID, ProductCode, product.Name As Product, RetailPrice, SupplierPrice, is_child_or_infant, has_supplier_deposit, category.Name As Category');
+		$this->db->select('ProductID, product.SupplierID, ProductCode, product.Name As Product, RetailPrice, SupplierPrice, is_child_or_infant, has_supplier_deposit, category.Name As Category,
+			Destination, Duration, DepartureCity, Difficulty, SuitableAge, TargetTraveller,
+			Countries, Cities, Themes, TourStyle, LocalTransport,
+			Flights, MealBreakfast, MealLunch, MealDinner,
+			Hotels, ScenicHighlights, ShoppingStops,
+			Inclusions, Exclusions, OptionalTours, Itinerary, SpecialRemarks');
 		$this->db->join('category', 'category.CategoryID = product.CategoryID', 'left');
 		$this->db->where('ProductID', $this->input->get('product_id'));
 		return $this->db->get('product')->row_array();
@@ -50,6 +55,34 @@ class Product_Model extends CI_Model
 		$this->db->where('product.Status', 'Y');
 		$this->db->order_by('ProductCode', 'ASC');
 		$this->db->order_by('product.Name', 'ASC');
+		return $this->db->get('product')->result();
+	}
+
+	/**
+	 * Active products that carry real tour detail, for the Competitor Analysis
+	 * "Comparison vs Our Products" block. Only products with at least one of the
+	 * key tour fields filled (Destination / Itinerary / Inclusions) are returned
+	 * — plain line-item products (a hotel room, a transfer) carry no signal for a
+	 * tour-vs-tour comparison and would only waste prompt tokens. Newest first.
+	 */
+	function Read_For_Comparison($limit = 40)
+	{
+		$this->db->select('ProductCode, product.Name As Name, RetailPrice,
+			Destination, Duration, DepartureCity, Difficulty, SuitableAge, TargetTraveller,
+			Countries, Cities, Themes, TourStyle, LocalTransport,
+			Flights, MealBreakfast, MealLunch, MealDinner,
+			Hotels, ScenicHighlights, ShoppingStops,
+			Inclusions, Exclusions, OptionalTours, Itinerary, SpecialRemarks');
+		$this->db->where('product.Status', 'Y');
+		$this->db->group_start();
+		$this->db->where("(Destination IS NOT NULL AND Destination != '')");
+		$this->db->or_where("(Itinerary IS NOT NULL AND Itinerary != '')");
+		$this->db->or_where("(Inclusions IS NOT NULL AND Inclusions != '')");
+		$this->db->group_end();
+		$this->db->order_by('ProductID', 'DESC');
+		if ((int) $limit > 0) {
+			$this->db->limit((int) $limit);
+		}
 		return $this->db->get('product')->result();
 	}
 

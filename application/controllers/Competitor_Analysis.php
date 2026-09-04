@@ -175,10 +175,55 @@ class Competitor_Analysis extends MY_Controller
 			return;
 		}
 
-		$url = trim((string) $this->input->post('url'));
+		$url   = trim((string) $this->input->post('url'));
+		$paste = trim((string) $this->input->post('paste'));
+
+		// Pasted text (notes + links) → BACKGROUND analyse job (non-blocking). We
+		// scrape each pasted link and browse JS pages with web_search, which can run
+		// for minutes — doing it inline hit the web server's read timeout and showed
+		// a false "Analysis Failed" even though the row saved. Queuing frees the
+		// browser immediately; the row appears in Analysis Results when done.
+		if ( ! $has_file && $paste !== '') {
+			$job_id = $this->queue_job(array(
+				'url'        => competitor_paste_source_label($paste),
+				'mode'       => 'paste',
+				'paste_text' => $paste,
+				'created_by' => $this->session->admin_id,
+			));
+			if ($job_id !== '') {
+				echo json_encode(array('success' => true, 'job' => $job_id));
+				return;
+			}
+			// No process spawn available (exec disabled) → run inline as a last resort.
+			@set_time_limit(600);
+			$this->load->model('Product_Model');
+			$this->load->helper('product_tour_fields');
+			$our_products = competitor_format_our_products($this->Product_Model->Read_For_Comparison());
+			$this->load->library('CompetitorAnalysisService');
+			try {
+				$record = $this->competitoranalysisservice->analyze_paste($paste, $our_products);
+			} catch (Exception $e) {
+				$this->Competitor_Analysis_Model->Create(array(
+					'url'           => competitor_paste_source_label($paste),
+					'source'        => 'paste',
+					'status'        => 'error',
+					'error_message' => $e->getMessage(),
+					'created_by'    => $this->session->admin_id,
+				));
+				echo json_encode(array('success' => false, 'message' => $e->getMessage()));
+				return;
+			}
+			$record['url']        = competitor_paste_source_label($paste);
+			$record['source']     = 'paste';
+			$record['status']     = 'done';
+			$record['created_by'] = $this->session->admin_id;
+			$id = $this->Competitor_Analysis_Model->Create($record);
+			echo json_encode(array('success' => true, 'id' => $id));
+			return;
+		}
 
 		if ( ! $has_file && ($url === '' || ! preg_match('#^https?://#i', $url))) {
-			echo json_encode(array('success' => false, 'message' => 'Enter a valid http(s) URL or upload a PDF/image.'));
+			echo json_encode(array('success' => false, 'message' => 'Enter a valid http(s) URL, paste text/links, or upload a PDF/image.'));
 			return;
 		}
 
@@ -199,8 +244,9 @@ class Competitor_Analysis extends MY_Controller
 
 		// File upload → synchronous OpenAI analysis (no crawl).
 		@set_time_limit(600);
-		$this->load->model('Costing_Model');
-		$our_products = competitor_format_our_products($this->Costing_Model->Read_Packages_Dashboard());
+		$this->load->model('Product_Model');
+		$this->load->helper('product_tour_fields');
+		$our_products = competitor_format_our_products($this->Product_Model->Read_For_Comparison());
 		$this->load->library('CompetitorAnalysisService');
 		$upload_full  = null;
 		$source_label = '';
@@ -213,6 +259,7 @@ class Competitor_Analysis extends MY_Controller
 			if ($upload_full) { @unlink($upload_full); }
 			$this->Competitor_Analysis_Model->Create(array(
 				'url'           => $source_label !== '' ? $source_label : 'uploaded file',
+				'source'        => 'upload',
 				'status'        => 'error',
 				'error_message' => $e->getMessage(),
 				'created_by'    => $this->session->admin_id,
@@ -223,6 +270,7 @@ class Competitor_Analysis extends MY_Controller
 		if ($upload_full) { @unlink($upload_full); }
 
 		$record['url']        = $source_label !== '' ? $source_label : 'uploaded file';
+		$record['source']     = 'upload';
 		$record['status']     = 'done';
 		$record['created_by'] = $this->session->admin_id;
 		$id = $this->Competitor_Analysis_Model->Create($record);
@@ -261,9 +309,16 @@ class Competitor_Analysis extends MY_Controller
 			if ( ! is_array($s)) {
 				continue;
 			}
+			$mode = isset($s['mode']) ? $s['mode'] : 'crawl';
 			// Analyse jobs are transient (driven from the Review page) — not listed
 			// as their own "Crawled Results" row.
-			if ((isset($s['mode']) ? $s['mode'] : 'crawl') === 'analyse') {
+			if ($mode === 'analyse') {
+				continue;
+			}
+			// A FINISHED paste job is shown via its saved DB row (folded in below), so
+			// skip the done status file to avoid a duplicate row. Queued/running/error
+			// paste jobs still show here (progress + error visibility).
+			if ($mode === 'paste' && (isset($s['state']) ? $s['state'] : '') === 'done') {
 				continue;
 			}
 			$view = competitor_job_public_view($s);
@@ -273,17 +328,20 @@ class Competitor_Analysis extends MY_Controller
 				$running = true;
 			}
 		}
-		// Fold in PDF/image UPLOAD analyses so they share the one results table.
+		// Fold in single (non-crawl) analyses — uploaded PDFs/images and pasted
+		// text/links — so they share the one results table.
 		foreach ($this->Competitor_Analysis_Model->Read_Uploads(20) as $u) {
-			$ts = (string) $u->created_at;
+			$ts       = (string) $u->created_at;
+			$is_paste = ($u->source === 'paste');
 			$jobs[] = array(
 				'job'          => 'upload_' . (int) $u->id,
-				'is_upload'    => true,
+				'is_upload'    => true,                             // shares the DB-row (delete/view) path
+				'is_paste'     => $is_paste,                        // paste vs file, for the tag/icon
 				'analysis_id'  => (int) $u->id,
-				'url'          => (string) $u->url,                 // the file name
+				'url'          => (string) $u->url,                 // file name, or the pasted source label
 				'title'        => (string) $u->product_name,
 				'state'        => ($u->status === 'error') ? 'error' : 'done',
-				'message'      => 'Uploaded',
+				'message'      => $is_paste ? 'Analysed' : 'Uploaded',
 				'count'        => 1,
 				'analysed'     => 1,
 				'cost_total'   => (float) $u->cost_usd,

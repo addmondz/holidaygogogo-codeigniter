@@ -1,0 +1,3 @@
+ALTER TABLE product DROP COLUMN FlightDeparture;
+ALTER TABLE product DROP COLUMN FlightReturn;
+ALTER TABLE product ADD COLUMN Flights TEXT NULL DEFAULT NULL;

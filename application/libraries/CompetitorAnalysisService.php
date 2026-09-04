@@ -826,6 +826,41 @@ class CompetitorAnalysisService
 	}
 
 	/**
+	 * Extract ONE tour page into OUR product shape (tour detail + structured
+	 * flights) for the Product form's "Extract from link" button. Reuses the same
+	 * scrape pipeline as analyze_url(); a thin/JS page falls back to a browsing
+	 * (web_search) call so the itinerary/flights can still be read. Returns
+	 * array('data' => <decoded AI JSON>, 'cost' => <usd>). Throws on bad URL,
+	 * unreadable page or unparseable reply.
+	 */
+	public function extract_for_product($url)
+	{
+		$this->CI->load->helper('product_extract');
+
+		$url = trim((string) $url);
+		if ( ! preg_match('#^https?://#i', $url)) {
+			throw new Exception('Please enter a valid http(s) URL.');
+		}
+
+		$text = $this->extract_source_text($url);
+		$thin = competitor_scrape_is_thin($text) || $this->last_spa_partial;
+
+		if ($thin) {
+			$spec = product_extract_agent_input($url, $text, true);
+			$raw  = $this->request($spec['instructions'], $spec['input'], array(array('type' => $this->web_search_tool())), 'product_extract(ws) ' . $url);
+		} else {
+			$spec = product_extract_agent_input($url, $text, false);
+			$raw  = $this->request($spec['instructions'], $spec['input'], array(), 'product_extract ' . $url);
+		}
+
+		$data = product_extract_decode($raw);
+		if ($data === null) {
+			throw new Exception('The AI response could not be parsed. Please try again.');
+		}
+		return array('data' => $data, 'cost' => $this->last_run_cost());
+	}
+
+	/**
 	 * Extract a single product page's SOURCE TEXT with NO OpenAI call — the shared
 	 * scraping pipeline behind both analyze_url() and crawl_to_text():
 	 *   0) ICE Holidays JSON API URLs -> read the JSON directly
@@ -1830,6 +1865,44 @@ class CompetitorAnalysisService
 			),
 		));
 		$raw = $this->request($spec['instructions'], $input, array(), 'file ' . $ext);
+		return $this->to_record($raw);
+	}
+
+	/**
+	 * Analyse PASTED TEXT (notes the user typed, with competitor links dropped in).
+	 * We pull the http(s) URLs out of the text and scrape each page OURSELVES
+	 * (extract_source_text — the same pipeline as a crawl, PDFs and SPAs included),
+	 * then hand the pasted notes PLUS every link's scraped content to OpenAI. Links
+	 * a plain fetch couldn't read (JS SPAs) are handed to the browsing agent with
+	 * web_search so the link content still reaches the model. Returns one record.
+	 */
+	public function analyze_paste($text, $our_products)
+	{
+		$text = trim((string) $text);
+		if ($text === '') {
+			throw new Exception('Paste some text or a competitor link to analyse.');
+		}
+
+		$urls  = competitor_extract_text_urls($text);
+		$links = array();
+		$any_thin = false;
+		foreach ($urls as $u) {
+			try {
+				$body = $this->extract_source_text($u);
+			} catch (Exception $e) {
+				$body = '';
+			}
+			$thin = competitor_scrape_is_thin($body);
+			if ($thin) { $any_thin = true; }
+			$links[] = array('url' => $u, 'text' => $thin ? '' : $body);
+		}
+
+		// Only let the model browse the unreadable links when we actually have a
+		// web_search tool for this model — otherwise just analyse the notes + text.
+		$allow_browse = $any_thin && $this->web_search_tool() !== '';
+		$spec  = competitor_build_paste_agent($text, $links, $our_products, $allow_browse);
+		$tools = $allow_browse ? array(array('type' => $this->web_search_tool())) : array();
+		$raw   = $this->request($spec['instructions'], $spec['input'], $tools, 'paste');
 		return $this->to_record($raw);
 	}
 

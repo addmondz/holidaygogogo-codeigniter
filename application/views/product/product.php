@@ -10,6 +10,33 @@
             </div>
             <div class="card-body">
                 <form id="form">
+                    <ul class="nav nav-tabs nav-tabs-line mb-5" role="tablist">
+                        <li class="nav-item">
+                            <a class="nav-link active" data-toggle="tab" href="#product_tab_info" role="tab">Product Information</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" data-toggle="tab" href="#product_tab_tour" role="tab">Tour Details</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" data-toggle="tab" href="#product_tab_flights" role="tab">Flights</a>
+                        </li>
+                    </ul>
+                    <div class="tab-content">
+                    <div class="tab-pane fade show active" id="product_tab_info" role="tabpanel">
+                    <div class="form-group">
+                        <label>Auto-fill Tour Details &amp; Flights from a link
+                            <i class="la la-info-circle" data-toggle="tooltip" title="Paste a tour page URL and click Extract — AI reads the page and fills the Tour Details and Flights tabs. Nothing is saved until you Update/Create."></i>
+                        </label>
+                        <div class="input-group">
+                            <input type="text" id="ExtractUrl" placeholder="https://... tour page link" autocomplete="off" class="form-control">
+                            <div class="input-group-append">
+                                <button type="button" id="extract-btn" class="btn btn-primary font-weight-bold">
+                                    <i class="la la-magic"></i> Extract
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="separator separator-dashed my-5"></div>
                     <strong>Product Information :</strong>
                     <br><br>
                     <div class="row">
@@ -103,6 +130,7 @@
                             </div>
                         </div>
                     </div>
+
                     <?php if(isset($package_checklists)) {
                         // Get required checklist IDs
                         $required_ids = array();
@@ -216,6 +244,48 @@
                             </div>
                         </div>
                     <?php } ?>
+                    </div><!-- #product_tab_info -->
+
+                    <div class="tab-pane fade" id="product_tab_tour" role="tabpanel">
+                        <?php // Tour-attribute sections (mirror Competitor Analysis >> View). ?>
+                        <?php foreach(product_tour_fields() as $section => $fields) { ?>
+                            <strong><?php echo $section; ?> :</strong>
+                            <br><br>
+                            <div class="row">
+                                <?php foreach($fields as $f) {
+                                    $col = $f['col'];
+                                    $val = isset($$col) ? (string) $$col : '';
+                                ?>
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label><?php echo $f['label']; ?></label>
+                                            <?php if($f['type'] === 'textarea') { ?>
+                                                <textarea id="<?php echo $col; ?>" rows="3" autocomplete="off" class="form-control"><?php echo htmlspecialchars($val); ?></textarea>
+                                            <?php } else { ?>
+                                                <div class="input-icon">
+                                                    <input type="text" id="<?php echo $col; ?>" value="<?php echo htmlspecialchars($val); ?>" autocomplete="off" class="form-control">
+                                                    <span><i class="la la-info-circle"></i></span>
+                                                </div>
+                                            <?php } ?>
+                                        </div>
+                                    </div>
+                                <?php } ?>
+                            </div>
+                            <br>
+                        <?php } ?>
+                    </div><!-- #product_tab_tour -->
+
+                    <div class="tab-pane fade" id="product_tab_flights" role="tabpanel">
+                        <strong>Flights :</strong>
+                        <span class="text-muted" style="font-size:12px;">(add one section per flight leg)</span>
+                        <br><br>
+                        <div id="flights-container"></div>
+                        <button type="button" id="add-flight-btn" class="btn btn-light-primary font-weight-bold">
+                            <i class="la la-plus"></i> Add Flight
+                        </button>
+                    </div><!-- #product_tab_flights -->
+                    </div><!-- tab-content -->
+
                     <div class="d-flex justify-content-between border-top pt-5">
                         <a class="btn btn-light-primary font-weight-bold d-flex align-items-center justify-content-center px-9 py-4" href="<?php echo base_url('Product'); ?>"><i class="la la-arrow-left"></i> Back to List</a>
                         <input type="button" value="<?php if(current_url() == base_url('Product/Create')) { echo 'Create Product'; } else { echo 'Update Product'; } ?>" class="btn btn-success font-weight-bold px-9 py-4" style="width:180px; margin-left:auto;">
@@ -509,6 +579,20 @@
                                         product[0]['SupplierPrice'] = supplier_price.replace(/,/g, '');;
                                     }
 
+                                    // Tour-attribute fields (kept as typed, only sent when filled)
+                                    <?php foreach(product_tour_field_columns() as $col) { ?>
+                                        var val_<?php echo $col; ?> = $('#<?php echo $col; ?>').val();
+                                        if(val_<?php echo $col; ?> != null && val_<?php echo $col; ?> != '') {
+                                            product[0]['<?php echo $col; ?>'] = val_<?php echo $col; ?>;
+                                        }
+                                    <?php } ?>
+
+                                    // Flights (multiple structured sections) -> JSON
+                                    var create_flights = collectFlights();
+                                    if(create_flights.length > 0) {
+                                        product[0]['Flights'] = JSON.stringify(create_flights);
+                                    }
+
                                     // Collect chosen checklists in order
                                     var selected_checklists = [];
                                     <?php if(isset($package_checklists)) { ?>
@@ -533,13 +617,21 @@
                             Display_Message('<?php echo base_url('assets/image/sweetalert.jpg') ?>', 'Product Name Must Not Exceed '+maxNameLength+' Characters', null);
                         } else {
                             var product = [{ProductID:<?php echo $ProductID ?>, UpdateBy:<?php echo $this->session->userdata('admin_id') ?>, UpdateDate:'<?php echo date('Y-m-d H:i:s') ?>'}];
+                            // Free-form tour fields keep their casing; Name (and legacy) stay uppercased.
+                            var keepCaseFields = <?php echo json_encode(product_tour_field_columns()); ?>;
                             var dirty_fields = $('#form').dirty('showDirtyFields');
                             if(dirty_fields.length > 0) {
                                 for(var i = 0; i < dirty_fields.length; i++) {
                                     var key = dirty_fields[i].id;
-                                    var value = (dirty_fields[i].value).toUpperCase();
+                                    if(key === 'ExtractUrl') { continue; } // helper field, not a column
+                                    var raw = dirty_fields[i].value;
+                                    var value;
                                     if(key == 'RetailPrice' || key == 'SupplierPrice') {
-                                        value = value.replace(/,/g, '');
+                                        value = raw.replace(/,/g, '');
+                                    } else if(keepCaseFields.indexOf(key) !== -1) {
+                                        value = raw;
+                                    } else {
+                                        value = raw.toUpperCase();
                                     }
                                     product[0][key] = value;
                                 }
@@ -549,6 +641,12 @@
                             var current_is_child_or_infant = $('#is_child_or_infant').val();
                             if(current_is_child_or_infant !== original_is_child_or_infant) {
                                 product[0]['is_child_or_infant'] = current_is_child_or_infant;
+                            }
+
+                            // Flights: send only when the set changed (JSON compare)
+                            var current_flights_json = JSON.stringify(collectFlights());
+                            if(current_flights_json !== originalFlightsJson) {
+                                product[0]['Flights'] = current_flights_json;
                             }
 
                             var original_has_supplier_deposit = '<?php echo $has_supplier_deposit ?? 0; ?>';
@@ -709,5 +807,193 @@
 
     document.addEventListener('DOMContentLoaded', function () {
         validateLength('Name', 'NameError', 80);
+    });
+
+    // ---------------------------------------------------------------------
+    // Flights tab: repeatable structured flight sections, stored as a JSON
+    // array in the single product.Flights column.
+    // ---------------------------------------------------------------------
+    var flightFields = <?php echo json_encode(product_flight_fields()); ?>;
+    var existingFlights = <?php echo json_encode(product_flights_decode(isset($Flights) ? $Flights : '')); ?>;
+    var originalFlightsJson = JSON.stringify(existingFlights);
+
+    function renumberFlights() {
+        $('#flights-container .flight-card').each(function(i) {
+            $(this).find('.flight-card-title').text('Flight ' + (i + 1));
+        });
+    }
+
+    function buildFlightCard(data) {
+        data = data || {};
+        var $card = $('<div class="flight-card" style="border:1px solid #e4e6ef;border-radius:6px;padding:15px 15px 0;margin-bottom:12px;background:#f8f9fa;"></div>');
+        var $head = $('<div class="d-flex justify-content-between align-items-center mb-3"></div>');
+        $head.append('<strong class="flight-card-title" style="color:#6082B6;">Flight</strong>');
+        $head.append('<button type="button" class="btn btn-sm btn-light-danger remove-flight-btn"><i class="la la-times"></i> Remove</button>');
+        $card.append($head);
+        var $row = $('<div class="row"></div>');
+        flightFields.forEach(function(f) {
+            var $col = $('<div class="col-md-6"><div class="form-group"><label>' + f.label + '</label></div></div>');
+            var $fg = $col.find('.form-group');
+            var $field;
+            if(f.type === 'select') {
+                $field = $('<select class="form-control flight-field"></select>').attr('data-key', f.key);
+                (f.options || []).forEach(function(o) {
+                    $field.append($('<option></option>').attr('value', o).text(o));
+                });
+            } else {
+                $field = $('<input type="text" class="form-control flight-field" autocomplete="off">').attr('data-key', f.key);
+            }
+            $fg.append($field);
+            $row.append($col);
+        });
+        $card.append($row);
+        $('#flights-container').append($card);
+        $card.find('.flight-field').each(function() {
+            var key = $(this).attr('data-key');
+            if(data[key] != null) $(this).val(data[key]);
+        });
+        renumberFlights();
+    }
+
+    function collectFlights() {
+        var flights = [];
+        $('#flights-container .flight-card').each(function() {
+            var obj = {};
+            var hasVal = false;
+            $(this).find('.flight-field').each(function() {
+                var key = $(this).attr('data-key');
+                var v = ($(this).val() || '').toString().trim();
+                obj[key] = v;
+                if(v !== '' && key !== 'direction') hasVal = true;
+            });
+            if(hasVal) flights.push(obj);
+        });
+        return flights;
+    }
+
+    $(document).on('click', '#add-flight-btn', function() {
+        buildFlightCard({});
+        $('#form').dirty('setDirty');
+    });
+    $(document).on('click', '.remove-flight-btn', function() {
+        $(this).closest('.flight-card').remove();
+        renumberFlights();
+        $('#form').dirty('setDirty');
+    });
+
+    $(document).ready(function() {
+        existingFlights.forEach(function(f) { buildFlightCard(f); });
+    });
+
+    // ---------------------------------------------------------------------
+    // "Extract from link": AI reads a tour page and fills Tour Details + Flights.
+    // ---------------------------------------------------------------------
+    function applyExtracted(fields, flights) {
+        var count = 0;
+        Object.keys(fields || {}).forEach(function(col) {
+            var $el = $('#' + col);
+            if($el.length) { $el.val(fields[col]); count++; }
+        });
+        if(Array.isArray(flights) && flights.length > 0) {
+            $('#flights-container').empty();
+            flights.forEach(function(f) { buildFlightCard(f); });
+            count += flights.length;
+        }
+        return count;
+    }
+
+    // Human labels for the extracted columns (for the confirmation preview).
+    var tourFieldLabels = <?php
+        $labels = array();
+        foreach (product_tour_fields_flat() as $f) { $labels[$f['col']] = $f['label']; }
+        echo json_encode($labels);
+    ?>;
+
+    function extractEsc(s) { return $('<div>').text(s == null ? '' : String(s)).html(); }
+
+    // Build a read-only summary of what Extract found, so the user can confirm
+    // BEFORE it overwrites the form fields.
+    function buildExtractPreview(fields, flights) {
+        var rows = [];
+        Object.keys(fields || {}).forEach(function(col) {
+            var label = tourFieldLabels[col] || col;
+            var oneLine = String(fields[col] || '').replace(/\s*\n\s*/g, ' · ');
+            if(oneLine.length > 180) { oneLine = oneLine.substring(0, 180) + '…'; }
+            rows.push('<div style="margin-bottom:6px;"><strong style="color:#6082B6;">' + extractEsc(label) + ':</strong> ' + extractEsc(oneLine) + '</div>');
+        });
+        if(Array.isArray(flights) && flights.length > 0) {
+            var fl = flights.map(function(f) {
+                var route = (f.from || '') + (f.to ? (' → ' + f.to) : '');
+                var parts = [f.direction, ((f.airline || '') + ' ' + (f.flight_no || '')).trim(), route.trim()]
+                    .filter(function(x) { return x && x.trim() !== ''; });
+                return '<div style="margin-left:10px;">• ' + extractEsc(parts.join(' | ')) + '</div>';
+            }).join('');
+            rows.push('<div style="margin-bottom:6px;"><strong style="color:#6082B6;">Flights (' + flights.length + '):</strong>' + fl + '</div>');
+        }
+        if(rows.length === 0) { return ''; }
+        // No inner max-height/overflow — let SweetAlert's own container scroll
+        // (a nested scroll box would show a second scrollbar).
+        return '<div style="text-align:left; font-size:13px; padding:4px 2px;">' + rows.join('') + '</div>';
+    }
+
+    // Progress shown as a SweetAlert popup (mirrors Competitor Analysis).
+    var EXTRACT_IMG = '<?php echo base_url('assets/image/sweetalert.jpg') ?>';
+
+    $(document).on('click', '#extract-btn', function() {
+        var url = ($('#ExtractUrl').val() || '').trim();
+        if(url === '' || !/^https?:\/\//i.test(url)) {
+            Display_Message(EXTRACT_IMG, 'Please Enter A Valid http(s) Link', null);
+            return;
+        }
+        var $btn = $(this);
+        var html = $btn.html();
+        $btn.prop('disabled', true).html('<i class="la la-spinner la-spin"></i> Working…');
+        Swal.fire({ background: 'url(' + EXTRACT_IMG + ')', title: 'Reading link &amp; extracting with AI…',
+            allowOutsideClick: false, didOpen: function() { Swal.showLoading(); } });
+        $.ajax({
+            url: '<?php echo base_url('Product/Extract') ?>',
+            type: 'post',
+            data: { url: url },
+            dataType: 'json',
+            success: function(res) {
+                $btn.prop('disabled', false).html(html);
+                Swal.close();
+                if(!res || !res.success) {
+                    Display_Message(EXTRACT_IMG, (res && res.message) ? res.message : 'Extraction Failed', null);
+                    return;
+                }
+                var previewHtml = buildExtractPreview(res.fields || {}, res.flights || []);
+                if(previewHtml === '') {
+                    Display_Message(EXTRACT_IMG, 'No details could be extracted from this link.', null);
+                    return;
+                }
+                var costTxt = res.cost ? (' · ~$' + Number(res.cost).toFixed(4)) : '';
+                // Review BEFORE overwriting: user must confirm to apply.
+                Swal.fire({
+                    title: 'Extracted details — apply?',
+                    html: previewHtml + '<div style="font-size:11px;color:#888;margin-top:8px;text-align:left;">This overwrites the Tour Details &amp; Flights fields.' + costTxt + '</div>',
+                    width: 640,
+                    showCancelButton: true,
+                    confirmButtonText: 'Apply to form',
+                    cancelButtonText: 'Cancel',
+                    customClass: { confirmButton: 'btn btn-light-success m-2', cancelButton: 'btn btn-danger m-2' },
+                    buttonsStyling: true
+                }).then(function(action) {
+                    if(action.isConfirmed) {
+                        var applied = applyExtracted(res.fields || {}, res.flights || []);
+                        $('#form').dirty('setDirty');
+                        Swal.fire({ toast: true, position: 'top-end', icon: 'success',
+                            title: 'Applied ' + applied + ' field(s)',
+                            text: 'Review the Tour Details & Flights tabs, then save.',
+                            showConfirmButton: false, timer: 4000, timerProgressBar: true });
+                    }
+                });
+            },
+            error: function() {
+                $btn.prop('disabled', false).html(html);
+                Swal.close();
+                Display_Message(EXTRACT_IMG, 'Extraction Failed. Please Try Again', null);
+            }
+        });
     });
 </script>

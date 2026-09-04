@@ -11,9 +11,10 @@
                 </div>
             </div>
             <div class="card-body">
+                <!-- Section 1: Crawl a competitor website (full row) -->
                 <div class="row align-items-start">
-                    <!-- Left: URL -->
-                    <div class="col-lg-6">
+                    <!-- Left: inputs -->
+                    <div class="col-md-6">
                         <div class="form-group mb-2">
                             <label style="font-size:13px;"><strong>Competitor Website (base URL)</strong></label>
                             <div class="input-group">
@@ -34,6 +35,9 @@
                                        placeholder="e.g. yunnan japan  (blank = whole site)" style="font-size:14px;">
                             </div>
                         </div>
+                    </div>
+                    <!-- Right: checkboxes -->
+                    <div class="col-md-6">
                         <div class="form-group mb-2">
                             <label class="d-inline-flex align-items-center mb-1" style="cursor:pointer; font-size:13px;">
                                 <input type="checkbox" id="competitor_force_render" class="mr-2" style="width:16px; height:16px;">
@@ -49,31 +53,40 @@
                             <span class="form-text text-muted" style="font-size:12px;">Lets AI browse the site to find the tour pages — best for JS sites the quick crawl can’t read. Uses a small OpenAI call for discovery.</span>
                         </div>
                     </div>
+                </div>
 
-                    <!-- OR divider -->
-                    <div class="col-lg-auto text-center my-2">
-                        <span class="text-muted font-weight-bold" style="font-size:12px;">OR</span>
-                    </div>
+                <!-- OR divider -->
+                <div class="text-center my-3"><span class="text-muted font-weight-bold" style="font-size:12px;">OR</span></div>
 
-                    <!-- Right: Upload -->
-                    <div class="col-lg-5">
-                        <div class="form-group mb-2">
-                            <label style="font-size:13px;"><strong>Upload PDF or Image</strong></label>
-                            <div class="input-group">
-                                <div class="input-group-prepend">
-                                    <span class="input-group-text"><i class="la la-file-upload"></i></span>
-                                </div>
-                                <div class="custom-file">
-                                    <input type="file" id="competitor_file" class="custom-file-input"
-                                           accept=".pdf,.jpg,.jpeg,.png,.gif,.webp">
-                                    <label class="custom-file-label" id="competitor_file_label" for="competitor_file" style="font-size:13px;">Choose a PDF or image…</label>
-                                </div>
-                            </div>
-                            <span class="form-text text-muted" style="font-size:12px;">
-                                A brochure, flyer, itinerary or screenshot (PDF / JPG / PNG / GIF / WEBP, max 20&nbsp;MB).
-                            </span>
+                <!-- Section 2: Upload a file (full row) -->
+                <div class="form-group mb-2">
+                    <label style="font-size:13px;"><strong>Upload PDF or Image</strong></label>
+                    <div class="input-group">
+                        <div class="input-group-prepend">
+                            <span class="input-group-text"><i class="la la-file-upload"></i></span>
+                        </div>
+                        <div class="custom-file">
+                            <input type="file" id="competitor_file" class="custom-file-input"
+                                   accept=".pdf,.jpg,.jpeg,.png,.gif,.webp">
+                            <label class="custom-file-label" id="competitor_file_label" for="competitor_file" style="font-size:13px;">Choose a PDF or image…</label>
                         </div>
                     </div>
+                    <span class="form-text text-muted" style="font-size:12px;">
+                        A brochure, flyer, itinerary or screenshot (PDF / JPG / PNG / GIF / WEBP, max 20&nbsp;MB).
+                    </span>
+                </div>
+
+                <!-- OR divider -->
+                <div class="text-center my-3"><span class="text-muted font-weight-bold" style="font-size:12px;">OR</span></div>
+
+                <!-- Section 3: Paste free text / links (full row) -->
+                <div class="form-group mb-2">
+                    <label style="font-size:13px;"><strong>Paste text or links</strong></label>
+                    <textarea id="competitor_paste" class="form-control" rows="4" style="font-size:14px;"
+                              placeholder="Paste competitor notes here. Any links you drop in are opened and read, then everything is sent to AI for analysis."></textarea>
+                    <span class="form-text text-muted" style="font-size:12px;">
+                        We fetch the content of every link in the text and hand it — plus your notes — to the AI.
+                    </span>
                 </div>
 
                 <button type="button" id="analyze_btn" class="btn btn-primary font-weight-bold mt-2" style="min-width:200px;">
@@ -167,7 +180,7 @@
             var eta = jobEta(j);
             return badge + (eta ? '<br><span style="font-size:10px; color:#8ba0c4;">' + $('<div>').text(eta).html() + '</span>' : '');
         }
-        return '<span class="label label-light-info label-inline font-weight-bold">' + (j.is_upload ? 'Uploaded' : 'Crawled') + '</span>';
+        return '<span class="label label-light-info label-inline font-weight-bold">' + (j.is_paste ? 'Analysed' : (j.is_upload ? 'Uploaded' : 'Crawled')) + '</span>';
     }
     function jobActionCell(j) {
         var items = [];
@@ -245,8 +258,16 @@
                         : '—');
                 var cost = (j.cost_total > 0) ? Number(j.cost_total).toFixed(4) : '—';
                 // Source cell: a crawl shows a clickable URL (+ keyword/full-render chips);
+                // a pasted analysis shows its label (a link when it's a URL) + a "Text" tag;
                 // an upload shows the file name + a "File" tag.
-                var source = j.is_upload
+                var isHttp = /^https?:\/\//i.test(j.url || '');
+                var source = j.is_paste
+                    ? (isHttp
+                        ? '<a href="' + esc(j.url) + '" target="_blank" rel="noopener" style="font-size:12px;"><i class="la la-paste mr-1"></i>' + esc(j.url) + '</a>'
+                        : '<span style="font-size:12px;"><i class="la la-paste mr-1"></i>' + esc(j.url) + '</span>')
+                        + ' <span class="label label-light-primary label-inline font-weight-bold" style="font-size:10px;">Text</span>'
+                        + (j.title ? '<div class="text-muted" style="font-size:11px;">' + esc(j.title) + '</div>' : '')
+                    : j.is_upload
                     ? '<span style="font-size:12px;"><i class="la la-file-alt mr-1"></i>' + esc(j.url) + '</span>'
                         + ' <span class="label label-light-info label-inline font-weight-bold" style="font-size:10px;">File</span>'
                         + (j.title ? '<div class="text-muted" style="font-size:11px;">' + esc(j.title) + '</div>' : '')
@@ -282,7 +303,7 @@
     function runAnalyze(form, $btn, title) {
         var html = $btn.html();
         $btn.prop('disabled', true).html('<i class="la la-spinner la-spin"></i> Working…');
-        var isDump = form.has && form.has('url') && $('#jobs_rows').length > 0;
+        var isDump = form.has && (form.has('url') || form.has('paste')) && $('#jobs_rows').length > 0;
         if(!isDump) {
             Swal.fire({ background: 'url(' + CA_IMG + ')', title: title, allowOutsideClick: false,
                 didOpen: function() { Swal.showLoading(); } });
@@ -293,11 +314,11 @@
             success: function(res) {
                 $btn.prop('disabled', false).html(html);
                 if(res && res.job) {
-                    // Background crawl started — free the user immediately.
+                    // Background crawl / paste analysis started — free the user immediately.
                     $('#competitor_url').val('');
                     Swal.fire({ toast: true, position: 'top-end', icon: 'success',
-                        title: 'Crawl started in the background',
-                        text: 'It appears at the top of Analysis History — you can keep working.',
+                        title: 'Started in the background',
+                        text: 'It appears at the top of Analysis Results — you can keep working.',
                         showConfirmButton: false, timer: 4000, timerProgressBar: true });
                     loadJobs();
                     return;
@@ -332,10 +353,15 @@
     $('#analyze_btn').click(function() {
         var fileInput = $('#competitor_file')[0];
         var hasFile = fileInput && fileInput.files && fileInput.files.length > 0;
+        var pasteVal = $.trim($('#competitor_paste').val());
         var form = new FormData(), title;
         if(hasFile) {
             form.append('file', fileInput.files[0]);
             title = 'Reading file &amp; analysing with AI…';
+        } else if(pasteVal !== '') {
+            form.append('paste', pasteVal);
+            title = 'Reading links &amp; analysing with AI…';
+            $('#competitor_paste').val('');
         } else {
             var base = baseUrlOnly($.trim($('#competitor_url').val()));
             if(base === '') {

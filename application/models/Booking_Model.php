@@ -96,8 +96,8 @@ class Booking_Model extends CI_Model
 	 * operative "next due" deadline depends on the payment stage (mirrors the
 	 * booking-status PO / P / PP filters and the card in
 	 * Booking::ajax_summary_cards):
-	 *   - Status 'P'  (nothing received): deposit first
-	 *       -> COALESCE(DepositDeadline, FullPaymentDeadline)
+	 *   - Status 'PBC' (pending BC confirmation) / 'P' (nothing received):
+	 *       deposit first -> COALESCE(DepositDeadline, FullPaymentDeadline)
 	 *   - Status 'PP' (deposit in): the balance -> FullPaymentDeadline
 	 * Buckets (floor = 1 March of the current year):
 	 *   overdue  : floor <= deadline < today
@@ -145,7 +145,7 @@ class Booking_Model extends CI_Model
 		$outstanding = "(booking.NetTotal - " . booking_settled_credit_sql() . ") > 0";
 
 		$this->db->where(
-			"((booking.Status = 'P' AND {$p_dl})"
+			"((booking.Status IN ('PBC','P') AND {$p_dl})"
 			. " OR (booking.Status = 'PP' AND {$pp_dl}))"
 			. " AND {$outstanding}",
 			null, false

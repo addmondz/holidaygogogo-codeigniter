@@ -11,14 +11,14 @@
  * customer payment whose operative deadline falls in the bucket. The
  * predicate mirrors the card exactly:
  *
- *   - booking.Status IN ('P','PP')
+ *   - booking.Status IN ('PBC','P','PP')
  *   - operative deadline in the bucket window:
  *       overdue  : floor (1 Mar, current year) <= deadline < today
  *       today    : deadline = today
  *       tomorrow : deadline = today + 1
  *     where the operative deadline is
- *       Status 'P'  -> COALESCE(DepositDeadline, FullPaymentDeadline)
- *       Status 'PP' -> FullPaymentDeadline
+ *       Status 'PBC' / 'P' -> COALESCE(DepositDeadline, FullPaymentDeadline)
+ *       Status 'PP'        -> FullPaymentDeadline
  *   - outstanding balance > 0
  *       outstanding = NetTotal - SUM(approved customer credits)
  *       approved credit = payment.Status='Y' AND Credit>0 AND
@@ -74,7 +74,11 @@ $pdo->exec("INSERT INTO booking VALUES
     /* BC8 PP, balance overdue on the floor (1 Mar), RM300 -> OVERDUE  */
     (8, 'PP', 1000.0, '{$minus1}', '{$mar1}'),
     /* BC9 PP, balance due today, only supplier-commission -> TODAY    */
-    (9, 'PP', 1000.0, '{$minus1}', '{$today}')
+    (9, 'PP', 1000.0, '{$minus1}', '{$today}'),
+    /* BC10 PBC (pending BC confirmation), deposit overdue -> OVERDUE   */
+    (10, 'PBC', 1500.0, '{$minus1}', '2026-08-01'),
+    /* BC11 PBC, no deposit schedule, full due tomorrow    -> TOMORROW  */
+    (11, 'PBC',  600.0, NULL,        '{$tomorrow}')
 ");
 
 $pdo->exec("INSERT INTO payment VALUES
@@ -104,7 +108,7 @@ function bcs_for_bucket($pdo, $bucket, $today, $tomorrow, $floor) {
         . " AND p.Status = 'Y' AND p.Credit > 0"
         . " AND (p.Type IS NULL OR p.Type != 'AGENT COMMISSION FROM SUPPLIER')), 0)) > 0";
     $sql = "SELECT BookingID FROM booking
-            WHERE ((booking.Status = 'P' AND {$p_dl})
+            WHERE ((booking.Status IN ('PBC','P') AND {$p_dl})
                 OR (booking.Status = 'PP' AND {$pp_dl}))
               AND {$outstanding}
             ORDER BY BookingID";
@@ -121,9 +125,9 @@ function assert_eq($label, $expected, $actual) {
     }
 }
 
-assert_eq('overdue BCs (BC1 + BC8 on floor)',  array(1, 8), bcs_for_bucket($pdo, 'overdue',  $today, $tomorrow, $floor));
-assert_eq('today BCs (BC2 + BC9)',             array(2, 9), bcs_for_bucket($pdo, 'today',    $today, $tomorrow, $floor));
-assert_eq('tomorrow BCs (BC3 only)',           array(3),    bcs_for_bucket($pdo, 'tomorrow', $today, $tomorrow, $floor));
+assert_eq('overdue BCs (BC1 + BC8 + BC10 PBC)', array(1, 8, 10), bcs_for_bucket($pdo, 'overdue',  $today, $tomorrow, $floor));
+assert_eq('today BCs (BC2 + BC9)',              array(2, 9),     bcs_for_bucket($pdo, 'today',    $today, $tomorrow, $floor));
+assert_eq('tomorrow BCs (BC3 + BC11 PBC)',      array(3, 11),    bcs_for_bucket($pdo, 'tomorrow', $today, $tomorrow, $floor));
 
 // Unknown bucket yields no predicate — guarded by the whitelist in the model.
 assert_eq('unknown bucket has no range', null, range_for('x', 'garbage', $today, $tomorrow, $floor));

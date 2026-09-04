@@ -14,6 +14,7 @@ class Product extends MY_Controller
 		$this->load->model('Product_Package_Checklist_Model');
 		$this->load->model('Package_Checklist_Model');
 		$this->load->model('Cronjob_Model');
+		$this->load->helper('product_tour_fields');
 	}
 
 	function index()
@@ -407,5 +408,41 @@ class Product extends MY_Controller
 		$category_id = $this->input->post('category_id');
 		$max_name_length = $this->Product_Model->Get_Max_Name_Length($category_id);
 		echo json_encode($max_name_length);
+	}
+
+	/**
+	 * AJAX: "Extract from link" on the Product form. Scrapes the pasted tour URL
+	 * and uses OpenAI to fill the Tour Details + Flights tabs. Returns
+	 * {success, fields:{Col=>value}, flights:[...], cost} — the JS applies these
+	 * to the form (nothing is saved until the user hits Update/Create).
+	 */
+	function Extract() {
+		$this->output->set_content_type('application/json');
+		if ( ! $this->input->is_ajax_request()) {
+			echo json_encode(array('success' => false, 'message' => 'Invalid request'));
+			return;
+		}
+		$url = trim((string) $this->input->post('url'));
+		if ($url === '' || ! preg_match('#^https?://#i', $url)) {
+			echo json_encode(array('success' => false, 'message' => 'Please enter a valid http(s) link.'));
+			return;
+		}
+
+		@set_time_limit(600);
+		$this->load->helper('product_extract');
+		$this->load->helper('product_tour_fields');
+		$this->load->library('CompetitorAnalysisService');
+		try {
+			$res    = $this->competitoranalysisservice->extract_for_product($url);
+			$mapped = product_extract_map($res['data']);
+			echo json_encode(array(
+				'success' => true,
+				'fields'  => $mapped['fields'],
+				'flights' => $mapped['flights'],
+				'cost'    => isset($res['cost']) ? $res['cost'] : 0,
+			));
+		} catch (Exception $e) {
+			echo json_encode(array('success' => false, 'message' => $e->getMessage()));
+		}
 	}
 }

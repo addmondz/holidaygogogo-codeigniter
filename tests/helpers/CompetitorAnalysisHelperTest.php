@@ -204,6 +204,10 @@ check('job_progress reading shows N/total', 'Reading products… 2 / 5',
     competitor_job_progress_message(array('state' => 'running', 'phase' => 'reading', 'done' => 2, 'total' => 5)));
 check('job_progress analysing shows N/total', 'Analysing… 4 / 5',
     competitor_job_progress_message(array('state' => 'running', 'phase' => 'analysing', 'done' => 4, 'total' => 5)));
+check('job_progress analysing without total', 'Analysing…',
+    competitor_job_progress_message(array('state' => 'running', 'phase' => 'analysing')));
+check('job_progress paste job = analysing (no discovery)', 'Analysing…',
+    competitor_job_progress_message(array('state' => 'running', 'mode' => 'paste')));
 check('job_progress done shows N', 'Done — 3', competitor_job_progress_message(array('state' => 'done', 'count' => 3)));
 check('job_progress done no count', 'Done.', competitor_job_progress_message(array('state' => 'done')));
 check('job_progress error', 'Error: boom',
@@ -262,6 +266,9 @@ check('job_view exposes analysis_id', 42,
 check('job_view ai_crawl false by default', false, $pv['ai_crawl']);
 check('job_view ai_crawl exposes flag', true,
     competitor_job_public_view(array('state' => 'done', 'ai_crawl' => 1))['ai_crawl']);
+check('job_view is_paste false for crawl', false, $pv['is_paste']);
+check('job_view is_paste true for paste mode', true,
+    competitor_job_public_view(array('state' => 'running', 'mode' => 'paste'))['is_paste']);
 
 // ---- competitor_model_supports_temperature ----------------------------------
 check('temp: gpt-4o-mini yes', true, competitor_model_supports_temperature('gpt-4o-mini'));
@@ -994,6 +1001,41 @@ check_true('contract lists meals', stripos($contract, 'meals') !== false);
 check_true('contract marks INFER fields', strpos($contract, 'INFER') !== false);
 check_true('contract asks for full flight detail', stripos($contract, 'FULL outbound flight detail') !== false);
 check_true('contract asks optionals verbatim with price', stripos($contract, 'each one verbatim WITH its price') !== false);
+
+// ---- competitor_extract_text_urls (pasted free text) ------------------------
+check('extract_text_urls pulls both urls from prose', array('https://a.com/tour', 'http://b.com/x'),
+    competitor_extract_text_urls('Please check https://a.com/tour and also http://b.com/x for details.'));
+check('extract_text_urls strips trailing punctuation', array('https://a.com/tour'),
+    competitor_extract_text_urls('See (https://a.com/tour).'));
+check('extract_text_urls dedupes', array('https://a.com/tour'),
+    competitor_extract_text_urls("https://a.com/tour\nhttps://a.com/tour"));
+check('extract_text_urls respects limit', 2,
+    count(competitor_extract_text_urls('https://a.com/1 https://b.com/2 https://c.com/3', 2)));
+check('extract_text_urls empty when no url', array(), competitor_extract_text_urls('just some notes, no links'));
+check('extract_text_urls empty on non-string', array(), competitor_extract_text_urls(null));
+
+// ---- competitor_paste_source_label ------------------------------------------
+check('paste_source_label uses first url', 'https://a.com/tour',
+    competitor_paste_source_label('look at https://a.com/tour please'));
+check('paste_source_label falls back to Pasted text', 'Pasted text',
+    competitor_paste_source_label('no links here'));
+
+// ---- competitor_build_paste_agent -------------------------------------------
+$pasteLinks = array(
+    array('url' => 'https://a.com/tour', 'text' => 'Bali 5D4N from RM1999, day 1 arrival'),
+    array('url' => 'https://b.com/spa',  'text' => ''),   // unreadable (thin JS page)
+);
+$pa = competitor_build_paste_agent("Compare these two:\nhttps://a.com/tour\nhttps://b.com/spa", $pasteLinks, $products, true);
+check_true('paste_agent carries the pasted notes', strpos($pa['input'], 'Compare these two:') !== false);
+check_true('paste_agent carries link url', strpos($pa['input'], 'https://a.com/tour') !== false);
+check_true('paste_agent carries scraped link text', strpos($pa['input'], 'Bali 5D4N from RM1999') !== false);
+check_true('paste_agent marks unreadable link', stripos($pa['input'], 'https://b.com/spa') !== false
+    && stripos($pa['input'], 'could not') !== false);
+check_true('paste_agent allows browsing unreadable links when told', stripos($pa['instructions'], 'web_search') !== false);
+check_true('paste_agent carries our products', strpos($pa['input'], competitor_products_block($products)) !== false);
+$paNoBrowse = competitor_build_paste_agent('just notes', array(), $products, false);
+check_true('paste_agent no web_search when browsing off', stripos($paNoBrowse['instructions'], 'web_search') === false);
+check_true('paste_agent works with notes only (no links)', strpos($paNoBrowse['input'], 'just notes') !== false);
 
 echo "\n" . ($failures === 0 ? "ALL PASS\n" : "{$failures} FAILURE(S)\n");
 exit($failures === 0 ? 0 : 1);

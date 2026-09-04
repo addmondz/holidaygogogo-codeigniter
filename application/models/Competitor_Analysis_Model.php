@@ -65,6 +65,7 @@ class Competitor_Analysis_Model extends CI_Model
 			'cost_usd'      => isset($data['cost_usd']) ? $data['cost_usd'] : 0,
 			'status'        => isset($data['status']) ? $data['status'] : 'done',
 			'error_message' => isset($data['error_message']) ? $data['error_message'] : null,
+			'source'        => isset($data['source']) ? $data['source'] : null,
 			'created_by'    => isset($data['created_by']) ? $data['created_by'] : null,
 		);
 		$this->db->insert('competitor_analyses', $row);
@@ -80,14 +81,16 @@ class Competitor_Analysis_Model extends CI_Model
 	}
 
 	/**
-	 * File-upload analyses only (a pasted PDF/image, whose "url" is a filename, not an
-	 * http link) — shown as rows in the main results table alongside crawls. Newest
-	 * first, capped.
+	 * Single (non-crawl) analyses — pasted PDF/image uploads and pasted text/links —
+	 * shown as rows in the main results table alongside crawls. Tagged rows come from
+	 * the `source` column; the url-prefix clause keeps legacy uploads (source NULL,
+	 * filename url) while still excluding site-crawl / crawl-analysed http rows.
+	 * Newest first, capped.
 	 */
 	function Read_Uploads($limit = 20)
 	{
-		$this->db->select('id, url, product_name, cost_usd, status, created_at');
-		$this->db->where("url NOT LIKE 'http%'", null, false);
+		$this->db->select('id, url, source, product_name, cost_usd, status, created_at');
+		$this->db->where("(source IN ('upload','paste') OR (source IS NULL AND url NOT LIKE 'http%'))", null, false);
 		$this->db->order_by('id', 'DESC');
 		$this->db->limit((int) $limit);
 		return $this->db->get('competitor_analyses')->result();

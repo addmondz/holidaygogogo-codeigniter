@@ -25,40 +25,117 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 if ( ! function_exists('competitor_format_our_products'))
 {
 	/**
-	 * Flatten Costing_Model::Read_Packages_Dashboard() output into a compact
-	 * list — name, tour_code and a representative selling price — for the
-	 * "our products" block in the prompt. Accepts the dashboard array
-	 * (['packages' => [...]]) or a bare list; tolerates arrays or objects.
-	 * Prices come from the latest booking's per-pax selling price when present.
+	 * Flatten "our products" into a compact list for the OUR PRODUCTS prompt
+	 * block. Handles two inputs:
+	 *   - Product_Model::Read_For_Comparison() rows (the current source): our own
+	 *     products enriched with tour detail (destination, duration, itinerary,
+	 *     inclusions, flights, ...) so the AI can compare like-for-like.
+	 *   - Legacy Costing dashboard (['packages'=>[...]] or a bare list) — name,
+	 *     tour_code and the latest booking's per-pax selling price.
+	 * Tolerates arrays or objects. Empty fields are omitted downstream by
+	 * competitor_products_block() to keep prompt tokens (and cost) low.
 	 */
-	function competitor_format_our_products($dashboard, $limit = 40)
+	function competitor_format_our_products($source, $limit = 40)
 	{
 		$rows = array();
-		if (is_array($dashboard) && isset($dashboard['packages'])) {
-			$rows = $dashboard['packages'];
-		} elseif (is_array($dashboard)) {
-			$rows = $dashboard;
+		if (is_array($source) && isset($source['packages'])) {
+			$rows = $source['packages'];
+		} elseif (is_array($source)) {
+			$rows = $source;
 		}
+
+		// Product columns (from Read_For_Comparison) -> compact prompt keys.
+		$single_map = array(
+			'Destination' => 'destination', 'Duration' => 'duration',
+			'DepartureCity' => 'departure_city', 'Difficulty' => 'difficulty',
+			'SuitableAge' => 'suitable_age', 'TargetTraveller' => 'target_traveller',
+			'TourStyle' => 'tour_style',
+		);
+		$list_map = array(
+			'Countries' => 'countries', 'Cities' => 'cities', 'Themes' => 'themes',
+			'LocalTransport' => 'local_transport', 'Hotels' => 'hotels',
+			'ScenicHighlights' => 'scenic_highlights', 'ShoppingStops' => 'shopping_stops',
+			'Inclusions' => 'inclusions', 'Exclusions' => 'exclusions',
+			'OptionalTours' => 'optional_tours', 'Itinerary' => 'itinerary',
+			'SpecialRemarks' => 'special_remarks',
+		);
 
 		$out = array();
 		foreach ($rows as $p) {
-			$p = (object) $p;
-			$name = isset($p->name) ? trim((string) $p->name) : '';
-			if ($name === '') {
-				continue;
-			}
-			$price = null;
-			if ( ! empty($p->bookings)) {
-				$first = (object) reset($p->bookings);
-				if (isset($first->selling_price_per_pax) && $first->selling_price_per_pax !== null && $first->selling_price_per_pax !== '') {
-					$price = (float) $first->selling_price_per_pax;
+			$p = (array) $p;
+			$is_product = array_key_exists('Name', $p) || array_key_exists('ProductCode', $p) || array_key_exists('RetailPrice', $p);
+
+			if ( ! $is_product) {
+				// Legacy costing package shape.
+				$name = isset($p['name']) ? trim((string) $p['name']) : '';
+				if ($name === '') {
+					continue;
 				}
+				$price = null;
+				if ( ! empty($p['bookings'])) {
+					$first = (array) reset($p['bookings']);
+					if (isset($first['selling_price_per_pax']) && $first['selling_price_per_pax'] !== null && $first['selling_price_per_pax'] !== '') {
+						$price = (float) $first['selling_price_per_pax'];
+					}
+				}
+				$out[] = array(
+					'name'      => $name,
+					'tour_code' => isset($p['tour_code']) ? (string) $p['tour_code'] : '',
+					'price_myr' => $price,
+				);
+			} else {
+				// Our own product enriched with tour detail.
+				$name = isset($p['Name']) ? trim((string) $p['Name']) : '';
+				if ($name === '') {
+					continue;
+				}
+				$item = array('name' => $name);
+				$code = isset($p['ProductCode']) ? trim((string) $p['ProductCode']) : '';
+				if ($code !== '') {
+					$item['tour_code'] = $code;
+				}
+				if (isset($p['RetailPrice']) && $p['RetailPrice'] !== null && $p['RetailPrice'] !== '' && (float) $p['RetailPrice'] > 0) {
+					$item['price_myr'] = (float) $p['RetailPrice'];
+				}
+				foreach ($single_map as $col => $key) {
+					if (isset($p[$col]) && trim((string) $p[$col]) !== '') {
+						$item[$key] = trim((string) $p[$col]);
+					}
+				}
+				$meals = array();
+				foreach (array('MealBreakfast' => 'breakfast', 'MealLunch' => 'lunch', 'MealDinner' => 'dinner') as $col => $key) {
+					if (isset($p[$col]) && trim((string) $p[$col]) !== '') {
+						$meals[$key] = trim((string) $p[$col]);
+					}
+				}
+				if ( ! empty($meals)) {
+					$item['meals'] = $meals;
+				}
+				foreach ($list_map as $col => $key) {
+					if (isset($p[$col]) && trim((string) $p[$col]) !== '') {
+						$lines = preg_split('/\r\n|\r|\n/', trim((string) $p[$col]));
+						$lines = array_values(array_filter(array_map('trim', $lines), function ($x) { return $x !== ''; }));
+						if ( ! empty($lines)) {
+							$item[$key] = $lines;
+						}
+					}
+				}
+				// Multiple structured flights -> readable one-liners.
+				if (isset($p['Flights']) && trim((string) $p['Flights']) !== '' && function_exists('product_flights_decode')) {
+					$flight_lines = array();
+					foreach (product_flights_decode($p['Flights']) as $fl) {
+						$s = product_flight_summary($fl);
+						if ($s !== '') {
+							$flight_lines[] = $s;
+						}
+					}
+					if ( ! empty($flight_lines)) {
+						$item['flights'] = $flight_lines;
+					}
+				}
+				$out[] = $item;
 			}
-			$out[] = array(
-				'name'      => $name,
-				'tour_code' => isset($p->tour_code) ? (string) $p->tour_code : '',
-				'price_myr' => $price,
-			);
+
 			if ($limit > 0 && count($out) >= $limit) {
 				break;
 			}
@@ -142,12 +219,17 @@ if ( ! function_exists('competitor_products_block'))
 			if ($name === '') {
 				continue;
 			}
+			// Keep `name` always; drop every empty field (null, '', []) — they
+			// carry no signal for the comparison, so we never pay to send them.
 			$item = array('name' => $name);
-			if (isset($p['tour_code']) && trim((string) $p['tour_code']) !== '') {
-				$item['tour_code'] = (string) $p['tour_code'];
-			}
-			if (isset($p['price_myr']) && $p['price_myr'] !== null && $p['price_myr'] !== '') {
-				$item['price_myr'] = $p['price_myr'];
+			foreach ($p as $k => $v) {
+				if ($k === 'name') {
+					continue;
+				}
+				if ($v === null || $v === '' || (is_array($v) && count($v) === 0)) {
+					continue;
+				}
+				$item[$k] = $v;
 			}
 			$compact[] = $item;
 		}
@@ -1280,8 +1362,12 @@ if ( ! function_exists('competitor_job_progress_message'))
 		if ($phase === 'reading' && $total > 0) {
 			return 'Reading products… ' . $done . ' / ' . $total;
 		}
-		if ($phase === 'analysing' && $total > 0) {
-			return 'Analysing… ' . $done . ' / ' . $total;
+		if ($phase === 'analysing') {
+			return $total > 0 ? ('Analysing… ' . $done . ' / ' . $total) : 'Analysing…';
+		}
+		// A pasted-text job has no discovery phase — it goes straight to analysing.
+		if (($mode = (isset($s['mode']) ? $s['mode'] : '')) === 'paste') {
+			return 'Analysing…';
 		}
 		return 'Discovering…';
 	}
@@ -1500,6 +1586,7 @@ if ( ! function_exists('competitor_job_public_view'))
 			'keyword'     => isset($s['keyword']) ? (string) $s['keyword'] : '',
 			'force_render' => ! empty($s['force_render']),
 			'ai_crawl'    => ! empty($s['ai_crawl']),
+			'is_paste'    => ($mode === 'paste'),
 			// Fixed submission time (when pasted + Analyse clicked), not last update.
 			'ts'          => isset($s['created']) ? (string) $s['created'] : (isset($s['ts']) ? (string) $s['ts'] : ''),
 			// Live-ETA inputs (reading phase): progress + when reading began.
@@ -2083,6 +2170,94 @@ if ( ! function_exists('competitor_build_scraped_agent'))
 		$input = "COMPETITOR PAGE URL: " . $url . "\n\n"
 			. "SCRAPED PAGE CONTENT:\n" . $text . "\n\n"
 			. "OUR PRODUCTS (JSON, prices in MYR):\n" . competitor_products_block($our_products);
+
+		return array('instructions' => $instructions, 'input' => $input);
+	}
+}
+
+if ( ! function_exists('competitor_extract_text_urls'))
+{
+	/**
+	 * Pull the http(s) URLs out of a block of pasted free text (notes the user
+	 * typed, with links dropped in). Strips trailing punctuation/brackets,
+	 * dedupes (keeping order), caps at $limit. Pure — no network. Returns [].
+	 */
+	function competitor_extract_text_urls($text, $limit = 10)
+	{
+		$text = (string) $text;
+		if ($text === '' || ! preg_match_all('#https?://[^\s"\'<>)\]]+#i', $text, $m)) {
+			return array();
+		}
+		$out = array();
+		foreach ($m[0] as $u) {
+			$u = preg_replace('/[.,);\]]+$/', '', trim($u));
+			if ($u === '' || ! preg_match('#^https?://#i', $u) || isset($out[$u])) {
+				continue;
+			}
+			$out[$u] = true;
+			if ($limit > 0 && count($out) >= $limit) {
+				break;
+			}
+		}
+		return array_keys($out);
+	}
+}
+
+if ( ! function_exists('competitor_paste_source_label'))
+{
+	/**
+	 * A short "source" label for a pasted-text analysis history row: the first
+	 * URL found in the text, else the generic "Pasted text". Pure.
+	 */
+	function competitor_paste_source_label($text)
+	{
+		$urls = competitor_extract_text_urls($text, 1);
+		return ! empty($urls) ? $urls[0] : 'Pasted text';
+	}
+}
+
+if ( ! function_exists('competitor_build_paste_agent'))
+{
+	/**
+	 * Build the Responses API pieces for a PASTED-TEXT analysis: the user typed
+	 * some notes and (optionally) dropped in one or more links. We fetch each
+	 * link's page text OURSELVES and pass it here, so the model sees the pasted
+	 * notes plus the scraped content of every link. $links is a list of
+	 * ['url' => …, 'text' => …] ('' text = a page we could not read). When
+	 * $allow_browse is true (some link came back unreadable and web_search is
+	 * available) the instructions let the model open those URLs itself; the
+	 * caller adds the web_search tool. Returns ['instructions', 'input'].
+	 */
+	function competitor_build_paste_agent($notes, $links, $our_products, $allow_browse = false)
+	{
+		$links = is_array($links) ? $links : array();
+
+		$instructions = "You are a travel-industry competitor analyst for HolidayGoGoGo, a Malaysian tour operator. "
+			. "The user pasted some notes and one or more competitor links. Use the pasted notes together with the "
+			. "SCRAPED PAGE CONTENT of each link below — do not invent facts that are not shown. ";
+		if ($allow_browse) {
+			$instructions .= "For any link marked as unreadable, use the web_search tool to OPEN and READ that page "
+				. "before analysing it. ";
+		} else {
+			$instructions .= "Do not browse the web; rely only on what is given. ";
+		}
+		$instructions .= "Extract the competitor product's details and compare it against the user's own products. "
+			. competitor_output_contract();
+
+		$input = "PASTED NOTES:\n" . trim((string) $notes) . "\n\n";
+		if ( ! empty($links)) {
+			$n = 0;
+			foreach ($links as $ln) {
+				$n++;
+				$url  = isset($ln['url']) ? (string) $ln['url'] : '';
+				$body = isset($ln['text']) ? trim((string) $ln['text']) : '';
+				$input .= "LINK " . $n . " URL: " . $url . "\n";
+				$input .= ($body !== '')
+					? ("SCRAPED PAGE CONTENT:\n" . $body . "\n\n")
+					: ("(This page's content could not be read automatically" . ($allow_browse ? " — open it with web_search." : ".") . ")\n\n");
+			}
+		}
+		$input .= "OUR PRODUCTS (JSON, prices in MYR):\n" . competitor_products_block($our_products);
 
 		return array('instructions' => $instructions, 'input' => $input);
 	}

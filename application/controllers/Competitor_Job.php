@@ -53,10 +53,47 @@ class Competitor_Job extends CI_Controller
 		};
 
 		$this->load->library('CompetitorAnalysisService');
-		if ((isset($job['mode']) ? $job['mode'] : 'crawl') === 'analyse') {
+		$mode = isset($job['mode']) ? $job['mode'] : 'crawl';
+		if ($mode === 'analyse') {
 			$this->run_analyse($job, $write);
+		} elseif ($mode === 'paste') {
+			$this->run_paste($job, $write);
 		} else {
 			$this->run_crawl($job, $write);
+		}
+	}
+
+	/**
+	 * Analyse PASTED TEXT (notes + links) in the background — the same work the old
+	 * synchronous path did, moved here so a slow paste (link fetches + an OpenAI
+	 * web_search browse) can't hit the web server's read timeout and show a false
+	 * "Analysis Failed" while the analysis actually completes. Saves one history row
+	 * and records its id on the job so the results table can link to it.
+	 */
+	private function run_paste($job, $write)
+	{
+		@set_time_limit(0);
+		$paste = isset($job['paste_text']) ? (string) $job['paste_text'] : '';
+		$write(array('state' => 'running', 'phase' => 'analysing', 'done' => 0, 'total' => 1));
+		$this->load->model('Product_Model');
+		$this->load->helper('product_tour_fields');
+		$this->load->model('Competitor_Analysis_Model');
+		try {
+			if (trim($paste) === '') {
+				throw new Exception('No text to analyse.');
+			}
+			$our    = competitor_format_our_products($this->Product_Model->Read_For_Comparison());
+			$record = $this->competitoranalysisservice->analyze_paste($paste, $our);
+			$record['url']        = competitor_paste_source_label($paste);
+			$record['source']     = 'paste';
+			$record['status']     = 'done';
+			$record['created_by'] = isset($job['created_by']) ? $job['created_by'] : null;
+			$id = (int) $this->Competitor_Analysis_Model->Create($record);
+			$write(array('state' => 'done', 'phase' => 'analysing', 'done' => 1, 'total' => 1,
+				'count' => 1, 'analysis_id' => $id, 'cost_total' => (float) $record['cost_usd']));
+		} catch (Exception $e) {
+			log_message('error', 'CompetitorJob paste failed: ' . $e->getMessage());
+			$write(array('state' => 'error', 'message' => $e->getMessage()));
 		}
 	}
 
@@ -125,10 +162,11 @@ class Competitor_Job extends CI_Controller
 
 		$n = count($sel);
 		$write(array('state' => 'running', 'phase' => 'analysing', 'done' => 0, 'total' => $n));
-		$this->load->model('Costing_Model');
+		$this->load->model('Product_Model');
+		$this->load->helper('product_tour_fields');
 		$this->load->model('Competitor_Analysis_Model');
 		try {
-			$our = competitor_format_our_products($this->Costing_Model->Read_Packages_Dashboard());
+			$our = competitor_format_our_products($this->Product_Model->Read_For_Comparison());
 			$results = array();   // index => {id, cost}
 			$total_cost = 0.0;
 			$done = 0;

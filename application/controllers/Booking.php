@@ -970,7 +970,7 @@ class Booking extends MY_Controller
 		$cust_after3pm  = ((int) date('H') >= 15);
 		$cust_overdue_op = $cust_after3pm ? '<=' : '<';
 		$cust_today_val  = $cust_after3pm ? '1000-01-01' : $today;
-		$cust_nd  = "(CASE WHEN booking.Status = 'P' THEN COALESCE(booking.DepositDeadline, booking.FullPaymentDeadline) ELSE booking.FullPaymentDeadline END)";
+		$cust_nd  = "(CASE WHEN booking.Status IN ('PBC','P') THEN COALESCE(booking.DepositDeadline, booking.FullPaymentDeadline) ELSE booking.FullPaymentDeadline END)";
 		$cust_out = "(booking.NetTotal - " . booking_settled_credit_sql() . ")";
 		$tc_own = "(booking.SalesAgent = ? OR booking.SalesAgent2 = ?)";
 		$row = $this->db->query(
@@ -985,7 +985,7 @@ class Booking extends MY_Controller
 			    SELECT {$cust_nd} AS nd, {$cust_out} AS outstanding
 			    FROM booking
 			    WHERE booking.CancelStatus = 'N'
-			      AND booking.Status IN ('P','PP')
+			      AND booking.Status IN ('PBC','P','PP')
 			      AND booking.BookingConfirmationTitle = 'BOOKING CONFIRMATION'
 			      AND {$tc_own}
 			 ) t
@@ -1007,7 +1007,7 @@ class Booking extends MY_Controller
 			           {$cust_nd} AS nd, {$cust_out} AS outstanding
 			    FROM booking
 			    WHERE booking.CancelStatus = 'N'
-			      AND booking.Status IN ('P','PP')
+			      AND booking.Status IN ('PBC','P','PP')
 			      AND booking.BookingConfirmationTitle = 'BOOKING CONFIRMATION'
 			      AND {$tc_own}
 			 ) t
@@ -2599,8 +2599,8 @@ class Booking extends MY_Controller
 			// chase customer payments by urgency. Customer deadlines live on the
 			// BOOKING (not the payment row), so we derive the operative "next due"
 			// deadline per BC and the outstanding balance still owed:
-			//   - Status 'P'  (nothing received): deposit first
-			//       -> COALESCE(DepositDeadline, FullPaymentDeadline)
+			//   - Status 'PBC' (pending BC confirmation) / 'P' (nothing received):
+			//       deposit first -> COALESCE(DepositDeadline, FullPaymentDeadline)
 			//   - Status 'PP' (deposit in): balance -> FullPaymentDeadline
 			//   - outstanding = NetTotal - approved customer credits (Status='Y',
 			//     Credit>0, excluding AGENT COMMISSION FROM SUPPLIER)
@@ -2617,7 +2617,7 @@ class Booking extends MY_Controller
 			$cust_after3pm  = ((int) date('H') >= 15);
 			$cust_overdue_op = $cust_after3pm ? '<=' : '<';
 			$cust_today_val  = $cust_after3pm ? '1000-01-01' : $today;
-			$cust_nd  = "(CASE WHEN booking.Status = 'P' THEN COALESCE(booking.DepositDeadline, booking.FullPaymentDeadline) ELSE booking.FullPaymentDeadline END)";
+			$cust_nd  = "(CASE WHEN booking.Status IN ('PBC','P') THEN COALESCE(booking.DepositDeadline, booking.FullPaymentDeadline) ELSE booking.FullPaymentDeadline END)";
 			$cust_out = "(booking.NetTotal - " . booking_settled_credit_sql() . ")";
 			$row = $this->db->query(
 				"SELECT
@@ -2631,7 +2631,7 @@ class Booking extends MY_Controller
 				    SELECT {$cust_nd} AS nd, {$cust_out} AS outstanding
 				    FROM booking
 				    WHERE booking.CancelStatus = 'N'
-				      AND booking.Status IN ('P','PP')
+				      AND booking.Status IN ('PBC','P','PP')
 				      AND {$op_sa_in}
 				 ) t
 				 WHERE t.nd BETWEEN ? AND ?
@@ -2655,7 +2655,7 @@ class Booking extends MY_Controller
 				           {$cust_nd} AS nd, {$cust_out} AS outstanding
 				    FROM booking
 				    WHERE booking.CancelStatus = 'N'
-				      AND booking.Status IN ('P','PP')
+				      AND booking.Status IN ('PBC','P','PP')
 				      AND {$op_sa_in}
 				 ) t
 				 WHERE t.nd BETWEEN ? AND ?

@@ -23,15 +23,15 @@
  * customer payment deadlines live on the BOOKING. The operative "next
  * due" deadline depends on where the BC is in the payment flow:
  *
- *   - Status 'P'  (pending payment, nothing received): the deposit is due
- *     first -> DepositDeadline, falling back to FullPaymentDeadline when
- *     no deposit schedule was set.
+ *   - Status 'PBC' (pending BC confirmation) / 'P' (pending payment, nothing
+ *     received): the deposit is due first -> DepositDeadline, falling back to
+ *     FullPaymentDeadline when no deposit schedule was set.
  *   - Status 'PP' (partial payment, deposit in): the balance is due ->
  *     FullPaymentDeadline.
  *
  * A BC is in scope when:
  *   - booking.CancelStatus = 'N'                 (active)
- *   - booking.Status IN ('P','PP')               (still owes a scheduled payment)
+ *   - booking.Status IN ('PBC','P','PP')         (still owes a scheduled payment)
  *   - next_deadline BETWEEN window_start AND today+1   (since-March..tomorrow)
  *   - outstanding balance > 0, where
  *       outstanding = NetTotal - SUM(approved customer credits)
@@ -98,7 +98,9 @@ $pdo->exec("INSERT INTO booking VALUES
     /* 8  PP, balance overdue on the floor (1 Mar), RM300  -> OVERDUE 700 */
     (8, 'BC-8', 'Theta', 'PP', 'N', 1000.0, '{$minus1}', '{$mar1}'),
     /* 9  PP, balance due today, only supplier-commission  -> TODAY 1000 (commission ignored) */
-    (9, 'BC-9', 'Iota',  'PP', 'N', 1000.0, '{$minus1}', '{$today}')
+    (9, 'BC-9', 'Iota',  'PP', 'N', 1000.0, '{$minus1}', '{$today}'),
+    /* 10 PBC (pending BC confirmation), no deposit sched, full due tomorrow -> TOMORROW 600 (fallback) */
+    (10, 'BC-10', 'Kappa', 'PBC', 'N', 600.0, NULL,      '{$tomorrow}')
 ");
 
 $pdo->exec("INSERT INTO payment VALUES
@@ -116,7 +118,7 @@ $pdo->exec("INSERT INTO payment VALUES
 
 // Operative customer deadline + outstanding balance — the two derived
 // expressions the card aggregates over.
-$nd  = "(CASE WHEN booking.Status = 'P' THEN COALESCE(booking.DepositDeadline, booking.FullPaymentDeadline) ELSE booking.FullPaymentDeadline END)";
+$nd  = "(CASE WHEN booking.Status IN ('PBC','P') THEN COALESCE(booking.DepositDeadline, booking.FullPaymentDeadline) ELSE booking.FullPaymentDeadline END)";
 $out = "(booking.NetTotal - COALESCE((SELECT SUM(p.Credit) FROM payment p"
      . " WHERE p.BookingID = booking.BookingID"
      . " AND p.Status = 'Y' AND p.Credit > 0"
@@ -141,7 +143,7 @@ $runBuckets = function($overdue_op, $today_val) use ($pdo, $nd, $out, $today, $t
             SELECT {$nd} AS nd, {$out} AS outstanding
             FROM booking
             WHERE booking.CancelStatus = 'N'
-              AND booking.Status IN ('P','PP')
+              AND booking.Status IN ('PBC','P','PP')
         ) t
         WHERE t.nd BETWEEN :start AND :tmr2
           AND t.outstanding > 0
@@ -163,7 +165,7 @@ $perStmt = $pdo->prepare("
                {$nd} AS nd, {$out} AS outstanding
         FROM booking
         WHERE booking.CancelStatus = 'N'
-          AND booking.Status IN ('P','PP')
+          AND booking.Status IN ('PBC','P','PP')
     ) t
     WHERE t.nd BETWEEN :start AND :tmr
       AND t.outstanding > 0
@@ -190,12 +192,14 @@ assert_eq('overdue total (1000 + 700)',         1700.0,  (float) $b['overdue_due
 // Today: BC2 (owes 1500) + BC9 (commission ignored, owes 1000).
 assert_eq('today count (BC2 + BC9)',            2,       (int)   $b['today_cnt']);
 assert_eq('today total (1500 + 1000)',          2500.0,  (float) $b['today_due']);
-// Tomorrow: BC3 (fallback to FullPaymentDeadline, owes 800). BC4 fully paid -> out.
-assert_eq('tomorrow count (BC3)',               1,       (int)   $b['tomorrow_cnt']);
-assert_eq('tomorrow total (800)',               800.0,   (float) $b['tomorrow_due']);
+// Tomorrow: BC3 (fallback, owes 800) + BC10 (PBC, fallback, owes 600). BC4 fully paid -> out.
+assert_eq('tomorrow count (BC3 + BC10 PBC)',    2,       (int)   $b['tomorrow_cnt']);
+assert_eq('tomorrow total (800 + 600)',         1400.0,  (float) $b['tomorrow_due']);
 
-// ---- Per-booking table (windowed) -------------------------------------
-assert_eq('rows shown (5 owing BCs in window)', 5,       count($rows));
+// ---- Per-booking table (windowed, LIMIT 5) ----------------------------
+// 6 owing BCs in window now; the table LIMITs to the 5 earliest, so the
+// PBC tomorrow row (BC10) sorts last and is truncated off the table.
+assert_eq('rows shown (LIMIT 5 of 6 owing)',    5,       count($rows));
 // Order: BC8 (1 Mar) -> BC1 (19 May) -> BC2 (20 May, 1500) -> BC9 (20 May, 1000) -> BC3 (21 May).
 assert_eq('row 0 = BC8 (1 Mar, most overdue)',  'BC-8',  (string) $rows[0]['booking_number']);
 assert_eq('row 1 = BC1 (yesterday)',            'BC-1',  (string) $rows[1]['booking_number']);
@@ -210,35 +214,37 @@ $nums = array_map(function ($r) { return $r['booking_number']; }, $rows);
 assert_eq('BC4 absent (fully paid)',            false,   in_array('BC-4', $nums, true));
 assert_eq('BC5 absent (before floor)',          false,   in_array('BC-5', $nums, true));
 assert_eq('BC6 absent (cancelled)',             false,   in_array('BC-6', $nums, true));
-assert_eq('BC7 absent (Status not P/PP)',       false,   in_array('BC-7', $nums, true));
+assert_eq('BC7 absent (Status not P/PP/PBC)',   false,   in_array('BC-7', $nums, true));
+assert_eq('BC10 present in bucket, cut from table', false, in_array('BC-10', $nums, true));
 
 // ---- Invariants --------------------------------------------------------
 // Buckets partition the windowed set: counts and totals add up.
 $bucket_cnt   = (int)$b['overdue_cnt'] + (int)$b['today_cnt'] + (int)$b['tomorrow_cnt'];
 $bucket_total = (float)$b['overdue_due'] + (float)$b['today_due'] + (float)$b['tomorrow_due'];
-assert_eq('buckets partition: total count',  5,       $bucket_cnt);
-assert_eq('buckets partition: total amount', 5000.0,  $bucket_total);
+assert_eq('buckets partition: total count',  6,       $bucket_cnt);
+assert_eq('buckets partition: total amount', 5600.0,  $bucket_total);
 
-// Per-booking sums reconcile with the windowed grand total (only 5 rows here).
+// The 5 shown rows are the earliest 5; BC10 (tomorrow, 600) is truncated by
+// LIMIT 5, so the shown rows sum to the windowed total minus BC10.
 $sum = 0.0;
 foreach ($rows as $r) { $sum += (float) $r['total_due']; }
-assert_eq('partition: per-booking sums to windowed total', $bucket_total, $sum);
+assert_eq('per-booking (LIMIT 5) sums to windowed total minus BC10', $bucket_total - 600.0, $sum);
 
 // ---- 3pm cutoff: today-deadline BCs lapse into overdue ----------------
 // At/after 15:00 the controller widens overdue to nd <= today and empties
 // the today bucket (sentinel date). BC2 (1500) + BC9 (1000), both due today,
-// join BC1 (1000) + BC8 (700) in overdue; tomorrow (BC3) is untouched.
+// join BC1 (1000) + BC8 (700) in overdue; tomorrow (BC3 + BC10) is untouched.
 $a = $runBuckets('<=', '0000-00-00');
 assert_eq('after-cut overdue count (BC1+BC8+BC2+BC9)', 4,      (int)   $a['overdue_cnt']);
 assert_eq('after-cut overdue total (1700+2500)',       4200.0, (float) $a['overdue_due']);
 assert_eq('after-cut today count (empty)',             0,      (int)   $a['today_cnt']);
 assert_eq('after-cut today total (empty)',             0.0,    (float) $a['today_due']);
-assert_eq('after-cut tomorrow count (BC3 unchanged)',  1,      (int)   $a['tomorrow_cnt']);
-assert_eq('after-cut tomorrow total (800 unchanged)',  800.0,  (float) $a['tomorrow_due']);
+assert_eq('after-cut tomorrow count (BC3 + BC10)',     2,      (int)   $a['tomorrow_cnt']);
+assert_eq('after-cut tomorrow total (800 + 600)',      1400.0, (float) $a['tomorrow_due']);
 // Still a clean partition of the same windowed set.
 $a_cnt   = (int)$a['overdue_cnt'] + (int)$a['today_cnt'] + (int)$a['tomorrow_cnt'];
 $a_total = (float)$a['overdue_due'] + (float)$a['today_due'] + (float)$a['tomorrow_due'];
-assert_eq('after-cut buckets partition: total count',  5,      $a_cnt);
-assert_eq('after-cut buckets partition: total amount', 5000.0, $a_total);
+assert_eq('after-cut buckets partition: total count',  6,      $a_cnt);
+assert_eq('after-cut buckets partition: total amount', 5600.0, $a_total);
 
 echo "\nAll assertions passed.\n";
