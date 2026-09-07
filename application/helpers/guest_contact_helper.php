@@ -321,6 +321,15 @@ if (!function_exists('guest_contact_parse_multi')) {
             if ($mobile === '') {
                 continue;
             }
+            // Drop placeholder/junk mobiles ("-", "--", "na", "0", …) so a merged
+            // customer whose bookings all stored "-" doesn't render a stack of
+            // "+CC -" lines (one per distinct calling code). A real phone carries
+            // at least 7 digits — mirrors Guests_Model::Dedup_Group_Key_Expr's
+            // junk guard, but counts TOTAL digits (not a run) so a real number
+            // split by separators ("016-954 6738") is still kept.
+            if (strlen(preg_replace('/\D/', '', $mobile)) < 7) {
+                continue;
+            }
             $wa  = guest_contact_wa_digits($calling_code, $mobile);
             $key = $wa !== '' ? $wa : ($calling_code . '|' . $mobile);
             if (isset($seen[$key])) {

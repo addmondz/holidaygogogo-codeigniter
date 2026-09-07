@@ -60,6 +60,23 @@ $assertions['diff code -> 2']             = count($codes) === 2;
 $mixed = guest_contact_parse_multi('+60' . $US . $RS . '+60' . $US . '0169546738');
 $assertions['blank + real -> 1']          = count($mixed) === 1 && $mixed[0]['mobile'] === '0169546738';
 
+// junk placeholder mobiles ("-", "na", "0", …) are dropped, NOT shown as
+// a "+CC -" line per distinct calling code (the reported Guest List bug where
+// one merged customer showed a stack of "+1 -", "+30 -", …). ---------------
+$dash = guest_contact_parse_multi('+1' . $US . '-' . $RS . '+30' . $US . '-' . $RS . '+60' . $US . '--');
+$assertions['dash placeholders -> []']    = $dash === array();
+$assertions['na placeholder -> []']       = guest_contact_parse_multi('+60' . $US . 'na') === array();
+$assertions['single zero -> []']          = guest_contact_parse_multi('+60' . $US . '0') === array();
+$assertions['short junk digits -> []']    = guest_contact_parse_multi('+60' . $US . '123') === array();
+
+// junk mixed with a real number: only the real one survives ---------------
+$mixed_junk = guest_contact_parse_multi('+1' . $US . '-' . $RS . '+60' . $US . '0169546738');
+$assertions['junk + real -> 1']           = count($mixed_junk) === 1 && $mixed_junk[0]['mobile'] === '0169546738';
+
+// a REAL number split by separators (few consecutive digits) is still kept -
+$formatted = guest_contact_parse_multi('+60' . $US . '016-954 6738');
+$assertions['formatted real kept']        = count($formatted) === 1 && $formatted[0]['mobile'] === '016-954 6738';
+
 // ---- report -------------------------------------------------------------
 $failed = 0;
 foreach ($assertions as $label => $ok) {
