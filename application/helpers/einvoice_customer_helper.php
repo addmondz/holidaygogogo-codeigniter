@@ -45,13 +45,18 @@ if (!function_exists('einvoice_pax_needs_new_customer')) {
      * NOT a new customer only when BOTH match). Requires the pax to carry a
      * non-blank name and phone.
      *
-     * @param string $pax_name      Requested pax name.
-     * @param string $pax_phone     Requested pax phone.
-     * @param string $booking_name  booking.Customer.
-     * @param string $booking_phone booking.Mobile.
+     * @param string $pax_name       Requested pax name.
+     * @param string $pax_phone      Requested pax phone.
+     * @param string $booking_name   booking.Customer.
+     * @param string $booking_phone  booking.Mobile.
+     * @param bool   $same_as_booker When ticked, match on PHONE ONLY: the name
+     *                               is ignored, so the pax is the booking
+     *                               customer as long as the phone matches (a
+     *                               genuinely different phone still spins off a
+     *                               new customer).
      * @return bool
      */
-    function einvoice_pax_needs_new_customer($pax_name, $pax_phone, $booking_name, $booking_phone)
+    function einvoice_pax_needs_new_customer($pax_name, $pax_phone, $booking_name, $booking_phone, $same_as_booker = false)
     {
         // Shared last-9-digit phone key (customer_dedup_helper). Available under
         // both CI (auto-loaded) and the standalone test (required directly).
@@ -67,8 +72,15 @@ if (!function_exists('einvoice_pax_needs_new_customer')) {
             return false;
         }
 
-        $name_differs  = $pax_name_key !== einvoice_name_key($booking_name);
         $phone_differs = $pax_phone_key !== customer_phone_dedup_key($booking_phone);
+
+        // "Same as booker" ticked: match on PHONE ONLY — the name is ignored, so
+        // a spelling drift on the same phone reuses the booking customer.
+        if ($same_as_booker) {
+            return $phone_differs;
+        }
+
+        $name_differs = $pax_name_key !== einvoice_name_key($booking_name);
 
         return $name_differs || $phone_differs;
     }

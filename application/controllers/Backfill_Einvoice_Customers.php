@@ -199,8 +199,9 @@ class Backfill_Einvoice_Customers extends CI_Controller
         foreach ($pax_data as $pax) {
             $pax_name  = isset($pax['PaxName']) ? $pax['PaxName'] : '';
             $pax_phone = isset($pax['PhoneNumber']) ? $pax['PhoneNumber'] : '';
+            $same_as_booker = !empty($pax['SameAsBooker']);
 
-            if (!einvoice_pax_needs_new_customer($pax_name, $pax_phone, $booking_name, $booking_phone)) {
+            if (!einvoice_pax_needs_new_customer($pax_name, $pax_phone, $booking_name, $booking_phone, $same_as_booker)) {
                 continue;
             }
             if (!empty($this->Customer_Model->find_active_by_phone($pax_phone, null, $pax_name))) {

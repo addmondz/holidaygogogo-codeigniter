@@ -29,6 +29,7 @@ class Invoice_Split_Model extends CI_Model
                     'Email' => $row['Email'],
                     'Address' => $row['Address'],
                     'PhoneNumber' => $row['PhoneNumber'],
+                    'SameAsBooker' => isset($row['SameAsBooker']) ? (int)$row['SameAsBooker'] : 0,
                     'SubtotalAmount' => $row['SubtotalAmount'],
                     'DiscountAmount' => $row['DiscountAmount'],
                     'NetAmount' => $row['NetAmount'],
@@ -231,6 +232,10 @@ class Invoice_Split_Model extends CI_Model
                 'Email' => $email,
                 'Address' => $address,
                 'PhoneNumber' => $phone_number,
+                // "Name is same as the booker" tick: when set, the submit flow
+                // treats this pax as the booking customer and skips creating a
+                // duplicate customer for it.
+                'SameAsBooker' => !empty($pax['SameAsBooker']) ? 1 : 0,
                 'products' => $validated_products
             ];
         }
@@ -358,6 +363,7 @@ class Invoice_Split_Model extends CI_Model
                 'Email' => $pax['Email'],
                 'Address' => $pax['Address'],
                 'PhoneNumber' => $pax['PhoneNumber'],
+                'SameAsBooker' => !empty($pax['SameAsBooker']) ? 1 : 0,
                 'SubtotalAmount' => $pax_subtotal,
                 'DiscountAmount' => 0,
                 'NetAmount' => $pax_subtotal,
@@ -456,22 +462,30 @@ class Invoice_Split_Model extends CI_Model
             foreach ($pax_data as $pax) {
                 $pax_name  = isset($pax['PaxName']) ? $pax['PaxName'] : '';
                 $pax_phone = isset($pax['PhoneNumber']) ? $pax['PhoneNumber'] : '';
+                $same_as_booker = !empty($pax['SameAsBooker']);
 
-                if (!einvoice_pax_needs_new_customer($pax_name, $pax_phone, $booking_name, $booking_phone)) {
+                if (!einvoice_pax_needs_new_customer($pax_name, $pax_phone, $booking_name, $booking_phone, $same_as_booker)) {
                     continue;
                 }
 
-                // Skip-if-exists: only when an active customer already matches
-                // BOTH this pax's phone AND name. A same-phone/different-name pax
-                // (e.g. a company billing name on a personal booker's phone) is a
-                // distinct customer and still gets created, per the OR rule above.
-                if (!empty($this->Customer_Model->find_active_by_phone($pax_phone, null, $pax_name))) {
-                    log_message('info', 'E-invoice: pax "' . $pax_name . '" name+phone already has a customer; skipped (booking ' . $booking_id . ')');
+                // Skip-if-exists: normally an active customer must match BOTH this
+                // pax's phone AND name (a same-phone/different-name pax is a
+                // distinct customer). When "same as booker" is ticked we match on
+                // PHONE ONLY, so a spelling drift on the same phone reuses the
+                // existing customer instead of duplicating it.
+                $match_name = $same_as_booker ? null : $pax_name;
+                if (!empty($this->Customer_Model->find_active_by_phone($pax_phone, null, $match_name))) {
+                    log_message('info', 'E-invoice: pax "' . $pax_name . '" ' . ($same_as_booker ? 'phone' : 'name+phone') . ' already has a customer; skipped (booking ' . $booking_id . ')');
                     continue;
                 }
+
+                // "Same as booker" ticked but the phone differed, so a new
+                // customer is still created — use the booker's name (the user has
+                // asserted this pax IS the booker) rather than the pax spelling.
+                $new_name = ($same_as_booker && trim($booking_name) !== '') ? trim($booking_name) : trim($pax_name);
 
                 $data = [
-                    'name'         => trim($pax_name),
+                    'name'         => $new_name,
                     'phone_number' => trim($pax_phone),
                     'PrimaryEmail' => !empty($pax['Email']) ? trim($pax['Email']) : null,
                     'Address'      => !empty($pax['Address']) ? trim($pax['Address']) : null,

@@ -40,6 +40,17 @@ $assertions['diff name AND diff phone -> true'] =
 $assertions['booking has no phone + diff name -> true'] =
     (einvoice_pax_needs_new_customer('Siti', '0139998877', 'Ali', '') === true);
 
+/* 4b) SAME-AS-BOOKER -> match PHONE ONLY (ignore name) ----------- */
+// Ticking "name is same as the booker" ignores the name: same phone reuses the
+// booking customer (the Jamuna case: same phone, "A/P" spelling drift)...
+$assertions['same_as_booker: diff name, SAME phone -> false'] =
+    (einvoice_pax_needs_new_customer('Jamuna Nadaraja', '0125133127', 'JAMUNA A/P NADARAJA', '125133127', true) === false);
+// ...but a genuinely different phone still spins off a new customer.
+$assertions['same_as_booker: diff name AND diff phone -> true'] =
+    (einvoice_pax_needs_new_customer('Siti', '0139998877', 'Ali', '0122983045', true) === true);
+$assertions['same_as_booker off: diff name spelling still -> true'] =
+    (einvoice_pax_needs_new_customer('Jamuna Nadaraja', '0125133127', 'JAMUNA A/P NADARAJA', '125133127', false) === true);
+
 /* 5) PAX MUST BE USABLE ------------------------------------------ */
 $assertions['blank pax name -> false']  =
     (einvoice_pax_needs_new_customer('', '0139998877', 'Ali', '0122983045') === false);

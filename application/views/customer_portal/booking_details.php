@@ -2685,6 +2685,7 @@
                 var email = paxData ? (paxData.Email || '') : '';
                 var address = paxData ? (paxData.Address || '') : '';
                 var phone = paxData ? (paxData.PhoneNumber || '') : '';
+                var sameAsBooker = paxData ? (parseInt(paxData.SameAsBooker, 10) === 1) : false;
 
                 var html = '<div class="pax-card" data-pax-idx="' + idx + '" style="background:#f8f9fa;border:1px solid #e0e0e0;border-radius:8px;padding:16px;margin-bottom:12px;">';
                 html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">';
@@ -2699,6 +2700,7 @@
                 html += '<div style="flex:1;min-width:200px;"><label style="font-size:12px;font-weight:600;color:#666;">Email <span style="color:red;">*</span></label><input type="email" class="pax-email" value="' + email.replace(/"/g, '&quot;') + '" placeholder="Email Address" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;font-size:13px;" required></div>';
                 html += '<div style="min-width:180px;"><label style="font-size:12px;font-weight:600;color:#666;">Phone Number <span style="color:red;">*</span></label><input type="text" class="pax-phone" value="' + phone.replace(/"/g, '&quot;') + '" placeholder="Phone Number" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;font-size:13px;" required></div>';
                 html += '</div>';
+                html += '<div style="margin-bottom:12px;"><label style="font-size:12px;font-weight:600;color:#444;display:inline-flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" class="pax-same-as-booker" ' + (sameAsBooker ? 'checked' : '') + ' style="width:15px;height:15px;cursor:pointer;"> Name is same as the booker <span style="font-weight:400;color:#888;">(match by phone only — no separate customer)</span></label></div>';
                 html += '<div style="margin-bottom:12px;"><label style="font-size:12px;font-weight:600;color:#666;">Address <span style="color:red;">*</span></label><textarea class="pax-address" placeholder="Full Address" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;font-size:13px;resize:vertical;min-height:60px;" required>' + address.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</textarea></div>';
                 html += '<table style="width:100%;border-collapse:collapse;font-size:13px;">';
                 html += '<thead><tr style="background:#e9ecef;"><th style="padding:8px;text-align:left;">Product</th><th style="padding:8px;text-align:center;width:100px;">Qty</th><th style="padding:8px;text-align:right;">Unit Price</th><th style="padding:8px;text-align:right;">Amount</th><th style="padding:8px;width:50px;"></th></tr></thead>';
@@ -2916,6 +2918,7 @@
                     var paxEmail = $(this).find('.pax-email').val().trim();
                     var paxAddress = $(this).find('.pax-address').val().trim();
                     var paxPhone = $(this).find('.pax-phone').val().trim();
+                    var paxSameAsBooker = $(this).find('.pax-same-as-booker').is(':checked') ? 1 : 0;
 
                     if (!paxName) {
                         hasError = true;
@@ -2963,7 +2966,7 @@
                         return false;
                     }
 
-                    paxList.push({ PaxName: paxName, TIN: paxTin, Email: paxEmail, Address: paxAddress, PhoneNumber: paxPhone, products: products });
+                    paxList.push({ PaxName: paxName, TIN: paxTin, Email: paxEmail, Address: paxAddress, PhoneNumber: paxPhone, SameAsBooker: paxSameAsBooker, products: products });
                 });
 
                 if (hasError) return null;

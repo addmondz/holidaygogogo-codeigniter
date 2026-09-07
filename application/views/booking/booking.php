@@ -2012,6 +2012,7 @@
                                                             var email = paxData ? (paxData.Email || '') : '';
                                                             var address = paxData ? (paxData.Address || '') : '';
                                                             var phone = paxData ? (paxData.PhoneNumber || '') : '';
+                                                            var sameAsBooker = paxData ? (parseInt(paxData.SameAsBooker, 10) === 1) : false;
                                                             var esc = function(s) { return String(s).replace(/"/g, '&quot;'); };
                                                             var escTa = function(s) { return String(s).replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
 
@@ -2028,6 +2029,7 @@
                                                             html += '<div class="form-group col-md-6"><label class="font-weight-bold" style="font-size:12px;">Email <span class="text-danger">*</span></label><input type="email" class="adm-pax-email form-control form-control-sm" value="' + esc(email) + '" placeholder="Email Address"></div>';
                                                             html += '<div class="form-group col-md-6"><label class="font-weight-bold" style="font-size:12px;">Phone Number <span class="text-danger">*</span></label><input type="text" class="adm-pax-phone form-control form-control-sm" value="' + esc(phone) + '" placeholder="Phone Number"></div>';
                                                             html += '</div>';
+                                                            html += '<div class="form-group mb-2"><label class="mb-0" style="font-size:12px;cursor:pointer;"><input type="checkbox" class="adm-pax-same-as-booker" ' + (sameAsBooker ? 'checked' : '') + '> <span class="font-weight-bold">Name is same as the booker</span> <span class="text-muted">(match by phone only — no separate customer)</span></label></div>';
                                                             html += '<div class="form-group"><label class="font-weight-bold" style="font-size:12px;">Address <span class="text-danger">*</span></label><textarea class="adm-pax-address form-control form-control-sm" placeholder="Full Address" style="min-height:60px;">' + escTa(address) + '</textarea></div>';
                                                             html += '<table class="table table-sm table-bordered mb-1" style="font-size:13px;">';
                                                             html += '<thead style="background:#e9ecef;"><tr><th>Product</th><th class="text-center" style="width:100px;">Qty</th><th class="text-right" style="width:110px;">Unit Price</th><th class="text-right" style="width:120px;">Amount</th><th style="width:40px;"></th></tr></thead>';
@@ -2203,6 +2205,7 @@
                                                                 var em = $(this).find('.adm-pax-email').val().trim();
                                                                 var ad = $(this).find('.adm-pax-address').val().trim();
                                                                 var ph = $(this).find('.adm-pax-phone').val().trim();
+                                                                var sab = $(this).find('.adm-pax-same-as-booker').is(':checked') ? 1 : 0;
                                                                 if (!name) { hadError = true; Swal.fire('Error', 'Each pax must have a name.', 'error'); return false; }
                                                                 if (!tin)  { hadError = true; Swal.fire('Error', 'Each pax must have a TIN.', 'error'); return false; }
                                                                 if (!em)   { hadError = true; Swal.fire('Error', 'Each pax must have an Email.', 'error'); return false; }
@@ -2219,7 +2222,7 @@
                                                                     Swal.fire('Error', 'Pax "' + name + '" must have at least one product.', 'error');
                                                                     return false;
                                                                 }
-                                                                paxList.push({ PaxName: name, TIN: tin, Email: em, Address: ad, PhoneNumber: ph, products: products });
+                                                                paxList.push({ PaxName: name, TIN: tin, Email: em, Address: ad, PhoneNumber: ph, SameAsBooker: sab, products: products });
                                                             });
                                                             if (hadError) return null;
                                                             // Full-allocation check (admin edit mirrors customer Submit).
