@@ -22,6 +22,15 @@ class GhlMessagesSyncService
             $mode = 'recent';
         }
 
+        // A filtered export is used for repair/backfill work. It must not stop at
+        // the normal rolling cutoff, otherwise an old conversation can never be
+        // repaired through the same sync code.
+        $contactId = isset($options['contact_id']) ? trim((string) $options['contact_id']) : '';
+        $conversationId = isset($options['conversation_id']) ? trim((string) $options['conversation_id']) : '';
+        if ($contactId !== '' || $conversationId !== '') {
+            $mode = 'full';
+        }
+
         $syncKey = 'ghl_messages_' . $config['location_id'];
         $moduleName = 'ghl_messages';
         $runId = $this->CI->Ghl_Sync_Model->generate_run_id($moduleName);
@@ -46,7 +55,7 @@ class GhlMessagesSyncService
         try {
             do {
                 $page++;
-                $response = $this->requestMessages($config, $cursor);
+                $response = $this->requestMessages($config, $cursor, $contactId, $conversationId);
 
                 if ($response['status'] >= 400) {
                     $this->logEvent($runId, $moduleName, array(
@@ -132,6 +141,8 @@ class GhlMessagesSyncService
                 'days_back' => (int) $config['days_back'],
                 'cutoff_datetime' => $cutoff->format('Y-m-d H:i:s'),
                 'api_total' => $apiTotal,
+                'contact_id' => $contactId !== '' ? $contactId : null,
+                'conversation_id' => $conversationId !== '' ? $conversationId : null,
             );
         } catch (Exception $e) {
             $this->logEvent($runId, $moduleName, array(
@@ -187,15 +198,26 @@ class GhlMessagesSyncService
         }
     }
 
-    protected function requestMessages($config, $cursor = null)
+    protected function requestMessages($config, $cursor = null, $contactId = '', $conversationId = '')
     {
         $query = array(
             'locationId' => $config['location_id'],
             'limit' => $config['page_limit'],
+            // The cutoff logic below depends on a stable newest-first result.
+            'sortBy' => 'createdAt',
+            'sortOrder' => 'desc',
         );
 
         if (!empty($config['channel'])) {
             $query['channel'] = $config['channel'];
+        }
+
+        if ($contactId !== '') {
+            $query['contactId'] = $contactId;
+        }
+
+        if ($conversationId !== '') {
+            $query['conversationId'] = $conversationId;
         }
 
         if ($cursor !== null && $cursor !== '') {

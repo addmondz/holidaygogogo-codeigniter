@@ -2715,6 +2715,8 @@ class Cron extends CI_Controller
 
 	/**
 	 * GHL messages sync. CLI only: php index.php Cron syncGhlMessages
+	 * Targeted history repair: php index.php Cron syncGhlMessages contact CONTACT_ID
+	 *                         php index.php Cron syncGhlMessages conversation CONVERSATION_ID
 	 */
 	public function syncGhlMessages()
 	{
@@ -2731,8 +2733,26 @@ class Cron extends CI_Controller
 		);
 
 		$this->load->library('GhlMessagesSyncService');
+		$contactId = '';
+		$conversationId = '';
+		for ($i = 0, $flagCount = count($flags); $i < $flagCount; $i++) {
+			$flag = $flags[$i];
+			if (strpos($flag, '--contact-id=') === 0) {
+				$contactId = trim(substr($flag, strlen('--contact-id=')));
+			} elseif (strpos($flag, '--conversation-id=') === 0) {
+				$conversationId = trim(substr($flag, strlen('--conversation-id=')));
+			// CodeIgniter treats "--contact-id=..." as an invalid URI. Support
+			// URI-safe CLI segments as well: contact CONTACT_ID / conversation ID.
+			} elseif ($flag === 'contact' && isset($flags[$i + 1])) {
+				$contactId = trim((string) $flags[++$i]);
+			} elseif ($flag === 'conversation' && isset($flags[$i + 1])) {
+				$conversationId = trim((string) $flags[++$i]);
+			}
+		}
 		$result = $this->ghlmessagessyncservice->sync(array(
 			'mode' => in_array('--full', $flags, true) ? 'full' : 'recent',
+			'contact_id' => $contactId,
+			'conversation_id' => $conversationId,
 		));
 
 		$this->output
