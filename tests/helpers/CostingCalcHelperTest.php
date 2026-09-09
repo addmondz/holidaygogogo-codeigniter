@@ -5,10 +5,10 @@
  * Locks the pure costing/quotation math (no DB / no HTTP / no date funcs, so it
  * runs on plain PHP + SQLite). These functions turn cost rows priced in any
  * currency + a frozen per-costing rate snapshot into MYR cost, then apply a
- * markup-on-cost margin to show selling + profit. No manual selling price.
+ * gross margin to show selling + profit. No manual selling price.
  *
- *   selling = cost x (1 + margin%/100)
- *   profit  = cost x (margin%/100)
+ *   selling = cost / (1 - margin%/100)
+ *   profit  = selling - cost
  *
  * Three parts:
  *   1. Pure math    : convert, sum-by-category, markup, snapshot build, normalize.
@@ -74,29 +74,33 @@ $assertions['sum: empty -> total 0']      = $approx(costing_sum_by_category([], 
 $assertions['sum: always has 5 cats + total'] = (count(costing_sum_by_category([], $rate_map)) === 6);
 
 /* ------------------------------------------------------------------ *
- * 3) MARKUP ON COST                                                   *
+ * 3) GROSS MARGIN (selling = cost / (1 - margin%))                     *
  * ------------------------------------------------------------------ */
 
-$m = costing_apply_markup(1000, 20);
-$assertions['markup: 20% on 1000 -> selling 1200'] = $approx($m['selling'], 1200.00);
-$assertions['markup: 20% on 1000 -> profit 200']   = $approx($m['profit'], 200.00);
-$assertions['markup: keeps cost']                  = $approx($m['cost'], 1000.00);
+$m = costing_apply_markup(1000, 20); // 1000 / 0.80 = 1250
+$assertions['margin: 20% on 1000 -> selling 1250'] = $approx($m['selling'], 1250.00);
+$assertions['margin: 20% on 1000 -> profit 250']   = $approx($m['profit'], 250.00);
+$assertions['margin: keeps cost']                  = $approx($m['cost'], 1000.00);
 
 $m0 = costing_apply_markup(1000, 0);
-$assertions['markup: 0% -> selling == cost'] = $approx($m0['selling'], 1000.00);
-$assertions['markup: 0% -> profit 0']        = $approx($m0['profit'], 0.00);
+$assertions['margin: 0% -> selling == cost'] = $approx($m0['selling'], 1000.00);
+$assertions['margin: 0% -> profit 0']        = $approx($m0['profit'], 0.00);
 
+$m50 = costing_apply_markup(1000, 50); // 1000 / 0.50 = 2000
+$assertions['margin: 50% -> selling 2x'] = $approx($m50['selling'], 2000.00);
+$assertions['margin: 50% -> profit == cost'] = $approx($m50['profit'], 1000.00);
+
+// 100%+ gross margin is undefined (infinite price) -> falls back to cost.
 $m100 = costing_apply_markup(1000, 100);
-$assertions['markup: 100% -> selling 2x'] = $approx($m100['selling'], 2000.00);
-$assertions['markup: 100% -> profit == cost'] = $approx($m100['profit'], 1000.00);
+$assertions['margin: 100% falls back to cost'] = $approx($m100['selling'], 1000.00);
 
-$mf = costing_apply_markup(1000, 12.5);
-$assertions['markup: 12.5% -> selling 1125'] = $approx($mf['selling'], 1125.00);
-$assertions['markup: 12.5% -> profit 125']   = $approx($mf['profit'], 125.00);
+$mf = costing_apply_markup(1000, 12.5); // 1000 / 0.875 = 1142.86
+$assertions['margin: 12.5% -> selling 1142.86'] = $approx($mf['selling'], 1142.86);
+$assertions['margin: 12.5% -> profit 142.86']   = $approx($mf['profit'], 142.86);
 
-$mr = costing_apply_markup(333.33, 15);
-$assertions['markup: rounds selling to 2dp'] = $approx($mr['selling'], 383.33);
-$assertions['markup: negative margin clamped to 0'] = $approx(costing_apply_markup(1000, -5)['selling'], 1000.00);
+$mr = costing_apply_markup(333.33, 15); // 333.33 / 0.85 = 392.15
+$assertions['margin: rounds selling to 2dp'] = $approx($mr['selling'], 392.15);
+$assertions['margin: negative margin clamped to 0'] = $approx(costing_apply_markup(1000, -5)['selling'], 1000.00);
 
 /* ------------------------------------------------------------------ *
  * 4) SNAPSHOT ROWS                                                    *
@@ -135,18 +139,18 @@ $assertions['normalize: clamps to 8dp']        = $approx(costing_normalize_rate(
  * 6) END-TO-END                                                      *
  * ------------------------------------------------------------------ */
 
-// Rows: USD 200 (flight) + SGD 100 (accommodation) + MYR 50 (misc), 10% markup.
-// Cost = 200*4.5 + 100*3.5 + 50 = 900 + 350 + 50 = 1300; selling = 1430; profit = 130.
+// Rows: USD 200 (flight) + SGD 100 (accommodation) + MYR 50 (misc), 10% margin.
+// Cost = 200*4.5 + 100*3.5 + 50 = 900 + 350 + 50 = 1300; selling = 1300/0.9 = 1444.44.
 $e_lines = [
     ['category' => 'flight',        'currency_code' => 'USD', 'unit_cost' => 200, 'quantity' => 1],
     ['category' => 'accommodation', 'currency_code' => 'SGD', 'unit_cost' => 100, 'quantity' => 1],
     ['category' => 'miscellaneous', 'currency_code' => 'MYR', 'unit_cost' => 50,  'quantity' => 1],
 ];
 $e_sum = costing_sum_by_category($e_lines, $rate_map);
-$e_fin = costing_apply_markup($e_sum['total'], 10);
-$assertions['e2e: cost 1300']    = $approx($e_fin['cost'], 1300.00);
-$assertions['e2e: selling 1430'] = $approx($e_fin['selling'], 1430.00);
-$assertions['e2e: profit 130']   = $approx($e_fin['profit'], 130.00);
+$e_fin = costing_apply_markup($e_sum['total'], 10); // 1300 / 0.90 = 1444.44
+$assertions['e2e: cost 1300']       = $approx($e_fin['cost'], 1300.00);
+$assertions['e2e: selling 1444.44'] = $approx($e_fin['selling'], 1444.44);
+$assertions['e2e: profit 144.44']   = $approx($e_fin['profit'], 144.44);
 
 /* ------------------------------------------------------------------ *
  * 6b) MULTIPLIER TYPES + ROW MYR (cost template)                      *
@@ -246,36 +250,37 @@ $assertions['breakdown: unknown currency -> rate 0'] = ($approx($bd_missing[0]['
  * 6b) COMBINATION SUMMARY (customer bundles, additive)                *
  * ------------------------------------------------------------------ */
 
-// Markup on cost: cost after markup = cost x (1 + margin/100).
-$assertions['after markup: 20% on 1000 -> 1200'] = $approx(costing_cost_after_markup(1000, 20), 1200.00);
+// Gross margin: cost after markup = cost / (1 - margin/100).
+$assertions['after markup: 20% on 1000 -> 1250'] = $approx(costing_cost_after_markup(1000, 20), 1250.00);
 $assertions['after markup: 0% keeps cost'] = $approx(costing_cost_after_markup(1000, 0), 1000.00);
 $assertions['after markup: negative keeps cost'] = $approx(costing_cost_after_markup(1000, -5), 1000.00);
-$assertions['after markup: 100% doubles'] = $approx(costing_cost_after_markup(1000, 100), 2000.00);
-$assertions['after markup: 12.5% -> 1125'] = $approx(costing_cost_after_markup(1000, 12.5), 1125.00);
+$assertions['after markup: 50% doubles'] = $approx(costing_cost_after_markup(1000, 50), 2000.00);
+$assertions['after markup: 100% falls back to cost'] = $approx(costing_cost_after_markup(1000, 100), 1000.00);
+$assertions['after markup: 12.5% -> 1142.86'] = $approx(costing_cost_after_markup(1000, 12.5), 1142.86);
 
 $combos_in = [
     ['name' => 'Premium',  'item_names' => ['Business Flight', '5-Star Hotel'], 'cost_myr' => 4000.00],
     ['name' => 'Standard', 'item_names' => ['Economy Flight', '4-Star Hotel'],  'cost_myr' => 2500.00],
 ];
-$cs = costing_combination_summary($combos_in, 20); // 20% markup on cost, no pax
+$cs = costing_combination_summary($combos_in, 20); // 20% gross margin, no pax
 
 $assertions['combo: one entry per combination'] = (count($cs['combinations']) === 2);
 $assertions['combo: name carried'] = ($cs['combinations'][0]['name'] === 'Premium');
 $assertions['combo: item names carried'] = ($cs['combinations'][0]['item_names'] === ['Business Flight', '5-Star Hotel']);
-$assertions['combo: selling = cost x (1 + margin)'] = $approx($cs['combinations'][0]['selling'], 4800.00);
-$assertions['combo: second selling'] = $approx($cs['combinations'][1]['selling'], 3000.00);
+$assertions['combo: selling = cost / (1 - margin)'] = $approx($cs['combinations'][0]['selling'], 5000.00); // 4000/0.8
+$assertions['combo: second selling'] = $approx($cs['combinations'][1]['selling'], 3125.00); // 2500/0.8
 $assertions['combo: total_cost = sum of costs'] = $approx($cs['total_cost'], 6500.00);
-$assertions['combo: total_selling additive'] = $approx($cs['total_selling'], 7800.00);
+$assertions['combo: total_selling additive'] = $approx($cs['total_selling'], 8125.00);
 
-// Per-pax pricing: cost/pax marked up, then × pax. 4000 cost, 4 pax, 20% ->
-// cost/pax 1000 -> after markup 1200 -> profit/pax 200 -> selling 4800.
+// Per-pax pricing: cost/pax grossed up, then × pax. 4000 cost, 4 pax, 20% ->
+// cost/pax 1000 -> after markup 1250 -> profit/pax 250 -> selling 5000.
 $csp = costing_combination_summary([['name' => 'P', 'item_names' => [], 'cost_myr' => 4000.00]], 20, 4);
 $assertions['combo: cost per pax'] = $approx($csp['combinations'][0]['cost_per_pax'], 1000.00);
-$assertions['combo: cost after markup per pax'] = $approx($csp['combinations'][0]['cost_after_markup_per_pax'], 1200.00);
-$assertions['combo: selling price per pax defaults to markup'] = $approx($csp['combinations'][0]['selling_price_per_pax'], 1200.00);
-$assertions['combo: profit per pax'] = $approx($csp['combinations'][0]['profit_per_pax'], 200.00);
-$assertions['combo: selling = price/pax x pax'] = $approx($csp['combinations'][0]['selling'], 4800.00);
-$assertions['combo: total profit'] = $approx($csp['combinations'][0]['total_profit'], 800.00);
+$assertions['combo: cost after markup per pax'] = $approx($csp['combinations'][0]['cost_after_markup_per_pax'], 1250.00);
+$assertions['combo: selling price per pax defaults to markup'] = $approx($csp['combinations'][0]['selling_price_per_pax'], 1250.00);
+$assertions['combo: profit per pax'] = $approx($csp['combinations'][0]['profit_per_pax'], 250.00);
+$assertions['combo: selling = price/pax x pax'] = $approx($csp['combinations'][0]['selling'], 5000.00);
+$assertions['combo: total profit'] = $approx($csp['combinations'][0]['total_profit'], 1000.00);
 
 // Manual selling price per pax overrides the suggested markup (authoritative).
 $csm = costing_combination_summary([['name' => 'M', 'item_names' => [], 'cost_myr' => 4000.00, 'selling_price_per_pax' => 1500.00]], 20, 4);

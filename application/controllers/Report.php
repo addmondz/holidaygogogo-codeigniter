@@ -79,13 +79,18 @@ class Report extends MY_Controller
 
         $this->load->helper('ghl_messages_log');
 
-        $range = $this->ghl_message_log_range(trim((string) $this->input->get('log_date')));
+        // "All dates" is set by the contact links in the log so clicking a contact
+        // threads their whole history regardless of the current date window.
+        $allDates = (string) $this->input->get('all_dates') === '1';
+        $range = $this->ghl_message_log_range(trim((string) $this->input->get('log_date')), $allDates);
         // Contact + Agent are BOTH multi-value filters. Contact arrives as a single
         // text field (comma / newline separated) or an array; agent arrives as a
         // multi-select array (or a single value from the legacy drill-down links).
         // Normalisers reduce each to a de-duplicated list the model OR/IN-matches.
         $contactInput = $this->input->get('contact');
-        $contact = ghl_message_log_normalize_contacts($contactInput);
+        // Typed terms so the filter matches phone numbers AND contact names --
+        // GHL stores a display name in from/to when it has no phone for a lead.
+        $contact = ghl_message_log_normalize_contact_terms($contactInput);
         $contactRaw = is_array($contactInput)
             ? implode(', ', array_map('strval', $contactInput))
             : trim((string) $contactInput);
@@ -237,10 +242,11 @@ class Report extends MY_Controller
 
         $this->load->helper('ghl_messages_log');
 
-        $range = $this->ghl_message_log_range(trim((string) $this->input->get('log_date')));
+        $allDates = (string) $this->input->get('all_dates') === '1';
+        $range = $this->ghl_message_log_range(trim((string) $this->input->get('log_date')), $allDates);
         // Same multi-value contact + agent filters as the on-screen log so the CSV
         // export mirrors exactly what the reader is looking at.
-        $contact = ghl_message_log_normalize_contacts($this->input->get('contact'));
+        $contact = ghl_message_log_normalize_contact_terms($this->input->get('contact'));
         $agent = ghl_message_log_normalize_agents($this->input->get('agent'));
         $hour = ghl_message_log_normalize_hour($this->input->get('hour'));
         $timeFrom = ghl_message_log_normalize_time($this->input->get('time_from'));
@@ -2097,8 +2103,20 @@ class Report extends MY_Controller
      * "dd/mm/YYYY - dd/mm/YYYY" picker value, otherwise defaults to the last 7
      * days so the newest messages load quickly.
      */
-    private function ghl_message_log_range($rangeInput)
+    private function ghl_message_log_range($rangeInput, $allDates = false)
     {
+        // "All dates" mode (set when the reader clicks a contact in the log): drop
+        // the date window entirely and thread that contact's whole history. Open
+        // bounds far enough on both sides to cover any stored message timestamp.
+        if ($allDates) {
+            return array(
+                'log_date' => '',
+                'start_date' => '2000-01-01',
+                'end_date' => '2100-01-01',
+                'all_dates' => true,
+            );
+        }
+
         if ($rangeInput !== '' && strpos($rangeInput, ' - ') !== false) {
             $parts = explode(' - ', $rangeInput);
             if (count($parts) === 2) {
@@ -2110,6 +2128,7 @@ class Report extends MY_Controller
                         'log_date' => date('d/m/Y', strtotime($startDate)) . ' - ' . date('d/m/Y', strtotime($endDate)),
                         'start_date' => $startDate,
                         'end_date' => $endDate,
+                        'all_dates' => false,
                     );
                 }
             }
@@ -2122,6 +2141,7 @@ class Report extends MY_Controller
             'log_date' => date('d/m/Y', strtotime($startDate)) . ' - ' . date('d/m/Y', strtotime($endDate)),
             'start_date' => $startDate,
             'end_date' => $endDate,
+            'all_dates' => false,
         );
     }
 

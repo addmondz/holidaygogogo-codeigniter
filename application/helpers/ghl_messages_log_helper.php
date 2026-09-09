@@ -25,37 +25,71 @@ if (!function_exists('ghl_message_log_normalize_contact')) {
     }
 }
 
-if (!function_exists('ghl_message_log_normalize_contacts')) {
+if (!function_exists('ghl_message_log_normalize_contact_terms')) {
     /**
-     * Normalise the Message Log "contact" filter into a list of digits-only phone
-     * numbers, so several leads can be threaded together in one view. Accepts
-     * either an array (from a multi-value form field) or a single text field where
-     * the user separated numbers with commas / semicolons / new lines. Internal
-     * spaces, dashes and '+' inside one number are kept as part of that number and
-     * stripped to digits, so "+60 12-345" stays a single "6012345"; only the
-     * comma/semicolon/newline separators split entries. Blanks and duplicates are
-     * dropped, order preserved.
+     * Normalise the Message Log "contact" filter into a list of TYPED terms so it
+     * can match both phone numbers AND contact names. GHL stores a contact's
+     * display name in from_number/to_number when it holds no phone number for them
+     * (e.g. "Siew Chin Yap", "HolidayGoGoGo", "Jenny Lim"), so a digits-only filter
+     * silently dropped every letter-bearing search and returned the whole log.
+     *
+     * Accepts an array (multi-value form field) or a single text field where the
+     * user separated entries with commas / semicolons / new lines. Each entry is
+     * classified: anything containing a letter is a NAME (kept trimmed, matched as
+     * free text); anything else is a PHONE (reduced to digits, so "+60 12-345"
+     * becomes "6012345" and any format matches the same lead). Blank/punctuation-
+     * only entries and exact (type+value) duplicates are dropped, order preserved.
+     *
+     * Idempotent: an already-typed list passes straight through, so the controller
+     * can normalise once and the model can safely re-normalise what it received.
      *
      * @param mixed $value Raw contact input (array or delimited string).
-     * @return array List of digits-only strings (empty when nothing usable).
+     * @return array<int,array{type:string,value:string}> 'phone'|'name' terms.
      */
-    function ghl_message_log_normalize_contacts($value)
+    function ghl_message_log_normalize_contact_terms($value)
     {
+        // Already-typed list (from the controller) -> pass through unchanged.
+        if (is_array($value) && isset($value[0]) && is_array($value[0])
+            && array_key_exists('type', $value[0]) && array_key_exists('value', $value[0])) {
+            return $value;
+        }
+
         if (is_array($value)) {
             $items = $value;
         } else {
             // Split ONLY on comma / semicolon / newline so a single number's own
-            // spaces/dashes are preserved and reduced to digits below.
+            // spaces/dashes (or a name's internal spaces) stay part of one entry.
             $items = preg_split('/[,;\r\n]+/', (string) $value);
         }
 
         $out = array();
+        $seen = array();
         foreach ($items as $item) {
-            $digits = preg_replace('/\D+/', '', (string) $item);
-            if ($digits === '' || in_array($digits, $out, true)) {
+            $item = trim((string) $item);
+            if ($item === '') {
                 continue;
             }
-            $out[] = $digits;
+
+            if (preg_match('/\p{L}/u', $item)) {
+                // A phone number never carries a letter -- treat it as a name and
+                // match the raw from/to text (case-insensitively in SQL).
+                $type = 'name';
+                $val = $item;
+            } else {
+                $digits = preg_replace('/\D+/', '', $item);
+                if ($digits === '') {
+                    continue; // punctuation-only entry, nothing to match on.
+                }
+                $type = 'phone';
+                $val = $digits;
+            }
+
+            $key = $type . ':' . $val;
+            if (isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+            $out[] = array('type' => $type, 'value' => $val);
         }
 
         return $out;

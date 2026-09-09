@@ -1112,12 +1112,13 @@ class Costing_Model extends CI_Model
         // Customer-facing line items: name + selling price (MYR cost incl. bank
         // charges, marked up by the same margin). Raw cost/margin/profit stay hidden.
         // Kept as a fallback for legacy scenarios that have no combinations yet.
+        $this->load->helper('costing_calc');
         $margin = max(0, (float) $financials['margin_percentage']);
         $items = array();
         foreach ($booking_items as $item) {
             $items[] = array(
                 'name'    => $item['name'],
-                'selling' => round((float) $item['base_total'] * (1 + $margin / 100), 2),
+                'selling' => costing_cost_after_markup((float) $item['base_total'], $margin),
             );
         }
 
@@ -1125,7 +1126,6 @@ class Costing_Model extends CI_Model
         // item names + its own selling price. The customer picks ONE, so prices are
         // NOT summed. When present, the PDF shows these options instead of the
         // internal item list.
-        $this->load->helper('costing_calc');
         $combo_input = array();
         foreach ($this->Read_Combinations((int) $booking['id'], $base_currency_id, $booking['travel_date']) as $combo) {
             $names = array();
@@ -1728,7 +1728,10 @@ class Costing_Model extends CI_Model
             return array('rate' => 1, 'bank_charges_myr' => 0);
         }
 
-        $this->db->select('rate, bank_charges_myr');
+        // The RATE is date-sensitive: pick the record in force on/before the travel
+        // date, falling back to the most recent record when the trip predates every
+        // rate.
+        $this->db->select('rate');
         $this->db->where('from_currency_id', $from_currency_id);
         $this->db->where('to_currency_id', $to_currency_id);
 
@@ -1740,25 +1743,48 @@ class Costing_Model extends CI_Model
         $this->db->order_by('id', 'DESC');
         $row = $this->db->get('costing_exchange_rates')->row_array();
 
-        if ($row) {
-            return array(
-                'rate' => (float) $row['rate'],
-                'bank_charges_myr' => (float) $row['bank_charges_myr'],
-            );
+        if (!$row) {
+            $row = $this->db
+                ->select('rate')
+                ->where('from_currency_id', $from_currency_id)
+                ->where('to_currency_id', $to_currency_id)
+                ->order_by('valid_from', 'DESC')
+                ->order_by('id', 'DESC')
+                ->get('costing_exchange_rates')
+                ->row_array();
         }
 
-        $fallback = $this->db
-            ->select('rate, bank_charges_myr')
-            ->where('from_currency_id', $from_currency_id)
-            ->where('to_currency_id', $to_currency_id)
+        if (!$row) {
+            return array('rate' => 0, 'bank_charges_myr' => 0);
+        }
+
+        // The BANK CHARGE is a fixed per-currency operational fee, NOT a market rate,
+        // so it always follows the latest configured value — regardless of travel
+        // date. Otherwise a charge added today would silently drop off any quote
+        // whose travel date (and therefore rate) predates the charge (e.g. IDR set up
+        // on 09 Sep but travelling 31 Jul showed RM 0.09 with no "incl. bank").
+        return array(
+            'rate' => (float) $row['rate'],
+            'bank_charges_myr' => $this->Read_Latest_Bank_Charges_Myr($from_currency_id, $to_currency_id),
+        );
+    }
+
+    /**
+     * Latest configured MYR bank charge for a currency pair, ignoring travel date.
+     * Bank charges are a per-currency operational fee, so the newest record wins.
+     */
+    private function Read_Latest_Bank_Charges_Myr($from_currency_id, $to_currency_id)
+    {
+        $row = $this->db
+            ->select('bank_charges_myr')
+            ->where('from_currency_id', (int) $from_currency_id)
+            ->where('to_currency_id', (int) $to_currency_id)
             ->order_by('valid_from', 'DESC')
             ->order_by('id', 'DESC')
             ->get('costing_exchange_rates')
             ->row_array();
 
-        return $fallback
-            ? array('rate' => (float) $fallback['rate'], 'bank_charges_myr' => (float) $fallback['bank_charges_myr'])
-            : array('rate' => 0, 'bank_charges_myr' => 0);
+        return $row ? round(max(0, (float) $row['bank_charges_myr']), 2) : 0.0;
     }
 
     /**
@@ -1895,7 +1921,7 @@ class Costing_Model extends CI_Model
             ->get('costing_booking_financials')
             ->row_array();
 
-        // Margin is a MARKUP ON COST: cost after markup = cost x (1 + margin%/100).
+        // Margin is a GROSS MARGIN: cost after markup = cost / (1 - margin%/100).
         // This booking-level roll-up is the aggregate of every cost row; per-
         // combination manual selling prices live on costing_combinations and drive
         // the customer quotation.
@@ -1914,7 +1940,7 @@ class Costing_Model extends CI_Model
         $price_per_pax = costing_cost_after_markup($cost_per_pax, $margin_percentage);
         $markup_amount_total = round(($price_per_pax * $total_pax) - $total_cost, 2);
         $total_per_pax = $price_per_pax;
-        // Selling price is derived from the markup, never entered by hand.
+        // Selling price is derived from the gross margin, never entered by hand.
         $selling_price_per_pax = $price_per_pax;
         $total_revenue = round($selling_price_per_pax * $total_pax, 2);
         $gross_profit = round($total_revenue - $total_cost, 2);

@@ -3566,34 +3566,27 @@ class Report_Model extends CI_Model
     }
 
     /**
-     * Build the optional contact-number WHERE fragment (and append its bound
-     * params) for the Message Log queries. Both the column and the typed value
-     * are reduced to digits only, so any phone format matches the same lead.
-     * Matching either from_number OR to_number returns the full two-way thread.
+     * Build the optional contact WHERE fragment (and append its bound params) for
+     * the Message Log queries. The filter matches BOTH phone numbers and contact
+     * NAMES, because GHL stores a contact's display name in from_number/to_number
+     * when it holds no phone number for them (e.g. "Siew Chin Yap"). Each typed
+     * term (ghl_message_log_normalize_contact_terms()) becomes:
+     *   - phone -> a digits-only compare against a normalised from/to, so any
+     *     phone format matches the same lead; or
+     *   - name  -> a case-insensitive LIKE against the raw from/to text.
+     * Every term matches either from_number OR to_number, so the full two-way
+     * thread is returned; several terms are OR-ed to thread multiple leads at once.
      *
-     * @param string $contact Raw contact filter.
-     * @param array  $params  Query params, appended to in place.
+     * @param mixed $contact Raw contact filter (string/array) or typed terms.
+     * @param array $params  Query params, appended to in place.
      * @return string SQL fragment beginning with ' AND ...', or '' when no filter.
      */
     protected function ghl_message_contact_clause($contact, array &$params)
     {
-        // Accept a single value or a list of numbers (multi-contact filter). Each
-        // entry is reduced to digits so any phone format matches the same lead;
-        // several contacts are OR-ed so the view can thread multiple leads at once.
-        if (is_array($contact)) {
-            $digitsList = array();
-            foreach ($contact as $c) {
-                $d = preg_replace('/\D+/', '', (string) $c);
-                if ($d !== '' && !in_array($d, $digitsList, true)) {
-                    $digitsList[] = $d;
-                }
-            }
-        } else {
-            $d = preg_replace('/\D+/', '', (string) $contact);
-            $digitsList = $d === '' ? array() : array($d);
-        }
+        $this->load->helper('ghl_messages_log');
+        $terms = ghl_message_log_normalize_contact_terms($contact);
 
-        if (empty($digitsList)) {
+        if (empty($terms)) {
             return '';
         }
 
@@ -3601,11 +3594,17 @@ class Report_Model extends CI_Model
         $normTo = $this->normalize_phone_sql('gm.to_number');
 
         $ors = array();
-        foreach ($digitsList as $digits) {
-            $like = '%' . $digits . '%';
+        foreach ($terms as $term) {
+            $like = '%' . $term['value'] . '%';
             $params[] = $like;
             $params[] = $like;
-            $ors[] = "({$normFrom} LIKE ? OR {$normTo} LIKE ?)";
+            if ($term['type'] === 'name') {
+                // from/to hold a display name here -- match the raw columns; the
+                // DB's case-insensitive collation keeps the search forgiving.
+                $ors[] = '(gm.from_number LIKE ? OR gm.to_number LIKE ?)';
+            } else {
+                $ors[] = "({$normFrom} LIKE ? OR {$normTo} LIKE ?)";
+            }
         }
 
         return ' AND (' . implode(' OR ', $ors) . ')';

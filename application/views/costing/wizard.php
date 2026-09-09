@@ -273,7 +273,7 @@ $cat_labels = $CI->Costing_Category_Model->Read_Category_Map();
                         <div class="form-group mb-0">
                             <label>Margin (Markup on Cost %)</label>
                             <input type="number" step="0.01" min="0" id="cw-margin" name="margin_percentage" class="form-control" value="<?php echo html_escape($margin_percentage); ?>">
-                            <span class="form-text text-muted">Cost after Markup = Cost × (1 + margin%). You can still override the Selling Price per combination.</span>
+                            <span class="form-text text-muted">Cost after Markup = Cost ÷ (1 − margin%) (gross margin). You can still override the Selling Price per combination.</span>
                         </div>
                     </div>
                 </div>
@@ -282,7 +282,7 @@ $cat_labels = $CI->Costing_Category_Model->Read_Category_Map();
             <!-- COMBINATIONS: customer-facing bundles shown on the Quotation PDF -->
             <div class="cw-panel">
                 <div class="cw-panel-title">Combinations</div>
-                <div class="cw-panel-sub">Alternative packages shown on the customer Quotation PDF &mdash; the customer picks ONE. Add cost items to each combination straight from the item master. Each combination is priced on its own (selling = its cost &times; margin); there is no combined total.</div>
+                <div class="cw-panel-sub">Alternative packages shown on the customer Quotation PDF &mdash; the customer picks ONE. Add cost items to each combination straight from the item master. Each combination is priced on its own (selling = its cost &divide; (1 &minus; margin), gross margin); there is no combined total.</div>
 
                 <div id="cw-combos"></div>
 
@@ -710,8 +710,8 @@ $cat_labels = $CI->Costing_Category_Model->Read_Category_Map();
     }
 
     // Combinations are ALTERNATIVES — the customer picks ONE, so each is priced on
-    // its own with no grand total. Each card gets its own P&L using MARKUP ON COST:
-    //   cost after markup / pax = cost/pax × (1 + margin%/100)   [suggested]
+    // its own with no grand total. Each card gets its own P&L using GROSS MARGIN:
+    //   cost after markup / pax = cost/pax ÷ (1 − margin%/100)   [suggested]
     //   selling price / pax     = manual override, else the suggestion
     //   revenue = selling/pax × pax, profit/pax = selling/pax − cost/pax.
     function recalcCombos(margin, pax) {
@@ -721,7 +721,8 @@ $cat_labels = $CI->Costing_Category_Model->Read_Category_Map();
             card.querySelectorAll('.cw-crow').forEach(function (row) { cost += processRow(row).total; });
             cost = Math.round(cost * 100) / 100;
             var costPax = Math.round((cost / pax) * 100) / 100;
-            var markupPax = Math.round(costPax * (1 + margin / 100) * 100) / 100;
+            var divisor = 1 - (margin / 100);
+            var markupPax = divisor > 0 ? Math.round((costPax / divisor) * 100) / 100 : costPax;
 
             // Manual Selling Price wins once the user edits it; otherwise it tracks
             // the suggested Cost after Markup.

@@ -38,11 +38,18 @@ $log_time_to = isset($log_filters['time_to']) ? (string) $log_filters['time_to']
 $log_time_param = ($log_time_from !== '' ? '&time_from=' . urlencode($log_time_from) : '')
     . ($log_time_to !== '' ? '&time_to=' . urlencode($log_time_to) : '');
 
+// "All dates" mode: set when the reader clicks a contact in the log so the whole
+// history of that contact is threaded regardless of the date window. Travels with
+// pagination, the sort headers and the export; a fresh date pick drops it.
+$log_all_dates = !empty($log_filters['all_dates']);
+$log_all_dates_param = $log_all_dates ? '&all_dates=1' : '';
+
 // Feed the picker unambiguous Y-m-d bounds so it opens on the correct month
 // with today directly selectable (parsing the DD/MM/YYYY text field alone made
 // the widget misread the month and refuse today until another date was picked).
-$log_start_date = isset($log_filters['start_date']) ? $log_filters['start_date'] : date('Y-m-d');
-$log_end_date = isset($log_filters['end_date']) ? $log_filters['end_date'] : date('Y-m-d');
+// In all-dates mode there is no window, so open the picker on today.
+$log_start_date = !empty($log_filters['start_date']) && !$log_all_dates ? $log_filters['start_date'] : date('Y-m-d');
+$log_end_date = !empty($log_filters['end_date']) && !$log_all_dates ? $log_filters['end_date'] : date('Y-m-d');
 
 // Sort state: which column ('date' default, or 'direction') and which way
 // ('desc' default / 'asc'). Both carry through pagination and the header links.
@@ -56,7 +63,8 @@ $log_filter_qs = 'log_date=' . urlencode($log_filters['log_date'])
     . $log_agent_param
     . $log_hour_param
     . $log_time_param
-    . $log_direction_param;
+    . $log_direction_param
+    . $log_all_dates_param;
 
 /** Build a page URL keeping the current date, contact, agent, hour and sort filters. */
 $page_url = function ($page) use ($log_filter_qs, $log_sort_param) {
@@ -83,10 +91,13 @@ $sort_caret = function ($col) use ($log_sort_col, $log_sort_dir) {
         : ' <i class="la la-arrow-down ml-1"></i>';
 };
 
-/** URL that filters the log to one contact number, keeping the current date range. */
-$contact_url = function ($number) use ($log_filters) {
-    return base_url('Report/Ghl_Message_Log?log_date=' . urlencode($log_filters['log_date'])
-        . '&contact=' . urlencode($number));
+/**
+ * URL that threads the log to one contact -- across ALL dates. Clicking a contact
+ * drops the date window (all_dates=1) so the reader sees that person's whole
+ * conversation history in one go, not just the currently selected days.
+ */
+$contact_url = function ($number) {
+    return base_url('Report/Ghl_Message_Log?all_dates=1&contact=' . urlencode($number));
 };
 ?>
 <div class="d-flex flex-column-fluid">
@@ -118,7 +129,8 @@ $contact_url = function ($number) use ($log_filters) {
                             // back to the whole day in one click.
                             $clear_hour_url = base_url('Report/Ghl_Message_Log?log_date=' . urlencode($log_filters['log_date'])
                                 . '&contact=' . urlencode($log_contact)
-                                . $log_agent_param);
+                                . $log_agent_param
+                                . $log_all_dates_param);
                         ?>
                         <span class="label label-light-warning label-inline font-weight-bold mr-2">
                             Hour: <?php echo html_escape($log_hour_label); ?>
@@ -145,10 +157,18 @@ $contact_url = function ($number) use ($log_filters) {
                     <div class="row align-items-end">
                         <div class="col-md-4">
                             <div class="form-group mb-4">
-                                <label>Date Range</label>
+                                <label>Date Range
+                                    <?php if ($log_all_dates) { ?>
+                                        <span class="label label-light-warning label-inline font-weight-bold ml-1">All dates</span>
+                                    <?php } ?>
+                                </label>
                                 <div id="ghl_message_log_daterangepicker" class="input-icon">
-                                    <input readonly type="text" name="log_date" value="<?php echo html_escape($log_filters['log_date']); ?>" autocomplete="off" class="form-control">
+                                    <input readonly type="text" name="log_date" value="<?php echo html_escape($log_filters['log_date']); ?>" autocomplete="off" placeholder="<?php echo $log_all_dates ? 'All dates — pick to narrow' : ''; ?>" class="form-control">
                                     <span><i class="la la-calendar"></i></span>
+                                    <?php if ($log_all_dates) { ?>
+                                        <!-- Keeps the log in all-dates mode while other filters (agent, direction, contact) are re-applied; the daterangepicker removes it as soon as a range is picked. -->
+                                        <input type="hidden" name="all_dates" id="ghl_message_log_all_dates" value="1">
+                                    <?php } ?>
                                 </div>
                             </div>
                         </div>
@@ -176,10 +196,10 @@ $contact_url = function ($number) use ($log_filters) {
                     <div class="row align-items-end">
                         <div class="col-md-4">
                             <div class="form-group mb-2">
-                                <label>Contact Number
-                                    <i class="la la-info-circle" style="cursor:help;" data-toggle="tooltip" title="Filter by one or more contacts. Separate multiple numbers with a comma, e.g. 0123456789, 0198765432"></i>
+                                <label>Contact
+                                    <i class="la la-info-circle" style="cursor:help;" data-toggle="tooltip" title="Filter by phone number OR contact name (GHL shows a name when it has no number). Separate multiple entries with a comma, e.g. 0123456789, Siew Chin Yap"></i>
                                 </label>
-                                <input type="text" name="contact" value="<?php echo html_escape($log_contact); ?>" autocomplete="off" placeholder="e.g. 0123456789, 0198765432" class="form-control">
+                                <input type="text" name="contact" value="<?php echo html_escape($log_contact); ?>" autocomplete="off" placeholder="e.g. 0123456789, Siew Chin Yap" class="form-control">
                             </div>
                         </div>
                         <div class="col-md-4">
@@ -197,7 +217,7 @@ $contact_url = function ($number) use ($log_filters) {
                                 <div class="d-flex" style="gap:8px;">
                                     <input type="submit" value="Filter" class="btn btn-light-success font-weight-bold flex-fill">
                                     <input type="button" id="ghl-message-log-reset" value="Reset" class="btn btn-light-primary font-weight-bold flex-fill">
-                                    <a href="<?php echo base_url('Report/Ghl_Message_Log_Export?log_date=') . urlencode($log_filters['log_date']) . '&contact=' . urlencode($log_contact) . $log_agent_param . $log_hour_param . $log_time_param . $log_direction_param; ?>" class="btn btn-light-info font-weight-bold flex-fill text-nowrap">
+                                    <a href="<?php echo base_url('Report/Ghl_Message_Log_Export?log_date=') . urlencode($log_filters['log_date']) . '&contact=' . urlencode($log_contact) . $log_agent_param . $log_hour_param . $log_time_param . $log_direction_param . $log_all_dates_param; ?>" class="btn btn-light-info font-weight-bold flex-fill text-nowrap">
                                         <i class="la la-download"></i> Export CSV
                                     </a>
                                 </div>
@@ -282,14 +302,14 @@ $contact_url = function ($number) use ($log_filters) {
                                         <td><?php echo !empty($m['agent']) ? html_escape($m['agent']) : '<span class="text-muted">&mdash;</span>'; ?></td>
                                         <td class="text-nowrap">
                                             <?php if (!empty($m['from_number'])) { ?>
-                                                <a href="<?php echo $contact_url($m['from_number']); ?>" class="font-weight-bold text-primary" data-toggle="tooltip" title="Show only this contact's messages"><?php echo html_escape($m['from_number']); ?></a>
+                                                <a href="<?php echo $contact_url($m['from_number']); ?>" class="font-weight-bold text-primary" data-toggle="tooltip" title="Show this contact's full conversation history (all dates)"><?php echo html_escape($m['from_number']); ?></a>
                                             <?php } else { ?>
                                                 <span class="text-muted">&mdash;</span>
                                             <?php } ?>
                                         </td>
                                         <td class="text-nowrap">
                                             <?php if (!empty($m['to_number'])) { ?>
-                                                <a href="<?php echo $contact_url($m['to_number']); ?>" class="font-weight-bold text-primary" data-toggle="tooltip" title="Show only this contact's messages"><?php echo html_escape($m['to_number']); ?></a>
+                                                <a href="<?php echo $contact_url($m['to_number']); ?>" class="font-weight-bold text-primary" data-toggle="tooltip" title="Show this contact's full conversation history (all dates)"><?php echo html_escape($m['to_number']); ?></a>
                                             <?php } else { ?>
                                                 <span class="text-muted">&mdash;</span>
                                             <?php } ?>
@@ -370,6 +390,9 @@ $contact_url = function ($number) use ($log_filters) {
         autoApply: true
     }, function(start, end) {
         $('#ghl_message_log_daterangepicker .form-control').val(start.format('DD/MM/YYYY') + ' - ' + end.format('DD/MM/YYYY'));
+        // Picking a concrete range leaves "all dates" mode: drop the hidden flag
+        // so this window is what gets applied on submit.
+        $('#ghl_message_log_all_dates').remove();
     });
 
     $('#ghl-message-log-reset').on('click', function() {

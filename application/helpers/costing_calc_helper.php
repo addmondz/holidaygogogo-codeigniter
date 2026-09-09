@@ -8,9 +8,10 @@ defined('BASEPATH') OR exit('No direct script access allowed');
  * A costing is built from cost rows priced in any currency. A frozen per-costing
  * rate snapshot (1 <CUR> = X MYR) converts every row to MYR.
  *
- * Customer pricing is a MARKUP ON COST — the margin is added on top of the cost:
+ * Customer pricing uses a GROSS MARGIN — the margin is a share of the SELLING
+ * price, so the cost is grossed up (never a simple markup on cost):
  *
- *   cost after markup = cost x (1 + margin%/100)   (costing_cost_after_markup)
+ *   cost after markup = cost / (1 - margin%/100)   (costing_cost_after_markup)
  *
  * Each combination may still override that suggested price with a manual selling
  * price entered on the cost step.
@@ -136,7 +137,9 @@ if (!function_exists('costing_sum_by_category')) {
 
 if (!function_exists('costing_apply_markup')) {
     /**
-     * Markup-on-cost. Margin is a percentage (20 => 20%), never negative.
+     * Gross-margin pricing. Margin is a percentage of the SELLING price
+     * (20 => 20%), never negative. A margin of 100%+ is undefined (infinite
+     * price) and falls back to cost.
      *
      * @param float $total_cost_myr
      * @param float $margin_percent
@@ -150,8 +153,8 @@ if (!function_exists('costing_apply_markup')) {
             $margin = 0.0;
         }
 
-        $profit  = round($cost * ($margin / 100), 2);
-        $selling = round($cost * (1 + $margin / 100), 2);
+        $selling = costing_cost_after_markup($cost, $margin);
+        $profit  = round($selling - $cost, 2);
 
         return [
             'cost'           => $cost,
@@ -164,14 +167,16 @@ if (!function_exists('costing_apply_markup')) {
 
 if (!function_exists('costing_cost_after_markup')) {
     /**
-     * Markup-on-cost pricing: the margin is added on top of the cost.
+     * Gross-margin pricing: the margin is a share of the SELLING price, so the
+     * cost is grossed up.
      *
-     *   cost after markup = cost x (1 + margin%/100)
+     *   cost after markup = cost / (1 - margin%/100)
      *
-     * Margin is never negative (clamped to 0 => cost unchanged).
+     * Margin is never negative (clamped to 0 => cost unchanged). A margin of
+     * 100%+ is undefined (infinite price) and falls back to cost.
      *
      * @param float $cost           MYR cost
-     * @param float $margin_percent  markup-on-cost percentage (>= 0)
+     * @param float $margin_percent  gross-margin percentage (0 <= m < 100)
      * @return float MYR selling price, 2dp
      */
     function costing_cost_after_markup($cost, $margin_percent)
@@ -181,7 +186,11 @@ if (!function_exists('costing_cost_after_markup')) {
         if ($margin < 0) {
             $margin = 0.0;
         }
-        return round($cost * (1 + $margin / 100), 2);
+        $divisor = 1 - ($margin / 100);
+        if ($divisor <= 0) {
+            return $cost;
+        }
+        return round($cost / $divisor, 2);
     }
 }
 
@@ -200,7 +209,7 @@ if (!function_exists('costing_combination_summary')) {
      *
      * @param array $combinations each: ['name','item_names','cost_myr',
      *                                    'selling_price_per_pax'(optional manual)]
-     * @param float $margin_percent markup-on-cost percentage (never negative)
+     * @param float $margin_percent gross-margin percentage (never negative)
      * @param int   $total_pax      pax the price/pax is computed against (0 = none)
      * @return array [
      *   'combinations' => [ ['name','item_names','cost_myr','cost_per_pax',

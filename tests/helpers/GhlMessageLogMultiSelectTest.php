@@ -4,9 +4,9 @@
  *
  * Locks the MULTI-select contact + agent Message Log filters:
  *
- *   - ghl_message_log_normalize_contacts(): array OR comma/newline string ->
- *     de-duplicated list of digits-only numbers (single number's own spaces /
- *     dashes / '+' are kept inside that one number).
+ *   - ghl_message_log_normalize_contact_terms(): array OR comma/newline string ->
+ *     de-duplicated list of TYPED terms (phone -> digits only; name -> trimmed
+ *     text), so the filter matches both numbers and GHL display names.
  *   - ghl_message_log_normalize_agents(): array OR single string ->
  *     de-duplicated list of trimmed agent names.
  *   - the SQL contract: several contacts OR together (each still matches both
@@ -30,23 +30,28 @@ function assert_eq($label, $expected, $actual) {
     }
 }
 
-// --- normalize contacts ------------------------------------------------------
-assert_eq('contacts: single number', array('0123456789'),
-    ghl_message_log_normalize_contacts('0123456789'));
-assert_eq('contacts: comma separated', array('012', '013'),
-    ghl_message_log_normalize_contacts('012, 013'));
-assert_eq('contacts: newline / semicolon separated', array('012', '013', '014'),
-    ghl_message_log_normalize_contacts("012;013\n014"));
-assert_eq('contacts: strips format inside one number', array('6012345'),
-    ghl_message_log_normalize_contacts('+60 12-345'));
-assert_eq('contacts: de-dupes repeats', array('012', '013'),
-    ghl_message_log_normalize_contacts('012, 013, 012'));
-assert_eq('contacts: drops blanks', array('012'),
-    ghl_message_log_normalize_contacts('012, , ,'));
-assert_eq('contacts: accepts an array', array('012', '013'),
-    ghl_message_log_normalize_contacts(array('012', '0-1-3')));
+// --- normalize contacts (typed phone/name terms) -----------------------------
+$phone = function ($v) { return array('type' => 'phone', 'value' => $v); };
+$name  = function ($v) { return array('type' => 'name',  'value' => $v); };
+
+assert_eq('contacts: single number', array($phone('0123456789')),
+    ghl_message_log_normalize_contact_terms('0123456789'));
+assert_eq('contacts: comma separated', array($phone('012'), $phone('013')),
+    ghl_message_log_normalize_contact_terms('012, 013'));
+assert_eq('contacts: newline / semicolon separated', array($phone('012'), $phone('013'), $phone('014')),
+    ghl_message_log_normalize_contact_terms("012;013\n014"));
+assert_eq('contacts: strips format inside one number', array($phone('6012345')),
+    ghl_message_log_normalize_contact_terms('+60 12-345'));
+assert_eq('contacts: de-dupes repeats', array($phone('012'), $phone('013')),
+    ghl_message_log_normalize_contact_terms('012, 013, 012'));
+assert_eq('contacts: drops blanks', array($phone('012')),
+    ghl_message_log_normalize_contact_terms('012, , ,'));
+assert_eq('contacts: accepts an array', array($phone('012'), $phone('013')),
+    ghl_message_log_normalize_contact_terms(array('012', '0-1-3')));
+assert_eq('contacts: a name is kept as a name term (not dropped)', array($name('Siew Chin Yap')),
+    ghl_message_log_normalize_contact_terms('Siew Chin Yap'));
 assert_eq('contacts: empty input -> empty list', array(),
-    ghl_message_log_normalize_contacts(''));
+    ghl_message_log_normalize_contact_terms(''));
 
 // --- normalize agents --------------------------------------------------------
 assert_eq('agents: single string (legacy link)', array('Agent Alice'),
