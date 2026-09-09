@@ -105,8 +105,11 @@ check('html_to_text separates table cells with |', '3D2N Semporna | T/CODE: SEMP
 check_true('html_to_text drops form widgets',
     strpos(competitor_html_to_text('<form><input name="q"><button>Search</button></form><h1>Bali 5D4N</h1>'), 'Search') === false);
 check('html_to_text collapses consecutive duplicate lines',
-    "Book Now\nBali 5D4N",
-    competitor_html_to_text('<p>Book Now</p><p>Book Now</p><p>Book Now</p><p>Bali 5D4N</p>'));
+    "Highlights\nBali 5D4N",
+    competitor_html_to_text('<p>Highlights</p><p>Highlights</p><p>Highlights</p><p>Bali 5D4N</p>'));
+// "Book Now" is a CTA button — now dropped as boilerplate before the cap.
+check('html_to_text drops CTA boilerplate lines', 'Bali 5D4N',
+    competitor_html_to_text('<p>Book Now</p><p>Subscribe to our newsletter</p><h1>Bali 5D4N</h1>'));
 
 // ---- competitor_spa_api_url (JS-app adapter) --------------------------------
 check('spa_api_url ICE post with category', 'https://www.gd.my/api/v1/posts/65',
@@ -186,11 +189,11 @@ check('websearch_cap negative -> default', 15, competitor_websearch_cap('-5'));
 check('websearch_cap custom default', 5, competitor_websearch_cap(false, 5));
 
 // ---- competitor_headless_cap ------------------------------------------------
-check('headless_cap default when unset', 30, competitor_headless_cap(false));
-check('headless_cap default when empty', 30, competitor_headless_cap(''));
+check('headless_cap default when unset', 60, competitor_headless_cap(false));
+check('headless_cap default when empty', 60, competitor_headless_cap(''));
 check('headless_cap honours value', 8, competitor_headless_cap('8'));
 check('headless_cap explicit 0 = unlimited', 0, competitor_headless_cap('0'));
-check('headless_cap negative -> default', 30, competitor_headless_cap('-2'));
+check('headless_cap negative -> default', 60, competitor_headless_cap('-2'));
 check('headless_cap custom default', 5, competitor_headless_cap(false, 5));
 
 // ---- competitor_job_progress_message ----------------------------------------
@@ -269,6 +272,52 @@ check('job_view ai_crawl exposes flag', true,
 check('job_view is_paste false for crawl', false, $pv['is_paste']);
 check('job_view is_paste true for paste mode', true,
     competitor_job_public_view(array('state' => 'running', 'mode' => 'paste'))['is_paste']);
+
+// ---- competitor_job_host ----------------------------------------------------
+check('job_host lowercases + strips www', 'example.com',
+    competitor_job_host('https://WWW.Example.com/tour/5d4n'));
+check('job_host keeps subdomain (only leading www stripped)', 'shop.example.com',
+    competitor_job_host('http://shop.example.com/a'));
+check('job_host bare host, no path', 'example.com', competitor_job_host('https://example.com'));
+check('job_host empty for non-http', '', competitor_job_host('ftp://example.com'));
+check('job_host empty for junk', '', competitor_job_host('Pasted text'));
+check('job_host empty for empty', '', competitor_job_host(''));
+
+// ---- competitor_group_crawl_jobs --------------------------------------------
+// Three crawl runs across two sites; runs of the same host collapse to one row.
+$cg_views = array(
+    competitor_job_public_view(array('job' => 'a1', 'url' => 'https://acme.com/tour-1', 'state' => 'done',
+        'count' => 4, 'analysed' => array('0' => 1, '1' => 1), 'cost_total' => 0.30, 'ts' => '2026-09-01 10:00:00')),
+    competitor_job_public_view(array('job' => 'a2', 'url' => 'https://www.acme.com/tour-2', 'state' => 'done',
+        'count' => 6, 'analysed' => array('0' => 1), 'cost_total' => 0.20, 'ts' => '2026-09-03 09:00:00')),
+    competitor_job_public_view(array('job' => 'b1', 'url' => 'https://beta.com/x', 'state' => 'done',
+        'count' => 2, 'cost_total' => 0.10, 'ts' => '2026-09-02 08:00:00')),
+);
+$cg = competitor_group_crawl_jobs($cg_views);
+check('group_crawls collapses to one row per host', 2, count($cg));
+// Newest run wins ordering: acme's latest run (09-03) beats beta (09-02).
+check('group_crawls newest host first', 'acme.com', $cg[0]['host']);
+check('group_crawls second host', 'beta.com', $cg[1]['host']);
+check('group_crawls flags is_group', true, $cg[0]['is_group']);
+check('group_crawls counts runs', 2, $cg[0]['runs_count']);
+check('group_crawls sums cost across runs', 0.5, round($cg[0]['cost_total'], 2));
+check('group_crawls sums analysed across runs', 3, $cg[0]['analysed']);
+check('group_crawls shows latest run product count', 6, $cg[0]['count']);
+check('group_crawls uses latest run url', 'https://www.acme.com/tour-2', $cg[0]['url']);
+check('group_crawls uses latest run ts', '2026-09-03 09:00:00', $cg[0]['ts']);
+check('group_crawls done host is reviewable', true, $cg[0]['reviewable']);
+check('group_crawls done host not running', false, $cg[0]['running']);
+// A host with a run still in progress surfaces the running state on the merged row.
+$cg_run = competitor_group_crawl_jobs(array(
+    competitor_job_public_view(array('job' => 'r1', 'url' => 'https://live.com/a', 'state' => 'done',
+        'count' => 3, 'cost_total' => 0.10, 'ts' => '2026-09-01 10:00:00')),
+    competitor_job_public_view(array('job' => 'r2', 'url' => 'https://live.com/b', 'state' => 'running',
+        'ts' => '2026-09-04 10:00:00')),
+));
+check('group_crawls one host', 1, count($cg_run));
+check('group_crawls surfaces running state', 'running', $cg_run[0]['state']);
+check('group_crawls running flag true', true, $cg_run[0]['running']);
+check('group_crawls ignores empty input', array(), competitor_group_crawl_jobs(array()));
 
 // ---- competitor_model_supports_temperature ----------------------------------
 check('temp: gpt-4o-mini yes', true, competitor_model_supports_temperature('gpt-4o-mini'));
@@ -686,6 +735,115 @@ check('looks_like_article false when it has a price', false,
 check('looks_like_article false when thin (benefit of doubt)', false,
     competitor_looks_like_article('Short SPA product shell.'));
 
+// ---- competitor_has_basic_tour_sections (crawl quality gate) -----------------
+$fullTour = "Bali 5D4N\nDay 1 arrival and welcome dinner\nDay 2 Ubud tour\n"
+    . "Inclusions:\n- 4 nights hotel\n- daily breakfast\nExclusions:\n- personal expenses";
+check_true('basic_sections true: itinerary + inclusions', competitor_has_basic_tour_sections($fullTour));
+check_true('basic_sections true: "price includes" wording',
+    competitor_has_basic_tour_sections("Day 1 arrival\nDay 2 tour\nThe price includes accommodation and meals."));
+check_true('basic_sections true: "Day 01" padded',
+    competitor_has_basic_tour_sections("Day 01 arrival. Inclusions: hotel, meals, transfers."));
+check('basic_sections false: itinerary but no inclusions', false,
+    competitor_has_basic_tour_sections("Day 1 arrival\nDay 2 city tour\nDay 3 departure and shopping"));
+check('basic_sections false: inclusions but no itinerary', false,
+    competitor_has_basic_tour_sections("Package includes hotel and breakfast. Inclusions: transfers."));
+check('basic_sections false: stray "include" is not an inclusions section', false,
+    competitor_has_basic_tour_sections("Day 1 tour. Our highlights include stunning views and great food."));
+check('basic_sections false on empty', false, competitor_has_basic_tour_sections(''));
+check('basic_sections false on non-string', false, competitor_has_basic_tour_sections(null));
+
+// ---- competitor_has_tour_itinerary (itinerary-primary crawl gate) -----------
+check_true('tour_itinerary true: two distinct days',
+    competitor_has_tour_itinerary("Bali tour\nDay 1 arrival and dinner\nDay 2 Ubud and rice terraces"));
+check_true('tour_itinerary true: padded Day 01/Day 02',
+    competitor_has_tour_itinerary("Day 01 arrival\nDay 02 city tour\nDay 03 departure"));
+check_true('tour_itinerary true: non-consecutive days (Day 1 + Day 5)',
+    competitor_has_tour_itinerary("Day 1 fly in. Day 5 fly home."));
+check_true('tour_itinerary true: single Day 1 + duration code',
+    competitor_has_tour_itinerary("Genting 2D1N getaway. Day 1: theme park and hotel."));
+check('tour_itinerary false: lone stray Day 1, no duration', false,
+    competitor_has_tour_itinerary("Day 1 of your adventure starts here. Book now for great deals."));
+check('tour_itinerary false: same day repeated, not day-by-day', false,
+    competitor_has_tour_itinerary("Day 1 morning session. Day 1 afternoon session. Day 1 evening."));
+check('tour_itinerary false: no day markers at all', false,
+    competitor_has_tour_itinerary("A wonderful holiday package with hotels and meals included."));
+check('tour_itinerary false on empty', false, competitor_has_tour_itinerary(''));
+check('tour_itinerary false on non-string', false, competitor_has_tour_itinerary(null));
+
+// ---- competitor_is_tour_page (crawl KEEP gate, itinerary OR duration+price) --
+check_true('tour_page: day-by-day itinerary',
+    competitor_is_tour_page("Bali tour\nDay 1 arrival\nDay 2 Ubud\nDay 3 departure"));
+// chanbrothers-style: itinerary behind a tab, but clearly a bookable tour.
+$cbLike = "7 DAYS BLOSSOMS OF TAIWAN\nCHECK AVAILABILITY From S\$1,488\nOVERVIEW ITINERARY DATES & PRICES\n"
+    . "Overnight Stay 6 nights\n5 Cities yilan, taichung, miaoli, nantou, taipei\nMeals: Flower Home Specialty, Xiao Long Bao";
+check_true('tour_page: duration + price (tab-hidden itinerary)', competitor_is_tour_page($cbLike));
+check_true('tour_page: 5D4N + RM price', competitor_is_tour_page('Genting 5D4N package from RM899 per pax'));
+check('tour_page false: duration but no price', false,
+    competitor_is_tour_page('A relaxing 7 days exploring the countryside and its people.'));
+check('tour_page false: price but no duration', false,
+    competitor_is_tour_page('Gift vouchers from RM100 available at our stores.'));
+check('tour_page false: plain article', false,
+    competitor_is_tour_page('The best noodle shops in Taipei and where to find them.'));
+check('tour_page false on empty', false, competitor_is_tour_page(''));
+
+// ---- competitor_needs_more_content (reading escalation trigger) --------------
+$fullPage = "Bali 5D4N Cultural Escape\n"
+    . "Day 1 Arrival in Denpasar, transfer to hotel and welcome dinner by the beach. "
+    . str_repeat("Explore the temples, rice terraces and local markets throughout the day. ", 8)
+    . "\nDay 2 Ubud art villages, Tegallalang rice terrace and a traditional dance show.\n"
+    . "Inclusions:\n- 4 nights hotel accommodation\n- daily breakfast and 3 dinners\n- English speaking guide and coach transfers";
+check_true('needs_more_content sanity: fixture is not thin', mb_strlen($fullPage, 'UTF-8') >= 500);
+check('needs_more_content false: full tour page (itinerary + inclusions)', false,
+    competitor_needs_more_content($fullPage));
+check_true('needs_more_content true: thin/empty', competitor_needs_more_content(''));
+check_true('needs_more_content true: short shell', competitor_needs_more_content('Loading...'));
+// >500 chars of boilerplate but NO itinerary/inclusions -> still escalate (the fix).
+$boiler = str_repeat("Book Now. Enquire now. Follow us on Facebook. ", 40);
+check_true('needs_more_content true: long boilerplate w/o tour sections',
+    competitor_needs_more_content($boiler));
+// A price-only teaser (has a price signal but no itinerary+inclusions) -> escalate.
+check_true('needs_more_content true: price teaser, itinerary behind a tab',
+    competitor_needs_more_content(str_repeat('Great value from RM1899 per pax. ', 30)));
+
+// ---- competitor_is_boilerplate_line / competitor_strip_boilerplate -----------
+check_true('boilerplate: cookie consent', competitor_is_boilerplate_line('We use cookies to improve your experience'));
+check_true('boilerplate: subscribe newsletter', competitor_is_boilerplate_line('Subscribe to our newsletter'));
+check_true('boilerplate: follow us', competitor_is_boilerplate_line('Follow us on Facebook'));
+check_true('boilerplate: standalone social label', competitor_is_boilerplate_line('Instagram'));
+check_true('boilerplate: breadcrumb', competitor_is_boilerplate_line('Home > Tours > Japan > Osaka'));
+check_true('boilerplate: CTA button', competitor_is_boilerplate_line('Book Now'));
+check_true('boilerplate: add to wishlist', competitor_is_boilerplate_line('Add to Wishlist'));
+check_true('boilerplate: copyright footer', competitor_is_boilerplate_line('© 2024 Holiday Sdn Bhd. All rights reserved'));
+check_true('boilerplate: related carousel heading', competitor_is_boilerplate_line('You may also like'));
+// Content must SURVIVE (specific/anchored patterns, no false positives):
+check('content kept: cookie factory in itinerary', false,
+    competitor_is_boilerplate_line('Day 3: Visit the cookie factory and enjoy local shopping'));
+check('content kept: inclusions line', false,
+    competitor_is_boilerplate_line('Tour fare includes daily breakfast and hotel accommodation'));
+check('content kept: "book this" in prose', false,
+    competitor_is_boilerplate_line('Book this 5D4N Bali tour from RM1899 per pax'));
+check('content kept: "share" in prose', false,
+    competitor_is_boilerplate_line('Share your travel dreams with our friendly consultants'));
+check('content kept: "home to" prose (not a breadcrumb)', false,
+    competitor_is_boilerplate_line('Home to over 200 ancient temples and shrines'));
+$mixed = "Home > Tours > Japan\nJapan 6D5N Highlights\nDay 1 arrival\nSubscribe to our newsletter\nInclusions: breakfast\nFollow us on Facebook";
+check('strip_boilerplate keeps content, drops chrome',
+    "Japan 6D5N Highlights\nDay 1 arrival\nInclusions: breakfast",
+    competitor_strip_boilerplate($mixed));
+check('strip_boilerplate empty on non-string', '', competitor_strip_boilerplate(null));
+
+// ---- competitor_page_char_cap -----------------------------------------------
+check('page_char_cap default when blank', 60000, competitor_page_char_cap(''));
+check('page_char_cap default when zero', 60000, competitor_page_char_cap('0'));
+check('page_char_cap honours env override', 90000, competitor_page_char_cap('90000'));
+check('page_char_cap custom default', 40000, competitor_page_char_cap(null, 40000));
+
+// ---- html_to_text cap cuts on a line boundary -------------------------------
+$capped = competitor_html_to_text("<p>" . str_repeat('AAAA ', 40) . "</p><p>" . str_repeat('B', 200) . "</p>", 210);
+check_true('html_to_text cap respects the ceiling', mb_strlen($capped, 'UTF-8') <= 210);
+check_true('html_to_text cap cut on a line boundary (no trailing partial B-run)',
+    substr($capped, -1) !== 'B');
+
 // ---- competitor_json_alternate_url ------------------------------------------
 $altHtml = '<head><link rel="canonical" href="/x">'
     . '<link rel="alternate" type="application/json" href="/api/tour/42.json">'
@@ -706,6 +864,114 @@ check('extract_urls strips trailing punctuation', array('https://cdn.co/x'),
 check('extract_urls respects limit', 1, count(competitor_extract_urls($filesLine, 1)));
 check('extract_urls empty when none', array(), competitor_extract_urls('no links at all'));
 check('extract_urls empty on non-string', array(), competitor_extract_urls(null));
+
+// ---- competitor_is_candidate_url (permissive whole-site sweep net) ----------
+check_true('candidate: keyword-less product URL (/detail/12345)',
+    competitor_is_candidate_url('https://comp.com/detail/12345', 'comp.com'));
+check_true('candidate: id-slug product (/en/12345-osaka)',
+    competitor_is_candidate_url('https://comp.com/en/12345-osaka', 'comp.com'));
+check_true('candidate: normal product URL',
+    competitor_is_candidate_url('https://comp.com/tours/bali-5d4n', 'comp.com'));
+check_true('candidate: www-insensitive host match',
+    competitor_is_candidate_url('https://www.comp.com/packages/japan', 'comp.com'));
+check('candidate false: homepage', false,
+    competitor_is_candidate_url('https://comp.com/', 'comp.com'));
+check('candidate false: off-host', false,
+    competitor_is_candidate_url('https://other.com/tours/bali', 'comp.com'));
+check('candidate false: about chrome', false,
+    competitor_is_candidate_url('https://comp.com/about-us', 'comp.com'));
+check('candidate false: blog post', false,
+    competitor_is_candidate_url('https://comp.com/blog/top-10-beaches', 'comp.com'));
+check('candidate false: asset', false,
+    competitor_is_candidate_url('https://comp.com/img/hero.jpg', 'comp.com'));
+check('candidate false: cart', false,
+    competitor_is_candidate_url('https://comp.com/checkout/cart', 'comp.com'));
+check('candidate false: customer support page', false,
+    competitor_is_candidate_url('https://comp.com/customer-support', 'comp.com'));
+check('candidate false: help centre', false,
+    competitor_is_candidate_url('https://comp.com/help/booking', 'comp.com'));
+check('candidate false: customer service', false,
+    competitor_is_candidate_url('https://comp.com/customer-service', 'comp.com'));
+// A real destination that merely contains "hel"/"support" letters is NOT excluded.
+check_true('candidate: Helsinki tour not caught by /help',
+    competitor_is_candidate_url('https://comp.com/tours/helsinki-5d4n', 'comp.com'));
+check_true('candidate: no base_host given still accepts a content page',
+    competitor_is_candidate_url('https://comp.com/x/y'));
+
+// ---- competitor_is_guide_url (travel-guide / planning-article filter) -------
+// Real false positives observed on topchinatravel.com:
+check_true('guide: how-to-plan URL',
+    competitor_is_guide_url('https://x.com/beijing/how-to-plan-a-trip-to-beijing.htm'));
+check_true('guide: how-to day-trip URL',
+    competitor_is_guide_url('https://x.com/guilin/how-to-plan-a-day-trip-to-longji-rice-terraces.htm'));
+check_true('guide: title "How to plan a trip"',
+    competitor_is_guide_url('https://x.com/p/12345', 'How to plan a trip to Guilin?'));
+check_true('guide: public holidays calendar URL',
+    competitor_is_guide_url('https://x.com/china-travel-guide/chinese-public-holidays-calendar.htm'));
+check_true('guide: best-time slug',
+    competitor_is_guide_url('https://x.com/tibet/best-time-to-visit-tibet.htm'));
+check_true('guide: things-to-do slug',
+    competitor_is_guide_url('https://x.com/xian/things-to-do-in-xian.htm'));
+check_true('guide: title "Best time to visit"',
+    competitor_is_guide_url('https://x.com/a/b', 'Best Time to Visit Yunnan'));
+// Real TOURS must survive:
+check('guide false: real group-tour URL', false,
+    competitor_is_guide_url('https://x.com/china-tours/yunnan-group-tour-02/', '7 Days Yunnan Highlights Group Tour'));
+check('guide false: asia-tours product', false,
+    competitor_is_guide_url('https://x.com/asia-tours/classic-japan-china-tour/', '17 Days Japan & China Group Tour'));
+check('guide false: duration-slug tour', false,
+    competitor_is_guide_url('https://x.com/tours/bali-5d4n-getaway'));
+check('guide false: cruise routes page title', false,
+    competitor_is_guide_url('https://x.com/yangtze-cruise/yangtze-cruise-routes.htm', 'Yangtze River Cruise Routes'));
+check('guide false on empty', false, competitor_is_guide_url('', ''));
+
+// ---- competitor_path_has_product_keyword (render-worthy on JS SPAs) ---------
+check_true('path_kw: section hub /tour-package',
+    competitor_path_has_product_keyword('https://esplanad.tio.asia/tour-package'));
+check_true('path_kw: numeric-id product /tour-package/1077',
+    competitor_path_has_product_keyword('https://esplanad.tio.asia/tour-package/1077'));
+check_true('path_kw: chanbrothers package-tours path',
+    competitor_path_has_product_keyword('https://www.chanbrothers.com/package-tours/asia/taiwan/blossoms'));
+check_true('path_kw: 5D4N duration code',
+    competitor_path_has_product_keyword('https://x.com/deals/5d4n-genting'));
+check('path_kw false: /hotel', false, competitor_path_has_product_keyword('https://esplanad.tio.asia/hotel'));
+check('path_kw false: /about', false, competitor_path_has_product_keyword('https://x.com/about'));
+check('path_kw false: homepage', false, competitor_path_has_product_keyword('https://x.com/'));
+
+// ---- competitor_count_child_links (SPA section-hub → listing detection) ------
+$tioLinks = array(
+    'https://esplanad.tio.asia/tour-package',            // self — not a child
+    'https://esplanad.tio.asia/tour-package/1077',
+    'https://esplanad.tio.asia/tour-package/1090',
+    'https://esplanad.tio.asia/tour-package/1093',
+    'https://esplanad.tio.asia/member/order/tour-package', // different branch
+    'https://esplanad.tio.asia/about',
+);
+check('count_child_links: 3 children under /tour-package', 3,
+    competitor_count_child_links('https://esplanad.tio.asia/tour-package', $tioLinks));
+check('count_child_links: grandchild not counted', 1,
+    competitor_count_child_links('https://x.com/a', array('https://x.com/a/b', 'https://x.com/a/b/c')));
+check('count_child_links: none for a leaf', 0,
+    competitor_count_child_links('https://x.com/tour-package/1077', $tioLinks));
+
+// ---- competitor_paginator_* + listing_item_url (SPA paginated listing) ------
+$page1 = array(
+    'data' => array(array('id' => 1077, 'name' => 'A'), array('id' => 1090, 'name' => 'B')),
+    'links' => array('next' => 'https://x.com/api/tour-package?page=2', 'last' => 'https://x.com/api/tour-package?page=5'),
+    'meta' => array('current_page' => 1, 'last_page' => 5, 'total' => 67),
+);
+check('paginator_items: returns the records', 2, count(competitor_paginator_items($page1)));
+check('paginator_next: links.next', 'https://x.com/api/tour-package?page=2', competitor_paginator_next($page1));
+check('paginator_items: plain {data} (no pagination) is NOT a listing', 0,
+    count(competitor_paginator_items(array('data' => array(array('id' => 1))))));
+check('paginator_items: empty data', 0, competitor_paginator_items(array('data' => array(), 'meta' => array('last_page' => 3))) ? 1 : 0);
+check('paginator_next: none at last page', '', competitor_paginator_next(array('data' => array(), 'links' => array('next' => null))));
+check('listing_item_url: id → listing/{id}', 'https://x.com/tour-package/1077',
+    competitor_listing_item_url('https://x.com/tour-package', array('id' => 1077)));
+check('listing_item_url: explicit slug wins', 'https://x.com/tour/bali-5d4n',
+    competitor_listing_item_url('https://x.com/tour-package', array('id' => 5, 'url' => '/tour/bali-5d4n')));
+check('listing_item_url: nothing usable', '',
+    competitor_listing_item_url('https://x.com/tour-package', array('name' => 'no id')));
 
 // ---- competitor_is_site_root ------------------------------------------------
 check_true('site_root bare host', competitor_is_site_root('https://comp.com'));
@@ -938,10 +1204,19 @@ $rich = json_encode(array(
     'hotels' => array('Hilton Beijing'),
     'meals' => array('breakfast' => '7', 'lunch' => '5', 'dinner' => '6'),
     'shopping_stops' => array('Silk factory'), 'optional_tours' => array('Kung fu show'),
-    'special_remarks' => array('Min 20 pax'), 'scenic_highlights' => array('Great Wall'),
-    'signature_meals' => array('Peking duck'), 'target_traveller' => 'Families',
+    'special_remarks' => array('Min 20 pax'),
+    'scenic_highlights' => array(
+        array('name' => 'Great Wall', 'description' => 'Walk the Mutianyu section with sweeping mountain views'),
+        'Tiananmen Square',
+    ),
+    'target_traveller' => 'Families',
     'suitable_age' => '6-70', 'child_friendly' => 'Yes — gentle pace', 'senior_friendly' => 'Yes',
     'usp' => array('Iconic landmarks'),
+    'traveller_segments' => array(
+        array('segment' => 'family_kids', 'suitability' => 'High', 'justification' => 'Gentle pace suits children.'),
+        array('segment' => 'elderly', 'suitability' => 'Medium', 'justification' => 'Some walking on the Wall.'),
+        array('segment' => 'company', 'suitability' => 'Low', 'justification' => 'No corporate facilities.'),
+    ),
     'itinerary' => array(
         array('day' => 1, 'title' => 'Arrival', 'description' => 'Land in Beijing'),
         array('day' => 'Day 2', 'title' => 'Great Wall', 'description' => 'Visit the wall'),
@@ -967,12 +1242,18 @@ check('parse meals slots', array('7', '5', '6'),
 check('parse shopping_stops', array('Silk factory'), $r['shopping_stops']);
 check('parse optional_tours', array('Kung fu show'), $r['optional_tours']);
 check('parse special_remarks', array('Min 20 pax'), $r['special_remarks']);
-check('parse scenic_highlights', array('Great Wall'), $r['scenic_highlights']);
-check('parse signature_meals', array('Peking duck'), $r['signature_meals']);
+check('parse scenic_highlights object', array('name' => 'Great Wall', 'description' => 'Walk the Mutianyu section with sweeping mountain views'), $r['scenic_highlights'][0]);
+check('parse scenic_highlights legacy string -> name only', array('name' => 'Tiananmen Square', 'description' => ''), $r['scenic_highlights'][1]);
 check('parse target_traveller', 'Families', $r['target_traveller']);
 check('parse suitable_age', '6-70', $r['suitable_age']);
 check('parse child_friendly', 'Yes — gentle pace', $r['child_friendly']);
 check('parse usp', array('Iconic landmarks'), $r['usp']);
+check('parse traveller_segments count', 3, count($r['traveller_segments']));
+check('parse traveller_segments reordered to canonical (elderly before family_kids)',
+    array('elderly', 'family_kids', 'company'),
+    array($r['traveller_segments'][0]['key'], $r['traveller_segments'][1]['key'], $r['traveller_segments'][2]['key']));
+check('parse traveller_segments derives level', 'high', $r['traveller_segments'][1]['level']);
+check('parse traveller_segments keeps justification', 'No corporate facilities.', $r['traveller_segments'][2]['justification']);
 check('parse itinerary count', 2, count($r['itinerary']));
 check('parse itinerary numeric day -> label', 'Day 1', $r['itinerary'][0]['day']);
 check('parse itinerary keeps day label', 'Day 2', $r['itinerary'][1]['day']);
@@ -993,14 +1274,48 @@ check('parse itinerary bare string count (empty skipped)', 2, count($bi));
 check('parse itinerary bare string desc', 'First day free', $bi[0]['description']);
 check('parse itinerary bare keeps day counter', 'Day 3', $bi[1]['day']);
 
-// contract advertises the new fields + INFER instruction
+// contract advertises the new fields + DERIVE-from-source (no-assumption) instruction
 $contract = competitor_output_contract();
 check_true('contract lists itinerary', stripos($contract, 'itinerary') !== false);
 check_true('contract lists exclusions', stripos($contract, 'exclusions') !== false);
 check_true('contract lists meals', stripos($contract, 'meals') !== false);
-check_true('contract marks INFER fields', strpos($contract, 'INFER') !== false);
+check_true('contract marks DERIVE fields', strpos($contract, 'DERIVE') !== false);
+check_true('contract forbids assumptions', stripos($contract, 'make NO assumptions') !== false);
+check_true('contract tells DERIVE to blank when no clue', stripos($contract, 'no clue') !== false);
 check_true('contract asks for full flight detail', stripos($contract, 'FULL outbound flight detail') !== false);
 check_true('contract asks optionals verbatim with price', stripos($contract, 'each one verbatim WITH its price') !== false);
+// summary is now a detailed, labelled, multi-paragraph overview (not a 2-4 sentence blurb)
+check_true('contract asks for detailed summary', stripos($contract, 'DETAILED overview') !== false);
+check_true('contract summary lists labelled sections', stripos($contract, '"Best for:"') !== false
+    && stripos($contract, '"Watch-outs:"') !== false);
+check_true('contract summary wants synthesis not restatement', stripos($contract, 'SYNTHESISE') !== false);
+
+// ---- competitor_summary_sections -------------------------------------------
+$labelled = "Overview: A 5D4N Bali tour through Denpasar and Ubud.\n\n"
+    . "Best for: Couples and families — gentle pace.\n\n"
+    . "Watch-outs: Several shopping stops eat into sightseeing time.";
+$secs = competitor_summary_sections($labelled);
+check('summary_sections count', 3, count($secs));
+check('summary_sections label parsed', 'Overview', $secs[0]['label']);
+check('summary_sections text parsed', 'A 5D4N Bali tour through Denpasar and Ubud.', $secs[0]['text']);
+check('summary_sections last label', 'Watch-outs', $secs[2]['label']);
+// single-newline separated paragraphs still split
+$one_nl = competitor_summary_sections("Overview: Foo.\nBest for: Bar.");
+check('summary_sections splits single newlines', 2, count($one_nl));
+check('summary_sections single-nl label', 'Best for', $one_nl[1]['label']);
+// legacy plain summary with no labels -> one unlabelled block, text intact
+$legacy = competitor_summary_sections('A budget Bali tour. Great value overall.');
+check('summary_sections legacy single block', 1, count($legacy));
+check('summary_sections legacy no label', '', $legacy[0]['label']);
+check('summary_sections legacy keeps full text', 'A budget Bali tour. Great value overall.', $legacy[0]['text']);
+// a colon that sits mid-prose (after a sentence) is NOT treated as a label
+check('summary_sections mid-sentence colon after period stays prose', '',
+    competitor_summary_sections('One sentence. Then: not a label because of the period.')[0]['label']);
+// full-width CJK colon is recognised
+$cjk = competitor_summary_sections('概览：一个巴厘岛旅行团。');
+check('summary_sections full-width colon label', '概览', $cjk[0]['label']);
+check('summary_sections empty -> []', array(), competitor_summary_sections(''));
+check('summary_sections whitespace -> []', array(), competitor_summary_sections("  \n  "));
 
 // ---- competitor_extract_text_urls (pasted free text) ------------------------
 check('extract_text_urls pulls both urls from prose', array('https://a.com/tour', 'http://b.com/x'),
@@ -1036,6 +1351,233 @@ check_true('paste_agent carries our products', strpos($pa['input'], competitor_p
 $paNoBrowse = competitor_build_paste_agent('just notes', array(), $products, false);
 check_true('paste_agent no web_search when browsing off', stripos($paNoBrowse['instructions'], 'web_search') === false);
 check_true('paste_agent works with notes only (no links)', strpos($paNoBrowse['input'], 'just notes') !== false);
+
+// ---- competitor_pdf_filename ------------------------------------------------
+check('pdf_filename slugifies name + id', 'bali-escape-5d4n-42',
+    substr(competitor_pdf_filename('Bali Escape 5D4N', 42), 0, -4));
+check('pdf_filename ends with .pdf', '.pdf',
+    substr(competitor_pdf_filename('Anything', 1), -4));
+check('pdf_filename collapses punctuation to single dash', 'yunnan-tour-7-id-9.pdf',
+    competitor_pdf_filename('Yunnan Tour (7)  //ID', 9));
+check('pdf_filename falls back when name blank', 'competitor-analysis-7.pdf',
+    competitor_pdf_filename('   ', 7));
+check('pdf_filename casts id to int', 'x-3.pdf',
+    competitor_pdf_filename('X', '3abc'));
+
+// ---- competitor_split_point_justification -----------------------------------
+$pj = competitor_split_point_justification('Direct flights — less travel fatigue and an extra day there');
+check('split em-dash point', 'Direct flights', $pj['point']);
+check('split em-dash justification', 'less travel fatigue and an extra day there', $pj['justification']);
+check('split spaced-hyphen point', 'Cheap',
+    competitor_split_point_justification('Cheap - budget-friendly for families')['point']);
+check('split spaced-hyphen keeps hyphenated justification', 'budget-friendly for families',
+    competitor_split_point_justification('Cheap - budget-friendly for families')['justification']);
+check('split keeps hyphenated word intact (no spaced separator)', 'Well-known operator',
+    competitor_split_point_justification('Well-known operator')['point']);
+check('split no separator -> empty justification', '',
+    competitor_split_point_justification('Comprehensive')['justification']);
+check('split only on first separator', 'more time — and less rush',
+    competitor_split_point_justification('Slow pace — more time — and less rush')['justification']);
+$pj_cn = competitor_split_point_justification('直飞航班—减少旅途疲劳');
+check('split CJK em-dash without spaces (point)', '直飞航班', $pj_cn['point']);
+check('split CJK em-dash without spaces (justification)', '减少旅途疲劳', $pj_cn['justification']);
+// A fact-justified shopping stop splits into the stop and its source-grounded reason.
+$pj_shop = competitor_split_point_justification('Pearl gallery — Day 3 itinerary lists a guided visit to a pearl factory');
+check('split shopping stop point', 'Pearl gallery', $pj_shop['point']);
+check('split shopping stop justification', 'Day 3 itinerary lists a guided visit to a pearl factory', $pj_shop['justification']);
+// A bare shopping stop with no supporting detail keeps the whole name as the point.
+check('shopping stop with no justification -> stop only', '',
+    competitor_split_point_justification('Batik workshop')['justification']);
+
+// ---- scenic_highlights normaliser -------------------------------------------
+$sc_obj = competitor_scenic_items(array(
+    array('name' => 'Ba Na Hills', 'description' => 'Ride one of the world\'s longest cable cars over lush forest'),
+));
+check('scenic keeps name + description', array('name' => 'Ba Na Hills', 'description' => 'Ride one of the world\'s longest cable cars over lush forest'), $sc_obj[0]);
+$sc_legacy = competitor_scenic_items(array('Golden Bridge', ''));
+check('scenic legacy string -> name only', array('name' => 'Golden Bridge', 'description' => ''), $sc_legacy[0]);
+check('scenic drops blank entries', 1, count($sc_legacy));
+check('scenic splits delimited string', 2, count(competitor_scenic_items("Golden Bridge\nFrench Village")));
+check('scenic reads alt keys (title/desc)', array('name' => 'Dragon Bridge', 'description' => 'Fire show on weekends'),
+    competitor_scenic_items(array(array('title' => 'Dragon Bridge', 'desc' => 'Fire show on weekends')))[0]);
+check('scenic non-array -> []', array(), competitor_scenic_items(null));
+check('scenic keeps description-only entry', array('name' => '', 'description' => 'Panoramic sunrise'),
+    competitor_scenic_items(array(array('description' => 'Panoramic sunrise')))[0]);
+
+// ---- traveller_segments normaliser ------------------------------------------
+check('segment match single from solo', 'single', competitor_segment_match_key('Solo Traveller'));
+check('segment match teenager from youth', 'teenager', competitor_segment_match_key('Youth / students'));
+check('segment match couple from honeymoon', 'couple', competitor_segment_match_key('Honeymoon couples'));
+check('segment match company from corporate', 'company', competitor_segment_match_key('Corporate incentive'));
+check('segment match family+kids', 'family_kids', competitor_segment_match_key('Families with young children'));
+check('segment match family+elderly beats bare family', 'family_elderly', competitor_segment_match_key('Family with elderly parents'));
+check('segment match bare family -> kids', 'family_kids', competitor_segment_match_key('Family'));
+check('segment match elderly (not family)', 'elderly', competitor_segment_match_key('Seniors'));
+check('segment match unknown -> empty', '', competitor_segment_match_key('Astronauts'));
+
+check('segment level high', 'high', competitor_segment_level('High'));
+check('segment level medium from moderate', 'medium', competitor_segment_level('Moderate'));
+check('segment level low from poor', 'low', competitor_segment_level('Poor fit'));
+check('segment level "not ideal" reads low not high', 'low', competitor_segment_level('Not ideal'));
+check('segment level blank -> empty', '', competitor_segment_level(''));
+
+$seg = competitor_traveller_segments(array(
+    array('segment' => 'couple', 'suitability' => 'High', 'justification' => 'Romantic pace.'),
+    array('type' => 'Solo', 'fit' => 'Low', 'reason' => 'Single supplement.'),
+    array('segment' => 'company', 'suitability' => '', 'justification' => ''),   // both blank -> dropped
+));
+check('segments keeps only content-bearing entries', 2, count($seg));
+check('segments returns canonical order (single before couple)',
+    array('single', 'couple'), array($seg[0]['key'], $seg[1]['key']));
+check('segments reads alt keys (type/fit/reason)',
+    array('single', 'low', 'Single supplement.'),
+    array($seg[0]['key'], $seg[0]['level'], $seg[0]['justification']));
+check('segments english label attached', 'Couple', $seg[1]['segment']);
+check('segments non-array -> []', array(), competitor_traveller_segments('nope'));
+// Assoc map keyed by segment name is also accepted.
+$seg_map = competitor_traveller_segments(array(
+    'elderly' => array('suitability' => 'Medium', 'justification' => 'Some walking.'),
+));
+check('segments accepts assoc map keyed by segment', 'elderly', $seg_map[0]['key']);
+// Idempotent + level-preserving: re-normalising a translated entry keeps the colour
+// level even though the visible suitability word is no longer English.
+$seg_cn = competitor_traveller_segments(array(
+    array('key' => 'couple', 'segment' => 'Couple', 'suitability' => '高', 'level' => 'high', 'justification' => '浪漫。'),
+));
+check('segments preserves explicit level (colour survives translation)', 'high', $seg_cn[0]['level']);
+
+// ---- translation helpers ----------------------------------------------------
+check('normalize_lang clamps unknown to en', 'en', competitor_normalize_lang('fr'));
+check('normalize_lang accepts cn', 'cn', competitor_normalize_lang('CN'));
+check_true('lang_label cn mentions Chinese', stripos(competitor_lang_label('cn'), 'Chinese') !== false);
+
+$prod = array(
+    'product_name' => 'Yunnan Tour', 'tour_code' => 'YN-1', 'price' => 'RM3999', 'currency' => 'MYR',
+    'destination' => 'Yunnan', 'duration' => '7D6N', 'flight_departure' => 'KUL-KMG',
+    'countries' => array('China'), 'cities' => array('Kunming', 'Dali'),
+    'meals' => array('breakfast' => '6', 'lunch' => '', 'dinner' => '5'),
+    'itinerary' => array(array('day' => 'Day 1', 'title' => 'Arrival', 'description' => 'Land and check in')),
+    'scenic_highlights' => array(array('name' => 'Stone Forest', 'description' => 'Wander karst pinnacles at sunset')),
+    'usp' => array(), 'pros' => array('Cheap'),
+    'traveller_segments' => array(
+        array('key' => 'couple', 'segment' => 'Couple', 'suitability' => 'High', 'level' => 'high', 'justification' => 'Romantic scenery.'),
+    ),
+);
+$tx = competitor_extract_translatable($prod);
+check_true('extract keeps translatable scalars', isset($tx['scalars']['product_name']) && $tx['scalars']['product_name'] === 'Yunnan Tour');
+check_true('extract drops price/code scalars', !isset($tx['scalars']['tour_code']) && !isset($tx['scalars']['price']) && !isset($tx['scalars']['currency']));
+check_true('extract keeps lists with content', $tx['lists']['cities'] === array('Kunming', 'Dali'));
+check_true('extract drops empty lists', !isset($tx['lists']['usp']));
+check_true('extract keeps only non-empty meals', isset($tx['meals']['breakfast']) && !isset($tx['meals']['lunch']));
+check_true('extract keeps itinerary text', $tx['itinerary'][0]['title'] === 'Arrival');
+check_true('extract keeps scenic name + description', $tx['scenic_highlights'][0]['name'] === 'Stone Forest' && $tx['scenic_highlights'][0]['description'] === 'Wander karst pinnacles at sunset');
+check_true('extract drops scenic from lists', !isset($tx['lists']['scenic_highlights']));
+check_true('extract keeps traveller_segment suitability + justification', $tx['traveller_segments'][0]['suitability'] === 'High' && $tx['traveller_segments'][0]['justification'] === 'Romantic scenery.');
+check_true('extract omits segment key/level (not translated)', !isset($tx['traveller_segments'][0]['key']) && !isset($tx['traveller_segments'][0]['level']));
+check_true('extract excludes flight code (not a scalar key)', !isset($tx['scalars']['flight_departure']));
+
+// Apply a (fake) Chinese overlay and confirm it merges by key/index, leaving
+// prices/codes and untranslated fields intact.
+$overlay = array(
+    'scalars' => array('product_name' => '云南之旅', 'destination' => '云南', 'duration' => '7天6晚'),
+    'lists' => array('cities' => array('昆明', '大理'), 'pros' => array('便宜')),
+    'meals' => array('breakfast' => '6', 'dinner' => '5'),
+    'itinerary' => array(array('day' => '第1天', 'title' => '抵达', 'description' => '落地入住')),
+    'scenic_highlights' => array(array('name' => '石林', 'description' => '日落时漫步喀斯特石峰')),
+    'traveller_segments' => array(array('suitability' => '高', 'justification' => '浪漫风景。')),
+);
+$merged = competitor_apply_translation($prod, $overlay);
+check('apply translates product_name', '云南之旅', $merged['product_name']);
+check('apply translates city list', array('昆明', '大理'), $merged['cities']);
+check('apply keeps tour_code verbatim', 'YN-1', $merged['tour_code']);
+check('apply keeps price verbatim', 'RM3999', $merged['price']);
+check('apply translates itinerary title', '抵达', $merged['itinerary'][0]['title']);
+check('apply translates scenic name', '石林', $merged['scenic_highlights'][0]['name']);
+check('apply translates scenic description', '日落时漫步喀斯特石峰', $merged['scenic_highlights'][0]['description']);
+check('apply translates segment suitability', '高', $merged['traveller_segments'][0]['suitability']);
+check('apply translates segment justification', '浪漫风景。', $merged['traveller_segments'][0]['justification']);
+check('apply keeps segment level from original (colour holds after CN)', 'high', $merged['traveller_segments'][0]['level']);
+check('apply keeps original when overlay missing', array('China'), $merged['countries']);
+check_true('apply does not mutate input', $prod['product_name'] === 'Yunnan Tour');
+
+$ta = competitor_build_translation_agent(array('a' => 'b'), 'cn');
+check_true('translation agent asks for target lang', stripos($ta['instructions'], 'Chinese') !== false);
+check_true('translation agent input carries the payload json', strpos($ta['input'], '{"a":"b"}') !== false);
+check_true('translation agent input mentions json (for json mode)', stripos($ta['input'], 'json') !== false);
+
+check_true('json_object_from_text strips fence', competitor_json_object_from_text("```json\n{\"x\":1}\n```") === array('x' => 1));
+check_true('json_object_from_text grabs outer braces', competitor_json_object_from_text('noise {"y":2} tail') === array('y' => 2));
+check_true('json_object_from_text null on garbage', competitor_json_object_from_text('no json here') === null);
+// Recover from a stray trailing brace (a real gpt-4.1-mini failure mode).
+check_true('json_object_from_text recovers extra trailing brace', competitor_json_object_from_text('{"a":{"b":1}}}') === array('a' => array('b' => 1)));
+check_true('json_object_from_text ignores braces inside strings', competitor_json_object_from_text('{"a":"x}y{z"} junk') === array('a' => 'x}y{z'));
+check('first_balanced_object returns first object', '{"a":1}', competitor_first_balanced_object('pre {"a":1} {"b":2}'));
+check('first_balanced_object empty when unclosed', '', competitor_first_balanced_object('{"a":1'));
+
+// row_to_product + display_products
+$rowObj = (object) array('product_name' => 'Solo', 'price' => 'RM1', 'countries' => array('MY'), 'products' => array());
+check('row_to_product maps name', 'Solo', competitor_row_to_product($rowObj)['product_name']);
+check('display_products single -> 1', 1, count(competitor_display_products($rowObj)));
+$crawlObj = (object) array('products' => array(array('product_name' => 'A'), array('product_name' => 'B')));
+check('display_products crawl -> N', 2, count(competitor_display_products($crawlObj)));
+
+// apply_translation_to_row (single + crawl)
+$single = (object) array('product_name' => 'Yunnan Tour', 'tour_code' => 'YN-1', 'countries' => array('China'), 'cities' => array('Kunming'), 'meals' => array(), 'itinerary' => array(), 'products' => array());
+competitor_apply_translation_to_row($single, array('products' => array(array('scalars' => array('product_name' => '云南之旅'), 'lists' => array('cities' => array('昆明'))))));
+check('apply_to_row single translates name', '云南之旅', $single->product_name);
+check('apply_to_row single translates list', array('昆明'), $single->cities);
+check('apply_to_row single keeps code', 'YN-1', $single->tour_code);
+$crawl = (object) array('products' => array(array('product_name' => 'A', 'cities' => array('X')), array('product_name' => 'B')));
+competitor_apply_translation_to_row($crawl, array('products' => array(array('scalars' => array('product_name' => '甲')), array('scalars' => array('product_name' => '乙')))));
+check('apply_to_row crawl p0', '甲', $crawl->products[0]['product_name']);
+check('apply_to_row crawl p1', '乙', $crawl->products[1]['product_name']);
+
+// ---- competitor_remove_crawl_item (Review-page per-product delete) -----------
+$ci_items = array(
+    array('url' => 'https://x/a', 'text' => 'A'),
+    array('url' => 'https://x/b', 'text' => 'B'),
+    array('url' => 'https://x/c', 'text' => 'C'),
+);
+$ci_status = array(
+    'count' => 3, 'cost_total' => 0.30,
+    'analysed' => array('1' => array('id' => 42, 'cost' => 0.10, 'at' => '2026-09-08 10:00:00')),
+);
+$r = competitor_remove_crawl_item($ci_items, $ci_status, 1);
+check_true('remove_item drops the index from items', !array_key_exists(1, $r['items']));
+check_true('remove_item keeps other items (no reindex)', array_key_exists(0, $r['items']) && array_key_exists(2, $r['items']));
+check('remove_item returns analysed id to delete', 42, $r['deleted_analysis_id']);
+check_true('remove_item drops the analysed entry', !isset($r['status']['analysed']['1']));
+check('remove_item refunds analysed cost', 0.2, $r['status']['cost_total']);
+check('remove_item resyncs count', 2, $r['status']['count']);
+check_true('remove_item does not mutate input items', count($ci_items) === 3);
+// Removing an un-analysed item: no id, cost untouched.
+$r2 = competitor_remove_crawl_item($ci_items, $ci_status, 0);
+check('remove_item unanalysed -> no id', 0, $r2['deleted_analysis_id']);
+check('remove_item unanalysed keeps cost', 0.3, $r2['status']['cost_total']);
+// Missing index is a no-op on items.
+$r3 = competitor_remove_crawl_item($ci_items, $ci_status, 9);
+check('remove_item missing index keeps all items', 3, count($r3['items']));
+check('remove_item missing index -> no id', 0, $r3['deleted_analysis_id']);
+
+// Bulk delete: remove indices 0 and 1 (1 is analysed) in one pass.
+$rb = competitor_remove_crawl_items($ci_items, $ci_status, array(0, 1));
+check('remove_items leaves only untouched index', array(2), array_keys($rb['items']));
+check('remove_items collects analysed ids', array(42), $rb['deleted_analysis_ids']);
+check('remove_items refunds analysed cost', 0.2, $rb['status']['cost_total']);
+check('remove_items resyncs count', 1, $rb['status']['count']);
+check_true('remove_items does not mutate input items', count($ci_items) === 3);
+// Empty indices are a no-op.
+$rb2 = competitor_remove_crawl_items($ci_items, $ci_status, array());
+check('remove_items empty -> all items kept', 3, count($rb2['items']));
+check('remove_items empty -> no ids', array(), $rb2['deleted_analysis_ids']);
+
+check('ui_labels en coverage', 'Coverage', competitor_ui_labels('en')['coverage']);
+check('ui_labels cn coverage', '覆盖范围', competitor_ui_labels('cn')['coverage']);
+check('ui_labels unknown key falls back to en set', 'Meals', competitor_ui_labels('en')['meals']);
+check('ui_labels en traveller_suitability', 'Suitability by Traveller Type', competitor_ui_labels('en')['traveller_suitability']);
+check('ui_labels en segment label', 'Family with Elderly', competitor_ui_labels('en')['seg_family_elderly']);
+check('ui_labels cn segment label', '亲子家庭', competitor_ui_labels('cn')['seg_family_kids']);
+check('ui_labels cn suitability level', '高', competitor_ui_labels('cn')['suit_high']);
 
 echo "\n" . ($failures === 0 ? "ALL PASS\n" : "{$failures} FAILURE(S)\n");
 exit($failures === 0 ? 0 : 1);

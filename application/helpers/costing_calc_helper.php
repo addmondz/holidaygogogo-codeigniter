@@ -6,11 +6,14 @@ defined('BASEPATH') OR exit('No direct script access allowed');
  * unit-testable on plain PHP + SQLite (see tests/helpers/CostingCalcHelperTest.php).
  *
  * A costing is built from cost rows priced in any currency. A frozen per-costing
- * rate snapshot (1 <CUR> = X MYR) converts every row to MYR. Margin is a
- * markup on cost (percentage only, no manual selling price):
+ * rate snapshot (1 <CUR> = X MYR) converts every row to MYR.
  *
- *   selling = cost x (1 + margin%/100)
- *   profit  = cost x (margin%/100)
+ * Customer pricing is a MARKUP ON COST — the margin is added on top of the cost:
+ *
+ *   cost after markup = cost x (1 + margin%/100)   (costing_cost_after_markup)
+ *
+ * Each combination may still override that suggested price with a manual selling
+ * price entered on the cost step.
  */
 
 if (!function_exists('costing_categories')) {
@@ -159,28 +162,61 @@ if (!function_exists('costing_apply_markup')) {
     }
 }
 
+if (!function_exists('costing_cost_after_markup')) {
+    /**
+     * Markup-on-cost pricing: the margin is added on top of the cost.
+     *
+     *   cost after markup = cost x (1 + margin%/100)
+     *
+     * Margin is never negative (clamped to 0 => cost unchanged).
+     *
+     * @param float $cost           MYR cost
+     * @param float $margin_percent  markup-on-cost percentage (>= 0)
+     * @return float MYR selling price, 2dp
+     */
+    function costing_cost_after_markup($cost, $margin_percent)
+    {
+        $cost = round((float) $cost, 2);
+        $margin = (float) $margin_percent;
+        if ($margin < 0) {
+            $margin = 0.0;
+        }
+        return round($cost * (1 + $margin / 100), 2);
+    }
+}
+
 if (!function_exists('costing_combination_summary')) {
     /**
      * Roll a scenario's combinations up for the customer quotation. Each
      * combination carries a name, its item names, and its MYR cost (the sum of its
-     * item MYR totals). Selling = cost x (1 + margin%) using the same markup-on-cost
-     * margin as the internal template. Combinations are ADDITIVE: the grand total
-     * is the sum of every combination's selling price.
+     * item MYR totals). The customer price is driven per-pax:
      *
-     * @param array $combinations each: ['name'=>string, 'item_names'=>array, 'cost_myr'=>float]
+     *   cost after markup / pax = costing_cost_after_markup(cost/pax, margin)
+     *   selling price / pax     = manual override, else the cost-after-markup
+     *   combination total       = selling price / pax × pax
+     *
+     * Combinations are ALTERNATIVES the customer picks one of; total_selling is the
+     * sum only for the legacy additive footer.
+     *
+     * @param array $combinations each: ['name','item_names','cost_myr',
+     *                                    'selling_price_per_pax'(optional manual)]
      * @param float $margin_percent markup-on-cost percentage (never negative)
+     * @param int   $total_pax      pax the price/pax is computed against (0 = none)
      * @return array [
-     *   'combinations' => [ ['name','item_names','cost_myr','selling'], ... ],
-     *   'total_cost'    => float, // sum of combination costs (MYR)
-     *   'total_selling' => float, // sum of combination selling prices (MYR)
+     *   'combinations' => [ ['name','item_names','cost_myr','cost_per_pax',
+     *                        'cost_after_markup_per_pax','selling_price_per_pax',
+     *                        'profit_per_pax','selling','total_profit'], ... ],
+     *   'total_cost'    => float,
+     *   'total_selling' => float,
      * ]
      */
-    function costing_combination_summary($combinations, $margin_percent)
+    function costing_combination_summary($combinations, $margin_percent, $total_pax = 0)
     {
         $margin = (float) $margin_percent;
         if ($margin < 0) {
             $margin = 0.0;
         }
+        $pax = max(0, (int) $total_pax);
 
         $out = [];
         $total_cost = 0.0;
@@ -188,7 +224,20 @@ if (!function_exists('costing_combination_summary')) {
 
         foreach ((array) $combinations as $combo) {
             $cost = round((float) (isset($combo['cost_myr']) ? $combo['cost_myr'] : 0), 2);
-            $selling = round($cost * (1 + $margin / 100), 2);
+
+            $has_manual = isset($combo['selling_price_per_pax'])
+                && $combo['selling_price_per_pax'] !== null
+                && $combo['selling_price_per_pax'] !== '';
+            $manual_pax = $has_manual ? max(0.0, round((float) $combo['selling_price_per_pax'], 2)) : null;
+
+            if ($pax > 0) {
+                $cost_per_pax = round($cost / $pax, 2);
+            } else {
+                $cost_per_pax = $cost;
+            }
+            $suggest_pax = costing_cost_after_markup($cost_per_pax, $margin);
+            $price_pax   = $has_manual ? $manual_pax : $suggest_pax;
+            $selling     = $pax > 0 ? round($price_pax * $pax, 2) : round($price_pax, 2);
 
             $names = [];
             foreach ((array) (isset($combo['item_names']) ? $combo['item_names'] : []) as $name) {
@@ -199,10 +248,15 @@ if (!function_exists('costing_combination_summary')) {
             }
 
             $out[] = [
-                'name'       => trim((string) (isset($combo['name']) ? $combo['name'] : '')),
-                'item_names' => $names,
-                'cost_myr'   => $cost,
-                'selling'    => $selling,
+                'name'                      => trim((string) (isset($combo['name']) ? $combo['name'] : '')),
+                'item_names'                => $names,
+                'cost_myr'                  => $cost,
+                'cost_per_pax'              => $cost_per_pax,
+                'cost_after_markup_per_pax' => $suggest_pax,
+                'selling_price_per_pax'     => round($price_pax, 2),
+                'profit_per_pax'            => round($price_pax - $cost_per_pax, 2),
+                'selling'                   => $selling,
+                'total_profit'              => round($selling - $cost, 2),
             ];
 
             $total_cost += $cost;

@@ -2,21 +2,26 @@
 defined('BASEPATH') OR exit('No direct script access allowed');
 
 /**
- * Customer-facing Quotation PDF (Dompdf). Layout mirrors the Booking Confirmation
- * PDF (application/views/booking/booking_confirmation.php): embedded logo header,
- * company block, title + No. row, a details table, itemised rows (here: the per-day
- * itinerary), a per-item "Package Includes" list with each line's selling price,
- * and a totals footer. All prices are the customer-facing selling price in MYR —
- * raw cost, margin %, currency snapshot, and profit stay internal and are NOT rendered.
+ * Customer-facing Quotation PDF (Dompdf). Layout follows the 9 Sep 2026 feedback
+ * screenshot: a branded header (embedded logo + company block) over a key/value
+ * detail table (Tour Code, Package, Name, Travel Date + note, Total Pax), a
+ * per-person HOTEL pricing table (twin/triple + single supplement), a FLIGHT
+ * schedule table (date/sector/flight no/timing/duration) with a per-pax price and
+ * fare notes, and a highlighted block of boilerplate footer notes.
+ *
+ * This document shows ONLY what the customer sees — raw cost, margin %, currency
+ * snapshot, profit, the internal item list, combinations and the day-by-day
+ * itinerary are intentionally NOT rendered here.
  */
+$this->load->helper('costing_quote');
+
 $company    = isset($company) && is_array($company) ? $company : array();
 $booking    = isset($booking) ? $booking : array();
 $package    = isset($package) ? $package : array();
-$itinerary    = isset($itinerary) ? $itinerary : array();
-$items        = isset($items) ? $items : array();
-$combinations = isset($combinations) ? $combinations : array();
-$financials   = isset($financials) ? $financials : array();
-$public_ref   = isset($public_ref) ? $public_ref : '';
+$quote_hotels  = isset($quote_hotels) && is_array($quote_hotels) ? $quote_hotels : array();
+$quote_flights = isset($quote_flights) && is_array($quote_flights) ? $quote_flights : array();
+$quote_meta    = isset($quote_meta) && is_array($quote_meta) ? $quote_meta : array();
+$public_ref    = isset($public_ref) ? $public_ref : '';
 
 $CompanyName    = isset($company['Name']) ? $company['Name'] : 'HolidayGoGoGo';
 $CompanyReg     = isset($company['RegistrationNumber']) ? $company['RegistrationNumber'] : '';
@@ -27,26 +32,40 @@ $CompanyAddress = isset($CompanyAddress) && $CompanyAddress !== ''
     : (isset($company['Address']) ? $company['Address'] : '');
 $CompanyWebsite = isset($company['Website']) ? $company['Website'] : '';
 
-$PackageName   = isset($package['name']) ? $package['name'] : '-';
-$TourCode      = isset($package['tour_code']) && $package['tour_code'] !== '' ? $package['tour_code'] : '-';
-$DurationDays  = (int) (isset($package['duration_days']) ? $package['duration_days'] : 0);
-$DurationNights = (int) (isset($package['duration_nights']) ? $package['duration_nights'] : 0);
-$TotalPax      = (int) (isset($booking['total_pax']) ? $booking['total_pax'] : 0);
-// Total shown to the customer: additive combination total when combinations
-// exist, else the legacy internal revenue (passed as total_selling by the model).
-$TotalSelling  = isset($total_selling)
-    ? (float) $total_selling
-    : (float) (isset($financials['total_revenue']) ? $financials['total_revenue'] : 0);
-$HasCombinations = !empty($combinations);
-// Markup-on-cost margin, used to price each combination option per-pax so the
-// customer PDF matches the internal cost step exactly (price/pax rounded first,
-// then × pax) instead of drifting by a cent from cost × margin.
-$Margin = max(0, (float) (isset($financials['margin_percentage']) ? $financials['margin_percentage'] : 0));
+$PackageName  = isset($package['name']) && $package['name'] !== '' ? $package['name'] : '-';
+$TourCode     = isset($package['tour_code']) && $package['tour_code'] !== '' ? $package['tour_code'] : '-';
+$CustomerName = isset($package['customer_name']) && $package['customer_name'] !== '' ? $package['customer_name'] : '-';
+$TotalPax     = (int) (isset($booking['total_pax']) ? $booking['total_pax'] : 0);
 
-$TravelDate = !empty($booking['travel_date']) && strtotime($booking['travel_date'])
-    ? strtoupper(date('d M Y', strtotime($booking['travel_date'])))
+// Travel Date as a start–end range (matches the wizard's start/end pair).
+$TravelStart = !empty($booking['travel_date']) && strtotime($booking['travel_date'])
+    ? date('d M Y', strtotime($booking['travel_date']))
     : '-';
-$InsertDate = strtoupper(date('d M Y'));
+$TravelEnd = !empty($booking['travel_date_end']) && strtotime($booking['travel_date_end'])
+    ? date('d M Y', strtotime($booking['travel_date_end']))
+    : '';
+$TravelDate = ($TravelEnd !== '' && $TravelEnd !== $TravelStart)
+    ? ($TravelStart . ' - ' . $TravelEnd)
+    : $TravelStart;
+
+// Quote-level free text.
+$qm = $quote_meta;
+$qv = function ($key) use ($qm) {
+    return isset($qm[$key]) && $qm[$key] !== null ? trim((string) $qm[$key]) : '';
+};
+$PricingBasis   = $qv('quote_pricing_basis');
+$TravelDateNote = $qv('quote_travel_date_note');
+$HotelNote      = $qv('quote_hotel_note');
+$FlightTitle    = $qv('quote_flight_title') !== '' ? $qv('quote_flight_title') : 'FLIGHT SCHEDULE';
+$FlightFareNote = $qv('quote_flight_fare_note');
+$FlightExpiry   = $qv('quote_flight_expiry');
+$FlightPrice    = (isset($qm['quote_flight_price']) && $qm['quote_flight_price'] !== null && $qm['quote_flight_price'] !== '')
+    ? (float) $qm['quote_flight_price'] : null;
+$FooterLines    = costing_quote_footer_note_lines($qv('quote_footer_notes'));
+
+$money = function ($value) {
+    return 'RM ' . number_format((float) $value, 2, '.', ',');
+};
 
 // Embedded logo (same asset the Booking Confirmation uses).
 $logoSrc = '';
@@ -72,10 +91,21 @@ if (is_file($logoPath)) {
     .text-center { text-align: center; }
     .text-right { text-align: right; }
     .small-font { font-size: 13px; }
+    .red { color: #c0392b; }
+    /* Key/value detail table + data tables share this bordered look. */
+    table.kv, table.data { width: 100%; border-collapse: collapse; }
+    table.kv td { border: 1px solid #444; padding: 5px 8px; font-size: 12px; vertical-align: top; }
+    table.kv td.k { width: 26%; font-weight: bold; background: #f2f2f2; }
+    table.data th, table.data td { border: 1px solid #444; padding: 5px 8px; font-size: 12px; }
+    table.data th { background: #d9d9d9; text-align: center; font-weight: bold; }
+    .section-title { font-weight: bold; text-align: center; margin: 14px 0 6px 0; }
+    .note-row td { background: #f7f7f7; font-style: italic; }
+    .footer-notes { margin-top: 14px; }
+    .footer-notes p { background: #fff3a3; font-style: italic; font-size: 11px; padding: 2px 4px; margin-bottom: 4px; }
     /* Reserve top/bottom margin on every page for the repeating header/footer. */
-    @page { margin: 165px 40px 95px 40px; }
+    @page { margin: 165px 40px 70px 40px; }
     #pdf-header { position: fixed; top: -145px; left: 0px; right: 0px; height: 135px; }
-    #pdf-footer { position: fixed; bottom: -78px; left: 0px; right: 0px; height: 68px; }
+    #pdf-footer { position: fixed; bottom: -55px; left: 0px; right: 0px; height: 45px; }
 </style><body>
     <!-- Repeats on every page (fixed) -->
     <div id="pdf-header">
@@ -103,183 +133,131 @@ if (is_file($logoPath)) {
 
     <table style="width:100%;">
         <tr>
-            <th style="width:65%;"><h3 class="text-right">QUOTATION</h3></th>
+            <th style="width:65%;"><h3 class="text-right">Custom Quotation</h3></th>
             <th style="width:35%; font-weight:700; text-align:right;">No : <?php echo html_escape($public_ref); ?></th>
         </tr>
     </table>
 
-    <table style="width:100%; font-size:12px;">
+    <!-- Key / value details -->
+    <table class="kv">
         <tr>
-            <td style="width:14%;">Tour Package</td>
-            <td style="width:1%;"> : </td>
-            <td style="width:35%;"><b><?php echo html_escape($PackageName); ?></b></td>
-            <td style="width:16%;"><b>Travel Date</b></td>
-            <td style="width:1%;"> : </td>
-            <td style="width:25%;"><?php echo html_escape($TravelDate); ?></td>
-        </tr>
-        <tr>
-            <td>Duration</td>
-            <td> : </td>
-            <td><?php echo $DurationDays; ?> Days / <?php echo $DurationNights; ?> Nights</td>
-            <td><b>No. Of Pax</b></td>
-            <td> : </td>
-            <td><?php echo $TotalPax; ?></td>
-        </tr>
-        <tr>
-            <td>Date</td>
-            <td> : </td>
-            <td><?php echo html_escape($InsertDate); ?></td>
-            <td><b>Tour Code</b></td>
-            <td> : </td>
+            <td class="k">TOUR CODE</td>
             <td><?php echo html_escape($TourCode); ?></td>
+        </tr>
+        <tr>
+            <td class="k">TOUR PACKAGE</td>
+            <td><?php echo html_escape($PackageName); ?></td>
+        </tr>
+        <tr>
+            <td class="k">NAME</td>
+            <td><?php echo html_escape($CustomerName); ?></td>
+        </tr>
+        <tr>
+            <td class="k">TRAVEL DATE</td>
+            <td>
+                <?php echo html_escape($TravelDate); ?>
+                <?php if ($TravelDateNote !== '') { ?>
+                    <span class="red">Note: <?php echo html_escape($TravelDateNote); ?></span>
+                <?php } ?>
+            </td>
+        </tr>
+        <tr>
+            <td class="k">TOTAL PAX</td>
+            <td><?php echo $TotalPax > 0 ? ($TotalPax . 'pax') : '-'; ?></td>
         </tr>
     </table>
 
-    <?php if ($HasCombinations) { ?>
-        <!-- Customer combinations: each is an ALTERNATIVE package option, priced on
-             its own. The customer picks ONE, so prices are NOT summed. -->
-        <hr style="margin-bottom:0px;">
-        <table style="width:100%; font-size:13px;">
-            <tr style="font-weight:700;">
-                <td style="width:70%;">Package Options <span style="font-weight:400; font-size:11px;">(choose one)</span></td>
-                <td style="width:30%; text-align:right;">Price (RM)</td>
-            </tr>
-        </table>
-        <hr style="margin-top:0px; margin-bottom:5px;">
-        <?php foreach ($combinations as $combo) { ?>
-            <?php
-            // Price per-pax first, then × pax — mirrors the cost step's per-combo
-            // Total Revenue so this option's price is self-consistent (price/pax × pax)
-            // and identical to what staff saw internally.
-            $combo_cost = (float) (isset($combo['cost_myr']) ? $combo['cost_myr'] : 0);
-            if ($TotalPax > 0) {
-                $combo_price_pax = round(round($combo_cost / $TotalPax, 2) * (1 + $Margin / 100), 2);
-                $combo_selling   = round($combo_price_pax * $TotalPax, 2);
-            } else {
-                $combo_price_pax = 0.0;
-                $combo_selling   = round($combo_cost * (1 + $Margin / 100), 2);
-            }
-            ?>
-            <table style="width:100%; font-size:12px; border-spacing:0; margin-bottom:8px;">
-                <tr style="vertical-align:baseline; font-weight:700;">
-                    <td style="width:70%; padding:3px 0;"><?php echo strtoupper(html_escape($combo['name'])); ?></td>
-                    <td style="width:30%; text-align:right; padding:3px 0;"><?php echo number_format($combo_selling, 2, '.', ','); ?></td>
-                </tr>
-                <?php if ($TotalPax > 0) { ?>
-                    <tr style="vertical-align:baseline;">
-                        <td style="width:70%; padding:0 0 1px 0; font-size:11px; color:#555;">Price / Pax</td>
-                        <td style="width:30%; text-align:right; padding:0 0 1px 0; font-size:11px; color:#555;"><?php echo number_format($combo_price_pax, 2, '.', ','); ?></td>
-                    </tr>
-                <?php } ?>
-                <?php foreach ($combo['item_names'] as $combo_item_name) { ?>
-                    <?php if (trim((string) $combo_item_name) === '') { continue; } ?>
-                    <tr style="vertical-align:baseline;">
-                        <td style="width:70%; padding:1px 0 1px 14px;">&bull; <?php echo html_escape($combo_item_name); ?></td>
-                        <td style="width:30%;">&nbsp;</td>
-                    </tr>
-                <?php } ?>
-            </table>
-        <?php } ?>
-    <?php } elseif (!empty($items)) { ?>
-        <hr style="margin-bottom:0px;">
-        <table style="width:100%; font-size:13px;">
-            <tr style="font-weight:700;">
-                <td style="width:8%;">No.</td>
-                <td style="width:62%;">Package Includes</td>
-                <td style="width:30%; text-align:right;">Price (RM)</td>
-            </tr>
-        </table>
-        <hr style="margin-top:0px; margin-bottom:5px;">
-        <table style="width:100%; font-size:12px; border-spacing:0;">
-            <?php $item_no = 0; ?>
-            <?php foreach ($items as $line) { ?>
-                <?php if (trim((string) $line['name']) === '') { continue; } ?>
-                <?php $item_no++; ?>
-                <tr style="vertical-align:baseline;">
-                    <td style="width:8%; padding:3px 0;"><?php echo $item_no; ?></td>
-                    <td style="width:62%; padding:3px 0;"><?php echo html_escape($line['name']); ?></td>
-                    <td style="width:30%; text-align:right; padding:3px 0;"><?php echo number_format((float) $line['selling'], 2, '.', ','); ?></td>
-                </tr>
-            <?php } ?>
-        </table>
-    <?php } ?>
-
-    <!-- Totals pinned to the bottom of page 1 (mirrors the Booking Confirmation footer).
-         Only for the legacy flat item list — combination options are each priced on
-         their own above (the customer picks one), so there is no single total. -->
-    <?php if (!$HasCombinations) { ?>
-    <div style="position: absolute; bottom: 0; left: 0; right: 0;">
-        <hr style="margin-bottom:5px; margin-top:10px;">
-        <table style="width:100%; margin-bottom:10px;">
-            <tr style="font-weight:bold;">
-                <td style="width:60%;">&nbsp;</td>
-                <td style="width:28%;">Total Package Price (RM):</td>
-                <td style="width:12%; text-align:right; float:left;"><label><?php echo number_format($TotalSelling, 2, '.', ','); ?></label></td>
-            </tr>
-            <?php if ($TotalPax > 0) { ?>
+    <!-- Hotel pricing -->
+    <div class="section-title">
+        Pricing per person<?php if ($PricingBasis !== '') { ?> (Quoted based on <span class="red"><?php echo html_escape($PricingBasis); ?></span>)<?php } ?>
+    </div>
+    <table class="data">
+        <thead>
             <tr>
-                <td>&nbsp;</td>
-                <td style="border-bottom: 1px solid black;">Price / Pax (RM):</td>
-                <td style="text-align:right; float:left; border-bottom: 1px solid black;"><label><?php echo number_format($TotalSelling / max(1, $TotalPax), 2, '.', ','); ?></label></td>
+                <th style="text-align:left;">Hotel</th>
+                <th style="width:22%;">Twin / Triple</th>
+                <th style="width:22%;">Single Supp</th>
             </tr>
+        </thead>
+        <tbody>
+            <?php $has_hotel = false; ?>
+            <?php foreach ($quote_hotels as $h) {
+                $hname = trim((string) (isset($h['hotel_name']) ? $h['hotel_name'] : ''));
+                $twin  = isset($h['twin_triple_price']) && $h['twin_triple_price'] !== null && $h['twin_triple_price'] !== '' ? $h['twin_triple_price'] : null;
+                $single = isset($h['single_supp_price']) && $h['single_supp_price'] !== null && $h['single_supp_price'] !== '' ? $h['single_supp_price'] : null;
+                if ($hname === '' && $twin === null && $single === null) { continue; }
+                $has_hotel = true; ?>
+                <tr>
+                    <td><?php echo html_escape($hname !== '' ? $hname : '-'); ?></td>
+                    <td class="text-center"><?php echo $twin !== null ? $money($twin) : '-'; ?></td>
+                    <td class="text-center"><?php echo $single !== null ? $money($single) : '-'; ?></td>
+                </tr>
             <?php } ?>
-        </table>
-    </div>
+            <?php if (!$has_hotel) { ?>
+                <tr><td colspan="3" class="text-center">Hotel pricing to be confirmed.</td></tr>
+            <?php } ?>
+            <?php if ($HotelNote !== '') { ?>
+                <tr class="note-row"><td colspan="3" class="text-center"><?php echo html_escape($HotelNote); ?></td></tr>
+            <?php } ?>
+        </tbody>
+    </table>
+
+    <!-- Flight schedule -->
+    <div class="section-title"><?php echo html_escape($FlightTitle); ?></div>
+    <table class="data">
+        <thead>
+            <tr>
+                <th>Travel Date</th>
+                <th>Sector</th>
+                <th>Flight No</th>
+                <th>Timing</th>
+                <th>Duration</th>
+            </tr>
+        </thead>
+        <tbody>
+            <?php $has_flight = false; ?>
+            <?php foreach ($quote_flights as $f) {
+                $cells = array(
+                    isset($f['travel_date']) ? $f['travel_date'] : '',
+                    isset($f['sector']) ? $f['sector'] : '',
+                    isset($f['flight_no']) ? $f['flight_no'] : '',
+                    isset($f['timing']) ? $f['timing'] : '',
+                    isset($f['duration']) ? $f['duration'] : '',
+                );
+                $is_blank = true;
+                foreach ($cells as $c) { if (trim((string) $c) !== '') { $is_blank = false; break; } }
+                if ($is_blank) { continue; }
+                $has_flight = true; ?>
+                <tr>
+                    <?php foreach ($cells as $c) { ?>
+                        <td class="text-center"><?php echo html_escape(trim((string) $c) !== '' ? $c : '-'); ?></td>
+                    <?php } ?>
+                </tr>
+            <?php } ?>
+            <?php if (!$has_flight) { ?>
+                <tr><td colspan="5" class="text-center">Flight schedule to be confirmed.</td></tr>
+            <?php } ?>
+            <?php if ($FlightPrice !== null) { ?>
+                <tr>
+                    <td colspan="4" style="font-weight:bold; text-align:right;">Price per person (Adult / Child)</td>
+                    <td class="text-center" style="font-weight:bold;"><?php echo $money($FlightPrice); ?></td>
+                </tr>
+            <?php } ?>
+            <?php if ($FlightFareNote !== '') { ?>
+                <tr class="note-row"><td colspan="5" class="text-center">Fare quote includes <?php echo html_escape($FlightFareNote); ?></td></tr>
+            <?php } ?>
+            <?php if ($FlightExpiry !== '') { ?>
+                <tr class="note-row"><td colspan="5" class="text-center" style="font-weight:bold; font-style:normal;"><?php echo html_escape($FlightExpiry); ?></td></tr>
+            <?php } ?>
+        </tbody>
+    </table>
+
+    <!-- Boilerplate footer notes (highlighted) -->
+    <?php if (!empty($FooterLines)) { ?>
+        <div class="footer-notes">
+            <?php foreach ($FooterLines as $line) { ?>
+                <p><?php echo html_escape($line); ?></p>
+            <?php } ?>
+        </div>
     <?php } ?>
-
-    <!-- PAGE 2: Itinerary -->
-    <div style="page-break-before: always;">
-        <h3 class="text-center" style="margin-bottom:5px;"><?php echo html_escape($PackageName); ?> — Itinerary</h3>
-        <p class="text-center small-font" style="margin-bottom:8px;"><?php echo $DurationDays; ?> Days / <?php echo $DurationNights; ?> Nights</p>
-        <hr style="margin-bottom:0px;">
-        <table style="width:100%; font-size:13px;">
-            <tr style="font-weight:700;">
-                <td style="width:8%;">Day</td>
-                <td style="width:32%;">Itinerary</td>
-                <td style="width:60%;">Details</td>
-            </tr>
-        </table>
-        <hr style="margin-top:0px;">
-
-        <?php if (empty($itinerary)) { ?>
-            <table style="width:100%; font-size:11px; border-spacing:5px;">
-                <tr><td style="text-align:center; padding:10px;">Itinerary details to be confirmed.</td></tr>
-            </table>
-        <?php } else {
-            $this->load->helper('costing_itinerary');
-            foreach ($itinerary as $day) {
-                $meals = costing_meal_plan_labels(isset($day['meal_plan']) ? $day['meal_plan'] : ''); ?>
-                <table style="width:100%; font-size:11px; border-spacing:5px;">
-                    <tr style="vertical-align:baseline;">
-                        <td style="width:8%;">Day <?php echo (int) $day['day_number']; ?></td>
-                        <td style="width:32%;"><strong><?php echo html_escape(isset($day['title']) ? $day['title'] : ''); ?></strong></td>
-                        <td style="width:60%;">
-                            <div><?php echo isset($day['description']) ? $day['description'] : ''; ?></div>
-                            <?php if (!empty($meals)) { ?>
-                                <div style="margin-top:4px;"><strong style="color:#2b3a55;">Meal Plan:</strong> <?php echo html_escape(implode(', ', $meals)); ?></div>
-                            <?php } ?>
-                        </td>
-                    </tr>
-                </table>
-            <?php } ?>
-        <?php }
-
-        // Itinerary-wide Notes / Special Remark / Terms & Conditions — one set for
-        // the whole itinerary, shown once beneath the day-by-day plan.
-        $itin_meta = isset($itinerary_meta) ? $itinerary_meta : array();
-        $itin_level = array(
-            'notes'                => 'Notes',
-            'special_remark'       => 'Special Remark',
-            'terms_and_conditions' => 'Terms &amp; Conditions',
-        );
-        foreach ($itin_level as $key => $label) {
-            $val = isset($itin_meta[$key]) ? $itin_meta[$key] : '';
-            if (trim(strip_tags($val, '<img>')) === '' && stripos($val, '<img') === false) {
-                continue;
-            } ?>
-            <table style="width:100%; font-size:11px; border-spacing:5px; margin-top:8px;">
-                <tr><td><strong style="color:#2b3a55;"><?php echo $label; ?>:</strong> <?php echo $val; ?></td></tr>
-            </table>
-        <?php } ?>
-    </div>
 </body></html>

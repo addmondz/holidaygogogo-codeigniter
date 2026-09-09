@@ -2,8 +2,8 @@
 defined('BASEPATH') OR exit('No direct script access allowed');
 
 /**
- * Competitor_Job — the background worker for Competitor Analysis. Spawned as a
- * detached CLI process:  php index.php Competitor_Job run <job_id>
+ * Competitor_Product_Job — the background worker for Competitor Product. Spawned as a
+ * detached CLI process:  php index.php Competitor_Product_Job run <job_id>
  * (exact case — Linux filesystems are case-sensitive; lowercase 404s there.)
  *
  * Two modes (from the queued status file's `mode`):
@@ -15,7 +15,7 @@ defined('BASEPATH') OR exit('No direct script access allowed');
  * The status file is updated through the phases (discovering→reading, or
  * analysing→done); the web side polls it. CLI-only.
  */
-class Competitor_Job extends CI_Controller
+class Competitor_Product_Job extends CI_Controller
 {
 	public function run($job_id = '')
 	{
@@ -44,7 +44,6 @@ class Competitor_Job extends CI_Controller
 				'url'          => isset($job['url']) ? $job['url'] : '',
 				'mode'         => isset($job['mode']) ? $job['mode'] : 'crawl',
 				'keyword'      => isset($job['keyword']) ? $job['keyword'] : '',          // persist chips
-				'force_render' => ! empty($job['force_render']) ? 1 : 0,                  // across updates
 				'ai_crawl'     => ! empty($job['ai_crawl']) ? 1 : 0,
 				'created'      => isset($job['created']) ? $job['created'] : date('Y-m-d H:i:s'),   // fixed submit time
 				'ts'           => date('Y-m-d H:i:s'),
@@ -120,9 +119,8 @@ class Competitor_Job extends CI_Controller
 				$write($data);
 			};
 			$keyword  = isset($job['keyword']) ? (string) $job['keyword'] : '';
-			$force    = ! empty($job['force_render']);
 			$ai_crawl = ! empty($job['ai_crawl']);
-			$items = $this->competitoranalysisservice->crawl_to_text($url, 0, $progress, $keyword, $force, $ai_crawl);
+			$items = $this->competitoranalysisservice->crawl_to_text($url, 0, $progress, $keyword, $ai_crawl);
 			$items_file = APPPATH . 'logs/competitor_crawl/jobs/' . $job['job'] . '.items.json';
 			@file_put_contents($items_file, json_encode($items, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
 

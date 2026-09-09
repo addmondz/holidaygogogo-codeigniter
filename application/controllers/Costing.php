@@ -21,10 +21,12 @@ class Costing extends MY_Controller
             'customer_name' => trim((string) $this->input->get('customer_name')),
             'customer_contact' => trim((string) $this->input->get('customer_contact')),
             'customer_email' => trim((string) $this->input->get('customer_email')),
+            'sales_admin_id' => (int) $this->input->get('sales_admin_id'),
         );
 
         $array = $this->Costing_Model->Read_Packages_Dashboard($filters);
         $array['filters'] = $filters;
+        $array['sales_agents'] = $this->Costing_Model->Read_Sales_Agents();
 
         $this->load->view('layout/header', $titles);
         $this->load->view('costing/index', $array);
@@ -96,6 +98,7 @@ class Costing extends MY_Controller
             'customer_name' => $this->input->post('customer_name'),
             'customer_contact' => $this->input->post('customer_contact'),
             'customer_email' => $this->input->post('customer_email'),
+            'sales_admin_id' => $this->input->post('sales_admin_id'),
             'duration_days' => $this->input->post('duration_days'),
             'duration_nights' => $this->input->post('duration_nights'),
             'description' => $this->input->post('description'),
@@ -140,7 +143,8 @@ class Costing extends MY_Controller
         $package_id = (int) $this->input->post('package_id');
         $booking_id = $this->Costing_Model->Generate_Booking_Snapshot($package_id, array(
             'booking_id' => (int) $this->input->post('booking_id'),
-            'travel_date' => $this->input->post('travel_date'),
+            'travel_date' => $this->input->post('travel_date_start'),
+            'travel_date_end' => $this->input->post('travel_date_end'),
             'adult_count' => $this->input->post('adult_count'),
             'child_count' => $this->input->post('child_count'),
             'status' => $this->input->post('status'),
@@ -169,9 +173,7 @@ class Costing extends MY_Controller
     {
         $package_id = (int) $this->input->post('package_id');
         $level_fields = array(
-            'notes'                => $this->input->post('itinerary_notes'),
-            'special_remark'       => $this->input->post('itinerary_special_remark'),
-            'terms_and_conditions' => $this->input->post('itinerary_terms_and_conditions'),
+            'notes' => $this->input->post('itinerary_notes'),
         );
         if ($package_id > 0 && $this->Costing_Model->Save_Itinerary_Days($package_id, (array) $this->input->post('itinerary'), $level_fields)) {
             $this->session->set_flashdata('message_success', 'Itinerary saved.');
@@ -179,7 +181,42 @@ class Costing extends MY_Controller
             $this->session->set_flashdata('message_error', 'Unable to save itinerary.');
         }
 
-        redirect('Costing/Package/' . $package_id . '?step=done');
+        redirect('Costing/Package/' . $package_id . '?step=logistics');
+    }
+
+    /**
+     * Wizard step 4. Replace-all save of the hotel-pricing + flight-schedule
+     * tables and their quote-level free-text (pricing basis, notes, flight
+     * price/expiry), then advance to the final Save & Quotation step. These drive
+     * the customer Quotation PDF.
+     */
+    public function Save_Logistics()
+    {
+        $package_id = (int) $this->input->post('package_id');
+        $level_fields = array(
+            'quote_pricing_basis'    => $this->input->post('quote_pricing_basis'),
+            'quote_travel_date_note' => $this->input->post('quote_travel_date_note'),
+            'quote_hotel_note'       => $this->input->post('quote_hotel_note'),
+            'quote_flight_title'     => $this->input->post('quote_flight_title'),
+            'quote_flight_price'     => $this->input->post('quote_flight_price'),
+            'quote_flight_fare_note' => $this->input->post('quote_flight_fare_note'),
+            'quote_flight_expiry'    => $this->input->post('quote_flight_expiry'),
+            'quote_footer_notes'     => $this->input->post('quote_footer_notes'),
+        );
+
+        if ($package_id > 0 && $this->Costing_Model->Save_Quote_Details(
+            $package_id,
+            (array) $this->input->post('hotels'),
+            (array) $this->input->post('flights'),
+            $level_fields
+        )) {
+            $this->session->set_flashdata('message_success', 'Hotel & flight details saved.');
+            redirect('Costing/Package/' . $package_id . '?step=done');
+            return;
+        }
+
+        $this->session->set_flashdata('message_error', 'Unable to save hotel & flight details.');
+        redirect('Costing/Package/' . $package_id . '?step=logistics');
     }
 
     public function Currency()
@@ -327,6 +364,7 @@ class Costing extends MY_Controller
             'details'   => 'Package Details',
             'cost'      => 'Cost Template & Margin',
             'itinerary' => 'Itinerary',
+            'logistics' => 'Hotel & Flights',
             'done'      => 'Save & Quotation',
         );
     }

@@ -10,6 +10,15 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 class Competitor_Analysis_Model extends CI_Model
 {
 	/**
+	 * Which slice of the shared competitor_analyses table this model owns. The
+	 * base model is the competitor tool ('competitor'); the "Our Product" tool
+	 * subclasses this and sets 'our_product' so the two features store and list
+	 * their runs independently while sharing one table (feature column). Every
+	 * write tags the row and every read/aggregate scopes to it.
+	 */
+	protected $feature = 'competitor';
+
+	/**
 	 * The rich extraction fields that live inside the single details_json column
 	 * (everything beyond the headline columns). Kept here so Create() stores and
 	 * Read_One() decodes exactly the same set.
@@ -20,7 +29,7 @@ class Competitor_Analysis_Model extends CI_Model
 		'matched_product',
 		'countries', 'cities', 'travel_months', 'themes', 'tour_styles', 'local_transport',
 		'exclusions', 'hotels', 'shopping_stops', 'optional_tours', 'special_remarks',
-		'scenic_highlights', 'signature_meals', 'usp', 'meals', 'itinerary',
+		'scenic_highlights', 'usp', 'traveller_segments', 'meals', 'itinerary',
 	);
 
 	/**
@@ -66,6 +75,7 @@ class Competitor_Analysis_Model extends CI_Model
 			'status'        => isset($data['status']) ? $data['status'] : 'done',
 			'error_message' => isset($data['error_message']) ? $data['error_message'] : null,
 			'source'        => isset($data['source']) ? $data['source'] : null,
+			'feature'       => $this->feature,
 			'created_by'    => isset($data['created_by']) ? $data['created_by'] : null,
 		);
 		$this->db->insert('competitor_analyses', $row);
@@ -76,6 +86,7 @@ class Competitor_Analysis_Model extends CI_Model
 	function Read_All()
 	{
 		$this->db->select('id, url, page_title, product_name, tour_code, price, currency, destination, duration, cost_usd, product_count, status, created_at');
+		$this->db->where('feature', $this->feature);
 		$this->db->order_by('id', 'DESC');
 		return $this->db->get('competitor_analyses')->result();
 	}
@@ -90,6 +101,7 @@ class Competitor_Analysis_Model extends CI_Model
 	function Read_Uploads($limit = 20)
 	{
 		$this->db->select('id, url, source, product_name, cost_usd, status, created_at');
+		$this->db->where('feature', $this->feature);
 		$this->db->where("(source IN ('upload','paste') OR (source IS NULL AND url NOT LIKE 'http%'))", null, false);
 		$this->db->order_by('id', 'DESC');
 		$this->db->limit((int) $limit);
@@ -99,7 +111,7 @@ class Competitor_Analysis_Model extends CI_Model
 	/** Cumulative USD OpenAI spend across every stored analysis. */
 	function Read_Total_Cost()
 	{
-		$row = $this->db->select('SUM(cost_usd) AS total', false)->get('competitor_analyses')->row();
+		$row = $this->db->select('SUM(cost_usd) AS total', false)->where('feature', $this->feature)->get('competitor_analyses')->row();
 		return $row && $row->total !== null ? (float) $row->total : 0.0;
 	}
 
@@ -112,7 +124,7 @@ class Competitor_Analysis_Model extends CI_Model
 	 */
 	function Read_One($id)
 	{
-		$row = $this->db->get_where('competitor_analyses', array('id' => (int) $id))->row();
+		$row = $this->db->get_where('competitor_analyses', array('id' => (int) $id, 'feature' => $this->feature))->row();
 		if ( ! $row) {
 			return null;
 		}
@@ -149,9 +161,44 @@ class Competitor_Analysis_Model extends CI_Model
 		return $row;
 	}
 
+	/**
+	 * Cached translation overlay for one language (from
+	 * CompetitorAnalysisService::translate_analysis), or null if not translated
+	 * yet. Stored as {"cn": {...}, ...} in the translations_json column.
+	 */
+	function Read_Translation($id, $lang)
+	{
+		$row = $this->db->select('translations_json')
+			->get_where('competitor_analyses', array('id' => (int) $id, 'feature' => $this->feature))->row();
+		if ( ! $row) {
+			return null;
+		}
+		$all = json_decode((string) $row->translations_json, true);
+		$lang = (string) $lang;
+		return (is_array($all) && isset($all[$lang]) && is_array($all[$lang])) ? $all[$lang] : null;
+	}
+
+	/** Store (upsert) the translation overlay for one language, keeping the others. */
+	function Save_Translation($id, $lang, $data)
+	{
+		$row = $this->db->select('translations_json')
+			->get_where('competitor_analyses', array('id' => (int) $id, 'feature' => $this->feature))->row();
+		if ( ! $row) {
+			return false;
+		}
+		$all = json_decode((string) $row->translations_json, true);
+		if ( ! is_array($all)) {
+			$all = array();
+		}
+		$all[(string) $lang] = $data;
+		$this->db->where('id', (int) $id)->where('feature', $this->feature)
+			->update('competitor_analyses', array('translations_json' => json_encode($all, JSON_UNESCAPED_UNICODE)));
+		return true;
+	}
+
 	function Delete($id)
 	{
-		$this->db->delete('competitor_analyses', array('id' => (int) $id));
+		$this->db->delete('competitor_analyses', array('id' => (int) $id, 'feature' => $this->feature));
 		return $this->db->affected_rows() > 0;
 	}
 

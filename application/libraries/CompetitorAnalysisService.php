@@ -60,6 +60,10 @@ class CompetitorAnalysisService
 
 	/** Product + PDF links found on the last-read page's HTML (for listing drill-down). */
 	protected $last_page_links = array();
+	/** Same-host links on the last page, UNFILTERED (product-URL heuristic not applied)
+	 *  — so a listing's numeric-id children (/tour-package/1077) are seen for the
+	 *  child-link listing test even though they fail competitor_is_product_url. */
+	protected $last_page_links_raw = array();
 
 	/** True when expand_source_items() dropped the last URL because it's a listing. */
 	protected $last_expand_was_listing = false;
@@ -87,9 +91,6 @@ class CompetitorAnalysisService
 
 	/** Whether reading a product page may fall back to headless Chrome (see above). */
 	protected $reading_allow_headless = true;
-
-	/** "Force full render": render EVERY page with the browser, not just JS-thin ones. */
-	protected $force_render = false;
 
 	/** Below this many chars, an SPA's recovered metadata is treated as partial. */
 	const SPA_PARTIAL_MAX = 2000;
@@ -155,14 +156,17 @@ class CompetitorAnalysisService
 			return $ice;
 		}
 
-		// Site ROOT pasted → enumerate the WHOLE site via its sitemap (the most
-		// complete + cheapest way to get every tour). Deeper URLs (a listing/product)
-		// are user-scoped, so we skip the sitemap for them.
+		// Site ROOT pasted → SWEEP the whole same-host site: enumerate EVERY candidate
+		// page (sitemap + a broad same-host crawl, NOT filtered by product-keyword),
+		// read them all and let the itinerary gate keep the real tours. This is how we
+		// get ALL tours — including oddly-named ones (/detail/12345) the product-URL
+		// heuristic misses. Deeper URLs (a user-pasted listing/product) stay scoped, so
+		// the sweep is site-root only.
 		if (competitor_is_site_root($base_url)) {
-			$sm = $this->discover_via_sitemap($base_url, $limit);
-			if ( ! empty($sm)) {
-				$this->last_discovery_source = 'sitemap';
-				return $sm;
+			$sweep = $this->discover_all_urls($base_url, $limit);
+			if ( ! empty($sweep)) {
+				$this->last_discovery_source = 'sweep';   // not sitemap/ice → reading may render JS tours
+				return $sweep;
 			}
 		}
 
@@ -202,30 +206,6 @@ class CompetitorAnalysisService
 			}
 		}
 		return $urls;
-	}
-
-	/**
-	 * Enumerate a whole site's product URLs from its sitemap — robots.txt's
-	 * `Sitemap:` entries (or /sitemap.xml as a default), following ALL
-	 * <sitemapindex> children (uncapped; the seen-set makes it terminate), keeping
-	 * same-host <loc>s that look like product pages (competitor_is_product_url).
-	 * Gzip (.xml.gz) bodies are inflated. Returns [] when the site has no usable
-	 * sitemap.
-	 */
-	protected function discover_via_sitemap($base_url, $limit)
-	{
-		$locs = $this->collect_sitemap_locs($base_url);
-		$products = array();
-		foreach ($locs as $u) {
-			if (competitor_is_product_url($u)) {
-				$products[] = $u;
-				if ((int) $limit > 0 && count($products) >= (int) $limit) {
-					break;
-				}
-			}
-		}
-		$this->log_crawl('sitemap_discovery', array('locs' => count($locs), 'count' => count($products)));
-		return $products;
 	}
 
 	/**
@@ -776,6 +756,104 @@ class CompetitorAnalysisService
 	}
 
 	/**
+	 * Whole-site sweep: spider EVERY same-host candidate page (competitor_is_
+	 * candidate_url) with a broad link-following crawl — NO sitemap (sites often lack
+	 * one or ship a stale one, so the crawl is the single source of truth). Strict
+	 * product-URL matches are ordered FIRST so the real tours are read (and rendered,
+	 * if JS) before the per-crawl render budget / page cap is spent on maybes; the
+	 * rest follow and the itinerary gate keeps only genuine tours. NO page cap by
+	 * default — it sweeps the WHOLE site (the visited-set guarantees it terminates);
+	 * an optional COMPETITOR_MAX_SITE_PAGES caps it only for a runaway/huge site.
+	 * Returns a URL list.
+	 */
+	protected function discover_all_urls($base_url, $limit)
+	{
+		$page_cap = (int) get_env('COMPETITOR_MAX_SITE_PAGES');   // <= 0 = unlimited
+
+		$cands = $this->crawl_all_urls($base_url, $page_cap);
+
+		// Order: strict product URLs first, then the rest (gate decides the maybes).
+		$products = array();
+		$rest     = array();
+		foreach ($cands as $u) {
+			if (competitor_is_product_url($u)) { $products[] = $u; } else { $rest[] = $u; }
+		}
+		$ordered = array_merge($products, $rest);
+
+		if ($page_cap > 0 && count($ordered) > $page_cap) {
+			$this->log_crawl('sweep_truncated', array('found' => count($ordered), 'cap' => $page_cap));
+			$ordered = array_slice($ordered, 0, $page_cap);
+		}
+		$this->log_crawl('sweep_discovery', array('base_url' => $base_url,
+			'total_candidates' => count($cands), 'strict_products_first' => count($products),
+			'kept' => count($ordered)));
+		return $ordered;
+	}
+
+	/**
+	 * Broad same-host BFS from $base_url: follow EVERY same-host candidate link
+	 * (competitor_is_candidate_url — no product-keyword requirement) and return every
+	 * candidate page URL reached. Breadth-first, so each page's links are one level
+	 * deeper than the page; depth is UNLIMITED by default (it keeps descending until
+	 * the whole same-host site is covered), optionally capped by COMPETITOR_MAX_CRAWL_
+	 * DEPTH (levels of links from the base). $cap <= 0 = NO fetch cap (the visited-set
+	 * still terminates it on a finite site); a positive $cap bounds a runaway/huge
+	 * site. Batches fetch concurrently (curl_multi, COMPETITOR_CRAWL_CONCURRENCY wide).
+	 *
+	 * SPEED: a strict product URL (competitor_is_product_url) is treated as a LEAF —
+	 * collected but NOT fetched-to-expand, because tours are reached from listing/
+	 * category pages, not from each other. So discovery only downloads the (few) hub
+	 * pages instead of every product page, roughly halving total fetches (the reading
+	 * phase downloads the products once). Never throws.
+	 */
+	protected function crawl_all_urls($base_url, $cap)
+	{
+		$host      = parse_url($base_url, PHP_URL_HOST);
+		$max_depth = (int) get_env('COMPETITOR_MAX_CRAWL_DEPTH');   // 0 / blank = unlimited
+		$unbounded = ((int) $cap <= 0);   // no page cap — sweep the whole site
+		$width     = (int) get_env('COMPETITOR_CRAWL_CONCURRENCY');
+		$width     = $width > 0 ? $width : 16;   // pages fetched per parallel batch
+		$visited   = array();
+		$queue     = array(array($base_url, 0));   // [url, depth]
+		$found     = array();
+		$fetches   = 0;
+		$deepest   = 0;
+		while ( ! empty($queue) && ($unbounded || $fetches < $cap)) {
+			$batch = array();   // url => depth
+			while ( ! empty($queue) && count($batch) < $width) {
+				list($u, $d) = array_shift($queue);
+				if (isset($visited[$u])) { continue; }
+				$visited[$u] = true;
+				$batch[$u] = $d;
+			}
+			if (empty($batch)) { break; }
+			$bodies = $this->fetch_urls_multi(array_keys($batch));
+			$fetches += count($batch);
+			foreach ($batch as $url => $d) {
+				$html = isset($bodies[$url]) ? $bodies[$url] : '';
+				if ($html === '') { continue; }
+				foreach (competitor_extract_links($html, $url) as $link) {
+					if (isset($visited[$link]) || isset($found[$link])) { continue; }
+					if ( ! competitor_is_candidate_url($link, $host)) { continue; }
+					if (competitor_is_guide_url($link)) { continue; }   // travel guide/article, not a tour
+					$found[$link] = true;
+					if ($d + 1 > $deepest) { $deepest = $d + 1; }
+					// Descend unless we've hit the depth cap (0 = unlimited) — and never
+					// spider OUT of a product page (a leaf): tours are found on hub pages,
+					// so fetching every product page here is wasted work.
+					if (($max_depth === 0 || $d + 1 < $max_depth) && ! competitor_is_product_url($link)) {
+						$queue[] = array($link, $d + 1);
+					}
+				}
+			}
+		}
+		$this->log_crawl('broad_crawl', array('base_url' => $base_url, 'fetched' => $fetches,
+			'found' => count($found), 'deepest_level' => $deepest,
+			'max_depth' => $max_depth > 0 ? $max_depth : 'unlimited'));
+		return array_keys($found);
+	}
+
+	/**
 	 * Analyse a single competitor product URL. We scrape the page OURSELVES first
 	 * (fetch_url + competitor_html_to_text) and hand the extracted text to OpenAI
 	 * with no web_search tool — cheaper, no per-call browse fee. Only when our
@@ -826,41 +904,6 @@ class CompetitorAnalysisService
 	}
 
 	/**
-	 * Extract ONE tour page into OUR product shape (tour detail + structured
-	 * flights) for the Product form's "Extract from link" button. Reuses the same
-	 * scrape pipeline as analyze_url(); a thin/JS page falls back to a browsing
-	 * (web_search) call so the itinerary/flights can still be read. Returns
-	 * array('data' => <decoded AI JSON>, 'cost' => <usd>). Throws on bad URL,
-	 * unreadable page or unparseable reply.
-	 */
-	public function extract_for_product($url)
-	{
-		$this->CI->load->helper('product_extract');
-
-		$url = trim((string) $url);
-		if ( ! preg_match('#^https?://#i', $url)) {
-			throw new Exception('Please enter a valid http(s) URL.');
-		}
-
-		$text = $this->extract_source_text($url);
-		$thin = competitor_scrape_is_thin($text) || $this->last_spa_partial;
-
-		if ($thin) {
-			$spec = product_extract_agent_input($url, $text, true);
-			$raw  = $this->request($spec['instructions'], $spec['input'], array(array('type' => $this->web_search_tool())), 'product_extract(ws) ' . $url);
-		} else {
-			$spec = product_extract_agent_input($url, $text, false);
-			$raw  = $this->request($spec['instructions'], $spec['input'], array(), 'product_extract ' . $url);
-		}
-
-		$data = product_extract_decode($raw);
-		if ($data === null) {
-			throw new Exception('The AI response could not be parsed. Please try again.');
-		}
-		return array('data' => $data, 'cost' => $this->last_run_cost());
-	}
-
-	/**
 	 * Extract a single product page's SOURCE TEXT with NO OpenAI call — the shared
 	 * scraping pipeline behind both analyze_url() and crawl_to_text():
 	 *   0) ICE Holidays JSON API URLs -> read the JSON directly
@@ -890,18 +933,49 @@ class CompetitorAnalysisService
 			}
 		}
 		$text = $this->extract_source_text($url, $prefetched);
-		if ($this->last_is_listing || competitor_is_category_url($url) || competitor_text_looks_like_listing($text)) {
-			// A category / listing page (by JSON-LD, a plural "…-tours" URL, or content)
-			// — not a product itself; drop it and let crawl_to_text drill its individual
-			// products (last_page_links).
+		// A page that links to >=3 of its OWN sub-pages is an index/listing of them
+		// (e.g. a JS section hub /tour-package linking /tour-package/1077, …/1090, …
+		// exposed after render) — drill the children instead of keeping the hub.
+		$child_links = competitor_count_child_links($url, $this->last_page_links_raw);
+		if ($this->last_is_listing || competitor_is_category_url($url) || competitor_text_looks_like_listing($text) || $child_links >= 3) {
+			// A category / listing page (by JSON-LD, a plural "…-tours" URL, content, or
+			// a hub of its own sub-pages) — not a product itself; drop it and let
+			// crawl_to_text drill its individual products (last_page_links). If it's a
+			// paginated SPA listing, walk its API for the products on page 2..N too (the
+			// render only exposes page 1 into the DOM).
 			$this->last_expand_was_listing = true;
-			$this->log_crawl('dropped_listing', array('url' => $url, 'links' => count($this->last_page_links)));
+			if ( ! empty($this->last_render_apis)) {
+				$paged = $this->paginated_child_urls($url);
+				if ( ! empty($paged)) {
+					$this->last_page_links = array_values(array_unique(array_merge($this->last_page_links, $paged)));
+				}
+			}
+			$this->log_crawl('dropped_listing', array('url' => $url,
+				'links' => count($this->last_page_links), 'child_links' => $child_links));
 			return array();
 		}
 		if (competitor_looks_like_article($text)) {
 			// Rich prose with NO product signal (price/duration/itinerary) — a blog
 			// article / info page that carried a product keyword in its URL. Drop it.
 			$this->log_crawl('dropped_article', array('url' => $url, 'text_len' => strlen($text)));
+			return array();
+		}
+		if (competitor_is_guide_url($url, $this->last_page_title)) {
+			// A travel GUIDE / planning article ("How to plan a trip…", "Best time…")
+			// — its day-by-day plan looks like an itinerary, so the gate below would
+			// keep it. Drop it here (backstop for guides the discovery filter's URL
+			// check missed, e.g. reached via a listing drill or category seed).
+			$this->log_crawl('dropped_guide', array('url' => $url, 'title' => $this->last_page_title));
+			return array();
+		}
+		// Tour-page gate (always on): a crawl keeps ONLY real bookable tour pages
+		// (competitor_is_tour_page — a day-by-day itinerary, OR a duration+price for
+		// sites that hide the itinerary behind a tab), and not thin. Landing/overview/
+		// category pages, blog posts and under-scraped shells fail this, so they're
+		// dropped here rather than analysed. Logged so the crawl log shows exactly what
+		// was skipped (no silent truncation).
+		if (competitor_scrape_is_thin($text) || ! competitor_is_tour_page($text)) {
+			$this->log_crawl('dropped_not_tour', array('url' => $url, 'text_len' => strlen($text)));
 			return array();
 		}
 		// Store the customer-facing web URL for an ICE series (set while extracting),
@@ -1024,6 +1098,71 @@ class CompetitorAnalysisService
 		return $parts ? ("CAPTURED API DATA:\n" . implode("\n\n", $parts)) : '';
 	}
 
+	/**
+	 * Fetch a JSON API endpoint as an XHR would (X-Requested-With + Accept: json +
+	 * Referer) — some SPA APIs (e.g. tio.asia) return empty to a plain browser
+	 * request. Returns the raw body, or '' on failure. Never throws.
+	 */
+	protected function fetch_api($url, $referer = '')
+	{
+		$ch = curl_init();
+		$opts = $this->curl_opts($url);
+		$headers = array('Accept: application/json', 'X-Requested-With: XMLHttpRequest');
+		if ($referer !== '') { $headers[] = 'Referer: ' . $referer; }
+		$opts[CURLOPT_HTTPHEADER] = $headers;
+		curl_setopt_array($ch, $opts);
+		$body = curl_exec($ch);
+		$code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+		curl_close($ch);
+		return ($code >= 400 || ! is_string($body)) ? '' : $body;
+	}
+
+	/**
+	 * Enumerate ALL product URLs behind a paginated SPA listing (e.g. tio.asia's
+	 * /tour-package, whose /api/tour-package returns {data,links,meta} 16 at a time).
+	 * Finds the paginated API among the listing's captured render XHRs, walks every
+	 * page via links.next (bounded), and builds a product URL per record — so the
+	 * crawl reaches page 2..N, not just the ~16 rendered into the DOM. Returns []
+	 * when there's no paginated API. Never throws.
+	 */
+	protected function paginated_child_urls($listing_url)
+	{
+		$host = parse_url($listing_url, PHP_URL_HOST);
+		foreach ((array) $this->last_render_apis as $a) {
+			$api = is_array($a) ? (string) (isset($a['url']) ? $a['url'] : '') : (string) $a;
+			if ($api === '' || parse_url($api, PHP_URL_HOST) !== $host) {
+				continue;
+			}
+			// Prefer the body captured at render; fall back to a fresh XHR fetch.
+			$body = (is_array($a) && ! empty($a['body'])) ? (string) $a['body'] : $this->fetch_api($api, $listing_url);
+			$json = json_decode($body, true);
+			if ( ! competitor_paginator_items($json)) {
+				continue;   // not the listing paginator
+			}
+			$out    = array();
+			$seen   = array();
+			$pages  = 0;
+			$cap    = 200;   // page guard (200 pages × ~16 = plenty; the seen-set also stops loops)
+			while (is_array($json) && $pages < $cap) {
+				foreach (competitor_paginator_items($json) as $it) {
+					$u = competitor_listing_item_url($listing_url, $it);
+					if ($u !== '') { $out[$u] = true; }
+				}
+				$pages++;
+				$next = competitor_paginator_next($json);
+				if ($next === '' || isset($seen[$next])) { break; }
+				$seen[$next] = true;
+				$json = json_decode($this->fetch_api($next, $listing_url), true);
+			}
+			if ( ! empty($out)) {
+				$this->log_crawl('paginated_listing', array('listing' => $listing_url,
+					'api' => $api, 'pages' => $pages, 'urls' => count($out)));
+				return array_keys($out);
+			}
+		}
+		return array();
+	}
+
 	protected function page_links_from_html($html, $base)
 	{
 		$links = competitor_filter_product_urls(competitor_extract_links($html, $base), 0);
@@ -1041,6 +1180,7 @@ class CompetitorAnalysisService
 		$this->last_is_listing  = false;
 		$this->last_page_title  = '';
 		$this->last_page_links  = array();
+		$this->last_page_links_raw = array();
 		$this->last_render_apis = array();   // don't carry a prior page's captured APIs
 		$this->last_ice_web_url = '';
 		$html_thin = false;   // was the raw HTML a blank-shell SPA?
@@ -1075,15 +1215,6 @@ class CompetitorAnalysisService
 				return $this->enrich_with_linked_files($this->extract_text_from_body($html, $url));
 			}
 
-			// Force full render: read the browser-rendered DOM for EVERY page (not just
-			// thin JS shells), so a page the cheap fetch misreads is captured properly.
-			if ($this->force_render) {
-				$rendered = $this->fetch_rendered($url);
-				if ($rendered !== '' && strlen($rendered) > strlen($html)) {
-					$html = $rendered;
-				}
-			}
-
 			// Category/listing/search page (per its JSON-LD) — not a single product;
 			// flag so expand_source_items() drops it instead of analysing a catalogue.
 			$this->last_is_listing = competitor_looks_like_listing(competitor_jsonld_types($html));
@@ -1092,7 +1223,7 @@ class CompetitorAnalysisService
 			// vs the first body line which is usually menu/CTA/inquiry-form chrome.
 			$this->last_page_title = competitor_page_title($html);
 
-			$text = competitor_html_to_text($html);
+			$text = competitor_html_to_text($html, competitor_page_char_cap(get_env('COMPETITOR_MAX_PAGE_CHARS')));
 			$html_thin = competitor_scrape_is_thin($text);   // blank-shell SPA?
 
 			// 1a) Lead with schema.org PRODUCT JSON-LD when present, even if the HTML
@@ -1105,8 +1236,9 @@ class CompetitorAnalysisService
 			}
 
 			// 1b) Known JS SPA platform (e.g. ICE Holidays / gd.my): the HTML is an
-			// empty shell, so read the JSON API that actually holds the content.
-			if (competitor_scrape_is_thin($text)) {
+			// empty shell (or boilerplate with no real tour sections), so read the JSON
+			// API that actually holds the content.
+			if (competitor_needs_more_content($text)) {
 				$api = competitor_spa_api_url($url);
 				if ($api !== '') {
 					$api_text = competitor_json_api_to_text($this->fetch_url($api));
@@ -1120,7 +1252,7 @@ class CompetitorAnalysisService
 			// 1c) Generic JS SPA: no known API, but most SPAs ship their data as JSON
 			// inside the HTML (JSON-LD / __NEXT_DATA__ / og-tags) — read that ourselves
 			// before paying for the browsing agent.
-			if (competitor_scrape_is_thin($text)) {
+			if (competitor_needs_more_content($text)) {
 				$embedded = competitor_extract_embedded_json($html);
 				if ( ! competitor_scrape_is_thin($embedded)) {
 					$this->log_crawl('embedded_json_used', array('url' => $url, 'text_len' => strlen($embedded)));
@@ -1128,9 +1260,10 @@ class CompetitorAnalysisService
 				}
 			}
 
-			// 1d) Still thin: follow a <link rel="alternate" type="application/json">
-			// feed if the page advertises one (its own machine-readable version).
-			if (competitor_scrape_is_thin($text)) {
+			// 1d) Still short of a full tour page: follow a <link rel="alternate"
+			// type="application/json"> feed if the page advertises one (its own
+			// machine-readable version).
+			if (competitor_needs_more_content($text)) {
 				$alt = competitor_json_alternate_url($html, $url);
 				if ($alt !== '') {
 					$alt_text = competitor_json_api_to_text($this->fetch_url($alt));
@@ -1141,16 +1274,26 @@ class CompetitorAnalysisService
 				}
 			}
 
-			// 1d2) The raw HTML was a JS shell and we only recovered partial content
-			// (blank, or just embedded metadata) — render it with headless Chrome and
-			// read the full DOM. Fires for both truly-thin and metadata-only SPA pages
-			// so a product page gets its real itinerary/prices, not just a title.
-			// Skipped on structured-catalogue sites (#4 gating) — see reading_allow_headless.
-			// (Skipped under force_render — the page was already rendered above.)
-			if ( ! $this->force_render && $this->reading_allow_headless && $html_thin && mb_strlen($text, 'UTF-8') < self::SPA_PARTIAL_MAX) {
+			// 1d2) We still don't have a full tour page — on a full JS SPA (e.g.
+			// chanbrothers) a product page is served as a shell whose itinerary loads via
+			// JS, so it MUST be browser-rendered to be kept. The render budget is precious
+			// (each render is a full page load), so we spend it ONLY on pages whose path
+			// carries a tour/product keyword (a product OR a tour-section hub/listing,
+			// any depth incl. numeric-id URLs like /tour-package/1077), that aren't a
+			// guide, and still lack an itinerary (competitor_needs_more_content). A hub
+			// renders so its child products can be drilled; a product renders to be read.
+			// Info/blog/account pages carry no keyword, so they're never rendered
+			// here — they'd be dropped anyway — so the budget isn't wasted on them (the
+			// old signal-based trigger burned it on /inspirations pages, starving the real
+			// products and returning zero). Listing pages get their own render in the drill
+			// step. Skipped on structured-catalogue sites (reading_allow_headless).
+			$render_worthy = competitor_path_has_product_keyword($url)
+				&& ! competitor_is_guide_url($url, $this->last_page_title)
+				&& competitor_needs_more_content($text);
+			if ($this->reading_allow_headless && $render_worthy) {
 				$rendered = $this->fetch_rendered($url);
 				if ($rendered !== '') {
-					$rendered_text = competitor_html_to_text($rendered);
+					$rendered_text = competitor_html_to_text($rendered, competitor_page_char_cap(get_env('COMPETITOR_MAX_PAGE_CHARS')));
 					if ( ! competitor_scrape_is_thin($rendered_text) && mb_strlen($rendered_text, 'UTF-8') > mb_strlen($text, 'UTF-8')) {
 						$this->log_crawl('headless_content_used', array('url' => $url, 'text_len' => strlen($rendered_text)));
 						$text = $rendered_text;
@@ -1164,7 +1307,7 @@ class CompetitorAnalysisService
 			}
 
 			// Fold any captured render-service APIs into the text — the itinerary/price
-			// an opaque SPA loads via XHR (set by force_render or the 1d2 render above).
+			// an opaque SPA loads via XHR (captured by the 1d2 render above).
 			if ( ! empty($this->last_render_apis)) {
 				$api_text = $this->render_apis_to_text();
 				if ($api_text !== '') {
@@ -1186,6 +1329,7 @@ class CompetitorAnalysisService
 			// Outbound product + PDF links on this page — used by the listing drill-down
 			// to reach the individual products of a category/listing page.
 			$this->last_page_links = $this->page_links_from_html($html, $url);
+			$this->last_page_links_raw = competitor_extract_links($html, $url);
 		}
 
 		// 2) Read any linked brochure/itinerary PDFs (the "View File" links) and
@@ -1241,13 +1385,19 @@ class CompetitorAnalysisService
 			return '';
 		}
 		$kind = competitor_file_binary_kind($body);
+		$text = '';
 		if ($kind === 'pdf') {
-			return $this->pdf_to_text($body, $url);
+			$text = $this->pdf_to_text($body, $url);
+		} elseif ($kind === 'image') {
+			$text = $this->image_to_text($body, $url);
 		}
-		if ($kind === 'image') {
-			return $this->image_to_text($body, $url);
+		// Cap one file's extracted text — a big brochure can yield hundreds of KB,
+		// which bloats both memory (all items held at once) and the AI token cost.
+		$cap = competitor_page_char_cap(get_env('COMPETITOR_MAX_PAGE_CHARS'));
+		if ($cap > 0 && mb_strlen($text, 'UTF-8') > $cap) {
+			$text = mb_substr($text, 0, $cap, 'UTF-8');
 		}
-		return '';
+		return $text;
 	}
 
 	/** PDF bytes -> text via pdftotext (-layout keeps price columns aligned). */
@@ -1563,7 +1713,7 @@ class CompetitorAnalysisService
 	 * $progress, when given, is called as $progress($phase, $done, $total, $label)
 	 * so a background job can report live progress ('discovering' then 'reading').
 	 */
-	public function crawl_to_text($base_url, $limit = 0, $progress = null, $keyword = '', $force_render = false, $ai_discover = false)
+	public function crawl_to_text($base_url, $limit = 0, $progress = null, $keyword = '', $ai_discover = false)
 	{
 		$base_url = trim((string) $base_url);
 		if ( ! preg_match('#^https?://#i', $base_url)) {
@@ -1571,15 +1721,6 @@ class CompetitorAnalysisService
 		}
 		$tick = is_callable($progress) ? $progress : function () {};
 		$this->reset_render_budget();
-
-		// Force full render: browser-render EVERY page (not just JS-thin ones) and lift
-		// the per-crawl render cap so a whole misclassified site can be read via the
-		// browser. Slow — user opt-in for a site the cheap cascade gets wrong.
-		$this->force_render = (bool) $force_render;
-		if ($this->force_render) {
-			$this->headless_cap = 0;   // unlimited renders for this crawl
-			$this->log_crawl('force_render', array('base_url' => $base_url));
-		}
 
 		// A base URL is always discovered into its full product list — UNCAPPED
 		// (bounded only by the same-host crawl's visited-set + fetch guard).
@@ -1654,9 +1795,9 @@ class CompetitorAnalysisService
 		// #4 Headless gating: a structured-catalogue site (sitemap / ICE API) has
 		// readable HTML for every product, so reading never needs a browser — don't
 		// risk one hanging. Allow headless during reading ONLY when discovery itself
-		// needed JS (html/headless/pdf or the single-URL fallback) — or Force render.
-		$this->reading_allow_headless = $this->force_render
-			|| ! in_array($this->last_discovery_source, array('sitemap', 'ice'), true);
+		// needed JS (html/headless/pdf/sweep or the single-URL fallback).
+		$this->reading_allow_headless =
+			! in_array($this->last_discovery_source, array('sitemap', 'ice'), true);
 		$this->log_crawl('reading_config', array('source' => $this->last_discovery_source,
 			'allow_headless' => $this->reading_allow_headless, 'products' => count($urls)));
 
@@ -1736,6 +1877,19 @@ class CompetitorAnalysisService
 		if ($after < $before) {
 			$this->log_crawl('stripped_shared_chrome', array('items' => count($out), 'bytes_removed' => $before - $after));
 		}
+		// Per-item boilerplate strip (cookie/subscribe/social/breadcrumb/CTA/footer +
+		// "related tours" headings). Catches the noise the shared-chrome pass can't —
+		// single-product crawls (< 3 items), mid-page widgets, and non-HTML sources
+		// (JSON API / PDF-OCR text that never went through html_to_text's line filter).
+		$bp_before = $after;
+		foreach ($out as &$bp_it) {
+			if (isset($bp_it['text'])) { $bp_it['text'] = competitor_strip_boilerplate($bp_it['text']); }
+		}
+		unset($bp_it);
+		$bp_after = array_sum(array_map(function ($it) { return isset($it['text']) ? strlen($it['text']) : 0; }, $out));
+		if ($bp_after < $bp_before) {
+			$this->log_crawl('stripped_boilerplate', array('items' => count($out), 'bytes_removed' => $bp_before - $bp_after));
+		}
 		// Lead each product's text with its real page title (<h1>) so the review list
 		// and the AI both see the product NAME first — the post-chrome first body line
 		// is often a shared inquiry-form/CTA message, not the tour name. Done AFTER
@@ -1753,6 +1907,71 @@ class CompetitorAnalysisService
 		return $out;
 	}
 
+	/**
+	 * Deep-read ONE tour/product detail page directly — the "Our Product" crawler.
+	 * The user pastes the exact detail-page URL, so there is NO site discovery,
+	 * listing-drill or tour-page gate: the pasted page is trusted and always kept.
+	 * Reuses extract_source_text (leads with schema.org Product JSON-LD, then falls
+	 * back through SPA-API / embedded-JSON / headless render and folds in linked
+	 * brochure PDFs), then applies the same boilerplate-strip + title-lead cleanup
+	 * as crawl_to_text. Returns a single {url, text, title} item — the exact shape
+	 * crawl_to_text yields — so the Review → Analyse flow is unchanged.
+	 */
+	public function read_single_product($url, $progress = null)
+	{
+		$url = trim((string) $url);
+		if ( ! preg_match('#^https?://#i', $url)) {
+			throw new Exception('Please enter a valid http(s) URL.');
+		}
+		$tick = is_callable($progress) ? $progress : function () {};
+		$this->reset_render_budget();
+		$this->reading_allow_headless = true;   // a JS detail page may still need a browser
+
+		$tick('reading', 0, 1, $url);
+		$text  = $this->extract_source_text($url);
+		$title = $this->last_page_title;
+		if (trim($text) === '') {
+			throw new Exception('Could not read the product page (no readable content).');
+		}
+		$display_url = ($this->last_ice_web_url !== '') ? $this->last_ice_web_url : $url;
+
+		// Same per-item cleanup crawl_to_text applies: strip cookie/nav/footer/CTA
+		// boilerplate, then lead the body with the real page title (<h1>) so the AI
+		// sees the product NAME first.
+		$text = competitor_strip_boilerplate($text);
+		if ($title !== '' && mb_stripos($text, $title, 0, 'UTF-8') !== 0) {
+			$text = 'Product: ' . $title . "\n" . $text;
+		}
+
+		$item = array('url' => $display_url, 'text' => $text);
+		if ($title !== '') { $item['title'] = $title; }
+		$tick('reading', 1, 1, $url);
+		$this->log_crawl('single_product_read', array('url' => $url, 'text_len' => strlen($text)));
+		return array($item);
+	}
+
+	/**
+	 * Shared curl handle. A whole-site crawl talks to ONE host, so reusing its DNS
+	 * lookup, TLS session and live connections across every fetch means roughly one
+	 * TLS handshake for the whole site instead of one per page — the dominant
+	 * per-request cost on HTTPS. Created once, lazily, and reused for the run.
+	 */
+	protected $curl_share = null;
+
+	protected function curl_share()
+	{
+		if ($this->curl_share === null) {
+			$sh = curl_share_init();
+			curl_share_setopt($sh, CURLSHOPT_SHARE, CURL_LOCK_DATA_DNS);
+			curl_share_setopt($sh, CURLSHOPT_SHARE, CURL_LOCK_DATA_SSL_SESSION);
+			if (defined('CURL_LOCK_DATA_CONNECT')) {   // reuse live connections (PHP 8.0+ / libcurl 7.57+)
+				curl_share_setopt($sh, CURLSHOPT_SHARE, CURL_LOCK_DATA_CONNECT);
+			}
+			$this->curl_share = $sh;
+		}
+		return $this->curl_share;
+	}
+
 	/** Browser-like curl options for a single URL, shared by fetch_url + multi. */
 	protected function curl_opts($url)
 	{
@@ -1768,6 +1987,15 @@ class CompetitorAnalysisService
 			CURLOPT_CONNECTTIMEOUT => 8,
 			CURLOPT_TIMEOUT        => $timeout,
 			CURLOPT_ENCODING       => '',   // accept gzip/deflate, curl inflates it
+			// Cap the download size (bytes) so a giant multi-tour brochure PDF (sedunia
+			// ships 16 MB ones) can't be pulled into memory and OOM the crawl — a page
+			// that big isn't a single product anyway. Aborts via Content-Length.
+			CURLOPT_MAXFILESIZE    => (int) (get_env('COMPETITOR_MAX_FILE_BYTES') ?: 12582912),  // 12 MB
+			// Reuse DNS + TLS session + connection pool across the whole crawl.
+			CURLOPT_SHARE          => $this->curl_share(),
+			// Prefer HTTP/2 (falls back to 1.1 if unsupported) so many same-host
+			// requests can MULTIPLEX over a single connection, not one connection each.
+			CURLOPT_HTTP_VERSION   => defined('CURL_HTTP_VERSION_2TLS') ? CURL_HTTP_VERSION_2TLS : CURL_HTTP_VERSION_1_1,
 			CURLOPT_USERAGENT      => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
 				. '(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
 			CURLOPT_HTTPHEADER     => array(
@@ -1811,6 +2039,11 @@ class CompetitorAnalysisService
 			return $out;
 		}
 		$mh = curl_multi_init();
+		// Let same-host requests share one connection via HTTP/2 multiplexing instead
+		// of opening a socket per URL (with CURLOPT_SHARE this reuses TLS too).
+		if (defined('CURLMOPT_PIPELINING') && defined('CURLPIPE_MULTIPLEX')) {
+			curl_multi_setopt($mh, CURLMOPT_PIPELINING, CURLPIPE_MULTIPLEX);
+		}
 		$handles = array();
 		foreach ($urls as $u) {
 			$ch = curl_init();
@@ -1923,6 +2156,43 @@ class CompetitorAnalysisService
 		return $record;
 	}
 
+	/**
+	 * Translate a whole analysis (its list of display products) into $lang with a
+	 * single OpenAI call. Returns a cacheable overlay structure
+	 *   { products: [ {scalars,lists,meals,itinerary}, ... ],
+	 *     lang, model, input_tokens, output_tokens, cost_usd }
+	 * that competitor_apply_translation_to_row() overlays onto the row at render
+	 * time. Throws Exception (surfaced to the user) on any failure.
+	 */
+	public function translate_analysis($products, $lang)
+	{
+		$this->CI->load->helper('competitor_analysis');
+		$payload = array('products' => array());
+		foreach ((array) $products as $p) {
+			$payload['products'][] = competitor_extract_translatable((array) $p);
+		}
+
+		$spec = competitor_build_translation_agent($payload, $lang);
+		// json_object mode guarantees a syntactically valid reply (the model can
+		// otherwise emit an unbalanced brace on long Chinese output).
+		$raw  = $this->request($spec['instructions'], $spec['input'], array(), 'translate ' . $lang, true);
+		$data = competitor_json_object_from_text($raw);
+		if ( ! is_array($data) || ! isset($data['products']) || ! is_array($data['products'])) {
+			throw new Exception('The translation response could not be parsed. Please try again.');
+		}
+
+		return array(
+			'products'      => array_values($data['products']),
+			'lang'          => competitor_normalize_lang($lang),
+			'model'         => $this->model(),
+			'input_tokens'  => $this->last_usage['input_tokens'],
+			'output_tokens' => $this->last_usage['output_tokens'],
+			'cost_usd'      => competitor_estimate_cost(
+				$this->model(), $this->last_usage['input_tokens'], $this->last_usage['output_tokens'], $this->price_rates()
+			),
+		);
+	}
+
 	protected function model()
 	{
 		$m = get_env('OPENAI_MODEL');
@@ -1957,7 +2227,7 @@ class CompetitorAnalysisService
 	 * (expected to be a JSON object). $input is either a string or a structured
 	 * message/content array; $tools is the tools list (empty = none).
 	 */
-	protected function request($instructions, $input, $tools = array(), $label = '')
+	protected function request($instructions, $input, $tools = array(), $label = '', $json_object = false)
 	{
 		$key = get_env('OPENAI_API_KEY');
 		if (empty($key)) {
@@ -1982,6 +2252,11 @@ class CompetitorAnalysisService
 		}
 		if ( ! empty($tools)) {
 			$payload['tools'] = $tools;
+		}
+		// Force a syntactically valid JSON object reply (Responses API "json mode").
+		// Requires the word "json" in the input, which the caller supplies.
+		if ($json_object) {
+			$payload['text'] = array('format' => array('type' => 'json_object'));
 		}
 
 		$this->log_ai('request', array(

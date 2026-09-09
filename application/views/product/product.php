@@ -23,20 +23,6 @@
                     </ul>
                     <div class="tab-content">
                     <div class="tab-pane fade show active" id="product_tab_info" role="tabpanel">
-                    <div class="form-group">
-                        <label>Auto-fill Tour Details &amp; Flights from a link
-                            <i class="la la-info-circle" data-toggle="tooltip" title="Paste a tour page URL and click Extract — AI reads the page and fills the Tour Details and Flights tabs. Nothing is saved until you Update/Create."></i>
-                        </label>
-                        <div class="input-group">
-                            <input type="text" id="ExtractUrl" placeholder="https://... tour page link" autocomplete="off" class="form-control">
-                            <div class="input-group-append">
-                                <button type="button" id="extract-btn" class="btn btn-primary font-weight-bold">
-                                    <i class="la la-magic"></i> Extract
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="separator separator-dashed my-5"></div>
                     <strong>Product Information :</strong>
                     <br><br>
                     <div class="row">
@@ -623,7 +609,6 @@
                             if(dirty_fields.length > 0) {
                                 for(var i = 0; i < dirty_fields.length; i++) {
                                     var key = dirty_fields[i].id;
-                                    if(key === 'ExtractUrl') { continue; } // helper field, not a column
                                     var raw = dirty_fields[i].value;
                                     var value;
                                     if(key == 'RetailPrice' || key == 'SupplierPrice') {
@@ -885,115 +870,4 @@
         existingFlights.forEach(function(f) { buildFlightCard(f); });
     });
 
-    // ---------------------------------------------------------------------
-    // "Extract from link": AI reads a tour page and fills Tour Details + Flights.
-    // ---------------------------------------------------------------------
-    function applyExtracted(fields, flights) {
-        var count = 0;
-        Object.keys(fields || {}).forEach(function(col) {
-            var $el = $('#' + col);
-            if($el.length) { $el.val(fields[col]); count++; }
-        });
-        if(Array.isArray(flights) && flights.length > 0) {
-            $('#flights-container').empty();
-            flights.forEach(function(f) { buildFlightCard(f); });
-            count += flights.length;
-        }
-        return count;
-    }
-
-    // Human labels for the extracted columns (for the confirmation preview).
-    var tourFieldLabels = <?php
-        $labels = array();
-        foreach (product_tour_fields_flat() as $f) { $labels[$f['col']] = $f['label']; }
-        echo json_encode($labels);
-    ?>;
-
-    function extractEsc(s) { return $('<div>').text(s == null ? '' : String(s)).html(); }
-
-    // Build a read-only summary of what Extract found, so the user can confirm
-    // BEFORE it overwrites the form fields.
-    function buildExtractPreview(fields, flights) {
-        var rows = [];
-        Object.keys(fields || {}).forEach(function(col) {
-            var label = tourFieldLabels[col] || col;
-            var oneLine = String(fields[col] || '').replace(/\s*\n\s*/g, ' · ');
-            if(oneLine.length > 180) { oneLine = oneLine.substring(0, 180) + '…'; }
-            rows.push('<div style="margin-bottom:6px;"><strong style="color:#6082B6;">' + extractEsc(label) + ':</strong> ' + extractEsc(oneLine) + '</div>');
-        });
-        if(Array.isArray(flights) && flights.length > 0) {
-            var fl = flights.map(function(f) {
-                var route = (f.from || '') + (f.to ? (' → ' + f.to) : '');
-                var parts = [f.direction, ((f.airline || '') + ' ' + (f.flight_no || '')).trim(), route.trim()]
-                    .filter(function(x) { return x && x.trim() !== ''; });
-                return '<div style="margin-left:10px;">• ' + extractEsc(parts.join(' | ')) + '</div>';
-            }).join('');
-            rows.push('<div style="margin-bottom:6px;"><strong style="color:#6082B6;">Flights (' + flights.length + '):</strong>' + fl + '</div>');
-        }
-        if(rows.length === 0) { return ''; }
-        // No inner max-height/overflow — let SweetAlert's own container scroll
-        // (a nested scroll box would show a second scrollbar).
-        return '<div style="text-align:left; font-size:13px; padding:4px 2px;">' + rows.join('') + '</div>';
-    }
-
-    // Progress shown as a SweetAlert popup (mirrors Competitor Analysis).
-    var EXTRACT_IMG = '<?php echo base_url('assets/image/sweetalert.jpg') ?>';
-
-    $(document).on('click', '#extract-btn', function() {
-        var url = ($('#ExtractUrl').val() || '').trim();
-        if(url === '' || !/^https?:\/\//i.test(url)) {
-            Display_Message(EXTRACT_IMG, 'Please Enter A Valid http(s) Link', null);
-            return;
-        }
-        var $btn = $(this);
-        var html = $btn.html();
-        $btn.prop('disabled', true).html('<i class="la la-spinner la-spin"></i> Working…');
-        Swal.fire({ background: 'url(' + EXTRACT_IMG + ')', title: 'Reading link &amp; extracting with AI…',
-            allowOutsideClick: false, didOpen: function() { Swal.showLoading(); } });
-        $.ajax({
-            url: '<?php echo base_url('Product/Extract') ?>',
-            type: 'post',
-            data: { url: url },
-            dataType: 'json',
-            success: function(res) {
-                $btn.prop('disabled', false).html(html);
-                Swal.close();
-                if(!res || !res.success) {
-                    Display_Message(EXTRACT_IMG, (res && res.message) ? res.message : 'Extraction Failed', null);
-                    return;
-                }
-                var previewHtml = buildExtractPreview(res.fields || {}, res.flights || []);
-                if(previewHtml === '') {
-                    Display_Message(EXTRACT_IMG, 'No details could be extracted from this link.', null);
-                    return;
-                }
-                var costTxt = res.cost ? (' · ~$' + Number(res.cost).toFixed(4)) : '';
-                // Review BEFORE overwriting: user must confirm to apply.
-                Swal.fire({
-                    title: 'Extracted details — apply?',
-                    html: previewHtml + '<div style="font-size:11px;color:#888;margin-top:8px;text-align:left;">This overwrites the Tour Details &amp; Flights fields.' + costTxt + '</div>',
-                    width: 640,
-                    showCancelButton: true,
-                    confirmButtonText: 'Apply to form',
-                    cancelButtonText: 'Cancel',
-                    customClass: { confirmButton: 'btn btn-light-success m-2', cancelButton: 'btn btn-danger m-2' },
-                    buttonsStyling: true
-                }).then(function(action) {
-                    if(action.isConfirmed) {
-                        var applied = applyExtracted(res.fields || {}, res.flights || []);
-                        $('#form').dirty('setDirty');
-                        Swal.fire({ toast: true, position: 'top-end', icon: 'success',
-                            title: 'Applied ' + applied + ' field(s)',
-                            text: 'Review the Tour Details & Flights tabs, then save.',
-                            showConfirmButton: false, timer: 4000, timerProgressBar: true });
-                    }
-                });
-            },
-            error: function() {
-                $btn.prop('disabled', false).html(html);
-                Swal.close();
-                Display_Message(EXTRACT_IMG, 'Extraction Failed. Please Try Again', null);
-            }
-        });
-    });
 </script>

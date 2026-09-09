@@ -6,7 +6,9 @@ $filter_status = isset($filters['status']) ? $filters['status'] : '';
 $filter_customer_name = isset($filters['customer_name']) ? $filters['customer_name'] : '';
 $filter_customer_contact = isset($filters['customer_contact']) ? $filters['customer_contact'] : '';
 $filter_customer_email = isset($filters['customer_email']) ? $filters['customer_email'] : '';
-$has_filter = ($filter_search !== '' || $filter_status !== '' || $filter_customer_name !== '' || $filter_customer_contact !== '' || $filter_customer_email !== '');
+$filter_sales_admin_id = isset($filters['sales_admin_id']) ? (int) $filters['sales_admin_id'] : 0;
+$sales_agents = isset($sales_agents) ? $sales_agents : array();
+$has_filter = ($filter_search !== '' || $filter_status !== '' || $filter_customer_name !== '' || $filter_customer_contact !== '' || $filter_customer_email !== '' || $filter_sales_admin_id > 0);
 ?>
 
 <div class="d-flex flex-column-fluid">
@@ -61,6 +63,15 @@ $has_filter = ($filter_search !== '' || $filter_status !== '' || $filter_custome
                                                 <option value="inactive" <?php echo ($filter_status === 'inactive') ? 'selected' : ''; ?>>Inactive</option>
                                             </select>
                                         </div>
+                                        <div class="col-md-4">
+                                            <label class="font-weight-bold">Sales Person</label>
+                                            <select name="sales_admin_id" class="form-control">
+                                                <option value="">All</option>
+                                                <?php foreach ($sales_agents as $agent) { ?>
+                                                    <option value="<?php echo (int) $agent['AdminID']; ?>" <?php echo ($filter_sales_admin_id === (int) $agent['AdminID']) ? 'selected' : ''; ?>><?php echo html_escape($agent['Name']); ?></option>
+                                                <?php } ?>
+                                            </select>
+                                        </div>
                                     </div>
                                     <div class="form-group row align-items-end mb-0">
                                         <div class="col-md-3">
@@ -101,6 +112,7 @@ $has_filter = ($filter_search !== '' || $filter_status !== '' || $filter_custome
                                 <th style="text-align:center;">Customer Name</th>
                                 <th style="text-align:center;">Contact Number</th>
                                 <th style="text-align:center;">Email Address</th>
+                                <th style="text-align:center;">Sales Person</th>
                                 <th style="text-align:center;">Tour Code</th>
                                 <th style="text-align:center;">Duration</th>
                                 <th style="text-align:center;">Status</th>
@@ -111,7 +123,7 @@ $has_filter = ($filter_search !== '' || $filter_status !== '' || $filter_custome
                         <tbody>
                             <?php if (empty($packages)) { ?>
                                 <tr>
-                                    <td colspan="10" style="text-align:center; padding-top:10px; padding-bottom:10px;">Costing Package Records Not Found</td>
+                                    <td colspan="11" style="text-align:center; padding-top:10px; padding-bottom:10px;">Costing Package Records Not Found</td>
                                 </tr>
                             <?php } else { ?>
                                 <?php $count = 1; ?>
@@ -125,6 +137,7 @@ $has_filter = ($filter_search !== '' || $filter_status !== '' || $filter_custome
                                         <td><?php echo !empty($package['customer_name']) ? html_escape($package['customer_name']) : '-'; ?></td>
                                         <td style="text-align:center;"><?php echo !empty($package['customer_contact']) ? html_escape($package['customer_contact']) : '-'; ?></td>
                                         <td><?php echo !empty($package['customer_email']) ? html_escape($package['customer_email']) : '-'; ?></td>
+                                        <td style="text-align:center;"><?php echo !empty($package['sales_admin_name']) ? html_escape($package['sales_admin_name']) : '-'; ?></td>
                                         <td style="text-align:center;"><?php echo !empty($package['tour_code']) ? html_escape($package['tour_code']) : '-'; ?></td>
                                         <td style="text-align:center;"><?php echo (int) $package['duration_days']; ?>D / <?php echo (int) $package['duration_nights']; ?>N</td>
                                         <td style="text-align:center;">

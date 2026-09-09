@@ -21,7 +21,7 @@ $assertions['one per-day html field']  = $fields === array('description');
 
 // --- costing_itinerary_level_fields (whole itinerary) ----------------------
 $level = costing_itinerary_level_fields();
-$assertions['three level fields'] = $level === array('itinerary_notes', 'itinerary_special_remark', 'itinerary_terms_and_conditions');
+$assertions['one merged level field'] = $level === array('itinerary_notes');
 
 // --- meal plan options + normalise + labels --------------------------------
 $opts = costing_meal_plan_options();
@@ -62,7 +62,7 @@ $assertions['empty row keeps day']    = $empty['day_number'] === 3;
 $assertions['empty row null title']   = $empty['title'] === null;
 $assertions['empty row null desc']    = $empty['description'] === null;
 $assertions['empty row null meal']    = $empty['meal_plan'] === null;
-$assertions['empty row no level keys'] = !array_key_exists('notes', $empty) && !array_key_exists('special_remark', $empty);
+$assertions['empty row no level keys'] = !array_key_exists('notes', $empty) && !array_key_exists('itinerary_notes', $empty);
 
 // --- title-only row is kept -------------------------------------------------
 $titleOnly = costing_itinerary_prepare_row(array('title' => 'Arrival Day', 'description' => '<p></p>'));
@@ -89,25 +89,16 @@ $assertions['meal-only not empty']    = $mealOnly['is_empty'] === false;
 $assertions['meal-only null title']   = $mealOnly['title'] === null;
 $assertions['meal-only slug kept']    = $mealOnly['meal_plan'] === 'breakfast';
 
-// --- costing_itinerary_prepare_level: itinerary-wide fields ----------------
+// --- costing_itinerary_prepare_level: merged Notes field -------------------
 $lvl = costing_itinerary_prepare_level(array(
-    'notes'                => '<ul><li>Bring walking shoes</li></ul>',
-    'special_remark'       => '   ',
-    'terms_and_conditions' => '<p>Non-refundable after departure.</p>',
+    'notes' => '<p><strong>Include</strong></p><ul><li>Bring walking shoes</li></ul>',
 ));
 $assertions['level notes kept']       = strpos($lvl['itinerary_notes'], '<li>Bring walking shoes</li>') !== false;
-$assertions['level blank remark null'] = $lvl['itinerary_special_remark'] === null;
-$assertions['level terms kept']       = $lvl['itinerary_terms_and_conditions'] === '<p>Non-refundable after departure.</p>';
+$assertions['level notes single key']  = (array_keys($lvl) === array('itinerary_notes'));
 
 // Blank TinyMCE markup collapses to null.
-$lvlBlank = costing_itinerary_prepare_level(array(
-    'notes'                => '<p><br></p>',
-    'special_remark'       => '<p>&nbsp;</p>',
-    'terms_and_conditions' => '',
-));
-$assertions['level all blank null'] = $lvlBlank['itinerary_notes'] === null
-    && $lvlBlank['itinerary_special_remark'] === null
-    && $lvlBlank['itinerary_terms_and_conditions'] === null;
+$lvlBlank = costing_itinerary_prepare_level(array('notes' => '<p><br></p>'));
+$assertions['level all blank null'] = $lvlBlank['itinerary_notes'] === null;
 
 $failed = 0;
 foreach ($assertions as $label => $ok) {

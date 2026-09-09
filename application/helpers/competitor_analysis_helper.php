@@ -168,35 +168,44 @@ if ( ! function_exists('competitor_output_contract'))
 			. '"departure_city": string (where the tour departs from), '
 			. '"flight_departure": string (FULL outbound flight detail EXACTLY as given: airline + flight no + from/to airports + date + time for every outbound leg, joining connecting legs with " -> "; "" if none), '
 			. '"flight_return": string (FULL return flight detail the same way, all legs; "" if none), '
-			. '"themes": string[] (INFER trip themes e.g. "Nature","Culture","Shopping"), '
-			. '"tour_styles": string[] (INFER e.g. "Group tour","Free & easy","Luxury"), '
-			. '"difficulty": string (INFER physical difficulty e.g. "Easy","Moderate","Challenging"), '
+			. '"themes": string[] (DERIVE trip themes e.g. "Nature","Culture","Shopping"), '
+			. '"tour_styles": string[] (DERIVE e.g. "Group tour","Free & easy","Luxury"), '
+			. '"difficulty": string (DERIVE physical difficulty e.g. "Easy","Moderate","Challenging"), '
 			. '"local_transport": string[] (coach, bullet train, cruise, ferry, etc.), '
 			. '"inclusions": string[] (what the price includes), '
 			. '"exclusions": string[] (what is NOT included), '
 			. '"hotels": string[] (hotels/accommodation named), '
-			. '"meals": {"breakfast": string, "lunch": string, "dinner": string} (for each meal, work through the day-by-day meal plan and give the COUNT plus the exact days it is provided e.g. "3 (Day 2,3,4)"; add special cuisine in parentheses when named; "" if the plan never provides that meal — do not guess a count), '
-			. '"shopping_stops": string[] (shopping/factory stops), '
+			. '"meals": {"breakfast": string, "lunch": string, "dinner": string} (for each meal, work through the day-by-day meal plan and give the COUNT plus the exact days it is provided e.g. "3 (Day 2,3,4)"; "" if the plan never provides that meal — do not guess a count), '
+			. '"shopping_stops": string[] (EVERY shopping/factory/retail stop the source states. Format EACH item as "<stop> — <justification>" where the justification is GROUNDED IN FACT FROM THE SOURCE — cite the concrete evidence, e.g. the itinerary day and what it actually says, "Pearl gallery — Day 3 itinerary lists a guided visit to a pearl factory". Do NOT invent stops or reasons; if the source names a stop but gives no supporting detail, list the stop alone with no justification), '
 			. '"optional_tours": string[] (EVERY optional/add-on tour listed, each one verbatim WITH its price and conditions e.g. min pax / what is included — never drop, merge or summarise any), '
 			. '"special_remarks": string[] (EVERY important note/term/condition, each listed separately — e.g. guide/commentary language, nationality restriction, room & single-supplement rules, insurance, disclaimers; do not omit any), '
-			. '"scenic_highlights": string[] (INFER key scenic/sightseeing highlights), '
-			. '"signature_meals": string[] (INFER notable/signature meals featured), '
-			. '"target_traveller": string (INFER ideal traveller e.g. "Families","Seniors","Couples"), '
-			. '"suitable_age": string (INFER suitable age range), '
-			. '"child_friendly": string (INFER "Yes"/"No" + short reason), '
-			. '"senior_friendly": string (INFER "Yes"/"No" + short reason), '
-			. '"usp": string[] (INFER unique selling points for the target traveller), '
+			. '"scenic_highlights": [{"name": string, "description": string}] (DERIVE the key scenic/sightseeing highlights; "name" is the place/attraction, "description" tells the customer what to EXPECT during their visit there — the sights, views, activities and experience from the traveller\'s point of view, roughly 1-2 sentences. Only include a highlight when the source gives concrete clues about it; leave "description" "" if the source names the place but says nothing about the experience), '
+			. '"target_traveller": string (DERIVE ideal traveller e.g. "Families","Seniors","Couples"), '
+			. '"suitable_age": string (DERIVE suitable age range), '
+			. '"child_friendly": string (DERIVE "Yes"/"No" + short reason), '
+			. '"senior_friendly": string (DERIVE "Yes"/"No" + short reason), '
+			. '"usp": string[] (DERIVE unique selling points for the target traveller), '
+			. '"traveller_segments": [{"segment": string (EXACTLY one of: "single","elderly","teenager","couple","family_kids","family_elderly","company"), "suitability": string ("High"/"Medium"/"Low"), "justification": string (2-3 sentences on WHY this tour does or does not suit that traveller type, citing CONCRETE tour attributes — pace & difficulty, itinerary intensity, meals, hotel tier, activities, child/senior friendliness, price/value, group vs free-and-easy style)}] '
+				. '(Assess ALL SEVEN traveller types once each, in that order. Judge each strictly from concrete clues in the source; give a suitability level and a grounded justification. If the source genuinely gives no basis to judge a type, still include it with suitability "" and a short note on what is missing — do NOT invent facts), '
 			. '"itinerary": [{"day": string, "title": string, "description": string}] (one entry per day; the description must list ALL places/activities visited that day, not just a few), '
-			. '"pros": string[], '
-			. '"cons": string[], '
-			. '"summary": string (2-4 sentence overview), '
+			. '"pros": string[] (advantages FROM THE CUSTOMER\'S POINT OF VIEW — what a traveller booking this tour actually gains, not marketing spin. Format EACH item as "<benefit> — <justification>" where the justification explains WHY it matters to the customer, e.g. "Direct flights — less travel fatigue and a full extra day at the destination"), '
+			. '"cons": string[] (drawbacks FROM THE CUSTOMER\'S POINT OF VIEW — what a traveller should be wary of before booking. Format EACH item as "<drawback> — <justification>" explaining WHY it matters to the customer, e.g. "Many shopping stops — less sightseeing time and possible sales pressure"), '
+			. '"summary": string (a DETAILED overview, roughly 150-250 words, written as several short labelled paragraphs each separated by a BLANK LINE. Use these exact labels, each on its own line immediately followed by its text: '
+				. '"Overview:" (what the tour is — main destination, the FULL route through the key cities/regions in order, total duration, departure city, and the overall tour style & pace); '
+				. '"Best for:" (the ideal traveller for this tour and, if the source hints it, who it is NOT suited to, each with a short reason); '
+				. '"Inclusions & value:" (the key things the price covers — flights, hotel tier, meals, transport — and how the pricing is positioned: budget / mid-range / premium relative to what is offered); '
+				. '"Highlights:" (the 2-3 standout experiences that make this tour worth booking); '
+				. '"Watch-outs:" (the main limitations, extra costs or things a traveller should check before booking). '
+				. 'SYNTHESISE the source into genuine insight — do NOT merely restate raw field values. Omit any single labelled paragraph whose information is genuinely absent from the source rather than guessing, but keep the rest.), '
 			. '"comparison": string (FIRST find a product in OUR PRODUCTS below that MATCHES or is SIMILAR to this competitor product — same/overlapping destination or tour type. If one matches, compare against THAT product only: pricing, value, gaps, and a recommendation. If NONE of our products match or are similar, do NOT force a comparison — state plainly that we have no comparable product on our side for this destination/type.), '
 			. '"matched_product": string (the EXACT "name" from OUR PRODUCTS you compared against in "comparison"; "" if none matched)'
 			. '}';
 		return "Reply with ONLY a single JSON object, no markdown, no code fences, matching exactly this shape: "
 			. $schema_hint . ". "
-			. "Fields marked INFER: reason them from the itinerary/content even when not stated outright. "
-			. "For every other field use \"\" or [] when the source does not state it — never invent literal facts like prices or hotel names.";
+			. "CRITICAL: make NO assumptions. Every value must be grounded in the supplied source (the scraped/pasted/attached content and the itinerary) — treat the source as your only evidence. "
+			. "Fields marked DERIVE: only fill them when the source contains concrete clues that support the value; base the value strictly on those clues, not on general knowledge, typical-tour patterns, or what is likely. "
+			. "If the source gives no clue for a DERIVE field, leave it \"\" or []. Do NOT guess. "
+			. "For every other field use \"\" or [] when the source does not state it — never invent literal facts like prices, hotel names, dates or codes.";
 	}
 }
 
@@ -273,17 +282,103 @@ if ( ! function_exists('competitor_build_agent_input'))
 	}
 }
 
+if ( ! function_exists('competitor_is_boilerplate_line'))
+{
+	/**
+	 * True when a single scraped line is unambiguous SITE CHROME / NOISE rather than
+	 * tour content — cookie banners, newsletter/subscribe prompts, social-share
+	 * widgets, breadcrumbs, CTA/booking buttons, account nav, copyright footers, and
+	 * "related tours" carousel headings. Patterns are deliberately SPECIFIC/anchored
+	 * so real tour lines survive (e.g. "Day 3: visit the cookie factory", "Tour fare
+	 * includes daily breakfast", "Book this 5D4N tour from RM1899" are all kept). Pure.
+	 */
+	function competitor_is_boilerplate_line($line)
+	{
+		$s = trim((string) $line);
+		if ($s === '') {
+			return false;   // blanks are handled by the caller
+		}
+		static $patterns = array(
+			// Cookie consent (needs the consent phrasing — not a bare "cookie").
+			'/\b(?:we use cookies|this (?:website|site) uses cookies|accept all cookies|cookie (?:policy|settings|preferences|consent)|manage cookies)\b/i',
+			// Newsletter / subscribe prompts.
+			'/\b(?:subscribe to (?:our )?newsletter|sign ?up (?:for|to)(?: our)? newsletter|join our (?:mailing list|newsletter)|subscribe (?:now|to our))\b/i',
+			// Social prompts + standalone social labels.
+			'/\bfollow us on\b/i',
+			'/\bshare (?:this|on)\b/i',
+			'/^(?:facebook|instagram|twitter|youtube|tiktok|whatsapp|linkedin|pinterest|telegram)$/i',
+			// Breadcrumb trail ("Home > Tours > Japan").
+			'#^home\s*[>»/|]\s*\S#i',
+			// CTA / booking / UI buttons (whole line only).
+			'/^(?:book now|enquire now|enquiry now|make (?:an )?enquiry|add to (?:cart|wishlist|itinerary)|read more|view more|load more|show more|view details|see more|back to top|print|download(?: brochure| itinerary)?|whatsapp us|call us|chat with us|get a quote|request (?:a )?quote|book this (?:tour|trip|package))$/i',
+			// Account / header nav (whole line only).
+			'#^(?:log ?in|sign ?in|sign ?up|register|my account|my cart|cart|wishlist|login/register)$#i',
+			// Copyright / footer.
+			'/(?:all rights reserved|©\s*\d{4}|copyright\s*©)/i',
+			// "Related / you may also like" carousel headings.
+			'/^(?:you may also like|you might also like|related (?:tours|products|packages|trips)|recommended (?:for you|tours|packages)|similar (?:tours|packages|trips)|other (?:tours|packages))\b/i',
+		);
+		foreach ($patterns as $re) {
+			if (preg_match($re, $s)) {
+				return true;
+			}
+		}
+		return false;
+	}
+}
+
+if ( ! function_exists('competitor_strip_boilerplate'))
+{
+	/**
+	 * Drop boilerplate/chrome lines (competitor_is_boilerplate_line) from a block of
+	 * already-extracted text — the per-page de-noise pass used on EVERY source
+	 * (HTML, JSON API, PDF/OCR), so noise the cross-item chrome strip can't catch
+	 * (single-product crawls, mid-page widgets, non-HTML sources) is removed before
+	 * the AI sees it. Pure. Returns '' for non-strings/empties.
+	 */
+	function competitor_strip_boilerplate($text)
+	{
+		if ( ! is_string($text) || $text === '') {
+			return '';
+		}
+		$out = array();
+		foreach (preg_split('/\r\n|\r|\n/', $text) as $ln) {
+			if ( ! competitor_is_boilerplate_line($ln)) {
+				$out[] = $ln;
+			}
+		}
+		return implode("\n", $out);
+	}
+}
+
+if ( ! function_exists('competitor_page_char_cap'))
+{
+	/**
+	 * The per-page character cap for scraped text (bounds AI token cost). Reads an
+	 * env override (COMPETITOR_MAX_PAGE_CHARS) when it's a positive integer, else the
+	 * default. Raised from the old 40k so a long multi-day itinerary + inclusions +
+	 * optional-tours tail isn't truncated away. Pure. 0/blank env -> default.
+	 */
+	function competitor_page_char_cap($env = null, $default = 60000)
+	{
+		$n = (int) $env;
+		return $n > 0 ? $n : (int) $default;
+	}
+}
+
 if ( ! function_exists('competitor_html_to_text'))
 {
 	/**
 	 * Reduce raw page HTML to clean, readable text for the AI — our own scraper's
 	 * output. Drops noise blocks (script/style/head/svg) and comments, turns block
 	 * boundaries into newlines so the itinerary keeps its shape, strips remaining
-	 * tags, decodes entities, and collapses whitespace. Capped at $max_chars to
-	 * bound token cost (0 = uncapped). Pure — the network fetch lives in the
-	 * service. Returns '' for non-strings/empties.
+	 * tags, decodes entities, collapses whitespace, and drops boilerplate/chrome
+	 * lines (competitor_is_boilerplate_line) BEFORE the cap so the char budget is
+	 * spent on real content, not menus. Capped at $max_chars — cut on a line
+	 * boundary, not mid-itinerary — to bound token cost (0 = uncapped). Pure — the
+	 * network fetch lives in the service. Returns '' for non-strings/empties.
 	 */
-	function competitor_html_to_text($html, $max_chars = 40000)
+	function competitor_html_to_text($html, $max_chars = 60000)
 	{
 		if ( ! is_string($html) || $html === '') {
 			return '';
@@ -306,8 +401,9 @@ if ( ! function_exists('competitor_html_to_text'))
 		foreach (preg_split('/\r\n|\r|\n/', $text) as $ln) {
 			$ln = preg_replace('/\s*\|\s*/', ' | ', $ln);
 			$ln = trim($ln, " |");
-			// Drop blanks and consecutive duplicate lines (repeated menu/CTA chrome).
-			if ($ln !== '' && $ln !== $prev) {
+			// Drop blanks, consecutive duplicate lines (repeated menu/CTA chrome), and
+			// boilerplate/chrome lines (cookie/subscribe/social/breadcrumb/CTA/footer).
+			if ($ln !== '' && $ln !== $prev && ! competitor_is_boilerplate_line($ln)) {
 				$out[] = $ln;
 				$prev  = $ln;
 			}
@@ -315,6 +411,12 @@ if ( ! function_exists('competitor_html_to_text'))
 		$text = implode("\n", $out);
 		if ($max_chars > 0 && mb_strlen($text, 'UTF-8') > $max_chars) {
 			$text = mb_substr($text, 0, $max_chars, 'UTF-8');
+			// Cut back to the last line boundary so we don't truncate mid-itinerary
+			// (unless that would discard more than half the budget — no newlines).
+			$nl = mb_strrpos($text, "\n", 0, 'UTF-8');
+			if ($nl !== false && $nl > (int) ($max_chars * 0.5)) {
+				$text = mb_substr($text, 0, $nl, 'UTF-8');
+			}
 		}
 		return $text;
 	}
@@ -654,6 +756,114 @@ if ( ! function_exists('competitor_looks_like_article'))
 	}
 }
 
+if ( ! function_exists('competitor_has_basic_tour_sections'))
+{
+	/**
+	 * True when a scraped page carries the BASIC hallmarks of a real, bookable tour
+	 * product — a day-by-day itinerary AND an inclusions section (what the price
+	 * covers). This is the crawl quality gate: a full tour page has both; a
+	 * landing/overview/category page or an under-scraped SPA shell does not, so the
+	 * crawler drops it. Exclusions are deliberately NOT required — many genuine tour
+	 * pages bury or omit an explicit exclusions list. Pure.
+	 */
+	function competitor_has_basic_tour_sections($text)
+	{
+		if ( ! is_string($text) || $text === '') {
+			return false;
+		}
+		// Day-by-day itinerary — a real tour has a "Day 1" (also "Day 01" / "Day01").
+		$has_itinerary = (bool) preg_match('/\bday\s*0?1\b/iu', $text);
+		// An inclusions section / "price includes" wording (not a stray "include").
+		$has_inclusions = (bool) preg_match(
+			'/\binclusions?\b'
+			. '|\b(?:price|package|tour|trip|fare|cost|holiday)\s+includes?\b'
+			. '|\bwhat\'?s\s+included\b'
+			. '|\bincludes?\s*:'
+			. '|\bincluded\s+in\s+(?:the\s+)?(?:price|tour|package|fare|cost)\b/iu',
+			$text
+		);
+		return $has_itinerary && $has_inclusions;
+	}
+}
+
+if ( ! function_exists('competitor_has_tour_itinerary'))
+{
+	/**
+	 * True when the text carries a REAL day-by-day itinerary — the itinerary-primary
+	 * crawl gate. A genuine tour page has at least two DISTINCT day markers ("Day 1"
+	 * … "Day 2" …), or a single "Day 1" together with an explicit trip duration
+	 * (5D4N / "3 days"). A lone stray "Day 1" does NOT qualify. Inclusions/exclusions
+	 * are treated as bonus, not required — many real tour pages never label them in
+	 * words, so requiring them dropped genuine tours. Multi-product LISTING pages
+	 * (many "Day 1"s) are filtered earlier by competitor_text_looks_like_listing. Pure.
+	 */
+	function competitor_has_tour_itinerary($text)
+	{
+		if ( ! is_string($text) || $text === '') {
+			return false;
+		}
+		if (preg_match_all('/\bday\s*0?([1-9][0-9]?)\b/iu', $text, $m)) {
+			$nums = array_unique(array_map('intval', $m[1]));
+			if (count($nums) >= 2) {
+				return true;   // a real multi-day day-by-day itinerary
+			}
+		}
+		// Single-day itinerary: a "Day 1" plus an explicit tour duration.
+		$has_day1 = (bool) preg_match('/\bday\s*0?1\b/iu', $text);
+		$has_dur  = (bool) preg_match('/\b\d{1,2}\s*d\s*\d{1,2}\s*n\b/i', $text)
+			|| (bool) preg_match('/\b\d{1,2}\s*(?:days?|nights?)\b/i', $text);
+		return $has_day1 && $has_dur;
+	}
+}
+
+if ( ! function_exists('competitor_is_tour_page'))
+{
+	/**
+	 * The crawl KEEP test: is this a bookable tour product page? True when it has a
+	 * real day-by-day itinerary (competitor_has_tour_itinerary), OR — for sites that
+	 * hide the itinerary behind a tab/accordion the scrape can't open (e.g.
+	 * chanbrothers) — when the page carries the unmistakable signals of a bookable
+	 * tour: a trip DURATION ("7 Days" / 5D4N) together with a PRICE. A travel guide or
+	 * listicle rarely has both a duration and a real price, and the guide-URL filter
+	 * backstops the rest. Pure.
+	 */
+	function competitor_is_tour_page($text)
+	{
+		if ( ! is_string($text) || $text === '') {
+			return false;
+		}
+		if (competitor_has_tour_itinerary($text)) {
+			return true;
+		}
+		$has_duration = (bool) preg_match('/\b\d{1,2}\s*d\s*\d{1,2}\s*n\b/i', $text)
+			|| (bool) preg_match('/\b\d{1,2}\s*(?:days?|nights?)\b/i', $text);
+		$has_price = (bool) preg_match('/(?:rm|myr|sgd|usd|php|thb|idr|aud|eur|s\$|\$|£|€)\s*[0-9][0-9,]{2,}/iu', $text);
+		return $has_duration && $has_price;
+	}
+}
+
+if ( ! function_exists('competitor_needs_more_content'))
+{
+	/**
+	 * True when a scrape does NOT yet hold a full, analysable tour page — either it's
+	 * thin (competitor_scrape_is_thin) OR it lacks the basic tour sections a real
+	 * product page has (competitor_has_basic_tour_sections: day-by-day itinerary +
+	 * inclusions). This drives the reading escalation cascade (SPA JSON API ->
+	 * embedded JSON -> json-alternate feed -> headless render): the crawler keeps
+	 * trying cheaper-to-costlier readers until it has a full tour page or exhausts
+	 * them — so a JS/boilerplate shell whose itinerary loads via a tab/XHR gets
+	 * rendered instead of scraped shallow and dropped by the crawl's sections gate.
+	 * Costlier readers stay bounded by the per-crawl render budget. Pure.
+	 */
+	function competitor_needs_more_content($text, $min_chars = 500)
+	{
+		if (competitor_scrape_is_thin($text, $min_chars)) {
+			return true;
+		}
+		return ! competitor_has_tour_itinerary($text);
+	}
+}
+
 if ( ! function_exists('competitor_json_alternate_url'))
 {
 	/**
@@ -903,6 +1113,206 @@ if ( ! function_exists('competitor_is_product_url'))
 		}
 		$last = end($segments);
 		return preg_match('/[a-z]/', $last) === 1;
+	}
+}
+
+if ( ! function_exists('competitor_is_candidate_url'))
+{
+	/**
+	 * PERMISSIVE net for the whole-site sweep: is this a same-host CONTENT page worth
+	 * reading (so the itinerary gate can judge it), as opposed to the homepage, an
+	 * asset, or obvious account/legal/blog chrome? Unlike competitor_is_product_url
+	 * this does NOT require a product keyword — so oddly-named tours (/detail/12345,
+	 * /en/12345-osaka) are still fetched and let the gate decide. $base_host, when
+	 * given, restricts to that host (www-insensitive). Pure — no network.
+	 */
+	function competitor_is_candidate_url($url, $base_host = '')
+	{
+		$host = parse_url((string) $url, PHP_URL_HOST);
+		if ( ! $host) {
+			return false;
+		}
+		$norm = function ($h) { return preg_replace('/^www\./i', '', strtolower((string) $h)); };
+		if ($base_host !== '' && $norm($host) !== $norm($base_host)) {
+			return false;   // same host only
+		}
+		$path = (string) parse_url((string) $url, PHP_URL_PATH);
+		if ($path === '' || $path === '/') {
+			return false;   // the homepage is a hub, not a product candidate
+		}
+		if (preg_match('#\.(jpe?g|png|gif|webp|svg|css|js|ico|zip|rar|gz|mp4|mp3|avi|mov|webm|woff2?|ttf|eot|rss|xml|json)(\?|$)#i', $path)) {
+			return false;   // asset, not a page
+		}
+		$p = strtolower($path);
+		// Obvious non-tour chrome — skip so the sweep doesn't burn fetches on them
+		// (the gate would drop them anyway). Kept deliberately short so real tour
+		// sections aren't excluded by accident.
+		static $chrome = array('/about', '/contact', '/blog', '/news', '/faq', '/privacy',
+			'/policy', '/policies', '/login', '/signin', '/sign-in', '/register', '/signup',
+			'/sign-up', '/cart', '/checkout', '/account', '/career', '/careers', '/job',
+			'/jobs', '/sitemap', '/wishlist', '/terms', '/search', '/tag/', '/tags/',
+			'/author/', '/feed', '/wp-admin', '/wp-login', '/wp-json',
+			// customer-support chrome (help centre / customer service) — not tours
+			'/support', '/help', '/customer');
+		foreach ($chrome as $c) {
+			if (strpos($p, $c) !== false) {
+				return false;
+			}
+		}
+		return true;
+	}
+}
+
+if ( ! function_exists('competitor_path_has_product_keyword'))
+{
+	/**
+	 * True when a URL's PATH carries a tour/product keyword at ANY depth (tour,
+	 * package, holiday, trip, itinerary, vacation, getaway, cruise, product, or a
+	 * 5D4N duration code). Looser than competitor_is_product_url — it doesn't care
+	 * about the last segment being a slug — so it also matches a section hub
+	 * (/tour-package) and a numeric-id product (/tour-package/1077). Used to decide
+	 * which pages are worth a (budget-limited) browser render on JS-SPA sites. Pure.
+	 */
+	function competitor_path_has_product_keyword($url)
+	{
+		$path = strtolower((string) parse_url((string) $url, PHP_URL_PATH));
+		if ($path === '') {
+			return false;
+		}
+		if (preg_match('/\d{1,2}d\d{1,2}n/i', $path)) {
+			return true;
+		}
+		static $kw = array('tour', 'package', 'holiday', 'trip', 'itinerar',
+			'vacation', 'getaway', 'cruise', 'product');
+		foreach ($kw as $k) {
+			if (strpos($path, $k) !== false) {
+				return true;
+			}
+		}
+		return false;
+	}
+}
+
+if ( ! function_exists('competitor_count_child_links'))
+{
+	/**
+	 * Count how many of $links are DIRECT children of $url's path — i.e. their path
+	 * is "<url-path>/<one-more-segment>". A page that links to several of its own
+	 * sub-pages (e.g. /tour-package → /tour-package/1077, /tour-package/1090, …) is an
+	 * index/listing of them, so the crawler should drill those children rather than
+	 * keep the hub. Pure — no network.
+	 */
+	function competitor_count_child_links($url, $links)
+	{
+		$base = rtrim((string) parse_url((string) $url, PHP_URL_PATH), '/');
+		if ($base === '') {
+			return 0;
+		}
+		$seen = array();
+		foreach ((array) $links as $l) {
+			$p = rtrim((string) parse_url((string) $l, PHP_URL_PATH), '/');
+			if ($p === $base || strpos($p, $base . '/') !== 0) {
+				continue;
+			}
+			$rest = substr($p, strlen($base) + 1);
+			if ($rest !== '' && strpos($rest, '/') === false) {
+				$seen[$rest] = true;   // exactly one segment deeper
+			}
+		}
+		return count($seen);
+	}
+}
+
+if ( ! function_exists('competitor_paginator_items'))
+{
+	/**
+	 * Return the record list from a decoded Laravel-style paginated API response
+	 * ({data:[…], links:{next}, meta:{last_page}}), or [] when the JSON isn't such a
+	 * paginator. Requires a pagination signal (meta.last_page / meta.current_page /
+	 * links.next|last) so a plain {data:[…]} blob isn't mistaken for a listing. Pure.
+	 */
+	function competitor_paginator_items($json)
+	{
+		if ( ! is_array($json) || ! isset($json['data']) || ! is_array($json['data']) || empty($json['data'])) {
+			return array();
+		}
+		$paged = isset($json['meta']['last_page']) || isset($json['meta']['current_page'])
+			|| isset($json['links']['next']) || isset($json['links']['last']);
+		if ( ! $paged) {
+			return array();
+		}
+		$first = reset($json['data']);
+		return is_array($first) ? $json['data'] : array();   // items must be records
+	}
+}
+
+if ( ! function_exists('competitor_paginator_next'))
+{
+	/** The next-page URL of a Laravel-style paginator (links.next), or '' at the end. Pure. */
+	function competitor_paginator_next($json)
+	{
+		if (is_array($json) && isset($json['links']['next']) && is_string($json['links']['next'])) {
+			return $json['links']['next'];
+		}
+		return '';
+	}
+}
+
+if ( ! function_exists('competitor_listing_item_url'))
+{
+	/**
+	 * Build the product-page URL for one paginated-listing record: an explicit
+	 * url/slug/link/permalink field (resolved against the listing) when present, else
+	 * the listing path plus the record's numeric id (e.g. /tour-package + 1077 →
+	 * /tour-package/1077). Returns '' when neither is available. Pure.
+	 */
+	function competitor_listing_item_url($listing_url, $item)
+	{
+		$item = (array) $item;
+		foreach (array('url', 'slug', 'link', 'permalink') as $k) {
+			if ( ! empty($item[$k]) && is_string($item[$k])) {
+				return competitor_resolve_url($listing_url, $item[$k]);
+			}
+		}
+		if (isset($item['id']) && (is_int($item['id']) || ctype_digit((string) $item['id']))) {
+			return rtrim((string) $listing_url, '/') . '/' . $item['id'];
+		}
+		return '';
+	}
+}
+
+if ( ! function_exists('competitor_is_guide_url'))
+{
+	/**
+	 * True when a page is a travel GUIDE / planning ARTICLE rather than a bookable
+	 * tour — "How to plan a trip to Beijing", "Best time to visit…", "Things to do in
+	 * …", "…Public Holidays Calendar". These slip past the itinerary gate because a
+	 * day-by-day *plan* reads like a day-by-day *itinerary*, so we exclude them by the
+	 * tell-tale URL slug (and, as a backstop, a title that opens like a guide). Real
+	 * tour slugs (…-group-tour, …-5d4n, /china-tours/…) don't carry these. Pure.
+	 */
+	function competitor_is_guide_url($url, $title = '')
+	{
+		$path = strtolower((string) parse_url((string) $url, PHP_URL_PATH));
+		static $slug = array(
+			'how-to', 'how_to', 'plan-a-trip', 'plan-your-trip', 'trip-planner',
+			'travel-planner', 'things-to-do', 'what-to-', 'where-to-', 'when-to-',
+			'best-time', 'best-months', 'best-places', 'travel-guide', 'travel-tips',
+			'travel-advice', 'public-holiday', '-calendar', 'weather', 'travel-faq',
+		);
+		foreach ($slug as $s) {
+			if (strpos($path, $s) !== false) {
+				return true;
+			}
+		}
+		$t = strtolower(trim((string) $title));
+		if ($t !== '' && preg_match(
+			'/^(?:how to\b|how do\b|best time\b|things to do\b|what to\b|where to\b|when to\b|top \d|ultimate guide\b|travel guide\b|a guide to\b|guide to\b)/',
+			$t
+		)) {
+			return true;
+		}
+		return false;
 	}
 }
 
@@ -1320,7 +1730,7 @@ if ( ! function_exists('competitor_headless_cap'))
 	 * Unset/blank -> $default; explicit 0 -> 0 = UNLIMITED; negative -> $default;
 	 * otherwise the integer. Pure.
 	 */
-	function competitor_headless_cap($raw, $default = 30)
+	function competitor_headless_cap($raw, $default = 60)
 	{
 		if ($raw === false || $raw === null || trim((string) $raw) === '') {
 			return (int) $default;
@@ -1584,7 +1994,6 @@ if ( ! function_exists('competitor_job_public_view'))
 			'message'     => competitor_job_progress_message($s),
 			'count'       => isset($s['count']) ? (int) $s['count'] : 0,
 			'keyword'     => isset($s['keyword']) ? (string) $s['keyword'] : '',
-			'force_render' => ! empty($s['force_render']),
 			'ai_crawl'    => ! empty($s['ai_crawl']),
 			'is_paste'    => ($mode === 'paste'),
 			// Fixed submission time (when pasted + Analyse clicked), not last update.
@@ -1598,6 +2007,124 @@ if ( ! function_exists('competitor_job_public_view'))
 			'analysis_id' => isset($s['analysis_id']) ? (int) $s['analysis_id'] : 0,
 			'reviewable'  => ($state === 'done' && $mode === 'crawl' && (int) (isset($s['count']) ? $s['count'] : 0) > 0),
 		);
+	}
+}
+
+if ( ! function_exists('competitor_job_host'))
+{
+	/**
+	 * Normalised host of an http(s) URL — lowercased, with a leading "www." stripped
+	 * — so every crawl of the same website groups under one key regardless of the
+	 * path or a www prefix. Returns '' for empty / non-http(s) input (e.g. a pasted
+	 * "Pasted text" label), which the caller keeps ungrouped. Pure.
+	 */
+	function competitor_job_host($url)
+	{
+		$url = trim((string) $url);
+		if ($url === '' || ! preg_match('#^https?://#i', $url)) {
+			return '';
+		}
+		$host = parse_url($url, PHP_URL_HOST);
+		if ( ! is_string($host) || $host === '') {
+			return '';
+		}
+		return preg_replace('/^www\./i', '', strtolower($host));
+	}
+}
+
+if ( ! function_exists('competitor_group_crawl_jobs'))
+{
+	/**
+	 * Collapse many crawl job-views (competitor_job_public_view, mode 'crawl') into
+	 * ONE merged row per website host, so the Analysis Results listing shows a single
+	 * line for a site crawled repeatedly and the per-run history lives behind a
+	 * timeline page. Each merged row carries: is_group, host, the LATEST run's url /
+	 * ts / product count / keyword / ai_crawl, the SUM of cost + analysed across all
+	 * runs, runs_count, and whether ANY run is still queued/running (so the row keeps
+	 * polling) or reviewable. When a run is in progress its state/message is surfaced
+	 * on the merged row (the site is "working"); otherwise the latest finished run's
+	 * state/message shows. Newest-crawled host first. A view with no host (shouldn't
+	 * happen for crawls) is skipped. Pure — no DB, no files.
+	 */
+	function competitor_group_crawl_jobs($views)
+	{
+		$views = is_array($views) ? $views : array();
+		$groups = array();   // host => list of runs
+		foreach ($views as $v) {
+			if ( ! is_array($v)) {
+				continue;
+			}
+			$host = competitor_job_host(isset($v['url']) ? $v['url'] : '');
+			if ($host === '') {
+				continue;
+			}
+			$groups[$host][] = $v;
+		}
+
+		$rows = array();
+		foreach ($groups as $host => $runs) {
+			// Newest run first (ts sorts lexically as it's Y-m-d H:i:s); tie-break on
+			// job id so the order is deterministic for the tests.
+			usort($runs, function ($a, $b) {
+				$ta = (string) (isset($a['ts']) ? $a['ts'] : '');
+				$tb = (string) (isset($b['ts']) ? $b['ts'] : '');
+				if ($ta === $tb) {
+					return strcmp((string) (isset($b['job']) ? $b['job'] : ''), (string) (isset($a['job']) ? $a['job'] : ''));
+				}
+				return strcmp($tb, $ta);
+			});
+			$latest = $runs[0];
+
+			$cost = 0.0;
+			$analysed = 0;
+			$running = false;
+			$reviewable = false;
+			$active = null;   // the first in-progress run, to surface on the merged row
+			foreach ($runs as $r) {
+				$cost     += (float) (isset($r['cost_total']) ? $r['cost_total'] : 0);
+				$analysed += (int) (isset($r['analysed']) ? $r['analysed'] : 0);
+				$state = (string) (isset($r['state']) ? $r['state'] : '');
+				if (in_array($state, array('queued', 'running'), true)) {
+					$running = true;
+					if ($active === null) {
+						$active = $r;
+					}
+				}
+				if ( ! empty($r['reviewable'])) {
+					$reviewable = true;
+				}
+			}
+			$face = $active !== null ? $active : $latest;
+
+			$rows[] = array(
+				'is_group'   => true,
+				'host'       => $host,
+				'url'        => (string) (isset($latest['url']) ? $latest['url'] : ''),
+				'runs_count' => count($runs),
+				'state'      => (string) (isset($face['state']) ? $face['state'] : 'unknown'),
+				'message'    => (string) (isset($face['message']) ? $face['message'] : ''),
+				'count'      => (int) (isset($latest['count']) ? $latest['count'] : 0),
+				'analysed'   => $analysed,
+				'cost_total' => $cost,
+				'keyword'    => (string) (isset($latest['keyword']) ? $latest['keyword'] : ''),
+				'ai_crawl'   => ! empty($latest['ai_crawl']),
+				'ts'         => (string) (isset($latest['ts']) ? $latest['ts'] : ''),
+				'done'       => (int) (isset($face['done']) ? $face['done'] : 0),
+				'total'      => (int) (isset($face['total']) ? $face['total'] : 0),
+				'read_start' => (string) (isset($face['read_start']) ? $face['read_start'] : ''),
+				'running'    => $running,
+				'reviewable' => $reviewable,
+			);
+		}
+
+		// Newest-crawled host first.
+		usort($rows, function ($a, $b) {
+			if ($a['ts'] === $b['ts']) {
+				return strcmp($b['host'], $a['host']);
+			}
+			return strcmp($b['ts'], $a['ts']);
+		});
+		return $rows;
 	}
 }
 
@@ -2702,14 +3229,871 @@ if ( ! function_exists('competitor_parse_ai_response'))
 			'shopping_stops'   => $list($get('shopping_stops')),
 			'optional_tours'   => $list($get('optional_tours')),
 			'special_remarks'  => $list($get('special_remarks')),
-			'scenic_highlights'=> $list($get('scenic_highlights')),
-			'signature_meals'  => $list($get('signature_meals')),
 			'usp'              => $list($get('usp')),
 			'pros'             => $list($get('pros')),
 			'cons'             => $list($get('cons')),
 			// Structured.
 			'meals'            => $meals($get('meals')),
 			'itinerary'        => $itin($get('itinerary')),
+			'scenic_highlights'=> competitor_scenic_items($get('scenic_highlights')),
+			'traveller_segments'=> competitor_traveller_segments($get('traveller_segments')),
+		);
+	}
+}
+
+if ( ! function_exists('competitor_scenic_items'))
+{
+	/**
+	 * Coerce the scenic_highlights value into a clean [{name, description}] list.
+	 * "name" is the attraction; "description" is what the customer can expect to
+	 * see/do during the visit (customer POV). Tolerates every shape the field has
+	 * carried: the new object list, legacy bare strings (name only, blank
+	 * description), a single newline/semicolon/bullet-delimited string, and stray
+	 * nested arrays. Drops entries with neither a name nor a description. Pure.
+	 */
+	function competitor_scenic_items($value)
+	{
+		if (is_string($value)) {
+			$value = $value === '' ? array() : preg_split('/\s*[\n;•]\s*/u', $value);
+		}
+		if ( ! is_array($value)) {
+			return array();
+		}
+		$out = array();
+		foreach ($value as $it) {
+			$name = '';
+			$desc = '';
+			if (is_array($it)) {
+				foreach (array('name', 'title', 'highlight', 'place') as $nk) {
+					if (isset($it[$nk]) && trim((string) $it[$nk]) !== '') { $name = trim((string) $it[$nk]); break; }
+				}
+				foreach (array('description', 'desc', 'expect', 'what_to_expect', 'experience') as $dk) {
+					if (isset($it[$dk]) && trim((string) $it[$dk]) !== '') { $desc = trim((string) $it[$dk]); break; }
+				}
+				// A bare list of scalars (no recognised keys) collapses to the name.
+				if ($name === '' && $desc === '') {
+					$name = trim(implode(' ', array_filter(array_map(function ($x) {
+						return is_scalar($x) ? (string) $x : '';
+					}, $it), 'strlen')));
+				}
+			} else {
+				$name = trim((string) $it);
+			}
+			if ($name === '' && $desc === '') { continue; }
+			$out[] = array('name' => $name, 'description' => $desc);
+		}
+		return array_values($out);
+	}
+}
+
+if ( ! function_exists('competitor_traveller_segment_defs'))
+{
+	/**
+	 * The seven canonical traveller types the analysis is judged against, in display
+	 * order: key => English label. The key is the stable identifier the AI returns
+	 * and the UI/translation layers key off; the label is the English fallback used
+	 * where a localized UI label is unavailable. Pure.
+	 */
+	function competitor_traveller_segment_defs()
+	{
+		return array(
+			'single'         => 'Single / Solo',
+			'elderly'        => 'Elderly',
+			'teenager'       => 'Teenager',
+			'couple'         => 'Couple',
+			'family_kids'    => 'Family with Kids',
+			'family_elderly' => 'Family with Elderly',
+			'company'        => 'Company / Corporate',
+		);
+	}
+}
+
+if ( ! function_exists('competitor_segment_match_key'))
+{
+	/**
+	 * Map a free-text traveller label to one of the seven canonical segment keys, or
+	 * '' when nothing matches. Order matters: the compound family types are tested
+	 * before the bare ones so "family with elderly" resolves to family_elderly (not
+	 * family_kids or elderly). Pure.
+	 */
+	function competitor_segment_match_key($text)
+	{
+		$t = strtolower(trim((string) $text));
+		if ($t === '') { return ''; }
+		if (array_key_exists($t, competitor_traveller_segment_defs())) { return $t; }
+		$has = function ($needles) use ($t) {
+			foreach ((array) $needles as $n) { if (strpos($t, $n) !== false) { return true; } }
+			return false;
+		};
+		$family = $has(array('family', 'families'));
+		if ($has(array('compan', 'corporate', 'business', 'incentive', 'colleague'))) { return 'company'; }
+		if ($family && $has(array('elder', 'senior', 'grandparent', 'parent', 'multi-gen', 'multigen', 'multi gen'))) { return 'family_elderly'; }
+		if ($family) { return 'family_kids'; }   // a bare "family" defaults to with-kids
+		if ($has(array('couple', 'honeymoon', 'partner', 'romantic'))) { return 'couple'; }
+		if ($has(array('teen', 'youth', 'student', 'adolescent'))) { return 'teenager'; }
+		if ($has(array('elder', 'senior', 'retire', 'old'))) { return 'elderly'; }
+		if ($has(array('single', 'solo', 'individual', 'alone'))) { return 'single'; }
+		return '';
+	}
+}
+
+if ( ! function_exists('competitor_segment_level'))
+{
+	/**
+	 * Normalise a free-text suitability value into 'high' | 'medium' | 'low' | '' so
+	 * the UI colours the badge language-independently (the persisted level survives
+	 * translation of the visible label). "not ideal" etc. is checked before the
+	 * positive words so a negated phrase never reads as high. Pure.
+	 */
+	function competitor_segment_level($suitability)
+	{
+		$s = strtolower(trim((string) $suitability));
+		if ($s === '') { return ''; }
+		$has = function ($needles) use ($s) {
+			foreach ((array) $needles as $n) { if (strpos($s, $n) !== false) { return true; } }
+			return false;
+		};
+		if ($has(array('not suitable', 'unsuitable', 'not ideal', 'poor', 'low', 'avoid'))) { return 'low'; }
+		if ($has(array('high', 'very', 'ideal', 'excellent', 'perfect', 'great', 'strongly', 'recommended', 'best'))) { return 'high'; }
+		if ($has(array('medium', 'moderate', 'fair', 'partial', 'somewhat', 'okay', 'average', 'mixed'))) { return 'medium'; }
+		if ($s === 'ok') { return 'medium'; }
+		if ($s === 'no') { return 'low'; }
+		if ($s === 'yes') { return 'high'; }
+		return '';
+	}
+}
+
+if ( ! function_exists('competitor_traveller_segments'))
+{
+	/**
+	 * Coerce the traveller_segments value into a clean list of per-type verdicts —
+	 * one entry per canonical segment that carries content, in canonical order:
+	 * [{key, segment, suitability, level, justification}]. Accepts the AI's list of
+	 * objects, an assoc map keyed by segment name, and tolerates alternate field
+	 * names. `level` is derived from `suitability` so the badge colour survives
+	 * translation. Entries with neither a suitability nor a justification are dropped
+	 * (legacy rows render nothing). Pure.
+	 */
+	function competitor_traveller_segments($value)
+	{
+		if ( ! is_array($value)) { return array(); }
+		$pick = function ($arr, $keys) {
+			foreach ((array) $keys as $k) {
+				if (isset($arr[$k]) && ! is_array($arr[$k]) && trim((string) $arr[$k]) !== '') {
+					return trim((string) $arr[$k]);
+				}
+			}
+			return '';
+		};
+		$found = array();   // canonical key => [suitability, level, justification]
+		foreach ($value as $k => $it) {
+			$seg_text = '';
+			$suit = '';
+			$just = '';
+			$level = '';
+			if (is_array($it)) {
+				$seg_text = $pick($it, array('segment', 'type', 'name', 'traveller', 'label', 'key'));
+				$suit     = $pick($it, array('suitability', 'fit', 'rating', 'score', 'verdict'));
+				$just     = $pick($it, array('justification', 'reason', 'why', 'info', 'detail', 'details', 'note', 'notes', 'explanation'));
+				$level    = $pick($it, array('level'));   // preserved when re-normalising an already-built entry
+			} else {
+				$just = trim((string) $it);
+			}
+			// An assoc map ("single" => {...} / "single" => "text") carries the segment
+			// name in the array key.
+			if ($seg_text === '' && is_string($k)) { $seg_text = $k; }
+			$ckey = competitor_segment_match_key($seg_text);
+			if ($ckey === '') { continue; }
+			if ($suit === '' && $just === '') { continue; }
+			if ( ! isset($found[$ckey])) {   // first non-empty verdict for a type wins
+				$found[$ckey] = array('suitability' => $suit, 'level' => $level, 'justification' => $just);
+			}
+		}
+		$out = array();
+		foreach (competitor_traveller_segment_defs() as $ckey => $label) {
+			if ( ! isset($found[$ckey])) { continue; }
+			$suit  = $found[$ckey]['suitability'];
+			// An explicit level (from an already-normalised entry) wins so the badge
+			// colour survives translation of the visible suitability wording; a fresh
+			// AI entry has none, so derive it from the English suitability text.
+			$level = $found[$ckey]['level'] !== '' ? $found[$ckey]['level'] : competitor_segment_level($suit);
+			$out[] = array(
+				'key'           => $ckey,
+				'segment'       => $label,
+				'suitability'   => $suit,
+				'level'         => $level,
+				'justification' => $found[$ckey]['justification'],
+			);
+		}
+		return $out;
+	}
+}
+
+if ( ! function_exists('competitor_split_point_justification'))
+{
+	/**
+	 * Split a customer-POV pros/cons item shaped "<point> — <justification>" into
+	 * its two halves so the UI can weight the point over the reasoning. Recognises
+	 * an em/en dash or a spaced hyphen as the separator and only splits on the
+	 * FIRST one, so a justification that itself contains dashes stays intact.
+	 * Returns ['point' => ..., 'justification' => '']; justification is '' when the
+	 * item carries no separator (a legacy bare pro/con). Pure.
+	 */
+	function competitor_split_point_justification($item)
+	{
+		$item  = trim((string) $item);
+		// Em/en dash split even without surrounding spaces (translated CJK output
+		// often drops them); a hyphen only counts when spaced, so hyphenated words
+		// like "well-known" stay intact.
+		$parts = preg_split('/\s*[—–]+\s*|\s+-\s+/u', $item, 2);
+		return array(
+			'point'         => isset($parts[0]) ? trim($parts[0]) : $item,
+			'justification' => isset($parts[1]) ? trim($parts[1]) : '',
+		);
+	}
+}
+
+if ( ! function_exists('competitor_summary_sections'))
+{
+	/**
+	 * Break the (now richer) summary text into labelled paragraphs so the UI can
+	 * weight each "Overview:" / "Best for:" / ... label over its body. The AI is
+	 * asked to separate paragraphs with a blank line; we split on blank lines and
+	 * fall back to single newlines when it collapses them. A paragraph is treated
+	 * as labelled only when it opens with a SHORT phrase (<=40 chars, no sentence
+	 * punctuation) followed by a colon — so a plain 2-4 sentence legacy summary, or
+	 * a sentence that merely contains a mid-clause colon, degrades to one unlabelled
+	 * block. Handles both the ASCII ":" and the full-width "：" of translated CJK.
+	 * Returns [['label' => ..., 'text' => ...], ...]; label is '' when absent. Pure.
+	 */
+	function competitor_summary_sections($summary)
+	{
+		$summary = trim((string) $summary);
+		if ($summary === '') { return array(); }
+		// Prefer blank-line paragraphs; if the model gave none, treat each line as one.
+		$blocks = preg_split('/\R\s*\R/u', $summary);
+		if (count($blocks) === 1) { $blocks = preg_split('/\R/u', $summary); }
+		$out = array();
+		foreach ($blocks as $b) {
+			$b = trim((string) $b);
+			if ($b === '') { continue; }
+			$label = '';
+			$text  = $b;
+			// A leading "<short label>:" with real body text after it. The label must
+			// not span a line break and must carry no sentence-ending punctuation, so
+			// ordinary prose with an internal colon is left whole.
+			if (preg_match('/^([^\r\n:：.!?]{1,40})[:：][ \t]*(\S.*)$/su', $b, $m)) {
+				$label = trim($m[1]);
+				$text  = trim($m[2]);
+			}
+			$out[] = array('label' => $label, 'text' => $text);
+		}
+		return $out;
+	}
+}
+
+if ( ! function_exists('competitor_pdf_filename'))
+{
+	/**
+	 * A safe download filename for a saved analysis PDF: the product/page name
+	 * slugified (spaces->_, punctuation dropped), suffixed with the row id, and
+	 * ending in .pdf. Falls back to "competitor-analysis" when the name is blank.
+	 * Pure — no DB/filesystem.
+	 */
+	function competitor_pdf_filename($name, $id)
+	{
+		$slug = strtolower(trim((string) $name));
+		$slug = preg_replace('/[^a-z0-9]+/', '-', $slug);   // non-alnum -> single dash
+		$slug = trim((string) $slug, '-');
+		if ($slug === '') { $slug = 'competitor-analysis'; }
+		$slug = substr($slug, 0, 60);                       // keep filenames sane
+		return $slug . '-' . (int) $id . '.pdf';
+	}
+}
+
+/* ---------------------------------------------------------------------------
+ * Translation (EN / CN) — pure helpers for the "translate this analysis"
+ * feature. The AI-extracted content is stored in English; on demand we ask
+ * OpenAI to translate the human-readable VALUES into another language and cache
+ * the result. These helpers decide which fields are translatable, shape the
+ * request, and merge the translated values back onto a product record. The
+ * network call lives in CompetitorAnalysisService::translate_analysis().
+ * ------------------------------------------------------------------------- */
+
+if ( ! function_exists('competitor_supported_langs'))
+{
+	/** Languages the UI offers. 'en' is the stored original; others are translated. */
+	function competitor_supported_langs()
+	{
+		return array('en', 'cn');
+	}
+}
+
+if ( ! function_exists('competitor_normalize_lang'))
+{
+	/** Clamp any input to a supported language code, defaulting to 'en'. */
+	function competitor_normalize_lang($lang)
+	{
+		$lang = strtolower(trim((string) $lang));
+		return in_array($lang, competitor_supported_langs(), true) ? $lang : 'en';
+	}
+}
+
+if ( ! function_exists('competitor_lang_label'))
+{
+	/** The target-language name handed to the translator model. */
+	function competitor_lang_label($lang)
+	{
+		switch (competitor_normalize_lang($lang)) {
+			case 'cn': return 'Simplified Chinese (简体中文)';
+			default:   return 'English';
+		}
+	}
+}
+
+if ( ! function_exists('competitor_translate_scalar_keys'))
+{
+	/** Single-value fields whose text is translated (prices/codes are excluded). */
+	function competitor_translate_scalar_keys()
+	{
+		return array(
+			'product_name', 'destination', 'duration', 'departure_city', 'difficulty',
+			'target_traveller', 'suitable_age', 'child_friendly', 'senior_friendly',
+			'summary', 'comparison', 'matched_product',
+		);
+	}
+}
+
+if ( ! function_exists('competitor_translate_list_keys'))
+{
+	/** List fields (arrays of strings) whose items are translated. */
+	function competitor_translate_list_keys()
+	{
+		return array(
+			'countries', 'cities', 'travel_months', 'themes', 'tour_styles', 'local_transport',
+			'inclusions', 'exclusions', 'hotels', 'shopping_stops', 'optional_tours',
+			'special_remarks', 'usp', 'pros', 'cons',
+		);
+	}
+}
+
+if ( ! function_exists('competitor_extract_translatable'))
+{
+	/**
+	 * Pull only the translatable, non-empty pieces of one product record into a
+	 * compact structure: { scalars:{}, lists:{}, meals:{}, itinerary:[{day,title,
+	 * description}] }. Empty sections are omitted so we don't pay to translate
+	 * blanks. Structure/keys are preserved so the reply can be merged back by key
+	 * and index. Pure.
+	 */
+	function competitor_extract_translatable($product)
+	{
+		$P = (array) $product;
+		$out = array();
+
+		$scalars = array();
+		foreach (competitor_translate_scalar_keys() as $k) {
+			$v = isset($P[$k]) ? $P[$k] : '';
+			if ( ! is_array($v)) {
+				$v = trim((string) $v);
+				if ($v !== '') { $scalars[$k] = $v; }
+			}
+		}
+		if ($scalars) { $out['scalars'] = $scalars; }
+
+		$flat = function ($items) {
+			$acc = array();
+			if ( ! is_array($items)) { return $acc; }
+			foreach ($items as $it) {
+				if (is_array($it)) {
+					$it = implode(' ', array_filter(array_map(function ($x) { return is_scalar($x) ? (string) $x : ''; }, $it), 'strlen'));
+				}
+				$it = trim((string) $it);
+				if ($it !== '') { $acc[] = $it; }
+			}
+			return $acc;
+		};
+		$lists = array();
+		foreach (competitor_translate_list_keys() as $k) {
+			$items = $flat(isset($P[$k]) ? $P[$k] : array());
+			if ($items) { $lists[$k] = $items; }
+		}
+		if ($lists) { $out['lists'] = $lists; }
+
+		$m = isset($P['meals']) && is_array($P['meals']) ? $P['meals'] : array();
+		$meals = array();
+		foreach (array('breakfast', 'lunch', 'dinner') as $mk) {
+			$mv = trim((string) (isset($m[$mk]) ? $m[$mk] : ''));
+			if ($mv !== '') { $meals[$mk] = $mv; }
+		}
+		if ($meals) { $out['meals'] = $meals; }
+
+		$it = isset($P['itinerary']) && is_array($P['itinerary']) ? $P['itinerary'] : array();
+		if ($it) {
+			$itin = array();
+			foreach ($it as $day) {
+				$day = (array) $day;
+				$row = array();
+				foreach (array('day', 'title', 'description') as $dk) {
+					$dv = trim((string) (isset($day[$dk]) ? $day[$dk] : ''));
+					if ($dv !== '') { $row[$dk] = $dv; }
+				}
+				$itin[] = $row;   // keep blanks to preserve index alignment
+			}
+			$out['itinerary'] = $itin;
+		}
+
+		// Scenic highlights: translate both the place name and the what-to-expect
+		// description, keeping the index so the overlay merges back cleanly.
+		$sc = isset($P['scenic_highlights']) ? competitor_scenic_items($P['scenic_highlights']) : array();
+		if ($sc) {
+			$scenic = array();
+			foreach ($sc as $s) {
+				$row = array();
+				foreach (array('name', 'description') as $sk) {
+					$sv = trim((string) (isset($s[$sk]) ? $s[$sk] : ''));
+					if ($sv !== '') { $row[$sk] = $sv; }
+				}
+				$scenic[] = $row;   // keep blanks to preserve index alignment
+			}
+			$out['scenic_highlights'] = $scenic;
+		}
+
+		// Traveller-type verdicts: translate only the free-text suitability + reason,
+		// keeping the index so the overlay merges back cleanly. The colour level is
+		// re-derived from the original at apply time, so it is not sent.
+		$ts = isset($P['traveller_segments']) ? competitor_traveller_segments($P['traveller_segments']) : array();
+		if ($ts) {
+			$seg = array();
+			foreach ($ts as $s) {
+				$row = array();
+				foreach (array('suitability', 'justification') as $sk) {
+					$sv = trim((string) (isset($s[$sk]) ? $s[$sk] : ''));
+					if ($sv !== '') { $row[$sk] = $sv; }
+				}
+				$seg[] = $row;   // keep blanks to preserve index alignment
+			}
+			$out['traveller_segments'] = $seg;
+		}
+		return $out;
+	}
+}
+
+if ( ! function_exists('competitor_apply_translation'))
+{
+	/**
+	 * Overlay a translated structure (from competitor_extract_translatable, with
+	 * values swapped for the target language) back onto the original product
+	 * record. Missing/blank translations keep the original text, so a partial
+	 * reply degrades gracefully. Lists are matched by key, itinerary by index.
+	 * Returns a translated COPY; never mutates the input. Pure.
+	 */
+	function competitor_apply_translation($product, $tr)
+	{
+		$out = (array) $product;
+		$tr  = (array) $tr;
+
+		if (isset($tr['scalars']) && is_array($tr['scalars'])) {
+			$allowed = competitor_translate_scalar_keys();
+			foreach ($tr['scalars'] as $k => $v) {
+				if (in_array($k, $allowed, true) && is_string($v) && trim($v) !== '') {
+					$out[$k] = $v;
+				}
+			}
+		}
+
+		if (isset($tr['lists']) && is_array($tr['lists'])) {
+			$allowed = competitor_translate_list_keys();
+			foreach ($tr['lists'] as $k => $v) {
+				if ( ! in_array($k, $allowed, true) || ! is_array($v)) { continue; }
+				$items = array();
+				foreach ($v as $it) {
+					$it = trim((string) (is_array($it) ? implode(' ', $it) : $it));
+					if ($it !== '') { $items[] = $it; }
+				}
+				if ($items) { $out[$k] = $items; }
+			}
+		}
+
+		if (isset($tr['meals']) && is_array($tr['meals'])) {
+			$m = isset($out['meals']) && is_array($out['meals']) ? $out['meals'] : array();
+			foreach (array('breakfast', 'lunch', 'dinner') as $mk) {
+				if (isset($tr['meals'][$mk]) && is_string($tr['meals'][$mk]) && trim($tr['meals'][$mk]) !== '') {
+					$m[$mk] = $tr['meals'][$mk];
+				}
+			}
+			$out['meals'] = $m;
+		}
+
+		if (isset($tr['itinerary']) && is_array($tr['itinerary'])
+			&& isset($out['itinerary']) && is_array($out['itinerary'])) {
+			$days = $out['itinerary'];
+			foreach ($days as $i => $day) {
+				$day = (array) $day;
+				if (isset($tr['itinerary'][$i]) && is_array($tr['itinerary'][$i])) {
+					foreach (array('day', 'title', 'description') as $dk) {
+						$tv = isset($tr['itinerary'][$i][$dk]) ? $tr['itinerary'][$i][$dk] : null;
+						if (is_string($tv) && trim($tv) !== '') { $day[$dk] = $tv; }
+					}
+				}
+				$days[$i] = $day;
+			}
+			$out['itinerary'] = $days;
+		}
+
+		if (isset($tr['scenic_highlights']) && is_array($tr['scenic_highlights'])) {
+			$items = competitor_scenic_items(isset($out['scenic_highlights']) ? $out['scenic_highlights'] : array());
+			foreach ($items as $i => $s) {
+				if (isset($tr['scenic_highlights'][$i]) && is_array($tr['scenic_highlights'][$i])) {
+					foreach (array('name', 'description') as $sk) {
+						$tv = isset($tr['scenic_highlights'][$i][$sk]) ? $tr['scenic_highlights'][$i][$sk] : null;
+						if (is_string($tv) && trim($tv) !== '') { $s[$sk] = $tv; }
+					}
+				}
+				$items[$i] = $s;
+			}
+			$out['scenic_highlights'] = $items;
+		}
+
+		if (isset($tr['traveller_segments']) && is_array($tr['traveller_segments'])) {
+			$items = competitor_traveller_segments(isset($out['traveller_segments']) ? $out['traveller_segments'] : array());
+			foreach ($items as $i => $s) {
+				if (isset($tr['traveller_segments'][$i]) && is_array($tr['traveller_segments'][$i])) {
+					foreach (array('suitability', 'justification') as $sk) {
+						$tv = isset($tr['traveller_segments'][$i][$sk]) ? $tr['traveller_segments'][$i][$sk] : null;
+						if (is_string($tv) && trim($tv) !== '') { $s[$sk] = $tv; }
+					}
+					// `level` is left as re-derived from the ORIGINAL suitability by
+					// competitor_traveller_segments() above, so the badge colour stays
+					// correct even though the visible label is now translated.
+				}
+				$items[$i] = $s;
+			}
+			$out['traveller_segments'] = $items;
+		}
+		return $out;
+	}
+}
+
+if ( ! function_exists('competitor_build_translation_agent'))
+{
+	/**
+	 * Shape the OpenAI Responses request that translates a payload's string
+	 * values into $lang while preserving JSON structure. Prices, codes, dates and
+	 * URLs are kept verbatim. Returns {instructions, input}. Pure.
+	 */
+	function competitor_build_translation_agent($payload, $lang)
+	{
+		$target = competitor_lang_label($lang);
+		$instructions =
+			"You are a professional travel-industry translator. The user sends a JSON object. "
+			. "Translate every human-readable string VALUE into {$target}. "
+			. "STRICT RULES: (1) Keep the JSON structure, keys, and array order EXACTLY the same. "
+			. "(2) Translate values only — never rename keys. "
+			. "(3) DO NOT translate or alter numbers, prices, currency codes, dates, tour codes, "
+			. "airport/flight codes, or URLs — copy them verbatim. "
+			. "(4) Render place names naturally in {$target}. "
+			. "(5) Return ONLY the JSON object — no commentary, no markdown, no code fence.";
+		// The input must mention "json" for the Responses API json_object format mode
+		// (which guarantees a syntactically valid reply — the model otherwise
+		// occasionally emits an unbalanced brace on long CJK output).
+		$input = "Translate the string values in this JSON object to {$target} and return a "
+			. "JSON object of the exact same shape:\n"
+			. json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+		return array(
+			'instructions' => $instructions,
+			'input'        => $input,
+		);
+	}
+}
+
+if ( ! function_exists('competitor_json_object_from_text'))
+{
+	/**
+	 * Parse a JSON object out of a model's text reply — strips a ```json fence and
+	 * falls back to the outermost {...} span. Returns an assoc array or null. Pure.
+	 */
+	function competitor_json_object_from_text($text)
+	{
+		$text = trim((string) $text);
+		if ($text === '') { return null; }
+		$text = preg_replace('/^```(?:json)?\s*/i', '', $text);
+		$text = preg_replace('/\s*```$/', '', $text);
+		$data = json_decode($text, true);
+		if (is_array($data)) { return $data; }
+
+		// Fallbacks for a slightly-dirty reply: (a) the outermost {...} span, then
+		// (b) a string-aware walk that returns the first balanced object — this
+		// trims trailing prose or a stray extra brace some models append.
+		if (preg_match('/\{.*\}/s', $text, $m)) {
+			$data = json_decode($m[0], true);
+			if (is_array($data)) { return $data; }
+		}
+		$balanced = competitor_first_balanced_object($text);
+		if ($balanced !== '') {
+			$data = json_decode($balanced, true);
+			if (is_array($data)) { return $data; }
+		}
+		return null;
+	}
+}
+
+if ( ! function_exists('competitor_first_balanced_object'))
+{
+	/**
+	 * Return the first brace-balanced {...} object in $text (string-literal aware,
+	 * so braces inside quoted values don't count), or '' if none. Lets us recover a
+	 * valid object when the model appended trailing junk or an extra closer. Pure.
+	 */
+	function competitor_first_balanced_object($text)
+	{
+		$text = (string) $text;
+		$start = strpos($text, '{');
+		if ($start === false) { return ''; }
+		$depth = 0; $in_str = false; $esc = false;
+		$len = strlen($text);
+		for ($i = $start; $i < $len; $i++) {
+			$c = $text[$i];
+			if ($esc) { $esc = false; continue; }
+			if ($c === '\\') { $esc = true; continue; }
+			if ($c === '"') { $in_str = ! $in_str; continue; }
+			if ($in_str) { continue; }
+			if ($c === '{') { $depth++; }
+			elseif ($c === '}') {
+				$depth--;
+				if ($depth === 0) { return substr($text, $start, $i - $start + 1); }
+			}
+		}
+		return '';   // never closed
+	}
+}
+
+if ( ! function_exists('competitor_row_to_product'))
+{
+	/**
+	 * Build the canonical product array from a single-analysis row ($a from
+	 * Read_One, which already merged details_json onto the row). Shared by the
+	 * detail view, the PDF and the translator so the single/upload/paste shape is
+	 * mapped in exactly one place. Pure.
+	 */
+	function competitor_row_to_product($a)
+	{
+		$a = (object) $a;
+		$g = function ($k, $default = '') use ($a) {
+			return isset($a->$k) ? $a->$k : $default;
+		};
+		return array(
+			'url' => $g('url'),
+			'product_name' => $g('product_name'), 'tour_code' => $g('tour_code'),
+			'price' => $g('price'), 'price_from' => $g('price_from'), 'price_to' => $g('price_to'),
+			'currency' => $g('currency'), 'destination' => $g('destination'), 'duration' => $g('duration'),
+			'departure_city' => $g('departure_city'), 'flight_departure' => $g('flight_departure'), 'flight_return' => $g('flight_return'),
+			'difficulty' => $g('difficulty'), 'target_traveller' => $g('target_traveller'), 'suitable_age' => $g('suitable_age'),
+			'child_friendly' => $g('child_friendly'), 'senior_friendly' => $g('senior_friendly'),
+			'summary' => $g('summary'), 'comparison' => $g('comparison'), 'matched_product' => $g('matched_product'),
+			'countries' => $g('countries', array()), 'cities' => $g('cities', array()), 'travel_months' => $g('travel_months', array()),
+			'themes' => $g('themes', array()), 'tour_styles' => $g('tour_styles', array()), 'local_transport' => $g('local_transport', array()),
+			'inclusions' => $g('inclusions', array()), 'exclusions' => $g('exclusions', array()), 'hotels' => $g('hotels', array()),
+			'shopping_stops' => $g('shopping_stops', array()), 'optional_tours' => $g('optional_tours', array()), 'special_remarks' => $g('special_remarks', array()),
+			'scenic_highlights' => $g('scenic_highlights', array()), 'usp' => $g('usp', array()),
+			'traveller_segments' => $g('traveller_segments', array()),
+			'pros' => $g('pros', array()), 'cons' => $g('cons', array()), 'meals' => $g('meals', array()), 'itinerary' => $g('itinerary', array()),
+		);
+	}
+}
+
+if ( ! function_exists('competitor_display_products'))
+{
+	/**
+	 * Normalise an analysis row into a flat list of product arrays: a site crawl
+	 * yields its stored products, a single/upload/paste yields one product built
+	 * from the row. The one source of truth the view, PDF and translator share.
+	 */
+	function competitor_display_products($a)
+	{
+		$a = (object) $a;
+		if ( ! empty($a->products) && is_array($a->products)) {
+			$out = array();
+			foreach ($a->products as $p) { $out[] = (array) $p; }
+			return $out;
+		}
+		return array(competitor_row_to_product($a));
+	}
+}
+
+if ( ! function_exists('competitor_apply_translation_to_row'))
+{
+	/**
+	 * Overlay a cached translation ({products:[overlay,...]}) onto an analysis row
+	 * ($a from Read_One) so the view/PDF render in the target language. For a site
+	 * crawl each stored product is overlaid; for a single row the translated keys
+	 * are written back onto $a. Returns the (same, mutated) row. Falls back to the
+	 * original text wherever a translation is missing.
+	 */
+	function competitor_apply_translation_to_row($a, $translation)
+	{
+		$overlays = (is_array($translation) && isset($translation['products']) && is_array($translation['products']))
+			? $translation['products'] : array();
+		if (empty($overlays)) { return $a; }
+
+		if ( ! empty($a->products) && is_array($a->products)) {
+			$prods = $a->products;
+			foreach ($prods as $i => $p) {
+				if (isset($overlays[$i])) {
+					$prods[$i] = competitor_apply_translation((array) $p, $overlays[$i]);
+				}
+			}
+			$a->products = $prods;
+			return $a;
+		}
+
+		$translated = competitor_apply_translation(competitor_row_to_product($a), $overlays[0]);
+		$keys = array_merge(competitor_translate_scalar_keys(), competitor_translate_list_keys(), array('meals', 'itinerary', 'scenic_highlights', 'traveller_segments'));
+		foreach ($keys as $k) {
+			if (array_key_exists($k, $translated)) { $a->$k = $translated[$k]; }
+		}
+		return $a;
+	}
+}
+
+if ( ! function_exists('competitor_ui_labels'))
+{
+	/**
+	 * The static UI labels for the detail view + PDF, per language. English is the
+	 * source; 'cn' is Simplified Chinese. Anything unknown falls back to English so
+	 * a missing key never blanks a label. Pure.
+	 */
+	function competitor_ui_labels($lang)
+	{
+		$en = array(
+			'tour_code' => 'Tour Code', 'destination' => 'Destination', 'duration' => 'Duration',
+			'departure_city' => 'Departure City', 'price_range' => 'Price Range', 'currency' => 'Currency',
+			'difficulty' => 'Difficulty', 'suitable_age' => 'Suitable Age',
+			'traveller_fit' => 'Traveller Fit', 'target_traveller' => 'Target Traveller',
+			'child_friendly' => 'Child Friendly', 'senior_friendly' => 'Senior Friendly', 'usp' => 'Unique Selling Points',
+			'traveller_suitability' => 'Suitability by Traveller Type',
+			'seg_single' => 'Single / Solo', 'seg_elderly' => 'Elderly', 'seg_teenager' => 'Teenager',
+			'seg_couple' => 'Couple', 'seg_family_kids' => 'Family with Kids',
+			'seg_family_elderly' => 'Family with Elderly', 'seg_company' => 'Company / Corporate',
+			'suit_high' => 'High', 'suit_medium' => 'Medium', 'suit_low' => 'Low',
+			'coverage' => 'Coverage', 'countries' => 'Countries', 'cities' => 'Cities', 'travel_months' => 'Travel Months',
+			'themes' => 'Themes', 'tour_style' => 'Tour Style', 'local_transport' => 'Local Transport',
+			'flight_details' => 'Flight Details', 'departure' => 'Departure', 'return' => 'Return',
+			'meals' => 'Meals', 'breakfast' => 'Breakfast', 'lunch' => 'Lunch', 'dinner' => 'Dinner',
+			'hotels' => 'Hotels', 'scenic_highlights' => 'Scenic Highlights',
+			'shopping_stops' => 'Shopping Stops', 'inclusions' => 'Inclusions', 'exclusions' => 'Exclusions',
+			'optional_tours' => 'Optional Tours', 'special_remarks' => 'Special Remarks',
+			'daily_itinerary' => 'Daily Itinerary', 'summary' => 'Summary', 'pros' => 'Pros', 'cons' => 'Cons',
+			'comparison' => 'Comparison vs Our Products', 'compared_against' => 'Compared against our product:',
+			'site' => 'Site:', 'source' => 'Source:', 'analysed' => 'Analysed', 'products' => 'products',
+			'ai_cost' => 'AI cost', 'uploaded_file' => 'uploaded file', 'back' => 'Back',
+			'download_pdf' => 'Download PDF', 'product' => 'Product', 'analysis_failed' => 'Analysis failed:',
+			'section_tour_info' => 'Tour Information', 'section_ai_analysis' => 'AI Analysis',
+		);
+		$cn = array(
+			'tour_code' => '行程代码', 'destination' => '目的地', 'duration' => '行程天数',
+			'departure_city' => '出发城市', 'price_range' => '价格范围', 'currency' => '货币',
+			'difficulty' => '难度', 'suitable_age' => '适合年龄',
+			'traveller_fit' => '适合人群', 'target_traveller' => '目标旅客',
+			'child_friendly' => '适合儿童', 'senior_friendly' => '适合长者', 'usp' => '独特卖点',
+			'traveller_suitability' => '各类旅客适合度',
+			'seg_single' => '单身 / 独自旅行', 'seg_elderly' => '长者', 'seg_teenager' => '青少年',
+			'seg_couple' => '情侣', 'seg_family_kids' => '亲子家庭',
+			'seg_family_elderly' => '携长者家庭', 'seg_company' => '公司 / 团体',
+			'suit_high' => '高', 'suit_medium' => '中', 'suit_low' => '低',
+			'coverage' => '覆盖范围', 'countries' => '国家', 'cities' => '城市', 'travel_months' => '出行月份',
+			'themes' => '主题', 'tour_style' => '行程风格', 'local_transport' => '当地交通',
+			'flight_details' => '航班详情', 'departure' => '去程', 'return' => '回程',
+			'meals' => '餐食', 'breakfast' => '早餐', 'lunch' => '午餐', 'dinner' => '晚餐',
+			'hotels' => '酒店', 'scenic_highlights' => '精华景点',
+			'shopping_stops' => '购物站', 'inclusions' => '包含项目', 'exclusions' => '不包含项目',
+			'optional_tours' => '自费项目', 'special_remarks' => '特别说明',
+			'daily_itinerary' => '每日行程', 'summary' => '总结', 'pros' => '优点', 'cons' => '缺点',
+			'comparison' => '与我方产品比较', 'compared_against' => '对比我方产品：',
+			'site' => '网站：', 'source' => '来源：', 'analysed' => '分析于', 'products' => '个产品',
+			'ai_cost' => 'AI 成本', 'uploaded_file' => '上传文件', 'back' => '返回',
+			'download_pdf' => '下载 PDF', 'product' => '产品', 'analysis_failed' => '分析失败：',
+			'section_tour_info' => '行程资料', 'section_ai_analysis' => 'AI 分析',
+		);
+		return (competitor_normalize_lang($lang) === 'cn') ? array_merge($en, $cn) : $en;
+	}
+}
+
+if ( ! function_exists('competitor_remove_crawl_item'))
+{
+	/**
+	 * Remove ONE crawled product (by its original index) from a crawl's items +
+	 * status, for the Review page's per-product delete. Pure: takes the decoded
+	 * items array and status array, returns the updated pair plus the analysis row
+	 * id that must be deleted from the DB (0 when the product was never analysed).
+	 *
+	 * The other indices are LEFT IN PLACE (the array stays sparse) so the status
+	 * `analysed` map — which is keyed by original index — keeps pointing at the
+	 * right products. When the removed product had already been analysed, its
+	 * entry is dropped and its cost refunded from the running `cost_total`. The
+	 * displayed `count` is resynced to the number of remaining items. Inputs are
+	 * not mutated.
+	 */
+	function competitor_remove_crawl_item($items, $status, $index)
+	{
+		$items  = is_array($items) ? $items : array();
+		$status = is_array($status) ? $status : array();
+		$index  = (int) $index;
+
+		$deleted_analysis_id = 0;
+
+		if (array_key_exists($index, $items)) {
+			unset($items[$index]);   // keep other keys as-is (no reindex)
+		}
+
+		$analysed = isset($status['analysed']) && is_array($status['analysed']) ? $status['analysed'] : array();
+		$key = (string) $index;
+		if (isset($analysed[$key]) && is_array($analysed[$key])) {
+			$deleted_analysis_id = isset($analysed[$key]['id']) ? (int) $analysed[$key]['id'] : 0;
+			$cost = isset($analysed[$key]['cost']) ? (float) $analysed[$key]['cost'] : 0.0;
+			$prev = isset($status['cost_total']) ? (float) $status['cost_total'] : 0.0;
+			$status['cost_total'] = round(max(0, $prev - $cost), 6);
+			unset($analysed[$key]);
+		}
+		$status['analysed'] = $analysed;
+		$status['count']    = count($items);
+
+		return array(
+			'items'               => $items,
+			'status'              => $status,
+			'deleted_analysis_id' => $deleted_analysis_id,
+		);
+	}
+}
+
+if ( ! function_exists('competitor_remove_crawl_items'))
+{
+	/**
+	 * Remove SEVERAL crawled products at once (bulk delete on the Review page) by
+	 * folding competitor_remove_crawl_item() over each index. Returns the updated
+	 * items + status and the list of analysis row ids to delete from the DB. Pure;
+	 * inputs are not mutated.
+	 */
+	function competitor_remove_crawl_items($items, $status, $indices)
+	{
+		$items   = is_array($items) ? $items : array();
+		$status  = is_array($status) ? $status : array();
+		$indices = is_array($indices) ? $indices : array();
+
+		$deleted_ids = array();
+		foreach ($indices as $idx) {
+			$res    = competitor_remove_crawl_item($items, $status, $idx);
+			$items  = $res['items'];
+			$status = $res['status'];
+			if ($res['deleted_analysis_id'] > 0) {
+				$deleted_ids[] = $res['deleted_analysis_id'];
+			}
+		}
+
+		return array(
+			'items'                => $items,
+			'status'               => $status,
+			'deleted_analysis_ids' => $deleted_ids,
 		);
 	}
 }

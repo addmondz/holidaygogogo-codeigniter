@@ -554,13 +554,37 @@ $is_dev_env = ($app_env !== 'prod');
 								</li>
 							<?php } ?>
 							<?php if((int)$this->session->level === 10) { ?>
-								<li class="menu-item <?php if($this->router->class == 'Competitor_Analysis') { echo 'menu-item-active'; } ?>">
-									<a href="<?php echo base_url('Competitor_Analysis'); ?>" class="menu-link">
+								<li class="menu-item menu-item-submenu <?php if($this->router->class == 'Competitor_Product' || $this->router->class == 'Our_Product' || $this->router->class == 'Master_Product') { echo 'menu-item-active menu-item-open'; } ?>">
+									<a href="javascript:;" class="menu-link menu-toggle">
 										<span class="svg-icon menu-icon">
 											<i class="la la-robot" style="font-size:20px;"></i>
 										</span>
-										<span class="menu-text">Competitor Analysis</span>
+										<span class="menu-text">Product Analysis</span>
+										<i class="menu-arrow"></i>
 									</a>
+									<div class="menu-submenu">
+										<i class="menu-arrow"></i>
+										<ul class="menu-subnav">
+											<li class="menu-item <?php if($this->router->class == 'Master_Product') { echo 'menu-item-active'; } ?>">
+												<a href="<?php echo base_url('Master_Product'); ?>" class="menu-link">
+													<i class="menu-bullet menu-bullet-dot"><span></span></i>
+													<span class="menu-text">Master Product</span>
+												</a>
+											</li>
+											<li class="menu-item <?php if($this->router->class == 'Competitor_Product') { echo 'menu-item-active'; } ?>">
+												<a href="<?php echo base_url('Competitor_Product'); ?>" class="menu-link">
+													<i class="menu-bullet menu-bullet-dot"><span></span></i>
+													<span class="menu-text">Competitor Product</span>
+												</a>
+											</li>
+											<li class="menu-item <?php if($this->router->class == 'Our_Product') { echo 'menu-item-active'; } ?>">
+												<a href="<?php echo base_url('Our_Product'); ?>" class="menu-link">
+													<i class="menu-bullet menu-bullet-dot"><span></span></i>
+													<span class="menu-text">Our Product</span>
+												</a>
+											</li>
+										</ul>
+									</div>
 								</li>
 							<?php } ?>
 							<?php

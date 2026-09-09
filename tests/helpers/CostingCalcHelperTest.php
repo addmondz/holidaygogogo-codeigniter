@@ -246,19 +246,42 @@ $assertions['breakdown: unknown currency -> rate 0'] = ($approx($bd_missing[0]['
  * 6b) COMBINATION SUMMARY (customer bundles, additive)                *
  * ------------------------------------------------------------------ */
 
+// Markup on cost: cost after markup = cost x (1 + margin/100).
+$assertions['after markup: 20% on 1000 -> 1200'] = $approx(costing_cost_after_markup(1000, 20), 1200.00);
+$assertions['after markup: 0% keeps cost'] = $approx(costing_cost_after_markup(1000, 0), 1000.00);
+$assertions['after markup: negative keeps cost'] = $approx(costing_cost_after_markup(1000, -5), 1000.00);
+$assertions['after markup: 100% doubles'] = $approx(costing_cost_after_markup(1000, 100), 2000.00);
+$assertions['after markup: 12.5% -> 1125'] = $approx(costing_cost_after_markup(1000, 12.5), 1125.00);
+
 $combos_in = [
     ['name' => 'Premium',  'item_names' => ['Business Flight', '5-Star Hotel'], 'cost_myr' => 4000.00],
     ['name' => 'Standard', 'item_names' => ['Economy Flight', '4-Star Hotel'],  'cost_myr' => 2500.00],
 ];
-$cs = costing_combination_summary($combos_in, 20); // 20% markup
+$cs = costing_combination_summary($combos_in, 20); // 20% markup on cost, no pax
 
 $assertions['combo: one entry per combination'] = (count($cs['combinations']) === 2);
 $assertions['combo: name carried'] = ($cs['combinations'][0]['name'] === 'Premium');
 $assertions['combo: item names carried'] = ($cs['combinations'][0]['item_names'] === ['Business Flight', '5-Star Hotel']);
-$assertions['combo: selling = cost x (1+margin)'] = $approx($cs['combinations'][0]['selling'], 4800.00);
+$assertions['combo: selling = cost x (1 + margin)'] = $approx($cs['combinations'][0]['selling'], 4800.00);
 $assertions['combo: second selling'] = $approx($cs['combinations'][1]['selling'], 3000.00);
 $assertions['combo: total_cost = sum of costs'] = $approx($cs['total_cost'], 6500.00);
 $assertions['combo: total_selling additive'] = $approx($cs['total_selling'], 7800.00);
+
+// Per-pax pricing: cost/pax marked up, then × pax. 4000 cost, 4 pax, 20% ->
+// cost/pax 1000 -> after markup 1200 -> profit/pax 200 -> selling 4800.
+$csp = costing_combination_summary([['name' => 'P', 'item_names' => [], 'cost_myr' => 4000.00]], 20, 4);
+$assertions['combo: cost per pax'] = $approx($csp['combinations'][0]['cost_per_pax'], 1000.00);
+$assertions['combo: cost after markup per pax'] = $approx($csp['combinations'][0]['cost_after_markup_per_pax'], 1200.00);
+$assertions['combo: selling price per pax defaults to markup'] = $approx($csp['combinations'][0]['selling_price_per_pax'], 1200.00);
+$assertions['combo: profit per pax'] = $approx($csp['combinations'][0]['profit_per_pax'], 200.00);
+$assertions['combo: selling = price/pax x pax'] = $approx($csp['combinations'][0]['selling'], 4800.00);
+$assertions['combo: total profit'] = $approx($csp['combinations'][0]['total_profit'], 800.00);
+
+// Manual selling price per pax overrides the suggested markup (authoritative).
+$csm = costing_combination_summary([['name' => 'M', 'item_names' => [], 'cost_myr' => 4000.00, 'selling_price_per_pax' => 1500.00]], 20, 4);
+$assertions['combo: manual selling wins'] = $approx($csm['combinations'][0]['selling_price_per_pax'], 1500.00);
+$assertions['combo: manual selling drives revenue'] = $approx($csm['combinations'][0]['selling'], 6000.00);
+$assertions['combo: manual selling drives profit/pax'] = $approx($csm['combinations'][0]['profit_per_pax'], 500.00);
 
 // Zero margin -> selling == cost.
 $cs0 = costing_combination_summary([['name' => 'A', 'item_names' => ['x'], 'cost_myr' => 1000]], 0);
@@ -281,7 +304,7 @@ $assertions['combo: cost rounds to 2dp'] = $approx($csr['combinations'][0]['cost
  * ------------------------------------------------------------------ */
 
 $helper = @file_get_contents(__DIR__ . '/../../application/helpers/costing_calc_helper.php');
-foreach (['costing_categories', 'costing_line_to_myr', 'costing_sum_by_category', 'costing_apply_markup', 'costing_build_snapshot_rows', 'costing_normalize_rate', 'costing_multiplier_types', 'costing_multiplier_count', 'costing_row_myr', 'costing_row_totals', 'costing_currency_breakdown', 'costing_combination_summary'] as $fn) {
+foreach (['costing_categories', 'costing_line_to_myr', 'costing_sum_by_category', 'costing_apply_markup', 'costing_cost_after_markup', 'costing_build_snapshot_rows', 'costing_normalize_rate', 'costing_multiplier_types', 'costing_multiplier_count', 'costing_row_myr', 'costing_row_totals', 'costing_currency_breakdown', 'costing_combination_summary'] as $fn) {
     $assertions["helper: defines {$fn}()"] = (bool) preg_match('/function\s+' . preg_quote($fn, '/') . '\s*\(/', (string) $helper);
 }
 

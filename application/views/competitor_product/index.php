@@ -11,9 +11,8 @@
                 </div>
             </div>
             <div class="card-body">
-                <!-- Section 1: Crawl a competitor website (full row) -->
+                <!-- Section 1: Crawl a competitor website (URL + keyword in one row) -->
                 <div class="row align-items-start">
-                    <!-- Left: inputs -->
                     <div class="col-md-6">
                         <div class="form-group mb-2">
                             <label style="font-size:13px;"><strong>Competitor Website (base URL)</strong></label>
@@ -25,6 +24,8 @@
                                        placeholder="https://competitor.com" style="font-size:14px;">
                             </div>
                         </div>
+                    </div>
+                    <div class="col-md-6">
                         <div class="form-group mb-2">
                             <label style="font-size:13px;"><strong>Keyword</strong> <span class="text-muted font-weight-normal">(optional)</span></label>
                             <div class="input-group">
@@ -36,23 +37,14 @@
                             </div>
                         </div>
                     </div>
-                    <!-- Right: checkboxes -->
-                    <div class="col-md-6">
-                        <div class="form-group mb-2">
-                            <label class="d-inline-flex align-items-center mb-1" style="cursor:pointer; font-size:13px;">
-                                <input type="checkbox" id="competitor_force_render" class="mr-2" style="width:16px; height:16px;">
-                                <span class="font-weight-bold">Force full render</span>
-                            </label>
-                            <span class="form-text text-muted" style="font-size:12px;">Uses a real browser on every page — slower. Turn on only for JS sites the quick crawl reads wrong.</span>
-                        </div>
-                        <div class="form-group mb-2">
-                            <label class="d-inline-flex align-items-center mb-1" style="cursor:pointer; font-size:13px;">
-                                <input type="checkbox" id="competitor_ai_crawl" class="mr-2" style="width:16px; height:16px;">
-                                <span class="font-weight-bold">Crawl with AI</span>
-                            </label>
-                            <span class="form-text text-muted" style="font-size:12px;">Lets AI browse the site to find the tour pages — best for JS sites the quick crawl can’t read. Uses a small OpenAI call for discovery.</span>
-                        </div>
-                    </div>
+                </div>
+                <!-- Crawl with AI (moved to bottom of Section 1) -->
+                <div class="form-group mb-2">
+                    <label class="d-inline-flex align-items-center mb-1" style="cursor:pointer; font-size:13px;">
+                        <input type="checkbox" id="competitor_ai_crawl" class="mr-2" style="width:16px; height:16px;">
+                        <span class="font-weight-bold">Crawl with AI</span>
+                    </label>
+                    <span class="form-text text-muted" style="font-size:12px;">Lets AI browse the site to find the tour pages — best for JS sites the quick crawl can’t read. Uses a small OpenAI call for discovery.</span>
                 </div>
 
                 <!-- OR divider -->
@@ -147,8 +139,10 @@
 
     // ---- Background crawl jobs, shown as rows AT THE TOP of Analysis History ----
     var jobsTimer = null;
-    var VIEW_URL   = '<?php echo base_url('Competitor_Analysis/View?id=') ?>';
-    var REVIEW_URL = '<?php echo base_url('Competitor_Analysis/Review') ?>?job=';
+    var VIEW_URL     = '<?php echo base_url('Competitor_Product/View?id=') ?>';
+    var PDF_URL      = '<?php echo base_url('Competitor_Product/Download_Pdf?id=') ?>';
+    var REVIEW_URL   = '<?php echo base_url('Competitor_Product/Review') ?>?job=';
+    var TIMELINE_URL = '<?php echo base_url('Competitor_Product/Timeline') ?>?host=';
 
     function fmtDur(sec) {
         sec = Math.max(0, Math.round(sec));
@@ -184,11 +178,18 @@
     }
     function jobActionCell(j) {
         var items = [];
-        if(j.state !== 'done' && j.state !== 'error') {
+        if(j.is_group) {
+            // A merged website row — its per-run history (Review & Select, Terminate,
+            // Delete) lives on the Timeline page.
+            items.push('<a href="' + TIMELINE_URL + encodeURIComponent(j.host) + '" class="dropdown-item" style="font-size:11px;"><i class="la la-history mr-2"></i>View Timeline</a>');
+        } else if(j.state !== 'done' && j.state !== 'error') {
             // Running → Terminate (kills the worker + drops the task).
             items.push('<a href="javascript:;" class="dropdown-item terminate-job" data-job="' + j.job + '" style="font-size:11px;"><i class="la la-times mr-2"></i>Terminate</a>');
         } else {
-            if(j.analysis_id) items.push('<a href="' + VIEW_URL + j.analysis_id + '" class="dropdown-item" style="font-size:11px;"><i class="la la-search mr-2"></i>View Analysis</a>');
+            if(j.analysis_id) {
+                items.push('<a href="' + VIEW_URL + j.analysis_id + '" class="dropdown-item" style="font-size:11px;"><i class="la la-search mr-2"></i>View Analysis</a>');
+                items.push('<a href="' + PDF_URL + j.analysis_id + '" class="dropdown-item" style="font-size:11px;"><i class="la la-file-pdf mr-2"></i>Download PDF</a>');
+            }
             else if(j.reviewable) items.push('<a href="' + REVIEW_URL + encodeURIComponent(j.job) + '" class="dropdown-item" style="font-size:11px;"><i class="la la-list-alt mr-2"></i>Review &amp; Select</a>');
             if(j.is_upload) items.push('<a href="javascript:;" class="dropdown-item delete-upload" data-id="' + j.analysis_id + '" style="font-size:11px;"><i class="la la-trash mr-2"></i>Delete</a>');
             else items.push('<a href="javascript:;" class="dropdown-item delete-job" data-job="' + j.job + '" style="font-size:11px;"><i class="la la-trash mr-2"></i>Delete</a>');
@@ -202,7 +203,7 @@
     $(document).on('click', '.terminate-job', function() {
         var job = $(this).data('job');
         $(this).closest('tr').fadeOut(200);   // optimistic drop
-        $.post('<?php echo base_url('Competitor_Analysis/Terminate_Job') ?>', { job: job }, function() { loadJobs(); }, 'json')
+        $.post('<?php echo base_url('Competitor_Product/Terminate_Job') ?>', { job: job }, function() { loadJobs(); }, 'json')
             .fail(function() { loadJobs(); });
     });
 
@@ -216,7 +217,7 @@
             .then(function(a) {
                 if(a.isConfirmed) {
                     $row.fadeOut(200);
-                    $.post('<?php echo base_url('Competitor_Analysis/Terminate_Job') ?>', { job: job }, function() { loadJobs(); }, 'json');
+                    $.post('<?php echo base_url('Competitor_Product/Terminate_Job') ?>', { job: job }, function() { loadJobs(); }, 'json');
                 }
             });
     });
@@ -231,7 +232,7 @@
             .then(function(a) {
                 if(a.isConfirmed) {
                     $row.fadeOut(200);
-                    $.post('<?php echo base_url('Competitor_Analysis/Delete') ?>', { id: id }, function() { loadJobs(); }, 'json')
+                    $.post('<?php echo base_url('Competitor_Product/Delete') ?>', { id: id }, function() { loadJobs(); }, 'json')
                         .fail(function() { loadJobs(); });
                 }
             });
@@ -251,17 +252,25 @@
             $rows.html(jobs.map(function(j) {
                 no++;
                 total += (j.cost_total || 0);
+                var analysedChip = j.analysed ? ' <span class="label label-light-success label-inline" style="font-size:9px;">' + j.analysed + ' analysed</span>' : '';
                 var products = j.is_upload
                     ? '<span class="text-muted">—</span>'
-                    : ((j.state === 'done')
-                        ? (j.count + (j.analysed ? ' <span class="label label-light-success label-inline" style="font-size:9px;">' + j.analysed + ' analysed</span>' : ''))
-                        : '—');
+                    : (j.is_group
+                        ? ((j.count > 0 ? j.count : '—') + analysedChip)
+                        : ((j.state === 'done') ? (j.count + analysedChip) : '—'));
                 var cost = (j.cost_total > 0) ? Number(j.cost_total).toFixed(4) : '—';
-                // Source cell: a crawl shows a clickable URL (+ keyword/full-render chips);
+                // Source cell: a merged website row shows the host + a "N crawls" tag;
+                // a single crawl shows a clickable URL (+ keyword/full-render chips);
                 // a pasted analysis shows its label (a link when it's a URL) + a "Text" tag;
                 // an upload shows the file name + a "File" tag.
                 var isHttp = /^https?:\/\//i.test(j.url || '');
-                var source = j.is_paste
+                var kwChip = j.keyword ? '<br><span class="label label-light-primary label-inline font-weight-bold mt-1" style="font-size:11px;"><i class="la la-filter mr-1"></i>Keyword: ' + esc(j.keyword) + '</span>' : '';
+                var aiChip = j.ai_crawl ? ' <span class="label label-light-info label-inline font-weight-bold mt-1" style="font-size:11px;"><i class="la la-robot mr-1"></i>AI crawl</span>' : '';
+                var source = j.is_group
+                    ? '<a href="' + esc(j.url) + '" target="_blank" rel="noopener" style="font-size:12px;">' + esc(j.host) + '</a>'
+                        + ' <span class="label label-light-dark label-inline font-weight-bold" style="font-size:10px;"><i class="la la-history mr-1"></i>' + j.runs_count + ' crawl' + (j.runs_count > 1 ? 's' : '') + '</span>'
+                        + kwChip + aiChip
+                    : j.is_paste
                     ? (isHttp
                         ? '<a href="' + esc(j.url) + '" target="_blank" rel="noopener" style="font-size:12px;"><i class="la la-paste mr-1"></i>' + esc(j.url) + '</a>'
                         : '<span style="font-size:12px;"><i class="la la-paste mr-1"></i>' + esc(j.url) + '</span>')
@@ -271,10 +280,7 @@
                     ? '<span style="font-size:12px;"><i class="la la-file-alt mr-1"></i>' + esc(j.url) + '</span>'
                         + ' <span class="label label-light-info label-inline font-weight-bold" style="font-size:10px;">File</span>'
                         + (j.title ? '<div class="text-muted" style="font-size:11px;">' + esc(j.title) + '</div>' : '')
-                    : '<a href="' + esc(j.url) + '" target="_blank" rel="noopener" style="font-size:12px;">' + esc(j.url) + '</a>'
-                        + (j.keyword ? '<br><span class="label label-light-primary label-inline font-weight-bold mt-1" style="font-size:11px;"><i class="la la-filter mr-1"></i>Keyword: ' + esc(j.keyword) + '</span>' : '')
-                        + (j.force_render ? ' <span class="label label-light-warning label-inline font-weight-bold mt-1" style="font-size:11px;"><i class="la la-desktop mr-1"></i>Full render</span>' : '')
-                        + (j.ai_crawl ? ' <span class="label label-light-info label-inline font-weight-bold mt-1" style="font-size:11px;"><i class="la la-robot mr-1"></i>AI crawl</span>' : '');
+                    : '<a href="' + esc(j.url) + '" target="_blank" rel="noopener" style="font-size:12px;">' + esc(j.url) + '</a>' + kwChip + aiChip;
                 return '<tr>'
                     + '<td style="text-align:center; padding:12px 8px;">' + no + '</td>'
                     + '<td style="max-width:260px; word-break:break-all;">' + source + '</td>'
@@ -294,7 +300,7 @@
     }
     function loadJobs() {
         if(!$('#jobs_rows').length) return;
-        $.getJSON('<?php echo base_url('Competitor_Analysis/Jobs_List') ?>').done(renderJobs);
+        $.getJSON('<?php echo base_url('Competitor_Product/Jobs_List') ?>').done(renderJobs);
     }
     $(document).ready(loadJobs);
 
@@ -309,7 +315,7 @@
                 didOpen: function() { Swal.showLoading(); } });
         }
         $.ajax({
-            url: '<?php echo base_url('Competitor_Analysis/Analyze') ?>',
+            url: '<?php echo base_url('Competitor_Product/Analyze') ?>',
             type: 'post', data: form, processData: false, contentType: false, dataType: 'json',
             success: function(res) {
                 $btn.prop('disabled', false).html(html);
@@ -325,7 +331,7 @@
                 }
                 Swal.close();
                 if(res && res.success && res.id) {
-                    window.location.href = '<?php echo base_url('Competitor_Analysis/View?id=') ?>' + res.id;
+                    window.location.href = '<?php echo base_url('Competitor_Product/View?id=') ?>' + res.id;
                 } else {
                     Display_Message(CA_IMG, (res && res.message) ? res.message : 'Analysis Failed', null);
                 }
@@ -372,13 +378,11 @@
             form.append('url', base);
             var kw = $.trim($('#competitor_keyword').val());
             if(kw !== '') { form.append('keyword', kw); }
-            if($('#competitor_force_render').is(':checked')) { form.append('force_render', '1'); }
             if($('#competitor_ai_crawl').is(':checked')) { form.append('ai_crawl', '1'); }
             title = kw !== '' ? ('Crawling for “' + kw + '”…') : 'Crawling the site…';
             // Reset the crawl inputs so the next crawl starts clean (the keyword +
-            // full-render + AI crawl are remembered on the queued crawl row, not the form).
+            // AI crawl are remembered on the queued crawl row, not the form).
             $('#competitor_keyword').val('');
-            $('#competitor_force_render').prop('checked', false);
             $('#competitor_ai_crawl').prop('checked', false);
         }
         runAnalyze(form, $(this), title);

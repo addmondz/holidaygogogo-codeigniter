@@ -2,7 +2,7 @@
 defined('BASEPATH') OR exit('No direct script access allowed');
 
 /**
- * Competitor Analysis — an Owner-only (level 10) tool. The Owner pastes a
+ * Competitor Product — an Owner-only (level 10) tool. The Owner pastes a
  * competitor product URL; we scrape the page, ask OpenAI to extract the product
  * and compare it against our own costing packages, then store and list the
  * result. GET renders the form + history; Analyze (AJAX POST) runs the pipeline;
@@ -11,7 +11,7 @@ defined('BASEPATH') OR exit('No direct script access allowed');
  * The scraping + OpenAI call live in libraries/CompetitorAnalysisService; the
  * pure transforms live in helpers/competitor_analysis_helper.
  */
-class Competitor_Analysis extends MY_Controller
+class Competitor_Product extends MY_Controller
 {
 	function __construct()
 	{
@@ -28,11 +28,11 @@ class Competitor_Analysis extends MY_Controller
 	function index()
 	{
 		$titles = array(
-			'tab_title'        => 'HolidayGoGoGo | Competitor Analysis',
-			'breadcrumb_title' => 'Competitor Analysis',
+			'tab_title'        => 'HolidayGoGoGo | Competitor Product',
+			'breadcrumb_title' => 'Competitor Product',
 		);
 		$this->load->view('layout/header', $titles);
-		$this->load->view('competitor_analysis/index');
+		$this->load->view('competitor_product/index');
 		$this->load->view('layout/footer');
 	}
 
@@ -48,7 +48,7 @@ class Competitor_Analysis extends MY_Controller
 		$status = json_decode((string) @file_get_contents($dir . $job_id . '.json'), true);
 		$items  = json_decode((string) @file_get_contents($dir . $job_id . '.items.json'), true);
 		if ($job_id === '' || ! is_array($status) || ! is_array($items)) {
-			redirect(base_url('Competitor_Analysis'));
+			redirect(base_url('Competitor_Product'));
 			return;
 		}
 		$analysed = isset($status['analysed']) && is_array($status['analysed']) ? $status['analysed'] : array();
@@ -74,11 +74,11 @@ class Competitor_Analysis extends MY_Controller
 			);
 		}
 		$titles = array(
-			'tab_title'        => 'HolidayGoGoGo | Competitor Analysis',
-			'breadcrumb_title' => 'Competitor Analysis >> Review',
+			'tab_title'        => 'HolidayGoGoGo | Competitor Product',
+			'breadcrumb_title' => 'Competitor Product >> Review',
 		);
 		$this->load->view('layout/header', $titles);
-		$this->load->view('competitor_analysis/review', array(
+		$this->load->view('competitor_product/review', array(
 			'job'      => $job_id,
 			'src_url'  => isset($status['url']) ? $status['url'] : '',
 			'products' => $products,
@@ -94,7 +94,7 @@ class Competitor_Analysis extends MY_Controller
 	function Analyze_Selected()
 	{
 		if ( ! $this->input->is_ajax_request()) {
-			redirect(base_url('Competitor_Analysis'));
+			redirect(base_url('Competitor_Product'));
 			return;
 		}
 		$this->output->set_content_type('application/json');
@@ -129,11 +129,55 @@ class Competitor_Analysis extends MY_Controller
 			: array('success' => false, 'message' => 'Could not start the analysis.'));
 	}
 
+	/**
+	 * AJAX: delete one OR MANY crawled products from a crawl's Review list (the
+	 * per-row trash button posts a single index; "Delete Selected" posts several).
+	 * Drops each item from the crawl's items.json (other indices stay put so the
+	 * analysed-map keys remain valid) and, for any product already analysed,
+	 * deletes its saved analysis row and refunds its cost from the running total.
+	 * Returns {success}.
+	 */
+	function Delete_Crawl_Items()
+	{
+		if ( ! $this->input->is_ajax_request()) {
+			redirect(base_url('Competitor_Product'));
+			return;
+		}
+		$this->output->set_content_type('application/json');
+		$job_id  = preg_replace('/[^A-Za-z0-9_]/', '', (string) $this->input->post('job'));
+		$indices = $this->input->post('indices');
+		$indices = is_array($indices) ? array_values(array_unique(array_map('intval', $indices))) : array();
+		$dir     = APPPATH . 'logs/competitor_crawl/jobs/';
+		$status_file = $dir . $job_id . '.json';
+		$items_file  = $dir . $job_id . '.items.json';
+		if ($job_id === '' || ! is_file($status_file) || ! is_file($items_file)) {
+			echo json_encode(array('success' => false, 'message' => 'Crawl not found.'));
+			return;
+		}
+		if (empty($indices)) {
+			echo json_encode(array('success' => false, 'message' => 'Select at least one product.'));
+			return;
+		}
+		$status = json_decode((string) @file_get_contents($status_file), true);
+		$items  = json_decode((string) @file_get_contents($items_file), true);
+		if ( ! is_array($status) || ! is_array($items)) {
+			echo json_encode(array('success' => false, 'message' => 'Crawl not found.'));
+			return;
+		}
+		$result = competitor_remove_crawl_items($items, $status, $indices);
+		foreach ($result['deleted_analysis_ids'] as $aid) {
+			$this->Competitor_Analysis_Model->Delete((int) $aid);
+		}
+		@file_put_contents($items_file, json_encode($result['items'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+		@file_put_contents($status_file, json_encode($result['status'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+		echo json_encode(array('success' => true));
+	}
+
 	/** AJAX: minimal state of a job (for the Review page to poll an analyse run). */
 	function Job_State()
 	{
 		if ( ! $this->input->is_ajax_request()) {
-			redirect(base_url('Competitor_Analysis'));
+			redirect(base_url('Competitor_Product'));
 			return;
 		}
 		$this->output->set_content_type('application/json');
@@ -152,7 +196,7 @@ class Competitor_Analysis extends MY_Controller
 	function Analyze()
 	{
 		if ( ! $this->input->is_ajax_request()) {
-			redirect(base_url('Competitor_Analysis'));
+			redirect(base_url('Competitor_Product'));
 			return;
 		}
 		$this->output->set_content_type('application/json');
@@ -231,9 +275,8 @@ class Competitor_Analysis extends MY_Controller
 		// history table). AI runs only when OPENAI_API_KEY is set.
 		if ( ! $has_file) {
 			$keyword  = trim((string) $this->input->post('keyword'));
-			$force    = (string) $this->input->post('force_render') === '1';
 			$ai_crawl = (string) $this->input->post('ai_crawl') === '1';
-			$job_id = $this->start_crawl_job($url, $keyword, $force, $ai_crawl);
+			$job_id = $this->start_crawl_job($url, $keyword, $ai_crawl);
 			if ($job_id !== '') {
 				echo json_encode(array('success' => true, 'job' => $job_id));
 			} else {
@@ -279,20 +322,17 @@ class Competitor_Analysis extends MY_Controller
 	}
 
 	/**
-	 * AJAX: list recent background crawl jobs (newest first) for the Crawl Jobs
-	 * panel — the browser-safe view of each status file, so the user can leave and
-	 * come back to check progress / download results. Prunes files older than 7
-	 * days. Returns {jobs: [...], running: <bool>}.
+	 * Read every crawl-job status file into public views, pruning files older than
+	 * 7 days along the way. Returns ['crawls' => [...crawl-mode views...], 'singles'
+	 * => [...in-progress paste views...], 'running' => bool]. A FINISHED paste job
+	 * is omitted (its saved DB row is folded in by the listing); transient analyse
+	 * jobs are skipped. Each view carries a '_sort' (file mtime) for recency order.
 	 */
-	function Jobs_List()
+	private function read_job_views()
 	{
-		if ( ! $this->input->is_ajax_request()) {
-			redirect(base_url('Competitor_Analysis'));
-			return;
-		}
-		$this->output->set_content_type('application/json');
 		$dir = APPPATH . 'logs/competitor_crawl/jobs/';
-		$jobs = array();
+		$crawls  = array();
+		$singles = array();
 		$running = false;
 		foreach (glob($dir . '*.json') ?: array() as $path) {
 			if (substr($path, -11) === '.items.json') {
@@ -315,19 +355,52 @@ class Competitor_Analysis extends MY_Controller
 			if ($mode === 'analyse') {
 				continue;
 			}
-			// A FINISHED paste job is shown via its saved DB row (folded in below), so
-			// skip the done status file to avoid a duplicate row. Queued/running/error
-			// paste jobs still show here (progress + error visibility).
+			// A FINISHED paste job is shown via its saved DB row (folded in by the
+			// listing), so skip the done status file to avoid a duplicate row.
+			// Queued/running/error paste jobs still show (progress + error visibility).
 			if ($mode === 'paste' && (isset($s['state']) ? $s['state'] : '') === 'done') {
 				continue;
 			}
 			$view = competitor_job_public_view($s);
 			$view['_sort'] = filemtime($path);
-			$jobs[] = $view;
 			if (in_array($view['state'], array('queued', 'running'), true)) {
 				$running = true;
 			}
+			if ($view['mode'] === 'crawl') {
+				$crawls[] = $view;
+			} else {
+				$singles[] = $view;   // in-progress paste
+			}
 		}
+		return array('crawls' => $crawls, 'singles' => $singles, 'running' => $running);
+	}
+
+	/**
+	 * AJAX: the Analysis Results table (newest first). Crawl runs of the SAME
+	 * website are MERGED into one row per host (competitor_group_crawl_jobs) — the
+	 * per-run history lives behind the Timeline page — while pasted text/links and
+	 * uploaded PDFs/images stay as their own rows. Prunes stale job files. Returns
+	 * {jobs: [...], running: <bool>}.
+	 */
+	function Jobs_List()
+	{
+		if ( ! $this->input->is_ajax_request()) {
+			redirect(base_url('Competitor_Product'));
+			return;
+		}
+		$this->output->set_content_type('application/json');
+		$collected = $this->read_job_views();
+		$running   = $collected['running'];
+
+		// One merged row per crawled website; recency = its latest run's timestamp.
+		$jobs = competitor_group_crawl_jobs($collected['crawls']);
+		foreach ($jobs as &$g) {
+			$g['_sort'] = strtotime($g['ts']) ?: 0;
+		}
+		unset($g);
+		// In-progress paste jobs stay as individual rows.
+		$jobs = array_merge($jobs, $collected['singles']);
+
 		// Fold in single (non-crawl) analyses — uploaded PDFs/images and pasted
 		// text/links — so they share the one results table.
 		foreach ($this->Competitor_Analysis_Model->Read_Uploads(20) as $u) {
@@ -347,7 +420,6 @@ class Competitor_Analysis extends MY_Controller
 				'cost_total'   => (float) $u->cost_usd,
 				'ts'           => $ts,
 				'keyword'      => '',
-				'force_render' => false,
 				'reviewable'   => false,
 				'done'         => 1,
 				'total'        => 1,
@@ -363,6 +435,66 @@ class Competitor_Analysis extends MY_Controller
 		echo json_encode(array('jobs' => $jobs, 'running' => $running));
 	}
 
+	/** Sanitise a ?host= param to a bare hostname (a-z 0-9 . -), lowercased. */
+	private function clean_host($raw)
+	{
+		return strtolower(preg_replace('/[^a-z0-9.\-]/i', '', (string) $raw));
+	}
+
+	/**
+	 * The Crawl Timeline for one website — every crawl RUN of that host, newest
+	 * first, each with its own Review & Select. Reached from the merged Analysis
+	 * Results row. The rows themselves load via Timeline_List so a running crawl
+	 * keeps updating.
+	 */
+	function Timeline()
+	{
+		$host = $this->clean_host($this->input->get('host'));
+		if ($host === '') {
+			redirect(base_url('Competitor_Product'));
+			return;
+		}
+		$titles = array(
+			'tab_title'        => 'HolidayGoGoGo | Competitor Product',
+			'breadcrumb_title' => 'Competitor Product >> Timeline',
+		);
+		$this->load->view('layout/header', $titles);
+		$this->load->view('competitor_product/timeline', array('host' => $host));
+		$this->load->view('layout/footer');
+	}
+
+	/**
+	 * AJAX: the crawl RUNS for one website host (newest first) — the un-merged
+	 * per-run views the Timeline page renders. Same shape as a single crawl row in
+	 * Jobs_List, so each run keeps Review & Select / Terminate / Delete. Returns
+	 * {jobs: [...runs...], running: <bool>}.
+	 */
+	function Timeline_List()
+	{
+		if ( ! $this->input->is_ajax_request()) {
+			redirect(base_url('Competitor_Product'));
+			return;
+		}
+		$this->output->set_content_type('application/json');
+		$host = $this->clean_host($this->input->get('host'));
+		$collected = $this->read_job_views();
+		$runs = array();
+		$running = false;
+		foreach ($collected['crawls'] as $v) {
+			if (competitor_job_host($v['url']) !== $host) {
+				continue;
+			}
+			if (in_array($v['state'], array('queued', 'running'), true)) {
+				$running = true;
+			}
+			$runs[] = $v;
+		}
+		usort($runs, function ($a, $b) { return $b['_sort'] - $a['_sort']; });
+		foreach ($runs as &$r) { unset($r['_sort']); }
+		unset($r);
+		echo json_encode(array('jobs' => $runs, 'running' => $running));
+	}
+
 	/**
 	 * AJAX: terminate a running crawl job and DROP it — kill the detached worker
 	 * process (by the PID captured at spawn, plus its direct children e.g. headless
@@ -371,7 +503,7 @@ class Competitor_Analysis extends MY_Controller
 	function Terminate_Job()
 	{
 		if ( ! $this->input->is_ajax_request()) {
-			redirect(base_url('Competitor_Analysis'));
+			redirect(base_url('Competitor_Product'));
 			return;
 		}
 		$this->output->set_content_type('application/json');
@@ -402,12 +534,11 @@ class Competitor_Analysis extends MY_Controller
 	 * Queue a crawl and spawn the detached CLI worker. Returns the job id or ''
 	 * when it can't be spawned.
 	 */
-	private function start_crawl_job($url, $keyword = '', $force_render = false, $ai_crawl = false)
+	private function start_crawl_job($url, $keyword = '', $ai_crawl = false)
 	{
 		return $this->queue_job(array(
 			'url'          => $url,
 			'keyword'      => trim((string) $keyword),
-			'force_render' => $force_render ? 1 : 0,
 			'ai_crawl'     => $ai_crawl ? 1 : 0,
 			'created_by'   => $this->session->admin_id,
 		));
@@ -415,7 +546,7 @@ class Competitor_Analysis extends MY_Controller
 
 	/**
 	 * Write a queued job status file (merging $status) and spawn the detached CLI
-	 * worker (Competitor_Job::run). Returns the job id, or '' when exec is
+	 * worker (Competitor_Product_Job::run). Returns the job id, or '' when exec is
 	 * unavailable / the process can't be launched.
 	 */
 	private function queue_job($status)
@@ -442,10 +573,10 @@ class Competitor_Analysis extends MY_Controller
 		$out   = $dir . $job_id . '.out';
 		// pcre.jit=0: the spawned (sandboxed) process can't allocate JIT executable
 		// memory, which otherwise spams a PCRE-JIT warning; the interpreter is fine.
-		// Controller name MUST match the file case exactly (Competitor_Job) — Linux
+		// Controller name MUST match the file case exactly (Competitor_Product_Job) — Linux
 		// filesystems are case-sensitive, so lowercase 'competitor_job' 404s there.
 		// `& echo $!` prints the detached worker's PID so we can Terminate it later.
-		$cmd = escapeshellarg($php) . ' -d pcre.jit=0 ' . escapeshellarg($index) . ' Competitor_Job run ' . escapeshellarg($job_id)
+		$cmd = escapeshellarg($php) . ' -d pcre.jit=0 -d memory_limit=768M ' . escapeshellarg($index) . ' Competitor_Product_Job run ' . escapeshellarg($job_id)
 			. ' > ' . escapeshellarg($out) . ' 2>&1 & echo $!';
 		$pid = (int) @exec($cmd);
 		if ($pid > 0) {
@@ -508,22 +639,187 @@ class Competitor_Analysis extends MY_Controller
 		$id = (int) $this->input->get('id');
 		$analysis = $this->Competitor_Analysis_Model->Read_One($id);
 		if ( ! $analysis) {
-			redirect(base_url('Competitor_Analysis'));
+			redirect(base_url('Competitor_Product'));
 			return;
 		}
+		$lang   = competitor_normalize_lang($this->input->get('lang'));
+		$has_cn = $this->Competitor_Analysis_Model->Read_Translation($id, 'cn') !== null;
+		if ($lang !== 'en') {
+			$analysis = $this->apply_language($analysis, $id, $lang);
+		}
 		$titles = array(
-			'tab_title'        => 'HolidayGoGoGo | Competitor Analysis',
-			'breadcrumb_title' => 'Competitor Analysis >> View',
+			'tab_title'        => 'HolidayGoGoGo | Competitor Product',
+			'breadcrumb_title' => 'Competitor Product >> View',
 		);
 		$this->load->view('layout/header', $titles);
-		$this->load->view('competitor_analysis/view', array('a' => $analysis));
+		$this->load->view('competitor_product/view', array(
+			'a'      => $analysis,
+			'lang'   => $lang,
+			'labels' => competitor_ui_labels($lang),
+			'has_cn' => $has_cn,
+		));
 		$this->load->view('layout/footer');
+	}
+
+	/**
+	 * AJAX: ensure a cached translation exists for {id, lang} — generate it with
+	 * OpenAI on first request, then reuse. The page reloads to ?lang=xx to render
+	 * it (so the PDF, which reads the same overlay, follows automatically).
+	 */
+	function Translate()
+	{
+		if ( ! $this->input->is_ajax_request()) {
+			redirect(base_url('Competitor_Product'));
+			return;
+		}
+		$this->output->set_content_type('application/json');
+
+		$id   = (int) $this->input->post('id');
+		$lang = competitor_normalize_lang($this->input->post('lang'));
+		if ($lang === 'en') {
+			echo json_encode(array('success' => true, 'cached' => true));   // English is the stored original
+			return;
+		}
+		if (empty(get_env('OPENAI_API_KEY'))) {
+			echo json_encode(array('success' => false, 'message' => 'OpenAI is not configured (OPENAI_API_KEY).'));
+			return;
+		}
+		$analysis = $this->Competitor_Analysis_Model->Read_One($id);
+		if ( ! $analysis) {
+			echo json_encode(array('success' => false, 'message' => 'Analysis not found.'));
+			return;
+		}
+		// Already translated → nothing to do (cheap path; keeps the toggle instant).
+		if ($this->Competitor_Analysis_Model->Read_Translation($id, $lang) !== null) {
+			echo json_encode(array('success' => true, 'cached' => true));
+			return;
+		}
+
+		@set_time_limit(600);
+		$this->load->library('CompetitorAnalysisService');
+		try {
+			$overlay = $this->competitoranalysisservice->translate_analysis(
+				competitor_display_products($analysis), $lang
+			);
+		} catch (Exception $e) {
+			echo json_encode(array('success' => false, 'message' => $e->getMessage()));
+			return;
+		}
+		$this->Competitor_Analysis_Model->Save_Translation($id, $lang, $overlay);
+		echo json_encode(array('success' => true, 'cached' => false));
+	}
+
+	/**
+	 * Overlay the cached translation for $lang onto the analysis row so the view /
+	 * PDF render in that language. Silently falls back to the English original when
+	 * no translation is cached yet.
+	 */
+	private function apply_language($analysis, $id, $lang)
+	{
+		$tr = $this->Competitor_Analysis_Model->Read_Translation($id, $lang);
+		if (is_array($tr)) {
+			$analysis = competitor_apply_translation_to_row($analysis, $tr);
+		}
+		return $analysis;
+	}
+
+	/**
+	 * Absolute path to a CJK-capable font for the Chinese PDF, from
+	 * COMPETITOR_PDF_CJK_FONT in .env. MUST be a TrueType .ttf: the bundled DomPDF
+	 * font lib mis-renders .otf/.cff (glyphs shift) and can't read .ttc
+	 * collections, so those are rejected here (the PDF then renders with a Latin
+	 * fallback rather than garbage). Returns '' when unset, missing or unsupported.
+	 */
+	private function pdf_cjk_font_path()
+	{
+		$path = trim((string) get_env('COMPETITOR_PDF_CJK_FONT'));
+		if ($path === '' || ! is_file($path)) {
+			return '';
+		}
+		$ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+		return in_array($ext, array('ttf'), true) ? $path : '';
+	}
+
+	/**
+	 * Stream a saved analysis as a downloadable PDF (same content as View(), laid
+	 * out for DomPDF via the competitor_product/pdf template). Owner-only via the
+	 * constructor gate.
+	 */
+	function Download_Pdf()
+	{
+		$id = (int) $this->input->get('id');
+		$analysis = $this->Competitor_Analysis_Model->Read_One($id);
+		if ( ! $analysis) {
+			redirect(base_url('Competitor_Product'));
+			return;
+		}
+
+		// Follow the language the user is viewing — overlay the cached translation
+		// so the PDF matches the on-screen (translated) content.
+		$lang = competitor_normalize_lang($this->input->get('lang'));
+		if ($lang !== 'en') {
+			$analysis = $this->apply_language($analysis, $id, $lang);
+		}
+
+		// DejaVu Sans (DomPDF's default) has no CJK glyphs, so a Chinese PDF would
+		// render as empty boxes. When a CJK TrueType font is configured
+		// (COMPETITOR_PDF_CJK_FONT in .env), register it and use it as the body font;
+		// subsetting keeps the embedded output small. Latin falls back to DejaVu.
+		$cjk_font = $this->pdf_cjk_font_path();
+		$use_cjk  = ($lang !== 'en' && $cjk_font !== '');
+
+		$html = $this->load->view('competitor_product/pdf', array(
+			'a'        => $analysis,
+			'lang'     => $lang,
+			'labels'   => competitor_ui_labels($lang),
+			'pdf_font' => $use_cjk ? 'cjk, "DejaVu Sans", sans-serif' : '"DejaVu Sans", sans-serif',
+		), true);
+
+		require_once APPPATH . 'libraries/dompdf/autoload.inc.php';
+		$options = new \Dompdf\Options();
+		$options->setIsRemoteEnabled(true);
+		$options->setIsFontSubsettingEnabled(true);
+		if ($use_cjk) {
+			// Namespace the (writable) font cache per font file so switching the
+			// configured font never mixes stale glyph metrics from a previous one.
+			$font_dir = APPPATH . 'cache/dompdf_fonts/' . md5($cjk_font) . '/';
+			if ( ! is_dir($font_dir)) { @mkdir($font_dir, 0755, true); }
+			$options->setFontDir($font_dir);
+			$options->setFontCache($font_dir);
+			// registerFont resolves symlinks (e.g. /Library/Fonts → /System/...), so
+			// the REAL directory must be in the chroot or the font silently won't load.
+			$real = realpath($cjk_font);
+			$options->setChroot(array_values(array_filter(array(
+				FCPATH, APPPATH, dirname($cjk_font), $real ? dirname($real) : null
+			))));
+		}
+		$dompdf = new \Dompdf\Dompdf($options);
+		if ($use_cjk) {
+			$fm = $dompdf->getFontMetrics();
+			$fm->registerFont(array('family' => 'cjk', 'style' => 'normal', 'weight' => 'normal'), $cjk_font);
+			$fm->registerFont(array('family' => 'cjk', 'style' => 'normal', 'weight' => 'bold'), $cjk_font);
+		}
+		$dompdf->loadHtml($html, 'UTF-8');
+		$dompdf->setPaper('A4', 'portrait');
+		$dompdf->render();
+
+		// Emit like the other PDF endpoints (Costing_Quotation / Booking_Confirmation):
+		// explicit headers + output() + exit, instead of DomPDF's stream() which
+		// die()s on "headers already sent".
+		$name = competitor_pdf_filename($analysis->product_name ?: $analysis->page_title, $analysis->id);
+		header('Content-Type: application/pdf');
+		header('Content-Disposition: attachment; filename="' . $name . '"');
+		header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+		header('Pragma: no-cache');
+		header('Expires: 0');
+		echo $dompdf->output();
+		exit;
 	}
 
 	function Delete()
 	{
 		if ( ! $this->input->is_ajax_request()) {
-			redirect(base_url('Competitor_Analysis'));
+			redirect(base_url('Competitor_Product'));
 			return;
 		}
 		$this->output->set_content_type('application/json');

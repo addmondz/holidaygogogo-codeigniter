@@ -120,7 +120,7 @@ if (!function_exists('costing_itinerary_level_fields')) {
      */
     function costing_itinerary_level_fields()
     {
-        return array('itinerary_notes', 'itinerary_special_remark', 'itinerary_terms_and_conditions');
+        return array('itinerary_notes');
     }
 }
 
@@ -194,23 +194,21 @@ if (!function_exists('costing_itinerary_prepare_row')) {
 
 if (!function_exists('costing_itinerary_prepare_level')) {
     /**
-     * Normalise the posted itinerary-level fields (notes, special remark, terms &
-     * conditions) into a package-update shape. Each rich-text field is trimmed
-     * and nulled when visually blank. The post keys are the bare names (notes,
-     * special_remark, terms_and_conditions); the returned keys are the
-     * costing_packages columns (itinerary_notes, ...).
+     * Normalise the posted itinerary-level field into a package-update shape. The
+     * Include / Exclude / Important Notes / Terms & Conditions are now kept in one
+     * merged rich-text Notes field. Trimmed and nulled when visually blank. Post
+     * key is the bare name (notes); the returned key is the costing_packages column
+     * (itinerary_notes).
      *
      * @param array $post
-     * @return array {itinerary_notes:?string, itinerary_special_remark:?string, itinerary_terms_and_conditions:?string}
+     * @return array {itinerary_notes:?string}
      */
     function costing_itinerary_prepare_level($post)
     {
         $post = (array) $post;
         // column => posted field name
         $map = array(
-            'itinerary_notes'                => 'notes',
-            'itinerary_special_remark'       => 'special_remark',
-            'itinerary_terms_and_conditions' => 'terms_and_conditions',
+            'itinerary_notes' => 'notes',
         );
 
         $out = array();
