@@ -1356,6 +1356,15 @@ class CompetitorAnalysisService
 	protected function enrich_with_linked_files($text)
 	{
 		$urls = competitor_extract_urls($text, 10);
+		// Drop legal/policy junk (privacy, terms & conditions, PDPA…) — these are linked
+		// site-wide (footer / chat widget), so their payment-schedule tables ("60 days
+		// prior", "RM35,000") would otherwise be folded into EVERY page's text, giving a
+		// non-product page (why-us, gallery, promotions) a spurious duration+price and
+		// slipping it past the tour-page keep gate. competitor_extract_file_links already
+		// applies this filter; the free-text URL path here must too.
+		$urls = array_values(array_filter($urls, function ($u) {
+			return ! competitor_is_junk_file_url($u);
+		}));
 		if (empty($urls)) {
 			return $text;
 		}

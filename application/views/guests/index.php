@@ -680,6 +680,17 @@ div.kt-datatable__pager-container {
 														</select>
 													</div>
 												</div>
+												<div class="col-md-3">
+													<div class="form-group">
+														<label>Created By</label>
+														<?php $sel_created_by = guest_list_multi_values($this->input->get('created_by')); ?>
+														<select name="created_by[]" class="form-control selectpicker" data-live-search="true" multiple data-actions-box="true" title="--SELECT CREATED BY--">
+															<?php if(!empty($admins)) { foreach($admins as $a) { ?>
+																<option data-icon="la la-user-tie font-size-lg bs-icon" value="<?php echo $a->AdminID; ?>" <?php if(in_array((string)$a->AdminID, $sel_created_by, true)) echo 'selected'; ?>><?php echo htmlspecialchars($a->Name); ?></option>
+															<?php } } ?>
+														</select>
+													</div>
+												</div>
 											</div>
 										<?php } ?>
 										<?php } ?>
@@ -713,6 +724,7 @@ div.kt-datatable__pager-container {
 										<th style="text-align:center;">Race</th>
 										<th style="text-align:center;">Lead Status</th>
 										<th style="text-align:center;">Created Date</th>
+										<th style="text-align:center;">Created By</th>
 										<th style="text-align:center;">Customer Type</th>
 										<th style="text-align:center;">State</th>
 									<?php } else { ?>
@@ -765,7 +777,7 @@ div.kt-datatable__pager-container {
 						</thead>
 						<tbody>
 							<?php if(empty($guests)) { ?>
-								<tr><td colspan="<?php echo ($list_base === 'Customer') ? 12 : ($list_base === 'Manual_Leads' ? 12 : 10); ?>" style="text-align:center; padding-top:10px; padding-bottom:10px;">Guest Records Not Found</td></tr>
+								<tr><td colspan="<?php echo ($list_base === 'Customer') ? 12 : ($list_base === 'Manual_Leads' ? 13 : 10); ?>" style="text-align:center; padding-top:10px; padding-bottom:10px;">Guest Records Not Found</td></tr>
 							<?php } else { ?>
 								<?php $count = 1; foreach($guests as $g) { ?>
 									<?php $is_ghl_row = isset($g->Type) && ($g->Type === 'GHL' || $g->Type === 'Manual'); ?>
@@ -874,6 +886,7 @@ div.kt-datatable__pager-container {
 													$status_val = isset($g->LeadStatus)       ? trim((string) $g->LeadStatus)       : '';
 													$state_val  = isset($g->State)            ? trim((string) $g->State)            : '';
 													$cust_val   = isset($g->CustomerType)     ? trim((string) $g->CustomerType)     : '';
+													$created_by_val = isset($g->CreatedByName) ? trim((string) $g->CreatedByName) : '';
 													$created_raw = isset($g->RecencyAt) ? (string) $g->RecencyAt : '';
 													$created_ts  = ($created_raw !== '' && strpos($created_raw, '0000-00-00') !== 0) ? strtotime($created_raw) : false;
 												?>
@@ -891,6 +904,7 @@ div.kt-datatable__pager-container {
 													<?php } else { echo $gl_dash; } ?>
 												</td>
 												<td style="text-align:center; white-space:nowrap;"><?php echo $created_ts ? date('d M Y', $created_ts) : $gl_dash; ?></td>
+												<td style="text-align:center;"><?php echo $created_by_val !== '' ? htmlspecialchars($created_by_val) : $gl_dash; ?></td>
 												<td style="text-align:center;">
 													<?php if($cust_val !== '') { ?>
 														<span class="label label-inline label-light-success font-weight-bold" style="white-space:normal;"><?php echo htmlspecialchars($cust_val); ?></span>

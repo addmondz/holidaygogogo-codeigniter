@@ -432,6 +432,8 @@ class Guests_Model extends CI_Model
 			$this->Append_In_Clause($ghl_where, $g_params, 'gc.number_of_pax', $this->input->get('number_of_pax'));
 			$this->Append_In_Clause($ghl_where, $g_params, 'gc.client_type',   $this->input->get('client_type'));
 			$this->Append_In_Clause($ghl_where, $g_params, 'gc.state',         $this->input->get('state'));
+			// Created By (Manual Leads): filter on the creator admin (gc.created_by = admin.AdminID).
+			$this->Append_In_Clause($ghl_where, $g_params, 'gc.created_by',    $this->input->get('created_by'));
 
 			// Lead Status (Manual Leads): a lead's status lives ONLY in the dated Lead
 			// Status Updates log (lead_status_log). Two related filters read it:
@@ -558,6 +560,7 @@ LEFT JOIN (
 	FROM ghl_conversations
 	GROUP BY contact_id
 ) gt ON gt.contact_id = gc.contact_id
+LEFT JOIN admin a ON a.AdminID = gc.created_by
 WHERE 1 = 1
 {$ghl_where}
 			";
@@ -847,6 +850,7 @@ WHERE 1 = 1
 		CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS NatureOfBusiness,
 		CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS LeadStatus,
 		CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS State,
+		CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS CreatedByName,
 		MAX(b.InsertDate) AS RecencyAt
 	{$from}
 	GROUP BY {$key}
@@ -900,6 +904,7 @@ SELECT
 	CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS NatureOfBusiness,
 	CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS LeadStatus,
 	CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS State,
+	CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS CreatedByName,
 	MAX(BookingDate) AS RecencyAt
 FROM (
 	{$this->Booking_Windowed_Select($dedup, $booking['from'])}
@@ -955,6 +960,7 @@ SELECT
 		ORDER BY lsl.StatusDate DESC, lsl.LogID DESC LIMIT 1
 	) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS LeadStatus,
 	CONVERT(gc.state USING utf8mb4) COLLATE utf8mb4_unicode_ci AS State,
+	CONVERT(a.Name USING utf8mb4) COLLATE utf8mb4_unicode_ci AS CreatedByName,
 	COALESCE(gc.date_added, gc.created_at) AS RecencyAt
 {$ghl['from']}
 			";
@@ -1043,6 +1049,7 @@ SELECT
 	MAX(CASE WHEN mm.rep_rn = 1 THEN mm.NatureOfBusiness END) AS NatureOfBusiness,
 	MAX(CASE WHEN mm.rep_rn = 1 THEN mm.LeadStatus       END) AS LeadStatus,
 	MAX(CASE WHEN mm.rep_rn = 1 THEN mm.State            END) AS State,
+	MAX(CASE WHEN mm.rep_rn = 1 THEN mm.CreatedByName    END) AS CreatedByName,
 	MAX(mm.RecencyAt) AS RecencyAt
 FROM (
 	SELECT m.*,

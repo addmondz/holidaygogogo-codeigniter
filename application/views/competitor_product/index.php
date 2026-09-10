@@ -304,13 +304,14 @@
     }
     $(document).ready(loadJobs);
 
-    // Shared: POST a FormData to Analyze. Dump mode → fire-and-forget background
-    // job (non-blocking; shows at the top of Analysis History). AI mode → redirect.
+    // Shared: POST a FormData to Analyze. All three inputs (URL crawl, pasted
+    // text/links, uploaded PDF/image) run as fire-and-forget background jobs —
+    // non-blocking; the row shows at the top of Analysis Results and polls itself.
     function runAnalyze(form, $btn, title) {
         var html = $btn.html();
         $btn.prop('disabled', true).html('<i class="la la-spinner la-spin"></i> Working…');
-        var isDump = form.has && (form.has('url') || form.has('paste')) && $('#jobs_rows').length > 0;
-        if(!isDump) {
+        var isBackground = form.has && (form.has('url') || form.has('paste') || form.has('file')) && $('#jobs_rows').length > 0;
+        if(!isBackground) {
             Swal.fire({ background: 'url(' + CA_IMG + ')', title: title, allowOutsideClick: false,
                 didOpen: function() { Swal.showLoading(); } });
         }
@@ -320,8 +321,10 @@
             success: function(res) {
                 $btn.prop('disabled', false).html(html);
                 if(res && res.job) {
-                    // Background crawl / paste analysis started — free the user immediately.
+                    // Background crawl / paste / upload analysis started — free the user immediately.
                     $('#competitor_url').val('');
+                    $('#competitor_file').val('');
+                    $('#competitor_file_label').text('Choose a PDF or image…');
                     Swal.fire({ toast: true, position: 'top-end', icon: 'success',
                         title: 'Started in the background',
                         text: 'It appears at the top of Analysis Results — you can keep working.',

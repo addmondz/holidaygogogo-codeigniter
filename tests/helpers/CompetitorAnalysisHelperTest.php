@@ -211,6 +211,8 @@ check('job_progress analysing without total', 'Analysing…',
     competitor_job_progress_message(array('state' => 'running', 'phase' => 'analysing')));
 check('job_progress paste job = analysing (no discovery)', 'Analysing…',
     competitor_job_progress_message(array('state' => 'running', 'mode' => 'paste')));
+check('job_progress upload job = analysing (no discovery)', 'Analysing…',
+    competitor_job_progress_message(array('state' => 'running', 'mode' => 'upload')));
 check('job_progress done shows N', 'Done — 3', competitor_job_progress_message(array('state' => 'done', 'count' => 3)));
 check('job_progress done no count', 'Done.', competitor_job_progress_message(array('state' => 'done')));
 check('job_progress error', 'Error: boom',
@@ -272,6 +274,11 @@ check('job_view ai_crawl exposes flag', true,
 check('job_view is_paste false for crawl', false, $pv['is_paste']);
 check('job_view is_paste true for paste mode', true,
     competitor_job_public_view(array('state' => 'running', 'mode' => 'paste'))['is_paste']);
+check('job_view is_upload false for crawl', false, $pv['is_upload']);
+check('job_view is_upload true for upload mode', true,
+    competitor_job_public_view(array('state' => 'running', 'mode' => 'upload'))['is_upload']);
+check('job_view is_paste false for upload mode', false,
+    competitor_job_public_view(array('state' => 'running', 'mode' => 'upload'))['is_paste']);
 
 // ---- competitor_job_host ----------------------------------------------------
 check('job_host lowercases + strips www', 'example.com',
@@ -590,6 +597,13 @@ check_true('category_url travelstyle hub', competitor_is_category_url('https://w
 check('category_url false for singular tour product', false, competitor_is_category_url('https://x.com/tours/bali-5d4n-tour'));
 check('category_url false for flat tour permalink', false, competitor_is_category_url('https://x.com/3d2n-genting-tour-itinerary'));
 check('category_url false for raha tours product', false, competitor_is_category_url('https://rahaholidays.com/tours/yunnan-travel/'));
+// Search / filter-result pages are listings (easyeurope /tour-search/?region=… flooded a crawl).
+check_true('category_url tour-search page', competitor_is_category_url('https://easyeurope.com.my/tour-search/'));
+check_true('category_url search path', competitor_is_category_url('https://x.com/search/'));
+check_true('category_url ?region= filter', competitor_is_category_url('https://easyeurope.com.my/tour-search/?region=africa'));
+check_true('category_url ?country= filter', competitor_is_category_url('https://easyeurope.com.my/tour-search/?country=egypt'));
+check('category_url false for product with harmless query', false, competitor_is_category_url('https://x.com/bali-5d4n-tour/?utm_source=fb'));
+check('category_url false for research slug (not -search-)', false, competitor_is_category_url('https://x.com/tours/market-research-trip/'));
 
 // ---- competitor_filter_urls_by_keyword (targeted crawl) ---------------------
 $kwUrls = array(
@@ -668,6 +682,10 @@ check_true('junk_file privacy', competitor_is_junk_file_url('https://x.com/priva
 check_true('junk_file pdpa', competitor_is_junk_file_url('https://x.com/media/pdpa-notice.pdf'));
 check_true('junk_file code of conduct', competitor_is_junk_file_url('https://x.com/code-of-conduct.pdf'));
 check('junk_file real brochure kept', false, competitor_is_junk_file_url('https://x.com/bali-5d4n-itinerary.pdf'));
+// A "-TC" terms-and-conditions PDF (easyeurope 20260513-EE-TC.pdf) was polluting every page.
+check_true('junk_file EE-TC terms pdf', competitor_is_junk_file_url('https://easyeurope.com.my/wp-content/uploads/20260513-EE-TC.pdf'));
+check_true('junk_file underscore tc pdf', competitor_is_junk_file_url('https://x.com/booking_tc.pdf'));
+check('junk_file brochure code ending -tc kept', false, competitor_is_junk_file_url('https://x.com/9d7n-swmj-enotc.pdf'));
 
 // ---- competitor_jsonld_product_text -----------------------------------------
 $ldTrip = '<script type="application/ld+json">' . json_encode(array(

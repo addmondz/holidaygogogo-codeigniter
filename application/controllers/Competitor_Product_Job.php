@@ -57,8 +57,50 @@ class Competitor_Product_Job extends CI_Controller
 			$this->run_analyse($job, $write);
 		} elseif ($mode === 'paste') {
 			$this->run_paste($job, $write);
+		} elseif ($mode === 'upload') {
+			$this->run_upload($job, $write);
 		} else {
 			$this->run_crawl($job, $write);
+		}
+	}
+
+	/**
+	 * Analyse an UPLOADED PDF/image in the background — the same work the old
+	 * synchronous path did, moved here so a slow OpenAI vision call can't hit the
+	 * web server's read timeout and show a false "Analysis Failed" while the
+	 * analysis actually completes. Reads the file the controller staged (file_path),
+	 * saves one history row, then deletes the staged file. On error the job file
+	 * carries the message (shown as an error row); a finished row is folded in from
+	 * the DB by Jobs_List.
+	 */
+	private function run_upload($job, $write)
+	{
+		@set_time_limit(0);
+		$file  = isset($job['file_path']) ? (string) $job['file_path'] : '';
+		$ext   = isset($job['file_ext']) ? (string) $job['file_ext'] : '';
+		$label = isset($job['url']) && $job['url'] !== '' ? (string) $job['url'] : 'uploaded file';
+		$write(array('state' => 'running', 'phase' => 'analysing', 'done' => 0, 'total' => 1));
+		$this->load->model('Product_Model');
+		$this->load->helper('product_tour_fields');
+		$this->load->model('Competitor_Analysis_Model');
+		try {
+			if ($file === '' || ! is_file($file)) {
+				throw new Exception('Uploaded file is no longer available.');
+			}
+			$our    = competitor_format_our_products($this->Product_Model->Read_For_Comparison());
+			$record = $this->competitoranalysisservice->analyze_file($file, $ext, $our);
+			$record['url']        = $label;
+			$record['source']     = 'upload';
+			$record['status']     = 'done';
+			$record['created_by'] = isset($job['created_by']) ? $job['created_by'] : null;
+			$id = (int) $this->Competitor_Analysis_Model->Create($record);
+			@unlink($file);
+			$write(array('state' => 'done', 'phase' => 'analysing', 'done' => 1, 'total' => 1,
+				'count' => 1, 'analysis_id' => $id, 'cost_total' => (float) $record['cost_usd']));
+		} catch (Exception $e) {
+			@unlink($file);
+			log_message('error', 'Competitor_Product_Job upload failed: ' . $e->getMessage());
+			$write(array('state' => 'error', 'message' => $e->getMessage()));
 		}
 	}
 

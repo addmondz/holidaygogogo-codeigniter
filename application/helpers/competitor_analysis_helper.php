@@ -1320,10 +1320,13 @@ if ( ! function_exists('competitor_is_category_url'))
 {
 	/**
 	 * True when a URL is a CATEGORY / listing page (a page OF products) rather than a
-	 * single product — a plural "…-tours/-packages/-holidays" slug, or a known listing
-	 * path (listing.php, /category/, /destination/, /travelstyle/, /collections/). The
+	 * single product — a plural "…-tours/-packages/-holidays" slug, a known listing
+	 * path (listing.php, /category/, /destination/, /travelstyle/, /collections/), or a
+	 * SEARCH / filter-result page (a "…-search" path, or a filter query such as
+	 * ?region=/?country=/?destination= that just re-lists the same catalogue). The
 	 * crawler drills these to their individual products instead of analysing the
-	 * catalogue as one item. Pure.
+	 * catalogue as one item — and, being near-identical, they'd otherwise flood the
+	 * crawl with dozens of redundant copies of the same search page. Pure.
 	 */
 	function competitor_is_category_url($url)
 	{
@@ -1333,6 +1336,21 @@ if ( ! function_exists('competitor_is_category_url'))
 		}
 		if (preg_match('#(?:listing|/category/|/categories/|catalog|/tag/|/destination|/travelstyle|/collections?/)#', $path)) {
 			return true;
+		}
+		// A search page (/search, /tour-search) is a results/listing page, not a product.
+		if (preg_match('#(?:^|/)[a-z0-9]*[-_]?search[a-z0-9]*/?$#', $path)) {
+			return true;
+		}
+		// A filter query (?region=/?country=/?destination=/…) re-lists the catalogue —
+		// each value is another copy of the same listing, so treat it as one.
+		$query = (string) parse_url((string) $url, PHP_URL_QUERY);
+		if ($query !== '') {
+			parse_str($query, $qa);
+			foreach (array('region', 'country', 'destination', 'category', 'filter', 'keyword', 'tag') as $fk) {
+				if (isset($qa[$fk]) && $qa[$fk] !== '') {
+					return true;
+				}
+			}
 		}
 		$segs = array_values(array_filter(explode('/', $path), 'strlen'));
 		if (empty($segs)) {
@@ -1465,7 +1483,7 @@ if ( ! function_exists('competitor_is_junk_file_url'))
 		}
 		return (bool) preg_match(
 			'#(policy|policies|privacy|pdpa|gdpr|abac|conduct|complaint|cookie|disclaimer'
-			. '|terms|tnc|t-and-c|t_c|gst|sst|corporate-governance|whistle|anti-bribery|edm)#',
+			. '|terms|tnc|t-and-c|t_c|[-_]tc(?=[-_.])|gst|sst|corporate-governance|whistle|anti-bribery|edm)#',
 			$path
 		);
 	}
@@ -1775,8 +1793,9 @@ if ( ! function_exists('competitor_job_progress_message'))
 		if ($phase === 'analysing') {
 			return $total > 0 ? ('Analysing… ' . $done . ' / ' . $total) : 'Analysing…';
 		}
-		// A pasted-text job has no discovery phase — it goes straight to analysing.
-		if (($mode = (isset($s['mode']) ? $s['mode'] : '')) === 'paste') {
+		// A pasted-text or uploaded-file job has no discovery phase — it goes
+		// straight to analysing.
+		if (in_array(($mode = (isset($s['mode']) ? $s['mode'] : '')), array('paste', 'upload'), true)) {
 			return 'Analysing…';
 		}
 		return 'Discovering…';
@@ -1996,6 +2015,7 @@ if ( ! function_exists('competitor_job_public_view'))
 			'keyword'     => isset($s['keyword']) ? (string) $s['keyword'] : '',
 			'ai_crawl'    => ! empty($s['ai_crawl']),
 			'is_paste'    => ($mode === 'paste'),
+			'is_upload'   => ($mode === 'upload'),
 			// Fixed submission time (when pasted + Analyse clicked), not last update.
 			'ts'          => isset($s['created']) ? (string) $s['created'] : (isset($s['ts']) ? (string) $s['ts'] : ''),
 			// Live-ETA inputs (reading phase): progress + when reading began.

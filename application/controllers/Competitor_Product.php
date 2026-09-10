@@ -285,23 +285,42 @@ class Competitor_Product extends MY_Controller
 			return;
 		}
 
-		// File upload → synchronous OpenAI analysis (no crawl).
+		// File upload → BACKGROUND analyse job (non-blocking). The OpenAI vision call
+		// can run for a minute; doing it inline hit the web server's read timeout and
+		// showed a false "Analysis Failed" even though the row saved. We stage the
+		// uploaded file, queue the job, and free the browser immediately; the row
+		// appears in Analysis Results when done (the worker deletes the staged file).
+		try {
+			$upload = $this->receive_upload();      // throws on invalid file
+		} catch (Exception $e) {
+			echo json_encode(array('success' => false, 'message' => $e->getMessage()));
+			return;
+		}
+		$source_label = $upload['orig_name'] !== '' ? $upload['orig_name'] : 'uploaded file';
+		$job_id = $this->queue_job(array(
+			'url'        => $source_label,
+			'mode'       => 'upload',
+			'file_path'  => $upload['full_path'],
+			'file_ext'   => $upload['file_ext'],
+			'created_by' => $this->session->admin_id,
+		));
+		if ($job_id !== '') {
+			echo json_encode(array('success' => true, 'job' => $job_id));
+			return;
+		}
+
+		// No process spawn available (exec disabled) → run inline as a last resort.
 		@set_time_limit(600);
 		$this->load->model('Product_Model');
 		$this->load->helper('product_tour_fields');
 		$our_products = competitor_format_our_products($this->Product_Model->Read_For_Comparison());
 		$this->load->library('CompetitorAnalysisService');
-		$upload_full  = null;
-		$source_label = '';
 		try {
-			$upload = $this->receive_upload();      // throws on invalid file
-			$upload_full  = $upload['full_path'];
-			$source_label = $upload['orig_name'];
-			$record = $this->competitoranalysisservice->analyze_file($upload_full, $upload['file_ext'], $our_products);
+			$record = $this->competitoranalysisservice->analyze_file($upload['full_path'], $upload['file_ext'], $our_products);
 		} catch (Exception $e) {
-			if ($upload_full) { @unlink($upload_full); }
+			@unlink($upload['full_path']);
 			$this->Competitor_Analysis_Model->Create(array(
-				'url'           => $source_label !== '' ? $source_label : 'uploaded file',
+				'url'           => $source_label,
 				'source'        => 'upload',
 				'status'        => 'error',
 				'error_message' => $e->getMessage(),
@@ -310,9 +329,9 @@ class Competitor_Product extends MY_Controller
 			echo json_encode(array('success' => false, 'message' => $e->getMessage()));
 			return;
 		}
-		if ($upload_full) { @unlink($upload_full); }
+		@unlink($upload['full_path']);
 
-		$record['url']        = $source_label !== '' ? $source_label : 'uploaded file';
+		$record['url']        = $source_label;
 		$record['source']     = 'upload';
 		$record['status']     = 'done';
 		$record['created_by'] = $this->session->admin_id;
@@ -355,10 +374,10 @@ class Competitor_Product extends MY_Controller
 			if ($mode === 'analyse') {
 				continue;
 			}
-			// A FINISHED paste job is shown via its saved DB row (folded in by the
-			// listing), so skip the done status file to avoid a duplicate row.
-			// Queued/running/error paste jobs still show (progress + error visibility).
-			if ($mode === 'paste' && (isset($s['state']) ? $s['state'] : '') === 'done') {
+			// A FINISHED paste/upload job is shown via its saved DB row (folded in by
+			// the listing), so skip the done status file to avoid a duplicate row.
+			// Queued/running/error jobs still show (progress + error visibility).
+			if (in_array($mode, array('paste', 'upload'), true) && (isset($s['state']) ? $s['state'] : '') === 'done') {
 				continue;
 			}
 			$view = competitor_job_public_view($s);
@@ -523,6 +542,12 @@ class Competitor_Product extends MY_Controller
 			} elseif (function_exists('exec')) {
 				@exec('kill -9 ' . escapeshellarg((string) $pid));
 			}
+		}
+		// An upload job stages the file for its (now-killed) worker to read; remove it
+		// so terminating mid-analysis doesn't orphan it in assets/upload/.
+		$s = json_decode((string) @file_get_contents($dir . $job_id . '.json'), true);
+		if (is_array($s) && ! empty($s['file_path']) && is_file($s['file_path'])) {
+			@unlink($s['file_path']);
 		}
 		foreach (array('.json', '.out', '.items.json', '.pid') as $ext) {
 			@unlink($dir . $job_id . $ext);

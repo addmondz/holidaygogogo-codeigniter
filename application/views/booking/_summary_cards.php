@@ -123,9 +123,18 @@
     #booking_summary_cards .sc-owner-tab.is-active { background:#6082B6; color:#fff; }
     #booking_summary_cards .sc-owner-tab:not(.is-active):hover { background:#DCE6F5; }
     /* Export-to-Excel button: sits to the right of the period toggle. */
-    #booking_summary_cards .sc-owner-export { margin-left:12px; border:1px solid #1D7044; background:#1D7044; color:#fff; font-size:12px; font-weight:600; padding:5px 14px; border-radius:5px; cursor:pointer; line-height:1.4; display:inline-flex; align-items:center; gap:6px; }
+    #booking_summary_cards .sc-owner-export-wrap { position:relative; margin-left:12px; display:inline-block; }
+    #booking_summary_cards .sc-owner-export { border:1px solid #1D7044; background:#1D7044; color:#fff; font-size:12px; font-weight:600; padding:5px 14px; border-radius:5px; cursor:pointer; line-height:1.4; display:inline-flex; align-items:center; gap:6px; }
     #booking_summary_cards .sc-owner-export:hover { background:#155c37; }
     #booking_summary_cards .sc-owner-export .la { font-size:15px; }
+    #booking_summary_cards .sc-owner-export-caret { font-size:11px; margin-left:2px; }
+    /* Period picker menu: opens under the Export button, right-aligned so it
+       doesn't spill off the card edge. Toggled via the .is-open class. */
+    #booking_summary_cards .sc-owner-export-menu { display:none; position:absolute; top:calc(100% + 4px); right:0; z-index:30; min-width:200px; background:#fff; border:1px solid #D5DEEC; border-radius:6px; box-shadow:0 6px 20px rgba(43,58,84,0.18); padding:4px 0; }
+    #booking_summary_cards .sc-owner-export-wrap.is-open .sc-owner-export-menu { display:block; }
+    #booking_summary_cards .sc-owner-export-item { display:block; width:100%; text-align:left; background:none; border:none; padding:7px 16px; font-size:12px; color:#3F4254; cursor:pointer; line-height:1.4; white-space:nowrap; }
+    #booking_summary_cards .sc-owner-export-item:hover { background:#EEF3FB; color:#1D7044; }
+    #booking_summary_cards .sc-owner-export-sep { height:1px; background:#EBEDF3; margin:4px 0; }
     /* Description "See more" toggle: mobile-only (revealed in the media query). */
     #booking_summary_cards .sc-owner-desc-toggle { display:none; }
     #booking_summary_cards .sc-owner-matrix th, #booking_summary_cards .sc-owner-matrix td { white-space:nowrap; vertical-align:middle; }
@@ -786,10 +795,24 @@
                             <button type="button" class="sc-owner-tab" data-owner-period="year">Year</button>
                             <button type="button" class="sc-owner-tab" data-owner-period="lastyear">Same Period Last Year</button>
                         </span>
-                        <button type="button" id="sc-owner-export" class="sc-owner-export"><i class="la la-file-excel-o"></i>Export to Excel</button>
+                        <span class="sc-owner-export-wrap">
+                            <button type="button" id="sc-owner-export" class="sc-owner-export" aria-haspopup="true" aria-expanded="false" title="Choose which period to export"><i class="la la-file-excel-o"></i>Export to Excel<i class="la la-angle-down sc-owner-export-caret"></i></button>
+                            <div class="sc-owner-export-menu" role="menu" aria-label="Export period">
+                                <button type="button" class="sc-owner-export-item" role="menuitem" data-export-period="current">Current view</button>
+                                <div class="sc-owner-export-sep"></div>
+                                <button type="button" class="sc-owner-export-item" role="menuitem" data-export-period="yesterday">Yesterday</button>
+                                <button type="button" class="sc-owner-export-item" role="menuitem" data-export-period="day">Day</button>
+                                <button type="button" class="sc-owner-export-item" role="menuitem" data-export-period="week">Week</button>
+                                <button type="button" class="sc-owner-export-item" role="menuitem" data-export-period="month">Month</button>
+                                <button type="button" class="sc-owner-export-item" role="menuitem" data-export-period="year">Year</button>
+                                <button type="button" class="sc-owner-export-item" role="menuitem" data-export-period="lastyear">Same Period Last Year</button>
+                                <div class="sc-owner-export-sep"></div>
+                                <button type="button" class="sc-owner-export-item" role="menuitem" data-export-period="all">All periods (one file)</button>
+                            </div>
+                        </span>
                     </div>
                     <div class="card-body summary-card-body">
-                        <div class="summary-sub mb-2 sc-owner-desc" id="sc-owner-desc">One row per sales agent across all performance metrics for the selected period, sorted by Agent Score &mdash; <strong>click any column header to re-sort</strong> (click again to reverse). The Yesterday / Day / Week / Month / Year / Same&nbsp;Period&nbsp;Last&nbsp;Year toggle re-scopes every column at once (Yesterday behaves like Day, Same Period Last Year like Year). Some columns only apply to certain periods, and any column with no data for the selected range is hidden automatically. <strong>Reply Time</strong>, <strong>Served</strong> &amp; <strong>Agent Score</strong> show on Day / Week / Month only (a Year window scans too many message rows), while <strong>Conversion</strong> shows on Year / Same&nbsp;Period&nbsp;Last&nbsp;Year only (a lead needs time to convert, so short windows read misleadingly low). Use the green <strong>Export to Excel</strong> button to download the visible table. Note that Cancellation on very short windows reads low because a booking needs time to cancel.</div>
+                        <div class="summary-sub mb-2 sc-owner-desc" id="sc-owner-desc">One row per sales agent across all performance metrics for the selected period, sorted by Agent Score &mdash; <strong>click any column header to re-sort</strong> (click again to reverse). The Yesterday / Day / Week / Month / Year / Same&nbsp;Period&nbsp;Last&nbsp;Year toggle re-scopes every column at once (Yesterday behaves like Day, Same Period Last Year like Year). Some columns only apply to certain periods, and any column with no data for the selected range is hidden automatically. <strong>Reply Time</strong>, <strong>Served</strong> &amp; <strong>Agent Score</strong> show on Day / Week / Month only (a Year window scans too many message rows), while <strong>Conversion</strong> shows on Year / Same&nbsp;Period&nbsp;Last&nbsp;Year only (a lead needs time to convert, so short windows read misleadingly low). Use the green <strong>Export to Excel</strong> button to download the table &mdash; pick <em>Current view</em>, any single period, or <em>All periods</em> without changing what&rsquo;s on screen. Note that Cancellation on very short windows reads low because a booking needs time to cancel.</div>
                         <button type="button" class="sc-owner-desc-toggle" data-target="sc-owner-desc" aria-expanded="false">See more</button>
                         <div class="table-responsive">
                             <table class="table table-sm summary-table sc-owner-matrix">
@@ -1381,6 +1404,177 @@ $(function() {
         v = Number(v) || 0;
         return 'RM ' + v.toLocaleString('en-MY', {minimumFractionDigits: 2, maximumFractionDigits: 2});
     }
+    // Periods each matrix column is defined for (everything else renders "—").
+    // Shared by the on-screen render (empty-cell / column-hide logic) AND the
+    // Excel export so both agree on which columns a period carries. Reply, Served
+    // and Score dash on Year (they scan raw message rows — a Year window runs
+    // long / has no fair Score inputs); Conversion shows on Year only (a lead
+    // needs time to convert, so short windows read misleadingly low).
+    var OWNER_COL_PERIODS = {
+        reply:    ['day','week','month'],
+        pickup:   ['day','week','month','year'],
+        newleads: ['day','week','month','year'],
+        served:   ['day','week','month'],
+        convc:    ['year'],
+        conva:    ['year'],
+        outbound: ['day','week','month','year'],
+        sales:    ['day','week','month','year'],
+        followup: ['day','week','month','year'],
+        cancel:   ['day','week','month','year'],
+        score:    ['day','week','month']
+    };
+    // Matrix columns in display order for the Excel export. Each entry pairs the
+    // header label with the period key it applies to (into OWNER_COL_PERIODS),
+    // a `raw` reader (used to test emptiness and to hide all-empty columns) and a
+    // `txt` formatter (the exported string). The Agent column (pk:null) always
+    // applies. Kept in one place so the export mirrors the on-screen table.
+    function ownerExportColumns() {
+        return [
+            {label:'Agent',             pk:null,       raw:function(r){return r.agent_name;},       txt:function(r){return r.agent_name || '';}},
+            {label:'Reply Time',        pk:'reply',    raw:function(r){return r.reply_secs;},       txt:function(r){return fmtOwnerDuration(r.reply_secs);}},
+            {label:'1st Reply',         pk:'pickup',   raw:function(r){return r.pickup_secs;},      txt:function(r){return fmtOwnerSecs(r.pickup_secs);}},
+            {label:'New Leads',         pk:'newleads', raw:function(r){return r.new_leads;},        txt:function(r){return String(r.new_leads);}},
+            {label:'Served',            pk:'served',   raw:function(r){return r.served_leads;},     txt:function(r){return String(r.served_leads);}},
+            {label:'Conv % (credited)', pk:'convc',    raw:function(r){return r.conv_rate_gated;},  txt:function(r){return r.conv_rate_gated + '%';}},
+            {label:'Conv % (all)',      pk:'conva',    raw:function(r){return r.conv_rate_ungated;},txt:function(r){return r.conv_rate_ungated + '%';}},
+            {label:'Outbound',          pk:'outbound', raw:function(r){return r.outbound_count;},   txt:function(r){return String(r.outbound_count);}},
+            {label:'Sales',             pk:'sales',    raw:function(r){return r.sales_total;},      txt:function(r){return fmtOwnerMoney(r.sales_total);}},
+            {label:'Follow-up %',       pk:'followup', raw:function(r){return r.followup_rate;},    txt:function(r){return r.followup_rate + '%';}},
+            {label:'Cancel %',          pk:'cancel',   raw:function(r){return r.cancel_rate;},      txt:function(r){return r.cancel_rate + '%';}},
+            {label:'Score',             pk:'score',    raw:function(r){return r.agent_score;},      txt:function(r){return String(r.agent_score);}}
+        ];
+    }
+    // Quote one value for CSV (double any embedded quote; Excel-safe).
+    function csvCell(v) { return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"'; }
+    // Build the CSV lines (header + one per agent) for a matrix payload scoped to
+    // `base` (the column granularity: day/week/month/year). Mirrors the on-screen
+    // table — columns that don't apply to the period, or whose every cell is
+    // empty, are dropped so the sheet isn't a wall of blanks. Returns [] when the
+    // period has no agent rows.
+    function buildOwnerMatrixCsvLines(matrix, base) {
+        matrix = matrix || [];
+        if(!matrix.length) return [];
+        var cols = ownerExportColumns();
+        var isEmpty = function(v) { return v === null || v === undefined || v === ''; };
+        var applies = function(pk) { return pk === null || OWNER_COL_PERIODS[pk].indexOf(base) !== -1; };
+        // Keep a column when it applies to the period and at least one agent has a
+        // value for it (Agent column is always kept).
+        var keep = cols.map(function(c, idx) {
+            if(idx === 0) return true;
+            if(!applies(c.pk)) return false;
+            return matrix.some(function(r) { return !isEmpty(c.raw(r)); });
+        });
+        var lines = [];
+        lines.push(cols.filter(function(c, i) { return keep[i]; })
+            .map(function(c) { return csvCell(c.label); }).join(','));
+        matrix.forEach(function(r) {
+            var line = [];
+            cols.forEach(function(c, i) {
+                if(!keep[i]) return;
+                var val = (i === 0) ? c.txt(r)
+                    : (isEmpty(c.raw(r)) ? '' : c.txt(r));
+                line.push(csvCell(val));
+            });
+            lines.push(line.join(','));
+        });
+        return lines;
+    }
+    // Trigger a client-side CSV download (BOM so Excel reads UTF-8).
+    function downloadCsv(lines, filename) {
+        var csv = String.fromCharCode(0xFEFF) + lines.join('\r\n');
+        var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+    // Fetch one period's matrix without disturbing the on-screen table, so the
+    // export can pull a period other than the one being viewed. Calls
+    // cb(matrix, meta) on success, or cb(null) on error. Honours the day picker
+    // so a specific day scopes the export the same way it scopes the view.
+    function fetchOwnerMatrix(period, cb) {
+        var url = '<?php echo base_url("Booking/ajax_summary_cards"); ?>';
+        var params = ['owner_period=' + encodeURIComponent(period)];
+        var dp = document.getElementById('sc-day-picker');
+        if(dp && dp.value) { params.push('day=' + encodeURIComponent(dp.value)); }
+        <?php if($owner_as_agent) { ?>params.push('owner_as_agent=1');<?php } ?>
+        $.getJSON(url + '?' + params.join('&'), function(resp) {
+            if(!resp || resp.error) { cb(null); return; }
+            var t = resp.tables || {}, m = resp.meta || {};
+            cb(t.owner_agent_matrix || [], m);
+        }).fail(function() { cb(null); });
+    }
+    // A safe filename fragment from a period label ("This month" -> "This_month").
+    function ownerExportSlug(label) {
+        return String(label || 'period').replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'period';
+    }
+    // The six selectable periods, in toggle order (base = the granularity the
+    // server computes at, used to pick applicable columns for the export).
+    var OWNER_EXPORT_PERIODS = [
+        {id:'yesterday', label:'Yesterday',             base:'day'},
+        {id:'day',       label:'Day',                   base:'day'},
+        {id:'week',      label:'Week',                  base:'week'},
+        {id:'month',     label:'Month',                 base:'month'},
+        {id:'year',      label:'Year',                  base:'year'},
+        {id:'lastyear',  label:'Same Period Last Year', base:'year'}
+    ];
+    // Toggle a busy state on the Export button while a fetch-backed export runs,
+    // so the (async) download gives visible feedback. Restored on completion.
+    function ownerExportBusy(on) {
+        var btn = document.getElementById('sc-owner-export');
+        if(!btn) return;
+        if(on) {
+            btn.dataset.label = btn.innerHTML;
+            btn.innerHTML = '<i class="la la-spinner la-spin"></i>Preparing…';
+            btn.disabled = true;
+        } else if(btn.dataset.label) {
+            btn.innerHTML = btn.dataset.label;
+            btn.disabled = false;
+        }
+    }
+    // Export a single chosen period: fetch it, build the CSV, download it named
+    // by the period.
+    function exportOwnerMatrixPeriod(period) {
+        ownerExportBusy(true);
+        fetchOwnerMatrix(period, function(matrix, meta) {
+            ownerExportBusy(false);
+            if(matrix === null) { alert('Could not load that period. Please try again.'); return; }
+            var base = (meta && meta.owner_period_base) || 'month';
+            var lines = buildOwnerMatrixCsvLines(matrix, base);
+            if(!lines.length) { alert('No data for that period.'); return; }
+            var label = (meta && meta.owner_period_label) || period;
+            downloadCsv(lines, 'Agent_Performance_' + ownerExportSlug(label) + '.csv');
+        });
+    }
+    // Export every period into one CSV, each period a titled block separated by a
+    // blank line. Fetched in parallel; assembled in toggle order once all return.
+    function exportOwnerMatrixAll() {
+        ownerExportBusy(true);
+        var results = new Array(OWNER_EXPORT_PERIODS.length);
+        var done = 0;
+        OWNER_EXPORT_PERIODS.forEach(function(p, idx) {
+            fetchOwnerMatrix(p.id, function(matrix, meta) {
+                var label = (meta && meta.owner_period_label) || p.label;
+                var base  = (meta && meta.owner_period_base) || p.base;
+                results[idx] = { label: label, lines: (matrix === null ? null : buildOwnerMatrixCsvLines(matrix, base)) };
+                if(++done < OWNER_EXPORT_PERIODS.length) return;
+                ownerExportBusy(false);
+                var out = [];
+                results.forEach(function(r) {
+                    if(out.length) { out.push(''); } // blank line between blocks
+                    out.push(csvCell(r.label));
+                    if(r.lines === null)      { out.push(csvCell('Could not load this period')); }
+                    else if(!r.lines.length)  { out.push(csvCell('No data for this period')); }
+                    else                      { out = out.concat(r.lines); }
+                });
+                downloadCsv(out, 'Agent_Performance_All_Periods.csv');
+            });
+        });
+    }
     // The six weighted criteria behind the Agent Score, in matrix-column order.
     // Weights mirror agent_score_weights() (server) and MUST sum to 1.0. lower:true
     // marks the two "faster is better" speed metrics (score = best ÷ yours); the
@@ -1677,19 +1871,34 @@ $(function() {
         }
         if(out.length < 2) return; // header only — nothing to export
         var lblEl = document.getElementById('sc-owner-period-label');
-        var label = ((lblEl && lblEl.textContent) || 'period').replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'period';
-        var csv = String.fromCharCode(0xFEFF) + out.join('\r\n'); // BOM so Excel reads UTF-8
-        var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-        var url = URL.createObjectURL(blob);
-        var a = document.createElement('a');
-        a.href = url;
-        a.download = 'Agent_Performance_' + label + '.csv';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        downloadCsv(out, 'Agent_Performance_' + ownerExportSlug(lblEl && lblEl.textContent) + '.csv');
     }
-    $('#booking_summary_cards').on('click', '#sc-owner-export', function() { exportOwnerMatrix(); });
+    // Export button = a period picker. Clicking the button opens the menu; a menu
+    // item exports that period. "Current view" downloads the on-screen table
+    // (respecting its sort + hidden columns); any named period is fetched fresh so
+    // you can export a period other than the one you're viewing; "All periods"
+    // bundles every period into one file.
+    function closeOwnerExportMenu() {
+        $('#booking_summary_cards .sc-owner-export-wrap').removeClass('is-open');
+        $('#sc-owner-export').attr('aria-expanded', 'false');
+    }
+    $('#booking_summary_cards').on('click', '#sc-owner-export', function(e) {
+        e.stopPropagation();
+        var wrap = $(this).closest('.sc-owner-export-wrap');
+        var open = wrap.toggleClass('is-open').hasClass('is-open');
+        $(this).attr('aria-expanded', open ? 'true' : 'false');
+    });
+    $('#booking_summary_cards').on('click', '.sc-owner-export-item', function(e) {
+        e.stopPropagation();
+        var period = $(this).data('export-period');
+        closeOwnerExportMenu();
+        if(period === 'current')   { exportOwnerMatrix(); }
+        else if(period === 'all')  { exportOwnerMatrixAll(); }
+        else                       { exportOwnerMatrixPeriod(period); }
+    });
+    // Dismiss the menu on any outside click or Escape.
+    $(document).on('click', function() { closeOwnerExportMenu(); });
+    $(document).on('keydown', function(e) { if(e.key === 'Escape') { closeOwnerExportMenu(); } });
 
     // Renders the three sales-agent "chase" cards (Travel in 7/14 Days – Not Yet
     // Ready, Payment From Customer Due Soon) from a cards/tables payload. Counts
@@ -2071,25 +2280,8 @@ $(function() {
         var ownerMatrixBody = document.getElementById('sc-owner-matrix-body');
         if(ownerMatrixBody) {
             // Periods each column is defined for (everything else renders "—").
-            var ownerColPeriods = {
-                // Reply, Served and Score dash on Year (Reply/Served scan raw message
-                // rows — a Year window OOMs / runs long; Year has no fair Score inputs).
-                // Every other column is reported on all periods.
-                reply:    ['day','week','month'],
-                pickup:   ['day','week','month','year'],
-                newleads: ['day','week','month','year'],
-                served:   ['day','week','month'],
-                // Conversion is a yearly measure — a lead needs time to convert,
-                // so short windows read misleadingly low. Report it on Year only;
-                // on shorter ranges the whole column is hidden (all cells dash).
-                convc:    ['year'],
-                conva:    ['year'],
-                outbound: ['day','week','month','year'],
-                sales:    ['day','week','month','year'],
-                followup: ['day','week','month','year'],
-                cancel:   ['day','week','month','year'],
-                score:    ['day','week','month']
-            };
+            // Shared with the Excel export — see OWNER_COL_PERIODS above.
+            var ownerColPeriods = OWNER_COL_PERIODS;
             var ownerP = m.owner_period || window._ownerPeriod || 'month';
             // Gate columns off the base granularity the server actually computed at,
             // not the raw toggle id: "Yesterday" folds to Day and "Same Period Last
