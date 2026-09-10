@@ -723,6 +723,7 @@ div.kt-datatable__pager-container {
 										<th style="text-align:center;">Language</th>
 										<th style="text-align:center;">Race</th>
 										<th style="text-align:center;">Lead Status</th>
+										<th style="text-align:center;">Status Date</th>
 										<th style="text-align:center;">Created Date</th>
 										<th style="text-align:center;">Created By</th>
 										<th style="text-align:center;">Customer Type</th>
@@ -777,7 +778,7 @@ div.kt-datatable__pager-container {
 						</thead>
 						<tbody>
 							<?php if(empty($guests)) { ?>
-								<tr><td colspan="<?php echo ($list_base === 'Customer') ? 12 : ($list_base === 'Manual_Leads' ? 13 : 10); ?>" style="text-align:center; padding-top:10px; padding-bottom:10px;">Guest Records Not Found</td></tr>
+								<tr><td colspan="<?php echo ($list_base === 'Customer') ? 12 : ($list_base === 'Manual_Leads' ? 14 : 10); ?>" style="text-align:center; padding-top:10px; padding-bottom:10px;">Guest Records Not Found</td></tr>
 							<?php } else { ?>
 								<?php $count = 1; foreach($guests as $g) { ?>
 									<?php $is_ghl_row = isset($g->Type) && ($g->Type === 'GHL' || $g->Type === 'Manual'); ?>
@@ -884,6 +885,8 @@ div.kt-datatable__pager-container {
 													$lang_val   = isset($g->Language)         ? trim((string) $g->Language)         : '';
 													$race_val   = isset($g->Race)             ? trim((string) $g->Race)             : '';
 													$status_val = isset($g->LeadStatus)       ? trim((string) $g->LeadStatus)       : '';
+													$status_date_raw = isset($g->LeadStatusDate) ? (string) $g->LeadStatusDate : '';
+													$status_date_ts  = ($status_date_raw !== '' && strpos($status_date_raw, '0000-00-00') !== 0) ? strtotime($status_date_raw) : false;
 													$state_val  = isset($g->State)            ? trim((string) $g->State)            : '';
 													$cust_val   = isset($g->CustomerType)     ? trim((string) $g->CustomerType)     : '';
 													$created_by_val = isset($g->CreatedByName) ? trim((string) $g->CreatedByName) : '';
@@ -903,7 +906,8 @@ div.kt-datatable__pager-container {
 														<span class="label label-inline label-light-info font-weight-bold" style="white-space:normal;"><?php echo htmlspecialchars($status_val); ?></span>
 													<?php } else { echo $gl_dash; } ?>
 												</td>
-												<td style="text-align:center; white-space:nowrap;"><?php echo $created_ts ? date('d M Y', $created_ts) : $gl_dash; ?></td>
+												<td style="text-align:center; white-space:nowrap;"><?php echo $status_date_ts ? date('d M Y', $status_date_ts) : $gl_dash; ?></td>
+													<td style="text-align:center; white-space:nowrap;"><?php echo $created_ts ? date('d M Y', $created_ts) : $gl_dash; ?></td>
 												<td style="text-align:center;"><?php echo $created_by_val !== '' ? htmlspecialchars($created_by_val) : $gl_dash; ?></td>
 												<td style="text-align:center;">
 													<?php if($cust_val !== '') { ?>
@@ -1054,7 +1058,7 @@ div.kt-datatable__pager-container {
 													<?php } ?>
 													<?php if(!$is_ghl_row) { ?>
 														<?php if($list_base === 'Customer' && !empty($g->CustomerID)) { ?>
-															<a href="<?php echo base_url('Customer/Update?customer_id=') . $g->CustomerID; ?>" class="dropdown-item" style="font-size:11px;">Update Customer</a>
+															<?php if($lc_can_edit) { ?><a href="<?php echo base_url('Customer/Update?customer_id=') . $g->CustomerID; ?>" class="dropdown-item" style="font-size:11px;">Update Customer</a><?php } ?>
 																														<?php
 																$this->load->helper('utils');
 																$portal_hash = generate_customer_portal_slug($g->CustomerID);

@@ -849,6 +849,7 @@ WHERE 1 = 1
 		MAX(c.created_at) AS CustomerCreatedAt,
 		CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS NatureOfBusiness,
 		CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS LeadStatus,
+		CAST(NULL AS DATE) AS LeadStatusDate,
 		CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS State,
 		CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS CreatedByName,
 		MAX(b.InsertDate) AS RecencyAt
@@ -903,6 +904,7 @@ SELECT
 	MAX(CASE WHEN rn = 1 THEN CustomerCreatedAt END) AS CustomerCreatedAt,
 	CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS NatureOfBusiness,
 	CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS LeadStatus,
+	CAST(NULL AS DATE) AS LeadStatusDate,
 	CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS State,
 	CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS CreatedByName,
 	MAX(BookingDate) AS RecencyAt
@@ -959,6 +961,10 @@ SELECT
 		WHERE lsl.Status = 'Y' AND lsl.dedup_key = {$gc_dedup}
 		ORDER BY lsl.StatusDate DESC, lsl.LogID DESC LIMIT 1
 	) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS LeadStatus,
+	(SELECT lsl.StatusDate FROM lead_status_log lsl
+		WHERE lsl.Status = 'Y' AND lsl.dedup_key = {$gc_dedup}
+		ORDER BY lsl.StatusDate DESC, lsl.LogID DESC LIMIT 1
+	) AS LeadStatusDate,
 	CONVERT(gc.state USING utf8mb4) COLLATE utf8mb4_unicode_ci AS State,
 	CONVERT(a.Name USING utf8mb4) COLLATE utf8mb4_unicode_ci AS CreatedByName,
 	COALESCE(gc.date_added, gc.created_at) AS RecencyAt
@@ -1048,6 +1054,7 @@ SELECT
 	MAX(CASE WHEN mm.rep_rn = 1 THEN mm.CustomerCreatedAt END) AS CustomerCreatedAt,
 	MAX(CASE WHEN mm.rep_rn = 1 THEN mm.NatureOfBusiness END) AS NatureOfBusiness,
 	MAX(CASE WHEN mm.rep_rn = 1 THEN mm.LeadStatus       END) AS LeadStatus,
+	MAX(CASE WHEN mm.rep_rn = 1 THEN mm.LeadStatusDate   END) AS LeadStatusDate,
 	MAX(CASE WHEN mm.rep_rn = 1 THEN mm.State            END) AS State,
 	MAX(CASE WHEN mm.rep_rn = 1 THEN mm.CreatedByName    END) AS CreatedByName,
 	MAX(mm.RecencyAt) AS RecencyAt

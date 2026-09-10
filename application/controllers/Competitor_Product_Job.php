@@ -228,7 +228,10 @@ class Competitor_Product_Job extends CI_Controller
 				$write(array('state' => 'running', 'phase' => 'analysing', 'done' => ++$done, 'total' => $n));
 			}
 			$this->merge_crawl_analysed($job, $results, $total_cost);
-			$write(array('state' => 'done', 'phase' => 'analysing', 'done' => $n, 'total' => $n, 'count' => count($results)));
+			// Carry the per-index results ({id,cost,at}) on the done status so the Review
+			// page can update just the analysed rows in place (no full reload) after it
+			// polls Job_State — the user may have kept the page open in the background.
+			$write(array('state' => 'done', 'phase' => 'analysing', 'done' => $n, 'total' => $n, 'count' => count($results), 'results' => $results));
 		} catch (Exception $e) {
 			$write(array('state' => 'error', 'message' => $e->getMessage()));
 		}

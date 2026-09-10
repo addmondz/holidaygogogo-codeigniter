@@ -184,7 +184,15 @@ class Competitor_Product extends MY_Controller
 		$job_id = preg_replace('/[^A-Za-z0-9_]/', '', (string) $this->input->get('job'));
 		$s = json_decode((string) @file_get_contents(APPPATH . 'logs/competitor_crawl/jobs/' . $job_id . '.json'), true);
 		$state = is_array($s) && isset($s['state']) ? $s['state'] : 'unknown';
-		echo json_encode(array('state' => $state, 'message' => is_array($s) ? competitor_job_progress_message($s) : ''));
+		// done/total drive the live "X / N" counter; results ({index:{id,cost,at}}) lets
+		// the Review page update the analysed rows in place when the background job finishes.
+		echo json_encode(array(
+			'state'   => $state,
+			'message' => is_array($s) ? competitor_job_progress_message($s) : '',
+			'done'    => is_array($s) && isset($s['done'])  ? (int) $s['done']  : 0,
+			'total'   => is_array($s) && isset($s['total']) ? (int) $s['total'] : 0,
+			'results' => (is_array($s) && isset($s['results']) && is_array($s['results'])) ? $s['results'] : array(),
+		));
 	}
 
 	/**

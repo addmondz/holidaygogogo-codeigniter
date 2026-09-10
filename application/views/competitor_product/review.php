@@ -61,15 +61,15 @@
                                         <?php if ( ! empty($p['snippet'])) { ?><div class="text-muted" style="font-size:11px; margin-top:2px;"><?php echo htmlspecialchars($p['snippet']); ?></div><?php } ?>
                                         <?php if ( ! empty($p['url'])) { ?><div style="margin-top:2px;"><a href="<?php echo htmlspecialchars($p['url']); ?>" target="_blank" rel="noopener" class="text-muted" style="font-size:11px; word-break:break-all;"><i class="la la-external-link-alt mr-1"></i><?php echo htmlspecialchars($p['url']); ?></a></div><?php } ?>
                                     </td>
-                                    <td style="text-align:center; font-size:12px;"><?php echo $analysed && $p['cost'] > 0 ? number_format((float) $p['cost'], 4) : '—'; ?></td>
-                                    <td style="text-align:center; font-size:12px;">
+                                    <td class="cell-cost" style="text-align:center; font-size:12px;"><?php echo $analysed && $p['cost'] > 0 ? number_format((float) $p['cost'], 4) : '—'; ?></td>
+                                    <td class="cell-analysed" style="text-align:center; font-size:12px;">
                                         <?php if ($analysed && ! empty($p['analysed_at'])) { ?>
                                             <span style="font-size:11px;"><?php echo htmlspecialchars(date('d M Y, g:i A', strtotime($p['analysed_at']))); ?></span>
                                         <?php } else { ?>
                                             <span class="text-muted" style="font-size:11px;">—</span>
                                         <?php } ?>
                                     </td>
-                                    <td style="text-align:center; white-space:nowrap;">
+                                    <td class="cell-action" style="text-align:center; white-space:nowrap;">
                                         <?php if ($analysed) { ?>
                                             <a href="<?php echo base_url('Competitor_Product/View?id=') . (int) $p['analysis_id']; ?>" class="btn btn-icon btn-light-success btn-sm mr-1" data-toggle="tooltip" title="View analysis">
                                                 <i class="la la-search"></i>
@@ -110,6 +110,7 @@
     $(document).ready(function() {
         refreshSel();
         $('[data-toggle="tooltip"]').tooltip();
+        resumeRun();   // re-attach to a background analysis left running before a refresh
     });
 
     // Renumber the visible No. column + refresh the "N found" count. Called after
@@ -181,46 +182,138 @@
     });
 
     var STATE_URL = '<?php echo base_url('Competitor_Product/Job_State') ?>?job=';
+    var VIEW_URL  = '<?php echo base_url('Competitor_Product/View?id=') ?>';
+    var analysing = false;   // guards against starting a second run over the first
 
-    function pollAnalyse(analyseJob) {
+    // Remember the in-flight analyse job (per crawl) so a page refresh can re-attach to
+    // it — the worker runs server-side and merges when done, but the "Analysing…" rows
+    // + progress poll live only in this page and would otherwise vanish on reload.
+    var LS_KEY = 'cp_analyse_' + JOB;
+    function saveRun(analyseJob, indices) {
+        try { localStorage.setItem(LS_KEY, JSON.stringify({ job: analyseJob, indices: indices })); } catch (e) {}
+    }
+    function clearRun() { try { localStorage.removeItem(LS_KEY); } catch (e) {} }
+    function loadRun() {
+        try { var r = JSON.parse(localStorage.getItem(LS_KEY)); return (r && r.job) ? r : null; } catch (e) { return null; }
+    }
+
+    // Non-blocking toast (top-right, no backdrop) so the user can keep working — or
+    // leave the page entirely — while the analysis runs in the background.
+    var Toast = Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false });
+
+    // Format a 'Y-m-d H:i:s' timestamp the same way the server renders "Analysed On".
+    function fmtWhen(s) {
+        var m = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})/.exec(String(s || ''));
+        if (!m) return s || '';
+        var d = new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]);
+        var mon = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()];
+        var h = d.getHours(), ap = h < 12 ? 'AM' : 'PM', h12 = (h % 12) || 12;
+        return d.getDate() + ' ' + mon + ' ' + d.getFullYear() + ', ' + h12 + ':' + ('0' + d.getMinutes()).slice(-2) + ' ' + ap;
+    }
+
+    function $rowFor(idx) { return $('.sel-item[value="' + idx + '"]').closest('tr'); }
+
+    // Show a spinner in the "Analysed On" cell of each in-flight row. On a resume after
+    // refresh, rows the worker already finished are re-rendered as analysed by PHP —
+    // skipParkAnalysed keeps their View link/timestamp instead of covering it with a spinner.
+    function markPending(indices, skipAnalysed) {
+        $.each(indices, function(_, idx) {
+            var $row = $rowFor(idx);
+            if (skipAnalysed && $row.find('.cell-action .btn-light-success').length) return;
+            $row.find('.cell-analysed').html('<span class="text-primary" style="font-size:11px;"><i class="la la-spinner la-spin mr-1"></i>Analysing…</span>');
+        });
+    }
+    // Restore a row's "Analysed On" cell to a dash (used when a run fails to start / errors).
+    function clearPending(indices) {
+        $.each(indices, function(_, idx) {
+            var $c = $rowFor(idx).find('.cell-analysed');
+            if ($c.find('.la-spinner').length) $c.html('<span class="text-muted" style="font-size:11px;">—</span>');
+        });
+    }
+
+    // Fold a finished result into its row in place: cost, analysed-on, a View link, and
+    // the analysed row tint — no full-page reload, so search/scroll are preserved.
+    function applyResult(idx, r) {
+        var $row = $rowFor(idx);
+        if (!$row.length || !r) return;
+        $row.css('background', '#f6fbf7');
+        $row.find('.cell-cost').text(r.cost > 0 ? (+r.cost).toFixed(4) : '—');
+        $row.find('.cell-analysed').html('<span style="font-size:11px;">' + fmtWhen(r.at) + '</span>');
+        var $act = $row.find('.cell-action');
+        if (r.id && !$act.find('.btn-light-success').length) {
+            $act.prepend('<a href="' + VIEW_URL + r.id + '" class="btn btn-icon btn-light-success btn-sm mr-1" data-toggle="tooltip" title="View analysis"><i class="la la-search"></i></a>');
+            $act.find('[data-toggle="tooltip"]').tooltip();
+        }
+    }
+
+    function pollAnalyse(analyseJob, indices) {
         var t = setInterval(function() {
             $.getJSON(STATE_URL + encodeURIComponent(analyseJob)).done(function(res) {
                 if (!res) return;
                 if (res.state === 'done' || res.state === 'error' || res.state === 'unknown') {
                     clearInterval(t);
-                    Swal.close();
-                    // Reload the Review page — analysed products now show View + cost.
-                    window.location.reload();
+                    clearRun();
+                    analysing = false;
+                    $('#analyse_selected').prop('disabled', <?php echo empty($has_ai) ? 'true' : 'false'; ?>).html('<i class="la la-robot"></i> Analyse Selected (<span id="sel_count">' + $('.sel-item:checked').length + '</span>)');
+                    if (res.state === 'done') {
+                        var results = res.results || {}, applied = 0;
+                        $.each(indices, function(_, idx) {
+                            if (results[idx]) { applyResult(idx, results[idx]); applied++; }
+                        });
+                        clearPending(indices);   // any selected item OpenAI returned nothing for
+                        Toast.fire({ icon: 'success', title: applied + ' product' + (applied === 1 ? '' : 's') + ' analysed', timer: 4000, timerProgressBar: true });
+                    } else {
+                        clearPending(indices);
+                        Toast.fire({ icon: 'error', title: (res.message || 'Analysis failed'), timer: 6000, timerProgressBar: true });
+                    }
                 } else {
-                    Swal.update({ title: res.message || 'Analysing…' });
-                    Swal.showLoading();
+                    Toast.update({ title: res.message || 'Analysing…' });
                 }
             });
         }, 2500);
     }
 
+    // On page load, if a background analyse job for this crawl was left running before a
+    // refresh, re-mark its pending rows and resume polling. The poll self-heals: a job
+    // that finished (or was pruned) returns done/unknown, folds in results, and clears.
+    function resumeRun() {
+        var run = loadRun();
+        if (!run || !run.job || !(run.indices && run.indices.length)) return;
+        analysing = true;
+        $('#analyse_selected').prop('disabled', true).html('<i class="la la-spinner la-spin"></i> Analysing in background…');
+        markPending(run.indices, true);
+        Toast.fire({ icon: 'info', title: 'Resuming background analysis…' });
+        pollAnalyse(run.job, run.indices);
+    }
+
     $('#analyse_selected').click(function() {
+        if (analysing) return;
         var indices = $('.sel-item:checked').map(function() { return $(this).val(); }).get();
         if (!indices.length) { Display_Message(CA_IMG, 'Select at least one product', null); return; }
-        var $btn = $(this), html = $btn.html();
-        $btn.prop('disabled', true).html('<i class="la la-spinner la-spin"></i> Starting…');
-        Swal.fire({ background: 'url(' + CA_IMG + ')', title: 'Analysing…', allowOutsideClick: false, didOpen: function() { Swal.showLoading(); } });
+        var $btn = $(this);
+        analysing = true;
+        $btn.prop('disabled', true).html('<i class="la la-spinner la-spin"></i> Analysing in background…');
+        markPending(indices);
         $.ajax({
             url: '<?php echo base_url('Competitor_Product/Analyze_Selected') ?>',
             type: 'post', dataType: 'json',
             data: { job: '<?php echo $job; ?>', indices: indices },
             success: function(res) {
                 if (res && res.success && res.job) {
-                    pollAnalyse(res.job);
+                    saveRun(res.job, indices);
+                    Toast.fire({ icon: 'info', title: 'Analysing in the background — you can keep working or leave this page.' });
+                    pollAnalyse(res.job, indices);
                 } else {
-                    Swal.close();
-                    $btn.prop('disabled', false).html(html);
+                    analysing = false;
+                    clearPending(indices);
+                    $btn.prop('disabled', false).html('<i class="la la-robot"></i> Analyse Selected (<span id="sel_count">' + $('.sel-item:checked').length + '</span>)');
                     Display_Message(CA_IMG, (res && res.message) ? res.message : 'Could not start analysis', null);
                 }
             },
             error: function() {
-                Swal.close();
-                $btn.prop('disabled', false).html(html);
+                analysing = false;
+                clearPending(indices);
+                $btn.prop('disabled', false).html('<i class="la la-robot"></i> Analyse Selected (<span id="sel_count">' + $('.sel-item:checked').length + '</span>)');
                 Display_Message(CA_IMG, 'Could not start analysis. Please try again', null);
             }
         });

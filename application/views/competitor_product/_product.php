@@ -333,7 +333,7 @@ $tab_ai   = 'ca_tab_ai_' . $GLOBALS['ca_tab_uid'];
 <?php if($has($av('usp'))) { ?>
     <div class="mb-5">
         <div class="text-muted font-weight-bold mb-2" style="font-size:13px;"><?php echo htmlspecialchars($lbl('usp', 'Unique Selling Points')); ?></div>
-        <?php $chips($av('usp'), '#E1F0FF', '#0073E9'); ?>
+        <?php $bullets($av('usp')); ?>
     </div>
 <?php } ?>
 
